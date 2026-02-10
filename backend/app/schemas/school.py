@@ -35,14 +35,22 @@ class SchoolAttributes(BaseModel):
     model_config = ConfigDict(extra="allow")
 
 
-class SchoolLocationBase(BaseModel):
+class SchoolLocationAgeGroupShift(BaseModel):
     age_group: str
+    shift: Optional[str] = None
+    has_organised_groups: Optional[bool] = None
+
+    model_config = {"from_attributes": True}
+
+
+class SchoolLocationBase(BaseModel):
+    age_groups: list[str]
+    age_group_shifts: Optional[list[SchoolLocationAgeGroupShift]] = None
     address_i18n: dict
     lat: Optional[float] = None
     lng: Optional[float] = None
     phone: Optional[str] = None
-    shift: Optional[str] = None
-    has_organised_groups: Optional[bool] = None
+    location_tags: Optional[list[str]] = None
     is_primary: bool = True
 
     model_config = {"from_attributes": True}

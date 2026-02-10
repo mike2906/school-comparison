@@ -8,7 +8,7 @@ from sqlalchemy.orm import selectinload
 
 from app.config import get_settings
 from app.database import get_db
-from app.models.school import School, SchoolLocation
+from app.models.school import School, SchoolLocation, SchoolLocationAgeGroupShift
 from app.schemas.school import SchoolResponse, SchoolListResponse
 from app.services.school_service import SchoolService
 
@@ -65,10 +65,11 @@ async def get_school_counts(
     """Get counts of schools per age group."""
     try:
         query = (
-            select(SchoolLocation.age_group, func.count(func.distinct(SchoolLocation.school_id)))
+            select(SchoolLocationAgeGroupShift.age_group, func.count(func.distinct(SchoolLocation.school_id)))
+            .join(SchoolLocation, SchoolLocation.id == SchoolLocationAgeGroupShift.location_id)
             .join(School, SchoolLocation.school_id == School.id)
             .where(School.country_code == country_code)
-            .group_by(SchoolLocation.age_group)
+            .group_by(SchoolLocationAgeGroupShift.age_group)
         )
         result = await db.execute(query)
         rows = result.all()

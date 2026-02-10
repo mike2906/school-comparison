@@ -129,6 +129,14 @@
     "grade_5_7": "5-7",
     "grade_8_12": "8-12"
   },
+  "locationTags": {
+    "science_focus": "Научен фокус",
+    "arts_focus": "Фокус изкуства",
+    "sports_focus": "Спортен фокус",
+    "music_focus": "Музикален фокус",
+    "technology_focus": "Технологичен фокус",
+    "language_focus": "Езиков фокус"
+  },
   "schoolTypes": {
     "state": "Държавно",
     "private": "Частно",
@@ -142,6 +150,9 @@
     "upper_secondary": "Гимназия"
   },
   "schools": {
+    "ageGroupsShifts": "Възрастови групи и смени",
+    "showAgeGroupsShifts": "Покажи възрастови групи и смени",
+    "showLocations": "Покажи локации",
     "results": "училища",
     "results_one": "училище",
     "results_other": "училища",
@@ -164,6 +175,25 @@
     "comparing": "Добавено",
     "viewDetails": "Виж детайли",
     "visitWebsite": "Посети сайт",
+    "enrollmentStatus": "Статус на приема",
+    "accepting": "Приемат кандидатури",
+    "waitlist": "Списък с чакащи",
+    "full": "Няма места",
+    "contactForDetails": "Свържете се с училището за детайли",
+    "admissionRequirements": "Изисквания за прием",
+    "locationsAndEnrollment": "Локации и записване",
+    "viewOnMap": "Виж на картата",
+    "academicPerformance": "Академични резултати",
+    "languagesPrograms": "Езици и програми",
+    "languagesOfInstruction": "Езици на обучение",
+    "teachingApproach": "Педагогически подход",
+    "amenitiesFacilities": "Удобства и съоръжения",
+    "additionalFacilities": "Допълнителни съоръжения",
+    "specialPrograms": "Специални програми и дейности",
+    "dataNotAvailable": "Информацията не е налична",
+    "share": "Сподели",
+    "contactSchool": "Свържи се с училището",
+    "addedToCompare": "В списъка за сравнение",
     "moreLocations": "още локация",
     "moreLocations_one": "още локация",
     "moreLocations_other": "още локации",
@@ -224,6 +254,13 @@
     "points": "Бал",
     "nvoScore": "НВО резултат",
     "historicalMin": "Минимален бал (миналата година)"
+  },
+  "academicPerformance": {
+    "title": "Академични резултати",
+    "basedOnYears": "Данни от {{start}} до {{end}}",
+    "yearAverage": "{{year}}-годишна средна",
+    "trend": "Тенденция",
+    "dataFrom": "Данни от"
   },
   "compare": {
     "title": "Сравнение",
@@ -426,12 +463,18 @@
     },
     "amenities": {
       "meals": "Осигурена храна",
+      "cafeteria": "Столова",
       "transport": "Транспорт",
       "extended": "Удължено време",
       "smallClasses": "Малки класове",
       "accessible": "Достъпност",
       "specialPrograms": "Специални програми",
-      "perClass": "{{count}}/клас"
+      "perClass": "{{count}}/клас",
+      "library": "Библиотека",
+      "computerLab": "Компютърен кабинет",
+      "musicRoom": "Музикална зала",
+      "scienceLab": "Научна лаборатория",
+      "sportsField": "Спортни съоръжения"
     },
     "sections": {
       "amenities": "Удобства",
