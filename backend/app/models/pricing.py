@@ -1,0 +1,62 @@
+import enum
+from datetime import datetime
+from typing import Optional, TYPE_CHECKING
+
+from sqlalchemy import String, Numeric, Enum, Integer, DateTime, ForeignKey, JSON
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.database import Base
+
+if TYPE_CHECKING:
+    from app.models.school import School
+
+
+class PriceCategory(str, enum.Enum):
+    TUITION = "tuition"
+    FOOD = "food"
+    TRANSPORT = "transport"
+    ACTIVITIES = "activities"
+    REGISTRATION = "registration"
+    MATERIALS = "materials"
+    EXTENDED_DAY = "extended_day"
+    UNIFORMS = "uniforms"
+    EXTRACURRICULAR = "extracurricular"
+    CAMP = "camp"
+
+
+class PricePeriod(str, enum.Enum):
+    MONTHLY = "monthly"
+    YEARLY = "yearly"
+    ONE_TIME = "one_time"
+    QUARTER = "quarter"
+    TERM = "term"
+    SEMESTER = "semester"
+
+
+class PriceSource(str, enum.Enum):
+    OFFICIAL = "official"
+    SCRAPED_WEBSITE = "scraped_website"
+    FORUM = "forum"
+    NOT_FOUND = "not_found"
+
+
+class Pricing(Base):
+    __tablename__ = "pricing"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    school_id: Mapped[int] = mapped_column(ForeignKey("schools.id"), nullable=False)
+    age_group: Mapped[Optional[str]] = mapped_column(String(50))
+    category: Mapped[PriceCategory] = mapped_column(Enum(PriceCategory), nullable=False)
+    academic_year: Mapped[Optional[str]] = mapped_column(String(20))
+    amount: Mapped[Optional[float]] = mapped_column(Numeric(10, 2))
+    amount_min: Mapped[Optional[float]] = mapped_column(Numeric(10, 2))
+    amount_max: Mapped[Optional[float]] = mapped_column(Numeric(10, 2))
+    currency: Mapped[str] = mapped_column(String(3), default="BGN")
+    period: Mapped[PricePeriod] = mapped_column(Enum(PricePeriod), nullable=False)
+    plan_name: Mapped[Optional[str]] = mapped_column(String(100))
+    pricing_context: Mapped[Optional[dict]] = mapped_column(JSON)
+    source: Mapped[PriceSource] = mapped_column(Enum(PriceSource), nullable=False)
+    source_url: Mapped[Optional[str]] = mapped_column(String(1000))
+    scraped_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    school: Mapped["School"] = relationship("School", back_populates="pricing")
