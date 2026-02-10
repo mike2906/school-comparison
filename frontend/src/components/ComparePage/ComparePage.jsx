@@ -211,6 +211,29 @@ function getPointsHistory(admissionInfo, ageGroup) {
     .sort((a, b) => b.year - a.year)
 }
 
+function getLocationAgeGroups(location) {
+  if (!location) return []
+  if (Array.isArray(location.age_groups)) return location.age_groups.filter(Boolean)
+  if (location.age_group) return [location.age_group]
+  return []
+}
+
+function getPrimaryAgeGroup(school) {
+  const primaryLocation = school.locations?.find(loc => loc.is_primary) || school.locations?.[0]
+  return primaryLocation ? getLocationAgeGroups(primaryLocation)[0] : null
+}
+
+function getPrimaryShiftInfo(school) {
+  const primaryLocation = school.locations?.find(loc => loc.is_primary) || school.locations?.[0]
+  if (!primaryLocation?.age_group_shifts || primaryLocation.age_group_shifts.length === 0) return null
+  const primaryGroup = getPrimaryAgeGroup(school)
+  if (primaryGroup) {
+    const match = primaryLocation.age_group_shifts.find(item => item.age_group === primaryGroup)
+    if (match) return match
+  }
+  return primaryLocation.age_group_shifts[0] || null
+}
+
 function getMinNvoScore(admissionInfo) {
   const scores = admissionInfo?.historical_min_scores || []
   if (scores.length === 0) return null
@@ -615,8 +638,8 @@ function ComparePage() {
         label: t('compare.labels.tuitionOrAdmission'),
         getValue: (school) => {
           const pricingRange = metricsById.get(school.id)?.pricingRange
-          const primaryLocation = getPrimaryLocation(school)
-          const lastAdmitted = getLastAdmittedPoints(school.admission_info, primaryLocation?.age_group)
+          const primaryAgeGroup = getPrimaryAgeGroup(school)
+          const lastAdmitted = getLastAdmittedPoints(school.admission_info, primaryAgeGroup)
           const minScore = getMinNvoScore(school.admission_info)
 
           if (school.school_type !== 'state' && pricingRange) {
@@ -655,8 +678,8 @@ function ComparePage() {
           if (school.school_type !== 'state') {
             return metricsById.get(school.id)?.pricingRange?.min ?? null
           }
-          const primaryLocation = getPrimaryLocation(school)
-          const lastAdmitted = getLastAdmittedPoints(school.admission_info, primaryLocation?.age_group)
+          const primaryAgeGroup = getPrimaryAgeGroup(school)
+          const lastAdmitted = getLastAdmittedPoints(school.admission_info, primaryAgeGroup)
           const minScore = getMinNvoScore(school.admission_info)
           return lastAdmitted?.points ?? minScore?.score ?? null
         },
@@ -683,8 +706,8 @@ function ComparePage() {
       {
         label: t('compare.labels.schedule'),
         getValue: (school) => {
-          const primaryLocation = getPrimaryLocation(school)
-          const shift = primaryLocation?.shift
+          const shiftInfo = getPrimaryShiftInfo(school)
+          const shift = shiftInfo?.shift
           if (!shift) return renderPlaceholder()
           const shiftLabelKey = `schoolCard.shift.${shift}`
           const shiftLabel = t(shiftLabelKey)
@@ -696,7 +719,7 @@ function ComparePage() {
             </div>
           )
         },
-        getCompare: (school) => getPrimaryLocation(school)?.shift || null,
+        getCompare: (school) => getPrimaryShiftInfo(school)?.shift || null,
       },
       {
         label: t('compare.labels.distance'),
@@ -834,9 +857,8 @@ function ComparePage() {
       {
         label: t('compare.labels.afterSchoolCare'),
         getValue: (school) => {
-          const primaryLocation = getPrimaryLocation(school)
           const hasAfterSchool = Boolean(
-            primaryLocation?.has_organised_groups ||
+            getPrimaryShiftInfo(school)?.has_organised_groups ||
             school.attributes?.after_school_care ||
             (school.attributes?.special_programs || []).includes('extended_day')
           )
@@ -846,7 +868,7 @@ function ComparePage() {
             </span>
           )
         },
-        getCompare: (school) => Boolean(getPrimaryLocation(school)?.has_organised_groups || school.attributes?.after_school_care),
+        getCompare: (school) => Boolean(getPrimaryShiftInfo(school)?.has_organised_groups || school.attributes?.after_school_care),
       },
       {
         label: t('compare.labels.meals'),
@@ -918,8 +940,8 @@ function ComparePage() {
         label: t('compare.labels.pointsThreshold'),
         getValue: (school) => {
           if (school.school_type !== 'state') return renderPlaceholder('compare.notApplicable')
-          const primaryLocation = getPrimaryLocation(school)
-          const history = getPointsHistory(school.admission_info, primaryLocation?.age_group).slice(0, 3)
+          const primaryAgeGroup = getPrimaryAgeGroup(school)
+          const history = getPointsHistory(school.admission_info, primaryAgeGroup).slice(0, 3)
           if (history.length === 0) return renderPlaceholder()
           return (
             <div className="space-y-1 text-sm text-neutral-700">
@@ -933,8 +955,8 @@ function ComparePage() {
           )
         },
         getCompare: (school) => {
-          const primaryLocation = getPrimaryLocation(school)
-          const history = getPointsHistory(school.admission_info, primaryLocation?.age_group)
+          const primaryAgeGroup = getPrimaryAgeGroup(school)
+          const history = getPointsHistory(school.admission_info, primaryAgeGroup)
           return history.length > 0 ? history[0].points : null
         },
       },
@@ -977,12 +999,14 @@ function ComparePage() {
         label: t('compare.labels.eligibleAgeGroups'),
         getValue: (school) => {
           const ageGroups = (school.locations || [])
-            .map(location => location.age_group)
+            .flatMap(location => (Array.isArray(location.age_groups) ? location.age_groups : [location.age_group]))
             .filter(Boolean)
             .map(group => t(`ageGroups.${group}`))
           return ageGroups.length > 0 ? makeTags(ageGroups) : renderPlaceholder()
         },
-        getCompare: (school) => (school.locations || []).map(location => location.age_group),
+        getCompare: (school) => (school.locations || [])
+          .flatMap(location => (Array.isArray(location.age_groups) ? location.age_groups : [location.age_group]))
+          .filter(Boolean),
       },
     ]
 
@@ -1046,14 +1070,18 @@ function ComparePage() {
                 const distance = userLocation && location.lat && location.lng
                   ? calculateDistance(userLocation.lat, userLocation.lng, location.lat, location.lng)
                   : null
+                const shiftInfo = (location.age_group_shifts || [])[0]
                 return (
                   <div key={`${location.id || idx}`} className="text-sm text-neutral-700">
                     <div className="font-medium text-neutral-900">
-                      {t(`ageGroups.${location.age_group}`)}
+                      {(Array.isArray(location.age_groups) ? location.age_groups : [location.age_group])
+                        .filter(Boolean)
+                        .map(group => t(`ageGroups.${group}`))
+                        .join(', ')}
                     </div>
                     <div>{getAddress(location, i18n.language)}</div>
                     <div className="text-xs text-neutral-500">
-                      {location.shift ? t(`schoolCard.shift.${location.shift}`) : null}
+                      {shiftInfo?.shift ? t(`schoolCard.shift.${shiftInfo.shift}`) : null}
                       {distance != null ? ` • ${formatDistance(distance)}` : ''}
                     </div>
                   </div>
@@ -1124,7 +1152,7 @@ function ComparePage() {
       if ((school.locations || []).length > 0) {
         present.add('locations')
       }
-      const hasSchedule = (school.locations || []).some(location => location.shift) ||
+      const hasSchedule = (school.locations || []).some(location => (location.age_group_shifts || []).some(item => item.shift)) ||
         Boolean(school.attributes?.schedule_hours)
       if (hasSchedule) {
         present.add('schedule')
@@ -1310,7 +1338,9 @@ function ComparePage() {
                             </span>
                           </div>
                           <div className="flex flex-wrap gap-1">
-                            {[...new Set((school.locations || []).map(location => location.age_group).filter(Boolean))].map((group) => {
+                            {[...new Set((school.locations || [])
+                              .flatMap(location => (Array.isArray(location.age_groups) ? location.age_groups : [location.age_group]))
+                              .filter(Boolean))].map((group) => {
                               const isSelected = selectedAgeGroup && group === selectedAgeGroup
                               return (
                                 <span

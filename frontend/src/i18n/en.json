@@ -129,6 +129,14 @@
     "grade_5_7": "5-7",
     "grade_8_12": "8-12"
   },
+  "locationTags": {
+    "science_focus": "Science focus",
+    "arts_focus": "Arts focus",
+    "sports_focus": "Sports focus",
+    "music_focus": "Music focus",
+    "technology_focus": "Technology focus",
+    "language_focus": "Language focus"
+  },
   "schoolTypes": {
     "state": "State",
     "private": "Private",
@@ -142,6 +150,9 @@
     "upper_secondary": "High School"
   },
   "schools": {
+    "ageGroupsShifts": "Age groups & shifts",
+    "showAgeGroupsShifts": "Show age groups & shifts",
+    "showLocations": "Show locations",
     "results": "schools",
     "results_one": "school",
     "results_other": "schools",
@@ -164,6 +175,25 @@
     "comparing": "Added",
     "viewDetails": "View details",
     "visitWebsite": "Visit website",
+    "enrollmentStatus": "Enrollment Status",
+    "accepting": "Accepting Applications",
+    "waitlist": "Waitlist Open",
+    "full": "No Openings",
+    "contactForDetails": "Contact school for admission details",
+    "admissionRequirements": "Admission Requirements",
+    "locationsAndEnrollment": "Locations & Enrollment",
+    "viewOnMap": "View on Map",
+    "academicPerformance": "Academic Performance",
+    "languagesPrograms": "Languages & Programs",
+    "languagesOfInstruction": "Languages of Instruction",
+    "teachingApproach": "Teaching Approach",
+    "amenitiesFacilities": "Amenities & Facilities",
+    "additionalFacilities": "Additional Facilities",
+    "specialPrograms": "Special Programs & Activities",
+    "dataNotAvailable": "Data not available",
+    "share": "Share",
+    "contactSchool": "Contact School",
+    "addedToCompare": "In Comparison",
     "moreLocations": "more location",
     "moreLocations_one": "more location",
     "moreLocations_other": "more locations",
@@ -224,6 +254,13 @@
     "points": "Points",
     "nvoScore": "NVO Score",
     "historicalMin": "Min. score (last year)"
+  },
+  "academicPerformance": {
+    "title": "Academic Performance",
+    "basedOnYears": "Data from {{start}} to {{end}}",
+    "yearAverage": "{{year}}-year average",
+    "trend": "Trend",
+    "dataFrom": "Data from"
   },
   "compare": {
     "title": "Comparison",
@@ -426,12 +463,18 @@
     },
     "amenities": {
       "meals": "Meals provided",
+      "cafeteria": "Cafeteria",
       "transport": "Transportation available",
       "extended": "Extended hours",
       "smallClasses": "Small classes",
       "accessible": "Accessible",
       "specialPrograms": "Special programs",
-      "perClass": "{{count}}/class"
+      "perClass": "{{count}}/class",
+      "library": "Library",
+      "computerLab": "Computer Lab",
+      "musicRoom": "Music Room",
+      "scienceLab": "Science Lab",
+      "sportsField": "Sports Facilities"
     },
     "sections": {
       "amenities": "Amenities",

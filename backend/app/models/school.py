@@ -49,16 +49,32 @@ class SchoolLocation(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     school_id: Mapped[int] = mapped_column(ForeignKey("schools.id"), nullable=False)
-    age_group: Mapped[str] = mapped_column(String(50), nullable=False)
     address_i18n: Mapped[dict] = mapped_column(JSON, nullable=False)
     lat: Mapped[Optional[float]] = mapped_column(Float)
     lng: Mapped[Optional[float]] = mapped_column(Float)
     phone: Mapped[Optional[str]] = mapped_column(String(100))
-    shift: Mapped[Optional[str]] = mapped_column(String(50))
-    has_organised_groups: Mapped[Optional[bool]] = mapped_column(Boolean)
+    location_tags: Mapped[Optional[list[str]]] = mapped_column(JSON, default=list)
     is_primary: Mapped[bool] = mapped_column(Boolean, default=True)
 
     school: Mapped["School"] = relationship("School", back_populates="locations")
+    age_group_shifts: Mapped[list["SchoolLocationAgeGroupShift"]] = relationship(
+        "SchoolLocationAgeGroupShift", back_populates="location", cascade="all, delete-orphan"
+    )
+
+    @property
+    def age_groups(self) -> list[str]:
+        return [link.age_group for link in self.age_group_shifts]
+
+
+class SchoolLocationAgeGroupShift(Base):
+    __tablename__ = "location_age_group_shifts"
+
+    location_id: Mapped[int] = mapped_column(ForeignKey("school_locations.id"), primary_key=True)
+    age_group: Mapped[str] = mapped_column(String(50), primary_key=True)
+    shift: Mapped[Optional[str]] = mapped_column(String(50))
+    has_organised_groups: Mapped[Optional[bool]] = mapped_column(Boolean)
+
+    location: Mapped["SchoolLocation"] = relationship("SchoolLocation", back_populates="age_group_shifts")
 
 
 # Import for relationship type hints
