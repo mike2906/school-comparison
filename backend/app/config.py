@@ -12,6 +12,20 @@ class Settings(BaseSettings):
     # OpenRouter (for AI features)
     openrouter_api_key: str = ""
 
+    # Model tier overrides (Phase 1 scraping pipeline)
+    # Set these to override default model selections
+    model_tier_cheap: str = ""  # Default: google/gemini-2.0-flash-lite
+    model_tier_medium: str = ""  # Default: google/gemini-2.5-flash
+    model_tier_capable: str = ""  # Default: google/gemini-2.5-pro
+
+    # Spot-check validation settings
+    spot_check_sample_size: int = 10  # Number of schools to spot-check per run (-1 = all, for calibration)
+    spot_check_discrepancy_threshold: float = 0.15  # Alert if >15% of spot-checks have discrepancies
+
+    # Pipeline alerting
+    alert_webhook_url: str = ""  # Slack/Discord webhook URL for pipeline alerts
+    alert_failure_threshold: float = 0.10  # Alert if >10% of schools fail
+
     # App settings
     debug: bool = True
     secret_key: str = "change-this-in-production"
