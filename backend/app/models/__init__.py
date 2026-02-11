@@ -1,5 +1,5 @@
 from app.models.country import Country
-from app.models.school import School, SchoolLocation
+from app.models.school import School, SchoolLocation, SchoolLocationAgeGroupShift
 from app.models.pricing import Pricing, PriceCategory, PricePeriod, PriceSource
 from app.models.exam_results import ExamResult
 from app.models.field_source import FieldSource, SourceType, SourceConfidence
@@ -12,6 +12,7 @@ __all__ = [
     "Country",
     "School",
     "SchoolLocation",
+    "SchoolLocationAgeGroupShift",
     "Pricing",
     "PriceCategory",
     "PricePeriod",

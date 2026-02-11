@@ -80,7 +80,9 @@ def list_adapters() -> dict[str, dict[str, str]]:
 
 
 # Import adapters to trigger registration
-# (Adapters will be imported here once created)
-# from app.scrapers.sources.bg.kg_sofia import KgSofiaBgAdapter
+# The @register_adapter decorator automatically adds them to the registry
+from app.scrapers.sources.bg.kg_sofia import KgSofiaBgAdapter  # noqa: F401
+
+# Future adapters:
 # from app.scrapers.sources.bg.moe_registry import MoeRegistryAdapter
 # from app.scrapers.sources.bg.web_search import WebSearchAdapter
