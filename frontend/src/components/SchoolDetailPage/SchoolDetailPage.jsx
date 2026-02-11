@@ -55,14 +55,17 @@ function SchoolDetailPage() {
       setLoading(true)
       setError(null)
       try {
-        // Load school data and exam averages in parallel
-        const [data, averagesData] = await Promise.all([
-          fetchSchool(id),
-          fetchExamAverages()
-        ])
+        // Load school data first; exam averages are best-effort
+        const data = await fetchSchool(id)
 
         setSchool(data)
-        setExamAverages(averagesData)
+
+        try {
+          const averagesData = await fetchExamAverages()
+          setExamAverages(averagesData)
+        } catch (err) {
+          setExamAverages(null)
+        }
 
         // Set default active exam type
         const availableTypes = getAvailableExamTypes(data.exam_results)

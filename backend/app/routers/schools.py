@@ -127,31 +127,6 @@ async def search_schools(
         )
 
 
-@router.get("/{school_id}", response_model=SchoolResponse)
-async def get_school(
-    school_id: Annotated[int, Path(gt=0, description="School ID (must be positive)")],
-    db: AsyncSession = Depends(get_db),
-):
-    """Get detailed information about a specific school."""
-    try:
-        service = SchoolService(db)
-        school = await service.get_school_with_details(school_id)
-
-        if not school:
-            raise HTTPException(status_code=404, detail="School not found")
-
-        return school
-    except HTTPException:
-        # Re-raise HTTP exceptions (like 404)
-        raise
-    except Exception as e:
-        logger.error(f"Error getting school {school_id}: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=500,
-            detail="An error occurred while fetching school details. Please try again later."
-        )
-
-
 @router.get("/exam-averages")
 async def get_exam_averages(
     country_code: str = Query("bg", description="Country code (ISO 3166-1 alpha-2)"),
@@ -214,4 +189,29 @@ async def get_exam_averages(
         raise HTTPException(
             status_code=500,
             detail="An error occurred while calculating exam averages. Please try again later."
+        )
+
+
+@router.get("/{school_id}", response_model=SchoolResponse)
+async def get_school(
+    school_id: Annotated[int, Path(gt=0, description="School ID (must be positive)")],
+    db: AsyncSession = Depends(get_db),
+):
+    """Get detailed information about a specific school."""
+    try:
+        service = SchoolService(db)
+        school = await service.get_school_with_details(school_id)
+
+        if not school:
+            raise HTTPException(status_code=404, detail="School not found")
+
+        return school
+    except HTTPException:
+        # Re-raise HTTP exceptions (like 404)
+        raise
+    except Exception as e:
+        logger.error(f"Error getting school {school_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="An error occurred while fetching school details. Please try again later."
         )
