@@ -1487,7 +1487,103 @@ async def seed_database():
                 )
             )
             schools.append(school)
-        
+
+        # ===== TEST SCHOOL: Multi-Grade NVO Results =====
+        # This school demonstrates the multi-grade tab feature
+        # with exam results for 4th, 7th, and 10th grades
+
+        test_multi_grade = legacy_school(
+            name='TEST: 155 СУ "Акад. Методи Попов"',
+            name_en='TEST: 155 SU "Acad. Metodi Popov"',
+            school_type="state",
+            education_level="lower_secondary",  # Primary education level
+            summary_bg="ТЕСТОВО училище за демонстрация на резултати от НВО в множество класове. Учениците показват прогресивно подобрение през годините.",
+            summary_en="TEST school demonstrating multi-grade NVO results. Students show progressive improvement over the years.",
+            num_pupils=950,
+            admission_info={
+                "system": "district",
+                "status": "accepting"
+            },
+            attributes={
+                "languages_of_instruction": ["bulgarian", "english"],
+                "special_focus": "general",
+                "has_canteen": True,
+                "facilities": ["library", "computer_lab", "sports_field", "science_lab"],
+                "class_size": 24,
+                "teacher_student_ratio": "1:12",
+                "school_hours": "8:00-17:00",
+                "established_year": 1975,
+                "language_focus": [
+                    {"language": "english", "level": "intensive"},
+                    {"language": "french", "level": "enrichment"}
+                ],
+                "teaching_approach": ["project_based", "student_centered"],
+                "special_programs": ["stem_program", "robotics_club"],
+                "activities_offered": ["chess", "drama", "music", "sport"]
+            }
+        )
+
+        set_locations(test_multi_grade, [
+            legacy_location(
+                age_group="grade_1_4",
+                address="бул. Цариградско шосе 115, София",
+                address_en="bul. Tsarigradsko shose 115, Sofia",
+                lat=42.6580,
+                lng=23.3750,
+                shift="morning",
+                is_primary=True,
+                phone="+359 2 876 5432"
+            ),
+            legacy_location(
+                age_group="grade_5_7",
+                address="бул. Цариградско шосе 115, София",
+                address_en="bul. Tsarigradsko shose 115, Sofia",
+                lat=42.6580,
+                lng=23.3750,
+                shift="morning",
+                is_primary=False
+            ),
+            legacy_location(
+                age_group="grade_8_12",
+                address="бул. Цариградско шосе 117, София",
+                address_en="bul. Tsarigradsko shose 117, Sofia",
+                lat=42.6585,
+                lng=23.3755,
+                shift="morning",
+                is_primary=False
+            ),
+        ])
+
+        # 4th Grade NVO Results (Starting point: 72% Bulgarian, 75% Math)
+        test_multi_grade.exam_results = build_nvo_results(
+            base_bg=72.0,
+            base_math=75.0,
+            exam_type="nvo_4",
+            year_offsets=NVO_FIVE_YEAR_DELTAS,  # 5 years of data
+        )
+
+        # 7th Grade NVO Results (Improved: 78% Bulgarian, 82% Math - shows growth!)
+        test_multi_grade.exam_results.extend(
+            build_nvo_results(
+                base_bg=78.0,
+                base_math=82.0,
+                exam_type="nvo_7",
+                year_offsets=NVO_FIVE_YEAR_DELTAS,
+            )
+        )
+
+        # 10th Grade NVO Results (Best performance: 85% Bulgarian, 88% Math)
+        test_multi_grade.exam_results.extend(
+            build_nvo_results(
+                base_bg=85.0,
+                base_math=88.0,
+                exam_type="nvo_10",
+                year_offsets=NVO_THREE_YEAR_DELTAS,
+            )
+        )
+
+        schools.append(test_multi_grade)
+
         # Add field sources before persisting
         for school in schools:
             school.field_sources = build_field_sources_for_school(school)
@@ -1505,12 +1601,17 @@ async def seed_database():
         print(f"   International schools: 5")
         print(f"   Private gymnasiums: 7")
         print(f"   State gymnasiums: 10")
+        print(f"   🧪 TEST: Multi-grade school: 1")
         print(f"   Total locations: ~{len(schools) * 2}")
         print(f"\n🎯 Comprehensive coverage for filter testing!")
         print(f"   - Every age group has multiple options")
         print(f"   - State and private all represented")
         print(f"   - Prices range from 480 BGN/mo to 24,000 BGN/yr")
         print(f"   - Multiple neighborhoods covered")
+        print(f"\n🧪 TEST SCHOOL FOR MULTI-GRADE TABS:")
+        print(f"   School: TEST: 155 СУ 'Акад. Методи Попов'")
+        print(f"   Has NVO results for: 4th grade (75%), 7th grade (82%), 10th grade (88%)")
+        print(f"   Expected insight: 📈 'Students improve as they progress'")
 
 
 if __name__ == "__main__":

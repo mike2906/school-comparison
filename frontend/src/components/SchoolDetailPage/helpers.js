@@ -352,3 +352,160 @@ export function hexToRgba(hex, alpha) {
   const b = bigint & 255
   return `rgba(${r}, ${g}, ${b}, ${alpha})`
 }
+
+/**
+ * Get exam type based on education level
+ */
+export function getExamTypeForEducationLevel(educationLevel) {
+  const examTypeMap = {
+    primary: 'nvo_4',
+    lower_secondary: 'nvo_7',
+    upper_secondary: 'nvo_10',
+  }
+  return examTypeMap[educationLevel] || 'nvo_7'
+}
+
+/**
+ * Get available exam types from exam results
+ * Returns them in chronological order (4th → 7th → 10th grade)
+ */
+export function getAvailableExamTypes(examResults = []) {
+  const types = new Set()
+  examResults.forEach(result => {
+    if (result.exam_type && result.metric?.includes('average')) {
+      types.add(result.exam_type)
+    }
+  })
+
+  // Sort by grade level (4 → 7 → 10) instead of alphabetically
+  const gradeOrder = { nvo_4: 1, nvo_7: 2, nvo_10: 3 }
+  return Array.from(types).sort((a, b) => {
+    return (gradeOrder[a] || 0) - (gradeOrder[b] || 0)
+  })
+}
+
+/**
+ * Get exam type label (e.g., "4th Grade NVO")
+ */
+export function getExamTypeLabel(examType, t) {
+  const labelMap = {
+    nvo_4: t ? t('schools.nvo4Label') : '4th Grade NVO',
+    nvo_7: t ? t('schools.nvo7Label') : '7th Grade NVO',
+    nvo_10: t ? t('schools.nvo10Label') : '10th Grade NVO',
+  }
+  return labelMap[examType] || examType
+}
+
+/**
+ * Get latest average score for an exam type
+ */
+export function getLatestScoreForExamType(examResults = [], examType) {
+  const filtered = examResults
+    .filter(r => r.exam_type === examType && r.metric?.includes('average'))
+    .sort((a, b) => b.year - a.year)
+
+  if (filtered.length === 0) return null
+
+  const latestYear = filtered[0].year
+  const yearResults = filtered.filter(r => r.year === latestYear)
+
+  const mathResult = yearResults.find(r => r.subject?.toLowerCase().includes('math'))
+  const bgResult = yearResults.find(r => r.subject?.toLowerCase().includes('bulg'))
+
+  if (!mathResult && !bgResult) return null
+
+  const mathScore = mathResult?.value || 0
+  const bgScore = bgResult?.value || 0
+
+  return mathScore && bgScore ? (mathScore + bgScore) / 2 : mathScore || bgScore
+}
+
+/**
+ * Get line style configuration for multi-grade chart
+ */
+export function getLineStyleForGrade(examType) {
+  const styles = {
+    nvo_4: {
+      strokeDasharray: '0',  // Solid
+      strokeWidth: 2,
+      opacity: 0.9
+    },
+    nvo_7: {
+      strokeDasharray: '8 4',  // Dashed
+      strokeWidth: 2.5,
+      opacity: 0.85
+    },
+    nvo_10: {
+      strokeDasharray: '2 3',  // Dotted
+      strokeWidth: 3,
+      opacity: 0.8
+    },
+  }
+  return styles[examType] || styles.nvo_7
+}
+
+/**
+ * Calculate cross-grade comparison insight
+ */
+export function getCrossGradeInsight(examResults = [], availableExamTypes = [], t) {
+  if (availableExamTypes.length < 2) return null
+
+  const scores = {}
+  availableExamTypes.forEach(examType => {
+    scores[examType] = getLatestScoreForExamType(examResults, examType)
+  })
+
+  // Find highest and lowest
+  const entries = Object.entries(scores).filter(([_, score]) => score != null)
+  if (entries.length < 2) return null
+
+  entries.sort((a, b) => b[1] - a[1]) // Sort by score descending
+  const [highestType, highestScore] = entries[0]
+  const [lowestType, lowestScore] = entries[entries.length - 1]
+
+  const diff = highestScore - lowestScore
+
+  if (diff < 2) {
+    return {
+      type: 'consistent',
+      message: t ? t('schools.crossGrade.consistent') : 'Scores remain consistent across grade levels',
+      icon: '📊'
+    }
+  }
+
+  // Check if progression is natural (higher grades = higher scores)
+  const gradeOrder = { nvo_4: 1, nvo_7: 2, nvo_10: 3 }
+  const isProgressive = gradeOrder[highestType] > gradeOrder[lowestType]
+
+  if (isProgressive) {
+    return {
+      type: 'improving',
+      message: t
+        ? t('schools.crossGrade.improving', {
+            highGrade: getExamTypeLabel(highestType, t),
+            lowGrade: getExamTypeLabel(lowestType, t),
+            diff: formatPercent(diff, 1)
+          })
+        : `Students improve as they progress: ${getExamTypeLabel(highestType)} scores ${formatPercent(diff, 1)}% higher than ${getExamTypeLabel(lowestType)}`,
+      icon: '📈',
+      highestType,
+      lowestType,
+      diff
+    }
+  } else {
+    return {
+      type: 'declining',
+      message: t
+        ? t('schools.crossGrade.declining', {
+            highGrade: getExamTypeLabel(highestType, t),
+            lowGrade: getExamTypeLabel(lowestType, t),
+            diff: formatPercent(diff, 1)
+          })
+        : `Performance varies by grade: ${getExamTypeLabel(highestType)} scores ${formatPercent(diff, 1)}% higher than ${getExamTypeLabel(lowestType)}`,
+      icon: '📉',
+      highestType,
+      lowestType,
+      diff
+    }
+  }
+}

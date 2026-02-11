@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import Layout from '../Layout/Layout'
-import { fetchSchool } from '../../api/schools'
+import { fetchSchool, fetchExamAverages } from '../../api/schools'
 import { getSchoolName, getAddress, getSummary } from '../../utils/i18n'
 import { useCompare } from '../../context/CompareContext'
 import {
@@ -23,7 +23,14 @@ import {
   getOptionLabel,
   normalizeLanguageFocus,
   hexToRgba,
+  getExamTypeForEducationLevel,
+  getAvailableExamTypes,
+  getExamTypeLabel,
+  getLatestScoreForExamType,
+  getCrossGradeInsight,
 } from './helpers'
+import NvoTimelineChart from './NvoTimelineChart'
+import MultiGradeComparisonChart from './MultiGradeComparisonChart'
 
 function SchoolDetailPage() {
   const { id } = useParams()
@@ -33,6 +40,10 @@ function SchoolDetailPage() {
   const [school, setSchool] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [activeExamType, setActiveExamType] = useState(null)
+  const [showAllGrades, setShowAllGrades] = useState(false)
+  const [selectedSubjects, setSelectedSubjects] = useState(['math', 'bulgarian'])
+  const [examAverages, setExamAverages] = useState(null)
 
   const formatAmount = (value) => {
     if (value == null || Number.isNaN(value)) return null
@@ -44,8 +55,27 @@ function SchoolDetailPage() {
       setLoading(true)
       setError(null)
       try {
+        // Load school data first; exam averages are best-effort
         const data = await fetchSchool(id)
+
         setSchool(data)
+
+        try {
+          const averagesData = await fetchExamAverages()
+          setExamAverages(averagesData)
+        } catch (err) {
+          setExamAverages(null)
+        }
+
+        // Set default active exam type
+        const availableTypes = getAvailableExamTypes(data.exam_results)
+        if (availableTypes.length > 0) {
+          // Default to school's primary education level, or first available
+          const defaultType = getExamTypeForEducationLevel(data.education_level)
+          setActiveExamType(
+            availableTypes.includes(defaultType) ? defaultType : availableTypes[0]
+          )
+        }
       } catch (err) {
         setError(err.message)
       } finally {
@@ -153,6 +183,19 @@ function SchoolDetailPage() {
     }
   }
 
+  const handleSubjectToggle = (subject) => {
+    // Must keep at least one subject selected
+    if (selectedSubjects.length === 1 && selectedSubjects.includes(subject)) {
+      return
+    }
+
+    setSelectedSubjects(prev =>
+      prev.includes(subject)
+        ? prev.filter(s => s !== subject)
+        : [...prev, subject]
+    )
+  }
+
   return (
     <Layout>
       <div className="max-w-5xl mx-auto px-4 md:px-6 py-6 md:py-8 pb-24 md:pb-8">
@@ -238,6 +281,96 @@ function SchoolDetailPage() {
                 </svg>
                 {primaryLocation.phone}
               </a>
+            )}
+          </div>
+        </div>
+
+        {/* At a Glance Section */}
+        <div className="bg-white rounded-2xl shadow-card border border-neutral-200 p-6 md:p-8 mb-6">
+          <h2 className="text-2xl font-bold text-neutral-900 mb-6">{t('schools.atAGlance')}</h2>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {/* Total Students */}
+            {school.num_pupils != null && (
+              <div className="flex flex-col items-center gap-2 p-4 bg-neutral-50 rounded-lg border border-neutral-200">
+                <svg className="w-8 h-8 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-neutral-900">{formatAmount(school.num_pupils)}</div>
+                  <div className="text-xs text-neutral-600 mt-1">{t('schools.totalStudents')}</div>
+                </div>
+              </div>
+            )}
+
+            {/* Average Class Size */}
+            {attributes.class_size != null && (
+              <div className="flex flex-col items-center gap-2 p-4 bg-neutral-50 rounded-lg border border-neutral-200">
+                <svg className="w-8 h-8 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                </svg>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-neutral-900">{formatAmount(attributes.class_size)}</div>
+                  <div className="text-xs text-neutral-600 mt-1">{t('schools.avgClassSize')}</div>
+                </div>
+              </div>
+            )}
+
+            {/* Teacher:Student Ratio */}
+            {attributes.teacher_student_ratio && (
+              <div className="flex flex-col items-center gap-2 p-4 bg-neutral-50 rounded-lg border border-neutral-200">
+                <svg className="w-8 h-8 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-neutral-900">{attributes.teacher_student_ratio}</div>
+                  <div className="text-xs text-neutral-600 mt-1">{t('schools.teacherRatio')}</div>
+                </div>
+              </div>
+            )}
+
+            {/* School Hours */}
+            {(attributes.school_hours || attributes.operating_hours) && (
+              <div className="flex flex-col items-center gap-2 p-4 bg-neutral-50 rounded-lg border border-neutral-200">
+                <svg className="w-8 h-8 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div className="text-center">
+                  <div className="text-sm font-bold text-neutral-900">{attributes.school_hours || attributes.operating_hours}</div>
+                  <div className="text-xs text-neutral-600 mt-1">{t('schools.schoolHours')}</div>
+                </div>
+              </div>
+            )}
+
+            {/* Languages */}
+            {normalizeLanguageFocus(attributes.language_focus).length > 0 && (
+              <div className="flex flex-col items-center gap-2 p-4 bg-neutral-50 rounded-lg border border-neutral-200">
+                <svg className="w-8 h-8 text-violet-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+                </svg>
+                <div className="text-center">
+                  <div className="text-sm font-bold text-neutral-900">
+                    {normalizeLanguageFocus(attributes.language_focus)
+                      .map(item => getLanguageLabel(item.language, t))
+                      .slice(0, 2)
+                      .join(', ')}
+                    {normalizeLanguageFocus(attributes.language_focus).length > 2 && ` +${normalizeLanguageFocus(attributes.language_focus).length - 2}`}
+                  </div>
+                  <div className="text-xs text-neutral-600 mt-1">{t('schools.languages')}</div>
+                </div>
+              </div>
+            )}
+
+            {/* Established Year */}
+            {attributes.established_year && (
+              <div className="flex flex-col items-center gap-2 p-4 bg-neutral-50 rounded-lg border border-neutral-200">
+                <svg className="w-8 h-8 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-neutral-900">{attributes.established_year}</div>
+                  <div className="text-xs text-neutral-600 mt-1">{t('schools.established')}</div>
+                </div>
+              </div>
             )}
           </div>
         </div>
@@ -372,89 +505,179 @@ function SchoolDetailPage() {
         )}
 
         {/* Academic Performance (NVO Results) */}
-        {hasExamResults && (
-          <div className="bg-white rounded-2xl shadow-card border border-neutral-200 p-6 md:p-8 mb-6">
-            <h2 className="text-2xl font-bold text-neutral-900 mb-2">{t('schools.academicPerformance')}</h2>
-            <div className="text-sm text-neutral-500 mb-6">
-              {nvoDetail.gradeLabel}
-              {nvoDetail.hasAverage && nvoDetail.minYear && nvoDetail.maxYear && (
-                <> • {t('academicPerformance.basedOnYears', { start: nvoDetail.minYear, end: nvoDetail.maxYear })}</>
-              )}
-            </div>
+        {hasExamResults && (() => {
+          const availableExamTypes = getAvailableExamTypes(school.exam_results)
+          const hasMultipleGrades = availableExamTypes.length > 1
+          const crossGradeInsight = hasMultipleGrades ? getCrossGradeInsight(school.exam_results, availableExamTypes, t) : null
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Math Card */}
-              {nvoDetail.latestMath != null && (
-                <div className="bg-neutral-50 rounded-xl p-6 border border-neutral-200">
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-lg font-semibold text-neutral-900">{t('schoolCard.nvo.subjectMath')}</h3>
-                    {nvoDetail.hasAverage && nvoDetail.latestMath != null && (
-                      <span className={`text-sm font-medium ${getTrendInfo(nvoDetail.latestMath, nvoDetail.mathAvg)?.className || ''}`}>
-                        {getTrendInfo(nvoDetail.latestMath, nvoDetail.mathAvg)?.arrow || ''}
-                      </span>
+          return (
+            <div className="bg-white rounded-2xl shadow-card border border-neutral-200 p-6 md:p-8 mb-6">
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <h2 className="text-2xl font-bold text-neutral-900 mb-2">
+                    {t('schools.academicPerformance')}
+                  </h2>
+                  <div className="text-sm text-neutral-500">
+                    {nvoDetail.gradeLabel}
+                    {nvoDetail.hasAverage && nvoDetail.minYear && nvoDetail.maxYear && (
+                      <> • {t('academicPerformance.basedOnYears', {
+                        start: nvoDetail.minYear,
+                        end: nvoDetail.maxYear
+                      })}</>
                     )}
                   </div>
-                  <div className={`text-4xl font-bold mb-2 ${getPerformanceStyle(nvoDetail.latestMath).text}`}>
-                    {formatPercent(nvoDetail.latestMath, 1)}%
-                  </div>
-                  <div className="w-full bg-neutral-200 rounded-full h-2 mb-3">
-                    <div
-                      className={`h-2 rounded-full ${getPerformanceStyle(nvoDetail.latestMath).bg}`}
-                      style={{ width: `${Math.min(nvoDetail.latestMath, 100)}%` }}
-                    />
-                  </div>
-                  {nvoDetail.hasAverage && nvoDetail.mathAvg != null && (
-                    <div className="text-sm text-neutral-600">
-                      {t('academicPerformance.yearAverage', { year: '3-5' })}: {formatPercent(nvoDetail.mathAvg, 1)}%
-                      {nvoDetail.latestMath != null && (
-                        <span className={`ml-2 font-medium ${getTrendInfo(nvoDetail.latestMath, nvoDetail.mathAvg)?.className || ''}`}>
-                          {getTrendInfo(nvoDetail.latestMath, nvoDetail.mathAvg) &&
-                            `${getTrendInfo(nvoDetail.latestMath, nvoDetail.mathAvg).diff > 0 ? '+' : ''}${formatPercent(getTrendInfo(nvoDetail.latestMath, nvoDetail.mathAvg).diff, 1)}%`
-                          }
-                        </span>
-                      )}
+                </div>
+
+                {/* Compare All Grades Toggle */}
+                {hasMultipleGrades && (
+                  <button
+                    onClick={() => setShowAllGrades(!showAllGrades)}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                      showAllGrades
+                        ? 'bg-primary-600 text-white shadow-md'
+                        : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
+                    }`}
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                    <span className="hidden md:inline">{showAllGrades ? t('schools.showByGrade') : t('schools.compareAllGrades')}</span>
+                    <span className="md:hidden">{showAllGrades ? t('schools.byGrade') : t('schools.compare')}</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Cross-Grade Insight Card */}
+              {crossGradeInsight && !showAllGrades && (
+                <div className={`rounded-lg p-4 mb-6 ${
+                  crossGradeInsight.type === 'improving'
+                    ? 'bg-emerald-50 border border-emerald-200'
+                    : crossGradeInsight.type === 'declining'
+                    ? 'bg-amber-50 border border-amber-200'
+                    : 'bg-blue-50 border border-blue-200'
+                }`}>
+                  <div className="flex items-start gap-3">
+                    <span className="text-2xl flex-shrink-0">{crossGradeInsight.icon}</span>
+                    <div>
+                      <div className={`font-semibold mb-1 ${
+                        crossGradeInsight.type === 'improving'
+                          ? 'text-emerald-900'
+                          : crossGradeInsight.type === 'declining'
+                          ? 'text-amber-900'
+                          : 'text-blue-900'
+                      }`}>
+                        {t('schools.performanceAcrossGrades')}
+                      </div>
+                      <div className={`text-sm ${
+                        crossGradeInsight.type === 'improving'
+                          ? 'text-emerald-700'
+                          : crossGradeInsight.type === 'declining'
+                          ? 'text-amber-700'
+                          : 'text-blue-700'
+                      }`}>
+                        {crossGradeInsight.message}
+                      </div>
                     </div>
-                  )}
+                  </div>
                 </div>
               )}
 
-              {/* Bulgarian Card */}
-              {nvoDetail.latestBg != null && (
-                <div className="bg-neutral-50 rounded-xl p-6 border border-neutral-200">
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-lg font-semibold text-neutral-900">{t('schoolCard.nvo.subjectBulgarian')}</h3>
-                    {nvoDetail.hasAverage && nvoDetail.latestBg != null && (
-                      <span className={`text-sm font-medium ${getTrendInfo(nvoDetail.latestBg, nvoDetail.bgAvg)?.className || ''}`}>
-                        {getTrendInfo(nvoDetail.latestBg, nvoDetail.bgAvg)?.arrow || ''}
-                      </span>
-                    )}
-                  </div>
-                  <div className={`text-4xl font-bold mb-2 ${getPerformanceStyle(nvoDetail.latestBg).text}`}>
-                    {formatPercent(nvoDetail.latestBg, 1)}%
-                  </div>
-                  <div className="w-full bg-neutral-200 rounded-full h-2 mb-3">
-                    <div
-                      className={`h-2 rounded-full ${getPerformanceStyle(nvoDetail.latestBg).bg}`}
-                      style={{ width: `${Math.min(nvoDetail.latestBg, 100)}%` }}
-                    />
-                  </div>
-                  {nvoDetail.hasAverage && nvoDetail.bgAvg != null && (
-                    <div className="text-sm text-neutral-600">
-                      {t('academicPerformance.yearAverage', { year: '3-5' })}: {formatPercent(nvoDetail.bgAvg, 1)}%
-                      {nvoDetail.latestBg != null && (
-                        <span className={`ml-2 font-medium ${getTrendInfo(nvoDetail.latestBg, nvoDetail.bgAvg)?.className || ''}`}>
-                          {getTrendInfo(nvoDetail.latestBg, nvoDetail.bgAvg) &&
-                            `${getTrendInfo(nvoDetail.latestBg, nvoDetail.bgAvg).diff > 0 ? '+' : ''}${formatPercent(getTrendInfo(nvoDetail.latestBg, nvoDetail.bgAvg).diff, 1)}%`
-                          }
-                        </span>
-                      )}
+              {/* Conditional Rendering: Tabs OR Combined Chart */}
+              {showAllGrades ? (
+                /* Show All Grades Combined */
+                <MultiGradeComparisonChart
+                  examResults={school.exam_results}
+                  availableExamTypes={availableExamTypes}
+                  selectedSubjects={selectedSubjects}
+                  examAverages={examAverages}
+                />
+              ) : (
+                /* Show Tabs + Single Grade Chart */
+                <>
+                  {/* Tabs for Multiple Grade Levels */}
+                  {hasMultipleGrades && (
+                    <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
+                      {availableExamTypes.map(examType => {
+                        const latestScore = getLatestScoreForExamType(school.exam_results, examType)
+                        const isActive = activeExamType === examType
+
+                        return (
+                          <button
+                            key={examType}
+                            onClick={() => setActiveExamType(examType)}
+                            className={`px-4 py-2.5 rounded-lg font-medium whitespace-nowrap transition-all ${
+                              isActive
+                                ? 'bg-primary-600 text-white shadow-md'
+                                : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
+                            }`}
+                          >
+                            {getExamTypeLabel(examType, t)}
+                            {latestScore != null && (
+                              <span className={`ml-2 text-sm ${isActive ? 'text-primary-100' : 'text-neutral-500'}`}>
+                                ({formatPercent(latestScore, 0)}%)
+                              </span>
+                            )}
+                          </button>
+                        )
+                      })}
                     </div>
                   )}
-                </div>
+
+                  {/* Single Grade Chart */}
+                  <NvoTimelineChart
+                    examResults={school.exam_results}
+                    examType={activeExamType || getExamTypeForEducationLevel(school.education_level)}
+                    selectedSubjects={selectedSubjects}
+                    examAverages={examAverages}
+                  />
+                </>
               )}
+
+              {/* Subject Filter Toggles (below chart) */}
+              <div className="flex items-center justify-center gap-3 mt-6 pt-6 border-t border-neutral-200">
+                <span className="text-sm font-medium text-neutral-600">{t('schools.showSubjects')}:</span>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleSubjectToggle('math')}
+                    disabled={selectedSubjects.length === 1 && selectedSubjects.includes('math')}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                      selectedSubjects.includes('math')
+                        ? 'bg-blue-600 text-white shadow-sm'
+                        : 'bg-neutral-100 text-neutral-500 hover:bg-neutral-200'
+                    } ${selectedSubjects.length === 1 && selectedSubjects.includes('math') ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    <span className="flex items-center gap-1.5">
+                      {selectedSubjects.includes('math') && (
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                      {t('schoolCard.nvo.subjectMath')}
+                    </span>
+                  </button>
+                  <button
+                    onClick={() => handleSubjectToggle('bulgarian')}
+                    disabled={selectedSubjects.length === 1 && selectedSubjects.includes('bulgarian')}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                      selectedSubjects.includes('bulgarian')
+                        ? 'bg-purple-600 text-white shadow-sm'
+                        : 'bg-neutral-100 text-neutral-500 hover:bg-neutral-200'
+                    } ${selectedSubjects.length === 1 && selectedSubjects.includes('bulgarian') ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    <span className="flex items-center gap-1.5">
+                      {selectedSubjects.includes('bulgarian') && (
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                      {t('schoolCard.nvo.subjectBulgarian')}
+                    </span>
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
-        )}
+          )
+        })()}
 
         {/* Enhanced Pricing */}
         {hasPricing && (
