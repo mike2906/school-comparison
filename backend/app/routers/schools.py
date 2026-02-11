@@ -9,6 +9,7 @@ from sqlalchemy.orm import selectinload
 from app.config import get_settings
 from app.database import get_db
 from app.models.school import School, SchoolLocation, SchoolLocationAgeGroupShift
+from app.models.exam_results import ExamResult
 from app.schemas.school import SchoolResponse, SchoolListResponse
 from app.services.school_service import SchoolService
 
@@ -148,4 +149,69 @@ async def get_school(
         raise HTTPException(
             status_code=500,
             detail="An error occurred while fetching school details. Please try again later."
+        )
+
+
+@router.get("/exam-averages")
+async def get_exam_averages(
+    country_code: str = Query("bg", description="Country code (ISO 3166-1 alpha-2)"),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Calculate average exam scores across all schools for each exam type.
+    Returns averages grouped by exam_type, year, and subject.
+    """
+    try:
+        # Query all exam results with average metrics
+        query = (
+            select(
+                ExamResult.exam_type,
+                ExamResult.year,
+                ExamResult.subject,
+                func.avg(ExamResult.value).label('average')
+            )
+            .join(School, ExamResult.school_id == School.id)
+            .where(School.country_code == country_code)
+            .where(ExamResult.metric.ilike('%average%'))
+            .group_by(ExamResult.exam_type, ExamResult.year, ExamResult.subject)
+            .order_by(ExamResult.exam_type, ExamResult.year)
+        )
+
+        result = await db.execute(query)
+        rows = result.fetchall()
+
+        # Transform into nested structure
+        averages = {}
+        for row in rows:
+            exam_type = row.exam_type
+            year = row.year
+            subject_key = 'math' if 'math' in row.subject.lower() else 'bulgarian'
+            average_value = float(row.average)
+
+            if exam_type not in averages:
+                averages[exam_type] = {}
+            if year not in averages[exam_type]:
+                averages[exam_type][year] = {}
+
+            averages[exam_type][year][subject_key] = round(average_value, 1)
+
+        # Also calculate overall average per exam type (across all years and subjects)
+        overall = {}
+        for exam_type, years_data in averages.items():
+            all_values = []
+            for year_data in years_data.values():
+                all_values.extend(year_data.values())
+            if all_values:
+                overall[exam_type] = round(sum(all_values) / len(all_values), 1)
+
+        return {
+            "by_year": averages,
+            "overall": overall
+        }
+
+    except Exception as e:
+        logger.error(f"Error calculating exam averages: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="An error occurred while calculating exam averages. Please try again later."
         )
