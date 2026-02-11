@@ -8,7 +8,7 @@ import SchoolCard from '../SchoolCard/SchoolCard'
 import SchoolCardSkeleton from '../SchoolCard/SchoolCardSkeleton'
 import { useSchools } from '../../hooks/useSchools'
 import { calculateDistance } from '../../utils/distance'
-import { geocodeAddress, cancelGeocode } from '../../utils/geocoding'
+import { geocodeAddress, reverseGeocode, cancelGeocode } from '../../utils/geocoding'
 import { getSchoolName } from '../../utils/i18n'
 import { useCompare } from '../../context/CompareContext'
 import { useCountry } from '../../context/CountryContext'
@@ -51,6 +51,7 @@ function SearchPage() {
   const [locationError, setLocationError] = useState(null)
   const [isLocating, setIsLocating] = useState(false)
   const [isGeocoding, setIsGeocoding] = useState(false)
+  const [isPickingLocation, setIsPickingLocation] = useState(false)
   const [distanceFilter, setDistanceFilter] = useState('any')
   const [sortBy, setSortBy] = useState('name')
   const [searchInBounds, setSearchInBounds] = useState(false)
@@ -61,8 +62,14 @@ function SearchPage() {
     focusLocationId: null,
     hideOthers: false,
   })
+  const [highlightLocation, setHighlightLocation] = useState(false)
+  const [locationToast, setLocationToast] = useState(null)
   const previousLocationRef = useRef(null)
+  const previousViewModeRef = useRef(null)
+  const previousMobileTabRef = useRef(null)
+  const locationSectionRef = useRef(null)
   const errorTimeoutRef = useRef(null)
+  const toastTimeoutRef = useRef(null)
   const latestGeocodeRef = useRef(0)
   const cardRefs = useRef(new Map())
   const scrollOnSelectRef = useRef(false)
@@ -74,6 +81,7 @@ function SearchPage() {
   const educationLevel = searchParams.get('education_level')
   const includeCrossover = searchParams.get('include_crossover') === 'true'
   const targetYearParam = searchParams.get('target_year')
+  const promptLocation = searchParams.get('prompt_location') === '1'
   const getParamList = (key) => {
     const values = searchParams.getAll(key)
     if (values.length > 0) return values
@@ -188,6 +196,28 @@ function SearchPage() {
   useEffect(() => {
     localStorage.setItem('searchInMapBounds', searchInBounds ? 'true' : 'false')
   }, [searchInBounds])
+
+  useEffect(() => {
+    if (!promptLocation) return
+    if (userLocation) return
+    if (window.innerWidth >= 768) return
+
+    setIsFiltersOpen(true)
+    setHighlightLocation(true)
+
+    const timer = setTimeout(() => {
+      locationSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 200)
+
+    const highlightTimer = setTimeout(() => {
+      setHighlightLocation(false)
+    }, 2500)
+
+    return () => {
+      clearTimeout(timer)
+      clearTimeout(highlightTimer)
+    }
+  }, [promptLocation, userLocation])
 
   const ageGroupOrder = useMemo(() => {
     const keys = getAgeGroupKeys(config)
@@ -367,12 +397,23 @@ function SearchPage() {
     }
   }
 
+  const showLocationToast = (message) => {
+    if (toastTimeoutRef.current) {
+      clearTimeout(toastTimeoutRef.current)
+    }
+    setLocationToast(message)
+    toastTimeoutRef.current = setTimeout(() => {
+      setLocationToast(null)
+    }, 1800)
+  }
+
   const persistLocation = (location) => {
     localStorage.setItem('userLocation', JSON.stringify(location))
   }
 
   const handleUseMyLocation = () => {
     setLocationError(null)
+    setIsPickingLocation(false)
 
     if (!navigator.geolocation) {
       showLocationError(t('location.errorUnavailable'))
@@ -414,6 +455,7 @@ function SearchPage() {
 
     setIsGeocoding(true)
     setLocationError(null)
+    setIsPickingLocation(false)
 
     try {
       const result = await geocodeAddress(trimmedAddress, geocodingConfig)
@@ -445,6 +487,7 @@ function SearchPage() {
     if (userLocation?.address) {
       setAddressInput(userLocation.address)
     }
+    setIsPickingLocation(false)
     setUserLocation(null)
     setLocationError(null)
     setIsManualInput(false)
@@ -452,12 +495,83 @@ function SearchPage() {
   }
 
   const handleClearLocation = () => {
+    setIsPickingLocation(false)
     setUserLocation(null)
     setAddressInput('')
     setLocationError(null)
     setDistanceFilter('any')
     setIsManualInput(false)
     localStorage.removeItem('userLocation')
+  }
+
+  const handleStartMapPick = () => {
+    setLocationError(null)
+    setIsManualInput(false)
+    setIsPickingLocation(prev => {
+      const next = !prev
+      if (next) {
+        setIsFiltersOpen(false)
+        previousViewModeRef.current = viewMode
+        previousMobileTabRef.current = mobileTab
+        if (window.innerWidth < 1024) {
+          setViewMode('map-only')
+        }
+        if (window.innerWidth < 768) {
+          setMobileTab('map')
+        }
+      } else {
+        if (previousViewModeRef.current) {
+          setViewMode(previousViewModeRef.current)
+        }
+        if (previousMobileTabRef.current) {
+          setMobileTab(previousMobileTabRef.current)
+        }
+      }
+      return next
+    })
+  }
+
+  const handleMapPickLocation = ({ lat, lng }) => {
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return
+    const newLocation = {
+      lat,
+      lng,
+      address: t('location.selectedOnMap'),
+    }
+    setUserLocation(newLocation)
+    setAddressInput('')
+    setIsManualInput(false)
+    setLocationError(null)
+    persistLocation(newLocation)
+    setIsPickingLocation(false)
+    if (window.innerWidth < 1024) {
+      setViewMode('list-map')
+    } else if (previousViewModeRef.current) {
+      setViewMode(previousViewModeRef.current)
+    }
+    if (window.innerWidth < 768) {
+      setMobileTab('list')
+      showLocationToast(t('location.setOnMapToast'))
+    } else if (previousMobileTabRef.current) {
+      setMobileTab(previousMobileTabRef.current)
+    }
+    previousViewModeRef.current = null
+    previousMobileTabRef.current = null
+
+    reverseGeocode(lat, lng, geocodingConfig)
+      .then((result) => {
+        if (!result?.address) return
+        setUserLocation(prev => {
+          if (!prev) return prev
+          if (prev.lat !== lat || prev.lng !== lng) return prev
+          const updated = { ...prev, address: result.address }
+          persistLocation(updated)
+          return updated
+        })
+      })
+      .catch(() => {
+        // Silent fallback to "Selected on map" when reverse geocoding fails.
+      })
   }
 
   const handleFilterChange = (newFilters) => {
@@ -709,7 +823,12 @@ function SearchPage() {
     const addressLine2 = addressParts.slice(1, 3).join(', ').trim()
 
     return (
-      <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-4 space-y-4">
+      <div
+        ref={locationSectionRef}
+        className={`rounded-xl border border-neutral-200 bg-neutral-50 p-4 space-y-4 ${
+          highlightLocation ? 'location-highlight' : ''
+        }`}
+      >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="text-lg">📍</span>
@@ -744,6 +863,23 @@ function SearchPage() {
               )}
               {t('location.useMyLocation')}
             </button>
+
+            <button
+              onClick={handleStartMapPick}
+              className={`w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                isPickingLocation
+                  ? 'bg-primary-50 border-primary-300 text-primary-800'
+                  : 'bg-white border-neutral-300 text-neutral-700 hover:bg-neutral-50'
+              }`}
+            >
+              {isPickingLocation ? t('location.cancelMapPick') : t('location.selectOnMap')}
+            </button>
+
+            {isPickingLocation && (
+              <p className="text-xs text-primary-700 bg-primary-50 border border-primary-200 rounded-lg px-3 py-2">
+                {t('location.mapPickHint')}
+              </p>
+            )}
 
             <div className="space-y-2">
               <label className="block text-sm font-medium text-neutral-700">
@@ -814,6 +950,21 @@ function SearchPage() {
                 {t('location.clear')}
               </button>
             </div>
+            <button
+              onClick={handleStartMapPick}
+              className={`w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                isPickingLocation
+                  ? 'bg-primary-50 border-primary-300 text-primary-800'
+                  : 'bg-white border-neutral-300 text-neutral-700 hover:bg-neutral-50'
+              }`}
+            >
+              {isPickingLocation ? t('location.cancelMapPick') : t('location.selectOnMap')}
+            </button>
+            {isPickingLocation && (
+              <p className="text-xs text-primary-700 bg-primary-50 border border-primary-200 rounded-lg px-3 py-2">
+                {t('location.mapPickHint')}
+              </p>
+            )}
           </div>
         )}
 
@@ -1513,53 +1664,54 @@ function SearchPage() {
   }
 
   return (
-    <Layout>
-      <div className="h-[calc(100vh-64px)] flex flex-col">
+    <Layout hideNavOnMobile>
+      <div className="h-screen md:h-[calc(100vh-64px)] flex flex-col">
         {/* Mobile/Tablet Header with Filters Button and Tabs */}
         <div className="lg:hidden border-b border-neutral-200 bg-white">
-          <div className="flex items-center justify-between px-4 py-3">
+          <div className="flex items-center gap-2 px-3 py-2">
             <button
               onClick={handleBackToLanding}
-              className="flex items-center gap-2 text-sm text-neutral-600 hover:text-neutral-900"
+              className="p-2 -ml-2 text-neutral-600 hover:text-neutral-900"
+              aria-label={t('search.backToFilters')}
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
               </svg>
-              {t('search.backToFilters')}
             </button>
+
+            <div className="flex-1 flex items-center justify-center">
+              <div className="inline-flex items-center bg-neutral-100 rounded-lg p-0.5">
+                <button
+                  onClick={() => setMobileTab('list')}
+                  className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                    mobileTab === 'list'
+                      ? 'bg-white text-neutral-900 shadow-sm'
+                      : 'text-neutral-600 hover:text-neutral-800'
+                  }`}
+                >
+                  {t('search.listView')}
+                </button>
+                <button
+                  onClick={() => setMobileTab('map')}
+                  className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                    mobileTab === 'map'
+                      ? 'bg-white text-neutral-900 shadow-sm'
+                      : 'text-neutral-600 hover:text-neutral-800'
+                  }`}
+                >
+                  {t('search.mapView')}
+                </button>
+              </div>
+            </div>
 
             <button
               onClick={() => setIsFiltersOpen(true)}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary-50 text-primary-700 text-sm font-medium"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-primary-50 text-primary-700 text-xs font-medium"
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
               </svg>
               {t('search.filters')}
-            </button>
-          </div>
-
-          {/* Mobile Tabs (List/Map) - only on mobile */}
-          <div className="md:hidden flex border-t border-neutral-200">
-            <button
-              onClick={() => setMobileTab('list')}
-              className={`flex-1 py-3 text-sm font-medium transition-colors ${
-                mobileTab === 'list'
-                  ? 'text-primary-600 border-b-2 border-primary-600'
-                  : 'text-neutral-500 hover:text-neutral-700'
-              }`}
-            >
-              {t('search.listView')}
-            </button>
-            <button
-              onClick={() => setMobileTab('map')}
-              className={`flex-1 py-3 text-sm font-medium transition-colors ${
-                mobileTab === 'map'
-                  ? 'text-primary-600 border-b-2 border-primary-600'
-                  : 'text-neutral-500 hover:text-neutral-700'
-              }`}
-            >
-              {t('search.mapView')}
             </button>
           </div>
         </div>
@@ -1635,8 +1787,8 @@ function SearchPage() {
             md:w-3/5
             w-full
           `}>
-              <div className="px-5 py-3 bg-white border-b border-neutral-200 space-y-3 lg:hidden">
-                {renderActiveFilters()}
+              <div className="px-4 py-2 bg-white border-b border-neutral-200 space-y-2 lg:hidden">
+                {renderActiveFilters({ compact: true })}
                 <div className="flex items-center justify-between gap-3">
                   {loading ? (
                     <div className="h-4 w-32 bg-neutral-200 animate-pulse rounded" />
@@ -1751,6 +1903,8 @@ function SearchPage() {
                   onClearSelection={handleClearSelection}
                   loading={loading}
                   userLocation={userLocation}
+                  isPickingLocation={isPickingLocation}
+                  onPickLocation={handleMapPickLocation}
                   onBoundsChange={handleBoundsChange}
                   autoFit={!searchInBounds}
                   hasCompare={hasCompare}
@@ -1769,13 +1923,13 @@ function SearchPage() {
           <>
             {/* Backdrop */}
             <div
-              className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+              className="fixed inset-0 bg-black/50 z-[2000] lg:hidden"
               onClick={() => setIsFiltersOpen(false)}
             />
 
             {/* Bottom Sheet (Mobile) / Side Drawer (Tablet) */}
             <div className={`
-              fixed z-50 bg-white lg:hidden
+              fixed z-[2100] bg-white lg:hidden
               md:top-0 md:right-0 md:bottom-0 md:w-96 md:shadow-2xl
               max-md:bottom-0 max-md:left-0 max-md:right-0 max-md:rounded-t-2xl max-md:shadow-up max-md:max-h-[85vh]
               overflow-y-auto
@@ -1801,6 +1955,14 @@ function SearchPage() {
               </div>
             </div>
           </>
+        )}
+
+        {locationToast && (
+          <div className="fixed inset-x-0 bottom-6 z-[2200] flex justify-center px-4 md:hidden">
+            <div className="bg-neutral-900 text-white text-sm font-medium px-4 py-2 rounded-full shadow-lg">
+              {locationToast}
+            </div>
+          </div>
         )}
       </div>
     </Layout>

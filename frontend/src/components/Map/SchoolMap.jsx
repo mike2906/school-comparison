@@ -342,6 +342,21 @@ function MapClickHandler({ onClearSelection }) {
   return null
 }
 
+function MapLocationPicker({ enabled, onPickLocation }) {
+  useMapEvents({
+    click: (event) => {
+      if (!enabled) return
+      const target = event.originalEvent?.target
+      if (target?.closest?.('.leaflet-marker-icon')) return
+      if (target?.closest?.('.leaflet-popup')) return
+      if (target?.closest?.('.map-bottom-sheet')) return
+      onPickLocation?.({ lat: event.latlng.lat, lng: event.latlng.lng })
+    },
+  })
+
+  return null
+}
+
 function MapOverlayNavigator({ overlaySchoolId, overlayLocations, focusLocation }) {
   const map = useMap()
   const lastOverlayRef = useRef(null)
@@ -736,6 +751,8 @@ function SchoolMap({
   onClearSelection,
   loading,
   userLocation,
+  isPickingLocation,
+  onPickLocation,
   onBoundsChange,
   autoFit = true,
   hasCompare = false,
@@ -951,7 +968,7 @@ function SchoolMap({
     <div
       className={`relative h-full w-full ${hasCompare ? 'map-has-compare' : ''} ${
         overlayActiveOnMap && !hideOthers ? 'map-dim-others' : ''
-      }`}
+      } ${isPickingLocation ? 'map-picking-location' : ''}`}
     >
       <MapContainer
         center={mapCenter}
@@ -1024,6 +1041,7 @@ function SchoolMap({
         <MapBoundsWatcher onBoundsChange={onBoundsChange} />
         <MapResizer resizeKey={resizeKey} />
         <MapClickHandler onClearSelection={onClearSelection} />
+        <MapLocationPicker enabled={isPickingLocation} onPickLocation={onPickLocation} />
         <MapSelectionPan marker={selectedMarker} />
         <MapOverlayNavigator
           overlaySchoolId={overlaySchoolId}
@@ -1048,7 +1066,7 @@ function SchoolMap({
           >
             <Popup autoPan={false}>
               <div className="p-2 text-sm text-neutral-700">
-                {t('location.currentLocation')}
+                {userLocation.address || t('location.currentLocation')}
               </div>
             </Popup>
           </Marker>

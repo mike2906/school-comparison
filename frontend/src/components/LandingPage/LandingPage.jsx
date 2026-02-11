@@ -232,6 +232,12 @@ function LandingPage() {
       params.set('include_crossover', 'true')
     }
 
+    const storedLocation = localStorage.getItem('userLocation')
+    const hasStoredLocation = Boolean(storedLocation)
+    if (window.innerWidth < 768 && !hasStoredLocation) {
+      params.set('prompt_location', '1')
+    }
+
     navigate(`/search?${params.toString()}`)
   }
 
