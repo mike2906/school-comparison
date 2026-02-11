@@ -21,6 +21,13 @@ class School(Base):
     num_pupils: Mapped[Optional[int]] = mapped_column(Integer)
     admission_info: Mapped[Optional[dict]] = mapped_column(JSON, default=dict)
     attributes: Mapped[Optional[dict]] = mapped_column(JSON, default=dict)
+
+    # Scraping-related fields (Phase 1)
+    institutional_id: Mapped[Optional[str]] = mapped_column(String(20))  # MoE Код по НЕИСПУО
+    scrape_status: Mapped[str] = mapped_column(String(30), default="pending")
+    last_full_scrape_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    city: Mapped[Optional[str]] = mapped_column(String(100))  # e.g., "sofia"
+
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)
@@ -53,6 +60,7 @@ class SchoolLocation(Base):
     lat: Mapped[Optional[float]] = mapped_column(Float)
     lng: Mapped[Optional[float]] = mapped_column(Float)
     phone: Mapped[Optional[str]] = mapped_column(String(100))
+    district: Mapped[Optional[str]] = mapped_column(String(100))  # District/neighborhood for idempotency matching
     location_tags: Mapped[Optional[list[str]]] = mapped_column(JSON, default=list)
     is_primary: Mapped[bool] = mapped_column(Boolean, default=True)
 

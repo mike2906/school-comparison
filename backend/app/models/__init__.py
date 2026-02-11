@@ -5,6 +5,8 @@ from app.models.exam_results import ExamResult
 from app.models.field_source import FieldSource, SourceType, SourceConfidence
 from app.models.scrape_log import ScrapeLog, ScrapeType, ScrapeStatus, ErrorType
 from app.models.source_page import SourcePage
+from app.models.pipeline_run import PipelineRun, PipelineStatus, PipelineStage
+from app.models.spot_check import SpotCheckResult, DiscrepancyType
 
 __all__ = [
     "Country",
@@ -23,4 +25,9 @@ __all__ = [
     "ScrapeStatus",
     "ErrorType",
     "SourcePage",
+    "PipelineRun",
+    "PipelineStatus",
+    "PipelineStage",
+    "SpotCheckResult",
+    "DiscrepancyType",
 ]

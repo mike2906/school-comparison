@@ -17,6 +17,10 @@ dependencies = [
     "httpx>=0.26.0",
     "python-dotenv>=1.0.0",
     "pdfplumber>=0.11.9",
+    # Phase 1 scraping dependencies
+    "beautifulsoup4>=4.12.0",
+    "pydantic-ai>=0.0.10",
+    "crawl4ai>=0.3.0",
 ]
 
 [project.optional-dependencies]

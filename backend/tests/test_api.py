@@ -91,7 +91,8 @@ class TestSchoolsEndpoint:
                 assert "lat" in location
                 assert "lng" in location
                 assert "address_i18n" in location
-                assert "age_group" in location
+                assert "age_groups" in location  # Changed to age_groups (list property)
+                assert "age_group_shifts" in location  # Junction table data
 
 
 class TestSchoolsFilterEndpoint:
