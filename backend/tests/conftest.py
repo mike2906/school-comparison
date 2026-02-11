@@ -33,6 +33,29 @@ async def db_session(async_engine):
 
 
 @pytest_asyncio.fixture
+async def sample_schools(db_session):
+    """Sample schools for testing."""
+    schools = []
+    for i in range(3):
+        school = School(
+            name_i18n={"bg": f"Училище {i+1}", "en": f"School {i+1}"},
+            country_code="bg",
+            school_type="state",
+            education_level="primary",
+            city="sofia",
+        )
+        db_session.add(school)
+        schools.append(school)
+    await db_session.commit()
+
+    # Refresh to get IDs
+    for school in schools:
+        await db_session.refresh(school)
+
+    return schools
+
+
+@pytest_asyncio.fixture
 async def client(db_session):
     async def override_get_db():
         yield db_session
