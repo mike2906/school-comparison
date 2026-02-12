@@ -69,9 +69,10 @@ def cli():
 @click.option("--city", default="sofia", help="City to filter by")
 @click.option("--country", default="bg", help="Country code")
 @click.option("--limit", type=int, help="Limit number of schools to process")
+@click.option("--sample-ratio", type=float, default=0.0, help="Sample ratio for unchanged schools (discover only)")
 @click.option("--sync", is_flag=True, help="Run synchronously (no Celery)")
 @click.option("--dry-run", is_flag=True, help="Show what would happen without executing")
-def run(school, school_id, stage, city, country, limit, sync, dry_run):
+def run(school, school_id, stage, city, country, limit, sample_ratio, sync, dry_run):
     """Run a pipeline stage."""
     if dry_run:
         console.print(f"[yellow]DRY RUN - would execute:[/yellow]")
@@ -80,19 +81,20 @@ def run(school, school_id, stage, city, country, limit, sync, dry_run):
         console.print(f"  City: {city}")
         console.print(f"  Country: {country}")
         console.print(f"  Limit: {limit}")
+        console.print(f"  Sample ratio: {sample_ratio}")
         console.print(f"  Mode: {'sync' if sync else 'celery'}")
         return
 
     if sync:
         # Run synchronously
-        asyncio.run(_run_sync(school, school_id, stage, city, country, limit))
+        asyncio.run(_run_sync(school, school_id, stage, city, country, limit, sample_ratio))
     else:
         # Run via Celery
         console.print("[yellow]Celery mode not yet implemented. Use --sync for now.[/yellow]")
         sys.exit(1)
 
 
-async def _run_sync(school_name, school_id, stage, city, country, limit):
+async def _run_sync(school_name, school_id, stage, city, country, limit, sample_ratio):
     """Run pipeline stage synchronously."""
     from app.database import async_session_maker
 
@@ -144,7 +146,7 @@ async def _run_sync(school_name, school_id, stage, city, country, limit):
             console.print(f"  Limit: {limit or 'all'}")
 
             if stage == "discover":
-                await _run_discover_batch(db, country, city, limit)
+                await _run_discover_batch(db, country, city, limit, sample_ratio)
             elif stage == "validate-urls":
                 await _run_validate_urls_batch(db, country, city, limit)
             else:
@@ -191,7 +193,7 @@ async def _find_school_by_name(db, name: str, country: str) -> Optional[int]:
     return None
 
 
-async def _run_discover_batch(db, country: str, city: str, limit: Optional[int]):
+async def _run_discover_batch(db, country: str, city: str, limit: Optional[int], sample_ratio: float):
     """Run discovery stage in batch mode."""
     from app.scrapers.sources import get_adapters_for_country
 
@@ -215,7 +217,7 @@ async def _run_discover_batch(db, country: str, city: str, limit: Optional[int])
             task = progress.add_task(f"Discovering schools...", total=None)
 
             try:
-                result = await adapter.run(limit=limit)
+                result = await adapter.run(limit=limit, sample_ratio=sample_ratio)
                 progress.update(task, completed=True)
 
                 console.print(f"[green]✓ Discovery complete:[/green]")

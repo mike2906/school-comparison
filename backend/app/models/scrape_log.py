@@ -10,6 +10,7 @@ from app.database import Base
 
 class ScrapeType(str, enum.Enum):
     DISCOVERY = "discovery"
+    REGISTRY = "registry"
     WEBSITE = "website"
     PRICES = "prices"
     NVO = "nvo"

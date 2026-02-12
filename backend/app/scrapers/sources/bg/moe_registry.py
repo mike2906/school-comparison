@@ -8,13 +8,17 @@ with their official institutional IDs.
 For detailed API documentation, field mappings, and examples, see:
 backend/docs/MOE_API_DOCUMENTATION.md
 """
+import hashlib
+import json
 import logging
+from datetime import datetime, timezone
 from typing import Optional
 import httpx
 
 from app.scrapers.sources.base_adapter import BaseSourceAdapter
 from app.schemas.scraping import DiscoveredSchool, DiscoveredLocation
 from app.scrapers.sources import register_adapter
+from app.scrapers.base import BaseScraper
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +53,7 @@ class MoeRegistryAdapter(BaseSourceAdapter):
     REGIONS_URL = f"{API_BASE_URL}/data/get/regionMultiple"
     MUNICIPALITIES_URL = f"{API_BASE_URL}/data/get/municipalityMultiple"
     TOWNS_URL = f"{API_BASE_URL}/data/get/townMultiple"
+    REGISTRY_SOURCE_PREFIX = "moe://public-register/"
 
     # Sofia region codes (город София + област София)
     SOFIA_CITY_REGION = 22  # София-град
@@ -93,7 +98,12 @@ class MoeRegistryAdapter(BaseSourceAdapter):
         181: "upper_secondary",  # училище, функциониращо по силата на международен договор
     }
 
-    async def discover(self, limit: Optional[int] = None, fetch_details: bool = True) -> list[DiscoveredSchool]:
+    async def discover(
+        self,
+        limit: Optional[int] = None,
+        fetch_details: bool = True,
+        sample_ratio: float = 0.0,
+    ) -> list[DiscoveredSchool]:
         """
         Discover schools from the Ministry of Education API.
 
@@ -107,6 +117,7 @@ class MoeRegistryAdapter(BaseSourceAdapter):
         Args:
             limit: Optional limit on number of schools to discover (for testing)
             fetch_details: Whether to fetch detailed data for each school (default: True)
+            sample_ratio: Optional ratio (0.0-1.0) of unchanged schools to sample for details
 
         Returns:
             List of DiscoveredSchool objects
@@ -115,7 +126,31 @@ class MoeRegistryAdapter(BaseSourceAdapter):
             httpx.HTTPError: If the API is unreachable
             ValueError: If the response format is unexpected
         """
+        from sqlalchemy import select
+        from app.models import School, SourcePage, ScrapeType
+
         discovered_schools = []
+        seen_instids: set[str] = set()
+        now = datetime.now(timezone.utc)
+
+        # Preload registry pages for quick lookup
+        pages_result = await self.db.execute(
+            select(SourcePage).where(
+                SourcePage.scrape_type == ScrapeType.REGISTRY,
+                SourcePage.source_url.like(f"{self.REGISTRY_SOURCE_PREFIX}%"),
+            )
+        )
+        existing_pages = {page.source_url: page for page in pages_result.scalars().all()}
+
+        # Preload instid -> school_id map
+        schools_result = await self.db.execute(
+            select(School.id, School.institutional_id).where(
+                School.country_code == "bg",
+                School.city == "sofia",
+                School.institutional_id.isnot(None),
+            )
+        )
+        school_id_by_instid = {str(instid): school_id for school_id, instid in schools_result.all() if instid}
 
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             # Step 1: Fetch schools from Sofia city and Sofia region
@@ -154,26 +189,138 @@ class MoeRegistryAdapter(BaseSourceAdapter):
                 try:
                     logger.info(f"Processing institution {idx}/{len(institutions)}: {inst_data.get('name')}")
 
+                    instid = inst_data.get("instid")
+                    if instid is None:
+                        logger.warning("Institution has no instid, skipping")
+                        continue
+                    instid_str = str(instid)
+                    seen_instids.add(instid_str)
+
+                    source_url = self._registry_source_url(instid_str)
+                    page_hash = self._hash_record(inst_data)
+                    source_page = existing_pages.get(source_url)
+                    changed = source_page is None or source_page.content_hash != page_hash
+                    sampled = False
+
+                    if not changed and sample_ratio > 0:
+                        sampled = self._should_sample(instid_str, sample_ratio, now)
+
+                    school_id = school_id_by_instid.get(instid_str)
+                    self._upsert_registry_page(
+                        source_page=source_page,
+                        source_url=source_url,
+                        page_hash=page_hash,
+                        school_id=school_id,
+                        changed=changed,
+                        seen_at=now,
+                    )
+
                     # Step 3a: Fetch detailed data for this school
                     detail_data = None
-                    if fetch_details:
+                    if fetch_details and (changed or sampled):
                         detail_data = await self._fetch_institution_detail(client, inst_data)
 
                     # Step 3b: Parse institution data (with detail data if available)
-                    school = self._parse_institution_data(inst_data, detail_data)
+                    school = None
+                    if changed or sampled:
+                        school = self._parse_institution_data(inst_data, detail_data)
 
                     if school:
+                        school.attributes["moe_registry_active"] = True
+                        school.attributes["moe_registry_last_seen_at"] = now.isoformat()
                         discovered_schools.append(school)
 
                     # Small delay to be respectful
-                    await self._delay()
+                    if fetch_details and (changed or sampled):
+                        await self._delay()
 
                 except Exception as e:
                     logger.error(f"Error processing institution {inst_data.get('id')}: {e}")
                     continue
 
+        # Update active/inactive flags for existing schools (avoid mass inactivation on empty results)
+        if seen_instids:
+            await self._update_active_flags(seen_instids, now)
+        else:
+            logger.warning("MoE public-register returned no records; skipping active/inactive updates")
+
         logger.info(f"Discovered {len(discovered_schools)} schools from MoE registry")
         return discovered_schools
+
+    def _registry_source_url(self, instid: str) -> str:
+        return f"{self.REGISTRY_SOURCE_PREFIX}{instid}"
+
+    def _hash_record(self, data: dict) -> str:
+        return BaseScraper.compute_hash(
+            json.dumps(data, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+        )
+
+    def _should_sample(self, key: str, sample_ratio: float, now: datetime) -> bool:
+        if sample_ratio <= 0:
+            return False
+        iso_year, iso_week, _ = now.isocalendar()
+        token = f"{key}:{iso_year}-W{iso_week}"
+        digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
+        bucket = int(digest[:8], 16) / 0xFFFFFFFF
+        return bucket < sample_ratio
+
+    def _upsert_registry_page(
+        self,
+        source_page: Optional["SourcePage"],
+        source_url: str,
+        page_hash: str,
+        school_id: Optional[int],
+        changed: bool,
+        seen_at: datetime,
+    ) -> None:
+        from app.models import SourcePage, ScrapeType
+
+        if source_page:
+            source_page.last_scraped_at = seen_at
+            source_page.scrape_count = (source_page.scrape_count or 0) + 1
+            if changed:
+                source_page.content_hash = page_hash
+                source_page.last_changed_at = seen_at
+            if school_id and source_page.school_id != school_id:
+                source_page.school_id = school_id
+        else:
+            new_page = SourcePage(
+                school_id=school_id,
+                scrape_type=ScrapeType.REGISTRY,
+                source_url=source_url,
+                content_hash=page_hash,
+                last_scraped_at=seen_at,
+                last_changed_at=seen_at,
+                scrape_count=1,
+            )
+            self.db.add(new_page)
+
+    async def _update_active_flags(self, seen_instids: set[str], seen_at: datetime) -> None:
+        from sqlalchemy import select
+        from app.models import School
+
+        now_iso = seen_at.isoformat()
+        result = await self.db.execute(
+            select(School).where(
+                School.country_code == "bg",
+                School.city == "sofia",
+                School.institutional_id.isnot(None),
+            )
+        )
+        for school in result.scalars().all():
+            attrs = school.attributes or {}
+            instid = school.institutional_id
+            if not instid:
+                continue
+            active = str(instid) in seen_instids
+            if active:
+                attrs["moe_registry_active"] = True
+                attrs["moe_registry_last_seen_at"] = now_iso
+                attrs.pop("moe_registry_inactive_since", None)
+            else:
+                attrs["moe_registry_active"] = False
+                attrs.setdefault("moe_registry_inactive_since", now_iso)
+            school.attributes = attrs
 
     async def _fetch_institution_detail(self, client: httpx.AsyncClient, inst_data: dict) -> Optional[dict]:
         """

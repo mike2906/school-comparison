@@ -7,13 +7,16 @@ with preparatory groups, including addresses and contact information.
 For detailed API documentation, see:
 backend/docs/KG_SOFIA_API_DOCUMENTATION.md
 """
+import json
 import logging
+from datetime import datetime, timezone
 from typing import Optional
 import httpx
 
 from app.scrapers.sources.base_adapter import BaseSourceAdapter
 from app.schemas.scraping import DiscoveredSchool, DiscoveredLocation
 from app.scrapers.sources import register_adapter
+from app.scrapers.base import BaseScraper
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +52,7 @@ class KgSofiaBgAdapter(BaseSourceAdapter):
     SCHOOLS_URL = f"{API_BASE_URL}/kg/type/school/all"
     PREPARATORY_URL = f"{API_BASE_URL}/kg/type/preparative/all"
     REGIONS_URL = f"{API_BASE_URL}/regions/all"
+    REGISTRY_SOURCE_PREFIX = "kg://"
 
     # District name normalization (same as before)
     DISTRICT_MAPPING = {
@@ -91,7 +95,7 @@ class KgSofiaBgAdapter(BaseSourceAdapter):
         "ПГ": "upper_secondary",
     }
 
-    async def discover(self, limit: Optional[int] = None) -> list[DiscoveredSchool]:
+    async def discover(self, limit: Optional[int] = None, sample_ratio: float = 0.0) -> list[DiscoveredSchool]:
         """
         Discover kindergartens and schools from kg.sofia.bg API.
 
@@ -105,6 +109,7 @@ class KgSofiaBgAdapter(BaseSourceAdapter):
 
         Args:
             limit: Optional limit on number of schools to discover (for testing)
+            sample_ratio: Optional ratio (0.0-1.0) of unchanged schools to sample for details (unused for kg.sofia.bg)
 
         Returns:
             List of DiscoveredSchool objects
@@ -113,7 +118,36 @@ class KgSofiaBgAdapter(BaseSourceAdapter):
             httpx.HTTPError: If the API is unreachable
             ValueError: If the response format is unexpected
         """
+        from sqlalchemy import select
+        from app.models import School, SourcePage, ScrapeType
+
         discovered_schools = []
+        seen_kg_ids: set[str] = set()
+        now = datetime.now(timezone.utc)
+
+        # Preload registry pages for quick lookup
+        pages_result = await self.db.execute(
+            select(SourcePage).where(
+                SourcePage.scrape_type == ScrapeType.REGISTRY,
+                SourcePage.source_url.like(f"{self.REGISTRY_SOURCE_PREFIX}%"),
+            )
+        )
+        existing_pages = {page.source_url: page for page in pages_result.scalars().all()}
+
+        # Preload kg_sofia_id -> school_id map
+        schools_result = await self.db.execute(
+            select(School.id, School.attributes).where(
+                School.country_code == "bg",
+                School.city == "sofia",
+            )
+        )
+        school_id_by_kg_id: dict[str, int] = {}
+        for school_id, attrs in schools_result.all():
+            if not attrs:
+                continue
+            kg_id = attrs.get("kg_sofia_id")
+            if kg_id is not None:
+                school_id_by_kg_id[str(kg_id)] = school_id
 
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             # Fetch kindergartens
@@ -135,7 +169,15 @@ class KgSofiaBgAdapter(BaseSourceAdapter):
 
             # Parse kindergartens
             for kg in kindergartens:
-                school = self._parse_institution(kg, "kindergarten")
+                school = await self._process_registry_record(
+                    kg,
+                    record_type="kinderGarden",
+                    default_type="kindergarten",
+                    existing_pages=existing_pages,
+                    school_id_by_kg_id=school_id_by_kg_id,
+                    seen_kg_ids=seen_kg_ids,
+                    seen_at=now,
+                )
                 if school:
                     discovered_schools.append(school)
 
@@ -158,7 +200,15 @@ class KgSofiaBgAdapter(BaseSourceAdapter):
 
             # Parse schools
             for school in schools:
-                school_obj = self._parse_institution(school, "school")
+                school_obj = await self._process_registry_record(
+                    school,
+                    record_type="school",
+                    default_type="school",
+                    existing_pages=existing_pages,
+                    school_id_by_kg_id=school_id_by_kg_id,
+                    seen_kg_ids=seen_kg_ids,
+                    seen_at=now,
+                )
                 if school_obj:
                     discovered_schools.append(school_obj)
 
@@ -166,8 +216,123 @@ class KgSofiaBgAdapter(BaseSourceAdapter):
             if limit:
                 discovered_schools = discovered_schools[:limit]
 
+        # Update active/inactive flags for existing schools (avoid mass inactivation on empty results)
+        if seen_kg_ids:
+            await self._update_active_flags(seen_kg_ids, now)
+        else:
+            logger.warning("kg.sofia list returned no records; skipping active/inactive updates")
+
         logger.info(f"Discovered {len(discovered_schools)} institutions from kg.sofia.bg")
         return discovered_schools
+
+    async def _process_registry_record(
+        self,
+        data: dict,
+        record_type: str,
+        default_type: str,
+        existing_pages: dict[str, "SourcePage"],
+        school_id_by_kg_id: dict[str, int],
+        seen_kg_ids: set[str],
+        seen_at: datetime,
+    ) -> Optional[DiscoveredSchool]:
+        from app.models import SourcePage, ScrapeType
+
+        kg_id = data.get("id")
+        if kg_id is None:
+            logger.warning("kg.sofia record missing id, skipping")
+            return None
+
+        kg_id_str = str(kg_id)
+        seen_kg_ids.add(kg_id_str)
+
+        source_url = self._registry_source_url(record_type, kg_id_str)
+        page_hash = self._hash_record({"_source": record_type, "data": data})
+        source_page = existing_pages.get(source_url)
+        changed = source_page is None or source_page.content_hash != page_hash
+
+        school_id = school_id_by_kg_id.get(kg_id_str)
+        self._upsert_registry_page(
+            source_page=source_page,
+            source_url=source_url,
+            page_hash=page_hash,
+            school_id=school_id,
+            changed=changed,
+            seen_at=seen_at,
+        )
+
+        if not changed:
+            return None
+
+        school = self._parse_institution(data, default_type)
+        if school:
+            school.attributes["kg_sofia_active"] = True
+            school.attributes["kg_sofia_last_seen_at"] = seen_at.isoformat()
+        return school
+
+    def _registry_source_url(self, record_type: str, kg_id: str) -> str:
+        return f"{self.REGISTRY_SOURCE_PREFIX}{record_type}/{kg_id}"
+
+    def _hash_record(self, payload: dict) -> str:
+        return BaseScraper.compute_hash(
+            json.dumps(payload, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+        )
+
+    def _upsert_registry_page(
+        self,
+        source_page: Optional["SourcePage"],
+        source_url: str,
+        page_hash: str,
+        school_id: Optional[int],
+        changed: bool,
+        seen_at: datetime,
+    ) -> None:
+        from app.models import SourcePage, ScrapeType
+
+        if source_page:
+            source_page.last_scraped_at = seen_at
+            source_page.scrape_count = (source_page.scrape_count or 0) + 1
+            if changed:
+                source_page.content_hash = page_hash
+                source_page.last_changed_at = seen_at
+            if school_id and source_page.school_id != school_id:
+                source_page.school_id = school_id
+        else:
+            new_page = SourcePage(
+                school_id=school_id,
+                scrape_type=ScrapeType.REGISTRY,
+                source_url=source_url,
+                content_hash=page_hash,
+                last_scraped_at=seen_at,
+                last_changed_at=seen_at,
+                scrape_count=1,
+            )
+            self.db.add(new_page)
+
+    async def _update_active_flags(self, seen_kg_ids: set[str], seen_at: datetime) -> None:
+        from sqlalchemy import select
+        from app.models import School
+
+        now_iso = seen_at.isoformat()
+        result = await self.db.execute(
+            select(School).where(
+                School.country_code == "bg",
+                School.city == "sofia",
+            )
+        )
+        for school in result.scalars().all():
+            attrs = school.attributes or {}
+            kg_id = attrs.get("kg_sofia_id")
+            if kg_id is None:
+                continue
+            active = str(kg_id) in seen_kg_ids
+            if active:
+                attrs["kg_sofia_active"] = True
+                attrs["kg_sofia_last_seen_at"] = now_iso
+                attrs.pop("kg_sofia_inactive_since", None)
+            else:
+                attrs["kg_sofia_active"] = False
+                attrs.setdefault("kg_sofia_inactive_since", now_iso)
+            school.attributes = attrs
 
     def _parse_institution(
         self, data: dict, default_type: str = "kindergarten"

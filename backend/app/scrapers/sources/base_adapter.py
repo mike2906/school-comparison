@@ -34,7 +34,7 @@ class BaseSourceAdapter(ABC):
         self.db = db
 
     @abstractmethod
-    async def discover(self, limit: Optional[int] = None) -> list[DiscoveredSchool]:
+    async def discover(self, limit: Optional[int] = None, sample_ratio: float = 0.0) -> list[DiscoveredSchool]:
         """
         Discover schools from this source.
 
@@ -45,6 +45,7 @@ class BaseSourceAdapter(ABC):
 
         Args:
             limit: Optional limit on number of schools to discover (for testing)
+            sample_ratio: Optional ratio (0.0-1.0) of unchanged schools to sample for details
 
         Returns:
             List of DiscoveredSchool objects
@@ -173,35 +174,37 @@ class BaseSourceAdapter(ABC):
                     created += 1
 
                 # Step 3: Create/update locations
-                # For simplicity, delete old locations and recreate
-                # (In production, might want smarter diffing, but locations rarely change)
-                if existing_school:
-                    await self.db.execute(
-                        SchoolLocation.__table__.delete().where(SchoolLocation.school_id == school_id)
-                    )
-
-                for loc in disc.locations:
-                    new_location = SchoolLocation(
-                        school_id=school_id,
-                        address_i18n=loc.address_i18n,
-                        district=loc.district,
-                        lat=loc.lat,
-                        lng=loc.lng,
-                        phone=loc.phone,
-                        is_primary=loc.is_primary,
-                    )
-                    self.db.add(new_location)
-                    await self.db.flush()
-
-                    # Add age group shifts
-                    for age_group in loc.age_groups:
-                        shift = SchoolLocationAgeGroupShift(
-                            location_id=new_location.id,
-                            age_group=age_group,
-                            shift=loc.shifts.get(age_group),
-                            has_organised_groups=loc.has_organised_groups.get(age_group),
+                # If no locations were discovered, keep existing locations intact to avoid wiping data.
+                if disc.locations:
+                    # For simplicity, delete old locations and recreate
+                    # (In production, might want smarter diffing, but locations rarely change)
+                    if existing_school:
+                        await self.db.execute(
+                            SchoolLocation.__table__.delete().where(SchoolLocation.school_id == school_id)
                         )
-                        self.db.add(shift)
+
+                    for loc in disc.locations:
+                        new_location = SchoolLocation(
+                            school_id=school_id,
+                            address_i18n=loc.address_i18n,
+                            district=loc.district,
+                            lat=loc.lat,
+                            lng=loc.lng,
+                            phone=loc.phone,
+                            is_primary=loc.is_primary,
+                        )
+                        self.db.add(new_location)
+                        await self.db.flush()
+
+                        # Add age group shifts
+                        for age_group in loc.age_groups:
+                            shift = SchoolLocationAgeGroupShift(
+                                location_id=new_location.id,
+                                age_group=age_group,
+                                shift=loc.shifts.get(age_group),
+                                has_organised_groups=loc.has_organised_groups.get(age_group),
+                            )
+                            self.db.add(shift)
 
             except Exception as e:
                 logger.error(f"Error upserting school {disc.name_i18n}: {e}")
@@ -213,7 +216,7 @@ class BaseSourceAdapter(ABC):
         logger.info(f"Discovery complete: created={created}, updated={updated}, skipped={skipped}")
         return {"created": created, "updated": updated, "skipped": skipped}
 
-    async def run(self, limit: Optional[int] = None) -> dict[str, int]:
+    async def run(self, limit: Optional[int] = None, sample_ratio: float = 0.0) -> dict[str, int]:
         """
         Run the full discovery process: discover + upsert.
 
@@ -221,9 +224,10 @@ class BaseSourceAdapter(ABC):
 
         Args:
             limit: Optional limit on number of schools to discover
+            sample_ratio: Optional ratio (0.0-1.0) of unchanged schools to sample for details
 
         Returns:
             Dict with counts: {"created": N, "updated": M, "skipped": K}
         """
-        discovered = await self.discover(limit=limit)
+        discovered = await self.discover(limit=limit, sample_ratio=sample_ratio)
         return await self.upsert_schools(discovered)
