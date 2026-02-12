@@ -34,6 +34,11 @@ class Settings(BaseSettings):
     # Scraping settings
     scrape_delay_seconds: int = 2
 
+    # Geocoding settings
+    geocoding_provider: str = "nominatim"  # nominatim | google | mapbox
+    # REQUIRED: Must be set in .env (Nominatim policy requires valid contact email)
+    geocoding_contact_email: str = "your-email@example.com"  # Placeholder - override in .env
+
     # API settings
     max_schools_to_compare: int = 5
     max_search_query_length: int = 100
