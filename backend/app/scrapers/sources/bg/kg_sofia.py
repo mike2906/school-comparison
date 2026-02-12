@@ -1,13 +1,15 @@
 """
-KgSofiaBgAdapter - Discover kindergartens from kg.sofia.bg
+KgSofiaBgAdapter - Discover kindergartens and schools from kg.sofia.bg
 
-This adapter scrapes the official Sofia kindergarten portal (kg.sofia.bg)
-to discover state kindergartens with their locations, age groups, and admission data.
+This adapter uses the Sofia Municipality's API to discover kindergartens and schools
+with preparatory groups, including addresses and contact information.
+
+For detailed API documentation, see:
+backend/docs/KG_SOFIA_API_DOCUMENTATION.md
 """
 import logging
 from typing import Optional
 import httpx
-from bs4 import BeautifulSoup
 
 from app.scrapers.sources.base_adapter import BaseSourceAdapter
 from app.schemas.scraping import DiscoveredSchool, DiscoveredLocation
@@ -19,40 +21,36 @@ logger = logging.getLogger(__name__)
 @register_adapter
 class KgSofiaBgAdapter(BaseSourceAdapter):
     """
-    Discover state kindergartens from kg.sofia.bg.
+    Discover kindergartens and schools with preparatory groups from kg.sofia.bg.
 
-    The Sofia municipality maintains a public registry of all state kindergartens
-    with enrollment information, locations, and admission thresholds.
+    The Sofia municipality maintains a public API with all municipal kindergartens
+    and schools, including addresses, phone numbers, and district information.
 
     Data extracted:
-    - School name (Bulgarian)
-    - Address(es) with districts
-    - Age groups offered (nursery, first, second, third, preschool)
+    - School/kindergarten name (Bulgarian)
+    - Full address string
+    - District/region name
     - Phone numbers
-    - Historical admission points thresholds (stored in admission_info)
+    - ESRI GIS ID
+
+    Note: This API does NOT provide institutional IDs - must match with MoE data by name.
     """
 
     # Adapter metadata
     ADAPTER_NAME = "kg_sofia_bg"
     COUNTRY_CODE = "bg"
     CITY = "sofia"
-    DESCRIPTION = "Sofia state kindergartens from kg.sofia.bg"
-    RATE_LIMIT = "2/m"  # Respect government server
+    DESCRIPTION = "Sofia kindergartens and schools from kg.sofia.bg API"
+    RATE_LIMIT = "10/m"
 
-    # kg.sofia.bg endpoints
-    BASE_URL = "https://kg.sofia.bg"
-    KINDERGARTENS_LIST_URL = f"{BASE_URL}/web/guest/83"  # Main kindergarten list page
+    # kg.sofia.bg API endpoints
+    API_BASE_URL = "https://kg.sofia.bg/api/public"
+    KINDERGARTENS_URL = f"{API_BASE_URL}/kg/type/kinderGarden/all"
+    SCHOOLS_URL = f"{API_BASE_URL}/kg/type/school/all"
+    PREPARATORY_URL = f"{API_BASE_URL}/kg/type/preparative/all"
+    REGIONS_URL = f"{API_BASE_URL}/regions/all"
 
-    # Age group mapping (kg.sofia.bg terminology → our schema)
-    AGE_GROUP_MAPPING = {
-        "яслена": "nursery",
-        "първа": "first",
-        "втора": "second",
-        "трета": "third",
-        "предучилищна": "preschool",
-    }
-
-    # District name normalization (Cyrillic → standardized)
+    # District name normalization (same as before)
     DISTRICT_MAPPING = {
         "студентски": "Студентски град",
         "изгрев": "Изгрев",
@@ -80,306 +78,240 @@ class KgSofiaBgAdapter(BaseSourceAdapter):
         "кремиковци": "Кремиковци",
     }
 
+    # Institution type mapping (from publicType field)
+    TYPE_MAPPING = {
+        "ДГ": "kindergarten",
+        "ДГ (с яслени групи)": "kindergarten",
+        "СДЯ": "kindergarten",  # Самостоятелна детска ясла (Independent Nursery) - maps to kindergarten level
+        "СУ": "upper_secondary",
+        "СЕУ": "upper_secondary",  # Средно езиково училище
+        "ОУ": "lower_secondary",
+        "ОбУ": "upper_secondary",  # Обединено училище (grades 1-12)
+        "НУ": "primary",
+        "ПГ": "upper_secondary",
+    }
+
     async def discover(self, limit: Optional[int] = None) -> list[DiscoveredSchool]:
         """
-        Discover kindergartens from kg.sofia.bg.
+        Discover kindergartens and schools from kg.sofia.bg API.
 
         Process:
-        1. Fetch the main kindergarten list page
-        2. Extract links to individual kindergarten detail pages
-        3. For each kindergarten, fetch its detail page
-        4. Parse: name, address, district, age groups, admission thresholds
-        5. Return DiscoveredSchool objects
+        1. Fetch kindergartens from /kg/type/kinderGarden/all
+        2. Fetch schools from /kg/type/school/all
+        3. Parse addresses, phone numbers, districts
+        4. Return DiscoveredSchool objects
+
+        Note: The API returns all data in a single request (no pagination).
 
         Args:
-            limit: Optional limit on number of kindergartens to discover (for testing)
+            limit: Optional limit on number of schools to discover (for testing)
 
         Returns:
             List of DiscoveredSchool objects
 
         Raises:
-            httpx.HTTPError: If kg.sofia.bg is unreachable
-            ValueError: If the page structure is unexpected
+            httpx.HTTPError: If the API is unreachable
+            ValueError: If the response format is unexpected
         """
         discovered_schools = []
 
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
-            # Step 1: Fetch kindergarten list page
-            logger.info(f"Fetching kindergarten list from {self.KINDERGARTENS_LIST_URL}")
-            response = await client.get(self.KINDERGARTENS_LIST_URL)
-            response.raise_for_status()
+            # Fetch kindergartens
+            logger.info(f"Fetching kindergartens from {self.KINDERGARTENS_URL}")
+            kg_response = await client.get(
+                self.KINDERGARTENS_URL,
+                params={
+                    "filterType": "by_region",
+                    "kgType": 0,  # All types
+                    "regionId": 0,  # All regions
+                },
+            )
+            kg_response.raise_for_status()
+            kg_data = kg_response.json()
 
-            soup = BeautifulSoup(response.content, "html.parser")
+            # Extract kindergartens
+            kindergartens = kg_data.get("items", {}).get("kinderGardens", [])
+            logger.info(f"Found {len(kindergartens)} kindergartens")
 
-            # Step 2: Extract kindergarten detail page links
-            # NOTE: This selector is a placeholder - will need to be adjusted based on actual HTML structure
-            kg_links = self._extract_kindergarten_links(soup)
+            # Parse kindergartens
+            for kg in kindergartens:
+                school = self._parse_institution(kg, "kindergarten")
+                if school:
+                    discovered_schools.append(school)
 
+            # Fetch schools with preparatory groups
+            logger.info(f"Fetching schools from {self.SCHOOLS_URL}")
+            school_response = await client.get(
+                self.SCHOOLS_URL,
+                params={
+                    "filterType": "by_region",
+                    "kgType": 0,
+                    "regionId": 0,
+                },
+            )
+            school_response.raise_for_status()
+            school_data = school_response.json()
+
+            # Extract schools (note: still called "kinderGardens" in response)
+            schools = school_data.get("items", {}).get("kinderGardens", [])
+            logger.info(f"Found {len(schools)} schools")
+
+            # Parse schools
+            for school in schools:
+                school_obj = self._parse_institution(school, "school")
+                if school_obj:
+                    discovered_schools.append(school_obj)
+
+            # Apply limit if specified
             if limit:
-                kg_links = kg_links[:limit]
+                discovered_schools = discovered_schools[:limit]
 
-            logger.info(f"Found {len(kg_links)} kindergartens to process")
-
-            # Step 3: Process each kindergarten
-            for idx, (kg_id, kg_url) in enumerate(kg_links, 1):
-                try:
-                    logger.info(f"Processing kindergarten {idx}/{len(kg_links)}: {kg_url}")
-
-                    # Fetch detail page
-                    detail_response = await client.get(kg_url)
-                    detail_response.raise_for_status()
-
-                    detail_soup = BeautifulSoup(detail_response.content, "html.parser")
-
-                    # Parse kindergarten data
-                    school_data = self._parse_kindergarten_page(kg_id, kg_url, detail_soup)
-
-                    if school_data:
-                        discovered_schools.append(school_data)
-
-                    # Rate limiting (handled by Celery task-level rate limit, but add small delay)
-                    await self._delay()
-
-                except Exception as e:
-                    logger.error(f"Error processing kindergarten {kg_url}: {e}")
-                    continue
-
-        logger.info(f"Discovered {len(discovered_schools)} kindergartens from kg.sofia.bg")
+        logger.info(f"Discovered {len(discovered_schools)} institutions from kg.sofia.bg")
         return discovered_schools
 
-    def _extract_kindergarten_links(self, soup: BeautifulSoup) -> list[tuple[str, str]]:
-        """
-        Extract kindergarten detail page links from the list page.
-
-        Args:
-            soup: Parsed HTML of the kindergarten list page
-
-        Returns:
-            List of (kindergarten_id, detail_url) tuples
-
-        Note:
-            This is a placeholder implementation. The actual selectors will depend
-            on the HTML structure of kg.sofia.bg. Common patterns:
-            - Links in a table with class="kg-list"
-            - Links with href containing "/kindergarten/" or "kg_id="
-            - JSON data embedded in a script tag
-        """
-        links = []
-
-        # Placeholder: Look for links that might be kindergarten detail pages
-        # Real implementation will need to inspect the actual HTML structure
-        for link in soup.find_all("a", href=True):
-            href = link["href"]
-            # Example pattern: href="/web/kg/123" or "?kg_id=123"
-            if "/kg/" in href or "kg_id=" in href:
-                full_url = href if href.startswith("http") else f"{self.BASE_URL}{href}"
-                # Extract ID from URL (rough heuristic)
-                kg_id = href.split("/")[-1] if "/" in href else href.split("=")[-1]
-                links.append((kg_id, full_url))
-
-        # Fallback: If no links found, log a warning
-        if not links:
-            logger.warning("No kindergarten links found - HTML structure may have changed")
-
-        return links
-
-    def _parse_kindergarten_page(
-        self, kg_id: str, source_url: str, soup: BeautifulSoup
+    def _parse_institution(
+        self, data: dict, default_type: str = "kindergarten"
     ) -> Optional[DiscoveredSchool]:
         """
-        Parse a kindergarten detail page.
+        Parse institution data from kg.sofia.bg API.
+
+        API Response Fields:
+        - id: Internal database ID
+        - nameStr: Full name (use this)
+        - name.publicType: Institution type (ДГ, СУ, ОУ, etc.)
+        - address: Full address string
+        - region: District/region name
+        - contacts[]: Contact information (phone, email, etc.)
+        - esriId: ESRI GIS ID
 
         Args:
-            kg_id: Kindergarten ID from the URL
-            source_url: URL of the detail page
-            soup: Parsed HTML of the detail page
+            data: Dict with institution data from API
+            default_type: Default education level if type parsing fails
 
         Returns:
             DiscoveredSchool object or None if parsing fails
-
-        Note:
-            This is a placeholder implementation. The actual parsing logic will depend
-            on the HTML structure of kg.sofia.bg kindergarten detail pages.
-
-            Common data locations:
-            - Name: <h1> or <div class="kg-name">
-            - Address: <div class="kg-address"> or in a "Контакти" section
-            - District: Often part of the address or in metadata
-            - Age groups: Table or list with "Възрастови групи"
-            - Admission points: Table with historical thresholds per year/group
         """
         try:
             # Extract name
-            name_bg = self._extract_name(soup)
+            name_bg = data.get("nameStr", "").strip()
             if not name_bg:
-                logger.warning(f"Could not extract name for kindergarten {kg_id}")
+                logger.warning(f"Institution {data.get('id')} has no name, skipping")
                 return None
 
-            # Extract location data
-            location_data = self._extract_location(soup)
+            # Determine education level from publicType
+            public_type = data.get("name", {}).get("publicType", "")
+            education_level = self._determine_education_level(public_type, name_bg)
 
-            # Extract age groups (may be per-location or school-wide)
-            age_groups_data = self._extract_age_groups(soup)
+            # Determine school type
+            # NOTE: kg.sofia.bg is the Sofia Municipality portal - ALL institutions are municipal (classified as "state" in our schema)
+            # Private schools are not listed here - they come from MoE API
+            school_type = "state"
 
-            # Extract admission info (historical thresholds)
-            admission_info = self._extract_admission_info(soup)
+            # Extract address
+            address_bg = data.get("address", "").strip()
+            if not address_bg:
+                logger.warning(f"Institution {name_bg} has no address, skipping")
+                return None
 
-            # Build DiscoveredLocation
-            locations = []
-            if location_data:
-                discovered_location = DiscoveredLocation(
-                    address_i18n={"bg": location_data["address"]},
-                    district=location_data.get("district"),
-                    phone=location_data.get("phone"),
-                    is_primary=True,
-                    age_groups=age_groups_data.get("age_groups", []),
-                    shifts=age_groups_data.get("shifts", {}),
-                    has_organised_groups=age_groups_data.get("organised_groups", {}),
-                )
-                locations.append(discovered_location)
+            # Extract district
+            district = data.get("region", "").strip()
+            if district:
+                district = self.DISTRICT_MAPPING.get(district.lower(), district)
+
+            # Extract phone from contacts array
+            phone = self._extract_phone(data.get("contacts", []))
+
+            # Extract ESRI ID
+            esri_id = data.get("esriId")
+
+            # Build location
+            location = DiscoveredLocation(
+                address_i18n={"bg": address_bg},
+                district=district,
+                phone=phone,
+                is_primary=True,
+                age_groups=[],  # Not provided by this API
+                shifts={},  # Not provided by this API
+                has_organised_groups={},  # Not provided by this API
+            )
 
             # Build DiscoveredSchool
             return DiscoveredSchool(
-                institutional_id=None,  # kg.sofia.bg may not provide MoE institutional ID
+                institutional_id=None,  # Not provided - must match with MoE data
                 name_i18n={"bg": name_bg},
                 country_code="bg",
                 city="sofia",
-                school_type="state",
-                education_level="kindergarten",
-                source_url=source_url,
-                locations=locations,
-                admission_info=admission_info,
+                school_type=school_type,
+                education_level=education_level,
+                source_url=self.KINDERGARTENS_URL if education_level == "kindergarten" else self.SCHOOLS_URL,
+                locations=[location],
+                attributes={
+                    "kg_sofia_id": data.get("id"),
+                    "kg_sofia_esri_id": esri_id,
+                    "kg_sofia_public_type": public_type,
+                },
             )
 
         except Exception as e:
-            logger.error(f"Error parsing kindergarten page {kg_id}: {e}")
+            logger.error(f"Error parsing institution data: {e}")
             return None
 
-    def _extract_name(self, soup: BeautifulSoup) -> Optional[str]:
-        """Extract kindergarten name from the page."""
-        # Try common selectors
-        name_tag = soup.find("h1") or soup.find("div", class_="kg-name") or soup.find("title")
-
-        if name_tag:
-            name = name_tag.get_text(strip=True)
-            # Clean up common prefixes/suffixes
-            name = name.replace("Детска градина", "ДГ").strip()
-            return name
-
-        return None
-
-    def _extract_location(self, soup: BeautifulSoup) -> Optional[dict]:
-        """Extract address, district, phone from the page."""
-        location = {}
-
-        # Try to find address
-        # Common patterns: <div class="address">, <span>Адрес:</span>, etc.
-        address_tag = soup.find("div", class_="address") or soup.find(string=lambda t: t and "адрес" in t.lower())
-
-        if address_tag:
-            if isinstance(address_tag, str):
-                # Found text containing "адрес", get the next sibling or parent
-                parent = address_tag.parent
-                address_text = parent.get_text(strip=True) if parent else ""
-            else:
-                address_text = address_tag.get_text(strip=True)
-
-            location["address"] = address_text
-
-            # Try to extract district from address
-            district = self._extract_district_from_address(address_text)
-            if district:
-                location["district"] = district
-
-        # Try to find phone
-        phone_tag = soup.find(string=lambda t: t and "телефон" in t.lower())
-        if phone_tag:
-            parent = phone_tag.parent
-            phone_text = parent.get_text(strip=True) if parent else ""
-            # Extract phone number pattern (e.g., 02/123-4567)
-            import re
-            phone_match = re.search(r"0\d{1}/\d{3}-?\d{4}", phone_text)
-            if phone_match:
-                location["phone"] = phone_match.group(0)
-
-        return location if location else None
-
-    def _extract_district_from_address(self, address: str) -> Optional[str]:
+    def _determine_education_level(self, public_type: str, name: str) -> str:
         """
-        Extract district name from address string.
+        Determine education level from publicType or school name.
 
-        Looks for known Sofia district names in the address.
-        """
-        address_lower = address.lower()
-        for district_key, district_name in self.DISTRICT_MAPPING.items():
-            if district_key in address_lower:
-                return district_name
-        return None
-
-    def _extract_age_groups(self, soup: BeautifulSoup) -> dict:
-        """
-        Extract age groups and shift information.
+        Args:
+            public_type: Institution type from API (e.g., "ДГ", "СУ", "ОУ")
+            name: School name (fallback for parsing)
 
         Returns:
-            Dict with:
-            - age_groups: list[str]
-            - shifts: dict[str, str]
-            - organised_groups: dict[str, bool]
+            Education level: "kindergarten", "primary", "lower_secondary", "upper_secondary"
         """
-        result = {"age_groups": [], "shifts": {}, "organised_groups": {}}
+        # Try exact match first
+        if public_type in self.TYPE_MAPPING:
+            return self.TYPE_MAPPING[public_type]
 
-        # Look for age group table or list
-        # Common patterns: table with "Възрастова група" column
-        age_group_section = soup.find(string=lambda t: t and "възрастов" in t.lower())
+        # Try partial match
+        for key, level in self.TYPE_MAPPING.items():
+            if key in public_type:
+                return level
 
-        if age_group_section:
-            # Find parent table or list
-            parent = age_group_section.find_parent(["table", "ul", "div"])
-            if parent:
-                # Extract age group text
-                for row in parent.find_all("tr"):
-                    cells = row.find_all(["td", "th"])
-                    if len(cells) >= 1:
-                        cell_text = cells[0].get_text(strip=True).lower()
-                        # Map Bulgarian age group names to our schema
-                        for bg_name, schema_name in self.AGE_GROUP_MAPPING.items():
-                            if bg_name in cell_text:
-                                result["age_groups"].append(schema_name)
-                                # Default to full_day for state kindergartens
-                                result["shifts"][schema_name] = "full_day"
-                                # Most state KGs have organised groups (after-school care)
-                                result["organised_groups"][schema_name] = True
+        # Fallback: parse from name
+        name_lower = name.lower()
 
-        return result
+        if "дг" in name_lower or "детска градина" in name_lower:
+            return "kindergarten"
+        if "су" in name_lower or "средно" in name_lower or "гимназия" in name_lower:
+            return "upper_secondary"
+        if "оу" in name_lower or "основно" in name_lower:
+            return "lower_secondary"
+        if "ну" in name_lower or "начално" in name_lower:
+            return "primary"
 
-    def _extract_admission_info(self, soup: BeautifulSoup) -> dict:
+        # Default
+        logger.warning(f"Could not determine education level for '{name}', defaulting to kindergarten")
+        return "kindergarten"
+
+    def _extract_phone(self, contacts: list) -> Optional[str]:
         """
-        Extract admission points thresholds from historical data.
+        Extract phone number from contacts array.
 
-        kg.sofia.bg often publishes historical admission thresholds showing
-        the minimum points needed to get into each age group in past years.
+        Args:
+            contacts: List of contact objects from API
 
         Returns:
-            Dict with historical_thresholds structure
+            Phone number string or None
         """
-        admission_info = {"system": "points", "historical_thresholds": []}
-
-        # Look for admission threshold tables
-        # Common patterns: table with "Прием" or "Бал" in the header
-        threshold_section = soup.find(string=lambda t: t and ("прием" in t.lower() or "бал" in t.lower()))
-
-        if threshold_section:
-            # This would parse the threshold table
-            # Format: year, age_group, rounds: [{round, last_admitted_points, admitted_count}]
-            # Placeholder for now - actual parsing depends on HTML structure
-            pass
-
-        return admission_info
+        for contact in contacts:
+            kind = contact.get("kindCommunication", {}).get("label", "")
+            if kind == "phone":
+                phone = contact.get("fieldValue", "").strip()
+                if phone:
+                    return phone
+        return None
 
     async def _delay(self):
-        """Small delay between requests to avoid overwhelming the server."""
+        """Small delay between requests (not really needed since API returns all data at once)."""
         import asyncio
-        from app.config import get_settings
 
-        settings = get_settings()
-        await asyncio.sleep(settings.scrape_delay_seconds)
+        await asyncio.sleep(0.1)

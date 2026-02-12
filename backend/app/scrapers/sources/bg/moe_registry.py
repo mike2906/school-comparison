@@ -1,13 +1,16 @@
 """
-MoeRegistryAdapter - Discover schools from the Ministry of Education registry
+MoeRegistryAdapter - Discover schools and kindergartens from the Ministry of Education registry
 
-This adapter scrapes the Bulgarian Ministry of Education's school registry
-to discover primary and secondary schools with their official institutional IDs.
+This adapter uses the Bulgarian Ministry of Education's official API (ri-api.mon.bg)
+to discover all educational institutions (kindergartens, primary schools, secondary schools)
+with their official institutional IDs.
+
+For detailed API documentation, field mappings, and examples, see:
+backend/docs/MOE_API_DOCUMENTATION.md
 """
 import logging
 from typing import Optional
 import httpx
-from bs4 import BeautifulSoup
 
 from app.scrapers.sources.base_adapter import BaseSourceAdapter
 from app.schemas.scraping import DiscoveredSchool, DiscoveredLocation
@@ -19,234 +22,344 @@ logger = logging.getLogger(__name__)
 @register_adapter
 class MoeRegistryAdapter(BaseSourceAdapter):
     """
-    Discover primary and secondary schools from the Ministry of Education registry.
+    Discover schools and kindergartens from the Ministry of Education registry API.
 
-    The Bulgarian Ministry of Education maintains a public registry of all
-    registered schools with their institutional codes (Код по НЕИСПУО).
+    The Bulgarian Ministry of Education maintains a public API at ri-api.mon.bg
+    with all registered educational institutions including their institutional codes (Код по НЕИСПУО).
 
     Data extracted:
-    - Institutional ID (Код по НЕИСПУО) - CRITICAL for idempotency
+    - Institutional ID (instid) - CRITICAL for idempotency
     - School name (Bulgarian)
     - School type (state/private/international)
-    - Education level (primary/lower_secondary/upper_secondary)
-    - Address
-    - District (when available)
-    - Phone
+    - Education level (kindergarten/primary/lower_secondary/upper_secondary)
+    - Region, Municipality, Town codes
     """
 
     # Adapter metadata
     ADAPTER_NAME = "moe_registry"
     COUNTRY_CODE = "bg"
-    CITY = None  # Country-wide registry, can filter by city in post-processing
-    DESCRIPTION = "Bulgarian schools from Ministry of Education registry"
-    RATE_LIMIT = "2/m"  # Respect government server
+    CITY = None  # Can filter by region/municipality
+    DESCRIPTION = "Bulgarian schools and kindergartens from Ministry of Education API (ri-api.mon.bg)"
+    RATE_LIMIT = "60/m"  # 1 second between detail requests
 
-    # Ministry of Education registry endpoints
-    BASE_URL = "https://admin.mon.bg"  # Placeholder - actual URL may differ
-    SCHOOLS_SEARCH_URL = f"{BASE_URL}/schools/search"  # Placeholder
+    # Ministry of Education API endpoints
+    API_BASE_URL = "https://ri-api.mon.bg"
+    PUBLIC_REGISTER_URL = f"{API_BASE_URL}/data/get/public-register"
+    INSTITUTION_DETAIL_URL = f"{API_BASE_URL}/data/get/institution"
+    REGIONS_URL = f"{API_BASE_URL}/data/get/regionMultiple"
+    MUNICIPALITIES_URL = f"{API_BASE_URL}/data/get/municipalityMultiple"
+    TOWNS_URL = f"{API_BASE_URL}/data/get/townMultiple"
 
-    # School type mapping (Bulgarian terms → our schema)
-    SCHOOL_TYPE_MAPPING = {
-        "държавно": "state",
-        "общинско": "state",
-        "частно": "private",
-        "международно": "international",
-        "чуждоезиково": "state",  # Foreign language schools are state-run
+    # Sofia region codes (город София + област София)
+    SOFIA_CITY_REGION = 22  # София-град
+    SOFIA_OBLAST_REGION = 23  # София област
+
+    # Institution type mapping (instType field)
+    INST_TYPE_MAPPING = {
+        1: "school",  # Училище
+        2: "kindergarten",  # Детска градина
+        # 3-5 are support centers, not regular schools
     }
 
-    # Education level mapping
-    EDUCATION_LEVEL_MAPPING = {
-        "начално": "primary",
-        "прогимназия": "lower_secondary",
-        "основно": "lower_secondary",  # ОУ covers grades 1-8
-        "гимназия": "upper_secondary",
-        "средно": "upper_secondary",
-        "професионална": "upper_secondary",
+    # Financial/ownership type mapping (financialSchoolType field)
+    FINANCIAL_TYPE_MAPPING = {
+        1: "state",  # Държавно
+        2: "state",  # Общинско (municipal = state-run)
+        3: "private",  # Частно
+        11: "state",  # Духовно (religious schools are state-funded)
+        12: "international",  # По силата на международен договор
     }
 
-    async def discover(self, limit: Optional[int] = None) -> list[DiscoveredSchool]:
+    # Detailed school type mapping (detailedSchoolType field)
+    # Maps to education_level in our schema
+    DETAILED_TYPE_MAPPING = {
+        111: "upper_secondary",  # духовно
+        112: "upper_secondary",  # по изкуствата
+        113: "upper_secondary",  # по културата
+        114: "upper_secondary",  # спортно
+        121: "primary",  # начално (grades 1-4)
+        122: "lower_secondary",  # основно (grades 1-8)
+        123: "upper_secondary",  # обединено (grades 1-12)
+        124: "upper_secondary",  # средно (grades 1-12)
+        125: "upper_secondary",  # профилирана гимназия (grades 8-12)
+        126: "upper_secondary",  # професионална гимназия (vocational)
+        131: "lower_secondary",  # за обучение и подкрепа на ученици с увреден слух
+        132: "lower_secondary",  # за обучение и подкрепа на ученици с нарушено зрение
+        133: "lower_secondary",  # възпитателно училище - интернат
+        134: "lower_secondary",  # социално-педагогически интернат
+        141: "lower_secondary",  # към местата за лишаване от свобода
+        151: "kindergarten",  # детска градина
+        # 161-174 are support centers, observatories, dormitories (not schools)
+        181: "upper_secondary",  # училище, функциониращо по силата на международен договор
+    }
+
+    async def discover(self, limit: Optional[int] = None, fetch_details: bool = True) -> list[DiscoveredSchool]:
         """
-        Discover schools from the Ministry of Education registry.
+        Discover schools from the Ministry of Education API.
 
         Process:
-        1. Search/list schools in the registry (may need pagination)
-        2. For each school, extract institutional ID and basic info
-        3. Optionally fetch detail pages for full information
-        4. Return DiscoveredSchool objects
+        1. Call the public-register API endpoint with Sofia region filters
+        2. For each school, fetch detailed data (addresses, phone, email, website)
+        3. Parse the JSON response
+        4. Map API fields to our DiscoveredSchool schema
+        5. Return list of schools
 
         Args:
             limit: Optional limit on number of schools to discover (for testing)
+            fetch_details: Whether to fetch detailed data for each school (default: True)
 
         Returns:
             List of DiscoveredSchool objects
 
         Raises:
-            httpx.HTTPError: If the registry is unreachable
-            ValueError: If the data format is unexpected
+            httpx.HTTPError: If the API is unreachable
+            ValueError: If the response format is unexpected
         """
         discovered_schools = []
 
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
-            # Step 1: Fetch school list/search page
-            logger.info(f"Fetching school registry from {self.SCHOOLS_SEARCH_URL}")
+            # Step 1: Fetch schools from Sofia city and Sofia region
+            logger.info(f"Fetching schools from MoE API: {self.PUBLIC_REGISTER_URL}")
 
-            # The actual implementation will depend on how the MoE registry works:
-            # Option A: Single page with all schools (unlikely)
-            # Option B: Paginated list
-            # Option C: Search form that needs to be submitted
-            # Option D: Downloadable CSV/Excel file
-            # Option E: API endpoint (best case)
+            # Request body - filter for Sofia regions and active institutions only
+            request_body = {
+                "region": [self.SOFIA_CITY_REGION, self.SOFIA_OBLAST_REGION],
+                "isRIActive": 1,  # Only active institutions
+            }
 
-            # Placeholder: Assume we can get a list of schools
-            schools_data = await self._fetch_school_list(client)
+            response = await client.post(
+                self.PUBLIC_REGISTER_URL,
+                json=request_body,
+                headers={
+                    "Accept": "application/json, text/plain, */*",
+                    "Content-Type": "application/json",
+                },
+            )
+            response.raise_for_status()
+
+            # Step 2: Parse response
+            data = response.json()
+
+            if data.get("status") != 1:
+                raise ValueError(f"API returned error status: {data}")
+
+            institutions = data.get("data", {}).get("publicInstitutions", [])
+            logger.info(f"Found {len(institutions)} institutions from API")
 
             if limit:
-                schools_data = schools_data[:limit]
+                institutions = institutions[:limit]
 
-            logger.info(f"Found {len(schools_data)} schools to process")
-
-            # Step 2: Process each school
-            for idx, school_data in enumerate(schools_data, 1):
+            # Step 3: Process each institution
+            for idx, inst_data in enumerate(institutions, 1):
                 try:
-                    logger.info(f"Processing school {idx}/{len(schools_data)}")
+                    logger.info(f"Processing institution {idx}/{len(institutions)}: {inst_data.get('name')}")
 
-                    # Parse school data
-                    school = self._parse_school_data(school_data)
+                    # Step 3a: Fetch detailed data for this school
+                    detail_data = None
+                    if fetch_details:
+                        detail_data = await self._fetch_institution_detail(client, inst_data)
+
+                    # Step 3b: Parse institution data (with detail data if available)
+                    school = self._parse_institution_data(inst_data, detail_data)
 
                     if school:
                         discovered_schools.append(school)
 
-                    # Rate limiting
+                    # Small delay to be respectful
                     await self._delay()
 
                 except Exception as e:
-                    logger.error(f"Error processing school: {e}")
+                    logger.error(f"Error processing institution {inst_data.get('id')}: {e}")
                     continue
 
         logger.info(f"Discovered {len(discovered_schools)} schools from MoE registry")
         return discovered_schools
 
-    async def _fetch_school_list(self, client: httpx.AsyncClient) -> list[dict]:
+    async def _fetch_institution_detail(self, client: httpx.AsyncClient, inst_data: dict) -> Optional[dict]:
         """
-        Fetch the list of schools from the registry.
+        Fetch detailed data for a specific institution.
 
-        This is a placeholder - the actual implementation depends on how
-        the MoE registry exposes data.
+        The detail endpoint provides addresses, phone numbers, emails, websites,
+        director information, and multiple locations.
 
         Args:
             client: HTTP client
+            inst_data: Basic institution data from public-register (contains instid and procID)
 
         Returns:
-            List of school data dictionaries
-
-        Note:
-            Real implementation options:
-            1. Scrape HTML list pages with pagination
-            2. Submit search forms to get results
-            3. Download CSV/Excel and parse
-            4. Call an API endpoint (if available)
-            5. Scrape regional/district pages separately
-        """
-        schools = []
-
-        # Placeholder: Assume we're scraping an HTML list
-        response = await client.get(self.SCHOOLS_SEARCH_URL)
-        response.raise_for_status()
-
-        soup = BeautifulSoup(response.content, "html.parser")
-
-        # Extract school entries from the page
-        # Common patterns:
-        # - Table with rows for each school
-        # - List items with school info
-        # - Search results with links to detail pages
-
-        # Example: Find all school rows in a table
-        for row in soup.find_all("tr", class_="school-row"):  # Placeholder selector
-            school_data = self._extract_school_from_row(row)
-            if school_data:
-                schools.append(school_data)
-
-        return schools
-
-    def _extract_school_from_row(self, row) -> Optional[dict]:
-        """
-        Extract school data from a table row or list item.
-
-        Args:
-            row: BeautifulSoup element (tr, li, div, etc.)
-
-        Returns:
-            Dict with school data or None if parsing fails
-
-        Note:
-            This is a placeholder - the actual structure depends on the HTML.
+            Dict with detailed institution data, or None if fetch fails
         """
         try:
-            # Example extraction (adjust selectors based on actual HTML)
-            cells = row.find_all("td")
+            instid = inst_data.get("instid")
+            proc_id = inst_data.get("procID")
 
-            if len(cells) < 4:
+            if not instid or not proc_id:
+                logger.warning(f"Missing instid or procID for institution {inst_data.get('name')}")
                 return None
 
-            return {
-                "institutional_id": cells[0].get_text(strip=True),
-                "name": cells[1].get_text(strip=True),
-                "type": cells[2].get_text(strip=True),
-                "address": cells[3].get_text(strip=True),
-            }
+            # Fetch detailed data
+            response = await client.post(
+                self.INSTITUTION_DETAIL_URL,
+                json={"instid": str(instid), "procID": proc_id},
+                headers={
+                    "Accept": "application/json, text/plain, */*",
+                    "Content-Type": "application/json",
+                },
+            )
+            response.raise_for_status()
+
+            data = response.json()
+
+            if data.get("status") != 1:
+                logger.warning(f"Detail API returned status {data.get('status')} for institution {instid}")
+                return None
+
+            detail_list = data.get("data", [])
+            if not detail_list:
+                logger.warning(f"No detail data returned for institution {instid}")
+                return None
+
+            # Return first item (should only be one)
+            return detail_list[0]
 
         except Exception as e:
-            logger.error(f"Error extracting school from row: {e}")
+            logger.error(f"Error fetching detail for institution {inst_data.get('instid')}: {e}")
             return None
 
-    def _parse_school_data(self, data: dict) -> Optional[DiscoveredSchool]:
+    def _parse_institution_data(self, data: dict, detail_data: Optional[dict] = None) -> Optional[DiscoveredSchool]:
         """
-        Parse raw school data into a DiscoveredSchool object.
+        Parse raw institution data from the API into a DiscoveredSchool object.
+
+        API Response Fields (from public-register):
+        - id: Internal database ID
+        - instid: Institutional ID (Код по НЕИСПУО) - USE THIS for idempotency
+        - name: School name in Bulgarian
+        - region: Region code (22 = Sofia city, 23 = Sofia oblast)
+        - municipality: Municipality code
+        - town: Town/settlement code
+        - instType: 1=school, 2=kindergarten
+        - detailedSchoolType: Specific school type (121=primary, 122=basic, etc.)
+        - financialSchoolType: 1=state, 2=municipal, 3=private, etc.
+        - transformType: Transformation status (not relevant for us)
+        - instKind: Institution category (not relevant for us)
+
+        Detail Data Fields (from /data/get/institution):
+        - settlementAddress: Full address
+        - phoneNumber: Phone number
+        - email: Email address
+        - website: Website URL
+        - institutionDepartments: Array of department locations
 
         Args:
-            data: Dict with raw school data from the registry
+            data: Dict with raw institution data from public-register API
+            detail_data: Optional dict with detailed data from institution API
 
         Returns:
-            DiscoveredSchool object or None if parsing fails
+            DiscoveredSchool object or None if not a regular school/kindergarten
         """
         try:
             # Extract institutional ID (CRITICAL for idempotency)
-            institutional_id = data.get("institutional_id")
+            instid = data.get("instid")
+            if instid is None:
+                logger.warning("Institution has no instid, skipping")
+                return None
+            institutional_id = str(instid)
 
             # Extract name
             name_bg = data.get("name", "").strip()
             if not name_bg:
-                logger.warning("School has no name, skipping")
+                logger.warning(f"Institution {institutional_id} has no name, skipping")
                 return None
 
-            # Determine school type
-            type_text = data.get("type", "").lower()
-            school_type = self._determine_school_type(type_text)
+            # Determine institution type (school vs kindergarten)
+            inst_type = data.get("instType")
+            if inst_type not in self.INST_TYPE_MAPPING:
+                logger.debug(f"Skipping non-school institution type {inst_type}: {name_bg}")
+                return None
 
-            # Determine education level
-            education_level = self._determine_education_level(name_bg, type_text)
+            inst_category = self.INST_TYPE_MAPPING[inst_type]
 
-            # Extract address
-            address_bg = data.get("address", "").strip()
+            # Determine school type (state/private/international)
+            financial_type = data.get("financialSchoolType")
+            school_type = self.FINANCIAL_TYPE_MAPPING.get(financial_type, "state")
 
-            # Try to extract city and district from address
-            city = self._extract_city_from_address(address_bg)
-            district = self._extract_district_from_address(address_bg)
+            # Determine education level from detailed type
+            detailed_type = data.get("detailedSchoolType")
+            education_level = self.DETAILED_TYPE_MAPPING.get(detailed_type)
 
-            # Build location
+            if not education_level:
+                logger.warning(f"Unknown detailedSchoolType {detailed_type} for {name_bg}, skipping")
+                return None
+
+            # If instType says kindergarten, ensure education_level matches
+            if inst_category == "kindergarten":
+                education_level = "kindergarten"
+
+            # Determine city (based on region code)
+            region_code = data.get("region")
+            city = "sofia" if region_code in [self.SOFIA_CITY_REGION, self.SOFIA_OBLAST_REGION] else None
+
+            # Extract location data from detail_data if available
             locations = []
-            if address_bg:
-                location = DiscoveredLocation(
-                    address_i18n={"bg": address_bg},
-                    district=district,
-                    phone=data.get("phone"),
-                    is_primary=True,
-                    age_groups=[],  # Will be populated later or from other sources
-                )
-                locations.append(location)
+            website_url = None
 
-            # Build school
+            if detail_data:
+                # Extract website URL
+                website_url = (detail_data.get("website") or "").strip() or None
+
+                # Extract primary location
+                primary_address = (detail_data.get("settlementAddress") or "").strip()
+                phone_number = (detail_data.get("phoneNumber") or "").strip() or None
+                email = (detail_data.get("email") or "").strip() or None
+
+                if primary_address:
+                    primary_location = DiscoveredLocation(
+                        address_i18n={"bg": primary_address},
+                        district=None,  # Will need to parse from address or enrich later
+                        phone=phone_number,
+                        is_primary=True,
+                        age_groups=[],
+                        shifts={},
+                        has_organised_groups={},
+                    )
+                    locations.append(primary_location)
+
+                # Extract department locations (branches)
+                departments = detail_data.get("institutionDepartments", [])
+                for dept in departments:
+                    dept_address = (dept.get("departmentAddress") or "").strip()
+                    if dept_address and dept_address != primary_address:  # Avoid duplicates
+                        dept_location = DiscoveredLocation(
+                            address_i18n={"bg": dept_address},
+                            district=None,
+                            phone=None,  # Departments don't have separate phone numbers in API
+                            is_primary=False,
+                            age_groups=[],
+                            shifts={},
+                            has_organised_groups={},
+                        )
+                        locations.append(dept_location)
+
+            # Build attributes dict
+            attributes = {
+                "moe_region_code": region_code,
+                "moe_municipality_code": data.get("municipality"),
+                "moe_town_code": data.get("town"),
+                "moe_detailed_type": detailed_type,
+                "moe_inst_type": inst_type,
+                "moe_financial_type": financial_type,
+            }
+
+            # Add detail data attributes if available
+            if detail_data:
+                attributes.update({
+                    "moe_bulstat": detail_data.get("bulstat"),
+                    "moe_abbreviation": detail_data.get("abbreviation"),
+                    "moe_director_name": detail_data.get("staffDirector"),
+                    "moe_email": detail_data.get("email"),
+                })
+
+            # Build DiscoveredSchool
             return DiscoveredSchool(
                 institutional_id=institutional_id,
                 name_i18n={"bg": name_bg},
@@ -254,139 +367,22 @@ class MoeRegistryAdapter(BaseSourceAdapter):
                 city=city,
                 school_type=school_type,
                 education_level=education_level,
-                source_url=data.get("detail_url"),
+                source_url=self.PUBLIC_REGISTER_URL,  # Provenance: API endpoint, not per-school URL (MoE doesn't have those)
+                website_url=website_url,
                 locations=locations,
-                attributes=data.get("attributes", {}),
+                attributes=attributes,
             )
 
         except Exception as e:
-            logger.error(f"Error parsing school data: {e}")
+            logger.error(f"Error parsing institution data: {e}")
             return None
-
-    def _determine_school_type(self, type_text: str) -> str:
-        """
-        Determine school type from registry text.
-
-        Args:
-            type_text: School type text from registry
-
-        Returns:
-            School type: "state", "private", or "international"
-        """
-        for keyword, school_type in self.SCHOOL_TYPE_MAPPING.items():
-            if keyword in type_text:
-                return school_type
-
-        # Default to state if unclear
-        logger.warning(f"Unknown school type '{type_text}', defaulting to 'state'")
-        return "state"
-
-    def _determine_education_level(self, name: str, type_text: str) -> str:
-        """
-        Determine education level from school name and type.
-
-        Args:
-            name: School name
-            type_text: School type text
-
-        Returns:
-            Education level: "primary", "lower_secondary", or "upper_secondary"
-
-        Note:
-            Bulgarian school naming conventions:
-            - ОУ (Основно училище) = grades 1-8 → lower_secondary
-            - СУ (Средно училище) = grades 8-12 → upper_secondary
-            - НУ (Начално училище) = grades 1-4 → primary
-            - ПГ (Професионална гимназия) = vocational high school → upper_secondary
-            - ПГМЕТ, ПГЕЕ, etc. = specialized vocational schools → upper_secondary
-        """
-        name_lower = name.lower()
-        type_lower = type_text.lower()
-
-        # Check name abbreviations
-        if " оу " in name_lower or name_lower.startswith("оу ") or "основно" in name_lower:
-            return "lower_secondary"
-
-        if " су " in name_lower or name_lower.startswith("су ") or "средно" in name_lower:
-            return "upper_secondary"
-
-        if " ну " in name_lower or name_lower.startswith("ну ") or "начално" in name_lower:
-            return "primary"
-
-        if "пг" in name_lower or "гимназия" in name_lower or "професионална" in name_lower:
-            return "upper_secondary"
-
-        # Check type text for keywords
-        for keyword, level in self.EDUCATION_LEVEL_MAPPING.items():
-            if keyword in type_lower:
-                return level
-
-        # Default based on common patterns
-        logger.warning(f"Could not determine education level for '{name}', defaulting to 'lower_secondary'")
-        return "lower_secondary"
-
-    def _extract_city_from_address(self, address: str) -> Optional[str]:
-        """
-        Extract city name from address.
-
-        Args:
-            address: Full address string
-
-        Returns:
-            City name (lowercase) or None
-
-        Note:
-            Common patterns in Bulgarian addresses:
-            - "гр. София" or "град София"
-            - "София, ул. ..."
-            - Address ending with ", София"
-        """
-        if not address:
-            return None
-
-        address_lower = address.lower()
-
-        # Check for Sofia
-        if "софия" in address_lower:
-            return "sofia"
-
-        # Could add other cities here
-        # "пловдив" → "plovdiv"
-        # "варна" → "varna"
-        # etc.
-
-        return None
-
-    def _extract_district_from_address(self, address: str) -> Optional[str]:
-        """
-        Extract district from address.
-
-        Args:
-            address: Full address string
-
-        Returns:
-            District name or None
-
-        Note:
-            Uses the same district mapping as KgSofiaBgAdapter
-        """
-        from app.scrapers.sources.bg.kg_sofia import KgSofiaBgAdapter
-
-        if not address:
-            return None
-
-        address_lower = address.lower()
-
-        for district_key, district_name in KgSofiaBgAdapter.DISTRICT_MAPPING.items():
-            if district_key in address_lower:
-                return district_name
-
-        return None
 
     async def _delay(self):
-        """Small delay between requests to avoid overwhelming the server."""
+        """Small delay between requests to be respectful to the API."""
         import asyncio
         from app.config import get_settings
 
         settings = get_settings()
-        await asyncio.sleep(settings.scrape_delay_seconds)
+        # Rate limit: 10/min = 6 seconds between requests
+        # Use 1 second delay to be respectful but not too slow
+        await asyncio.sleep(1.0)  # 1 second between detail requests (~60 schools/min)

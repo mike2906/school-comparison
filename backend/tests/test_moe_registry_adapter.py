@@ -20,7 +20,7 @@ class TestMoeRegistryAdapterRegistry:
         assert MoeRegistryAdapter.ADAPTER_NAME == "moe_registry"
         assert MoeRegistryAdapter.COUNTRY_CODE == "bg"
         assert MoeRegistryAdapter.CITY is None  # Country-wide
-        assert MoeRegistryAdapter.RATE_LIMIT == "2/m"
+        assert MoeRegistryAdapter.RATE_LIMIT == "60/m"
 
     def test_adapter_listed(self):
         """Adapter appears in list_adapters()."""
@@ -30,158 +30,243 @@ class TestMoeRegistryAdapterRegistry:
         assert adapters["moe_registry"]["city"] == "country-wide"
 
 
-class TestMoeRegistryAdapterParsing:
-    """Test parsing logic."""
+class TestMoeRegistryAdapterMappings:
+    """Test field mappings."""
 
-    def test_determine_school_type_state(self):
-        """Determine school type from text."""
-        adapter = MoeRegistryAdapter(db=AsyncMock())
+    def test_financial_type_mapping_complete(self):
+        """All financial types are mapped."""
+        assert len(MoeRegistryAdapter.FINANCIAL_TYPE_MAPPING) >= 4
+        assert MoeRegistryAdapter.FINANCIAL_TYPE_MAPPING[1] == "state"  # Държавно
+        assert MoeRegistryAdapter.FINANCIAL_TYPE_MAPPING[2] == "state"  # Общинско
+        assert MoeRegistryAdapter.FINANCIAL_TYPE_MAPPING[3] == "private"  # Частно
+        assert MoeRegistryAdapter.FINANCIAL_TYPE_MAPPING[12] == "international"
 
-        assert adapter._determine_school_type("държавно училище") == "state"
-        assert adapter._determine_school_type("общинско училище") == "state"
-        assert adapter._determine_school_type("чуждоезиково училище") == "state"
-
-    def test_determine_school_type_private(self):
-        """Determine private school type."""
-        adapter = MoeRegistryAdapter(db=AsyncMock())
-
-        assert adapter._determine_school_type("частно училище") == "private"
-
-    def test_determine_school_type_international(self):
-        """Determine international school type."""
-        adapter = MoeRegistryAdapter(db=AsyncMock())
-
-        assert adapter._determine_school_type("международно училище") == "international"
-
-    def test_determine_education_level_from_name(self):
-        """Determine education level from school name."""
-        adapter = MoeRegistryAdapter(db=AsyncMock())
-
-        # Primary schools (НУ)
-        assert adapter._determine_education_level("НУ Христо Ботев", "") == "primary"
-        assert adapter._determine_education_level("Начално училище Иван Вазов", "") == "primary"
-
-        # Lower secondary (ОУ - grades 1-8)
-        assert adapter._determine_education_level("ОУ Отец Паисий", "") == "lower_secondary"
-        assert adapter._determine_education_level("134 ОУ Иван Вазов", "") == "lower_secondary"
-        assert adapter._determine_education_level("Основно училище Христо Ботев", "") == "lower_secondary"
-
-        # Upper secondary (СУ, gymnasiums)
-        assert adapter._determine_education_level("СУ Неофит Рилски", "") == "upper_secondary"
-        assert adapter._determine_education_level("23 СУ Фредерик Жолио-Кюри", "") == "upper_secondary"
-        assert adapter._determine_education_level("ПГМЕТ Джон Атанасов", "") == "upper_secondary"
-        assert adapter._determine_education_level("Професионална гимназия по икономика", "") == "upper_secondary"
-
-    def test_extract_city_from_address(self):
-        """Extract city from address."""
-        adapter = MoeRegistryAdapter(db=AsyncMock())
-
-        # Sofia patterns
-        assert adapter._extract_city_from_address("гр. София, ул. Иван Вазов 15") == "sofia"
-        assert adapter._extract_city_from_address("ул. Граф Игнатиев 20, София") == "sofia"
-        assert adapter._extract_city_from_address("София 1000, бул. Витоша 100") == "sofia"
-
-        # No city
-        assert adapter._extract_city_from_address("ул. Неизвестна 1") is None
-
-    def test_extract_district_from_address(self):
-        """Extract district from address."""
-        adapter = MoeRegistryAdapter(db=AsyncMock())
-
-        # Uses KgSofiaBgAdapter's district mapping
-        assert adapter._extract_district_from_address("ул. Иван Вазов 15, Средец") == "Средец"
-        assert adapter._extract_district_from_address("бул. Витоша 100, Лозенец, София") == "Лозенец"
-
-        # No district
-        assert adapter._extract_district_from_address("ул. Неизвестна 1") is None
-
-
-class TestMoeRegistryAdapterSchoolTypeMappings:
-    """Test school type and education level mappings."""
-
-    def test_school_type_mapping_complete(self):
-        """All school type keywords are mapped."""
-        assert len(MoeRegistryAdapter.SCHOOL_TYPE_MAPPING) >= 4
-        assert "държавно" in MoeRegistryAdapter.SCHOOL_TYPE_MAPPING
-        assert "частно" in MoeRegistryAdapter.SCHOOL_TYPE_MAPPING
-
-    def test_education_level_mapping_complete(self):
-        """All education level keywords are mapped."""
-        assert len(MoeRegistryAdapter.EDUCATION_LEVEL_MAPPING) >= 5
-        assert "начално" in MoeRegistryAdapter.EDUCATION_LEVEL_MAPPING
-        assert "гимназия" in MoeRegistryAdapter.EDUCATION_LEVEL_MAPPING
+    def test_detailed_type_mapping_complete(self):
+        """All detailed school types are mapped."""
+        assert len(MoeRegistryAdapter.DETAILED_TYPE_MAPPING) >= 10
+        assert MoeRegistryAdapter.DETAILED_TYPE_MAPPING[121] == "primary"
+        assert MoeRegistryAdapter.DETAILED_TYPE_MAPPING[122] == "lower_secondary"
+        assert MoeRegistryAdapter.DETAILED_TYPE_MAPPING[125] == "upper_secondary"
+        assert MoeRegistryAdapter.DETAILED_TYPE_MAPPING[151] == "kindergarten"
 
 
 @pytest.mark.asyncio
 class TestMoeRegistryAdapterIntegration:
-    """Integration tests with mocked HTTP responses."""
+    """Integration tests with mocked API responses."""
 
-    async def test_discover_with_mock_response(self, db_session: AsyncSession):
-        """Test discover() with mocked HTTP responses."""
+    async def test_discover_with_mock_api_response(self, db_session: AsyncSession):
+        """Test discover() with mocked API JSON responses."""
         adapter = MoeRegistryAdapter(db=db_session)
 
-        # Mock HTML response (simplified registry table)
-        registry_html = """
-        <html>
-            <body>
-                <table>
-                    <tr class="school-row">
-                        <td>12345</td>
-                        <td>23 СУ Фредерик Жолио-Кюри</td>
-                        <td>Държавно средно училище</td>
-                        <td>гр. София, ул. Сан Стефано 40, Изгрев</td>
-                    </tr>
-                    <tr class="school-row">
-                        <td>67890</td>
-                        <td>134 ОУ Иван Вазов</td>
-                        <td>Държавно основно училище</td>
-                        <td>гр. София, ул. Граф Игнатиев 20, Средец</td>
-                    </tr>
-                </table>
-            </body>
-        </html>
-        """
+        # Mock API response for public-register endpoint
+        public_register_response = {
+            "status": 1,
+            "data": {
+                "publicInstitutions": [
+                    {
+                        "id": 2200015,
+                        "instid": 2200015,
+                        "name": '"ЧАСТНО ОСНОВНО УЧИЛИЩЕ "Проф. д-р Васил Златарски" ЕООД',
+                        "region": 22,
+                        "municipality": 220,
+                        "town": 68134,
+                        "instType": 1,
+                        "detailedSchoolType": 122,
+                        "financialSchoolType": 3,
+                        "transformType": 5,
+                        "instKind": 3,
+                        "formName": "institution",
+                        "procID": 9642,
+                    },
+                    {
+                        "id": 2200016,
+                        "instid": 2200016,
+                        "name": '"ЧАСТНА ДЕТСКА ГРАДИНА СЛЪНЧЕВ АНГЕЛ" ЕООД',
+                        "region": 22,
+                        "municipality": 220,
+                        "town": 68134,
+                        "instType": 2,
+                        "detailedSchoolType": 151,
+                        "financialSchoolType": 3,
+                        "transformType": 5,
+                        "instKind": 7,
+                        "formName": "institution",
+                        "procID": 9643,
+                    },
+                ]
+            },
+        }
+
+        # Mock API response for institution detail endpoint
+        detail_response_school = {
+            "status": 1,
+            "data": [
+                {
+                    "riInstitutionID": 9642,
+                    "codeNEISPUO": 2200015,
+                    "name": '"ЧАСТНО ОСНОВНО УЧИЛИЩЕ "Проф. д-р Васил Златарски" ЕООД',
+                    "abbreviation": 'ЧАСТНО ОСНОВНО УЧИЛИЩЕ "Проф. д-р Васил Златарски"',
+                    "bulstat": "204959296",
+                    "settlementAddress": 'район Студетски, бул. "Св. Климент Охридски" № 49',
+                    "settlementPostCode": 1756,
+                    "headFirstName": "Цветанка",
+                    "headLastName": "Кардашева",
+                    "staffDirector": "Цветанка Стефанова Кардашева",
+                    "email": "info@zlatarskischool.org",
+                    "website": "zlatarskischool.org",
+                    "phoneNumber": "02/8766767",
+                    "institutionDepartments": [
+                        {
+                            "id": 14186,
+                            "departmentAddress": 'район Студетски, бул. "Св. Климент Охридски" № 49',
+                            "departmentPostalCode": 1756,
+                        }
+                    ],
+                }
+            ],
+        }
+
+        detail_response_kindergarten = {
+            "status": 1,
+            "data": [
+                {
+                    "riInstitutionID": 9643,
+                    "codeNEISPUO": 2200016,
+                    "name": '"ЧАСТНА ДЕТСКА ГРАДИНА СЛЪНЧЕВ АНГЕЛ" ЕООД',
+                    "abbreviation": 'ЧАСТНА ДЕТСКА ГРАДИНА "СЛЪНЧЕВ АНГЕЛ"',
+                    "bulstat": "204679814",
+                    "settlementAddress": 'район Витоша, ж. к. Симеоново, ул. "Шумако" № 29 (нов № 47)',
+                    "settlementPostCode": 1434,
+                    "headFirstName": "Михаела",
+                    "headLastName": "Михайлова-Ботева",
+                    "staffDirector": "Михаела Иванова Михайлова-Ботева",
+                    "email": "office@sunnyangel.bg",
+                    "website": "",
+                    "phoneNumber": "0889828647",
+                    "institutionDepartments": [],
+                }
+            ],
+        }
 
         # Mock httpx responses
         class MockResponse:
-            def __init__(self, content):
-                self.content = content.encode()
+            def __init__(self, json_data):
+                self._json_data = json_data
                 self.status_code = 200
 
             def raise_for_status(self):
                 pass
 
-        # Create mock client
-        mock_get = AsyncMock(return_value=MockResponse(registry_html))
+            def json(self):
+                return self._json_data
 
+        # Track which detail request is being made
+        detail_call_count = [0]
+
+        async def mock_post(url, **kwargs):
+            if "public-register" in url:
+                return MockResponse(public_register_response)
+            elif "institution" in url:
+                # Return detail for first school, then second
+                detail_call_count[0] += 1
+                if detail_call_count[0] == 1:
+                    return MockResponse(detail_response_school)
+                else:
+                    return MockResponse(detail_response_kindergarten)
+
+        # Create mock client
         mock_client = AsyncMock()
         mock_client.__aenter__.return_value = mock_client
         mock_client.__aexit__.return_value = None
-        mock_client.get = mock_get
+        mock_client.post = mock_post
 
         with patch("httpx.AsyncClient", return_value=mock_client):
-            schools = await adapter.discover(limit=2)
+            schools = await adapter.discover(limit=2, fetch_details=True)
 
         # Verify we got schools back
         assert len(schools) == 2
 
-        # Verify first school (СУ - upper secondary)
+        # Verify first school (ОУ - lower secondary)
         school1 = schools[0]
-        assert school1.institutional_id == "12345"
-        assert "Жолио-Кюри" in school1.name_i18n["bg"]
+        assert school1.institutional_id == "2200015"
+        assert "Златарски" in school1.name_i18n["bg"]
         assert school1.country_code == "bg"
         assert school1.city == "sofia"
-        assert school1.school_type == "state"
-        assert school1.education_level == "upper_secondary"
+        assert school1.school_type == "private"
+        assert school1.education_level == "lower_secondary"
+        assert school1.website_url == "zlatarskischool.org"
         assert len(school1.locations) == 1
-        assert school1.locations[0].district == "Изгрев"
+        assert "Климент Охридски" in school1.locations[0].address_i18n["bg"]
+        assert school1.locations[0].phone == "02/8766767"
+        assert school1.attributes["moe_email"] == "info@zlatarskischool.org"
 
-        # Verify second school (ОУ - lower secondary)
+        # Verify second school (ДГ - kindergarten)
         school2 = schools[1]
-        assert school2.institutional_id == "67890"
-        assert "Иван Вазов" in school2.name_i18n["bg"]
-        assert school2.education_level == "lower_secondary"
-        assert school2.locations[0].district == "Средец"
+        assert school2.institutional_id == "2200016"
+        assert "СЛЪНЧЕВ АНГЕЛ" in school2.name_i18n["bg"]
+        assert school2.education_level == "kindergarten"
+        assert school2.school_type == "private"
+        assert len(school2.locations) == 1
+        assert "Шумако" in school2.locations[0].address_i18n["bg"]
+        assert school2.locations[0].phone == "0889828647"
+
+    async def test_discover_without_details(self, db_session: AsyncSession):
+        """Test discover() without fetching detail data (fast mode)."""
+        adapter = MoeRegistryAdapter(db=db_session)
+
+        # Mock only public-register response
+        public_register_response = {
+            "status": 1,
+            "data": {
+                "publicInstitutions": [
+                    {
+                        "id": 2200015,
+                        "instid": 2200015,
+                        "name": "Test School",
+                        "region": 22,
+                        "municipality": 220,
+                        "town": 68134,
+                        "instType": 1,
+                        "detailedSchoolType": 122,
+                        "financialSchoolType": 1,
+                        "transformType": 5,
+                        "instKind": 3,
+                        "formName": "institution",
+                        "procID": 9642,
+                    }
+                ]
+            },
+        }
+
+        class MockResponse:
+            def __init__(self, json_data):
+                self._json_data = json_data
+                self.status_code = 200
+
+            def raise_for_status(self):
+                pass
+
+            def json(self):
+                return self._json_data
+
+        async def mock_post(url, **kwargs):
+            return MockResponse(public_register_response)
+
+        mock_client = AsyncMock()
+        mock_client.__aenter__.return_value = mock_client
+        mock_client.__aexit__.return_value = None
+        mock_client.post = mock_post
+
+        with patch("httpx.AsyncClient", return_value=mock_client):
+            schools = await adapter.discover(limit=1, fetch_details=False)
+
+        # Should get basic data without addresses
+        assert len(schools) == 1
+        school = schools[0]
+        assert school.institutional_id == "2200015"
+        assert school.name_i18n["bg"] == "Test School"
+        assert school.locations == []  # No location data in fast mode
+        assert school.website_url is None
 
 
 @pytest.mark.asyncio
@@ -198,16 +283,16 @@ class TestMoeRegistryAdapterUpsert:
         discovered_schools = [
             DiscoveredSchool(
                 institutional_id="TEST-123",
-                name_i18n={"bg": "23 СУ Фредерик Жолио-Кюри"},
+                name_i18n={"bg": "Test School"},
                 country_code="bg",
                 city="sofia",
                 school_type="state",
                 education_level="upper_secondary",
-                source_url="https://mon.bg/schools/TEST-123",
+                source_url="https://ri-api.mon.bg/data/get/public-register",
                 locations=[
                     DiscoveredLocation(
-                        address_i18n={"bg": "ул. Сан Стефано 40, Изгрев"},
-                        district="Изгрев",
+                        address_i18n={"bg": "Test Address"},
+                        district="Средец",
                         is_primary=True,
                         age_groups=[],
                     )
@@ -220,7 +305,7 @@ class TestMoeRegistryAdapterUpsert:
         assert result["created"] == 1
 
         # Upsert again with same institutional_id (should update, not create)
-        discovered_schools[0].name_i18n["bg"] = "23 СУ Фредерик Жолио-Кюри (обновено)"
+        discovered_schools[0].name_i18n["bg"] = "Test School (updated)"
         result = await adapter.upsert_schools(discovered_schools)
         assert result["created"] == 0
         assert result["updated"] == 1
@@ -235,6 +320,6 @@ class TestMoeRegistryAdapterUpsert:
         school = db_result.scalar_one_or_none()
 
         assert school is not None
-        assert "(обновено)" in school.name_i18n["bg"]
+        assert "(updated)" in school.name_i18n["bg"]
         assert school.city == "sofia"
         assert school.education_level == "upper_secondary"
