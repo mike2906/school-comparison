@@ -19,6 +19,7 @@ from app.scrapers.sources.base_adapter import BaseSourceAdapter
 from app.schemas.scraping import DiscoveredSchool, DiscoveredLocation
 from app.scrapers.sources import register_adapter
 from app.scrapers.base import BaseScraper
+from app.models.scrape_log import ScrapeType
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +46,7 @@ class MoeRegistryAdapter(BaseSourceAdapter):
     CITY = None  # Can filter by region/municipality
     DESCRIPTION = "Bulgarian schools and kindergartens from Ministry of Education API (ri-api.mon.bg)"
     RATE_LIMIT = "60/m"  # 1 second between detail requests
+    SCRAPE_TYPE = ScrapeType.REGISTRY
 
     # Ministry of Education API endpoints
     API_BASE_URL = "https://ri-api.mon.bg"
@@ -85,7 +87,7 @@ class MoeRegistryAdapter(BaseSourceAdapter):
         121: "primary",  # начално (grades 1-4)
         122: "lower_secondary",  # основно (grades 1-8)
         123: "upper_secondary",  # обединено (grades 1-12)
-        124: "upper_secondary",  # средно (grades 1-12)
+        124: "upper_secondary",  # средно (grades 5-12)
         125: "upper_secondary",  # профилирана гимназия (grades 8-12)
         126: "upper_secondary",  # професионална гимназия (vocational)
         131: "lower_secondary",  # за обучение и подкрепа на ученици с увреден слух
@@ -97,6 +99,62 @@ class MoeRegistryAdapter(BaseSourceAdapter):
         # 161-174 are support centers, observatories, dormitories (not schools)
         181: "upper_secondary",  # училище, функциониращо по силата на международен договор
     }
+
+    # Age group defaults derived from education level
+    # (MoE API doesn't provide explicit age group data)
+    EDUCATION_LEVEL_AGE_GROUPS = {
+        'kindergarten': ['first', 'second', 'third', 'preschool'],  # Conservative (no nursery by default)
+        'primary': ['grade_1_4'],
+        'lower_secondary': ['grade_5_7'],
+        'upper_secondary': ['grade_8_12'],
+    }
+
+    # Detailed school type → age groups mapping (for multi-grade schools)
+    # Overrides EDUCATION_LEVEL_AGE_GROUPS when detailed type is known
+    # Uses detailedSchoolType codes from MoE API
+    DETAILED_TYPE_AGE_GROUPS = {
+        121: ['grade_1_4'],  # начално (grades 1-4)
+        122: ['grade_1_4', 'grade_5_7'],  # основно (grades 1-8; no dedicated grade-8 bucket)
+        123: ['grade_1_4', 'grade_5_7', 'grade_8_12'],  # обединено (grades 1-12)
+        124: ['grade_5_7', 'grade_8_12'],  # средно (grades 5-12, NOT 1-12)
+        125: ['grade_8_12'],  # профилирана гимназия (grades 8-12)
+        126: ['grade_8_12'],  # професионална гимназия (grades 8-12)
+        151: ['first', 'second', 'third', 'preschool'],  # детска градина
+    }
+
+    @staticmethod
+    def _get_age_groups_for_detailed_type(detailed_type: Optional[int], education_level: str) -> list[str]:
+        """
+        Derive age groups from detailed school type or education level.
+
+        Args:
+            detailed_type: MoE detailedSchoolType code (e.g., 122 for основно)
+            education_level: Fallback education level if detailed type not recognized
+
+        Returns:
+            List of age group codes
+        """
+        # Try detailed type mapping first (more accurate for multi-grade schools)
+        if detailed_type and detailed_type in MoeRegistryAdapter.DETAILED_TYPE_AGE_GROUPS:
+            return MoeRegistryAdapter.DETAILED_TYPE_AGE_GROUPS[detailed_type]
+
+        # Fall back to education level mapping
+        return MoeRegistryAdapter.EDUCATION_LEVEL_AGE_GROUPS.get(education_level, [])
+
+    @staticmethod
+    def _get_age_groups_for_education_level(education_level: str) -> list[str]:
+        """
+        Derive reasonable age group defaults from education level.
+
+        DEPRECATED: Use _get_age_groups_for_detailed_type() instead for better accuracy.
+
+        Args:
+            education_level: Education level code
+
+        Returns:
+            List of age group codes
+        """
+        return MoeRegistryAdapter.EDUCATION_LEVEL_AGE_GROUPS.get(education_level, [])
 
     async def discover(
         self,
@@ -465,7 +523,7 @@ class MoeRegistryAdapter(BaseSourceAdapter):
                         district=None,  # Will need to parse from address or enrich later
                         phone=phone_number,
                         is_primary=True,
-                        age_groups=[],
+                        age_groups=self._get_age_groups_for_detailed_type(detailed_type, education_level),
                         shifts={},
                         has_organised_groups={},
                     )
@@ -481,7 +539,7 @@ class MoeRegistryAdapter(BaseSourceAdapter):
                             district=None,
                             phone=None,  # Departments don't have separate phone numbers in API
                             is_primary=False,
-                            age_groups=[],
+                            age_groups=self._get_age_groups_for_detailed_type(detailed_type, education_level),
                             shifts={},
                             has_organised_groups={},
                         )

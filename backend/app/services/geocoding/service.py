@@ -4,9 +4,10 @@ from typing import Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import SchoolLocation
+from app.models import SchoolLocation, School
 from app.services.geocoding.base import BaseGeocodingProvider, GeocodingResult
 from app.services.geocoding.nominatim import NominatimProvider
+from app.services.geocoding.composite import CompositeGeocodingProvider
 from app.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -42,16 +43,21 @@ class GeocodingService:
         if provider is None:
             provider_name = self.settings.geocoding_provider.lower()
 
-            if provider_name == "nominatim":
-                # Validate contact email is not a placeholder
-                contact_email = self.settings.geocoding_contact_email
-                if not contact_email or "example.com" in contact_email.lower():
-                    raise ValueError(
-                        "GEOCODING_CONTACT_EMAIL must be set to a valid email in .env file. "
-                        "Nominatim requires a real contact email in the User-Agent header. "
-                        f"Current value: {contact_email}"
-                    )
-                user_agent = f"SofiaSchoolComparison/1.0 ({contact_email})"
+            # Validate contact email is not a placeholder (required for Nominatim and Composite)
+            contact_email = self.settings.geocoding_contact_email
+            if not contact_email or "example.com" in contact_email.lower():
+                raise ValueError(
+                    "GEOCODING_CONTACT_EMAIL must be set to a valid email in .env file. "
+                    "Nominatim requires a real contact email in the User-Agent header. "
+                    f"Current value: {contact_email}"
+                )
+            user_agent = f"SofiaSchoolComparison/1.0 ({contact_email})"
+
+            if provider_name == "composite":
+                # Composite provider (GeoJSON + Nominatim fallback) - RECOMMENDED
+                self.provider = CompositeGeocodingProvider(user_agent=user_agent)
+            elif provider_name == "nominatim":
+                # Nominatim only (no GeoJSON optimization)
                 self.provider = NominatimProvider(user_agent=user_agent)
             # TODO: Add other providers when implemented
             # elif provider_name == "google":
@@ -61,7 +67,7 @@ class GeocodingService:
             else:
                 raise ValueError(
                     f"Unknown geocoding provider: {provider_name}. "
-                    f"Supported providers: nominatim (more coming soon)"
+                    f"Supported providers: composite, nominatim"
                 )
         else:
             self.provider = provider
@@ -106,9 +112,26 @@ class GeocodingService:
                 error="No address available",
             )
 
+        # Fetch school data for GeoJSON matching (if provider supports it)
+        school_name = None
+        city = None
+        if hasattr(self.provider, 'geojson_provider'):  # Composite provider
+            school_result = await self.db.execute(
+                select(School).where(School.id == location.school_id)
+            )
+            school = school_result.scalar_one_or_none()
+            if school:
+                school_name = school.name_i18n.get("bg") or school.name_i18n.get("en")
+                city = school.city  # Use city from database instead of parsing address
+
         # Geocode using provider
-        logger.info(f"Geocoding location {location.id}: {address}")
-        result = await self.provider.geocode(address, country_code=country_code)
+        logger.info(f"Geocoding location {location.id}: {address} (school: {school_name}, city: {city})")
+        result = await self.provider.geocode(
+            address,
+            country_code=country_code,
+            school_name=school_name,
+            city=city,
+        )
 
         # Update database if successful
         if result.success and result.lat is not None and result.lng is not None:

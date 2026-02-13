@@ -31,13 +31,21 @@ class BaseGeocodingProvider(ABC):
         pass
 
     @abstractmethod
-    async def geocode(self, address: str, country_code: str = "bg") -> GeocodingResult:
+    async def geocode(
+        self,
+        address: str,
+        country_code: str = "bg",
+        school_name: Optional[str] = None,
+        city: Optional[str] = None
+    ) -> GeocodingResult:
         """
         Convert an address to lat/lng coordinates.
 
         Args:
             address: Full address string (e.g., "ул. Иван Вазов 15, София")
             country_code: ISO 3166-1 alpha-2 country code (default: "bg" for Bulgaria)
+            school_name: Optional school name for providers that can use it for matching (e.g., GeoJSON)
+            city: Optional city name for disambiguation (e.g., "София", "Пловдив")
 
         Returns:
             GeocodingResult with coordinates or error information

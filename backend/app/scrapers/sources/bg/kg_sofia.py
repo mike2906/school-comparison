@@ -17,6 +17,7 @@ from app.scrapers.sources.base_adapter import BaseSourceAdapter
 from app.schemas.scraping import DiscoveredSchool, DiscoveredLocation
 from app.scrapers.sources import register_adapter
 from app.scrapers.base import BaseScraper
+from app.models.scrape_log import ScrapeType
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +46,9 @@ class KgSofiaBgAdapter(BaseSourceAdapter):
     CITY = "sofia"
     DESCRIPTION = "Sofia kindergartens and schools from kg.sofia.bg API"
     RATE_LIMIT = "10/m"
+    SCRAPE_TYPE = ScrapeType.REGISTRY
+    ENRICHMENT_ONLY = True
+    ENRICHMENT_ATTRIBUTE_PREFIXES = ("kg_sofia_",)
 
     # kg.sofia.bg API endpoints
     API_BASE_URL = "https://kg.sofia.bg/api/public"
@@ -80,6 +84,24 @@ class KgSofiaBgAdapter(BaseSourceAdapter):
         "нови искър": "Нови Искър",
         "банкя": "Банкя",
         "кремиковци": "Кремиковци",
+    }
+
+    # Age group mapping from publicType (for kindergartens)
+    AGE_GROUP_MAPPING = {
+        'ДГ (с яслени групи)': ['nursery', 'first', 'second', 'third', 'preschool'],
+        'ДГ': ['first', 'second', 'third', 'preschool'],
+        'СДЯ': ['nursery'],  # Самостоятелна детска ясла - Nursery only
+        'ДГ (с логопедични групи)': ['first', 'second', 'third', 'preschool'],
+    }
+
+    # School type age group mapping (for multi-grade schools)
+    SCHOOL_TYPE_AGE_GROUPS = {
+        'НУ': ['grade_1_4'],  # Начално училище (grades 1-4)
+        'ОУ': ['grade_1_4', 'grade_5_7'],  # Основно училище (grades 1-8; no dedicated grade-8 bucket)
+        'ОбУ': ['grade_1_4', 'grade_5_7', 'grade_8_12'],  # Обединено училище (grades 1-12)
+        'СУ': ['grade_5_7', 'grade_8_12'],  # Средно училище (grades 5-12)
+        'СЕУ': ['grade_5_7', 'grade_8_12'],  # Средно езиково училище (grades 5-12)
+        'ПГ': ['grade_8_12'],  # Профилирана гимназия (grades 8-12)
     }
 
     # Institution type mapping (from publicType field)
@@ -389,13 +411,16 @@ class KgSofiaBgAdapter(BaseSourceAdapter):
             # Extract ESRI ID
             esri_id = data.get("esriId")
 
+            # Extract age groups from publicType
+            age_groups = self._extract_age_groups(public_type, education_level)
+
             # Build location
             location = DiscoveredLocation(
                 address_i18n={"bg": address_bg},
                 district=district,
                 phone=phone,
                 is_primary=True,
-                age_groups=[],  # Not provided by this API
+                age_groups=age_groups,
                 shifts={},  # Not provided by this API
                 has_organised_groups={},  # Not provided by this API
             )
@@ -456,6 +481,39 @@ class KgSofiaBgAdapter(BaseSourceAdapter):
         # Default
         logger.warning(f"Could not determine education level for '{name}', defaulting to kindergarten")
         return "kindergarten"
+
+    def _extract_age_groups(self, public_type: str, education_level: str) -> list[str]:
+        """
+        Extract age groups from publicType (for kindergartens) or derive from education level.
+
+        Args:
+            public_type: Institution type from API (e.g., "ДГ (с яслени групи)", "СУ")
+            education_level: Determined education level
+
+        Returns:
+            List of age group codes
+        """
+        # For kindergartens, try to get from publicType (most precise)
+        if education_level == "kindergarten":
+            # Try exact match first
+            if public_type in self.AGE_GROUP_MAPPING:
+                return self.AGE_GROUP_MAPPING[public_type]
+
+            # Default for kindergartens: assume no nursery (conservative)
+            return ['first', 'second', 'third', 'preschool']
+
+        # For schools, try publicType mapping first (more accurate for multi-grade schools)
+        if public_type in self.SCHOOL_TYPE_AGE_GROUPS:
+            return self.SCHOOL_TYPE_AGE_GROUPS[public_type]
+
+        # Fall back to education level defaults
+        education_level_defaults = {
+            'primary': ['grade_1_4'],
+            'lower_secondary': ['grade_5_7'],
+            'upper_secondary': ['grade_8_12'],
+        }
+
+        return education_level_defaults.get(education_level, [])
 
     def _extract_phone(self, contacts: list) -> Optional[str]:
         """

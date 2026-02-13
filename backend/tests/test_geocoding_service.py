@@ -18,6 +18,18 @@ class TestNominatimProvider:
         provider = NominatimProvider()
         assert provider.provider_name == "nominatim"
 
+    def test_normalize_preserves_city_locality(self):
+        """Normalization should keep city locality when stripping 'гр.' prefix."""
+        provider = NominatimProvider()
+        normalized = provider._normalize_bulgarian_address('гр. София, ул. "Брегалница", №48')
+        assert normalized == "Брегалница, 48, София"
+
+    def test_normalize_preserves_village_locality(self):
+        """Normalization should keep village locality when stripping 'с.' prefix."""
+        provider = NominatimProvider()
+        normalized = provider._normalize_bulgarian_address('с. Казичене, ул. "Първа" № 24')
+        assert normalized == "Първа 24, Казичене"
+
     @pytest.mark.asyncio
     async def test_geocode_with_mock_response(self):
         """Test geocoding with mocked Nominatim API response."""
@@ -393,3 +405,172 @@ class TestGeocodingService:
         assert location2.lng == 23.3219
         assert location3.lat == 42.0  # Unchanged
         assert location3.lng == 23.0  # Unchanged
+
+
+class TestGeoJSONProvider:
+    """Tests for GeoJSON geocoding provider."""
+
+    def test_city_normalization_sofia_variants(self):
+        """Test that all Sofia variants map to СТОЛИЧНА."""
+        from app.services.geocoding.bg.geojson import GeoJSONProvider
+        
+        provider = GeoJSONProvider()
+        
+        # All Sofia variants should map to СТОЛИЧНА (GeoJSON convention)
+        sofia_variants = ['sofia', 'SOFIA', 'Sofia', 'СОФИЯ', 'софия', 'СТОЛИЧНА']
+        for variant in sofia_variants:
+            assert provider._normalize_city(variant) == 'СТОЛИЧНА', \
+                f"'{variant}' should normalize to 'СТОЛИЧНА'"
+    
+    def test_city_normalization_other_cities(self):
+        """Test that other cities pass through correctly."""
+        from app.services.geocoding.bg.geojson import GeoJSONProvider
+        
+        provider = GeoJSONProvider()
+        
+        # Other cities should normalize to uppercase but not map
+        test_cases = [
+            ('Пловдив', 'ПЛОВДИВ'),
+            ('ВАРНА', 'ВАРНА'),
+            ('Бургас', 'БУРГАС'),
+            ('plovdiv', 'PLOVDIV'),
+        ]
+        
+        for input_city, expected in test_cases:
+            assert provider._normalize_city(input_city) == expected, \
+                f"'{input_city}' should normalize to '{expected}'"
+
+
+class TestGeoJSONMatching:
+    """Tests for GeoJSON name+city matching logic."""
+
+    @pytest.mark.asyncio
+    async def test_exact_name_city_match(self):
+        """Test exact (school_name, city) matching."""
+        from app.services.geocoding.bg.geojson import GeoJSONProvider
+        from unittest.mock import patch
+        
+        # Mock GeoJSON data with specific school in СТОЛИЧНА
+        mock_geojson = {
+            'features': [
+                {
+                    'type': 'Feature',
+                    'geometry': {'coordinates': [23.3219, 42.6977]},
+                    'properties': {
+                        'name': 'ДЕТСКА ГРАДИНА "КАЛИНКА"',
+                        'city': 'СТОЛИЧНА',
+                        'street': 'УЛ. TEST №1',
+                    }
+                }
+            ]
+        }
+        
+        with patch('pathlib.Path.exists', return_value=True):
+            with patch('builtins.open', create=True):
+                with patch('json.load', return_value=mock_geojson):
+                    provider = GeoJSONProvider()
+                    provider._load_index()
+                    
+                    # Should match with city
+                    result = await provider.geocode(
+                        address='ул. Test №1',
+                        country_code='bg',
+                        school_name='ДГ "Калинка"',
+                        city='sofia'  # Maps to СТОЛИЧНА
+                    )
+                    
+                    assert result.success
+                    assert result.lat == 42.6977
+                    assert result.lng == 23.3219
+
+    @pytest.mark.asyncio
+    async def test_ambiguous_name_rejection(self):
+        """Test that ambiguous names (multiple cities) are rejected."""
+        from app.services.geocoding.bg.geojson import GeoJSONProvider
+        from unittest.mock import patch
+        
+        # Mock GeoJSON with same school name in different cities
+        mock_geojson = {
+            'features': [
+                {
+                    'type': 'Feature',
+                    'geometry': {'coordinates': [23.3219, 42.6977]},
+                    'properties': {
+                        'name': 'ДЕТСКА ГРАДИНА "КАЛИНКА"',
+                        'city': 'СТОЛИЧНА',
+                        'street': 'УЛ. TEST №1',
+                    }
+                },
+                {
+                    'type': 'Feature',
+                    'geometry': {'coordinates': [24.7453, 42.1354]},
+                    'properties': {
+                        'name': 'ДЕТСКА ГРАДИНА "КАЛИНКА"',
+                        'city': 'ПЛОВДИВ',
+                        'street': 'УЛ. TEST №2',
+                    }
+                }
+            ]
+        }
+        
+        with patch('pathlib.Path.exists', return_value=True):
+            with patch('builtins.open', create=True):
+                with patch('json.load', return_value=mock_geojson):
+                    provider = GeoJSONProvider()
+                    provider._load_index()
+                    
+                    # Should reject ambiguous match (no city provided)
+                    result = await provider.geocode(
+                        address='ул. Test №1',
+                        country_code='bg',
+                        school_name='ДГ "Калинка"',
+                        city=None  # No city to disambiguate
+                    )
+                    
+                    assert not result.success
+                    assert 'ambiguous' in result.error.lower()
+
+
+class TestCompositeProvider:
+    """Tests for composite provider fallback behavior."""
+
+    @pytest.mark.asyncio
+    async def test_fallback_to_nominatim(self):
+        """Test that composite falls back to Nominatim when GeoJSON fails."""
+        from app.services.geocoding.composite import CompositeGeocodingProvider
+        from unittest.mock import AsyncMock, patch
+        
+        # Mock failed GeoJSON result
+        mock_geojson_result = AsyncMock(return_value=type('Result', (), {
+            'success': False,
+            'error': 'No match in GeoJSON index'
+        })())
+        
+        # Mock successful Nominatim result
+        mock_nominatim_result = AsyncMock(return_value=type('Result', (), {
+            'success': True,
+            'lat': 42.6977,
+            'lng': 23.3219,
+            'provider': 'nominatim'
+        })())
+        
+        provider = CompositeGeocodingProvider()
+        
+        with patch.object(provider.geojson_provider, 'geocode', mock_geojson_result):
+            with patch.object(provider.nominatim_provider, 'geocode', mock_nominatim_result):
+                result = await provider.geocode(
+                    address='ул. Иван Вазов 15',
+                    country_code='bg',
+                    school_name='ДГ Тестова',
+                    city='sofia'
+                )
+                
+                # Should have tried GeoJSON first
+                mock_geojson_result.assert_called_once()
+                
+                # Should have fallen back to Nominatim
+                mock_nominatim_result.assert_called_once()
+                
+                # Should return Nominatim result
+                assert result.success
+                assert result.provider == 'nominatim'

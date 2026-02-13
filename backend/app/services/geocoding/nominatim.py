@@ -62,17 +62,76 @@ class NominatimProvider(BaseGeocodingProvider):
             import time
             self._last_request_time = time.monotonic()
 
-    async def geocode(self, address: str, country_code: str = "bg") -> GeocodingResult:
+    def _normalize_bulgarian_address(self, address: str) -> str:
+        """
+        Normalize Bulgarian address for better Nominatim results.
+
+        Removes city prefixes, street abbreviations, and formatting that confuses geocoding.
+
+        Examples:
+            'гр. София, ул. "Брегалница", №48' -> 'Брегалница 48, София'
+            'район Панчарево, ж. к. Малинова Долина, ул. "Първа" № 24' -> 'Първа 24, Малинова Долина, Панчарево, София'
+        """
+        import re
+
+        # Remove quotes first (before removing abbreviations)
+        logger.debug(f"Before quote removal: {address!r}")
+        address = address.replace('"', '').replace('"', '').replace('"', '')
+        logger.debug(f"After quote removal: {address!r}")
+
+        # Extract locality prefix (гр./с.) and keep it for re-append later.
+        # This avoids dropping crucial disambiguation data for village addresses.
+        locality = None
+        locality_match = re.match(r'^\s*(гр\.|с\.)\s*([^,]+)\s*,\s*(.+)$', address, flags=re.IGNORECASE)
+        if locality_match:
+            locality = locality_match.group(2).strip()
+            address = locality_match.group(3).strip()
+
+        # Remove district prefix (район X,)
+        address = re.sub(r'район\s+([^,]+),\s*', r'\1, ', address)
+
+        # Remove neighborhood prefix (ж. к. X,) but keep the name
+        address = re.sub(r'ж\.\s*к\.\s*', '', address)
+
+        # Remove street abbreviations (бул. BEFORE ул. to avoid partial match)
+        logger.debug(f"Before abbreviation removal: {address!r}")
+        address = re.sub(r'бул\.\s*', '', address)  # Remove "бул." first
+        address = re.sub(r'ул\.\s*', '', address)   # Then remove "ул."
+        logger.debug(f"After abbreviation removal: {address!r}")
+
+        # Replace № with space
+        address = address.replace('№', ' ')
+
+        # Clean up extra spaces and commas
+        address = re.sub(r'\s+', ' ', address).strip()
+        address = re.sub(r',\s*,', ',', address)
+
+        # Re-append locality if it was stripped from a city/village prefix.
+        if locality and locality.lower() not in address.lower():
+            address = f"{address}, {locality}" if address else locality
+
+        return address
+
+    async def geocode(self, address: str, country_code: str = "bg", school_name: Optional[str] = None, city: Optional[str] = None) -> GeocodingResult:
         """
         Geocode an address using Nominatim.
 
         Args:
             address: Full address string (e.g., "ул. Иван Вазов 15, София")
             country_code: ISO country code (default: "bg")
+            school_name: Optional school name (not used by Nominatim)
+            city: Optional city name (not used by Nominatim - address should be complete)
 
         Returns:
             GeocodingResult with coordinates or error
         """
+        # Normalize Bulgarian addresses for better results
+        if country_code == "bg":
+            normalized_address = self._normalize_bulgarian_address(address)
+            logger.debug(f"Normalized address: '{address}' -> '{normalized_address}'")
+        else:
+            normalized_address = address
+
         # Enforce rate limit
         await self._enforce_rate_limit()
 
@@ -81,7 +140,7 @@ class NominatimProvider(BaseGeocodingProvider):
                 response = await client.get(
                     f"{self.BASE_URL}/search",
                     params={
-                        "q": address,
+                        "q": normalized_address,
                         "format": "json",
                         "countrycodes": country_code,
                         "limit": 1,
@@ -96,7 +155,7 @@ class NominatimProvider(BaseGeocodingProvider):
                 results = response.json()
 
                 if not results:
-                    logger.warning(f"Nominatim: No results found for address: {address}")
+                    logger.warning(f"Nominatim: No results found for address: {normalized_address} (original: {address})")
                     return GeocodingResult(
                         success=False,
                         error="No results found",

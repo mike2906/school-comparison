@@ -375,3 +375,172 @@ class TestKgSofiaBgAdapterUpsert:
         assert len(school.locations) == 1
         assert school.locations[0].district == "Средец"
         assert school.attributes["kg_sofia_id"] == 99
+
+    async def test_upsert_preserves_moe_core_fields_on_existing_school(self, db_session: AsyncSession):
+        """kg.sofia enrichment must not overwrite core fields sourced from MoE."""
+        from sqlalchemy import select
+        from app.models import School, SchoolLocation
+        from app.schemas.scraping import DiscoveredSchool, DiscoveredLocation
+
+        existing = School(
+            country_code="bg",
+            name_i18n={"bg": "ДГ №200 Тест"},
+            school_type="state",
+            education_level="kindergarten",
+            city="sofia",
+            source_url="moe://public-register/2200200",
+            website_url="https://moe-school.example",
+            institutional_id="2200200",
+            attributes={
+                "moe_email": "office@moe-school.example",
+                "moe_registry_active": True,
+            },
+            admission_info={"system": "points"},
+        )
+        db_session.add(existing)
+        await db_session.flush()
+
+        db_session.add(
+            SchoolLocation(
+                school_id=existing.id,
+                address_i18n={"bg": "ул. Тестова 1, София"},
+                district="Средец",
+                is_primary=True,
+            )
+        )
+        await db_session.commit()
+
+        adapter = KgSofiaBgAdapter(db=db_session)
+        discovered_schools = [
+            DiscoveredSchool(
+                institutional_id="2200200",
+                name_i18n={"bg": "ДГ №200 Тест"},
+                country_code="bg",
+                city="sofia",
+                school_type="private",  # Must not overwrite existing core classification
+                education_level="upper_secondary",  # Must not overwrite existing level
+                source_url="https://kg.sofia.bg/api/public/kg/type/kinderGarden/all",
+                website_url="https://kg-sofia.example",
+                locations=[
+                    DiscoveredLocation(
+                        address_i18n={"bg": "ул. Тестова 2, София"},
+                        district="Средец",
+                        phone="02/123-0000",
+                        is_primary=True,
+                        age_groups=[],
+                        shifts={},
+                        has_organised_groups={},
+                    )
+                ],
+                attributes={
+                    "kg_sofia_id": 200,
+                    "kg_sofia_public_type": "ДГ",
+                    "moe_email": "bad-overwrite@example.com",  # Must be ignored by enrichment filter
+                },
+            )
+        ]
+
+        result = await adapter.upsert_schools(discovered_schools)
+        assert result["updated"] == 1
+        assert result["created"] == 0
+
+        refreshed = (
+            await db_session.execute(
+                select(School).where(School.id == existing.id)
+            )
+        ).scalar_one()
+
+        # Core identity/classification fields remain authoritative.
+        assert refreshed.institutional_id == "2200200"
+        assert refreshed.school_type == "state"
+        assert refreshed.education_level == "kindergarten"
+        assert refreshed.website_url == "https://moe-school.example"
+        assert refreshed.source_url == "moe://public-register/2200200"
+
+        # MoE attributes are preserved; kg.sofia attributes are added.
+        assert refreshed.attributes["moe_email"] == "office@moe-school.example"
+        assert refreshed.attributes["kg_sofia_id"] == 200
+
+
+class TestKgSofiaAgeGroupExtraction:
+    """Tests for age group extraction logic."""
+
+    def test_extract_age_groups_kindergarten_with_nursery(self):
+        """Test age groups for kindergarten with nursery (яслени групи)."""
+        from app.scrapers.sources.bg.kg_sofia import KgSofiaBgAdapter
+        
+        adapter = KgSofiaBgAdapter(db=None)
+        
+        # ДГ (с яслени групи) should include nursery + all kindergarten groups
+        result = adapter._extract_age_groups('ДГ (с яслени групи)', 'kindergarten')
+        assert result == ['nursery', 'first', 'second', 'third', 'preschool']
+    
+    def test_extract_age_groups_kindergarten_standard(self):
+        """Test age groups for standard kindergarten."""
+        from app.scrapers.sources.bg.kg_sofia import KgSofiaBgAdapter
+        
+        adapter = KgSofiaBgAdapter(db=None)
+        
+        # Standard ДГ (no nursery)
+        result = adapter._extract_age_groups('ДГ', 'kindergarten')
+        assert result == ['first', 'second', 'third', 'preschool']
+    
+    def test_extract_age_groups_nursery_only(self):
+        """Test age groups for standalone nursery (СДЯ)."""
+        from app.scrapers.sources.bg.kg_sofia import KgSofiaBgAdapter
+        
+        adapter = KgSofiaBgAdapter(db=None)
+        
+        # СДЯ (Самостоятелна детска ясла) = nursery only
+        result = adapter._extract_age_groups('СДЯ', 'kindergarten')
+        assert result == ['nursery']
+    
+    def test_extract_age_groups_primary_school(self):
+        """Test age groups for primary school (НУ)."""
+        from app.scrapers.sources.bg.kg_sofia import KgSofiaBgAdapter
+        
+        adapter = KgSofiaBgAdapter(db=None)
+        
+        # НУ (Начално училище) = grades 1-4 only
+        result = adapter._extract_age_groups('НУ', 'primary')
+        assert result == ['grade_1_4']
+    
+    def test_extract_age_groups_basic_school(self):
+        """Test age groups for basic school (ОУ) serving grades 1-8."""
+        from app.scrapers.sources.bg.kg_sofia import KgSofiaBgAdapter
+        
+        adapter = KgSofiaBgAdapter(db=None)
+        
+        # ОУ (Основно училище) = grades 1-8
+        result = adapter._extract_age_groups('ОУ', 'lower_secondary')
+        assert result == ['grade_1_4', 'grade_5_7']
+    
+    def test_extract_age_groups_united_school(self):
+        """Test age groups for united school (ОбУ) serving grades 1-12."""
+        from app.scrapers.sources.bg.kg_sofia import KgSofiaBgAdapter
+        
+        adapter = KgSofiaBgAdapter(db=None)
+        
+        # ОбУ (Обединено училище) = grades 1-12
+        result = adapter._extract_age_groups('ОбУ', 'upper_secondary')
+        assert result == ['grade_1_4', 'grade_5_7', 'grade_8_12']
+    
+    def test_extract_age_groups_secondary_school(self):
+        """Test age groups for secondary school (СУ) serving grades 5-12."""
+        from app.scrapers.sources.bg.kg_sofia import KgSofiaBgAdapter
+        
+        adapter = KgSofiaBgAdapter(db=None)
+        
+        # СУ (Средно училище) = grades 5-12 (NOT 1-12)
+        result = adapter._extract_age_groups('СУ', 'upper_secondary')
+        assert result == ['grade_5_7', 'grade_8_12']
+    
+    def test_extract_age_groups_gymnasium(self):
+        """Test age groups for specialized gymnasium (ПГ) serving grades 8-12."""
+        from app.scrapers.sources.bg.kg_sofia import KgSofiaBgAdapter
+        
+        adapter = KgSofiaBgAdapter(db=None)
+        
+        # ПГ (Профилирана гимназия) = grades 8-12 only
+        result = adapter._extract_age_groups('ПГ', 'upper_secondary')
+        assert result == ['grade_8_12']

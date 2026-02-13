@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     scrape_delay_seconds: int = 2
 
     # Geocoding settings
-    geocoding_provider: str = "nominatim"  # nominatim | google | mapbox
+    geocoding_provider: str = "composite"  # composite | nominatim | google | mapbox (composite = GeoJSON + Nominatim fallback, recommended)
     # REQUIRED: Must be set in .env (Nominatim policy requires valid contact email)
     geocoding_contact_email: str = "your-email@example.com"  # Placeholder - override in .env
 

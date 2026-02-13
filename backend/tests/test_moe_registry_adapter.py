@@ -323,3 +323,74 @@ class TestMoeRegistryAdapterUpsert:
         assert "(updated)" in school.name_i18n["bg"]
         assert school.city == "sofia"
         assert school.education_level == "upper_secondary"
+
+
+class TestMoeRegistryAgeGroupExtraction:
+    """Tests for age group extraction based on detailed type."""
+
+    def test_age_groups_primary_school(self):
+        """Test age groups for primary school (type 121)."""
+        from app.scrapers.sources.bg.moe_registry import MoeRegistryAdapter
+        
+        # Type 121 = начално (grades 1-4)
+        result = MoeRegistryAdapter._get_age_groups_for_detailed_type(121, 'primary')
+        assert result == ['grade_1_4']
+    
+    def test_age_groups_basic_school(self):
+        """Test age groups for basic school (type 122) serving grades 1-8."""
+        from app.scrapers.sources.bg.moe_registry import MoeRegistryAdapter
+        
+        # Type 122 = основно (grades 1-8)
+        result = MoeRegistryAdapter._get_age_groups_for_detailed_type(122, 'lower_secondary')
+        assert result == ['grade_1_4', 'grade_5_7']
+    
+    def test_age_groups_united_school(self):
+        """Test age groups for united school (type 123) serving grades 1-12."""
+        from app.scrapers.sources.bg.moe_registry import MoeRegistryAdapter
+        
+        # Type 123 = обединено (grades 1-12)
+        result = MoeRegistryAdapter._get_age_groups_for_detailed_type(123, 'upper_secondary')
+        assert result == ['grade_1_4', 'grade_5_7', 'grade_8_12']
+    
+    def test_age_groups_secondary_school(self):
+        """Test age groups for secondary school (type 124) serving grades 5-12."""
+        from app.scrapers.sources.bg.moe_registry import MoeRegistryAdapter
+        
+        # Type 124 = средно (grades 5-12, NOT 1-12)
+        result = MoeRegistryAdapter._get_age_groups_for_detailed_type(124, 'upper_secondary')
+        assert result == ['grade_5_7', 'grade_8_12']
+    
+    def test_age_groups_specialized_gymnasium(self):
+        """Test age groups for specialized gymnasium (type 125) serving grades 8-12."""
+        from app.scrapers.sources.bg.moe_registry import MoeRegistryAdapter
+        
+        # Type 125 = профилирана гимназия (grades 8-12)
+        result = MoeRegistryAdapter._get_age_groups_for_detailed_type(125, 'upper_secondary')
+        assert result == ['grade_8_12']
+    
+    def test_age_groups_vocational_gymnasium(self):
+        """Test age groups for vocational gymnasium (type 126) serving grades 8-12."""
+        from app.scrapers.sources.bg.moe_registry import MoeRegistryAdapter
+        
+        # Type 126 = професионална гимназия
+        result = MoeRegistryAdapter._get_age_groups_for_detailed_type(126, 'upper_secondary')
+        assert result == ['grade_8_12']
+    
+    def test_age_groups_kindergarten(self):
+        """Test age groups for kindergarten (type 151)."""
+        from app.scrapers.sources.bg.moe_registry import MoeRegistryAdapter
+        
+        # Type 151 = детска градина (conservative: no nursery by default)
+        result = MoeRegistryAdapter._get_age_groups_for_detailed_type(151, 'kindergarten')
+        assert result == ['first', 'second', 'third', 'preschool']
+    
+    def test_age_groups_fallback_to_education_level(self):
+        """Test fallback to education level when detailed type is unknown."""
+        from app.scrapers.sources.bg.moe_registry import MoeRegistryAdapter
+        
+        # Unknown type code should fall back to education level mapping
+        result = MoeRegistryAdapter._get_age_groups_for_detailed_type(999, 'primary')
+        assert result == ['grade_1_4']
+        
+        result = MoeRegistryAdapter._get_age_groups_for_detailed_type(None, 'kindergarten')
+        assert result == ['first', 'second', 'third', 'preschool']

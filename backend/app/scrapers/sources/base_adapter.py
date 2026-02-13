@@ -1,9 +1,15 @@
 """Base adapter for discovery sources (government registries, search engines, etc.)."""
 from abc import ABC, abstractmethod
 from typing import Optional
+from datetime import datetime
+import uuid
+import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.schemas.scraping import DiscoveredSchool
+from app.models.scrape_log import ScrapeLog, ScrapeType, ScrapeStatus
+
+logger = logging.getLogger(__name__)
 
 
 class BaseSourceAdapter(ABC):
@@ -23,6 +29,13 @@ class BaseSourceAdapter(ABC):
     CITY: Optional[str] = None  # e.g., "sofia" - None means country-wide
     DESCRIPTION: str = "Base adapter (override in subclass)"
     RATE_LIMIT: str = "2/m"  # Celery rate limit (e.g., "2/m" = 2 requests per minute)
+    SCRAPE_TYPE: Optional[ScrapeType] = None  # Override to set explicit scrape type (REGISTRY or DISCOVERY)
+    # If True, existing records are treated as authoritative for core identity/classification
+    # fields and this adapter only enriches supplemental fields.
+    ENRICHMENT_ONLY: bool = False
+    # Optional prefixes that incoming attribute keys must match in ENRICHMENT_ONLY mode.
+    # Non-matching keys are ignored to avoid clobbering authoritative source metadata.
+    ENRICHMENT_ATTRIBUTE_PREFIXES: tuple[str, ...] = ()
 
     def __init__(self, db: AsyncSession):
         """
@@ -115,7 +128,7 @@ class BaseSourceAdapter(ABC):
 
                     # Try to find by name, city, and district
                     # Use JSON operations to match name in name_i18n
-                    from sqlalchemy import cast, String, func
+                    from sqlalchemy import cast, String
 
                     result = await self.db.execute(
                         select(School)
@@ -139,16 +152,30 @@ class BaseSourceAdapter(ABC):
 
                 # Step 2: Create or update school
                 if existing_school:
+                    incoming_attributes = self._filter_incoming_attributes(disc.attributes or {})
+                    existing_attributes = existing_school.attributes or {}
+                    existing_admission_info = existing_school.admission_info or {}
+
                     # Update existing
-                    existing_school.name_i18n = disc.name_i18n
-                    existing_school.school_type = disc.school_type
-                    existing_school.education_level = disc.education_level
-                    existing_school.city = disc.city
-                    existing_school.website_url = disc.website_url or existing_school.website_url
-                    existing_school.source_url = disc.source_url or existing_school.source_url
-                    existing_school.institutional_id = disc.institutional_id or existing_school.institutional_id
-                    existing_school.attributes = {**existing_school.attributes, **disc.attributes}
-                    existing_school.admission_info = {**existing_school.admission_info, **disc.admission_info}
+                    if self.ENRICHMENT_ONLY:
+                        # Enrichment adapters (e.g., kg.sofia) must not overwrite core
+                        # identity/classification fields from authoritative registries.
+                        existing_school.website_url = existing_school.website_url or disc.website_url
+                        existing_school.source_url = existing_school.source_url or disc.source_url
+                        existing_school.city = existing_school.city or disc.city
+                        if disc.institutional_id and not existing_school.institutional_id:
+                            existing_school.institutional_id = disc.institutional_id
+                    else:
+                        existing_school.name_i18n = disc.name_i18n
+                        existing_school.school_type = disc.school_type
+                        existing_school.education_level = disc.education_level
+                        existing_school.city = disc.city
+                        existing_school.website_url = disc.website_url or existing_school.website_url
+                        existing_school.source_url = disc.source_url or existing_school.source_url
+                        existing_school.institutional_id = disc.institutional_id or existing_school.institutional_id
+
+                    existing_school.attributes = {**existing_attributes, **incoming_attributes}
+                    existing_school.admission_info = {**existing_admission_info, **(disc.admission_info or {})}
                     existing_school.scrape_status = "pending"  # Reset to pending for re-scraping
 
                     school_id = existing_school.id
@@ -164,8 +191,8 @@ class BaseSourceAdapter(ABC):
                         website_url=disc.website_url,
                         source_url=disc.source_url,
                         institutional_id=disc.institutional_id,
-                        attributes=disc.attributes,
-                        admission_info=disc.admission_info,
+                        attributes=disc.attributes or {},
+                        admission_info=disc.admission_info or {},
                         scrape_status="pending",
                     )
                     self.db.add(new_school)
@@ -216,11 +243,26 @@ class BaseSourceAdapter(ABC):
         logger.info(f"Discovery complete: created={created}, updated={updated}, skipped={skipped}")
         return {"created": created, "updated": updated, "skipped": skipped}
 
+    def _filter_incoming_attributes(self, incoming: dict) -> dict:
+        """Filter incoming attributes according to adapter merge policy."""
+        if not incoming:
+            return {}
+        if not self.ENRICHMENT_ONLY:
+            return incoming
+        if not self.ENRICHMENT_ATTRIBUTE_PREFIXES:
+            return incoming
+        return {
+            key: value
+            for key, value in incoming.items()
+            if key.startswith(self.ENRICHMENT_ATTRIBUTE_PREFIXES)
+        }
+
     async def run(self, limit: Optional[int] = None, sample_ratio: float = 0.0) -> dict[str, int]:
         """
         Run the full discovery process: discover + upsert.
 
         This is a convenience method that combines discover() and upsert_schools().
+        It also logs the scrape run to scrape_log for observability.
 
         Args:
             limit: Optional limit on number of schools to discover
@@ -229,5 +271,63 @@ class BaseSourceAdapter(ABC):
         Returns:
             Dict with counts: {"created": N, "updated": M, "skipped": K}
         """
-        discovered = await self.discover(limit=limit, sample_ratio=sample_ratio)
-        return await self.upsert_schools(discovered)
+        run_id = str(uuid.uuid4())
+        start_time = datetime.now()
+        source_url = getattr(self, 'API_BASE_URL', None) or getattr(self, 'KINDERGARTENS_URL', None)
+
+        # Determine scrape type from class attribute or fallback to heuristic
+        if self.SCRAPE_TYPE is not None:
+            scrape_type = self.SCRAPE_TYPE
+        else:
+            # Fallback: heuristic based on adapter name
+            # Registry adapters (moe_registry) use REGISTRY, others use DISCOVERY
+            scrape_type = ScrapeType.REGISTRY if 'registry' in self.ADAPTER_NAME.lower() else ScrapeType.DISCOVERY
+
+        try:
+            logger.info(f"Starting {self.ADAPTER_NAME} scrape (run_id={run_id}, limit={limit})")
+
+            # Run discovery and upsert
+            discovered = await self.discover(limit=limit, sample_ratio=sample_ratio)
+            result = await self.upsert_schools(discovered)
+
+            # Calculate duration
+            duration_ms = int((datetime.now() - start_time).total_seconds() * 1000)
+
+            # Log success
+            log = ScrapeLog(
+                scrape_type=scrape_type,
+                status=ScrapeStatus.SUCCESS,
+                source_url=source_url,
+                run_id=run_id,
+                duration_ms=duration_ms,
+                scraped_at=datetime.utcnow()
+            )
+            self.db.add(log)
+            await self.db.commit()
+
+            logger.info(f"Completed {self.ADAPTER_NAME} scrape in {duration_ms}ms: {result}")
+
+            return result
+
+        except Exception as e:
+            # Calculate duration even on failure
+            duration_ms = int((datetime.now() - start_time).total_seconds() * 1000)
+
+            # Rollback any failed transaction before logging
+            await self.db.rollback()
+
+            # Log failure
+            log = ScrapeLog(
+                scrape_type=scrape_type,
+                status=ScrapeStatus.FAILED,
+                source_url=source_url,
+                error_message=str(e),
+                run_id=run_id,
+                duration_ms=duration_ms,
+                scraped_at=datetime.utcnow()
+            )
+            self.db.add(log)
+            await self.db.commit()
+
+            logger.error(f"Failed {self.ADAPTER_NAME} scrape after {duration_ms}ms: {e}")
+            raise
