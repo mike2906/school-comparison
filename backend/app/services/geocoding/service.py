@@ -124,14 +124,59 @@ class GeocodingService:
                 school_name = school.name_i18n.get("bg") or school.name_i18n.get("en")
                 city = school.city  # Use city from database instead of parsing address
 
+                # For merged branch families (kg.sofia "сграда"), name-only GeoJSON
+                # lookups can collapse multiple branches to one point. Force
+                # address-first fallback by skipping GeoJSON in these cases.
+                attrs = school.attributes or {}
+                source_refs = attrs.get("source_refs") if isinstance(attrs, dict) else {}
+                kg_ref = source_refs.get("kg_sofia_bg") if isinstance(source_refs, dict) else {}
+                kg_record_ids = kg_ref.get("record_ids") if isinstance(kg_ref, dict) else []
+                is_merged_branch_school = bool(attrs.get("kg_sofia_merged_buildings")) or (
+                    isinstance(kg_record_ids, list) and len(kg_record_ids) > 1
+                )
+                if is_merged_branch_school:
+                    school_name = None
+
         # Geocode using provider
         logger.info(f"Geocoding location {location.id}: {address} (school: {school_name}, city: {city})")
-        result = await self.provider.geocode(
-            address,
-            country_code=country_code,
-            school_name=school_name,
-            city=city,
-        )
+        result = None
+
+        # Special handling for merged kg.sofia branch families:
+        # 1) Try address-first geocoding (Nominatim) for per-branch precision
+        # 2) If that fails, fall back to GeoJSON using school name
+        if (
+            school_name is None
+            and hasattr(self.provider, "nominatim_provider")
+            and hasattr(self.provider, "geojson_provider")
+        ):
+            result = await self.provider.nominatim_provider.geocode(
+                address=address,
+                country_code=country_code,
+                city=city,
+            )
+            if not result.success:
+                school_result = await self.db.execute(
+                    select(School).where(School.id == location.school_id)
+                )
+                school = school_result.scalar_one_or_none()
+                fallback_school_name = None
+                if school:
+                    fallback_school_name = school.name_i18n.get("bg") or school.name_i18n.get("en")
+                if fallback_school_name:
+                    result = await self.provider.geojson_provider.geocode(
+                        address=address,
+                        country_code=country_code,
+                        school_name=fallback_school_name,
+                        city=city,
+                    )
+
+        if result is None:
+            result = await self.provider.geocode(
+                address,
+                country_code=country_code,
+                school_name=school_name,
+                city=city,
+            )
 
         # Update database if successful
         if result.success and result.lat is not None and result.lng is not None:

@@ -24,6 +24,7 @@ dependencies = [
     # CLI dependencies
     "click>=8.1.0",
     "rich>=13.0.0",
+    "cyrtranslit>=1.2.0",
 ]
 
 [project.optional-dependencies]

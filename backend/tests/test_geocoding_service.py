@@ -30,6 +30,59 @@ class TestNominatimProvider:
         normalized = provider._normalize_bulgarian_address('с. Казичене, ул. "Първа" № 24')
         assert normalized == "Първа 24, Казичене"
 
+    def test_normalize_block_address_removes_entrances(self):
+        """Block-style addresses should keep key block info and drop entrance noise."""
+        provider = NominatimProvider()
+        normalized = provider._normalize_bulgarian_address(
+            'гр. София, жк. Обеля - 1, бл.102, вх.А и вх.Г'
+        )
+        assert normalized == "ж.к. Обеля - 1, бл.102, София"
+
+    def test_normalize_section_marker_and_block_letter(self):
+        """Roman section markers should map to numeric district names for OSM lookup."""
+        provider = NominatimProvider()
+        normalized = provider._normalize_bulgarian_address(
+            'гр. София, кв. "Връбница" I ч.  бл. 510 А,Б'
+        )
+        assert normalized == "ж.к. Връбница 1, бл. 510 А, София"
+
+    def test_normalize_expands_known_street_abbreviation(self):
+        """Known local abbreviations should expand to canonical street names."""
+        provider = NominatimProvider()
+        normalized = provider._normalize_bulgarian_address(
+            'гр. София, ул. "Плачк. манастир", №11'
+        )
+        assert normalized == "Плачковски манастир, 11, София"
+
+    def test_build_candidates_includes_simplified_street_number_variant(self):
+        """Fallback candidates should include street+number query when neighborhood query is too specific."""
+        provider = NominatimProvider()
+        normalized = provider._normalize_bulgarian_address(
+            'гр. София, ж. к. "Л. Толстой", ул. "Генерал Жостов" , №1'
+        )
+        candidates = provider._build_bulgarian_query_candidates(normalized, city="sofia")
+        assert "Генерал Жостов 1, София" in candidates
+
+    def test_build_candidates_includes_block_variant_for_numeric_street_encoding(self):
+        """Fallback candidates should generate block query for numeric neighborhood encodings."""
+        provider = NominatimProvider()
+        normalized = provider._normalize_bulgarian_address(
+            'гр. София, ж.к. "Дружба 1", ул."5016", №3'
+        )
+        candidates = provider._build_bulgarian_query_candidates(normalized, city="sofia")
+        assert "ж.к. Дружба 1, бл. 3, София" in candidates
+
+    def test_city_match_accepts_sofia_and_stolichna(self):
+        """City matching should treat Sofia and Stolichna as equivalent."""
+        provider = NominatimProvider()
+        sofia_result = {"address": {"city": "София"}}
+        stolichna_result = {"address": {"municipality": "Столична"}}
+        ruse_result = {"address": {"city": "Русе"}}
+
+        assert provider._result_matches_expected_city(sofia_result, "sofia")
+        assert provider._result_matches_expected_city(stolichna_result, "sofia")
+        assert not provider._result_matches_expected_city(ruse_result, "sofia")
+
     @pytest.mark.asyncio
     async def test_geocode_with_mock_response(self):
         """Test geocoding with mocked Nominatim API response."""
@@ -74,6 +127,62 @@ class TestNominatimProvider:
         assert result.lng == 23.3219
         assert result.provider == "nominatim"
         assert "Sofia" in result.formatted_address
+
+    @pytest.mark.asyncio
+    async def test_geocode_rejects_wrong_city_and_tries_next_candidate(self):
+        """Provider should reject mismatched city hit and continue fallback queries."""
+        provider = NominatimProvider(user_agent="Test/1.0")
+        provider.MIN_REQUEST_INTERVAL = 0
+
+        class MockResponse:
+            def __init__(self, json_data):
+                self._json_data = json_data
+                self.status_code = 200
+
+            def raise_for_status(self):
+                pass
+
+            def json(self):
+                return self._json_data
+
+        async def mock_get(*args, **kwargs):
+            query = kwargs["params"]["q"]
+            if query == "ж.к. Дружба 1, 5016, 3, София":
+                return MockResponse([
+                    {
+                        "lat": "43.8330064",
+                        "lon": "25.9488803",
+                        "display_name": "София, Русе",
+                        "address": {"city": "Русе"},
+                    }
+                ])
+            if query == "ж.к. Дружба 1, бл. 3, София":
+                return MockResponse([
+                    {
+                        "lat": "42.6690",
+                        "lon": "23.4032",
+                        "display_name": "ж.к. Дружба 1, София",
+                        "address": {"city": "София"},
+                    }
+                ])
+            return MockResponse([])
+
+        mock_client = AsyncMock()
+        mock_client.__aenter__.return_value = mock_client
+        mock_client.__aexit__.return_value = None
+        mock_client.get = mock_get
+
+        with patch("httpx.AsyncClient", return_value=mock_client):
+            result = await provider.geocode(
+                'гр. София, ж.к. "Дружба 1", ул."5016", №3',
+                country_code="bg",
+                city="sofia",
+            )
+
+        assert result.success is True
+        assert result.lat == 42.6690
+        assert result.lng == 23.4032
+        assert "София" in result.formatted_address
 
     @pytest.mark.asyncio
     async def test_geocode_no_results(self):
@@ -405,6 +514,77 @@ class TestGeocodingService:
         assert location2.lng == 23.3219
         assert location3.lat == 42.0  # Unchanged
         assert location3.lng == 23.0  # Unchanged
+
+    async def test_merged_kg_branches_skip_geojson_name_lookup(self, db_session: AsyncSession):
+        """Merged kg.sofia branch families should bypass GeoJSON name-only matching."""
+        class _CompositeLikeProvider:
+            provider_name = "composite-mock"
+
+            def __init__(self):
+                self.geocode = AsyncMock(return_value=GeocodingResult(
+                    lat=42.7,
+                    lng=23.3,
+                    success=True,
+                    provider="composite",
+                ))
+                self.nominatim_provider = type(
+                    "NomProvider",
+                    (),
+                    {
+                        "geocode": AsyncMock(return_value=GeocodingResult(
+                            success=False,
+                            error="no results",
+                            provider="nominatim",
+                        ))
+                    },
+                )()
+                self.geojson_provider = type(
+                    "GeoProvider",
+                    (),
+                    {
+                        "geocode": AsyncMock(return_value=GeocodingResult(
+                            lat=42.71125,
+                            lng=23.14131,
+                            success=True,
+                            provider="geojson_bg",
+                        ))
+                    },
+                )()
+
+        mock_provider = _CompositeLikeProvider()
+
+        service = GeocodingService(db=db_session, provider=mock_provider)
+
+        school = School(
+            name_i18n={"bg": "ДГ №25 Изворче"},
+            country_code="bg",
+            city="sofia",
+            school_type="state",
+            education_level="kindergarten",
+            attributes={
+                "kg_sofia_merged_buildings": True,
+                "source_refs": {"kg_sofia_bg": {"record_ids": ["174", "274", "497"]}},
+            },
+        )
+        db_session.add(school)
+        await db_session.flush()
+
+        location = SchoolLocation(
+            school_id=school.id,
+            address_i18n={"bg": 'гр. Банкя, ул. "П. Д. Петков", №15'},
+            is_primary=True,
+        )
+        db_session.add(location)
+        await db_session.commit()
+
+        result = await service.geocode_location(location)
+
+        # For merged branch families, direct subproviders are used:
+        # Nominatim first (address-first), then GeoJSON fallback if needed.
+        mock_provider.nominatim_provider.geocode.assert_called_once()
+        mock_provider.geojson_provider.geocode.assert_called_once()
+        mock_provider.geocode.assert_not_called()
+        assert result.success is True
 
 
 class TestGeoJSONProvider:

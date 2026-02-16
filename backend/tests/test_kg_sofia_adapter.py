@@ -171,8 +171,11 @@ class TestKgSofiaBgAdapterIntegration:
         assert "Иван Вазов" in kg1.locations[0].address_i18n["bg"]
         assert kg1.locations[0].district == "Средец"
         assert kg1.locations[0].phone == "02/987-6543"
+        assert "source=kg_sofia_bg" in kg1.locations[0].location_tags
+        assert "source_record_id=1" in kg1.locations[0].location_tags
         assert kg1.attributes["kg_sofia_id"] == 1
         assert kg1.attributes["kg_sofia_esri_id"] == 12345
+        assert kg1.attributes["source_refs"]["kg_sofia_bg"]["record_id"] == "1"
 
         # Verify second kindergarten (with nursery groups)
         kg2 = schools[1]
@@ -460,6 +463,108 @@ class TestKgSofiaBgAdapterUpsert:
         # MoE attributes are preserved; kg.sofia attributes are added.
         assert refreshed.attributes["moe_email"] == "office@moe-school.example"
         assert refreshed.attributes["kg_sofia_id"] == 200
+
+
+class TestKgSofiaBuildingMerges:
+    """Tests for safe 'сграда' branch merging."""
+
+    def test_merge_building_variants_into_single_school(self):
+        """Explicit '- сграда ...' records should merge into one school with multiple locations."""
+        from app.schemas.scraping import DiscoveredSchool, DiscoveredLocation
+
+        adapter = KgSofiaBgAdapter(db=None)
+
+        def _school(name_bg: str, address_bg: str, kg_id: int):
+            return DiscoveredSchool(
+                name_i18n={"bg": name_bg},
+                country_code="bg",
+                city="sofia",
+                school_type="state",
+                education_level="kindergarten",
+                source_url="https://kg.sofia.bg/api/public/kg/type/kinderGarden/all",
+                locations=[
+                    DiscoveredLocation(
+                        address_i18n={"bg": address_bg},
+                        district="Банкя",
+                        phone="02/967 66 20",
+                        is_primary=True,
+                        location_tags=[
+                            "source=kg_sofia_bg",
+                            f"source_record_id={kg_id}",
+                            f"source_esri_id={kg_id}",
+                        ],
+                        age_groups=["first", "second", "third", "preschool"],
+                        shifts={},
+                        has_organised_groups={},
+                    )
+                ],
+                attributes={
+                    "kg_sofia_id": kg_id,
+                    "kg_sofia_esri_id": kg_id,
+                    "kg_sofia_public_type": "ДГ",
+                },
+            )
+
+        records = [
+            (_school("ДГ №25 Изворче", 'гр. Банкя, ул. "П. Д. Петков", №15', 174), False),
+            (_school("ДГ №25 Изворче - сграда 2", "гр. Банкя, ул.Восток-2, №4", 274), True),
+            (_school("ДГ №25 Изворче - сграда 3", 'гр. Банкя, ул. "Царибродска", №5', 497), False),
+        ]
+
+        merged = adapter._merge_building_branch_records(records)
+
+        assert len(merged) == 1
+        merged_school, changed = merged[0]
+        assert changed is True
+        assert merged_school.name_i18n["bg"] == "ДГ №25 Изворче"
+        assert len(merged_school.locations) == 3
+        assert sum(1 for location in merged_school.locations if location.is_primary) == 1
+        assert merged_school.attributes["kg_sofia_merged_buildings"] is True
+        assert merged_school.attributes["kg_sofia_ids"] == ["174", "274", "497"]
+        assert merged_school.attributes["source_refs"]["kg_sofia_bg"]["record_ids"] == ["174", "274", "497"]
+        flat_tags = [tag for location in merged_school.locations for tag in (location.location_tags or [])]
+        assert "source_record_id=174" in flat_tags
+        assert "source_record_id=274" in flat_tags
+        assert "source_record_id=497" in flat_tags
+
+    def test_does_not_merge_without_building_suffix(self):
+        """Records without '- сграда' suffix must remain independent."""
+        from app.schemas.scraping import DiscoveredSchool, DiscoveredLocation
+
+        adapter = KgSofiaBgAdapter(db=None)
+
+        def _school(name_bg: str, address_bg: str, kg_id: int):
+            return DiscoveredSchool(
+                name_i18n={"bg": name_bg},
+                country_code="bg",
+                city="sofia",
+                school_type="state",
+                education_level="kindergarten",
+                source_url="https://kg.sofia.bg/api/public/kg/type/kinderGarden/all",
+                locations=[
+                    DiscoveredLocation(
+                        address_i18n={"bg": address_bg},
+                        district="Средец",
+                        phone="02/123 45 67",
+                        is_primary=True,
+                        age_groups=[],
+                        shifts={},
+                        has_organised_groups={},
+                    )
+                ],
+                attributes={"kg_sofia_id": kg_id},
+            )
+
+        records = [
+            (_school("ДГ №1 Щастливо детство", "ул. Иван Вазов 1", 1), True),
+            (_school("ДГ №1 Щастливо детство 2", "ул. Иван Вазов 2", 2), True),
+        ]
+
+        merged = adapter._merge_building_branch_records(records)
+
+        assert len(merged) == 2
+        assert merged[0][0].name_i18n["bg"] == "ДГ №1 Щастливо детство"
+        assert merged[1][0].name_i18n["bg"] == "ДГ №1 Щастливо детство 2"
 
 
 class TestKgSofiaAgeGroupExtraction:

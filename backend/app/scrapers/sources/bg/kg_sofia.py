@@ -9,6 +9,7 @@ backend/docs/KG_SOFIA_API_DOCUMENTATION.md
 """
 import json
 import logging
+import re
 from datetime import datetime, timezone
 from typing import Optional
 import httpx
@@ -57,6 +58,7 @@ class KgSofiaBgAdapter(BaseSourceAdapter):
     PREPARATORY_URL = f"{API_BASE_URL}/kg/type/preparative/all"
     REGIONS_URL = f"{API_BASE_URL}/regions/all"
     REGISTRY_SOURCE_PREFIX = "kg://"
+    BUILDING_SUFFIX_RE = re.compile(r"^(?P<base>.+?)\s*-\s*сграда\b.*$", re.IGNORECASE)
 
     # District name normalization (same as before)
     DISTRICT_MAPPING = {
@@ -143,7 +145,7 @@ class KgSofiaBgAdapter(BaseSourceAdapter):
         from sqlalchemy import select
         from app.models import School, SourcePage, ScrapeType
 
-        discovered_schools = []
+        parsed_records: list[tuple[DiscoveredSchool, bool]] = []
         seen_kg_ids: set[str] = set()
         now = datetime.now(timezone.utc)
 
@@ -167,6 +169,11 @@ class KgSofiaBgAdapter(BaseSourceAdapter):
         for school_id, attrs in schools_result.all():
             if not attrs:
                 continue
+            kg_ids = attrs.get("kg_sofia_ids")
+            if isinstance(kg_ids, list):
+                for grouped_kg_id in kg_ids:
+                    if grouped_kg_id is not None:
+                        school_id_by_kg_id[str(grouped_kg_id)] = school_id
             kg_id = attrs.get("kg_sofia_id")
             if kg_id is not None:
                 school_id_by_kg_id[str(kg_id)] = school_id
@@ -201,7 +208,7 @@ class KgSofiaBgAdapter(BaseSourceAdapter):
                     seen_at=now,
                 )
                 if school:
-                    discovered_schools.append(school)
+                    parsed_records.append(school)
 
             # Fetch schools with preparatory groups
             logger.info(f"Fetching schools from {self.SCHOOLS_URL}")
@@ -232,7 +239,10 @@ class KgSofiaBgAdapter(BaseSourceAdapter):
                     seen_at=now,
                 )
                 if school_obj:
-                    discovered_schools.append(school_obj)
+                    parsed_records.append(school_obj)
+
+            merged_records = self._merge_building_branch_records(parsed_records)
+            discovered_schools = [school for school, changed in merged_records if changed]
 
             # Apply limit if specified
             if limit:
@@ -256,7 +266,7 @@ class KgSofiaBgAdapter(BaseSourceAdapter):
         school_id_by_kg_id: dict[str, int],
         seen_kg_ids: set[str],
         seen_at: datetime,
-    ) -> Optional[DiscoveredSchool]:
+    ) -> Optional[tuple[DiscoveredSchool, bool]]:
         from app.models import SourcePage, ScrapeType
 
         kg_id = data.get("id")
@@ -282,14 +292,12 @@ class KgSofiaBgAdapter(BaseSourceAdapter):
             seen_at=seen_at,
         )
 
-        if not changed:
-            return None
-
         school = self._parse_institution(data, default_type)
         if school:
             school.attributes["kg_sofia_active"] = True
             school.attributes["kg_sofia_last_seen_at"] = seen_at.isoformat()
-        return school
+            return school, changed
+        return None
 
     def _registry_source_url(self, record_type: str, kg_id: str) -> str:
         return f"{self.REGISTRY_SOURCE_PREFIX}{record_type}/{kg_id}"
@@ -343,10 +351,18 @@ class KgSofiaBgAdapter(BaseSourceAdapter):
         )
         for school in result.scalars().all():
             attrs = school.attributes or {}
-            kg_id = attrs.get("kg_sofia_id")
-            if kg_id is None:
+            id_candidates: list[str] = []
+            kg_ids = attrs.get("kg_sofia_ids")
+            if isinstance(kg_ids, list):
+                for kg_id in kg_ids:
+                    if kg_id is not None:
+                        id_candidates.append(str(kg_id))
+            single_kg_id = attrs.get("kg_sofia_id")
+            if single_kg_id is not None:
+                id_candidates.append(str(single_kg_id))
+            if not id_candidates:
                 continue
-            active = str(kg_id) in seen_kg_ids
+            active = any(kg_id in seen_kg_ids for kg_id in id_candidates)
             if active:
                 attrs["kg_sofia_active"] = True
                 attrs["kg_sofia_last_seen_at"] = now_iso
@@ -355,6 +371,207 @@ class KgSofiaBgAdapter(BaseSourceAdapter):
                 attrs["kg_sofia_active"] = False
                 attrs.setdefault("kg_sofia_inactive_since", now_iso)
             school.attributes = attrs
+
+    def _merge_building_branch_records(
+        self,
+        records: list[tuple[DiscoveredSchool, bool]],
+    ) -> list[tuple[DiscoveredSchool, bool]]:
+        """
+        Merge explicit '- сграда ...' branch entries into one institution with multiple locations.
+
+        Safety constraints:
+        - Merge only when at least one record has explicit 'сграда' suffix.
+        - Require same normalized base name, district, phone, and education level.
+        - Keep non-branch records untouched.
+        """
+        if not records:
+            return []
+
+        family_candidates: set[tuple[str, str, str, str]] = set()
+        for school, _changed in records:
+            name_bg = (school.name_i18n or {}).get("bg", "").strip()
+            base_name = self._extract_building_base_name(name_bg)
+            if not base_name:
+                continue
+            primary_location = self._get_primary_location(school)
+            family_candidates.add(
+                (
+                    self._normalize_name_for_grouping(base_name),
+                    (primary_location.district or "").strip().lower(),
+                    self._normalize_phone(primary_location.phone),
+                    school.education_level,
+                )
+            )
+
+        grouped: dict[tuple[str, ...], list[tuple[DiscoveredSchool, bool]]] = {}
+        for index, (school, changed) in enumerate(records):
+            primary_location = self._get_primary_location(school)
+            name_bg = (school.name_i18n or {}).get("bg", "").strip()
+            base_name = self._extract_building_base_name(name_bg)
+
+            if base_name:
+                key = (
+                    "family",
+                    self._normalize_name_for_grouping(base_name),
+                    (primary_location.district or "").strip().lower(),
+                    self._normalize_phone(primary_location.phone),
+                    school.education_level,
+                )
+            else:
+                candidate_key = (
+                    self._normalize_name_for_grouping(name_bg),
+                    (primary_location.district or "").strip().lower(),
+                    self._normalize_phone(primary_location.phone),
+                    school.education_level,
+                )
+                if candidate_key in family_candidates:
+                    key = ("family", *candidate_key)
+                else:
+                    key = ("single", str(index))
+
+            grouped.setdefault(key, []).append((school, changed))
+
+        merged_records: list[tuple[DiscoveredSchool, bool]] = []
+        for key, group in grouped.items():
+            if key[0] != "family" or len(group) == 1:
+                merged_records.extend(group)
+                continue
+
+            merged_records.append(self._merge_school_group(group))
+
+        return merged_records
+
+    def _merge_school_group(
+        self,
+        group: list[tuple[DiscoveredSchool, bool]],
+    ) -> tuple[DiscoveredSchool, bool]:
+        """Merge one grouped family into a single DiscoveredSchool record."""
+        schools = [school for school, _changed in group]
+        group_changed = any(changed for _school, changed in group)
+
+        canonical = self._pick_canonical_school(schools)
+        merged_school = canonical.model_copy(deep=True)
+
+        # Prefer unsuffixed institution name when available.
+        preferred_name = (merged_school.name_i18n or {}).get("bg", "")
+        for school in schools:
+            name_bg = (school.name_i18n or {}).get("bg", "")
+            if name_bg and not self._extract_building_base_name(name_bg):
+                preferred_name = name_bg
+                break
+        if preferred_name:
+            merged_school.name_i18n = {**(merged_school.name_i18n or {}), "bg": preferred_name}
+
+        preferred_primary = self._location_signature(self._get_primary_location(canonical))
+        merged_locations: list[DiscoveredLocation] = []
+        signature_to_index: dict[tuple[str, str, str], int] = {}
+
+        for school in schools:
+            for location in school.locations:
+                signature = self._location_signature(location)
+                if signature in signature_to_index:
+                    existing = merged_locations[signature_to_index[signature]]
+                    existing_tags = set(existing.location_tags or [])
+                    incoming_tags = set(location.location_tags or [])
+                    existing.location_tags = sorted(existing_tags | incoming_tags)
+                    existing.age_groups = sorted(set(existing.age_groups or []) | set(location.age_groups or []))
+                    continue
+                copied = location.model_copy(deep=True)
+                copied.is_primary = signature == preferred_primary
+                copied.location_tags = sorted(set(copied.location_tags or []))
+                copied.age_groups = sorted(set(copied.age_groups or []))
+                signature_to_index[signature] = len(merged_locations)
+                merged_locations.append(copied)
+
+        if merged_locations and not any(location.is_primary for location in merged_locations):
+            merged_locations[0].is_primary = True
+        merged_school.locations = merged_locations
+
+        canonical_attrs = merged_school.attributes or {}
+        kg_ids: set[str] = set()
+        esri_ids: set[str] = set()
+        for school in schools:
+            attrs = school.attributes or {}
+            kg_id = attrs.get("kg_sofia_id")
+            if kg_id is not None:
+                kg_ids.add(str(kg_id))
+            grouped_kg_ids = attrs.get("kg_sofia_ids")
+            if isinstance(grouped_kg_ids, list):
+                for grouped_kg_id in grouped_kg_ids:
+                    if grouped_kg_id is not None:
+                        kg_ids.add(str(grouped_kg_id))
+            esri_id = attrs.get("kg_sofia_esri_id")
+            if esri_id is not None:
+                esri_ids.add(str(esri_id))
+
+        primary_kg_id = canonical_attrs.get("kg_sofia_id")
+        if primary_kg_id is None and kg_ids:
+            primary_kg_id = sorted(kg_ids)[0]
+
+        canonical_attrs["kg_sofia_id"] = primary_kg_id
+        canonical_attrs["kg_sofia_ids"] = sorted(kg_ids)
+        if esri_ids:
+            canonical_attrs["kg_sofia_esri_ids"] = sorted(esri_ids)
+        canonical_attrs["kg_sofia_merged_buildings"] = True
+        source_refs = canonical_attrs.get("source_refs")
+        if not isinstance(source_refs, dict):
+            source_refs = {}
+        kg_ref = source_refs.get(self.ADAPTER_NAME)
+        if not isinstance(kg_ref, dict):
+            kg_ref = {}
+        kg_ref["record_id"] = str(primary_kg_id) if primary_kg_id is not None else None
+        kg_ref["record_ids"] = sorted(kg_ids)
+        kg_ref["esri_ids"] = sorted(esri_ids)
+        source_refs[self.ADAPTER_NAME] = kg_ref
+        canonical_attrs["source_refs"] = source_refs
+        merged_school.attributes = canonical_attrs
+
+        return merged_school, group_changed
+
+    def _pick_canonical_school(self, schools: list[DiscoveredSchool]) -> DiscoveredSchool:
+        """Pick canonical school record for merged attributes and metadata."""
+        unsuffixed = [
+            school
+            for school in schools
+            if not self._extract_building_base_name((school.name_i18n or {}).get("bg", ""))
+        ]
+        if unsuffixed:
+            return unsuffixed[0]
+        return schools[0]
+
+    def _get_primary_location(self, school: DiscoveredSchool) -> DiscoveredLocation:
+        """Return primary location, falling back to first available location."""
+        return next((location for location in school.locations if location.is_primary), school.locations[0])
+
+    def _extract_building_base_name(self, name_bg: str) -> Optional[str]:
+        """Extract base school name from '- сграда ...' branch names."""
+        if not name_bg:
+            return None
+        match = self.BUILDING_SUFFIX_RE.match(name_bg.strip())
+        if not match:
+            return None
+        return match.group("base").strip()
+
+    def _normalize_name_for_grouping(self, name: str) -> str:
+        """Normalize BG name for deterministic grouping comparisons."""
+        normalized = name.upper().strip()
+        normalized = re.sub(r'\s*\(.*?\)\s*', ' ', normalized)
+        normalized = normalized.replace('"', '').replace('„', '').replace('“', '')
+        normalized = re.sub(r'\s+', ' ', normalized).strip()
+        return normalized
+
+    def _normalize_phone(self, phone: Optional[str]) -> str:
+        """Normalize phone for grouping key comparisons."""
+        if not phone:
+            return ""
+        return re.sub(r"[^\d+]", "", phone)
+
+    def _location_signature(self, location: DiscoveredLocation) -> tuple[str, str, str]:
+        """Location signature used to deduplicate merged locations."""
+        address_bg = (location.address_i18n or {}).get("bg", "").strip().lower()
+        district = (location.district or "").strip().lower()
+        phone = self._normalize_phone(location.phone)
+        return address_bg, district, phone
 
     def _parse_institution(
         self, data: dict, default_type: str = "kindergarten"
@@ -410,9 +627,17 @@ class KgSofiaBgAdapter(BaseSourceAdapter):
 
             # Extract ESRI ID
             esri_id = data.get("esriId")
+            source_record_id = data.get("id")
 
             # Extract age groups from publicType
             age_groups = self._extract_age_groups(public_type, education_level)
+
+            location_tags = [
+                f"source={self.ADAPTER_NAME}",
+                f"source_record_id={source_record_id}",
+            ]
+            if esri_id is not None:
+                location_tags.append(f"source_esri_id={esri_id}")
 
             # Build location
             location = DiscoveredLocation(
@@ -420,6 +645,7 @@ class KgSofiaBgAdapter(BaseSourceAdapter):
                 district=district,
                 phone=phone,
                 is_primary=True,
+                location_tags=location_tags,
                 age_groups=age_groups,
                 shifts={},  # Not provided by this API
                 has_organised_groups={},  # Not provided by this API
@@ -436,9 +662,18 @@ class KgSofiaBgAdapter(BaseSourceAdapter):
                 source_url=self.KINDERGARTENS_URL if education_level == "kindergarten" else self.SCHOOLS_URL,
                 locations=[location],
                 attributes={
-                    "kg_sofia_id": data.get("id"),
+                    "kg_sofia_id": source_record_id,
                     "kg_sofia_esri_id": esri_id,
                     "kg_sofia_public_type": public_type,
+                    "source_refs": {
+                        self.ADAPTER_NAME: {
+                            "record_id": str(source_record_id),
+                            "record_ids": [str(source_record_id)],
+                            "esri_id": str(esri_id) if esri_id is not None else None,
+                            "esri_ids": [str(esri_id)] if esri_id is not None else [],
+                            "public_type": public_type,
+                        }
+                    },
                 },
             )
 

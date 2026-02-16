@@ -12,6 +12,10 @@ class DiscoveredLocation(BaseModel):
     lng: Optional[float] = Field(None, description="Longitude")
     phone: Optional[str] = Field(None, description="Phone number")
     is_primary: bool = Field(True, description="Whether this is the primary/main location")
+    location_tags: list[str] = Field(
+        default_factory=list,
+        description="Location-level tags/refs (e.g. source-specific branch identifiers)",
+    )
 
     # Age group shifts (many-to-many relationship data)
     age_groups: list[str] = Field(default_factory=list, description="Age groups served at this location")
