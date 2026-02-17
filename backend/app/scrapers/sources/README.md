@@ -19,10 +19,13 @@ Each country has its own subdirectory (`bg/`, `us/`, etc.) containing source ada
 - School type (state/private/international)
 - Education level
 - Region/municipality/town codes
+- Physical addresses
+- Phone numbers
+- Emails
+- Website URLs (when present in registry)
 
 **Does NOT provide:**
-- Physical addresses or GPS coordinates
-- Phone numbers or websites
+- GPS coordinates
 - Admission data or pricing
 
 **Documentation:** See [backend/docs/MOE_API_DOCUMENTATION.md](../../docs/MOE_API_DOCUMENTATION.md)
@@ -64,10 +67,16 @@ Match records by:
 - Fallback name + city + district matching
 - Manual review for edge cases
 
-### Phase 3: Website Scraping
-For schools not covered by specialized sources:
-- Use institutional ID to find official website
-- Scrape contact info, addresses, pricing (Stage 3-4 of pipeline)
+### Phase 3: Website Discovery + Validation
+For schools with missing/low-quality URLs:
+- Stage 2 discovers and normalizes website candidates
+- Stage 3 validates candidates (heuristics + optional LLM fallback)
+
+### Phase 4: Website Navigation
+For validated websites:
+- Crawl same-domain pages
+- Classify likely categories (admission/pricing/contact/etc.)
+- Cache page content in `source_pages` for extraction stage
 
 ## Adding a New Source
 

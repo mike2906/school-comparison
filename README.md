@@ -14,6 +14,16 @@ Bilingual (Bulgarian/English) web app for parents in Sofia to discover, filter, 
 - Backend: FastAPI, SQLAlchemy 2.0 (async), PostgreSQL
 - Frontend: React 18 + Vite, Leaflet, Tailwind, i18next
 
+## Scraping Pipeline Status
+Implemented:
+- Stage 1: School discovery adapters
+- Stage 2: Website discovery + normalization
+- Stage 3: URL validation (heuristics + optional LLM fallback)
+- Stage 4: Website navigation + page caching
+
+Not implemented yet:
+- Stage 5+: extraction, data validation, summarization
+
 ## Local Development
 ```bash
 # Optional but recommended (gitignored root .env):
@@ -38,6 +48,23 @@ docker compose up -d --force-recreate searxng
 ```
 
 Backend env note: `DEBUG=true` no longer enables SQL logging by itself. Use `DATABASE_ECHO=true` when you explicitly want SQL query logs.
+
+## Scraper CLI Quick Commands
+```bash
+cd backend
+
+# Batch website discovery (Stage 2)
+uv run python -m app.scrapers.cli run --stage discover-websites --city sofia --sync --limit 100
+
+# Recover failed URL candidates
+uv run python -m app.scrapers.cli run --stage recover-failed-urls --city sofia --sync --limit 50
+
+# Validate URLs (Stage 3)
+uv run python -m app.scrapers.cli run --stage validate-urls --city sofia --sync --limit 100
+
+# Navigate validated websites (Stage 4)
+uv run python -m app.scrapers.cli run --stage navigate --city sofia --sync --limit 100
+```
 
 ## License
 TBD

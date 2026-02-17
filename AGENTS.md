@@ -21,7 +21,7 @@ This file provides everything you need to work effectively on this project. Read
 - Multi-country architecture with country-specific education configs
 - Bilingual interface (Bulgarian is primary, English is secondary for MVP)
 
-**Current status:** Multi-country refactoring complete (Phases 1-5). Scraping pipeline (Phase 1) in progress.
+**Current status:** Multi-country refactoring complete (Phases 1-5). Scraping pipeline Stages 1-4 are implemented (discovery, website discovery, URL validation, navigation). Extraction/validation/summarization are pending.
 
 ---
 
@@ -387,7 +387,7 @@ Response includes nested `locations`, `pricing`, `exam_results`.
 - School comparison UI improvements
 - NVO results graphs (Recharts)
 - Points calculator tool
-- Scraping pipeline (Phase 2+)
+- Scraping pipeline Stage 5+ (extraction, data validation, summarization)
 
 ---
 
@@ -402,6 +402,10 @@ REDIS_URL=redis://localhost:6379/0
 Optional (for later phases):
 ```
 OPENROUTER_API_KEY=  # For AI features
+SEARXNG_BASE_URL=http://localhost:8080
+WEBSITE_SEARCH_PROVIDER_DISABLE_SECONDS=300
+URL_VALIDATION_MAX_CONCURRENCY=8
+URL_RECOVERY_CONCURRENCY=3
 ```
 
 ---
