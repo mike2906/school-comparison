@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:16-alpine
@@ -30,6 +28,22 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+
+  searxng:
+    image: searxng/searxng:latest
+    container_name: sofia_schools_searxng
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./searxng:/etc/searxng
+    environment:
+      BASE_URL: http://localhost:8080/
+      INSTANCE_NAME: Sofia School Search
+      # Set in local .env (gitignored). Fallback avoids SearXNG default crash loop.
+      SEARXNG_SECRET: ${SEARXNG_SECRET:-replace-this-local-searxng-secret}
+    depends_on:
+      - redis
+    restart: unless-stopped
 
 volumes:
   postgres_data:

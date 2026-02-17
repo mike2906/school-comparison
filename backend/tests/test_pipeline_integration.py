@@ -1,4 +1,4 @@
-"""Integration tests for scraping pipeline (Stages 1-2).
+"""Integration tests for scraping pipeline orchestration (Stages 1-3).
 
 These tests focus on the integration points between pipeline stages,
 not the full end-to-end execution (which requires Celery workers).
@@ -263,10 +263,10 @@ class TestPipelineOrchestration:
 
             assert "pipeline_id" in result
             assert result["pipeline_id"] == "test-pipeline-123"
-            assert "Stages 1-2" in result["message"]
+            assert "Stages 1-4" in result["message"]
 
     async def test_pipeline_uses_chain_for_stages(self):
-        """Pipeline chains discovery and validation stages."""
+        """Pipeline chains discovery, website discovery, validation, and navigation."""
         from tasks.scrape_tasks import run_full_pipeline
 
         with patch("tasks.scrape_tasks.chain") as mock_chain:
@@ -278,6 +278,7 @@ class TestPipelineOrchestration:
 
             # Verify chain was called
             mock_chain.assert_called_once()
+            assert len(mock_chain.call_args.args) == 4
 
 
 @pytest.mark.asyncio

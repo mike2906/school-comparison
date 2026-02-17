@@ -1,4 +1,5 @@
 """Tests for AI client and model tier configuration."""
+from types import SimpleNamespace
 import pytest
 from app.ai.client import (
     get_model,
@@ -27,7 +28,7 @@ class TestModelTiers:
     def test_get_model_cheap(self):
         """Get cheap tier model."""
         model = get_model("cheap")
-        assert model == "openrouter/google/gemini-2.0-flash-lite"
+        assert model == "openrouter/google/gemini-2.5-flash-lite"
 
     def test_get_model_medium(self):
         """Get medium tier model."""
@@ -129,3 +130,44 @@ class TestCostEstimates:
         total = navigation + extraction + summarization
         # Should be around $1-2 per run according to the plan
         assert 0.80 < total < 2.50
+
+
+class TestOpenAIModelCompat:
+    """Test OpenAIModel initialization compatibility logic."""
+
+    def test_get_openai_model_prefers_provider_signature(self, monkeypatch):
+        """Provider-based initialization is used when available."""
+        from app.ai import client as ai_client
+
+        captured = {}
+
+        class DummyProvider:
+            def __init__(self, *, base_url, api_key):
+                captured["provider_base_url"] = base_url
+                captured["provider_api_key"] = api_key
+
+        class DummyModel:
+            def __init__(self, model_name, *, provider=None):
+                captured["model_name"] = model_name
+                captured["provider"] = provider
+
+        monkeypatch.setattr(ai_client, "OpenAIProvider", DummyProvider)
+        monkeypatch.setattr(ai_client, "OpenAIModel", DummyModel)
+        monkeypatch.setattr(
+            ai_client,
+            "get_settings",
+            lambda: SimpleNamespace(
+                openrouter_api_key="test-key",
+                model_tier_cheap=None,
+                model_tier_medium=None,
+                model_tier_capable=None,
+            ),
+        )
+
+        model = ai_client.get_openai_model("cheap")
+
+        assert isinstance(model, DummyModel)
+        assert captured["model_name"] == "google/gemini-2.5-flash-lite"
+        assert captured["provider_base_url"] == "https://openrouter.ai/api/v1"
+        assert captured["provider_api_key"] == "test-key"
+        assert captured["provider"] is not None

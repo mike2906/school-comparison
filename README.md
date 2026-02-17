@@ -16,6 +16,9 @@ Bilingual (Bulgarian/English) web app for parents in Sofia to discover, filter, 
 
 ## Local Development
 ```bash
+# Optional but recommended (gitignored root .env):
+# SEARXNG_SECRET=your-long-random-secret
+
 # Databases
 docker-compose up -d
 
@@ -27,6 +30,14 @@ uv run uvicorn app.main:app --reload
 cd frontend
 npm run dev
 ```
+
+If `searxng` crash-loops with `server.secret_key is not changed`, set `SEARXNG_SECRET` in a root `.env` file (project root, not `backend/.env`) and restart:
+
+```bash
+docker compose up -d --force-recreate searxng
+```
+
+Backend env note: `DEBUG=true` no longer enables SQL logging by itself. Use `DATABASE_ECHO=true` when you explicitly want SQL query logs.
 
 ## License
 TBD

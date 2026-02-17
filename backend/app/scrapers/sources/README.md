@@ -31,22 +31,22 @@ Each country has its own subdirectory (`bg/`, `us/`, etc.) containing source ada
 
 ### KgSofiaBgAdapter (`kg_sofia.py`)
 **Source:** Sofia Municipality Kindergarten Portal (https://kg.sofia.bg)
-**Coverage:** State kindergartens in Sofia only
-**Data Quality:** ★★★★☆ (Official municipal data, but needs scraping)
+**Coverage:** Sofia municipal kindergartens and schools with preparatory groups
+**Data Quality:** ★★★★☆ (Official municipal data)
 
 **Provides:**
 - Physical addresses with districts
 - Phone numbers
-- Age groups served per location
-- Admission points thresholds (historical)
+- Age groups served per location (derived from institution type)
 - Shift information
+- Registry metadata (`kg_sofia_*` attributes) used for enrichment and idempotency
 
 **Does NOT provide:**
-- Institutional IDs (in most cases)
+- Institutional IDs (in most cases, must be matched with MoE registry)
 - Private kindergartens
-- Schools (only kindergartens)
+- Full private-school coverage
 
-**Status:** ⚠️ Placeholder implementation - needs HTML scraping logic
+**Status:** ✅ Implemented (API integration + enrichment merge behavior)
 
 ---
 
@@ -60,8 +60,8 @@ Run both adapters to get complementary data:
 
 ### Phase 2: Matching & Merging
 Match records by:
-- Exact institutional ID match (if kg.sofia.bg provides it)
-- Fuzzy name matching (if no ID available)
+- Exact institutional ID (when available)
+- Fallback name + city + district matching
 - Manual review for edge cases
 
 ### Phase 3: Website Scraping

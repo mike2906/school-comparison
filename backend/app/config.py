@@ -5,6 +5,7 @@ from functools import lru_cache
 class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/sofia_schools"
+    database_echo: bool = False
 
     # Redis
     REDIS_URL: str = "redis://localhost:6379/0"
@@ -33,6 +34,18 @@ class Settings(BaseSettings):
 
     # Scraping settings
     scrape_delay_seconds: int = 2
+    website_search_providers: str = "searxng,brave"
+    searxng_base_url: str = "http://localhost:8080"
+    website_search_timeout_seconds: float = 6.0
+    website_search_provider_disable_seconds: int = 300
+    url_validation_http_timeout_seconds: float = 4.0
+    url_validation_retry_http_timeout_seconds: float = 8.0
+    url_validation_timeout_terminal_threshold: int = 3
+    url_validation_concurrency: int = 4
+    url_validation_max_concurrency: int = 8
+    url_validation_llm_timeout_seconds: float = 25.0
+    url_recovery_candidate_attempts: int = 6
+    url_recovery_concurrency: int = 3
 
     # Geocoding settings
     geocoding_provider: str = "composite"  # composite | nominatim | google | mapbox (composite = GeoJSON + Nominatim fallback, recommended)

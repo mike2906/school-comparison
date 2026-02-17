@@ -4,6 +4,8 @@ Celery tasks for the scraping pipeline.
 Task Graph:
     discover_schools (batch)
         ↓
+    discover_websites_batch → discover_school_website (per school)
+        ↓
     validate_urls_batch → validate_school_url (per school)
         ↓
     navigate_batch → navigate_school_website (per school)
@@ -119,7 +121,99 @@ async def _discover_schools_async(country_code, adapter_name, city, limit):
 
 
 # =============================================================================
-# Stage 2: URL Validation
+# Stage 2: Website Discovery
+# =============================================================================
+
+@celery_app.task(
+    bind=True,
+    name="tasks.discover_websites_batch",
+    max_retries=3,
+)
+def discover_websites_batch(
+    self,
+    country_code: str = "bg",
+    city: Optional[str] = "sofia",
+    limit: Optional[int] = None,
+):
+    """
+    Discover/normalize website URLs for schools before URL validation.
+
+    This is a fan-out task that creates individual website discovery tasks.
+    """
+    try:
+        school_ids = run_async(_get_schools_for_website_discovery(country_code, city, limit))
+
+        if not school_ids:
+            return {"message": "No schools to discover websites for", "processed": 0}
+
+        job = group(discover_school_website_task.s(school_id, country_code) for school_id in school_ids)
+        result = job.apply_async()
+        results = result.get()
+
+        discovered_count = sum(1 for item in results if item.get("found"))
+        updated_count = sum(1 for item in results if item.get("updated"))
+        unchanged_count = len(results) - updated_count
+
+        return {
+            "processed": len(school_ids),
+            "found": discovered_count,
+            "updated": updated_count,
+            "unchanged": unchanged_count,
+        }
+    except Exception as exc:
+        logger.exception(f"Website discovery batch failed: {exc}")
+        raise self.retry(exc=exc)
+
+
+async def _get_schools_for_website_discovery(country_code, city, limit):
+    """Get school IDs that are eligible for website discovery."""
+    from app.database import async_session_maker
+    from app.models import School
+    from sqlalchemy import select
+
+    async with async_session_maker() as db:
+        query = select(School.id).where(
+            School.country_code == country_code,
+            School.scrape_status.in_(["pending", "failed_validate"]),
+        )
+
+        if city:
+            query = query.where(School.city == city)
+
+        if limit:
+            query = query.limit(limit)
+
+        result = await db.execute(query)
+        return [row[0] for row in result.all()]
+
+
+@celery_app.task(
+    bind=True,
+    name="tasks.discover_school_website",
+    max_retries=3,
+    default_retry_delay=30,
+    rate_limit="20/m",
+)
+def discover_school_website_task(self, school_id: int, country_code: str = "bg"):
+    """Discover/normalize website URL for a single school."""
+    try:
+        return run_async(_discover_school_website_async(school_id, country_code))
+    except Exception as exc:
+        logger.exception(f"Website discovery failed for school {school_id}: {exc}")
+        raise self.retry(exc=exc)
+
+
+async def _discover_school_website_async(school_id, country_code):
+    """Async implementation of discover_school_website."""
+    from app.database import async_session_maker
+    from app.scrapers.website_discovery import discover_school_website
+
+    async with async_session_maker() as db:
+        return await discover_school_website(db=db, school_id=school_id, country_code=country_code)
+
+
+# =============================================================================
+# Stage 3: URL Validation
 # =============================================================================
 
 @celery_app.task(
@@ -242,6 +336,7 @@ async def _validate_school_url_async(school_id, country_code):
             url=school.website_url,
             country_code=country_code,
             update_db=True,
+            school_name=(school.name_i18n or {}).get("bg") or (school.name_i18n or {}).get("en"),
         )
 
         return {
@@ -253,24 +348,94 @@ async def _validate_school_url_async(school_id, country_code):
 
 
 # =============================================================================
-# Stage 3: Navigation (Placeholder - Phase 2)
+# Stage 4: Navigation
 # =============================================================================
 
-@celery_app.task(name="tasks.navigate_batch")
-def navigate_batch(country_code: str = "bg", city: Optional[str] = "sofia", limit: Optional[int] = None):
-    """Navigate and classify school website pages (Phase 2)."""
-    logger.info("Navigate batch - Phase 2 implementation")
-    return {"message": "Not implemented yet - Phase 2"}
+@celery_app.task(
+    bind=True,
+    name="tasks.navigate_batch",
+    max_retries=3,
+)
+def navigate_batch(
+    self,
+    country_code: str = "bg",
+    city: Optional[str] = "sofia",
+    limit: Optional[int] = None,
+    include_navigated: bool = False,
+):
+    """Navigate and classify website pages for validated schools."""
+    try:
+        school_ids = run_async(_get_schools_for_navigation(country_code, city, limit, include_navigated))
+
+        if not school_ids:
+            return {"message": "No schools to navigate", "processed": 0}
+
+        job = group(navigate_school_website.s(school_id, country_code) for school_id in school_ids)
+        result = job.apply_async()
+        results = result.get()
+
+        success_count = sum(1 for item in results if item.get("success"))
+        failed_count = len(results) - success_count
+        pages_found = sum(item.get("pages_found", 0) for item in results if item.get("success"))
+
+        return {
+            "processed": len(school_ids),
+            "successful": success_count,
+            "failed": failed_count,
+            "pages_found": pages_found,
+        }
+    except Exception as exc:
+        logger.exception(f"Navigation batch failed: {exc}")
+        raise self.retry(exc=exc)
+
+
+async def _get_schools_for_navigation(country_code, city, limit, include_navigated: bool = False):
+    """Get validated school IDs eligible for website navigation."""
+    from app.database import async_session_maker
+    from app.models import School
+    from sqlalchemy import select
+
+    async with async_session_maker() as db:
+        statuses = ["validated", "navigated"] if include_navigated else ["validated"]
+        query = select(School.id).where(
+            School.country_code == country_code,
+            School.scrape_status.in_(statuses),
+            School.website_url.isnot(None),
+        )
+
+        if city:
+            query = query.where(School.city == city)
+
+        if limit:
+            query = query.limit(limit)
+
+        result = await db.execute(query)
+        return [row[0] for row in result.all()]
 
 
 @celery_app.task(
+    bind=True,
     name="tasks.navigate_school_website",
-    rate_limit="3/m",  # Crawl4AI concurrency limit
+    max_retries=3,
+    default_retry_delay=60,
+    rate_limit="3/m",  # Keep conservative while crawler is simple.
 )
-def navigate_school_website(school_id: int):
-    """Navigate a single school website and classify pages (Phase 2)."""
-    logger.info(f"Navigate school {school_id} - Phase 2 implementation")
-    return {"school_id": school_id, "message": "Not implemented yet - Phase 2"}
+def navigate_school_website(self, school_id: int, country_code: str = "bg"):
+    """Navigate a single school website and persist discovered pages."""
+    try:
+        return run_async(_navigate_school_website_async(school_id, country_code))
+    except Exception as exc:
+        logger.exception(f"Navigation failed for school {school_id}: {exc}")
+        raise self.retry(exc=exc)
+
+
+async def _navigate_school_website_async(school_id: int, country_code: str = "bg"):
+    """Async implementation of navigate_school_website."""
+    from app.database import async_session_maker
+    from app.scrapers.navigator import navigate_school
+
+    async with async_session_maker() as db:
+        return await navigate_school(db=db, school_id=school_id, country_code=country_code)
 
 
 # =============================================================================
@@ -367,23 +532,25 @@ def run_full_pipeline(
     Returns:
         Pipeline execution ID
     """
-    # Create a chain of stage tasks
-    # Note: Stages 3-6 are placeholders for Phase 2
+    # Create a chain of stage tasks.
+    # Use immutable signatures (.si) so each task receives only explicit kwargs,
+    # not the previous task's return payload.
     pipeline = chain(
-        discover_schools.s(country_code=country_code, city=city, limit=limit),
-        validate_urls_batch.s(country_code=country_code, city=city, limit=limit),
+        discover_schools.si(country_code=country_code, city=city, limit=limit),
+        discover_websites_batch.si(country_code=country_code, city=city, limit=limit),
+        validate_urls_batch.si(country_code=country_code, city=city, limit=limit),
+        navigate_batch.si(country_code=country_code, city=city, limit=limit),
         # Phase 2 stages would be added here:
-        # navigate_batch.s(country_code=country_code, city=city, limit=limit),
-        # extract_batch.s(country_code=country_code, city=city, limit=limit),
-        # group(validate_batch.s(country_code=country_code, city=city), run_spot_checks.s(country_code=country_code, city=city)),
-        # summarize_batch.s(country_code=country_code, city=city, limit=limit),
+        # extract_batch.si(country_code=country_code, city=city, limit=limit),
+        # group(validate_batch.si(country_code=country_code, city=city), run_spot_checks.si(country_code=country_code, city=city)),
+        # summarize_batch.si(country_code=country_code, city=city, limit=limit),
     )
 
     result = pipeline.apply_async()
 
     return {
         "pipeline_id": result.id,
-        "message": "Pipeline started (Stages 1-2 only; 3-6 are Phase 2)",
+        "message": "Pipeline started (Stages 1-4 enabled; 5-7 are Phase 2)",
     }
 
 
@@ -399,7 +566,7 @@ def run_stage(
     Run a specific pipeline stage.
 
     Args:
-        stage: Stage name (discover, validate-urls, navigate, extract, validate-data, summarize)
+        stage: Stage name (discover, discover-websites, validate-urls, navigate, extract, validate-data, summarize)
         country_code: Country code
         city: City to filter by
         school_ids: Specific school IDs to process (optional)
@@ -410,6 +577,7 @@ def run_stage(
     """
     stage_map = {
         "discover": discover_schools,
+        "discover-websites": discover_websites_batch,
         "validate-urls": validate_urls_batch,
         "navigate": navigate_batch,
         "extract": extract_batch,

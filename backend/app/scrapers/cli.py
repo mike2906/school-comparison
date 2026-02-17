@@ -11,6 +11,12 @@ Usage:
     # Run by school ID
     uv run python -m app.scrapers.cli run --school-id 42 --stage validate-urls
 
+    # Discover/normalize website URLs
+    uv run python -m app.scrapers.cli run --stage discover-websites --city sofia --limit 20
+
+    # Retry failed URL discovery+validation (failed_validate only)
+    uv run python -m app.scrapers.cli run --stage recover-failed-urls --city sofia --limit 20
+
     # Run batch with limit
     uv run python -m app.scrapers.cli run --stage discover --city sofia --limit 10
 
@@ -43,6 +49,11 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
+# Keep CLI output focused on scraper progress; DEBUG=true still enables app-level behavior.
+logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
+logging.getLogger("sqlalchemy.pool").setLevel(logging.WARNING)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 console = Console()
@@ -60,7 +71,17 @@ def cli():
 @click.option(
     "--stage",
     type=click.Choice(
-        ["discover", "validate-urls", "navigate", "extract", "validate-data", "summarize", "all"],
+        [
+            "discover",
+            "discover-websites",
+            "recover-failed-urls",
+            "validate-urls",
+            "navigate",
+            "extract",
+            "validate-data",
+            "summarize",
+            "all",
+        ],
         case_sensitive=False,
     ),
     required=True,
@@ -70,9 +91,10 @@ def cli():
 @click.option("--country", default="bg", help="Country code")
 @click.option("--limit", type=int, help="Limit number of schools to process")
 @click.option("--sample-ratio", type=float, default=0.0, help="Sample ratio for unchanged schools (discover only)")
+@click.option("--include-navigated", is_flag=True, help="For navigate stage, recrawl already navigated schools")
 @click.option("--sync", is_flag=True, help="Run synchronously (no Celery)")
 @click.option("--dry-run", is_flag=True, help="Show what would happen without executing")
-def run(school, school_id, stage, city, country, limit, sample_ratio, sync, dry_run):
+def run(school, school_id, stage, city, country, limit, sample_ratio, include_navigated, sync, dry_run):
     """Run a pipeline stage."""
     if dry_run:
         console.print(f"[yellow]DRY RUN - would execute:[/yellow]")
@@ -82,19 +104,20 @@ def run(school, school_id, stage, city, country, limit, sample_ratio, sync, dry_
         console.print(f"  Country: {country}")
         console.print(f"  Limit: {limit}")
         console.print(f"  Sample ratio: {sample_ratio}")
+        console.print(f"  Include navigated: {include_navigated}")
         console.print(f"  Mode: {'sync' if sync else 'celery'}")
         return
 
     if sync:
         # Run synchronously
-        asyncio.run(_run_sync(school, school_id, stage, city, country, limit, sample_ratio))
+        asyncio.run(_run_sync(school, school_id, stage, city, country, limit, sample_ratio, include_navigated))
     else:
         # Run via Celery
         console.print("[yellow]Celery mode not yet implemented. Use --sync for now.[/yellow]")
         sys.exit(1)
 
 
-async def _run_sync(school_name, school_id, stage, city, country, limit, sample_ratio):
+async def _run_sync(school_name, school_id, stage, city, country, limit, sample_ratio, include_navigated: bool):
     """Run pipeline stage synchronously."""
     from app.database import async_session_maker
 
@@ -119,10 +142,14 @@ async def _run_sync(school_name, school_id, stage, city, country, limit, sample_
                 try:
                     if stage == "discover":
                         console.print("[yellow]Discover stage runs in batch mode only[/yellow]")
+                    elif stage == "discover-websites":
+                        await _run_discover_website(db, school_id, country)
+                    elif stage == "recover-failed-urls":
+                        await _run_recover_failed_school(db, school_id, country)
                     elif stage == "validate-urls":
                         await _run_validate_url(db, school_id, country)
                     elif stage == "navigate":
-                        console.print("[yellow]Navigate stage not yet implemented[/yellow]")
+                        await _run_navigate_school(db, school_id, country)
                     elif stage == "extract":
                         console.print("[yellow]Extract stage not yet implemented[/yellow]")
                     elif stage == "validate-data":
@@ -147,8 +174,14 @@ async def _run_sync(school_name, school_id, stage, city, country, limit, sample_
 
             if stage == "discover":
                 await _run_discover_batch(db, country, city, limit, sample_ratio)
+            elif stage == "discover-websites":
+                await _run_discover_websites_batch(db, country, city, limit)
+            elif stage == "recover-failed-urls":
+                await _run_recover_failed_urls_batch(db, country, city, limit)
             elif stage == "validate-urls":
                 await _run_validate_urls_batch(db, country, city, limit)
+            elif stage == "navigate":
+                await _run_navigate_batch(db, country, city, limit, include_navigated=include_navigated)
             else:
                 console.print(f"[yellow]Batch mode for '{stage}' not yet implemented[/yellow]")
 
@@ -230,16 +263,255 @@ async def _run_discover_batch(db, country: str, city: str, limit: Optional[int],
                 logger.exception("Discovery failed")
 
 
-async def _run_validate_urls_batch(db, country: str, city: str, limit: Optional[int]):
+async def _run_validate_urls_batch(
+    db,
+    country: str,
+    city: Optional[str],
+    limit: Optional[int],
+    statuses: Optional[list[str]] = None,
+    school_ids: Optional[list[int]] = None,
+):
     """Run URL validation stage in batch mode."""
+    from app.config import get_settings
+    from app.models import School
+    from sqlalchemy import select
+    from app.scrapers.url_validator import validate_school_url
+
+    statuses = statuses or ["pending", "failed_validate"]
+
+    query = select(School.id, School.website_url, School.name_i18n).where(
+        School.country_code == country,
+        School.scrape_status.in_(statuses),
+        School.website_url.isnot(None),
+    )
+
+    if city:
+        query = query.where(School.city == city)
+
+    if school_ids:
+        query = query.where(School.id.in_(school_ids))
+
+    if limit:
+        query = query.limit(limit)
+
+    result = await db.execute(query)
+    schools = result.all()
+
+    if not schools:
+        console.print("[yellow]No schools to validate[/yellow]")
+        return
+
+    settings = get_settings()
+    requested_concurrency = max(1, int(settings.url_validation_concurrency))
+    max_concurrency = max(1, int(settings.url_validation_max_concurrency))
+    concurrency = min(requested_concurrency, max_concurrency)
+
+    console.print(f"[cyan]Validating {len(schools)} school URLs...[/cyan]")
+    console.print(f"  Concurrency: {concurrency}")
+    if requested_concurrency > max_concurrency:
+        console.print(
+            f"[yellow]  Requested concurrency {requested_concurrency} capped to {max_concurrency} "
+            f"(DB session safety)[/yellow]"
+        )
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console,
+    ) as progress:
+        task = progress.add_task("Validating URLs...", total=len(schools))
+
+        valid_count = 0
+        invalid_count = 0
+        ambiguous_count = 0
+        error_count = 0
+        semaphore = asyncio.Semaphore(concurrency)
+
+        async def _validate_single(school_id: int, website_url: str, school_name: Optional[str]) -> str:
+            async with semaphore:
+                try:
+                    result, _, _ = await validate_school_url(
+                        school_id=school_id,
+                        url=website_url,
+                        country_code=country,
+                        update_db=True,
+                        school_name=school_name,
+                    )
+                    return result.value
+                except Exception as exc:
+                    logger.error(f"Error validating school {school_id}: {exc}")
+                    return "error"
+
+        tasks = [
+            asyncio.create_task(
+                _validate_single(
+                    school_id=school_id,
+                    website_url=website_url,
+                    school_name=(name_i18n or {}).get("bg") or (name_i18n or {}).get("en"),
+                )
+            )
+            for school_id, website_url, name_i18n in schools
+            if website_url
+        ]
+
+        for completed in asyncio.as_completed(tasks):
+            outcome = await completed
+            if outcome == "valid":
+                valid_count += 1
+            elif outcome == "invalid":
+                invalid_count += 1
+            elif outcome == "ambiguous":
+                ambiguous_count += 1
+            else:
+                error_count += 1
+            progress.update(task, advance=1)
+
+    console.print(f"[green]✓ URL validation complete:[/green]")
+    console.print(f"  Valid: {valid_count}")
+    console.print(f"  Invalid: {invalid_count}")
+    console.print(f"  Ambiguous: {ambiguous_count}")
+    console.print(f"  Errors: {error_count}")
+
+
+async def _run_recover_failed_school(db, school_id: int, country: str) -> dict:
+    """Rediscover + revalidate URL for one failed school, trying multiple candidates."""
+    from app.config import get_settings
+    from app.models import School
+    from sqlalchemy import select
+    from app.scrapers.website_discovery import WebsiteDiscoverer
+
+    result = await db.execute(select(School).where(School.id == school_id))
+    school = result.scalar_one_or_none()
+    if not school:
+        raise ValueError(f"School {school_id} not found")
+
+    if school.scrape_status != "failed_validate":
+        console.print(
+            f"[yellow]School {school_id} is '{school.scrape_status}' (expected failed_validate); skipping[/yellow]"
+        )
+        return {"school_id": school_id, "skipped": True, "reason": "not_failed_validate"}
+
+    settings = get_settings()
+    max_attempts = max(1, int(settings.url_recovery_candidate_attempts))
+    discoverer = WebsiteDiscoverer(country_code=country)
+    return await discoverer.recover_failed_school(
+        db=db,
+        school=school,
+        max_attempts=max_attempts,
+    )
+
+
+async def _recover_failed_school_with_new_session(school_id: int, country: str) -> dict:
+    """Run recovery for one school in an isolated DB session."""
+    from app.database import async_session_maker
+
+    async with async_session_maker() as db:
+        return await _run_recover_failed_school(db, school_id, country)
+
+
+async def _run_recover_failed_urls_batch(db, country: str, city: str, limit: Optional[int]):
+    """Retry website discovery for failed URLs with multi-candidate validation fallback."""
+    from app.config import get_settings
     from app.models import School
     from sqlalchemy import select
 
-    # Get schools with pending or failed_validate status
+    query = select(School.id).where(
+        School.country_code == country,
+        School.scrape_status == "failed_validate",
+    )
+
+    if city:
+        query = query.where(School.city == city)
+
+    if limit:
+        query = query.limit(limit)
+
+    result = await db.execute(query)
+    school_ids = [row[0] for row in result.all()]
+
+    if not school_ids:
+        console.print("[yellow]No failed_validate schools to recover[/yellow]")
+        return
+
+    console.print(f"[cyan]Recovering {len(school_ids)} failed school URLs...[/cyan]")
+
+    settings = get_settings()
+    requested_concurrency = max(1, int(settings.url_recovery_concurrency))
+    max_concurrency = max(1, int(settings.url_validation_max_concurrency))
+    concurrency = min(requested_concurrency, max_concurrency)
+    console.print(f"  Concurrency: {concurrency}")
+    if requested_concurrency > max_concurrency:
+        console.print(
+            f"[yellow]  Requested concurrency {requested_concurrency} capped to {max_concurrency} "
+            f"(DB session safety)[/yellow]"
+        )
+
+    validated_count = 0
+    still_failed_count = 0
+    terminal_count = 0
+    skipped_count = 0
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console,
+    ) as progress:
+        task = progress.add_task("Recovering failed URLs...", total=len(school_ids))
+
+        semaphore = asyncio.Semaphore(concurrency)
+
+        async def _recover_single(target_school_id: int) -> dict:
+            async with semaphore:
+                return await _recover_failed_school_with_new_session(target_school_id, country)
+
+        tasks = [asyncio.create_task(_recover_single(school_id)) for school_id in school_ids]
+        for completed in asyncio.as_completed(tasks):
+            try:
+                out = await completed
+                if out.get("terminal"):
+                    terminal_count += 1
+                elif out.get("skipped"):
+                    skipped_count += 1
+                elif out.get("status") == "validated":
+                    validated_count += 1
+                else:
+                    still_failed_count += 1
+            except Exception as exc:
+                logger.error(f"Failed to recover school URL: {exc}")
+            progress.update(task, advance=1)
+
+    console.print("[green]✓ Failed URL recovery pass complete:[/green]")
+    console.print(f"  Recovered + validated: {validated_count}")
+    console.print(f"  Still failed: {still_failed_count}")
+    console.print(f"  No official website: {terminal_count}")
+    console.print(f"  Skipped: {skipped_count}")
+
+
+async def _run_discover_website(db, school_id: int, country: str):
+    """Run website discovery for a single school."""
+    from app.scrapers.website_discovery import discover_school_website
+
+    console.print(f"  Discovering website for school {school_id}...")
+    result = await discover_school_website(db=db, school_id=school_id, country_code=country)
+
+    if result.get("found"):
+        console.print(
+            f"  Result: {result.get('website_url')} "
+            f"(method={result.get('method')}, updated={result.get('updated')})"
+        )
+    else:
+        console.print(f"[yellow]  Not found: {result.get('reason', 'No reason')}[/yellow]")
+    return result
+
+
+async def _run_discover_websites_batch(db, country: str, city: str, limit: Optional[int]):
+    """Run website discovery stage in batch mode."""
+    from app.models import School
+    from sqlalchemy import select
+
     query = select(School).where(
         School.country_code == country,
         School.scrape_status.in_(["pending", "failed_validate"]),
-        School.website_url.isnot(None),
     )
 
     if city:
@@ -252,41 +524,36 @@ async def _run_validate_urls_batch(db, country: str, city: str, limit: Optional[
     schools = result.scalars().all()
 
     if not schools:
-        console.print("[yellow]No schools to validate[/yellow]")
+        console.print("[yellow]No schools to discover websites for[/yellow]")
         return
 
-    console.print(f"[cyan]Validating {len(schools)} school URLs...[/cyan]")
+    console.print(f"[cyan]Discovering websites for {len(schools)} schools...[/cyan]")
 
     with Progress(
         SpinnerColumn(),
         TextColumn("[progress.description]{task.description}"),
         console=console,
     ) as progress:
-        task = progress.add_task("Validating URLs...", total=len(schools))
+        task = progress.add_task("Discovering websites...", total=len(schools))
 
-        valid_count = 0
-        invalid_count = 0
+        found_count = 0
+        updated_count = 0
 
         for school in schools:
             try:
-                await _run_validate_url(db, school.id, country)
-                # Refresh school to get updated status
-                await db.refresh(school)
-
-                if school.scrape_status == "validated":
-                    valid_count += 1
-                else:
-                    invalid_count += 1
-
+                result = await _run_discover_website(db, school.id, country)
+                if result and result.get("found"):
+                    found_count += 1
+                if result and result.get("updated"):
+                    updated_count += 1
             except Exception as e:
-                logger.error(f"Error validating school {school.id}: {e}")
-                invalid_count += 1
-
+                logger.error(f"Error discovering website for school {school.id}: {e}")
             progress.update(task, advance=1)
 
-    console.print(f"[green]✓ URL validation complete:[/green]")
-    console.print(f"  Valid: {valid_count}")
-    console.print(f"  Invalid: {invalid_count}")
+    console.print(f"[green]✓ Website discovery complete:[/green]")
+    console.print(f"  Found: {found_count}")
+    console.print(f"  Updated: {updated_count}")
+    console.print(f"  Unchanged: {len(schools) - updated_count}")
 
 
 async def _run_validate_url(db, school_id: int, country: str):
@@ -312,20 +579,104 @@ async def _run_validate_url(db, school_id: int, country: str):
         url=school.website_url,
         country_code=country,
         update_db=True,
+        school_name=(school.name_i18n or {}).get("bg") or (school.name_i18n or {}).get("en"),
     )
 
     console.print(f"  Result: {validation_result.value} - {reason}")
 
 
+async def _run_navigate_school(db, school_id: int, country: str):
+    """Run navigation stage for a single school."""
+    from app.scrapers.navigator import navigate_school
+
+    console.print(f"  Navigating website for school {school_id}...")
+    result = await navigate_school(db=db, school_id=school_id, country_code=country)
+
+    if result.get("success"):
+        console.print(
+            f"  Result: pages={result.get('pages_found', 0)}, "
+            f"created={result.get('created', 0)}, updated={result.get('updated', 0)}"
+        )
+    else:
+        console.print(f"[yellow]  Skipped: {result.get('reason', 'Unknown reason')}[/yellow]")
+    return result
+
+
+async def _run_navigate_batch(
+    db,
+    country: str,
+    city: str,
+    limit: Optional[int],
+    include_navigated: bool = False,
+):
+    """Run navigation stage in batch mode."""
+    from app.models import School
+    from sqlalchemy import select
+
+    statuses = ["validated", "navigated"] if include_navigated else ["validated"]
+    query = select(School).where(
+        School.country_code == country,
+        School.scrape_status.in_(statuses),
+        School.website_url.isnot(None),
+    )
+
+    if city:
+        query = query.where(School.city == city)
+
+    if limit:
+        query = query.limit(limit)
+
+    result = await db.execute(query)
+    schools = result.scalars().all()
+
+    if not schools:
+        console.print("[yellow]No schools to navigate[/yellow]")
+        return
+
+    status_label = "validated+navigated" if include_navigated else "validated"
+    console.print(f"[cyan]Navigating websites for {len(schools)} schools...[/cyan]")
+    console.print(f"  Status filter: {status_label}")
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console,
+    ) as progress:
+        task = progress.add_task("Navigating websites...", total=len(schools))
+
+        success_count = 0
+        fail_count = 0
+
+        for school in schools:
+            try:
+                result = await _run_navigate_school(db, school.id, country)
+                if result and result.get("success"):
+                    success_count += 1
+                else:
+                    fail_count += 1
+            except Exception as e:
+                logger.error(f"Error navigating school {school.id}: {e}")
+                fail_count += 1
+            progress.update(task, advance=1)
+
+    console.print(f"[green]✓ Navigation complete:[/green]")
+    console.print(f"  Successful: {success_count}")
+    console.print(f"  Failed: {fail_count}")
+
+
 async def _run_all_stages(db, school_id: int, country: str):
     """Run all pipeline stages for a single school."""
-    stages = ["validate-urls", "navigate", "extract", "validate-data", "summarize"]
+    stages = ["discover-websites", "validate-urls", "navigate", "extract", "validate-data", "summarize"]
 
     for stage in stages:
         console.print(f"\n[cyan]Stage: {stage}[/cyan]")
 
-        if stage == "validate-urls":
+        if stage == "discover-websites":
+            await _run_discover_website(db, school_id, country)
+        elif stage == "validate-urls":
             await _run_validate_url(db, school_id, country)
+        elif stage == "navigate":
+            await _run_navigate_school(db, school_id, country)
         else:
             console.print(f"[yellow]{stage} not yet implemented[/yellow]")
 
@@ -337,7 +688,10 @@ async def _run_all_stages(db, school_id: int, country: str):
 @click.option(
     "--to",
     "to_status",
-    type=click.Choice(["pending", "validated", "navigated", "extracted", "summarized"], case_sensitive=False),
+    type=click.Choice(
+        ["pending", "failed_validate", "validated", "navigated", "extracted", "summarized", "no_official_website"],
+        case_sensitive=False,
+    ),
     required=True,
     help="Target status",
 )

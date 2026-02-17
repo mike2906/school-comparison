@@ -6,16 +6,18 @@ This module provides:
 - OpenRouter integration via PydanticAI
 - Cost tracking helpers
 """
+import inspect
 from typing import Literal
 from pydantic_ai import Agent
 from pydantic_ai.models.openai import OpenAIModel
+from pydantic_ai.providers.openai import OpenAIProvider
 
 from app.config import get_settings
 
 # Model tier definitions
 # See: https://openrouter.ai/models for pricing and capabilities
 MODEL_TIERS = {
-    "cheap": "openrouter/google/gemini-2.0-flash-lite",  # $0.075/$0.30 per 1M tokens
+    "cheap": "openrouter/google/gemini-2.5-flash-lite",  # keep lightweight tier for validation/classification
     "medium": "openrouter/google/gemini-2.5-flash",  # $0.15/$0.60 per 1M tokens
     "capable": "openrouter/google/gemini-2.5-pro",  # $1.25/$10.00 per 1M tokens
 }
@@ -113,6 +115,19 @@ def get_openai_model(tier: ModelTier) -> OpenAIModel:
     # OpenRouter expects format: google/gemini-2.0-flash-lite
     api_model_name = model_name.replace("openrouter/", "")
 
+    # pydantic-ai changed OpenAIModel initialization to use `provider=...`.
+    # Keep a compatibility fallback for older versions that accept base_url/api_key directly.
+    init_params = inspect.signature(OpenAIModel.__init__).parameters
+    if "provider" in init_params:
+        provider = OpenAIProvider(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=settings.openrouter_api_key,
+        )
+        return OpenAIModel(
+            model_name=api_model_name,
+            provider=provider,
+        )
+
     return OpenAIModel(
         model_name=api_model_name,
         base_url="https://openrouter.ai/api/v1",
@@ -156,6 +171,14 @@ def create_agent(
         'Sofia School #1'
     """
     model = get_openai_model(tier)
+    init_params = inspect.signature(Agent.__init__).parameters
+    if "output_type" in init_params:
+        return Agent(
+            model=model,
+            system_prompt=system_prompt,
+            output_type=result_type,
+            **agent_kwargs,
+        )
 
     return Agent(
         model=model,

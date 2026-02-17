@@ -8,13 +8,20 @@ for ambiguous cases.
 import logging
 from typing import Optional
 from enum import Enum
+import asyncio
+import re
+from urllib.parse import urlparse
 import httpx
 from bs4 import BeautifulSoup
 
 from app.ai.client import create_agent
+from app.config import get_settings
+from app.scrapers.school_tokens import extract_school_name_tokens
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
+
+TIMEOUT_FAILURE_ATTR_KEY = "url_validation_timeout_failures"
 
 
 class ValidationResult(str, Enum):
@@ -44,7 +51,7 @@ class URLValidator:
     """
 
     # Timeout for HTTP requests
-    HTTP_TIMEOUT = 10.0
+    HTTP_TIMEOUT = 4.0
 
     # Keywords that indicate a school website (locale-specific)
     # These should be loaded from sources/{country_code}/keywords.json
@@ -85,6 +92,31 @@ class URLValidator:
         "youtube.com",
     ]
 
+    # Generic directory/listing markers (pattern-based, not per-domain denylist).
+    DIRECTORY_PATH_MARKERS = (
+        "firm",
+        "firms",
+        "company",
+        "companies",
+        "listing",
+        "listings",
+        "directory",
+        "catalog",
+        "profile",
+        "business",
+    )
+    DIRECTORY_TEXT_MARKERS = (
+        "добави фирма",
+        "подобни фирми",
+        "още фирми",
+        "каталог",
+        "каталог на фирми",
+        "business directory",
+        "company profile",
+        "add company",
+        "related companies",
+        "all companies",
+    )
     def __init__(self, country_code: str = "bg"):
         """
         Initialize the URL validator.
@@ -94,6 +126,10 @@ class URLValidator:
         """
         self.country_code = country_code
         self.keywords = self._load_keywords(country_code)
+        settings = get_settings()
+        self.http_timeout = max(1.0, float(settings.url_validation_http_timeout_seconds))
+        self.retry_http_timeout = max(self.http_timeout, float(settings.url_validation_retry_http_timeout_seconds))
+        self.llm_timeout = max(5.0, float(settings.url_validation_llm_timeout_seconds))
 
     def _load_keywords(self, country_code: str) -> list[str]:
         """
@@ -112,10 +148,61 @@ class URLValidator:
         # TODO: Load from JSON file when we create the keywords.json files
         return self.DEFAULT_SCHOOL_KEYWORDS.get(country_code, self.DEFAULT_SCHOOL_KEYWORDS["en"])
 
+    def normalize_url(self, url: str) -> Optional[str]:
+        """
+        Normalize website URL so HTTP client can fetch it reliably.
+
+        Handles common data issues:
+        - Missing scheme: `www.school.bg` -> `https://www.school.bg`
+        - Malformed scheme: `http//school.bg` -> `http://school.bg`
+        - Protocol-relative URLs: `//school.bg` -> `https://school.bg`
+        """
+        if not url:
+            return None
+
+        cleaned = url.strip().strip("\"' ")
+        if not cleaned:
+            return None
+
+        lower = cleaned.lower()
+        if lower.startswith("http//"):
+            cleaned = "http://" + cleaned[6:]
+        elif lower.startswith("https//"):
+            cleaned = "https://" + cleaned[7:]
+        elif cleaned.startswith("//"):
+            cleaned = f"https:{cleaned}"
+        elif "://" not in cleaned:
+            cleaned = f"https://{cleaned.lstrip('/')}"
+
+        parsed = urlparse(cleaned)
+        if parsed.scheme not in {"http", "https"}:
+            return None
+
+        # Handle edge case like "https:school.bg" (missing //).
+        if not parsed.netloc and parsed.path:
+            fixed = f"{parsed.scheme}://{parsed.path.lstrip('/')}"
+            parsed = urlparse(fixed)
+            cleaned = fixed
+
+        if not parsed.netloc:
+            return None
+
+        if any(char.isspace() for char in parsed.netloc):
+            compact_netloc = "".join(parsed.netloc.split())
+            if not compact_netloc:
+                return None
+            cleaned = cleaned.replace(parsed.netloc, compact_netloc, 1)
+            parsed = urlparse(cleaned)
+            if not parsed.netloc or any(char.isspace() for char in parsed.netloc):
+                return None
+
+        return cleaned
+
     async def validate_url(
         self,
         url: str,
         use_llm_fallback: bool = True,
+        school_name: Optional[str] = None,
     ) -> tuple[ValidationResult, Optional[str], Optional[str]]:
         """
         Validate a school website URL.
@@ -123,6 +210,7 @@ class URLValidator:
         Args:
             url: URL to validate
             use_llm_fallback: Whether to use LLM for ambiguous cases
+            school_name: Optional expected school name for official-site checks
 
         Returns:
             Tuple of (result, final_url, reason)
@@ -136,71 +224,130 @@ class URLValidator:
             >>> if result == ValidationResult.VALID:
             ...     print(f"Valid school website: {final_url}")
         """
+        normalized_url = self.normalize_url(url)
+        if not normalized_url:
+            return ValidationResult.INVALID, None, "Invalid URL format"
+
         # Step 1: Check if domain is blocked
-        if self._is_blocked_domain(url):
+        if self._is_blocked_domain(normalized_url):
             return ValidationResult.INVALID, None, "Blocked domain (social media/forum)"
 
-        # Step 2: HTTP check
+        first_result = await self._validate_with_http_timeout(
+            normalized_url=normalized_url,
+            timeout_seconds=self.http_timeout,
+            use_llm_fallback=use_llm_fallback,
+            school_name=school_name,
+        )
+
+        result, _, reason = first_result
+        should_retry_timeout = (
+            result == ValidationResult.INVALID
+            and _is_timeout_reason(reason)
+            and self.retry_http_timeout > self.http_timeout
+        )
+        if not should_retry_timeout:
+            return first_result
+
+        retry_result = await self._validate_with_http_timeout(
+            normalized_url=normalized_url,
+            timeout_seconds=self.retry_http_timeout,
+            use_llm_fallback=use_llm_fallback,
+            school_name=school_name,
+        )
+        retry_status, retry_final_url, retry_reason = retry_result
+
+        if retry_status == ValidationResult.INVALID and _is_timeout_reason(retry_reason):
+            return retry_result
+        return (
+            retry_status,
+            retry_final_url,
+            f"{retry_reason} (after timeout retry at {self.retry_http_timeout:.1f}s)",
+        )
+
+    async def _validate_with_http_timeout(
+        self,
+        normalized_url: str,
+        timeout_seconds: float,
+        use_llm_fallback: bool,
+        school_name: Optional[str],
+    ) -> tuple[ValidationResult, Optional[str], Optional[str]]:
+        """Run one validation pass with a specific HTTP timeout."""
         try:
-            async with httpx.AsyncClient(timeout=self.HTTP_TIMEOUT, follow_redirects=True) as client:
-                response = await client.get(url)
+            async with httpx.AsyncClient(timeout=timeout_seconds, follow_redirects=True) as client:
+                response = await client.get(normalized_url)
                 final_url = str(response.url)  # Final URL after redirects
 
-                # Check status code
                 if response.status_code >= 400:
-                    return (
-                        ValidationResult.INVALID,
-                        None,
-                        f"HTTP error: {response.status_code}",
-                    )
+                    return ValidationResult.INVALID, None, f"HTTP error: {response.status_code}"
 
-                # Step 3: Heuristic keyword check
                 html_content = response.text
                 soup = BeautifulSoup(html_content, "html.parser")
 
-                # Extract text content
                 text_content = soup.get_text(separator=" ", strip=True).lower()
+                title_text = soup.title.string if soup.title and soup.title.string else ""
+                h1_text = " ".join(tag.get_text(" ", strip=True) for tag in soup.find_all("h1")[:2])
+                page_context = f"{title_text} {h1_text} {text_content[:4000]}".lower()
 
-                # Count keyword matches
                 keyword_count = sum(1 for keyword in self.keywords if keyword.lower() in text_content)
+                name_tokens = self._extract_school_name_tokens(school_name)
+                name_token_hits = self._count_school_name_token_hits(page_context, name_tokens)
+                directory_signals = self._count_directory_signals(final_url, text_content, soup)
 
-                # Decision based on keyword density
-                if keyword_count >= 3:
-                    # Strong signal - likely a school website
+                # If page looks like a directory and doesn't reference the expected school,
+                # reject immediately to avoid false positives from broad listing portals.
+                if directory_signals >= 1 and name_tokens and name_token_hits == 0:
                     return (
-                        ValidationResult.VALID,
-                        final_url,
-                        f"Keyword match: {keyword_count} school terms found",
+                        ValidationResult.INVALID,
+                        None,
+                        f"Directory-like listing signals with missing school-name match ({directory_signals})",
                     )
-                elif keyword_count == 0:
-                    # No school keywords - likely not a school
+
+                if directory_signals >= 2:
+                    return (
+                        ValidationResult.INVALID,
+                        None,
+                        f"Directory-like listing signals detected ({directory_signals})",
+                    )
+
+                if name_tokens and name_token_hits == 0:
                     if use_llm_fallback:
-                        # Still check with LLM to be sure
-                        return await self._llm_validate(text_content, final_url)
-                    else:
-                        return (
-                            ValidationResult.INVALID,
-                            None,
-                            "No school-related keywords found",
-                        )
-                else:
-                    # Ambiguous (1-2 keywords) - needs LLM validation
-                    if use_llm_fallback:
-                        return await self._llm_validate(text_content, final_url)
-                    else:
+                        return await self._llm_validate(text_content, final_url, school_name=school_name)
+                    return ValidationResult.INVALID, None, "Expected school name not found on page"
+
+                if keyword_count >= 3:
+                    if directory_signals > 0:
+                        if use_llm_fallback:
+                            return await self._llm_validate(text_content, final_url, school_name=school_name)
                         return (
                             ValidationResult.AMBIGUOUS,
                             final_url,
-                            f"Ambiguous: only {keyword_count} keyword(s) found",
+                            f"Ambiguous: listing-like signal detected ({directory_signals})",
                         )
+                    return (
+                        ValidationResult.VALID,
+                        final_url,
+                        f"Keyword match: {keyword_count} school terms; name tokens matched: {name_token_hits}",
+                    )
 
+                if keyword_count == 0:
+                    if use_llm_fallback:
+                        return await self._llm_validate(text_content, final_url, school_name=school_name)
+                    return ValidationResult.INVALID, None, "No school-related keywords found"
+
+                if use_llm_fallback:
+                    return await self._llm_validate(text_content, final_url, school_name=school_name)
+                return (
+                    ValidationResult.AMBIGUOUS,
+                    final_url,
+                    f"Ambiguous: only {keyword_count} keyword(s) found",
+                )
         except httpx.TimeoutException:
             return ValidationResult.INVALID, None, "Connection timeout"
-        except httpx.HTTPError as e:
-            return ValidationResult.INVALID, None, f"HTTP error: {str(e)}"
-        except Exception as e:
-            logger.error(f"Error validating URL {url}: {e}")
-            return ValidationResult.INVALID, None, f"Validation error: {str(e)}"
+        except httpx.HTTPError as exc:
+            return ValidationResult.INVALID, None, f"HTTP error: {exc}"
+        except Exception as exc:
+            logger.error("Error validating URL %s: %s", normalized_url, exc)
+            return ValidationResult.INVALID, None, f"Validation error: {exc}"
 
     def _is_blocked_domain(self, url: str) -> bool:
         """
@@ -215,10 +362,46 @@ class URLValidator:
         url_lower = url.lower()
         return any(domain in url_lower for domain in self.BLOCKED_DOMAINS)
 
+    def _extract_school_name_tokens(self, school_name: Optional[str]) -> list[str]:
+        """Extract distinctive tokens from school name for ownership checks."""
+        return extract_school_name_tokens(school_name, limit=8)
+
+    def _count_school_name_token_hits(self, page_context: str, school_tokens: list[str]) -> int:
+        """Return number of expected school-name tokens present in page context."""
+        if not school_tokens:
+            return 0
+        return sum(1 for token in school_tokens if token in page_context)
+
+    def _count_directory_signals(self, url: str, text_content: str, soup: BeautifulSoup) -> int:
+        """Count generic listing-directory signals from URL and page content."""
+        parsed = urlparse(url)
+        path = (parsed.path or "").lower()
+        query = (parsed.query or "").lower()
+        signals = 0
+
+        marker_pattern = r"(?:^|/|[-_])(" + "|".join(re.escape(m) for m in self.DIRECTORY_PATH_MARKERS) + r")(?:[-_0-9/]|$)"
+        if re.search(marker_pattern, path):
+            signals += 1
+        if any(marker in query for marker in ("firm", "company", "listing", "directory", "catalog", "profile")):
+            signals += 1
+        if any(marker in text_content for marker in self.DIRECTORY_TEXT_MARKERS):
+            signals += 1
+
+        listing_links = 0
+        for anchor in soup.find_all("a", href=True):
+            href = (anchor.get("href") or "").lower()
+            if re.search(marker_pattern, href):
+                listing_links += 1
+                if listing_links >= 4:
+                    signals += 1
+                    break
+        return signals
+
     async def _llm_validate(
         self,
         page_text: str,
         url: str,
+        school_name: Optional[str] = None,
     ) -> tuple[ValidationResult, Optional[str], Optional[str]]:
         """
         Use LLM to validate if a page is a school website.
@@ -232,9 +415,8 @@ class URLValidator:
         Returns:
             Tuple of (result, final_url, reason)
         """
-        try:
-            # Create agent with cheap model
-            system_prompt = """You are a website classifier. Determine if a webpage is a school website.
+        # Create agent with cheap model
+        system_prompt = """You are a website classifier. Determine if a webpage is a school website.
 
 Consider it a school website if it contains:
 - Information about students, teachers, classes, grades
@@ -251,43 +433,142 @@ Do NOT consider it a school website if it's:
 
 Be strict - only return true if you're confident it's an actual school's website."""
 
-            agent = create_agent(
+        # Truncate page text to avoid huge token counts
+        truncated_text = page_text[:2000]  # ~500 words
+        expected_name = school_name or "unknown"
+        prompt = (
+            f"URL: {url}\n"
+            f"Expected school name: {expected_name}\n\n"
+            f"Page content:\n{truncated_text}\n\n"
+            "Is this the school's official website (not a directory/listing/profile page)?"
+        )
+
+        try:
+            output = await self._run_llm_validation_tier(
                 tier="cheap",
                 system_prompt=system_prompt,
-                result_type=URLValidationOutput,
+                prompt=prompt,
             )
-
-            # Truncate page text to avoid huge token counts
-            truncated_text = page_text[:2000]  # ~500 words
-
-            # Run agent
-            result = await agent.run(
-                f"URL: {url}\n\nPage content:\n{truncated_text}\n\nIs this a school website?"
-            )
-
-            output: URLValidationOutput = result.data
-
-            if output.is_school_website and output.confidence >= 0.7:
-                return (
-                    ValidationResult.VALID,
+        except Exception as cheap_error:
+            if self._is_model_or_provider_error(cheap_error):
+                logger.warning(
+                    "Cheap LLM validation failed for %s (%s). Retrying with medium tier.",
                     url,
-                    f"LLM validation: {output.reason} (confidence: {output.confidence:.2f})",
+                    cheap_error,
                 )
+                try:
+                    output = await self._run_llm_validation_tier(
+                        tier="medium",
+                        system_prompt=system_prompt,
+                        prompt=prompt,
+                    )
+                except Exception as medium_error:
+                    logger.error(f"LLM validation failed for {url}: {medium_error}")
+                    # On repeated LLM failure, mark as ambiguous rather than invalid.
+                    return (
+                        ValidationResult.AMBIGUOUS,
+                        url,
+                        f"LLM validation failed after retry: {str(medium_error)}",
+                    )
             else:
+                logger.error(f"LLM validation failed for {url}: {cheap_error}")
                 return (
-                    ValidationResult.INVALID,
-                    None,
-                    f"LLM validation: {output.reason} (confidence: {output.confidence:.2f})",
+                    ValidationResult.AMBIGUOUS,
+                    url,
+                    f"LLM validation failed: {str(cheap_error)}",
                 )
 
-        except Exception as e:
-            logger.error(f"LLM validation failed for {url}: {e}")
-            # On LLM failure, mark as ambiguous rather than invalid
+        if output.is_school_website and output.confidence >= 0.7:
             return (
-                ValidationResult.AMBIGUOUS,
+                ValidationResult.VALID,
                 url,
-                f"LLM validation failed: {str(e)}",
+                f"LLM validation: {output.reason} (confidence: {output.confidence:.2f})",
             )
+
+        return (
+            ValidationResult.INVALID,
+            None,
+            f"LLM validation: {output.reason} (confidence: {output.confidence:.2f})",
+        )
+
+    async def _run_llm_validation_tier(
+        self,
+        tier: str,
+        system_prompt: str,
+        prompt: str,
+    ) -> URLValidationOutput:
+        """Run one LLM classification pass for the provided tier."""
+        agent = create_agent(
+            tier=tier,  # type: ignore[arg-type]
+            system_prompt=system_prompt,
+            result_type=URLValidationOutput,
+        )
+        result = await asyncio.wait_for(agent.run(prompt), timeout=self.llm_timeout)
+        return self._parse_llm_output(result)
+
+    def _parse_llm_output(self, result) -> URLValidationOutput:
+        """Read structured output across pydantic-ai versions."""
+        raw_output = getattr(result, "output", None)
+        if isinstance(raw_output, URLValidationOutput):
+            return raw_output
+        if isinstance(raw_output, dict):
+            return URLValidationOutput.model_validate(raw_output)
+
+        raw_data = getattr(result, "data")
+        if isinstance(raw_data, URLValidationOutput):
+            return raw_data
+        return URLValidationOutput.model_validate(raw_data)
+
+    def _is_model_or_provider_error(self, exc: Exception) -> bool:
+        """Detect model/provider failures that deserve one retry with fallback tier."""
+        message = str(exc).lower()
+        markers = (
+            "not a valid model id",
+            "openrouter",
+            "provider",
+            "authentication",
+            "failed to authenticate",
+            "chat completions endpoint",
+            "status_code",
+            "finish_reason",
+        )
+        return any(marker in message for marker in markers)
+
+
+def _is_timeout_reason(reason: Optional[str]) -> bool:
+    """Return True when the validation failure is due to timeout."""
+    return "timeout" in (reason or "").lower()
+
+
+def _update_timeout_failure_state(
+    attributes: object,
+    result: ValidationResult,
+    reason: Optional[str],
+    threshold: int,
+) -> tuple[dict, int, bool]:
+    """
+    Track consecutive timeout failures in school attributes.
+
+    Returns:
+        (updated_attributes, timeout_count, reached_terminal_threshold)
+    """
+    attrs = dict(attributes) if isinstance(attributes, dict) else {}
+    raw_count = attrs.get(TIMEOUT_FAILURE_ATTR_KEY, 0)
+    try:
+        count = int(raw_count)
+    except (TypeError, ValueError):
+        count = 0
+
+    timed_out = result == ValidationResult.INVALID and _is_timeout_reason(reason)
+
+    if timed_out:
+        count += 1
+    elif result in {ValidationResult.INVALID, ValidationResult.VALID, ValidationResult.AMBIGUOUS}:
+        count = 0
+
+    attrs[TIMEOUT_FAILURE_ATTR_KEY] = count
+    reached_terminal_threshold = timed_out and count >= max(1, threshold)
+    return attrs, count, reached_terminal_threshold
 
 
 async def validate_school_url(
@@ -295,6 +576,7 @@ async def validate_school_url(
     url: str,
     country_code: str = "bg",
     update_db: bool = True,
+    school_name: Optional[str] = None,
 ) -> tuple[ValidationResult, Optional[str], Optional[str]]:
     """
     Validate a school's website URL and optionally update the database.
@@ -306,6 +588,7 @@ async def validate_school_url(
         url: URL to validate
         country_code: Country code for locale-specific validation
         update_db: Whether to update SourcePage and School in the database
+        school_name: Optional expected school name for official-site checks
 
     Returns:
         Tuple of (result, final_url, reason)
@@ -318,10 +601,16 @@ async def validate_school_url(
         ... )
     """
     validator = URLValidator(country_code=country_code)
-    result, final_url, reason = await validator.validate_url(url)
+    normalized_url = validator.normalize_url(url)
+    result, final_url, reason = await validator.validate_url(
+        url,
+        school_name=school_name,
+    )
 
     if update_db:
-        await _update_validation_result(school_id, url, result, final_url, reason)
+        # Persist normalized input URL when available to reduce duplicate source pages.
+        source_url = normalized_url or url
+        await _update_validation_result(school_id, source_url, result, final_url, reason)
 
     return result, final_url, reason
 
@@ -353,6 +642,9 @@ async def _update_validation_result(
     from sqlalchemy import select
 
     async with async_session_maker() as db:
+        settings = get_settings()
+        timeout_terminal_threshold = max(1, int(settings.url_validation_timeout_terminal_threshold))
+
         # Update or create SourcePage
         source_page_result = await db.execute(
             select(SourcePage).where(
@@ -383,16 +675,33 @@ async def _update_validation_result(
         school = school_result.scalar_one_or_none()
 
         if school:
-            # Update website_url if redirected
-            if final_url and final_url != url:
+            updated_attrs, timeout_count, timeout_terminal = _update_timeout_failure_state(
+                attributes=school.attributes,
+                result=result,
+                reason=reason,
+                threshold=timeout_terminal_threshold,
+            )
+            school.attributes = updated_attrs
+
+            # Keep canonical final URL on school record, including normalized scheme updates.
+            if final_url and school.website_url != final_url:
                 school.website_url = final_url
 
             # Update scrape_status based on validation result
             if result == ValidationResult.VALID:
-                if school.scrape_status == "pending":
+                if school.scrape_status in ("pending", "failed_validate", "no_official_website"):
                     school.scrape_status = "validated"
             elif result == ValidationResult.INVALID:
-                school.scrape_status = "failed_validate"
+                if timeout_terminal:
+                    school.scrape_status = "no_official_website"
+                    school.website_url = None
+                    logger.info(
+                        "School %s marked no_official_website after %s consecutive timeout failures",
+                        school_id,
+                        timeout_count,
+                    )
+                else:
+                    school.scrape_status = "failed_validate"
 
         await db.commit()
 
