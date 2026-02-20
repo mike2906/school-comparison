@@ -7,7 +7,9 @@ web-search fallback when needed.
 
 from __future__ import annotations
 
+import json
 import logging
+import pathlib
 import re
 import time
 from datetime import datetime, timezone
@@ -31,6 +33,18 @@ _URL_HINTS = ("website", "web", "url", "site", "domain")
 _EMAIL_HINTS = ("email", "mail", "contact")
 _REGISTRY_SCHEMES = ("moe://", "kg://")
 _REGISTRY_DOMAINS = ("ri-api.mon.bg", "kg.sofia.bg")
+def _load_country_directory_domains(country_code: str) -> tuple[str, ...]:
+    """Load country-specific directory domain blocklist from data/bg/directory_domains.json."""
+    data_file = (
+        pathlib.Path(__file__).parent.parent.parent  # backend/
+        / "data" / country_code / "directory_domains.json"
+    )
+    try:
+        return tuple(json.loads(data_file.read_text(encoding="utf-8")))
+    except (FileNotFoundError, json.JSONDecodeError):
+        return ()
+
+
 _NOISY_DIRECTORY_DOMAINS = (
     "papagal.bg",
     "uchilishtata.bg",
@@ -40,7 +54,7 @@ _NOISY_DIRECTORY_DOMAINS = (
     "detskigradini.bg",
     "dz-priem.plovdiv.bg",
     "wikipedia.org",
-)
+) + _load_country_directory_domains("bg")
 _DOCUMENT_EXTENSIONS = (
     ".pdf",
     ".doc",
@@ -58,6 +72,25 @@ _NOISY_PATH_SNIPPETS = (
     "/document/",
     "/wp-content/uploads/",
     "/asset_publisher/",
+    "/spravochnik/",  # Bulgarian word for "reference directory"
+    "/item/",         # registry/marketplace listing path (e.g. /item/school-name)
+)
+
+# BG-specific: transliterated and Cyrillic school-type terms that appear as path slugs
+# in aggregator/directory URLs (e.g. finansi.bg/chastna-detska-gradina-NAME).
+# A legitimate school site would never have its own school-type as a path segment.
+_BG_SCHOOL_TYPE_PATH_PREFIXES = (
+    "chastna-detska-gradina",
+    "chastno-detska-gradina",
+    "chastna-detska-yasla",
+    "detska-gradina-",
+    "chastno-uchilishte",
+    "chastna-uchilishte",
+    # Cyrillic equivalents (matched after URL-decoding)
+    "частна-детска-градина",
+    "частна детска градина",
+    "детска-градина-",
+    "частно-училище",
 )
 _FREE_EMAIL_DOMAINS = {
     "gmail.com",
@@ -162,6 +195,7 @@ class WebsiteDiscoverer:
         resolved_url = None
         method = None
         seen: set[str] = set()
+        searched: list[str] = []  # Track raw search URLs for caller reuse
 
         is_failed_retry = school.scrape_status == "failed_validate"
         existing_normalized = self.validator.normalize_url(existing_url or "")
@@ -220,6 +254,7 @@ class WebsiteDiscoverer:
                 "reason": "No candidate website found",
                 "candidates_checked": len(seen),
                 "terminal_status": "no_official_website" if is_failed_retry else None,
+                "search_candidates": searched,
             }
 
         updated = existing_url != resolved_url
@@ -239,6 +274,7 @@ class WebsiteDiscoverer:
             "website_url": resolved_url,
             "method": method,
             "candidates_checked": len(seen),
+            "search_candidates": searched,
         }
 
     async def recover_failed_school(
@@ -285,18 +321,28 @@ class WebsiteDiscoverer:
             attempted_candidates.add(normalized_current)
 
         if validation_result != ValidationResult.VALID:
-            search_candidates = await self._search_candidates(school)
-            candidate_pool: list[tuple[str, str]] = [(url, "search") for url in search_candidates]
+            # Reuse the search candidates already fetched by discover() rather than
+            # issuing a second search.  The provider may now be rate-limited (e.g.
+            # Brave 429), so a fresh search would return nothing and the remaining
+            # valid candidates from the first batch would be silently lost.
+            candidate_pool: list[tuple[str, str]] = [
+                (url, "search") for url in (discovery.get("search_candidates") or [])
+            ]
             candidate_pool.extend(self._collect_candidates(school, include_existing=False))
 
             while attempts < max_attempts:
+                # Pass a COPY of attempted_candidates so _pick_best_candidate doesn't
+                # mark the entire pool as seen in one pass (which would leave nothing
+                # for the next iteration).  Only the chosen URL is added back.
+                seen_snapshot = set(attempted_candidates)
                 next_url, _ = self._pick_best_candidate(
                     candidate_pool,
-                    attempted_candidates,
+                    seen_snapshot,
                     school_name=school_name,
                 )
                 if not next_url:
                     break
+                attempted_candidates.add(next_url)
 
                 school.website_url = next_url
                 school.scrape_status = "pending"
@@ -312,6 +358,9 @@ class WebsiteDiscoverer:
                 )
                 attempts += 1
                 await db.refresh(school)
+
+                if validation_result == ValidationResult.VALID:
+                    break
 
         if validation_result != ValidationResult.VALID and school.scrape_status == "pending":
             school.scrape_status = "failed_validate"
@@ -975,6 +1024,21 @@ class WebsiteDiscoverer:
             return True
 
         if re.search(r"/download(?:s)?(?:/|$|-|_)", path):
+            return True
+
+        # Reject hosts that look like aggregator/directory portals (e.g. spravochnik.framar.bg,
+        # detskitegradini.com, obrazovatelen-register.com).
+        if self._is_likely_directory_host(host):
+            return True
+
+        # BG-specific: reject directory listing entries where the URL path slug encodes the
+        # school type + name (e.g. finansi.bg/chastna-detska-gradina-NAME or
+        # yox.bg/частна-детска-градина-NAME after URL-decoding).
+        decoded_path = unquote(path)
+        last_segment = decoded_path.rstrip("/").rsplit("/", 1)[-1]
+        if len(last_segment) > 20 and any(
+            last_segment.startswith(prefix) for prefix in _BG_SCHOOL_TYPE_PATH_PREFIXES
+        ):
             return True
 
         return False

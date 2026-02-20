@@ -20,6 +20,7 @@ from app.schemas.scraping import DiscoveredSchool, DiscoveredLocation
 from app.scrapers.sources import register_adapter
 from app.scrapers.base import BaseScraper
 from app.models.scrape_log import ScrapeType
+from app.services.geocoding.bg import GeoJSONProvider
 
 logger = logging.getLogger(__name__)
 
@@ -122,6 +123,10 @@ class MoeRegistryAdapter(BaseSourceAdapter):
         151: ['first', 'second', 'third', 'preschool'],  # детска градина
     }
 
+    def __init__(self, db):
+        super().__init__(db)
+        self._geojson_provider = GeoJSONProvider()
+
     @staticmethod
     def _get_age_groups_for_detailed_type(detailed_type: Optional[int], education_level: str) -> list[str]:
         """
@@ -200,15 +205,19 @@ class MoeRegistryAdapter(BaseSourceAdapter):
         )
         existing_pages = {page.source_url: page for page in pages_result.scalars().all()}
 
-        # Preload instid -> school_id map
+        # Preload instid -> existing school metadata map
         schools_result = await self.db.execute(
-            select(School.id, School.institutional_id).where(
+            select(School.id, School.institutional_id, School.website_url).where(
                 School.country_code == "bg",
                 School.city == "sofia",
                 School.institutional_id.isnot(None),
             )
         )
-        school_id_by_instid = {str(instid): school_id for school_id, instid in schools_result.all() if instid}
+        school_meta_by_instid = {
+            str(instid): {"school_id": school_id, "website_url": website_url}
+            for school_id, instid, website_url in schools_result.all()
+            if instid
+        }
 
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             # Step 1: Fetch schools from Sofia city and Sofia region
@@ -263,7 +272,8 @@ class MoeRegistryAdapter(BaseSourceAdapter):
                     if not changed and sample_ratio > 0:
                         sampled = self._should_sample(instid_str, sample_ratio, now)
 
-                    school_id = school_id_by_instid.get(instid_str)
+                    school_meta = school_meta_by_instid.get(instid_str) or {}
+                    school_id = school_meta.get("school_id")
                     self._upsert_registry_page(
                         source_page=source_page,
                         source_url=source_url,
@@ -284,6 +294,28 @@ class MoeRegistryAdapter(BaseSourceAdapter):
                         school = self._parse_institution_data(inst_data, detail_data)
 
                     if school:
+                        existing_website = school_meta.get("website_url")
+                        if not school.website_url and existing_website:
+                            school.website_url = existing_website
+
+                        if fetch_details and not school.locations:
+                            fallback_location = await self._recover_location_from_geojson(
+                                school=school,
+                                inst_data=inst_data,
+                                detail_data=detail_data,
+                            )
+                            if fallback_location:
+                                school.locations = [fallback_location]
+                                school.attributes["missing_location_data"] = False
+                                school.attributes["moe_location_fallback"] = "geojson"
+                            else:
+                                school.attributes["missing_location_data"] = True
+                                school.attributes["missing_location_reason"] = "no_address_and_geojson_miss"
+                                logger.warning(
+                                    "No location recovered for instid=%s (%s)",
+                                    school.institutional_id,
+                                    school.name_i18n.get("bg"),
+                                )
                         school.attributes["moe_registry_active"] = True
                         school.attributes["moe_registry_last_seen_at"] = now.isoformat()
                         discovered_schools.append(school)
@@ -304,6 +336,60 @@ class MoeRegistryAdapter(BaseSourceAdapter):
 
         logger.info(f"Discovered {len(discovered_schools)} schools from MoE registry")
         return discovered_schools
+
+    async def _recover_location_from_geojson(
+        self,
+        school: DiscoveredSchool,
+        inst_data: dict,
+        detail_data: Optional[dict],
+    ) -> Optional[DiscoveredLocation]:
+        """Recover a missing location using deterministic GeoJSON school-name matching."""
+        school_name_bg = (school.name_i18n or {}).get("bg")
+        if not school_name_bg:
+            return None
+
+        address_hint = ""
+        phone_number = None
+        if detail_data:
+            address_hint = (detail_data.get("settlementAddress") or "").strip()
+            phone_number = (detail_data.get("phoneNumber") or "").strip() or None
+
+        geo_result = await self._geojson_provider.geocode(
+            address=address_hint,
+            country_code=school.country_code,
+            school_name=school_name_bg,
+            city=school.city,
+        )
+        if not geo_result.success or geo_result.lat is None or geo_result.lng is None:
+            if school.website_url:
+                geo_result = await self._geojson_provider.geocode_by_website(school.website_url)
+            if not geo_result.success or geo_result.lat is None or geo_result.lng is None:
+                return None
+
+        detailed_type = inst_data.get("detailedSchoolType")
+        age_groups = self._get_age_groups_for_detailed_type(detailed_type, school.education_level)
+        recovered_address = (geo_result.formatted_address or address_hint or "София").strip()
+
+        logger.info(
+            "Recovered missing location via GeoJSON for instid=%s (%s) -> (%s, %s)",
+            school.institutional_id,
+            school_name_bg,
+            geo_result.lat,
+            geo_result.lng,
+        )
+
+        return DiscoveredLocation(
+            address_i18n={"bg": recovered_address},
+            district=None,
+            lat=geo_result.lat,
+            lng=geo_result.lng,
+            phone=phone_number,
+            is_primary=True,
+            location_tags=["source=moe_registry", "location_recovered=geojson"],
+            age_groups=age_groups,
+            shifts={},
+            has_organised_groups={},
+        )
 
     def _registry_source_url(self, instid: str) -> str:
         return f"{self.REGISTRY_SOURCE_PREFIX}{instid}"

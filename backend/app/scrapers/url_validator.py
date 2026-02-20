@@ -10,7 +10,7 @@ from typing import Optional
 from enum import Enum
 import asyncio
 import re
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 import httpx
 from bs4 import BeautifulSoup
 
@@ -83,6 +83,7 @@ class URLValidator:
     }
 
     # Domains to immediately reject (social media, forums, etc.)
+    # TODO: Consolidate directory/blocked-domain heuristics with website_discovery to avoid drift.
     BLOCKED_DOMAINS = [
         "facebook.com",
         "instagram.com",
@@ -104,6 +105,8 @@ class URLValidator:
         "catalog",
         "profile",
         "business",
+        "spravochnik",  # Bulgarian: справочник = reference directory
+        "item",         # registry/marketplace listing path (/item/school-name)
     )
     DIRECTORY_TEXT_MARKERS = (
         "добави фирма",
@@ -283,6 +286,17 @@ class URLValidator:
                 html_content = response.text
                 soup = BeautifulSoup(html_content, "html.parser")
 
+                if self._is_bot_protection_page(soup):
+                    canonical_final_url = self._canonicalize_bot_protection_final_url(
+                        normalized_url=normalized_url,
+                        final_url=final_url,
+                    )
+                    return (
+                        ValidationResult.VALID,
+                        canonical_final_url,
+                        "Bot protection detected - browser navigation required",
+                    )
+
                 text_content = soup.get_text(separator=" ", strip=True).lower()
                 title_text = soup.title.string if soup.title and soup.title.string else ""
                 h1_text = " ".join(tag.get_text(" ", strip=True) for tag in soup.find_all("h1")[:2])
@@ -349,6 +363,49 @@ class URLValidator:
             logger.error("Error validating URL %s: %s", normalized_url, exc)
             return ValidationResult.INVALID, None, f"Validation error: {exc}"
 
+    # Known bot-protection challenge URL path fragments (case-insensitive).
+    # A <meta http-equiv="refresh"> pointing to any of these indicates the page
+    # is a captcha/challenge gate, not actual school content.
+    _BOT_CHALLENGE_PATHS = (
+        "/.well-known/sgcaptcha",   # Sucuri WAF
+        "/.well-known/captcha",
+        "/cdn-cgi/challenge",       # Cloudflare
+        "/cdn-cgi/l/chk_jschl",    # Cloudflare JS challenge
+    )
+
+    def _is_bot_protection_page(self, soup: BeautifulSoup) -> bool:
+        """Return True when the page is a bot-protection / captcha challenge gate.
+
+        These pages return a 2xx status but contain no real content — only a
+        meta-refresh redirect to a challenge endpoint.  Marking them VALID lets
+        the school proceed to the navigation stage where Playwright/crawl4ai can
+        handle the JS challenge and access the real site content.
+        """
+        for meta in soup.find_all("meta"):
+            if (meta.get("http-equiv") or "").strip().lower() != "refresh":
+                continue
+            content = (meta.get("content") or "").lower()
+            if any(path in content for path in self._BOT_CHALLENGE_PATHS):
+                return True
+        return False
+
+    def _is_bot_challenge_url(self, url: str) -> bool:
+        """Return True when URL path points to a known bot-challenge endpoint."""
+        parsed = urlparse(url)
+        path = (parsed.path or "").lower()
+        return any(path.startswith(marker) for marker in self._BOT_CHALLENGE_PATHS)
+
+    def _canonicalize_bot_protection_final_url(self, normalized_url: str, final_url: Optional[str]) -> str:
+        """Keep canonical site URL when challenge endpoints are encountered."""
+        if final_url and self._is_bot_challenge_url(final_url):
+            parsed = urlparse(final_url)
+            if parsed.scheme and parsed.netloc:
+                canonical = self.normalize_url(f"{parsed.scheme}://{parsed.netloc}")
+                if canonical:
+                    return canonical
+            return normalized_url
+        return final_url or normalized_url
+
     def _is_blocked_domain(self, url: str) -> bool:
         """
         Check if URL is from a blocked domain.
@@ -372,6 +429,23 @@ class URLValidator:
             return 0
         return sum(1 for token in school_tokens if token in page_context)
 
+    # BG-specific: school-type prefixes that appear in directory listing URL slugs.
+    # Any URL whose last path segment starts with one of these is a directory entry,
+    # not an official school website.
+    _BG_SCHOOL_TYPE_PATH_PREFIXES = (
+        "chastna-detska-gradina",
+        "chastno-detska-gradina",
+        "chastna-detska-yasla",
+        "detska-gradina-",
+        "chastno-uchilishte",
+        "chastna-uchilishte",
+        # Cyrillic equivalents (matched after URL-decoding)
+        "частна-детска-градина",
+        "частна детска градина",
+        "детска-градина-",
+        "частно-училище",
+    )
+
     def _count_directory_signals(self, url: str, text_content: str, soup: BeautifulSoup) -> int:
         """Count generic listing-directory signals from URL and page content."""
         parsed = urlparse(url)
@@ -385,6 +459,14 @@ class URLValidator:
         if any(marker in query for marker in ("firm", "company", "listing", "directory", "catalog", "profile")):
             signals += 1
         if any(marker in text_content for marker in self.DIRECTORY_TEXT_MARKERS):
+            signals += 1
+
+        # BG-specific: URL path slug encodes school type + name (directory entry pattern)
+        decoded_path = unquote(path)
+        last_segment = decoded_path.rstrip("/").rsplit("/", 1)[-1]
+        if len(last_segment) > 20 and any(
+            last_segment.startswith(prefix) for prefix in self._BG_SCHOOL_TYPE_PATH_PREFIXES
+        ):
             signals += 1
 
         listing_links = 0
@@ -514,9 +596,11 @@ Be strict - only return true if you're confident it's an actual school's website
         if isinstance(raw_output, dict):
             return URLValidationOutput.model_validate(raw_output)
 
-        raw_data = getattr(result, "data")
+        raw_data = getattr(result, "data", None)
         if isinstance(raw_data, URLValidationOutput):
             return raw_data
+        if raw_data is None:
+            raise ValueError("LLM validation result missing structured data")
         return URLValidationOutput.model_validate(raw_data)
 
     def _is_model_or_provider_error(self, exc: Exception) -> bool:
@@ -656,7 +740,10 @@ async def _update_validation_result(
         source_page = source_page_result.scalar_one_or_none()
 
         if source_page:
-            source_page.is_valid = result == ValidationResult.VALID
+            if result == ValidationResult.AMBIGUOUS:
+                source_page.is_valid = None
+            else:
+                source_page.is_valid = result == ValidationResult.VALID
         else:
             # Create new SourcePage
             from app.scrapers.base import BaseScraper
@@ -666,7 +753,7 @@ async def _update_validation_result(
                 scrape_type=ScrapeType.WEBSITE,
                 source_url=url,
                 content_hash=BaseScraper.compute_hash(""),  # Empty for now
-                is_valid=result == ValidationResult.VALID,
+                is_valid=None if result == ValidationResult.AMBIGUOUS else result == ValidationResult.VALID,
             )
             db.add(source_page)
 
@@ -682,6 +769,12 @@ async def _update_validation_result(
                 threshold=timeout_terminal_threshold,
             )
             school.attributes = updated_attrs
+            if result == ValidationResult.AMBIGUOUS:
+                school.attributes["url_validation_ambiguous"] = True
+                school.attributes["url_validation_ambiguous_reason"] = reason
+            else:
+                school.attributes.pop("url_validation_ambiguous", None)
+                school.attributes.pop("url_validation_ambiguous_reason", None)
 
             # Keep canonical final URL on school record, including normalized scheme updates.
             if final_url and school.website_url != final_url:
@@ -702,6 +795,9 @@ async def _update_validation_result(
                     )
                 else:
                     school.scrape_status = "failed_validate"
+            elif result == ValidationResult.AMBIGUOUS:
+                if school.scrape_status in ("pending", "failed_validate", "no_official_website"):
+                    school.scrape_status = "validated"
 
         await db.commit()
 

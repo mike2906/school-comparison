@@ -10,6 +10,7 @@ import logging
 import re
 from pathlib import Path
 from typing import Optional
+from urllib.parse import urlparse
 
 from app.services.geocoding.base import BaseGeocodingProvider, GeocodingResult
 
@@ -41,6 +42,7 @@ class GeoJSONProvider(BaseGeocodingProvider):
 
         self.geojson_path = Path(geojson_path)
         self._index = None  # Lazy-loaded on first use
+        self._website_index = None  # Lazy-loaded host -> feature index
 
     @property
     def provider_name(self) -> str:
@@ -56,6 +58,7 @@ class GeoJSONProvider(BaseGeocodingProvider):
         if not self.geojson_path.exists():
             logger.error(f"GeoJSON file not found: {self.geojson_path}")
             self._index = {}
+            self._website_index = {}
             return
 
         with open(self.geojson_path, 'r', encoding='utf-8') as f:
@@ -63,6 +66,7 @@ class GeoJSONProvider(BaseGeocodingProvider):
 
         # Build index: (normalized_name, normalized_city) -> feature
         self._index = {}
+        self._website_index = {}
         for feature in data.get('features', []):
             props = feature['properties']
             name = props.get('name', '').strip()
@@ -78,6 +82,13 @@ class GeoJSONProvider(BaseGeocodingProvider):
             # Keep the best match (prefer entries with more complete data)
             if key not in self._index or self._has_better_data(feature, self._index[key]):
                 self._index[key] = feature
+
+            website_host = self._normalize_website_host(props.get('url', ''))
+            if website_host and (
+                website_host not in self._website_index
+                or self._has_better_data(feature, self._website_index[website_host])
+            ):
+                self._website_index[website_host] = feature
 
         logger.info(f"Indexed {len(self._index)} schools from GeoJSON")
 
@@ -225,6 +236,42 @@ class GeoJSONProvider(BaseGeocodingProvider):
 
         return False
 
+    def _normalize_website_host(self, website: str) -> Optional[str]:
+        """Normalize website URL/host to comparable host value."""
+        value = (website or "").strip().lower()
+        if not value:
+            return None
+
+        candidate = value if "://" in value else f"https://{value}"
+        parsed = urlparse(candidate)
+        host = (parsed.netloc or parsed.path).strip().lower()
+        if not host:
+            return None
+        if "/" in host:
+            host = host.split("/", 1)[0]
+        if host.startswith("www."):
+            host = host[4:]
+        return host or None
+
+    def _result_from_feature(self, feature: dict) -> GeocodingResult:
+        """Build a GeocodingResult from a matched GeoJSON feature."""
+        coords = feature['geometry']['coordinates']
+        lng, lat = coords[0], coords[1]
+
+        props = feature['properties']
+        street = props.get('street', '')
+        matched_city = props.get('city', '')
+        postcode = props.get('postcode', '')
+        formatted_address = f"{street}, {postcode} {matched_city}".strip(', ')
+
+        return GeocodingResult(
+            lat=lat,
+            lng=lng,
+            success=True,
+            provider=self.provider_name,
+            formatted_address=formatted_address,
+        )
+
     async def geocode(self, address: str, country_code: str = "bg", school_name: Optional[str] = None, city: Optional[str] = None) -> GeocodingResult:
         """
         Geocode by matching school name and city in GeoJSON index.
@@ -313,26 +360,32 @@ class GeoJSONProvider(BaseGeocodingProvider):
                 provider=self.provider_name,
             )
 
-        # Extract coordinates
-        coords = feature['geometry']['coordinates']
-        lng, lat = coords[0], coords[1]
-
-        # Extract formatted address
         props = feature['properties']
-        street = props.get('street', '')
-        matched_city = props.get('city', '')
-        postcode = props.get('postcode', '')
-        formatted_address = f"{street}, {postcode} {matched_city}".strip(', ')
+        logger.info(f"GeoJSON match: '{school_name}' in {props.get('city', '')}")
+        return self._result_from_feature(feature)
 
-        logger.info(f"GeoJSON match: '{school_name}' → ({lat}, {lng}) in {matched_city}")
+    async def geocode_by_website(self, website_url: str) -> GeocodingResult:
+        """Geocode by website host match in the GeoJSON dataset."""
+        self._load_index()
 
-        return GeocodingResult(
-            lat=lat,
-            lng=lng,
-            success=True,
-            provider=self.provider_name,
-            formatted_address=formatted_address,
-        )
+        host = self._normalize_website_host(website_url)
+        if not host:
+            return GeocodingResult(
+                success=False,
+                error="Website host missing",
+                provider=self.provider_name,
+            )
+
+        feature = (self._website_index or {}).get(host)
+        if not feature:
+            return GeocodingResult(
+                success=False,
+                error="No website host match in GeoJSON index",
+                provider=self.provider_name,
+            )
+
+        logger.info("GeoJSON website match: '%s' -> %s", website_url, host)
+        return self._result_from_feature(feature)
 
     async def reverse_geocode(self, lat: float, lng: float) -> GeocodingResult:
         """

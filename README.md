@@ -20,9 +20,10 @@ Implemented:
 - Stage 2: Website discovery + normalization
 - Stage 3: URL validation (heuristics + optional LLM fallback)
 - Stage 4: Website navigation + page caching
+- Stage 5: Extraction (pricing + general info, hash-based skip, quality gate)
 
 Not implemented yet:
-- Stage 5+: extraction, data validation, summarization
+- Stage 6+: data validation, summarization
 
 ## Local Development
 ```bash
@@ -64,6 +65,49 @@ uv run python -m app.scrapers.cli run --stage validate-urls --city sofia --sync 
 
 # Navigate validated websites (Stage 4)
 uv run python -m app.scrapers.cli run --stage navigate --city sofia --sync --limit 100
+
+# Extract structured data from navigated pages (Stage 5)
+uv run python -m app.scrapers.cli run --stage extract --city sofia --sync --limit 100
+```
+
+## Recommended Single-School Workflow
+For problematic domains (like bot-protected sites), use the standard per-school flow:
+1. `validate-urls`
+2. `navigate` (now includes challenge-aware retry and undetected+stealth second fallback)
+3. `extract`
+
+```bash
+cd backend
+scripts/run_school_workflow.sh --school-id 182
+```
+
+## Extraction Tuning
+Set these in `backend/.env` when tuning quality/cost:
+
+```bash
+EXTRACTION_PRIMARY_TIER=medium         # cheap|medium
+EXTRACTION_QUALITY_GATE_ENABLED=true
+EXTRACTION_GENERAL_INFO_MIN_QUALITY_SCORE=4
+NAV_CONTENT_EXTRACTOR=bs4              # bs4|trafilatura|crawl4ai
+NAV_FETCH_ENGINE=httpx                 # httpx|crawl4ai
+```
+
+Current default recommendation from school `182` benchmark:
+- `NAV_FETCH_ENGINE=httpx`
+- `NAV_CONTENT_EXTRACTOR=bs4`
+
+Run benchmark for one school with Lite-only models:
+
+```bash
+cd backend
+scripts/run_school_workflow.sh --school-id 182 --benchmark-lite
+```
+
+Optional A/B script for `bs4` vs `trafilatura`:
+
+```bash
+cd backend
+uv run python scripts/compare_content_extractors.py --city sofia --limit 20 --output reports/extractor_ab.json
 ```
 
 ## License

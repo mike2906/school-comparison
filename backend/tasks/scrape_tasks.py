@@ -38,6 +38,11 @@ def run_async(coro):
     return asyncio.run(coro)
 
 
+def _should_wait_for_group() -> bool:
+    """Only block on group results in eager (synchronous) mode."""
+    return bool(getattr(celery_app.conf, "task_always_eager", False))
+
+
 # =============================================================================
 # Stage 1: Discovery
 # =============================================================================
@@ -148,17 +153,21 @@ def discover_websites_batch(
 
         job = group(discover_school_website_task.s(school_id, country_code) for school_id in school_ids)
         result = job.apply_async()
-        results = result.get()
-
-        discovered_count = sum(1 for item in results if item.get("found"))
-        updated_count = sum(1 for item in results if item.get("updated"))
-        unchanged_count = len(results) - updated_count
+        if _should_wait_for_group():
+            results = result.get()
+            discovered_count = sum(1 for item in results if item.get("found"))
+            updated_count = sum(1 for item in results if item.get("updated"))
+            unchanged_count = len(results) - updated_count
+            return {
+                "processed": len(school_ids),
+                "found": discovered_count,
+                "updated": updated_count,
+                "unchanged": unchanged_count,
+            }
 
         return {
             "processed": len(school_ids),
-            "found": discovered_count,
-            "updated": updated_count,
-            "unchanged": unchanged_count,
+            "job_id": result.id,
         }
     except Exception as exc:
         logger.exception(f"Website discovery batch failed: {exc}")
@@ -250,18 +259,19 @@ def validate_urls_batch(
         # Create a group of validation tasks (fan-out pattern)
         job = group(validate_school_url.s(school_id, country_code) for school_id in school_ids)
         result = job.apply_async()
-
-        # Wait for all to complete
-        results = result.get()
-
-        # Aggregate results
-        valid_count = sum(1 for r in results if r.get("valid"))
-        invalid_count = sum(1 for r in results if not r.get("valid"))
+        if _should_wait_for_group():
+            results = result.get()
+            valid_count = sum(1 for r in results if r.get("valid"))
+            invalid_count = sum(1 for r in results if not r.get("valid"))
+            return {
+                "processed": len(school_ids),
+                "valid": valid_count,
+                "invalid": invalid_count,
+            }
 
         return {
             "processed": len(school_ids),
-            "valid": valid_count,
-            "invalid": invalid_count,
+            "job_id": result.id,
         }
 
     except Exception as exc:
@@ -372,17 +382,21 @@ def navigate_batch(
 
         job = group(navigate_school_website.s(school_id, country_code) for school_id in school_ids)
         result = job.apply_async()
-        results = result.get()
-
-        success_count = sum(1 for item in results if item.get("success"))
-        failed_count = len(results) - success_count
-        pages_found = sum(item.get("pages_found", 0) for item in results if item.get("success"))
+        if _should_wait_for_group():
+            results = result.get()
+            success_count = sum(1 for item in results if item.get("success"))
+            failed_count = len(results) - success_count
+            pages_found = sum(item.get("pages_found", 0) for item in results if item.get("success"))
+            return {
+                "processed": len(school_ids),
+                "successful": success_count,
+                "failed": failed_count,
+                "pages_found": pages_found,
+            }
 
         return {
             "processed": len(school_ids),
-            "successful": success_count,
-            "failed": failed_count,
-            "pages_found": pages_found,
+            "job_id": result.id,
         }
     except Exception as exc:
         logger.exception(f"Navigation batch failed: {exc}")
@@ -439,28 +453,106 @@ async def _navigate_school_website_async(school_id: int, country_code: str = "bg
 
 
 # =============================================================================
-# Stage 4: Extraction (Placeholder - Phase 2)
+# Stage 5: Extraction
 # =============================================================================
-
-@celery_app.task(name="tasks.extract_batch")
-def extract_batch(country_code: str = "bg", city: Optional[str] = "sofia", limit: Optional[int] = None):
-    """Extract structured data from school websites (Phase 2)."""
-    logger.info("Extract batch - Phase 2 implementation")
-    return {"message": "Not implemented yet - Phase 2"}
 
 
 @celery_app.task(
+    bind=True,
+    name="tasks.extract_batch",
+    max_retries=3,
+)
+def extract_batch(
+    self,
+    country_code: str = "bg",
+    city: Optional[str] = "sofia",
+    limit: Optional[int] = None,
+):
+    """
+    Extract structured data from school websites (Phase 2).
+
+    This is a fan-out task that creates individual extraction tasks.
+    """
+    try:
+        school_ids = run_async(_get_schools_for_extraction(country_code, city, limit))
+
+        if not school_ids:
+            return {"message": "No schools to extract", "processed": 0}
+
+        job = group(extract_school_data.s(school_id, country_code) for school_id in school_ids)
+        result = job.apply_async()
+        if _should_wait_for_group():
+            results = result.get()
+            extracted_count = sum(1 for item in results if item.get("status") == "extracted")
+            failed_count = len(results) - extracted_count
+            pricing_items = sum(item.get("pricing_count", 0) for item in results)
+            return {
+                "processed": len(school_ids),
+                "extracted": extracted_count,
+                "failed": failed_count,
+                "pricing_items": pricing_items,
+            }
+
+        return {
+            "processed": len(school_ids),
+            "job_id": result.id,
+        }
+    except Exception as exc:
+        logger.exception(f"Extraction batch failed: {exc}")
+        raise self.retry(exc=exc)
+
+
+async def _get_schools_for_extraction(country_code, city, limit):
+    """Get school IDs eligible for extraction."""
+    from app.database import async_session_maker
+    from app.models import School
+    from sqlalchemy import select
+
+    async with async_session_maker() as db:
+        # Retry failed extractions by default in next batch run
+        query = select(School.id).where(
+            School.country_code == country_code,
+            School.scrape_status.in_(["navigated", "extraction_failed"]),
+            School.website_url.isnot(None),
+        )
+
+        if city:
+            query = query.where(School.city == city)
+
+        if limit:
+            query = query.limit(limit)
+
+        result = await db.execute(query)
+        return [row[0] for row in result.all()]
+
+
+@celery_app.task(
+    bind=True,
     name="tasks.extract_school_data",
+    max_retries=3,
+    default_retry_delay=60,
     rate_limit="10/m",  # LLM API rate limit
 )
-def extract_school_data(school_id: int, extractors: Optional[list[str]] = None):
-    """Extract data from a single school (Phase 2)."""
-    logger.info(f"Extract school {school_id} - Phase 2 implementation")
-    return {"school_id": school_id, "message": "Not implemented yet - Phase 2"}
+def extract_school_data(self, school_id: int, country_code: str = "bg"):
+    """Extract data from a single school."""
+    try:
+        return run_async(_extract_school_async(school_id, country_code))
+    except Exception as exc:
+        logger.exception(f"Extraction failed for school {school_id}: {exc}")
+        raise self.retry(exc=exc)
+
+
+async def _extract_school_async(school_id, country_code):
+    """Async implementation of extract_school_data."""
+    from app.database import async_session_maker
+    from app.scrapers.extractor import extract_school
+
+    async with async_session_maker() as db:
+        return await extract_school(db=db, school_id=school_id, country_code=country_code)
 
 
 # =============================================================================
-# Stage 5: Data Validation (Placeholder - Phase 2)
+# Stage 6: Data Validation (Placeholder - Phase 2)
 # =============================================================================
 
 @celery_app.task(name="tasks.validate_batch")
@@ -478,7 +570,7 @@ def run_spot_checks(country_code: str = "bg", sample_size: int = 10, city: Optio
 
 
 # =============================================================================
-# Stage 6: Summarization (Placeholder - Phase 2)
+# Stage 7: Summarization (Placeholder - Phase 2)
 # =============================================================================
 
 @celery_app.task(name="tasks.summarize_batch")
@@ -540,8 +632,8 @@ def run_full_pipeline(
         discover_websites_batch.si(country_code=country_code, city=city, limit=limit),
         validate_urls_batch.si(country_code=country_code, city=city, limit=limit),
         navigate_batch.si(country_code=country_code, city=city, limit=limit),
+        extract_batch.si(country_code=country_code, city=city, limit=limit),
         # Phase 2 stages would be added here:
-        # extract_batch.si(country_code=country_code, city=city, limit=limit),
         # group(validate_batch.si(country_code=country_code, city=city), run_spot_checks.si(country_code=country_code, city=city)),
         # summarize_batch.si(country_code=country_code, city=city, limit=limit),
     )
@@ -550,7 +642,7 @@ def run_full_pipeline(
 
     return {
         "pipeline_id": result.id,
-        "message": "Pipeline started (Stages 1-4 enabled; 5-7 are Phase 2)",
+        "message": "Pipeline started (Stages 1-5 enabled; 6-7 are Phase 2)",
     }
 
 

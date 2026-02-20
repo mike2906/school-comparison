@@ -6,6 +6,7 @@ import { useCompare } from '../../context/CompareContext'
 import { fetchCompare } from '../../api/schools'
 import { calculateDistance, formatDistance } from '../../utils/distance'
 import { getSchoolName, getAddress, getSummary } from '../../utils/i18n'
+import { normalizeSchoolList } from '../../utils/schoolAttributes'
 
 const SOURCE_BADGE_STYLES = {
   official: 'bg-emerald-50 text-emerald-700',
@@ -470,9 +471,14 @@ function ComparePage() {
     loadSchools()
   }, [ids, navigate])
 
+  const localizedSchools = useMemo(
+    () => normalizeSchoolList(schools, i18n.language),
+    [schools, i18n.language]
+  )
+
   const metricsById = useMemo(() => {
     const map = new Map()
-    schools.forEach((school) => {
+    localizedSchools.forEach((school) => {
       const primaryLocation = getPrimaryLocation(school)
       const distance = userLocation && primaryLocation?.lat && primaryLocation?.lng
         ? calculateDistance(userLocation.lat, userLocation.lng, primaryLocation.lat, primaryLocation.lng)
@@ -495,10 +501,10 @@ function ComparePage() {
       })
     })
     return map
-  }, [schools, t, userLocation])
+  }, [localizedSchools, t, userLocation])
 
   const sortedSchools = useMemo(() => {
-    const list = [...schools]
+    const list = [...localizedSchools]
 
     list.sort((a, b) => {
       if (sortBy === 'name') {
@@ -538,7 +544,7 @@ function ComparePage() {
     })
 
     return list
-  }, [schools, sortBy, i18n.language, metricsById])
+  }, [localizedSchools, sortBy, i18n.language, metricsById])
 
   const handleRemove = (schoolId) => {
     removeFromCompare(schoolId)

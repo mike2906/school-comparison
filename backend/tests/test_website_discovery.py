@@ -423,6 +423,76 @@ class TestWebsiteDiscovery:
         assert WebsiteDiscoverer._DISABLED_UNTIL_MONOTONIC.get("searxng") is None
         assert mock.await_count == 1
 
+    async def test_recover_reuses_initial_search_candidates_when_provider_disabled(self, db_session):
+        """recover_failed_school must reuse candidates from the initial discover() pass.
+
+        Scenario: Brave returns [high-score-suspended.bg, lower-score-real.bg].
+        First validation picks high-score-suspended.bg → fails (suspended).
+        Brave is now disabled (429).  Without the fix, the retry loop re-searches and
+        gets nothing.  With the fix, lower-score-real.bg is tried from the saved pool.
+        """
+        from app.scrapers.url_validator import ValidationResult
+        from app.scrapers.website_discovery import WebsiteDiscoverer
+
+        school = School(
+            name_i18n={"bg": "ЧАСТНА ДЕТСКА ГРАДИНА ЗВЕЗДИЧКА ЕООД"},
+            country_code="bg",
+            school_type="private",
+            education_level="kindergarten",
+            city="sofia",
+            website_url="https://yox.bg/частна-детска-градина-звездичка",
+            scrape_status="failed_validate",
+            attributes={},
+        )
+        db_session.add(school)
+        await db_session.commit()
+
+        discoverer = WebsiteDiscoverer(country_code="bg")
+
+        # Brave returns two candidates on the FIRST call; subsequent calls return nothing
+        # (simulating 429 rate-limit after first use).
+        search_call_count = 0
+
+        async def mock_search(s):
+            nonlocal search_call_count
+            search_call_count += 1
+            if search_call_count == 1:
+                return ["https://zvezdichka-sofia.com/", "https://dg185.bg/"]
+            return []
+
+        # zvezdichka-sofia.com → suspended (INVALID)
+        # dg185.bg → bot-protected (VALID)
+        async def mock_validate(school_id, url, country_code, update_db, school_name):
+            await db_session.refresh(school)
+            if "zvezdichka" in url:
+                school.scrape_status = "failed_validate"
+                await db_session.commit()
+                return ValidationResult.INVALID, None, "suspended"
+            else:
+                school.scrape_status = "validated"
+                await db_session.commit()
+                return ValidationResult.VALID, url, "Bot protection detected"
+
+        with (
+            patch.object(discoverer, "_search_candidates", new=AsyncMock(side_effect=mock_search)),
+            patch(
+                "app.scrapers.url_validator.validate_school_url",
+                new=AsyncMock(side_effect=mock_validate),
+            ),
+        ):
+            result = await discoverer.recover_failed_school(
+                db=db_session,
+                school=school,
+                max_attempts=4,
+            )
+
+        await db_session.refresh(school)
+        # The fix: dg185.bg was tried from the cached candidate pool
+        assert result["validation_result"] == "valid"
+        assert school.scrape_status == "validated"
+        # Only ONE search call was made, not two
+        assert search_call_count == 1
+
     async def test_searxng_403_falls_back_to_brave_and_disables_searxng(self, db_session):
         school = School(
             name_i18n={"bg": "Училище Тест", "en": "Test School"},

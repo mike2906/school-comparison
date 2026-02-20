@@ -48,6 +48,8 @@ logs/
 # Tool outputs
 repomix-output.xml
 repomix-*.xml
+backend/reports/
+searxng/limiter.toml
 
 # Testing
 .coverage

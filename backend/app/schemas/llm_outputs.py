@@ -1,30 +1,6 @@
-from typing import Optional
-
 from pydantic import BaseModel, Field
 
 from app.schemas.school import SummaryI18n
-
-
-class ExtractedPrice(BaseModel):
-    """Structured price information extracted by LLM."""
-
-    category: str = Field(description="Price category: tuition, food, transport, or activities")
-    amount: float = Field(description="Numeric amount")
-    currency: str = Field(default="BGN", description="Currency code")
-    period: str = Field(description="Period: monthly, yearly, or one_time")
-    age_group: Optional[str] = Field(default=None, description="Age group if specified")
-    confidence: float = Field(
-        default=1.0, description="Confidence score 0-1, lower if price not found in raw HTML"
-    )
-
-
-class ExtractedPrices(BaseModel):
-    """All prices extracted from a school website."""
-
-    prices: list[ExtractedPrice] = Field(default_factory=list)
-    extraction_notes: Optional[str] = Field(
-        default=None, description="Notes about the extraction process"
-    )
 
 
 class SchoolSummary(BaseModel):

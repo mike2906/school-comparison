@@ -710,6 +710,38 @@ class TestGeoJSONMatching:
                     assert not result.success
                     assert 'ambiguous' in result.error.lower()
 
+    @pytest.mark.asyncio
+    async def test_match_by_website_host(self):
+        """GeoJSON provider can recover coordinates by website host."""
+        from app.services.geocoding.bg.geojson import GeoJSONProvider
+        from unittest.mock import patch
+
+        mock_geojson = {
+            'features': [
+                {
+                    'type': 'Feature',
+                    'geometry': {'coordinates': [23.25751, 42.65307]},
+                    'properties': {
+                        'name': 'ЧАСТНО СРЕДНО УЧИЛИЩЕ "УВЕКИНД"',
+                        'city': 'СТОЛИЧНА',
+                        'street': 'УЛ. ДЕЯН ГЬОРГОВ №4',
+                        'url': 'www.uwekind.com',
+                    }
+                }
+            ]
+        }
+
+        with patch('pathlib.Path.exists', return_value=True):
+            with patch('builtins.open', create=True):
+                with patch('json.load', return_value=mock_geojson):
+                    provider = GeoJSONProvider()
+                    provider._load_index()
+                    result = await provider.geocode_by_website("https://uwekind.com")
+
+                    assert result.success
+                    assert result.lat == pytest.approx(42.65307)
+                    assert result.lng == pytest.approx(23.25751)
+
 
 class TestCompositeProvider:
     """Tests for composite provider fallback behavior."""

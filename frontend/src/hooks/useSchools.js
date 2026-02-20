@@ -1,5 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useMemo, useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { fetchSchools } from '../api/schools'
+import { normalizeSchoolList } from '../utils/schoolAttributes'
 
 export function useSchools(
   ageGroup = null,
@@ -15,6 +17,7 @@ export function useSchools(
   const [schools, setSchools] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const { i18n } = useTranslation()
 
   useEffect(() => {
     const loadSchools = async () => {
@@ -44,5 +47,10 @@ export function useSchools(
     loadSchools()
   }, [countryCode, ageGroup, schoolType, educationLevel, includeCrossover, languageFocus, specialPrograms, facilities, teachingApproach])
 
-  return { schools, loading, error }
+  const localizedSchools = useMemo(
+    () => normalizeSchoolList(schools, i18n.language),
+    [schools, i18n.language]
+  )
+
+  return { schools: localizedSchools, loading, error }
 }

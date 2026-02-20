@@ -655,3 +655,136 @@ class TestValidateSchoolURL:
 
             assert result == ValidationResult.VALID
             assert final_url == "https://school.bg"
+
+
+class TestBotProtectionDetection:
+    """Unit tests for _is_bot_protection_page."""
+
+    def _soup(self, html: str):
+        from bs4 import BeautifulSoup
+        return BeautifulSoup(html, "html.parser")
+
+    def test_detects_sucuri_sgcaptcha_meta_refresh(self):
+        validator = URLValidator("bg")
+        html = (
+            '<html><head>'
+            '<meta http-equiv="refresh" content="0;/.well-known/sgcaptcha/?r=%2F&y=ipc:1.2.3.4:99">'
+            '</head></html>'
+        )
+        assert validator._is_bot_protection_page(self._soup(html)) is True
+
+    def test_detects_cloudflare_challenge_meta_refresh(self):
+        validator = URLValidator("bg")
+        html = (
+            '<html><head>'
+            '<meta http-equiv="refresh" content="0; url=/cdn-cgi/challenge?s=abc">'
+            '</head></html>'
+        )
+        assert validator._is_bot_protection_page(self._soup(html)) is True
+
+    def test_normal_meta_refresh_is_not_bot_protection(self):
+        """A regular redirect meta-refresh (e.g. to /home) must not be flagged."""
+        validator = URLValidator("bg")
+        html = '<html><head><meta http-equiv="refresh" content="3; url=/home"></head></html>'
+        assert validator._is_bot_protection_page(self._soup(html)) is False
+
+    def test_page_without_meta_refresh_is_not_bot_protection(self):
+        validator = URLValidator("bg")
+        html = "<html><body><p>Детска градина</p></body></html>"
+        assert validator._is_bot_protection_page(self._soup(html)) is False
+
+
+@pytest.mark.asyncio
+class TestBotProtectionValidation:
+    """Validate_url returns VALID (not INVALID) for bot-protected pages."""
+
+    async def test_bot_protection_page_returns_valid(self):
+        """A 202 captcha-challenge page should be accepted so the school proceeds to navigation."""
+        validator = URLValidator("bg")
+
+        captcha_html = (
+            "<html><head>"
+            '<link rel="icon" href="data:;">'
+            '<meta http-equiv="refresh" content="0;/.well-known/sgcaptcha/?r=%2F&y=ipc:78.83.254.41:123">'
+            "</head></html>"
+        )
+        mock_response = MagicMock()
+        mock_response.status_code = 202
+        mock_response.url = "https://dg185.bg/"
+        mock_response.text = captcha_html
+
+        with patch("httpx.AsyncClient") as mock_client_class:
+            mock_client = AsyncMock()
+            mock_client.__aenter__.return_value = mock_client
+            mock_client.__aexit__.return_value = None
+            mock_client.get.return_value = mock_response
+            mock_client_class.return_value = mock_client
+
+            result, final_url, reason = await validator.validate_url(
+                "https://dg185.bg/",
+                use_llm_fallback=False,
+            )
+
+        assert result == ValidationResult.VALID
+        assert final_url == "https://dg185.bg/"
+        assert "Bot protection" in reason
+
+    async def test_bot_protection_redirect_url_is_canonicalized(self):
+        """Challenge endpoint redirects must store canonical site URL, not captcha path."""
+        validator = URLValidator("bg")
+
+        captcha_html = (
+            "<html><head>"
+            '<meta http-equiv="refresh" content="0;/.well-known/sgcaptcha/?r=%2F&y=ipc:78.83.254.41:123">'
+            "</head></html>"
+        )
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.url = "https://dg185.bg/.well-known/sgcaptcha/?r=%2F&y=ipc:78.83.254.41:123"
+        mock_response.text = captcha_html
+
+        with patch("httpx.AsyncClient") as mock_client_class:
+            mock_client = AsyncMock()
+            mock_client.__aenter__.return_value = mock_client
+            mock_client.__aexit__.return_value = None
+            mock_client.get.return_value = mock_response
+            mock_client_class.return_value = mock_client
+
+            result, final_url, reason = await validator.validate_url(
+                "https://dg185.bg/",
+                use_llm_fallback=False,
+            )
+
+        assert result == ValidationResult.VALID
+        assert final_url == "https://dg185.bg"
+        assert "Bot protection" in reason
+
+    async def test_bot_protection_does_not_call_llm(self):
+        """LLM should not be called when bot protection is detected."""
+        validator = URLValidator("bg")
+
+        captcha_html = (
+            "<html><head>"
+            '<meta http-equiv="refresh" content="0;/cdn-cgi/challenge?s=xyz">'
+            "</head></html>"
+        )
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.url = "https://protected-school.bg/"
+        mock_response.text = captcha_html
+
+        with patch("httpx.AsyncClient") as mock_client_class:
+            mock_client = AsyncMock()
+            mock_client.__aenter__.return_value = mock_client
+            mock_client.__aexit__.return_value = None
+            mock_client.get.return_value = mock_response
+            mock_client_class.return_value = mock_client
+
+            with patch.object(validator, "_llm_validate", new_callable=AsyncMock) as llm_mock:
+                result, _, _ = await validator.validate_url(
+                    "https://protected-school.bg/",
+                    use_llm_fallback=True,
+                )
+
+        llm_mock.assert_not_called()
+        assert result == ValidationResult.VALID

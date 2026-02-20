@@ -19,6 +19,7 @@ dependencies = [
     "pdfplumber>=0.11.9",
     # Phase 1 scraping dependencies
     "beautifulsoup4>=4.12.0",
+    "trafilatura>=1.10.0",
     "pydantic-ai>=0.0.10",
     "crawl4ai>=0.3.0",
     # CLI dependencies

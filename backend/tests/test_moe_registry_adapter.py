@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.scrapers.sources.bg.moe_registry import MoeRegistryAdapter
 from app.scrapers.sources import get_adapter, list_adapters
+from app.services.geocoding.base import GeocodingResult
 
 
 class TestMoeRegistryAdapterRegistry:
@@ -267,6 +268,173 @@ class TestMoeRegistryAdapterIntegration:
         assert school.name_i18n["bg"] == "Test School"
         assert school.locations == []  # No location data in fast mode
         assert school.website_url is None
+
+    async def test_discover_recovers_missing_location_from_geojson(self, db_session: AsyncSession):
+        """When MoE detail has no address, recover location via GeoJSON by school name."""
+        adapter = MoeRegistryAdapter(db=db_session)
+
+        public_register_response = {
+            "status": 1,
+            "data": {
+                "publicInstitutions": [
+                    {
+                        "id": 2200017,
+                        "instid": 2200017,
+                        "name": "ЧАСТНО НАЧАЛНО УЧИЛИЩЕ ЛОЗЕН ЕООД",
+                        "region": 22,
+                        "municipality": 220,
+                        "town": 68134,
+                        "instType": 1,
+                        "detailedSchoolType": 121,
+                        "financialSchoolType": 3,
+                        "transformType": 5,
+                        "instKind": 3,
+                        "formName": "institution",
+                        "procID": 9645,
+                    }
+                ]
+            },
+        }
+        detail_response = {
+            "status": 1,
+            "data": [
+                {
+                    "settlementAddress": None,
+                    "website": None,
+                    "phoneNumber": None,
+                    "institutionDepartments": [],
+                }
+            ],
+        }
+
+        class MockResponse:
+            def __init__(self, json_data):
+                self._json_data = json_data
+                self.status_code = 200
+
+            def raise_for_status(self):
+                pass
+
+            def json(self):
+                return self._json_data
+
+        async def mock_post(url, **kwargs):
+            if "public-register" in url:
+                return MockResponse(public_register_response)
+            return MockResponse(detail_response)
+
+        mock_client = AsyncMock()
+        mock_client.__aenter__.return_value = mock_client
+        mock_client.__aexit__.return_value = None
+        mock_client.post = mock_post
+
+        with (
+            patch("httpx.AsyncClient", return_value=mock_client),
+            patch.object(
+                adapter._geojson_provider,
+                "geocode",
+                new=AsyncMock(
+                    return_value=GeocodingResult(
+                        success=True,
+                        lat=42.7001,
+                        lng=23.3002,
+                        provider="geojson_bg",
+                        formatted_address='ул. "Ветрушка" 5а, 1616 СТОЛИЧНА',
+                    )
+                ),
+            ),
+        ):
+            schools = await adapter.discover(limit=1, fetch_details=True)
+
+        assert len(schools) == 1
+        school = schools[0]
+        assert len(school.locations) == 1
+        assert school.locations[0].lat == pytest.approx(42.7001)
+        assert school.locations[0].lng == pytest.approx(23.3002)
+        assert school.locations[0].age_groups == ["grade_1_4"]
+        assert school.attributes["moe_location_fallback"] == "geojson"
+        assert school.attributes["missing_location_data"] is False
+
+    async def test_discover_flags_missing_location_when_geojson_misses(self, db_session: AsyncSession):
+        """When MoE detail has no address and GeoJSON misses, keep explicit QA flag."""
+        adapter = MoeRegistryAdapter(db=db_session)
+
+        public_register_response = {
+            "status": 1,
+            "data": {
+                "publicInstitutions": [
+                    {
+                        "id": 2200017,
+                        "instid": 2200017,
+                        "name": "ЧАСТНО НАЧАЛНО УЧИЛИЩЕ ЛОЗЕН ЕООД",
+                        "region": 22,
+                        "municipality": 220,
+                        "town": 68134,
+                        "instType": 1,
+                        "detailedSchoolType": 121,
+                        "financialSchoolType": 3,
+                        "transformType": 5,
+                        "instKind": 3,
+                        "formName": "institution",
+                        "procID": 9645,
+                    }
+                ]
+            },
+        }
+        detail_response = {
+            "status": 1,
+            "data": [
+                {
+                    "settlementAddress": None,
+                    "website": None,
+                    "phoneNumber": None,
+                    "institutionDepartments": [],
+                }
+            ],
+        }
+
+        class MockResponse:
+            def __init__(self, json_data):
+                self._json_data = json_data
+                self.status_code = 200
+
+            def raise_for_status(self):
+                pass
+
+            def json(self):
+                return self._json_data
+
+        async def mock_post(url, **kwargs):
+            if "public-register" in url:
+                return MockResponse(public_register_response)
+            return MockResponse(detail_response)
+
+        mock_client = AsyncMock()
+        mock_client.__aenter__.return_value = mock_client
+        mock_client.__aexit__.return_value = None
+        mock_client.post = mock_post
+
+        with (
+            patch("httpx.AsyncClient", return_value=mock_client),
+            patch.object(
+                adapter._geojson_provider,
+                "geocode",
+                new=AsyncMock(
+                    return_value=GeocodingResult(
+                        success=False,
+                        provider="geojson_bg",
+                        error="No match in GeoJSON index",
+                    )
+                ),
+            ),
+        ):
+            schools = await adapter.discover(limit=1, fetch_details=True)
+
+        assert len(schools) == 1
+        school = schools[0]
+        assert school.locations == []
+        assert school.attributes["missing_location_data"] is True
+        assert school.attributes["missing_location_reason"] == "no_address_and_geojson_miss"
 
 
 @pytest.mark.asyncio

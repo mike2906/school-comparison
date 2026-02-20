@@ -85,8 +85,7 @@ class BaseSourceAdapter(ABC):
             Dict with counts: {"created": N, "updated": M, "skipped": K}
         """
         from app.models import School, SchoolLocation, SchoolLocationAgeGroupShift
-        from sqlalchemy import select, and_
-        from sqlalchemy.dialects.postgresql import insert
+        from sqlalchemy import select, and_, func
         import logging
 
         logger = logging.getLogger(__name__)
@@ -94,6 +93,7 @@ class BaseSourceAdapter(ABC):
         created = 0
         updated = 0
         skipped = 0
+        touched_school_ids: set[int] = set()
 
         for disc in discovered_schools:
             try:
@@ -202,6 +202,7 @@ class BaseSourceAdapter(ABC):
                     await self.db.flush()
                     school_id = new_school.id
                     created += 1
+                touched_school_ids.add(school_id)
 
                 # Step 3: Create/update locations
                 # If no locations were discovered, keep existing locations intact to avoid wiping data.
@@ -241,6 +242,30 @@ class BaseSourceAdapter(ABC):
                 logger.error(f"Error upserting school {disc.name_i18n}: {e}")
                 skipped += 1
                 continue
+
+        if touched_school_ids:
+            missing_locations_result = await self.db.execute(
+                select(School.id)
+                .outerjoin(SchoolLocation, School.id == SchoolLocation.school_id)
+                .where(School.id.in_(touched_school_ids))
+                .group_by(School.id)
+                .having(func.count(SchoolLocation.id) == 0)
+            )
+            missing_ids = [row[0] for row in missing_locations_result.all()]
+            for school_id in missing_ids:
+                school = await self.db.get(School, school_id)
+                name_i18n = school.name_i18n if school else None
+                school_name = None
+                if isinstance(name_i18n, dict):
+                    school_name = name_i18n.get("bg") or name_i18n.get("en")
+                if not school_name:
+                    school_name = str(name_i18n)
+                logger.warning(
+                    "Data quality: school has no locations after upsert (id=%s, name=%s, adapter=%s)",
+                    school_id,
+                    school_name,
+                    self.ADAPTER_NAME,
+                )
 
         await self.db.commit()
 

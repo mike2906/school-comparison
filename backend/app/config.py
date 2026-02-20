@@ -47,6 +47,26 @@ class Settings(BaseSettings):
     url_recovery_candidate_attempts: int = 6
     url_recovery_concurrency: int = 3
 
+    # Extraction settings
+    extraction_llm_timeout_seconds: float = 15.0
+    extraction_max_content_chars: int = 15000
+    extraction_primary_tier: str = "medium"  # cheap | medium
+    extraction_quality_gate_enabled: bool = True
+    extraction_general_info_min_quality_score: int = 4
+    extraction_enable_capable_fallback: bool = False
+    extraction_output_retries: int = 2
+    extraction_temperature: float = 0.0
+    extraction_request_min_interval_seconds: float = 0.0
+    # When true, clear existing scraped pricing rows if extraction finds no pricing info.
+    extraction_clear_pricing_on_no_info: bool = False
+    nav_content_extractor: str = "bs4"  # bs4 | trafilatura | crawl4ai
+    nav_fetch_engine: str = "httpx"  # httpx | crawl4ai | crawl4ai_deep
+    # Per-school hard timeout for CLI batch navigation. Prevents a single hung browser
+    # from stalling the entire batch. Set to 0 to disable (not recommended with crawl4ai).
+    nav_school_timeout_seconds: float = 120.0
+    # Per-school hard timeout for CLI batch extraction (covers all LLM calls + retries).
+    extraction_school_timeout_seconds: float = 180.0
+
     # Geocoding settings
     geocoding_provider: str = "composite"  # composite | nominatim | google | mapbox (composite = GeoJSON + Nominatim fallback, recommended)
     # REQUIRED: Must be set in .env (Nominatim policy requires valid contact email)

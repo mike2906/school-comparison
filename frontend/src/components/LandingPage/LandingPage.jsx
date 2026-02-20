@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { calculateAgeGroup } from '../../utils/education'
@@ -6,6 +6,7 @@ import { searchSchools, fetchSchoolCounts } from '../../api/schools'
 import { useCountry } from '../../context/CountryContext'
 import { getAgeGroupsByCategory, getAgeGroupLabel } from '../../utils/countryConfig'
 import { getSchoolName } from '../../utils/i18n'
+import { normalizeSchoolList } from '../../utils/schoolAttributes'
 import LanguageToggle from '../LanguageToggle/LanguageToggle'
 
 const FALLBACK_KINDERGARTEN_GROUPS = ['nursery', 'first', 'second', 'third', 'preschool']
@@ -18,7 +19,7 @@ const SCHOOL_TYPES = [
 
 const currentYear = new Date().getFullYear()
 const YEARS = Array.from({ length: 5 }, (_, i) => currentYear + i)
-const BIRTH_YEARS = Array.from({ length: 12 }, (_, i) => currentYear - i - 1)
+const MAX_CHILD_AGE = 18
 
 function LandingPage() {
   const { t, i18n } = useTranslation()
@@ -64,6 +65,16 @@ function LandingPage() {
   const [showSearchDropdown, setShowSearchDropdown] = useState(false)
   const [schoolCounts, setSchoolCounts] = useState({})
   const searchRef = useRef(null)
+
+  const birthYears = useMemo(() => {
+    const baseYear = filters.targetYear || currentYear + 1
+    return Array.from({ length: MAX_CHILD_AGE + 1 }, (_, i) => baseYear - i)
+  }, [filters.targetYear])
+
+  const localizedSearchResults = useMemo(
+    () => normalizeSchoolList(searchResults, i18n.language),
+    [searchResults, i18n.language]
+  )
 
   // Fetch school counts on mount
   useEffect(() => {
@@ -205,11 +216,12 @@ function LandingPage() {
       return 'kindergarten'
     } else {
       // school category
-      if (filters.ageGroup === 'preschool' || filters.ageGroup === 'grade_1_4') return 'primary'
-      if (filters.ageGroup === 'grade_5_7') return 'lower_secondary'
-      if (filters.ageGroup === 'grade_8_12') return 'upper_secondary'
+      // Keep preschool scoped to primary unless crossover is explicitly enabled.
+      // For grade bands, age_group is the source of truth and education_level can
+      // become stale/inconsistent with imported data.
+      if (filters.ageGroup === 'preschool') return 'primary'
+      return null
     }
-    return null
   }
 
   const handleSearch = () => {
@@ -299,9 +311,9 @@ function LandingPage() {
             </div>
 
             {/* Search dropdown */}
-            {showSearchDropdown && searchResults.length > 0 && (
+            {showSearchDropdown && localizedSearchResults.length > 0 && (
               <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl border-2 border-neutral-200 shadow-xl overflow-hidden z-10 max-h-96 overflow-y-auto">
-                {searchResults.map(school => (
+                {localizedSearchResults.map(school => (
                   <button
                     key={school.id}
                     onClick={() => handleSearchSelect(school)}
@@ -316,7 +328,7 @@ function LandingPage() {
               </div>
             )}
 
-            {showSearchDropdown && searchResults.length === 0 && searchQuery.length >= 2 && !isSearching && (
+            {showSearchDropdown && localizedSearchResults.length === 0 && searchQuery.length >= 2 && !isSearching && (
               <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl border-2 border-neutral-200 shadow-xl p-4 z-10">
                 <p className="text-sm text-neutral-500 text-center">{t('landing.noSearchResults')}</p>
               </div>
@@ -493,7 +505,7 @@ function LandingPage() {
                       className="w-full border border-neutral-300 rounded-lg px-3 py-2.5 text-sm bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-shadow"
                     >
                       <option value="">{t('filters.selectBirthYear')}</option>
-                      {BIRTH_YEARS.map(year => (
+                      {birthYears.map(year => (
                         <option key={year} value={year}>{year}</option>
                       ))}
                     </select>

@@ -263,7 +263,7 @@ class TestPipelineOrchestration:
 
             assert "pipeline_id" in result
             assert result["pipeline_id"] == "test-pipeline-123"
-            assert "Stages 1-4" in result["message"]
+            assert "Stages 1-5" in result["message"]
 
     async def test_pipeline_uses_chain_for_stages(self):
         """Pipeline chains discovery, website discovery, validation, and navigation."""
@@ -278,7 +278,7 @@ class TestPipelineOrchestration:
 
             # Verify chain was called
             mock_chain.assert_called_once()
-            assert len(mock_chain.call_args.args) == 4
+            assert len(mock_chain.call_args.args) == 5
 
 
 @pytest.mark.asyncio
