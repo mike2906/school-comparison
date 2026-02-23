@@ -6,6 +6,7 @@ Extracts structured pricing and general school info from navigated website pages
 from __future__ import annotations
 
 import asyncio
+import contextvars
 import ast
 import datetime
 import json
@@ -27,274 +28,32 @@ from app.models.pricing import PriceCategory, PricePeriod, PriceSource, Pricing
 from app.models.school import School
 from app.models.scrape_log import ScrapeType
 from app.models.source_page import SourcePage
+from app.scrapers.extraction_rules import get_rules
 from app.schemas.extraction import (
+    AdmissionExtractionOutput,
     ExtractedLanguageFocus,
     FacilitiesExtractionOutput,
     GeneralInfoExtractionOutput,
     LanguagesExtractionOutput,
     MetadataExtractionOutput,
+    OperationsExtractionOutput,
     PriceExtractionOutput,
+    PricingTermsExtractionOutput,
     ProgramsExtractionOutput,
+    ServicesExtractionOutput,
 )
 
 logger = logging.getLogger(__name__)
 _REQUEST_THROTTLE_LOCK = asyncio.Lock()
 _LAST_LLM_REQUEST_AT = 0.0
-
-
-_CATEGORY_ALIASES: dict[str, PriceCategory] = {
-    "tuition": PriceCategory.TUITION,
-    "обучение": PriceCategory.TUITION,
-    "таксаобучение": PriceCategory.TUITION,
-    "schoolfee": PriceCategory.TUITION,
-    "food": PriceCategory.FOOD,
-    "храна": PriceCategory.FOOD,
-    "transport": PriceCategory.TRANSPORT,
-    "транспорт": PriceCategory.TRANSPORT,
-    "activities": PriceCategory.ACTIVITIES,
-    "activity": PriceCategory.ACTIVITIES,
-    "дейности": PriceCategory.ACTIVITIES,
-    "registration": PriceCategory.REGISTRATION,
-    "enrollment": PriceCategory.REGISTRATION,
-    "admission": PriceCategory.REGISTRATION,
-    "materials": PriceCategory.MATERIALS,
-    "extendedday": PriceCategory.EXTENDED_DAY,
-    "extended": PriceCategory.EXTENDED_DAY,
-    "uniforms": PriceCategory.UNIFORMS,
-    "extracurricular": PriceCategory.EXTRACURRICULAR,
-    "camp": PriceCategory.CAMP,
-}
-
-_PERIOD_ALIASES: dict[str, PricePeriod] = {
-    "monthly": PricePeriod.MONTHLY,
-    "month": PricePeriod.MONTHLY,
-    "месечно": PricePeriod.MONTHLY,
-    "месец": PricePeriod.MONTHLY,
-    "yearly": PricePeriod.YEARLY,
-    "annual": PricePeriod.YEARLY,
-    "годишно": PricePeriod.YEARLY,
-    "year": PricePeriod.YEARLY,
-    "one_time": PricePeriod.ONE_TIME,
-    "onetime": PricePeriod.ONE_TIME,
-    "single": PricePeriod.ONE_TIME,
-    "еднократно": PricePeriod.ONE_TIME,
-    "quarter": PricePeriod.QUARTER,
-    "quarterly": PricePeriod.QUARTER,
-    "term": PricePeriod.TERM,
-    "semester": PricePeriod.SEMESTER,
-    "семестър": PricePeriod.SEMESTER,
-}
-
-_PROVIDER_ERROR_MARKERS = (
-    "not a valid model id",
-    "openrouter",
-    "provider",
-    "authentication",
-    "failed to authenticate",
-    "chat completions endpoint",
-    "status_code",
+_ACTIVE_RULES: contextvars.ContextVar[Any] = contextvars.ContextVar(
+    "extraction_rules_module",
+    default=get_rules(None),
 )
 
-_OUTPUT_VALIDATION_ERROR_MARKERS = (
-    "output validation",
-    "result validation",
-    "structured parse returned no data",
-    "validation error",
-    "validation errors",
-    "invalid json",
-    "json decode",
-    "json parse",
-    "failed to validate",
-    "failed validation",
-    "exceeded maximum retries",
-    "retry attempts exhausted",
-)
 
-_GENERAL_INFO_LIST_MAX_ITEMS = 20
-_GENERAL_INFO_ITEM_MAX_LEN = 100
-_GENERAL_INFO_CLASS_SIZE_MAX_LEN = 48
-_GENERAL_INFO_JUNK_VALUES = {
-    "n/a",
-    "na",
-    "none",
-    "null",
-    "unknown",
-    "неизвестно",
-    "-",
-    "--",
-    ".",
-}
-
-_GENERAL_INFO_TEXT_KEYS = (
-    "name",
-    "title",
-    "label",
-    "language",
-    "program",
-    "program_name",
-    "facility",
-    "activity",
-    "accreditation",
-    "value",
-    "text",
-)
-
-_GENERAL_INFO_SECTION_CONFIG: dict[str, dict[str, tuple[str, ...] | list[str]]] = {
-    "languages": {
-        "preferred_categories": ["about", "contact"],
-        "include_tokens": (
-            "language",
-            "languages",
-            "език",
-            "езици",
-            "чужд",
-            "двуезич",
-            "bilingual",
-            "english",
-            "английски",
-            "немски",
-            "deutsch",
-            "french",
-            "français",
-        ),
-    },
-    "facilities": {
-        "preferred_categories": ["facilities", "about", "contact"],
-        "include_tokens": (
-            "facility",
-            "facilities",
-            "campus",
-            "base",
-            "classroom",
-            "laboratory",
-            "library",
-            "sport",
-            "pool",
-            "material",
-            "база",
-            "сграда",
-            "класна",
-            "лаборатория",
-            "библиотека",
-            "двор",
-            "физкултур",
-            "плувен",
-        ),
-    },
-    "programs": {
-        "preferred_categories": ["programs", "about", "admission", "contact"],
-        "include_tokens": (
-            "program",
-            "curriculum",
-            "method",
-            "montessori",
-            "waldorf",
-            "ib",
-            "cambridge",
-            "stem",
-            "robotics",
-            "club",
-            "programme",
-            "програма",
-            "обучение",
-            "клуб",
-            "извънклас",
-            "занимания",
-            "роботика",
-        ),
-    },
-    "metadata": {
-        "preferred_categories": ["about", "contact"],
-        "include_tokens": (
-            "founded",
-            "established",
-            "since",
-            "year",
-            "class",
-            "students",
-            "accreditation",
-            "accredited",
-            "founding",
-            "основан",
-            "създаден",
-            "учреден",
-            "година",
-            "клас",
-            "ученици",
-            "акредитац",
-            "лиценз",
-        ),
-    },
-}
-
-_DETERMINISTIC_LANGUAGE_PATTERNS: tuple[tuple[str, tuple[str, ...]], ...] = (
-    ("Bulgarian", ("български", "bulgarian")),
-    ("English", ("английски", "english")),
-    ("German", ("немски", "германски", "deutsch", "german")),
-    ("French", ("френски", "français", "french")),
-    ("Spanish", ("испански", "spanish", "español")),
-    ("Italian", ("италиански", "italian", "italiano")),
-    ("Russian", ("руски", "russian")),
-    ("Turkish", ("турски", "turkish")),
-    ("Greek", ("гръцки", "greek")),
-    ("Chinese", ("китайски", "chinese", "mandarin")),
-    ("Japanese", ("японски", "japanese")),
-    ("Hebrew", ("иврит", "hebrew")),
-    ("Arabic", ("арабски", "arabic")),
-)
-
-_LANGUAGE_CONTEXT_MARKERS = (
-    "език",
-    "езици",
-    "чужд",
-    "двуезич",
-    "language",
-    "languages",
-    "bilingual",
-    "teaching",
-    "instruction",
-    "обучение",
-)
-
-_ACCREDITATION_CONTEXT_MARKERS = (
-    "accredit",
-    "authorized",
-    "licensed",
-    "certified",
-    "affiliated",
-    "акредитац",
-    "акредит",
-    "оторизиран",
-    "лиценз",
-    "сертифи",
-    "удостоверен",
-)
-
-_ACCREDITATION_KEYWORDS: tuple[tuple[str, tuple[str, ...]], ...] = (
-    ("International Baccalaureate (IB)", ("international baccalaureate", "ib diploma", "ib programme", "ib program")),
-    ("Cambridge International", ("cambridge international", "cambridge assessment", "cambridge english")),
-    ("Council of International Schools (CIS)", ("council of international schools", "cis accreditation", "cis accredited")),
-    ("COBIS", ("cobis",)),
-    ("Pearson Edexcel", ("pearson", "edexcel")),
-    ("МОН лиценз", ("мон", "министерство на образованието", "министерството на образованието")),
-)
-
-# Bulgarian phone: 0XXXXXXXXX (mobile), 02-XXXXXXX (Sofia landline), 0800... (toll-free)
-# Also handles +359XXXXXXXXX, 00359XXXXXXXXX international formats
-_PHONE_PATTERN = re.compile(
-    r"(?:(?:\+359|00359|0)(?:\s*[-./]?\s*))"  # prefix: +359, 00359, or 0
-    r"(?:8[7-9]\d|2|[3-9]\d)"                  # area/mobile prefix
-    r"(?:\s*[-./]?\s*\d){5,8}",               # remaining digits with optional separators
-    re.IGNORECASE,
-)
-_EMAIL_PATTERN = re.compile(
-    r"[a-z0-9._%+\-]+\s*(?:\[\s*a\s*t\s*\]|@)\s*[a-z0-9.\-]+\.[a-z]{2,}",
-    re.IGNORECASE,
-)
-_CONTACT_NOISE_TOKENS = frozenset({
-    "example", "yourname", "email@", "@domain", "placeholder", "username",
-    "noreply", "no-reply", "donotreply", "info@info", "test@test",
-})
+def _rules() -> Any:
+    return _ACTIVE_RULES.get()
 
 
 @dataclass
@@ -371,6 +130,8 @@ async def extract_school(
 ) -> dict:
     """Extract pricing + general info for one school from navigated pages."""
     settings = get_settings()
+
+    _ACTIVE_RULES.set(get_rules(country_code))
 
     school_result = await db.execute(select(School).where(School.id == school_id))
     school = school_result.scalar_one_or_none()
@@ -574,7 +335,7 @@ async def _extract_prices(
     school_name = (school.name_i18n or {}).get("bg") or (school.name_i18n or {}).get("en") or ""
     system_prompt = (
         "Extract school pricing into structured JSON. "
-        "Return category, period, amount/amount_min/amount_max, currency, plan_name, academic_year, age_group, notes, confidence. "
+        "Return category, period, amount/amount_min/amount_max, currency, plan_name, academic_year, age_group, notes, discounts, installments, includes, excludes, confidence. "
         "Use category names like tuition/food/transport/activities/registration/materials/extended_day/uniforms/extracurricular/camp. "
         "Use period names like monthly/yearly/one_time/quarter/term/semester. "
         "If no concrete pricing is present, set has_pricing_info=false and prices=[]. "
@@ -657,6 +418,9 @@ async def _extract_prices(
             "output_tokens": output_tokens,
         }
 
+    # Keep row-level pricing context scoped to the row itself.
+    # Global pricing terms are stored separately under general-info extraction.
+
     source_url = source_urls[0] if source_urls else None
     pricing_rows: list[Pricing] = []
     source_rows: list[FieldSource] = []
@@ -671,6 +435,11 @@ async def _extract_prices(
             continue
         if amount is None and amount_min is None and amount_max is None:
             continue
+
+        normalized_discounts = _normalize_text_list(extracted.discounts)
+        normalized_installments = _normalize_text_list(extracted.installments)
+        normalized_includes = _normalize_text_list(extracted.includes)
+        normalized_excludes = _normalize_text_list(extracted.excludes)
 
         pricing_rows.append(
             Pricing(
@@ -689,6 +458,10 @@ async def _extract_prices(
                 pricing_context={
                     "notes": extracted.notes,
                     "confidence": extracted.confidence,
+                    "discounts": normalized_discounts,
+                    "installments": normalized_installments,
+                    "includes": normalized_includes,
+                    "excludes": normalized_excludes,
                 },
             )
         )
@@ -814,7 +587,15 @@ async def _extract_general_info(
     contact_info = _extract_contact_info_deterministic(all_page_text)
 
     attrs = dict(school.attributes) if isinstance(school.attributes, dict) else {}
+    admission_info = dict(school.admission_info) if isinstance(school.admission_info, dict) else {}
+
+    admission_payload = normalized.admission.model_dump()
+    operations_payload = normalized.operations.model_dump()
+    services_payload = normalized.services.model_dump()
+    pricing_terms_payload = normalized.pricing_terms.model_dump()
+
     extracted: dict[str, Any] = {
+        "_schema_version": 1,
         "languages": [entry.model_dump() for entry in normalized.languages],
         "facilities": normalized.facilities,
         "programs": normalized.programs,
@@ -822,16 +603,30 @@ async def _extract_general_info(
         "class_size": normalized.class_size,
         "founded_year": normalized.founded_year,
         "accreditations": normalized.accreditations,
+        "admission": admission_payload,
+        "operations": operations_payload,
+        "services": services_payload,
+        "pricing_terms": pricing_terms_payload,
     }
     if contact_info:
         extracted["contact"] = contact_info
     attrs["extracted"] = extracted
+    # Drop legacy duplicated top-level copies to keep a single source of truth.
+    attrs.pop("operations", None)
+    attrs.pop("services", None)
+    attrs.pop("pricing_terms", None)
     # TODO: Confirm frontend consumption of extracted_i18n; drop if unused to avoid schema drift.
     if extracted_i18n:
         attrs["extracted_i18n"] = extracted_i18n
     else:
         attrs.pop("extracted_i18n", None)
     school.attributes = attrs
+
+    if normalized.admission.has_useful_info:
+        admission_info["website_extracted"] = admission_payload
+    else:
+        admission_info.pop("website_extracted", None)
+    school.admission_info = admission_info
 
     await db.execute(
         delete(FieldSource).where(
@@ -843,7 +638,12 @@ async def _extract_general_info(
 
     source_url = source_urls[0] if source_urls else None
 
-    def add_source(field_key: str, value_json: Any = None, value_text: Optional[str] = None) -> None:
+    def add_source(
+        field_key: str,
+        value_json: Any = None,
+        value_text: Optional[str] = None,
+        path_prefix: str = "attributes",
+    ) -> None:
         if value_json is None and not value_text:
             return
         if isinstance(value_json, list) and not value_json:
@@ -852,7 +652,7 @@ async def _extract_general_info(
             FieldSource(
                 school_id=school.id,
                 category="general_info",
-                field_key=f"attributes.{field_key}",
+                field_key=f"{path_prefix}.{field_key}",
                 value_json=value_json,
                 value_text=value_text,
                 source_type=SourceType.SCRAPED_WEBSITE,
@@ -870,6 +670,15 @@ async def _extract_general_info(
     add_source("accreditations", value_json=normalized.accreditations)
     add_source("class_size", value_text=normalized.class_size)
     add_source("founded_year", value_text=normalized.founded_year)
+    if normalized.admission.has_useful_info:
+        add_source("admission", value_json=admission_payload)
+        add_source("website_extracted", value_json=admission_payload, path_prefix="admission_info")
+    if normalized.operations.has_useful_info:
+        add_source("operations", value_json=operations_payload)
+    if normalized.services.has_useful_info:
+        add_source("services", value_json=services_payload)
+    if normalized.pricing_terms.has_useful_info:
+        add_source("pricing_terms", value_json=pricing_terms_payload)
     if contact_info:
         add_source("contact", value_json=contact_info)
 
@@ -882,6 +691,10 @@ async def _extract_general_info(
             normalized.class_size,
             normalized.founded_year,
             normalized.accreditations,
+            normalized.admission.has_useful_info,
+            normalized.operations.has_useful_info,
+            normalized.services.has_useful_info,
+            normalized.pricing_terms.has_useful_info,
             contact_info,
         ]
     )
@@ -933,6 +746,30 @@ async def _extract_general_info_sections(
         school=school,
         pages=pages,
         section_key="metadata",
+        fallback_content=fallback_content,
+    )
+    admission_content = _select_general_info_section_content(
+        school=school,
+        pages=pages,
+        section_key="admission",
+        fallback_content=fallback_content,
+    )
+    operations_content = _select_general_info_section_content(
+        school=school,
+        pages=pages,
+        section_key="operations",
+        fallback_content=fallback_content,
+    )
+    services_content = _select_general_info_section_content(
+        school=school,
+        pages=pages,
+        section_key="services",
+        fallback_content=fallback_content,
+    )
+    pricing_terms_content = _select_general_info_section_content(
+        school=school,
+        pages=pages,
+        section_key="pricing_terms",
         fallback_content=fallback_content,
     )
 
@@ -1037,6 +874,18 @@ async def _extract_general_info_sections(
     merged_class_size = _merge_class_size(llm_class_size, deterministic_class_size)
     llm_accreditations = metadata_out.accreditations if isinstance(metadata_out, MetadataExtractionOutput) else []
     merged_accreditations = _merge_text_values(llm_accreditations, deterministic_accreditations)
+    deterministic_admission = _extract_admission_info_deterministic(
+        "\n".join([admission_content, fallback_content]).strip()
+    )
+    deterministic_operations = _extract_operations_info_deterministic(
+        "\n".join([operations_content, fallback_content]).strip()
+    )
+    deterministic_services = _extract_services_info_deterministic(
+        "\n".join([services_content, fallback_content]).strip()
+    )
+    deterministic_pricing_terms = _extract_pricing_terms_deterministic(
+        "\n".join([pricing_terms_content, fallback_content]).strip()
+    )
 
     combined = GeneralInfoExtractionOutput(
         languages=merged_languages,
@@ -1046,6 +895,10 @@ async def _extract_general_info_sections(
         class_size=merged_class_size,
         founded_year=merged_founded_year,
         accreditations=merged_accreditations,
+        admission=deterministic_admission,
+        operations=deterministic_operations,
+        services=deterministic_services,
+        pricing_terms=deterministic_pricing_terms,
         has_useful_info=False,
     )
     combined.has_useful_info = _score_general_info_output(combined) > 0
@@ -1059,7 +912,7 @@ def _select_general_info_section_content(
     section_key: str,
     fallback_content: str,
 ) -> str:
-    section_config = _GENERAL_INFO_SECTION_CONFIG.get(section_key, {})
+    section_config = _rules()._GENERAL_INFO_SECTION_CONFIG.get(section_key, {})
     preferred_categories = section_config.get("preferred_categories") or ["about", "contact"]
     include_tokens = tuple(section_config.get("include_tokens") or ())
     section_content, _ = _select_pages(
@@ -1086,8 +939,8 @@ def _extract_languages_deterministic(text: str) -> list[ExtractedLanguageFocus]:
         lowered_fragment = fragment.lower().strip()
         if not lowered_fragment:
             continue
-        has_context = any(marker in lowered_fragment for marker in _LANGUAGE_CONTEXT_MARKERS)
-        for label, variants in _DETERMINISTIC_LANGUAGE_PATTERNS:
+        has_context = any(marker in lowered_fragment for marker in _rules()._LANGUAGE_CONTEXT_MARKERS)
+        for label, variants in _rules()._DETERMINISTIC_LANGUAGE_PATTERNS:
             if label.lower() in seen:
                 continue
             for variant in variants:
@@ -1157,16 +1010,322 @@ def _extract_accreditations_deterministic(text: str) -> list[str]:
     seen: set[str] = set()
 
     for fragment in fragments:
-        has_context = any(marker in fragment for marker in _ACCREDITATION_CONTEXT_MARKERS)
+        has_context = any(marker in fragment for marker in _rules()._ACCREDITATION_CONTEXT_MARKERS)
         if not has_context:
             continue
-        for label, keywords in _ACCREDITATION_KEYWORDS:
+        for label, keywords in _rules()._ACCREDITATION_KEYWORDS:
             if label in seen:
                 continue
             if any(keyword in fragment for keyword in keywords):
                 seen.add(label)
                 found.append(label)
     return found
+
+
+def _extract_admission_info_deterministic(text: str) -> AdmissionExtractionOutput:
+    deadlines = _collect_matching_lines(
+        text,
+        _rules()._ADMISSION_DEADLINE_PATTERNS,
+        require_patterns=_rules()._ADMISSION_DEADLINE_REQUIRE_PATTERNS,
+        exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+    )
+    required_documents = _collect_matching_lines(
+        text,
+        _rules()._ADMISSION_DOCUMENT_PATTERNS,
+        require_patterns=_rules()._ADMISSION_REQUIRED_DOCUMENTS_REQUIRE_PATTERNS,
+        exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+    )
+    application_steps = _collect_matching_lines(
+        text,
+        _rules()._ADMISSION_STEPS_PATTERNS,
+        require_patterns=_rules()._ADMISSION_APPLICATION_STEPS_REQUIRE_PATTERNS,
+        exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+    )
+    entrance_requirements = _collect_matching_lines(
+        text,
+        _rules()._ADMISSION_ENTRANCE_PATTERNS,
+        exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+    )
+    available_spots = _collect_matching_lines(
+        text,
+        _rules()._ADMISSION_SPOTS_PATTERNS,
+        require_patterns=_rules()._ADMISSION_AVAILABLE_SPOTS_REQUIRE_PATTERNS,
+        exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+    )
+
+    parsed = AdmissionExtractionOutput(
+        deadlines=deadlines,
+        required_documents=required_documents,
+        application_steps=application_steps,
+        entrance_requirements=entrance_requirements,
+        available_spots=available_spots,
+        has_useful_info=False,
+    )
+    parsed.has_useful_info = any(
+        (
+            parsed.deadlines,
+            parsed.required_documents,
+            parsed.application_steps,
+            parsed.entrance_requirements,
+            parsed.available_spots,
+        )
+    )
+    return parsed
+
+
+def _extract_operations_info_deterministic(text: str) -> OperationsExtractionOutput:
+    working_hours = _extract_working_hours_value(text)
+    day_options = _collect_matching_lines(
+        text,
+        _rules()._OPERATIONS_DAY_OPTIONS_PATTERNS,
+        exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+    )
+    daily_schedule = _collect_matching_lines(
+        text,
+        _rules()._OPERATIONS_DAILY_SCHEDULE_PATTERNS,
+        require_patterns=_rules()._OPERATIONS_DAILY_SCHEDULE_REQUIRE_PATTERNS,
+        exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+    )
+    meals = _collect_matching_lines(
+        text,
+        _rules()._OPERATIONS_MEALS_PATTERNS,
+        require_patterns=_rules()._OPERATIONS_MEALS_REQUIRE_PATTERNS,
+        exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+    )
+    transport = _collect_matching_lines(
+        text,
+        _rules()._OPERATIONS_TRANSPORT_PATTERNS,
+        exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+    )
+    uniforms = _collect_matching_lines(
+        text,
+        _rules()._OPERATIONS_UNIFORMS_PATTERNS,
+        exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+    )
+
+    parsed = OperationsExtractionOutput(
+        working_hours=working_hours,
+        day_options=day_options,
+        daily_schedule=daily_schedule,
+        meals=meals,
+        transport=transport,
+        uniforms=uniforms,
+        has_useful_info=False,
+    )
+    parsed.has_useful_info = any(
+        (
+            parsed.working_hours,
+            parsed.day_options,
+            parsed.daily_schedule,
+            parsed.meals,
+            parsed.transport,
+            parsed.uniforms,
+        )
+    )
+    return parsed
+
+
+def _extract_services_info_deterministic(text: str) -> ServicesExtractionOutput:
+    support_services = _collect_matching_lines(
+        text,
+        _rules()._SERVICES_SUPPORT_PATTERNS,
+        require_patterns=_rules()._SERVICES_SUPPORT_REQUIRE_PATTERNS,
+        exclude_patterns=(*_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS, *_rules()._SERVICES_SUPPORT_EXCLUDE_PATTERNS),
+    )
+    safety_features = _collect_matching_lines(
+        text,
+        _rules()._SERVICES_SAFETY_PATTERNS,
+        require_patterns=_rules()._SERVICES_SAFETY_REQUIRE_PATTERNS,
+        exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+    )
+    parsed = ServicesExtractionOutput(
+        support_services=support_services,
+        safety_features=safety_features,
+        has_useful_info=False,
+    )
+    parsed.has_useful_info = any((parsed.support_services, parsed.safety_features))
+    return parsed
+
+
+def _extract_pricing_terms_deterministic(text: str) -> PricingTermsExtractionOutput:
+    discounts = _collect_matching_lines(
+        text,
+        _rules()._PRICING_TERMS_DISCOUNT_PATTERNS,
+        require_patterns=_rules()._PRICING_TERMS_DISCOUNTS_REQUIRE_PATTERNS,
+        exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+    )
+    installments = _collect_matching_lines(
+        text,
+        _rules()._PRICING_TERMS_INSTALLMENTS_PATTERNS,
+        require_patterns=_rules()._PRICING_TERMS_INSTALLMENTS_REQUIRE_PATTERNS,
+        exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+    )
+    included_items = _collect_matching_lines(
+        text,
+        _rules()._PRICING_TERMS_INCLUDED_PATTERNS,
+        require_patterns=_rules()._PRICING_TERMS_INCLUDED_REQUIRE_PATTERNS,
+        exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+    )
+    excluded_items = _collect_matching_lines(
+        text,
+        _rules()._PRICING_TERMS_EXCLUDED_PATTERNS,
+        require_patterns=_rules()._PRICING_TERMS_EXCLUDED_REQUIRE_PATTERNS,
+        exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+    )
+    deposits = _collect_matching_lines(
+        text,
+        _rules()._PRICING_TERMS_DEPOSIT_PATTERNS,
+        require_patterns=_rules()._PRICING_TERMS_DEPOSIT_REQUIRE_PATTERNS,
+        exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+    )
+    application_fees = _collect_matching_lines(
+        text,
+        _rules()._PRICING_TERMS_APPLICATION_FEE_PATTERNS,
+        require_patterns=_rules()._PRICING_TERMS_APPLICATION_FEE_REQUIRE_PATTERNS,
+        exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+    )
+    registration_fees = _collect_matching_lines(
+        text,
+        _rules()._PRICING_TERMS_REGISTRATION_FEE_PATTERNS,
+        require_patterns=_rules()._PRICING_TERMS_REGISTRATION_FEE_REQUIRE_PATTERNS,
+        exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+    )
+    parsed = PricingTermsExtractionOutput(
+        discounts=discounts,
+        installments=installments,
+        included_items=included_items,
+        excluded_items=excluded_items,
+        deposits=deposits,
+        application_fees=application_fees,
+        registration_fees=registration_fees,
+        has_useful_info=False,
+    )
+    parsed.has_useful_info = any(
+        (
+            parsed.discounts,
+            parsed.installments,
+            parsed.included_items,
+            parsed.excluded_items,
+            parsed.deposits,
+            parsed.application_fees,
+            parsed.registration_fees,
+        )
+    )
+    return parsed
+
+
+def _collect_matching_lines(
+    text: str,
+    patterns: tuple[str, ...],
+    require_patterns: tuple[str, ...] | None = None,
+    exclude_patterns: tuple[str, ...] | None = None,
+    max_items: int = 6,
+) -> list[str]:
+    if not text:
+        return []
+    lines = [line.strip() for line in re.split(r"[\n\r]+", text) if line.strip()]
+    collected: list[str] = []
+    seen: set[str] = set()
+    for line in lines:
+        lowered = line.lower()
+        if exclude_patterns and _line_matches_any_pattern(lowered, exclude_patterns):
+            continue
+        if _is_probable_section_noise_line(lowered):
+            continue
+        if not any(re.search(pattern, lowered, flags=re.IGNORECASE) for pattern in patterns):
+            continue
+        if require_patterns and not _line_matches_any_pattern(lowered, require_patterns):
+            continue
+        normalized = _sanitize_label(line, max_len=180)
+        if not normalized:
+            continue
+        key = normalized.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        collected.append(normalized)
+        if len(collected) >= max_items:
+            break
+    return collected
+
+
+def _line_matches_any_pattern(text: str, patterns: tuple[str, ...]) -> bool:
+    return any(re.search(pattern, text, flags=re.IGNORECASE) for pattern in patterns)
+
+
+def _normalize_heading_key(text: str) -> str:
+    normalized = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", text or "")
+    normalized = re.sub(r"^\s*[-*#>\d().]+\s*", "", normalized)
+    normalized = normalized.strip().strip(":;,.!?")
+    normalized = re.sub(r"\s+", " ", normalized).lower()
+    return normalized
+
+
+def _is_heading_only_value(text: str, markers: tuple[str, ...]) -> bool:
+    heading = _normalize_heading_key(text)
+    if not heading:
+        return False
+    return heading in {marker.strip().lower() for marker in markers}
+
+
+def _reconcile_pricing_include_exclude(
+    included_items: list[str],
+    excluded_items: list[str],
+) -> tuple[list[str], list[str]]:
+    include_values = _normalize_text_list(included_items)
+    exclude_values = _normalize_text_list(excluded_items)
+
+    moved_to_excluded: list[str] = []
+    cleaned_includes: list[str] = []
+    for value in include_values:
+        if _line_matches_any_pattern(value.lower(), _rules()._PRICING_NEGATED_INCLUDE_PATTERNS):
+            moved_to_excluded.append(value)
+        else:
+            cleaned_includes.append(value)
+
+    merged_excluded = _merge_text_values(exclude_values, moved_to_excluded)
+    return cleaned_includes, merged_excluded
+
+
+def _is_probable_section_noise_line(text: str) -> bool:
+    if not text:
+        return True
+
+    lowered = text.lower()
+    if _line_matches_any_pattern(lowered, _rules()._SECTION_REGULATORY_NOISE_PATTERNS):
+        return True
+    if _line_matches_any_pattern(lowered, _rules()._MENU_BREADCRUMB_NOISE_PATTERNS):
+        return True
+
+    nav_hits = sum(
+        1
+        for pattern in _rules()._SECTION_NAV_NOISE_PATTERNS
+        if re.search(pattern, lowered, flags=re.IGNORECASE)
+    )
+    if nav_hits >= 2:
+        return True
+
+    if nav_hits >= 1 and re.search(r"(?:\||>|»|/).*(?:\||>|»|/)", lowered):
+        return True
+
+    return False
+
+
+def _extract_working_hours_value(text: str) -> str | None:
+    if not text:
+        return None
+    snippets = _collect_matching_lines(
+        text,
+        _rules()._OPERATIONS_WORKING_HOURS_PATTERNS,
+        exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+        max_items=1,
+    )
+    if snippets:
+        return snippets[0]
+    time_match = re.search(r"\b([01]?\d|2[0-3])[:.][0-5]\d\b\s*[-–]\s*\b([01]?\d|2[0-3])[:.][0-5]\d\b", text)
+    if not time_match:
+        return None
+    return _sanitize_label(time_match.group(0), max_len=_rules()._GENERAL_INFO_ITEM_MAX_LEN)
 
 
 def _extract_contact_info_deterministic(text: str) -> dict[str, Any] | None:
@@ -1183,7 +1342,7 @@ def _extract_contact_info_deterministic(text: str) -> dict[str, Any] | None:
     # Extract phone numbers
     phones: list[str] = []
     seen_phones: set[str] = set()
-    for match in _PHONE_PATTERN.finditer(text):
+    for match in _rules()._PHONE_PATTERN.finditer(text):
         raw = match.group(0).strip()
         # Normalize: collapse internal whitespace and separators
         normalized = re.sub(r"[\s./\-]+", "", raw)
@@ -1202,13 +1361,13 @@ def _extract_contact_info_deterministic(text: str) -> dict[str, Any] | None:
     # Extract email addresses
     emails: list[str] = []
     seen_emails: set[str] = set()
-    for match in _EMAIL_PATTERN.finditer(text):
+    for match in _rules()._EMAIL_PATTERN.finditer(text):
         raw = match.group(0).strip()
         # Normalize [at] / [ a t ] → @, collapse spaces around @
         normalized = re.sub(r"\s*\[\s*a\s*t\s*\]\s*", "@", raw, flags=re.IGNORECASE)
         normalized = re.sub(r"\s+", "", normalized).lower()
         # Filter obvious placeholder/noise emails
-        if any(noise in normalized for noise in _CONTACT_NOISE_TOKENS):
+        if any(noise in normalized for noise in _rules()._CONTACT_NOISE_TOKENS):
             continue
         if normalized in seen_emails:
             continue
@@ -1713,6 +1872,8 @@ def _coerce_and_validate_output_verbose(
             return None, "Could not parse raw output into JSON/Python object", diagnostics
         if result_type is GeneralInfoExtractionOutput:
             candidate = _normalize_general_info_payload(candidate)
+        elif result_type is PriceExtractionOutput:
+            candidate = _normalize_price_payload(candidate)
         elif result_type is LanguagesExtractionOutput:
             candidate, coercions = _normalize_languages_section_payload(candidate)
             diagnostics["languages_coercions_applied"] = coercions
@@ -1934,6 +2095,100 @@ def _normalize_general_info_payload(payload: Any) -> Any:
         if value is not None and not isinstance(value, str):
             normalized[key] = str(value)
 
+    for key in ("admission", "operations", "services", "pricing_terms"):
+        value = normalized.get(key)
+        if value is None:
+            continue
+        if not isinstance(value, dict):
+            if key == "operations" and isinstance(value, str):
+                normalized[key] = {"working_hours": value}
+            else:
+                normalized[key] = {}
+            continue
+        normalized[key] = _normalize_nested_section_payload(key, value)
+
+    return normalized
+
+
+def _normalize_nested_section_payload(section_key: str, payload: dict[str, Any]) -> dict[str, Any]:
+    normalized = dict(payload)
+    section_list_fields: dict[str, tuple[str, ...]] = {
+        "admission": (
+            "deadlines",
+            "required_documents",
+            "application_steps",
+            "entrance_requirements",
+            "available_spots",
+        ),
+        "operations": (
+            "day_options",
+            "daily_schedule",
+            "meals",
+            "transport",
+            "uniforms",
+        ),
+        "services": (
+            "support_services",
+            "safety_features",
+        ),
+        "pricing_terms": (
+            "discounts",
+            "installments",
+            "included_items",
+            "excluded_items",
+            "deposits",
+            "application_fees",
+            "registration_fees",
+        ),
+    }
+    for field in section_list_fields.get(section_key, ()):
+        value = normalized.get(field)
+        if isinstance(value, str):
+            normalized[field] = [value.strip()] if value.strip() else []
+        elif isinstance(value, list):
+            normalized[field] = [str(item).strip() for item in value if str(item).strip()]
+        elif value is None:
+            normalized[field] = []
+        else:
+            item = str(value).strip()
+            normalized[field] = [item] if item else []
+
+    scalar = normalized.get("working_hours")
+    if section_key == "operations" and scalar is not None and not isinstance(scalar, str):
+        normalized["working_hours"] = str(scalar)
+
+    useful = normalized.get("has_useful_info")
+    if useful is not None and not isinstance(useful, bool):
+        normalized["has_useful_info"] = str(useful).strip().lower() in {"1", "true", "yes", "y"}
+    return normalized
+
+
+def _normalize_price_payload(payload: Any) -> Any:
+    if not isinstance(payload, dict):
+        return payload
+    normalized = dict(payload)
+    prices = normalized.get("prices")
+    if not isinstance(prices, list):
+        return normalized
+
+    normalized_prices: list[dict[str, Any]] = []
+    for item in prices:
+        if not isinstance(item, dict):
+            continue
+        fixed = dict(item)
+        for key in ("discounts", "installments", "includes", "excludes"):
+            value = fixed.get(key)
+            if isinstance(value, str):
+                fixed[key] = [value.strip()] if value.strip() else []
+            elif isinstance(value, list):
+                fixed[key] = [str(entry).strip() for entry in value if str(entry).strip()]
+            elif value is None:
+                fixed[key] = []
+            else:
+                item_text = str(value).strip()
+                fixed[key] = [item_text] if item_text else []
+        normalized_prices.append(fixed)
+    normalized["prices"] = normalized_prices
     return normalized
 
 
@@ -1972,7 +2227,7 @@ def _normalize_languages_section_payload(payload: Any) -> tuple[Any, int]:
         if isinstance(item, dict):
             language_value = item.get("language")
             if not language_value:
-                for key in _GENERAL_INFO_TEXT_KEYS:
+                for key in _rules()._GENERAL_INFO_TEXT_KEYS:
                     fallback = item.get(key)
                     if fallback:
                         language_value = fallback
@@ -2015,8 +2270,12 @@ def _normalize_general_info_output(
     programs = _normalize_text_list(parsed.programs)
     extracurricular = _normalize_text_list(parsed.extracurricular)
     accreditations = _normalize_text_list(parsed.accreditations)
-    class_size = _normalize_scalar_text(parsed.class_size, _GENERAL_INFO_CLASS_SIZE_MAX_LEN)
+    class_size = _normalize_scalar_text(parsed.class_size, _rules()._GENERAL_INFO_CLASS_SIZE_MAX_LEN)
     founded_year = _normalize_founded_year(parsed.founded_year)
+    admission = _normalize_admission_output(parsed.admission)
+    operations = _normalize_operations_output(parsed.operations)
+    services = _normalize_services_output(parsed.services)
+    pricing_terms = _normalize_pricing_terms_output(parsed.pricing_terms)
 
     primary_lang = _pick_primary_text_lang(
         country_code=country_code,
@@ -2026,6 +2285,25 @@ def _normalize_general_info_output(
             + programs
             + extracurricular
             + accreditations
+            + admission.deadlines
+            + admission.required_documents
+            + admission.application_steps
+            + admission.entrance_requirements
+            + admission.available_spots
+            + operations.day_options
+            + operations.daily_schedule
+            + operations.meals
+            + operations.transport
+            + operations.uniforms
+            + services.support_services
+            + services.safety_features
+            + pricing_terms.discounts
+            + pricing_terms.installments
+            + pricing_terms.included_items
+            + pricing_terms.excluded_items
+            + pricing_terms.deposits
+            + pricing_terms.application_fees
+            + pricing_terms.registration_fees
         ),
     )
 
@@ -2043,6 +2321,10 @@ def _normalize_general_info_output(
         class_size=class_size,
         founded_year=founded_year,
         accreditations=split_accreditations["primary"],
+        admission=admission,
+        operations=operations,
+        services=services,
+        pricing_terms=pricing_terms,
         has_useful_info=False,
     )
     normalized.has_useful_info = _score_general_info_output(normalized) > 0
@@ -2055,6 +2337,179 @@ def _normalize_general_info_output(
         split_accreditations=split_accreditations,
     )
     return normalized, extracted_i18n
+
+
+def _normalize_admission_output(value: AdmissionExtractionOutput) -> AdmissionExtractionOutput:
+    normalized = AdmissionExtractionOutput(
+        deadlines=_filter_section_values(
+            value.deadlines,
+            require_patterns=_rules()._ADMISSION_DEADLINE_REQUIRE_PATTERNS,
+            exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+        ),
+        required_documents=_filter_section_values(
+            value.required_documents,
+            require_patterns=_rules()._ADMISSION_REQUIRED_DOCUMENTS_REQUIRE_PATTERNS,
+            exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+            heading_only_markers=_rules()._ADMISSION_REQUIRED_DOCUMENTS_HEADING_MARKERS,
+        ),
+        application_steps=_filter_section_values(
+            value.application_steps,
+            require_patterns=_rules()._ADMISSION_APPLICATION_STEPS_REQUIRE_PATTERNS,
+            exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+        ),
+        entrance_requirements=_filter_section_values(
+            value.entrance_requirements,
+            exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+        ),
+        available_spots=_filter_section_values(
+            value.available_spots,
+            require_patterns=_rules()._ADMISSION_AVAILABLE_SPOTS_REQUIRE_PATTERNS,
+            exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+        ),
+        has_useful_info=False,
+    )
+    normalized.has_useful_info = any(
+        (
+            normalized.deadlines,
+            normalized.required_documents,
+            normalized.application_steps,
+            normalized.entrance_requirements,
+            normalized.available_spots,
+        )
+    )
+    return normalized
+
+
+def _normalize_operations_output(value: OperationsExtractionOutput) -> OperationsExtractionOutput:
+    working_hours = _normalize_scalar_text(value.working_hours, _rules()._GENERAL_INFO_ITEM_MAX_LEN)
+    if working_hours:
+        lowered_working_hours = working_hours.lower()
+        if _line_matches_any_pattern(lowered_working_hours, _rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS):
+            working_hours = None
+        elif _is_probable_section_noise_line(lowered_working_hours):
+            working_hours = None
+        elif not (
+            _line_matches_any_pattern(lowered_working_hours, _rules()._OPERATIONS_WORKING_HOURS_PATTERNS)
+            or _rules()._WORKING_HOURS_TIME_PATTERN.search(working_hours)
+        ):
+            working_hours = None
+
+    normalized = OperationsExtractionOutput(
+        working_hours=working_hours,
+        day_options=_filter_section_values(
+            value.day_options,
+            exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+        ),
+        daily_schedule=_filter_section_values(
+            value.daily_schedule,
+            require_patterns=_rules()._OPERATIONS_DAILY_SCHEDULE_REQUIRE_PATTERNS,
+            exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+        ),
+        meals=_filter_section_values(
+            value.meals,
+            require_patterns=_rules()._OPERATIONS_MEALS_REQUIRE_PATTERNS,
+            exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+            heading_only_markers=_rules()._OPERATIONS_MEALS_HEADING_MARKERS,
+        ),
+        transport=_filter_section_values(
+            value.transport,
+            exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+        ),
+        uniforms=_filter_section_values(
+            value.uniforms,
+            exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+        ),
+        has_useful_info=False,
+    )
+    normalized.has_useful_info = any(
+        (
+            normalized.working_hours,
+            normalized.day_options,
+            normalized.daily_schedule,
+            normalized.meals,
+            normalized.transport,
+            normalized.uniforms,
+        )
+    )
+    return normalized
+
+
+def _normalize_services_output(value: ServicesExtractionOutput) -> ServicesExtractionOutput:
+    normalized = ServicesExtractionOutput(
+        support_services=_filter_section_values(
+            value.support_services,
+            require_patterns=_rules()._SERVICES_SUPPORT_REQUIRE_PATTERNS,
+            exclude_patterns=(*_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS, *_rules()._SERVICES_SUPPORT_EXCLUDE_PATTERNS),
+        ),
+        safety_features=_filter_section_values(
+            value.safety_features,
+            require_patterns=_rules()._SERVICES_SAFETY_REQUIRE_PATTERNS,
+            exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+        ),
+        has_useful_info=False,
+    )
+    normalized.has_useful_info = any((normalized.support_services, normalized.safety_features))
+    return normalized
+
+
+def _normalize_pricing_terms_output(value: PricingTermsExtractionOutput) -> PricingTermsExtractionOutput:
+    included_items = _filter_section_values(
+        value.included_items,
+        require_patterns=_rules()._PRICING_TERMS_INCLUDED_REQUIRE_PATTERNS,
+        exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+    )
+    excluded_items = _filter_section_values(
+        value.excluded_items,
+        require_patterns=_rules()._PRICING_TERMS_EXCLUDED_REQUIRE_PATTERNS,
+        exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+    )
+    included_items, excluded_items = _reconcile_pricing_include_exclude(
+        included_items,
+        excluded_items,
+    )
+
+    normalized = PricingTermsExtractionOutput(
+        discounts=_filter_section_values(
+            value.discounts,
+            require_patterns=_rules()._PRICING_TERMS_DISCOUNTS_REQUIRE_PATTERNS,
+            exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+        ),
+        installments=_filter_section_values(
+            value.installments,
+            require_patterns=_rules()._PRICING_TERMS_INSTALLMENTS_REQUIRE_PATTERNS,
+            exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+        ),
+        included_items=included_items,
+        excluded_items=excluded_items,
+        deposits=_filter_section_values(
+            value.deposits,
+            require_patterns=_rules()._PRICING_TERMS_DEPOSIT_REQUIRE_PATTERNS,
+            exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+        ),
+        application_fees=_filter_section_values(
+            value.application_fees,
+            require_patterns=_rules()._PRICING_TERMS_APPLICATION_FEE_REQUIRE_PATTERNS,
+            exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+        ),
+        registration_fees=_filter_section_values(
+            value.registration_fees,
+            require_patterns=_rules()._PRICING_TERMS_REGISTRATION_FEE_REQUIRE_PATTERNS,
+            exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+        ),
+        has_useful_info=False,
+    )
+    normalized.has_useful_info = any(
+        (
+            normalized.discounts,
+            normalized.installments,
+            normalized.included_items,
+            normalized.excluded_items,
+            normalized.deposits,
+            normalized.application_fees,
+            normalized.registration_fees,
+        )
+    )
+    return normalized
 
 
 def _normalize_languages(values: list[ExtractedLanguageFocus]) -> list[ExtractedLanguageFocus]:
@@ -2082,7 +2537,7 @@ def _normalize_languages(values: list[ExtractedLanguageFocus]) -> list[Extracted
                     level=level_text or None,
                 )
             )
-            if len(cleaned) >= _GENERAL_INFO_LIST_MAX_ITEMS:
+            if len(cleaned) >= _rules()._GENERAL_INFO_LIST_MAX_ITEMS:
                 return cleaned
     return cleaned
 
@@ -2101,9 +2556,50 @@ def _normalize_text_list(values: list[str]) -> list[str]:
                 continue
             seen.add(key)
             cleaned.append(label)
-            if len(cleaned) >= _GENERAL_INFO_LIST_MAX_ITEMS:
+            if len(cleaned) >= _rules()._GENERAL_INFO_LIST_MAX_ITEMS:
                 return cleaned
     return cleaned
+
+
+def _filter_section_values(
+    values: list[str],
+    require_patterns: tuple[str, ...] | None = None,
+    exclude_patterns: tuple[str, ...] | None = None,
+    heading_only_markers: tuple[str, ...] | None = None,
+) -> list[str]:
+    filtered: list[str] = []
+    seen: set[str] = set()
+    for raw_value in values:
+        raw_text = str(raw_value or "").strip()
+        if not raw_text:
+            continue
+        lowered_raw = raw_text.lower()
+        if exclude_patterns and _line_matches_any_pattern(lowered_raw, exclude_patterns):
+            continue
+        if _is_probable_section_noise_line(lowered_raw):
+            continue
+
+        for candidate in _extract_clean_text_candidates(raw_value):
+            label = _sanitize_label(candidate)
+            if not label:
+                continue
+            lowered = label.lower()
+            if exclude_patterns and _line_matches_any_pattern(lowered, exclude_patterns):
+                continue
+            if _is_probable_section_noise_line(lowered):
+                continue
+            if require_patterns and not _line_matches_any_pattern(lowered, require_patterns):
+                continue
+            if heading_only_markers and _is_heading_only_value(label, heading_only_markers):
+                continue
+            key = label.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            filtered.append(label)
+            if len(filtered) >= _rules()._GENERAL_INFO_LIST_MAX_ITEMS:
+                return filtered
+    return filtered
 
 
 def _normalize_scalar_text(raw_value: Any, max_len: int) -> str | None:
@@ -2176,7 +2672,7 @@ def _flatten_structured_values(value: Any) -> list[str]:
         return [value.strip()] if value.strip() else []
     if isinstance(value, dict):
         preferred: list[str] = []
-        for key in _GENERAL_INFO_TEXT_KEYS:
+        for key in _rules()._GENERAL_INFO_TEXT_KEYS:
             if key in value:
                 preferred.extend(_flatten_structured_values(value.get(key)))
         if preferred:
@@ -2195,7 +2691,10 @@ def _flatten_structured_values(value: Any) -> list[str]:
     return [text] if text else []
 
 
-def _sanitize_label(raw_text: str, max_len: int = _GENERAL_INFO_ITEM_MAX_LEN) -> str | None:
+def _sanitize_label(raw_text: str, max_len: int | None = None) -> str | None:
+    if max_len is None:
+        max_len = _rules()._GENERAL_INFO_ITEM_MAX_LEN
+
     text = str(raw_text).replace("\x00", "").strip()
     if not text:
         return None
@@ -2206,7 +2705,7 @@ def _sanitize_label(raw_text: str, max_len: int = _GENERAL_INFO_ITEM_MAX_LEN) ->
         return None
 
     lowered = text.lower()
-    if lowered in _GENERAL_INFO_JUNK_VALUES:
+    if lowered in _rules()._GENERAL_INFO_JUNK_VALUES:
         return None
     if (text.startswith("{") and text.endswith("}")) or (text.startswith("[") and text.endswith("]")):
         return None
@@ -2327,7 +2826,7 @@ def _is_model_or_provider_error(exc: Exception) -> bool:
     if isinstance(exc, (ModelHTTPError, ModelAPIError)):
         return True
     message = str(exc).lower()
-    return any(marker in message for marker in _PROVIDER_ERROR_MARKERS)
+    return any(marker in message for marker in _rules()._PROVIDER_ERROR_MARKERS)
 
 
 def _is_output_validation_error(exc: Exception) -> bool:
@@ -2342,7 +2841,7 @@ def _is_output_validation_error(exc: Exception) -> bool:
         seen.add(current_id)
 
         message = str(current).lower()
-        if any(marker in message for marker in _OUTPUT_VALIDATION_ERROR_MARKERS):
+        if any(marker in message for marker in _rules()._OUTPUT_VALIDATION_ERROR_MARKERS):
             return True
         if isinstance(current, UnexpectedModelBehavior) and "retry" in message and "validation" in message:
             return True
@@ -2397,6 +2896,26 @@ def _score_general_info_output(parsed: GeneralInfoExtractionOutput) -> int:
         score += 1
     if _is_usable_text(parsed.founded_year):
         score += 1
+    if _count_usable_text_values(parsed.admission.deadlines) > 0:
+        score += 1
+    if _count_usable_text_values(parsed.admission.required_documents) > 0:
+        score += 1
+    if _count_usable_text_values(parsed.admission.application_steps) > 0:
+        score += 1
+    if _count_usable_text_values(parsed.admission.available_spots) > 0:
+        score += 1
+    if _is_usable_text(parsed.operations.working_hours):
+        score += 1
+    if _count_usable_text_values(parsed.operations.day_options) > 0:
+        score += 1
+    if _count_usable_text_values(parsed.operations.meals) > 0:
+        score += 1
+    if _count_usable_text_values(parsed.services.support_services) > 0:
+        score += 1
+    if _count_usable_text_values(parsed.services.safety_features) > 0:
+        score += 1
+    if _count_usable_text_values(parsed.pricing_terms.discounts) > 0:
+        score += 1
     return score
 
 
@@ -2422,10 +2941,10 @@ def _coerce_price_category(raw: Optional[str | PriceCategory]) -> Optional[Price
     if isinstance(raw, str) and "." in raw:
         tail = raw.split(".")[-1]
         normalized_tail = _normalize_key(tail)
-        if normalized_tail in _CATEGORY_ALIASES:
-            return _CATEGORY_ALIASES[normalized_tail]
+        if normalized_tail in _rules()._CATEGORY_ALIASES:
+            return _rules()._CATEGORY_ALIASES[normalized_tail]
     normalized = _normalize_key(raw)
-    return _CATEGORY_ALIASES.get(normalized)
+    return _rules()._CATEGORY_ALIASES.get(normalized)
 
 
 def _coerce_price_period(raw: Optional[str | PricePeriod]) -> Optional[PricePeriod]:
@@ -2436,10 +2955,10 @@ def _coerce_price_period(raw: Optional[str | PricePeriod]) -> Optional[PricePeri
     if isinstance(raw, str) and "." in raw:
         tail = raw.split(".")[-1]
         normalized_tail = _normalize_key(tail)
-        if normalized_tail in _PERIOD_ALIASES:
-            return _PERIOD_ALIASES[normalized_tail]
+        if normalized_tail in _rules()._PERIOD_ALIASES:
+            return _rules()._PERIOD_ALIASES[normalized_tail]
     normalized = _normalize_key(raw)
-    return _PERIOD_ALIASES.get(normalized)
+    return _rules()._PERIOD_ALIASES.get(normalized)
 
 
 def _to_optional_float(raw: Any) -> Optional[float]:

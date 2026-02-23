@@ -57,6 +57,7 @@ class Settings(BaseSettings):
     extraction_output_retries: int = 2
     extraction_temperature: float = 0.0
     extraction_request_min_interval_seconds: float = 0.0
+    extraction_batch_concurrency: int = 1
     # When true, clear existing scraped pricing rows if extraction finds no pricing info.
     extraction_clear_pricing_on_no_info: bool = False
     nav_content_extractor: str = "bs4"  # bs4 | trafilatura | crawl4ai

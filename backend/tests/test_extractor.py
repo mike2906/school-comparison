@@ -1,3 +1,4 @@
+import asyncio
 import datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
@@ -11,14 +12,18 @@ from app.models.scrape_log import ScrapeType
 from app.models.school import School
 from app.models.source_page import SourcePage
 from app.schemas.extraction import (
+    AdmissionExtractionOutput,
     ExtractedLanguageFocus,
     ExtractedPrice,
     FacilitiesExtractionOutput,
     MetadataExtractionOutput,
     LanguagesExtractionOutput,
     GeneralInfoExtractionOutput,
+    OperationsExtractionOutput,
     PriceExtractionOutput,
+    PricingTermsExtractionOutput,
     ProgramsExtractionOutput,
+    ServicesExtractionOutput,
 )
 from app.scrapers import extractor
 
@@ -66,6 +71,23 @@ async def sample_school_for_extraction(db_session):
 @pytest.mark.asyncio
 async def test_extract_creates_pricing_rows(db_session, sample_school_for_extraction):
     school = sample_school_for_extraction
+    pages = (
+        await db_session.execute(
+            select(SourcePage).where(
+                SourcePage.school_id == school.id,
+                SourcePage.page_category == "pricing",
+            )
+        )
+    ).scalars().all()
+    for page in pages:
+        page.raw_markdown = (
+            "Tuition for 2024 is 1000 BGN monthly. "
+            "Sibling discount 10%. "
+            "Tuition includes lunch."
+        )
+        db_session.add(page)
+    await db_session.commit()
+
     mock_price = ExtractedPrice(
         category=PriceCategory.TUITION,
         amount=1000.0,
@@ -109,6 +131,8 @@ async def test_extract_creates_pricing_rows(db_session, sample_school_for_extrac
     assert row.category == PriceCategory.TUITION
     assert row.period == PricePeriod.MONTHLY
     assert row.source == PriceSource.SCRAPED_WEBSITE
+    assert (row.pricing_context or {}).get("discounts", []) == []
+    assert (row.pricing_context or {}).get("includes", []) == []
 
 
 @pytest.mark.asyncio
@@ -436,6 +460,260 @@ def test_extract_accreditations_deterministic_detects_formal_context():
     assert "International Baccalaureate (IB)" in values
 
 
+def test_extract_admission_info_deterministic_extracts_key_fields():
+    text = (
+        "ПЛАН-ПРИЕМ за учебната 2025/2026 година.\n"
+        "Краен срок за подаване на документи: 15.06.2025.\n"
+        "Необходими документи: заявление и медицинско свидетелство.\n"
+        "Кандидатстване чрез онлайн форма.\n"
+        "Приемен изпит по математика.\n"
+        "Свободни места: 25."
+    )
+    result = extractor._extract_admission_info_deterministic(text)
+    assert result.has_useful_info is True
+    assert any("ПЛАН-ПРИЕМ" in item for item in result.deadlines)
+    assert any("Необходими документи" in item for item in result.required_documents)
+    assert any("онлайн форма" in item for item in result.application_steps)
+    assert any("Приемен изпит" in item for item in result.entrance_requirements)
+    assert any("Свободни места" in item for item in result.available_spots)
+
+
+def test_extract_admission_info_deterministic_extracts_document_items_without_heading():
+    text = "Копие от акт за раждане и заявление по образец."
+    result = extractor._extract_admission_info_deterministic(text)
+    assert any("акт за раждане" in item.lower() for item in result.required_documents)
+
+
+def test_extract_operations_info_deterministic_extracts_key_fields():
+    text = (
+        "Работно време: 08:00 - 18:00.\n"
+        "Осигуряваме целодневна и полудневна организация.\n"
+        "Дневен режим за всички групи.\n"
+        "Седмично меню и хранене.\n"
+        "Училищен автобус и транспорт.\n"
+        "Униформа за учениците."
+    )
+    result = extractor._extract_operations_info_deterministic(text)
+    assert result.has_useful_info is True
+    assert result.working_hours is not None
+    assert any("целодневна" in item for item in result.day_options)
+    assert any("Дневен режим" in item for item in result.daily_schedule)
+    assert any("Седмично меню" in item for item in result.meals)
+    assert any("автобус" in item for item in result.transport)
+    assert any("Униформа" in item for item in result.uniforms)
+
+
+def test_extract_operations_info_deterministic_detects_meals_without_menu_word():
+    text = "Осигуряваме топъл обяд и следобедна закуска всеки ден."
+    result = extractor._extract_operations_info_deterministic(text)
+    assert any("топъл обяд" in item.lower() for item in result.meals)
+
+
+def test_extract_services_info_deterministic_extracts_key_fields():
+    text = (
+        "Екипът включва психолог, логопед и медицинска сестра.\n"
+        "Сигурността е подсигурена с видеонаблюдение и охрана."
+    )
+    result = extractor._extract_services_info_deterministic(text)
+    assert result.has_useful_info is True
+    assert any("психолог" in item.lower() for item in result.support_services)
+    assert any("видеонаблюдение" in item.lower() for item in result.safety_features)
+
+
+def test_extract_services_info_deterministic_ignores_parent_guide_noise():
+    text = (
+        "Наръчник на родителя: Лично за мама, здраве и психология, учим и играем заедно.\n"
+        "Екипът включва педагогически съветник и ресурсен учител."
+    )
+    result = extractor._extract_services_info_deterministic(text)
+    assert all("наръчник" not in item.lower() for item in result.support_services)
+    assert any("педагогически съветник" in item.lower() for item in result.support_services)
+    assert any("ресурсен учител" in item.lower() for item in result.support_services)
+
+
+def test_extract_pricing_terms_deterministic_extracts_key_fields():
+    text = (
+        "Отстъпка за второ дете 10%.\n"
+        "Плащане на 3 вноски.\n"
+        "Таксата включва храна.\n"
+        "Таксата не е включена униформа.\n"
+        "Депозит в размер на 1 такса.\n"
+        "Такса за кандидатстване 80 лв.\n"
+        "Такса записване 200 лв."
+    )
+    result = extractor._extract_pricing_terms_deterministic(text)
+    assert result.has_useful_info is True
+    assert any("Отстъпка" in item for item in result.discounts)
+    assert any("вноски" in item for item in result.installments)
+    assert any("включва" in item for item in result.included_items)
+    assert any("не е включена" in item for item in result.excluded_items)
+    assert any("Депозит" in item for item in result.deposits)
+    assert any("кандидатстване" in item for item in result.application_fees)
+    assert any("записване" in item for item in result.registration_fees)
+
+
+def test_extract_pricing_terms_deterministic_moves_negated_includes_to_excluded():
+    text = "В таксата не е включена храна."
+    result = extractor._extract_pricing_terms_deterministic(text)
+    # Deterministic extraction captures raw matches; reconciliation happens in normalization.
+    normalized = extractor._normalize_pricing_terms_output(result)
+    assert normalized.included_items == []
+    assert any("не е включена" in item.lower() for item in normalized.excluded_items)
+
+
+def test_extract_admission_info_deterministic_filters_navigation_noise():
+    text = (
+        "Начало | За родителите | Необходими документи | Контакти.\n"
+        "Необходими документи: заявление и медицинско свидетелство."
+    )
+    result = extractor._extract_admission_info_deterministic(text)
+    assert len(result.required_documents) == 1
+    assert "заявление" in result.required_documents[0].lower()
+
+
+def test_extract_operations_info_deterministic_filters_menu_noise():
+    text = (
+        "За родителите | Електронен дневник | Седмично меню.\n"
+        "Седмично меню: топъл обяд и следобедна закуска."
+    )
+    result = extractor._extract_operations_info_deterministic(text)
+    assert len(result.meals) == 1
+    assert "топъл обяд" in result.meals[0].lower()
+
+
+def test_extract_services_info_deterministic_filters_regulatory_noise():
+    text = (
+        "Медицински стандарти и центрове за спешна медицинска помощ.\n"
+        "Екипът включва психолог и логопед."
+    )
+    result = extractor._extract_services_info_deterministic(text)
+    assert len(result.support_services) == 1
+    assert "психолог" in result.support_services[0].lower()
+
+
+def test_normalize_price_payload_coerces_term_fields():
+    payload = {
+        "has_pricing_info": True,
+        "prices": [
+            {
+                "category": "tuition",
+                "period": "monthly",
+                "amount": 1000,
+                "discounts": "10% sibling discount",
+                "installments": 3,
+                "includes": "food",
+                "excludes": None,
+            }
+        ],
+    }
+    normalized = extractor._normalize_price_payload(payload)
+    row = normalized["prices"][0]
+    assert row["discounts"] == ["10% sibling discount"]
+    assert row["installments"] == ["3"]
+    assert row["includes"] == ["food"]
+    assert row["excludes"] == []
+
+
+def test_normalize_admission_output_filters_navigation_noise():
+    normalized = extractor._normalize_admission_output(
+        AdmissionExtractionOutput(
+            deadlines=[],
+            required_documents=[
+                "Начало | За родителите | Необходими документи | Контакти",
+                "Необходими документи: заявление и акт за раждане.",
+            ],
+            application_steps=[],
+            entrance_requirements=[],
+            available_spots=[],
+            has_useful_info=True,
+        )
+    )
+    assert normalized.required_documents == ["Необходими документи: заявление и акт за раждане."]
+
+
+def test_normalize_admission_output_drops_heading_only_required_documents():
+    normalized = extractor._normalize_admission_output(
+        AdmissionExtractionOutput(
+            deadlines=[],
+            required_documents=[
+                "- Необходими документи",
+                "Необходими документи:",
+                "Медицински документ / имунизационен статус",
+            ],
+            application_steps=[],
+            entrance_requirements=[],
+            available_spots=[],
+            has_useful_info=True,
+        )
+    )
+    assert normalized.required_documents == ["Медицински документ / имунизационен статус"]
+
+
+def test_normalize_services_output_filters_regulatory_noise():
+    normalized = extractor._normalize_services_output(
+        ServicesExtractionOutput(
+            support_services=[
+                "Медицински стандарти и центрове за спешна медицинска помощ",
+                "Екипът включва психолог и логопед",
+            ],
+            safety_features=[
+                "Начало | Новини | Контакти | Охрана",
+                "24/7 охрана и видеонаблюдение",
+            ],
+            has_useful_info=True,
+        )
+    )
+    assert normalized.support_services == ["Екипът включва психолог и логопед"]
+    assert normalized.safety_features == ["24/7 охрана и видеонаблюдение"]
+
+
+def test_normalize_operations_output_drops_noise_working_hours():
+    normalized = extractor._normalize_operations_output(
+        OperationsExtractionOutput(
+            working_hours="Начало | Контакти | Новини",
+            day_options=[],
+            daily_schedule=[],
+            meals=[],
+            transport=[],
+            uniforms=[],
+            has_useful_info=True,
+        )
+    )
+    assert normalized.working_hours is None
+
+
+def test_normalize_operations_output_drops_heading_only_meals():
+    normalized = extractor._normalize_operations_output(
+        OperationsExtractionOutput(
+            working_hours=None,
+            day_options=[],
+            daily_schedule=[],
+            meals=["- Седмично меню", "Седмично меню: топъл обяд и закуска"],
+            transport=[],
+            uniforms=[],
+            has_useful_info=True,
+        )
+    )
+    assert normalized.meals == ["Седмично меню: топъл обяд и закуска"]
+
+
+def test_normalize_pricing_terms_output_moves_negated_includes_to_excluded():
+    normalized = extractor._normalize_pricing_terms_output(
+        PricingTermsExtractionOutput(
+            discounts=[],
+            installments=[],
+            included_items=["В таксата не е включена храна"],
+            excluded_items=[],
+            deposits=[],
+            application_fees=[],
+            registration_fees=[],
+            has_useful_info=True,
+        )
+    )
+    assert normalized.included_items == []
+    assert normalized.excluded_items == ["В таксата не е включена храна"]
+
+
 @pytest.mark.asyncio
 async def test_extract_general_info_sections_merges_deterministic_signals(sample_school_for_extraction):
     school = sample_school_for_extraction
@@ -485,6 +763,57 @@ async def test_extract_general_info_sections_merges_deterministic_signals(sample
     assert combined.class_size == "18 students"
     assert "Cambridge International" in combined.accreditations
     assert any(entry.language == "English" for entry in combined.languages)
+
+
+@pytest.mark.asyncio
+async def test_extract_general_info_persists_schema_version_and_admission_info(db_session, sample_school_for_extraction):
+    school = sample_school_for_extraction
+    pages = (
+        await db_session.execute(
+            select(SourcePage).where(
+                SourcePage.school_id == school.id,
+                SourcePage.scrape_type == ScrapeType.WEBSITE,
+                SourcePage.is_valid.is_(True),
+                SourcePage.raw_markdown.isnot(None),
+            )
+        )
+    ).scalars().all()
+    for page in pages:
+        if page.page_category == "about":
+            page.raw_markdown = (
+                "Необходими документи: заявление.\n"
+                "Работно време: 08:00 - 18:00.\n"
+                "Екипът включва психолог.\n"
+                "Отстъпка за второ дете 10%."
+            )
+            db_session.add(page)
+    await db_session.commit()
+
+    async def fake_run(*, result_type, **kwargs):  # type: ignore[no-untyped-def]
+        if result_type is PriceExtractionOutput:
+            return PriceExtractionOutput(prices=[], has_pricing_info=False), 5, 1
+        if result_type is LanguagesExtractionOutput:
+            return LanguagesExtractionOutput(languages=[]), 5, 1
+        if result_type is FacilitiesExtractionOutput:
+            return FacilitiesExtractionOutput(facilities=[]), 5, 1
+        if result_type is ProgramsExtractionOutput:
+            return ProgramsExtractionOutput(programs=[], extracurricular=[]), 5, 1
+        if result_type is MetadataExtractionOutput:
+            return MetadataExtractionOutput(class_size=None, founded_year=None, accreditations=[]), 5, 1
+        raise AssertionError(f"Unexpected result_type {result_type}")
+
+    with patch("app.scrapers.extractor._run_agent_with_fallback", new_callable=AsyncMock) as mock_run:
+        mock_run.side_effect = fake_run
+        result = await extractor.extract_school(db_session, school.id, "bg")
+
+    assert result["status"] == "extracted"
+    await db_session.refresh(school)
+    assert school.attributes["extracted"]["_schema_version"] == 1
+    assert school.attributes["extracted"]["admission"]["has_useful_info"] is True
+    assert school.admission_info["website_extracted"]["has_useful_info"] is True
+    assert "operations" not in school.attributes
+    assert "services" not in school.attributes
+    assert "pricing_terms" not in school.attributes
 
 
 # ---------------------------------------------------------------------------
@@ -583,3 +912,50 @@ async def test_extract_general_info_includes_contact(sample_school_for_extractio
     assert contact is not None
     assert any("884801660" in p for p in contact["phones"])
     assert "office@test-school.bg" in contact["emails"]
+
+
+@pytest.mark.asyncio
+async def test_active_rules_are_isolated_per_concurrent_task(monkeypatch):
+    alias_key = "customcategorykey"
+    bg_rules = SimpleNamespace(
+        _CATEGORY_ALIASES={alias_key: PriceCategory.TUITION},
+        _PERIOD_ALIASES={},
+    )
+    us_rules = SimpleNamespace(
+        _CATEGORY_ALIASES={alias_key: PriceCategory.FOOD},
+        _PERIOD_ALIASES={},
+    )
+
+    monkeypatch.setattr(
+        extractor,
+        "get_rules",
+        lambda country_code: {"bg": bg_rules, "us": us_rules}.get(country_code, bg_rules),
+    )
+
+    started = 0
+    started_lock = asyncio.Lock()
+    release = asyncio.Event()
+
+    async def resolve_category(country_code: str) -> PriceCategory:
+        nonlocal started
+        extractor._ACTIVE_RULES.set(extractor.get_rules(country_code))
+
+        async with started_lock:
+            started += 1
+            if started == 2:
+                release.set()
+
+        await release.wait()
+        await asyncio.sleep(0)
+
+        category = extractor._coerce_price_category(alias_key)
+        assert category is not None
+        return category
+
+    bg_category, us_category = await asyncio.gather(
+        resolve_category("bg"),
+        resolve_category("us"),
+    )
+
+    assert bg_category == PriceCategory.TUITION
+    assert us_category == PriceCategory.FOOD

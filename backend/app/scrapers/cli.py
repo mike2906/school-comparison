@@ -972,33 +972,91 @@ async def _run_extract_batch(
         fail_count = 0
 
         from app.config import get_settings as _get_settings
+        from app.database import async_session_maker
 
-        _ext_timeout = _get_settings().extraction_school_timeout_seconds
+        settings = _get_settings()
+        _ext_timeout = settings.extraction_school_timeout_seconds
+        requested_concurrency = max(1, int(getattr(settings, "extraction_batch_concurrency", 1)))
+        max_concurrency = 8
+        concurrency = min(requested_concurrency, max_concurrency)
 
-        for school_id in school_ids:
-            try:
-                coro = _run_extract_school(db, school_id, country)
-                if _ext_timeout > 0:
-                    result = await asyncio.wait_for(coro, timeout=_ext_timeout)
-                else:
-                    result = await coro
+        console.print(f"  Concurrency: {concurrency}")
+        if requested_concurrency > max_concurrency:
+            console.print(
+                f"[yellow]  Requested concurrency {requested_concurrency} capped to {max_concurrency}[/yellow]"
+            )
+
+        if concurrency == 1:
+            for school_id in school_ids:
+                try:
+                    coro = _run_extract_school(db, school_id, country)
+                    if _ext_timeout > 0:
+                        result = await asyncio.wait_for(coro, timeout=_ext_timeout)
+                    else:
+                        result = await coro
+                    if result.get("skipped"):
+                        skipped_count += 1
+                    elif result.get("status") == "extracted":
+                        success_count += 1
+                    else:
+                        fail_count += 1
+                except asyncio.TimeoutError:
+                    logger.error(
+                        "Extraction timed out after %.0fs for school %s", _ext_timeout, school_id
+                    )
+                    await db.rollback()
+                    fail_count += 1
+                except Exception as e:
+                    logger.error(f"Error extracting school {school_id}: {e}")
+                    await db.rollback()
+                    fail_count += 1
+                progress.update(task, advance=1)
+        else:
+            from app.scrapers.extractor import extract_school
+
+            semaphore = asyncio.Semaphore(concurrency)
+
+            async def _extract_single(school_id: int) -> tuple[int, dict]:
+                async with semaphore:
+                    try:
+                        async with async_session_maker() as school_db:
+                            coro = extract_school(db=school_db, school_id=school_id, country_code=country)
+                            if _ext_timeout > 0:
+                                result = await asyncio.wait_for(coro, timeout=_ext_timeout)
+                            else:
+                                result = await coro
+                            return school_id, result
+                    except asyncio.TimeoutError:
+                        logger.error(
+                            "Extraction timed out after %.0fs for school %s", _ext_timeout, school_id
+                        )
+                        return school_id, {
+                            "school_id": school_id,
+                            "status": "extraction_failed",
+                            "error": "Extraction timeout",
+                        }
+                    except Exception as exc:
+                        logger.error("Error extracting school %s: %s", school_id, exc)
+                        return school_id, {
+                            "school_id": school_id,
+                            "status": "extraction_failed",
+                            "error": str(exc),
+                        }
+
+            tasks = [asyncio.create_task(_extract_single(school_id)) for school_id in school_ids]
+
+            for completed in asyncio.as_completed(tasks):
+                school_id, result = await completed
                 if result.get("skipped"):
                     skipped_count += 1
                 elif result.get("status") == "extracted":
                     success_count += 1
                 else:
                     fail_count += 1
-            except asyncio.TimeoutError:
-                logger.error(
-                    "Extraction timed out after %.0fs for school %s", _ext_timeout, school_id
-                )
-                await db.rollback()
-                fail_count += 1
-            except Exception as e:
-                logger.error(f"Error extracting school {school_id}: {e}")
-                await db.rollback()
-                fail_count += 1
-            progress.update(task, advance=1)
+                    console.print(
+                        f"[red]  School {school_id} failed: {result.get('error', 'Unknown error')}[/red]"
+                    )
+                progress.update(task, advance=1)
 
     console.print(f"[green]✓ Extraction complete:[/green]")
     console.print(f"  Successful: {success_count}")
