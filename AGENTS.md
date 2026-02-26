@@ -8,19 +8,20 @@ This file provides everything you need to work effectively on this project. Read
 
 ## Project Overview
 
-**What:** Bilingual (Bulgarian/English) web app for parents in Sofia to discover, filter, and compare kindergartens and schools.
+**What:** Multi-country school comparison platform for parents to discover, filter, and compare kindergartens and schools.
 
-**Target users:** Parents with children aged 0-18 looking for schools in Sofia, Bulgaria.
+**Target users:** Parents with children aged 0-18 looking for schools. **MVP: Sofia, Bulgaria.** Expanding to all Bulgarian cities, then other countries.
 
 **Key features:**
 - Interactive map showing school locations
-- Filter by child's age/enrollment year
+- Filter by child's age/enrollment year, city, and school type
 - Compare private schools side-by-side (pricing, facilities)
-- View NVO exam results for state schools
+- View NVO exam results for state schools (Bulgaria-specific)
 - See admission thresholds (how many points needed to get in)
-- Bilingual interface (Bulgarian is primary, English is secondary)
+- Multi-country architecture with country-specific education configs
+- Bilingual interface (Bulgarian is primary, English is secondary for MVP)
 
-**Current status:** Phase 1 scaffold complete. Backend API runs, frontend displays map, 10 schools seeded. Ready for feature development.
+**Current status:** Multi-country refactoring complete (Phases 1-5). Scraping pipeline Stages 1-4 are implemented (discovery, website discovery, URL validation, navigation). Extraction/validation/summarization are pending.
 
 ---
 
@@ -184,6 +185,36 @@ This is stored in `school_locations.shift`.
 ```jsx
 <button>{t('search_schools')}</button>
 ```
+
+---
+
+## Geocoding & GeoJSON Data
+
+### GeoJSON City Convention
+
+The geocoding system uses EU Commission's GeoJSON education dataset (`backend/data/bg/education.geojson`).
+
+**CRITICAL:** GeoJSON uses **province/municipality names**, not city names:
+- Sofia schools: `city="СТОЛИЧНА"` (Stolichna = Capital municipality)
+- NOT `city="СОФИЯ"` (Sofia city name)
+
+**Impact on code:**
+- Database stores: `city="sofia"` (lowercase ASCII)
+- GeoJSON provider automatically maps: `"sofia"` → `"СТОЛИЧНА"` for matching
+- City normalization handles: `sofia`, `SOFIA`, `София`, `СОФИЯ`, `СТОЛИЧНА` → all map to `"СТОЛИЧНА"`
+
+**Location:** `backend/app/services/geocoding/bg/geojson.py:_normalize_city()`
+
+### Geocoding Strategy
+
+The composite provider uses a two-tier approach:
+1. **GeoJSON lookup** (instant, no API calls) - tries to match by (school_name, city)
+2. **Nominatim fallback** (OpenStreetMap API) - used when GeoJSON has no match
+
+**City matching rules:**
+- Exact match preferred: `("ДГ 5 НАДЕЖДА", "СТОЛИЧНА")`
+- Fallback if unique: `("ДГ 5 НАДЕЖДА", any city)` - only if school name is unique across Bulgaria
+- Ambiguous match rejected: If multiple cities have same school name, returns error with warning
 
 ---
 
@@ -356,7 +387,7 @@ Response includes nested `locations`, `pricing`, `exam_results`.
 - School comparison UI improvements
 - NVO results graphs (Recharts)
 - Points calculator tool
-- Scraping pipeline (Phase 2+)
+- Scraping pipeline Stage 5+ (extraction, data validation, summarization)
 
 ---
 
@@ -371,6 +402,10 @@ REDIS_URL=redis://localhost:6379/0
 Optional (for later phases):
 ```
 OPENROUTER_API_KEY=  # For AI features
+SEARXNG_BASE_URL=http://localhost:8080
+WEBSITE_SEARCH_PROVIDER_DISABLE_SECONDS=300
+URL_VALIDATION_MAX_CONCURRENCY=8
+URL_RECOVERY_CONCURRENCY=3
 ```
 
 ---

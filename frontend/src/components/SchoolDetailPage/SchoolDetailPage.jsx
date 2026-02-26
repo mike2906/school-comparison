@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import Layout from '../Layout/Layout'
 import { fetchSchool, fetchExamAverages } from '../../api/schools'
 import { getSchoolName, getAddress, getSummary } from '../../utils/i18n'
+import { normalizeSchool } from '../../utils/schoolAttributes'
 import { useCompare } from '../../context/CompareContext'
 import {
   getStatusInfo,
@@ -37,7 +38,7 @@ function SchoolDetailPage() {
   const navigate = useNavigate()
   const { t, i18n } = useTranslation()
   const { addToCompare, removeFromCompare, isInCompare, canAddMore } = useCompare()
-  const [school, setSchool] = useState(null)
+  const [rawSchool, setRawSchool] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [activeExamType, setActiveExamType] = useState(null)
@@ -58,7 +59,7 @@ function SchoolDetailPage() {
         // Load school data first; exam averages are best-effort
         const data = await fetchSchool(id)
 
-        setSchool(data)
+        setRawSchool(data)
 
         try {
           const averagesData = await fetchExamAverages()
@@ -85,6 +86,11 @@ function SchoolDetailPage() {
 
     loadSchool()
   }, [id])
+
+  const school = useMemo(
+    () => normalizeSchool(rawSchool, i18n.language),
+    [rawSchool, i18n.language]
+  )
 
   if (loading) {
     return (

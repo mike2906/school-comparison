@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sess
 from app.database import Base, get_db
 from app.main import app
 from app.models.country import Country
-from app.models.school import School, SchoolLocation
+from app.models.school import School, SchoolLocation, SchoolLocationAgeGroupShift
 
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
@@ -30,6 +30,29 @@ async def db_session(async_engine):
     )
     async with async_session_maker() as session:
         yield session
+
+
+@pytest_asyncio.fixture
+async def sample_schools(db_session):
+    """Sample schools for testing."""
+    schools = []
+    for i in range(3):
+        school = School(
+            name_i18n={"bg": f"Училище {i+1}", "en": f"School {i+1}"},
+            country_code="bg",
+            school_type="state",
+            education_level="primary",
+            city="sofia",
+        )
+        db_session.add(school)
+        schools.append(school)
+    await db_session.commit()
+
+    # Refresh to get IDs
+    for school in schools:
+        await db_session.refresh(school)
+
+    return schools
 
 
 @pytest_asyncio.fixture
@@ -76,25 +99,35 @@ async def seeded_db(db_session):
 
     loc1 = SchoolLocation(
         school_id=kg1.id,
-        age_group="first",
         address_i18n={"bg": "ул. Иван Вазов 15, София", "en": "15 Ivan Vazov St, Sofia"},
         lat=42.6977,
         lng=23.3219,
-        shift="morning",
-        has_organised_groups=True,
         is_primary=True,
     )
     loc2 = SchoolLocation(
         school_id=kg1.id,
-        age_group="preschool",
         address_i18n={"bg": "ул. Граф Игнатиев 20, София", "en": "20 Graf Ignatiev St, Sofia"},
         lat=42.6900,
         lng=23.3300,
-        shift="full_day",
-        has_organised_groups=True,
         is_primary=False,
     )
     db_session.add_all([loc1, loc2])
+    await db_session.flush()
+
+    # Add age group shifts for locations
+    shift1 = SchoolLocationAgeGroupShift(
+        location_id=loc1.id,
+        age_group="first",
+        shift="morning",
+        has_organised_groups=True,
+    )
+    shift2 = SchoolLocationAgeGroupShift(
+        location_id=loc2.id,
+        age_group="preschool",
+        shift="full_day",
+        has_organised_groups=True,
+    )
+    db_session.add_all([shift1, shift2])
 
     # Private kindergarten
     kg2 = School(
@@ -113,14 +146,20 @@ async def seeded_db(db_session):
 
     loc3 = SchoolLocation(
         school_id=kg2.id,
-        age_group="first",
         address_i18n={"bg": "бул. Витоша 100, София", "en": "100 Vitosha Blvd, Sofia"},
         lat=42.6800,
         lng=23.3150,
-        shift="full_day",
         is_primary=True,
     )
     db_session.add(loc3)
+    await db_session.flush()
+
+    shift3 = SchoolLocationAgeGroupShift(
+        location_id=loc3.id,
+        age_group="first",
+        shift="full_day",
+    )
+    db_session.add(shift3)
 
     # State primary school
     school1 = School(
@@ -138,15 +177,21 @@ async def seeded_db(db_session):
 
     loc4 = SchoolLocation(
         school_id=school1.id,
-        age_group="grade_1_4",
         address_i18n={"bg": "ул. Сан Стефано 40, София", "en": "40 San Stefano St, Sofia"},
         lat=42.6850,
         lng=23.3400,
-        shift="morning",
-        has_organised_groups=True,
         is_primary=True,
     )
     db_session.add(loc4)
+    await db_session.flush()
+
+    shift4 = SchoolLocationAgeGroupShift(
+        location_id=loc4.id,
+        age_group="grade_1_4",
+        shift="morning",
+        has_organised_groups=True,
+    )
+    db_session.add(shift4)
 
     await db_session.commit()
     return db_session

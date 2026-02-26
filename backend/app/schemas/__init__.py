@@ -7,6 +7,7 @@ from app.schemas.school import (
     SchoolLocationResponse,
 )
 from app.schemas.pricing import PricingBase, PricingResponse
+from app.schemas.scraping import DiscoveredSchool, DiscoveredLocation
 
 __all__ = [
     "SchoolBase",
@@ -17,4 +18,6 @@ __all__ = [
     "SchoolLocationResponse",
     "PricingBase",
     "PricingResponse",
+    "DiscoveredSchool",
+    "DiscoveredLocation",
 ]

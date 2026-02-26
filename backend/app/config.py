@@ -5,12 +5,27 @@ from functools import lru_cache
 class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/sofia_schools"
+    database_echo: bool = False
 
     # Redis
     REDIS_URL: str = "redis://localhost:6379/0"
 
     # OpenRouter (for AI features)
     openrouter_api_key: str = ""
+
+    # Model tier overrides (Phase 1 scraping pipeline)
+    # Set these to override default model selections
+    model_tier_cheap: str = ""  # Default: google/gemini-2.0-flash-lite
+    model_tier_medium: str = ""  # Default: google/gemini-2.5-flash
+    model_tier_capable: str = ""  # Default: google/gemini-2.5-pro
+
+    # Spot-check validation settings
+    spot_check_sample_size: int = 10  # Number of schools to spot-check per run (-1 = all, for calibration)
+    spot_check_discrepancy_threshold: float = 0.15  # Alert if >15% of spot-checks have discrepancies
+
+    # Pipeline alerting
+    alert_webhook_url: str = ""  # Slack/Discord webhook URL for pipeline alerts
+    alert_failure_threshold: float = 0.10  # Alert if >10% of schools fail
 
     # App settings
     debug: bool = True
@@ -19,6 +34,54 @@ class Settings(BaseSettings):
 
     # Scraping settings
     scrape_delay_seconds: int = 2
+    website_search_providers: str = "searxng,brave"
+    searxng_base_url: str = "http://localhost:8080"
+    website_search_timeout_seconds: float = 6.0
+    website_search_provider_disable_seconds: int = 300
+    url_validation_http_timeout_seconds: float = 4.0
+    url_validation_retry_http_timeout_seconds: float = 8.0
+    url_validation_timeout_terminal_threshold: int = 3
+    url_validation_concurrency: int = 4
+    url_validation_max_concurrency: int = 8
+    url_validation_llm_timeout_seconds: float = 25.0
+    url_recovery_candidate_attempts: int = 6
+    url_recovery_concurrency: int = 3
+
+    # Extraction settings
+    extraction_llm_timeout_seconds: float = 15.0
+    extraction_max_content_chars: int = 15000
+    extraction_primary_tier: str = "medium"  # cheap | medium
+    extraction_quality_gate_enabled: bool = True
+    extraction_general_info_min_quality_score: int = 4
+    extraction_enable_capable_fallback: bool = False
+    extraction_output_retries: int = 2
+    extraction_temperature: float = 0.0
+    # Optional OpenRouter model routing controls used by v2 extractor.
+    # Comma-separated list of fallback model ids, e.g. "openai/gpt-4o-mini,anthropic/claude-3.5-haiku".
+    extraction_openrouter_models: str = ""
+    # Comma-separated provider priority, e.g. "openai,anthropic,google-ai-studio".
+    extraction_openrouter_provider_order: str = ""
+    # When false, disable OpenRouter's provider-level fallback behavior.
+    extraction_openrouter_provider_allow_fallbacks: bool = True
+    # Optional provider sort hint: price|throughput|latency.
+    extraction_openrouter_provider_sort: str = ""
+    extraction_request_min_interval_seconds: float = 0.0
+    extraction_batch_concurrency: int = 1
+    # When true, clear existing scraped pricing rows if extraction finds no pricing info.
+    extraction_clear_pricing_on_no_info: bool = False
+    nav_content_extractor: str = "bs4"  # bs4 | trafilatura | crawl4ai
+    nav_fetch_engine: str = "httpx"  # httpx | crawl4ai | crawl4ai_deep
+    nav_batch_concurrency: int = 3
+    # Per-school hard timeout for CLI batch navigation. Prevents a single hung browser
+    # from stalling the entire batch. Set to 0 to disable (not recommended with crawl4ai).
+    nav_school_timeout_seconds: float = 120.0
+    # Per-school hard timeout for CLI batch extraction (covers all LLM calls + retries).
+    extraction_school_timeout_seconds: float = 180.0
+
+    # Geocoding settings
+    geocoding_provider: str = "composite"  # composite | nominatim | google | mapbox (composite = GeoJSON + Nominatim fallback, recommended)
+    # REQUIRED: Must be set in .env (Nominatim policy requires valid contact email)
+    geocoding_contact_email: str = "your-email@example.com"  # Placeholder - override in .env
 
     # API settings
     max_schools_to_compare: int = 5

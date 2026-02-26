@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, JsonValue
 
 from app.models.field_source import SourceType, SourceConfidence
 
@@ -12,7 +12,8 @@ class FieldSourceBase(BaseModel):
     field_key: str
     field_path: Optional[str] = None
     value_text: Optional[str] = None
-    value_json: Optional[dict] = None
+    # JSON payload can be object, array, scalar, or null.
+    value_json: Optional[JsonValue] = None
     source_type: SourceType
     source_name: Optional[str] = None
     source_url: Optional[str] = None

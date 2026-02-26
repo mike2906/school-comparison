@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import String, Integer, DateTime, Enum, ForeignKey
+from sqlalchemy import String, Integer, DateTime, Enum, ForeignKey, Text, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -16,6 +16,12 @@ class SourcePage(Base):
     scrape_type: Mapped[ScrapeType] = mapped_column(Enum(ScrapeType, name="scrapetype", create_type=False), nullable=False)
     source_url: Mapped[str] = mapped_column(String(1000), nullable=False)
     content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+
+    # Navigation and extraction fields (Phase 1)
+    page_category: Mapped[Optional[str]] = mapped_column(String(50))  # about/pricing/admission/contact/gallery
+    raw_markdown: Mapped[Optional[str]] = mapped_column(Text)  # Cached Crawl4AI markdown
+    is_valid: Mapped[Optional[bool]] = mapped_column(Boolean)  # URL validation result
+
     last_scraped_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )

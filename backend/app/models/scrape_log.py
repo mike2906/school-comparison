@@ -10,6 +10,7 @@ from app.database import Base
 
 class ScrapeType(str, enum.Enum):
     DISCOVERY = "discovery"
+    REGISTRY = "registry"
     WEBSITE = "website"
     PRICES = "prices"
     NVO = "nvo"
@@ -43,4 +44,11 @@ class ScrapeLog(Base):
     retry_count: Mapped[int] = mapped_column(Integer, default=0)
     next_retry_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
     model_used: Mapped[Optional[str]] = mapped_column(String(100))
+
+    # Pipeline tracking fields (Phase 1)
+    run_id: Mapped[Optional[str]] = mapped_column(String(36))  # Links to pipeline_runs.id
+    llm_input_tokens: Mapped[Optional[int]] = mapped_column(Integer)
+    llm_output_tokens: Mapped[Optional[int]] = mapped_column(Integer)
+    duration_ms: Mapped[Optional[int]] = mapped_column(Integer)
+
     scraped_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
