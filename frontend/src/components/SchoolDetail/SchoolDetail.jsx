@@ -58,17 +58,22 @@ function SchoolDetail({ school, onClose }) {
             {school.locations?.map(location => (
               <div key={location.id} className="border-t py-3">
                 <p className="text-sm font-medium text-gray-900">
-                  {t(`ageGroups.${location.age_group}`)}
+                  {(Array.isArray(location.age_groups) ? location.age_groups : [location.age_group])
+                    .filter(Boolean)
+                    .map(group => t(`ageGroups.${group}`))
+                    .join(', ')}
                 </p>
                 <p className="text-sm text-gray-600">{getAddress(location, i18n.language)}</p>
                 {location.phone && (
                   <p className="text-sm text-gray-500">{location.phone}</p>
                 )}
-                {location.shift && (
-                  <p className="text-sm text-gray-500">
-                    {t(`shifts.${location.shift}`)}
+                {(location.age_group_shifts || []).map(item => (
+                  <p key={item.age_group} className="text-sm text-gray-500">
+                    {t(`ageGroups.${item.age_group}`)}
+                    {item.shift ? ` • ${t(`shifts.${item.shift}`)}` : ''}
+                    {item.has_organised_groups ? ` • ${t('schools.organisedGroups')}` : ''}
                   </p>
-                )}
+                ))}
               </div>
             ))}
           </div>

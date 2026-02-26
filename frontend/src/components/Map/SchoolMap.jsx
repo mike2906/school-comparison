@@ -10,6 +10,7 @@ import { getSchoolName, getAddress } from '../../utils/i18n'
 import { useCompare } from '../../context/CompareContext'
 import { useCountry } from '../../context/CountryContext'
 import { getAgeGroupKeys } from '../../utils/countryConfig'
+import { getFocusEmojis, getFocusLabels } from '../../utils/locationFocus'
 import { AGE_GROUP_KEYS } from '../../utils/education'
 
 // Fallback values (used when country config hasn't loaded yet)
@@ -89,9 +90,9 @@ const createLocationMarkerIcon = (type, { label, isSelected }) => {
       </div>
     `,
     className: 'leaflet-div-icon location-marker-wrapper',
-    iconSize: [46, 46],
-    iconAnchor: [23, 23],
-    popupAnchor: [0, -23],
+    iconSize: [48, 58],
+    iconAnchor: [24, 56],
+    popupAnchor: [0, -30],
   })
 }
 
@@ -112,6 +113,75 @@ const getAgeGroupFullLabel = (t, ageGroup) => {
   const fullLabel = t(fullKey)
   if (fullLabel && fullLabel !== fullKey) return fullLabel
   return ageGroup
+}
+
+const normalizeAgeGroups = (location) => {
+  if (!location) return []
+  if (Array.isArray(location.age_groups)) return location.age_groups.filter(Boolean)
+  if (location.age_group) return [location.age_group]
+  return []
+}
+
+const getAgeGroupShifts = (location) => {
+  if (!location?.age_group_shifts) return []
+  return location.age_group_shifts.filter(item => item && item.age_group)
+}
+
+const getLocationTags = (location) => {
+  if (!location?.location_tags) return []
+  if (!Array.isArray(location.location_tags)) return []
+  return location.location_tags.filter(Boolean)
+}
+
+const getLocationFocusLabels = (t, location) => {
+  const tags = getLocationTags(location)
+  if (!tags.length) return []
+  return getFocusLabels(t, tags)
+}
+
+const getLocationFocusMarkerLabel = (t, location) => {
+  const tags = getLocationTags(location)
+  if (!tags.length) return ''
+  const emojis = getFocusEmojis(tags)
+  if (emojis.length) return emojis.join('')
+  const labels = getLocationFocusLabels(t, location)
+  return labels[0] || ''
+}
+
+const getShiftForAgeGroup = (location, ageGroup) => {
+  const shifts = getAgeGroupShifts(location)
+  if (!shifts.length) return null
+  if (ageGroup) {
+    const match = shifts.find(item => item.age_group === ageGroup)
+    if (match) return match
+  }
+  return shifts[0] || null
+}
+
+const orderAgeGroups = (groups, ageGroupOrder) => {
+  if (!groups.length) return []
+  const orderMap = new globalThis.Map(ageGroupOrder.map((key, idx) => [key, idx]))
+  return [...groups].sort((a, b) => {
+    const aIndex = orderMap.has(a) ? orderMap.get(a) : 999
+    const bIndex = orderMap.has(b) ? orderMap.get(b) : 999
+    return aIndex - bIndex
+  })
+}
+
+const getLocationShortLabel = (t, location, ageGroupOrder, activeAgeGroup) => {
+  const groups = orderAgeGroups(normalizeAgeGroups(location), ageGroupOrder)
+  if (!groups.length) return '?'
+  if (activeAgeGroup && groups.includes(activeAgeGroup)) {
+    return getAgeGroupShortLabel(t, activeAgeGroup)
+  }
+  const first = getAgeGroupShortLabel(t, groups[0])
+  return groups.length > 1 ? `${first}+` : first
+}
+
+const getLocationFullLabel = (t, location, ageGroupOrder) => {
+  const groups = orderAgeGroups(normalizeAgeGroups(location), ageGroupOrder)
+  if (!groups.length) return ''
+  return groups.map(group => getAgeGroupFullLabel(t, group)).join(', ')
 }
 
 const createUserMarkerIcon = () => {
@@ -317,6 +387,7 @@ function PopupContent({
   isMobile,
   inCompare,
   canAddMore,
+  activeAgeGroup,
   onShowLocations,
   overlayActive,
 }) {
@@ -329,9 +400,11 @@ function PopupContent({
   const schoolName = getSchoolName(marker.school, language)
   const displayType = marker.school.school_type === 'international' ? 'private' : marker.school.school_type
   const address = getAddress(marker.location, language)
-  const locationLabel = t(`ageGroups.${marker.location.age_group}`)
-  const shiftLabel = marker.location.shift ? t(`shifts.${marker.location.shift}`) : null
-  const hasOrganisedGroups = Boolean(marker.location.has_organised_groups)
+  const locationLabel = getLocationFullLabel(t, marker.location, AGE_GROUP_KEYS)
+  const shiftInfo = getShiftForAgeGroup(marker.location, activeAgeGroup)
+  const shiftLabel = shiftInfo?.shift ? t(`shifts.${shiftInfo.shift}`) : null
+  const hasOrganisedGroups = Boolean(shiftInfo?.has_organised_groups)
+  const locationTags = getLocationTags(marker.location)
   const additionalLocations = (marker.school.locations?.length ?? 0) - 1
   const showLocationsAction = additionalLocations > 0 && onShowLocations && !overlayActive
 
@@ -369,6 +442,19 @@ function PopupContent({
           <span className="text-neutral-400">📍</span>
           <span>{address}</span>
         </div>
+
+        {locationTags.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1">
+            {locationTags.map(tag => (
+              <span
+                key={tag}
+                className="inline-flex items-center rounded-full bg-neutral-100 px-2 py-0.5 text-[11px] font-semibold text-neutral-600"
+              >
+                {t(`locationTags.${tag}`, { defaultValue: tag })}
+              </span>
+            ))}
+          </div>
+        )}
 
         {typeof distanceKm === 'number' && (
           <div className="flex items-start gap-2">
@@ -504,6 +590,7 @@ const SchoolMarker = memo(function SchoolMarker({
             isMobile={false}
             inCompare={inCompare}
             canAddMore={canAddMore}
+            activeAgeGroup={activeAgeGroup}
             onShowLocations={onShowLocations}
             overlayActive={overlayActive}
           />
@@ -517,6 +604,9 @@ const OverlayLocationMarker = memo(function OverlayLocationMarker({
   marker,
   isSchoolSelected,
   isSelected,
+  ageGroupOrder,
+  activeAgeGroup,
+  labelMode = 'age',
   showPopup,
   t,
   language,
@@ -532,12 +622,17 @@ const OverlayLocationMarker = memo(function OverlayLocationMarker({
   overlayActive,
 }) {
   const markerRef = useRef(null)
-  const label = getAgeGroupShortLabel(t, marker.location.age_group)
+  const focusLabels = getLocationFocusLabels(t, marker.location)
+  const label = labelMode === 'focus' && focusLabels.length
+    ? getLocationFocusMarkerLabel(t, marker.location)
+    : getLocationShortLabel(t, marker.location, ageGroupOrder, activeAgeGroup)
   const icon = createLocationMarkerIcon(marker.school.school_type, {
     label,
     isSelected,
   })
-  const fullLabel = getAgeGroupFullLabel(t, marker.location.age_group)
+  const fullLabel = labelMode === 'focus' && focusLabels.length
+    ? focusLabels.join(', ')
+    : getLocationFullLabel(t, marker.location, ageGroupOrder)
 
   useEffect(() => {
     if (!markerRef.current || !showPopup) return
@@ -584,6 +679,7 @@ const OverlayLocationMarker = memo(function OverlayLocationMarker({
             isMobile={false}
             inCompare={inCompare}
             canAddMore={canAddMore}
+            activeAgeGroup={activeAgeGroup}
             onShowLocations={onShowLocations}
             overlayActive={overlayActive}
           />
@@ -673,7 +769,7 @@ function SchoolMap({
     const result = []
     schools.forEach(school => {
       const eligibleLocations = activeAgeGroup
-        ? school.locations?.filter(location => location.age_group === activeAgeGroup)
+        ? school.locations?.filter(location => normalizeAgeGroups(location).includes(activeAgeGroup))
         : school.locations
       eligibleLocations?.forEach((location, idx) => {
         const lat = parseCoordinate(location.lat)
@@ -727,9 +823,14 @@ function SchoolMap({
   const overlayFlowPath = useMemo(() => {
     if (!overlayLocations.length) return []
     const orderMap = new globalThis.Map(ageGroupOrder.map((key, idx) => [key, idx]))
+    const getLocationOrder = (location) => {
+      const groups = normalizeAgeGroups(location)
+      if (!groups.length) return 999
+      return Math.min(...groups.map(group => (orderMap.has(group) ? orderMap.get(group) : 999)))
+    }
     const ordered = [...overlayLocations].sort((a, b) => {
-      const aIndex = orderMap.has(a.age_group) ? orderMap.get(a.age_group) : 999
-      const bIndex = orderMap.has(b.age_group) ? orderMap.get(b.age_group) : 999
+      const aIndex = getLocationOrder(a)
+      const bIndex = getLocationOrder(b)
       if (aIndex !== bIndex) return aIndex - bIndex
       if (a.is_primary !== b.is_primary) return a.is_primary ? -1 : 1
       if (a.id != null && b.id != null) return a.id - b.id
@@ -738,6 +839,17 @@ function SchoolMap({
     return ordered.map(location => [location.__lat, location.__lng])
   }, [overlayLocations, ageGroupOrder])
   const overlayFlowAvailable = overlayFlowPath.length > 1
+  const overlayFocusLabels = useMemo(() => {
+    if (overlayLocations.length < 2) return false
+    const orderedGroups = overlayLocations.map(location =>
+      orderAgeGroups(normalizeAgeGroups(location), ageGroupOrder).join('|')
+    )
+    if (!orderedGroups.length) return false
+    const first = orderedGroups[0]
+    const consistentGroups = orderedGroups.every(groups => groups === first)
+    const hasTags = overlayLocations.every(location => getLocationTags(location).length > 0)
+    return consistentGroups && hasTags
+  }, [overlayLocations, ageGroupOrder])
 
   const overlayMarkers = useMemo(() => {
     if (!overlaySchool) return []
@@ -864,6 +976,9 @@ function SchoolMap({
                   marker={marker}
                   isSchoolSelected={selectedSchoolId === overlaySchoolId}
                   isSelected={marker.location.id === overlaySelectedLocationId}
+                  ageGroupOrder={ageGroupOrder}
+                  activeAgeGroup={activeAgeGroup}
+                  labelMode={overlayFocusLabels ? 'focus' : 'age'}
                   showPopup={!isMobile}
                   t={t}
                   language={i18n.language}
@@ -889,7 +1004,7 @@ function SchoolMap({
                     opacity: 0.7,
                     dashArray: '8 6',
                   }}
-                  className="flow-line"
+                  className={overlayFocusLabels ? 'flow-line flow-line--static' : 'flow-line'}
                   pane="overlayFlow"
                 />
               )}

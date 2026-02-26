@@ -305,10 +305,15 @@ function SearchPage() {
 
   const handleToggleLocationsPanel = (school) => {
     if (!school) return
+    const hasMultipleLocations = (school.locations?.length || 0) > 1
     setOpenLocationsId(prev => {
       const nextId = prev === school.id ? null : school.id
       if (nextId) {
-        setOverlayForSchool(school.id)
+        if (hasMultipleLocations) {
+          setOverlayForSchool(school.id)
+        } else if (locationOverlay.schoolId === school.id) {
+          clearLocationOverlay()
+        }
       } else if (locationOverlay.schoolId === school.id) {
         clearLocationOverlay()
       }
@@ -518,7 +523,11 @@ function SearchPage() {
 
   const getLocationForAgeGroup = (school, ageGroupValue) => {
     if (!ageGroupValue) return getPrimaryLocation(school)
-    const matching = school.locations?.filter(location => location.age_group === ageGroupValue) || []
+    const matching = school.locations?.filter(location => {
+      if (Array.isArray(location.age_groups)) return location.age_groups.includes(ageGroupValue)
+      if (location.age_group) return location.age_group === ageGroupValue
+      return false
+    }) || []
     return matching.find(location => location.is_primary) || matching[0] || getPrimaryLocation(school)
   }
 
@@ -1713,6 +1722,7 @@ function SearchPage() {
                     onHover={() => handleSchoolHover(school)}
                     onHoverEnd={handleSchoolHoverEnd}
                     ageGroupOrder={ageGroupOrder}
+                    activeAgeGroup={filters.ageGroup}
                     isLocationsOpen={openLocationsId === school.id}
                     locationOverlay={locationOverlay}
                     onToggleLocations={() => handleToggleLocationsPanel(school)}

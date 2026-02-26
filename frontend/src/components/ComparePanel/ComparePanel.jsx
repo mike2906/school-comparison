@@ -53,8 +53,8 @@ function ComparePanel({ schools, onRemove }) {
             <td className="p-2 text-gray-600">{t('schools.shift')}</td>
             {schools.map(school => (
               <td key={school.id} className="p-2">
-                {school.locations?.[0]?.shift
-                  ? t(`shifts.${school.locations[0].shift}`)
+                {school.locations?.[0]?.age_group_shifts?.[0]?.shift
+                  ? t(`shifts.${school.locations[0].age_group_shifts[0].shift}`)
                   : '-'}
               </td>
             ))}

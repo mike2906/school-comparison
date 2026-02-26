@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { useCompare } from '../../context/CompareContext'
 import { getSchoolName, getAddress } from '../../utils/i18n'
 import { formatDistance } from '../../utils/distance'
+import { getFocusEmoji } from '../../utils/locationFocus'
 
 const typeColors = {
   state: 'bg-teal-500 text-white',
@@ -433,22 +434,22 @@ function getNvoDetail(school, t) {
   }
 }
 
-function getAmenityFlags(attributes, primaryLocation) {
+function getAmenityFlags(attributes, hasAfterSchool) {
   const facilities = attributes?.facilities || []
   const specialPrograms = attributes?.special_programs || []
 
   return {
     meals: Boolean(attributes?.has_canteen || facilities.includes('cafeteria') || specialPrograms.includes('meals_provided')),
     transport: Boolean(facilities.includes('transportation') || attributes?.transportation_available),
-    extended: Boolean(primaryLocation?.has_organised_groups || specialPrograms.includes('extended_day') || attributes?.after_school_care),
+    extended: Boolean(hasAfterSchool || specialPrograms.includes('extended_day') || attributes?.after_school_care),
     smallClasses: Boolean(attributes?.class_size && Number(attributes.class_size) < 16),
     accessible: Boolean(attributes?.accessible || facilities.includes('accessible')),
     specialPrograms: Boolean(specialPrograms.length > 0),
   }
 }
 
-function getScheduleLine(primaryLocation, attributes, t) {
-  const shift = primaryLocation?.shift
+function getScheduleLine(primaryShiftInfo, attributes, t) {
+  const shift = primaryShiftInfo?.shift
   if (!shift) return null
   const shiftLabelKey = `schoolCard.shift.${shift}`
   const shiftLabel = t(shiftLabelKey)
@@ -456,7 +457,7 @@ function getScheduleLine(primaryLocation, attributes, t) {
   const hours = attributes?.schedule_hours?.[shift]
   const baseText = hours ? `${label} (${hours})` : label
   const hasAfterSchool = Boolean(
-    primaryLocation?.has_organised_groups ||
+    primaryShiftInfo?.has_organised_groups ||
     attributes?.after_school_care ||
     (attributes?.special_programs || []).includes('extended_day')
   )
@@ -465,6 +466,40 @@ function getScheduleLine(primaryLocation, attributes, t) {
     text: hasAfterSchool ? `${baseText} • ${t('schoolCard.afterSchoolCare')}` : baseText,
     icon: SHIFT_ICONS[shift] || '⏰',
   }
+}
+
+function getLocationAgeGroups(location) {
+  if (!location) return []
+  if (Array.isArray(location.age_groups)) return location.age_groups.filter(Boolean)
+  if (location.age_group) return [location.age_group]
+  return []
+}
+
+function getAgeGroupShifts(location) {
+  if (!location?.age_group_shifts) return []
+  return location.age_group_shifts.filter(item => item && item.age_group)
+}
+
+function getLocationTags(location) {
+  if (!location?.location_tags) return []
+  if (!Array.isArray(location.location_tags)) return []
+  return location.location_tags.filter(Boolean)
+}
+
+function getShiftForAgeGroup(location, ageGroup) {
+  const shifts = getAgeGroupShifts(location)
+  if (!shifts.length) return null
+  if (ageGroup) {
+    const match = shifts.find(item => item.age_group === ageGroup)
+    if (match) return match
+  }
+  return shifts[0] || null
+}
+
+function getLocationAgeGroupLabel(location, t) {
+  const groups = getLocationAgeGroups(location)
+  if (!groups.length) return ''
+  return groups.map(group => t(`ageGroups.${group}`)).join(', ')
 }
 
 function buildExpandedSections({
@@ -544,18 +579,19 @@ function buildExpandedSections({
     })
   }
 
-  const scheduleLines = locations
-    .filter(location => location.shift)
-    .map(location => {
-      const ageGroup = location.age_group ? t(`ageGroups.${location.age_group}`) : ''
-      const shiftLabelKey = `schoolCard.shift.${location.shift}`
+  const scheduleLines = locations.flatMap(location => {
+    const shifts = getAgeGroupShifts(location).filter(item => item.shift)
+    return shifts.map(item => {
+      const ageGroupLabel = t(`ageGroups.${item.age_group}`)
+      const shiftLabelKey = `schoolCard.shift.${item.shift}`
       const shiftLabel = t(shiftLabelKey)
-      const label = shiftLabel !== shiftLabelKey ? shiftLabel : t(`shifts.${location.shift}`)
-      const hours = attributes?.schedule_hours?.[location.shift]
+      const label = shiftLabel !== shiftLabelKey ? shiftLabel : t(`shifts.${item.shift}`)
+      const hours = attributes?.schedule_hours?.[item.shift]
       const baseText = hours ? `${label} (${hours})` : label
-      const afterSchool = location.has_organised_groups ? ` • ${t('schoolCard.afterSchoolCare')}` : ''
-      return ageGroup ? `${ageGroup}: ${baseText}${afterSchool}` : `${baseText}${afterSchool}`
+      const afterSchool = item.has_organised_groups ? ` • ${t('schoolCard.afterSchoolCare')}` : ''
+      return `${ageGroupLabel}: ${baseText}${afterSchool}`
     })
+  })
 
   if (scheduleLines.length > 0) {
     sections.push({
@@ -621,6 +657,7 @@ const SchoolCard = forwardRef(function SchoolCard(
     onHover,
     onHoverEnd,
     location,
+    activeAgeGroup = null,
     ageGroupOrder = [],
     isLocationsOpen = false,
     locationOverlay = null,
@@ -656,8 +693,10 @@ const SchoolCard = forwardRef(function SchoolCard(
     if (!locations.length) return []
     const orderMap = new Map(ageGroupOrder.map((key, idx) => [key, idx]))
     return [...locations].sort((a, b) => {
-      const aIndex = orderMap.has(a.age_group) ? orderMap.get(a.age_group) : 999
-      const bIndex = orderMap.has(b.age_group) ? orderMap.get(b.age_group) : 999
+      const aGroups = getLocationAgeGroups(a)
+      const bGroups = getLocationAgeGroups(b)
+      const aIndex = aGroups.length ? Math.min(...aGroups.map(group => orderMap.get(group) ?? 999)) : 999
+      const bIndex = bGroups.length ? Math.min(...bGroups.map(group => orderMap.get(group) ?? 999)) : 999
       if (aIndex !== bIndex) return aIndex - bIndex
       if (a.is_primary !== b.is_primary) return a.is_primary ? -1 : 1
       if (a.id != null && b.id != null) return a.id - b.id
@@ -689,16 +728,28 @@ const SchoolCard = forwardRef(function SchoolCard(
     const seen = new Set()
     const groups = []
     orderedLocations.forEach(locationItem => {
-      if (!locationItem.age_group || seen.has(locationItem.age_group)) return
-      seen.add(locationItem.age_group)
-      groups.push(locationItem.age_group)
+      const locationGroups = getLocationAgeGroups(locationItem)
+      locationGroups.forEach(group => {
+        if (seen.has(group)) return
+        seen.add(group)
+        groups.push(group)
+      })
     })
     return groups
   }, [orderedLocations])
 
+  const primaryAgeGroup = primaryLocation ? getLocationAgeGroups(primaryLocation)[0] : null
+
+  const primaryShiftInfo = useMemo(
+    () => getShiftForAgeGroup(primaryLocation, activeAgeGroup),
+    [primaryLocation, activeAgeGroup]
+  )
   const statusInfo = useMemo(() => getStatusInfo(school, t), [school, t])
   const primaryFeature = useMemo(() => getPrimaryFeature(attributes, t), [attributes, t])
-  const scheduleLine = useMemo(() => getScheduleLine(primaryLocation, attributes, t), [primaryLocation, attributes, t])
+  const scheduleLine = useMemo(
+    () => getScheduleLine(primaryShiftInfo, attributes, t),
+    [primaryShiftInfo, attributes, t]
+  )
   const pricingYear = useMemo(() => getLatestAcademicYear(pricing), [pricing])
 
   const admissionsInfo = useMemo(() => {
@@ -730,15 +781,15 @@ const SchoolCard = forwardRef(function SchoolCard(
     }
 
     if (school.school_type === 'state' && school.education_level === 'kindergarten') {
-      const lastAdmitted = getLastAdmittedPoints(admissionInfo, primaryLocation?.age_group)
+      const lastAdmitted = getLastAdmittedPoints(admissionInfo, primaryAgeGroup)
       if (lastAdmitted) {
         return {
           icon: '🎯',
           text: t('schoolCard.admissions.lastAdmitted', {
-          points: lastAdmitted.points,
-          year: lastAdmitted.year,
-          pointsLabel: t('admission.points'),
-        }),
+            points: lastAdmitted.points,
+            year: lastAdmitted.year,
+            pointsLabel: t('admission.points'),
+          }),
         }
       }
       return { icon: '🎯', text: t('schoolCard.admissions.admissionsUnavailable') }
@@ -795,7 +846,7 @@ const SchoolCard = forwardRef(function SchoolCard(
   }, [nvoDetail, t])
 
   const amenityItems = useMemo(() => {
-    const flags = getAmenityFlags(attributes, primaryLocation)
+    const flags = getAmenityFlags(attributes, primaryShiftInfo?.has_organised_groups)
     return AMENITY_PRIORITY
       .filter(item => flags[item.key])
       .slice(0, 4)
@@ -1059,9 +1110,14 @@ const SchoolCard = forwardRef(function SchoolCard(
         </div>
       </div>
 
-      {(hasExpandedContent || (school.locations?.length || 0) > 1) && (
+      {(() => {
+        const hasMultipleAgeGroupShifts = (school.locations || [])
+          .some(location => (location.age_group_shifts || []).length > 1)
+        const hasMultipleLocations = (school.locations?.length || 0) > 1
+        return hasExpandedContent || hasMultipleLocations || hasMultipleAgeGroupShifts
+      })() && (
         <div className="mt-4 flex items-center justify-between text-sm text-neutral-500">
-          {school.locations?.length > 1 ? (
+          {(school.locations?.length || 0) > 1 ? (
             <button
               type="button"
               className="text-sm text-neutral-600 hover:text-teal-600 hover:underline transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal-500 rounded-sm"
@@ -1070,7 +1126,17 @@ const SchoolCard = forwardRef(function SchoolCard(
               + {school.locations.length - 1} {t('schools.moreLocations', { count: school.locations.length - 1 })}
             </button>
           ) : (
-            <span />
+            ((school.locations || []).some(location => (location.age_group_shifts || []).length > 1)) ? (
+              <button
+                type="button"
+                className="text-sm text-neutral-600 hover:text-teal-600 hover:underline transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal-500 rounded-sm"
+                onClick={handleToggleLocations}
+              >
+                {t('schools.showAgeGroupsShifts')}
+              </button>
+            ) : (
+              <span />
+            )
           )}
           {hasExpandedContent && (
             <button
@@ -1089,11 +1155,13 @@ const SchoolCard = forwardRef(function SchoolCard(
         </div>
       )}
 
-      {isLocationsOpen && orderedLocations.length > 1 && (
+      {isLocationsOpen && (orderedLocations.length > 1 || (orderedLocations[0]?.age_group_shifts || []).length > 1) && (
         <div className="mt-3 rounded-xl border border-neutral-200 bg-white px-4 py-3 space-y-3">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="space-y-1">
-              <p className="text-sm font-semibold text-neutral-900">{t('schools.locations')}</p>
+              <p className="text-sm font-semibold text-neutral-900">
+                {school.school_type === 'state' ? t('schools.ageGroupsShifts') : t('schools.locations')}
+              </p>
               {flowGroups.length > 1 && (
                 <div className="flex flex-wrap items-center gap-1 text-xs text-neutral-500">
                   {flowGroups.map((group, idx) => (
@@ -1107,21 +1175,23 @@ const SchoolCard = forwardRef(function SchoolCard(
                 </div>
               )}
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                className={`px-2.5 py-1 text-xs font-semibold rounded-full border transition-colors ${
-                  canShowOnMap
-                    ? 'border-primary-200 text-primary-700 hover:bg-primary-50'
-                    : 'border-neutral-200 text-neutral-400 cursor-not-allowed'
-                }`}
-                onClick={handleShowAllLocations}
-                disabled={!canShowOnMap}
-                title={canShowOnMap ? '' : t('schools.mapLocationMissing')}
-              >
-                {t('schools.showAllOnMap')}
-              </button>
-            </div>
+            {orderedLocations.length > 1 && (
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  className={`px-2.5 py-1 text-xs font-semibold rounded-full border transition-colors ${
+                    canShowOnMap
+                      ? 'border-primary-200 text-primary-700 hover:bg-primary-50'
+                      : 'border-neutral-200 text-neutral-400 cursor-not-allowed'
+                  }`}
+                  onClick={handleShowAllLocations}
+                  disabled={!canShowOnMap}
+                  title={canShowOnMap ? '' : t('schools.mapLocationMissing')}
+                >
+                  {t('schools.showAllOnMap')}
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -1129,34 +1199,64 @@ const SchoolCard = forwardRef(function SchoolCard(
               const locationKey = locationItem.id ?? `${school.id}-${idx}`
               const isFocused = focusedLocationId === locationItem.id
               const addressLabel = getAddress(locationItem, i18n.language)
+              const locationGroups = getLocationAgeGroups(locationItem)
+              const shiftEntries = getAgeGroupShifts(locationItem)
+              const shiftByGroup = new Map(shiftEntries.map(entry => [entry.age_group, entry]))
+              const locationTags = getLocationTags(locationItem)
+              const hasMultipleLocations = orderedLocations.length > 1
               return (
                 <button
                   key={locationKey}
                   type="button"
                   onClick={(event) => handleFocusLocation(event, locationItem.id)}
-                  className={`w-full text-left rounded-lg border px-3 py-2 transition-colors ${
-                    isFocused
-                      ? 'border-primary-300 bg-primary-50'
-                      : 'border-neutral-200 bg-white hover:bg-neutral-50'
+                  disabled={!hasMultipleLocations}
+                  className={`w-full text-left rounded-lg px-3 py-2 transition-colors ${
+                    hasMultipleLocations
+                      ? isFocused
+                        ? 'border border-primary-300 bg-primary-50'
+                        : 'border border-neutral-200 bg-white hover:bg-neutral-50'
+                      : 'bg-transparent'
                   }`}
                 >
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex flex-wrap items-center gap-2">
-                      {locationItem.age_group && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-neutral-100 text-[11px] font-semibold text-neutral-600">
-                          {t(`ageGroups.${locationItem.age_group}`)}
-                        </span>
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="space-y-1">
+                      {addressLabel && (
+                        <div className="text-sm font-semibold text-neutral-800">{addressLabel}</div>
                       )}
-                      {locationItem.shift && (
-                        <span className="text-xs text-neutral-500">
-                          {t(`shifts.${locationItem.shift}`)}
-                        </span>
+                      {locationTags.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {locationTags.map(tag => (
+                            <span
+                              key={tag}
+                              className="inline-flex items-center rounded-full bg-neutral-100 px-2 py-0.5 text-[11px] font-semibold text-neutral-600"
+                            >
+                              {getFocusEmoji(tag) ? `${getFocusEmoji(tag)} ` : ''}
+                              {t(`locationTags.${tag}`, { defaultValue: tag })}
+                            </span>
+                          ))}
+                        </div>
                       )}
-                      {locationItem.has_organised_groups && (
-                        <span className="text-xs text-neutral-500">
-                          {t('schools.organisedGroups')}
-                        </span>
-                      )}
+                      <div className="space-y-1">
+                        {locationGroups.map(group => {
+                          const shiftInfo = shiftByGroup.get(group)
+                          return (
+                            <div
+                              key={group}
+                              className="text-xs text-neutral-600"
+                            >
+                              <span className="font-semibold text-neutral-700">
+                                {t(`ageGroups.${group}`)}
+                              </span>
+                              {shiftInfo?.shift && (
+                                <span className="text-neutral-500"> • {t(`shifts.${shiftInfo.shift}`)}</span>
+                              )}
+                              {shiftInfo?.has_organised_groups && (
+                                <span className="text-primary-600"> • {t('schools.organisedGroups')}</span>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
                     </div>
                     {!Number.isFinite(parseCoordinate(locationItem.lat)) || !Number.isFinite(parseCoordinate(locationItem.lng)) ? (
                       <span className="text-[11px] uppercase tracking-wide text-neutral-400">
@@ -1170,9 +1270,6 @@ const SchoolCard = forwardRef(function SchoolCard(
                       )
                     )}
                   </div>
-                  {addressLabel && (
-                    <p className="mt-1 text-sm text-neutral-700">{addressLabel}</p>
-                  )}
                 </button>
               )
             })}

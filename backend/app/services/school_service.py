@@ -4,7 +4,7 @@ from sqlalchemy import select, cast, String
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models.school import School, SchoolLocation
+from app.models.school import School, SchoolLocation, SchoolLocationAgeGroupShift
 
 
 class SchoolService:
@@ -14,7 +14,7 @@ class SchoolService:
     def _base_query(self):
         """Base query with all relationships eager-loaded."""
         return select(School).options(
-            selectinload(School.locations),
+            selectinload(School.locations).selectinload(SchoolLocation.age_group_shifts),
             selectinload(School.pricing),
             selectinload(School.exam_results),
             selectinload(School.field_sources),
@@ -25,7 +25,8 @@ class SchoolService:
         query = (
             self._base_query()
             .join(SchoolLocation)
-            .where(SchoolLocation.age_group == age_group)
+            .join(SchoolLocationAgeGroupShift, SchoolLocationAgeGroupShift.location_id == SchoolLocation.id)
+            .where(SchoolLocationAgeGroupShift.age_group == age_group)
             .where(School.country_code == country_code)
         )
         result = await self.db.execute(query)
@@ -70,7 +71,12 @@ class SchoolService:
 
         # Filter by age group if specified
         if age_group:
-            query = query.join(SchoolLocation).where(SchoolLocation.age_group == age_group)
+            query = (
+                query
+                .join(SchoolLocation)
+                .join(SchoolLocationAgeGroupShift, SchoolLocationAgeGroupShift.location_id == SchoolLocation.id)
+                .where(SchoolLocationAgeGroupShift.age_group == age_group)
+            )
 
         # Apply education_level filter unless include_crossover is true for preschool
         # This allows showing both kindergartens and primary schools for preschool age

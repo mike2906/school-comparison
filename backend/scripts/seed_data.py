@@ -18,7 +18,7 @@ from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 
-from app.models.school import School, SchoolLocation
+from app.models.school import School, SchoolLocation, SchoolLocationAgeGroupShift
 from app.models.country import Country
 from app.models.pricing import Pricing, PriceCategory, PricePeriod, PriceSource
 from app.models.exam_results import ExamResult
@@ -131,11 +131,85 @@ def legacy_school(**kwargs) -> School:
 def legacy_location(**kwargs) -> SchoolLocation:
     address = kwargs.pop("address", None)
     address_en = kwargs.pop("address_en", None)
+    age_groups = kwargs.pop("age_groups", None)
+    age_group = kwargs.pop("age_group", None)
+    shift = kwargs.pop("shift", None)
+    has_organised_groups = kwargs.pop("has_organised_groups", None)
+    location_tags = kwargs.pop("location_tags", None)
 
     if "address_i18n" not in kwargs and address:
         kwargs["address_i18n"] = make_i18n(address, address_en, fallback=transliterate_address)
 
-    return SchoolLocation(**kwargs)
+    if location_tags is not None:
+        kwargs["location_tags"] = location_tags
+    location = SchoolLocation(**kwargs)
+    groups = []
+    if age_groups:
+        groups.extend(age_groups)
+    if age_group:
+        groups.append(age_group)
+    if groups:
+        unique_groups = sorted({group for group in groups if group})
+        location.age_group_shifts = [
+            SchoolLocationAgeGroupShift(
+                age_group=group,
+                shift=shift,
+                has_organised_groups=has_organised_groups,
+            )
+            for group in unique_groups
+        ]
+    return location
+
+
+def merge_locations(locations: list[SchoolLocation]) -> list[SchoolLocation]:
+    merged: dict[tuple, SchoolLocation] = {}
+    for location in locations:
+        address_bg = (location.address_i18n or {}).get("bg")
+        address_en = (location.address_i18n or {}).get("en")
+        key = (
+            address_bg,
+            address_en,
+            location.lat,
+            location.lng,
+        )
+        if key not in merged:
+            merged[key] = location
+            continue
+
+        current = merged[key]
+        current.is_primary = current.is_primary or location.is_primary
+        if not current.phone and location.phone:
+            current.phone = location.phone
+
+        existing_by_group = {link.age_group: link for link in current.age_group_shifts}
+        for link in location.age_group_shifts:
+            if link.age_group not in existing_by_group:
+                current.age_group_shifts.append(
+                    SchoolLocationAgeGroupShift(
+                        age_group=link.age_group,
+                        shift=link.shift,
+                        has_organised_groups=link.has_organised_groups,
+                    )
+                )
+                existing_by_group[link.age_group] = current.age_group_shifts[-1]
+                continue
+            existing = existing_by_group[link.age_group]
+            if existing.shift is None and link.shift is not None:
+                existing.shift = link.shift
+            if existing.has_organised_groups is None and link.has_organised_groups is not None:
+                existing.has_organised_groups = link.has_organised_groups
+
+        if location.location_tags:
+            current_tags = set(current.location_tags or [])
+            for tag in location.location_tags:
+                current_tags.add(tag)
+            current.location_tags = sorted(current_tags)
+
+    return list(merged.values())
+
+
+def set_locations(school: School, locations: list[SchoolLocation]) -> None:
+    school.locations = merge_locations(locations)
 
 
 def clamp_score(value: float, min_value: float = 50.0, max_value: float = 100.0) -> float:
@@ -297,6 +371,7 @@ async def seed_database():
         # Clear existing data to avoid duplicate schools on reseed
         await session.execute(delete(ExamResult))
         await session.execute(delete(Pricing))
+        await session.execute(delete(SchoolLocationAgeGroupShift))
         await session.execute(delete(SchoolLocation))
         await session.execute(delete(FieldSource))
         await session.execute(delete(School))
@@ -372,7 +447,7 @@ async def seed_database():
                 "teaching_approach": ["montessori"]
             }
         )
-        school.locations = [
+        set_locations(school, [
             legacy_location(age_group="nursery", address="ул. Кричим 25, Лозенец, София",
                           address_en=transliterate_address("ул. Кричим 25, Лозенец, София"),
                           lat=42.6735, lng=23.3355, phone="+359 88 123 4567",
@@ -385,7 +460,7 @@ async def seed_database():
                           address_en=transliterate_address("ул. Кричим 25, Лозенец, София"),
                           lat=42.6735, lng=23.3355, phone="+359 88 123 4567",
                           shift="full_day", has_organised_groups=False, is_primary=False),
-        ]
+        ])
         school.pricing = [
             Pricing(age_group="nursery", category=PriceCategory.TUITION, amount=900, period=PricePeriod.MONTHLY, source=PriceSource.OFFICIAL),
             Pricing(age_group="first", category=PriceCategory.TUITION, amount=800, period=PricePeriod.MONTHLY, source=PriceSource.OFFICIAL),
@@ -413,7 +488,7 @@ async def seed_database():
                 "facilities": ["sports_facilities", "cafeteria"]
             }
         )
-        school.locations = [
+        set_locations(school, [
             legacy_location(age_group="first", address="ул. Цар Иван Асен II 42, Център, София",
                           address_en=transliterate_address("ул. Цар Иван Асен II 42, Център, София"),
                           lat=42.6977, lng=23.3219, shift="full_day", is_primary=True),
@@ -423,7 +498,7 @@ async def seed_database():
             legacy_location(age_group="third", address="ул. Цар Иван Асен II 42, Център, София",
                           address_en=transliterate_address("ул. Цар Иван Асен II 42, Център, София"),
                           lat=42.6977, lng=23.3219, shift="full_day", is_primary=False),
-        ]
+        ])
         school.pricing = [
             Pricing(age_group="first", category=PriceCategory.TUITION, amount=650, period=PricePeriod.MONTHLY, source=PriceSource.SCRAPED_WEBSITE),
             Pricing(age_group="second", category=PriceCategory.TUITION, amount=600, period=PricePeriod.MONTHLY, source=PriceSource.SCRAPED_WEBSITE),
@@ -480,7 +555,7 @@ async def seed_database():
                     "facilities": ["library", "cafeteria"],
                     "teaching_approach": ["project_based"]
                 }
-                school.locations = [
+                set_locations(school, [
                     legacy_location(age_group="preschool", address="бул. България 105, Борово, София",
                                   address_en=transliterate_address("бул. България 105, Борово, София"),
                                   lat=42.6717, lng=23.2872,
@@ -491,7 +566,7 @@ async def seed_database():
                     legacy_location(age_group="second", address="ул. Сребърна 18, Лозенец, София",
                                   address_en=transliterate_address("ул. Сребърна 18, Лозенец, София"),
                                   lat=42.6549, lng=23.3237, shift="full_day", is_primary=False),
-                ]
+                ])
             elif kg_data["name"] == "ЧДГ Малки изследователи":
                 school.attributes = {
                     "languages_of_instruction": ["bulgarian", "english"],
@@ -505,7 +580,7 @@ async def seed_database():
                     "class_size": 14
                 }
                 school.admission_info = {"status": "accepting", "requirements": "interview"}
-                school.locations = [
+                set_locations(school, [
                     legacy_location(age_group="first", address="ул. Иван Багрянов 12, Манастирски ливади, София",
                                   address_en=transliterate_address("ул. Иван Багрянов 12, Манастирски ливади, София"),
                                   lat=42.6685, lng=23.2805, shift="full_day", is_primary=True),
@@ -515,7 +590,7 @@ async def seed_database():
                     legacy_location(age_group="third", address="ул. Иван Багрянов 12, Манастирски ливади, София",
                                   address_en=transliterate_address("ул. Иван Багрянов 12, Манастирски ливади, София"),
                                   lat=42.6685, lng=23.2805, shift="full_day", is_primary=False),
-                ]
+                ])
             elif kg_data["name"] == "ЧДГ Немски свят":
                 school.attributes = {
                     "languages_of_instruction": ["bulgarian", "german"],
@@ -529,16 +604,16 @@ async def seed_database():
                     "class_size": 15
                 }
                 school.admission_info = {"status": "waitlist", "requirements": "interview"}
-                school.locations = [
+                set_locations(school, [
                     legacy_location(age_group="first", address="ул. Марагидик 6, Гео Милев, София",
                                   address_en=transliterate_address("ул. Марагидик 6, Гео Милев, София"),
                                   lat=42.6825, lng=23.3615, shift="full_day", is_primary=True),
                     legacy_location(age_group="second", address="ул. Марагидик 6, Гео Милев, София",
                                   address_en=transliterate_address("ул. Марагидик 6, Гео Милев, София"),
                                   lat=42.6825, lng=23.3615, shift="full_day", is_primary=False),
-                ]
+                ])
             else:
-                school.locations = [
+                set_locations(school, [
                     legacy_location(age_group="first", address=f"кв. {kg_data['area']}, София",
                                   address_en=transliterate_address(f"кв. {kg_data['area']}, София"),
                                   lat=kg_data["lat"], lng=kg_data["lng"], shift="full_day", is_primary=True),
@@ -548,7 +623,7 @@ async def seed_database():
                     legacy_location(age_group="third", address=f"кв. {kg_data['area']}, София",
                                   address_en=transliterate_address(f"кв. {kg_data['area']}, София"),
                                   lat=kg_data["lat"], lng=kg_data["lng"], shift="full_day", is_primary=False),
-                ]
+                ])
             school.pricing = [
                 Pricing(age_group="first", category=PriceCategory.TUITION, amount=kg_data["price"], 
                        period=PricePeriod.MONTHLY, source=PriceSource.SCRAPED_WEBSITE),
@@ -607,14 +682,14 @@ async def seed_database():
                 },
                 attributes={"languages_of_instruction": ["bulgarian"], "has_canteen": True}
             )
-            school.locations = [
+            set_locations(school, [
                 legacy_location(age_group="first", address=f"кв. {kg_data['area']}, София",
                               address_en=transliterate_address(f"кв. {kg_data['area']}, София"),
                               lat=kg_data["lat"], lng=kg_data["lng"], shift="full_day", is_primary=True),
                 legacy_location(age_group="second", address=f"кв. {kg_data['area']}, София",
                               address_en=transliterate_address(f"кв. {kg_data['area']}, София"),
                               lat=kg_data["lat"], lng=kg_data["lng"], shift="full_day", is_primary=False),
-            ]
+            ])
             schools.append(school)
         
         # ===== PRIVATE PRIMARY SCHOOLS (14 schools) =====
@@ -638,14 +713,14 @@ async def seed_database():
                 ],
             }
         )
-        school.locations = [
+        set_locations(school, [
             legacy_location(age_group="preschool", address="ул. Панайот Волов 27, Лозенец, София",
                           address_en=transliterate_address("ул. Панайот Волов 27, Лозенец, София"),
                           lat=42.6725, lng=23.3365, shift="full_day", is_primary=True),
             legacy_location(age_group="grade_1_4", address="ул. Чипровци 1, Лозенец, София",
                           address_en=transliterate_address("ул. Чипровци 1, Лозенец, София"),
                           lat=42.6701, lng=23.3388, shift="full_day", is_primary=False),
-        ]
+        ])
         school.pricing = [
             Pricing(
                 age_group="preschool",
@@ -687,6 +762,114 @@ async def seed_database():
             ),
         ]
         schools.append(school)
+
+        # Private primary school with shifts at a single location
+        school = legacy_school(
+            name="ЧУ Свети Паисий",
+            name_en=transliterate_bulgarian("ЧУ Свети Паисий"),
+            school_type="private",
+            education_level="primary",
+            summary_bg="Частно училище с утринна и следобедна смяна.",
+            summary_en="Private school with morning and afternoon shifts.",
+            num_pupils=280,
+            attributes={
+                "languages_of_instruction": ["bulgarian", "english"],
+                "has_canteen": True,
+                "special_programs": ["extended_day", "meals_provided"],
+                "facilities": ["cafeteria", "sports_facilities"],
+            }
+        )
+        set_locations(school, [
+            legacy_location(age_group="grade_1_4", address="ул. Ген. Гурко 18, Център, София",
+                          address_en=transliterate_address("ул. Ген. Гурко 18, Център, София"),
+                          lat=42.6942, lng=23.3275, shift="morning", has_organised_groups=True, is_primary=True),
+            legacy_location(age_group="grade_5_7", address="ул. Ген. Гурко 18, Център, София",
+                          address_en=transliterate_address("ул. Ген. Гурко 18, Център, София"),
+                          lat=42.6942, lng=23.3275, shift="afternoon", has_organised_groups=False, is_primary=False),
+        ])
+        school.pricing = [
+            Pricing(age_group="grade_1_4", category=PriceCategory.TUITION, amount=12000, period=PricePeriod.YEARLY, source=PriceSource.OFFICIAL),
+            Pricing(age_group="grade_5_7", category=PriceCategory.TUITION, amount=13500, period=PricePeriod.YEARLY, source=PriceSource.OFFICIAL),
+        ]
+        schools.append(school)
+
+        # Private primary school with three locations
+        school = legacy_school(
+            name="ЧУ Три кампуса",
+            name_en=transliterate_bulgarian("ЧУ Три кампуса"),
+            school_type="private",
+            education_level="primary",
+            summary_bg="Частно училище с три кампуса в различни райони.",
+            summary_en="Private school with three campuses across Sofia.",
+            num_pupils=420,
+            attributes={
+                "languages_of_instruction": ["english"],
+                "has_canteen": True,
+                "special_programs": ["meals_provided", "arts_program"],
+                "facilities": ["library", "sports_facilities"],
+            }
+        )
+        set_locations(school, [
+            legacy_location(age_group="preschool", address="ул. Шипка 12, Център, София",
+                          address_en=transliterate_address("ул. Шипка 12, Център, София"),
+                          lat=42.6955, lng=23.3340, shift="full_day", is_primary=True),
+            legacy_location(age_group="grade_1_4", address="бул. България 45, Борово, София",
+                          address_en=transliterate_address("бул. България 45, Борово, София"),
+                          lat=42.6768, lng=23.2878, shift="full_day", is_primary=False),
+            legacy_location(age_group="grade_5_7", address="ул. Атанас Далчев 8, Изток, София",
+                          address_en=transliterate_address("ул. Атанас Далчев 8, Изток, София"),
+                          lat=42.6722, lng=23.3515, shift="full_day", is_primary=False),
+        ])
+        school.pricing = [
+            Pricing(age_group="preschool", category=PriceCategory.TUITION, amount=11000, period=PricePeriod.YEARLY, source=PriceSource.OFFICIAL),
+            Pricing(age_group="grade_1_4", category=PriceCategory.TUITION, amount=15000, period=PricePeriod.YEARLY, source=PriceSource.OFFICIAL),
+            Pricing(age_group="grade_5_7", category=PriceCategory.TUITION, amount=16500, period=PricePeriod.YEARLY, source=PriceSource.OFFICIAL),
+        ]
+        schools.append(school)
+
+        # Private school with campus specializations (science vs arts)
+        school = legacy_school(
+            name="ЧУ Наука и изкуства",
+            name_en=transliterate_bulgarian("ЧУ Наука и изкуства"),
+            school_type="private",
+            education_level="primary",
+            summary_bg="Частно училище с различни кампуси за науки и изкуства.",
+            summary_en="Private school with specialized science and arts campuses.",
+            num_pupils=360,
+            attributes={
+                "languages_of_instruction": ["bulgarian", "english"],
+                "has_canteen": True,
+                "special_programs": ["arts_program", "science_lab", "meals_provided"],
+                "facilities": ["library", "sports_facilities", "laboratory"],
+            }
+        )
+        set_locations(school, [
+            legacy_location(
+                age_groups=["grade_1_4", "grade_5_7"],
+                address="бул. Цариградско шосе 125, Дружба, София",
+                address_en=transliterate_address("бул. Цариградско шосе 125, Дружба, София"),
+                lat=42.6572, lng=23.4042,
+                shift="morning",
+                has_organised_groups=True,
+                location_tags=["science_focus"],
+                is_primary=True,
+            ),
+            legacy_location(
+                age_groups=["grade_1_4", "grade_5_7"],
+                address="ул. Солунска 34, Център, София",
+                address_en=transliterate_address("ул. Солунска 34, Център, София"),
+                lat=42.6914, lng=23.3198,
+                shift="afternoon",
+                has_organised_groups=False,
+                location_tags=["arts_focus"],
+                is_primary=False,
+            ),
+        ])
+        school.pricing = [
+            Pricing(age_group="grade_1_4", category=PriceCategory.TUITION, amount=14000, period=PricePeriod.YEARLY, source=PriceSource.OFFICIAL),
+            Pricing(age_group="grade_5_7", category=PriceCategory.TUITION, amount=15500, period=PricePeriod.YEARLY, source=PriceSource.OFFICIAL),
+        ]
+        schools.append(school)
         
         # International School of Sofia (treated as private with language focus)
         school = legacy_school(
@@ -711,11 +894,11 @@ async def seed_database():
                 "teaching_approach": ["ib_program"]
             }
         )
-        school.locations = [
+        set_locations(school, [
             legacy_location(age_group="grade_1_4", address="бул. Пенчо Славейков 73, Витоша, София",
                           address_en=transliterate_address("бул. Пенчо Славейков 73, Витоша, София"),
                           lat=42.6620, lng=23.3110, shift="full_day", is_primary=True),
-        ]
+        ])
         school.pricing = [
             Pricing(age_group="grade_1_4", category=PriceCategory.TUITION, amount=16500, period=PricePeriod.YEARLY, source=PriceSource.OFFICIAL),
         ]
@@ -779,11 +962,11 @@ async def seed_database():
                 school.admission_info = {"status": "waitlist", "requirements": "interview"}
             elif school_data["name"] == "ЧУ Св. София":
                 school.admission_info = {"status": "accepting", "requirements": "interview"}
-            school.locations = [
+            set_locations(school, [
                 legacy_location(age_group="grade_1_4", address=f"кв. {school_data['area']}, София",
                               address_en=transliterate_address(f"кв. {school_data['area']}, София"),
                               lat=school_data["lat"], lng=school_data["lng"], shift="full_day", is_primary=True),
-            ]
+            ])
             school.pricing = [
                 Pricing(age_group="grade_1_4", category=PriceCategory.TUITION,
                        amount=school_data["price"], period=PricePeriod.YEARLY, source=PriceSource.SCRAPED_WEBSITE),
@@ -818,11 +1001,11 @@ async def seed_database():
                 "teaching_approach": ["project_based"]
             }
         )
-        school.locations = [
+        set_locations(school, [
             legacy_location(age_group="grade_1_4", address="ул. Николай Хайтов 12, Дианабад, София",
                           address_en=transliterate_address("ул. Николай Хайтов 12, Дианабад, София"),
                           lat=42.6758, lng=23.3535, shift="full_day", is_primary=True),
-        ]
+        ])
         school.pricing = [
             Pricing(age_group="grade_1_4", category=PriceCategory.TUITION, amount=19500,
                    period=PricePeriod.YEARLY, source=PriceSource.OFFICIAL),
@@ -847,11 +1030,11 @@ async def seed_database():
                 "class_size": 16
             }
         )
-        school.locations = [
+        set_locations(school, [
             legacy_location(age_group="grade_5_7", address="ул. Жолио-Кюри 20, Изток, София",
                           address_en=transliterate_address("ул. Жолио-Кюри 20, Изток, София"),
                           lat=42.6722, lng=23.3520, shift="full_day", is_primary=True),
-        ]
+        ])
         school.pricing = [
             Pricing(age_group="grade_5_7", category=PriceCategory.TUITION, amount=21000,
                    period=PricePeriod.YEARLY, source=PriceSource.OFFICIAL),
@@ -920,11 +1103,11 @@ async def seed_database():
                     "facilities": ["library", "cafeteria"],
                 }
             )
-            school.locations = [
+            set_locations(school, [
                 legacy_location(age_group=school_data["age_group"], address=f"кв. {school_data['area']}, София",
                               address_en=transliterate_address(f"кв. {school_data['area']}, София"),
                               lat=school_data["lat"], lng=school_data["lng"], shift="full_day", is_primary=True),
-            ]
+            ])
             school.pricing = [
                 Pricing(age_group=school_data["age_group"], category=PriceCategory.TUITION, amount=school_data["price"],
                        period=PricePeriod.YEARLY, source=PriceSource.OFFICIAL),
@@ -961,16 +1144,36 @@ async def seed_database():
                 num_pupils=650,
                 attributes={"languages_of_instruction": ["bulgarian"], "has_canteen": True}
             )
-            school.locations = [
-                legacy_location(age_group="grade_1_4", address=f"кв. {school_data['area']}, София",
-                              address_en=transliterate_address(f"кв. {school_data['area']}, София"),
-                              lat=school_data["lat"], lng=school_data["lng"],
-                              shift="morning", has_organised_groups=True, is_primary=True),
-                legacy_location(age_group="grade_5_7", address=f"кв. {school_data['area']}, София",
-                              address_en=transliterate_address(f"кв. {school_data['area']}, София"),
-                              lat=school_data["lat"], lng=school_data["lng"],
-                              shift="afternoon", has_organised_groups=False, is_primary=False),
-            ]
+            if school_data["name"] == '22 ОУ "П. Р. Славейков"':
+                set_locations(school, [
+                    legacy_location(age_group="grade_1_4", address="ул. Симеоновско шосе 12, Симеоново, София",
+                                  address_en=transliterate_address("ул. Симеоновско шосе 12, Симеоново, София"),
+                                  lat=42.6285, lng=23.3345,
+                                  shift="morning", has_organised_groups=True, is_primary=True),
+                    legacy_location(age_group="grade_5_7", address="ул. Симеоновско шосе 12, Симеоново, София",
+                                  address_en=transliterate_address("ул. Симеоновско шосе 12, Симеоново, София"),
+                                  lat=42.6285, lng=23.3345,
+                                  shift="afternoon", has_organised_groups=False, is_primary=False),
+                    legacy_location(age_group="grade_1_4", address="бул. Черни връх 61, Симеоново, София",
+                                  address_en=transliterate_address("бул. Черни връх 61, Симеоново, София"),
+                                  lat=42.6225, lng=23.3290,
+                                  shift="morning", has_organised_groups=True, is_primary=False),
+                    legacy_location(age_group="grade_5_7", address="бул. Черни връх 61, Симеоново, София",
+                                  address_en=transliterate_address("бул. Черни връх 61, Симеоново, София"),
+                                  lat=42.6225, lng=23.3290,
+                                  shift="afternoon", has_organised_groups=False, is_primary=False),
+                ])
+            else:
+                set_locations(school, [
+                    legacy_location(age_group="grade_1_4", address=f"кв. {school_data['area']}, София",
+                                  address_en=transliterate_address(f"кв. {school_data['area']}, София"),
+                                  lat=school_data["lat"], lng=school_data["lng"],
+                                  shift="morning", has_organised_groups=True, is_primary=True),
+                    legacy_location(age_group="grade_5_7", address=f"кв. {school_data['area']}, София",
+                                  address_en=transliterate_address(f"кв. {school_data['area']}, София"),
+                                  lat=school_data["lat"], lng=school_data["lng"],
+                                  shift="afternoon", has_organised_groups=False, is_primary=False),
+                ])
             school.exam_results = build_nvo_results(
                 base_bg=school_data["nvo"][0],
                 base_math=school_data["nvo"][1],
@@ -1006,12 +1209,12 @@ async def seed_database():
                     "facilities": ["library", "sports_facilities"],
                 }
             )
-            school.locations = [
+            set_locations(school, [
                 legacy_location(age_group="grade_5_7", address=f"кв. {school_data['area']}, София",
                               address_en=transliterate_address(f"кв. {school_data['area']}, София"),
                               lat=school_data["lat"], lng=school_data["lng"],
                               shift="morning", has_organised_groups=False, is_primary=True),
-            ]
+            ])
             school.exam_results = build_nvo_results(
                 base_bg=school_data["nvo"][0],
                 base_math=school_data["nvo"][1],
@@ -1061,12 +1264,12 @@ async def seed_database():
                     "class_size": 14 if school_data["name"] == "ЧУ Нови хоризонти" else 16
                 }
             )
-            school.locations = [
+            set_locations(school, [
                 legacy_location(age_group="grade_5_7", address=f"кв. {school_data['area']}, София",
                               address_en=transliterate_address(f"кв. {school_data['area']}, София"),
                               lat=school_data["lat"], lng=school_data["lng"],
                               shift="full_day", is_primary=True),
-            ]
+            ])
             school.pricing = [
                 Pricing(age_group="grade_5_7", category=PriceCategory.TUITION,
                        amount=school_data["price"], period=PricePeriod.YEARLY, source=PriceSource.OFFICIAL),
@@ -1105,11 +1308,11 @@ async def seed_database():
                 "teaching_approach": ["ib_program"]
             }
         )
-        school.locations = [
+        set_locations(school, [
             legacy_location(age_group="grade_8_12", address="ул. Коста Лулчев 13, Симеоново, София",
                           address_en=transliterate_address("ул. Коста Лулчев 13, Симеоново, София"),
                           lat=42.6320, lng=23.3445, shift="full_day", is_primary=True),
-        ]
+        ])
         school.pricing = [
             Pricing(age_group="grade_8_12", category=PriceCategory.TUITION, amount=24000,
                    period=PricePeriod.YEARLY, source=PriceSource.OFFICIAL),
@@ -1128,11 +1331,11 @@ async def seed_database():
             admission_info={"status": "accepting", "requirements": "interview"},
             attributes={"languages_of_instruction": ["bulgarian"], "special_focus": "humanities"}
         )
-        school.locations = [
+        set_locations(school, [
             legacy_location(age_group="grade_8_12", address="бул. Витоша 15, Център, София",
                           address_en=transliterate_address("бул. Витоша 15, Център, София"),
                           lat=42.6890, lng=23.3190, shift="full_day", is_primary=True),
-        ]
+        ])
         school.pricing = [
             Pricing(age_group="grade_8_12", category=PriceCategory.TUITION, amount=4500,
                    period=PricePeriod.YEARLY, source=PriceSource.SCRAPED_WEBSITE),
@@ -1162,11 +1365,11 @@ async def seed_database():
                 "facilities": ["computer_lab", "library", "cafeteria"]
             }
         )
-        school.locations = [
+        set_locations(school, [
             legacy_location(age_group="grade_8_12", address="ул. Богатица 8, Лозенец, София",
                           address_en=transliterate_address("ул. Богатица 8, Лозенец, София"),
                           lat=42.6730, lng=23.3300, shift="full_day", is_primary=True),
-        ]
+        ])
         school.pricing = [
             Pricing(age_group="grade_8_12", category=PriceCategory.TUITION, amount=9600,
                    period=PricePeriod.YEARLY, source=PriceSource.OFFICIAL),
@@ -1207,11 +1410,11 @@ async def seed_database():
                     "facilities": ["library", "cafeteria"]
                 }
             )
-            school.locations = [
+            set_locations(school, [
                 legacy_location(age_group="grade_8_12", address=f"кв. {school_data['area']}, София",
                               address_en=transliterate_address(f"кв. {school_data['area']}, София"),
                               lat=school_data["lat"], lng=school_data["lng"], shift="full_day", is_primary=True),
-            ]
+            ])
             school.pricing = [
                 Pricing(age_group="grade_8_12", category=PriceCategory.TUITION, amount=school_data["price"],
                        period=PricePeriod.YEARLY, source=PriceSource.OFFICIAL),
@@ -1264,11 +1467,11 @@ async def seed_database():
                 },
                 attributes={"languages_of_instruction": ["bulgarian"], "special_focus": school_data["focus"]}
             )
-            school.locations = [
+            set_locations(school, [
                 legacy_location(age_group="grade_8_12", address=f"кв. {school_data['area']}, София",
                               address_en=transliterate_address(f"кв. {school_data['area']}, София"),
                               lat=school_data["lat"], lng=school_data["lng"], shift="morning", is_primary=True),
-            ]
+            ])
             school.exam_results = build_nvo_results(
                 base_bg=school_data["nvo"][0],
                 base_math=school_data["nvo"][1],
@@ -1284,7 +1487,103 @@ async def seed_database():
                 )
             )
             schools.append(school)
-        
+
+        # ===== TEST SCHOOL: Multi-Grade NVO Results =====
+        # This school demonstrates the multi-grade tab feature
+        # with exam results for 4th, 7th, and 10th grades
+
+        test_multi_grade = legacy_school(
+            name='TEST: 155 СУ "Акад. Методи Попов"',
+            name_en='TEST: 155 SU "Acad. Metodi Popov"',
+            school_type="state",
+            education_level="lower_secondary",  # Primary education level
+            summary_bg="ТЕСТОВО училище за демонстрация на резултати от НВО в множество класове. Учениците показват прогресивно подобрение през годините.",
+            summary_en="TEST school demonstrating multi-grade NVO results. Students show progressive improvement over the years.",
+            num_pupils=950,
+            admission_info={
+                "system": "district",
+                "status": "accepting"
+            },
+            attributes={
+                "languages_of_instruction": ["bulgarian", "english"],
+                "special_focus": "general",
+                "has_canteen": True,
+                "facilities": ["library", "computer_lab", "sports_field", "science_lab"],
+                "class_size": 24,
+                "teacher_student_ratio": "1:12",
+                "school_hours": "8:00-17:00",
+                "established_year": 1975,
+                "language_focus": [
+                    {"language": "english", "level": "intensive"},
+                    {"language": "french", "level": "enrichment"}
+                ],
+                "teaching_approach": ["project_based", "student_centered"],
+                "special_programs": ["stem_program", "robotics_club"],
+                "activities_offered": ["chess", "drama", "music", "sport"]
+            }
+        )
+
+        set_locations(test_multi_grade, [
+            legacy_location(
+                age_group="grade_1_4",
+                address="бул. Цариградско шосе 115, София",
+                address_en="bul. Tsarigradsko shose 115, Sofia",
+                lat=42.6580,
+                lng=23.3750,
+                shift="morning",
+                is_primary=True,
+                phone="+359 2 876 5432"
+            ),
+            legacy_location(
+                age_group="grade_5_7",
+                address="бул. Цариградско шосе 115, София",
+                address_en="bul. Tsarigradsko shose 115, Sofia",
+                lat=42.6580,
+                lng=23.3750,
+                shift="morning",
+                is_primary=False
+            ),
+            legacy_location(
+                age_group="grade_8_12",
+                address="бул. Цариградско шосе 117, София",
+                address_en="bul. Tsarigradsko shose 117, Sofia",
+                lat=42.6585,
+                lng=23.3755,
+                shift="morning",
+                is_primary=False
+            ),
+        ])
+
+        # 4th Grade NVO Results (Starting point: 72% Bulgarian, 75% Math)
+        test_multi_grade.exam_results = build_nvo_results(
+            base_bg=72.0,
+            base_math=75.0,
+            exam_type="nvo_4",
+            year_offsets=NVO_FIVE_YEAR_DELTAS,  # 5 years of data
+        )
+
+        # 7th Grade NVO Results (Improved: 78% Bulgarian, 82% Math - shows growth!)
+        test_multi_grade.exam_results.extend(
+            build_nvo_results(
+                base_bg=78.0,
+                base_math=82.0,
+                exam_type="nvo_7",
+                year_offsets=NVO_FIVE_YEAR_DELTAS,
+            )
+        )
+
+        # 10th Grade NVO Results (Best performance: 85% Bulgarian, 88% Math)
+        test_multi_grade.exam_results.extend(
+            build_nvo_results(
+                base_bg=85.0,
+                base_math=88.0,
+                exam_type="nvo_10",
+                year_offsets=NVO_THREE_YEAR_DELTAS,
+            )
+        )
+
+        schools.append(test_multi_grade)
+
         # Add field sources before persisting
         for school in schools:
             school.field_sources = build_field_sources_for_school(school)
@@ -1302,12 +1601,17 @@ async def seed_database():
         print(f"   International schools: 5")
         print(f"   Private gymnasiums: 7")
         print(f"   State gymnasiums: 10")
+        print(f"   🧪 TEST: Multi-grade school: 1")
         print(f"   Total locations: ~{len(schools) * 2}")
         print(f"\n🎯 Comprehensive coverage for filter testing!")
         print(f"   - Every age group has multiple options")
         print(f"   - State and private all represented")
         print(f"   - Prices range from 480 BGN/mo to 24,000 BGN/yr")
         print(f"   - Multiple neighborhoods covered")
+        print(f"\n🧪 TEST SCHOOL FOR MULTI-GRADE TABS:")
+        print(f"   School: TEST: 155 СУ 'Акад. Методи Попов'")
+        print(f"   Has NVO results for: 4th grade (75%), 7th grade (82%), 10th grade (88%)")
+        print(f"   Expected insight: 📈 'Students improve as they progress'")
 
 
 if __name__ == "__main__":

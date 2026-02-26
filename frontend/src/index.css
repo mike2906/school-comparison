@@ -117,8 +117,8 @@
 
 .location-marker {
   --marker-color: #0ea5e9;
-  width: 46px;
-  height: 46px;
+  width: 48px;
+  height: 48px;
   border-radius: 9999px;
   border: 2px solid var(--marker-color);
   background: white;
@@ -128,8 +128,24 @@
   justify-content: center;
   font-weight: 700;
   font-size: 13px;
-  box-shadow: 0 6px 12px rgba(15, 23, 42, 0.18);
+  box-shadow: 0 8px 14px rgba(15, 23, 42, 0.18);
+  position: relative;
   transition: transform 200ms ease, box-shadow 200ms ease;
+}
+
+.location-marker::after {
+  content: '';
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  background: white;
+  border-right: 2px solid var(--marker-color);
+  border-bottom: 2px solid var(--marker-color);
+  transform: rotate(45deg);
+  left: 50%;
+  bottom: -7px;
+  margin-left: -7px;
+  box-shadow: 2px 2px 6px rgba(15, 23, 42, 0.12);
 }
 
 .location-marker.is-selected {
@@ -139,8 +155,14 @@
   box-shadow: 0 10px 18px rgba(15, 23, 42, 0.25);
 }
 
+.location-marker.is-selected::after {
+  background: var(--marker-color);
+}
+
 .location-marker-label {
   line-height: 1;
+  text-align: center;
+  padding: 0 6px;
 }
 
 .location-marker-label.wide {
@@ -185,6 +207,10 @@
 
 .flow-line {
   animation: flow-dash 1.6s linear infinite;
+}
+
+.flow-line.flow-line--static {
+  animation: none;
 }
 
 @keyframes flow-dash {

@@ -102,3 +102,14 @@ export async function fetchCountryConfig(code) {
 
   return response.json()
 }
+
+export async function fetchExamAverages({ countryCode = 'bg' } = {}) {
+  const params = new URLSearchParams()
+  params.set('country_code', countryCode)
+  const response = await fetch(`${API_BASE}/schools/exam-averages?${params.toString()}`)
+  if (!response.ok) {
+    throw new Error(`Failed to fetch exam averages: ${response.statusText}`)
+  }
+
+  return response.json()
+}
