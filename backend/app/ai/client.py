@@ -2,7 +2,7 @@
 OpenRouter client and model tier configuration for the scraping pipeline.
 
 This module provides:
-- Model tier selection (cheap/medium/capable)
+- Model selection (cheap tier)
 - OpenRouter integration via PydanticAI
 - Cost tracking helpers
 """
@@ -17,19 +17,15 @@ from app.config import get_settings
 # Model tier definitions
 # See: https://openrouter.ai/models for pricing and capabilities
 MODEL_TIERS = {
-    "cheap": "openrouter/google/gemini-2.5-flash-lite",  # keep lightweight tier for validation/classification
-    "medium": "openrouter/google/gemini-2.5-flash",  # $0.15/$0.60 per 1M tokens
-    "capable": "openrouter/google/gemini-2.5-pro",  # $1.25/$10.00 per 1M tokens
+    "cheap": "openrouter/google/gemini-2.5-flash-lite",  # lightweight tier for validation/classification
 }
 
 # Cost per 1M tokens (input/output)
 MODEL_COSTS = {
     "cheap": (0.075, 0.30),
-    "medium": (0.15, 0.60),
-    "capable": (1.25, 10.00),
 }
 
-ModelTier = Literal["cheap", "medium", "capable"]
+ModelTier = Literal["cheap"]
 
 
 def get_model(tier: ModelTier) -> str:
@@ -40,7 +36,7 @@ def get_model(tier: ModelTier) -> str:
     before returning the default model.
 
     Args:
-        tier: Model tier ("cheap", "medium", or "capable")
+        tier: Model tier ("cheap")
 
     Returns:
         OpenRouter model string (e.g., "openrouter/google/gemini-2.0-flash-lite")
@@ -59,7 +55,7 @@ def get_model_costs(tier: ModelTier) -> tuple[float, float]:
     Get the cost per 1M tokens for a given tier.
 
     Args:
-        tier: Model tier ("cheap", "medium", or "capable")
+        tier: Model tier ("cheap")
 
     Returns:
         Tuple of (input_cost, output_cost) per 1M tokens in USD
@@ -104,7 +100,7 @@ def get_openai_model(tier: ModelTier) -> OpenAIModel:
         Configured OpenAIModel instance
 
     Example:
-        >>> model = get_openai_model("medium")
+        >>> model = get_openai_model("cheap")
         >>> # Use with PydanticAI Agent:
         >>> agent = Agent(model=model, result_type=MySchema)
     """
@@ -162,7 +158,7 @@ def create_agent(
         ...     name: str
         ...     type: str
         >>> agent = create_agent(
-        ...     tier="medium",
+        ...     tier="cheap",
         ...     system_prompt="Extract school information",
         ...     result_type=SchoolInfo
         ... )

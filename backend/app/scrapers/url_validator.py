@@ -534,23 +534,23 @@ Be strict - only return true if you're confident it's an actual school's website
         except Exception as cheap_error:
             if self._is_model_or_provider_error(cheap_error):
                 logger.warning(
-                    "Cheap LLM validation failed for %s (%s). Retrying with medium tier.",
+                    "Cheap LLM validation failed for %s (%s). Retrying once with cheap tier.",
                     url,
                     cheap_error,
                 )
                 try:
                     output = await self._run_llm_validation_tier(
-                        tier="medium",
+                        tier="cheap",
                         system_prompt=system_prompt,
                         prompt=prompt,
                     )
-                except Exception as medium_error:
-                    logger.error(f"LLM validation failed for {url}: {medium_error}")
+                except Exception as retry_error:
+                    logger.error(f"LLM validation failed for {url}: {retry_error}")
                     # On repeated LLM failure, mark as ambiguous rather than invalid.
                     return (
                         ValidationResult.AMBIGUOUS,
                         url,
-                        f"LLM validation failed after retry: {str(medium_error)}",
+                        f"LLM validation failed after retry: {str(retry_error)}",
                     )
             else:
                 logger.error(f"LLM validation failed for {url}: {cheap_error}")
@@ -604,7 +604,7 @@ Be strict - only return true if you're confident it's an actual school's website
         return URLValidationOutput.model_validate(raw_data)
 
     def _is_model_or_provider_error(self, exc: Exception) -> bool:
-        """Detect model/provider failures that deserve one retry with fallback tier."""
+        """Detect model/provider failures that deserve one retry."""
         message = str(exc).lower()
         markers = (
             "not a valid model id",

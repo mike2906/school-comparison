@@ -85,29 +85,16 @@ scripts/run_school_workflow.sh --school-id 182
 Set these in `backend/.env` when tuning quality/cost:
 
 ```bash
-EXTRACTION_PRIMARY_TIER=medium         # cheap|medium
-EXTRACTION_QUALITY_GATE_ENABLED=true
 EXTRACTION_GENERAL_INFO_MIN_QUALITY_SCORE=4
-NAV_CONTENT_EXTRACTOR=bs4              # bs4|trafilatura|crawl4ai
-NAV_FETCH_ENGINE=httpx                 # httpx|crawl4ai
+EXTRACTION_OUTPUT_RETRIES=2
+EXTRACTION_OPENROUTER_MODELS=openai/gpt-4o-mini
+EXTRACTION_OPENROUTER_PROVIDER_ALLOW_FALLBACKS=true
 ```
 
-Current default recommendation from school `182` benchmark:
-- `NAV_FETCH_ENGINE=httpx`
-- `NAV_CONTENT_EXTRACTOR=bs4`
-
-Run benchmark for one school with Lite-only models:
-
+Use the single-school workflow for fast validation:
 ```bash
 cd backend
-scripts/run_school_workflow.sh --school-id 182 --benchmark-lite
-```
-
-Optional A/B script for `bs4` vs `trafilatura`:
-
-```bash
-cd backend
-uv run python scripts/compare_content_extractors.py --city sofia --limit 20 --output reports/extractor_ab.json
+scripts/run_school_workflow.sh --school-id 182
 ```
 
 ## License

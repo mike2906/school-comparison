@@ -1,4 +1,4 @@
-"""Tests for scraper CLI v2 stages."""
+"""Tests for scraper CLI stage helpers (canonical)."""
 
 from __future__ import annotations
 
@@ -12,18 +12,21 @@ from app.scrapers import cli as scraper_cli
 
 
 @pytest.mark.asyncio
-async def test_stage_choices_include_v2_variants():
+async def test_stage_choices_use_canonical_names():
     run_command = scraper_cli.run
     stage_param = next(param for param in run_command.params if param.name == "stage")
     choices = set(stage_param.type.choices)
 
-    assert "navigate-v2" in choices
-    assert "extract-v2" in choices
-    assert "all-v2" in choices
+    assert "navigate" in choices
+    assert "extract" in choices
+    assert "all" in choices
+    assert "navigate-v2" not in choices
+    assert "extract-v2" not in choices
+    assert "all-v2" not in choices
 
 
 @pytest.mark.asyncio
-async def test_run_all_stages_v2_routes_to_v2_handlers(db_session):
+async def test_run_all_stages_routes_to_canonical_handlers(db_session):
     school = School(
         name_i18n={"bg": "Тест"},
         country_code="bg",
@@ -39,10 +42,10 @@ async def test_run_all_stages_v2_routes_to_v2_handlers(db_session):
     with (
         patch.object(scraper_cli, "_run_discover_website", new=AsyncMock()) as discover_mock,
         patch.object(scraper_cli, "_run_validate_url", new=AsyncMock()) as validate_mock,
-        patch.object(scraper_cli, "_run_navigate_school_v2", new=AsyncMock()) as nav_mock,
-        patch.object(scraper_cli, "_run_extract_school_v2", new=AsyncMock()) as extract_mock,
+        patch.object(scraper_cli, "_run_navigate_school", new=AsyncMock()) as nav_mock,
+        patch.object(scraper_cli, "_run_extract_school", new=AsyncMock()) as extract_mock,
     ):
-        await scraper_cli._run_all_stages_v2(db_session, school.id, "bg")
+        await scraper_cli._run_all_stages(db_session, school.id, "bg")
 
     discover_mock.assert_awaited_once()
     validate_mock.assert_awaited_once()
@@ -51,7 +54,7 @@ async def test_run_all_stages_v2_routes_to_v2_handlers(db_session):
 
 
 @pytest.mark.asyncio
-async def test_run_navigate_batch_v2_rolls_back_and_continues_after_school_error(db_session):
+async def test_run_navigate_batch_rolls_back_and_continues_after_school_error(db_session):
     for idx in range(2):
         db_session.add(
             School(
@@ -72,11 +75,11 @@ async def test_run_navigate_batch_v2_rolls_back_and_continues_after_school_error
 
     with (
         patch("app.config.get_settings", return_value=settings),
-        patch("app.scrapers.v2.navigator.navigate_schools_v2_batch", new=AsyncMock(side_effect=RuntimeError("boom"))),
-        patch.object(scraper_cli, "_run_navigate_school_v2", new=run_mock),
+        patch("app.scrapers.navigator.navigate_schools_batch", new=AsyncMock(side_effect=RuntimeError("boom"))),
+        patch.object(scraper_cli, "_run_navigate_school", new=run_mock),
         patch.object(db_session, "rollback", new=rollback_spy),
     ):
-        await scraper_cli._run_navigate_batch_v2(
+        await scraper_cli._run_navigate_batch(
             db=db_session,
             country="bg",
             city="sofia",
@@ -89,7 +92,7 @@ async def test_run_navigate_batch_v2_rolls_back_and_continues_after_school_error
 
 
 @pytest.mark.asyncio
-async def test_run_navigate_batch_v2_uses_batch_crawler_results(db_session):
+async def test_run_navigate_batch_uses_batch_crawler_results(db_session):
     schools = []
     for idx in range(2):
         school = School(
@@ -113,10 +116,10 @@ async def test_run_navigate_batch_v2_uses_batch_crawler_results(db_session):
 
     with (
         patch("app.config.get_settings", return_value=settings),
-        patch("app.scrapers.v2.navigator.navigate_schools_v2_batch", new=AsyncMock(return_value=batch_results)) as batch_mock,
-        patch.object(scraper_cli, "_run_navigate_school_v2", new=AsyncMock()) as single_mock,
+        patch("app.scrapers.navigator.navigate_schools_batch", new=AsyncMock(return_value=batch_results)) as batch_mock,
+        patch.object(scraper_cli, "_run_navigate_school", new=AsyncMock()) as single_mock,
     ):
-        await scraper_cli._run_navigate_batch_v2(
+        await scraper_cli._run_navigate_batch(
             db=db_session,
             country="bg",
             city="sofia",
@@ -129,7 +132,7 @@ async def test_run_navigate_batch_v2_uses_batch_crawler_results(db_session):
 
 
 @pytest.mark.asyncio
-async def test_run_extract_batch_v2_rolls_back_and_continues_after_school_error(db_session):
+async def test_run_extract_batch_rolls_back_and_continues_after_school_error(db_session):
     for idx in range(2):
         db_session.add(
             School(
@@ -150,10 +153,10 @@ async def test_run_extract_batch_v2_rolls_back_and_continues_after_school_error(
 
     with (
         patch("app.config.get_settings", return_value=settings),
-        patch.object(scraper_cli, "_run_extract_school_v2", new=run_mock),
+        patch.object(scraper_cli, "_run_extract_school", new=run_mock),
         patch.object(db_session, "rollback", new=rollback_spy),
     ):
-        await scraper_cli._run_extract_batch_v2(
+        await scraper_cli._run_extract_batch(
             db=db_session,
             country="bg",
             city="sofia",

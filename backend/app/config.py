@@ -14,10 +14,8 @@ class Settings(BaseSettings):
     openrouter_api_key: str = ""
 
     # Model tier overrides (Phase 1 scraping pipeline)
-    # Set these to override default model selections
-    model_tier_cheap: str = ""  # Default: google/gemini-2.0-flash-lite
-    model_tier_medium: str = ""  # Default: google/gemini-2.5-flash
-    model_tier_capable: str = ""  # Default: google/gemini-2.5-pro
+    # Set this to override default model selection.
+    model_tier_cheap: str = ""  # Default: google/gemini-2.5-flash-lite
 
     # Spot-check validation settings
     spot_check_sample_size: int = 10  # Number of schools to spot-check per run (-1 = all, for calibration)
@@ -50,13 +48,10 @@ class Settings(BaseSettings):
     # Extraction settings
     extraction_llm_timeout_seconds: float = 15.0
     extraction_max_content_chars: int = 15000
-    extraction_primary_tier: str = "medium"  # cheap | medium
-    extraction_quality_gate_enabled: bool = True
     extraction_general_info_min_quality_score: int = 4
-    extraction_enable_capable_fallback: bool = False
     extraction_output_retries: int = 2
     extraction_temperature: float = 0.0
-    # Optional OpenRouter model routing controls used by v2 extractor.
+    # Optional OpenRouter model routing controls.
     # Comma-separated list of fallback model ids, e.g. "openai/gpt-4o-mini,anthropic/claude-3.5-haiku".
     extraction_openrouter_models: str = ""
     # Comma-separated provider priority, e.g. "openai,anthropic,google-ai-studio".
@@ -65,12 +60,9 @@ class Settings(BaseSettings):
     extraction_openrouter_provider_allow_fallbacks: bool = True
     # Optional provider sort hint: price|throughput|latency.
     extraction_openrouter_provider_sort: str = ""
-    extraction_request_min_interval_seconds: float = 0.0
     extraction_batch_concurrency: int = 1
     # When true, clear existing scraped pricing rows if extraction finds no pricing info.
     extraction_clear_pricing_on_no_info: bool = False
-    nav_content_extractor: str = "bs4"  # bs4 | trafilatura | crawl4ai
-    nav_fetch_engine: str = "httpx"  # httpx | crawl4ai | crawl4ai_deep
     nav_batch_concurrency: int = 3
     # Per-school hard timeout for CLI batch navigation. Prevents a single hung browser
     # from stalling the entire batch. Set to 0 to disable (not recommended with crawl4ai).

@@ -558,15 +558,15 @@ class TestURLValidatorLLM:
             assert result == ValidationResult.INVALID
             assert final_url is None
 
-    async def test_llm_retries_with_medium_tier_on_model_error(self):
-        """Model/provider errors on cheap tier retry once with medium tier."""
+    async def test_llm_retries_once_with_cheap_tier_on_model_error(self):
+        """Model/provider errors on cheap tier retry once with cheap tier."""
         validator = URLValidator("bg")
 
         cheap_agent = AsyncMock()
         cheap_agent.run.side_effect = Exception("google/gemini is not a valid model ID")
 
-        medium_agent = AsyncMock()
-        medium_agent.run.return_value = SimpleNamespace(
+        retry_agent = AsyncMock()
+        retry_agent.run.return_value = SimpleNamespace(
             output=URLValidationOutput(
                 is_school_website=True,
                 confidence=0.93,
@@ -576,7 +576,7 @@ class TestURLValidatorLLM:
 
         with patch(
             "app.scrapers.url_validator.create_agent",
-            side_effect=[cheap_agent, medium_agent],
+            side_effect=[cheap_agent, retry_agent],
         ) as mock_create_agent:
             result, final_url, reason = await validator._llm_validate(
                 "School page content", "https://school.bg"
@@ -587,7 +587,7 @@ class TestURLValidatorLLM:
             assert "confidence: 0.93" in reason
             assert mock_create_agent.call_count == 2
             assert mock_create_agent.call_args_list[0].kwargs["tier"] == "cheap"
-            assert mock_create_agent.call_args_list[1].kwargs["tier"] == "medium"
+            assert mock_create_agent.call_args_list[1].kwargs["tier"] == "cheap"
 
     async def test_llm_timeout_returns_ambiguous(self):
         """LLM calls are bounded and timeout returns ambiguous."""

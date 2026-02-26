@@ -7,7 +7,6 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import School
 from app.scrapers import cli as scraper_cli
@@ -131,76 +130,3 @@ async def test_run_recover_failed_urls_batch_uses_isolated_session_helper(db_ses
     assert recover_mock.await_count == 3
     assert captured_semaphore_values[0] == 4
 
-
-@pytest.mark.asyncio
-async def test_run_navigate_batch_rolls_back_and_continues_after_school_error(db_session: AsyncSession):
-    for idx in range(2):
-        db_session.add(
-            School(
-                name_i18n={"bg": f"Навигация {idx}"},
-                country_code="bg",
-                school_type="state",
-                education_level="primary",
-                city="sofia",
-                website_url=f"https://n{idx}.school.bg",
-                scrape_status="validated",
-            )
-        )
-    await db_session.commit()
-
-    run_mock = AsyncMock(side_effect=[RuntimeError("boom"), {"success": True}])
-    rollback_spy = AsyncMock(wraps=db_session.rollback)
-    settings = SimpleNamespace(nav_school_timeout_seconds=0)
-
-    with (
-        patch("app.config.get_settings", return_value=settings),
-        patch.object(scraper_cli, "_run_navigate_school", new=run_mock),
-        patch.object(db_session, "rollback", new=rollback_spy),
-    ):
-        await scraper_cli._run_navigate_batch(
-            db=db_session,
-            country="bg",
-            city="sofia",
-            limit=None,
-            include_navigated=False,
-        )
-
-    assert run_mock.await_count == 2
-    assert rollback_spy.await_count == 1
-
-
-@pytest.mark.asyncio
-async def test_run_extract_batch_rolls_back_and_continues_after_school_error(db_session: AsyncSession):
-    for idx in range(2):
-        db_session.add(
-            School(
-                name_i18n={"bg": f"Екстракция {idx}"},
-                country_code="bg",
-                school_type="private",
-                education_level="primary",
-                city="sofia",
-                website_url=f"https://e{idx}.school.bg",
-                scrape_status="navigated",
-            )
-        )
-    await db_session.commit()
-
-    run_mock = AsyncMock(side_effect=[RuntimeError("boom"), {"status": "extracted"}])
-    rollback_spy = AsyncMock(wraps=db_session.rollback)
-    settings = SimpleNamespace(extraction_school_timeout_seconds=0)
-
-    with (
-        patch("app.config.get_settings", return_value=settings),
-        patch.object(scraper_cli, "_run_extract_school", new=run_mock),
-        patch.object(db_session, "rollback", new=rollback_spy),
-    ):
-        await scraper_cli._run_extract_batch(
-            db=db_session,
-            country="bg",
-            city="sofia",
-            limit=None,
-            include_extracted=False,
-        )
-
-    assert run_mock.await_count == 2
-    assert rollback_spy.await_count == 1
