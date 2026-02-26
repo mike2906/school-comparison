@@ -1,0 +1,15 @@
+use_default_settings: true
+
+general:
+  instance_name: "Sofia School Search"
+
+server:
+  # Local dev only: disable limiter so API-style curl/httpx calls are not blocked.
+  limiter: false
+  public_instance: false
+
+search:
+  # We need JSON for scraper integration.
+  formats:
+    - html
+    - json
