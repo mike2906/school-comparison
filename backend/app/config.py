@@ -56,12 +56,22 @@ class Settings(BaseSettings):
     extraction_enable_capable_fallback: bool = False
     extraction_output_retries: int = 2
     extraction_temperature: float = 0.0
+    # Optional OpenRouter model routing controls used by v2 extractor.
+    # Comma-separated list of fallback model ids, e.g. "openai/gpt-4o-mini,anthropic/claude-3.5-haiku".
+    extraction_openrouter_models: str = ""
+    # Comma-separated provider priority, e.g. "openai,anthropic,google-ai-studio".
+    extraction_openrouter_provider_order: str = ""
+    # When false, disable OpenRouter's provider-level fallback behavior.
+    extraction_openrouter_provider_allow_fallbacks: bool = True
+    # Optional provider sort hint: price|throughput|latency.
+    extraction_openrouter_provider_sort: str = ""
     extraction_request_min_interval_seconds: float = 0.0
     extraction_batch_concurrency: int = 1
     # When true, clear existing scraped pricing rows if extraction finds no pricing info.
     extraction_clear_pricing_on_no_info: bool = False
     nav_content_extractor: str = "bs4"  # bs4 | trafilatura | crawl4ai
     nav_fetch_engine: str = "httpx"  # httpx | crawl4ai | crawl4ai_deep
+    nav_batch_concurrency: int = 3
     # Per-school hard timeout for CLI batch navigation. Prevents a single hung browser
     # from stalling the entire batch. Set to 0 to disable (not recommended with crawl4ai).
     nav_school_timeout_seconds: float = 120.0

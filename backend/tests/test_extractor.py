@@ -183,6 +183,53 @@ async def test_extract_creates_general_info(db_session, sample_school_for_extrac
 
 
 @pytest.mark.asyncio
+async def test_extract_pricing_drops_oversized_text_fields(db_session, sample_school_for_extraction):
+    school = sample_school_for_extraction
+    pages = (
+        await db_session.execute(
+            select(SourcePage).where(
+                SourcePage.school_id == school.id,
+                SourcePage.page_category == "pricing",
+            )
+        )
+    ).scalars().all()
+    for page in pages:
+        page.raw_markdown = "Pricing page content."
+        db_session.add(page)
+    await db_session.commit()
+
+    mock_price = ExtractedPrice(
+        category=PriceCategory.TUITION,
+        amount=1000.0,
+        currency="BGN",
+        period=PricePeriod.MONTHLY,
+        academic_year="A" * 64,
+        plan_name="B" * 140,
+        age_group="C" * 80,
+        confidence=0.9,
+    )
+    mock_output = PriceExtractionOutput(prices=[mock_price], has_pricing_info=True)
+    empty_general = GeneralInfoExtractionOutput(has_useful_info=False)
+
+    with (
+        patch("app.scrapers.extractor._run_agent_with_fallback", new_callable=AsyncMock) as mock_run,
+        patch("app.scrapers.extractor._extract_general_info_sections", new_callable=AsyncMock) as mock_sections,
+    ):
+        mock_run.return_value = (mock_output, 100, 50)
+        mock_sections.return_value = (empty_general, 10, 2)
+        result = await extractor.extract_school(db_session, school.id, "bg")
+
+    assert result["status"] == "extracted"
+
+    row = (
+        await db_session.execute(select(Pricing).where(Pricing.school_id == school.id))
+    ).scalars().one()
+    assert row.age_group is None
+    assert row.plan_name is None
+    assert row.academic_year is None
+
+
+@pytest.mark.asyncio
 async def test_extract_skips_unchanged_content(db_session, sample_school_for_extraction):
     school = sample_school_for_extraction
     school.attributes["_extraction_hashes"] = {
@@ -353,6 +400,18 @@ def test_normalize_general_info_output_cleans_stringified_values():
     assert normalized.accreditations == ["Cambridge"]
     assert extracted_i18n is not None
     assert "en" in extracted_i18n
+
+
+def test_normalize_general_info_output_handles_invalid_language_level():
+    parsed = GeneralInfoExtractionOutput(
+        languages=[ExtractedLanguageFocus(language="English", level="{}")],
+        has_useful_info=True,
+    )
+
+    normalized, _ = extractor._normalize_general_info_output(parsed, "bg")
+    assert len(normalized.languages) == 1
+    assert normalized.languages[0].language == "English"
+    assert normalized.languages[0].level is None
 
 
 @pytest.mark.asyncio

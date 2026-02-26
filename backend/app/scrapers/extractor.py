@@ -440,6 +440,9 @@ async def _extract_prices(
         normalized_installments = _normalize_text_list(extracted.installments)
         normalized_includes = _normalize_text_list(extracted.includes)
         normalized_excludes = _normalize_text_list(extracted.excludes)
+        normalized_plan_name = _normalize_scalar_text(extracted.plan_name, max_len=100)
+        normalized_academic_year = _normalize_scalar_text(extracted.academic_year, max_len=20)
+        normalized_age_group = _normalize_scalar_text(extracted.age_group, max_len=50)
 
         pricing_rows.append(
             Pricing(
@@ -450,9 +453,9 @@ async def _extract_prices(
                 amount_max=amount_max,
                 currency=(extracted.currency or "BGN")[:3].upper(),
                 period=period,
-                plan_name=extracted.plan_name,
-                academic_year=extracted.academic_year,
-                age_group=extracted.age_group,
+                plan_name=normalized_plan_name,
+                academic_year=normalized_academic_year,
+                age_group=normalized_age_group,
                 source=PriceSource.SCRAPED_WEBSITE,
                 source_url=source_url,
                 pricing_context={
@@ -2524,7 +2527,10 @@ def _normalize_languages(values: list[ExtractedLanguageFocus]) -> list[Extracted
             level_text = ""
             if value.level is not None:
                 level_candidates = _extract_clean_text_candidates(value.level)
-                level_text = _sanitize_label(level_candidates[0]) if level_candidates else ""
+                if level_candidates:
+                    sanitized_level = _sanitize_label(level_candidates[0])
+                    if sanitized_level:
+                        level_text = sanitized_level
 
             dedupe_key = (normalized_language.lower(), level_text.lower())
             if dedupe_key in seen:

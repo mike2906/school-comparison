@@ -77,10 +77,13 @@ def cli():
             "recover-failed-urls",
             "validate-urls",
             "navigate",
+            "navigate-v2",
             "extract",
+            "extract-v2",
             "validate-data",
             "summarize",
             "all",
+            "all-v2",
         ],
         case_sensitive=False,
     ),
@@ -152,14 +155,20 @@ async def _run_sync(school_name, school_id, stage, city, country, limit, sample_
                         await _run_validate_url(db, school_id, country)
                     elif stage == "navigate":
                         await _run_navigate_school(db, school_id, country)
+                    elif stage == "navigate-v2":
+                        await _run_navigate_school_v2(db, school_id, country)
                     elif stage == "extract":
                         await _run_extract_school(db, school_id, country)
+                    elif stage == "extract-v2":
+                        await _run_extract_school_v2(db, school_id, country)
                     elif stage == "validate-data":
                         console.print("[yellow]Validate-data stage not yet implemented[/yellow]")
                     elif stage == "summarize":
                         console.print("[yellow]Summarize stage not yet implemented[/yellow]")
                     elif stage == "all":
                         await _run_all_stages(db, school_id, country)
+                    elif stage == "all-v2":
+                        await _run_all_stages_v2(db, school_id, country)
 
                     progress.update(task, completed=True)
                     console.print(f"[green]✓ Completed stage '{stage}' for school {school_id}[/green]")
@@ -184,8 +193,16 @@ async def _run_sync(school_name, school_id, stage, city, country, limit, sample_
                 await _run_validate_urls_batch(db, country, city, limit)
             elif stage == "navigate":
                 await _run_navigate_batch(db, country, city, limit, include_navigated=include_navigated)
+            elif stage == "navigate-v2":
+                await _run_navigate_batch_v2(db, country, city, limit, include_navigated=include_navigated)
             elif stage == "extract":
                 await _run_extract_batch(db, country, city, limit, include_extracted=include_extracted)
+            elif stage == "extract-v2":
+                await _run_extract_batch_v2(db, country, city, limit, include_extracted=include_extracted)
+            elif stage == "all-v2":
+                await _run_validate_urls_batch(db, country, city, limit)
+                await _run_navigate_batch_v2(db, country, city, limit, include_navigated=include_navigated)
+                await _run_extract_batch_v2(db, country, city, limit, include_extracted=include_extracted)
             else:
                 console.print(f"[yellow]Batch mode for '{stage}' not yet implemented[/yellow]")
 
@@ -606,6 +623,24 @@ async def _run_navigate_school(db, school_id: int, country: str):
     return result
 
 
+async def _run_navigate_school_v2(db, school_id: int, country: str):
+    """Run navigation stage (v2) for a single school."""
+    from app.scrapers.v2.navigator import navigate_school_v2
+
+    console.print(f"  Navigating website for school {school_id} [v2]...")
+    result = await navigate_school_v2(db=db, school_id=school_id, country_code=country)
+
+    if result.get("success"):
+        console.print(
+            f"  Result [v2]: pages={result.get('pages_found', 0)}, "
+            f"created={result.get('created', 0)}, updated={result.get('updated', 0)}, "
+            f"cache_hits={result.get('cache_hits', 0)}"
+        )
+    else:
+        console.print(f"[yellow]  Skipped [v2]: {result.get('reason', 'Unknown reason')}[/yellow]")
+    return result
+
+
 async def _run_navigate_batch(
     db,
     country: str,
@@ -684,6 +719,102 @@ async def _run_navigate_batch(
     console.print(f"  Failed: {fail_count}")
 
 
+async def _run_navigate_batch_v2(
+    db,
+    country: str,
+    city: str,
+    limit: Optional[int],
+    include_navigated: bool = False,
+):
+    """Run navigation stage (v2) in batch mode."""
+    from app.models import School
+    from app.scrapers.v2.navigator import navigate_schools_v2_batch
+    from sqlalchemy import select
+
+    statuses = ["validated", "navigated"] if include_navigated else ["validated"]
+    query = select(School).where(
+        School.country_code == country,
+        School.scrape_status.in_(statuses),
+        School.website_url.isnot(None),
+    )
+
+    if city:
+        query = query.where(School.city == city)
+
+    if limit:
+        query = query.limit(limit)
+
+    result = await db.execute(query)
+    schools = result.scalars().all()
+    school_ids = [school.id for school in schools]
+
+    if not school_ids:
+        console.print("[yellow]No schools to navigate [v2][/yellow]")
+        return
+
+    status_label = "validated+navigated" if include_navigated else "validated"
+    console.print(f"[cyan]Navigating websites for {len(school_ids)} schools [v2]...[/cyan]")
+    console.print(f"  Status filter: {status_label}")
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console,
+    ) as progress:
+        task = progress.add_task("Navigating websites [v2]...", total=len(school_ids))
+
+        success_count = 0
+        fail_count = 0
+
+        from app.config import get_settings as _get_settings
+
+        settings = _get_settings()
+        _nav_timeout = settings.nav_school_timeout_seconds
+        nav_batch_concurrency = max(1, int(getattr(settings, "nav_batch_concurrency", 3)))
+        console.print(f"  Batch crawl concurrency [v2]: {nav_batch_concurrency}")
+
+        try:
+            results = await navigate_schools_v2_batch(
+                db=db,
+                school_ids=school_ids,
+                country_code=country,
+                max_concurrency=nav_batch_concurrency,
+            )
+        except Exception as exc:
+            logger.warning("V2 batch navigation failed; falling back to sequential mode: %s", exc)
+            await db.rollback()
+            results = []
+            for school_id in school_ids:
+                try:
+                    coro = _run_navigate_school_v2(db, school_id, country)
+                    if _nav_timeout > 0:
+                        result = await asyncio.wait_for(coro, timeout=_nav_timeout)
+                    else:
+                        result = await coro
+                except asyncio.TimeoutError:
+                    logger.error(
+                        "Navigation [v2] timed out after %.0fs for school %s", _nav_timeout, school_id
+                    )
+                    await db.rollback()
+                    result = {"school_id": school_id, "success": False, "reason": "Navigation timeout"}
+                except Exception as e:
+                    logger.error(f"Error navigating [v2] school {school_id}: {e}")
+                    await db.rollback()
+                    result = {"school_id": school_id, "success": False, "reason": str(e)}
+                results.append(result)
+
+        for result in results:
+            if result and result.get("success"):
+                success_count += 1
+            else:
+                fail_count += 1
+            progress.update(task, advance=1)
+
+    console.print(f"[green]✓ Navigation [v2] complete:[/green]")
+    console.print(f"  Successful: {success_count}")
+    console.print(f"  Failed: {fail_count}")
+
+
 async def _run_all_stages(db, school_id: int, country: str):
     """Run all pipeline stages for a single school."""
     stages = ["discover-websites", "validate-urls", "navigate", "extract", "validate-data", "summarize"]
@@ -699,6 +830,25 @@ async def _run_all_stages(db, school_id: int, country: str):
             await _run_navigate_school(db, school_id, country)
         elif stage == "extract":
             await _run_extract_school(db, school_id, country)
+        else:
+            console.print(f"[yellow]{stage} not yet implemented[/yellow]")
+
+
+async def _run_all_stages_v2(db, school_id: int, country: str):
+    """Run pipeline stages for a single school, using v2 for stage 4+5."""
+    stages = ["discover-websites", "validate-urls", "navigate-v2", "extract-v2", "validate-data", "summarize"]
+
+    for stage in stages:
+        console.print(f"\n[cyan]Stage: {stage}[/cyan]")
+
+        if stage == "discover-websites":
+            await _run_discover_website(db, school_id, country)
+        elif stage == "validate-urls":
+            await _run_validate_url(db, school_id, country)
+        elif stage == "navigate-v2":
+            await _run_navigate_school_v2(db, school_id, country)
+        elif stage == "extract-v2":
+            await _run_extract_school_v2(db, school_id, country)
         else:
             console.print(f"[yellow]{stage} not yet implemented[/yellow]")
 
@@ -921,6 +1071,42 @@ async def _run_extract_school(db, school_id: int, country: str):
     return result
 
 
+async def _run_extract_school_v2(db, school_id: int, country: str):
+    """Run extraction stage (v2) for a single school."""
+    from app.scrapers.v2.extractor import extract_school_v2
+
+    console.print(f"  Extracting data for school {school_id} [v2]...")
+    result = await extract_school_v2(db=db, school_id=school_id, country_code=country)
+    llm_stats = result.get("llm_stats") or {}
+
+    if result.get("skipped"):
+        console.print(f"[yellow]  Skipped [v2]: content unchanged[/yellow]")
+    elif result.get("status") == "extracted":
+        console.print(
+            f"[green]  Success [v2]: pricing={result.get('pricing_count')} items, "
+            f"general_info={result.get('general_info_success')}[/green]"
+        )
+        if result.get("details"):
+            for detail in result.get("details"):
+                console.print(f"    [dim]{detail}[/dim]")
+    else:
+        console.print(f"[red]  Failed [v2]: {result.get('error', 'Unknown error')}[/red]")
+        if result.get("details"):
+            for detail in result.get("details"):
+                console.print(f"    [dim]{detail}[/dim]")
+
+    if llm_stats:
+        console.print(
+            "    [dim]"
+            f"LLM calls={llm_stats.get('total_calls', 0)}, "
+            f"model_retries={llm_stats.get('model_retries', 0)}, "
+            f"hard_fail={llm_stats.get('hard_failures', 0)} "
+            f"({llm_stats.get('hard_failure_rate', 0):.2%})"
+            "[/dim]"
+        )
+    return result
+
+
 async def _run_extract_batch(
     db,
     country: str,
@@ -1059,6 +1245,145 @@ async def _run_extract_batch(
                 progress.update(task, advance=1)
 
     console.print(f"[green]✓ Extraction complete:[/green]")
+    console.print(f"  Successful: {success_count}")
+    console.print(f"  Skipped: {skipped_count}")
+    console.print(f"  Failed: {fail_count}")
+
+
+async def _run_extract_batch_v2(
+    db,
+    country: str,
+    city: str,
+    limit: Optional[int],
+    include_extracted: bool = False,
+):
+    """Run extraction stage (v2) in batch mode."""
+    from app.models import School
+    from sqlalchemy import select
+
+    statuses = ["navigated", "extraction_failed"]
+    if include_extracted:
+        statuses.append("extracted")
+
+    query = select(School).where(
+        School.country_code == country,
+        School.scrape_status.in_(statuses),
+        School.website_url.isnot(None),
+    )
+
+    if city:
+        query = query.where(School.city == city)
+
+    if limit:
+        query = query.limit(limit)
+
+    result = await db.execute(query)
+    schools = result.scalars().all()
+    school_ids = [school.id for school in schools]
+
+    if not school_ids:
+        console.print("[yellow]No schools to extract [v2] (must be navigated or extraction_failed)[/yellow]")
+        return
+
+    status_label = "navigated/failed + extracted" if include_extracted else "navigated/failed"
+    console.print(f"[cyan]Extracting data for {len(school_ids)} schools [v2]...[/cyan]")
+    console.print(f"  Status filter: {status_label}")
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console,
+    ) as progress:
+        task = progress.add_task("Extracting data [v2]...", total=len(school_ids))
+
+        success_count = 0
+        skipped_count = 0
+        fail_count = 0
+
+        from app.config import get_settings as _get_settings
+        from app.database import async_session_maker
+
+        settings = _get_settings()
+        _ext_timeout = settings.extraction_school_timeout_seconds
+        requested_concurrency = max(1, int(getattr(settings, "extraction_batch_concurrency", 1)))
+        max_concurrency = 8
+        concurrency = min(requested_concurrency, max_concurrency)
+
+        console.print(f"  Concurrency: {concurrency}")
+        if requested_concurrency > max_concurrency:
+            console.print(
+                f"[yellow]  Requested concurrency {requested_concurrency} capped to {max_concurrency}[/yellow]"
+            )
+
+        if concurrency == 1:
+            for school_id in school_ids:
+                try:
+                    coro = _run_extract_school_v2(db, school_id, country)
+                    if _ext_timeout > 0:
+                        result = await asyncio.wait_for(coro, timeout=_ext_timeout)
+                    else:
+                        result = await coro
+                    if result.get("skipped"):
+                        skipped_count += 1
+                    elif result.get("status") == "extracted":
+                        success_count += 1
+                    else:
+                        fail_count += 1
+                except asyncio.TimeoutError:
+                    logger.error(
+                        "Extraction [v2] timed out after %.0fs for school %s", _ext_timeout, school_id
+                    )
+                    await db.rollback()
+                    fail_count += 1
+                except Exception as e:
+                    logger.error(f"Error extracting [v2] school {school_id}: {e}")
+                    await db.rollback()
+                    fail_count += 1
+                progress.update(task, advance=1)
+        else:
+            from app.scrapers.v2.extractor import extract_school_v2
+
+            semaphore = asyncio.Semaphore(concurrency)
+
+            async def _extract_single(school_id: int) -> tuple[int, dict]:
+                async with semaphore:
+                    try:
+                        async with async_session_maker() as school_db:
+                            coro = extract_school_v2(db=school_db, school_id=school_id, country_code=country)
+                            if _ext_timeout > 0:
+                                result = await asyncio.wait_for(coro, timeout=_ext_timeout)
+                            else:
+                                result = await coro
+                            return school_id, result
+                    except asyncio.TimeoutError:
+                        logger.error(
+                            "Extraction [v2] timed out after %.0fs for school %s", _ext_timeout, school_id
+                        )
+                        return school_id, {
+                            "school_id": school_id,
+                            "status": "extraction_failed",
+                            "error": "Extraction timeout",
+                        }
+                    except Exception as exc:
+                        logger.error("Error extracting [v2] school %s: %s", school_id, exc)
+                        return school_id, {
+                            "school_id": school_id,
+                            "status": "extraction_failed",
+                            "error": str(exc),
+                        }
+
+            tasks = [asyncio.create_task(_extract_single(school_id)) for school_id in school_ids]
+            for task_result in asyncio.as_completed(tasks):
+                _, result = await task_result
+                if result.get("skipped"):
+                    skipped_count += 1
+                elif result.get("status") == "extracted":
+                    success_count += 1
+                else:
+                    fail_count += 1
+                progress.update(task, advance=1)
+
+    console.print(f"[green]✓ Extraction [v2] complete:[/green]")
     console.print(f"  Successful: {success_count}")
     console.print(f"  Skipped: {skipped_count}")
     console.print(f"  Failed: {fail_count}")
