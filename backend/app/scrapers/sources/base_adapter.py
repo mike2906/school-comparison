@@ -85,7 +85,7 @@ class BaseSourceAdapter(ABC):
             Dict with counts: {"created": N, "updated": M, "skipped": K}
         """
         from app.models import School, SchoolLocation, SchoolLocationAgeGroupShift
-        from sqlalchemy import select, and_, func
+        from sqlalchemy import select, and_, func, delete
         import logging
 
         logger = logging.getLogger(__name__)
@@ -210,8 +210,19 @@ class BaseSourceAdapter(ABC):
                     # For simplicity, delete old locations and recreate
                     # (In production, might want smarter diffing, but locations rarely change)
                     if existing_school:
+                        # Remove child shift rows first because raw deletes bypass ORM cascades.
+                        location_ids_result = await self.db.execute(
+                            select(SchoolLocation.id).where(SchoolLocation.school_id == school_id)
+                        )
+                        location_ids = [row[0] for row in location_ids_result.all()]
+                        if location_ids:
+                            await self.db.execute(
+                                delete(SchoolLocationAgeGroupShift).where(
+                                    SchoolLocationAgeGroupShift.location_id.in_(location_ids)
+                                )
+                            )
                         await self.db.execute(
-                            SchoolLocation.__table__.delete().where(SchoolLocation.school_id == school_id)
+                            delete(SchoolLocation).where(SchoolLocation.school_id == school_id)
                         )
 
                     for loc in disc.locations:
