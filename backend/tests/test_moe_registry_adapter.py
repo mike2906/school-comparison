@@ -181,7 +181,31 @@ class TestMoeRegistryAdapterIntegration:
         mock_client.__aexit__.return_value = None
         mock_client.post = mock_post
 
-        with patch("httpx.AsyncClient", return_value=mock_client):
+        geocode_results = [
+            (
+                GeocodingResult(
+                    success=True,
+                    lat=42.6501,
+                    lng=23.3502,
+                    provider="nominatim",
+                ),
+                "coords_source=nominatim",
+            ),
+            (
+                GeocodingResult(
+                    success=True,
+                    lat=42.6201,
+                    lng=23.3202,
+                    provider="nominatim",
+                ),
+                "coords_source=nominatim",
+            ),
+        ]
+
+        with (
+            patch("httpx.AsyncClient", return_value=mock_client),
+            patch.object(adapter, "_geocode_discovered_location", new=AsyncMock(side_effect=geocode_results)),
+        ):
             schools = await adapter.discover(limit=2, fetch_details=True)
 
         # Verify we got schools back
@@ -199,6 +223,9 @@ class TestMoeRegistryAdapterIntegration:
         assert len(school1.locations) == 1
         assert "Климент Охридски" in school1.locations[0].address_i18n["bg"]
         assert school1.locations[0].phone == "02/8766767"
+        assert school1.locations[0].lat == pytest.approx(42.6501)
+        assert school1.locations[0].lng == pytest.approx(23.3502)
+        assert "coords_source=nominatim" in school1.locations[0].location_tags
         assert school1.attributes["moe_email"] == "info@zlatarskischool.org"
 
         # Verify second school (ДГ - kindergarten)
@@ -210,6 +237,9 @@ class TestMoeRegistryAdapterIntegration:
         assert len(school2.locations) == 1
         assert "Шумако" in school2.locations[0].address_i18n["bg"]
         assert school2.locations[0].phone == "0889828647"
+        assert school2.locations[0].lat == pytest.approx(42.6201)
+        assert school2.locations[0].lng == pytest.approx(23.3202)
+        assert "coords_source=nominatim" in school2.locations[0].location_tags
 
     async def test_discover_without_details(self, db_session: AsyncSession):
         """Test discover() without fetching detail data (fast mode)."""
