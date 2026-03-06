@@ -498,6 +498,8 @@ async def _extract_general_info(
         "Populate languages, facilities, programs, extracurricular, class_size, founded_year, accreditations, "
         "and nested admission/operations/services/pricing_terms sections. "
         "Return only concrete facts explicitly supported by content; do not invent. "
+        "For languages, class_size, and founded_year: include values only when explicitly stated in the content. "
+        "If not explicit, return languages=[] and class_size/founded_year as null. "
         "When content explicitly mentions facilities, programs, or extracurriculars, include them as short list items "
         "instead of leaving those arrays empty. "
         "Set has_useful_info=true whenever at least one concrete fact is extracted."
@@ -524,7 +526,9 @@ async def _extract_general_info(
                 "Extract additional concrete school facts that are explicitly present. "
                 "Prioritize filling missing languages, facilities, programs, extracurricular, class size, founded "
                 "year, accreditations, admission, operations, services, and pricing terms. "
-                "Do not invent values."
+                "Do not invent values. "
+                "For languages, class_size, and founded_year: only include them when explicitly stated; otherwise "
+                "leave them empty/null."
             )
             max_chars = max(2000, int(settings.extraction_max_content_chars))
             recovery_user_prompt = f"School: {school_name}\n\nContent:\n{all_page_text[:max_chars]}"
@@ -578,6 +582,8 @@ async def _extract_general_info(
         extracted["contact"] = contact_info
 
     attrs["extracted"] = extracted
+    # Invalidate previous Stage 6 report because extracted payload just changed.
+    attrs.pop("data_validation", None)
     attrs.pop("operations", None)
     attrs.pop("services", None)
     attrs.pop("pricing_terms", None)

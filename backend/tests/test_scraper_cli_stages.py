@@ -44,6 +44,7 @@ async def test_run_all_stages_routes_to_canonical_handlers(db_session):
         patch.object(scraper_cli, "_run_validate_url", new=AsyncMock()) as validate_mock,
         patch.object(scraper_cli, "_run_navigate_school", new=AsyncMock()) as nav_mock,
         patch.object(scraper_cli, "_run_extract_school", new=AsyncMock()) as extract_mock,
+        patch.object(scraper_cli, "_run_validate_data_school", new=AsyncMock()) as validate_data_mock,
     ):
         await scraper_cli._run_all_stages(db_session, school.id, "bg")
 
@@ -51,6 +52,7 @@ async def test_run_all_stages_routes_to_canonical_handlers(db_session):
     validate_mock.assert_awaited_once()
     nav_mock.assert_awaited_once()
     extract_mock.assert_awaited_once()
+    validate_data_mock.assert_awaited_once()
 
 
 @pytest.mark.asyncio

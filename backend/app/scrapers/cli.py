@@ -38,6 +38,7 @@ Usage:
 import asyncio
 import sys
 import logging
+import random
 from typing import Optional
 import click
 from rich.console import Console
@@ -93,9 +94,27 @@ def cli():
 @click.option("--sample-ratio", type=float, default=0.0, help="Sample ratio for unchanged schools (discover only)")
 @click.option("--include-navigated", is_flag=True, help="For navigate stage, recrawl already navigated schools")
 @click.option("--include-extracted", is_flag=True, help="For extract stage, re-extract already extracted schools")
+@click.option(
+    "--force-validate",
+    is_flag=True,
+    help="For validate-data stage, include schools that already have a current validation report",
+)
 @click.option("--sync", is_flag=True, help="Run synchronously (no Celery)")
 @click.option("--dry-run", is_flag=True, help="Show what would happen without executing")
-def run(school, school_id, stage, city, country, limit, sample_ratio, include_navigated, include_extracted, sync, dry_run):
+def run(
+    school,
+    school_id,
+    stage,
+    city,
+    country,
+    limit,
+    sample_ratio,
+    include_navigated,
+    include_extracted,
+    force_validate,
+    sync,
+    dry_run,
+):
     """Run a pipeline stage."""
     if dry_run:
         console.print(f"[yellow]DRY RUN - would execute:[/yellow]")
@@ -107,19 +126,44 @@ def run(school, school_id, stage, city, country, limit, sample_ratio, include_na
         console.print(f"  Sample ratio: {sample_ratio}")
         console.print(f"  Include navigated: {include_navigated}")
         console.print(f"  Include extracted: {include_extracted}")
+        console.print(f"  Force validate: {force_validate}")
         console.print(f"  Mode: {'sync' if sync else 'celery'}")
         return
 
     if sync:
         # Run synchronously
-        asyncio.run(_run_sync(school, school_id, stage, city, country, limit, sample_ratio, include_navigated, include_extracted))
+        asyncio.run(
+            _run_sync(
+                school,
+                school_id,
+                stage,
+                city,
+                country,
+                limit,
+                sample_ratio,
+                include_navigated,
+                include_extracted,
+                force_validate,
+            )
+        )
     else:
         # Run via Celery
         console.print("[yellow]Celery mode not yet implemented. Use --sync for now.[/yellow]")
         sys.exit(1)
 
 
-async def _run_sync(school_name, school_id, stage, city, country, limit, sample_ratio, include_navigated: bool, include_extracted: bool):
+async def _run_sync(
+    school_name,
+    school_id,
+    stage,
+    city,
+    country,
+    limit,
+    sample_ratio,
+    include_navigated: bool,
+    include_extracted: bool,
+    force_validate: bool,
+):
     """Run pipeline stage synchronously."""
     from app.database import async_session_maker
 
@@ -155,7 +199,7 @@ async def _run_sync(school_name, school_id, stage, city, country, limit, sample_
                     elif stage == "extract":
                         await _run_extract_school(db, school_id, country)
                     elif stage == "validate-data":
-                        console.print("[yellow]Validate-data stage not yet implemented[/yellow]")
+                        await _run_validate_data_school(db, school_id, country, run_spot_check=True)
                     elif stage == "summarize":
                         console.print("[yellow]Summarize stage not yet implemented[/yellow]")
                     elif stage == "all":
@@ -186,10 +230,13 @@ async def _run_sync(school_name, school_id, stage, city, country, limit, sample_
                 await _run_navigate_batch(db, country, city, limit, include_navigated=include_navigated)
             elif stage == "extract":
                 await _run_extract_batch(db, country, city, limit, include_extracted=include_extracted)
+            elif stage == "validate-data":
+                await _run_validate_data_batch(db, country, city, limit, force_validate=force_validate)
             elif stage == "all":
                 await _run_validate_urls_batch(db, country, city, limit)
                 await _run_navigate_batch(db, country, city, limit, include_navigated=include_navigated)
                 await _run_extract_batch(db, country, city, limit, include_extracted=include_extracted)
+                await _run_validate_data_batch(db, country, city, limit, force_validate=force_validate)
             else:
                 console.print(f"[yellow]Batch mode for '{stage}' not yet implemented[/yellow]")
 
@@ -722,6 +769,8 @@ async def _run_all_stages(db, school_id: int, country: str):
             await _run_navigate_school(db, school_id, country)
         elif stage == "extract":
             await _run_extract_school(db, school_id, country)
+        elif stage == "validate-data":
+            await _run_validate_data_school(db, school_id, country, run_spot_check=True)
         else:
             console.print(f"[yellow]{stage} not yet implemented[/yellow]")
 
@@ -908,6 +957,248 @@ async def _show_stats(city, country):
         for school_type, count in sorted(type_counts.items()):
             console.print(f"  {school_type}: {count}")
 
+
+
+async def _run_validate_data_school(
+    db,
+    school_id: int,
+    country: str,
+    run_spot_check: bool = False,
+):
+    """Run deterministic Stage 6 validation for one school."""
+    from app.scrapers.validator import validate_school_data
+
+    console.print(f"  Validating extracted data for school {school_id}...")
+    result = await validate_school_data(
+        db=db,
+        school_id=school_id,
+        country_code=country,
+        run_spot_check=run_spot_check,
+    )
+
+    status = result.get("status")
+    if status == "validation_failed":
+        console.print(f"[red]  Failed: {result.get('error', 'Unknown error')}[/red]")
+        return result
+
+    issue_counts = result.get("issue_counts") or {}
+    error_count = int(issue_counts.get("error", 0))
+    warning_count = int(issue_counts.get("warning", 0))
+    status_color = "yellow" if status == "needs_review" else "green"
+    console.print(
+        f"[{status_color}]  Validation status: {status} "
+        f"(errors={error_count}, warnings={warning_count}, auto_fixes={result.get('auto_fixes', 0)})[/{status_color}]"
+    )
+
+    spot = result.get("spot_check") or {}
+    if spot:
+        if spot.get("status") == "checked":
+            kind_counts = spot.get("kind_counts") or {}
+            console.print(
+                "    [dim]"
+                f"Spot-check: discrepancies={spot.get('discrepancies', 0)}, "
+                f"has_discrepancy={spot.get('has_discrepancy', False)}, "
+                f"contradiction={int(kind_counts.get('contradiction', 0))}, "
+                f"omission={int(kind_counts.get('omission', 0))}, "
+                f"unsupported={int(kind_counts.get('unsupported', 0))}"
+                "[/dim]"
+            )
+            console.print("    [dim]Spot-check is monitoring-only; validation status is deterministic.[/dim]")
+        else:
+            console.print(
+                f"    [dim]Spot-check: {spot.get('status')} ({spot.get('reason') or spot.get('error')})[/dim]"
+            )
+
+    return result
+
+
+async def _run_validate_data_batch(
+    db,
+    country: str,
+    city: Optional[str],
+    limit: Optional[int],
+    force_validate: bool = False,
+):
+    """Run Stage 6 validation in batch mode, then sampled monitoring spot-checks."""
+    from app.config import get_settings as _get_settings
+    from app.database import async_session_maker
+    from app.models import School
+    from app.scrapers.validator import (
+        has_current_validation_report,
+        run_spot_check_for_school,
+        validate_school_data,
+    )
+    from sqlalchemy import select
+
+    settings = _get_settings()
+    query = select(School.id, School.attributes).where(
+        School.country_code == country,
+        School.scrape_status == "extracted",
+    )
+    if city:
+        query = query.where(School.city == city)
+    if limit:
+        query = query.limit(limit)
+
+    result = await db.execute(query)
+    school_rows = result.all()
+    if force_validate:
+        school_ids = [row[0] for row in school_rows]
+    else:
+        school_ids = [
+            row[0] for row in school_rows if not has_current_validation_report(row[1], schema_version=1)
+        ]
+
+    if not school_ids:
+        if force_validate:
+            console.print("[yellow]No schools to validate (must be extracted)[/yellow]")
+        else:
+            console.print("[yellow]No schools to validate (all extracted schools already have current Stage 6 reports)[/yellow]")
+        return
+
+    requested_concurrency = max(1, int(getattr(settings, "validation_batch_concurrency", 1)))
+    max_concurrency = 8
+    concurrency = min(requested_concurrency, max_concurrency)
+    if requested_concurrency > max_concurrency:
+        console.print(
+            f"[yellow]Requested concurrency {requested_concurrency} capped to {max_concurrency}[/yellow]"
+        )
+
+    console.print(f"[cyan]Running Stage 6 validation for {len(school_ids)} schools...[/cyan]")
+    console.print(f"  Concurrency: {concurrency}")
+
+    ok_count = 0
+    review_count = 0
+    failed_count = 0
+    validated_ids: list[int] = []
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console,
+    ) as progress:
+        task = progress.add_task("Validating extracted data...", total=len(school_ids))
+        semaphore = asyncio.Semaphore(concurrency)
+
+        async def _validate_single(school_id: int) -> tuple[int, dict]:
+            async with semaphore:
+                async with async_session_maker() as school_db:
+                    try:
+                        out = await validate_school_data(
+                            db=school_db,
+                            school_id=school_id,
+                            country_code=country,
+                            run_spot_check=False,
+                        )
+                    except Exception as exc:
+                        logger.error("Validation failed for school %s: %s", school_id, exc)
+                        out = {"status": "validation_failed", "error": str(exc)}
+                    return school_id, out
+
+        tasks = [asyncio.create_task(_validate_single(school_id)) for school_id in school_ids]
+        for completed in asyncio.as_completed(tasks):
+            school_id, out = await completed
+            status = out.get("status")
+            if status == "ok":
+                ok_count += 1
+                validated_ids.append(school_id)
+            elif status == "needs_review":
+                review_count += 1
+                validated_ids.append(school_id)
+            else:
+                failed_count += 1
+            progress.update(task, advance=1)
+
+    console.print("[green]✓ Validation complete:[/green]")
+    console.print(f"  OK: {ok_count}")
+    console.print(f"  Needs review: {review_count}")
+    console.print(f"  Failed: {failed_count}")
+
+    sample_size = int(getattr(settings, "spot_check_sample_size", 0))
+    sample_ids = sorted(validated_ids)
+    if sample_size == 0:
+        sample_ids = []
+    elif sample_size > 0:
+        sample_ids = sorted(random.sample(sample_ids, min(sample_size, len(sample_ids))))
+    elif sample_size < 0:
+        # -1 sentinel means "all validated schools in this run".
+        pass
+    if not sample_ids:
+        console.print("[yellow]No spot-checks scheduled (sample size is 0 or no validated schools).[/yellow]")
+        return
+
+    console.print(f"[cyan]Running capable-model spot-checks for {len(sample_ids)} schools...[/cyan]")
+    console.print("  [dim]Spot-checks are monitoring-only and do not change Stage 6 pass/fail status.[/dim]")
+
+    checked_count = 0
+    discrepancy_count = 0
+    spot_failed_count = 0
+    contradiction_count = 0
+    omission_count = 0
+    unsupported_count = 0
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console,
+    ) as progress:
+        task = progress.add_task("Running spot-checks...", total=len(sample_ids))
+
+        semaphore = asyncio.Semaphore(concurrency)
+
+        async def _spot_check_single(school_id: int) -> tuple[int, dict]:
+            async with semaphore:
+                async with async_session_maker() as school_db:
+                    try:
+                        out = await run_spot_check_for_school(
+                            db=school_db,
+                            school_id=school_id,
+                            country_code=country,
+                        )
+                    except Exception as exc:
+                        logger.error("Spot-check failed for school %s: %s", school_id, exc)
+                        out = {"status": "failed", "error": str(exc)}
+                    return school_id, out
+
+        tasks = [asyncio.create_task(_spot_check_single(school_id)) for school_id in sample_ids]
+        for completed in asyncio.as_completed(tasks):
+            _, out = await completed
+            if out.get("status") == "checked":
+                checked_count += 1
+                if out.get("has_discrepancy"):
+                    discrepancy_count += 1
+                kind_counts = out.get("kind_counts") or {}
+                contradiction_count += int(kind_counts.get("contradiction", 0))
+                omission_count += int(kind_counts.get("omission", 0))
+                unsupported_count += int(kind_counts.get("unsupported", 0))
+            else:
+                spot_failed_count += 1
+            progress.update(task, advance=1)
+
+    console.print("[green]✓ Spot-check complete:[/green]")
+    console.print(f"  Checked: {checked_count}")
+    console.print(f"  With discrepancies: {discrepancy_count}")
+    console.print(f"  Failed/skipped: {spot_failed_count}")
+    console.print(
+        "  Discrepancy kinds: "
+        f"contradiction={contradiction_count}, "
+        f"omission={omission_count}, "
+        f"unsupported={unsupported_count}"
+    )
+
+    if checked_count > 0:
+        discrepancy_rate = discrepancy_count / checked_count
+        threshold = float(getattr(settings, "spot_check_discrepancy_threshold", 0.15))
+        console.print(f"  Discrepancy rate: {discrepancy_rate:.1%}")
+        contradiction_rate = contradiction_count / checked_count
+        console.print(f"  Contradiction rate: {contradiction_rate:.1%}")
+        console.print("  [dim]Note: contradiction threshold is advisory for calibration only.[/dim]")
+        if contradiction_rate > threshold:
+            logger.info(
+                "Spot-check monitoring alert: contradiction rate %.1f%% exceeded advisory threshold %.1f%%",
+                contradiction_rate * 100,
+                threshold * 100,
+            )
 
 
 async def _run_extract_school(db, school_id: int, country: str):
