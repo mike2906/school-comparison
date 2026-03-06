@@ -1,4 +1,4 @@
-"""Tests for AI client and cheap-tier model configuration."""
+"""Tests for AI client model-tier configuration."""
 
 from types import SimpleNamespace
 
@@ -21,18 +21,25 @@ def _default_model_tier_settings(monkeypatch):
         lambda: SimpleNamespace(
             openrouter_api_key="test-key",
             model_tier_cheap="",
+            model_tier_capable="",
         ),
     )
 
 
 class TestModelTier:
-    """Test cheap-tier model configuration."""
+    """Test model tier configuration."""
 
     def test_model_tiers_defined(self):
-        assert MODEL_TIERS == {"cheap": "openrouter/google/gemini-2.5-flash-lite"}
+        assert MODEL_TIERS == {
+            "cheap": "openrouter/google/gemini-2.5-flash-lite",
+            "capable": "openrouter/openai/gpt-4o-mini",
+        }
 
     def test_model_costs_defined(self):
-        assert MODEL_COSTS == {"cheap": (0.075, 0.30)}
+        assert MODEL_COSTS == {
+            "cheap": (0.075, 0.30),
+            "capable": (0.15, 0.60),
+        }
 
     def test_get_model_cheap(self):
         model = get_model("cheap")
@@ -42,6 +49,15 @@ class TestModelTier:
         input_cost, output_cost = get_model_costs("cheap")
         assert input_cost == 0.075
         assert output_cost == 0.30
+
+    def test_get_model_capable(self):
+        model = get_model("capable")
+        assert model == "openrouter/openai/gpt-4o-mini"
+
+    def test_get_model_costs_capable(self):
+        input_cost, output_cost = get_model_costs("capable")
+        assert input_cost == 0.15
+        assert output_cost == 0.60
 
 
 class TestCostCalculation:
@@ -111,6 +127,7 @@ class TestOpenAIModelCompat:
             lambda: SimpleNamespace(
                 openrouter_api_key="test-key",
                 model_tier_cheap=None,
+                model_tier_capable=None,
             ),
         )
 
