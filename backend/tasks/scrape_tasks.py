@@ -12,7 +12,7 @@ Task Graph:
         ↓
     extract_batch → extract_school_data (per school)
         ↓
-    validate_batch + run_spot_checks
+    validate_batch → run_spot_checks
         ↓
     summarize_batch → summarize_school (per school)
 
@@ -20,6 +20,7 @@ Each stage is independently runnable and idempotent.
 """
 import asyncio
 import logging
+import random
 from typing import Optional
 from celery import group, chain
 from celery.exceptions import Retry
@@ -38,8 +39,10 @@ def run_async(coro):
     return asyncio.run(coro)
 
 
-def _should_wait_for_group() -> bool:
-    """Only block on group results in eager (synchronous) mode."""
+def _should_wait_for_group(wait_for_completion: bool = False) -> bool:
+    """Block on group results when explicitly requested or in eager mode."""
+    if wait_for_completion:
+        return True
     return bool(getattr(celery_app.conf, "task_always_eager", False))
 
 
@@ -139,6 +142,7 @@ def discover_websites_batch(
     country_code: str = "bg",
     city: Optional[str] = "sofia",
     limit: Optional[int] = None,
+    wait_for_completion: bool = False,
 ):
     """
     Discover/normalize website URLs for schools before URL validation.
@@ -153,7 +157,7 @@ def discover_websites_batch(
 
         job = group(discover_school_website_task.s(school_id, country_code) for school_id in school_ids)
         result = job.apply_async()
-        if _should_wait_for_group():
+        if _should_wait_for_group(wait_for_completion):
             results = result.get()
             discovered_count = sum(1 for item in results if item.get("found"))
             updated_count = sum(1 for item in results if item.get("updated"))
@@ -235,6 +239,7 @@ def validate_urls_batch(
     country_code: str = "bg",
     city: Optional[str] = "sofia",
     limit: Optional[int] = None,
+    wait_for_completion: bool = False,
 ):
     """
     Validate URLs for all schools in pending or failed_validate status.
@@ -259,7 +264,7 @@ def validate_urls_batch(
         # Create a group of validation tasks (fan-out pattern)
         job = group(validate_school_url.s(school_id, country_code) for school_id in school_ids)
         result = job.apply_async()
-        if _should_wait_for_group():
+        if _should_wait_for_group(wait_for_completion):
             results = result.get()
             valid_count = sum(1 for r in results if r.get("valid"))
             invalid_count = sum(1 for r in results if not r.get("valid"))
@@ -372,6 +377,7 @@ def navigate_batch(
     city: Optional[str] = "sofia",
     limit: Optional[int] = None,
     include_navigated: bool = False,
+    wait_for_completion: bool = False,
 ):
     """Navigate and classify website pages for validated schools."""
     try:
@@ -382,7 +388,7 @@ def navigate_batch(
 
         job = group(navigate_school_website.s(school_id, country_code) for school_id in school_ids)
         result = job.apply_async()
-        if _should_wait_for_group():
+        if _should_wait_for_group(wait_for_completion):
             results = result.get()
             success_count = sum(1 for item in results if item.get("success"))
             failed_count = len(results) - success_count
@@ -467,6 +473,7 @@ def extract_batch(
     country_code: str = "bg",
     city: Optional[str] = "sofia",
     limit: Optional[int] = None,
+    wait_for_completion: bool = False,
 ):
     """
     Extract structured data from school websites (Phase 2).
@@ -481,7 +488,7 @@ def extract_batch(
 
         job = group(extract_school_data.s(school_id, country_code) for school_id in school_ids)
         result = job.apply_async()
-        if _should_wait_for_group():
+        if _should_wait_for_group(wait_for_completion):
             results = result.get()
             extracted_count = sum(1 for item in results if item.get("status") == "extracted")
             failed_count = len(results) - extracted_count
@@ -552,21 +559,270 @@ async def _extract_school_async(school_id, country_code):
 
 
 # =============================================================================
-# Stage 6: Data Validation (Placeholder - Phase 2)
+# Stage 6: Data Validation
 # =============================================================================
 
-@celery_app.task(name="tasks.validate_batch")
-def validate_batch(country_code: str = "bg", city: Optional[str] = "sofia"):
-    """Validate extracted data (Phase 2)."""
-    logger.info("Validate batch - Phase 2 implementation")
-    return {"message": "Not implemented yet - Phase 2"}
+@celery_app.task(
+    bind=True,
+    name="tasks.validate_batch",
+    max_retries=3,
+)
+def validate_batch(
+    self,
+    country_code: str = "bg",
+    city: Optional[str] = "sofia",
+    limit: Optional[int] = None,
+    force_validate: bool = False,
+    wait_for_completion: bool = False,
+):
+    """Validate extracted data for all extracted schools."""
+    try:
+        school_ids = run_async(_get_schools_for_validation(country_code, city, limit, force_validate))
+
+        if not school_ids:
+            return {"message": "No schools to validate", "processed": 0}
+
+        job = group(validate_school_data_task.s(school_id, country_code) for school_id in school_ids)
+        result = job.apply_async()
+        if _should_wait_for_group(wait_for_completion):
+            results = result.get(timeout=600, propagate=False)
+            ok_count = 0
+            needs_review_count = 0
+            failed_count = 0
+            for item in results:
+                if isinstance(item, Exception):
+                    failed_count += 1
+                    continue
+                if item.get("status") == "ok":
+                    ok_count += 1
+                elif item.get("status") == "needs_review":
+                    needs_review_count += 1
+                else:
+                    failed_count += 1
+            return {
+                "processed": len(school_ids),
+                "ok": ok_count,
+                "needs_review": needs_review_count,
+                "failed": failed_count,
+            }
+
+        return {
+            "processed": len(school_ids),
+            "job_id": result.id,
+        }
+    except Exception as exc:
+        logger.exception("Validation batch failed: %s", exc)
+        raise self.retry(exc=exc)
 
 
-@celery_app.task(name="tasks.run_spot_checks")
-def run_spot_checks(country_code: str = "bg", sample_size: int = 10, city: Optional[str] = "sofia"):
-    """Run spot-check validation with capable model (Phase 2)."""
-    logger.info("Spot checks - Phase 2 implementation")
-    return {"message": "Not implemented yet - Phase 2"}
+async def _get_schools_for_validation(
+    country_code: str,
+    city: Optional[str],
+    limit: Optional[int],
+    force_validate: bool = False,
+) -> list[int]:
+    """Get school IDs eligible for Stage 6 deterministic validation."""
+    from app.database import async_session_maker
+    from app.models import School
+    from app.scrapers.validator import has_current_validation_report
+    from sqlalchemy import select
+
+    async with async_session_maker() as db:
+        query = select(School.id, School.attributes).where(
+            School.country_code == country_code,
+            School.scrape_status == "extracted",
+        )
+
+        if city:
+            query = query.where(School.city == city)
+
+        if limit:
+            query = query.limit(limit)
+
+        result = await db.execute(query)
+        rows = result.all()
+        if force_validate:
+            return [row[0] for row in rows]
+        return [row[0] for row in rows if not has_current_validation_report(row[1], schema_version=1)]
+
+
+@celery_app.task(
+    bind=True,
+    name="tasks.validate_school_data",
+    max_retries=2,
+    default_retry_delay=30,
+    rate_limit="15/m",
+)
+def validate_school_data_task(self, school_id: int, country_code: str = "bg"):
+    """Run Stage 6 deterministic validation for one school."""
+    try:
+        return run_async(_validate_school_data_async(school_id, country_code))
+    except Exception as exc:
+        logger.exception("Validation failed for school %s: %s", school_id, exc)
+        raise self.retry(exc=exc)
+
+
+async def _validate_school_data_async(school_id: int, country_code: str = "bg"):
+    """Async implementation of validate_school_data_task."""
+    from app.database import async_session_maker
+    from app.scrapers.validator import validate_school_data
+
+    async with async_session_maker() as db:
+        return await validate_school_data(
+            db=db,
+            school_id=school_id,
+            country_code=country_code,
+            run_spot_check=False,
+        )
+
+
+@celery_app.task(
+    bind=True,
+    name="tasks.run_spot_checks",
+    max_retries=2,
+)
+def run_spot_checks(
+    self,
+    country_code: str = "bg",
+    sample_size: Optional[int] = None,
+    city: Optional[str] = "sofia",
+    limit: Optional[int] = None,
+    wait_for_completion: bool = False,
+):
+    """Run sampled spot-check validation with capable model."""
+    try:
+        school_ids = run_async(_sample_school_ids_for_spot_checks(country_code, city, limit, sample_size))
+        if not school_ids:
+            return {
+                "message": "No schools selected for spot-checks (requires current Stage 6 validation reports)",
+                "processed": 0,
+            }
+
+        job = group(run_spot_check_task.s(school_id, country_code) for school_id in school_ids)
+        result = job.apply_async()
+        if _should_wait_for_group(wait_for_completion):
+            results = result.get(timeout=600, propagate=False)
+            checked_count = 0
+            discrepancy_count = 0
+            contradiction_count = 0
+            omission_count = 0
+            unsupported_count = 0
+            failed_count = 0
+            for item in results:
+                if isinstance(item, Exception):
+                    failed_count += 1
+                    continue
+                if item.get("status") == "checked":
+                    checked_count += 1
+                    if item.get("has_discrepancy"):
+                        discrepancy_count += 1
+                    kind_counts = item.get("kind_counts") or {}
+                    contradiction_count += int(kind_counts.get("contradiction", 0))
+                    omission_count += int(kind_counts.get("omission", 0))
+                    unsupported_count += int(kind_counts.get("unsupported", 0))
+                else:
+                    failed_count += 1
+            discrepancy_rate = (discrepancy_count / checked_count) if checked_count else 0.0
+            contradiction_rate = (contradiction_count / checked_count) if checked_count else 0.0
+
+            from app.config import get_settings
+
+            threshold = float(get_settings().spot_check_discrepancy_threshold)
+            if checked_count and contradiction_rate > threshold:
+                logger.info(
+                    "Spot-check monitoring alert: contradiction rate %.1f%% exceeded advisory threshold %.1f%%",
+                    contradiction_rate * 100,
+                    threshold * 100,
+                )
+
+            return {
+                "processed": len(school_ids),
+                "checked": checked_count,
+                "discrepancies": discrepancy_count,
+                "contradictions": contradiction_count,
+                "omissions": omission_count,
+                "unsupported": unsupported_count,
+                "failed": failed_count,
+                "discrepancy_rate": round(discrepancy_rate, 4),
+                "contradiction_rate": round(contradiction_rate, 4),
+            }
+
+        return {
+            "processed": len(school_ids),
+            "job_id": result.id,
+        }
+    except Exception as exc:
+        logger.exception("Spot-check batch failed: %s", exc)
+        raise self.retry(exc=exc)
+
+
+async def _sample_school_ids_for_spot_checks(
+    country_code: str,
+    city: Optional[str],
+    limit: Optional[int],
+    sample_size: Optional[int],
+) -> list[int]:
+    """Choose already-validated school IDs for sampled spot-checks."""
+    from app.config import get_settings
+    from app.database import async_session_maker
+    from app.models import School
+    from app.scrapers.validator import has_current_validation_report
+    from sqlalchemy import select
+
+    configured_sample_size = int(get_settings().spot_check_sample_size)
+    effective_sample_size = configured_sample_size if sample_size is None else int(sample_size)
+
+    async with async_session_maker() as db:
+        query = select(School.id, School.attributes).where(
+            School.country_code == country_code,
+            School.scrape_status == "extracted",
+        )
+
+        if city:
+            query = query.where(School.city == city)
+
+        if limit:
+            query = query.limit(limit)
+
+        result = await db.execute(query)
+        rows = result.all()
+        school_ids = sorted(
+            row[0] for row in rows if has_current_validation_report(row[1], schema_version=1)
+        )
+
+    if effective_sample_size == 0:
+        return []
+    if effective_sample_size < 0:
+        # -1 sentinel means "all extracted schools from this selection".
+        return school_ids
+    if effective_sample_size >= len(school_ids):
+        return school_ids
+    return sorted(random.sample(school_ids, effective_sample_size))
+
+
+@celery_app.task(
+    bind=True,
+    name="tasks.run_spot_check_school",
+    max_retries=2,
+    default_retry_delay=30,
+    rate_limit="10/m",
+)
+def run_spot_check_task(self, school_id: int, country_code: str = "bg"):
+    """Run Stage 6 capable-model spot-check for one school."""
+    try:
+        return run_async(_run_spot_check_async(school_id, country_code))
+    except Exception as exc:
+        logger.exception("Spot-check failed for school %s: %s", school_id, exc)
+        raise self.retry(exc=exc)
+
+
+async def _run_spot_check_async(school_id: int, country_code: str = "bg"):
+    """Async implementation of run_spot_check_task."""
+    from app.database import async_session_maker
+    from app.scrapers.validator import run_spot_check_for_school
+
+    async with async_session_maker() as db:
+        return await run_spot_check_for_school(db=db, school_id=school_id, country_code=country_code)
 
 
 # =============================================================================
@@ -629,20 +885,31 @@ def run_full_pipeline(
     # not the previous task's return payload.
     pipeline = chain(
         discover_schools.si(country_code=country_code, city=city, limit=limit),
-        discover_websites_batch.si(country_code=country_code, city=city, limit=limit),
-        validate_urls_batch.si(country_code=country_code, city=city, limit=limit),
-        navigate_batch.si(country_code=country_code, city=city, limit=limit),
-        extract_batch.si(country_code=country_code, city=city, limit=limit),
-        # Phase 2 stages would be added here:
-        # group(validate_batch.si(country_code=country_code, city=city), run_spot_checks.si(country_code=country_code, city=city)),
-        # summarize_batch.si(country_code=country_code, city=city, limit=limit),
+        discover_websites_batch.si(
+            country_code=country_code, city=city, limit=limit, wait_for_completion=True
+        ),
+        validate_urls_batch.si(
+            country_code=country_code, city=city, limit=limit, wait_for_completion=True
+        ),
+        navigate_batch.si(
+            country_code=country_code, city=city, limit=limit, wait_for_completion=True
+        ),
+        extract_batch.si(
+            country_code=country_code, city=city, limit=limit, wait_for_completion=True
+        ),
+        validate_batch.si(
+            country_code=country_code, city=city, limit=limit, wait_for_completion=True
+        ),
+        run_spot_checks.si(
+            country_code=country_code, city=city, limit=limit, wait_for_completion=True
+        ),
     )
 
     result = pipeline.apply_async()
 
     return {
         "pipeline_id": result.id,
-        "message": "Pipeline started (Stages 1-5 enabled; 6-7 are Phase 2)",
+        "message": "Pipeline started (Stages 1-6 enabled; 7 is pending)",
     }
 
 
