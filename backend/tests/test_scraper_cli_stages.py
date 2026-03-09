@@ -168,3 +168,36 @@ async def test_run_extract_batch_rolls_back_and_continues_after_school_error(db_
 
     assert run_mock.await_count == 2
     assert rollback_spy.await_count == 1
+
+
+@pytest.mark.asyncio
+async def test_run_extract_batch_with_explicit_school_ids_ignores_status_filter(db_session):
+    school = School(
+        name_i18n={"bg": "Изрично училище"},
+        country_code="bg",
+        school_type="private",
+        education_level="primary",
+        city="sofia",
+        website_url="https://explicit.school.bg",
+        scrape_status="pending",
+    )
+    db_session.add(school)
+    await db_session.commit()
+
+    settings = SimpleNamespace(extraction_school_timeout_seconds=0, extraction_batch_concurrency=1)
+    run_mock = AsyncMock(return_value={"status": "extracted"})
+
+    with (
+        patch("app.config.get_settings", return_value=settings),
+        patch.object(scraper_cli, "_run_extract_school", new=run_mock),
+    ):
+        await scraper_cli._run_extract_batch(
+            db=db_session,
+            country="bg",
+            city="sofia",
+            limit=None,
+            include_extracted=True,
+            school_ids=[school.id],
+        )
+
+    run_mock.assert_awaited_once_with(db_session, school.id, "bg")

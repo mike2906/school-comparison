@@ -8,7 +8,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.schemas.scraping import DiscoveredSchool
 from app.models.scrape_log import ScrapeLog, ScrapeType, ScrapeStatus
-from app.utils.transliteration import transliterate_address, transliterate_bulgarian
 
 logger = logging.getLogger(__name__)
 
@@ -284,20 +283,8 @@ class BaseSourceAdapter(ABC):
         return {"created": created, "updated": updated, "skipped": skipped}
 
     def _ensure_i18n_fallbacks(self, disc: DiscoveredSchool) -> None:
-        """Populate missing EN i18n fields from BG values for Bulgarian records."""
-        if disc.country_code != "bg":
-            return
-
-        if disc.name_i18n and disc.name_i18n.get("bg") and not disc.name_i18n.get("en"):
-            disc.name_i18n["en"] = transliterate_bulgarian(disc.name_i18n["bg"])
-
-        for location in disc.locations or []:
-            if (
-                location.address_i18n
-                and location.address_i18n.get("bg")
-                and not location.address_i18n.get("en")
-            ):
-                location.address_i18n["en"] = transliterate_address(location.address_i18n["bg"])
+        """Keep discovery data source-backed; synthetic EN fallbacks are added at display time only."""
+        return None
 
     def _filter_incoming_attributes(self, incoming: dict) -> dict:
         """Filter incoming attributes according to adapter merge policy."""

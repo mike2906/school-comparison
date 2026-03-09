@@ -1,0 +1,60 @@
+import assert from 'node:assert/strict'
+import test from 'node:test'
+
+import { getAddress, getSchoolName } from './i18n.js'
+
+test('getSchoolName prefers display_name_i18n over legal name', () => {
+  const school = {
+    resolved_name_i18n: {
+      bg: 'Fusion School',
+      en: 'Fusion School'
+    },
+    name_i18n: {
+      bg: 'Частно основно училище Фюжън ЕООД',
+      en: 'CHASTNO OSNOVNO UCHILISHTE FYUZHAN EOOD'
+    },
+    attributes: {
+      display_name_i18n: {
+        bg: 'Fusion School',
+        en: 'Fusion School'
+      }
+    }
+  }
+
+  assert.equal(getSchoolName(school, 'en'), 'Fusion School')
+  assert.equal(getSchoolName(school, 'bg'), 'Fusion School')
+})
+
+test('getSchoolName prefers resolved_name_i18n derived fallback', () => {
+  const school = {
+    resolved_name_i18n: {
+      bg: 'Д-р Петър Берон',
+      en: 'Dr. Petar Beron'
+    },
+    name_i18n: {
+      bg: 'ДГ №1 Щастливо детство'
+    }
+  }
+
+  assert.equal(getSchoolName(school, 'en'), 'Dr. Petar Beron')
+})
+
+test('getSchoolName falls back to name_i18n when resolved name is missing', () => {
+  const school = {
+    name_i18n: {
+      bg: 'ДГ №1 Щастливо детство'
+    }
+  }
+
+  assert.equal(getSchoolName(school, 'en'), 'ДГ №1 Щастливо детство')
+})
+
+test('getAddress falls back to available address value when en is missing', () => {
+  const location = {
+    address_i18n: {
+      bg: 'ул. Иван Вазов 15, София'
+    }
+  }
+
+  assert.equal(getAddress(location, 'en'), 'ул. Иван Вазов 15, София')
+})

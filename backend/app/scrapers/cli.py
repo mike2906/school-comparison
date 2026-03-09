@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 CLI tool for running scraping pipeline stages.
 
@@ -34,11 +36,18 @@ Usage:
 
     # Show stats
     uv run python -m app.scrapers.cli stats --city sofia
+
+    # Clear legacy transliterated EN names/addresses and rerun extraction
+    uv run python -m app.scrapers.cli repair-i18n --city sofia
 """
 import asyncio
+import builtins
+from collections import defaultdict
 import sys
 import logging
 import random
+import re
+from urllib.parse import urlparse
 from typing import Optional
 import click
 from rich.console import Console
@@ -59,11 +68,105 @@ logger = logging.getLogger(__name__)
 
 console = Console()
 
+_BRAND_ALIAS_GENERIC_EXACT = {
+    "school",
+    "kindergarten",
+    "preschool",
+    "academy",
+    "училище",
+    "детска градина",
+    "гимназия",
+}
+_BRAND_ALIAS_BANNED_SUBSTRINGS = {
+    "google reference school",
+    "елитно канадско образование",
+    "school community",
+    "our identity",
+    "иновативно училище",
+}
+_BRAND_ALIAS_BANNED_MARKERS = {
+    "парти център",
+    "портал",
+    "@school",
+    "→",
+}
+
 
 @click.group()
 def cli():
     """Sofia School Comparison - Scraping Pipeline CLI"""
     pass
+
+
+@cli.command("repair-i18n")
+@click.option("--school", help="School name (fuzzy match)")
+@click.option("--school-id", type=int, help="School ID")
+@click.option("--city", default="sofia", help="City to filter by")
+@click.option("--country", default="bg", help="Country code")
+@click.option("--limit", type=int, help="Limit number of schools to inspect")
+@click.option("--dry-run", is_flag=True, help="Show affected schools without changing data")
+@click.option("--no-reextract", is_flag=True, help="Clear synthetic EN values without rerunning extraction")
+def repair_i18n(school, school_id, city, country, limit, dry_run, no_reextract):
+    """Repair legacy transliterated EN i18n fields and optionally rerun extraction."""
+    asyncio.run(
+        _repair_i18n_command(
+            school_name=school,
+            school_id=school_id,
+            city=city,
+            country=country,
+            limit=limit,
+            dry_run=dry_run,
+            reextract=not no_reextract,
+        )
+    )
+
+
+@cli.command("repair-websites")
+@click.option("--school", help="School name (fuzzy match)")
+@click.option("--school-id", type=int, help="School ID")
+@click.option("--city", default="sofia", help="City to filter by")
+@click.option("--country", default="bg", help="Country code")
+@click.option("--limit", type=int, help="Limit number of schools to inspect")
+@click.option("--include-state", is_flag=True, help="Include state schools")
+@click.option("--dry-run", is_flag=True, help="Preview alias/validation candidates without writing data")
+@click.option("--no-recover-failed", is_flag=True, help="Skip recovery attempts for failed_validate schools")
+@click.option("--no-extract", is_flag=True, help="Skip extraction after successful revalidation")
+def repair_websites(school, school_id, city, country, limit, include_state, dry_run, no_recover_failed, no_extract):
+    """Promote safe website aliases, revalidate ownership, and refresh extraction."""
+    asyncio.run(
+        _repair_websites_command(
+            school_name=school,
+            school_id=school_id,
+            city=city,
+            country=country,
+            limit=limit,
+            include_state=include_state,
+            dry_run=dry_run,
+            recover_failed=not no_recover_failed,
+            run_extract=not no_extract,
+        )
+    )
+
+
+@cli.command("cleanup-display-names")
+@click.option("--school", help="School name (fuzzy match)")
+@click.option("--school-id", type=int, help="School ID")
+@click.option("--city", default="sofia", help="City to filter by")
+@click.option("--country", default="bg", help="Country code")
+@click.option("--limit", type=int, help="Limit number of schools to inspect")
+@click.option("--dry-run", is_flag=True, help="Preview affected schools without writing data")
+def cleanup_display_names(school, school_id, city, country, limit, dry_run):
+    """Clean obviously bad stored display names without changing legal names."""
+    asyncio.run(
+        _cleanup_display_names_command(
+            school_name=school,
+            school_id=school_id,
+            city=city,
+            country=country,
+            limit=limit,
+            dry_run=dry_run,
+        )
+    )
 
 
 @cli.command()
@@ -281,6 +384,550 @@ async def _find_school_by_name(db, name: str, country: str) -> Optional[int]:
     return None
 
 
+def _school_label(school) -> str:
+    name_i18n = school.name_i18n or {}
+    return name_i18n.get("bg") or name_i18n.get("en") or f"School {school.id}"
+
+
+def _has_synthetic_school_name_en(school) -> bool:
+    from app.utils.transliteration import transliterate_bulgarian
+
+    name_i18n = dict(school.name_i18n or {})
+    bg_name = name_i18n.get("bg")
+    en_name = name_i18n.get("en")
+    if not bg_name or not en_name:
+        return False
+    return en_name.strip() == transliterate_bulgarian(bg_name).strip()
+
+
+def _has_synthetic_location_address_en(location) -> bool:
+    from app.utils.transliteration import transliterate_address
+
+    address_i18n = dict(location.address_i18n or {})
+    bg_address = address_i18n.get("bg")
+    en_address = address_i18n.get("en")
+    if not bg_address or not en_address:
+        return False
+    return en_address.strip() == transliterate_address(bg_address).strip()
+
+
+async def _repair_i18n_command(
+    *,
+    school_name: Optional[str],
+    school_id: Optional[int],
+    city: Optional[str],
+    country: str,
+    limit: Optional[int],
+    dry_run: bool,
+    reextract: bool,
+):
+    from sqlalchemy import select
+    from sqlalchemy.orm import selectinload
+
+    from app.database import async_session_maker
+    from app.models import School, SourcePage
+    from app.models.scrape_log import ScrapeType
+
+    async with async_session_maker() as db:
+        if school_name and not school_id:
+            school_id = await _find_school_by_name(db, school_name, country)
+            if not school_id:
+                console.print(f"[red]School not found: {school_name}[/red]")
+                return
+
+        query = (
+            select(School)
+            .options(selectinload(School.locations))
+            .where(School.country_code == country)
+        )
+        if city:
+            query = query.where(School.city == city)
+        if school_id:
+            query = query.where(School.id == school_id)
+        if limit:
+            query = query.limit(limit)
+
+        schools = (await db.execute(query)).scalars().all()
+
+        affected_schools = []
+        affected_name_count = 0
+        affected_location_count = 0
+        preview_rows: list[tuple[int, str, bool, int]] = []
+
+        for school in schools:
+            has_name_issue = _has_synthetic_school_name_en(school)
+            affected_locations = [
+                location for location in (school.locations or []) if _has_synthetic_location_address_en(location)
+            ]
+            if not has_name_issue and not affected_locations:
+                continue
+
+            affected_schools.append(school)
+            affected_name_count += int(has_name_issue)
+            affected_location_count += len(affected_locations)
+            preview_rows.append((school.id, _school_label(school), has_name_issue, len(affected_locations)))
+
+        if not affected_schools:
+            console.print("[yellow]No schools with synthetic EN i18n values found.[/yellow]")
+            return
+
+        console.print(f"[cyan]Found {len(affected_schools)} affected schools[/cyan]")
+        console.print(f"  Synthetic school names: {affected_name_count}")
+        console.print(f"  Synthetic location addresses: {affected_location_count}")
+        console.print(f"  Mode: {'dry-run' if dry_run else 'commit'}")
+        console.print(f"  Re-extract: {reextract}")
+
+        preview_table = Table(title="Affected Schools")
+        preview_table.add_column("ID", style="cyan", no_wrap=True)
+        preview_table.add_column("School")
+        preview_table.add_column("Name EN", justify="center")
+        preview_table.add_column("Addr EN", justify="right")
+        for row in preview_rows[:20]:
+            preview_table.add_row(str(row[0]), row[1], "yes" if row[2] else "", str(row[3]))
+        console.print(preview_table)
+        if len(preview_rows) > 20:
+            console.print(f"[dim]Showing first 20 of {len(preview_rows)} affected schools[/dim]")
+
+        if dry_run:
+            return
+
+        repaired_school_ids: list[int] = []
+        for school in affected_schools:
+            changed = False
+            if _has_synthetic_school_name_en(school):
+                name_i18n = dict(school.name_i18n or {})
+                name_i18n.pop("en", None)
+                school.name_i18n = name_i18n
+                changed = True
+
+            for location in school.locations or []:
+                if not _has_synthetic_location_address_en(location):
+                    continue
+                address_i18n = dict(location.address_i18n or {})
+                address_i18n.pop("en", None)
+                location.address_i18n = address_i18n
+                changed = True
+
+            if changed:
+                repaired_school_ids.append(school.id)
+
+        await db.commit()
+        console.print(f"[green]✓ Cleared synthetic EN values for {len(repaired_school_ids)} schools[/green]")
+
+        if not reextract:
+            return
+
+        page_query = (
+            select(SourcePage.school_id)
+            .where(
+                SourcePage.school_id.in_(repaired_school_ids),
+                SourcePage.scrape_type == ScrapeType.WEBSITE,
+                SourcePage.is_valid.is_(True),
+                SourcePage.raw_markdown.isnot(None),
+            )
+            .distinct()
+        )
+        eligible_ids = [row[0] for row in (await db.execute(page_query)).all()]
+        ineligible_count = len(repaired_school_ids) - len(eligible_ids)
+        if ineligible_count:
+            console.print(
+                f"[yellow]{ineligible_count} repaired schools have no navigated website content; skipped re-extraction[/yellow]"
+            )
+        if not eligible_ids:
+            return
+
+        console.print(f"[cyan]Re-extracting {len(eligible_ids)} repaired schools...[/cyan]")
+        await _run_extract_batch(
+            db=db,
+            country=country,
+            city=city or "",
+            limit=None,
+            include_extracted=True,
+            school_ids=eligible_ids,
+        )
+
+
+def _contains_cyrillic(text: str | None) -> bool:
+    return bool(text and re.search(r"[А-Яа-я]", text))
+
+
+def _clean_display_name_i18n_for_school(school) -> tuple[dict[str, str] | None, bool, str | None]:
+    from app.scrapers.extractor_helpers import _is_display_name_en_transliteration, _is_low_quality_display_name
+    from app.utils.i18n_resolver import resolve_name_i18n
+
+    attrs = dict(school.attributes or {})
+    raw_display = attrs.get("display_name_i18n")
+    if not isinstance(raw_display, dict):
+        return None, False, None
+
+    display = {
+        str(lang): " ".join(str(text or "").split()).strip()
+        for lang, text in raw_display.items()
+        if str(lang).strip() and str(text).strip()
+    }
+    if not display:
+        return None, False, "clear-empty"
+
+    if any(_is_low_quality_display_name(value) for value in display.values()):
+        return None, True, "clear-junk"
+
+    bg_value = display.get("bg")
+    en_value = display.get("en")
+    if _is_display_name_en_transliteration(bg_value, en_value):
+        display.pop("en", None)
+        return (display or None), True, "drop-transliterated-en"
+    if en_value and bg_value and en_value == bg_value and _contains_cyrillic(en_value):
+        display.pop("en", None)
+        return (display or None), True, "drop-cyrillic-en"
+
+    if en_value and _contains_cyrillic(en_value):
+        resolved_en = resolve_name_i18n(school.name_i18n, {"display_name_i18n": display}).get("en")
+        if resolved_en and resolved_en != en_value:
+            display.pop("en", None)
+            return (display or None), True, "drop-worse-en"
+
+    return display, False, None
+
+
+async def _cleanup_display_names_command(
+    *,
+    school_name: Optional[str],
+    school_id: Optional[int],
+    city: Optional[str],
+    country: str,
+    limit: Optional[int],
+    dry_run: bool,
+):
+    from sqlalchemy import select
+
+    from app.database import async_session_maker
+    from app.models import School
+
+    async with async_session_maker() as db:
+        if school_name and not school_id:
+            school_id = await _find_school_by_name(db, school_name, country)
+            if not school_id:
+                console.print(f"[red]School not found: {school_name}[/red]")
+                return
+
+        query = select(School).where(School.country_code == country)
+        if city:
+            query = query.where(School.city == city)
+        if school_id:
+            query = query.where(School.id == school_id)
+        if limit:
+            query = query.limit(limit)
+
+        schools = (await db.execute(query)).scalars().all()
+
+        preview_rows: list[tuple[int, str, str]] = []
+        cleaned_school_ids: list[int] = []
+        reason_counts = {
+            "clear-junk": 0,
+            "drop-cyrillic-en": 0,
+            "drop-transliterated-en": 0,
+            "drop-worse-en": 0,
+            "clear-empty": 0,
+        }
+
+        for school in schools:
+            cleaned_display, changed, reason = _clean_display_name_i18n_for_school(school)
+            if not changed:
+                continue
+            preview_rows.append((school.id, _school_label(school), reason or "updated"))
+            cleaned_school_ids.append(school.id)
+            if reason:
+                reason_counts[reason] = reason_counts.get(reason, 0) + 1
+            if dry_run:
+                continue
+
+            attrs = dict(school.attributes or {})
+            if cleaned_display:
+                attrs["display_name_i18n"] = cleaned_display
+            else:
+                attrs.pop("display_name_i18n", None)
+            school.attributes = attrs
+
+        if not preview_rows:
+            console.print("[yellow]No display-name cleanup candidates found.[/yellow]")
+            return
+
+        console.print(f"[cyan]Found {len(preview_rows)} display-name cleanup candidates[/cyan]")
+        console.print(f"  Junk display names: {reason_counts.get('clear-junk', 0)}")
+        console.print(f"  Dropped duplicated Cyrillic EN: {reason_counts.get('drop-cyrillic-en', 0)}")
+        console.print(f"  Dropped transliterated EN: {reason_counts.get('drop-transliterated-en', 0)}")
+        console.print(f"  Dropped worse EN variants: {reason_counts.get('drop-worse-en', 0)}")
+        console.print(f"  Cleared empty display maps: {reason_counts.get('clear-empty', 0)}")
+        console.print(f"  Mode: {'dry-run' if dry_run else 'commit'}")
+
+        preview_table = Table(title="Display Name Cleanup")
+        preview_table.add_column("ID", style="cyan", no_wrap=True)
+        preview_table.add_column("School")
+        preview_table.add_column("Action")
+        for row in preview_rows[:20]:
+            preview_table.add_row(str(row[0]), row[1], row[2])
+        console.print(preview_table)
+        if len(preview_rows) > 20:
+            console.print(f"[dim]Showing first 20 of {len(preview_rows)} cleanup candidates[/dim]")
+
+        if dry_run:
+            return
+
+        await db.commit()
+        console.print(f"[green]✓ Cleaned stored display names for {len(cleaned_school_ids)} schools[/green]")
+
+
+def _normalize_brand_alias_host_text(text: str) -> str:
+    return re.sub(r"[^a-z0-9а-я]+", "", (text or "").lower())
+
+
+def _brand_alias_token_variants(token: str) -> set[str]:
+    from app.utils.transliteration import transliterate_bulgarian
+
+    lowered = (token or "").lower()
+    variants = {lowered, transliterate_bulgarian(lowered).lower()}
+    if lowered.startswith("в"):
+        variants.add("w" + transliterate_bulgarian(lowered[1:]).lower())
+    if lowered.startswith("w"):
+        variants.add("v" + lowered[1:])
+    return {value for value in variants if value}
+
+
+def _select_brand_aliases_for_school(candidate: dict[str, str] | None, website_url: str, school) -> list[str]:
+    from app.scrapers.school_tokens import extract_school_name_tokens
+
+    if not candidate:
+        return []
+    if school.school_type not in {"private", "international"}:
+        return []
+
+    host = urlparse(website_url or "").netloc.lower().replace("www.", "")
+    host_compact = _normalize_brand_alias_host_text(host)
+    aliases: list[str] = []
+    seen: set[str] = set()
+
+    for value in candidate.values():
+        text = " ".join((value or "").split()).strip()
+        lowered = text.lower()
+        if not text or lowered in _BRAND_ALIAS_GENERIC_EXACT:
+            continue
+        if any(bad in lowered for bad in _BRAND_ALIAS_BANNED_SUBSTRINGS):
+            continue
+        if any(marker in lowered for marker in _BRAND_ALIAS_BANNED_MARKERS):
+            continue
+        if len(text.split()) > 7:
+            continue
+        if school.education_level == "kindergarten" and lowered.startswith(
+            ("частно средно училище", "частно основно училище", "чоу ", "чсу ")
+        ):
+            continue
+
+        tokens = [token for token in extract_school_name_tokens(text, limit=8) if len(token) >= 3]
+        if not tokens:
+            continue
+
+        aligned = False
+        for token in tokens:
+            for variant in _brand_alias_token_variants(token):
+                if len(variant) >= 3 and variant in host_compact:
+                    aligned = True
+                    break
+            if aligned:
+                break
+        if not aligned:
+            continue
+
+        key = text.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        aliases.append(text)
+
+    return aliases
+
+
+async def _repair_websites_command(
+    *,
+    school_name: Optional[str],
+    school_id: Optional[int],
+    city: Optional[str],
+    country: str,
+    limit: Optional[int],
+    include_state: bool,
+    dry_run: bool,
+    recover_failed: bool,
+    run_extract: bool,
+):
+    from sqlalchemy import select
+
+    from app.database import async_session_maker
+    from app.models import School, SourcePage
+    from app.models.scrape_log import ScrapeType
+    from app.scrapers.extractor_helpers import _extract_display_name_i18n_deterministic
+    from app.scrapers.url_validator import extract_validation_aliases, validate_school_url
+
+    async with async_session_maker() as db:
+        if school_name and not school_id:
+            school_id = await _find_school_by_name(db, school_name, country)
+            if not school_id:
+                console.print(f"[red]School not found: {school_name}[/red]")
+                return
+
+        query = select(School).where(School.country_code == country)
+        if city:
+            query = query.where(School.city == city)
+        if school_id:
+            query = query.where(School.id == school_id)
+        if not include_state:
+            query = query.where(School.school_type.in_(["private", "international"]))
+        if limit:
+            query = query.limit(limit)
+
+        schools = (await db.execute(query)).scalars().all()
+        if not schools:
+            console.print("[yellow]No schools matched the repair-websites filters.[/yellow]")
+            return
+
+        failed_validate_ids = [school.id for school in schools if school.scrape_status == "failed_validate"]
+        if recover_failed and failed_validate_ids and not dry_run:
+            console.print(f"[cyan]Recovering {len(failed_validate_ids)} failed website mappings...[/cyan]")
+            for target_school_id in failed_validate_ids:
+                try:
+                    await _run_recover_failed_school(db, target_school_id, country)
+                except Exception as exc:
+                    logger.error("Failed website recovery for school %s: %s", target_school_id, exc)
+
+            schools = (await db.execute(query)).scalars().all()
+
+        schools_by_id = {school.id: school for school in schools}
+        website_school_ids = [school.id for school in schools if school.website_url]
+        if not website_school_ids:
+            console.print("[yellow]No schools with website URLs matched the repair-websites filters.[/yellow]")
+            return
+
+        pages = (
+            await db.execute(
+                select(SourcePage)
+                .where(
+                    SourcePage.school_id.in_(website_school_ids),
+                    SourcePage.scrape_type == ScrapeType.WEBSITE,
+                    SourcePage.is_valid != False,
+                    SourcePage.raw_markdown.isnot(None),
+                )
+                .order_by(SourcePage.school_id, SourcePage.id)
+            )
+        ).scalars().all()
+
+        pages_by_school: dict[int, list] = defaultdict(builtins.list)
+        for page in pages:
+            pages_by_school[page.school_id].append(page)
+
+        alias_updates: dict[int, list[str]] = {}
+        preview_rows: list[tuple[int, str, list[str]]] = []
+        for target_school_id in website_school_ids:
+            school = schools_by_id[target_school_id]
+            school_pages = pages_by_school.get(target_school_id)
+            if not school_pages:
+                continue
+
+            candidate = _extract_display_name_i18n_deterministic(
+                text="\n\n".join((page.raw_markdown or "") for page in school_pages[:4]),
+                registry_name=(school.name_i18n or {}).get("bg") or (school.name_i18n or {}).get("en"),
+                country_code=school.country_code,
+            )
+            aliases = _select_brand_aliases_for_school(candidate, school.website_url, school)
+            if not aliases:
+                continue
+
+            existing_aliases = extract_validation_aliases(school.attributes)
+            merged_aliases: list[str] = []
+            seen: set[str] = set()
+            for value in existing_aliases + aliases:
+                key = value.casefold()
+                if key in seen:
+                    continue
+                seen.add(key)
+                merged_aliases.append(value)
+            if merged_aliases == existing_aliases:
+                continue
+
+            alias_updates[target_school_id] = merged_aliases
+            preview_rows.append((target_school_id, _school_label(school), aliases))
+
+        console.print(f"[cyan]Website repair candidates: {len(preview_rows)}[/cyan]")
+        console.print(f"  Failed websites to recover: {len(failed_validate_ids)}")
+        console.print(f"  Alias promotions: {len(alias_updates)}")
+        console.print(f"  Re-extract after validate: {run_extract and not dry_run}")
+
+        if preview_rows:
+            preview_table = Table(title="Alias Promotions")
+            preview_table.add_column("ID", style="cyan", no_wrap=True)
+            preview_table.add_column("School")
+            preview_table.add_column("New aliases")
+            for row in preview_rows[:20]:
+                preview_table.add_row(str(row[0]), row[1], ", ".join(row[2]))
+            console.print(preview_table)
+            if len(preview_rows) > 20:
+                console.print(f"[dim]Showing first 20 of {len(preview_rows)} alias promotions[/dim]")
+
+        if dry_run:
+            return
+
+        for target_school_id, aliases in alias_updates.items():
+            school = schools_by_id[target_school_id]
+            attrs = dict(school.attributes or {})
+            attrs["name_aliases"] = aliases
+            school.attributes = attrs
+        await db.commit()
+
+        validate_target_ids = sorted(
+            {
+                school.id
+                for school in schools
+                if school.website_url and (school.id in alias_updates or school.id in failed_validate_ids)
+            }
+        )
+        if not validate_target_ids:
+            console.print("[yellow]No schools needed revalidation after alias promotion.[/yellow]")
+            return
+
+        validated_ids: list[int] = []
+        invalid_rows: list[tuple[int, str, str]] = []
+        for target_school_id in validate_target_ids:
+            school = schools_by_id[target_school_id]
+            school_name_value = (school.name_i18n or {}).get("bg") or (school.name_i18n or {}).get("en")
+            aliases = dict(school.attributes or {}).get("name_aliases", [])
+            result, _, reason = await validate_school_url(
+                school_id=target_school_id,
+                url=school.website_url,
+                country_code=school.country_code,
+                update_db=True,
+                school_name=school_name_value,
+                school_aliases=aliases,
+            )
+            if result.value == "valid":
+                validated_ids.append(target_school_id)
+            else:
+                invalid_rows.append((target_school_id, _school_label(school), reason or result.value))
+
+        console.print("[green]✓ Validation complete:[/green]")
+        console.print(f"  Validated: {len(validated_ids)}")
+        console.print(f"  Not validated: {len(invalid_rows)}")
+        for row in invalid_rows[:10]:
+            console.print(f"  [yellow]{row[0]} {row[1]}[/yellow]: {row[2]}")
+
+        if run_extract and validated_ids:
+            console.print(f"[cyan]Refreshing extraction for {len(validated_ids)} schools...[/cyan]")
+            await _run_extract_batch(
+                db=db,
+                country=country,
+                city=city or "",
+                limit=None,
+                include_extracted=True,
+                school_ids=validated_ids,
+            )
+
+
 async def _run_discover_batch(db, country: str, city: str, limit: Optional[int], sample_ratio: float):
     """Run discovery stage in batch mode."""
     from app.scrapers.sources import get_adapters_for_country
@@ -330,11 +977,11 @@ async def _run_validate_urls_batch(
     from app.config import get_settings
     from app.models import School
     from sqlalchemy import select
-    from app.scrapers.url_validator import validate_school_url
+    from app.scrapers.url_validator import extract_validation_aliases, validate_school_url
 
     statuses = statuses or ["pending", "failed_validate"]
 
-    query = select(School.id, School.website_url, School.name_i18n).where(
+    query = select(School.id, School.website_url, School.name_i18n, School.attributes).where(
         School.country_code == country,
         School.scrape_status.in_(statuses),
         School.website_url.isnot(None),
@@ -382,7 +1029,12 @@ async def _run_validate_urls_batch(
         error_count = 0
         semaphore = asyncio.Semaphore(concurrency)
 
-        async def _validate_single(school_id: int, website_url: str, school_name: Optional[str]) -> str:
+        async def _validate_single(
+            school_id: int,
+            website_url: str,
+            school_name: Optional[str],
+            school_aliases: list[str],
+        ) -> str:
             async with semaphore:
                 try:
                     result, _, _ = await validate_school_url(
@@ -391,6 +1043,7 @@ async def _run_validate_urls_batch(
                         country_code=country,
                         update_db=True,
                         school_name=school_name,
+                        school_aliases=school_aliases,
                     )
                     return result.value
                 except Exception as exc:
@@ -403,9 +1056,10 @@ async def _run_validate_urls_batch(
                     school_id=school_id,
                     website_url=website_url,
                     school_name=(name_i18n or {}).get("bg") or (name_i18n or {}).get("en"),
+                    school_aliases=extract_validation_aliases(attributes),
                 )
             )
-            for school_id, website_url, name_i18n in schools
+            for school_id, website_url, name_i18n, attributes in schools
             if website_url
         ]
 
@@ -615,7 +1269,7 @@ async def _run_validate_url(db, school_id: int, country: str):
     """Run URL validation for a single school."""
     from app.models import School
     from sqlalchemy import select
-    from app.scrapers.url_validator import validate_school_url
+    from app.scrapers.url_validator import extract_validation_aliases, validate_school_url
 
     result = await db.execute(select(School).where(School.id == school_id))
     school = result.scalar_one_or_none()
@@ -635,6 +1289,7 @@ async def _run_validate_url(db, school_id: int, country: str):
         country_code=country,
         update_db=True,
         school_name=(school.name_i18n or {}).get("bg") or (school.name_i18n or {}).get("en"),
+        school_aliases=extract_validation_aliases(school.attributes),
     )
 
     console.print(f"  Result: {validation_result.value} - {reason}")
@@ -1243,20 +1898,25 @@ async def _run_extract_batch(
     city: str,
     limit: Optional[int],
     include_extracted: bool = False,
+    school_ids: Optional[list[int]] = None,
 ):
     """Run extraction stage in batch mode."""
     from app.models import School
     from sqlalchemy import select
 
-    statuses = ["navigated", "extraction_failed"]
-    if include_extracted:
-        statuses.append("extracted")
-
+    explicit_school_ids = builtins.list(school_ids or [])
     query = select(School).where(
         School.country_code == country,
-        School.scrape_status.in_(statuses),
         School.website_url.isnot(None),
     )
+
+    if explicit_school_ids:
+        query = query.where(School.id.in_(explicit_school_ids))
+    else:
+        statuses = ["navigated", "extraction_failed"]
+        if include_extracted:
+            statuses.append("extracted")
+        query = query.where(School.scrape_status.in_(statuses))
 
     if city:
         query = query.where(School.city == city)
@@ -1272,7 +1932,10 @@ async def _run_extract_batch(
         console.print("[yellow]No schools to extract (must be navigated or extraction_failed)[/yellow]")
         return
 
-    status_label = "navigated/failed + extracted" if include_extracted else "navigated/failed"
+    if explicit_school_ids:
+        status_label = "explicit repair selection"
+    else:
+        status_label = "navigated/failed + extracted" if include_extracted else "navigated/failed"
     console.print(f"[cyan]Extracting data for {len(school_ids)} schools...[/cyan]")
     console.print(f"  Status filter: {status_label}")
 

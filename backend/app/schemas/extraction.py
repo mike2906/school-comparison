@@ -89,6 +89,14 @@ class PricingTermsExtractionOutput(BaseModel):
 class GeneralInfoExtractionOutput(BaseModel):
     """Output from general info extraction."""
 
+    display_name_i18n: dict[str, str] = Field(
+        default_factory=dict,
+        description=(
+            "Official public-facing school name variants shown on the website, keyed by language "
+            "(e.g. {'bg': 'Фюжън Скул', 'en': 'Fusion School'}). "
+            "Only include names explicitly shown on the website."
+        ),
+    )
     languages: list[ExtractedLanguageFocus] = Field(default_factory=list, description="Languages taught/focused on")
     facilities: list[str] = Field(default_factory=list, description="List of facilities (e.g. 'swimming pool', 'lab')")
     programs: list[str] = Field(default_factory=list, description="Educational programs (e.g. 'IB', 'A-Levels', 'Montessori')")

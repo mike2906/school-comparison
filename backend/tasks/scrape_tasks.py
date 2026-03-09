@@ -336,7 +336,7 @@ async def _validate_school_url_async(school_id, country_code):
     """Async implementation of validate_school_url."""
     from app.database import async_session_maker
     from app.models import School
-    from app.scrapers.url_validator import validate_school_url as validate_url
+    from app.scrapers.url_validator import extract_validation_aliases, validate_school_url as validate_url
     from sqlalchemy import select
 
     async with async_session_maker() as db:
@@ -352,6 +352,7 @@ async def _validate_school_url_async(school_id, country_code):
             country_code=country_code,
             update_db=True,
             school_name=(school.name_i18n or {}).get("bg") or (school.name_i18n or {}).get("en"),
+            school_aliases=extract_validation_aliases(school.attributes),
         )
 
         return {

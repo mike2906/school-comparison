@@ -1,5 +1,8 @@
 """Tests for API endpoints."""
 import pytest
+from sqlalchemy import select
+
+from app.models.school import School
 
 
 class TestHealthEndpoint:
@@ -35,6 +38,7 @@ class TestSchoolsEndpoint:
         assert "education_level" in school
         assert "locations" in school
         assert "country_code" in school
+        assert "resolved_name_i18n" in school
 
     @pytest.mark.asyncio
     async def test_list_schools_filter_by_age_group(self, seeded_client):
@@ -71,8 +75,31 @@ class TestSchoolsEndpoint:
         school = response.json()
         assert school["id"] == school_id
         assert "name_i18n" in school
+        assert "resolved_name_i18n" in school
         assert "locations" in school
         assert "summary_i18n" in school
+
+    @pytest.mark.asyncio
+    async def test_resolved_name_i18n_derives_english_fallback(self, seeded_db, seeded_client):
+        school = School(
+            name_i18n={"bg": "Д-р Петър Берон"},
+            country_code="bg",
+            school_type="state",
+            education_level="primary",
+            city="sofia",
+            attributes={},
+        )
+        seeded_db.add(school)
+        await seeded_db.commit()
+
+        response = await seeded_client.get(f"/schools/{school.id}")
+        assert response.status_code == 200
+
+        data = response.json()
+        assert data["resolved_name_i18n"] == {
+            "bg": "Д-р Петър Берон",
+            "en": "Dr. Petar Beron",
+        }
 
     @pytest.mark.asyncio
     async def test_get_school_not_found(self, seeded_client):
@@ -187,6 +214,28 @@ class TestSchoolsSearchEndpoint:
         assert response.status_code == 200
         data = response.json()
         assert len(data) >= 1
+
+    @pytest.mark.asyncio
+    async def test_search_matches_display_name_i18n(self, seeded_db, seeded_client):
+        """Search also matches branded display names stored in attributes."""
+        school = (
+            await seeded_db.execute(
+                select(School).where(School.school_type == "private")
+            )
+        ).scalar_one()
+        school.attributes = {
+            "display_name_i18n": {
+                "bg": "Fusion School",
+                "en": "Fusion School",
+            }
+        }
+        await seeded_db.commit()
+
+        response = await seeded_client.get("/schools/search?q=Fusion")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["attributes"]["display_name_i18n"]["en"] == "Fusion School"
 
     @pytest.mark.asyncio
     async def test_search_min_length_violation(self, seeded_client):

@@ -78,6 +78,7 @@ async def test_extract_school_persists_pricing_and_general_info(db_session, samp
         has_pricing_info=True,
     )
     mock_general = GeneralInfoExtractionOutput(
+        display_name_i18n={"en": "Fusion School"},
         languages=[ExtractedLanguageFocus(language="English")],
         facilities=["pool"],
         programs=["STEM"],
@@ -104,11 +105,16 @@ async def test_extract_school_persists_pricing_and_general_info(db_session, samp
     await db_session.refresh(school)
     extracted = (school.attributes or {}).get("extracted", {})
     assert extracted.get("facilities") == ["pool"]
+    assert (school.attributes or {}).get("display_name_i18n") == {
+        "bg": "Fusion School",
+        "en": "Fusion School",
+    }
 
     field_sources = (
         await db_session.execute(select(FieldSource).where(FieldSource.school_id == school.id))
     ).scalars().all()
     assert any(row.field_key == "attributes.facilities" for row in field_sources)
+    assert any(row.field_key == "attributes.display_name_i18n" for row in field_sources)
 
 
 @pytest.mark.asyncio
@@ -296,6 +302,383 @@ def test_extract_openrouter_cost_usd_falls_back_to_response_details():
     )
     cost = extractor_module._extract_openrouter_cost_usd(result)
     assert cost == 0.004
+
+
+def test_normalize_display_name_i18n_duplicates_single_brand_name_for_bg_and_en():
+    normalized = extractor_module.helpers._normalize_display_name_i18n(
+        {"en": "Fusion School"},
+        "bg",
+    )
+
+    assert normalized == {
+        "bg": "Fusion School",
+        "en": "Fusion School",
+    }
+
+
+def test_normalize_display_name_i18n_keeps_cyrillic_single_value_in_bg_only():
+    normalized = extractor_module.helpers._normalize_display_name_i18n(
+        {"bg": "ЧОУ ПЕТЪР БЕРОН"},
+        "bg",
+    )
+
+    assert normalized == {
+        "bg": "ЧОУ ПЕТЪР БЕРОН",
+    }
+
+
+def test_normalize_display_name_i18n_drops_duplicated_cyrillic_en_value():
+    normalized = extractor_module.helpers._normalize_display_name_i18n(
+        {"bg": "Българско школо", "en": "Българско школо"},
+        "bg",
+    )
+
+    assert normalized == {
+        "bg": "Българско школо",
+    }
+
+
+def test_normalize_display_name_i18n_drops_transliterated_en_value():
+    normalized = extractor_module.helpers._normalize_display_name_i18n(
+        {"bg": "Българско школо", "en": "BALGARSKO SHKOLO"},
+        "bg",
+    )
+
+    assert normalized == {
+        "bg": "Българско школо",
+    }
+
+
+def test_normalize_display_name_i18n_simplifies_generic_bg_label_to_brand_core():
+    normalized = extractor_module.helpers._normalize_display_name_i18n(
+        {"bg": 'Частно начално училище "БИЗИ"'},
+        "bg",
+    )
+
+    assert normalized == {
+        "bg": "БИЗИ",
+    }
+
+
+def test_normalize_display_name_i18n_simplifies_quoted_brand_but_keeps_location_only_case():
+    normalized = extractor_module.helpers._normalize_display_name_i18n(
+        {"bg": 'Учебен комплекс “Българско школо”'},
+        "bg",
+    )
+    location_only = extractor_module.helpers._normalize_display_name_i18n(
+        {"bg": 'Частна Детска Градина “София”'},
+        "bg",
+    )
+
+    assert normalized == {
+        "bg": "Българско школо",
+    }
+    assert location_only == {
+        "bg": 'Частна Детска Градина “София”',
+    }
+
+
+def test_extract_display_name_i18n_deterministic_accepts_matching_brand_signal():
+    text = '[ЧДГ Доверие](https://doverie-bg.net "ЧДГ Доверие")'
+
+    extracted = extractor_module.helpers._extract_display_name_i18n_deterministic(
+        text,
+        registry_name='ЧАСТНА ДЕТСКА ГРАДИНА "ДОВЕРИЕ" ЕООД',
+        country_code="bg",
+    )
+
+    assert extracted == {
+        "bg": "ЧДГ Доверие",
+        "en": "ЧДГ Доверие",
+    }
+
+
+def test_extract_display_name_i18n_deterministic_rejects_wrong_site_name():
+    text = '![ЧОУ “Азбуки” | София](https://azbuki-school.bg/wp-content/uploads/logo.svg)'
+
+    extracted = extractor_module.helpers._extract_display_name_i18n_deterministic(
+        text,
+        registry_name='ЧАСТНА ДЕТСКА ГРАДИНА МАЛКИ СТЪПКИ - ЛИТЪЛ СТЕПС',
+        country_code="bg",
+    )
+
+    assert extracted is None
+
+
+def test_extract_display_name_i18n_deterministic_keeps_explicit_bg_and_en_variants():
+    text = (
+        '[![Fusion School](https://school.fusion.bg/logo.svg)](https://school.fusion.bg "Fusion School") '
+        '[ЧОУ „Фюжън“](https://school.fusion.bg)'
+    )
+
+    extracted = extractor_module.helpers._extract_display_name_i18n_deterministic(
+        text,
+        registry_name='ЧАСТНО ОСНОВНО УЧИЛИЩЕ ФЮЖЪН ЕООД',
+        country_code="bg",
+    )
+
+    assert extracted == {
+        "bg": 'ЧОУ „Фюжън“',
+        "en": "Fusion School",
+    }
+
+
+def test_extract_display_name_i18n_deterministic_strips_section_prefixes():
+    text = '[Защо BRITANICA Park School](https://britanica-parkschool.bg/)'
+
+    extracted = extractor_module.helpers._extract_display_name_i18n_deterministic(
+        text,
+        registry_name='ЧАСТНА ДЕТСКА ГРАДИНА БРИТАНИКА ООД',
+        country_code="bg",
+    )
+
+    assert extracted == {
+        "bg": "BRITANICA Park School",
+        "en": "BRITANICA Park School",
+    }
+
+
+def test_extract_display_name_i18n_deterministic_strips_about_prefix_when_name_matches():
+    text = '[За Веда](https://wedaschule.com/)'
+
+    extracted = extractor_module.helpers._extract_display_name_i18n_deterministic(
+        text,
+        registry_name='ЧАСТНА ДЕТСКА ГРАДИНА ВЕДА ООД',
+        country_code="bg",
+    )
+
+    assert extracted == {
+        "bg": "Веда",
+        "en": "Веда",
+    }
+
+
+def test_extract_display_name_i18n_deterministic_rejects_blog_title_noise():
+    text = '[Блогът на Увекинд](https://uwekind.com/blog)'
+
+    extracted = extractor_module.helpers._extract_display_name_i18n_deterministic(
+        text,
+        registry_name='ЧАСТНО НАЧАЛНО УЧИЛИЩЕ ЛОЗЕН ЕООД',
+        country_code="bg",
+    )
+
+    assert extracted is None
+
+
+def test_extract_display_name_i18n_deterministic_rejects_reference_school_noise():
+    text = '[Google Reference School](https://espa.bg)'
+
+    extracted = extractor_module.helpers._extract_display_name_i18n_deterministic(
+        text,
+        registry_name='Частно средно училище ЕСПА ЕООД',
+        country_code="bg",
+    )
+
+    assert extracted is None
+
+
+def test_extract_display_name_i18n_deterministic_strips_markdown_emphasis():
+    text = '[**ЧДГ „Приказка без край“**](https://novigradini.com/pbk/)'
+
+    extracted = extractor_module.helpers._extract_display_name_i18n_deterministic(
+        text,
+        registry_name='ЧАСТНА ДЕТСКА ГРАДИНА ПРИКАЗКА БЕЗ КРАЙ 1',
+        country_code="bg",
+    )
+
+    assert extracted == {
+        "bg": 'ЧДГ „Приказка без край“',
+        "en": 'ЧДГ „Приказка без край“',
+    }
+
+
+def test_extract_display_name_i18n_deterministic_ignores_city_only_overlap():
+    extracted = extractor_module.helpers._extract_display_name_i18n_deterministic(
+        '[УЧИЛИЩА В СОФИЯ](https://luiskarol.com/)',
+        registry_name='"Частно начално училище Луис Карол - гр. София" ЕООД',
+        country_code="bg",
+    )
+
+    assert extracted is None
+
+
+def test_extract_display_name_i18n_deterministic_falls_back_to_host_aligned_registry_brand():
+    extracted = extractor_module.helpers._extract_display_name_i18n_deterministic(
+        '[УЧИЛИЩА В СОФИЯ](https://luiskarol.com/)',
+        registry_name='"Частно начално училище Луис Карол - гр. София" ЕООД',
+        country_code="bg",
+        website_url="https://luiskarol.com/",
+    )
+
+    assert extracted == {
+        "bg": "Луис Карол",
+        "en": "Luis Karol",
+    }
+
+
+def test_extract_display_name_i18n_deterministic_backfills_en_from_host_when_bg_found():
+    extracted = extractor_module.helpers._extract_display_name_i18n_deterministic(
+        '[Луис Карол](https://luiskarol.com/)',
+        registry_name='"Частно начално училище Луис Карол - гр. София" ЕООД',
+        country_code="bg",
+        website_url="https://luiskarol.com/",
+    )
+
+    assert extracted == {
+        "bg": "Луис Карол",
+        "en": "Luis Karol",
+    }
+
+
+def test_merge_display_name_i18n_backfills_missing_locale_from_deterministic():
+    merged = extractor_module.helpers._merge_display_name_i18n(
+        {"bg": "Луис Карол"},
+        {"bg": "Луис Карол", "en": "Luis Karol"},
+        "bg",
+    )
+
+    assert merged == {
+        "bg": "Луис Карол",
+    }
+
+
+def test_normalize_display_name_i18n_rejects_low_quality_headings():
+    normalized = extractor_module.helpers._normalize_display_name_i18n(
+        {"en": "Our kindergartens", "bg": "Стратегически план на Американския колеж 2027"},
+        "bg",
+    )
+
+    assert normalized is None
+
+
+def test_normalize_display_name_i18n_rejects_junk_group_and_markdown_values():
+    normalized = extractor_module.helpers._normalize_display_name_i18n(
+        {"bg": "Групи", "en": "![39"},
+        "bg",
+    )
+
+    assert normalized is None
+
+
+def test_normalize_display_name_i18n_rejects_role_and_icon_noise():
+    role_noise = extractor_module.helpers._normalize_display_name_i18n(
+        {"bg": 'Директор на ЧСУ “ДРУЖБА”'},
+        "bg",
+    )
+    icon_noise = extractor_module.helpers._normalize_display_name_i18n(
+        {"en": "language-school-icon"},
+        "bg",
+    )
+
+    assert role_noise is None
+    assert icon_noise is None
+
+
+def test_extract_display_name_i18n_deterministic_falls_back_to_known_aliases():
+    extracted = extractor_module.helpers._extract_display_name_i18n_deterministic(
+        text="## Our kindergartens",
+        registry_name='Частна детска градина АВСландия',
+        country_code="bg",
+        website_url="https://abckinder.org/",
+        known_aliases=["ABClandia", "ABCKinder"],
+    )
+
+    assert extracted == {"bg": "ABClandia", "en": "ABClandia"}
+
+
+def test_extract_alias_display_name_i18n_keeps_bg_and_en_aliases():
+    extracted = extractor_module.helpers._extract_alias_display_name_i18n(
+        ["Йор Кидс", "Your Kids"],
+        "bg",
+    )
+
+    assert extracted == {"bg": "Йор Кидс", "en": "Your Kids"}
+
+
+def test_extract_alias_display_name_i18n_prefers_specific_brand_over_acronym():
+    extracted = extractor_module.helpers._extract_alias_display_name_i18n(
+        ["American College of Sofia", "ACS"],
+        "bg",
+    )
+
+    assert extracted == {"bg": "American College of Sofia", "en": "American College of Sofia"}
+
+
+def test_extract_display_name_i18n_deterministic_prefers_fuller_alias_over_short_brand():
+    extracted = extractor_module.helpers._extract_display_name_i18n_deterministic(
+        text="![American College Logo](https://example.com/logo.png)",
+        registry_name="Американски колеж в София",
+        country_code="bg",
+        website_url="https://www.acs.bg/bg/",
+        known_aliases=["American College of Sofia", "ACS"],
+    )
+
+    assert extracted == {"bg": "American College of Sofia", "en": "American College of Sofia"}
+
+
+def test_extract_display_name_i18n_deterministic_rejects_network_wide_bulgaria_label():
+    extracted = extractor_module.helpers._extract_display_name_i18n_deterministic(
+        text="![Maarif International Education Bulgaria](https://example.com/logo.png)\n* [Училища Маариф в България](https://example.com)",
+        registry_name="ЧАСТНА ДЕТСКА ГРАДИНА МААРИФ СОФИЯ",
+        country_code="bg",
+        website_url="https://bg.maarifschools.org/page/detska-gradina",
+    )
+
+    assert extracted == {"bg": "МААРИФ СОФИЯ", "en": "MAARIF SOFIA"}
+
+
+def test_extract_display_name_i18n_deterministic_prefers_alias_over_short_maple_bear():
+    extracted = extractor_module.helpers._extract_display_name_i18n_deterministic(
+        text="## Maple Bear",
+        registry_name="ЧАСТНА ДЕТСКА ГРАДИНА КАНАДСКО МЕЧЕ",
+        country_code="bg",
+        website_url="https://sofia-school.maplebear.bg/en/",
+        known_aliases=["Maple Bear Sofia", "Maple Bear Sofia School", "Maple Bear"],
+    )
+
+    assert extracted == {"bg": "Maple Bear Sofia", "en": "Maple Bear Sofia"}
+
+
+def test_derive_display_name_seed_aliases_from_host_and_registry():
+    aliases = extractor_module.helpers._derive_display_name_seed_aliases(
+        registry_name='Частна детска градина АВСландия',
+        website_url="https://abckinder.org/",
+    )
+
+    assert aliases == ["ABClandia", "ABC Kinder"]
+
+
+def test_extract_display_name_i18n_deterministic_uses_seed_aliases_from_host():
+    extracted = extractor_module.helpers._extract_display_name_i18n_deterministic(
+        text="## Preschool Program",
+        registry_name="ЧАСТНА ДЕТСКА ГРАДИНА КАНАДСКО МЕЧЕ",
+        country_code="bg",
+        website_url="https://sofia-school.maplebear.bg/en/",
+    )
+
+    assert extracted == {"bg": "Maple Bear Sofia", "en": "Maple Bear Sofia"}
+
+
+def test_extract_display_name_i18n_deterministic_uses_seed_aliases_for_mixed_script_brand():
+    extracted = extractor_module.helpers._extract_display_name_i18n_deterministic(
+        text="## Summer School & Courses",
+        registry_name='Частна детска градина АВСландия',
+        country_code="bg",
+        website_url="https://abckinder.org/",
+    )
+
+    assert extracted == {"bg": "ABClandia", "en": "ABClandia"}
+
+
+def test_extract_display_name_i18n_deterministic_augments_english_college_name_with_city():
+    extracted = extractor_module.helpers._extract_display_name_i18n_deterministic(
+        text="![American College Logo](https://www.acs.bg/media/img/acs_logo.png)",
+        registry_name="АМЕРИКАНСКИ КОЛЕЖ В СОФИЯ",
+        country_code="bg",
+        website_url="https://www.acs.bg/bg/",
+    )
+
+    assert extracted == {"bg": "American College of Sofia", "en": "American College of Sofia"}
 
 
 def test_build_openrouter_model_settings_defaults(monkeypatch):

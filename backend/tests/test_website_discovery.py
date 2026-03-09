@@ -108,6 +108,48 @@ class TestWebsiteDiscovery:
         assert school.scrape_status == "no_official_website"
         assert school.website_url is None
 
+    async def test_ignores_non_url_metadata_under_website_keys(self, db_session):
+        school = School(
+            name_i18n={"bg": "Частно училище Тест"},
+            country_code="bg",
+            school_type="private",
+            education_level="primary",
+            city="sofia",
+            website_url=None,
+            scrape_status="failed_validate",
+            attributes={
+                "website_candidate_checked_at": "2026-03-06T13:44:25.154353+00:00",
+                "website_candidate_method": "search",
+                "website_candidate_reason": "HTTP error: [Errno -2] Name or service not known",
+                "website_candidate_url": "https://real-school.bg",
+            },
+        )
+        db_session.add(school)
+        await db_session.commit()
+
+        result = await discover_school_website(
+            db=db_session,
+            school_id=school.id,
+            country_code="bg",
+            use_search_fallback=False,
+        )
+
+        await db_session.refresh(school)
+        assert result["found"] is True
+        assert school.website_url == "https://real-school.bg"
+
+    async def test_generate_brand_domain_candidates_from_registry_name(self, db_session):
+        discoverer = WebsiteDiscoverer(country_code="bg")
+
+        candidates = discoverer._generate_brand_domain_candidates(
+            '"Частно начално училище Луис Карол - гр. София" ЕООД',
+            [],
+        )
+
+        urls = {url for url, _ in candidates}
+        assert "https://luiskarol.com" in urls
+        assert "https://luiskarol.bg" in urls
+
     async def test_uses_search_fallback_when_no_local_candidate(self, db_session):
         school = School(
             name_i18n={"bg": "Училище Тест", "en": "Test School"},
@@ -462,7 +504,14 @@ class TestWebsiteDiscovery:
 
         # zvezdichka-sofia.com → suspended (INVALID)
         # dg185.bg → bot-protected (VALID)
-        async def mock_validate(school_id, url, country_code, update_db, school_name):
+        async def mock_validate(
+            school_id,
+            url,
+            country_code,
+            update_db,
+            school_name,
+            school_aliases=None,
+        ):
             await db_session.refresh(school)
             if "zvezdichka" in url:
                 school.scrape_status = "failed_validate"

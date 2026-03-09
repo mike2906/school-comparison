@@ -241,6 +241,7 @@ async def _run_typed_agent(
         if isinstance(data, GeneralInfoExtractionOutput):
             has_payload = any(
                 [
+                    data.display_name_i18n,
                     data.languages,
                     data.facilities,
                     data.programs,
@@ -495,6 +496,10 @@ async def _extract_general_info(
     school_name = (school.name_i18n or {}).get("bg") or (school.name_i18n or {}).get("en") or ""
     system_prompt = (
         "Extract general school information into structured output. "
+        "If the website shows a public-facing school or brand name that differs from the registry name, "
+        "capture it in display_name_i18n using explicit website language variants only. "
+        "If the same brand text is used in multiple languages, you may repeat the exact same text in both variants. "
+        "Do not copy the registry/legal name into display_name_i18n unless the website itself shows it as the display name. "
         "Populate languages, facilities, programs, extracurricular, class_size, founded_year, accreditations, "
         "and nested admission/operations/services/pricing_terms sections. "
         "Return only concrete facts explicitly supported by content; do not invent. "
@@ -504,7 +509,9 @@ async def _extract_general_info(
         "instead of leaving those arrays empty. "
         "Set has_useful_info=true whenever at least one concrete fact is extracted."
     )
-    user_prompt = f"School: {school_name}\n\nContent:\n{selected_text}"
+    known_aliases = [str(value) for value in dict(school.attributes or {}).get("name_aliases", []) if str(value or "").strip()]
+
+    user_prompt = f"Registry name: {school_name}\n\nWebsite content:\n{selected_text}"
 
     parsed, input_tokens, output_tokens, token_cost_usd = await _run_typed_agent(
         system_prompt=system_prompt,
@@ -515,18 +522,32 @@ async def _extract_general_info(
     )
     detail_note: str | None = None
     if parsed is None:
-        parsed = _build_deterministic_general_info_output(all_page_text)
+        parsed = _build_deterministic_general_info_output(
+            all_page_text,
+            registry_name=school_name,
+            country_code=school.country_code,
+            website_url=school.website_url,
+            known_aliases=known_aliases,
+        )
         detail_note = "General-info extraction LLM call failed; used deterministic fallback"
     else:
-        parsed = _augment_general_info_with_deterministic(parsed, all_page_text)
+        parsed = _augment_general_info_with_deterministic(
+            parsed,
+            all_page_text,
+            registry_name=school_name,
+            country_code=school.country_code,
+            website_url=school.website_url,
+            known_aliases=known_aliases,
+        )
         min_quality_score = max(0, int(settings.extraction_general_info_min_quality_score))
         current_quality = helpers._score_general_info_output(parsed)
         if current_quality < min_quality_score:
             recovery_prompt = (
                 "Extract additional concrete school facts that are explicitly present. "
-                "Prioritize filling missing languages, facilities, programs, extracurricular, class size, founded "
-                "year, accreditations, admission, operations, services, and pricing terms. "
+                "Prioritize filling missing display_name_i18n, languages, facilities, programs, extracurricular, "
+                "class size, founded year, accreditations, admission, operations, services, and pricing terms. "
                 "Do not invent values. "
+                "Only populate display_name_i18n when the website explicitly shows a public-facing name. "
                 "For languages, class_size, and founded_year: only include them when explicitly stated; otherwise "
                 "leave them empty/null."
             )
@@ -543,7 +564,14 @@ async def _extract_general_info(
             output_tokens += out2
             token_cost_usd += cost2
             if recovered is not None:
-                recovered_augmented = _augment_general_info_with_deterministic(recovered, all_page_text)
+                recovered_augmented = _augment_general_info_with_deterministic(
+                    recovered,
+                    all_page_text,
+                    registry_name=school_name,
+                    country_code=school.country_code,
+                    website_url=school.website_url,
+                    known_aliases=known_aliases,
+                )
                 recovered_quality = helpers._score_general_info_output(recovered_augmented)
                 if recovered_quality >= current_quality:
                     parsed = recovered_augmented
@@ -553,7 +581,7 @@ async def _extract_general_info(
             elif detail_note is None:
                 detail_note = "quality gate recovery call failed"
 
-    normalized, extracted_i18n = helpers._normalize_general_info_output(parsed, school.country_code)
+    normalized, extracted_i18n, display_name_i18n = helpers._normalize_general_info_output(parsed, school.country_code)
     contact_info = helpers._extract_contact_info_deterministic(all_page_text)
 
     attrs = dict(school.attributes) if isinstance(school.attributes, dict) else {}
@@ -592,6 +620,9 @@ async def _extract_general_info(
         attrs["extracted_i18n"] = extracted_i18n
     else:
         attrs.pop("extracted_i18n", None)
+
+    if display_name_i18n:
+        attrs["display_name_i18n"] = display_name_i18n
 
     school.attributes = attrs
 
@@ -637,6 +668,8 @@ async def _extract_general_info(
         )
 
     add_source("languages", value_json=[entry.model_dump() for entry in normalized.languages])
+    if display_name_i18n:
+        add_source("display_name_i18n", value_json=display_name_i18n)
     add_source("facilities", value_json=normalized.facilities)
     add_source("programs", value_json=normalized.programs)
     add_source("extracurricular", value_json=normalized.extracurricular)
@@ -658,6 +691,7 @@ async def _extract_general_info(
     has_any_info = any(
         [
             normalized.languages,
+            display_name_i18n,
             normalized.facilities,
             normalized.programs,
             normalized.extracurricular,
@@ -795,7 +829,18 @@ def _merge_pricing_terms_info(
 def _augment_general_info_with_deterministic(
     llm_output: GeneralInfoExtractionOutput,
     all_page_text: str,
+    registry_name: str | None,
+    country_code: str,
+    website_url: str | None,
+    known_aliases: list[str] | None,
 ) -> GeneralInfoExtractionOutput:
+    deterministic_display_name = helpers._extract_display_name_i18n_deterministic(
+        all_page_text,
+        registry_name=registry_name,
+        country_code=country_code,
+        website_url=website_url,
+        known_aliases=known_aliases,
+    )
     deterministic_languages = helpers._extract_languages_deterministic(all_page_text)
     deterministic_founded_year = helpers._extract_founded_year_deterministic(all_page_text)
     deterministic_class_size = helpers._extract_class_size_deterministic(all_page_text)
@@ -806,6 +851,12 @@ def _augment_general_info_with_deterministic(
     deterministic_pricing_terms = helpers._extract_pricing_terms_deterministic(all_page_text)
 
     merged = GeneralInfoExtractionOutput(
+        display_name_i18n=helpers._merge_display_name_i18n(
+            llm_output.display_name_i18n,
+            deterministic_display_name,
+            country_code,
+        )
+        or {},
         languages=helpers._merge_language_candidates(llm_output.languages, deterministic_languages),
         facilities=llm_output.facilities,
         programs=llm_output.programs,
@@ -825,8 +876,21 @@ def _augment_general_info_with_deterministic(
     return merged
 
 
-def _build_deterministic_general_info_output(all_page_text: str) -> GeneralInfoExtractionOutput:
-    return _augment_general_info_with_deterministic(GeneralInfoExtractionOutput(), all_page_text)
+def _build_deterministic_general_info_output(
+    all_page_text: str,
+    registry_name: str | None,
+    country_code: str,
+    website_url: str | None,
+    known_aliases: list[str] | None,
+) -> GeneralInfoExtractionOutput:
+    return _augment_general_info_with_deterministic(
+        GeneralInfoExtractionOutput(),
+        all_page_text,
+        registry_name=registry_name,
+        country_code=country_code,
+        website_url=website_url,
+        known_aliases=known_aliases,
+    )
 
 
 async def extract_school(

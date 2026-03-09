@@ -4,16 +4,22 @@ from types import SimpleNamespace
 import pytest
 import httpx
 from unittest.mock import AsyncMock, patch, MagicMock
+from sqlalchemy import select
 
 from app.scrapers.url_validator import (
     URLValidator,
     ValidationResult,
     URLValidationOutput,
+    _should_clear_website_derived_data,
+    _update_validation_result,
+    extract_validation_aliases,
     validate_school_url,
     _is_timeout_reason,
     _update_timeout_failure_state,
     TIMEOUT_FAILURE_ATTR_KEY,
 )
+from app.models import School, SourcePage, ScrapeType
+from app.scrapers.base import BaseScraper
 
 
 class TestURLValidator:
@@ -63,6 +69,11 @@ class TestURLValidator:
         """Whitespace inside domain is compacted to improve malformed inputs."""
         validator = URLValidator("bg")
         assert validator.normalize_url("https://bad domain.bg") == "https://baddomain.bg"
+
+    def test_normalize_url_rejects_invalid_bracketed_metadata(self):
+        """Bracketed non-URL metadata should be ignored instead of crashing urlparse."""
+        validator = URLValidator("bg")
+        assert validator.normalize_url("HTTP error: [Errno -2] Name or service not known") is None
 
 
 class TestTimeoutFailurePolicy:
@@ -115,6 +126,89 @@ class TestTimeoutFailurePolicy:
             assert count == expected
 
         assert terminal is True
+
+
+class TestValidationAliases:
+    def test_extract_validation_aliases_prefers_structured_brand_fields(self):
+        aliases = extract_validation_aliases(
+            {
+                "display_name_i18n": {
+                    "bg": 'ЧОУ "Фюжън"',
+                    "en": "Fusion School",
+                },
+                "name_aliases": ["Fusion", "Fusion School"],
+            }
+        )
+
+        assert aliases == ['ЧОУ "Фюжън"', "Fusion School", "Fusion"]
+
+    def test_should_clear_website_derived_data_only_for_strong_invalid_reasons(self):
+        assert _should_clear_website_derived_data(
+            ValidationResult.INVALID,
+            "Website identity mismatch: ЧОУ Азбуки",
+        )
+        assert _should_clear_website_derived_data(
+            ValidationResult.INVALID,
+            "LLM validation: expected-school mismatch - another school",
+        )
+        assert not _should_clear_website_derived_data(
+            ValidationResult.INVALID,
+            "Connection timeout",
+        )
+        assert not _should_clear_website_derived_data(
+            ValidationResult.AMBIGUOUS,
+            "Ambiguous: only 1 keyword(s) found",
+        )
+
+    def test_find_identity_mismatch_ignores_generic_heading(self):
+        validator = URLValidator("bg")
+
+        reason = validator._find_identity_mismatch(
+            ['Начало - Частна Детска Градина'],
+            ['ЧАСТНА ДЕТСКА ГРАДИНА ПАТЕТА'],
+        )
+
+        assert reason is None
+
+    def test_find_identity_mismatch_ignores_long_slogan(self):
+        validator = URLValidator("bg")
+
+        reason = validator._find_identity_mismatch(
+            ['Утвърдено име в българското частно образование, училище с тридесетгодишна традиция'],
+            ['ЧАСТНА ПРОФИЛИРАНА ГИМНАЗИЯ МЕРИДИАН 22'],
+        )
+
+        assert reason is None
+
+    def test_find_identity_mismatch_ignores_generic_school_type_label(self):
+        validator = URLValidator("bg")
+
+        reason = validator._find_identity_mismatch(
+            ['Английска гимназия'],
+            ['ЧАСТНА ПРОФИЛИРАНА ГИМНАЗИЯ МЕРИДИАН 22'],
+        )
+
+        assert reason is None
+
+    def test_find_identity_mismatch_ignores_navigation_label(self):
+        validator = URLValidator("bg")
+
+        reason = validator._find_identity_mismatch(
+            ['Към градината'],
+            ['ЧАСТНА ПРОФИЛИРАНА ГИМНАЗИЯ МЕРИДИАН 22'],
+        )
+
+        assert reason is None
+
+    def test_find_identity_mismatch_accepts_generic_title_with_strong_name_match(self):
+        validator = URLValidator("bg")
+
+        reason = validator._find_identity_mismatch(
+            ['Начало - НУ „Ерих Кестнер“'],
+            ['Частно основно училище Ерих Кестнер'],
+        )
+
+        assert reason is None
 
 
 @pytest.mark.asyncio
@@ -189,6 +283,75 @@ class TestURLValidatorHeuristics:
             assert result == ValidationResult.VALID
             assert final_url == "https://school.bg"
             assert "Keyword match" in reason
+
+    async def test_validate_url_uses_browser_fallback_for_blocked_site(self):
+        """Blocked responses should use browser content before being rejected."""
+        validator = URLValidator("bg")
+
+        mock_response = MagicMock()
+        mock_response.status_code = 403
+        mock_response.url = "https://yourkidsbg.com"
+        mock_response.text = ""
+
+        fallback_pages = [
+            SimpleNamespace(
+                url="https://yourkidsbg.com/",
+                markdown="Частна детска градина Йор Кидс\nПрием на деца\nУчители\nОбразователна програма",
+            )
+        ]
+
+        with patch("httpx.AsyncClient") as mock_client_class:
+            mock_client = AsyncMock()
+            mock_client.__aenter__.return_value = mock_client
+            mock_client.__aexit__.return_value = None
+            mock_client.get.return_value = mock_response
+            mock_client_class.return_value = mock_client
+
+            with patch("app.scrapers.navigator.WebsiteNavigator.discover_pages", new=AsyncMock(return_value=("https://yourkidsbg.com/", fallback_pages))):
+                result, final_url, reason = await validator.validate_url(
+                    "https://yourkidsbg.com",
+                    use_llm_fallback=False,
+                    school_name='ЧАСТНА ДЕТСКА ГРАДИНА "ЙОР КИДС"',
+                )
+
+        assert result == ValidationResult.VALID
+        assert final_url == "https://yourkidsbg.com/"
+        assert "Strong expected-school match" in reason
+
+    async def test_validate_url_accepts_explicit_name_match_with_two_keywords(self):
+        """A strong explicit school-name match should validate with limited keyword evidence."""
+        validator = URLValidator("bg")
+
+        html_content = """
+        <html>
+            <body>
+                <h1>Частна детска градина Йор Кидс</h1>
+                <p>Прием за новата учебна година.</p>
+            </body>
+        </html>
+        """
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.url = "https://yourkidsbg.com"
+        mock_response.text = html_content
+
+        with patch("httpx.AsyncClient") as mock_client_class:
+            mock_client = AsyncMock()
+            mock_client.__aenter__.return_value = mock_client
+            mock_client.__aexit__.return_value = None
+            mock_client.get.return_value = mock_response
+            mock_client_class.return_value = mock_client
+
+            result, final_url, reason = await validator.validate_url(
+                "https://yourkidsbg.com",
+                use_llm_fallback=False,
+                school_name='ЧАСТНА ДЕТСКА ГРАДИНА "ЙОР КИДС"',
+            )
+
+        assert result == ValidationResult.VALID
+        assert final_url == "https://yourkidsbg.com"
+        assert "Strong expected-school match" in reason
 
     async def test_validate_url_no_keywords(self):
         """URLs with no keywords are rejected (or marked ambiguous with LLM)."""
@@ -381,6 +544,120 @@ class TestURLValidatorHeuristics:
             assert result == ValidationResult.INVALID
             assert final_url is None
             assert "Expected school name not found" in reason
+
+    async def test_validate_url_accepts_explicit_brand_alias_match(self):
+        """Known display-name aliases should count as ownership evidence."""
+        validator = URLValidator("bg")
+
+        html_content = """
+        <html>
+            <head><title>Fusion School</title></head>
+            <body>
+                <h1>Fusion School</h1>
+                <p>Информация за прием на ученици</p>
+                <p>Нашите учители работят в малки класове.</p>
+                <p>School admissions and education programs.</p>
+            </body>
+        </html>
+        """
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.url = "https://school.fusion.bg"
+        mock_response.text = html_content
+
+        with patch("httpx.AsyncClient") as mock_client_class:
+            mock_client = AsyncMock()
+            mock_client.__aenter__.return_value = mock_client
+            mock_client.__aexit__.return_value = None
+            mock_client.get.return_value = mock_response
+            mock_client_class.return_value = mock_client
+
+            result, final_url, reason = await validator.validate_url(
+                "https://school.fusion.bg",
+                use_llm_fallback=False,
+                school_name="ЧАСТНО ОСНОВНО УЧИЛИЩЕ ФЮЖЪН ЕООД",
+                school_aliases=["Fusion School", 'ЧОУ "Фюжън"'],
+            )
+
+            assert result == ValidationResult.VALID
+            assert final_url == "https://school.fusion.bg"
+            assert "Strong expected-school match" in reason
+
+    async def test_validate_url_rejects_weak_single_token_overlap(self):
+        """One incidental token hit should not count as school-ownership proof."""
+        validator = URLValidator("bg")
+
+        html_content = """
+        <html>
+            <head><title>Частна детска градина Момо. Домашен уют приятелска атмосфера.</title></head>
+            <body>
+                <p>Прием и програми за детска градина.</p>
+                <p>Образование, учители и занимания.</p>
+            </body>
+        </html>
+        """
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.url = "https://gradinamomo.com"
+        mock_response.text = html_content
+
+        with patch("httpx.AsyncClient") as mock_client_class:
+            mock_client = AsyncMock()
+            mock_client.__aenter__.return_value = mock_client
+            mock_client.__aexit__.return_value = None
+            mock_client.get.return_value = mock_response
+            mock_client_class.return_value = mock_client
+
+            result, final_url, reason = await validator.validate_url(
+                "https://gradinamomo.com",
+                use_llm_fallback=False,
+                school_name='"ЧАСТНА ДЕТСКА ГРАДИНА - ПРИЯТЕЛСКА КЪЩА" ЕООД',
+            )
+
+            assert result == ValidationResult.INVALID
+            assert final_url is None
+            assert "Weak expected-school name match" in reason
+
+    async def test_validate_url_rejects_wrong_school_identity_before_llm(self):
+        """Clear wrong-school identity labels should fail before LLM fallback."""
+        validator = URLValidator("bg")
+
+        html_content = """
+        <html>
+            <head><title>ЧОУ Азбуки</title></head>
+            <body>
+                <h1>ЧОУ Азбуки</h1>
+                <p>Информация за прием на ученици</p>
+                <p>Учители, класове и образователна програма.</p>
+            </body>
+        </html>
+        """
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.url = "https://azbuki-school.bg"
+        mock_response.text = html_content
+
+        with patch("httpx.AsyncClient") as mock_client_class:
+            mock_client = AsyncMock()
+            mock_client.__aenter__.return_value = mock_client
+            mock_client.__aexit__.return_value = None
+            mock_client.get.return_value = mock_response
+            mock_client_class.return_value = mock_client
+
+            with patch.object(validator, "_llm_validate", new_callable=AsyncMock) as llm_mock:
+                result, final_url, reason = await validator.validate_url(
+                    "https://azbuki-school.bg",
+                    use_llm_fallback=True,
+                    school_name="ЧАСТНА ДЕТСКА ГРАДИНА МАЛКИ СТЪПКИ",
+                )
+
+            llm_mock.assert_not_called()
+            assert result == ValidationResult.INVALID
+            assert final_url is None
+            assert "Website identity mismatch" in reason
 
     async def test_validate_url_redirect(self):
         """Redirects are followed and final URL is returned."""
@@ -655,6 +932,71 @@ class TestValidateSchoolURL:
 
             assert result == ValidationResult.VALID
             assert final_url == "https://school.bg"
+
+
+@pytest.mark.asyncio
+async def test_update_validation_result_clears_stale_validated_website_on_invalid(db_session):
+    school = School(
+        name_i18n={"bg": "Тест"},
+        country_code="bg",
+        school_type="private",
+        education_level="primary",
+        website_url="https://old-school.bg",
+        scrape_status="validated",
+        summary_i18n={"bg": {"short": "bad"}, "en": {"short": "bad"}},
+        attributes={
+            "validated_website_url": "https://old-school.bg",
+            "display_name_i18n": {"bg": "ЧОУ Азбуки", "en": "Azbuki School"},
+            "extracted": {"programs": ["Wrong data"]},
+            "extracted_i18n": {"en": {"programs": ["Wrong data"]}},
+        },
+    )
+    db_session.add(school)
+    await db_session.flush()
+    db_session.add(
+        SourcePage(
+            school_id=school.id,
+            scrape_type=ScrapeType.WEBSITE,
+            source_url="https://wrong-school.bg/about",
+            content_hash=BaseScraper.compute_hash("wrong"),
+            is_valid=True,
+            raw_markdown="wrong",
+        )
+    )
+    await db_session.commit()
+
+    class SessionCtx:
+        async def __aenter__(self):
+            return db_session
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+    with patch("app.database.async_session_maker", return_value=SessionCtx()):
+        await _update_validation_result(
+            school_id=school.id,
+            url="https://wrong-school.bg",
+            result=ValidationResult.INVALID,
+            final_url=None,
+            reason="Website identity mismatch: ЧОУ Азбуки",
+        )
+
+    await db_session.refresh(school)
+    assert school.scrape_status == "failed_validate"
+    assert school.website_url is None
+    assert school.summary_i18n == {}
+    assert school.attributes.get("website_candidate_url") == "https://wrong-school.bg"
+    assert "validated_website_url" not in school.attributes
+    assert "display_name_i18n" not in school.attributes
+    assert "extracted" not in school.attributes
+    assert "extracted_i18n" not in school.attributes
+    assert "ЧОУ Азбуки" in school.attributes.get("website_mismatch_reason", "")
+    invalidated_page = (
+        await db_session.execute(
+            select(SourcePage).where(SourcePage.source_url == "https://wrong-school.bg/about")
+        )
+    ).scalar_one()
+    assert invalidated_page.is_valid is False
 
 
 class TestBotProtectionDetection:
