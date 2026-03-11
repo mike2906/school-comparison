@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from typing import Any, Mapping
 
-from app.utils.transliteration import transliterate_bulgarian
+from app.utils.transliteration import transliterate_address, transliterate_bulgarian
 
 
 _NAME_EN_REPLACEMENTS = (
@@ -153,5 +153,25 @@ def resolve_name_i18n(
         en_name = derive_english_name(derived_source)
     if en_name:
         resolved["en"] = en_name
+
+    return resolved
+
+
+def resolve_address_i18n(address_i18n: Mapping[str, Any] | None) -> dict[str, str]:
+    """Resolve the best display address without persisting synthetic EN fields."""
+    raw_address = _clean_i18n_map(address_i18n)
+    if not raw_address:
+        return {}
+
+    resolved: dict[str, str] = {}
+    bg_address = raw_address.get("bg") or raw_address.get("en")
+    if bg_address:
+        resolved["bg"] = bg_address
+
+    en_address = raw_address.get("en")
+    if not en_address and raw_address.get("bg"):
+        en_address = transliterate_address(raw_address["bg"]).strip() or None
+    if en_address:
+        resolved["en"] = en_address
 
     return resolved

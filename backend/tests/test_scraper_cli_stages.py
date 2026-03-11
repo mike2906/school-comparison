@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
@@ -130,6 +131,55 @@ async def test_run_navigate_batch_uses_batch_crawler_results(db_session):
         )
 
     batch_mock.assert_awaited_once()
+    single_mock.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_run_navigate_batch_skips_timed_out_explicit_chunks(db_session):
+    schools = []
+    for idx in range(3):
+        school = School(
+            name_i18n={"bg": f"Навигация {idx}"},
+            country_code="bg",
+            school_type="state",
+            education_level="primary",
+            city="sofia",
+            website_url=f"https://n{idx}.school.bg",
+            scrape_status="validated",
+        )
+        db_session.add(school)
+        schools.append(school)
+    await db_session.commit()
+    school_ids = [school.id for school in schools]
+
+    settings = SimpleNamespace(nav_school_timeout_seconds=10, nav_batch_concurrency=2)
+    batch_mock = AsyncMock(
+        side_effect=[
+            asyncio.TimeoutError(),
+            [{"school_id": schools[2].id, "success": True}],
+        ]
+    )
+    rollback_spy = AsyncMock(wraps=db_session.rollback)
+
+    with (
+        patch("app.config.get_settings", return_value=settings),
+        patch("app.scrapers.navigator.navigate_schools_batch", new=batch_mock),
+        patch.object(db_session, "rollback", new=rollback_spy),
+        patch.object(scraper_cli, "_run_navigate_school", new=AsyncMock()) as single_mock,
+    ):
+        results = await scraper_cli._run_navigate_batch(
+            db=db_session,
+            country="bg",
+            city="sofia",
+            limit=None,
+            include_navigated=True,
+            school_ids=school_ids,
+            skip_timed_out_chunks=True,
+        )
+
+    assert [result["school_id"] for result in results] == school_ids
+    assert [result["success"] for result in results] == [False, False, True]
+    assert rollback_spy.await_count == 1
     single_mock.assert_not_awaited()
 
 

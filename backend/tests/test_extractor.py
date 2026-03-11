@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from sqlalchemy import select
 
-from app.models import FieldSource, Pricing, School
+from app.models import FieldSource, Pricing, School, SchoolLocation
 from app.models.scrape_log import ScrapeType
 from app.models.source_page import SourcePage
 from app.schemas.extraction import (
@@ -228,6 +228,199 @@ async def test_extract_school_augments_general_info_with_deterministic_signals(
     extracted = (school.attributes or {}).get("extracted", {})
     languages = extracted.get("languages", [])
     assert any((entry.get("language") or "").lower() == "english" for entry in languages)
+
+
+def test_extract_contact_info_deterministic_captures_postal_address():
+    contact = extractor_module.helpers._extract_contact_info_deterministic(
+        """
+        ## Контакти
+        **Телефон** 02/1234567
+        **Адрес**
+        гр. София, ул. "Флора Кънева" № 7
+        """
+    )
+
+    assert contact is not None
+    assert contact["address"] == 'гр. София, ул. "Флора Кънева" № 7'
+
+
+def test_address_is_precise_enough_for_override_requires_street_number():
+    assert extractor_module._address_is_precise_enough_for_override('гр. София, ул. "Флора Кънева" № 7')
+    assert extractor_module._address_is_precise_enough_for_override("гр. София, ул. Есен 2A")
+    assert not extractor_module._address_is_precise_enough_for_override('гр. София, ул. "Иван Вазов", ет. 1, ап. 2')
+    assert not extractor_module._address_is_precise_enough_for_override('гр. София, бул. "Джеймс Баучер", офис 3')
+    assert not extractor_module._address_is_precise_enough_for_override("бул. Джеймс Баучер офис 3")
+    assert not extractor_module._address_is_precise_enough_for_override("ул. Иван Вазов ет. 1 ап. 2")
+
+
+@pytest.mark.asyncio
+async def test_extract_school_replaces_office_like_registry_address_with_website_contact_address(
+    db_session,
+    sample_school_for_extraction,
+):
+    school = sample_school_for_extraction
+    location = SchoolLocation(
+        school_id=school.id,
+        address_i18n={"bg": 'бул. "Джеймс Баучер" № 116, ет. 1, ап. 4'},
+        lat=42.65,
+        lng=23.31,
+        location_tags=["coords_source=nominatim"],
+        is_primary=True,
+    )
+    db_session.add(location)
+
+    contact_page = SourcePage(
+        school_id=school.id,
+        source_url="https://test-school.bg/contact",
+        page_category="contact",
+        scrape_type=ScrapeType.WEBSITE,
+        is_valid=True,
+        raw_markdown="""
+        ## Контакти
+        **Адрес**
+        гр. София, ул. "Флора Кънева" № 7
+        Coordinates: 42.650340, 23.319464
+        **Телефон** 02/1234567
+        """,
+        content_hash="hash-contact",
+        last_scraped_at=datetime.datetime.now(datetime.UTC),
+    )
+    db_session.add(contact_page)
+    await db_session.commit()
+
+    mock_price = PriceExtractionOutput(prices=[], has_pricing_info=False)
+    mock_general = GeneralInfoExtractionOutput(
+        facilities=["pool"],
+        has_useful_info=True,
+    )
+
+    with patch(
+        "app.scrapers.extractor._run_typed_agent",
+        new=AsyncMock(side_effect=[(mock_price, 10, 2, 0.0), (mock_general, 20, 4, 0.001), (None, 0, 0, 0.0)]),
+    ):
+        result = await extractor_module.extract_school(db_session, school.id, "bg")
+
+    assert result["status"] == "extracted"
+    await db_session.refresh(location)
+    assert location.address_i18n == {"bg": 'гр. София, ул. "Флора Кънева" № 7'}
+    assert location.lat == pytest.approx(42.65034)
+    assert location.lng == pytest.approx(23.319464)
+    assert "address_source=website_contact" in (location.location_tags or [])
+    assert "coords_source=website_map_link" in (location.location_tags or [])
+
+    field_sources = (
+        await db_session.execute(select(FieldSource).where(FieldSource.school_id == school.id))
+    ).scalars().all()
+    assert any(row.field_key == "locations.primary.address_i18n.bg" for row in field_sources)
+
+
+@pytest.mark.asyncio
+async def test_extract_school_refreshes_coords_from_website_map_link_when_address_already_matches(
+    db_session,
+    sample_school_for_extraction,
+):
+    school = sample_school_for_extraction
+    location = SchoolLocation(
+        school_id=school.id,
+        address_i18n={"bg": 'гр. София, ул. "Флора Кънева" № 7'},
+        lat=42.0,
+        lng=23.0,
+        location_tags=["address_source=website_contact"],
+        is_primary=True,
+    )
+    db_session.add(location)
+
+    contact_page = SourcePage(
+        school_id=school.id,
+        source_url="https://test-school.bg/contact",
+        page_category="contact",
+        scrape_type=ScrapeType.WEBSITE,
+        is_valid=True,
+        raw_markdown="""
+        ## Контакти
+        **Адрес**
+        гр. София, ул. "Флора Кънева" № 7
+        Coordinates: 42.650340, 23.319464
+        **Телефон** 02/1234567
+        """,
+        content_hash="hash-contact-2",
+        last_scraped_at=datetime.datetime.now(datetime.UTC),
+    )
+    db_session.add(contact_page)
+    await db_session.commit()
+
+    mock_price = PriceExtractionOutput(prices=[], has_pricing_info=False)
+    mock_general = GeneralInfoExtractionOutput(
+        facilities=["pool"],
+        has_useful_info=True,
+    )
+
+    with patch(
+        "app.scrapers.extractor._run_typed_agent",
+        new=AsyncMock(side_effect=[(mock_price, 10, 2, 0.0), (mock_general, 20, 4, 0.001), (None, 0, 0, 0.0)]),
+    ):
+        result = await extractor_module.extract_school(db_session, school.id, "bg")
+
+    assert result["status"] == "extracted"
+    await db_session.refresh(location)
+    assert location.address_i18n == {"bg": 'гр. София, ул. "Флора Кънева" № 7'}
+    assert location.lat == pytest.approx(42.65034)
+    assert location.lng == pytest.approx(23.319464)
+    assert "coords_source=website_map_link" in (location.location_tags or [])
+
+
+@pytest.mark.asyncio
+async def test_extract_school_does_not_replace_with_office_like_website_contact_address(
+    db_session,
+    sample_school_for_extraction,
+):
+    school = sample_school_for_extraction
+    location = SchoolLocation(
+        school_id=school.id,
+        address_i18n={"bg": 'гр. София, ул. "Флора Кънева" № 7'},
+        lat=42.65,
+        lng=23.31,
+        location_tags=["coords_source=nominatim"],
+        is_primary=True,
+    )
+    db_session.add(location)
+
+    contact_page = SourcePage(
+        school_id=school.id,
+        source_url="https://test-school.bg/contact",
+        page_category="contact",
+        scrape_type=ScrapeType.WEBSITE,
+        is_valid=True,
+        raw_markdown="""
+        ## Контакти
+        **Адрес**
+        гр. София, ул. "Иван Вазов", ет. 1, ап. 2
+        **Телефон** 02/1234567
+        """,
+        content_hash="hash-contact-office-like",
+        last_scraped_at=datetime.datetime.now(datetime.UTC),
+    )
+    db_session.add(contact_page)
+    await db_session.commit()
+
+    mock_price = PriceExtractionOutput(prices=[], has_pricing_info=False)
+    mock_general = GeneralInfoExtractionOutput(
+        facilities=["pool"],
+        has_useful_info=True,
+    )
+
+    with patch(
+        "app.scrapers.extractor._run_typed_agent",
+        new=AsyncMock(side_effect=[(mock_price, 10, 2, 0.0), (mock_general, 20, 4, 0.001), (None, 0, 0, 0.0)]),
+    ):
+        result = await extractor_module.extract_school(db_session, school.id, "bg")
+
+    assert result["status"] == "extracted"
+    await db_session.refresh(location)
+    assert location.address_i18n == {"bg": 'гр. София, ул. "Флора Кънева" № 7'}
+    assert location.lat == pytest.approx(42.65)
+    assert location.lng == pytest.approx(23.31)
+    assert "address_source=website_contact" not in (location.location_tags or [])
 
 
 @pytest.mark.asyncio

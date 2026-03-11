@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+
 import pytest
 from sqlalchemy import select
 
@@ -9,9 +11,103 @@ from app.models import School, ScrapeType, SourcePage
 from app.scrapers.navigator import (
     BatchDiscoverOutcome,
     NavigatedPage,
+    WebsiteNavigator,
     navigate_school,
     navigate_schools_batch,
 )
+
+
+def test_classify_page_treats_school_profile_slug_as_about():
+    navigator = WebsiteNavigator(country_code="bg")
+
+    assert navigator.classify_page("https://pberon.com/za-chou-d-r-petar-beron/") == "about"
+
+
+def test_extract_markdown_prefers_richer_markdown_candidate():
+    navigator = WebsiteNavigator(country_code="bg")
+
+    crawl_result = type(
+        "Result",
+        (),
+        {
+            "markdown": type(
+                "Markdown",
+                (),
+                {
+                    "fit_markdown": "# За училището\nКратък текст",
+                    "raw_markdown": "# За училището\nКратък текст\n## Contact Us\nгр. София, ул. Флора Кънева №14",
+                },
+            )(),
+        },
+    )()
+
+    extracted = navigator._extract_markdown(crawl_result)
+
+    assert extracted is not None
+    assert "Флора Кънева №14" in extracted
+
+
+def test_extract_markdown_appends_html_contact_signals_from_site_chrome():
+    navigator = WebsiteNavigator(country_code="bg")
+
+    crawl_result = type(
+        "Result",
+        (),
+        {
+            "markdown": type(
+                "Markdown",
+                (),
+                {
+                    "fit_markdown": "# За ЧОУ\nОсновно съдържание",
+                    "raw_markdown": "# За ЧОУ\nОсновно съдържание",
+                },
+            )(),
+            "cleaned_html": """
+                <html>
+                  <body>
+                    <ul class="all-contacts">
+                      <li class="d-adress">
+                        <a href="https://www.google.com/maps?ll=42.65034,23.319464&x=1">19. гр. София, ул. Флора Кънева №14</a>
+                      </li>
+                      <li class="contact-f">
+                        <a href="tel:+35921234567">02/1234567</a>
+                      </li>
+                    </ul>
+                    <article><h1>За ЧОУ</h1><p>Основно съдържание</p></article>
+                  </body>
+                </html>
+            """,
+        },
+    )()
+
+    extracted = navigator._extract_markdown(crawl_result)
+
+    assert extracted is not None
+    assert "Address: гр. София, ул. Флора Кънева №14" in extracted
+    assert "Coordinates: 42.650340, 23.319464" in extracted
+    assert "Phone: 02/1234567" in extracted
+
+
+def test_extract_map_link_coordinates_supports_center_param():
+    navigator = WebsiteNavigator(country_code="bg")
+
+    coords = navigator._extract_map_link_coordinates(
+        "https://www.google.com/maps?center=42.65034,23.319464&zoom=16"
+    )
+
+    assert coords == (42.65034, 23.319464)
+
+
+def test_build_run_config_uses_raw_html_for_about_and_contact_pages():
+    navigator = WebsiteNavigator(country_code="bg")
+
+    about_config = navigator._build_run_config("https://pberon.com/za-chou-d-r-petar-beron/")
+    contact_config = navigator._build_run_config("https://pberon.com/kontakti/")
+    program_config = navigator._build_run_config("https://pberon.com/programirane/")
+
+    assert about_config.markdown_generator.content_source == "raw_html"
+    assert contact_config.markdown_generator.content_source == "raw_html"
+    assert program_config.markdown_generator.content_source == "cleaned_html"
 
 
 @pytest.mark.asyncio
@@ -248,3 +344,61 @@ async def test_navigate_schools_batch_retries_failed_outcome_sequentially(db_ses
         )
     ).scalars().all()
     assert len(rows) == 1
+
+
+@pytest.mark.asyncio
+async def test_discover_pages_many_falls_back_per_chunk_on_timeout():
+    navigator = WebsiteNavigator(country_code="bg")
+    chunk_calls: list[list[str]] = []
+
+    async def fake_discover_many_chunk(self, website_urls, *, max_concurrency):
+        chunk_calls.append(list(website_urls))
+        if website_urls[0] == "https://school0.bg":
+            raise asyncio.TimeoutError("chunk timeout")
+        return {
+            "https://school2.bg": BatchDiscoverOutcome(
+                seed_url="https://school2.bg",
+                final_url="https://school2.bg",
+                pages=[
+                    NavigatedPage(
+                        url="https://school2.bg/about",
+                        category="about",
+                        markdown="About",
+                        content_hash="hash-about",
+                    )
+                ],
+            )
+        }
+
+    async def fake_discover_pages(self, website_url: str):
+        return (
+            website_url,
+            [
+                NavigatedPage(
+                    url=f"{website_url}/about",
+                    category="about",
+                    markdown=f"About {website_url}",
+                    content_hash=f"hash-{website_url}",
+                )
+            ],
+        )
+
+    from unittest.mock import patch
+
+    with (
+        patch.object(WebsiteNavigator, "_discover_pages_many_chunk", new=fake_discover_many_chunk),
+        patch.object(WebsiteNavigator, "discover_pages", new=fake_discover_pages),
+    ):
+        outcomes = await navigator.discover_pages_many(
+            ["https://school0.bg", "https://school1.bg", "https://school2.bg"],
+            max_concurrency=2,
+        )
+
+    assert chunk_calls == [
+        ["https://school0.bg", "https://school1.bg"],
+        ["https://school2.bg"],
+    ]
+    assert set(outcomes) == {"https://school0.bg", "https://school1.bg", "https://school2.bg"}
+    assert outcomes["https://school0.bg"].pages[0].url == "https://school0.bg/about"
+    assert outcomes["https://school1.bg"].pages[0].url == "https://school1.bg/about"
+    assert outcomes["https://school2.bg"].pages[0].url == "https://school2.bg/about"

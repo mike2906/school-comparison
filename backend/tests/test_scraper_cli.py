@@ -256,6 +256,107 @@ async def test_repair_i18n_command_clears_synthetic_values_and_reextracts_eligib
 
 
 @pytest.mark.asyncio
+async def test_location_repair_reasons_for_school_detects_office_like_and_missing_coords():
+    school = School(
+        id=537,
+        name_i18n={"bg": 'ЧОУ "Д-р Петър Берон"'},
+        country_code="bg",
+        school_type="private",
+        education_level="primary",
+        city="sofia",
+        website_url="https://pberon.example",
+    )
+    school.locations = [
+        SchoolLocation(
+            school_id=537,
+            address_i18n={"bg": 'бул. "Джеймс Баучер" № 116, ет. 1, ап. 4'},
+            is_primary=True,
+            location_tags=["coords_source=geojson"],
+        )
+    ]
+
+    reasons = scraper_cli._location_repair_reasons_for_school(school)
+
+    assert reasons == ["office-like-address", "missing-coords", "geojson-coords"]
+
+
+@pytest.mark.asyncio
+async def test_repair_locations_command_targets_candidates_and_runs_navigate_and_extract(db_session):
+    candidate_school = School(
+        name_i18n={"bg": 'ЧОУ "Д-р Петър Берон"'},
+        country_code="bg",
+        school_type="private",
+        education_level="primary",
+        city="sofia",
+        website_url="https://pberon.example",
+        scrape_status="extracted",
+    )
+    healthy_school = School(
+        name_i18n={"bg": "Fusion Academy"},
+        country_code="bg",
+        school_type="private",
+        education_level="primary",
+        city="sofia",
+        website_url="https://fusion.example",
+        scrape_status="extracted",
+    )
+    db_session.add_all([candidate_school, healthy_school])
+    await db_session.flush()
+
+    db_session.add_all(
+        [
+            SchoolLocation(
+                school_id=candidate_school.id,
+                address_i18n={"bg": 'бул. "Джеймс Баучер" № 116, ет. 1, ап. 4'},
+                is_primary=True,
+                location_tags=["coords_source=geojson"],
+            ),
+            SchoolLocation(
+                school_id=healthy_school.id,
+                address_i18n={"bg": "гр. София, ул. Иван Вазов 15"},
+                lat=42.69,
+                lng=23.32,
+                is_primary=True,
+                location_tags=["coords_source=website_map_link"],
+            ),
+        ]
+    )
+    await db_session.commit()
+
+    class SessionCtx:
+        async def __aenter__(self):
+            return db_session
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+    navigate_batch_mock = AsyncMock(return_value=[{"school_id": candidate_school.id, "success": True}])
+    extract_batch_mock = AsyncMock()
+
+    with (
+        patch("app.database.async_session_maker", return_value=SessionCtx()),
+        patch.object(scraper_cli, "_run_navigate_batch", new=navigate_batch_mock),
+        patch.object(scraper_cli, "_run_extract_batch", new=extract_batch_mock),
+    ):
+        await scraper_cli._repair_locations_command(
+            school_name=None,
+            school_id=None,
+            city="sofia",
+            country="bg",
+            limit=None,
+            include_state=False,
+            dry_run=False,
+            run_extract=True,
+        )
+
+    navigate_batch_mock.assert_awaited_once()
+    extract_batch_mock.assert_awaited_once()
+    assert navigate_batch_mock.await_args.kwargs["school_ids"] == [candidate_school.id]
+    assert navigate_batch_mock.await_args.kwargs["skip_timed_out_chunks"] is True
+    assert extract_batch_mock.await_args.kwargs["school_ids"] == [candidate_school.id]
+
+
+@pytest.mark.asyncio
 async def test_cleanup_display_names_command_removes_junk_and_cyrillic_en(db_session):
     junk_school = School(
         name_i18n={"bg": 'ДГ №10 "Чебурашка"'},

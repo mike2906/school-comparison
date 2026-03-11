@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from math import ceil
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 from bs4 import BeautifulSoup
 from sqlalchemy import select
@@ -48,7 +48,7 @@ class BatchDiscoverOutcome:
 class WebsiteNavigator:
     """Crawl4AI deep crawler wrapper for school websites."""
 
-    MAX_PAGES = 8
+    MAX_PAGES = 12
     MAX_DEPTH = 1
     PAGE_TIMEOUT_SECONDS = 30.0
     CRAWL_TIMEOUT_SECONDS = 120.0
@@ -82,7 +82,18 @@ class WebsiteNavigator:
     )
 
     CATEGORY_KEYWORDS = {
-        "about": ["about", "za-nas", "за-нас", "мисия", "екип", "team"],
+        "about": [
+            "about",
+            "za-nas",
+            "за-нас",
+            "za-chou",
+            "za-chdg",
+            "za-dg",
+            "za-uchilishte",
+            "мисия",
+            "екип",
+            "team",
+        ],
         "pricing": ["price", "prices", "pricing", "fees", "tuition", "ceni", "taksi", "цен", "такс"],
         "admission": ["admission", "apply", "enroll", "priem", "прием", "кандидат", "запис"],
         "contact": ["contact", "contacts", "kontakti", "контакт", "телефон", "адрес", "address", "phone"],
@@ -93,6 +104,10 @@ class WebsiteNavigator:
     PRIORITY_KEYWORDS = [
         "about",
         "za-nas",
+        "za-chou",
+        "za-chdg",
+        "za-dg",
+        "za-uchilishte",
         "мисия",
         "team",
         "pricing",
@@ -144,6 +159,16 @@ class WebsiteNavigator:
         "*.mp4",
         "*.mp3",
     ]
+    CONTACT_SIGNAL_CLASS_HINTS = ("contact", "adress", "address", "location", "map")
+    MAP_LINK_HINTS = ("google.com/maps", "maps.app.goo.gl", "mapclient=embed", "/maps/")
+    PHONE_HREF_RE = re.compile(r"^tel:\s*(.+)$", flags=re.IGNORECASE)
+    EMAIL_HREF_RE = re.compile(r"^mailto:\s*(.+)$", flags=re.IGNORECASE)
+    EMAIL_TEXT_RE = re.compile(r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", flags=re.IGNORECASE)
+    PHONE_TEXT_RE = re.compile(r"(?:\+?\d[\d\s()/.-]{6,}\d)")
+    ADDRESS_TEXT_RE = re.compile(
+        r"(?:гр\.|ул\.|бул\.|ж\.к\.|жк\.|кв\.|pl\.|street|st\.|boulevard|blvd|road|rd\.|avenue|ave\.)",
+        flags=re.IGNORECASE,
+    )
 
     def __init__(self, country_code: str = "bg"):
         self.country_code = country_code
@@ -184,8 +209,10 @@ class WebsiteNavigator:
             url_scorer=scorer,
         )
 
+        page_category = self.classify_page(website_url)
         markdown_generator = DefaultMarkdownGenerator(
-            content_filter=PruningContentFilter(threshold=0.45)
+            content_filter=PruningContentFilter(threshold=0.45),
+            content_source="raw_html" if page_category in {"about", "contact"} else "cleaned_html",
         )
 
         return CrawlerRunConfig(
@@ -228,6 +255,13 @@ class WebsiteNavigator:
     def _extract_markdown(self, crawl_result: Any) -> str | None:
         markdown_obj = getattr(crawl_result, "markdown", None)
         candidates: list[str] = []
+        cleaned_html = getattr(crawl_result, "cleaned_html", None)
+        raw_html = getattr(crawl_result, "html", None)
+        html = cleaned_html or raw_html
+        contact_signals = self._dedupe_lines(
+            self._extract_html_contact_signals(raw_html if isinstance(raw_html, str) else None)
+            + self._extract_html_contact_signals(cleaned_html if isinstance(cleaned_html, str) else None)
+        )
 
         if isinstance(markdown_obj, str) and markdown_obj.strip():
             candidates.append(markdown_obj.strip())
@@ -238,20 +272,147 @@ class WebsiteNavigator:
                     candidates.append(value.strip())
 
         if not candidates:
-            html = getattr(crawl_result, "cleaned_html", None) or getattr(crawl_result, "html", None)
             if not isinstance(html, str) or not html.strip():
-                return None
+                return self._append_contact_signals(None, contact_signals)
             soup = BeautifulSoup(html, "html.parser")
             for node in soup.find_all(["script", "style", "noscript", "header", "footer", "nav", "aside"]):
                 node.decompose()
             text = soup.get_text("\n", strip=True)
             lines = self._dedupe_lines(text.splitlines())
             extracted = "\n".join(lines)
-            return extracted[: self.MAX_CONTENT_CHARS] if extracted else None
+            normalized = extracted[: self.MAX_CONTENT_CHARS] if extracted else None
+            return self._append_contact_signals(normalized, contact_signals)
 
-        lines = self._dedupe_lines(candidates[0].splitlines())
-        extracted = "\n".join(lines)
-        return extracted[: self.MAX_CONTENT_CHARS] if extracted else None
+        extracted_candidates: list[str] = []
+        for candidate in candidates:
+            lines = self._dedupe_lines(candidate.splitlines())
+            extracted = "\n".join(lines)
+            if extracted:
+                extracted_candidates.append(extracted[: self.MAX_CONTENT_CHARS])
+        if not extracted_candidates:
+            return self._append_contact_signals(None, contact_signals)
+        return self._append_contact_signals(max(extracted_candidates, key=len), contact_signals)
+
+    def _normalize_contact_signal_text(self, text: str) -> str:
+        normalized = self._clean_text(text)
+        if not normalized:
+            return ""
+        normalized = re.sub(r"^[*_#`|>\-:\s]+", "", normalized)
+        if re.match(r"^\d+\.\s*(?:гр\.|ул\.|бул\.|ж\.к\.|жк\.|кв\.)", normalized, flags=re.IGNORECASE):
+            normalized = re.sub(r"^\d+\.\s*", "", normalized)
+        return normalized.strip()
+
+    def _format_contact_signal(self, label: str, value: str) -> str | None:
+        normalized = self._normalize_contact_signal_text(value)
+        if not normalized:
+            return None
+        return f"{label}: {normalized}"
+
+    def _extract_map_link_coordinates(self, href: str) -> tuple[float, float] | None:
+        if not href:
+            return None
+        parsed = urlparse(href)
+        query = parse_qs(parsed.query)
+
+        for param_name in ("ll", "center", "q", "query", "destination"):
+            for value in query.get(param_name) or []:
+                match = re.search(r"(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)", value)
+                if match:
+                    return float(match.group(1)), float(match.group(2))
+
+        fragment_match = re.search(r"[?#](?:.*?)(?:center|q|query|destination)=(-?\d+\.\d+),(-?\d+\.\d+)", href)
+        if fragment_match:
+            return float(fragment_match.group(1)), float(fragment_match.group(2))
+
+        for value in (parsed.fragment or "", parsed.path or ""):
+            match = re.search(r"(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)", value)
+            if match:
+                return float(match.group(1)), float(match.group(2))
+        path_match = re.search(r"@(-?\d+\.\d+),(-?\d+\.\d+)", href)
+        if path_match:
+            return float(path_match.group(1)), float(path_match.group(2))
+
+        return None
+
+    def _extract_html_contact_signals(self, html: str | None) -> list[str]:
+        if not html or not html.strip():
+            return []
+
+        soup = BeautifulSoup(html, "html.parser")
+        candidates: list[str] = []
+
+        for anchor in soup.find_all("a", href=True):
+            href = str(anchor.get("href") or "").strip()
+            text = self._normalize_contact_signal_text(anchor.get_text(" ", strip=True))
+            if not href and not text:
+                continue
+
+            phone_match = self.PHONE_HREF_RE.match(href)
+            if phone_match:
+                signal = self._format_contact_signal("Phone", text or phone_match.group(1))
+                if signal:
+                    candidates.append(signal)
+                continue
+
+            email_match = self.EMAIL_HREF_RE.match(href)
+            if email_match:
+                signal = self._format_contact_signal("Email", text or email_match.group(1))
+                if signal:
+                    candidates.append(signal)
+                continue
+
+            lowered_href = href.lower()
+            if any(marker in lowered_href for marker in self.MAP_LINK_HINTS) and self.ADDRESS_TEXT_RE.search(text):
+                signal = self._format_contact_signal("Address", text)
+                if signal:
+                    candidates.append(signal)
+                coords = self._extract_map_link_coordinates(href)
+                if coords is not None:
+                    candidates.append(f"Coordinates: {coords[0]:.6f}, {coords[1]:.6f}")
+
+        for node in soup.find_all(True):
+            if node.name in {"html", "body", "ul", "ol", "nav", "header", "footer"}:
+                continue
+            attrs = " ".join(
+                str(value)
+                for key, value in node.attrs.items()
+                if key in {"class", "id"}
+            ).lower()
+            if not attrs or not any(hint in attrs for hint in self.CONTACT_SIGNAL_CLASS_HINTS):
+                continue
+            text = self._normalize_contact_signal_text(node.get_text(" ", strip=True))
+            if not text:
+                continue
+            if self.ADDRESS_TEXT_RE.search(text):
+                signal = self._format_contact_signal("Address", text)
+                if signal:
+                    candidates.append(signal)
+            for email in self.EMAIL_TEXT_RE.findall(text):
+                signal = self._format_contact_signal("Email", email)
+                if signal:
+                    candidates.append(signal)
+            for phone in self.PHONE_TEXT_RE.findall(text):
+                signal = self._format_contact_signal("Phone", phone)
+                if signal:
+                    candidates.append(signal)
+
+        return self._dedupe_lines(candidates)[:8]
+
+    def _append_contact_signals(self, markdown: str | None, signals: list[str]) -> str | None:
+        base = (markdown or "").strip()
+        if not signals:
+            return base or None
+
+        existing = (base or "").lower()
+        missing = [signal for signal in signals if signal.lower() not in existing]
+        if not missing:
+            return base or None
+
+        section = "## HTML contact signals\n" + "\n".join(missing)
+        if not base:
+            return section[: self.MAX_CONTENT_CHARS]
+        merged = f"{base}\n\n{section}"
+        return merged[: self.MAX_CONTENT_CHARS]
 
     def classify_page(self, url: str, title: str = "", anchor_text: str = "") -> str | None:
         haystack = f"{url} {title} {anchor_text}".lower()
@@ -442,9 +603,7 @@ class WebsiteNavigator:
         *,
         max_concurrency: int = 3,
     ) -> dict[str, BatchDiscoverOutcome]:
-        """Discover pages for many school websites using Crawl4AI arun_many."""
-        from crawl4ai import AsyncWebCrawler, RateLimiter, SemaphoreDispatcher  # type: ignore
-
+        """Discover pages for many school websites using chunked Crawl4AI arun_many."""
         if not website_urls:
             return {}
 
@@ -460,10 +619,69 @@ class WebsiteNavigator:
         if not normalized_urls:
             return {}
 
-        browser_config = self._build_browser_config(enable_stealth=True)
-        run_configs = [self._build_run_config(url) for url in normalized_urls]
         concurrency = max(1, int(max_concurrency))
-        timeout_budget = self.CRAWL_TIMEOUT_SECONDS * max(1, ceil(len(normalized_urls) / concurrency))
+        outcomes: dict[str, BatchDiscoverOutcome] = {}
+
+        for chunk_start in range(0, len(normalized_urls), concurrency):
+            chunk_urls = normalized_urls[chunk_start : chunk_start + concurrency]
+            try:
+                chunk_outcomes = await self._discover_pages_many_chunk(
+                    chunk_urls,
+                    max_concurrency=min(concurrency, len(chunk_urls)),
+                )
+            except Exception as exc:
+                logger.warning(
+                    "arun_many failed for %s-school chunk; falling back to sequential discover_pages: %s",
+                    len(chunk_urls),
+                    exc,
+                )
+                chunk_outcomes = await self._discover_pages_sequentially(chunk_urls)
+
+            outcomes.update(chunk_outcomes)
+
+        return outcomes
+
+    async def _discover_pages_sequentially(
+        self,
+        website_urls: list[str],
+    ) -> dict[str, BatchDiscoverOutcome]:
+        outcomes: dict[str, BatchDiscoverOutcome] = {}
+        for url in website_urls:
+            try:
+                final_url, pages = await self.discover_pages(url)
+                outcomes[url] = BatchDiscoverOutcome(
+                    seed_url=url,
+                    final_url=final_url,
+                    pages=pages,
+                )
+            except Exception as school_exc:
+                outcomes[url] = BatchDiscoverOutcome(
+                    seed_url=url,
+                    final_url=None,
+                    pages=[],
+                    error=str(school_exc),
+                )
+        return outcomes
+
+    async def _discover_pages_many_chunk(
+        self,
+        website_urls: list[str],
+        *,
+        max_concurrency: int,
+    ) -> dict[str, BatchDiscoverOutcome]:
+        from crawl4ai import AsyncWebCrawler, RateLimiter, SemaphoreDispatcher  # type: ignore
+
+        if not website_urls:
+            return {}
+
+        browser_config = self._build_browser_config(enable_stealth=True)
+        run_configs = [self._build_run_config(url) for url in website_urls]
+        concurrency = max(1, int(max_concurrency))
+        timeout_budget = max(
+            self.CRAWL_TIMEOUT_SECONDS,
+            float(getattr(self.settings, "nav_school_timeout_seconds", self.CRAWL_TIMEOUT_SECONDS))
+            * max(1, ceil(len(website_urls) / concurrency)),
+        )
         rate_limiter = RateLimiter(
             base_delay=(0.2, 0.8),
             max_delay=6.0,
@@ -475,40 +693,21 @@ class WebsiteNavigator:
             rate_limiter=rate_limiter,
         )
 
-        outcomes: dict[str, BatchDiscoverOutcome] = {}
-        try:
-            async with AsyncWebCrawler(config=browser_config) as crawler:
-                containers = await asyncio.wait_for(
-                    crawler.arun_many(
-                        urls=normalized_urls,
-                        config=run_configs,
-                        dispatcher=dispatcher,
-                    ),
-                    timeout=timeout_budget,
-                )
-        except Exception as exc:
-            logger.warning("arun_many failed; falling back to sequential discover_pages: %s", exc)
-            for url in normalized_urls:
-                try:
-                    final_url, pages = await self.discover_pages(url)
-                    outcomes[url] = BatchDiscoverOutcome(
-                        seed_url=url,
-                        final_url=final_url,
-                        pages=pages,
-                    )
-                except Exception as school_exc:
-                    outcomes[url] = BatchDiscoverOutcome(
-                        seed_url=url,
-                        final_url=None,
-                        pages=[],
-                        error=str(school_exc),
-                    )
-            return outcomes
+        async with AsyncWebCrawler(config=browser_config) as crawler:
+            containers = await asyncio.wait_for(
+                crawler.arun_many(
+                    urls=website_urls,
+                    config=run_configs,
+                    dispatcher=dispatcher,
+                ),
+                timeout=timeout_budget,
+            )
 
         if not isinstance(containers, list):
             containers = [containers]
 
-        for idx, url in enumerate(normalized_urls):
+        outcomes: dict[str, BatchDiscoverOutcome] = {}
+        for idx, url in enumerate(website_urls):
             container = containers[idx] if idx < len(containers) else None
             if container is None:
                 outcomes[url] = BatchDiscoverOutcome(

@@ -5,7 +5,7 @@ from pydantic import BaseModel, ConfigDict, computed_field
 
 from app.schemas.pricing import PricingResponse
 from app.schemas.field_source import FieldSourceResponse
-from app.utils.i18n_resolver import resolve_name_i18n
+from app.utils.i18n_resolver import resolve_address_i18n, resolve_name_i18n
 
 
 class SummaryText(BaseModel):
@@ -56,6 +56,11 @@ class SchoolLocationBase(BaseModel):
     is_primary: bool = True
 
     model_config = {"from_attributes": True}
+
+    @computed_field(return_type=dict[str, str])
+    @property
+    def resolved_address_i18n(self) -> dict[str, str]:
+        return resolve_address_i18n(self.address_i18n)
 
 
 class SchoolLocationResponse(SchoolLocationBase):

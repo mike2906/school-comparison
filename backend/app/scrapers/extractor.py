@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import datetime
 import logging
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -18,7 +19,7 @@ from app.ai.client import get_model
 from app.config import get_settings
 from app.models.field_source import FieldSource, SourceConfidence, SourceType
 from app.models.pricing import PriceSource, Pricing
-from app.models.school import School
+from app.models.school import School, SchoolLocation
 from app.models.scrape_log import ScrapeType
 from app.models.source_page import SourcePage
 from app.schemas.extraction import (
@@ -209,6 +210,162 @@ def _extract_openrouter_cost_usd(result: Any) -> float:
         except (TypeError, ValueError):
             return 0.0
     return 0.0
+
+
+def _normalize_address_for_compare(value: str | None) -> str:
+    return " ".join((value or "").casefold().replace('"', "").split())
+
+
+def _address_has_street_signal(value: str | None) -> bool:
+    return any(
+        marker in (value or "").casefold()
+        for marker in ("ул.", "бул.", "ж.к.", "жк.", "кв.", "пл.", "street", "st.", "boulevard", "blvd")
+    )
+
+
+def _address_has_street_number(value: str | None) -> bool:
+    if not value:
+        return False
+    match = re.search(
+        r"(?:ул\.|бул\.|street|st\.|boulevard|blvd|road|rd\.|avenue|ave\.)"
+        r"([^,\n]{0,80})",
+        value,
+        flags=re.IGNORECASE,
+    )
+    if not match:
+        return False
+
+    street_segment = match.group(1)
+    building_match = re.search(r"(?:[№#]\s*\d+[A-Za-zА-Яа-я]?|\b\d+[A-Za-zА-Яа-я]?\b)", street_segment)
+    if not building_match:
+        return False
+
+    prefix = street_segment[: building_match.start()]
+    if re.search(r"\b(?:ет\.?|ап\.?|апартамент|офис|office|suite|floor)\b", prefix, flags=re.IGNORECASE):
+        return False
+
+    suffix = street_segment[building_match.end() :]
+    if re.search(
+        r"^\s*(?:[,/-]?\s*(?:ет\.?|ап\.?|апартамент|офис|office|suite|floor)\b)",
+        suffix,
+        flags=re.IGNORECASE,
+    ):
+        return False
+
+    return True
+
+
+def _address_is_precise_enough_for_override(value: str | None) -> bool:
+    lowered = (value or "").casefold()
+    if not lowered:
+        return False
+    has_precise_marker = any(
+        marker in lowered
+        for marker in ("ул.", "бул.", "street", "st.", "boulevard", "blvd", "road", "rd.", "avenue", "ave.")
+    )
+    return has_precise_marker and _address_has_street_number(value)
+
+
+def _address_looks_like_registry_office(value: str | None) -> bool:
+    lowered = (value or "").casefold()
+    if not lowered:
+        return False
+    office_markers = ("ап.", "апартамент", "офис", "office", "suite")
+    floor_markers = ("ет.", "floor")
+    return any(marker in lowered for marker in office_markers) or (
+        any(marker in lowered for marker in floor_markers) and any(marker in lowered for marker in office_markers)
+    )
+
+
+def _should_replace_primary_address(
+    current_address: str | None,
+    website_address: str | None,
+    location_count: int,
+) -> bool:
+    if not website_address:
+        return False
+    if not _address_is_precise_enough_for_override(website_address):
+        return False
+    if not current_address:
+        return True
+    if _normalize_address_for_compare(current_address) == _normalize_address_for_compare(website_address):
+        return False
+    if location_count > 1:
+        return False
+    if _address_looks_like_registry_office(current_address):
+        return True
+    if not _address_has_street_signal(current_address) and _address_has_street_signal(website_address):
+        return True
+    return False
+
+
+async def _sync_primary_location_from_contact_address(
+    db: AsyncSession,
+    school: School,
+    contact_info: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    website_address = helpers._normalize_contact_address_candidate((contact_info or {}).get("address") or "")
+    coordinates = (contact_info or {}).get("coordinates")
+    coord_lat = coordinates.get("lat") if isinstance(coordinates, dict) else None
+    coord_lng = coordinates.get("lng") if isinstance(coordinates, dict) else None
+    if not website_address:
+        return None
+
+    locations = (
+        await db.execute(
+            select(SchoolLocation)
+            .where(SchoolLocation.school_id == school.id)
+            .order_by(SchoolLocation.is_primary.desc(), SchoolLocation.id.asc())
+        )
+    ).scalars().all()
+    if not locations:
+        return None
+
+    primary_location = locations[0]
+    address_i18n = dict(primary_location.address_i18n or {})
+    current_bg = helpers._normalize_contact_address_candidate(address_i18n.get("bg") or "")
+    tags = [tag for tag in list(primary_location.location_tags or []) if not str(tag).startswith("coords_source=")]
+    same_address = _normalize_address_for_compare(current_bg) == _normalize_address_for_compare(website_address)
+
+    if same_address and coord_lat is not None and coord_lng is not None:
+        primary_location.lat = float(coord_lat)
+        primary_location.lng = float(coord_lng)
+        if "coords_source=website_map_link" not in tags:
+            tags.append("coords_source=website_map_link")
+        if "address_source=website_contact" not in tags:
+            tags.append("address_source=website_contact")
+        primary_location.location_tags = tags
+        db.add(primary_location)
+        return {
+            "location_id": primary_location.id,
+            "address": website_address,
+            "replaced_address": None,
+        }
+
+    if not _should_replace_primary_address(current_bg, website_address, len(locations)):
+        return None
+
+    address_i18n["bg"] = website_address
+    address_i18n.pop("en", None)
+    primary_location.address_i18n = address_i18n
+    if coord_lat is not None and coord_lng is not None:
+        primary_location.lat = float(coord_lat)
+        primary_location.lng = float(coord_lng)
+        if "coords_source=website_map_link" not in tags:
+            tags.append("coords_source=website_map_link")
+    elif current_bg and _normalize_address_for_compare(current_bg) != _normalize_address_for_compare(website_address):
+        primary_location.lat = None
+        primary_location.lng = None
+    if "address_source=website_contact" not in tags:
+        tags.append("address_source=website_contact")
+    primary_location.location_tags = tags
+    db.add(primary_location)
+
+    return {
+        "location_id": primary_location.id,
+        "address": website_address,
+        "replaced_address": current_bg,
+    }
 
 
 async def _run_typed_agent(
@@ -583,6 +740,7 @@ async def _extract_general_info(
 
     normalized, extracted_i18n, display_name_i18n = helpers._normalize_general_info_output(parsed, school.country_code)
     contact_info = helpers._extract_contact_info_deterministic(all_page_text)
+    location_address_update = await _sync_primary_location_from_contact_address(db, school, contact_info)
 
     attrs = dict(school.attributes) if isinstance(school.attributes, dict) else {}
     admission_info = dict(school.admission_info) if isinstance(school.admission_info, dict) else {}
@@ -687,6 +845,28 @@ async def _extract_general_info(
         add_source("pricing_terms", value_json=pricing_terms_payload)
     if contact_info:
         add_source("contact", value_json=contact_info)
+        if isinstance(contact_info.get("address"), str):
+            add_source("contact.address", value_text=contact_info["address"])
+    if location_address_update:
+        db.add(
+            FieldSource(
+                school_id=school.id,
+                category="general_info",
+                field_key="locations.primary.address_i18n.bg",
+                field_path="locations.primary.address_i18n.bg",
+                value_text=location_address_update["address"],
+                source_type=SourceType.SCRAPED_WEBSITE,
+                source_url=source_url,
+                scraped_at=helpers._utcnow_naive(),
+                confidence=SourceConfidence.HIGH,
+                confidence_score=0.85,
+                notes=(
+                    f"Replaced previous location address: {location_address_update['replaced_address']}"
+                    if location_address_update.get("replaced_address")
+                    else "Filled missing primary location address from website contact content"
+                ),
+            )
+        )
 
     has_any_info = any(
         [
@@ -703,12 +883,15 @@ async def _extract_general_info(
             normalized.services.has_useful_info,
             normalized.pricing_terms.has_useful_info,
             contact_info,
+            location_address_update,
         ]
     )
 
     detail = "General info extracted" if has_any_info else "No useful general info detected"
     if detail_note and has_any_info:
         detail = f"{detail} ({detail_note})"
+    if location_address_update:
+        detail = f"{detail}; repaired primary location address from website contact page"
 
     return {
         "success": True,

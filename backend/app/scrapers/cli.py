@@ -39,10 +39,14 @@ Usage:
 
     # Clear legacy transliterated EN names/addresses and rerun extraction
     uv run python -m app.scrapers.cli repair-i18n --city sofia
+
+    # Refresh location data only for likely-bad website-backed schools
+    uv run python -m app.scrapers.cli repair-locations --city sofia
 """
 import asyncio
 import builtins
 from collections import defaultdict
+from math import ceil
 import sys
 import logging
 import random
@@ -165,6 +169,31 @@ def cleanup_display_names(school, school_id, city, country, limit, dry_run):
             country=country,
             limit=limit,
             dry_run=dry_run,
+        )
+    )
+
+
+@cli.command("repair-locations")
+@click.option("--school", help="School name (fuzzy match)")
+@click.option("--school-id", type=int, help="School ID")
+@click.option("--city", default="sofia", help="City to filter by")
+@click.option("--country", default="bg", help="Country code")
+@click.option("--limit", type=int, help="Limit number of schools to inspect")
+@click.option("--include-state", is_flag=True, help="Include state schools")
+@click.option("--dry-run", is_flag=True, help="Preview affected schools without writing data")
+@click.option("--no-extract", is_flag=True, help="Only rerun navigate, skip extract")
+def repair_locations(school, school_id, city, country, limit, include_state, dry_run, no_extract):
+    """Refresh likely-bad location rows via targeted navigate+extract reruns."""
+    asyncio.run(
+        _repair_locations_command(
+            school_name=school,
+            school_id=school_id,
+            city=city,
+            country=country,
+            limit=limit,
+            include_state=include_state,
+            dry_run=dry_run,
+            run_extract=not no_extract,
         )
     )
 
@@ -409,6 +438,152 @@ def _has_synthetic_location_address_en(location) -> bool:
     if not bg_address or not en_address:
         return False
     return en_address.strip() == transliterate_address(bg_address).strip()
+
+
+def _primary_location_for_school(school):
+    locations = builtins.list(school.locations or [])
+    if not locations:
+        return None
+    return sorted(locations, key=lambda loc: (not bool(loc.is_primary), loc.id or 0))[0]
+
+
+def _location_has_tag(location, tag: str) -> bool:
+    return any(str(value) == tag for value in builtins.list(location.location_tags or []))
+
+
+def _location_repair_reasons_for_school(school) -> list[str]:
+    if not school.website_url:
+        return []
+
+    location = _primary_location_for_school(school)
+    if location is None:
+        return []
+
+    from app.scrapers.extractor import _address_looks_like_registry_office
+
+    reasons: list[str] = []
+    address_bg = dict(location.address_i18n or {}).get("bg") or dict(location.address_i18n or {}).get("en") or ""
+    if _address_looks_like_registry_office(address_bg):
+        reasons.append("office-like-address")
+    if location.lat is None or location.lng is None:
+        reasons.append("missing-coords")
+    if _location_has_tag(location, "coords_source=geojson") or _location_has_tag(location, "coords_source=geojson_website"):
+        reasons.append("geojson-coords")
+    return reasons
+
+
+async def _repair_locations_command(
+    *,
+    school_name: Optional[str],
+    school_id: Optional[int],
+    city: Optional[str],
+    country: str,
+    limit: Optional[int],
+    include_state: bool,
+    dry_run: bool,
+    run_extract: bool,
+):
+    from sqlalchemy import select
+    from sqlalchemy.orm import selectinload
+
+    from app.database import async_session_maker
+    from app.models import School
+
+    async with async_session_maker() as db:
+        if school_name and not school_id:
+            school_id = await _find_school_by_name(db, school_name, country)
+            if not school_id:
+                console.print(f"[red]School not found: {school_name}[/red]")
+                return
+
+        query = (
+            select(School)
+            .options(selectinload(School.locations))
+            .where(
+                School.country_code == country,
+                School.website_url.isnot(None),
+            )
+        )
+        if city:
+            query = query.where(School.city == city)
+        if school_id:
+            query = query.where(School.id == school_id)
+        if not include_state:
+            query = query.where(School.school_type.in_(["private", "international"]))
+        if limit:
+            query = query.limit(limit)
+
+        schools = (await db.execute(query)).scalars().all()
+        candidate_rows: list[tuple[int, str, str, str]] = []
+        target_school_ids: list[int] = []
+        reason_counts: dict[str, int] = defaultdict(int)
+
+        for school in schools:
+            reasons = _location_repair_reasons_for_school(school)
+            if not reasons:
+                continue
+            location = _primary_location_for_school(school)
+            address_bg = dict(location.address_i18n or {}).get("bg") or dict(location.address_i18n or {}).get("en") or ""
+            candidate_rows.append((school.id, _school_label(school), ", ".join(reasons), address_bg))
+            target_school_ids.append(school.id)
+            for reason in reasons:
+                reason_counts[reason] += 1
+
+        if not candidate_rows:
+            console.print("[yellow]No location-repair candidates found.[/yellow]")
+            return
+
+        console.print(f"[cyan]Found {len(candidate_rows)} location-repair candidates[/cyan]")
+        console.print(f"  Office-like addresses: {reason_counts.get('office-like-address', 0)}")
+        console.print(f"  Missing coordinates: {reason_counts.get('missing-coords', 0)}")
+        console.print(f"  GeoJSON coordinates: {reason_counts.get('geojson-coords', 0)}")
+        console.print(f"  Re-extract after navigate: {run_extract and not dry_run}")
+
+        preview_table = Table(title="Location Repair Candidates")
+        preview_table.add_column("ID", style="cyan", no_wrap=True)
+        preview_table.add_column("School")
+        preview_table.add_column("Reasons")
+        preview_table.add_column("Primary address")
+        for row in candidate_rows[:20]:
+            preview_table.add_row(str(row[0]), row[1], row[2], row[3])
+        console.print(preview_table)
+        if len(candidate_rows) > 20:
+            console.print(f"[dim]Showing first 20 of {len(candidate_rows)} repair candidates[/dim]")
+
+        if dry_run:
+            return
+
+        console.print(f"[cyan]Refreshing navigation for {len(target_school_ids)} schools...[/cyan]")
+        navigate_results = await _run_navigate_batch(
+            db=db,
+            country=country,
+            city=city or "",
+            limit=None,
+            include_navigated=True,
+            school_ids=target_school_ids,
+            skip_timed_out_chunks=True,
+        )
+        if not run_extract:
+            return
+
+        extract_school_ids = [
+            int(result["school_id"])
+            for result in builtins.list(navigate_results or [])
+            if result and result.get("success") and result.get("school_id") is not None
+        ]
+        if not extract_school_ids:
+            console.print("[yellow]No schools finished navigation cleanly; skipping extract.[/yellow]")
+            return
+
+        console.print(f"[cyan]Refreshing extraction for {len(extract_school_ids)} schools...[/cyan]")
+        await _run_extract_batch(
+            db=db,
+            country=country,
+            city=city or "",
+            limit=None,
+            include_extracted=True,
+            school_ids=extract_school_ids,
+        )
 
 
 async def _repair_i18n_command(
@@ -1319,18 +1494,25 @@ async def _run_navigate_batch(
     city: str,
     limit: Optional[int],
     include_navigated: bool = False,
+    school_ids: Optional[list[int]] = None,
+    skip_timed_out_chunks: bool = False,
 ):
     """Run navigation stage in batch mode."""
     from app.models import School
     from app.scrapers.navigator import navigate_schools_batch
     from sqlalchemy import select
 
-    statuses = ["validated", "navigated"] if include_navigated else ["validated"]
     query = select(School).where(
         School.country_code == country,
-        School.scrape_status.in_(statuses),
         School.website_url.isnot(None),
     )
+
+    explicit_school_ids = builtins.list(school_ids or [])
+    if explicit_school_ids:
+        query = query.where(School.id.in_(explicit_school_ids))
+    else:
+        statuses = ["validated", "navigated"] if include_navigated else ["validated"]
+        query = query.where(School.scrape_status.in_(statuses))
 
     if city:
         query = query.where(School.city == city)
@@ -1346,9 +1528,14 @@ async def _run_navigate_batch(
         console.print("[yellow]No schools to navigate[/yellow]")
         return
 
-    status_label = "validated+navigated" if include_navigated else "validated"
+    if explicit_school_ids:
+        status_label = "explicit repair selection"
+    else:
+        status_label = "validated+navigated" if include_navigated else "validated"
     console.print(f"[cyan]Navigating websites for {len(school_ids)} schools...[/cyan]")
     console.print(f"  Status filter: {status_label}")
+
+    results: list[dict] = []
 
     with Progress(
         SpinnerColumn(),
@@ -1367,46 +1554,125 @@ async def _run_navigate_batch(
         nav_batch_concurrency = max(1, int(getattr(settings, "nav_batch_concurrency", 3)))
         console.print(f"  Batch crawl concurrency: {nav_batch_concurrency}")
 
-        try:
-            results = await navigate_schools_batch(
-                db=db,
-                school_ids=school_ids,
-                country_code=country,
-                max_concurrency=nav_batch_concurrency,
-            )
-        except Exception as exc:
-            logger.warning("Batch navigation failed; falling back to sequential mode: %s", exc)
-            await db.rollback()
-            results = []
-            for school_id in school_ids:
+        if skip_timed_out_chunks and explicit_school_ids:
+            timed_out_school_ids: list[int] = []
+            for chunk_start in range(0, len(school_ids), nav_batch_concurrency):
+                school_chunk = school_ids[chunk_start : chunk_start + nav_batch_concurrency]
                 try:
-                    coro = _run_navigate_school(db, school_id, country)
+                    coro = navigate_schools_batch(
+                        db=db,
+                        school_ids=school_chunk,
+                        country_code=country,
+                        max_concurrency=nav_batch_concurrency,
+                    )
                     if _nav_timeout > 0:
-                        result = await asyncio.wait_for(coro, timeout=_nav_timeout)
+                        chunk_timeout = _nav_timeout * max(
+                            1, ceil(len(school_chunk) / nav_batch_concurrency)
+                        )
+                        chunk_results = await asyncio.wait_for(coro, timeout=chunk_timeout)
                     else:
-                        result = await coro
+                        chunk_results = await coro
                 except asyncio.TimeoutError:
                     logger.error(
-                        "Navigation timed out after %.0fs for school %s", _nav_timeout, school_id
+                        "Navigation timed out after %.0fs for school chunk %s",
+                        _nav_timeout,
+                        school_chunk,
                     )
                     await db.rollback()
-                    result = {"school_id": school_id, "success": False, "reason": "Navigation timeout"}
-                except Exception as e:
-                    logger.error(f"Error navigating school {school_id}: {e}")
+                    timed_out_school_ids.extend(school_chunk)
+                    chunk_results = [
+                        {
+                            "school_id": timed_out_school_id,
+                            "success": False,
+                            "reason": "Navigation timeout",
+                        }
+                        for timed_out_school_id in school_chunk
+                    ]
+                except Exception as exc:
+                    logger.warning(
+                        "Batch navigation chunk failed for %s; retrying sequentially: %s",
+                        school_chunk,
+                        exc,
+                    )
                     await db.rollback()
-                    result = {"school_id": school_id, "success": False, "reason": str(e)}
-                results.append(result)
+                    chunk_results = []
+                    for school_id in school_chunk:
+                        try:
+                            coro = _run_navigate_school(db, school_id, country)
+                            if _nav_timeout > 0:
+                                result = await asyncio.wait_for(coro, timeout=_nav_timeout)
+                            else:
+                                result = await coro
+                        except asyncio.TimeoutError:
+                            logger.error(
+                                "Navigation timed out after %.0fs for school %s", _nav_timeout, school_id
+                            )
+                            await db.rollback()
+                            result = {
+                                "school_id": school_id,
+                                "success": False,
+                                "reason": "Navigation timeout",
+                            }
+                        except Exception as e:
+                            logger.error(f"Error navigating school {school_id}: {e}")
+                            await db.rollback()
+                            result = {"school_id": school_id, "success": False, "reason": str(e)}
+                        chunk_results.append(result)
 
-        for result in results:
-            if result and result.get("success"):
-                success_count += 1
-            else:
-                fail_count += 1
-            progress.update(task, advance=1)
+                results.extend(chunk_results)
+                for result in chunk_results:
+                    if result and result.get("success"):
+                        success_count += 1
+                    else:
+                        fail_count += 1
+                    progress.update(task, advance=1)
+
+            if timed_out_school_ids:
+                console.print(
+                    f"[yellow]  Timed out and skipped: {len(timed_out_school_ids)} schools[/yellow]"
+                )
+        else:
+            try:
+                results = await navigate_schools_batch(
+                    db=db,
+                    school_ids=school_ids,
+                    country_code=country,
+                    max_concurrency=nav_batch_concurrency,
+                )
+            except Exception as exc:
+                logger.warning("Batch navigation failed; falling back to sequential mode: %s", exc)
+                await db.rollback()
+                results = []
+                for school_id in school_ids:
+                    try:
+                        coro = _run_navigate_school(db, school_id, country)
+                        if _nav_timeout > 0:
+                            result = await asyncio.wait_for(coro, timeout=_nav_timeout)
+                        else:
+                            result = await coro
+                    except asyncio.TimeoutError:
+                        logger.error(
+                            "Navigation timed out after %.0fs for school %s", _nav_timeout, school_id
+                        )
+                        await db.rollback()
+                        result = {"school_id": school_id, "success": False, "reason": "Navigation timeout"}
+                    except Exception as e:
+                        logger.error(f"Error navigating school {school_id}: {e}")
+                        await db.rollback()
+                        result = {"school_id": school_id, "success": False, "reason": str(e)}
+                    results.append(result)
+
+            for result in results:
+                if result and result.get("success"):
+                    success_count += 1
+                else:
+                    fail_count += 1
+                progress.update(task, advance=1)
 
     console.print(f"[green]✓ Navigation complete:[/green]")
     console.print(f"  Successful: {success_count}")
     console.print(f"  Failed: {fail_count}")
+    return results
 
 
 async def _run_all_stages(db, school_id: int, country: str):

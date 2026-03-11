@@ -25,6 +25,11 @@ function getResolvedNameI18n(school) {
   return resolvedName && typeof resolvedName === 'object' ? resolvedName : null
 }
 
+function getResolvedAddressI18n(location) {
+  const resolvedAddress = location?.resolved_address_i18n
+  return resolvedAddress && typeof resolvedAddress === 'object' ? resolvedAddress : null
+}
+
 /**
  * Returns the localized school name from name_i18n
  *
@@ -48,7 +53,7 @@ export function getSchoolName(school, language) {
  * @returns {string} Localized address
  */
 export function getAddress(location, language) {
-  return getI18nValue(location?.address_i18n, language)
+  return getI18nValue(getResolvedAddressI18n(location), language) || getI18nValue(location?.address_i18n, language)
 }
 
 /**

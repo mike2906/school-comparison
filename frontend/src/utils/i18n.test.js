@@ -58,3 +58,17 @@ test('getAddress falls back to available address value when en is missing', () =
 
   assert.equal(getAddress(location, 'en'), 'ул. Иван Вазов 15, София')
 })
+
+test('getAddress prefers resolved_address_i18n transliteration fallback', () => {
+  const location = {
+    address_i18n: {
+      bg: 'бул. "Джеймс Баучер" № 116'
+    },
+    resolved_address_i18n: {
+      bg: 'бул. "Джеймс Баучер" № 116',
+      en: 'bul. "Dzheims Baucher" № 116'
+    }
+  }
+
+  assert.equal(getAddress(location, 'en'), 'bul. "Dzheims Baucher" № 116')
+})

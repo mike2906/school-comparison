@@ -1,5 +1,5 @@
 from app.utils.transliteration import transliterate_address, transliterate_bulgarian
-from app.utils.i18n_resolver import derive_english_name, resolve_name_i18n
+from app.utils.i18n_resolver import derive_english_name, resolve_address_i18n, resolve_name_i18n
 
 
 def test_transliterate_bulgarian_basic():
@@ -55,4 +55,15 @@ def test_resolve_name_i18n_prefers_non_generic_bg_display_name_for_english_fallb
     assert resolved == {
         "bg": "НИКАТОР",
         "en": "Nikator",
+    }
+
+
+def test_resolve_address_i18n_derives_english_without_persisting_it():
+    resolved = resolve_address_i18n(
+        {"bg": 'бул. "Джеймс Баучер" № 116, ет. 1, ап. 4'},
+    )
+
+    assert resolved == {
+        "bg": 'бул. "Джеймс Баучер" № 116, ет. 1, ап. 4',
+        "en": 'bul. "Dzheyms Baucher" № 116, et. 1, ap. 4',
     }
