@@ -1,7 +1,7 @@
 # Sofia School Comparison - Project Status
 
-**Last Updated:** February 17, 2026  
-**Current Phase:** Scraping Pipeline - Stages 1-4 implemented
+**Last Updated:** March 11, 2026  
+**Current Phase:** Scraping Pipeline - Stages 1-6 implemented, Stage 7 pending
 
 ---
 
@@ -12,11 +12,11 @@ Implemented:
 2. Stage 2 - Website discovery and URL normalization
 3. Stage 3 - URL validation (heuristics + optional LLM fallback)
 4. Stage 4 - Website navigation and page caching (`source_pages`)
+5. Stage 5 - Extraction (pricing + general info, hash-based skip, quality gate)
+6. Stage 6 - Data validation and monitoring spot checks
 
 Not implemented yet:
-1. Stage 5 - Extraction
-2. Stage 6 - Data validation/spot checks
-3. Stage 7 - Summarization
+1. Stage 7 - Summarization
 
 ---
 
@@ -36,6 +36,12 @@ uv run python -m app.scrapers.cli run --stage validate-urls --city sofia --sync 
 
 # Stage 4
 uv run python -m app.scrapers.cli run --stage navigate --city sofia --sync --limit 100
+
+# Stage 5
+uv run python -m app.scrapers.cli run --stage extract --city sofia --sync --limit 100
+
+# Stage 6
+uv run python -m app.scrapers.cli run --stage validate-data --city sofia --sync --limit 100
 ```
 
 ---

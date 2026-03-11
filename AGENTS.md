@@ -21,7 +21,7 @@ This file provides everything you need to work effectively on this project. Read
 - Multi-country architecture with country-specific education configs
 - Bilingual interface (Bulgarian is primary, English is secondary for MVP)
 
-**Current status:** Multi-country refactoring complete (Phases 1-5). Scraping pipeline Stages 1-4 are implemented (discovery, website discovery, URL validation, navigation). Extraction/validation/summarization are pending.
+**Current status:** Multi-country refactoring complete (Phases 1-5). Scraping pipeline Stages 1-6 are implemented (discovery, website discovery, URL validation, navigation, extraction, validation/spot checks). Stage 7 summarization is still pending.
 
 ---
 
@@ -387,7 +387,7 @@ Response includes nested `locations`, `pricing`, `exam_results`.
 - School comparison UI improvements
 - NVO results graphs (Recharts)
 - Points calculator tool
-- Scraping pipeline Stage 5+ (extraction, data validation, summarization)
+- Scraping pipeline Stage 7+ (summarization) plus ongoing extraction/validation quality improvements
 
 ---
 
