@@ -22,6 +22,10 @@ def test_derive_english_name_normalizes_common_honorifics():
     assert derive_english_name("Св. Климент Охридски") == "St. Kliment Ohridski"
 
 
+def test_derive_english_name_preserves_short_uppercase_acronyms():
+    assert derive_english_name("ЕСПА") == "ESPA"
+
+
 def test_resolve_name_i18n_keeps_bg_display_name_but_derives_english_from_legal_name():
     resolved = resolve_name_i18n(
         {"bg": 'Частно основно училище "Д-р Петър Берон"'},
@@ -55,6 +59,30 @@ def test_resolve_name_i18n_prefers_non_generic_bg_display_name_for_english_fallb
     assert resolved == {
         "bg": "НИКАТОР",
         "en": "Nikator",
+    }
+
+
+def test_resolve_name_i18n_prefers_clean_display_brand_for_english_alignment():
+    resolved = resolve_name_i18n(
+        {"bg": '"ЧАСТНА ПРОФЕСИОНАЛНА ГИМНАЗИЯ ПО ПРОГРАМИРАНЕ И РОБОТИКА "СТИВ ДЖОБС" ЕООД'},
+        {"display_name_i18n": {"bg": "СофтУни БУДИТЕЛ"}},
+    )
+
+    assert resolved == {
+        "bg": "СофтУни БУДИТЕЛ",
+        "en": "SoftUni BUDITEL",
+    }
+
+
+def test_resolve_name_i18n_strips_generic_german_school_prefix_for_english():
+    resolved = resolve_name_i18n(
+        {"bg": '"Частна немска гимназия Ерих Кестнер" ООД'},
+        {"display_name_i18n": {"bg": "немска гимназия Ерих Кестнер"}},
+    )
+
+    assert resolved == {
+        "bg": "немска гимназия Ерих Кестнер",
+        "en": "Erih Kestner",
     }
 
 

@@ -22,12 +22,15 @@ from app.models.pricing import PriceSource, Pricing
 from app.models.school import School
 from app.models.scrape_log import ScrapeType
 from app.models.source_page import SourcePage
+from app.schemas.extraction import ExtractedLanguageFocus, SummarySourceExtractionOutput
 from app.schemas.validation import (
     SpotCheckOutput,
     ValidationAutoFix,
     ValidationIssue,
     ValidationReport,
 )
+from app.scrapers import extractor_helpers as extraction_helpers
+from app.scrapers.summarizer import clear_summary_state
 
 logger = logging.getLogger(__name__)
 
@@ -270,6 +273,88 @@ def _filter_values_by_source_evidence(source_text: str, values: list[str]) -> li
     return [value for value in values if _source_mentions_text_value(source_text, value)]
 
 
+def _normalize_summary_source(
+    value: Any,
+    source_text: str,
+    *,
+    languages: list[dict[str, Any]] | list[Any] | None = None,
+    programs: list[str] | None = None,
+) -> dict[str, Any]:
+    parsed = SummarySourceExtractionOutput.model_validate(value or {})
+    language_candidates = extraction_helpers._normalize_languages(
+        [ExtractedLanguageFocus.model_validate(item) for item in (languages or [])]
+    )
+    normalized_model = extraction_helpers._normalize_summary_source_output(
+        parsed,
+        language_candidates=language_candidates,
+        program_candidates=_normalize_text_list(programs or []),
+    )
+    normalized = normalized_model.model_dump()
+
+    if source_text:
+        normalized_source = _normalize_match_text(source_text)
+
+        def has_summary_source_evidence(text: str) -> bool:
+            if _source_mentions_text_value(source_text, text):
+                return True
+            tokens = [
+                token
+                for token in re.findall(r"[a-zа-я0-9]+", _normalize_match_text(text), flags=re.IGNORECASE)
+                if len(token) >= 4
+            ]
+            if len(tokens) < 2:
+                return False
+            return sum(1 for token in set(tokens) if token in normalized_source) >= 2
+
+        positioning = normalized.get("positioning")
+        if positioning and not has_summary_source_evidence(positioning):
+            normalized["positioning"] = None
+
+        for key in (
+            "teaching_approach",
+            "student_experience",
+            "community_signals",
+            "differentiators",
+        ):
+            normalized[key] = [
+                item
+                for item in _normalize_text_list(normalized.get(key))
+                if has_summary_source_evidence(item)
+            ]
+    else:
+        normalized["positioning"] = None
+        for key in (
+            "teaching_approach",
+            "student_experience",
+            "community_signals",
+            "differentiators",
+        ):
+            normalized[key] = []
+
+    normalized["canonical_tags"] = extraction_helpers._derive_summary_source_canonical_tags(
+        positioning=normalized.get("positioning"),
+        teaching_approach=_normalize_text_list(normalized.get("teaching_approach")),
+        student_experience=_normalize_text_list(normalized.get("student_experience")),
+        community_signals=_normalize_text_list(normalized.get("community_signals")),
+        differentiators=_normalize_text_list(normalized.get("differentiators")),
+        language_candidates=language_candidates,
+        program_candidates=_normalize_text_list(programs or []),
+        explicit_tags=_normalize_text_list(normalized.get("canonical_tags")),
+    )
+
+    normalized["has_useful_info"] = any(
+        (
+            normalized.get("positioning"),
+            normalized.get("teaching_approach"),
+            normalized.get("student_experience"),
+            normalized.get("community_signals"),
+            normalized.get("differentiators"),
+            normalized.get("canonical_tags"),
+        )
+    )
+    return normalized
+
+
 def _normalize_spot_check_field_path(field_path: str) -> str:
     path = (field_path or "").strip()
     if not path:
@@ -296,6 +381,7 @@ def _normalize_spot_check_field_path(field_path: str) -> str:
         "operations",
         "services",
         "pricing_terms",
+        "summary_source",
         "contact",
     }
     if path in root_keys:
@@ -654,7 +740,7 @@ async def validate_school_data(
                 extracted_has_meaningful_payload = _has_meaningful_payload(extracted_dict)
                 needs_evidence_checks = any(
                     extracted_dict.get(key)
-                    for key in ("languages", "class_size", "founded_year", "programs", "admission")
+                    for key in ("languages", "class_size", "founded_year", "programs", "admission", "summary_source")
                 )
                 if needs_evidence_checks:
                     pages_result = await db.execute(
@@ -854,6 +940,25 @@ async def validate_school_data(
                         ),
                     )
 
+                original_summary_source = extracted_dict.get("summary_source")
+                if original_summary_source is not None:
+                    normalized_summary_source = _normalize_summary_source(
+                        original_summary_source,
+                        source_text,
+                        languages=extracted_dict.get("languages"),
+                        programs=extracted_dict.get("programs"),
+                    )
+                    if original_summary_source != normalized_summary_source:
+                        _add_fix(
+                            report,
+                            code="normalized_summary_source",
+                            field_path="attributes.extracted.summary_source",
+                            original_value=original_summary_source,
+                            fixed_value=normalized_summary_source,
+                            reason="Removed empty, generic, duplicate, or unsupported summary-source entries.",
+                        )
+                        extracted_dict["summary_source"] = normalized_summary_source
+
                 attrs["extracted"] = extracted_dict
 
             if extracted_has_meaningful_payload:
@@ -885,6 +990,8 @@ async def validate_school_data(
 
             school.attributes = attrs
             school.admission_info = admission_info
+            if report.auto_fixes:
+                clear_summary_state(school, downgrade_status=True)
             school.updated_at = datetime.datetime.now(datetime.timezone.utc)
             flag_modified(school, "attributes")
             flag_modified(school, "admission_info")

@@ -29,7 +29,9 @@ from app.schemas.extraction import (
     PriceExtractionOutput,
     PricingTermsExtractionOutput,
     ServicesExtractionOutput,
+    SummarySourceExtractionOutput,
 )
+from app.scrapers.summarizer import clear_summary_state
 from . import extractor_helpers as helpers
 
 logger = logging.getLogger(__name__)
@@ -39,6 +41,11 @@ GENERAL_INFO_HINT_TOKENS: tuple[str, ...] = (
     "programs",
     "curriculum",
     "method",
+    "approach",
+    "philosophy",
+    "mission",
+    "values",
+    "community",
     "montessori",
     "waldorf",
     "ib",
@@ -59,6 +66,11 @@ GENERAL_INFO_HINT_TOKENS: tuple[str, ...] = (
     "клуб",
     "програма",
     "програми",
+    "подход",
+    "философ",
+    "мисия",
+    "ценности",
+    "общност",
     "извънклас",
     "занимания",
     "база",
@@ -112,9 +124,9 @@ class ExtractionLLMStats:
         }
 
 
-def _build_openrouter_model() -> OpenRouterModel:
+def _build_openrouter_model(tier: str = "cheap") -> OpenRouterModel:
     settings = get_settings()
-    model_name = (get_model("cheap") or "openrouter/google/gemini-2.5-flash-lite").replace("openrouter/", "")
+    model_name = (get_model(tier) or "openrouter/google/gemini-2.5-flash-lite").replace("openrouter/", "")
     provider = OpenRouterProvider(api_key=settings.openrouter_api_key)
     return OpenRouterModel(model_name=model_name, provider=provider)
 
@@ -128,7 +140,7 @@ def _normalize_openrouter_model_name(raw: str) -> str:
     return value.replace("openrouter/", "", 1) if value.startswith("openrouter/") else value
 
 
-def _build_openrouter_model_settings() -> dict[str, Any]:
+def _build_openrouter_model_settings(tier: str = "cheap") -> dict[str, Any]:
     settings = get_settings()
     model_settings: dict[str, Any] = {
         "temperature": float(settings.extraction_temperature),
@@ -136,7 +148,7 @@ def _build_openrouter_model_settings() -> dict[str, Any]:
     }
 
     primary_model = _normalize_openrouter_model_name(
-        get_model("cheap") or "openrouter/google/gemini-2.5-flash-lite"
+        get_model(tier) or "openrouter/google/gemini-2.5-flash-lite"
     )
     routed_models = [
         _normalize_openrouter_model_name(model)
@@ -377,62 +389,80 @@ async def _run_typed_agent(
     llm_stats: ExtractionLLMStats,
 ) -> tuple[Any | None, int, int, float]:
     settings = get_settings()
-    retries_state = {"count": 0}
 
-    model = _build_openrouter_model()
-    agent = Agent(
-        model=model,
-        system_prompt=system_prompt,
-        output_type=result_type,
-        retries=1,
-        output_retries=max(0, int(settings.extraction_output_retries)),
-        model_settings=_build_openrouter_model_settings(),
-    )
+    async def _run_for_tier(tier: str) -> tuple[Any | None, int, int, float]:
+        retries_state = {"count": 0}
+        model = _build_openrouter_model(tier)
+        agent = Agent(
+            model=model,
+            system_prompt=system_prompt,
+            output_type=result_type,
+            retries=1,
+            output_retries=max(0, int(settings.extraction_output_retries)),
+            model_settings=_build_openrouter_model_settings(tier),
+        )
 
-    @agent.output_validator
-    def _semantic_output_validator(data: Any) -> Any:
-        if isinstance(data, PriceExtractionOutput):
-            if data.has_pricing_info and not data.prices:
-                retries_state["count"] += 1
-                raise ModelRetry("has_pricing_info=true requires at least one pricing row")
-        if isinstance(data, GeneralInfoExtractionOutput):
-            has_payload = any(
-                [
-                    data.display_name_i18n,
-                    data.languages,
-                    data.facilities,
-                    data.programs,
-                    data.extracurricular,
-                    data.class_size,
-                    data.founded_year,
-                    data.accreditations,
-                    data.admission.has_useful_info,
-                    data.operations.has_useful_info,
-                    data.services.has_useful_info,
-                    data.pricing_terms.has_useful_info,
-                ]
-            )
-            if data.has_useful_info and not has_payload:
-                retries_state["count"] += 1
-                raise ModelRetry("has_useful_info=true requires at least one populated field")
-        return data
+        @agent.output_validator
+        def _semantic_output_validator(data: Any) -> Any:
+            if isinstance(data, PriceExtractionOutput):
+                if data.has_pricing_info and not data.prices:
+                    retries_state["count"] += 1
+                    raise ModelRetry("has_pricing_info=true requires at least one pricing row")
+            if isinstance(data, GeneralInfoExtractionOutput):
+                has_payload = any(
+                    [
+                        data.display_name_i18n,
+                        data.languages,
+                        data.facilities,
+                        data.programs,
+                        data.extracurricular,
+                        data.class_size,
+                        data.founded_year,
+                        data.accreditations,
+                        data.admission.has_useful_info,
+                        data.operations.has_useful_info,
+                        data.services.has_useful_info,
+                        data.pricing_terms.has_useful_info,
+                        data.summary_source.has_useful_info,
+                    ]
+                )
+                if data.has_useful_info and not has_payload:
+                    retries_state["count"] += 1
+                    raise ModelRetry("has_useful_info=true requires at least one populated field")
+            return data
 
-    llm_stats.total_calls += 1
-    try:
+        llm_stats.total_calls += 1
         result = await asyncio.wait_for(agent.run(user_prompt), timeout=timeout_seconds)
         llm_stats.model_retries += retries_state["count"]
         parsed = _parse_agent_output(result, result_type)
         input_tokens, output_tokens = helpers._get_usage(result)
         token_cost_usd = _extract_openrouter_cost_usd(result)
         return parsed, input_tokens, output_tokens, token_cost_usd
-    except Exception as exc:
+
+    def _record_failure(exc: Exception, *, final: bool) -> None:
         if helpers._is_output_validation_error(exc):
             llm_stats.typed_validation_failures += 1
         if helpers._is_model_or_provider_error(exc):
             llm_stats.provider_failures += 1
-        llm_stats.hard_failures += 1
-        llm_stats.add_failure(exc, stage=result_type.__name__)
-        logger.warning("Extraction call failed (%s): %s", result_type.__name__, exc)
+        if final:
+            llm_stats.hard_failures += 1
+            llm_stats.add_failure(exc, stage=result_type.__name__)
+            logger.warning("Extraction call failed (%s): %s", result_type.__name__, exc)
+
+    try:
+        return await _run_for_tier("cheap")
+    except Exception as exc:
+        _record_failure(exc, final=False)
+        if result_type is GeneralInfoExtractionOutput:
+            llm_stats.capable_fallback_attempts += 1
+            try:
+                out = await _run_for_tier("capable")
+            except Exception as capable_exc:
+                _record_failure(capable_exc, final=True)
+                return None, 0, 0, 0.0
+            llm_stats.capable_fallback_successes += 1
+            return out
+        _record_failure(exc, final=True)
         return None, 0, 0, 0.0
 
 
@@ -642,6 +672,13 @@ async def _extract_general_info(
         use_case="general_info",
         include_tokens=GENERAL_INFO_HINT_TOKENS,
     )
+    narrative_text, _ = helpers._select_pages(
+        school=school,
+        pages=pages,
+        preferred_categories=["about", "programs", "facilities"],
+        use_case="general_summary_source",
+        include_tokens=GENERAL_INFO_HINT_TOKENS,
+    )
     if not selected_text:
         return {
             "success": False,
@@ -658,12 +695,16 @@ async def _extract_general_info(
         "If the same brand text is used in multiple languages, you may repeat the exact same text in both variants. "
         "Do not copy the registry/legal name into display_name_i18n unless the website itself shows it as the display name. "
         "Populate languages, facilities, programs, extracurricular, class_size, founded_year, accreditations, "
-        "and nested admission/operations/services/pricing_terms sections. "
+        "nested admission/operations/services/pricing_terms sections, and summary_source. "
         "Return only concrete facts explicitly supported by content; do not invent. "
         "For languages, class_size, and founded_year: include values only when explicitly stated in the content. "
         "If not explicit, return languages=[] and class_size/founded_year as null. "
         "When content explicitly mentions facilities, programs, or extracurriculars, include them as short list items "
         "instead of leaving those arrays empty. "
+        "For summary_source, extract only short factual phrases from about/mission/philosophy/program content. "
+        "Use it to capture positioning, teaching approach, student experience, community signals, and differentiators. "
+        "Do not write polished marketing prose, slogans, or full paragraphs. "
+        "Do not include generic claims like 'quality education' or 'innovative school' unless the phrase is made specific by surrounding detail. "
         "Set has_useful_info=true whenever at least one concrete fact is extracted."
     )
     known_aliases = [str(value) for value in dict(school.attributes or {}).get("name_aliases", []) if str(value or "").strip()]
@@ -681,6 +722,7 @@ async def _extract_general_info(
     if parsed is None:
         parsed = _build_deterministic_general_info_output(
             all_page_text,
+            narrative_text=narrative_text,
             registry_name=school_name,
             country_code=school.country_code,
             website_url=school.website_url,
@@ -691,6 +733,7 @@ async def _extract_general_info(
         parsed = _augment_general_info_with_deterministic(
             parsed,
             all_page_text,
+            narrative_text=narrative_text,
             registry_name=school_name,
             country_code=school.country_code,
             website_url=school.website_url,
@@ -702,11 +745,12 @@ async def _extract_general_info(
             recovery_prompt = (
                 "Extract additional concrete school facts that are explicitly present. "
                 "Prioritize filling missing display_name_i18n, languages, facilities, programs, extracurricular, "
-                "class size, founded year, accreditations, admission, operations, services, and pricing terms. "
+                "class size, founded year, accreditations, admission, operations, services, pricing terms, and summary_source. "
                 "Do not invent values. "
                 "Only populate display_name_i18n when the website explicitly shows a public-facing name. "
                 "For languages, class_size, and founded_year: only include them when explicitly stated; otherwise "
-                "leave them empty/null."
+                "leave them empty/null. "
+                "For summary_source, prefer concise evidence-backed phrases over polished prose."
             )
             max_chars = max(2000, int(settings.extraction_max_content_chars))
             recovery_user_prompt = f"School: {school_name}\n\nContent:\n{all_page_text[:max_chars]}"
@@ -724,6 +768,7 @@ async def _extract_general_info(
                 recovered_augmented = _augment_general_info_with_deterministic(
                     recovered,
                     all_page_text,
+                    narrative_text=narrative_text,
                     registry_name=school_name,
                     country_code=school.country_code,
                     website_url=school.website_url,
@@ -749,6 +794,7 @@ async def _extract_general_info(
     operations_payload = normalized.operations.model_dump()
     services_payload = normalized.services.model_dump()
     pricing_terms_payload = normalized.pricing_terms.model_dump()
+    summary_source_payload = normalized.summary_source.model_dump()
 
     extracted: dict[str, Any] = {
         "_schema_version": 1,
@@ -763,6 +809,7 @@ async def _extract_general_info(
         "operations": operations_payload,
         "services": services_payload,
         "pricing_terms": pricing_terms_payload,
+        "summary_source": summary_source_payload,
     }
     if contact_info:
         extracted["contact"] = contact_info
@@ -783,6 +830,7 @@ async def _extract_general_info(
         attrs["display_name_i18n"] = display_name_i18n
 
     school.attributes = attrs
+    clear_summary_state(school)
 
     if normalized.admission.has_useful_info:
         admission_info["website_extracted"] = admission_payload
@@ -843,6 +891,8 @@ async def _extract_general_info(
         add_source("services", value_json=services_payload)
     if normalized.pricing_terms.has_useful_info:
         add_source("pricing_terms", value_json=pricing_terms_payload)
+    if normalized.summary_source.has_useful_info:
+        add_source("summary_source", value_json=summary_source_payload)
     if contact_info:
         add_source("contact", value_json=contact_info)
         if isinstance(contact_info.get("address"), str):
@@ -882,6 +932,7 @@ async def _extract_general_info(
             normalized.operations.has_useful_info,
             normalized.services.has_useful_info,
             normalized.pricing_terms.has_useful_info,
+            normalized.summary_source.has_useful_info,
             contact_info,
             location_address_update,
         ]
@@ -1009,9 +1060,46 @@ def _merge_pricing_terms_info(
     return merged
 
 
+def _merge_summary_source_info(
+    llm: SummarySourceExtractionOutput,
+    deterministic: SummarySourceExtractionOutput,
+) -> SummarySourceExtractionOutput:
+    merged = SummarySourceExtractionOutput(
+        positioning=llm.positioning or deterministic.positioning,
+        teaching_approach=helpers._merge_text_values(
+            llm.teaching_approach, deterministic.teaching_approach
+        ),
+        student_experience=helpers._merge_text_values(
+            llm.student_experience, deterministic.student_experience
+        ),
+        community_signals=helpers._merge_text_values(
+            llm.community_signals, deterministic.community_signals
+        ),
+        differentiators=helpers._merge_text_values(
+            llm.differentiators, deterministic.differentiators
+        ),
+        canonical_tags=helpers._merge_text_values(
+            llm.canonical_tags, deterministic.canonical_tags
+        ),
+        has_useful_info=False,
+    )
+    merged.has_useful_info = any(
+        (
+            merged.positioning,
+            merged.teaching_approach,
+            merged.student_experience,
+            merged.community_signals,
+            merged.differentiators,
+            merged.canonical_tags,
+        )
+    )
+    return merged
+
+
 def _augment_general_info_with_deterministic(
     llm_output: GeneralInfoExtractionOutput,
     all_page_text: str,
+    narrative_text: str,
     registry_name: str | None,
     country_code: str,
     website_url: str | None,
@@ -1032,6 +1120,9 @@ def _augment_general_info_with_deterministic(
     deterministic_operations = helpers._extract_operations_info_deterministic(all_page_text)
     deterministic_services = helpers._extract_services_info_deterministic(all_page_text)
     deterministic_pricing_terms = helpers._extract_pricing_terms_deterministic(all_page_text)
+    deterministic_summary_source = helpers._extract_summary_source_deterministic(
+        narrative_text or all_page_text
+    )
 
     merged = GeneralInfoExtractionOutput(
         display_name_i18n=helpers._merge_display_name_i18n(
@@ -1053,6 +1144,9 @@ def _augment_general_info_with_deterministic(
         operations=_merge_operations_info(llm_output.operations, deterministic_operations),
         services=_merge_services_info(llm_output.services, deterministic_services),
         pricing_terms=_merge_pricing_terms_info(llm_output.pricing_terms, deterministic_pricing_terms),
+        summary_source=_merge_summary_source_info(
+            llm_output.summary_source, deterministic_summary_source
+        ),
         has_useful_info=False,
     )
     merged.has_useful_info = helpers._score_general_info_output(merged) > 0
@@ -1061,6 +1155,7 @@ def _augment_general_info_with_deterministic(
 
 def _build_deterministic_general_info_output(
     all_page_text: str,
+    narrative_text: str,
     registry_name: str | None,
     country_code: str,
     website_url: str | None,
@@ -1069,6 +1164,7 @@ def _build_deterministic_general_info_output(
     return _augment_general_info_with_deterministic(
         GeneralInfoExtractionOutput(),
         all_page_text,
+        narrative_text,
         registry_name=registry_name,
         country_code=country_code,
         website_url=website_url,
@@ -1163,6 +1259,7 @@ async def extract_school(
         stats["details"].append(general_result["detail"])
 
     if stats["pricing_success"] or stats["general_info_success"]:
+        clear_summary_state(school)
         school.scrape_status = "extracted"
         stats["status"] = "extracted"
     else:

@@ -631,7 +631,7 @@ async def _get_schools_for_validation(
     async with async_session_maker() as db:
         query = select(School.id, School.attributes).where(
             School.country_code == country_code,
-            School.scrape_status == "extracted",
+            School.scrape_status.in_(["extracted", "summarized"]),
         )
 
         if city:
@@ -776,7 +776,7 @@ async def _sample_school_ids_for_spot_checks(
     async with async_session_maker() as db:
         query = select(School.id, School.attributes).where(
             School.country_code == country_code,
-            School.scrape_status == "extracted",
+            School.scrape_status.in_(["extracted", "summarized"]),
         )
 
         if city:
@@ -794,7 +794,7 @@ async def _sample_school_ids_for_spot_checks(
     if effective_sample_size == 0:
         return []
     if effective_sample_size < 0:
-        # -1 sentinel means "all extracted schools from this selection".
+        # -1 sentinel means "all extracted/summarized schools from this selection".
         return school_ids
     if effective_sample_size >= len(school_ids):
         return school_ids
@@ -827,24 +827,116 @@ async def _run_spot_check_async(school_id: int, country_code: str = "bg"):
 
 
 # =============================================================================
-# Stage 7: Summarization (Placeholder - Phase 2)
+# Stage 7: Summarization
 # =============================================================================
 
-@celery_app.task(name="tasks.summarize_batch")
-def summarize_batch(country_code: str = "bg", city: Optional[str] = "sofia", limit: Optional[int] = None):
-    """Generate summaries for schools (Phase 2)."""
-    logger.info("Summarize batch - Phase 2 implementation")
-    return {"message": "Not implemented yet - Phase 2"}
+@celery_app.task(
+    bind=True,
+    name="tasks.summarize_batch",
+    max_retries=2,
+)
+def summarize_batch(
+    self,
+    country_code: str = "bg",
+    city: Optional[str] = "sofia",
+    limit: Optional[int] = None,
+    wait_for_completion: bool = False,
+):
+    """Generate summaries for eligible schools."""
+    try:
+        school_ids = run_async(_get_schools_for_summarization(country_code, city, limit))
+        if not school_ids:
+            return {"message": "No schools to summarize", "processed": 0}
+
+        job = group(summarize_school.s(school_id, country_code) for school_id in school_ids)
+        result = job.apply_async()
+        if _should_wait_for_group(wait_for_completion):
+            results = result.get(timeout=600, propagate=False)
+            summarized_count = 0
+            skipped_count = 0
+            failed_count = 0
+            input_tokens = 0
+            output_tokens = 0
+            token_cost_usd = 0.0
+            for item in results:
+                if isinstance(item, Exception):
+                    failed_count += 1
+                    continue
+                status = item.get("status")
+                if status == "summarized":
+                    summarized_count += 1
+                    input_tokens += int(item.get("input_tokens", 0) or 0)
+                    output_tokens += int(item.get("output_tokens", 0) or 0)
+                    token_cost_usd += float(item.get("token_cost_usd", 0.0) or 0.0)
+                elif status == "skipped":
+                    skipped_count += 1
+                else:
+                    failed_count += 1
+            return {
+                "processed": len(school_ids),
+                "summarized": summarized_count,
+                "skipped": skipped_count,
+                "failed": failed_count,
+                "input_tokens": input_tokens,
+                "output_tokens": output_tokens,
+                "token_cost_usd": round(token_cost_usd, 6),
+            }
+
+        return {
+            "processed": len(school_ids),
+            "job_id": result.id,
+        }
+    except Exception as exc:
+        logger.exception("Summarization batch failed: %s", exc)
+        raise self.retry(exc=exc)
 
 
 @celery_app.task(
+    bind=True,
     name="tasks.summarize_school",
+    max_retries=2,
+    default_retry_delay=30,
     rate_limit="10/m",  # LLM API rate limit
 )
-def summarize_school(school_id: int):
-    """Generate summary for a single school (Phase 2)."""
-    logger.info(f"Summarize school {school_id} - Phase 2 implementation")
-    return {"school_id": school_id, "message": "Not implemented yet - Phase 2"}
+def summarize_school(self, school_id: int, country_code: str = "bg"):
+    """Generate summary for a single school."""
+    try:
+        return run_async(_summarize_school_async(school_id, country_code))
+    except Exception as exc:
+        logger.exception("Summarization failed for school %s: %s", school_id, exc)
+        raise self.retry(exc=exc)
+
+
+async def _get_schools_for_summarization(
+    country_code: str,
+    city: Optional[str],
+    limit: Optional[int],
+) -> list[int]:
+    """Get school IDs eligible for Stage 7 summarization."""
+    from app.database import async_session_maker
+    from app.scrapers.summarizer import get_schools_requiring_summary
+
+    async with async_session_maker() as db:
+        schools = await get_schools_requiring_summary(
+            db=db,
+            country_code=country_code,
+            city=city,
+            limit=limit,
+        )
+        return [school.id for school in schools]
+
+
+async def _summarize_school_async(school_id: int, country_code: str = "bg"):
+    """Async implementation of summarize_school task."""
+    from app.database import async_session_maker
+    from app.scrapers.summarizer import summarize_school as summarize_school_stage
+
+    async with async_session_maker() as db:
+        return await summarize_school_stage(
+            db=db,
+            school_id=school_id,
+            country_code=country_code,
+        )
 
 
 # =============================================================================
@@ -904,13 +996,16 @@ def run_full_pipeline(
         run_spot_checks.si(
             country_code=country_code, city=city, limit=limit, wait_for_completion=True
         ),
+        summarize_batch.si(
+            country_code=country_code, city=city, limit=limit, wait_for_completion=True
+        ),
     )
 
     result = pipeline.apply_async()
 
     return {
         "pipeline_id": result.id,
-        "message": "Pipeline started (Stages 1-6 enabled; 7 is pending)",
+        "message": "Pipeline started (Stages 1-7 enabled)",
     }
 
 

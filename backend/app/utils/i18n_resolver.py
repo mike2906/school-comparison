@@ -29,6 +29,26 @@ _GENERIC_BG_PREFIX_RE = re.compile(
     r"^(?:частн(?:а|о)?|основно|начално|средно|езиково|профилирано|училище|детска|градина|учебен|комплекс)\b",
     flags=re.IGNORECASE,
 )
+_GENERIC_BG_NAME_STRIP_PREFIX = re.compile(
+    r"""^(?:
+        частна?\s+немска\s+гимназия|
+        частна?\s+английска\s+гимназия|
+        частна?\s+френска\s+гимназия|
+        частн(?:а|о)?\s+(?:детска\ градина|детско\ заведение|основно\ училище|начално\ училище|средно\ училище|училище|професионална\ гимназия)|
+        средно\ училище|
+        основно\ училище|
+        детска\ градина|
+        гимназия
+    )\s+""",
+    flags=re.IGNORECASE | re.VERBOSE,
+)
+_LEGAL_ENTITY_SUFFIX_RE = re.compile(
+    r"""[\s,"'„“”-]*(?:
+        еоод|оод|ад|ет|еад|кд|сд|
+        eood|ood|ad|ead|ltd|llc|inc
+    )\.?$""",
+    flags=re.IGNORECASE | re.VERBOSE,
+)
 
 
 def derive_english_name(bg_name: str | None) -> str | None:
@@ -39,7 +59,10 @@ def derive_english_name(bg_name: str | None) -> str | None:
     resolved = transliterate_bulgarian(bg_name).strip()
     if not resolved:
         return None
-    if resolved.isupper() and any(char.isalpha() for char in resolved):
+    preserve_uppercase_acronym = bool(
+        re.fullmatch(r"[А-Я]{3,6}", re.sub(r"\s+", "", bg_name or ""))
+    )
+    if not preserve_uppercase_acronym and resolved.isupper() and any(char.isalpha() for char in resolved):
         resolved = resolved.title()
 
     for pattern, replacement in _NAME_EN_REPLACEMENTS:
@@ -71,6 +94,15 @@ def _extract_quoted_core_name(text: str | None) -> str | None:
     return None
 
 
+def _clean_core_candidate(text: str | None) -> str | None:
+    normalized = re.sub(r"\s+", " ", text or "").strip(' "„“”')
+    if not normalized:
+        return None
+    cleaned = _LEGAL_ENTITY_SUFFIX_RE.sub("", normalized).strip(' "„“”,-')
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    return cleaned or None
+
+
 def _extract_named_core(text: str | None) -> str | None:
     normalized = re.sub(r"\s+", " ", text or "").strip(' "„“”')
     if not normalized:
@@ -78,18 +110,35 @@ def _extract_named_core(text: str | None) -> str | None:
 
     quoted = _extract_quoted_core_name(normalized)
     if quoted:
-        return quoted
+        return _clean_core_candidate(quoted)
 
     honorific_match = re.search(
         r"(Д-Р|Д-р|д-р|Св\.|СВ\.|св\.)\s+[A-ZА-Я][A-Za-zА-Яа-я-]+(?:\s+[A-ZА-Я][A-Za-zА-Яа-я-]+){0,3}",
         normalized,
     )
     if honorific_match:
-        return honorific_match.group(0)
+        return _clean_core_candidate(honorific_match.group(0))
 
-    abbreviated = _SCHOOL_ABBREVIATION_PREFIX.sub("", normalized).strip()
-    if abbreviated and abbreviated != normalized:
+    stripped = _GENERIC_BG_NAME_STRIP_PREFIX.sub("", normalized).strip(' "„“”')
+    stripped = re.sub(
+        r"^(?:с\s+ранно\s+чуждоезиково\s+обучение|с\s+немски\s+език|немска\s+гимназия|английска\s+гимназия|френска\s+гимназия)\s+",
+        "",
+        stripped,
+        flags=re.IGNORECASE,
+    ).strip(' "„“”')
+    stripped = _clean_core_candidate(stripped)
+    if stripped and stripped != normalized and not _is_generic_bg_label(stripped):
+        return stripped
+
+    abbreviated = _clean_core_candidate(_SCHOOL_ABBREVIATION_PREFIX.sub("", normalized).strip())
+    if abbreviated and abbreviated != normalized and not _is_generic_bg_label(abbreviated):
         return abbreviated
+
+    cleaned = _clean_core_candidate(normalized)
+    if cleaned and cleaned != normalized and not _is_generic_bg_label(cleaned):
+        return cleaned
+    if cleaned and not _is_generic_bg_label(cleaned):
+        return cleaned
 
     return None
 
@@ -118,6 +167,13 @@ def _is_generic_bg_label(text: str | None) -> bool:
     return bool(_GENERIC_BG_PREFIX_RE.match(normalized))
 
 
+def _contains_honorific(text: str | None) -> bool:
+    normalized = re.sub(r"\s+", " ", text or "").strip()
+    if not normalized:
+        return False
+    return bool(re.search(r"\b(?:Д-Р|Д-р|д-р|Св\.|СВ\.|св\.)\b", normalized))
+
+
 def resolve_name_i18n(
     name_i18n: Mapping[str, Any] | None,
     attributes: Mapping[str, Any] | None = None,
@@ -144,9 +200,17 @@ def resolve_name_i18n(
             raw_core = _extract_named_core(raw_name.get("bg"))
             if raw_core and _is_generic_bg_label(raw_core):
                 raw_core = None
-            derived_source = (
+            if (
                 raw_core
-                or display_core
+                and display_core
+                and _contains_honorific(raw_core)
+                and not _contains_honorific(display_core)
+            ):
+                preferred_core = raw_core
+            else:
+                preferred_core = display_core or raw_core
+            derived_source = (
+                preferred_core
                 or (display_bg if display_bg and not _is_generic_bg_label(display_bg) else None)
                 or derived_source
             )

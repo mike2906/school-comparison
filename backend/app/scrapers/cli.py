@@ -333,7 +333,7 @@ async def _run_sync(
                     elif stage == "validate-data":
                         await _run_validate_data_school(db, school_id, country, run_spot_check=True)
                     elif stage == "summarize":
-                        console.print("[yellow]Summarize stage not yet implemented[/yellow]")
+                        await _run_summarize_school(db, school_id, country)
                     elif stage == "all":
                         await _run_all_stages(db, school_id, country)
 
@@ -364,11 +364,14 @@ async def _run_sync(
                 await _run_extract_batch(db, country, city, limit, include_extracted=include_extracted)
             elif stage == "validate-data":
                 await _run_validate_data_batch(db, country, city, limit, force_validate=force_validate)
+            elif stage == "summarize":
+                await _run_summarize_batch(db, country, city, limit)
             elif stage == "all":
                 await _run_validate_urls_batch(db, country, city, limit)
                 await _run_navigate_batch(db, country, city, limit, include_navigated=include_navigated)
                 await _run_extract_batch(db, country, city, limit, include_extracted=include_extracted)
                 await _run_validate_data_batch(db, country, city, limit, force_validate=force_validate)
+                await _run_summarize_batch(db, country, city, limit)
             else:
                 console.print(f"[yellow]Batch mode for '{stage}' not yet implemented[/yellow]")
 
@@ -1692,6 +1695,8 @@ async def _run_all_stages(db, school_id: int, country: str):
             await _run_extract_school(db, school_id, country)
         elif stage == "validate-data":
             await _run_validate_data_school(db, school_id, country, run_spot_check=True)
+        elif stage == "summarize":
+            await _run_summarize_school(db, school_id, country)
         else:
             console.print(f"[yellow]{stage} not yet implemented[/yellow]")
 
@@ -1954,7 +1959,7 @@ async def _run_validate_data_batch(
     settings = _get_settings()
     query = select(School.id, School.attributes).where(
         School.country_code == country,
-        School.scrape_status == "extracted",
+        School.scrape_status.in_(["extracted", "summarized"]),
     )
     if city:
         query = query.where(School.city == city)
@@ -1972,9 +1977,9 @@ async def _run_validate_data_batch(
 
     if not school_ids:
         if force_validate:
-            console.print("[yellow]No schools to validate (must be extracted)[/yellow]")
+            console.print("[yellow]No schools to validate (must be extracted or summarized)[/yellow]")
         else:
-            console.print("[yellow]No schools to validate (all extracted schools already have current Stage 6 reports)[/yellow]")
+            console.print("[yellow]No schools to validate (all extracted/summarized schools already have current Stage 6 reports)[/yellow]")
         return
 
     requested_concurrency = max(1, int(getattr(settings, "validation_batch_concurrency", 1)))
@@ -2181,7 +2186,7 @@ async def _run_extract_batch(
     else:
         statuses = ["navigated", "extraction_failed"]
         if include_extracted:
-            statuses.append("extracted")
+            statuses.extend(["extracted", "summarized"])
         query = query.where(School.scrape_status.in_(statuses))
 
     if city:
@@ -2201,7 +2206,7 @@ async def _run_extract_batch(
     if explicit_school_ids:
         status_label = "explicit repair selection"
     else:
-        status_label = "navigated/failed + extracted" if include_extracted else "navigated/failed"
+        status_label = "navigated/failed + extracted/summarized" if include_extracted else "navigated/failed"
     console.print(f"[cyan]Extracting data for {len(school_ids)} schools...[/cyan]")
     console.print(f"  Status filter: {status_label}")
 
@@ -2303,6 +2308,112 @@ async def _run_extract_batch(
     console.print(f"  Successful: {success_count}")
     console.print(f"  Skipped: {skipped_count}")
     console.print(f"  Failed: {fail_count}")
+
+
+async def _run_summarize_school(db, school_id: int, country: str):
+    """Run Stage 7 summarization for one school."""
+    from app.scrapers.summarizer import summarize_school
+
+    console.print(f"  Summarizing school {school_id}...")
+    result = await summarize_school(db=db, school_id=school_id, country_code=country)
+    status = result.get("status")
+    if status == "summarized":
+        console.print(
+            f"[green]  Summarized "
+            f"(input={int(result.get('input_tokens', 0) or 0)}, "
+            f"output={int(result.get('output_tokens', 0) or 0)}, "
+            f"cost=${float(result.get('token_cost_usd', 0.0) or 0.0):.6f})[/green]"
+        )
+    elif status == "skipped":
+        console.print(f"[yellow]  Skipped: {result.get('reason', 'No reason provided')}[/yellow]")
+    else:
+        console.print(f"[red]  Failed: {result.get('reason', 'Unknown error')}[/red]")
+    return result
+
+
+async def _run_summarize_batch(
+    db,
+    country: str,
+    city: Optional[str],
+    limit: Optional[int],
+):
+    """Run Stage 7 summarization in batch mode."""
+    from app.config import get_settings as _get_settings
+    from app.database import async_session_maker
+    from app.scrapers.summarizer import get_schools_requiring_summary, summarize_school
+
+    settings = _get_settings()
+    schools = await get_schools_requiring_summary(db=db, country_code=country, city=city, limit=limit)
+    school_ids = [school.id for school in schools]
+
+    if not school_ids:
+        console.print("[yellow]No schools to summarize (all eligible summaries are current or ineligible)[/yellow]")
+        return []
+
+    requested_concurrency = max(1, int(getattr(settings, "summarization_batch_concurrency", 1)))
+    max_concurrency = 8
+    concurrency = min(requested_concurrency, max_concurrency)
+    if requested_concurrency > max_concurrency:
+        console.print(
+            f"[yellow]Requested concurrency {requested_concurrency} capped to {max_concurrency}[/yellow]"
+        )
+
+    console.print(f"[cyan]Summarizing {len(school_ids)} schools...[/cyan]")
+    console.print(f"  Concurrency: {concurrency}")
+
+    summarized_count = 0
+    skipped_count = 0
+    failed_count = 0
+    input_tokens = 0
+    output_tokens = 0
+    token_cost = 0.0
+    results: list[dict] = []
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console,
+    ) as progress:
+        task = progress.add_task("Generating summaries...", total=len(school_ids))
+        semaphore = asyncio.Semaphore(concurrency)
+
+        async def _summarize_single(school_id: int) -> tuple[int, dict]:
+            async with semaphore:
+                async with async_session_maker() as school_db:
+                    try:
+                        out = await summarize_school(
+                            db=school_db,
+                            school_id=school_id,
+                            country_code=country,
+                        )
+                    except Exception as exc:
+                        logger.error("Summarization failed for school %s: %s", school_id, exc)
+                        out = {"status": "summary_failed", "reason": str(exc)}
+                    return school_id, out
+
+        tasks = [asyncio.create_task(_summarize_single(school_id)) for school_id in school_ids]
+        for completed in asyncio.as_completed(tasks):
+            _, out = await completed
+            results.append(out)
+            status = out.get("status")
+            if status == "summarized":
+                summarized_count += 1
+                input_tokens += int(out.get("input_tokens", 0) or 0)
+                output_tokens += int(out.get("output_tokens", 0) or 0)
+                token_cost += float(out.get("token_cost_usd", 0.0) or 0.0)
+            elif status == "skipped":
+                skipped_count += 1
+            else:
+                failed_count += 1
+            progress.update(task, advance=1)
+
+    console.print("[green]✓ Summarization complete:[/green]")
+    console.print(f"  Summarized: {summarized_count}")
+    console.print(f"  Skipped: {skipped_count}")
+    console.print(f"  Failed: {failed_count}")
+    console.print(f"  Tokens: in={input_tokens}, out={output_tokens}")
+    console.print(f"  Cost: ${token_cost:.6f}")
+    return results
 
 
 if __name__ == "__main__":

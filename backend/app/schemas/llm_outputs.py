@@ -1,6 +1,8 @@
-from pydantic import BaseModel, Field
+import json
 
-from app.schemas.school import SummaryI18n
+from pydantic import BaseModel, Field, Json, model_validator
+
+from app.schemas.school import SummaryI18n, SummaryText
 
 
 class SchoolSummary(BaseModel):
@@ -12,6 +14,37 @@ class SchoolSummary(BaseModel):
             "{'bg': {'short': '...', 'long': '...'}, 'en': {'short': '...', 'long': '...'}}"
         )
     )
+
+
+class SummaryI18nStrict(BaseModel):
+    bg: SummaryText
+    en: SummaryText
+
+
+class SchoolSummaryStrict(BaseModel):
+    """Strict internal schema for bilingual LLM-generated summaries."""
+
+    summary_i18n: SummaryI18nStrict | Json[SummaryI18nStrict] = Field(
+        description=(
+            "Summary in Bulgarian and English with exactly this shape: "
+            "{'summary_i18n': {'bg': {'short': '...', 'long': '...'}, 'en': {'short': '...', 'long': '...'}}}"
+        )
+    )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce_stringified_summary_i18n(cls, value):
+        if isinstance(value, dict):
+            raw_summary = value.get("summary_i18n")
+            if isinstance(raw_summary, str):
+                try:
+                    return {
+                        **value,
+                        "summary_i18n": json.loads(raw_summary),
+                    }
+                except json.JSONDecodeError:
+                    raise ValueError("summary_i18n must be valid JSON when provided as a string") from None
+        return value
 
 
 class NavigatorOutput(BaseModel):

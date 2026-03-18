@@ -17,6 +17,27 @@ from app.schemas.validation import SpotCheckDiscrepancy, SpotCheckOutput
 from app.scrapers import validator as validator_module
 
 
+def test_normalize_summary_source_clears_narrative_fields_without_source_text():
+    normalized = validator_module._normalize_summary_source(
+        {
+            "positioning": "Licensed private school for preschool through grade 7.",
+            "teaching_approach": ["project-based learning"],
+            "community_signals": ["partnership with parents"],
+            "canonical_tags": ["Project-based learning"],
+            "has_useful_info": True,
+        },
+        "",
+        languages=[{"language": "English"}],
+        programs=["Cambridge"],
+    )
+
+    assert normalized["positioning"] is None
+    assert normalized["teaching_approach"] == []
+    assert normalized["community_signals"] == []
+    assert normalized["canonical_tags"] == ["Cambridge"]
+    assert normalized["has_useful_info"] is True
+
+
 @pytest.mark.asyncio
 async def test_validate_school_data_applies_safe_fixes_and_persists_report(db_session):
     school = School(
@@ -38,6 +59,13 @@ async def test_validate_school_data_applies_safe_fixes_and_persists_report(db_se
                 "extracurricular": [],
                 "accreditations": [],
                 "founded_year": "3020",
+                "summary_source": {
+                    "positioning": "Innovative school",
+                    "teaching_approach": ["project-based learning", "quality education"],
+                    "community_signals": ["parent partnership", "supportive environment"],
+                    "canonical_tags": ["Project-based learning"],
+                    "has_useful_info": True,
+                },
                 "admission": {"has_useful_info": True, "deadlines": ["April"]},
             }
         },
@@ -77,6 +105,18 @@ async def test_validate_school_data_applies_safe_fixes_and_persists_report(db_se
             source_type=SourceType.SCRAPED_WEBSITE,
         )
     )
+    db_session.add(
+        SourcePage(
+            school_id=school.id,
+            source_url="https://example.test/about",
+            page_category="about",
+            scrape_type=ScrapeType.WEBSITE,
+            is_valid=True,
+            raw_markdown="The school uses project-based learning and works in partnership with parents.",
+            content_hash="hash-validator-summary-source",
+            last_scraped_at=datetime.datetime.now(datetime.timezone.utc),
+        )
+    )
     await db_session.commit()
     duplicate_row_id = row2.id
 
@@ -100,7 +140,12 @@ async def test_validate_school_data_applies_safe_fixes_and_persists_report(db_se
     extracted = (school.attributes or {}).get("extracted", {})
     assert extracted.get("founded_year") is None
     assert extracted.get("facilities") == ["pool"]
-    assert school.admission_info.get("website_extracted") == extracted.get("admission")
+    assert extracted.get("summary_source", {}).get("positioning") is None
+    assert extracted.get("summary_source", {}).get("teaching_approach") == ["project-based learning"]
+    assert extracted.get("summary_source", {}).get("community_signals") == ["parent partnership"]
+    assert extracted.get("summary_source", {}).get("canonical_tags") == ["Project-based learning"]
+    assert extracted.get("admission", {}).get("deadlines") == []
+    assert school.admission_info.get("website_extracted") is None
 
     data_validation = (school.attributes or {}).get("data_validation", {})
     assert data_validation.get("_schema_version") == 1
@@ -152,6 +197,46 @@ async def test_validate_school_data_sets_needs_review_on_errors(db_session):
     report = (school.attributes or {}).get("data_validation", {})
     assert report.get("status") == "needs_review"
     assert any(issue.get("code") == "negative_price_amount" for issue in report.get("issues", []))
+
+
+@pytest.mark.asyncio
+async def test_validate_school_data_clears_stale_summary_after_auto_fixes(db_session):
+    school = School(
+        name_i18n={"bg": "Summary Reset"},
+        country_code="bg",
+        school_type="private",
+        education_level="primary",
+        city="sofia",
+        scrape_status="summarized",
+        summary_i18n={"bg": {"short": "старо", "long": "старо"}, "en": {"short": "old", "long": "old"}},
+        attributes={
+            "summary_generation": {"_schema_version": 1, "input_fingerprint": "old"},
+            "extracted": {
+                "languages": [{"language": "English", "level": ""}],
+                "facilities": [" pool ", "Pool"],
+                "programs": ["STEM"],
+            },
+        },
+    )
+    db_session.add(school)
+    await db_session.flush()
+    db_session.add(
+        FieldSource(
+            school_id=school.id,
+            category="general_info",
+            field_key="attributes.languages",
+            source_type=SourceType.SCRAPED_WEBSITE,
+        )
+    )
+    await db_session.commit()
+
+    result = await validator_module.validate_school_data(db_session, school.id, "bg")
+
+    assert result["status"] == "ok"
+    await db_session.refresh(school)
+    assert school.summary_i18n == {}
+    assert school.scrape_status == "extracted"
+    assert "summary_generation" not in (school.attributes or {})
 
 
 @pytest.mark.asyncio

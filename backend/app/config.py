@@ -1,5 +1,6 @@
-from pydantic_settings import BaseSettings
 from functools import lru_cache
+from pydantic import field_validator
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
@@ -74,6 +75,8 @@ class Settings(BaseSettings):
     nav_school_timeout_seconds: float = 120.0
     # Per-school hard timeout for CLI batch extraction (covers all LLM calls + retries).
     extraction_school_timeout_seconds: float = 180.0
+    summarization_llm_timeout_seconds: float = 20.0
+    summarization_batch_concurrency: int = 2
 
     # Geocoding settings
     geocoding_provider: str = "composite"  # composite | nominatim | google | mapbox (composite = GeoJSON + Nominatim fallback, recommended)
@@ -87,11 +90,23 @@ class Settings(BaseSettings):
     model_config = {
         "env_file": ".env",
         "env_file_encoding": "utf-8",
+        "extra": "ignore",
     }
 
     @property
     def allowed_origins_list(self) -> list[str]:
         return [origin.strip() for origin in self.allowed_origins.split(",")]
+
+    @field_validator("debug", mode="before")
+    @classmethod
+    def _normalize_debug(cls, value):
+        if isinstance(value, str):
+            lowered = value.strip().lower()
+            if lowered in {"release", "prod", "production"}:
+                return False
+            if lowered in {"debug", "dev", "development"}:
+                return True
+        return value
 
 
 @lru_cache
