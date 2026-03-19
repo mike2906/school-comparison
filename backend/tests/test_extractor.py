@@ -239,6 +239,214 @@ async def test_extract_school_augments_general_info_with_deterministic_signals(
 
 
 @pytest.mark.asyncio
+async def test_extract_school_recovers_display_name_with_targeted_capable_fallback(db_session):
+    school = School(
+        name_i18n={"bg": 'Частна детска градина "Детска къща Монтесори" ООД'},
+        country_code="bg",
+        city="sofia",
+        school_type="private",
+        education_level="kindergarten",
+        website_url="https://www.montessori-bulgaria.com/en",
+        scrape_status="navigated",
+    )
+    db_session.add(school)
+    await db_session.flush()
+
+    page = SourcePage(
+        school_id=school.id,
+        source_url="https://www.montessori-bulgaria.com/en",
+        page_category="about",
+        scrape_type=ScrapeType.WEBSITE,
+        is_valid=True,
+        raw_markdown=(
+            '[ ![Montessori House](https://www.montessori-bulgaria.com/logo.svg) **Montessori House** ]'
+            '(https://www.montessori-bulgaria.com/en "Montessori House")\n'
+            "We teach English. We have a pool and STEM activities."
+        ),
+        content_hash="montessori-house",
+        last_scraped_at=datetime.datetime.now(datetime.UTC),
+    )
+    db_session.add(page)
+    await db_session.commit()
+
+    mock_price = PriceExtractionOutput(prices=[], has_pricing_info=False)
+    mock_general = GeneralInfoExtractionOutput(
+        languages=[ExtractedLanguageFocus(language="English")],
+        facilities=["pool"],
+        programs=["STEM"],
+        class_size="18 students",
+        has_useful_info=True,
+    )
+    name_only = extractor_module.DisplayNameOnlyExtractionOutput(
+        display_name_i18n={"en": "Montessori House"}
+    )
+
+    with (
+        patch.object(extractor_module.helpers, "_extract_display_name_i18n_deterministic", return_value=None),
+        patch(
+            "app.scrapers.extractor._run_typed_agent",
+            new=AsyncMock(
+                side_effect=[
+                    (mock_price, 10, 2, 0.0),
+                    (mock_general, 20, 4, 0.001),
+                    (name_only, 8, 2, 0.001),
+                ]
+            ),
+        ),
+    ):
+        result = await extractor_module.extract_school(db_session, school.id, "bg")
+
+    assert result["status"] == "extracted"
+    assert any("Recovered display name with capable fallback" in detail for detail in result["details"])
+    await db_session.refresh(school)
+    assert (school.attributes or {}).get("display_name_i18n") == {
+        "bg": "Montessori House",
+        "en": "Montessori House",
+    }
+
+
+@pytest.mark.asyncio
+async def test_extract_school_promotes_repeated_fuller_display_name_from_page_evidence(db_session):
+    school = School(
+        name_i18n={"bg": 'Частна детска градина "Детска къща Монтесори" ООД'},
+        country_code="bg",
+        city="sofia",
+        school_type="private",
+        education_level="kindergarten",
+        website_url="https://www.montessori-bulgaria.com/en",
+        scrape_status="navigated",
+    )
+    db_session.add(school)
+    await db_session.flush()
+
+    pages = [
+        SourcePage(
+            school_id=school.id,
+            source_url="https://www.montessori-bulgaria.com/en/about-us",
+            page_category="about",
+            scrape_type=ScrapeType.WEBSITE,
+            is_valid=True,
+            raw_markdown=(
+                "# About us\n"
+                "Montessori Children’s House (Detska kushta Montessori) helps the children unfold their potential.\n"
+                '[ ![Montessori House](https://www.montessori-bulgaria.com/logo.svg) **Montessori House** ]'
+                '(https://www.montessori-bulgaria.com/en "Montessori House")\n'
+            ),
+            content_hash="montessori-about",
+            last_scraped_at=datetime.datetime.now(datetime.UTC),
+        ),
+        SourcePage(
+            school_id=school.id,
+            source_url="https://www.montessori-bulgaria.com/en/admission",
+            page_category="admission",
+            scrape_type=ScrapeType.WEBSITE,
+            is_valid=True,
+            raw_markdown=(
+                "Initial visit to Montessori Children's House of both parents and the child.\n"
+            ),
+            content_hash="montessori-admission",
+            last_scraped_at=datetime.datetime.now(datetime.UTC),
+        ),
+    ]
+    db_session.add_all(pages)
+    await db_session.commit()
+
+    mock_price = PriceExtractionOutput(prices=[], has_pricing_info=False)
+    mock_general = GeneralInfoExtractionOutput(
+        display_name_i18n={"en": "Montessori House"},
+        languages=[ExtractedLanguageFocus(language="English")],
+        facilities=["pool"],
+        programs=["STEM"],
+        class_size="18 students",
+        has_useful_info=True,
+    )
+
+    with patch(
+        "app.scrapers.extractor._run_typed_agent",
+        new=AsyncMock(side_effect=[(mock_price, 10, 2, 0.0), (mock_general, 20, 4, 0.001)]),
+    ):
+        result = await extractor_module.extract_school(db_session, school.id, "bg")
+
+    assert result["status"] == "extracted"
+    assert any("Promoted repeated fuller display name" in detail for detail in result["details"])
+    await db_session.refresh(school)
+    assert (school.attributes or {}).get("display_name_i18n") == {
+        "bg": "Montessori Children’s House",
+        "en": "Montessori Children’s House",
+    }
+
+
+@pytest.mark.asyncio
+async def test_extract_school_does_not_promote_footer_network_name(db_session):
+    school = School(
+        name_i18n={"bg": '"ЧАСТНА ДЕТСКА ГРАДИНА КАНАДСКО МЕЧЕ" ООД'},
+        country_code="bg",
+        city="sofia",
+        school_type="private",
+        education_level="kindergarten",
+        website_url="https://sofia-school.maplebear.bg/en/",
+        scrape_status="navigated",
+        attributes={"name_aliases": ["Maple Bear Sofia"]},
+    )
+    db_session.add(school)
+    await db_session.flush()
+
+    pages = [
+        SourcePage(
+            school_id=school.id,
+            source_url="https://sofia-school.maplebear.bg/en/high-school-program/",
+            page_category="programs",
+            scrape_type=ScrapeType.WEBSITE,
+            is_valid=True,
+            raw_markdown="## © 2026 Maple Bear Global Schools Ltd.\n",
+            content_hash="maple-program",
+            last_scraped_at=datetime.datetime.now(datetime.UTC),
+        ),
+        SourcePage(
+            school_id=school.id,
+            source_url="https://sofia-school.maplebear.bg/en/contact/",
+            page_category="contact",
+            scrape_type=ScrapeType.WEBSITE,
+            is_valid=True,
+            raw_markdown="## © 2026 Maple Bear Global Schools Ltd.\n",
+            content_hash="maple-contact",
+            last_scraped_at=datetime.datetime.now(datetime.UTC),
+        ),
+    ]
+    db_session.add_all(pages)
+    await db_session.commit()
+
+    mock_price = PriceExtractionOutput(prices=[], has_pricing_info=False)
+    mock_general = GeneralInfoExtractionOutput(
+        display_name_i18n={"en": "Maple Bear Sofia"},
+        languages=[ExtractedLanguageFocus(language="English")],
+        facilities=["library"],
+        programs=["Canadian curriculum"],
+        has_useful_info=True,
+    )
+
+    with patch(
+        "app.scrapers.extractor._run_typed_agent",
+        new=AsyncMock(
+            side_effect=[
+                (mock_price, 10, 2, 0.0),
+                (mock_general, 20, 4, 0.001),
+                (mock_general, 5, 1, 0.0),
+            ]
+        ),
+    ):
+        result = await extractor_module.extract_school(db_session, school.id, "bg")
+
+    assert result["status"] == "extracted"
+    assert not any("Promoted repeated fuller display name" in detail for detail in result["details"])
+    await db_session.refresh(school)
+    assert (school.attributes or {}).get("display_name_i18n") == {
+        "bg": "Maple Bear Sofia",
+        "en": "Maple Bear Sofia",
+    }
+
+
+@pytest.mark.asyncio
 async def test_extract_school_clears_stale_summary_metadata_on_success(db_session, sample_school_for_extraction):
     school = sample_school_for_extraction
     school.scrape_status = "summarized"
@@ -860,6 +1068,24 @@ def test_extract_display_name_i18n_deterministic_keeps_explicit_bg_and_en_varian
     }
 
 
+def test_extract_display_name_i18n_deterministic_accepts_cross_script_house_brand():
+    text = (
+        '[ ![Montessori House](https://www.montessori-bulgaria.com/logo.svg) **Montessori House** ]'
+        '(https://www.montessori-bulgaria.com/en "Montessori House")'
+    )
+
+    extracted = extractor_module.helpers._extract_display_name_i18n_deterministic(
+        text,
+        registry_name='Частна детска градина "Детска къща Монтесори" ООД',
+        country_code="bg",
+    )
+
+    assert extracted == {
+        "bg": "Montessori House",
+        "en": "Montessori House",
+    }
+
+
 def test_extract_display_name_i18n_deterministic_strips_section_prefixes():
     text = '[Защо BRITANICA Park School](https://britanica-parkschool.bg/)'
 
@@ -1052,6 +1278,18 @@ def test_normalize_display_name_i18n_rejects_junk_group_and_markdown_values():
     assert normalized is None
 
 
+def test_normalize_display_name_i18n_rejects_screenshot_filename_values():
+    normalized = extractor_module.helpers._normalize_display_name_i18n(
+        {
+            "bg": "Screenshot 2019-01-02 at 17.18.42.png",
+            "en": "Screenshot 2019-01-02 at 17.18.42.png",
+        },
+        "bg",
+    )
+
+    assert normalized is None
+
+
 def test_normalize_display_name_i18n_rejects_role_and_icon_noise():
     role_noise = extractor_module.helpers._normalize_display_name_i18n(
         {"bg": 'Директор на ЧСУ “ДРУЖБА”'},
@@ -1096,6 +1334,15 @@ def test_extract_alias_display_name_i18n_prefers_specific_brand_over_acronym():
     assert extracted == {"bg": "American College of Sofia", "en": "American College of Sofia"}
 
 
+def test_should_prefer_alias_display_name_handles_cross_script_brand_expansion():
+    should_prefer = extractor_module.helpers._should_prefer_alias_display_name(
+        {"bg": "ТУТИ 2011"},
+        {"bg": "TUTI Kindergarten", "en": "TUTI Kindergarten"},
+    )
+
+    assert should_prefer is True
+
+
 def test_extract_display_name_i18n_deterministic_prefers_fuller_alias_over_short_brand():
     extracted = extractor_module.helpers._extract_display_name_i18n_deterministic(
         text="![American College Logo](https://example.com/logo.png)",
@@ -1129,6 +1376,32 @@ def test_extract_display_name_i18n_deterministic_prefers_alias_over_short_maple_
     )
 
     assert extracted == {"bg": "Maple Bear Sofia", "en": "Maple Bear Sofia"}
+
+
+def test_extract_display_name_i18n_deterministic_rejects_copyright_network_heading():
+    extracted = extractor_module.helpers._extract_display_name_i18n_deterministic(
+        text="## © 2026 Maple Bear Global Schools Ltd.",
+        registry_name="ЧАСТНА ДЕТСКА ГРАДИНА КАНАДСКО МЕЧЕ",
+        country_code="bg",
+        website_url="https://sofia-school.maplebear.bg/en/",
+        known_aliases=["Maple Bear Sofia"],
+    )
+
+    assert extracted == {"bg": "Maple Bear Sofia", "en": "Maple Bear Sofia"}
+
+
+def test_extract_display_name_i18n_deterministic_ignores_screenshot_asset_name():
+    extracted = extractor_module.helpers._extract_display_name_i18n_deterministic(
+        text=(
+            "![Screenshot 2019-01-02 at 17.18.42.png](https://static.wixstatic.com/media/foo.png)\n"
+            "### Частна детска градина Албертино\n"
+        ),
+        registry_name='"Частна детска градина Албертино 01.09." ЕООД',
+        country_code="bg",
+        website_url="https://www.albertino.bg",
+    )
+
+    assert extracted == {"bg": "Албертино 01.09.", "en": "Albertino 01.09."}
 
 
 def test_derive_display_name_seed_aliases_from_host_and_registry():

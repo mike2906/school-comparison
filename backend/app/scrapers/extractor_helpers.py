@@ -498,10 +498,14 @@ def _extract_display_name_i18n_deterministic(
         )
 
     registry_tokens = _display_name_tokens(registry_name)
+    registry_match_tokens = _display_name_match_tokens(registry_name)
     alias_tokens: set[str] = set()
+    alias_match_tokens: set[str] = set()
     for alias in effective_aliases:
         alias_tokens.update(_display_name_tokens(alias))
+        alias_match_tokens.update(_display_name_match_tokens(alias))
     strict_alias_tokens = {token for token in alias_tokens if len(token) >= 4}
+    strict_alias_match_tokens = {token for token in alias_match_tokens if len(token) >= 4}
     school_markers = (
         "училище",
         "гимназ",
@@ -512,10 +516,13 @@ def _extract_display_name_i18n_deterministic(
         "kindergarten",
         "academy",
         "college",
+        "house",
     )
     junk_markers = (
         "управление на съгласието",
         "manage consent",
+        "copyright",
+        "all rights reserved",
         "cookie",
         "бисквит",
         "skip to content",
@@ -562,6 +569,10 @@ def _extract_display_name_i18n_deterministic(
         lowered = candidate.lower()
         if any(marker in lowered for marker in junk_markers):
             return None
+        if re.search(r"^(?:©\s*)?\d{4}\b", candidate):
+            return None
+        if re.search(r"\b(?:ltd|llc|inc|eood|ood|ad)\b", lowered):
+            return None
         if any(re.search(pattern, lowered, flags=re.IGNORECASE) for pattern in junk_prefix_patterns):
             return None
         if "→" in candidate:
@@ -575,14 +586,21 @@ def _extract_display_name_i18n_deterministic(
         if len(candidate) < 3:
             return None
         candidate_tokens = _display_name_tokens(candidate)
+        candidate_match_tokens = _display_name_match_tokens(candidate)
         candidate_lang = _text_lang_bucket(candidate)
         has_school_marker = any(marker in lowered for marker in school_markers)
         if registry_tokens and not (candidate_tokens & registry_tokens):
             alias_hits = len(candidate_tokens & strict_alias_tokens)
-            min_alias_hits = 2 if len(strict_alias_tokens) >= 2 else 1
+            alias_match_hits = len(candidate_match_tokens & strict_alias_match_tokens)
+            min_alias_hits = 2 if len(strict_alias_tokens | strict_alias_match_tokens) >= 2 else 1
+            registry_match_overlap = bool(candidate_match_tokens & registry_match_tokens)
             if strict_alias_tokens and alias_hits >= min_alias_hits:
                 pass
-            elif strict_alias_tokens:
+            elif strict_alias_match_tokens and alias_match_hits >= min_alias_hits:
+                pass
+            elif registry_match_overlap and (candidate_lang != "en" or has_school_marker):
+                pass
+            elif strict_alias_tokens or strict_alias_match_tokens:
                 return None
             elif not (candidate_lang == "en" and has_school_marker):
                 return None
@@ -660,6 +678,24 @@ def _display_name_tokens(value: str | None) -> set[str]:
         token
         for token in extract_school_name_tokens(value, limit=10)
         if token and token not in _DISPLAY_NAME_LOCATION_TOKENS
+    }
+
+
+def _normalize_display_name_match_token(token: str | None) -> str:
+    raw_token = (token or "").strip()
+    if not raw_token:
+        return ""
+    normalized = transliterate_bulgarian(raw_token) if re.search(r"[А-Яа-я]", raw_token) else raw_token
+    normalized = re.sub(r"[^a-z0-9]+", "", normalized.casefold())
+    normalized = re.sub(r"(.)\1+", r"\1", normalized)
+    return normalized
+
+
+def _display_name_match_tokens(value: str | None) -> set[str]:
+    return {
+        normalized
+        for token in _display_name_tokens(value)
+        if (normalized := _normalize_display_name_match_token(token))
     }
 
 
@@ -1959,6 +1995,10 @@ def _is_low_quality_display_name(value: str | None) -> bool:
     lowered = raw_value.lower()
     if not lowered:
         return True
+    if re.search(r"(?i)\b(?:screenshot|screen shot)\b", raw_value):
+        return True
+    if re.search(r"(?i)\.(?:png|jpe?g|webp|svg|gif|avif)\b", raw_value):
+        return True
     if lowered in {"our kindergartens", "our schools"}:
         return True
     if lowered in {"групи", "groups"}:
@@ -2058,13 +2098,41 @@ def _should_prefer_alias_display_name(
         alias_label = alias_value.get(lang)
         if not current_label or not alias_label:
             continue
-        if _display_name_specificity_score(alias_label) <= _display_name_specificity_score(current_label):
+        current_lower = current_label.casefold()
+        alias_lower = alias_label.casefold()
+        if any(token in current_lower for token in ("sofia", "софия")) and not any(
+            token in alias_lower for token in ("sofia", "софия")
+        ):
             continue
         current_tokens = _display_name_tokens(current_label)
         alias_tokens = _display_name_tokens(alias_label)
+        current_match_tokens = _display_name_match_tokens(current_label)
+        alias_match_tokens = _display_name_match_tokens(alias_label)
+        alias_has_school_marker = bool(
+            re.search(r"(?i)\b(?:school|kindergarten|academy|college|house|училище|детска\s+градина|детска\s+къща|гимназия)\b", alias_label)
+        )
+        if (
+            current_match_tokens
+            and alias_match_tokens
+            and current_match_tokens & alias_match_tokens
+            and re.search(r"\b20\d{2}\b", current_label)
+            and alias_has_school_marker
+        ):
+            return True
+        if _display_name_specificity_score(alias_label) <= _display_name_specificity_score(current_label):
+            continue
         if not current_tokens:
             return True
         if current_tokens.issubset(alias_tokens):
+            return True
+        if current_match_tokens and current_match_tokens.issubset(alias_match_tokens):
+            return True
+        if (
+            current_match_tokens
+            and alias_match_tokens
+            and current_match_tokens & alias_match_tokens
+            and len(alias_match_tokens) >= len(current_match_tokens)
+        ):
             return True
         if current_label.casefold() in alias_label.casefold() and len(alias_label) > len(current_label):
             return True

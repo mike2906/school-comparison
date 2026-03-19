@@ -9,6 +9,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
+from pydantic import BaseModel, Field
 from pydantic_ai import Agent, ModelRetry
 from pydantic_ai.models.openrouter import OpenRouterModel
 from pydantic_ai.providers.openrouter import OpenRouterProvider
@@ -122,6 +123,12 @@ class ExtractionLLMStats:
             "hard_failure_rate": round(hard_failure_rate, 4),
             "hard_failure_details": self.hard_failure_details,
         }
+
+
+class DisplayNameOnlyExtractionOutput(BaseModel):
+    """Minimal schema for a targeted display-name recovery pass."""
+
+    display_name_i18n: dict[str, str] = Field(default_factory=dict)
 
 
 def _build_openrouter_model(tier: str = "cheap") -> OpenRouterModel:
@@ -387,6 +394,7 @@ async def _run_typed_agent(
     result_type: type,
     timeout_seconds: float,
     llm_stats: ExtractionLLMStats,
+    preferred_tier: str = "cheap",
 ) -> tuple[Any | None, int, int, float]:
     settings = get_settings()
 
@@ -450,10 +458,11 @@ async def _run_typed_agent(
             logger.warning("Extraction call failed (%s): %s", result_type.__name__, exc)
 
     try:
-        return await _run_for_tier("cheap")
+        return await _run_for_tier(preferred_tier)
     except Exception as exc:
-        _record_failure(exc, final=False)
-        if result_type is GeneralInfoExtractionOutput:
+        should_try_capable_fallback = preferred_tier == "cheap" and result_type is GeneralInfoExtractionOutput
+        _record_failure(exc, final=not should_try_capable_fallback)
+        if should_try_capable_fallback:
             llm_stats.capable_fallback_attempts += 1
             try:
                 out = await _run_for_tier("capable")
@@ -464,6 +473,120 @@ async def _run_typed_agent(
             return out
         _record_failure(exc, final=True)
         return None, 0, 0, 0.0
+
+
+def _has_display_name_signal(text: str) -> bool:
+    snippet = text[:2500]
+    patterns = (
+        r"!\[([^\]]{3,160})\]\(",
+        r"\[([^\]]{3,160})\]\(https?://[^)]+\)",
+        r"(?m)^#{1,3}\s+(.{3,160})$",
+    )
+    for pattern in patterns:
+        for match in re.finditer(pattern, snippet, flags=re.IGNORECASE):
+            candidate = helpers._refine_display_name_label(match.group(1))
+            if not candidate or helpers._is_low_quality_display_name(candidate):
+                continue
+            lowered = candidate.casefold()
+            if lowered in {
+                "about us",
+                "за нас",
+                "preschool",
+                "contact",
+                "contacts",
+                "контакти",
+                "admission",
+                "pricing",
+                "documents",
+                "request a meeting",
+            }:
+                continue
+            if any(noise in lowered for noise in ("cookie", "consent", "blog", "reference school")):
+                continue
+            if helpers._display_name_tokens(candidate):
+                return True
+    return False
+
+
+async def _extract_display_name_capable_fallback(
+    *,
+    school_name: str,
+    text: str,
+    country_code: str,
+    timeout_seconds: float,
+    llm_stats: ExtractionLLMStats,
+) -> tuple[dict[str, str] | None, int, int, float]:
+    system_prompt = (
+        "Extract only the public-facing school or brand name shown on the website into display_name_i18n. "
+        "Do not return the registry/legal name unless the website itself uses it as the public-facing name."
+    )
+    user_prompt = (
+        f"Registry name: {school_name}\n\n"
+        "Identify the website-facing school name from the header/navigation content below. "
+        "If the same Latin-script brand is used site-wide, you may repeat the exact same text in both locales.\n\n"
+        f"Website content:\n{text[:2500]}"
+    )
+    parsed, input_tokens, output_tokens, token_cost_usd = await _run_typed_agent(
+        system_prompt=system_prompt,
+        user_prompt=user_prompt,
+        result_type=DisplayNameOnlyExtractionOutput,
+        timeout_seconds=timeout_seconds,
+        llm_stats=llm_stats,
+        preferred_tier="capable",
+    )
+    if parsed is None:
+        return None, input_tokens, output_tokens, token_cost_usd
+    normalized = helpers._normalize_display_name_i18n(parsed.display_name_i18n, country_code)
+    return normalized, input_tokens, output_tokens, token_cost_usd
+
+
+def _promote_repeated_display_name_candidate(
+    parsed: GeneralInfoExtractionOutput,
+    *,
+    school: School,
+    pages: list[SourcePage],
+) -> tuple[GeneralInfoExtractionOutput, str | None]:
+    from app.scrapers.display_name_audit import audit_school_display_name
+
+    current_display = helpers._normalize_display_name_i18n(parsed.display_name_i18n, school.country_code) or {}
+    finding = audit_school_display_name(
+        {
+            "id": school.id,
+            "name_i18n": school.name_i18n or {},
+            "attributes": {"display_name_i18n": current_display},
+            "website_url": school.website_url,
+        },
+        [
+            {
+                "source_url": page.source_url,
+                "page_category": page.page_category,
+                "raw_markdown": page.raw_markdown,
+            }
+            for page in pages
+        ],
+    )
+    if finding is None or finding.repeated_pages < 2 or finding.core_pages < 1 or finding.score < 12:
+        return parsed, None
+
+    bucket = helpers._text_lang_bucket(finding.candidate_name)
+    candidate_i18n = helpers._normalize_display_name_i18n(
+        {"en": finding.candidate_name} if bucket == "en" else {"bg": finding.candidate_name},
+        school.country_code,
+    )
+    if not candidate_i18n:
+        return parsed, None
+    # If we already have a display name, require the promoted candidate to be
+    # clearly better. When the current display is empty, strong repeated page
+    # evidence is allowed to seed it.
+    if current_display and not helpers._should_prefer_alias_display_name(current_display, candidate_i18n):
+        return parsed, None
+    if current_display == candidate_i18n:
+        return parsed, None
+
+    return (
+        parsed.model_copy(update={"display_name_i18n": candidate_i18n}),
+        f"Promoted repeated fuller display name from page evidence: {finding.candidate_name}",
+    )
 
 
 async def _extract_prices(
@@ -782,6 +905,46 @@ async def _extract_general_info(
                     )
             elif detail_note is None:
                 detail_note = "quality gate recovery call failed"
+
+        if not parsed.display_name_i18n and _has_display_name_signal(selected_text):
+            recovered_display_name, in3, out3, cost3 = await _extract_display_name_capable_fallback(
+                school_name=school_name,
+                text=selected_text,
+                country_code=school.country_code,
+                timeout_seconds=timeout_seconds,
+                llm_stats=llm_stats,
+            )
+            input_tokens += in3
+            output_tokens += out3
+            token_cost_usd += cost3
+            if recovered_display_name:
+                parsed.display_name_i18n = recovered_display_name
+                parsed = _augment_general_info_with_deterministic(
+                    parsed,
+                    all_page_text,
+                    narrative_text=narrative_text,
+                    registry_name=school_name,
+                    country_code=school.country_code,
+                    website_url=school.website_url,
+                    known_aliases=known_aliases,
+                )
+                detail_note = (
+                    f"{detail_note}; recovered display name with capable fallback"
+                    if detail_note
+                    else "Recovered display name with capable fallback"
+                )
+
+        parsed, promoted_display_name_note = _promote_repeated_display_name_candidate(
+            parsed,
+            school=school,
+            pages=pages,
+        )
+        if promoted_display_name_note:
+            detail_note = (
+                f"{detail_note}; {promoted_display_name_note}"
+                if detail_note
+                else promoted_display_name_note
+            )
 
     normalized, extracted_i18n, display_name_i18n = helpers._normalize_general_info_output(parsed, school.country_code)
     contact_info = helpers._extract_contact_info_deterministic(all_page_text)
