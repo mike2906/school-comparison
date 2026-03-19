@@ -22,9 +22,8 @@ Implemented:
 - Stage 4: Website navigation + page caching
 - Stage 5: Extraction (pricing + general info, hash-based skip, quality gate)
 - Stage 6: Data validation + monitoring spot-checks
-
-Not implemented yet:
 - Stage 7: summarization
+- Independent official BG NVO import (`nvo` stage, 2021-2025 Sofia backfill loaded)
 
 ## Local Development
 ```bash
@@ -72,6 +71,12 @@ uv run python -m app.scrapers.cli run --stage extract --city sofia --sync --limi
 
 # Validate extracted data and run monitoring spot-checks (Stage 6)
 uv run python -m app.scrapers.cli run --stage validate-data --city sofia --sync --limit 100
+
+# Generate bilingual summaries for eligible schools (Stage 7)
+uv run python -m app.scrapers.cli run --stage summarize --city sofia --sync --limit 100
+
+# Import official NVO results (independent of website pipeline)
+uv run python -m app.scrapers.cli run --stage nvo --city sofia --country bg --sync
 ```
 
 ## Recommended Single-School Workflow

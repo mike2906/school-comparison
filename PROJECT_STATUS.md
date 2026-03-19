@@ -1,7 +1,7 @@
 # Sofia School Comparison - Project Status
 
-**Last Updated:** March 11, 2026  
-**Current Phase:** Scraping Pipeline - Stages 1-6 implemented, Stage 7 pending
+**Last Updated:** March 19, 2026  
+**Current Phase:** Scraping Pipeline - Stages 1-7 implemented, official BG NVO import live
 
 ---
 
@@ -14,9 +14,18 @@ Implemented:
 4. Stage 4 - Website navigation and page caching (`source_pages`)
 5. Stage 5 - Extraction (pricing + general info, hash-based skip, quality gate)
 6. Stage 6 - Data validation and monitoring spot checks
+7. Stage 7 - Summarization
+8. Independent NVO import stage (official `io.mon.bg` → `data.egov.bg` datasets)
 
-Not implemented yet:
-1. Stage 7 - Summarization
+Current local DB snapshot:
+1. `summarized`: 464 schools
+2. `extracted`: 5 schools
+3. `extraction_failed`: 27 schools
+4. `no_official_website`: 32 schools
+5. `validated`: 1 school
+6. `pending`: 11 schools
+7. `exam_results`: 5115 official NVO rows across 247 Sofia schools
+8. NVO year coverage: 2021-2025 for `nvo_4`, `nvo_7`, `nvo_10`
 
 ---
 
@@ -42,6 +51,12 @@ uv run python -m app.scrapers.cli run --stage extract --city sofia --sync --limi
 
 # Stage 6
 uv run python -m app.scrapers.cli run --stage validate-data --city sofia --sync --limit 100
+
+# Stage 7
+uv run python -m app.scrapers.cli run --stage summarize --city sofia --sync --limit 100
+
+# Official NVO import (independent of website pipeline)
+uv run python -m app.scrapers.cli run --stage nvo --city sofia --country bg --sync
 ```
 
 ---
