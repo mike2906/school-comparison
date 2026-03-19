@@ -234,6 +234,7 @@ def repair_locations(school, school_id, city, country, limit, include_state, dry
             "extract",
             "validate-data",
             "summarize",
+            "nvo",
             "all",
         ],
         case_sensitive=False,
@@ -244,6 +245,20 @@ def repair_locations(school, school_id, city, country, limit, include_state, dry
 @click.option("--city", default="sofia", help="City to filter by")
 @click.option("--country", default="bg", help="Country code")
 @click.option("--limit", type=int, help="Limit number of schools to process")
+@click.option("--year", type=int, help="Specific NVO exam year to import")
+@click.option(
+    "--history-years",
+    type=int,
+    default=5,
+    show_default=True,
+    help="Number of recent NVO years to import when --year is omitted",
+)
+@click.option(
+    "--exam-type",
+    "exam_types",
+    multiple=True,
+    help="NVO exam type to import (repeatable: nvo_4, nvo_7, nvo_10)",
+)
 @click.option("--sample-ratio", type=float, default=0.0, help="Sample ratio for unchanged schools (discover only)")
 @click.option("--include-navigated", is_flag=True, help="For navigate stage, recrawl already navigated schools")
 @click.option("--include-extracted", is_flag=True, help="For extract stage, re-extract already extracted schools")
@@ -261,6 +276,9 @@ def run(
     city,
     country,
     limit,
+    year,
+    history_years,
+    exam_types,
     sample_ratio,
     include_navigated,
     include_extracted,
@@ -276,6 +294,9 @@ def run(
         console.print(f"  City: {city}")
         console.print(f"  Country: {country}")
         console.print(f"  Limit: {limit}")
+        console.print(f"  Year: {year}")
+        console.print(f"  History years: {history_years}")
+        console.print(f"  Exam types: {builtins.list(exam_types) or 'default'}")
         console.print(f"  Sample ratio: {sample_ratio}")
         console.print(f"  Include navigated: {include_navigated}")
         console.print(f"  Include extracted: {include_extracted}")
@@ -293,6 +314,9 @@ def run(
                 city,
                 country,
                 limit,
+                year,
+                history_years,
+                builtins.list(exam_types),
                 sample_ratio,
                 include_navigated,
                 include_extracted,
@@ -312,6 +336,9 @@ async def _run_sync(
     city,
     country,
     limit,
+    year,
+    history_years,
+    exam_types: list[str],
     sample_ratio,
     include_navigated: bool,
     include_extracted: bool,
@@ -355,6 +382,16 @@ async def _run_sync(
                         await _run_validate_data_school(db, school_id, country, run_spot_check=True)
                     elif stage == "summarize":
                         await _run_summarize_school(db, school_id, country)
+                    elif stage == "nvo":
+                        await _run_nvo_import(
+                            db,
+                            country=country,
+                            city=city,
+                            year=year,
+                            history_years=history_years,
+                            exam_types=exam_types,
+                            school_ids=[school_id],
+                        )
                     elif stage == "all":
                         await _run_all_stages(db, school_id, country)
 
@@ -387,6 +424,16 @@ async def _run_sync(
                 await _run_validate_data_batch(db, country, city, limit, force_validate=force_validate)
             elif stage == "summarize":
                 await _run_summarize_batch(db, country, city, limit)
+            elif stage == "nvo":
+                await _run_nvo_import(
+                    db,
+                    country=country,
+                    city=city,
+                    year=year,
+                    history_years=history_years,
+                    exam_types=exam_types,
+                    school_ids=None,
+                )
             elif stage == "all":
                 await _run_validate_urls_batch(db, country, city, limit)
                 await _run_navigate_batch(db, country, city, limit, include_navigated=include_navigated)
@@ -395,6 +442,51 @@ async def _run_sync(
                 await _run_summarize_batch(db, country, city, limit)
             else:
                 console.print(f"[yellow]Batch mode for '{stage}' not yet implemented[/yellow]")
+
+
+async def _run_nvo_import(
+    db,
+    *,
+    country: str,
+    city: Optional[str],
+    year: Optional[int],
+    history_years: int,
+    exam_types: Optional[list[str]],
+    school_ids: Optional[list[int]],
+):
+    """Run official NVO import."""
+    from app.scrapers.nvo_results import import_nvo_results
+
+    console.print("[cyan]Importing official NVO results...[/cyan]")
+    console.print(f"  Country: {country}")
+    console.print(f"  City: {city or 'all'}")
+    console.print(f"  Year: {year or 'latest available'}")
+    console.print(f"  History years: {history_years}")
+    console.print(f"  Exam types: {exam_types or 'all supported'}")
+    if school_ids:
+        console.print(f"  School IDs: {school_ids}")
+
+    summary = await import_nvo_results(
+        db=db,
+        country_code=country,
+        city=city,
+        year=year,
+        history_years=history_years,
+        exam_types=exam_types or None,
+        school_ids=school_ids,
+    )
+
+    console.print("[green]✓ NVO import complete:[/green]")
+    console.print(f"  Years imported: {summary.get('years_imported') or []}")
+    console.print(f"  Matched schools: {summary.get('matched_schools', 0)}")
+    console.print(f"  Created rows: {summary.get('created_rows', 0)}")
+    console.print(f"  Updated rows: {summary.get('updated_rows', 0)}")
+    console.print(f"  Skipped rows: {summary.get('skipped_rows', 0)}")
+    console.print(f"  Unmatched rows: {summary.get('unmatched_rows', 0)}")
+    console.print(f"  Source URL: {summary.get('source_url')}")
+    if summary.get("slice_failures"):
+        console.print(f"[yellow]  Slice failures: {len(summary['slice_failures'])}[/yellow]")
+    return summary
 
 
 async def _find_school_by_name(db, name: str, country: str) -> Optional[int]:

@@ -944,10 +944,50 @@ async def _summarize_school_async(school_id: int, country_code: str = "bg"):
 # =============================================================================
 
 @celery_app.task(name="tasks.scrape_nvo_results")
-def scrape_nvo_results(country_code: str = "bg", year: Optional[int] = None, city: Optional[str] = "sofia"):
-    """Scrape NVO exam results from government platform (Phase 3)."""
-    logger.info("NVO scraping - Phase 3 implementation")
-    return {"message": "Not implemented yet - Phase 3"}
+def scrape_nvo_results(
+    country_code: str = "bg",
+    year: Optional[int] = None,
+    city: Optional[str] = "sofia",
+    history_years: int = 5,
+    exam_types: Optional[list[str]] = None,
+    school_ids: Optional[list[int]] = None,
+):
+    """Import official NVO exam results."""
+    return run_async(
+        _scrape_nvo_results_async(
+            country_code=country_code,
+            year=year,
+            city=city,
+            history_years=history_years,
+            exam_types=exam_types,
+            school_ids=school_ids,
+        )
+    )
+
+
+async def _scrape_nvo_results_async(
+    *,
+    country_code: str = "bg",
+    year: Optional[int] = None,
+    city: Optional[str] = "sofia",
+    history_years: int = 5,
+    exam_types: Optional[list[str]] = None,
+    school_ids: Optional[list[int]] = None,
+):
+    """Async implementation of NVO import task."""
+    from app.database import async_session_maker
+    from app.scrapers.nvo_results import import_nvo_results
+
+    async with async_session_maker() as db:
+        return await import_nvo_results(
+            db=db,
+            country_code=country_code,
+            city=city,
+            year=year,
+            history_years=history_years,
+            exam_types=exam_types,
+            school_ids=school_ids,
+        )
 
 
 # =============================================================================
@@ -1016,12 +1056,15 @@ def run_stage(
     city: Optional[str] = "sofia",
     school_ids: Optional[list[int]] = None,
     limit: Optional[int] = None,
+    year: Optional[int] = None,
+    history_years: int = 5,
+    exam_types: Optional[list[str]] = None,
 ):
     """
     Run a specific pipeline stage.
 
     Args:
-        stage: Stage name (discover, discover-websites, validate-urls, navigate, extract, validate-data, summarize)
+        stage: Stage name (discover, discover-websites, validate-urls, navigate, extract, validate-data, summarize, nvo)
         country_code: Country code
         city: City to filter by
         school_ids: Specific school IDs to process (optional)
@@ -1038,6 +1081,7 @@ def run_stage(
         "extract": extract_batch,
         "validate-data": validate_batch,
         "summarize": summarize_batch,
+        "nvo": scrape_nvo_results,
     }
 
     if stage not in stage_map:
@@ -1046,13 +1090,23 @@ def run_stage(
     task = stage_map[stage]
 
     # Run the task
-    result = task.apply_async(
-        kwargs={
+    if stage == "nvo":
+        kwargs = {
+            "country_code": country_code,
+            "city": city,
+            "year": year,
+            "history_years": history_years,
+            "exam_types": exam_types,
+            "school_ids": school_ids,
+        }
+    else:
+        kwargs = {
             "country_code": country_code,
             "city": city,
             "limit": limit,
         }
-    )
+
+    result = task.apply_async(kwargs=kwargs)
 
     return {
         "stage": stage,

@@ -18,6 +18,7 @@ async def test_stage_choices_use_canonical_names():
     stage_param = next(param for param in run_command.params if param.name == "stage")
     choices = set(stage_param.type.choices)
 
+    assert "nvo" in choices
     assert "navigate" in choices
     assert "extract" in choices
     assert "all" in choices
@@ -56,6 +57,45 @@ async def test_run_all_stages_routes_to_canonical_handlers(db_session):
     extract_mock.assert_awaited_once()
     validate_data_mock.assert_awaited_once()
     summarize_mock.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_run_sync_routes_nvo_stage_to_import_helper(db_session):
+    school = School(
+        name_i18n={"bg": "НВО тест"},
+        country_code="bg",
+        school_type="state",
+        education_level="primary",
+        city="sofia",
+    )
+    db_session.add(school)
+    await db_session.commit()
+
+    with patch.object(scraper_cli, "_run_nvo_import", new=AsyncMock()) as nvo_mock:
+        await scraper_cli._run_sync(
+            school_name=None,
+            school_id=school.id,
+            stage="nvo",
+            city="sofia",
+            country="bg",
+            limit=None,
+            year=2025,
+            history_years=5,
+            exam_types=["nvo_4"],
+            sample_ratio=0.0,
+            include_navigated=False,
+            include_extracted=False,
+            force_validate=False,
+        )
+
+    nvo_mock.assert_awaited_once()
+    kwargs = nvo_mock.await_args.kwargs
+    assert kwargs["country"] == "bg"
+    assert kwargs["city"] == "sofia"
+    assert kwargs["year"] == 2025
+    assert kwargs["history_years"] == 5
+    assert kwargs["exam_types"] == ["nvo_4"]
+    assert kwargs["school_ids"] == [school.id]
 
 
 @pytest.mark.asyncio
