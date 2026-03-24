@@ -1,10 +1,11 @@
 from datetime import datetime
 from typing import Optional, Union
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, computed_field
 
 from app.schemas.pricing import PricingResponse
 from app.schemas.field_source import FieldSourceResponse
+from app.utils.i18n_resolver import resolve_address_i18n, resolve_name_i18n
 
 
 class SummaryText(BaseModel):
@@ -21,6 +22,7 @@ class LanguageFocusItem(BaseModel):
 
 
 class SchoolAttributes(BaseModel):
+    display_name_i18n: Optional[dict[str, str]] = None
     languages_of_instruction: Optional[list[str]] = None
     has_canteen: Optional[bool] = None
     activities_offered: Optional[list[str]] = None
@@ -55,6 +57,11 @@ class SchoolLocationBase(BaseModel):
 
     model_config = {"from_attributes": True}
 
+    @computed_field(return_type=dict[str, str])
+    @property
+    def resolved_address_i18n(self) -> dict[str, str]:
+        return resolve_address_i18n(self.address_i18n)
+
 
 class SchoolLocationResponse(SchoolLocationBase):
     id: int
@@ -85,6 +92,12 @@ class SchoolBase(BaseModel):
     num_pupils: Optional[int] = None
     admission_info: Optional[dict] = None
     attributes: Optional[SchoolAttributes] = None
+
+    @computed_field(return_type=dict[str, str])
+    @property
+    def resolved_name_i18n(self) -> dict[str, str]:
+        attributes = self.attributes.model_dump(exclude_none=True) if self.attributes is not None else None
+        return resolve_name_i18n(self.name_i18n, attributes)
 
 
 class SchoolCreate(SchoolBase):
@@ -117,3 +130,11 @@ class SchoolListResponse(BaseModel):
     field_sources: list[FieldSourceResponse] = []
 
     model_config = {"from_attributes": True}
+
+    @computed_field(return_type=dict[str, str])
+    @property
+    def resolved_name_i18n(self) -> dict[str, str]:
+        attributes = None
+        if self.attributes is not None:
+            attributes = SchoolAttributes.model_validate(self.attributes).model_dump(exclude_none=True)
+        return resolve_name_i18n(self.name_i18n, attributes)

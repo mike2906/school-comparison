@@ -17,6 +17,8 @@ from app.models.pricing import PriceCategory, PricePeriod
 from app.models.school import School
 from app.models.source_page import SourcePage
 from app.scrapers.extraction_rules import get_rules
+from app.scrapers.school_tokens import extract_school_name_tokens
+from app.utils.transliteration import transliterate_bulgarian
 from app.schemas.extraction import (
     AdmissionExtractionOutput,
     ExtractedLanguageFocus,
@@ -24,11 +26,382 @@ from app.schemas.extraction import (
     OperationsExtractionOutput,
     PricingTermsExtractionOutput,
     ServicesExtractionOutput,
+    SummarySourceExtractionOutput,
 )
 
 _ACTIVE_RULES: contextvars.ContextVar[Any] = contextvars.ContextVar(
     "extraction_rules_module",
     default=get_rules(None),
+)
+
+_DISPLAY_NAME_LOCATION_TOKENS = {"софия", "sofia", "град", "grad", "city"}
+_DISPLAY_NAME_GENERIC_PREFIXES = (
+    "учебен комплекс",
+    "частна детска градина",
+    "частно детско заведение",
+    "частно основно училище",
+    "частно начално училище",
+    "частно средно училище",
+    "частна профилирана гимназия",
+    "частна езикова гимназия",
+    "детска градина",
+    "kindergarten",
+    "private kindergarten",
+    "private school",
+)
+_DISPLAY_NAME_BG_STRIP_PREFIX = re.compile(
+    r"""^(?:
+        учебен\ комплекс|
+        частно\ средно\ училище\ и\ детска\ градина|
+        частна\ немска\ гимназия|
+        частно\ средно\ училище\ с\ ранно\ чуждоезиково\ обучение|
+        частно\ средно\ училище\ с\ немски\ език|
+        частн(?:а|о)?\s+(?:детска\ градина|детско\ заведение|основно\ училище|начално\ училище|средно\ училище|училище)
+    )\s+""",
+    flags=re.IGNORECASE | re.VERBOSE,
+)
+_DISPLAY_NAME_EN_STRIP_PREFIX = re.compile(
+    r"""^(?:
+        logo|
+        nemska\s+gimnaziya|
+        angliyska\s+gimnaziya|
+        frenska\s+gimnaziya|
+        s\s+ranno\s+chuzhdoezikovo\s+obuchenie|
+        s\s+nemski\s+ezik|
+        chastna?\s+nemska\s+gimnaziya|
+        chastna?\s+angliyska\s+gimnaziya|
+        chastna?\s+frenska\s+gimnaziya|
+        chastn(?:a|o)?\s+(?:detska\ gradina|detsko\ zavedenie|osnovno\ uchilishte|nachalno\ uchilishte|sredno\ uchilishte|uchilishte|profesionalna\ gimnaziya)
+    )\s+""",
+    flags=re.IGNORECASE | re.VERBOSE,
+)
+_DISPLAY_NAME_ABBREV_PREFIX = re.compile(r"^(?:ЧОУ|ЧДГ|ЧСУ|ЦДГ|ДГ|НУ|ОУ|СУ|ПГ)\b", flags=re.IGNORECASE)
+_DISPLAY_NAME_ROLE_PREFIXES = (
+    "директор на",
+    "екип",
+    "team",
+    "teacher",
+    "учители",
+)
+_HOST_ALIAS_GENERIC_PARTS = {"www", "bg", "com", "org", "net", "eu", "edu"}
+_HOST_ALIAS_SPLIT_SUFFIXES = (
+    "kindergarten",
+    "preschool",
+    "college",
+    "academy",
+    "school",
+    "kinder",
+    "kids",
+    "bear",
+)
+_ENGLISH_INSTITUTION_SUFFIXES = ("college", "university")
+_SUMMARY_SOURCE_MAX_ITEMS = 5
+_SUMMARY_SOURCE_GENERIC_EXACT = {
+    "качествено образование",
+    "quality education",
+    "иновативно училище",
+    "innovative school",
+    "модерно училище",
+    "modern school",
+    "подкрепяща среда",
+    "supportive environment",
+    "приятелска среда",
+    "friendly environment",
+    "сигурна среда",
+    "safe environment",
+    "зона за родители",
+    "parents zone",
+    "специализирани преподаватели",
+    "teachers of sports and arts",
+}
+_SUMMARY_SOURCE_NAV_EXACT = {
+    "начало",
+    "контакти",
+    "за родители",
+    "академия",
+    "transport",
+    "транспорт",
+    "методика",
+    "образователен модел",
+}
+_SUMMARY_SOURCE_ALLOWED_SINGLE_TOKENS = {"montessori", "waldorf", "stem", "ib", "cambridge"}
+_SUMMARY_SOURCE_GENERIC_PATTERNS = (
+    r"^(?:иновативн(?:о|а)?|модерн(?:о|а)?|креативн(?:о|а)?|вдъхновяващ(?:о|а)?|подкрепящ(?:а|о)|"
+    r"приятелск(?:а|о)|безопасн(?:а|о)|качествен(?:а|о)|цялостн(?:о|а))\s+"
+    r"(?:училище|детска градина|среда|образование|общност|подход|програма)$",
+    r"^(?:innovative|modern|creative|inspiring|supportive|friendly|safe|quality|holistic)\s+"
+    r"(?:school|kindergarten|environment|education|community|approach|program)$",
+    r"^(?:подготовка|preparing)\b.+\b(?:предизвикателствата|challenges)\b",
+    r"^(?:well-rounded individuals|цялостни личности)$",
+    r"^(?:©|copyright|\(c\)).*",
+    r"^(?:all rights reserved|всички права запазени)\.?$",
+    r".*\b(?:best education|най-доброто обучение)\b.*",
+    r".*\b(?:най-голямо богатство|deserve the best|заслужават най-доброто)\b.*",
+    r".*\b(?:епидемичн|epidemic|pandemic|temporarily suspended|временно прекратени)\b.*",
+    r".*\b(?:recommendations how to choose|препоръки как да изберете)\b.*",
+    r".*\b(?:week|седмица|ден|day|games|игри|event|събитие)\b.*\b20\d{2}(?:/\d{2,4})?\b.*",
+    r".*\b(?:техническото съхранение или достъп|technical storage or access)\b.*",
+    r".*\b(?:мисия и изкуство|mission and art)\b.*",
+    r".*\b(?:динам(?:ичн|ic).+образователна среда|dynamic.+educational environment)\b.*",
+)
+_SUMMARY_SOURCE_CATEGORY_HINTS: dict[str, tuple[str, ...]] = {
+    "teaching_approach": (
+        "approach",
+        "method",
+        "model",
+        "teaching",
+        "learning",
+        "learning through",
+        "experiential",
+        "pedagog",
+        "project-based",
+        "project based",
+        "montessori",
+        "waldorf",
+        "democratic",
+        "emotional intelligence",
+        "critical thinking",
+        "individual approach",
+        "индивидуален подход",
+        "проектно",
+        "емоционална интелигентност",
+        "мислене",
+        "учене чрез",
+        "обучение",
+        "преподав",
+        "метод",
+        "подход",
+        "модел",
+        "педагог",
+        "демократич",
+    ),
+    "student_experience": (
+        "creative",
+        "movement",
+        "arts",
+        "sport",
+        "full-day",
+        "full day",
+        "daily",
+        "hands-on",
+        "activities",
+        "summer",
+        "camp",
+        "meals",
+        "snacks",
+        "transport",
+        "celebrat",
+        "clubs",
+        "заним",
+        "творч",
+        "движ",
+        "спорт",
+        "целоднев",
+        "ежеднев",
+        "дейност",
+        "практическ",
+        "лятна",
+        "лагер",
+        "хран",
+        "закуск",
+        "транспорт",
+        "празник",
+        "клуб",
+    ),
+    "community_signals": (
+        "community",
+        "parent",
+        "family",
+        "supportive",
+        "environment",
+        "partnership",
+        "общност",
+        "родител",
+        "семей",
+        "подкрепящ",
+        "среда",
+        "партньор",
+    ),
+    "differentiators": (
+        "licensed",
+        "license",
+        "accredit",
+        "author",
+        "fusion",
+        "synthesis",
+        "international",
+        "bilingual",
+        "cambridge",
+        "ib",
+        "stem",
+        "лиценз",
+        "акредитац",
+        "авторск",
+        "синтез",
+        "международ",
+        "двуезич",
+        "cambridge",
+        "ib",
+        "stem",
+    ),
+    "positioning": (
+        "serves",
+        "for children",
+        "from preschool",
+        "through",
+        "licensed",
+        "private",
+        "state",
+        "international",
+        "приема",
+        "за деца",
+        "от предучилищна",
+        "лиценз",
+        "частн",
+        "държавн",
+        "международ",
+    ),
+}
+_SUMMARY_SOURCE_PAGE_GOOD_URL_TOKENS = (
+    "about",
+    "za-nas",
+    "program",
+    "curriculum",
+    "mission",
+    "vision",
+    "philosophy",
+    "model",
+    "method",
+    "pedagog",
+    "obuchenie",
+    "obrazovatelen-model",
+    "metodika",
+    "approach",
+    "waldorf",
+    "montessori",
+    "fusion",
+)
+_SUMMARY_SOURCE_PAGE_BAD_URL_TOKENS = (
+    "news",
+    "novini",
+    "blog",
+    "event",
+    "calendar",
+    "parents",
+    "roditeli",
+    "document",
+    "docs",
+    "policy",
+    "gdpr",
+    "contact",
+    "team",
+    "staff",
+    "cookies",
+    "admission",
+    "priem",
+    "pricing",
+    "fees",
+    "gallery",
+    "vacancy",
+    "konkurs",
+)
+_SUMMARY_SOURCE_PAGE_BAD_TEXT_TOKENS = (
+    "правилник",
+    "cookie",
+    "cookies",
+    "приемам",
+    "всички права запазени",
+    "all rights reserved",
+    "новини",
+    "news",
+    "technical storage or access",
+    "техническото съхранение или достъп",
+    "зона за родители",
+)
+_SUMMARY_SOURCE_PAGE_NARRATIVE_TEXT_TOKENS = (
+    "мисия",
+    "визия",
+    "философ",
+    "подход",
+    "метод",
+    "модел",
+    "педагог",
+    "обучение",
+    "учене",
+    "езиков",
+    "чуждоезиков",
+    "монте",
+    "валдорф",
+    "cambridge",
+    "ib",
+    "fusion",
+    "project-based",
+    "project based",
+    "language",
+    "curriculum",
+    "philosophy",
+    "mission",
+    "vision",
+    "approach",
+    "method",
+    "model",
+    "pedagog",
+    "bilingual",
+)
+_SUMMARY_SOURCE_PAGE_OPERATIONAL_URL_TOKENS = (
+    "admission",
+    "priem",
+    "pricing",
+    "fees",
+    "menu",
+    "transport",
+    "contact",
+    "documents",
+    "docs",
+    "policy",
+    "rules",
+)
+_SUMMARY_SOURCE_PAGE_OPERATIONAL_TEXT_TOKENS = (
+    "прием",
+    "записване",
+    "такса",
+    "цени",
+    "меню",
+    "транспорт",
+    "работно време",
+    "контакти",
+    "документи",
+    "phone",
+    "email",
+    "admission",
+    "apply",
+    "fees",
+    "pricing",
+    "working hours",
+    "menu",
+    "transport",
+    "contact",
+    "documents",
+)
+_SUMMARY_SOURCE_PAGE_NEWS_PATTERNS = (
+    r"\b20\d{2}(?:/\d{2,4})?\b",
+    r"\b(?:новин|news|archive|calendar|event|събит)\b",
+)
+_SUMMARY_SOURCE_CANONICAL_TAG_PATTERNS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("Montessori", ("montessori", "монтесори")),
+    ("Waldorf", ("waldorf", "валдорф")),
+    ("Reggio Emilia", ("reggio emilia", "reggio-emilia")),
+    ("IB", ("international baccalaureate", " ib ", "ib programme", "ib program", "ib diploma")),
+    ("Cambridge", ("cambridge", "кембридж")),
+    ("A-Level", ("a-level", "a level", "alevel")),
+    ("Fusion educational model", ("fusion educational model", "fusion model", "образователния модел fusion", "модел fusion")),
+    ("Project-based learning", ("project-based", "project based", "проектно базирано")),
+    ("STEM-focused", (" stem ", "steam", "stem-focused", "stem focus", "stem програма")),
+    ("Bilingual", ("bilingual", "двуезич")),
+    ("Early foreign language education", ("early foreign language", "ранно чуждоезиково", "early language education")),
+    ("German-focused", ("german-focused", "deutsch", "немски език", "германски")),
+    ("French-focused", ("french-focused", "френски език", "francais")),
+    ("Spanish-focused", ("spanish-focused", "испански език", "espanol")),
 )
 
 def _rules() -> Any:
@@ -105,6 +478,510 @@ def _extract_class_size_deterministic(text: str) -> str | None:
     if not candidates:
         return None
     return f"{min(candidates)} students"
+
+def _extract_display_name_i18n_deterministic(
+    text: str,
+    registry_name: str | None,
+    country_code: str,
+    website_url: str | None = None,
+    known_aliases: list[str] | None = None,
+) -> dict[str, str] | None:
+    effective_aliases = list(known_aliases or [])
+    for alias in _derive_display_name_seed_aliases(registry_name, website_url):
+        if alias and alias.casefold() not in {value.casefold() for value in effective_aliases}:
+            effective_aliases.append(alias)
+
+    if not text:
+        return _extract_alias_display_name_i18n(effective_aliases, country_code) or _extract_host_aligned_display_name(
+            registry_name,
+            website_url,
+        )
+
+    registry_tokens = _display_name_tokens(registry_name)
+    registry_match_tokens = _display_name_match_tokens(registry_name)
+    alias_tokens: set[str] = set()
+    alias_match_tokens: set[str] = set()
+    for alias in effective_aliases:
+        alias_tokens.update(_display_name_tokens(alias))
+        alias_match_tokens.update(_display_name_match_tokens(alias))
+    strict_alias_tokens = {token for token in alias_tokens if len(token) >= 4}
+    strict_alias_match_tokens = {token for token in alias_match_tokens if len(token) >= 4}
+    school_markers = (
+        "училище",
+        "гимназ",
+        "детска градина",
+        "чоу",
+        "чдг",
+        "school",
+        "kindergarten",
+        "academy",
+        "college",
+        "house",
+    )
+    junk_markers = (
+        "управление на съгласието",
+        "manage consent",
+        "copyright",
+        "all rights reserved",
+        "cookie",
+        "бисквит",
+        "skip to content",
+        "преглед на настройки",
+        "manage options",
+        "manage services",
+        "vendors",
+        "начало",
+        "home",
+        "контакти",
+        "contact",
+        "блог",
+        "blog",
+        "reference school",
+        "@school",
+    )
+    junk_prefix_patterns = (
+        r"^(?:discover|why|our|admissions?|curriculum|calendar|school dates|work with us)\b",
+        r"^(?:да бъдеш|защо|нашите дейности|мисия и визия|мисия|визия)\b",
+    )
+
+    def normalize_candidate(raw: str) -> str | None:
+        candidate = _normalize_scalar_text(raw, max_len=160)
+        if not candidate:
+            return None
+        candidate = re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", candidate)
+        candidate = re.sub(
+            r"^(?:лого на|logo of|история на|информация за|екип\s+|лято в\s+|защо\s+|why\s+)",
+            "",
+            candidate,
+            flags=re.IGNORECASE,
+        )
+        candidate = re.sub(r"^(?:за|about)\s+(?=[A-ZА-Я0-9\"“„])", "", candidate, flags=re.IGNORECASE)
+        candidate = re.split(r"\s+[-–]\s+", candidate, maxsplit=1)[0]
+        candidate = candidate.strip("*_` ")
+        candidate = re.sub(r"\s+(?:logo|лого)\b", "", candidate, flags=re.IGNORECASE)
+        candidate = re.sub(r"\s+\|\s+(?:София|Sofia)\b", "", candidate, flags=re.IGNORECASE).strip()
+        candidate = candidate.strip(" -|")
+        candidate = _refine_display_name_label(candidate)
+        if not candidate:
+            return None
+        if _is_low_quality_display_name(candidate):
+            return None
+        lowered = candidate.lower()
+        if any(marker in lowered for marker in junk_markers):
+            return None
+        if re.search(r"^(?:©\s*)?\d{4}\b", candidate):
+            return None
+        if re.search(r"\b(?:ltd|llc|inc|eood|ood|ad)\b", lowered):
+            return None
+        if any(re.search(pattern, lowered, flags=re.IGNORECASE) for pattern in junk_prefix_patterns):
+            return None
+        if "→" in candidate:
+            return None
+        if lowered in {"за нас", "about us", "preschool"}:
+            return None
+        if lowered in {"preschool program", "high school program", "summer school & courses"}:
+            return None
+        if re.search(r"\b(?:е|is|are|was|were)\b", lowered) and len(candidate.split()) > 4:
+            return None
+        if len(candidate) < 3:
+            return None
+        candidate_tokens = _display_name_tokens(candidate)
+        candidate_match_tokens = _display_name_match_tokens(candidate)
+        candidate_lang = _text_lang_bucket(candidate)
+        has_school_marker = any(marker in lowered for marker in school_markers)
+        if registry_tokens and not (candidate_tokens & registry_tokens):
+            alias_hits = len(candidate_tokens & strict_alias_tokens)
+            alias_match_hits = len(candidate_match_tokens & strict_alias_match_tokens)
+            min_alias_hits = 2 if len(strict_alias_tokens | strict_alias_match_tokens) >= 2 else 1
+            registry_match_overlap = bool(candidate_match_tokens & registry_match_tokens)
+            if strict_alias_tokens and alias_hits >= min_alias_hits:
+                pass
+            elif strict_alias_match_tokens and alias_match_hits >= min_alias_hits:
+                pass
+            elif registry_match_overlap and (candidate_lang != "en" or has_school_marker):
+                pass
+            elif strict_alias_tokens or strict_alias_match_tokens:
+                return None
+            elif not (candidate_lang == "en" and has_school_marker):
+                return None
+        if not registry_tokens and not has_school_marker:
+            return None
+        return candidate
+
+    snippets = text[:4000]
+    patterns = (
+        r"!\[([^\]]{3,160})\]\(",
+        r"\[([^\]]{3,160})\]\(https?://[^)]+\)",
+        r"(?m)^#{1,3}\s+(.{3,160})$",
+    )
+    seen: set[str] = set()
+    by_lang: dict[str, str] = {}
+    fallback_en_candidate: str | None = None
+    for pattern in patterns:
+        for match in re.finditer(pattern, snippets, flags=re.IGNORECASE):
+            raw_candidate = match.group(1)
+            candidate = normalize_candidate(raw_candidate)
+            if not candidate:
+                continue
+            key = candidate.casefold()
+            if key in seen:
+                continue
+            seen.add(key)
+            lang = _text_lang_bucket(candidate)
+            if lang == "other":
+                lang = "bg" if (country_code or "").lower() == "bg" else "en"
+            if lang == "en" and any(marker in candidate.lower() for marker in ("school", "kindergarten", "academy")):
+                fallback_en_candidate = fallback_en_candidate or candidate
+            by_lang.setdefault(lang, candidate)
+            if by_lang.get("bg") and by_lang.get("en"):
+                return {"bg": by_lang["bg"], "en": by_lang["en"]}
+
+    alias_display = _extract_alias_display_name_i18n(effective_aliases, country_code)
+    if not by_lang:
+        return alias_display or _extract_host_aligned_display_name(
+            registry_name,
+            website_url,
+        )
+    current_display: dict[str, str] | None = None
+    if by_lang.get("bg") and fallback_en_candidate:
+        current_display = {"bg": by_lang["bg"], "en": fallback_en_candidate}
+    elif by_lang.get("bg") and by_lang.get("en"):
+        current_display = {"bg": by_lang["bg"], "en": by_lang["en"]}
+    elif by_lang.get("bg"):
+        host_aligned = _extract_host_aligned_display_name(registry_name, website_url)
+        if host_aligned and host_aligned.get("bg", "").casefold() == by_lang["bg"].casefold():
+            current_display = {
+                "bg": by_lang["bg"],
+                "en": host_aligned.get("en") or by_lang["bg"],
+            }
+        else:
+            current_display = {"bg": by_lang["bg"], "en": by_lang["bg"]}
+    elif by_lang.get("en"):
+        english_label = _augment_english_display_name(by_lang["en"], registry_name)
+        current_display = {"bg": english_label, "en": english_label}
+
+    host_aligned_display = _extract_host_aligned_display_name(registry_name, website_url)
+    if _should_prefer_alias_display_name(current_display, alias_display):
+        return alias_display
+    if _should_prefer_alias_display_name(current_display, host_aligned_display):
+        return host_aligned_display
+    if current_display:
+        return current_display
+    return alias_display or host_aligned_display or _extract_host_aligned_display_name(
+        registry_name,
+        website_url,
+    )
+
+
+def _display_name_tokens(value: str | None) -> set[str]:
+    return {
+        token
+        for token in extract_school_name_tokens(value, limit=10)
+        if token and token not in _DISPLAY_NAME_LOCATION_TOKENS
+    }
+
+
+def _normalize_display_name_match_token(token: str | None) -> str:
+    raw_token = (token or "").strip()
+    if not raw_token:
+        return ""
+    normalized = transliterate_bulgarian(raw_token) if re.search(r"[А-Яа-я]", raw_token) else raw_token
+    normalized = re.sub(r"[^a-z0-9]+", "", normalized.casefold())
+    normalized = re.sub(r"(.)\1+", r"\1", normalized)
+    return normalized
+
+
+def _display_name_match_tokens(value: str | None) -> set[str]:
+    return {
+        normalized
+        for token in _display_name_tokens(value)
+        if (normalized := _normalize_display_name_match_token(token))
+    }
+
+
+def _extract_display_name_core(text: str | None) -> str | None:
+    matches = re.findall(r'[„"“]([^"“”„]+)["”]?', text or "")
+    for raw_match in reversed(matches):
+        core = _normalize_scalar_text(raw_match, max_len=120)
+        if not core:
+            continue
+        if _display_name_tokens(core):
+            return core
+    return None
+
+
+def _is_display_name_en_transliteration(bg_value: str | None, en_value: str | None) -> bool:
+    if not bg_value or not en_value or not re.search(r"[А-Яа-я]", bg_value):
+        return False
+
+    def normalize(value: str) -> str:
+        return re.sub(r"[^a-z0-9]+", "", value.lower())
+
+    expected = transliterate_bulgarian(bg_value)
+    return bool(expected) and normalize(expected) == normalize(en_value)
+
+
+def _normalize_display_name_case(value: str | None) -> str | None:
+    label = str(value or "").strip()
+    if not label:
+        return None
+    if label[0].isalpha() and label[0].islower():
+        return label[0].upper() + label[1:]
+    return label
+
+
+def _refine_display_name_label(value: str | None) -> str | None:
+    label = _normalize_scalar_text(value, max_len=200)
+    if not label:
+        return None
+    label = re.sub(r"^(?:лого|logo)\s+", "", label, flags=re.IGNORECASE).strip()
+    lowered = label.lower()
+    if lowered.startswith(_DISPLAY_NAME_ROLE_PREFIXES):
+        return None
+    if lowered.endswith("-icon") or lowered.endswith("_icon"):
+        return None
+    if _DISPLAY_NAME_ABBREV_PREFIX.match(label):
+        return label
+
+    quoted_core = _extract_display_name_core(label)
+    if quoted_core:
+        return quoted_core
+
+    stripped = _DISPLAY_NAME_BG_STRIP_PREFIX.sub("", label).strip(" -,\"'“”„")
+    stripped = re.sub(
+        r"^(?:с\s+ранно\s+чуждоезиково\s+обучение|с\s+немски\s+език|немска\s+гимназия|английска\s+гимназия|френска\s+гимназия)\s+",
+        "",
+        stripped,
+        flags=re.IGNORECASE,
+    ).strip(" -,\"'“”„")
+    stripped = re.sub(r"\s+софия\s+\d+$", "", stripped, flags=re.IGNORECASE).strip()
+    if stripped and stripped != label and _display_name_tokens(stripped):
+        return _normalize_display_name_case(stripped)
+
+    return _normalize_display_name_case(label)
+
+
+def _refine_display_name_en_label(value: str | None) -> str | None:
+    label = _normalize_scalar_text(value, max_len=200)
+    if not label:
+        return None
+    stripped = _DISPLAY_NAME_EN_STRIP_PREFIX.sub("", label).strip(" -,\"'“”„")
+    if stripped and stripped != label and _display_name_tokens(stripped):
+        return _normalize_display_name_case(stripped)
+    return _normalize_display_name_case(label)
+
+
+def _should_drop_display_name_en(bg_value: str | None, en_value: str | None) -> bool:
+    bg_label = str(bg_value or "").strip()
+    en_label = str(en_value or "").strip()
+    if not bg_label or not en_label:
+        return False
+    if _is_display_name_en_transliteration(bg_value, en_value):
+        return True
+    normalized_en = re.sub(r"[^a-z0-9]+", " ", en_label.lower()).strip()
+    return bool(normalized_en and _DISPLAY_NAME_EN_STRIP_PREFIX.match(normalized_en))
+
+
+def _normalize_host_brand_text(website_url: str | None) -> str:
+    host = urlparse(website_url or "").netloc.lower()
+    if host.startswith("www."):
+        host = host[4:]
+    parts = [part for part in re.split(r"[.-]+", host) if part]
+    filtered = [part for part in parts if part not in {"bg", "com", "org", "net", "eu", "school"}]
+    return "".join(filtered)
+
+
+def _format_host_alias_word(value: str) -> str:
+    if not value:
+        return ""
+    if value.isalpha() and len(value) <= 3:
+        return value.upper()
+    return value.title()
+
+
+def _humanize_host_alias_part(value: str) -> str | None:
+    compact = re.sub(r"[^a-z0-9]+", "", (value or "").lower())
+    if not compact or compact in _HOST_ALIAS_GENERIC_PARTS:
+        return None
+    words: list[str] | None = None
+    for suffix in _HOST_ALIAS_SPLIT_SUFFIXES:
+        if compact.endswith(suffix) and len(compact) > len(suffix) + 1:
+            prefix = compact[: -len(suffix)]
+            if prefix:
+                words = [prefix, suffix]
+            break
+    if words is None:
+        if compact.isalpha() and len(compact) <= 3:
+            words = [compact]
+        else:
+            return None
+    return " ".join(_format_host_alias_word(word) for word in words if word)
+
+
+def _extract_host_seed_aliases(website_url: str | None) -> list[str]:
+    host = urlparse(website_url or "").netloc.lower()
+    if host.startswith("www."):
+        host = host[4:]
+    parts = [part for part in re.split(r"[.-]+", host) if part]
+    if not parts:
+        return []
+
+    aliases: list[str] = []
+    seen: set[str] = set()
+    has_school_part = "school" in parts
+    location_label = None
+    brand_candidates: list[str] = []
+    for part in parts:
+        if part in _HOST_ALIAS_GENERIC_PARTS:
+            continue
+        if part in _DISPLAY_NAME_LOCATION_TOKENS and location_label is None:
+            location_label = _format_host_alias_word(part)
+            continue
+        label = _humanize_host_alias_part(part)
+        if label:
+            brand_candidates.append(label)
+
+    if not brand_candidates:
+        return []
+
+    brand_label = brand_candidates[-1]
+    if has_school_part and location_label and location_label.casefold() not in brand_label.casefold():
+        aliases.append(f"{brand_label} {location_label}")
+    aliases.append(brand_label)
+
+    deduped: list[str] = []
+    for alias in aliases:
+        key = alias.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(alias)
+    return deduped
+
+
+def _extract_mixed_script_registry_alias(
+    registry_name: str | None,
+    seed_aliases: list[str],
+) -> str | None:
+    brand_text = _extract_registry_brand_text(registry_name)
+    if not brand_text:
+        return None
+    match = re.match(r"^([А-Я]{2,4})([а-я].+)$", brand_text)
+    if not match:
+        return None
+
+    acronym = None
+    for alias in seed_aliases:
+        token = (alias.split() or [""])[0]
+        if token.isalpha() and token.upper() == token and 2 <= len(token) <= 4:
+            acronym = token.upper()
+            break
+    if not acronym:
+        return None
+
+    suffix = transliterate_bulgarian(match.group(2)).strip()
+    suffix = re.sub(r"(?i)landiya\b", "landia", suffix)
+    suffix = suffix.lstrip("- ")
+    if not suffix:
+        return None
+    return f"{acronym}{suffix}"
+
+
+def _derive_display_name_seed_aliases(
+    registry_name: str | None,
+    website_url: str | None,
+) -> list[str]:
+    aliases = _extract_host_seed_aliases(website_url)
+    mixed_script_alias = _extract_mixed_script_registry_alias(registry_name, aliases)
+    if mixed_script_alias:
+        aliases.insert(0, mixed_script_alias)
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for alias in aliases:
+        label = _normalize_scalar_text(alias, max_len=200)
+        if not label:
+            continue
+        key = label.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(label)
+    return deduped
+
+
+def _extract_registry_city_label(registry_name: str | None) -> str | None:
+    candidate = " ".join((registry_name or "").replace("\n", " ").split())
+    if not candidate:
+        return None
+    match = re.search(r"\b(?:в|гр\.?)\s+([A-ZА-Я][A-ZА-Яа-я]+)\b", candidate, flags=re.IGNORECASE)
+    if not match:
+        return None
+    city = match.group(1).strip()
+    if not city:
+        return None
+    city_label = transliterate_bulgarian(city) if re.search(r"[А-Яа-я]", city) else city
+    return city_label.title()
+
+
+def _augment_english_display_name(value: str, registry_name: str | None) -> str:
+    label = " ".join((value or "").split()).strip()
+    if not label:
+        return label
+    city_label = _extract_registry_city_label(registry_name)
+    if not city_label or city_label.casefold() in label.casefold():
+        return label
+    if label.lower().endswith(_ENGLISH_INSTITUTION_SUFFIXES):
+        return f"{label} of {city_label}"
+    return label
+
+
+def _extract_registry_brand_text(registry_name: str | None) -> str | None:
+    candidate = " ".join((registry_name or "").replace("\n", " ").split()).strip(" \"'“”„")
+    if not candidate:
+        return None
+
+    quoted = re.search(r'[„"“]([^"“”„]+)["”]', candidate)
+    if quoted:
+        inner = quoted.group(1).strip()
+        if inner:
+            return inner
+
+    candidate = re.sub(r"\b(?:ЕООД|ООД|ЕАД|АД|СДРУЖЕНИЕ)\b.*$", "", candidate, flags=re.IGNORECASE).strip()
+    candidate = re.sub(r"\s*-\s*(?:гр\.?|city)\s+.+$", "", candidate, flags=re.IGNORECASE).strip()
+    candidate = re.sub(
+        r"^(?:частн(?:а|о)?|държавн(?:а|о)?|начално|основно|средно|профилирана|професионална|езикова|английска|детска|градина|училище|гимназия|чоу|чдг|чсу|чну|\s)+",
+        "",
+        candidate,
+        flags=re.IGNORECASE,
+    ).strip(" -,\"'“”„")
+    return candidate or None
+
+
+def _extract_host_aligned_display_name(
+    registry_name: str | None,
+    website_url: str | None,
+) -> dict[str, str] | None:
+    host_text = _normalize_host_brand_text(website_url)
+    brand_text = _extract_registry_brand_text(registry_name)
+    brand_tokens = _display_name_tokens(brand_text)
+    if not host_text or not brand_text or not brand_tokens:
+        return None
+
+    transliterated = transliterate_bulgarian(brand_text).lower().replace(" ", "")
+    compact_bg = re.sub(r"[^a-z0-9а-я]+", "", brand_text.lower())
+    if len(transliterated) < 4 and len(compact_bg) < 4:
+        return None
+    if transliterated and transliterated not in host_text and compact_bg not in host_text:
+        transliterated_tokens = [
+            transliterate_bulgarian(token).lower().replace(" ", "")
+            for token in brand_tokens
+            if len(token) >= 4
+        ]
+        if not any(token and token in host_text for token in transliterated_tokens):
+            return None
+
+    en_brand = transliterate_bulgarian(brand_text) if re.search(r"[А-Яа-я]", brand_text) else brand_text
+    return {"bg": brand_text, "en": en_brand}
 
 def _extract_accreditations_deterministic(text: str) -> list[str]:
     if not text:
@@ -421,7 +1298,7 @@ def _extract_working_hours_value(text: str) -> str | None:
     return _sanitize_label(time_match.group(0), max_len=_rules()._GENERAL_INFO_ITEM_MAX_LEN)
 
 def _extract_contact_info_deterministic(text: str) -> dict[str, Any] | None:
-    """Extract phone numbers and email addresses from page text using regex.
+    """Extract phone numbers, email addresses, and postal addresses from page text.
 
     This is deterministic (no LLM) and processes all page content. Returns None
     when nothing useful is found.
@@ -429,7 +1306,7 @@ def _extract_contact_info_deterministic(text: str) -> dict[str, Any] | None:
     if not text:
         return None
 
-    contact: dict[str, list[str]] = {}
+    contact: dict[str, Any] = {}
 
     # Extract phone numbers
     phones: list[str] = []
@@ -471,7 +1348,181 @@ def _extract_contact_info_deterministic(text: str) -> dict[str, Any] | None:
     if emails:
         contact["emails"] = emails
 
+    addresses = _extract_contact_address_candidates(text)
+    if addresses:
+        contact["address"] = addresses[0]
+        if len(addresses) > 1:
+            contact["addresses"] = addresses
+
+    coordinates = _extract_contact_coordinates(text)
+    if coordinates:
+        contact["coordinates"] = coordinates
+
     return contact if contact else None
+
+
+_CONTACT_ADDRESS_LABEL_RE = re.compile(r"(?:^|[\s>*_-])(?:address|адрес)\b[:\s-]*", flags=re.IGNORECASE)
+_CONTACT_ADDRESS_STREET_MARKERS = (
+    "ул.",
+    "бул.",
+    "ж.к.",
+    "жк.",
+    "кв.",
+    "пл.",
+    "гр.",
+    "street",
+    "st.",
+    "boulevard",
+    "blvd",
+    "road",
+    "rd.",
+    "avenue",
+    "ave.",
+)
+_CONTACT_ADDRESS_NOISE_MARKERS = (
+    "all rights reserved",
+    "cookie",
+    "бисквит",
+    "privacy",
+    "политика",
+    "общи условия",
+    "designed by",
+    "телефон",
+    "email",
+    "e-mail",
+    "турнир",
+    "шампион",
+    "училища",
+)
+
+
+def _extract_contact_address_candidates(text: str) -> list[str]:
+    if not text:
+        return []
+
+    lines = [line.strip() for line in text.splitlines()]
+    candidates: list[tuple[int, str]] = []
+
+    def add_candidate(raw_value: str, score_bonus: int = 0) -> None:
+        normalized = _normalize_contact_address_candidate(raw_value)
+        if not _looks_like_contact_address(normalized):
+            return
+        score = _contact_address_score(normalized) + score_bonus
+        candidates.append((score, normalized))
+
+    for idx, line in enumerate(lines):
+        if not line:
+            continue
+        normalized_line = _normalize_contact_address_candidate(line)
+        if _looks_like_contact_address(normalized_line):
+            add_candidate(normalized_line)
+
+        if not _CONTACT_ADDRESS_LABEL_RE.search(line):
+            continue
+
+        inline = _CONTACT_ADDRESS_LABEL_RE.sub("", line).strip(" -:|")
+        if inline:
+            add_candidate(inline, score_bonus=3)
+
+        trailing_lines: list[str] = []
+        for offset in range(1, 4):
+            next_idx = idx + offset
+            if next_idx >= len(lines):
+                break
+            next_line = lines[next_idx].strip()
+            if not next_line or _is_probable_section_noise_line(next_line):
+                continue
+            if re.match(r"^#{1,6}\s", next_line):
+                break
+            if _CONTACT_ADDRESS_LABEL_RE.search(next_line):
+                break
+            trailing_lines.append(next_line)
+            if _looks_like_contact_address(next_line):
+                break
+        if trailing_lines:
+            add_candidate(", ".join(trailing_lines), score_bonus=4)
+
+    unique: list[str] = []
+    seen: set[str] = set()
+    for _score, candidate in sorted(candidates, key=lambda item: (-item[0], len(item[1]))):
+        key = re.sub(r"\s+", " ", candidate.casefold()).strip(" ,")
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(candidate)
+        if len(unique) >= 3:
+            break
+    return unique
+
+
+def _normalize_contact_address_candidate(raw_value: str) -> str:
+    candidate = _sanitize_label(str(raw_value or "").strip(), max_len=240)
+    if not candidate:
+        return ""
+    candidate = re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", candidate)
+    candidate = candidate.replace("location_on", " ")
+    candidate = re.sub(r"[*_#`]+", " ", candidate)
+    candidate = _CONTACT_ADDRESS_LABEL_RE.sub("", candidate).strip(" -:|")
+    lowered = candidate.casefold()
+    marker_positions = [lowered.find(marker) for marker in _CONTACT_ADDRESS_STREET_MARKERS if marker in lowered]
+    if marker_positions:
+        first_marker = min(pos for pos in marker_positions if pos >= 0)
+        if first_marker > 0:
+            candidate = candidate[first_marker:].strip(" ,")
+    candidate = re.sub(r"\s+", " ", candidate).strip(" ,")
+    return candidate
+
+
+def _contact_address_score(value: str) -> int:
+    lowered = (value or "").casefold()
+    if not lowered:
+        return 0
+
+    score = 0
+    if any(marker in lowered for marker in _CONTACT_ADDRESS_STREET_MARKERS):
+        score += 4
+    if re.search(r"[№#]\s*\d+", value) or re.search(r"\b\d+[A-Za-zА-Яа-я]?\b", value):
+        score += 2
+    if any(marker in lowered for marker in ("ет.", "ап.", "офис", "floor", "suite")):
+        score += 1
+    if _CONTACT_ADDRESS_LABEL_RE.search(value):
+        score += 2
+    return score
+
+
+def _looks_like_contact_address(value: str | None) -> bool:
+    candidate = (value or "").strip()
+    lowered = candidate.casefold()
+    if not candidate or len(candidate) < 8:
+        return False
+    if any(marker in lowered for marker in _CONTACT_ADDRESS_NOISE_MARKERS):
+        return False
+    if _is_probable_section_noise_line(candidate):
+        return False
+    if len(candidate.split()) < 2:
+        return False
+    if len(candidate.split()) > 16:
+        return False
+    if not any(marker in lowered for marker in _CONTACT_ADDRESS_STREET_MARKERS) and not re.search(r"[№#]\s*\d+", candidate):
+        return False
+    return _contact_address_score(candidate) >= 4
+
+
+def _extract_contact_coordinates(text: str) -> dict[str, float] | None:
+    if not text:
+        return None
+    match = re.search(
+        r"(?:coordinates|координати)\s*:\s*(-?\d{1,3}\.\d+)\s*,\s*(-?\d{1,3}\.\d+)",
+        text,
+        flags=re.IGNORECASE,
+    )
+    if not match:
+        return None
+    lat = float(match.group(1))
+    lng = float(match.group(2))
+    if not (-90 <= lat <= 90 and -180 <= lng <= 180):
+        return None
+    return {"lat": lat, "lng": lng}
 
 def _merge_language_candidates(
     llm_languages: list[ExtractedLanguageFocus],
@@ -530,6 +1581,96 @@ def _merge_text_values(primary: list[str], secondary: list[str]) -> list[str]:
         merged.append(normalized)
     return merged
 
+
+def _classify_summary_source_page(page: SourcePage) -> str:
+    category = (page.page_category or "").lower()
+    page_url = (page.source_url or "").lower()
+    page_text = (page.raw_markdown or "").lower()[:4000]
+
+    narrative_hits = 0
+    operational_hits = 0
+    noise_hits = 0
+
+    if category in {"about", "programs", "facilities"}:
+        narrative_hits += 3
+    if category in {"news", "gallery"}:
+        noise_hits += 3
+    if category in {"admission", "pricing", "contact"}:
+        operational_hits += 3
+
+    narrative_hits += sum(1 for token in _SUMMARY_SOURCE_PAGE_GOOD_URL_TOKENS if token in page_url)
+    noise_hits += sum(1 for token in _SUMMARY_SOURCE_PAGE_BAD_URL_TOKENS if token in page_url)
+    operational_hits += sum(1 for token in _SUMMARY_SOURCE_PAGE_OPERATIONAL_URL_TOKENS if token in page_url)
+
+    narrative_hits += sum(1 for token in _SUMMARY_SOURCE_PAGE_NARRATIVE_TEXT_TOKENS if token in page_text)
+    noise_hits += sum(1 for token in _SUMMARY_SOURCE_PAGE_BAD_TEXT_TOKENS if token in page_text)
+    operational_hits += sum(1 for token in _SUMMARY_SOURCE_PAGE_OPERATIONAL_TEXT_TOKENS if token in page_text)
+
+    if any(re.search(pattern, page_text, flags=re.IGNORECASE) for pattern in _SUMMARY_SOURCE_PAGE_NEWS_PATTERNS):
+        noise_hits += 2
+
+    if narrative_hits >= max(2, operational_hits + 1) and narrative_hits >= noise_hits + 1:
+        return "narrative"
+    if noise_hits >= max(2, narrative_hits + 1):
+        return "noise"
+    if operational_hits >= max(2, narrative_hits):
+        return "operational"
+    if category in {"about", "programs", "facilities"} and narrative_hits > 0:
+        return "narrative"
+    if category in {"news", "gallery"}:
+        return "noise"
+    if category in {"admission", "pricing", "contact"}:
+        return "operational"
+    return "neutral"
+
+
+def _prepare_summary_source_page_text(text: str) -> str:
+    if not text:
+        return ""
+
+    prepared_lines: list[str] = []
+    for raw_line in text.splitlines():
+        stripped = raw_line.strip()
+        if not stripped:
+            continue
+        if stripped.startswith(("--- SOURCE:", "* [", "- [")):
+            continue
+        if stripped.startswith("[") and "](" in stripped:
+            continue
+
+        cleaned = re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", stripped).strip()
+        cleaned = re.sub(r"^[#>\-\*\s]+", "", cleaned)
+        cleaned = re.sub(r"\s+", " ", cleaned).strip()
+        if not cleaned or len(cleaned) < 8:
+            continue
+
+        lowered = cleaned.casefold()
+        if lowered in _SUMMARY_SOURCE_NAV_EXACT:
+            continue
+        if any(token in lowered for token in _SUMMARY_SOURCE_PAGE_BAD_TEXT_TOKENS):
+            continue
+        if "http://" in lowered or "https://" in lowered:
+            continue
+
+        narrative_hits = sum(1 for token in _SUMMARY_SOURCE_PAGE_NARRATIVE_TEXT_TOKENS if token in lowered)
+        operational_hits = sum(1 for token in _SUMMARY_SOURCE_PAGE_OPERATIONAL_TEXT_TOKENS if token in lowered)
+        noise_hits = sum(1 for token in _SUMMARY_SOURCE_PAGE_BAD_TEXT_TOKENS if token in lowered)
+
+        if noise_hits > 0:
+            continue
+        if narrative_hits == 0 and operational_hits > 0:
+            continue
+        if narrative_hits == 0 and len(cleaned) < 60:
+            continue
+
+        prepared_lines.append(cleaned)
+        if len(prepared_lines) >= 20:
+            break
+
+    if prepared_lines:
+        return "\n".join(prepared_lines)
+    return text
+
 def _select_pages(
     school: School,
     pages: list[SourcePage],
@@ -540,7 +1681,9 @@ def _select_pages(
     """Build bounded prompt content with simple relevance ranking."""
     settings = get_settings()
     max_chars = max(2000, int(settings.extraction_max_content_chars))
-    if use_case == "general_info" or use_case.startswith("general_"):
+    if use_case == "general_summary_source":
+        max_chars = min(max_chars, 6000)
+    elif use_case == "general_info" or use_case.startswith("general_"):
         # Field-focused extraction runs multiple passes; keep each prompt compact.
         max_chars = min(max_chars, 8000)
 
@@ -555,6 +1698,22 @@ def _select_pages(
         if _host_matches(_canonical_host(page.source_url), school_host)
     ]
     candidate_pages = same_host_pages or pages
+    summary_page_classifications = (
+        {id(page): _classify_summary_source_page(page) for page in candidate_pages}
+        if use_case == "general_summary_source"
+        else {}
+    )
+    if use_case == "general_summary_source":
+        narrative_pages = [
+            page for page in candidate_pages if summary_page_classifications.get(id(page)) == "narrative"
+        ]
+        if narrative_pages:
+            candidate_pages = narrative_pages
+        else:
+            non_noise_pages = [
+                page for page in candidate_pages if summary_page_classifications.get(id(page)) != "noise"
+            ]
+            candidate_pages = non_noise_pages or candidate_pages
 
     def score_page(page: SourcePage) -> int:
         score = 0
@@ -629,6 +1788,24 @@ def _select_pages(
         elif use_case == "pricing":
             if any(token in page_url for token in ("pricing", "prices", "fees", "tuition", "taksi", "ceni", "price")):
                 score += 60
+        elif use_case == "general_summary_source":
+            classification = summary_page_classifications.get(id(page))
+            if classification == "narrative":
+                score += 140
+            elif classification == "operational":
+                score -= 80
+            elif classification == "noise":
+                score -= 220
+            if category in {"about", "programs", "facilities"}:
+                score += 80
+            if category in {"contact", "admission", "pricing", "gallery", "news"}:
+                score -= 110
+            if any(token in page_url for token in _SUMMARY_SOURCE_PAGE_GOOD_URL_TOKENS):
+                score += 90
+            if any(token in page_url for token in _SUMMARY_SOURCE_PAGE_BAD_URL_TOKENS):
+                score -= 140
+            if any(token in page_text for token in _SUMMARY_SOURCE_PAGE_BAD_TEXT_TOKENS):
+                score -= 100
         elif use_case.startswith("general_"):
             if category in {"about", "contact"}:
                 score += 45
@@ -642,6 +1819,8 @@ def _select_pages(
     urls_used: list[str] = []
     current_chars = 0
     max_pages = 3 if (use_case == "general_info" or use_case.startswith("general_")) else 4
+    if use_case == "general_summary_source":
+        max_pages = 2
 
     for page in sorted_pages:
         if len(urls_used) >= max_pages:
@@ -650,6 +1829,10 @@ def _select_pages(
         text = (page.raw_markdown or "").strip()
         if not text:
             continue
+        if use_case == "general_summary_source":
+            text = _prepare_summary_source_page_text(text)
+            if not text:
+                continue
 
         header = f"--- SOURCE: {page.source_url} ---\n"
         candidate = header + text
@@ -671,8 +1854,9 @@ def _select_pages(
 def _normalize_general_info_output(
     parsed: GeneralInfoExtractionOutput,
     country_code: str,
-) -> tuple[GeneralInfoExtractionOutput, dict[str, Any] | None]:
+) -> tuple[GeneralInfoExtractionOutput, dict[str, Any] | None, dict[str, str] | None]:
     """Post-process extraction output for cleaner UI-safe fields + optional i18n split."""
+    display_name_i18n = _normalize_display_name_i18n(parsed.display_name_i18n, country_code)
     language_entries = _normalize_languages(parsed.languages)
     facilities = _normalize_text_list(parsed.facilities)
     programs = _normalize_text_list(parsed.programs)
@@ -684,6 +1868,11 @@ def _normalize_general_info_output(
     operations = _normalize_operations_output(parsed.operations)
     services = _normalize_services_output(parsed.services)
     pricing_terms = _normalize_pricing_terms_output(parsed.pricing_terms)
+    summary_source = _normalize_summary_source_output(
+        parsed.summary_source,
+        language_candidates=language_entries,
+        program_candidates=programs,
+    )
 
     primary_lang = _pick_primary_text_lang(
         country_code=country_code,
@@ -733,6 +1922,7 @@ def _normalize_general_info_output(
         operations=operations,
         services=services,
         pricing_terms=pricing_terms,
+        summary_source=summary_source,
         has_useful_info=False,
     )
     normalized.has_useful_info = _score_general_info_output(normalized) > 0
@@ -744,7 +1934,249 @@ def _normalize_general_info_output(
         split_extracurricular=split_extracurricular,
         split_accreditations=split_accreditations,
     )
-    return normalized, extracted_i18n
+    return normalized, extracted_i18n, display_name_i18n
+
+def _normalize_display_name_i18n(
+    raw_value: dict[str, str] | None,
+    country_code: str,
+) -> dict[str, str] | None:
+    if not isinstance(raw_value, dict):
+        return None
+
+    alias_to_lang = {
+        "bg": "bg",
+        "bulgarian": "bg",
+        "bългарски": "bg",
+        "en": "en",
+        "english": "en",
+        "английски": "en",
+    }
+
+    cleaned: dict[str, str] = {}
+    for raw_key, raw_text in raw_value.items():
+        lang_key = alias_to_lang.get(str(raw_key or "").strip().lower())
+        if lang_key is None:
+            continue
+        label = _normalize_scalar_text(raw_text, max_len=200)
+        label = _refine_display_name_label(label)
+        if lang_key == "en":
+            label = _refine_display_name_en_label(label)
+        if label and not _is_low_quality_display_name(label):
+            cleaned[lang_key] = label
+
+    if not cleaned:
+        return None
+
+    if cleaned.get("bg") and cleaned.get("en") and cleaned["bg"] == cleaned["en"] and re.search(r"[А-Яа-я]", cleaned["en"]):
+        cleaned.pop("en", None)
+    if _should_drop_display_name_en(cleaned.get("bg"), cleaned.get("en")):
+        cleaned.pop("en", None)
+
+    if len(cleaned) == 1:
+        only_value = next(iter(cleaned.values()))
+        bucket = _text_lang_bucket(only_value)
+        default_lang = "bg" if (country_code or "").lower() == "bg" else "en"
+        if bucket == "other":
+            cleaned = {default_lang: only_value}
+        elif bucket not in cleaned:
+            cleaned = {bucket: only_value}
+
+        # Reuse Latin-brand labels across locales, but avoid persisting fake
+        # English by copying Bulgarian/Cyrillic text into the EN slot.
+        if bucket in {"bg", "en"} and (bucket == "en" or not re.search(r"[А-Яа-я]", only_value)):
+            other_lang = "en" if bucket == "bg" else "bg"
+            cleaned.setdefault(other_lang, only_value)
+
+    return cleaned
+
+
+def _is_low_quality_display_name(value: str | None) -> bool:
+    raw_value = (value or "").strip()
+    lowered = raw_value.lower()
+    if not lowered:
+        return True
+    if re.search(r"(?i)\b(?:screenshot|screen shot)\b", raw_value):
+        return True
+    if re.search(r"(?i)\.(?:png|jpe?g|webp|svg|gif|avif)\b", raw_value):
+        return True
+    if lowered in {"our kindergartens", "our schools"}:
+        return True
+    if lowered in {"групи", "groups"}:
+        return True
+    if lowered in {"preschool program", "high school program", "summer school & courses"}:
+        return True
+    if lowered.startswith("на "):
+        return True
+    if lowered.startswith(("преподаватели в", "teachers at")):
+        return True
+    if lowered.startswith(("стратегически план", "strategic plan")):
+        return True
+    if lowered.startswith(("тримесечен отчет", "годишен отчет", "quarterly report", "annual report")):
+        return True
+    if raw_value.startswith("!["):
+        return True
+    if re.fullmatch(r"\d{1,3}", raw_value):
+        return True
+    if lowered.endswith((" в българия", " in bulgaria")):
+        return True
+    if "international education bulgaria" in lowered:
+        return True
+    if re.match(r"^\d+\s+(?:години|years)\b", lowered):
+        return True
+    if any(marker in lowered for marker in ("магазин", "shop", "store")):
+        return True
+    if len(raw_value) <= 4 and raw_value.isupper() and raw_value.isalpha() and not re.search(r"[А-Яа-я]", raw_value):
+        return True
+    if re.fullmatch(r"\d+\.?\s+(?:основно|начално|средно|обединено)\s+училище", lowered):
+        return True
+    return False
+
+
+def _display_name_specificity_score(value: str | None) -> int:
+    label = (value or "").strip()
+    if not label:
+        return -1000
+    if _is_low_quality_display_name(label):
+        return -500
+    lowered = label.lower()
+    tokens = _display_name_tokens(label)
+    score = min(len(label), 80) + len(tokens) * 12
+    for prefix in _DISPLAY_NAME_GENERIC_PREFIXES:
+        if lowered.startswith(prefix):
+            score -= 18
+            break
+    score -= sum(
+        10 for token in ("school", "kindergarten", "academy", "kinder", "училище", "градина", "гимназия")
+        if token in lowered
+    )
+    return score
+
+
+def _extract_alias_display_name_i18n(
+    known_aliases: list[str] | None,
+    country_code: str,
+) -> dict[str, str] | None:
+    selected: dict[str, str] = {}
+    selected_scores: dict[str, int] = {}
+    neutral_candidates: list[tuple[int, str]] = []
+    for alias in known_aliases or []:
+        label = _normalize_scalar_text(alias, max_len=200)
+        if not label or _is_low_quality_display_name(label):
+            continue
+        bucket = _text_lang_bucket(label)
+        score = _display_name_specificity_score(label)
+        if bucket in {"bg", "en"}:
+            if score > selected_scores.get(bucket, -1000):
+                selected[bucket] = label
+                selected_scores[bucket] = score
+            continue
+        neutral_candidates.append((score, label))
+
+    neutral_candidates.sort(key=lambda item: item[0], reverse=True)
+    if not selected and neutral_candidates:
+        return _normalize_display_name_i18n({"en": neutral_candidates[0][1]}, country_code)
+    if "bg" not in selected and "en" not in selected and neutral_candidates:
+        return _normalize_display_name_i18n({"en": neutral_candidates[0][1]}, country_code)
+    if "bg" not in selected and "en" in selected:
+        return _normalize_display_name_i18n({"en": selected["en"]}, country_code)
+    if "en" not in selected and "bg" in selected:
+        return _normalize_display_name_i18n({"bg": selected["bg"]}, country_code)
+    if not selected:
+        return None
+    return _normalize_display_name_i18n(selected, country_code)
+
+
+def _should_prefer_alias_display_name(
+    current_value: dict[str, str] | None,
+    alias_value: dict[str, str] | None,
+) -> bool:
+    if not current_value or not alias_value:
+        return False
+
+    for lang in ("en", "bg"):
+        current_label = current_value.get(lang)
+        alias_label = alias_value.get(lang)
+        if not current_label or not alias_label:
+            continue
+        current_lower = current_label.casefold()
+        alias_lower = alias_label.casefold()
+        if any(token in current_lower for token in ("sofia", "софия")) and not any(
+            token in alias_lower for token in ("sofia", "софия")
+        ):
+            continue
+        current_tokens = _display_name_tokens(current_label)
+        alias_tokens = _display_name_tokens(alias_label)
+        current_match_tokens = _display_name_match_tokens(current_label)
+        alias_match_tokens = _display_name_match_tokens(alias_label)
+        alias_has_school_marker = bool(
+            re.search(r"(?i)\b(?:school|kindergarten|academy|college|house|училище|детска\s+градина|детска\s+къща|гимназия)\b", alias_label)
+        )
+        if (
+            current_match_tokens
+            and alias_match_tokens
+            and current_match_tokens & alias_match_tokens
+            and re.search(r"\b20\d{2}\b", current_label)
+            and alias_has_school_marker
+        ):
+            return True
+        if _display_name_specificity_score(alias_label) <= _display_name_specificity_score(current_label):
+            continue
+        if not current_tokens:
+            return True
+        if current_tokens.issubset(alias_tokens):
+            return True
+        if current_match_tokens and current_match_tokens.issubset(alias_match_tokens):
+            return True
+        if (
+            current_match_tokens
+            and alias_match_tokens
+            and current_match_tokens & alias_match_tokens
+            and len(alias_match_tokens) >= len(current_match_tokens)
+        ):
+            return True
+        if current_label.casefold() in alias_label.casefold() and len(alias_label) > len(current_label):
+            return True
+    return False
+
+
+def _merge_display_name_i18n(
+    llm_value: dict[str, str] | None,
+    deterministic_value: dict[str, str] | None,
+    country_code: str,
+) -> dict[str, str] | None:
+    alias_to_lang = {
+        "bg": "bg",
+        "bulgarian": "bg",
+        "bългарски": "bg",
+        "en": "en",
+        "english": "en",
+        "английски": "en",
+    }
+    explicit_llm_langs = {
+        alias_to_lang.get(str(raw_key or "").strip().lower())
+        for raw_key in (llm_value or {})
+    }
+    explicit_llm_langs.discard(None)
+
+    normalized_llm = _normalize_display_name_i18n(llm_value, country_code)
+    normalized_deterministic = _normalize_display_name_i18n(deterministic_value, country_code)
+    if not normalized_llm:
+        return normalized_deterministic
+    if not normalized_deterministic:
+        return normalized_llm
+
+    merged = dict(normalized_llm)
+    for lang, value in normalized_deterministic.items():
+        should_replace_placeholder = (
+            lang == "en"
+            and normalized_llm.get("bg")
+            and normalized_llm.get("en") == normalized_llm.get("bg")
+            and normalized_deterministic.get("en")
+            and normalized_deterministic.get("en") != normalized_llm.get("en")
+        )
+        if lang not in explicit_llm_langs or should_replace_placeholder:
+            merged[lang] = value
+    return merged
 
 def _normalize_admission_output(value: AdmissionExtractionOutput) -> AdmissionExtractionOutput:
     normalized = AdmissionExtractionOutput(
@@ -964,6 +2396,278 @@ def _normalize_text_list(values: list[str]) -> list[str]:
             if len(cleaned) >= _rules()._GENERAL_INFO_LIST_MAX_ITEMS:
                 return cleaned
     return cleaned
+
+def _is_generic_summary_source_value(value: str) -> bool:
+    lowered = str(value or "").strip().casefold()
+    if not lowered:
+        return True
+    if lowered in _SUMMARY_SOURCE_GENERIC_EXACT:
+        return True
+    if any(re.search(pattern, lowered, flags=re.IGNORECASE) for pattern in _SUMMARY_SOURCE_GENERIC_PATTERNS):
+        return True
+    slogan_markers = (
+        "всяко дете може повече",
+        "every child is capable of more",
+        "future challenges",
+        "новото време",
+    )
+    return any(marker in lowered for marker in slogan_markers)
+
+
+def _normalize_summary_source_positioning(raw_value: Any) -> str | None:
+    text = _clean_summary_source_candidate(raw_value, max_len=180)
+    if not text:
+        return None
+    if _is_generic_summary_source_value(text):
+        return None
+    if not _summary_source_matches_category(text, "positioning"):
+        return None
+    return text
+
+
+def _normalize_summary_source_list(values: Any, category: str) -> list[str]:
+    if not isinstance(values, list):
+        values = [values] if values is not None else []
+    cleaned: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        for candidate in _extract_clean_text_candidates(value):
+            label = _clean_summary_source_candidate(candidate, max_len=120)
+            if not label or _is_generic_summary_source_value(label):
+                continue
+            if not _summary_source_matches_category(label, category):
+                continue
+            key = re.sub(r"[\W_]+", "", label.casefold())
+            if key in seen:
+                continue
+            seen.add(key)
+            cleaned.append(label)
+            if len(cleaned) >= _SUMMARY_SOURCE_MAX_ITEMS:
+                return cleaned
+    return cleaned
+
+
+def _clean_summary_source_candidate(raw_value: Any, max_len: int) -> str | None:
+    if raw_value is None:
+        return None
+    text = re.sub(r"\[([^\]]*)\]\([^)]*\)", r"\1", str(raw_value or ""))
+    text = re.sub(r"^---\s*SOURCE:.*?---\s*", "", text, flags=re.IGNORECASE)
+    text = text.replace("**", "")
+    text = re.sub(r"^[#>\-\*\s]+", "", text)
+    label = _sanitize_label(text, max_len=max_len)
+    if not label:
+        return None
+    lowered = label.casefold()
+    if "©" in label or "(c)" in lowered:
+        return None
+    if lowered.startswith(("source:", "home", "начало")):
+        return None
+    if lowered.startswith(("в случай", "че ", "if ", "when ")):
+        return None
+    if "@" in label and re.search(r"\b[\w.+-]+@[\w.-]+\.[a-z]{2,}\b", label, flags=re.IGNORECASE):
+        return None
+    if "http://" in lowered or "https://" in lowered or "www." in lowered:
+        return None
+    if lowered in _SUMMARY_SOURCE_NAV_EXACT:
+        return None
+    tokens = re.findall(r"[a-zа-я0-9]+", lowered, flags=re.IGNORECASE)
+    if len(tokens) == 1 and tokens[0] not in _SUMMARY_SOURCE_ALLOWED_SINGLE_TOKENS:
+        return None
+    school_type_tokens = {"училище", "детска", "градина", "school", "kindergarten", "preschool", "чоу", "чдг"}
+    if len(tokens) <= 3 and any(token in school_type_tokens for token in tokens):
+        return None
+    if lowered.endswith((" гр", " city")):
+        return None
+    return label.rstrip(" .;,:")
+
+
+def _summary_source_matches_category(text: str, category: str) -> bool:
+    lowered = text.casefold()
+    hints = _SUMMARY_SOURCE_CATEGORY_HINTS.get(category, ())
+    if any(hint in lowered for hint in hints):
+        return True
+
+    token_count = len(re.findall(r"[a-zа-я0-9]+", lowered, flags=re.IGNORECASE))
+    if token_count < 3:
+        return False
+
+    if category == "teaching_approach":
+        return bool(
+            re.search(
+                r"\b(?:approach|method|model|pedagog|learning|teaching|подход|метод|модел|педагог|обучение|учене)\b",
+                lowered,
+                flags=re.IGNORECASE,
+            )
+        )
+    if category == "student_experience":
+        return bool(
+            re.search(
+                r"\b(?:activity|club|summer|camp|meal|snack|transport|sport|arts|заним|клуб|лагер|"
+                r"хран|закуск|транспорт|спорт|творч)\b",
+                lowered,
+                flags=re.IGNORECASE,
+            )
+        )
+    if category == "community_signals":
+        return bool(
+            re.search(
+                r"\b(?:parent|family|community|support|partnership|родител|семей|общност|подкреп|партньор)\b",
+                lowered,
+                flags=re.IGNORECASE,
+            )
+        )
+    if category == "differentiators":
+        return bool(
+            re.search(
+                r"\b(?:licensed|license|accredit|bilingual|international|stem|ib|cambridge|waldorf|"
+                r"лиценз|акредитац|двуезич|международ|stem|ib|cambridge|валдорф)\b",
+                lowered,
+                flags=re.IGNORECASE,
+            )
+        )
+    if category == "positioning":
+        return bool(
+            re.search(
+                r"\b(?:school|kindergarten|serves|offers|private|state|international|"
+                r"училище|градина|предлага|частн|държавн|международ)\b",
+                lowered,
+                flags=re.IGNORECASE,
+            )
+        )
+    return False
+
+
+def _derive_summary_source_canonical_tags(
+    *,
+    positioning: str | None,
+    teaching_approach: list[str],
+    student_experience: list[str],
+    community_signals: list[str],
+    differentiators: list[str],
+    language_candidates: list[ExtractedLanguageFocus] | None = None,
+    program_candidates: list[str] | None = None,
+    explicit_tags: list[str] | None = None,
+) -> list[str]:
+    tags: list[str] = []
+    seen: set[str] = set()
+
+    def add(tag: str) -> None:
+        if not tag or tag in seen:
+            return
+        seen.add(tag)
+        tags.append(tag)
+
+    combined_values = [
+        positioning or "",
+        *(teaching_approach or []),
+        *(student_experience or []),
+        *(community_signals or []),
+        *(differentiators or []),
+        *(program_candidates or []),
+    ]
+    combined_text = f" {' '.join(value.casefold() for value in combined_values if value)} "
+
+    for tag, patterns in _SUMMARY_SOURCE_CANONICAL_TAG_PATTERNS:
+        if any(pattern in combined_text for pattern in patterns):
+            add(tag)
+
+    normalized_languages = {
+        _sanitize_label(candidate.language, max_len=40).casefold()
+        for candidate in (language_candidates or [])
+        if _sanitize_label(candidate.language, max_len=40)
+    }
+    if "german" in normalized_languages:
+        add("German-focused")
+    if "french" in normalized_languages:
+        add("French-focused")
+    if "spanish" in normalized_languages:
+        add("Spanish-focused")
+
+    return tags[:6]
+
+
+def _normalize_summary_source_output(
+    value: SummarySourceExtractionOutput,
+    *,
+    language_candidates: list[ExtractedLanguageFocus] | None = None,
+    program_candidates: list[str] | None = None,
+) -> SummarySourceExtractionOutput:
+    positioning = _normalize_summary_source_positioning(value.positioning)
+    teaching_approach = _normalize_summary_source_list(value.teaching_approach, "teaching_approach")
+    student_experience = _normalize_summary_source_list(value.student_experience, "student_experience")
+    community_signals = _normalize_summary_source_list(value.community_signals, "community_signals")
+    differentiators = _normalize_summary_source_list(value.differentiators, "differentiators")
+    canonical_tags = _derive_summary_source_canonical_tags(
+        positioning=positioning,
+        teaching_approach=teaching_approach,
+        student_experience=student_experience,
+        community_signals=community_signals,
+        differentiators=differentiators,
+        language_candidates=language_candidates,
+        program_candidates=program_candidates,
+        explicit_tags=value.canonical_tags,
+    )
+    normalized = SummarySourceExtractionOutput(
+        positioning=positioning,
+        teaching_approach=teaching_approach,
+        student_experience=student_experience,
+        community_signals=community_signals,
+        differentiators=differentiators,
+        canonical_tags=canonical_tags,
+        has_useful_info=False,
+    )
+    normalized.has_useful_info = any(
+        (
+            normalized.positioning,
+            normalized.teaching_approach,
+            normalized.student_experience,
+            normalized.community_signals,
+            normalized.differentiators,
+            normalized.canonical_tags,
+        )
+    )
+    return normalized
+
+
+def _extract_summary_source_deterministic(text: str) -> SummarySourceExtractionOutput:
+    if not text:
+        return SummarySourceExtractionOutput()
+
+    sentences = [
+        fragment.strip(" -*_")
+        for fragment in re.split(r"(?<=[.!?])\s+|[\n\r]+", text)
+        if fragment and fragment.strip()
+    ]
+    buckets: dict[str, list[str]] = {key: [] for key in _SUMMARY_SOURCE_CATEGORY_HINTS}
+    seen: dict[str, set[str]] = {key: set() for key in _SUMMARY_SOURCE_CATEGORY_HINTS}
+
+    for sentence in sentences:
+        candidate = _clean_summary_source_candidate(sentence, max_len=180)
+        if not candidate or _is_generic_summary_source_value(candidate):
+            continue
+        lowered = candidate.casefold()
+        if len(re.findall(r"[A-Za-zА-Яа-я]", candidate)) < 12:
+            continue
+        for category, hints in _SUMMARY_SOURCE_CATEGORY_HINTS.items():
+            if not any(hint in lowered for hint in hints):
+                continue
+            key = candidate.casefold()
+            if key in seen[category]:
+                continue
+            seen[category].add(key)
+            buckets[category].append(candidate)
+            if len(buckets[category]) >= _SUMMARY_SOURCE_MAX_ITEMS:
+                break
+
+    normalized = SummarySourceExtractionOutput(
+        positioning=buckets["positioning"][0] if buckets["positioning"] else None,
+        teaching_approach=buckets["teaching_approach"],
+        student_experience=buckets["student_experience"],
+        community_signals=buckets["community_signals"],
+        differentiators=buckets["differentiators"],
+        has_useful_info=False,
+    )
+    return _normalize_summary_source_output(normalized)
 
 def _filter_section_values(
     values: list[str],
@@ -1287,6 +2991,18 @@ def _score_general_info_output(parsed: GeneralInfoExtractionOutput) -> int:
     if _count_usable_text_values(parsed.services.safety_features) > 0:
         score += 1
     if _count_usable_text_values(parsed.pricing_terms.discounts) > 0:
+        score += 1
+    if _is_usable_text(parsed.summary_source.positioning):
+        score += 1
+    if _count_usable_text_values(parsed.summary_source.teaching_approach) > 0:
+        score += 1
+    if _count_usable_text_values(parsed.summary_source.student_experience) > 0:
+        score += 1
+    if _count_usable_text_values(parsed.summary_source.community_signals) > 0:
+        score += 1
+    if _count_usable_text_values(parsed.summary_source.differentiators) > 0:
+        score += 1
+    if _count_usable_text_values(parsed.summary_source.canonical_tags) > 0:
         score += 1
     return score
 

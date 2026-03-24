@@ -1,5 +1,6 @@
-from pydantic_settings import BaseSettings
 from functools import lru_cache
+from pydantic import field_validator
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
@@ -16,10 +17,15 @@ class Settings(BaseSettings):
     # Model tier overrides (Phase 1 scraping pipeline)
     # Set this to override default model selection.
     model_tier_cheap: str = ""  # Default: google/gemini-2.5-flash-lite
+    model_tier_capable: str = ""  # Default: openai/gpt-4o-mini
 
     # Spot-check validation settings
     spot_check_sample_size: int = 10  # Number of schools to spot-check per run (-1 = all, for calibration)
-    spot_check_discrepancy_threshold: float = 0.15  # Alert if >15% of spot-checks have discrepancies
+    spot_check_discrepancy_threshold: float = 0.15  # Advisory monitoring alert threshold (non-gating)
+    validation_batch_concurrency: int = 3
+    validation_spot_check_timeout_seconds: float = 20.0
+    validation_spot_check_max_content_chars: int = 12000
+    validation_spot_check_max_extracted_chars: int = 8000
 
     # Pipeline alerting
     alert_webhook_url: str = ""  # Slack/Discord webhook URL for pipeline alerts
@@ -69,6 +75,8 @@ class Settings(BaseSettings):
     nav_school_timeout_seconds: float = 120.0
     # Per-school hard timeout for CLI batch extraction (covers all LLM calls + retries).
     extraction_school_timeout_seconds: float = 180.0
+    summarization_llm_timeout_seconds: float = 20.0
+    summarization_batch_concurrency: int = 2
 
     # Geocoding settings
     geocoding_provider: str = "composite"  # composite | nominatim | google | mapbox (composite = GeoJSON + Nominatim fallback, recommended)
@@ -82,11 +90,23 @@ class Settings(BaseSettings):
     model_config = {
         "env_file": ".env",
         "env_file_encoding": "utf-8",
+        "extra": "ignore",
     }
 
     @property
     def allowed_origins_list(self) -> list[str]:
         return [origin.strip() for origin in self.allowed_origins.split(",")]
+
+    @field_validator("debug", mode="before")
+    @classmethod
+    def _normalize_debug(cls, value):
+        if isinstance(value, str):
+            lowered = value.strip().lower()
+            if lowered in {"release", "prod", "production"}:
+                return False
+            if lowered in {"debug", "dev", "development"}:
+                return True
+        return value
 
 
 @lru_cache

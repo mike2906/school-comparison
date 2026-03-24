@@ -21,7 +21,7 @@ This file provides everything you need to work effectively on this project. Read
 - Multi-country architecture with country-specific education configs
 - Bilingual interface (Bulgarian is primary, English is secondary for MVP)
 
-**Current status:** Multi-country refactoring complete (Phases 1-5). Scraping pipeline Stages 1-4 are implemented (discovery, website discovery, URL validation, navigation). Extraction/validation/summarization are pending.
+**Current status:** Multi-country refactoring complete (Phases 1-5). Scraping pipeline Stages 1-7 are implemented and wired into the CLI/Celery pipeline (discovery, website discovery, URL validation, navigation, extraction, validation/spot checks, summarization). Official Bulgaria NVO import is also implemented as an independent stage, with Sofia backfilled for `nvo_4`, `nvo_7`, and `nvo_10` across 2021-2025. Current work is focused on data quality improvements and remaining planned features such as NVO-based parent tools.
 
 ---
 
@@ -122,6 +122,7 @@ Skills are stored in `skills/` to keep the project model-agnostic.
 - `school_id` (FK)
 - `year`, `exam_type` (nvo_4 | nvo_7 | nvo_10)
 - `subject`, `metric`, `value`
+- Current canonical imported metric: `average_score` (official school-level average scores)
 
 **Important:** `admission_info` and `attributes` are JSONB. Don't add new columns for one-off fields — put them in JSONB.
 
@@ -347,6 +348,17 @@ cd frontend
 npm run dev
 ```
 
+### Import official NVO results
+```bash
+cd backend
+uv run python -m app.scrapers.cli run --stage nvo --sync --city sofia --country bg
+```
+
+Optional filters:
+- `--year 2025` for a single year
+- `--exam-type nvo_7` (repeatable)
+- `--school-id 123` for a targeted import
+
 ---
 
 ## Known Issues & Gotchas
@@ -366,6 +378,8 @@ npm run dev
 5. **Age filter:** Uses enrollment year and birth year. Never use exact dates or "age on September 1" logic.
 
 6. **School names and addresses:** Stored in both Bulgarian and English (`name_en`, `address_en`). The frontend displays the appropriate version based on the user's language preference.
+
+7. **NVO import is independent of the website pipeline:** Use the dedicated `nvo` stage when refreshing official exam results; it is not part of `all`.
 
 ---
 
@@ -387,7 +401,8 @@ Response includes nested `locations`, `pricing`, `exam_results`.
 - School comparison UI improvements
 - NVO results graphs (Recharts)
 - Points calculator tool
-- Scraping pipeline Stage 5+ (extraction, data validation, summarization)
+- Ongoing scraping extraction/validation/summarization quality improvements
+- NVO data audits, parent-facing NVO calculator, and admission-threshold tooling
 
 ---
 

@@ -2,7 +2,7 @@
 OpenRouter client and model tier configuration for the scraping pipeline.
 
 This module provides:
-- Model selection (cheap tier)
+- Model selection (cheap/capable tiers)
 - OpenRouter integration via PydanticAI
 - Cost tracking helpers
 """
@@ -18,14 +18,16 @@ from app.config import get_settings
 # See: https://openrouter.ai/models for pricing and capabilities
 MODEL_TIERS = {
     "cheap": "openrouter/google/gemini-2.5-flash-lite",  # lightweight tier for validation/classification
+    "capable": "openrouter/openai/gpt-4o-mini",  # stronger tier for spot-check validation
 }
 
 # Cost per 1M tokens (input/output)
 MODEL_COSTS = {
     "cheap": (0.075, 0.30),
+    "capable": (0.15, 0.60),
 }
 
-ModelTier = Literal["cheap"]
+ModelTier = Literal["cheap", "capable"]
 
 
 def get_model(tier: ModelTier) -> str:

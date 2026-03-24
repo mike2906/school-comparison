@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional, TYPE_CHECKING
 
-from sqlalchemy import String, Numeric, Integer, DateTime, ForeignKey
+from sqlalchemy import String, Numeric, Integer, DateTime, ForeignKey, Index, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -12,6 +12,22 @@ if TYPE_CHECKING:
 
 class ExamResult(Base):
     __tablename__ = "exam_results"
+    __table_args__ = (
+        UniqueConstraint(
+            "school_id",
+            "year",
+            "exam_type",
+            "subject",
+            "metric",
+            name="uq_exam_results_school_year_exam_subject_metric",
+        ),
+        Index(
+            "ix_exam_results_exam_type_year_school_id",
+            "exam_type",
+            "year",
+            "school_id",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     school_id: Mapped[int] = mapped_column(ForeignKey("schools.id"), nullable=False)

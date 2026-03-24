@@ -1,6 +1,6 @@
 from typing import Optional
 
-from sqlalchemy import select, cast, String
+from sqlalchemy import select, cast, String, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -197,7 +197,10 @@ class SchoolService:
             self._base_query()
             .where(School.country_code == country_code)
             .where(
-                (cast(School.name_i18n, String).ilike(pattern, escape="\\"))
+                or_(
+                    cast(School.name_i18n, String).ilike(pattern, escape="\\"),
+                    cast(School.attributes["display_name_i18n"], String).ilike(pattern, escape="\\"),
+                )
             )
             .limit(limit)
         )

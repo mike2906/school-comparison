@@ -15,6 +15,21 @@ export function getI18nValue(i18nField, language) {
   return i18nField[language] || Object.values(i18nField)[0] || ''
 }
 
+function getDisplayNameI18n(school) {
+  const displayName = school?.attributes?.display_name_i18n
+  return displayName && typeof displayName === 'object' ? displayName : null
+}
+
+function getResolvedNameI18n(school) {
+  const resolvedName = school?.resolved_name_i18n
+  return resolvedName && typeof resolvedName === 'object' ? resolvedName : null
+}
+
+function getResolvedAddressI18n(location) {
+  const resolvedAddress = location?.resolved_address_i18n
+  return resolvedAddress && typeof resolvedAddress === 'object' ? resolvedAddress : null
+}
+
 /**
  * Returns the localized school name from name_i18n
  *
@@ -23,7 +38,11 @@ export function getI18nValue(i18nField, language) {
  * @returns {string} Localized school name
  */
 export function getSchoolName(school, language) {
-  return getI18nValue(school?.name_i18n, language)
+  return (
+    getI18nValue(getResolvedNameI18n(school), language) ||
+    getI18nValue(getDisplayNameI18n(school), language) ||
+    getI18nValue(school?.name_i18n, language)
+  )
 }
 
 /**
@@ -34,7 +53,7 @@ export function getSchoolName(school, language) {
  * @returns {string} Localized address
  */
 export function getAddress(location, language) {
-  return getI18nValue(location?.address_i18n, language)
+  return getI18nValue(getResolvedAddressI18n(location), language) || getI18nValue(location?.address_i18n, language)
 }
 
 /**

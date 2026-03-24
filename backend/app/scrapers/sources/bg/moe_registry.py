@@ -15,12 +15,15 @@ from datetime import datetime, timezone
 from typing import Optional
 import httpx
 
+from app.config import get_settings
 from app.scrapers.sources.base_adapter import BaseSourceAdapter
 from app.schemas.scraping import DiscoveredSchool, DiscoveredLocation
 from app.scrapers.sources import register_adapter
 from app.scrapers.base import BaseScraper
 from app.models.scrape_log import ScrapeType
+from app.services.geocoding.base import GeocodingResult
 from app.services.geocoding.bg import GeoJSONProvider
+from app.services.geocoding.nominatim import NominatimProvider
 
 logger = logging.getLogger(__name__)
 
@@ -126,6 +129,17 @@ class MoeRegistryAdapter(BaseSourceAdapter):
     def __init__(self, db):
         super().__init__(db)
         self._geojson_provider = GeoJSONProvider()
+        self._nominatim_provider: Optional[NominatimProvider] = None
+
+        settings = get_settings()
+        contact_email = settings.geocoding_contact_email
+        if contact_email and "example.com" not in contact_email.lower():
+            user_agent = f"SofiaSchoolComparison/1.0 ({contact_email})"
+            self._nominatim_provider = NominatimProvider(user_agent=user_agent)
+        else:
+            logger.warning(
+                "MoE registry geocoding will skip Nominatim because GEOCODING_CONTACT_EMAIL is not configured"
+            )
 
     @staticmethod
     def _get_age_groups_for_detailed_type(detailed_type: Optional[int], education_level: str) -> list[str]:
@@ -298,6 +312,9 @@ class MoeRegistryAdapter(BaseSourceAdapter):
                         if not school.website_url and existing_website:
                             school.website_url = existing_website
 
+                        if fetch_details and school.locations:
+                            await self._populate_location_coordinates(school)
+
                         if fetch_details and not school.locations:
                             fallback_location = await self._recover_location_from_geojson(
                                 school=school,
@@ -336,6 +353,67 @@ class MoeRegistryAdapter(BaseSourceAdapter):
 
         logger.info(f"Discovered {len(discovered_schools)} schools from MoE registry")
         return discovered_schools
+
+    async def _populate_location_coordinates(self, school: DiscoveredSchool) -> None:
+        """Populate coordinates for discovered locations when address data is available."""
+        for location in school.locations:
+            if location.lat is not None and location.lng is not None:
+                continue
+
+            result, provider_tag = await self._geocode_discovered_location(school, location)
+            if not result.success or result.lat is None or result.lng is None:
+                logger.warning(
+                    "Failed to geocode discovered location for instid=%s (%s): %s",
+                    school.institutional_id,
+                    school.name_i18n.get("bg"),
+                    result.error,
+                )
+                continue
+
+            location.lat = result.lat
+            location.lng = result.lng
+
+            if provider_tag and provider_tag not in location.location_tags:
+                location.location_tags.append(provider_tag)
+
+    async def _geocode_discovered_location(
+        self,
+        school: DiscoveredSchool,
+        location: DiscoveredLocation,
+    ) -> tuple[GeocodingResult, Optional[str]]:
+        """Geocode a discovered location using address-first lookup with GeoJSON fallback."""
+        address = (location.address_i18n or {}).get("bg") or (location.address_i18n or {}).get("en") or ""
+        school_name = (school.name_i18n or {}).get("bg") or (school.name_i18n or {}).get("en")
+
+        if self._nominatim_provider and address:
+            result = await self._nominatim_provider.geocode(
+                address=address,
+                country_code=school.country_code,
+                city=school.city,
+            )
+            if result.success and result.lat is not None and result.lng is not None:
+                return result, "coords_source=nominatim"
+
+        if school_name:
+            result = await self._geojson_provider.geocode(
+                address=address,
+                country_code=school.country_code,
+                school_name=school_name,
+                city=school.city,
+            )
+            if result.success and result.lat is not None and result.lng is not None:
+                return result, "coords_source=geojson"
+
+        if school.website_url and location.is_primary:
+            result = await self._geojson_provider.geocode_by_website(school.website_url)
+            if result.success and result.lat is not None and result.lng is not None:
+                return result, "coords_source=geojson_website"
+
+        return GeocodingResult(
+            success=False,
+            provider="moe_registry_geocoding",
+            error="No geocoding match for discovered location",
+        ), None
 
     async def _recover_location_from_geojson(
         self,
