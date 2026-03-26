@@ -138,6 +138,65 @@ class TestWebsiteDiscovery:
         assert result["found"] is True
         assert school.website_url == "https://real-school.bg"
 
+    async def test_collects_validated_website_url_attribute_as_trusted_fallback(self, db_session):
+        school = School(
+            name_i18n={"bg": "Частно училище Тест"},
+            country_code="bg",
+            school_type="private",
+            education_level="primary",
+            city="sofia",
+            website_url=None,
+            scrape_status="pending",
+            attributes={
+                "validated_website_url": "https://validated-school.bg",
+                "website_candidate_checked_at": "2026-03-06T13:44:25.154353+00:00",
+                "website_candidate_method": "search",
+                "website_candidate_reason": "HTTP error: [Errno -2] Name or service not known",
+            },
+        )
+        db_session.add(school)
+        await db_session.commit()
+
+        result = await discover_school_website(
+            db=db_session,
+            school_id=school.id,
+            country_code="bg",
+            use_search_fallback=False,
+        )
+
+        await db_session.refresh(school)
+        assert result["found"] is True
+        assert school.website_url == "https://validated-school.bg"
+
+    async def test_skips_stale_candidate_metadata_after_identity_mismatch(self, db_session):
+        school = School(
+            name_i18n={"bg": "Тест училище"},
+            country_code="bg",
+            school_type="state",
+            education_level="primary",
+            city="sofia",
+            website_url=None,
+            scrape_status="extraction_failed",
+            attributes={
+                "website_candidate_url": "https://wrong-school.bg",
+                "website_candidate_method": "generated",
+                "website_candidate_reason": "Website identity mismatch: IT company",
+            },
+        )
+        db_session.add(school)
+        await db_session.commit()
+
+        result = await discover_school_website(
+            db=db_session,
+            school_id=school.id,
+            country_code="bg",
+            use_search_fallback=False,
+        )
+
+        await db_session.refresh(school)
+        assert result["found"] is False
+        assert school.website_url is None
+
     async def test_generate_brand_domain_candidates_from_registry_name(self, db_session):
         discoverer = WebsiteDiscoverer(country_code="bg")
 
@@ -192,6 +251,44 @@ class TestWebsiteDiscovery:
         assert result["found"] is True
         assert school.website_url == "https://official-school.bg"
 
+    async def test_prefers_search_results_before_generated_brand_domains(self, db_session):
+        school = School(
+            name_i18n={"bg": '"ЧАСТНА ДЕТСКА ГРАДИНА "ПРОЛЕТ" ООД'},
+            country_code="bg",
+            school_type="private",
+            education_level="kindergarten",
+            city="sofia",
+            website_url=None,
+            scrape_status="pending",
+            attributes={},
+        )
+        db_session.add(school)
+        await db_session.commit()
+
+        with (
+            patch.object(
+                WebsiteDiscoverer,
+                "_search_candidates",
+                new=AsyncMock(return_value=["https://www.prolet2006.com"]),
+            ),
+            patch.object(
+                WebsiteDiscoverer,
+                "_generate_brand_domain_candidates",
+                return_value=[("https://prolet.bg", "generated")],
+            ) as generated_mock,
+        ):
+            result = await discover_school_website(
+                db=db_session,
+                school_id=school.id,
+                country_code="bg",
+                use_search_fallback=True,
+            )
+
+        await db_session.refresh(school)
+        assert result["found"] is True
+        assert school.website_url == "https://www.prolet2006.com"
+        generated_mock.assert_not_called()
+
     async def test_failed_validate_forces_fresh_search_candidate(self, db_session):
         school = School(
             name_i18n={"bg": "Училище Тест", "en": "Test School"},
@@ -223,6 +320,68 @@ class TestWebsiteDiscovery:
         assert result["updated"] is True
         assert school.website_url == "https://fresh-school.bg"
         assert school.scrape_status == "pending"
+
+    async def test_extraction_failed_requeues_to_pending_when_new_website_found(self, db_session):
+        school = School(
+            name_i18n={"bg": "Частно училище Тест"},
+            country_code="bg",
+            school_type="private",
+            education_level="primary",
+            city="sofia",
+            website_url=None,
+            scrape_status="extraction_failed",
+            attributes={},
+        )
+        db_session.add(school)
+        await db_session.commit()
+
+        with patch.object(
+            WebsiteDiscoverer,
+            "_search_candidates",
+            new=AsyncMock(return_value=["https://fresh-school.bg"]),
+        ):
+            result = await discover_school_website(
+                db=db_session,
+                school_id=school.id,
+                country_code="bg",
+                use_search_fallback=True,
+            )
+
+        await db_session.refresh(school)
+        assert result["found"] is True
+        assert school.website_url == "https://fresh-school.bg"
+        assert school.scrape_status == "pending"
+
+    async def test_extraction_failed_no_candidates_sets_terminal_status(self, db_session):
+        school = School(
+            name_i18n={"bg": "Частно училище Без Сайт"},
+            country_code="bg",
+            school_type="private",
+            education_level="primary",
+            city="sofia",
+            website_url=None,
+            scrape_status="extraction_failed",
+            attributes={},
+        )
+        db_session.add(school)
+        await db_session.commit()
+
+        with (
+            patch.object(WebsiteDiscoverer, "_search_candidates", new=AsyncMock(return_value=[])),
+            patch.object(WebsiteDiscoverer, "_generate_brand_domain_candidates", return_value=[]),
+        ):
+            result = await discover_school_website(
+                db=db_session,
+                school_id=school.id,
+                country_code="bg",
+                use_search_fallback=True,
+            )
+
+        await db_session.refresh(school)
+        assert result["found"] is False
+        assert result["terminal_status"] == "no_official_website"
+        assert school.scrape_status == "no_official_website"
+        assert school.website_url is None
 
     async def test_failed_validate_no_candidates_sets_terminal_status(self, db_session):
         school = School(
@@ -331,6 +490,27 @@ class TestWebsiteDiscovery:
         assert any("българанче sofia официален сайт" == query.lower() for query in queries)
         assert any("частна детска градина българанче" == query.lower() for query in queries)
 
+    async def test_build_search_queries_includes_free_email_local_part_hints(self):
+        discoverer = WebsiteDiscoverer(country_code="bg")
+        school = School(
+            name_i18n={"bg": '"ЧАСТНА ДЕТСКА ГРАДИНА "ПРОЛЕТ" ООД'},
+            country_code="bg",
+            school_type="private",
+            education_level="kindergarten",
+            city="sofia",
+            attributes={"moe_email": "prolet_2006_07@abv.bg"},
+        )
+
+        hints = discoverer._discovery_hints_for_school(school)
+        queries = discoverer._build_search_queries(
+            school_name=(school.name_i18n or {}).get("bg"),
+            city="sofia",
+            discovery_hints=hints,
+        )
+
+        assert "prolet 2006" in hints
+        assert any("prolet 2006 sofia официален сайт" == query.lower() for query in queries)
+
     async def test_pick_best_candidate_prefers_root_url(self):
         discoverer = WebsiteDiscoverer(country_code="bg")
         seen: set[str] = set()
@@ -360,6 +540,24 @@ class TestWebsiteDiscovery:
         )
 
         assert best_url == "https://5dg.eu"
+        assert method == "search"
+
+    async def test_pick_best_candidate_uses_free_email_hint_to_break_brand_ties(self):
+        discoverer = WebsiteDiscoverer(country_code="bg")
+        seen: set[str] = set()
+        candidates = [
+            ("https://prolet-dg.eu", "search"),
+            ("https://www.prolet2006.com", "search"),
+        ]
+
+        best_url, method = discoverer._pick_best_candidate(
+            candidates,
+            seen,
+            school_name='"ЧАСТНА ДЕТСКА ГРАДИНА "ПРОЛЕТ" ООД',
+            discovery_hints=["prolet 2006", "prolet2006"],
+        )
+
+        assert best_url == "https://www.prolet2006.com"
         assert method == "search"
 
     async def test_search_candidates_expands_result_to_site_root(self):

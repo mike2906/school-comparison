@@ -32,8 +32,13 @@ logger = logging.getLogger(__name__)
 _URL_HINTS = ("website", "web", "url", "site", "domain")
 _EMAIL_HINTS = ("email", "mail", "contact")
 _WEBSITE_METADATA_SUFFIXES = ("_checked_at", "_method", "_reason")
+_WEBSITE_METADATA_KEYS = {
+    "url_validation_ambiguous",
+}
 _REGISTRY_SCHEMES = ("moe://", "kg://")
 _REGISTRY_DOMAINS = ("ri-api.mon.bg", "kg.sofia.bg")
+
+
 def _load_country_directory_domains(country_code: str) -> tuple[str, ...]:
     """Load country-specific directory domain blocklist from data/bg/directory_domains.json."""
     data_file = (
@@ -113,6 +118,39 @@ _EMAIL_DOMAIN_HINTS = (
     "kids",
     "child",
 )
+_FREE_EMAIL_LOCALPART_STOPWORDS = {
+    "office",
+    "info",
+    "contact",
+    "admin",
+    "mail",
+    "email",
+    "director",
+    "directorate",
+    "school",
+    "kindergarten",
+    "detska",
+    "gradina",
+    "kids",
+    "team",
+}
+_NON_REUSABLE_CANDIDATE_REASON_MARKERS = (
+    "not a school website",
+    "expected school name not found",
+    "weak expected-school name match",
+    "website identity mismatch",
+    "directory-like",
+    "blocked domain",
+)
+_TRANSIENT_CANDIDATE_REASON_MARKERS = (
+    "http error",
+    "connection timeout",
+    "validation error",
+    "name or service not known",
+    "temporary failure",
+    "temporarily unavailable",
+)
+_TERMINAL_NO_WEBSITE_STATUSES = {"failed_validate", "extraction_failed"}
 _SCHOOL_ABBREV_VARIANTS = {
     "дг": ("дг", "dg"),
     "чдг": ("чдг", "cdg", "dg"),
@@ -220,8 +258,10 @@ class WebsiteDiscoverer:
         searched: list[str] = []  # Track raw search URLs for caller reuse
 
         is_failed_retry = school.scrape_status == "failed_validate"
+        can_mark_no_website = school.scrape_status in _TERMINAL_NO_WEBSITE_STATUSES
         existing_normalized = self.validator.normalize_url(existing_url or "")
         school_aliases = self._validation_aliases_for_school(school)
+        discovery_hints = self._discovery_hints_for_school(school)
 
         # For failed URLs, force a fresh discovery attempt.
         if is_failed_retry and existing_normalized:
@@ -237,6 +277,7 @@ class WebsiteDiscoverer:
                     seen,
                     school_name=(school.name_i18n or {}).get("bg") or (school.name_i18n or {}).get("en"),
                     school_aliases=school_aliases,
+                    discovery_hints=discovery_hints,
                 )
 
             # 2) Deterministic non-existing candidates only
@@ -247,6 +288,7 @@ class WebsiteDiscoverer:
                     seen,
                     school_name=(school.name_i18n or {}).get("bg") or (school.name_i18n or {}).get("en"),
                     school_aliases=school_aliases,
+                    discovery_hints=discovery_hints,
                 )
         else:
             # Try deterministic candidates first (existing fields/attributes).
@@ -256,18 +298,10 @@ class WebsiteDiscoverer:
                 seen,
                 school_name=(school.name_i18n or {}).get("bg") or (school.name_i18n or {}).get("en"),
                 school_aliases=school_aliases,
+                discovery_hints=discovery_hints,
             )
 
-            if not resolved_url:
-                generated_candidates = self._collect_candidates(school, include_generated=True)
-                resolved_url, method = self._pick_best_candidate(
-                    generated_candidates,
-                    seen,
-                    school_name=(school.name_i18n or {}).get("bg") or (school.name_i18n or {}).get("en"),
-                    school_aliases=school_aliases,
-                )
-
-            # Fall back to web search only if deterministic sources produced nothing.
+            # Fall back to web search before guessed brand domains.
             if not resolved_url and use_search_fallback:
                 searched = await self._search_candidates(school)
                 search_candidates = [(url, "search") for url in searched]
@@ -276,10 +310,21 @@ class WebsiteDiscoverer:
                     seen,
                     school_name=(school.name_i18n or {}).get("bg") or (school.name_i18n or {}).get("en"),
                     school_aliases=school_aliases,
+                    discovery_hints=discovery_hints,
+                )
+
+            if not resolved_url:
+                generated_candidates = self._collect_candidates(school, include_generated=True)
+                resolved_url, method = self._pick_best_candidate(
+                    generated_candidates,
+                    seen,
+                    school_name=(school.name_i18n or {}).get("bg") or (school.name_i18n or {}).get("en"),
+                    school_aliases=school_aliases,
+                    discovery_hints=discovery_hints,
                 )
 
         if not resolved_url:
-            if is_failed_retry:
+            if can_mark_no_website:
                 school.scrape_status = "no_official_website"
                 school.website_url = None
                 await db.commit()
@@ -289,7 +334,7 @@ class WebsiteDiscoverer:
                 "updated": False,
                 "reason": "No candidate website found",
                 "candidates_checked": len(seen),
-                "terminal_status": "no_official_website" if is_failed_retry else None,
+                "terminal_status": "no_official_website" if can_mark_no_website else None,
                 "search_candidates": searched,
             }
 
@@ -300,8 +345,8 @@ class WebsiteDiscoverer:
         school.attributes["website_candidate_checked_at"] = datetime.now(timezone.utc).isoformat()
         if updated:
             school.website_url = resolved_url
-            # Failed URL can re-enter validation with a fresh candidate.
-            if school.scrape_status == "failed_validate":
+            # Any non-terminal failure state should re-enter validation with a fresh candidate.
+            if school.scrape_status in {"failed_validate", "extraction_failed"}:
                 school.scrape_status = "pending"
 
         await self._upsert_discovery_source_page(db, school.id, resolved_url, method or "unknown")
@@ -331,6 +376,7 @@ class WebsiteDiscoverer:
 
         school_name = (school.name_i18n or {}).get("bg") or (school.name_i18n or {}).get("en")
         school_aliases = self._validation_aliases_for_school(school)
+        discovery_hints = self._discovery_hints_for_school(school)
         max_attempts = max(1, int(max_attempts))
 
         discovery = await self.discover(
@@ -382,6 +428,7 @@ class WebsiteDiscoverer:
                     seen_snapshot,
                     school_name=school_name,
                     school_aliases=school_aliases,
+                    discovery_hints=discovery_hints,
                 )
                 if not next_url:
                     break
@@ -427,11 +474,13 @@ class WebsiteDiscoverer:
         seen: set[str],
         school_name: str | None = None,
         school_aliases: list[str] | None = None,
+        discovery_hints: list[str] | None = None,
     ) -> tuple[str | None, str | None]:
         """Return best acceptable normalized URL from candidate list."""
         accepted: list[tuple[str, str, int]] = []
         expected_names = self.validator._expected_school_names(school_name, school_aliases)
         school_tokens = self.validator._extract_expected_name_tokens(expected_names)
+        hint_tokens = self._extract_discovery_hint_tokens(discovery_hints, school_tokens)
         host_frequency = self._build_host_frequency(candidates)
 
         for raw_url, source in candidates:
@@ -459,7 +508,13 @@ class WebsiteDiscoverer:
                 if self._is_non_official_candidate(candidate_url):
                     continue
 
-                score = self._score_candidate(candidate_url, source, school_tokens, host_frequency)
+                score = self._score_candidate(
+                    candidate_url,
+                    source,
+                    school_tokens,
+                    host_frequency,
+                    hint_tokens=hint_tokens,
+                )
                 accepted.append((candidate_url, source, score))
 
         if not accepted:
@@ -495,7 +550,11 @@ class WebsiteDiscoverer:
             and school.school_type in {"private", "international"}
         ):
             candidates.extend(
-                self._generate_brand_domain_candidates(school_name, self._validation_aliases_for_school(school))
+                self._generate_brand_domain_candidates(
+                    school_name,
+                    self._validation_aliases_for_school(school),
+                    self._discovery_hints_for_school(school),
+                )
             )
         return candidates
 
@@ -510,7 +569,11 @@ class WebsiteDiscoverer:
             for key, value in payload.items():
                 key_str = str(key).lower()
                 if isinstance(value, str):
+                    if key_str in _WEBSITE_METADATA_KEYS:
+                        continue
                     if key_str.endswith(_WEBSITE_METADATA_SUFFIXES):
+                        continue
+                    if key_str == "website_candidate_url" and not self._should_reuse_candidate_metadata(payload):
                         continue
                     if any(hint in key_str for hint in _URL_HINTS) and self._looks_like_url_candidate(value):
                         candidates.append((value, f"attributes:{key_str}"))
@@ -559,10 +622,12 @@ class WebsiteDiscoverer:
             return []
 
         school_aliases = self._validation_aliases_for_school(school)
+        discovery_hints = self._discovery_hints_for_school(school)
         queries = self._build_search_queries(
             school_name=school_name,
             city=school.city or "",
             school_aliases=school_aliases,
+            discovery_hints=discovery_hints,
         )
         if not queries:
             return []
@@ -598,6 +663,7 @@ class WebsiteDiscoverer:
                 seen=set(),
                 school_name=school_name,
                 school_aliases=school_aliases,
+                discovery_hints=discovery_hints,
             )
             if probe_best:
                 return provider_candidates
@@ -668,11 +734,12 @@ class WebsiteDiscoverer:
         school_name: str,
         city: str,
         school_aliases: list[str] | None = None,
+        discovery_hints: list[str] | None = None,
     ) -> list[str]:
         """Build de-duplicated search queries with targeted and broad fallback variants."""
         suffix = "официален сайт" if self.country_code == "bg" else "official website"
         city_value = " ".join((city or "").split())
-        candidates = self._candidate_school_names_for_search(school_name, school_aliases)
+        candidates = self._candidate_school_names_for_search(school_name, school_aliases, discovery_hints)
 
         queries: list[str] = []
         seen: set[str] = set()
@@ -714,11 +781,12 @@ class WebsiteDiscoverer:
         self,
         school_name: str,
         school_aliases: list[str] | None = None,
+        discovery_hints: list[str] | None = None,
     ) -> list[str]:
         """Generate school-name variants that improve search recall."""
         variants: list[str] = []
         seen: set[str] = set()
-        raw_candidates = [school_name, *(school_aliases or [])]
+        raw_candidates = [school_name, *(school_aliases or []), *(discovery_hints or [])]
         for raw_name in raw_candidates:
             cleaned = self._sanitize_school_name_for_search(raw_name)
             simplified = self._simplify_school_name(cleaned)
@@ -774,9 +842,14 @@ class WebsiteDiscoverer:
         self,
         school_name: str | None,
         school_aliases: list[str] | None = None,
+        discovery_hints: list[str] | None = None,
     ) -> list[tuple[str, str]]:
         """Generate likely official domains from brand-like school-name variants."""
-        variants = self._candidate_school_names_for_search(school_name or "", school_aliases)
+        variants = self._candidate_school_names_for_search(
+            school_name or "",
+            school_aliases,
+            discovery_hints,
+        )
         compact_variants: list[str] = []
         seen: set[str] = set()
 
@@ -851,6 +924,7 @@ class WebsiteDiscoverer:
         source: str,
         school_tokens: list[str],
         host_frequency: dict[str, int],
+        hint_tokens: list[str] | None = None,
     ) -> int:
         """Rank candidate URLs so official-looking domains beat list directories."""
         parsed = urlparse(url)
@@ -885,6 +959,15 @@ class WebsiteDiscoverer:
             elif any(variant in (path + query) for variant in variants):
                 path_hits += 1
         score += host_hits * 18 + path_hits * 6
+        if hint_tokens:
+            hint_host_hits = 0
+            hint_path_hits = 0
+            for token in hint_tokens:
+                if token in host:
+                    hint_host_hits += 1
+                elif token in (path + query):
+                    hint_path_hits += 1
+            score += hint_host_hits * 14 + hint_path_hits * 4
         score += max(0, host_frequency.get(host, 0) - 1) * 8
 
         if source == "search" and host_hits == 0 and path_hits == 0:
@@ -894,6 +977,135 @@ class WebsiteDiscoverer:
         if self._is_likely_directory_host(host):
             score -= 25
         return score
+
+    def _should_reuse_candidate_metadata(self, payload: dict) -> bool:
+        """Reuse last candidate metadata only for transient validation failures."""
+        reason = str(payload.get("website_candidate_reason") or "").strip().lower()
+        method = str(payload.get("website_candidate_method") or "").strip().lower()
+
+        if not reason:
+            return method != "generated"
+        if any(marker in reason for marker in _TRANSIENT_CANDIDATE_REASON_MARKERS):
+            return True
+        if any(marker in reason for marker in _NON_REUSABLE_CANDIDATE_REASON_MARKERS):
+            return False
+        return method != "generated"
+
+    def _discovery_hints_for_school(self, school: School) -> list[str]:
+        """Extract non-authoritative hints that help search and ranking."""
+        school_name = (school.name_i18n or {}).get("bg") or (school.name_i18n or {}).get("en")
+        school_tokens = self._extract_school_name_tokens(school_name)
+        hints: list[str] = []
+        seen: set[str] = set()
+
+        def add_hint(value: str) -> None:
+            normalized = " ".join((value or "").split())
+            if not normalized:
+                return
+            key = normalized.casefold()
+            if key in seen:
+                return
+            seen.add(key)
+            hints.append(normalized)
+
+        for email in self._collect_email_values(school.attributes or {}):
+            for hint in self._email_local_part_hints(email, school_tokens):
+                add_hint(hint)
+
+        return hints
+
+    def _collect_email_values(self, payload: dict | list | str) -> list[str]:
+        """Collect email strings from nested attribute payloads."""
+        emails: list[str] = []
+
+        def walk(value: dict | list | str) -> None:
+            if isinstance(value, str):
+                text = value.strip()
+                if re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", text):
+                    emails.append(text)
+                return
+            if isinstance(value, dict):
+                for nested in value.values():
+                    walk(nested)
+                return
+            if isinstance(value, list):
+                for nested in value:
+                    walk(nested)
+
+        walk(payload)
+        return emails
+
+    def _email_local_part_hints(self, email: str, school_tokens: list[str]) -> list[str]:
+        """Extract brand-like hints from free-email local parts such as prolet_2006."""
+        value = (email or "").strip().lower()
+        if "@" not in value:
+            return []
+
+        local_part, domain = value.split("@", 1)
+        if domain not in _FREE_EMAIL_DOMAINS:
+            return []
+
+        normalized_local = re.sub(r"[^a-z0-9]+", " ", self._transliterate_bg(local_part))
+        tokens = re.findall(r"[a-z0-9]+", normalized_local)
+        if not tokens:
+            return []
+
+        school_variants = {
+            variant
+            for token in school_tokens
+            for variant in self._token_variants(token)
+            if variant and len(variant) >= 3
+        }
+        filtered: list[str] = []
+        has_school_aligned_alpha = False
+        for token in tokens:
+            if token in _FREE_EMAIL_LOCALPART_STOPWORDS:
+                continue
+            if token.isdigit():
+                if len(token) == 4:
+                    filtered.append(token)
+                continue
+            if len(token) < 3:
+                continue
+            if any(token in variant or variant in token for variant in school_variants):
+                has_school_aligned_alpha = True
+            filtered.append(token)
+
+        if not has_school_aligned_alpha:
+            return []
+
+        alpha_tokens = [token for token in filtered if not token.isdigit()]
+        digit_tokens = [token for token in filtered if token.isdigit()]
+        if not alpha_tokens:
+            return []
+
+        hints: list[str] = []
+        hints.append(" ".join(alpha_tokens[:2]))
+        if digit_tokens:
+            hints.append(" ".join([*alpha_tokens[:2], digit_tokens[0]]))
+            hints.append("".join([*alpha_tokens[:2], digit_tokens[0]]))
+        return hints
+
+    def _extract_discovery_hint_tokens(
+        self,
+        discovery_hints: list[str] | None,
+        school_tokens: list[str],
+    ) -> list[str]:
+        """Convert search/ranking hints into distinctive host/path tokens."""
+        tokens: list[str] = []
+        seen: set[str] = set(school_tokens)
+        for hint in discovery_hints or []:
+            for token in re.findall(r"[a-z0-9]+", self._transliterate_bg(hint or "")):
+                if token in seen:
+                    continue
+                if token.isdigit():
+                    if len(token) != 4:
+                        continue
+                elif len(token) < 3:
+                    continue
+                seen.add(token)
+                tokens.append(token)
+        return tokens
 
     def _build_host_frequency(self, candidates: list[tuple[str, str]]) -> dict[str, int]:
         """Count how often candidate hosts appear (repeated hosts are stronger signals)."""

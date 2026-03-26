@@ -1608,11 +1608,14 @@ async def _run_discover_website(db, school_id: int, country: str):
 async def _run_discover_websites_batch(db, country: str, city: str, limit: Optional[int]):
     """Run website discovery stage in batch mode."""
     from app.models import School
-    from sqlalchemy import select
+    from sqlalchemy import and_, or_, select
 
     query = select(School).where(
         School.country_code == country,
-        School.scrape_status.in_(["pending", "failed_validate"]),
+        or_(
+            School.scrape_status.in_(["pending", "failed_validate"]),
+            and_(School.scrape_status == "extraction_failed", School.website_url.is_(None)),
+        ),
     )
 
     if city:

@@ -99,6 +99,72 @@ async def test_run_sync_routes_nvo_stage_to_import_helper(db_session):
 
 
 @pytest.mark.asyncio
+async def test_discover_websites_batch_includes_missing_website_rows_beyond_failed_validate(db_session):
+    eligible_missing = School(
+        name_i18n={"bg": "Липсващ сайт"},
+        country_code="bg",
+        school_type="private",
+        education_level="kindergarten",
+        city="sofia",
+        website_url=None,
+        scrape_status="extraction_failed",
+    )
+    eligible_pending = School(
+        name_i18n={"bg": "Чакащ сайт"},
+        country_code="bg",
+        school_type="state",
+        education_level="primary",
+        city="sofia",
+        website_url=None,
+        scrape_status="pending",
+    )
+    terminal_no_site = School(
+        name_i18n={"bg": "Без сайт"},
+        country_code="bg",
+        school_type="state",
+        education_level="primary",
+        city="sofia",
+        website_url=None,
+        scrape_status="no_official_website",
+    )
+    extraction_failed_with_site = School(
+        name_i18n={"bg": "Екстракция със сайт"},
+        country_code="bg",
+        school_type="private",
+        education_level="kindergarten",
+        city="sofia",
+        website_url="https://existing-school.bg",
+        scrape_status="extraction_failed",
+    )
+    validated = School(
+        name_i18n={"bg": "Валидиран"},
+        country_code="bg",
+        school_type="state",
+        education_level="primary",
+        city="sofia",
+        website_url="https://school.bg",
+        scrape_status="validated",
+    )
+    db_session.add_all([eligible_missing, eligible_pending, terminal_no_site, extraction_failed_with_site, validated])
+    await db_session.commit()
+
+    with patch.object(scraper_cli, "_run_discover_website", new=AsyncMock(return_value={"found": False})) as discover_mock:
+        await scraper_cli._run_discover_websites_batch(
+            db=db_session,
+            country="bg",
+            city="sofia",
+            limit=None,
+        )
+
+    called_ids = {call.args[1] for call in discover_mock.await_args_list}
+    assert eligible_missing.id in called_ids
+    assert eligible_pending.id in called_ids
+    assert terminal_no_site.id not in called_ids
+    assert extraction_failed_with_site.id not in called_ids
+    assert validated.id not in called_ids
+
+
+@pytest.mark.asyncio
 async def test_run_navigate_batch_rolls_back_and_continues_after_school_error(db_session):
     for idx in range(2):
         db_session.add(
