@@ -1995,9 +1995,15 @@ def _is_low_quality_display_name(value: str | None) -> bool:
     lowered = raw_value.lower()
     if not lowered:
         return True
+    if lowered.startswith("към портал "):
+        return True
+    if lowered.startswith(("close submenu", "open submenu", "затвори подменю", "отвори подменю")):
+        return True
     if re.search(r"(?i)\b(?:screenshot|screen shot)\b", raw_value):
         return True
     if re.search(r"(?i)\.(?:png|jpe?g|webp|svg|gif|avif)\b", raw_value):
+        return True
+    if any(marker in lowered for marker in ("-logo", "_logo", "logo-", "logo_", "-icon", "_icon", "icon-", "icon_")):
         return True
     if lowered in {"our kindergartens", "our schools"}:
         return True

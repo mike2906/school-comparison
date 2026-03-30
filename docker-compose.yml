@@ -39,6 +39,7 @@ services:
     environment:
       BASE_URL: http://localhost:8080/
       INSTANCE_NAME: Sofia School Search
+      SEARXNG_LIMITER: "false"
       # Set in local .env (gitignored). Fallback avoids SearXNG default crash loop.
       SEARXNG_SECRET: ${SEARXNG_SECRET:-replace-this-local-searxng-secret}
     depends_on:

@@ -6,7 +6,7 @@ import httpx
 import pytest
 from sqlalchemy import select
 
-from app.models import School, SourcePage, ScrapeType
+from app.models import School, SchoolLocation, SourcePage, ScrapeType
 from app.scrapers.website_discovery import WebsiteDiscoverer, discover_school_website
 
 
@@ -108,7 +108,7 @@ class TestWebsiteDiscovery:
         assert school.scrape_status == "no_official_website"
         assert school.website_url is None
 
-    async def test_ignores_non_url_metadata_under_website_keys(self, db_session):
+    async def test_does_not_reuse_raw_website_candidate_url_metadata(self, db_session):
         school = School(
             name_i18n={"bg": "Частно училище Тест"},
             country_code="bg",
@@ -135,8 +135,8 @@ class TestWebsiteDiscovery:
         )
 
         await db_session.refresh(school)
-        assert result["found"] is True
-        assert school.website_url == "https://real-school.bg"
+        assert result["found"] is False
+        assert school.website_url is None
 
     async def test_collects_validated_website_url_attribute_as_trusted_fallback(self, db_session):
         school = School(
@@ -197,18 +197,6 @@ class TestWebsiteDiscovery:
         assert result["found"] is False
         assert school.website_url is None
 
-    async def test_generate_brand_domain_candidates_from_registry_name(self, db_session):
-        discoverer = WebsiteDiscoverer(country_code="bg")
-
-        candidates = discoverer._generate_brand_domain_candidates(
-            '"Частно начално училище Луис Карол - гр. София" ЕООД',
-            [],
-        )
-
-        urls = {url for url, _ in candidates}
-        assert "https://luiskarol.com" in urls
-        assert "https://luiskarol.bg" in urls
-
     async def test_uses_search_fallback_when_no_local_candidate(self, db_session):
         school = School(
             name_i18n={"bg": "Училище Тест", "en": "Test School"},
@@ -251,7 +239,7 @@ class TestWebsiteDiscovery:
         assert result["found"] is True
         assert school.website_url == "https://official-school.bg"
 
-    async def test_prefers_search_results_before_generated_brand_domains(self, db_session):
+    async def test_stops_after_search_results_without_generated_domain_guessing(self, db_session):
         school = School(
             name_i18n={"bg": '"ЧАСТНА ДЕТСКА ГРАДИНА "ПРОЛЕТ" ООД'},
             country_code="bg",
@@ -265,17 +253,10 @@ class TestWebsiteDiscovery:
         db_session.add(school)
         await db_session.commit()
 
-        with (
-            patch.object(
-                WebsiteDiscoverer,
-                "_search_candidates",
-                new=AsyncMock(return_value=["https://www.prolet2006.com"]),
-            ),
-            patch.object(
-                WebsiteDiscoverer,
-                "_generate_brand_domain_candidates",
-                return_value=[("https://prolet.bg", "generated")],
-            ) as generated_mock,
+        with patch.object(
+            WebsiteDiscoverer,
+            "_search_candidates",
+            new=AsyncMock(return_value=["https://www.prolet2006.com"]),
         ):
             result = await discover_school_website(
                 db=db_session,
@@ -287,7 +268,6 @@ class TestWebsiteDiscovery:
         await db_session.refresh(school)
         assert result["found"] is True
         assert school.website_url == "https://www.prolet2006.com"
-        generated_mock.assert_not_called()
 
     async def test_failed_validate_forces_fresh_search_candidate(self, db_session):
         school = School(
@@ -366,10 +346,7 @@ class TestWebsiteDiscovery:
         db_session.add(school)
         await db_session.commit()
 
-        with (
-            patch.object(WebsiteDiscoverer, "_search_candidates", new=AsyncMock(return_value=[])),
-            patch.object(WebsiteDiscoverer, "_generate_brand_domain_candidates", return_value=[]),
-        ):
+        with patch.object(WebsiteDiscoverer, "_search_candidates", new=AsyncMock(return_value=[])):
             result = await discover_school_website(
                 db=db_session,
                 school_id=school.id,
@@ -490,6 +467,30 @@ class TestWebsiteDiscovery:
         assert any("българанче sofia официален сайт" == query.lower() for query in queries)
         assert any("частна детска градина българанче" == query.lower() for query in queries)
 
+    async def test_build_search_queries_prioritizes_locality_hint(self):
+        discoverer = WebsiteDiscoverer(country_code="bg")
+        queries = discoverer._build_search_queries(
+            school_name='"Частна детска градина Монтесори" ЕООД',
+            city="sofia",
+            locality_hints=["Горна баня"],
+        )
+
+        assert "горна баня" in queries[0].lower()
+        assert "официален сайт" in queries[0].lower()
+        assert 'Частна детска градина Монтесори ЕООД sofia официален сайт' in queries
+
+    async def test_build_search_queries_reserves_room_for_city_wide_queries(self):
+        discoverer = WebsiteDiscoverer(country_code="bg")
+        queries = discoverer._build_search_queries(
+            school_name='"Частна детска градина Монтесори" ЕООД',
+            city="sofia",
+            locality_hints=["Горна баня", "Карпузица", "Овча купел", "Бояна", "Княжево"],
+        )
+
+        locality_queries = [query for query in queries if any(hint in query for hint in ("Горна баня", "Карпузица", "Овча купел", "Бояна", "Княжево"))]
+        assert len(locality_queries) <= 4
+        assert any(" sofia официален сайт" in query.lower() for query in queries)
+
     async def test_build_search_queries_includes_free_email_local_part_hints(self):
         discoverer = WebsiteDiscoverer(country_code="bg")
         school = School(
@@ -511,6 +512,56 @@ class TestWebsiteDiscovery:
         assert "prolet 2006" in hints
         assert any("prolet 2006 sofia официален сайт" == query.lower() for query in queries)
 
+    async def test_candidate_school_names_prioritize_aliases_before_legal_name(self):
+        discoverer = WebsiteDiscoverer(country_code="bg")
+
+        candidates = discoverer._candidate_school_names_for_search(
+            school_name="Сдружение на родителите от немско-българското училище за среща на културите София",
+            school_aliases=["Немско училище София"],
+        )
+
+        assert candidates[0] == "Немско училище София"
+        assert any("сдружение на родителите" in candidate.lower() for candidate in candidates[1:])
+
+    async def test_location_search_hints_extracts_neighborhood_and_street_from_primary_address(self):
+        discoverer = WebsiteDiscoverer(country_code="bg")
+        school = School(
+            name_i18n={"bg": '"Частна детска градина Монтесори" ЕООД'},
+            country_code="bg",
+            school_type="private",
+            education_level="kindergarten",
+            city="sofia",
+            locations=[
+                SchoolLocation(
+                    address_i18n={"bg": 'ж. к. Горна баня, ул. "Вечерница" № 21'},
+                    is_primary=True,
+                )
+            ],
+        )
+
+        hints = discoverer._location_search_hints_for_school(school)
+
+        assert "Горна баня" in hints
+        assert "Вечерница" in hints
+
+    async def test_should_promote_search_root_requires_school_alignment_signal(self):
+        discoverer = WebsiteDiscoverer(country_code="bg")
+
+        assert (
+            discoverer._should_promote_search_root(
+                "https://yellowpages.bg/school-listing",
+                school_tokens=["монтесори"],
+            )
+            is False
+        )
+        assert (
+            discoverer._should_promote_search_root(
+                "https://example.bg/chastna-detska-gradina-montesori/priem",
+                school_tokens=["монтесори"],
+            )
+            is True
+        )
+
     async def test_pick_best_candidate_prefers_root_url(self):
         discoverer = WebsiteDiscoverer(country_code="bg")
         seen: set[str] = set()
@@ -522,7 +573,7 @@ class TestWebsiteDiscovery:
 
         best_url, method = discoverer._pick_best_candidate(candidates, seen)
 
-        assert best_url == "https://dg11-mikimaus.com"
+        assert best_url == "https://dg11-mikimaus.com/"
         assert method == "search"
 
     async def test_pick_best_candidate_prefers_school_aligned_domain(self):
@@ -560,7 +611,7 @@ class TestWebsiteDiscovery:
         assert best_url == "https://www.prolet2006.com"
         assert method == "search"
 
-    async def test_search_candidates_expands_result_to_site_root(self):
+    async def test_search_candidates_keeps_raw_result_without_eager_root_expansion(self):
         discoverer = WebsiteDiscoverer(country_code="bg")
         discoverer.search_providers = ["searxng"]
 
@@ -585,8 +636,40 @@ class TestWebsiteDiscovery:
         ):
             links = await discoverer._search_candidates(school)
 
-        assert "https://5dg.eu" in links
         assert "https://5dg.eu/%D0%BF%D1%80%D0%BE%D1%84%D0%B8%D0%BB-%D0%BD%D0%B0-%D0%BA%D1%83%D0%BF%D1%83%D0%B2%D0%B0%D1%87%D0%B0/" in links
+        assert "https://5dg.eu" not in links
+
+    async def test_pick_best_candidate_promotes_school_aligned_search_result_root(self):
+        discoverer = WebsiteDiscoverer(country_code="bg")
+        best_url, method = discoverer._pick_best_candidate(
+            [
+                (
+                    "https://5dg.eu/%D0%BF%D1%80%D0%BE%D1%84%D0%B8%D0%BB-%D0%BD%D0%B0-%D0%BA%D1%83%D0%BF%D1%83%D0%B2%D0%B0%D1%87%D0%B0/",
+                    "search",
+                ),
+            ],
+            seen=set(),
+            school_name="ДГ №5 Надежда",
+        )
+
+        assert best_url == "https://5dg.eu"
+        assert method == "search"
+
+    async def test_pick_best_candidate_rejects_unrelated_media_article_search_result(self):
+        discoverer = WebsiteDiscoverer(country_code="bg")
+        best_url, method = discoverer._pick_best_candidate(
+            [
+                (
+                    "https://offnews.bg/news/Obshtestvo_4/Koi-sa-chastnite-iasli-koito-shte-nosiat-tochka-za-klasirane-v-detska_677976.html",
+                    "search",
+                ),
+            ],
+            seen=set(),
+            school_name='ЧАСТНА ДЕТСКА ГРАДИНА "ПРИЯТЕЛСКА КЪЩА"',
+        )
+
+        assert best_url is None
+        assert method is None
 
     async def test_search_candidates_uses_fallback_only_when_primary_empty(self):
         discoverer = WebsiteDiscoverer(country_code="bg")

@@ -203,8 +203,19 @@ class URLValidator:
         Returns:
             List of school-related keywords
         """
-        # For now, use default keywords
-        # TODO: Load from JSON file when we create the keywords.json files
+        # For now, use default keywords.
+        # Bulgarian school websites often expose English-only landing pages, so
+        # BG validation should recognize both Bulgarian and English school terms.
+        if country_code == "bg":
+            merged: list[str] = []
+            seen: set[str] = set()
+            for keyword in [*self.DEFAULT_SCHOOL_KEYWORDS["bg"], *self.DEFAULT_SCHOOL_KEYWORDS["en"]]:
+                lowered = keyword.lower()
+                if lowered in seen:
+                    continue
+                seen.add(lowered)
+                merged.append(keyword)
+            return merged
         return self.DEFAULT_SCHOOL_KEYWORDS.get(country_code, self.DEFAULT_SCHOOL_KEYWORDS["en"])
 
     def normalize_url(self, url: str) -> Optional[str]:
@@ -455,10 +466,14 @@ class URLValidator:
         text_content = (text_content or "").lower()
         page_identity_labels = page_identity_labels or []
         page_context = f"{title_text} {h1_text} {text_content[:4000]}".lower()
+        # keyword_context intentionally includes identity labels in addition to
+        # the broader page text so short school markers in nav/hero/title copy
+        # still contribute to keyword scoring.
+        keyword_context = " ".join([title_text, h1_text, *page_identity_labels[:8], text_content[:4000]]).lower()
         expected_names = self._expected_school_names(school_name, school_aliases)
         identity_context = " ".join([title_text, h1_text, *page_identity_labels[:8]]).lower()
 
-        keyword_count = sum(1 for keyword in self.keywords if keyword.lower() in text_content)
+        keyword_count = self._count_keyword_hits(keyword_context)
         name_tokens = self._extract_expected_name_tokens(expected_names)
         name_token_hits = self._count_school_name_token_hits(identity_context, name_tokens)
         min_name_token_hits = self._minimum_required_name_token_hits(name_tokens)
@@ -469,6 +484,20 @@ class URLValidator:
         identity_mismatch = self._find_identity_mismatch(page_identity_labels, expected_names)
 
         if directory_signals >= 1 and name_tokens and name_token_hits < min_name_token_hits:
+            if keyword_count >= 2 and name_token_hits > 0 and not identity_mismatch:
+                if use_llm_fallback:
+                    return await self._llm_validate(
+                        text_content,
+                        final_url,
+                        school_name=school_name,
+                        school_aliases=school_aliases,
+                        page_identity_labels=page_identity_labels,
+                    )
+                return (
+                    ValidationResult.AMBIGUOUS,
+                    final_url,
+                    f"Ambiguous: directory-like signal with partial school-name match ({name_token_hits}/{min_name_token_hits})",
+                )
             return (
                 ValidationResult.INVALID,
                 None,
@@ -696,6 +725,11 @@ class URLValidator:
         if not school_tokens:
             return 0
         return sum(1 for token in school_tokens if token in page_context)
+
+    def _count_keyword_hits(self, page_context: str) -> int:
+        """Count school-related keywords in identity-rich page content."""
+        normalized = (page_context or "").lower()
+        return sum(1 for keyword in self.keywords if keyword.lower() in normalized)
 
     def _minimum_required_name_token_hits(self, school_tokens: list[str]) -> int:
         """Require two hits when multiple distinctive ownership tokens exist."""
@@ -1055,6 +1089,8 @@ def extract_validation_aliases(attributes: object) -> list[str]:
     if isinstance(display_name_i18n, Mapping):
         for value in display_name_i18n.values():
             add_alias(value)
+
+    add_alias(attributes.get("moe_abbreviation"))
 
     name_aliases = attributes.get("name_aliases")
     if isinstance(name_aliases, list):
