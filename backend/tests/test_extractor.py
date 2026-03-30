@@ -1304,6 +1304,29 @@ def test_normalize_display_name_i18n_rejects_role_and_icon_noise():
     assert icon_noise is None
 
 
+def test_normalize_display_name_i18n_rejects_logo_slug_and_portal_noise():
+    logo_slug = extractor_module.helpers._normalize_display_name_i18n(
+        {"en": "school-logo"},
+        "bg",
+    )
+    portal_noise = extractor_module.helpers._normalize_display_name_i18n(
+        {"bg": "Към Портал МИЛЕА"},
+        "bg",
+    )
+
+    assert logo_slug is None
+    assert portal_noise is None
+
+
+def test_normalize_display_name_i18n_rejects_submenu_navigation_noise():
+    normalized = extractor_module.helpers._normalize_display_name_i18n(
+        {"bg": "Close submenu (Училището)", "en": "Close submenu (Училището)"},
+        "bg",
+    )
+
+    assert normalized is None
+
+
 def test_extract_display_name_i18n_deterministic_falls_back_to_known_aliases():
     extracted = extractor_module.helpers._extract_display_name_i18n_deterministic(
         text="## Our kindergartens",

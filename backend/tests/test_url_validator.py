@@ -30,6 +30,7 @@ class TestURLValidator:
         validator = URLValidator("bg")
         assert len(validator.keywords) > 0
         assert "училище" in validator.keywords
+        assert "school" in validator.keywords
 
     def test_init_english_keywords(self):
         """Validator loads English keywords."""
@@ -136,6 +137,7 @@ class TestValidationAliases:
                     "bg": 'ЧОУ "Фюжън"',
                     "en": "Fusion School",
                 },
+                "moe_abbreviation": 'ЧОУ "Фюжън"',
                 "name_aliases": ["Fusion", "Fusion School"],
             }
         )
@@ -501,6 +503,101 @@ class TestURLValidatorHeuristics:
                     "https://example.bg/catalog/schools",
                     use_llm_fallback=True,
                     school_name='74 СУ "Гоце Делчев"',
+                )
+
+            llm_mock.assert_not_called()
+            assert result == ValidationResult.INVALID
+            assert final_url is None
+            assert "Directory-like listing signals" in reason
+
+    async def test_validate_url_uses_llm_for_school_like_english_page_with_partial_name_match(self):
+        """A school-looking English landing page should not be rejected before LLM on one weak directory signal."""
+        validator = URLValidator("bg")
+
+        html_content = """
+        <html>
+            <head><title>Zlatarski International School of Sofia</title></head>
+            <body>
+                <a href="/about/">About the school</a>
+                <a href="/curriculum/">Curriculum</a>
+                <a href="https://www.linkedin.com/company/zlatarski-international-school">Community</a>
+                <a href="http://linkedin.com/company/zlatarski-international-school">Careers</a>
+                <a href="/company/history/">History</a>
+                <a href="/company/mission/">Mission</a>
+                <a href="/admissions/">Admissions</a>
+                <a href="/news/">Student Success</a>
+                <p>30 years of quality international education in Sofia, Bulgaria.</p>
+            </body>
+        </html>
+        """
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.url = "https://zlatarskischool.org"
+        mock_response.text = html_content
+
+        with patch("httpx.AsyncClient") as mock_client_class:
+            mock_client = AsyncMock()
+            mock_client.__aenter__.return_value = mock_client
+            mock_client.__aexit__.return_value = None
+            mock_client.get.return_value = mock_response
+            mock_client_class.return_value = mock_client
+
+            with patch.object(
+                validator,
+                "_llm_validate",
+                new=AsyncMock(return_value=(ValidationResult.VALID, "https://zlatarskischool.org", "LLM validation")),
+            ) as llm_mock:
+                result, final_url, reason = await validator.validate_url(
+                    "https://zlatarskischool.org",
+                    use_llm_fallback=True,
+                    school_name='"ЧАСТНА ЕЗИКОВА ГИМНАЗИЯ "Проф. д-р Васил Златарски" ЕООД',
+                )
+
+            llm_mock.assert_awaited_once()
+            assert result == ValidationResult.VALID
+            assert final_url == "https://zlatarskischool.org"
+            assert reason == "LLM validation"
+
+    async def test_validate_url_keeps_rejecting_corporate_site_with_partial_acronym_match(self):
+        """A corporate root site with one acronym overlap should still fail before LLM."""
+        validator = URLValidator("bg")
+
+        html_content = """
+        <html>
+            <head><title>Leadership through excellence - GBS</title></head>
+            <body>
+                <a href="/about-gbs/group-of-companies/">Group of companies</a>
+                <a href="/about-gbs/group-of-companies/">Group of companies 2</a>
+                <a href="https://www.linkedin.com/company/glavbolgarstroy-holding/">LinkedIn</a>
+                <a href="https://www.linkedin.com/company/glavbolgarstroy-holding/">LinkedIn 2</a>
+                <p>Connecting, creating, inspiring.</p>
+                <p>Energy infrastructure and transport infrastructure projects.</p>
+            </body>
+        </html>
+        """
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.url = "https://gbs-bg.com"
+        mock_response.text = html_content
+
+        with patch("httpx.AsyncClient") as mock_client_class:
+            mock_client = AsyncMock()
+            mock_client.__aenter__.return_value = mock_client
+            mock_client.__aexit__.return_value = None
+            mock_client.get.return_value = mock_response
+            mock_client_class.return_value = mock_client
+
+            with patch.object(
+                validator,
+                "_llm_validate",
+                new=AsyncMock(return_value=(ValidationResult.INVALID, None, "LLM invalid")),
+            ) as llm_mock:
+                result, final_url, reason = await validator.validate_url(
+                    "https://gbs-bg.com",
+                    use_llm_fallback=True,
+                    school_name='"Частна детска градина "ГБС Кидс" ЕООД',
                 )
 
             llm_mock.assert_not_called()

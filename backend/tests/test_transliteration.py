@@ -52,13 +52,25 @@ def test_resolve_name_i18n_handles_malformed_nested_quotes_in_legal_name():
 
 def test_resolve_name_i18n_prefers_non_generic_bg_display_name_for_english_fallback():
     resolved = resolve_name_i18n(
-        {"bg": '"ЧАСТНА ДЕТСКА ГРАДИНА НИКАТОР" ЕООД'},
+        {"bg": '"ЧАСТНА ДЕТСКА ГРАДИНА НИКАТОР" ЕООД', "en": '"Chastna detska gradina Nikator" EOOD'},
         {"display_name_i18n": {"bg": "НИКАТОР"}},
     )
 
     assert resolved == {
         "bg": "НИКАТОР",
         "en": "Nikator",
+    }
+
+
+def test_resolve_name_i18n_does_not_prefer_raw_legal_english_when_display_bg_exists():
+    resolved = resolve_name_i18n(
+        {"bg": '"ЧАСТНА ДЕТСКА ГРАДИНА "ДЕТСКА МЕЧТА" ООД', "en": '"Chastna detska gradina "Detska mechta" OOD'},
+        {"display_name_i18n": {"bg": "Детска мечта"}},
+    )
+
+    assert resolved == {
+        "bg": "Детска мечта",
+        "en": "Detska mechta",
     }
 
 
@@ -83,6 +95,39 @@ def test_resolve_name_i18n_strips_generic_german_school_prefix_for_english():
     assert resolved == {
         "bg": "немска гимназия Ерих Кестнер",
         "en": "Erih Kestner",
+    }
+
+
+def test_resolve_name_i18n_strips_legal_suffixes_when_no_display_name_exists():
+    resolved = resolve_name_i18n(
+        {"bg": '"Частно основно училище с изучаване на английски език "Меридиан 22" ЕООД'},
+    )
+
+    assert resolved == {
+        "bg": "Меридиан 22",
+        "en": "Meridian 22",
+    }
+
+
+def test_resolve_name_i18n_strips_association_suffix_when_no_display_name_exists():
+    resolved = resolve_name_i18n(
+        {"bg": '"ЧАСТНО ОСНОВНО УЧИЛИЩЕ МИЛЕА" Сдружение'},
+    )
+
+    assert resolved == {
+        "bg": "МИЛЕА",
+        "en": "MILEA",
+    }
+
+
+def test_resolve_name_i18n_preserves_clean_raw_english_when_no_display_name_exists():
+    resolved = resolve_name_i18n(
+        {"bg": "Американски международен колеж", "en": "American International College"},
+    )
+
+    assert resolved == {
+        "bg": "Американски международен колеж",
+        "en": "American International College",
     }
 
 

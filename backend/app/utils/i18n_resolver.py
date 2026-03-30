@@ -44,8 +44,8 @@ _GENERIC_BG_NAME_STRIP_PREFIX = re.compile(
 )
 _LEGAL_ENTITY_SUFFIX_RE = re.compile(
     r"""[\s,"'„“”-]*(?:
-        еоод|оод|ад|ет|еад|кд|сд|
-        eood|ood|ad|ead|ltd|llc|inc
+        еоод|оод|ад|ет|еад|кд|сд|сдружение|
+        eood|ood|ad|ead|ltd|llc|inc|association
     )\.?$""",
     flags=re.IGNORECASE | re.VERBOSE,
 )
@@ -101,6 +101,18 @@ def _clean_core_candidate(text: str | None) -> str | None:
     cleaned = _LEGAL_ENTITY_SUFFIX_RE.sub("", normalized).strip(' "„“”,-')
     cleaned = re.sub(r"\s+", " ", cleaned).strip()
     return cleaned or None
+
+
+def _extract_legal_fallback_name(text: str | None) -> str | None:
+    normalized = re.sub(r"\s+", " ", text or "").strip(' "„“”')
+    if not normalized or not _LEGAL_ENTITY_SUFFIX_RE.search(normalized):
+        return None
+
+    core = _extract_named_core(normalized)
+    if core and not _is_generic_bg_label(core):
+        return core
+
+    return _clean_core_candidate(normalized)
 
 
 def _extract_named_core(text: str | None) -> str | None:
@@ -160,6 +172,16 @@ def _prefer_display_english(display_name: Mapping[str, Any] | None) -> str | Non
     return None
 
 
+def _prefer_raw_english_name(raw_name: Mapping[str, str] | None) -> str | None:
+    cleaned = _clean_i18n_map(raw_name)
+    raw_en = cleaned.get("en")
+    if not raw_en or _contains_cyrillic(raw_en):
+        return None
+    if _LEGAL_ENTITY_SUFFIX_RE.search(raw_en):
+        return None
+    return raw_en
+
+
 def _is_generic_bg_label(text: str | None) -> bool:
     normalized = re.sub(r"\s+", " ", text or "").strip(' "„“”')
     if not normalized:
@@ -185,15 +207,18 @@ def resolve_name_i18n(
     display = _clean_i18n_map(display_name if isinstance(display_name, Mapping) else None)
 
     resolved: dict[str, str] = {}
-    bg_name = display.get("bg") or display.get("en") or raw_name.get("bg") or raw_name.get("en")
+    raw_primary_name = raw_name.get("bg") or raw_name.get("en")
+    cleaned_raw_fallback = _extract_legal_fallback_name(raw_primary_name)
+
+    bg_name = display.get("bg") or display.get("en") or cleaned_raw_fallback or raw_primary_name
     if bg_name:
         resolved["bg"] = bg_name
 
     en_name = _prefer_display_english(display)
+    if not en_name and not display:
+        en_name = _prefer_raw_english_name(raw_name)
     if not en_name:
-        en_name = raw_name.get("en")
-    if not en_name:
-        derived_source = raw_name.get("bg")
+        derived_source = raw_name.get("bg") or raw_name.get("en")
         if display.get("bg"):
             display_bg = display.get("bg")
             display_core = _extract_named_core(display_bg)
@@ -211,9 +236,11 @@ def resolve_name_i18n(
                 preferred_core = display_core or raw_core
             derived_source = (
                 preferred_core
-                or (display_bg if display_bg and not _is_generic_bg_label(display_bg) else None)
+                or display_bg
                 or derived_source
             )
+        elif cleaned_raw_fallback:
+            derived_source = cleaned_raw_fallback
         en_name = derive_english_name(derived_source)
     if en_name:
         resolved["en"] = en_name
