@@ -5,7 +5,7 @@ import { calculateAgeGroup } from '../../utils/education'
 import { searchSchools, fetchSchoolCounts } from '../../api/schools'
 import { useCountry } from '../../context/CountryContext'
 import { getAgeGroupsByCategory, getAgeGroupLabel } from '../../utils/countryConfig'
-import { getSchoolName } from '../../utils/i18n'
+import { getAddress, getSchoolName } from '../../utils/i18n'
 import { normalizeSchoolList } from '../../utils/schoolAttributes'
 import LanguageToggle from '../LanguageToggle/LanguageToggle'
 
@@ -75,6 +75,10 @@ function LandingPage() {
     () => normalizeSchoolList(searchResults, i18n.language),
     [searchResults, i18n.language]
   )
+
+  const getPrimaryLocation = (school) => {
+    return school.locations?.find(location => location.is_primary) || school.locations?.[0] || null
+  }
 
   // Fetch school counts on mount
   useEffect(() => {
@@ -329,6 +333,11 @@ function LandingPage() {
                     <div className="text-sm text-neutral-500 mt-0.5">
                       {t(`educationLevels.${school.education_level}`)} • {t(`schoolTypes.${school.school_type}`)}
                     </div>
+                    {getPrimaryLocation(school) && (
+                      <div className="text-xs text-neutral-500 mt-1 line-clamp-2">
+                        {getAddress(getPrimaryLocation(school), i18n.language)}
+                      </div>
+                    )}
                   </button>
                 ))}
               </div>

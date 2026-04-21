@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.services.geocoding.base import GeocodingResult
 from app.services.geocoding.nominatim import NominatimProvider
 from app.services.geocoding.service import GeocodingService
+from app.scrapers.cli import _oblast_fallback_query_specs
 from app.models import School, SchoolLocation
 
 
@@ -71,6 +72,28 @@ class TestNominatimProvider:
         )
         candidates = provider._build_bulgarian_query_candidates(normalized, city="sofia")
         assert "ж.к. Дружба 1, бл. 3, София" in candidates
+
+    def test_oblast_fallback_specs_include_school_and_locality_queries(self):
+        specs = _oblast_fallback_query_specs(
+            address="с.Осиковица, община Правец",
+            school_name='Основно училище "Любен Каравелов"',
+            town_name="Осиковица",
+            municipality_name="Правец",
+        )
+        queries = {query: precision for query, precision, _ in specs}
+        assert 'Основно училище Любен Каравелов, Осиковица' in queries
+        assert 'Осиковица, Правец' in queries
+        assert queries['Осиковица, Правец'] == "locality"
+
+    def test_oblast_fallback_specs_generate_street_query_without_number(self):
+        specs = _oblast_fallback_query_specs(
+            address='Копривщица, бул."х.Н.Палавеев"№77',
+            school_name='Средно училище "Любен Каравелов"',
+            town_name="Копривщица",
+            municipality_name="Копривщица",
+        )
+        queries = {query: precision for query, precision, _ in specs}
+        assert 'Копривщица хаджи Н Палавеев' in queries or 'Копривщица хаджи Н.Палавеев' in queries or 'Копривщица хаджи Н Палавеев 77' in queries
 
     def test_city_match_accepts_sofia_and_stolichna(self):
         """City matching should treat Sofia and Stolichna as equivalent."""
@@ -585,6 +608,76 @@ class TestGeocodingService:
         mock_provider.geojson_provider.geocode.assert_called_once()
         mock_provider.geocode.assert_not_called()
         assert result.success is True
+
+    async def test_sofia_oblast_schools_prefer_nominatim_before_geojson(self, db_session: AsyncSession):
+        """Sofia-oblast schools should use address-first geocoding to avoid GeoJSON false positives."""
+        class _CompositeLikeProvider:
+            provider_name = "composite-mock"
+
+            def __init__(self):
+                self.geocode = AsyncMock(return_value=GeocodingResult(
+                    lat=0.0,
+                    lng=0.0,
+                    success=True,
+                    provider="composite",
+                ))
+                self.nominatim_provider = type(
+                    "NomProvider",
+                    (),
+                    {
+                        "geocode": AsyncMock(return_value=GeocodingResult(
+                            lat=42.744,
+                            lng=23.163,
+                            success=True,
+                            provider="nominatim",
+                        ))
+                    },
+                )()
+                self.geojson_provider = type(
+                    "GeoProvider",
+                    (),
+                    {
+                        "geocode": AsyncMock(return_value=GeocodingResult(
+                            lat=43.80754,
+                            lng=26.18329,
+                            success=True,
+                            provider="geojson_bg",
+                        ))
+                    },
+                )()
+
+        mock_provider = _CompositeLikeProvider()
+        service = GeocodingService(db=db_session, provider=mock_provider)
+
+        school = School(
+            name_i18n={"bg": 'Професионална гимназия по транспорт "Никола Йонков Вапцаров"'},
+            country_code="bg",
+            city="sofia",
+            school_type="state",
+            education_level="upper_secondary",
+            attributes={
+                "moe_region_code": 23,
+                "moe_town_name": "Сливница",
+            },
+        )
+        db_session.add(school)
+        await db_session.flush()
+
+        location = SchoolLocation(
+            school_id=school.id,
+            address_i18n={"bg": 'Сливница, ул. "Кирил и Методий" № 4'},
+            is_primary=True,
+        )
+        db_session.add(location)
+        await db_session.commit()
+
+        result = await service.geocode_location(location)
+
+        mock_provider.nominatim_provider.geocode.assert_called_once()
+        mock_provider.geojson_provider.geocode.assert_not_called()
+        mock_provider.geocode.assert_not_called()
+        assert result.success is True
+        assert result.provider == "nominatim"
 
 
 class TestGeoJSONProvider:

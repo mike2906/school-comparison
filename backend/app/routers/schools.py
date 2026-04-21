@@ -70,6 +70,7 @@ async def get_school_counts(
             .join(SchoolLocation, SchoolLocation.id == SchoolLocationAgeGroupShift.location_id)
             .join(School, SchoolLocation.school_id == School.id)
             .where(School.country_code == country_code)
+            .where(SchoolService._resolved_location_clause(SchoolLocation))
             .group_by(SchoolLocationAgeGroupShift.age_group)
         )
         result = await db.execute(query)
