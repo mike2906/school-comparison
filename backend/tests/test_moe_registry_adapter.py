@@ -149,6 +149,19 @@ class TestMoeRegistryAdapterIntegration:
             ],
         }
 
+        region_lookup_response = {
+            "status": 1,
+            "data": [{"code": 22, "label": "София-град"}],
+        }
+        municipality_lookup_response = {
+            "status": 1,
+            "data": [{"code": 220, "label": "Столична"}],
+        }
+        town_lookup_response = {
+            "status": 1,
+            "data": [{"code": 68134, "label": "София"}],
+        }
+
         # Mock httpx responses
         class MockResponse:
             def __init__(self, json_data):
@@ -167,6 +180,12 @@ class TestMoeRegistryAdapterIntegration:
         async def mock_post(url, **kwargs):
             if "public-register" in url:
                 return MockResponse(public_register_response)
+            elif "regionMultiple" in url:
+                return MockResponse(region_lookup_response)
+            elif "municipalityMultiple" in url:
+                return MockResponse(municipality_lookup_response)
+            elif "townMultiple" in url:
+                return MockResponse(town_lookup_response)
             elif "institution" in url:
                 # Return detail for first school, then second
                 detail_call_count[0] += 1
@@ -227,6 +246,7 @@ class TestMoeRegistryAdapterIntegration:
         assert school1.locations[0].lng == pytest.approx(23.3502)
         assert "coords_source=nominatim" in school1.locations[0].location_tags
         assert school1.attributes["moe_email"] == "info@zlatarskischool.org"
+        assert school1.attributes["moe_town_name"] == "София"
 
         # Verify second school (ДГ - kindergarten)
         school2 = schools[1]
@@ -281,6 +301,12 @@ class TestMoeRegistryAdapterIntegration:
                 return self._json_data
 
         async def mock_post(url, **kwargs):
+            if "regionMultiple" in url:
+                return MockResponse({"status": 1, "data": [{"code": 22, "label": "София-град"}]})
+            if "municipalityMultiple" in url:
+                return MockResponse({"status": 1, "data": [{"code": 220, "label": "Столична"}]})
+            if "townMultiple" in url:
+                return MockResponse({"status": 1, "data": [{"code": 68134, "label": "София"}]})
             return MockResponse(public_register_response)
 
         mock_client = AsyncMock()
@@ -351,6 +377,12 @@ class TestMoeRegistryAdapterIntegration:
         async def mock_post(url, **kwargs):
             if "public-register" in url:
                 return MockResponse(public_register_response)
+            if "regionMultiple" in url:
+                return MockResponse({"status": 1, "data": [{"code": 22, "label": "София-град"}]})
+            if "municipalityMultiple" in url:
+                return MockResponse({"status": 1, "data": [{"code": 220, "label": "Столична"}]})
+            if "townMultiple" in url:
+                return MockResponse({"status": 1, "data": [{"code": 68134, "label": "София"}]})
             return MockResponse(detail_response)
 
         mock_client = AsyncMock()
@@ -437,6 +469,12 @@ class TestMoeRegistryAdapterIntegration:
         async def mock_post(url, **kwargs):
             if "public-register" in url:
                 return MockResponse(public_register_response)
+            if "regionMultiple" in url:
+                return MockResponse({"status": 1, "data": [{"code": 22, "label": "София-град"}]})
+            if "municipalityMultiple" in url:
+                return MockResponse({"status": 1, "data": [{"code": 220, "label": "Столична"}]})
+            if "townMultiple" in url:
+                return MockResponse({"status": 1, "data": [{"code": 68134, "label": "София"}]})
             return MockResponse(detail_response)
 
         mock_client = AsyncMock()
@@ -592,3 +630,14 @@ class TestMoeRegistryAgeGroupExtraction:
         
         result = MoeRegistryAdapter._get_age_groups_for_detailed_type(None, 'kindergarten')
         assert result == ['first', 'second', 'third', 'preschool']
+
+    def test_preferred_geocoding_city_uses_town_name_for_sofia_oblast(self):
+        from app.scrapers.sources.bg.moe_registry import MoeRegistryAdapter
+
+        attrs = {
+            "moe_region_code": MoeRegistryAdapter.SOFIA_OBLAST_REGION,
+            "moe_municipality_name": "Своге",
+            "moe_town_name": "Реброво",
+        }
+
+        assert MoeRegistryAdapter._preferred_geocoding_city("sofia", attrs) == "Реброво"

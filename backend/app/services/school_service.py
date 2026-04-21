@@ -1,8 +1,8 @@
 from typing import Optional
 
-from sqlalchemy import select, cast, String, or_
+from sqlalchemy import and_, exists, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import aliased, selectinload
 
 from app.models.school import School, SchoolLocation, SchoolLocationAgeGroupShift
 
@@ -10,6 +10,26 @@ from app.models.school import School, SchoolLocation, SchoolLocationAgeGroupShif
 class SchoolService:
     def __init__(self, db: AsyncSession):
         self.db = db
+
+    @staticmethod
+    def _resolved_location_clause(location_model=SchoolLocation):
+        return and_(
+            location_model.lat.is_not(None),
+            location_model.lng.is_not(None),
+        )
+
+    @staticmethod
+    def _has_resolved_location():
+        resolved_location = aliased(SchoolLocation)
+        return exists(
+            select(1)
+            .select_from(resolved_location)
+            .where(
+                resolved_location.school_id == School.id,
+                SchoolService._resolved_location_clause(resolved_location),
+            )
+            .correlate(School)
+        )
 
     def _base_query(self):
         """Base query with all relationships eager-loaded."""
@@ -28,6 +48,7 @@ class SchoolService:
             .join(SchoolLocationAgeGroupShift, SchoolLocationAgeGroupShift.location_id == SchoolLocation.id)
             .where(SchoolLocationAgeGroupShift.age_group == age_group)
             .where(School.country_code == country_code)
+            .where(self._resolved_location_clause(SchoolLocation))
         )
         result = await self.db.execute(query)
         return result.scalars().unique().all()
@@ -67,7 +88,11 @@ class SchoolService:
         Returns:
             List of schools matching the filters with all relationships eager-loaded
         """
-        query = self._base_query().where(School.country_code == country_code)
+        query = (
+            self._base_query()
+            .where(School.country_code == country_code)
+            .where(self._has_resolved_location())
+        )
 
         # Filter by age group if specified
         if age_group:
@@ -76,6 +101,7 @@ class SchoolService:
                 .join(SchoolLocation)
                 .join(SchoolLocationAgeGroupShift, SchoolLocationAgeGroupShift.location_id == SchoolLocation.id)
                 .where(SchoolLocationAgeGroupShift.age_group == age_group)
+                .where(self._resolved_location_clause(SchoolLocation))
             )
 
         # Apply education_level filter unless include_crossover is true for preschool
@@ -133,7 +159,11 @@ class SchoolService:
         return [school for school in schools if matches_filter(school)]
 
     async def get_available_filters(self, country_code: str = "bg") -> dict[str, list[str]]:
-        query = select(School.attributes).where(School.country_code == country_code)
+        query = (
+            select(School.attributes)
+            .where(School.country_code == country_code)
+            .where(self._has_resolved_location())
+        )
         result = await self.db.execute(query)
         rows = result.scalars().all()
 
@@ -178,7 +208,7 @@ class SchoolService:
 
     async def search_schools(self, search_query: str, country_code: str = "bg", limit: int = 10) -> list[School]:
         """
-        Search schools by name.
+        Search schools by name or location.
 
         Args:
             search_query: Search term (already sanitized)
@@ -192,20 +222,35 @@ class SchoolService:
         sanitized_query = search_query.replace("%", "\\%").replace("_", "\\_")
         pattern = f"%{sanitized_query}%"
 
-        # Use cast to String for cross-database compatibility (works on both PostgreSQL and SQLite)
-        query = (
-            self._base_query()
+        # Match on school names, branded display names, and location addresses.
+        # Query matching ids first so multiple matching locations do not duplicate
+        # schools or consume the result limit.
+        matching_school_ids = (
+            select(School.id)
+            .outerjoin(SchoolLocation, SchoolLocation.school_id == School.id)
             .where(School.country_code == country_code)
+            .where(self._has_resolved_location())
             .where(
                 or_(
-                    cast(School.name_i18n, String).ilike(pattern, escape="\\"),
-                    cast(School.attributes["display_name_i18n"], String).ilike(pattern, escape="\\"),
+                    School.name_i18n["bg"].as_string().ilike(pattern, escape="\\"),
+                    School.name_i18n["en"].as_string().ilike(pattern, escape="\\"),
+                    School.attributes["display_name_i18n"]["bg"].as_string().ilike(pattern, escape="\\"),
+                    School.attributes["display_name_i18n"]["en"].as_string().ilike(pattern, escape="\\"),
+                    SchoolLocation.address_i18n["bg"].as_string().ilike(pattern, escape="\\"),
+                    SchoolLocation.address_i18n["en"].as_string().ilike(pattern, escape="\\"),
                 )
             )
+            .distinct()
             .limit(limit)
+            .subquery()
+        )
+
+        query = (
+            self._base_query()
+            .join(matching_school_ids, School.id == matching_school_ids.c.id)
         )
         result = await self.db.execute(query)
-        return result.scalars().all()
+        return result.scalars().unique().all()
 
     async def get_schools_by_ids(self, school_ids: list[int]) -> list[School]:
         """

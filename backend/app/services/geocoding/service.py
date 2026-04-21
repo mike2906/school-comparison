@@ -13,6 +13,21 @@ from app.config import get_settings
 logger = logging.getLogger(__name__)
 
 
+def _preferred_geocoding_city(school: School | None) -> Optional[str]:
+    if school is None:
+        return None
+
+    attrs = school.attributes or {}
+    if attrs.get("moe_region_code") == 23:
+        return (
+            attrs.get("moe_town_name")
+            or attrs.get("moe_municipality_name")
+            or attrs.get("moe_region_name")
+            or school.city
+        )
+    return school.city
+
+
 class GeocodingService:
     """
     Service for geocoding school locations.
@@ -112,63 +127,64 @@ class GeocodingService:
                 error="No address available",
             )
 
-        # Fetch school data for GeoJSON matching (if provider supports it)
+        # Fetch school data for GeoJSON matching and locality-aware city hints.
         school_name = None
+        fallback_school_name = None
         city = None
-        if hasattr(self.provider, 'geojson_provider'):  # Composite provider
-            school_result = await self.db.execute(
-                select(School).where(School.id == location.school_id)
-            )
-            school = school_result.scalar_one_or_none()
-            if school:
-                school_name = school.name_i18n.get("bg") or school.name_i18n.get("en")
-                city = school.city  # Use city from database instead of parsing address
+        school_result = await self.db.execute(
+            select(School).where(School.id == location.school_id)
+        )
+        school = school_result.scalar_one_or_none()
+        if school:
+            school_name = school.name_i18n.get("bg") or school.name_i18n.get("en")
+            fallback_school_name = school_name
+            city = _preferred_geocoding_city(school)
 
-                # For merged branch families (kg.sofia "сграда"), name-only GeoJSON
-                # lookups can collapse multiple branches to one point. Force
-                # address-first fallback by skipping GeoJSON in these cases.
-                attrs = school.attributes or {}
-                source_refs = attrs.get("source_refs") if isinstance(attrs, dict) else {}
-                kg_ref = source_refs.get("kg_sofia_bg") if isinstance(source_refs, dict) else {}
-                kg_record_ids = kg_ref.get("record_ids") if isinstance(kg_ref, dict) else []
-                is_merged_branch_school = bool(attrs.get("kg_sofia_merged_buildings")) or (
-                    isinstance(kg_record_ids, list) and len(kg_record_ids) > 1
-                )
-                if is_merged_branch_school:
-                    school_name = None
+            # For merged branch families (kg.sofia "сграда"), name-only GeoJSON
+            # lookups can collapse multiple branches to one point. Force
+            # address-first fallback by skipping GeoJSON in these cases.
+            attrs = school.attributes or {}
+            source_refs = attrs.get("source_refs") if isinstance(attrs, dict) else {}
+            kg_ref = source_refs.get("kg_sofia_bg") if isinstance(source_refs, dict) else {}
+            kg_record_ids = kg_ref.get("record_ids") if isinstance(kg_ref, dict) else []
+            is_merged_branch_school = bool(attrs.get("kg_sofia_merged_buildings")) or (
+                isinstance(kg_record_ids, list) and len(kg_record_ids) > 1
+            )
+            if is_merged_branch_school:
+                school_name = None
 
         # Geocode using provider
         logger.info(f"Geocoding location {location.id}: {address} (school: {school_name}, city: {city})")
         result = None
 
-        # Special handling for merged kg.sofia branch families:
-        # 1) Try address-first geocoding (Nominatim) for per-branch precision
-        # 2) If that fails, fall back to GeoJSON using school name
-        if (
-            school_name is None
+        # Special handling for merged kg.sofia branch families and Sofia-oblast
+        # schools: use address-first geocoding before name-based GeoJSON lookup.
+        # This avoids collapsing distinct branch/town records onto an unrelated
+        # school point when the legal name is common across Bulgaria.
+        prefer_address_first = (
+            school is not None
+            and (
+                school_name is None
+                or (school.attributes or {}).get("moe_region_code") == 23
+            )
             and hasattr(self.provider, "nominatim_provider")
             and hasattr(self.provider, "geojson_provider")
+        )
+        if (
+            prefer_address_first
         ):
             result = await self.provider.nominatim_provider.geocode(
                 address=address,
                 country_code=country_code,
                 city=city,
             )
-            if not result.success:
-                school_result = await self.db.execute(
-                    select(School).where(School.id == location.school_id)
+            if not result.success and fallback_school_name:
+                result = await self.provider.geojson_provider.geocode(
+                    address=address,
+                    country_code=country_code,
+                    school_name=fallback_school_name,
+                    city=city,
                 )
-                school = school_result.scalar_one_or_none()
-                fallback_school_name = None
-                if school:
-                    fallback_school_name = school.name_i18n.get("bg") or school.name_i18n.get("en")
-                if fallback_school_name:
-                    result = await self.provider.geojson_provider.geocode(
-                        address=address,
-                        country_code=country_code,
-                        school_name=fallback_school_name,
-                        city=city,
-                    )
 
         if result is None:
             result = await self.provider.geocode(

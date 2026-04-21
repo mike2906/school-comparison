@@ -2,7 +2,7 @@
 import pytest
 from sqlalchemy import select
 
-from app.models.school import School
+from app.models.school import School, SchoolLocation, SchoolLocationAgeGroupShift
 
 
 class TestHealthEndpoint:
@@ -121,6 +121,40 @@ class TestSchoolsEndpoint:
                 assert "age_groups" in location  # Changed to age_groups (list property)
                 assert "age_group_shifts" in location  # Junction table data
 
+    @pytest.mark.asyncio
+    async def test_list_excludes_schools_without_resolved_locations(self, seeded_db, seeded_client):
+        hidden_school = School(
+            name_i18n={"bg": "Скрито училище", "en": "Hidden School"},
+            country_code="bg",
+            school_type="state",
+            education_level="primary",
+            city="sofia",
+        )
+        seeded_db.add(hidden_school)
+        await seeded_db.flush()
+        hidden_location = SchoolLocation(
+            school_id=hidden_school.id,
+            address_i18n={"bg": "ул. Без координати 1, София", "en": "1 No Coordinates St, Sofia"},
+            lat=None,
+            lng=None,
+            is_primary=True,
+        )
+        seeded_db.add(hidden_location)
+        await seeded_db.flush()
+        seeded_db.add(
+            SchoolLocationAgeGroupShift(
+                location_id=hidden_location.id,
+                age_group="grade_1_4",
+                shift="morning",
+            )
+        )
+        await seeded_db.commit()
+
+        response = await seeded_client.get("/schools")
+        assert response.status_code == 200
+        ids = {school["id"] for school in response.json()}
+        assert hidden_school.id not in ids
+
 
 class TestSchoolsFilterEndpoint:
     """Test advanced filtering capabilities."""
@@ -164,6 +198,56 @@ class TestSchoolsFilterEndpoint:
         # Should return 1 state kindergarten with first group
         assert len(data) == 1
         assert data[0]["school_type"] == "state"
+
+    @pytest.mark.asyncio
+    async def test_age_group_filter_excludes_schools_with_only_unresolved_matching_location(self, seeded_db, seeded_client):
+        school = School(
+            name_i18n={"bg": "Смесени локации", "en": "Mixed Locations School"},
+            country_code="bg",
+            school_type="state",
+            education_level="primary",
+            city="sofia",
+        )
+        seeded_db.add(school)
+        await seeded_db.flush()
+
+        resolved_location = SchoolLocation(
+            school_id=school.id,
+            address_i18n={"bg": "ул. Видима 4, София", "en": "4 Visible St, Sofia"},
+            lat=42.7001,
+            lng=23.3001,
+            is_primary=True,
+        )
+        unresolved_location = SchoolLocation(
+            school_id=school.id,
+            address_i18n={"bg": "ул. Невидима 5, София", "en": "5 Invisible St, Sofia"},
+            lat=None,
+            lng=None,
+            is_primary=False,
+        )
+        seeded_db.add_all([resolved_location, unresolved_location])
+        await seeded_db.flush()
+
+        seeded_db.add(
+            SchoolLocationAgeGroupShift(
+                location_id=resolved_location.id,
+                age_group="preschool",
+                shift="full_day",
+            )
+        )
+        seeded_db.add(
+            SchoolLocationAgeGroupShift(
+                location_id=unresolved_location.id,
+                age_group="grade_1_4",
+                shift="morning",
+            )
+        )
+        await seeded_db.commit()
+
+        response = await seeded_client.get("/schools?age_group=grade_1_4")
+        assert response.status_code == 200
+        ids = {item["id"] for item in response.json()}
+        assert school.id not in ids
 
     @pytest.mark.asyncio
     async def test_include_crossover_preschool(self, seeded_client):
@@ -216,6 +300,24 @@ class TestSchoolsSearchEndpoint:
         assert len(data) >= 1
 
     @pytest.mark.asyncio
+    async def test_search_matches_location_address(self, seeded_client):
+        """Search also matches location address text."""
+        response = await seeded_client.get("/schools/search?q=Vitosha")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["name_i18n"]["en"] == "Private KG Sunshine"
+
+    @pytest.mark.asyncio
+    async def test_search_deduplicates_multi_location_matches(self, seeded_client):
+        """Multiple matching addresses still return each school once."""
+        response = await seeded_client.get("/schools/search?q=Sofia")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 3
+        assert len({school["id"] for school in data}) == 3
+
+    @pytest.mark.asyncio
     async def test_search_matches_display_name_i18n(self, seeded_db, seeded_client):
         """Search also matches branded display names stored in attributes."""
         school = (
@@ -257,6 +359,32 @@ class TestSchoolsSearchEndpoint:
         assert response.status_code == 200
         assert response.json() == []
 
+    @pytest.mark.asyncio
+    async def test_search_excludes_schools_without_resolved_locations(self, seeded_db, seeded_client):
+        hidden_school = School(
+            name_i18n={"bg": "Невидимо училище", "en": "Invisible School"},
+            country_code="bg",
+            school_type="state",
+            education_level="primary",
+            city="sofia",
+        )
+        seeded_db.add(hidden_school)
+        await seeded_db.flush()
+        seeded_db.add(
+            SchoolLocation(
+                school_id=hidden_school.id,
+                address_i18n={"bg": "ул. Невидима 2, София", "en": "2 Invisible St, Sofia"},
+                lat=None,
+                lng=None,
+                is_primary=True,
+            )
+        )
+        await seeded_db.commit()
+
+        response = await seeded_client.get("/schools/search?q=Invisible")
+        assert response.status_code == 200
+        assert response.json() == []
+
 
 class TestSchoolsCountsEndpoint:
     """Test counts endpoint."""
@@ -280,6 +408,90 @@ class TestSchoolsCountsEndpoint:
         response = await client.get("/schools/counts")
         assert response.status_code == 200
         assert response.json() == {}
+
+    @pytest.mark.asyncio
+    async def test_counts_exclude_schools_without_resolved_locations(self, seeded_db, seeded_client):
+        hidden_school = School(
+            name_i18n={"bg": "Брояч скрито училище", "en": "Hidden Count School"},
+            country_code="bg",
+            school_type="state",
+            education_level="primary",
+            city="sofia",
+        )
+        seeded_db.add(hidden_school)
+        await seeded_db.flush()
+        hidden_location = SchoolLocation(
+            school_id=hidden_school.id,
+            address_i18n={"bg": "ул. Пропусната 3, София", "en": "3 Missing St, Sofia"},
+            lat=None,
+            lng=None,
+            is_primary=True,
+        )
+        seeded_db.add(hidden_location)
+        await seeded_db.flush()
+        seeded_db.add(
+            SchoolLocationAgeGroupShift(
+                location_id=hidden_location.id,
+                age_group="first",
+                shift="morning",
+            )
+        )
+        await seeded_db.commit()
+
+        response = await seeded_client.get("/schools/counts")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["first"] == 2
+
+    @pytest.mark.asyncio
+    async def test_counts_exclude_unresolved_locations_for_matching_age_group(self, seeded_db, seeded_client):
+        school = School(
+            name_i18n={"bg": "Брояч смесени локации", "en": "Mixed Count School"},
+            country_code="bg",
+            school_type="state",
+            education_level="primary",
+            city="sofia",
+        )
+        seeded_db.add(school)
+        await seeded_db.flush()
+
+        resolved_location = SchoolLocation(
+            school_id=school.id,
+            address_i18n={"bg": "ул. Видима 6, София", "en": "6 Visible St, Sofia"},
+            lat=42.7002,
+            lng=23.3002,
+            is_primary=True,
+        )
+        unresolved_location = SchoolLocation(
+            school_id=school.id,
+            address_i18n={"bg": "ул. Невидима 7, София", "en": "7 Invisible St, Sofia"},
+            lat=None,
+            lng=None,
+            is_primary=False,
+        )
+        seeded_db.add_all([resolved_location, unresolved_location])
+        await seeded_db.flush()
+
+        seeded_db.add(
+            SchoolLocationAgeGroupShift(
+                location_id=resolved_location.id,
+                age_group="preschool",
+                shift="full_day",
+            )
+        )
+        seeded_db.add(
+            SchoolLocationAgeGroupShift(
+                location_id=unresolved_location.id,
+                age_group="grade_1_4",
+                shift="morning",
+            )
+        )
+        await seeded_db.commit()
+
+        response = await seeded_client.get("/schools/counts")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["grade_1_4"] == 1
 
 
 class TestSchoolValidation:

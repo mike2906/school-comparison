@@ -11,6 +11,7 @@ backend/docs/MOE_API_DOCUMENTATION.md
 import hashlib
 import json
 import logging
+import re
 from datetime import datetime, timezone
 from typing import Optional
 import httpx
@@ -26,6 +27,7 @@ from app.services.geocoding.bg import GeoJSONProvider
 from app.services.geocoding.nominatim import NominatimProvider
 
 logger = logging.getLogger(__name__)
+_LOCALITY_MARKER_RE = re.compile(r"\b(?:гр\.?|с\.?|село|район|кв\.|ж\.к\.)\b", flags=re.IGNORECASE)
 
 
 @register_adapter
@@ -130,6 +132,9 @@ class MoeRegistryAdapter(BaseSourceAdapter):
         super().__init__(db)
         self._geojson_provider = GeoJSONProvider()
         self._nominatim_provider: Optional[NominatimProvider] = None
+        self._region_labels: dict[int, str] = {}
+        self._municipality_labels: dict[int, str] = {}
+        self._town_labels: dict[int, str] = {}
 
         settings = get_settings()
         contact_email = settings.geocoding_contact_email
@@ -174,6 +179,70 @@ class MoeRegistryAdapter(BaseSourceAdapter):
             List of age group codes
         """
         return MoeRegistryAdapter.EDUCATION_LEVEL_AGE_GROUPS.get(education_level, [])
+
+    @staticmethod
+    def _extract_code_label_map(payload: dict | None) -> dict[int, str]:
+        data = payload.get("data") if isinstance(payload, dict) else None
+        if not isinstance(data, list):
+            return {}
+
+        resolved: dict[int, str] = {}
+        for item in data:
+            if not isinstance(item, dict):
+                continue
+            code = item.get("code")
+            label = item.get("label")
+            if isinstance(code, int) and isinstance(label, str) and label.strip():
+                resolved[code] = label.strip()
+        return resolved
+
+    async def _load_reference_labels(self, client: httpx.AsyncClient) -> None:
+        if self._region_labels and self._municipality_labels and self._town_labels:
+            return
+
+        endpoints = (
+            ("_region_labels", self.REGIONS_URL),
+            ("_municipality_labels", self.MUNICIPALITIES_URL),
+            ("_town_labels", self.TOWNS_URL),
+        )
+        headers = {
+            "Accept": "application/json, text/plain, */*",
+            "Content-Type": "application/json",
+        }
+
+        for attr_name, url in endpoints:
+            try:
+                response = await client.post(url, json={}, headers=headers)
+                response.raise_for_status()
+                setattr(self, attr_name, self._extract_code_label_map(response.json()))
+            except Exception as exc:
+                logger.warning("Failed to load MoE lookup labels from %s: %s", url, exc)
+                setattr(self, attr_name, {})
+
+    @staticmethod
+    def _preferred_geocoding_city(city: Optional[str], attributes: Optional[dict]) -> Optional[str]:
+        attrs = attributes or {}
+        region_code = attrs.get("moe_region_code")
+        if region_code == MoeRegistryAdapter.SOFIA_OBLAST_REGION:
+            return (
+                attrs.get("moe_town_name")
+                or attrs.get("moe_municipality_name")
+                or attrs.get("moe_region_name")
+                or city
+            )
+        return city
+
+    @staticmethod
+    def _address_with_locality_hint(address: str, locality_name: Optional[str]) -> str:
+        normalized_address = (address or "").strip()
+        locality = (locality_name or "").strip()
+        if not normalized_address or not locality:
+            return normalized_address
+        if locality.casefold() in normalized_address.casefold():
+            return normalized_address
+        if _LOCALITY_MARKER_RE.search(normalized_address):
+            return normalized_address
+        return f"{locality}, {normalized_address}"
 
     async def discover(
         self,
@@ -234,6 +303,8 @@ class MoeRegistryAdapter(BaseSourceAdapter):
         }
 
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+            await self._load_reference_labels(client)
+
             # Step 1: Fetch schools from Sofia city and Sofia region
             logger.info(f"Fetching schools from MoE API: {self.PUBLIC_REGISTER_URL}")
 
@@ -384,12 +455,13 @@ class MoeRegistryAdapter(BaseSourceAdapter):
         """Geocode a discovered location using address-first lookup with GeoJSON fallback."""
         address = (location.address_i18n or {}).get("bg") or (location.address_i18n or {}).get("en") or ""
         school_name = (school.name_i18n or {}).get("bg") or (school.name_i18n or {}).get("en")
+        geocoding_city = self._preferred_geocoding_city(school.city, school.attributes)
 
         if self._nominatim_provider and address:
             result = await self._nominatim_provider.geocode(
                 address=address,
                 country_code=school.country_code,
-                city=school.city,
+                city=geocoding_city,
             )
             if result.success and result.lat is not None and result.lng is not None:
                 return result, "coords_source=nominatim"
@@ -399,7 +471,7 @@ class MoeRegistryAdapter(BaseSourceAdapter):
                 address=address,
                 country_code=school.country_code,
                 school_name=school_name,
-                city=school.city,
+                city=geocoding_city,
             )
             if result.success and result.lat is not None and result.lng is not None:
                 return result, "coords_source=geojson"
@@ -436,7 +508,7 @@ class MoeRegistryAdapter(BaseSourceAdapter):
             address=address_hint,
             country_code=school.country_code,
             school_name=school_name_bg,
-            city=school.city,
+            city=self._preferred_geocoding_city(school.city, school.attributes),
         )
         if not geo_result.success or geo_result.lat is None or geo_result.lng is None:
             if school.website_url:
@@ -667,6 +739,13 @@ class MoeRegistryAdapter(BaseSourceAdapter):
             # Determine city (based on region code)
             region_code = data.get("region")
             city = "sofia" if region_code in [self.SOFIA_CITY_REGION, self.SOFIA_OBLAST_REGION] else None
+            municipality_code = data.get("municipality")
+            town_code = data.get("town")
+            region_name = self._region_labels.get(region_code) if isinstance(region_code, int) else None
+            municipality_name = (
+                self._municipality_labels.get(municipality_code) if isinstance(municipality_code, int) else None
+            )
+            town_name = self._town_labels.get(town_code) if isinstance(town_code, int) else None
 
             # Extract location data from detail_data if available
             locations = []
@@ -677,7 +756,10 @@ class MoeRegistryAdapter(BaseSourceAdapter):
                 website_url = (detail_data.get("website") or "").strip() or None
 
                 # Extract primary location
-                primary_address = (detail_data.get("settlementAddress") or "").strip()
+                primary_address = self._address_with_locality_hint(
+                    (detail_data.get("settlementAddress") or "").strip(),
+                    town_name,
+                )
                 phone_number = (detail_data.get("phoneNumber") or "").strip() or None
                 email = (detail_data.get("email") or "").strip() or None
 
@@ -696,7 +778,10 @@ class MoeRegistryAdapter(BaseSourceAdapter):
                 # Extract department locations (branches)
                 departments = detail_data.get("institutionDepartments", [])
                 for dept in departments:
-                    dept_address = (dept.get("departmentAddress") or "").strip()
+                    dept_address = self._address_with_locality_hint(
+                        (dept.get("departmentAddress") or "").strip(),
+                        town_name,
+                    )
                     if dept_address and dept_address != primary_address:  # Avoid duplicates
                         dept_location = DiscoveredLocation(
                             address_i18n={"bg": dept_address},
@@ -712,8 +797,11 @@ class MoeRegistryAdapter(BaseSourceAdapter):
             # Build attributes dict
             attributes = {
                 "moe_region_code": region_code,
-                "moe_municipality_code": data.get("municipality"),
-                "moe_town_code": data.get("town"),
+                "moe_region_name": region_name,
+                "moe_municipality_code": municipality_code,
+                "moe_municipality_name": municipality_name,
+                "moe_town_code": town_code,
+                "moe_town_name": town_name,
                 "moe_detailed_type": detailed_type,
                 "moe_inst_type": inst_type,
                 "moe_financial_type": financial_type,
