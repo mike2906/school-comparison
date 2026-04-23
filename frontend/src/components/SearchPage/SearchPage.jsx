@@ -12,7 +12,7 @@ import { geocodeAddress, reverseGeocode, cancelGeocode } from '../../utils/geoco
 import { getSchoolName } from '../../utils/i18n'
 import { useCompare } from '../../context/CompareContext'
 import { useCountry } from '../../context/CountryContext'
-import { fetchAvailableFilters } from '../../api/schools'
+import { fetchAvailableFilters, fetchExamAverages } from '../../api/schools'
 import { getAgeGroupKeys } from '../../utils/countryConfig'
 import { AGE_GROUP_KEYS } from '../../utils/education'
 
@@ -111,6 +111,7 @@ function SearchPage() {
     facilities: [],
     teaching_approach: [],
   })
+  const [examAverages, setExamAverages] = useState(null)
 
   const effectiveEducationLevel =
     filters.ageGroup === 'preschool' && !filters.includeCrossover
@@ -169,7 +170,25 @@ function SearchPage() {
     return () => {
       isMounted = false
     }
-  }, [])
+  }, [countryCode])
+
+  useEffect(() => {
+    let isMounted = true
+
+    fetchExamAverages({ countryCode })
+      .then((data) => {
+        if (!isMounted) return
+        setExamAverages(data)
+      })
+      .catch(() => {
+        if (!isMounted) return
+        setExamAverages(null)
+      })
+
+    return () => {
+      isMounted = false
+    }
+  }, [countryCode])
 
   useEffect(() => {
     const storedLocation = localStorage.getItem('userLocation')
@@ -1904,6 +1923,7 @@ function SearchPage() {
                     onShowAllLocations={() => handleShowAllLocations(school.id)}
                     onFocusLocation={(locationId) => handleFocusLocation(school.id, locationId)}
                     onClearLocations={clearLocationOverlay}
+                    examAverages={examAverages}
                   />
                 ))}
               </div>

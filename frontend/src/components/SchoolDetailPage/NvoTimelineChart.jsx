@@ -1,5 +1,6 @@
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip } from 'recharts'
 import { useTranslation } from 'react-i18next'
+import { prepareNvoTimelineData } from '../../utils/nvo'
 
 /**
  * NVO Exam Results Timeline Chart Component
@@ -14,16 +15,15 @@ import { useTranslation } from 'react-i18next'
  * @param {Array} props.selectedSubjects - Array of subjects to display (['math', 'bulgarian'])
  */
 function NvoTimelineChart({ examResults = [], examType, examAverages = null, selectedSubjects = ['math', 'bulgarian'] }) {
-  const { t, i18n } = useTranslation()
+  const { t } = useTranslation()
 
   // Filter and transform data for the chart
-  const chartData = prepareChartData(examResults, examType)
+  const chartData = prepareChartData(examResults, examType, examAverages)
 
   const showMath = selectedSubjects.includes('math')
   const showBulgarian = selectedSubjects.includes('bulgarian')
-
-  // Get average for this exam type (overall average across all years)
-  const average = examAverages?.overall?.[examType] || null
+  const showNationalMath = showMath && chartData.some(item => item.nationalMath != null)
+  const showNationalBulgarian = showBulgarian && chartData.some(item => item.nationalBulgarian != null)
 
   if (chartData.length === 0) {
     return (
@@ -63,7 +63,14 @@ function NvoTimelineChart({ examResults = [], examType, examAverages = null, sel
       )}
 
       {/* Interactive line chart */}
-      <div className="bg-neutral-50 rounded-xl p-6 border border-neutral-200">
+      <div className="bg-neutral-50 rounded-xl p-6 border border-neutral-200 space-y-4">
+        <ChartLegend
+          t={t}
+          showMath={showMath}
+          showBulgarian={showBulgarian}
+          showNationalMath={showNationalMath}
+          showNationalBulgarian={showNationalBulgarian}
+        />
         <ResponsiveContainer width="100%" height={400}>
           <LineChart
             data={chartData}
@@ -89,37 +96,43 @@ function NvoTimelineChart({ examResults = [], examType, examAverages = null, sel
               }}
             />
 
-            {/* Average benchmark (if available) */}
-            {average != null && (
-              <ReferenceLine
-                y={average}
-                stroke="#9ca3af"
-                strokeDasharray="5 5"
-                label={{
-                  value: t('academicPerformance.average'),
-                  position: 'insideTopRight',
-                  fill: '#6b7280',
-                  fontSize: 12
-                }}
-              />
-            )}
-
             <Tooltip
               content={<CustomTooltip />}
               cursor={{ stroke: '#d1d5db', strokeWidth: 1 }}
             />
 
-            <Legend
-              wrapperStyle={{ paddingTop: '20px' }}
-              iconType="line"
-            />
+            {showNationalBulgarian && (
+              <Line
+                type="monotone"
+                dataKey="nationalBulgarian"
+                name={t('academicPerformance.seriesNational', { subject: t('schoolCard.nvo.subjectBulgarian') })}
+                stroke="#c084fc"
+                strokeWidth={2}
+                strokeDasharray="6 4"
+                dot={false}
+                isAnimationActive={false}
+              />
+            )}
+
+            {showNationalMath && (
+              <Line
+                type="monotone"
+                dataKey="nationalMath"
+                name={t('academicPerformance.seriesNational', { subject: t('schoolCard.nvo.subjectMath') })}
+                stroke="#60a5fa"
+                strokeWidth={2}
+                strokeDasharray="6 4"
+                dot={false}
+                isAnimationActive={false}
+              />
+            )}
 
             {/* Bulgarian Language line */}
             {showBulgarian && (
               <Line
                 type="monotone"
                 dataKey="bulgarian"
-                name={t('schoolCard.nvo.subjectBulgarian')}
+                name={t('academicPerformance.seriesSchool', { subject: t('schoolCard.nvo.subjectBulgarian') })}
                 stroke="#8b5cf6"
                 strokeWidth={3}
                 dot={{
@@ -141,7 +154,7 @@ function NvoTimelineChart({ examResults = [], examType, examAverages = null, sel
               <Line
                 type="monotone"
                 dataKey="math"
-                name={t('schoolCard.nvo.subjectMath')}
+                name={t('academicPerformance.seriesSchool', { subject: t('schoolCard.nvo.subjectMath') })}
                 stroke="#3b82f6"
                 strokeWidth={3}
                 dot={{
@@ -161,22 +174,77 @@ function NvoTimelineChart({ examResults = [], examType, examAverages = null, sel
         </ResponsiveContainer>
       </div>
 
-      {/* Performance legend */}
-      <div className="flex items-center justify-center gap-6 text-xs text-neutral-600">
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
-          <span>{t('academicPerformance.excellent')} (&gt;75%)</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-amber-500"></div>
-          <span>{t('academicPerformance.good')} (60-75%)</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-red-500"></div>
-          <span>{t('academicPerformance.needsImprovement')} (&lt;60%)</span>
-        </div>
+    </div>
+  )
+}
+
+function ChartLegend({ t, showMath, showBulgarian, showNationalMath, showNationalBulgarian }) {
+  return (
+    <div className="rounded-lg border border-neutral-200 bg-white/80 p-4">
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-neutral-700">
+        <span className="font-medium text-neutral-900">{t('academicPerformance.seriesLegend')}</span>
+        {showBulgarian && (
+          <LegendLine
+            color="#8b5cf6"
+            label={t('academicPerformance.seriesSchool', { subject: t('schoolCard.nvo.subjectBulgarian') })}
+          />
+        )}
+        {showMath && (
+          <LegendLine
+            color="#3b82f6"
+            label={t('academicPerformance.seriesSchool', { subject: t('schoolCard.nvo.subjectMath') })}
+          />
+        )}
+        {showNationalBulgarian && (
+          <LegendLine
+            color="#c084fc"
+            dashed
+            label={t('academicPerformance.seriesNational', { subject: t('schoolCard.nvo.subjectBulgarian') })}
+          />
+        )}
+        {showNationalMath && (
+          <LegendLine
+            color="#60a5fa"
+            dashed
+            label={t('academicPerformance.seriesNational', { subject: t('schoolCard.nvo.subjectMath') })}
+          />
+        )}
       </div>
     </div>
+  )
+}
+
+function LegendLine({ color, label, dashed = false }) {
+  return (
+    <div className="inline-flex items-center gap-2">
+      <svg width="28" height="10" aria-hidden="true" className="shrink-0">
+        <line
+          x1="1"
+          y1="5"
+          x2="27"
+          y2="5"
+          stroke={color}
+          strokeWidth={dashed ? 2 : 3}
+          strokeDasharray={dashed ? '6 4' : undefined}
+          strokeLinecap="round"
+        />
+      </svg>
+      <span>{label}</span>
+    </div>
+  )
+}
+
+function BenchmarkDelta({ benchmarkInfo }) {
+  if (!benchmarkInfo) return null
+
+  const sign = benchmarkInfo.diff > 0 ? '+' : ''
+
+  return (
+    <span
+      className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${benchmarkInfo.badgeClass}`}
+    >
+      {benchmarkInfo.label} · {sign}{benchmarkInfo.diff.toFixed(1)} {benchmarkInfo.pointsLabel}
+    </span>
   )
 }
 
@@ -197,27 +265,37 @@ function CustomTooltip({ active, payload, label }) {
         const value = entry.value
         const previousValue = entry.payload[`${entry.dataKey}Previous`]
         const change = previousValue != null ? value - previousValue : null
-        const performanceColor = getPerformanceColor(value)
+        const benchmarkInfo = getBenchmarkInfo(entry.dataKey, entry.payload, t)
 
         return (
-          <div key={index} className="flex items-center justify-between gap-4 mb-1">
-            <div className="flex items-center gap-2">
-              <div
-                className="w-3 h-3 rounded-full"
-                style={{ backgroundColor: entry.color }}
-              />
-              <span className="text-sm text-neutral-700">{entry.name}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className={`text-sm font-semibold ${performanceColor}`}>
-                {value.toFixed(1)}%
-              </span>
-              {change != null && (
-                <span className={`text-xs font-medium ${getChangeColor(change)}`}>
-                  {change > 0 ? '+' : ''}{change.toFixed(1)}% {getChangeArrow(change)}
+          <div key={index} className="mb-2 last:mb-0">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <div
+                  className="w-3 h-3 rounded-full"
+                  style={{ backgroundColor: entry.color }}
+                />
+                <span className="text-sm text-neutral-700">{entry.name}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold text-neutral-900">
+                  {value.toFixed(1)}%
                 </span>
-              )}
+                {change != null && (
+                  <span className={`text-xs font-medium ${getChangeColor(change)}`}>
+                    {change > 0 ? '+' : ''}{change.toFixed(1)}% {getChangeArrow(change)}
+                  </span>
+                )}
+              </div>
             </div>
+            {benchmarkInfo && (
+              <div className="ml-5 mt-1 text-xs text-neutral-500">
+                {t('academicPerformance.nationalBenchmarkValue', { value: benchmarkInfo.benchmarkValue.toFixed(1) })} ·{' '}
+                <span className={benchmarkInfo.textClass}>
+                  {benchmarkInfo.label}
+                </span>
+              </div>
+            )}
           </div>
         )
       })}
@@ -246,18 +324,19 @@ function YearOverYearBadge({ subject, data, dataKey, color }) {
   }
 
   const change = currentValue - previousValue
-  const changePercent = ((change / previousValue) * 100).toFixed(1)
   const arrow = getChangeArrow(change)
   const changeColorClass = getChangeColor(change)
+  const benchmarkInfo = getBenchmarkInfo(dataKey, latest, t)
 
   return (
     <div className="bg-white rounded-xl p-4 border border-neutral-200">
-      <div className="flex items-center gap-2 mb-2">
+      <div className="flex flex-wrap items-center gap-2 mb-2">
         <div className={`w-2 h-2 rounded-full ${color}`}></div>
         <h4 className="text-sm font-medium text-neutral-700">{subject}</h4>
+        {benchmarkInfo && <BenchmarkDelta benchmarkInfo={benchmarkInfo} />}
       </div>
       <div className="flex items-baseline gap-2">
-        <span className="text-2xl font-bold text-neutral-900">
+        <span className={`text-2xl font-bold ${benchmarkInfo?.textClass || 'text-neutral-900'}`}>
           {currentValue.toFixed(1)}%
         </span>
         <span className={`text-sm font-semibold ${changeColorClass}`}>
@@ -266,6 +345,9 @@ function YearOverYearBadge({ subject, data, dataKey, color }) {
       </div>
       <p className="text-xs text-neutral-500 mt-1">
         {t('academicPerformance.vsLastYear')}: {previousValue.toFixed(1)}%
+        {benchmarkInfo && (
+          <> • {t('academicPerformance.nationalBenchmarkValue', { value: benchmarkInfo.benchmarkValue.toFixed(1) })}</>
+        )}
       </p>
     </div>
   )
@@ -278,58 +360,62 @@ function YearOverYearBadge({ subject, data, dataKey, color }) {
 /**
  * Prepare and transform exam results data for Recharts
  */
-function prepareChartData(examResults, examType) {
-  // Filter relevant results
-  const relevant = examResults.filter(result =>
-    result.exam_type === examType &&
-    result.metric.toLowerCase().includes('average')
-  )
-
-  // Group by year
-  const byYear = {}
-  relevant.forEach(result => {
-    const year = result.year
-    const subject = result.subject.toLowerCase()
-
-    if (!byYear[year]) {
-      byYear[year] = { year }
-    }
-
-    if (subject.includes('bulgarian')) {
-      byYear[year].bulgarian = parseFloat(result.value)
-    } else if (subject.includes('math')) {
-      byYear[year].math = parseFloat(result.value)
-    }
-  })
-
-  // Convert to array and sort by year
-  const chartData = Object.values(byYear)
-    .filter(item => item.bulgarian != null || item.math != null)
-    .sort((a, b) => a.year - b.year)
-
-  // Add previous year values for change calculation
-  chartData.forEach((item, index) => {
-    if (index > 0) {
-      const previous = chartData[index - 1]
-      if (item.bulgarian != null && previous.bulgarian != null) {
-        item.bulgarianPrevious = previous.bulgarian
-      }
-      if (item.math != null && previous.math != null) {
-        item.mathPrevious = previous.math
-      }
-    }
-  })
-
-  return chartData
+function prepareChartData(examResults, examType, examAverages) {
+  return prepareNvoTimelineData(examResults, examType, examAverages)
 }
 
-/**
- * Get color class based on performance threshold
- */
-function getPerformanceColor(score) {
-  if (score >= 75) return 'text-emerald-600'
-  if (score >= 60) return 'text-amber-600'
-  return 'text-red-600'
+function getBenchmarkTone(tone) {
+  if (tone === 'above') {
+    return {
+      textClass: 'text-emerald-700',
+      badgeClass: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+    }
+  }
+  if (tone === 'below') {
+    return {
+      textClass: 'text-red-700',
+      badgeClass: 'border-red-200 bg-red-50 text-red-700',
+    }
+  }
+
+  return {
+    textClass: 'text-amber-700',
+    badgeClass: 'border-amber-200 bg-amber-50 text-amber-700',
+  }
+}
+
+function getBenchmarkInfo(subjectKey, point, t) {
+  const benchmarkKeyMap = {
+    bulgarian: 'nationalBulgarian',
+    math: 'nationalMath',
+  }
+
+  const benchmarkKey = benchmarkKeyMap[subjectKey]
+  const value = point?.[subjectKey]
+  const benchmarkValue = benchmarkKey ? point?.[benchmarkKey] : null
+
+  if (value == null || benchmarkValue == null) {
+    return null
+  }
+
+  const diff = value - benchmarkValue
+  const tone = diff >= 5 ? 'above' : diff <= -5 ? 'below' : 'near'
+  const toneClasses = getBenchmarkTone(tone)
+  const labelKey = (
+    tone === 'above'
+      ? 'academicPerformance.aboveBenchmark'
+      : tone === 'below'
+        ? 'academicPerformance.belowBenchmark'
+        : 'academicPerformance.nearBenchmark'
+  )
+
+  return {
+    diff,
+    benchmarkValue,
+    label: t(labelKey),
+    pointsLabel: t('academicPerformance.pointsShort'),
+    ...toneClasses,
+  }
 }
 
 /**

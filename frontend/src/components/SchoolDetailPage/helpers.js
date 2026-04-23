@@ -1,3 +1,11 @@
+import {
+  getNvoDetail as getSharedNvoDetail,
+  getExamTypeForEducationLevel as getSharedExamTypeForEducationLevel,
+  getAvailableExamTypes as getSharedAvailableExamTypes,
+  getExamTypeLabel as getSharedExamTypeLabel,
+  getLatestScoreForExamType as getSharedLatestScoreForExamType,
+} from '../../utils/nvo'
+
 /**
  * SchoolDetailPage Helper Functions
  * Extracted from SchoolCard.jsx for reuse in detail page
@@ -151,84 +159,7 @@ export function getTrendInfo(latest, average) {
  * Get detailed NVO data for a school
  */
 export function getNvoDetail(school, t) {
-  const examResults = school.exam_results || []
-  if (examResults.length === 0) return null
-
-  const educationLevel = school.education_level
-  const examTypeMap = {
-    primary: { examType: 'nvo_4', gradeKey: 'schoolCard.nvo.grade4' },
-    lower_secondary: { examType: 'nvo_7', gradeKey: 'schoolCard.nvo.grade7' },
-    upper_secondary: { examType: 'nvo_10', gradeKey: 'schoolCard.nvo.grade12' },
-  }
-
-  const examConfig = examTypeMap[educationLevel]
-  if (!examConfig) return null
-
-  const relevant = examResults.filter(result => result.exam_type === examConfig.examType)
-  if (relevant.length === 0) return null
-
-  const subjects = {
-    bulgarian: [],
-    math: [],
-  }
-
-  relevant.forEach(result => {
-    const subject = String(result.subject || '').toLowerCase()
-    const metric = String(result.metric || '').toLowerCase()
-    if (!metric.includes('average')) return
-    if (subject.includes('bulgarian')) {
-      subjects.bulgarian.push(result)
-    } else if (subject.includes('math')) {
-      subjects.math.push(result)
-    }
-  })
-
-  const yearsBulgarian = new Set(subjects.bulgarian.map(item => item.year))
-  const yearsMath = new Set(subjects.math.map(item => item.year))
-
-  const hasAverage = yearsBulgarian.size >= 3 && yearsMath.size >= 3
-
-  const computeAverage = (items) => {
-    const sorted = [...items].sort((a, b) => b.year - a.year).slice(0, 5)
-    const values = sorted.map(item => Number(item.value)).filter(value => !Number.isNaN(value))
-    if (values.length === 0) return null
-    return {
-      average: values.reduce((sum, value) => sum + value, 0) / values.length,
-      years: sorted.map(item => item.year),
-    }
-  }
-
-  const mathData = hasAverage ? computeAverage(subjects.math) : null
-  const bgData = hasAverage ? computeAverage(subjects.bulgarian) : null
-
-  const latestMath = subjects.math.sort((a, b) => b.year - a.year)[0]
-  const latestBg = subjects.bulgarian.sort((a, b) => b.year - a.year)[0]
-
-  const overallAvg = hasAverage ? (mathData.average + bgData.average) / 2 : null
-  const colorClass = overallAvg == null
-    ? 'text-neutral-600'
-    : overallAvg >= 75
-    ? 'text-emerald-500'
-    : overallAvg >= 60
-    ? 'text-amber-500'
-    : 'text-red-500'
-
-  const yearsUsed = hasAverage ? [...new Set([...mathData.years, ...bgData.years])] : []
-  const minYear = hasAverage ? Math.min(...yearsUsed) : null
-  const maxYear = hasAverage ? Math.max(...yearsUsed) : null
-
-  return {
-    gradeLabel: t(examConfig.gradeKey),
-    mathAvg: mathData?.average ?? null,
-    bgAvg: bgData?.average ?? null,
-    latestMath: latestMath ? Number(latestMath.value) : null,
-    latestBg: latestBg ? Number(latestBg.value) : null,
-    latestYear: Math.max(latestMath?.year || 0, latestBg?.year || 0),
-    colorClass,
-    minYear,
-    maxYear,
-    hasAverage,
-  }
+  return getSharedNvoDetail(school, t)
 }
 
 /**
@@ -357,12 +288,7 @@ export function hexToRgba(hex, alpha) {
  * Get exam type based on education level
  */
 export function getExamTypeForEducationLevel(educationLevel) {
-  const examTypeMap = {
-    primary: 'nvo_4',
-    lower_secondary: 'nvo_7',
-    upper_secondary: 'nvo_10',
-  }
-  return examTypeMap[educationLevel] || 'nvo_7'
+  return getSharedExamTypeForEducationLevel(educationLevel)
 }
 
 /**
@@ -370,54 +296,21 @@ export function getExamTypeForEducationLevel(educationLevel) {
  * Returns them in chronological order (4th → 7th → 10th grade)
  */
 export function getAvailableExamTypes(examResults = []) {
-  const types = new Set()
-  examResults.forEach(result => {
-    if (result.exam_type && result.metric?.includes('average')) {
-      types.add(result.exam_type)
-    }
-  })
-
-  // Sort by grade level (4 → 7 → 10) instead of alphabetically
-  const gradeOrder = { nvo_4: 1, nvo_7: 2, nvo_10: 3 }
-  return Array.from(types).sort((a, b) => {
-    return (gradeOrder[a] || 0) - (gradeOrder[b] || 0)
-  })
+  return getSharedAvailableExamTypes(examResults)
 }
 
 /**
  * Get exam type label (e.g., "4th Grade NVO")
  */
 export function getExamTypeLabel(examType, t) {
-  const labelMap = {
-    nvo_4: t ? t('schools.nvo4Label') : '4th Grade NVO',
-    nvo_7: t ? t('schools.nvo7Label') : '7th Grade NVO',
-    nvo_10: t ? t('schools.nvo10Label') : '10th Grade NVO',
-  }
-  return labelMap[examType] || examType
+  return getSharedExamTypeLabel(examType, t)
 }
 
 /**
  * Get latest average score for an exam type
  */
 export function getLatestScoreForExamType(examResults = [], examType) {
-  const filtered = examResults
-    .filter(r => r.exam_type === examType && r.metric?.includes('average'))
-    .sort((a, b) => b.year - a.year)
-
-  if (filtered.length === 0) return null
-
-  const latestYear = filtered[0].year
-  const yearResults = filtered.filter(r => r.year === latestYear)
-
-  const mathResult = yearResults.find(r => r.subject?.toLowerCase().includes('math'))
-  const bgResult = yearResults.find(r => r.subject?.toLowerCase().includes('bulg'))
-
-  if (!mathResult && !bgResult) return null
-
-  const mathScore = mathResult?.value || 0
-  const bgScore = bgResult?.value || 0
-
-  return mathScore && bgScore ? (mathScore + bgScore) / 2 : mathScore || bgScore
+  return getSharedLatestScoreForExamType(examResults, examType)
 }
 
 /**

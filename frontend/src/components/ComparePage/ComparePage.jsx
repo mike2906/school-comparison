@@ -3,10 +3,11 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import Layout from '../Layout/Layout'
 import { useCompare } from '../../context/CompareContext'
-import { fetchCompare } from '../../api/schools'
+import { fetchCompare, fetchExamAverages } from '../../api/schools'
 import { calculateDistance, formatDistance } from '../../utils/distance'
 import { getSchoolName, getAddress, getSummary } from '../../utils/i18n'
 import { normalizeSchoolList } from '../../utils/schoolAttributes'
+import { getBenchmarkComparison, getNvoDetail as getSharedNvoDetail } from '../../utils/nvo'
 
 const SOURCE_BADGE_STYLES = {
   official: 'bg-emerald-50 text-emerald-700',
@@ -264,6 +265,80 @@ function getPerformanceStyle(value) {
   return { text: 'text-red-500' }
 }
 
+function getNvoValueStyle({ value, examType, year, subjectKey, examAverages }) {
+  const benchmark = getBenchmarkComparison({
+    examType,
+    year,
+    subjectKey,
+    value,
+    examAverages,
+  })
+
+  if (benchmark) {
+    return { text: benchmark.textClass, benchmark }
+  }
+
+  return { text: getPerformanceStyle(value).text, benchmark: null }
+}
+
+function getBenchmarkTooltip(value, benchmark, t) {
+  if (value == null || !benchmark) return null
+
+  const diff = Math.abs(benchmark.diff).toFixed(1)
+  const valueText = formatPercent(value, 1)
+  const benchmarkText = formatPercent(benchmark.benchmarkValue, 1)
+
+  if (benchmark.tone === 'above') {
+    return t('academicPerformance.tooltipBenchmarkAbove', {
+      value: valueText,
+      diff,
+      benchmark: benchmarkText,
+    })
+  }
+  if (benchmark.tone === 'below') {
+    return t('academicPerformance.tooltipBenchmarkBelow', {
+      value: valueText,
+      diff,
+      benchmark: benchmarkText,
+    })
+  }
+
+  return t('academicPerformance.tooltipBenchmarkNear', {
+    value: valueText,
+    diff,
+    benchmark: benchmarkText,
+  })
+}
+
+function getTrendTooltip(latest, average, trend, t) {
+  if (latest == null || average == null || !trend) return null
+
+  const diff = Math.abs(trend.diff).toFixed(1)
+  const latestText = formatPercent(latest, 1)
+  const averageText = formatPercent(average, 1)
+
+  if (trend.arrow === '↑') {
+    return t('academicPerformance.tooltipTrendUp', {
+      latest: latestText,
+      average: averageText,
+      diff,
+    })
+  }
+  if (trend.arrow === '↓') {
+    return t('academicPerformance.tooltipTrendDown', {
+      latest: latestText,
+      average: averageText,
+      diff,
+    })
+  }
+
+  return t('academicPerformance.tooltipTrendFlat', {
+    latest: latestText,
+    average: averageText,
+    diff,
+  })
+}
+
 function getTrendInfo(latest, average) {
   if (latest == null || average == null) return null
   const diff = latest - average
@@ -273,72 +348,7 @@ function getTrendInfo(latest, average) {
 }
 
 function getNvoDetail(school, t) {
-  const examResults = school.exam_results || []
-  if (examResults.length === 0) return null
-
-  const examTypeMap = {
-    primary: { examType: 'nvo_4', gradeKey: 'schoolCard.nvo.grade4' },
-    lower_secondary: { examType: 'nvo_7', gradeKey: 'schoolCard.nvo.grade7' },
-    upper_secondary: { examType: 'nvo_10', gradeKey: 'schoolCard.nvo.grade12' },
-  }
-
-  const examConfig = examTypeMap[school.education_level]
-  if (!examConfig) return null
-
-  const relevant = examResults.filter(result => result.exam_type === examConfig.examType)
-  if (relevant.length === 0) return null
-
-  const subjects = {
-    bulgarian: [],
-    math: [],
-  }
-
-  relevant.forEach((result) => {
-    const metric = String(result.metric || '').toLowerCase()
-    if (!metric.includes('average')) return
-    const subject = String(result.subject || '').toLowerCase()
-    if (subject.includes('bulgarian')) {
-      subjects.bulgarian.push(result)
-      return
-    }
-    if (subject.includes('math')) {
-      subjects.math.push(result)
-    }
-  })
-
-  if (subjects.bulgarian.length === 0 && subjects.math.length === 0) return null
-
-  const computeAverage = (items) => {
-    const sorted = [...items].sort((a, b) => b.year - a.year).slice(0, 5)
-    const values = sorted.map(item => Number(item.value)).filter(value => !Number.isNaN(value))
-    if (values.length === 0) return null
-    return {
-      average: values.reduce((sum, value) => sum + value, 0) / values.length,
-      years: sorted.map(item => item.year),
-    }
-  }
-
-  const mathData = computeAverage(subjects.math)
-  const bgData = computeAverage(subjects.bulgarian)
-
-  const latestMath = subjects.math.sort((a, b) => b.year - a.year)[0]
-  const latestBg = subjects.bulgarian.sort((a, b) => b.year - a.year)[0]
-
-  const yearsUsed = [...new Set([...(mathData?.years || []), ...(bgData?.years || [])])]
-  const minYear = yearsUsed.length > 0 ? Math.min(...yearsUsed) : null
-  const maxYear = yearsUsed.length > 0 ? Math.max(...yearsUsed) : null
-
-  return {
-    gradeLabel: t(examConfig.gradeKey),
-    examType: examConfig.examType,
-    mathAvg: mathData?.average ?? null,
-    bgAvg: bgData?.average ?? null,
-    latestMath: latestMath ? Number(latestMath.value) : null,
-    latestBg: latestBg ? Number(latestBg.value) : null,
-    latestYear: Math.max(latestMath?.year || 0, latestBg?.year || 0),
-    minYear,
-    maxYear,
-  }
+  return getSharedNvoDetail(school, t)
 }
 
 function getPricingYearlyRange(pricing = []) {
@@ -429,6 +439,7 @@ function ComparePage() {
   const [shareStatus, setShareStatus] = useState('')
   const [userLocation, setUserLocation] = useState(null)
   const [sourcesOpen, setSourcesOpen] = useState(false)
+  const [examAverages, setExamAverages] = useState(null)
   const queryKey = searchParams.get('ids') ? 'ids' : (searchParams.get('schools') ? 'schools' : null)
   const queryIds = useMemo(() => parseIds(queryKey ? searchParams.get(queryKey) : ''), [queryKey, searchParams])
   const ids = useMemo(() => (queryIds.length > 0 ? queryIds : compareList.map(s => s.id)), [queryIds, compareList])
@@ -471,6 +482,24 @@ function ComparePage() {
     loadSchools()
   }, [ids, navigate])
 
+  useEffect(() => {
+    let isMounted = true
+
+    fetchExamAverages()
+      .then((data) => {
+        if (!isMounted) return
+        setExamAverages(data)
+      })
+      .catch(() => {
+        if (!isMounted) return
+        setExamAverages(null)
+      })
+
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
   const localizedSchools = useMemo(
     () => normalizeSchoolList(schools, i18n.language),
     [schools, i18n.language]
@@ -485,12 +514,8 @@ function ComparePage() {
         : null
       const pricingRange = getPricingYearlyRange(school.pricing)
       const nvoDetail = school.school_type === 'international' ? null : getNvoDetail(school, t)
-      const overallLatest = nvoDetail?.latestMath != null && nvoDetail?.latestBg != null
-        ? (nvoDetail.latestMath + nvoDetail.latestBg) / 2
-        : null
-      const overallAvg = nvoDetail?.mathAvg != null && nvoDetail?.bgAvg != null
-        ? (nvoDetail.mathAvg + nvoDetail.bgAvg) / 2
-        : null
+      const overallLatest = nvoDetail?.latestCombined ?? null
+      const overallAvg = nvoDetail?.schoolAverageCombined ?? null
 
       map.set(school.id, {
         distance,
@@ -770,16 +795,33 @@ function ComparePage() {
           const detail = metricsById.get(school.id)?.nvoDetail
           if (!detail?.latestMath && !detail?.mathAvg) return renderPlaceholder()
           const value = detail.latestMath ?? detail.mathAvg
+          const style = getNvoValueStyle({
+            value,
+            examType: detail.examType,
+            year: detail.latestMathYear ?? detail.latestYear,
+            subjectKey: 'math',
+            examAverages,
+          })
           const trend = detail.latestMath != null && detail.mathAvg != null
             ? getTrendInfo(detail.latestMath, detail.mathAvg)
             : null
           return (
             <div>
               <div className="flex items-center gap-2">
-                <span className={`text-sm font-semibold ${getPerformanceStyle(value).text}`}>
+                <span
+                  className={`text-sm font-semibold ${style.text} ${style.benchmark ? 'cursor-help' : ''}`}
+                  title={getBenchmarkTooltip(value, style.benchmark, t) || undefined}
+                >
                   {formatPercent(value, 1)}%
                 </span>
-                {trend ? <span className={`text-xs ${trend.className}`}>{trend.arrow}</span> : null}
+                {trend ? (
+                  <span
+                    className={`text-xs ${trend.className} cursor-help`}
+                    title={getTrendTooltip(detail.latestMath, detail.mathAvg, trend, t) || undefined}
+                  >
+                    {trend.arrow}
+                  </span>
+                ) : null}
               </div>
               {detail.mathAvg != null && detail.latestMath != null && (
                 <div className="text-xs text-neutral-500">
@@ -805,16 +847,33 @@ function ComparePage() {
           const detail = metricsById.get(school.id)?.nvoDetail
           if (!detail?.latestBg && !detail?.bgAvg) return renderPlaceholder()
           const value = detail.latestBg ?? detail.bgAvg
+          const style = getNvoValueStyle({
+            value,
+            examType: detail.examType,
+            year: detail.latestBgYear ?? detail.latestYear,
+            subjectKey: 'bulgarian',
+            examAverages,
+          })
           const trend = detail.latestBg != null && detail.bgAvg != null
             ? getTrendInfo(detail.latestBg, detail.bgAvg)
             : null
           return (
             <div>
               <div className="flex items-center gap-2">
-                <span className={`text-sm font-semibold ${getPerformanceStyle(value).text}`}>
+                <span
+                  className={`text-sm font-semibold ${style.text} ${style.benchmark ? 'cursor-help' : ''}`}
+                  title={getBenchmarkTooltip(value, style.benchmark, t) || undefined}
+                >
                   {formatPercent(value, 1)}%
                 </span>
-                {trend ? <span className={`text-xs ${trend.className}`}>{trend.arrow}</span> : null}
+                {trend ? (
+                  <span
+                    className={`text-xs ${trend.className} cursor-help`}
+                    title={getTrendTooltip(detail.latestBg, detail.bgAvg, trend, t) || undefined}
+                  >
+                    {trend.arrow}
+                  </span>
+                ) : null}
               </div>
               {detail.bgAvg != null && detail.latestBg != null && (
                 <div className="text-xs text-neutral-500">

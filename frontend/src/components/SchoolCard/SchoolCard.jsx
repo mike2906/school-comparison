@@ -5,6 +5,7 @@ import { useCompare } from '../../context/CompareContext'
 import { getSchoolName, getAddress } from '../../utils/i18n'
 import { formatDistance } from '../../utils/distance'
 import { getFocusEmoji } from '../../utils/locationFocus'
+import { getBenchmarkComparison, getNvoDetail as getSharedNvoDetail } from '../../utils/nvo'
 
 const typeColors = {
   state: 'bg-teal-500 text-white',
@@ -336,6 +337,80 @@ function getPerformanceStyle(value) {
   return { text: 'text-red-500' }
 }
 
+function getNvoValueStyle({ value, examType, year, subjectKey, examAverages }) {
+  const benchmark = getBenchmarkComparison({
+    examType,
+    year,
+    subjectKey,
+    value,
+    examAverages,
+  })
+
+  if (benchmark) {
+    return { text: benchmark.textClass, benchmark }
+  }
+
+  return { text: getPerformanceStyle(value).text, benchmark: null }
+}
+
+function getBenchmarkTooltip(value, benchmark, t) {
+  if (value == null || !benchmark) return null
+
+  const diff = Math.abs(benchmark.diff).toFixed(1)
+  const valueText = formatPercent(value, 1)
+  const benchmarkText = formatPercent(benchmark.benchmarkValue, 1)
+
+  if (benchmark.tone === 'above') {
+    return t('academicPerformance.tooltipBenchmarkAbove', {
+      value: valueText,
+      diff,
+      benchmark: benchmarkText,
+    })
+  }
+  if (benchmark.tone === 'below') {
+    return t('academicPerformance.tooltipBenchmarkBelow', {
+      value: valueText,
+      diff,
+      benchmark: benchmarkText,
+    })
+  }
+
+  return t('academicPerformance.tooltipBenchmarkNear', {
+    value: valueText,
+    diff,
+    benchmark: benchmarkText,
+  })
+}
+
+function getTrendTooltip(latest, average, trend, t) {
+  if (latest == null || average == null || !trend) return null
+
+  const diff = Math.abs(trend.diff).toFixed(1)
+  const latestText = formatPercent(latest, 1)
+  const averageText = formatPercent(average, 1)
+
+  if (trend.arrow === '↑') {
+    return t('academicPerformance.tooltipTrendUp', {
+      latest: latestText,
+      average: averageText,
+      diff,
+    })
+  }
+  if (trend.arrow === '↓') {
+    return t('academicPerformance.tooltipTrendDown', {
+      latest: latestText,
+      average: averageText,
+      diff,
+    })
+  }
+
+  return t('academicPerformance.tooltipTrendFlat', {
+    latest: latestText,
+    average: averageText,
+    diff,
+  })
+}
+
 function getTrendInfo(latest, average) {
   if (latest == null || average == null) return null
   const diff = latest - average
@@ -354,84 +429,7 @@ function hexToRgba(hex, alpha) {
 }
 
 function getNvoDetail(school, t) {
-  const examResults = school.exam_results || []
-  if (examResults.length === 0) return null
-
-  const educationLevel = school.education_level
-  const examTypeMap = {
-    primary: { examType: 'nvo_4', gradeKey: 'schoolCard.nvo.grade4' },
-    lower_secondary: { examType: 'nvo_7', gradeKey: 'schoolCard.nvo.grade7' },
-    upper_secondary: { examType: 'nvo_10', gradeKey: 'schoolCard.nvo.grade12' },
-  }
-
-  const examConfig = examTypeMap[educationLevel]
-  if (!examConfig) return null
-
-  const relevant = examResults.filter(result => result.exam_type === examConfig.examType)
-  if (relevant.length === 0) return null
-
-  const subjects = {
-    bulgarian: [],
-    math: [],
-  }
-
-  relevant.forEach(result => {
-    const subject = String(result.subject || '').toLowerCase()
-    const metric = String(result.metric || '').toLowerCase()
-    if (!metric.includes('average')) return
-    if (subject.includes('bulgarian')) {
-      subjects.bulgarian.push(result)
-    } else if (subject.includes('math')) {
-      subjects.math.push(result)
-    }
-  })
-
-  const yearsBulgarian = new Set(subjects.bulgarian.map(item => item.year))
-  const yearsMath = new Set(subjects.math.map(item => item.year))
-
-  const hasAverage = yearsBulgarian.size >= 3 && yearsMath.size >= 3
-
-  const computeAverage = (items) => {
-    const sorted = [...items].sort((a, b) => b.year - a.year).slice(0, 5)
-    const values = sorted.map(item => Number(item.value)).filter(value => !Number.isNaN(value))
-    if (values.length === 0) return null
-    return {
-      average: values.reduce((sum, value) => sum + value, 0) / values.length,
-      years: sorted.map(item => item.year),
-    }
-  }
-
-  const mathData = hasAverage ? computeAverage(subjects.math) : null
-  const bgData = hasAverage ? computeAverage(subjects.bulgarian) : null
-
-  const latestMath = subjects.math.sort((a, b) => b.year - a.year)[0]
-  const latestBg = subjects.bulgarian.sort((a, b) => b.year - a.year)[0]
-
-  const overallAvg = hasAverage ? (mathData.average + bgData.average) / 2 : null
-  const colorClass = overallAvg == null
-    ? 'text-neutral-600'
-    : overallAvg >= 75
-    ? 'text-emerald-500'
-    : overallAvg >= 60
-    ? 'text-amber-500'
-    : 'text-red-500'
-
-  const yearsUsed = hasAverage ? [...new Set([...mathData.years, ...bgData.years])] : []
-  const minYear = hasAverage ? Math.min(...yearsUsed) : null
-  const maxYear = hasAverage ? Math.max(...yearsUsed) : null
-
-  return {
-    gradeLabel: t(examConfig.gradeKey),
-    mathAvg: mathData?.average ?? null,
-    bgAvg: bgData?.average ?? null,
-    latestMath: latestMath ? Number(latestMath.value) : null,
-    latestBg: latestBg ? Number(latestBg.value) : null,
-    latestYear: Math.max(latestMath?.year || 0, latestBg?.year || 0),
-    colorClass,
-    minYear,
-    maxYear,
-    hasAverage,
-  }
+  return getSharedNvoDetail(school, t)
 }
 
 function getAmenityFlags(attributes, hasAfterSchool) {
@@ -665,6 +663,7 @@ const SchoolCard = forwardRef(function SchoolCard(
     onShowAllLocations,
     onFocusLocation,
     onClearLocations,
+    examAverages = null,
   },
   ref
 ) {
@@ -828,22 +827,39 @@ const SchoolCard = forwardRef(function SchoolCard(
     if (!nvoDetail) return null
     const mathValue = nvoDetail.latestMath ?? nvoDetail.mathAvg
     const bgValue = nvoDetail.latestBg ?? nvoDetail.bgAvg
+    const mathStyle = getNvoValueStyle({
+      value: mathValue,
+      examType: nvoDetail.examType,
+      year: nvoDetail.latestMathYear ?? nvoDetail.latestYear,
+      subjectKey: 'math',
+      examAverages,
+    })
+    const bulgarianStyle = getNvoValueStyle({
+      value: bgValue,
+      examType: nvoDetail.examType,
+      year: nvoDetail.latestBgYear ?? nvoDetail.latestYear,
+      subjectKey: 'bulgarian',
+      examAverages,
+    })
+
     return {
       gradeLabel: nvoDetail.gradeLabel,
       math: {
         value: mathValue,
+        style: mathStyle,
         trend: nvoDetail.hasAverage && nvoDetail.latestMath != null
           ? getTrendInfo(nvoDetail.latestMath, nvoDetail.mathAvg)
           : null,
       },
       bulgarian: {
         value: bgValue,
+        style: bulgarianStyle,
         trend: nvoDetail.hasAverage && nvoDetail.latestBg != null
           ? getTrendInfo(nvoDetail.latestBg, nvoDetail.bgAvg)
           : null,
       },
     }
-  }, [nvoDetail, t])
+  }, [examAverages, nvoDetail, t])
 
   const amenityItems = useMemo(() => {
     const flags = getAmenityFlags(attributes, primaryShiftInfo?.has_organised_groups)
@@ -1069,34 +1085,66 @@ const SchoolCard = forwardRef(function SchoolCard(
               <div className="text-sm font-medium text-neutral-800">📊 {t('schoolCard.nvo.latestTitle', { grade: nvoSummary.gradeLabel })}</div>
               <div className="flex items-center justify-between max-md:hidden">
                 <span>{t('schoolCard.nvo.subjectMath')}</span>
-                <span className={`font-medium ${getPerformanceStyle(nvoSummary.math.value).text}`}>
+                <span
+                  className={`font-medium ${nvoSummary.math.style.text} ${nvoSummary.math.style.benchmark ? 'cursor-help' : ''}`}
+                  title={getBenchmarkTooltip(nvoSummary.math.value, nvoSummary.math.style.benchmark, t) || undefined}
+                >
                   {formatPercent(nvoSummary.math.value, 0)}%
                   {nvoSummary.math.trend && (
-                    <span className={`ml-1 ${nvoSummary.math.trend.className}`}>{nvoSummary.math.trend.arrow}</span>
+                    <span
+                      className={`ml-1 ${nvoSummary.math.trend.className} cursor-help`}
+                      title={getTrendTooltip(nvoDetail.latestMath, nvoDetail.mathAvg, nvoSummary.math.trend, t) || undefined}
+                    >
+                      {nvoSummary.math.trend.arrow}
+                    </span>
                   )}
                 </span>
               </div>
               <div className="flex items-center justify-between max-md:hidden">
                 <span>{t('schoolCard.nvo.subjectBulgarian')}</span>
-                <span className={`font-medium ${getPerformanceStyle(nvoSummary.bulgarian.value).text}`}>
+                <span
+                  className={`font-medium ${nvoSummary.bulgarian.style.text} ${nvoSummary.bulgarian.style.benchmark ? 'cursor-help' : ''}`}
+                  title={getBenchmarkTooltip(nvoSummary.bulgarian.value, nvoSummary.bulgarian.style.benchmark, t) || undefined}
+                >
                   {formatPercent(nvoSummary.bulgarian.value, 0)}%
                   {nvoSummary.bulgarian.trend && (
-                    <span className={`ml-1 ${nvoSummary.bulgarian.trend.className}`}>{nvoSummary.bulgarian.trend.arrow}</span>
+                    <span
+                      className={`ml-1 ${nvoSummary.bulgarian.trend.className} cursor-help`}
+                      title={getTrendTooltip(nvoDetail.latestBg, nvoDetail.bgAvg, nvoSummary.bulgarian.trend, t) || undefined}
+                    >
+                      {nvoSummary.bulgarian.trend.arrow}
+                    </span>
                   )}
                 </span>
               </div>
               <div className="text-[13px] text-neutral-700 md:hidden">
-                <span className={`font-medium ${getPerformanceStyle(nvoSummary.math.value).text}`}>
+                <span
+                  className={`font-medium ${nvoSummary.math.style.text} ${nvoSummary.math.style.benchmark ? 'cursor-help' : ''}`}
+                  title={getBenchmarkTooltip(nvoSummary.math.value, nvoSummary.math.style.benchmark, t) || undefined}
+                >
                   {t('schoolCard.nvo.subjectMath')}: {formatPercent(nvoSummary.math.value, 0)}%
                   {nvoSummary.math.trend && (
-                    <span className={`ml-1 ${nvoSummary.math.trend.className}`}>{nvoSummary.math.trend.arrow}</span>
+                    <span
+                      className={`ml-1 ${nvoSummary.math.trend.className} cursor-help`}
+                      title={getTrendTooltip(nvoDetail.latestMath, nvoDetail.mathAvg, nvoSummary.math.trend, t) || undefined}
+                    >
+                      {nvoSummary.math.trend.arrow}
+                    </span>
                   )}
                 </span>
                 <span className="text-neutral-300 px-2">•</span>
-                <span className={`font-medium ${getPerformanceStyle(nvoSummary.bulgarian.value).text}`}>
+                <span
+                  className={`font-medium ${nvoSummary.bulgarian.style.text} ${nvoSummary.bulgarian.style.benchmark ? 'cursor-help' : ''}`}
+                  title={getBenchmarkTooltip(nvoSummary.bulgarian.value, nvoSummary.bulgarian.style.benchmark, t) || undefined}
+                >
                   {t('schoolCard.nvo.subjectBulgarian')}: {formatPercent(nvoSummary.bulgarian.value, 0)}%
                   {nvoSummary.bulgarian.trend && (
-                    <span className={`ml-1 ${nvoSummary.bulgarian.trend.className}`}>{nvoSummary.bulgarian.trend.arrow}</span>
+                    <span
+                      className={`ml-1 ${nvoSummary.bulgarian.trend.className} cursor-help`}
+                      title={getTrendTooltip(nvoDetail.latestBg, nvoDetail.bgAvg, nvoSummary.bulgarian.trend, t) || undefined}
+                    >
+                      {nvoSummary.bulgarian.trend.arrow}
+                    </span>
                   )}
                 </span>
               </div>
@@ -1316,8 +1364,30 @@ const SchoolCard = forwardRef(function SchoolCard(
                       <span className="text-center">{t('schoolCard.nvo.trendHeader')}</span>
                     </div>
                     {[
-                      { label: t('schoolCard.nvo.subjectMath'), latest: nvoDetail.latestMath, avg: nvoDetail.mathAvg },
-                      { label: t('schoolCard.nvo.subjectBulgarian'), latest: nvoDetail.latestBg, avg: nvoDetail.bgAvg },
+                      {
+                        label: t('schoolCard.nvo.subjectMath'),
+                        latest: nvoDetail.latestMath,
+                        avg: nvoDetail.mathAvg,
+                        style: getNvoValueStyle({
+                          value: nvoDetail.latestMath ?? nvoDetail.mathAvg,
+                          examType: nvoDetail.examType,
+                          year: nvoDetail.latestMathYear ?? nvoDetail.latestYear,
+                          subjectKey: 'math',
+                          examAverages,
+                        }),
+                      },
+                      {
+                        label: t('schoolCard.nvo.subjectBulgarian'),
+                        latest: nvoDetail.latestBg,
+                        avg: nvoDetail.bgAvg,
+                        style: getNvoValueStyle({
+                          value: nvoDetail.latestBg ?? nvoDetail.bgAvg,
+                          examType: nvoDetail.examType,
+                          year: nvoDetail.latestBgYear ?? nvoDetail.latestYear,
+                          subjectKey: 'bulgarian',
+                          examAverages,
+                        }),
+                      },
                     ].map(item => {
                       const latestValue = item.latest ?? item.avg
                       const trend = item.latest != null ? getTrendInfo(item.latest, item.avg) : null
@@ -1325,13 +1395,19 @@ const SchoolCard = forwardRef(function SchoolCard(
                       return (
                         <div key={item.label} className="grid grid-cols-[1.4fr_1fr_1fr_0.8fr] gap-2 py-2 border-b border-neutral-100 text-sm">
                           <span>{item.label}</span>
-                          <span className={`text-center font-mono ${getPerformanceStyle(latestValue).text}`}>
+                          <span
+                            className={`text-center font-mono ${item.style.text} ${item.style.benchmark ? 'cursor-help' : ''}`}
+                            title={getBenchmarkTooltip(latestValue, item.style.benchmark, t) || undefined}
+                          >
                             {formatPercent(latestValue, 1)}%
                           </span>
                           <span className="text-center font-mono text-neutral-700">
                             {formatPercent(item.avg, 1)}%
                           </span>
-                          <span className={`text-center font-mono ${trend ? trend.className : 'text-neutral-400'}`}>
+                          <span
+                            className={`text-center font-mono ${trend ? `${trend.className} cursor-help` : 'text-neutral-400'}`}
+                            title={getTrendTooltip(item.latest, item.avg, trend, t) || undefined}
+                          >
                             {trend ? `${trend.arrow} ${formatPercent(diff, 1)}%` : '—'}
                           </span>
                         </div>
@@ -1345,13 +1421,63 @@ const SchoolCard = forwardRef(function SchoolCard(
                   <div className="text-sm text-neutral-700">
                     <div className="flex items-center justify-between border-b border-neutral-100 py-2">
                       <span>{t('schoolCard.nvo.subjectMath')}</span>
-                      <span className={`font-mono ${getPerformanceStyle(nvoDetail.latestMath ?? 0).text}`}>
+                      <span
+                        className={`font-mono ${getNvoValueStyle({
+                          value: nvoDetail.latestMath,
+                          examType: nvoDetail.examType,
+                          year: nvoDetail.latestMathYear ?? nvoDetail.latestYear,
+                          subjectKey: 'math',
+                          examAverages,
+                        }).text} ${getNvoValueStyle({
+                          value: nvoDetail.latestMath,
+                          examType: nvoDetail.examType,
+                          year: nvoDetail.latestMathYear ?? nvoDetail.latestYear,
+                          subjectKey: 'math',
+                          examAverages,
+                        }).benchmark ? 'cursor-help' : ''}`}
+                        title={getBenchmarkTooltip(
+                          nvoDetail.latestMath,
+                          getNvoValueStyle({
+                            value: nvoDetail.latestMath,
+                            examType: nvoDetail.examType,
+                            year: nvoDetail.latestMathYear ?? nvoDetail.latestYear,
+                            subjectKey: 'math',
+                            examAverages,
+                          }).benchmark,
+                          t
+                        ) || undefined}
+                      >
                         {formatPercent(nvoDetail.latestMath, 1)}%
                       </span>
                     </div>
                     <div className="flex items-center justify-between py-2">
                       <span>{t('schoolCard.nvo.subjectBulgarian')}</span>
-                      <span className={`font-mono ${getPerformanceStyle(nvoDetail.latestBg ?? 0).text}`}>
+                      <span
+                        className={`font-mono ${getNvoValueStyle({
+                          value: nvoDetail.latestBg,
+                          examType: nvoDetail.examType,
+                          year: nvoDetail.latestBgYear ?? nvoDetail.latestYear,
+                          subjectKey: 'bulgarian',
+                          examAverages,
+                        }).text} ${getNvoValueStyle({
+                          value: nvoDetail.latestBg,
+                          examType: nvoDetail.examType,
+                          year: nvoDetail.latestBgYear ?? nvoDetail.latestYear,
+                          subjectKey: 'bulgarian',
+                          examAverages,
+                        }).benchmark ? 'cursor-help' : ''}`}
+                        title={getBenchmarkTooltip(
+                          nvoDetail.latestBg,
+                          getNvoValueStyle({
+                            value: nvoDetail.latestBg,
+                            examType: nvoDetail.examType,
+                            year: nvoDetail.latestBgYear ?? nvoDetail.latestYear,
+                            subjectKey: 'bulgarian',
+                            examAverages,
+                          }).benchmark,
+                          t
+                        ) || undefined}
+                      >
                         {formatPercent(nvoDetail.latestBg, 1)}%
                       </span>
                     </div>

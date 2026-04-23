@@ -83,7 +83,7 @@ function MultiGradeComparisonChart({ examResults, availableExamTypes, selectedSu
           })}
           {average != null && (
             <div className="flex items-center justify-between gap-4 text-sm mt-2 pt-2 border-t border-neutral-200">
-              <span className="text-neutral-500">{t('academicPerformance.average')}:</span>
+              <span className="text-neutral-500">{t('academicPerformance.nationalAverage')}:</span>
               <span className="font-medium text-neutral-600">{formatPercent(average, 1)}%</span>
             </div>
           )}
@@ -194,7 +194,7 @@ function MultiGradeComparisonChart({ examResults, availableExamTypes, selectedSu
               stroke="#9ca3af"
               strokeWidth={1}
               strokeDasharray="5 5"
-              name={t('academicPerformance.average')}
+              name={t('academicPerformance.nationalAverage')}
               dot={false}
               isAnimationActive={false}
             />
