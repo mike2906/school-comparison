@@ -614,9 +614,17 @@ async def _extract_prices(
 
     school_name = (school.name_i18n or {}).get("bg") or (school.name_i18n or {}).get("en") or ""
     system_prompt = (
-        "Extract school pricing into structured output. "
-        "Use category values that map to tuition/food/transport/activities/registration/materials/extended_day/uniforms/extracurricular/camp. "
-        "Use period values that map to monthly/yearly/one_time/quarter/term/semester. "
+        "Extract school pricing into structured output.\n"
+        "Categories: tuition, food, transport, registration, materials, extended_day, uniforms, extracurricular, camp.\n"
+        "Periods: monthly, yearly, one_time, quarter, term, semester.\n"
+        "\n"
+        "Emit ONE row per distinct fee. Apply these rules:\n"
+        "- Dual currencies: when the same fee is quoted in both EUR and BGN (e.g. '€8,100 / 15 842,22 лв'), emit only ONE row in the page's primary currency. Never emit a BGN row for a fee already emitted in EUR (or vice versa).\n"
+        "- Payment schedules: when one fee has multiple payment options (full pay / 2 installments / 10 monthly), emit ONE row with the full-payment amount as `amount` and list the other options as strings in `installments` (e.g. '€8,100 – 2 installments'). Do NOT emit separate rows for the installment amounts.\n"
+        "- Distinct tiers: when multiple tiers exist (e.g. 'Bulgarian students' vs 'International students', different grade bands, different meal plans like breakfast vs full-day), emit SEPARATE rows and set `plan_name` to the tier label from the page. `plan_name` must be populated whenever multiple rows share the same category/period/age_group on one page.\n"
+        "- Set `age_group` when the page specifies it (grade range, preschool, nursery, etc.).\n"
+        "- Set `academic_year` when the page specifies it (e.g. '2025/2026').\n"
+        "\n"
         "If no concrete pricing exists, return has_pricing_info=false and prices=[]."
     )
     user_prompt = f"School: {school_name}\n\nContent:\n{selected_text}"
@@ -645,7 +653,7 @@ async def _extract_prices(
                 "token_cost_usd": token_cost_usd,
             }
 
-    if (not parsed.has_pricing_info or not parsed.prices) and deterministic_pricing.has_pricing_info:
+    if not parsed.prices and deterministic_pricing.has_pricing_info:
         parsed = deterministic_pricing
         used_deterministic_pricing = True
 
