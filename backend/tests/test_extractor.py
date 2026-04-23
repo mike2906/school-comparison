@@ -1028,6 +1028,74 @@ def test_extract_prices_deterministic_handles_generic_monthly_fee_page():
     assert by_amount[20].period == "monthly"
 
 
+def test_extract_prices_deterministic_resets_after_optional_services_section():
+    parsed = extractor_module.helpers._extract_prices_deterministic(
+        """
+        Такса "Обучение, консумативи и образователни ресурси" за една уч. година
+        Първи клас - € 8170
+        Такси за учебната 2025/2026 г. УСЛУГИ ПО ЖЕЛАНИЕ НА РОДИТЕЛИТЕ И С ДОПЪЛНИТЕЛНО ЗАПЛАЩАНЕ
+        Чуждоезиков курс с преподаватели от UK
+        € 300 за 30 уч. часа седмично
+        Отбори по математика 2 - 5 клас - € 360 на срок
+        """
+    )
+
+    tuition_amounts = sorted(price.amount for price in parsed.prices if price.category == "tuition")
+    extracurricular_by_amount = {price.amount: price for price in parsed.prices if price.category == "extracurricular"}
+    tuition_by_amount = {price.amount: price for price in parsed.prices if price.category == "tuition"}
+
+    assert parsed.has_pricing_info is True
+    assert tuition_amounts == [8170]
+    assert tuition_by_amount[8170].period == "yearly"
+    assert extracurricular_by_amount[300].period == "yearly"
+    assert extracurricular_by_amount[360].period == "term"
+
+
+def test_extract_prices_deterministic_keeps_registration_and_optional_services_out_of_tuition():
+    parsed = extractor_module.helpers._extract_prices_deterministic(
+        """
+        School fees
+        TUITION FEES FOR THE ACADEMIC 2025/2026 YEAR
+        5 - 7 grade | € 8890: Students from Bulgarian schools
+        Additional Services
+        Registration fee (for all candidates): € 200
+        School Transport (optional): € 2100
+        Cafeteria Meals (optional): € 345 (per quarter)
+        """
+    )
+
+    by_amount = {price.amount: price for price in parsed.prices}
+    tuition_amounts = sorted(price.amount for price in parsed.prices if price.category == "tuition")
+
+    assert parsed.has_pricing_info is True
+    assert tuition_amounts == [8890]
+    assert by_amount[200].category == "registration"
+    assert by_amount[200].period == "one_time"
+    assert by_amount[2100].category == "transport"
+    assert by_amount[345].category == "food"
+    assert by_amount[345].period == "quarter"
+
+
+def test_extract_prices_deterministic_maps_installment_multipliers_to_periods():
+    parsed = extractor_module.helpers._extract_prices_deterministic(
+        """
+        Годишна такса „Обучение“
+        Плащане на пълна такса
+        7,950€
+        Плащане на две вноски
+        2×4,094€
+        Месечно заплащане
+        10×843€
+        """
+    )
+
+    by_amount = {price.amount: price for price in parsed.prices}
+
+    assert by_amount[7950].period == "yearly"
+    assert by_amount[4094].period == "semester"
+    assert by_amount[843].period == "monthly"
+
+
 def test_filter_supported_prices_drops_unsupported_llm_rows():
     text = """
     # Book a visit

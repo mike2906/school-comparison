@@ -1197,6 +1197,17 @@ _PRICE_LINE_AMOUNT_RE = re.compile(
     r"(?:(€|eur|euro|лв\.?|bgn)\s*([\d][\d\s.,]*))|(?:([\d][\d\s.,]*)\s*(€|eur|euro|лв\.?|bgn))",
     flags=re.IGNORECASE,
 )
+_OPTIONAL_PRICING_SECTION_TOKENS = (
+    "услуги по желание",
+    "по желание на родителите",
+    "допълнително заплащане",
+    "допълнителни услуги",
+    "допълнителни такси",
+    "additional services",
+    "additional fees",
+    "additional charges",
+    "optional services",
+)
 
 
 def _clean_price_line(raw: str) -> str:
@@ -1261,7 +1272,7 @@ def _detect_price_category(value: str, *, allow_generic_heading: bool = False) -
         return "extracurricular"
     if "обуч" in lowered or "tuition" in lowered:
         return "tuition"
-    if "храна" in lowered or "food" in lowered:
+    if any(token in lowered for token in ("храна", "food", "meal", "meals", "lunch", "snack", "закуска", "обяд")):
         return "food"
     if "транспорт" in lowered or "transport" in lowered:
         return "transport"
@@ -1269,14 +1280,48 @@ def _detect_price_category(value: str, *, allow_generic_heading: bool = False) -
         return "materials"
     if "униформ" in lowered or "uniform" in lowered:
         return "uniforms"
-    if any(token in lowered for token in ("регистрац", "admission", "enrollment", "кандидатств", "application fee", "deposit", "депозит")):
+    if any(
+        token in lowered
+        for token in (
+            "регистрац",
+            "registration",
+            "admission",
+            "enrollment",
+            "кандидатств",
+            "application fee",
+            "deposit",
+            "депозит",
+        )
+    ):
         return "registration"
     if "лагер" in lowered or "camp" in lowered:
         return "camp"
-    if any(token in lowered for token in ("извънклас", "extracurricular", "допълнителни дейности", "additional activities")):
+    if any(
+        token in lowered
+        for token in (
+            "извънклас",
+            "extracurricular",
+            "допълнителни дейности",
+            "additional activities",
+            "курс",
+            "course",
+            "урок",
+            "уроци",
+            "lesson",
+            "lessons",
+            "занимания",
+            "training",
+            "trainings",
+            "отбор",
+            "teams",
+            "музикален инструмент",
+        )
+    ):
         return "extracurricular"
     if "удължен" in lowered or "extended day" in lowered:
         return "extended_day"
+    if allow_generic_heading and any(token in lowered for token in _OPTIONAL_PRICING_SECTION_TOKENS):
+        return None
     if allow_generic_heading and re.search(r"\b(такси|fees?)\b", lowered):
         return "tuition"
     return None
@@ -1300,6 +1345,27 @@ def _detect_price_age_group(value: str) -> str | None:
     return None
 
 
+_INSTALLMENT_MULTIPLIER_RE = re.compile(r"\b(\d{1,2})\s*[×xXхХ]\s*[\d.,\s]*\s*(?:€|eur|euro|лв|bgn)", flags=re.IGNORECASE)
+
+
+def _detect_installment_period(value: str) -> str | None:
+    match = _INSTALLMENT_MULTIPLIER_RE.search(value)
+    if match is None:
+        return None
+    if len(_PRICE_LINE_AMOUNT_RE.findall(value)) > 1:
+        return None
+    count = int(match.group(1))
+    if count == 2:
+        return "semester"
+    if count == 3:
+        return "term"
+    if count == 4:
+        return "quarter"
+    if count in (9, 10, 11, 12):
+        return "monthly"
+    return None
+
+
 def _detect_explicit_price_period(value: str) -> str | None:
     lowered = value.lower()
     if any(token in lowered for token in ("еднократ", "one-time", "one time", "депозит", "deposit")):
@@ -1308,6 +1374,10 @@ def _detect_explicit_price_period(value: str) -> str | None:
         return "semester"
     if "четвърт" in lowered or "quarter" in lowered:
         return "quarter"
+    if re.search(r"\b(?:term|срока?|срок)\b", lowered):
+        return "term"
+    if re.search(r"(?:уч\.?\s*год|учебн(?:а|ата)\s+година|school year)", lowered):
+        return "yearly"
     if any(token in lowered for token in ("годиш", "annual", "yearly", "учебна")):
         return "yearly"
     if any(token in lowered for token in ("ежемес", "месеч", "monthly", "на месец", "per month")):
@@ -1321,9 +1391,14 @@ def _detect_price_period(
     has_year: bool,
     default_period: str | None = None,
 ) -> str:
+    installment = _detect_installment_period(value)
+    if installment is not None:
+        return installment
     explicit = _detect_explicit_price_period(value)
     if explicit is not None:
         return explicit
+    if category == "registration":
+        return "one_time"
     if has_year or "вноск" in value.lower():
         return "yearly"
     amount_matches = _PRICE_LINE_AMOUNT_RE.findall(value or "")
@@ -1333,8 +1408,6 @@ def _detect_price_period(
         return default_period
     if category in {"food", "materials", "extended_day"}:
         return "yearly"
-    if category == "registration":
-        return "one_time"
     return "monthly" if category in {"tuition", "extracurricular", "transport"} else "one_time"
 
 
@@ -1355,6 +1428,12 @@ def _iter_price_line_signals(text: str) -> list[dict[str, Any]]:
         academic_year_match = re.search(r"(20\d{2}\s*[-/]\s*20\d{2})", line)
         if academic_year_match:
             current_academic_year = academic_year_match.group(1).replace(" ", "")
+
+        if line_amount is None and any(token in lowered for token in _OPTIONAL_PRICING_SECTION_TOKENS):
+            current_category = None
+            current_age_group = None
+            current_period = None
+            continue
 
         line_category = _detect_price_category(line, allow_generic_heading=True)
         if line_category is not None and line_amount is None:
@@ -1428,6 +1507,15 @@ def _extract_prices_deterministic(text: str) -> PriceExtractionOutput:
         academic_year_match = re.search(r"(20\d{2}\s*[-/]\s*20\d{2})", line)
         if academic_year_match:
             current_academic_year = academic_year_match.group(1).replace(" ", "")
+
+        if line_amount is None and any(token in lowered for token in _OPTIONAL_PRICING_SECTION_TOKENS):
+            current_category = None
+            current_age_group = None
+            current_period = None
+            current_plan_name = None
+            current_includes = []
+            active_price = None
+            continue
 
         line_category = _detect_price_category(line, allow_generic_heading=True)
         if line_category is not None and line_amount is None:
