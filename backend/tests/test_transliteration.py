@@ -26,6 +26,12 @@ def test_derive_english_name_preserves_short_uppercase_acronyms():
     assert derive_english_name("ЕСПА") == "ESPA"
 
 
+def test_derive_english_name_translates_common_institution_types():
+    assert derive_english_name('21 СРЕДНО УЧИЛИЩЕ "ХРИСТО БОТЕВ"') == '21 Secondary School "Hristo Botev"'
+    assert derive_english_name('145 Основно училище "Симеон Радев"') == '145 Primary School "Simeon Radev"'
+    assert derive_english_name('Детска градина "Звездичка"') == 'Kindergarten "Zvezdichka"'
+
+
 def test_resolve_name_i18n_keeps_bg_display_name_but_derives_english_from_legal_name():
     resolved = resolve_name_i18n(
         {"bg": 'Частно основно училище "Д-р Петър Берон"'},
@@ -128,6 +134,18 @@ def test_resolve_name_i18n_preserves_clean_raw_english_when_no_display_name_exis
     assert resolved == {
         "bg": "Американски международен колеж",
         "en": "American International College",
+    }
+
+
+def test_resolve_name_i18n_ignores_generic_numbered_school_display_label():
+    resolved = resolve_name_i18n(
+        {"bg": '21 СРЕДНО УЧИЛИЩЕ "ХРИСТО БОТЕВ"'},
+        {"display_name_i18n": {"bg": "21. СУ"}},
+    )
+
+    assert resolved == {
+        "bg": '21 СРЕДНО УЧИЛИЩЕ "ХРИСТО БОТЕВ"',
+        "en": '21 Secondary School "Hristo Botev"',
     }
 
 

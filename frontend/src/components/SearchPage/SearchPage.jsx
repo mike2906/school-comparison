@@ -112,10 +112,15 @@ function SearchPage() {
     teaching_approach: [],
   })
 
+  const effectiveEducationLevel =
+    filters.ageGroup === 'preschool' && !filters.includeCrossover
+      ? filters.educationLevel
+      : null
+
   const { schools, loading, error } = useSchools(
     filters.ageGroup,
     filters.schoolType,
-    filters.educationLevel,
+    effectiveEducationLevel,
     filters.includeCrossover,
     filters.languageFocus,
     filters.specialPrograms,
@@ -127,7 +132,7 @@ function SearchPage() {
   const { schools: baseSchools } = useSchools(
     filters.ageGroup,
     filters.schoolType,
-    filters.educationLevel,
+    effectiveEducationLevel,
     filters.includeCrossover,
     EMPTY_LIST,
     EMPTY_LIST,
@@ -575,7 +580,20 @@ function SearchPage() {
   }
 
   const handleFilterChange = (newFilters) => {
-    setFilters(prev => ({ ...prev, ...newFilters }))
+    const nextFilters = { ...filters, ...newFilters }
+    if (newFilters.ageGroup !== undefined) {
+      if (nextFilters.ageGroup !== 'preschool') {
+        nextFilters.educationLevel = null
+        nextFilters.includeCrossover = false
+      } else if (nextFilters.includeCrossover) {
+        nextFilters.educationLevel = null
+      }
+    }
+    if (newFilters.includeCrossover !== undefined && nextFilters.includeCrossover) {
+      nextFilters.educationLevel = null
+    }
+
+    setFilters(nextFilters)
 
     // Update URL when filters change
     const params = new URLSearchParams(searchParams)
@@ -606,6 +624,11 @@ function SearchPage() {
       } else {
         params.delete('include_crossover')
       }
+    }
+    if (nextFilters.ageGroup === 'preschool' && !nextFilters.includeCrossover && nextFilters.educationLevel) {
+      params.set('education_level', nextFilters.educationLevel)
+    } else {
+      params.delete('education_level')
     }
     if (newFilters.languageFocus !== undefined) {
       params.delete('language_focus')

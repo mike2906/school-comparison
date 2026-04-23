@@ -10,6 +10,17 @@ _NAME_EN_REPLACEMENTS = (
     (re.compile(r"\bD-r\b", flags=re.IGNORECASE), "Dr."),
     (re.compile(r"\bSv\.(?=\s|$)", flags=re.IGNORECASE), "St."),
 )
+_INSTITUTION_EN_REPLACEMENTS = (
+    (re.compile(r"\bChastna Detska Gradina\b", flags=re.IGNORECASE), "Private Kindergarten"),
+    (re.compile(r"\bDetska Gradina\b", flags=re.IGNORECASE), "Kindergarten"),
+    (re.compile(r"\bChastno Nachalno Uchilishte\b", flags=re.IGNORECASE), "Private Primary School"),
+    (re.compile(r"\bNachalno Uchilishte\b", flags=re.IGNORECASE), "Primary School"),
+    (re.compile(r"\bChastno Osnovno Uchilishte\b", flags=re.IGNORECASE), "Private Primary School"),
+    (re.compile(r"\bOsnovno Uchilishte\b", flags=re.IGNORECASE), "Primary School"),
+    (re.compile(r"\bObedineno Uchilishte\b", flags=re.IGNORECASE), "Unified School"),
+    (re.compile(r"\bChastno Sredno Uchilishte\b", flags=re.IGNORECASE), "Private Secondary School"),
+    (re.compile(r"\bSredno Uchilishte\b", flags=re.IGNORECASE), "Secondary School"),
+)
 _SCHOOL_ABBREVIATION_PREFIX = re.compile(r"^(?:ЧОУ|ЧДГ|ЧСУ|ЦДГ|ДГ|НУ|ОУ|СУ|ПГ)\s+", flags=re.IGNORECASE)
 _GENERIC_BG_NAME_MARKERS = {
     "частно",
@@ -49,6 +60,30 @@ _LEGAL_ENTITY_SUFFIX_RE = re.compile(
     )\.?$""",
     flags=re.IGNORECASE | re.VERBOSE,
 )
+_GENERIC_NUMBERED_BG_DISPLAY_RE = re.compile(
+    r"""^(?:№\s*)?\d+\.?\s*(?:
+        ОУ|ОбУ|СУ|НУ|ПГ|ППМГ|ДГ|ЦДГ|ЧОУ|ЧСУ|ЧДГ|
+        основно\ училище|
+        начално\ училище|
+        средно\ училище|
+        обединено\ училище|
+        детска\ градина|
+        гимназия
+    )\.?$""",
+    flags=re.IGNORECASE | re.VERBOSE,
+)
+_GENERIC_NUMBERED_EN_DISPLAY_RE = re.compile(
+    r"""^(?:No\.\s*)?\d+\.?\s*(?:
+        SU|OU|NU|PG|PPMG|DG|TSDG|CHOU|CHSU|CHDG|
+        primary\ school|
+        secondary\ school|
+        unified\ school|
+        kindergarten|
+        gymnasium|
+        high\ school
+    )\.?$""",
+    flags=re.IGNORECASE | re.VERBOSE,
+)
 
 
 def derive_english_name(bg_name: str | None) -> str | None:
@@ -66,6 +101,8 @@ def derive_english_name(bg_name: str | None) -> str | None:
         resolved = resolved.title()
 
     for pattern, replacement in _NAME_EN_REPLACEMENTS:
+        resolved = pattern.sub(replacement, resolved)
+    for pattern, replacement in _INSTITUTION_EN_REPLACEMENTS:
         resolved = pattern.sub(replacement, resolved)
 
     resolved = re.sub(r"\s+", " ", resolved).strip()
@@ -196,6 +233,25 @@ def _contains_honorific(text: str | None) -> bool:
     return bool(re.search(r"\b(?:Д-Р|Д-р|д-р|Св\.|СВ\.|св\.)\b", normalized))
 
 
+def is_generic_numbered_display_label(text: str | None) -> bool:
+    normalized = re.sub(r"\s+", " ", text or "").strip(' "„“”')
+    if not normalized:
+        return False
+    return bool(
+        _GENERIC_NUMBERED_BG_DISPLAY_RE.fullmatch(normalized)
+        or _GENERIC_NUMBERED_EN_DISPLAY_RE.fullmatch(normalized)
+    )
+
+
+def _filter_display_name_i18n(display_name: Mapping[str, Any] | None) -> dict[str, str]:
+    display = _clean_i18n_map(display_name)
+    return {
+        lang: value
+        for lang, value in display.items()
+        if not is_generic_numbered_display_label(value)
+    }
+
+
 def resolve_name_i18n(
     name_i18n: Mapping[str, Any] | None,
     attributes: Mapping[str, Any] | None = None,
@@ -204,7 +260,7 @@ def resolve_name_i18n(
     raw_name = _clean_i18n_map(name_i18n)
     raw_attributes = dict(attributes or {})
     display_name = raw_attributes.get("display_name_i18n")
-    display = _clean_i18n_map(display_name if isinstance(display_name, Mapping) else None)
+    display = _filter_display_name_i18n(display_name if isinstance(display_name, Mapping) else None)
 
     resolved: dict[str, str] = {}
     raw_primary_name = raw_name.get("bg") or raw_name.get("en")

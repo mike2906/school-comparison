@@ -104,10 +104,17 @@ class SchoolService:
                 .where(self._resolved_location_clause(SchoolLocation))
             )
 
-        # Apply education_level filter unless include_crossover is true for preschool
-        # This allows showing both kindergartens and primary schools for preschool age
-        if education_level and not (age_group == "preschool" and include_crossover):
-            query = query.where(School.education_level == education_level)
+        # Apply education_level filter. Preschool is special:
+        # - kindergarten => kindergarten-only preschool results
+        # - primary => school-side preschool results (including all-through schools)
+        # - include_crossover => no education-level restriction
+        if education_level:
+            if age_group == "preschool" and include_crossover:
+                pass
+            elif age_group == "preschool" and education_level == "primary":
+                query = query.where(School.education_level != "kindergarten")
+            else:
+                query = query.where(School.education_level == education_level)
 
         # Filter by school type if specified
         if school_type:

@@ -265,6 +265,45 @@ class TestSchoolsFilterEndpoint:
         # Should have both the state KG with preschool location
         assert len(data2) >= 1
 
+    @pytest.mark.asyncio
+    async def test_preschool_school_filter_includes_all_through_schools(self, seeded_db, seeded_client):
+        school = School(
+            name_i18n={"bg": '21 СРЕДНО УЧИЛИЩЕ "ХРИСТО БОТЕВ"'},
+            country_code="bg",
+            school_type="state",
+            education_level="upper_secondary",
+            city="sofia",
+            website_url="https://21su.bg",
+        )
+        seeded_db.add(school)
+        await seeded_db.flush()
+
+        location = SchoolLocation(
+            school_id=school.id,
+            address_i18n={"bg": "ул. Люботрън 12"},
+            lat=42.66915,
+            lng=23.31543,
+            is_primary=True,
+        )
+        seeded_db.add(location)
+        await seeded_db.flush()
+
+        seeded_db.add(
+            SchoolLocationAgeGroupShift(
+                location_id=location.id,
+                age_group="preschool",
+                shift="full_day",
+            )
+        )
+        await seeded_db.commit()
+
+        response = await seeded_client.get("/schools?age_group=preschool&education_level=primary")
+        assert response.status_code == 200
+        data = response.json()
+        ids = {item["id"] for item in data}
+        assert school.id in ids
+        assert all(item["education_level"] != "kindergarten" for item in data)
+
 
 class TestSchoolsSearchEndpoint:
     """Test search endpoint.

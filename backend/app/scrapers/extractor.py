@@ -620,6 +620,8 @@ async def _extract_prices(
         "If no concrete pricing exists, return has_pricing_info=false and prices=[]."
     )
     user_prompt = f"School: {school_name}\n\nContent:\n{selected_text}"
+    deterministic_pricing = helpers._extract_prices_deterministic(selected_text)
+    used_deterministic_pricing = False
 
     parsed, input_tokens, output_tokens, token_cost_usd = await _run_typed_agent(
         system_prompt=system_prompt,
@@ -630,14 +632,37 @@ async def _extract_prices(
     )
 
     if parsed is None:
-        return {
-            "success": False,
-            "count": 0,
-            "detail": "Price extraction LLM call failed",
-            "input_tokens": input_tokens,
-            "output_tokens": output_tokens,
-            "token_cost_usd": token_cost_usd,
-        }
+        if deterministic_pricing.has_pricing_info:
+            parsed = deterministic_pricing
+            used_deterministic_pricing = True
+        else:
+            return {
+                "success": False,
+                "count": 0,
+                "detail": "Price extraction LLM call failed",
+                "input_tokens": input_tokens,
+                "output_tokens": output_tokens,
+                "token_cost_usd": token_cost_usd,
+            }
+
+    if (not parsed.has_pricing_info or not parsed.prices) and deterministic_pricing.has_pricing_info:
+        parsed = deterministic_pricing
+        used_deterministic_pricing = True
+
+    supported_prices = helpers._filter_supported_prices(parsed.prices, selected_text) if parsed.prices else []
+    if supported_prices:
+        parsed = parsed.model_copy(update={"prices": supported_prices, "has_pricing_info": True})
+    elif deterministic_pricing.has_pricing_info:
+        deterministic_supported_prices = helpers._filter_supported_prices(deterministic_pricing.prices, selected_text)
+        if deterministic_supported_prices:
+            parsed = deterministic_pricing.model_copy(
+                update={"prices": deterministic_supported_prices, "has_pricing_info": True}
+            )
+            used_deterministic_pricing = True
+        else:
+            parsed = parsed.model_copy(update={"prices": [], "has_pricing_info": False})
+    else:
+        parsed = parsed.model_copy(update={"prices": [], "has_pricing_info": False})
 
     if not parsed.has_pricing_info:
         if settings.extraction_clear_pricing_on_no_info:
@@ -695,6 +720,7 @@ async def _extract_prices(
         normalized_plan_name = helpers._normalize_scalar_text(extracted.plan_name, max_len=100)
         normalized_academic_year = helpers._normalize_scalar_text(extracted.academic_year, max_len=20)
         normalized_age_group = helpers._normalize_scalar_text(extracted.age_group, max_len=50)
+        row_source_url = helpers._find_supporting_price_source_url(school, pages, extracted) or source_url
 
         pricing_rows.append(
             Pricing(
@@ -709,7 +735,7 @@ async def _extract_prices(
                 academic_year=normalized_academic_year,
                 age_group=normalized_age_group,
                 source=PriceSource.SCRAPED_WEBSITE,
-                source_url=source_url,
+                source_url=row_source_url,
                 pricing_context={
                     "notes": extracted.notes,
                     "confidence": extracted.confidence,
@@ -733,7 +759,7 @@ async def _extract_prices(
                     extracted.currency,
                 ),
                 source_type=SourceType.SCRAPED_WEBSITE,
-                source_url=source_url,
+                source_url=row_source_url,
                 scraped_at=helpers._utcnow_naive(),
                 confidence=SourceConfidence.HIGH if (extracted.confidence or 0) >= 0.8 else SourceConfidence.MEDIUM,
                 confidence_score=extracted.confidence,
@@ -772,7 +798,10 @@ async def _extract_prices(
     return {
         "success": True,
         "count": len(pricing_rows),
-        "detail": f"Extracted {len(pricing_rows)} pricing rows",
+        "detail": (
+            f"Extracted {len(pricing_rows)} pricing rows"
+            + (" (deterministic fallback)" if used_deterministic_pricing else "")
+        ),
         "input_tokens": input_tokens,
         "output_tokens": output_tokens,
         "token_cost_usd": token_cost_usd,

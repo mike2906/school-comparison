@@ -8,8 +8,9 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from sqlalchemy import select
 
-from app.models import School, SchoolLocation, SourcePage
+from app.models import School, SchoolLocation, SchoolLocationAgeGroupShift, SourcePage
 from app.models.scrape_log import ScrapeType
 from app.scrapers import cli as scraper_cli
 from app.scrapers.url_validator import ValidationResult
@@ -68,6 +69,413 @@ def test_select_brand_aliases_for_school_skips_state_schools():
     )
 
     assert aliases == []
+
+
+def test_infer_age_group_evidence_from_source_pages_detects_all_through_school_signals():
+    pages = [
+        SourcePage(
+            school_id=1,
+            scrape_type=ScrapeType.WEBSITE,
+            source_url="https://21su.bg/priem/predutchilishtni-grupi",
+            content_hash="a" * 64,
+            raw_markdown="## Предучилищни групи\nКритерии за прием",
+        ),
+        SourcePage(
+            school_id=1,
+            scrape_type=ScrapeType.WEBSITE,
+            source_url="https://21su.bg/priem/parvi-klas",
+            content_hash="b" * 64,
+            raw_markdown="## Първи клас\nПодаване на заявления",
+        ),
+        SourcePage(
+            school_id=1,
+            scrape_type=ScrapeType.WEBSITE,
+            source_url="https://21su.bg/obuchenie/klasni-rakovoditeli",
+            content_hash="c" * 64,
+            raw_markdown="""
+            # Класни ръководители
+            3. група | Вергиния Николова
+            4. група | Елка Вълкова
+            1 а | Дорина Христова
+            5 а | Стефани Витанова
+            8 а | Андреа Иванова
+            """,
+        ),
+    ]
+
+    evidence = scraper_cli._infer_age_group_evidence_from_source_pages(pages)
+
+    assert set(evidence) == {"preschool", "grade_1_4", "grade_5_7", "grade_8_12"}
+
+
+def test_should_refresh_age_group_navigation_for_upper_secondary_missing_primary_stages():
+    school = School(
+        name_i18n={"bg": '21 СРЕДНО УЧИЛИЩЕ "ХРИСТО БОТЕВ"'},
+        country_code="bg",
+        school_type="state",
+        education_level="upper_secondary",
+        city="sofia",
+        website_url="https://21su.bg",
+    )
+    school.locations = [
+        SchoolLocation(
+            school_id=1,
+            is_primary=True,
+            age_group_shifts=[
+                SchoolLocationAgeGroupShift(location_id=1, age_group="grade_5_7"),
+                SchoolLocationAgeGroupShift(location_id=1, age_group="grade_8_12"),
+            ],
+        )
+    ]
+
+    assert scraper_cli._should_refresh_age_group_navigation(school) is True
+
+
+def test_should_refresh_age_group_navigation_skips_complete_all_through_school():
+    school = School(
+        name_i18n={"bg": '96. Средно училище "Лев Николаевич Толстой"'},
+        country_code="bg",
+        school_type="state",
+        education_level="upper_secondary",
+        city="sofia",
+        website_url="https://96sou.com",
+    )
+    school.locations = [
+        SchoolLocation(
+            school_id=1,
+            is_primary=True,
+            age_group_shifts=[
+                SchoolLocationAgeGroupShift(location_id=1, age_group="preschool"),
+                SchoolLocationAgeGroupShift(location_id=1, age_group="grade_1_4"),
+                SchoolLocationAgeGroupShift(location_id=1, age_group="grade_5_7"),
+                SchoolLocationAgeGroupShift(location_id=1, age_group="grade_8_12"),
+            ],
+        )
+    ]
+
+    assert scraper_cli._should_refresh_age_group_navigation(school) is False
+
+
+def test_allowed_age_group_repairs_for_kindergarten_excludes_school_grades():
+    school = School(
+        name_i18n={"bg": '"ЧАСТНА ДЕТСКА ГРАДИНА МЕРИДИАН 22" ЕООД'},
+        country_code="bg",
+        school_type="private",
+        education_level="kindergarten",
+        city="sofia",
+        website_url="https://meridian22.bg",
+    )
+
+    assert scraper_cli._allowed_age_group_repairs_for_school(school) == {"preschool"}
+
+
+def test_allowed_age_group_repairs_for_lower_secondary_excludes_grade_8_12():
+    school = School(
+        name_i18n={"bg": '124 ОСНОВНО УЧИЛИЩЕ "ВАСИЛ ЛЕВСКИ"'},
+        country_code="bg",
+        school_type="state",
+        education_level="lower_secondary",
+        city="sofia",
+        website_url="https://124-ou.com",
+    )
+
+    assert scraper_cli._allowed_age_group_repairs_for_school(school) == {
+        "preschool",
+        "grade_1_4",
+        "grade_5_7",
+    }
+
+
+@pytest.mark.asyncio
+async def test_repair_age_groups_command_adds_missing_groups_from_source_pages(db_session):
+    school = School(
+        name_i18n={"bg": '21 СРЕДНО УЧИЛИЩЕ "ХРИСТО БОТЕВ"'},
+        country_code="bg",
+        school_type="state",
+        education_level="upper_secondary",
+        city="sofia",
+        website_url="https://21su.bg",
+        scrape_status="navigated",
+    )
+    db_session.add(school)
+    await db_session.flush()
+
+    location = SchoolLocation(
+        school_id=school.id,
+        address_i18n={"bg": "ул. Люботрън 12"},
+        lat=42.66915,
+        lng=23.31543,
+        is_primary=True,
+    )
+    db_session.add(location)
+    await db_session.flush()
+    db_session.add_all(
+        [
+            SchoolLocationAgeGroupShift(location_id=location.id, age_group="grade_5_7"),
+            SchoolLocationAgeGroupShift(location_id=location.id, age_group="grade_8_12"),
+        ]
+    )
+    db_session.add_all(
+        [
+            SourcePage(
+                school_id=school.id,
+                scrape_type=ScrapeType.WEBSITE,
+                source_url="https://21su.bg/priem/predutchilishtni-grupi",
+                content_hash="d" * 64,
+                raw_markdown="## Предучилищни групи\nКритерии за прием",
+            ),
+            SourcePage(
+                school_id=school.id,
+                scrape_type=ScrapeType.WEBSITE,
+                source_url="https://21su.bg/priem/parvi-klas",
+                content_hash="e" * 64,
+                raw_markdown="## Първи клас\nПодаване на заявления",
+            ),
+        ]
+    )
+    await db_session.commit()
+
+    class SessionCtx:
+        async def __aenter__(self):
+            return db_session
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+    with patch("app.database.async_session_maker", return_value=SessionCtx()):
+        await scraper_cli._repair_age_groups_command(
+            school_name=None,
+            school_id=school.id,
+            city="sofia",
+            country="bg",
+            limit=None,
+            dry_run=False,
+            refresh_navigation=False,
+        )
+
+    refreshed = (
+        await db_session.get(SchoolLocation, location.id)
+    )
+    age_groups = {
+        row.age_group
+        for row in (await db_session.execute(
+            select(SchoolLocationAgeGroupShift).where(
+                SchoolLocationAgeGroupShift.location_id == location.id
+            )
+        )).scalars().all()
+    }
+    assert refreshed is not None
+    assert age_groups == {"preschool", "grade_1_4", "grade_5_7", "grade_8_12"}
+
+
+@pytest.mark.asyncio
+async def test_repair_age_groups_command_ignores_disallowed_kindergarten_school_grades(db_session):
+    school = School(
+        name_i18n={"bg": '"ЧАСТНА ДЕТСКА ГРАДИНА МЕРИДИАН 22" ЕООД'},
+        country_code="bg",
+        school_type="private",
+        education_level="kindergarten",
+        city="sofia",
+        website_url="https://meridian22.bg",
+        scrape_status="navigated",
+    )
+    db_session.add(school)
+    await db_session.flush()
+
+    location = SchoolLocation(
+        school_id=school.id,
+        address_i18n={"bg": "ул. Примерна 1"},
+        is_primary=True,
+    )
+    db_session.add(location)
+    await db_session.flush()
+    db_session.add(
+        SchoolLocationAgeGroupShift(location_id=location.id, age_group="preschool")
+    )
+    db_session.add(
+        SourcePage(
+            school_id=school.id,
+            scrape_type=ScrapeType.WEBSITE,
+            source_url="https://meridian22.bg/priem/parvi-klas",
+            content_hash="f" * 64,
+            raw_markdown="## Първи клас\nПодаване на заявления",
+        )
+    )
+    await db_session.commit()
+
+    class SessionCtx:
+        async def __aenter__(self):
+            return db_session
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+    with patch("app.database.async_session_maker", return_value=SessionCtx()):
+        await scraper_cli._repair_age_groups_command(
+            school_name=None,
+            school_id=school.id,
+            city="sofia",
+            country="bg",
+            limit=None,
+            dry_run=False,
+            refresh_navigation=False,
+        )
+
+    age_groups = {
+        row.age_group
+        for row in (
+            await db_session.execute(
+                select(SchoolLocationAgeGroupShift).where(
+                    SchoolLocationAgeGroupShift.location_id == location.id
+                )
+            )
+        ).scalars().all()
+    }
+    assert age_groups == {"preschool"}
+
+
+@pytest.mark.asyncio
+async def test_repair_age_groups_command_ignores_disallowed_lower_secondary_grade_8_12(db_session):
+    school = School(
+        name_i18n={"bg": '124 ОСНОВНО УЧИЛИЩЕ "ВАСИЛ ЛЕВСКИ"'},
+        country_code="bg",
+        school_type="state",
+        education_level="lower_secondary",
+        city="sofia",
+        website_url="https://124-ou.com",
+        scrape_status="navigated",
+    )
+    db_session.add(school)
+    await db_session.flush()
+
+    location = SchoolLocation(
+        school_id=school.id,
+        address_i18n={"bg": "ул. Примерна 2"},
+        is_primary=True,
+    )
+    db_session.add(location)
+    await db_session.flush()
+    db_session.add_all(
+        [
+            SchoolLocationAgeGroupShift(location_id=location.id, age_group="grade_1_4"),
+            SchoolLocationAgeGroupShift(location_id=location.id, age_group="grade_5_7"),
+        ]
+    )
+    db_session.add(
+        SourcePage(
+            school_id=school.id,
+            scrape_type=ScrapeType.WEBSITE,
+            source_url="https://124-ou.com/priem/sled-sedmi-klas",
+            content_hash="g" * 64,
+            raw_markdown="## След 7 клас\nБалообразуване",
+        )
+    )
+    await db_session.commit()
+
+    class SessionCtx:
+        async def __aenter__(self):
+            return db_session
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+    with patch("app.database.async_session_maker", return_value=SessionCtx()):
+        await scraper_cli._repair_age_groups_command(
+            school_name=None,
+            school_id=school.id,
+            city="sofia",
+            country="bg",
+            limit=None,
+            dry_run=False,
+            refresh_navigation=False,
+        )
+
+    age_groups = {
+        row.age_group
+        for row in (
+            await db_session.execute(
+                select(SchoolLocationAgeGroupShift).where(
+                    SchoolLocationAgeGroupShift.location_id == location.id
+                )
+            )
+        ).scalars().all()
+    }
+    assert age_groups == {"grade_1_4", "grade_5_7"}
+
+
+@pytest.mark.asyncio
+async def test_repair_age_groups_refresh_navigation_only_targets_likely_candidates(db_session):
+    candidate = School(
+        name_i18n={"bg": '21 СРЕДНО УЧИЛИЩЕ "ХРИСТО БОТЕВ"'},
+        country_code="bg",
+        school_type="state",
+        education_level="upper_secondary",
+        city="sofia",
+        website_url="https://21su.bg",
+        scrape_status="navigated",
+    )
+    complete = School(
+        name_i18n={"bg": '96. Средно училище "Лев Николаевич Толстой"'},
+        country_code="bg",
+        school_type="state",
+        education_level="upper_secondary",
+        city="sofia",
+        website_url="https://96sou.com",
+        scrape_status="navigated",
+    )
+    db_session.add_all([candidate, complete])
+    await db_session.flush()
+
+    candidate_location = SchoolLocation(
+        school_id=candidate.id,
+        address_i18n={"bg": "ул. Люботрън 12"},
+        is_primary=True,
+    )
+    complete_location = SchoolLocation(
+        school_id=complete.id,
+        address_i18n={"bg": "ул. Толстой 1"},
+        is_primary=True,
+    )
+    db_session.add_all([candidate_location, complete_location])
+    await db_session.flush()
+
+    db_session.add_all(
+        [
+            SchoolLocationAgeGroupShift(location_id=candidate_location.id, age_group="grade_5_7"),
+            SchoolLocationAgeGroupShift(location_id=candidate_location.id, age_group="grade_8_12"),
+            SchoolLocationAgeGroupShift(location_id=complete_location.id, age_group="preschool"),
+            SchoolLocationAgeGroupShift(location_id=complete_location.id, age_group="grade_1_4"),
+            SchoolLocationAgeGroupShift(location_id=complete_location.id, age_group="grade_5_7"),
+            SchoolLocationAgeGroupShift(location_id=complete_location.id, age_group="grade_8_12"),
+        ]
+    )
+    await db_session.commit()
+
+    class SessionCtx:
+        async def __aenter__(self):
+            return db_session
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+    navigate_mock = AsyncMock()
+
+    with (
+        patch("app.database.async_session_maker", return_value=SessionCtx()),
+        patch.object(scraper_cli, "_run_navigate_batch", new=navigate_mock),
+    ):
+        await scraper_cli._repair_age_groups_command(
+            school_name=None,
+            school_id=None,
+            city="sofia",
+            country="bg",
+            limit=None,
+            dry_run=False,
+            refresh_navigation=True,
+        )
+
+    navigate_mock.assert_awaited_once()
+    assert navigate_mock.await_args.kwargs["school_ids"] == [candidate.id]
 
 
 @pytest.mark.asyncio
@@ -404,3 +812,22 @@ async def test_cleanup_display_names_command_removes_junk_and_cyrillic_en(db_ses
     assert (cyrillic_en_school.attributes or {}).get("display_name_i18n") == {
         "bg": "ЧОУ ПЕТЪР БЕРОН",
     }
+
+
+def test_clean_display_name_i18n_for_school_clears_generic_numbered_abbreviation():
+    school = School(
+        name_i18n={"bg": '21 СРЕДНО УЧИЛИЩЕ "ХРИСТО БОТЕВ"'},
+        country_code="bg",
+        school_type="state",
+        education_level="upper_secondary",
+        city="sofia",
+        website_url="https://21su.bg",
+        scrape_status="extracted",
+        attributes={"display_name_i18n": {"bg": "21. СУ", "en": "21 Secondary School"}},
+    )
+
+    cleaned, changed, reason = scraper_cli._clean_display_name_i18n_for_school(school)
+
+    assert cleaned is None
+    assert changed is True
+    assert reason == "clear-junk"

@@ -123,6 +123,43 @@ async def test_prepare_summary_candidate_ignores_low_quality_display_name(db_ses
 
 
 @pytest.mark.asyncio
+async def test_prepare_summary_candidate_ignores_generic_numbered_display_name(db_session):
+    school = School(
+        name_i18n={"bg": '21 СРЕДНО УЧИЛИЩЕ "ХРИСТО БОТЕВ"'},
+        country_code="bg",
+        school_type="state",
+        education_level="upper_secondary",
+        city="sofia",
+        scrape_status="extracted",
+        attributes={
+            "display_name_i18n": {"bg": "21. СУ"},
+            "extracted": {"programs": ["STEM"]},
+            "data_validation": _validation_payload(),
+        },
+    )
+    db_session.add(school)
+    await db_session.commit()
+
+    school = (
+        await db_session.execute(
+            select(School).options(
+                selectinload(School.locations),
+                selectinload(School.pricing),
+                selectinload(School.exam_results),
+            ).where(School.id == school.id)
+        )
+    ).scalar_one()
+    prepared = summarizer_module.prepare_summary_candidate(school)
+
+    assert prepared.summary_input is not None
+    assert prepared.summary_input.identity.display_name_i18n == {}
+    assert prepared.summary_input.identity.name_i18n == {
+        "bg": '21 СРЕДНО УЧИЛИЩЕ "ХРИСТО БОТЕВ"',
+        "en": '21 Secondary School "Hristo Botev"',
+    }
+
+
+@pytest.mark.asyncio
 async def test_prepare_summary_candidate_drops_display_name_if_any_locale_is_low_quality(db_session):
     school = School(
         name_i18n={"bg": "Професионална гимназия по телекомуникации"},

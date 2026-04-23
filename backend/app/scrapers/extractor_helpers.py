@@ -18,12 +18,15 @@ from app.models.school import School
 from app.models.source_page import SourcePage
 from app.scrapers.extraction_rules import get_rules
 from app.scrapers.school_tokens import extract_school_name_tokens
+from app.utils.i18n_resolver import is_generic_numbered_display_label
 from app.utils.transliteration import transliterate_bulgarian
 from app.schemas.extraction import (
     AdmissionExtractionOutput,
+    ExtractedPrice,
     ExtractedLanguageFocus,
     GeneralInfoExtractionOutput,
     OperationsExtractionOutput,
+    PriceExtractionOutput,
     PricingTermsExtractionOutput,
     ServicesExtractionOutput,
     SummarySourceExtractionOutput,
@@ -1190,6 +1193,411 @@ def _extract_pricing_terms_deterministic(text: str) -> PricingTermsExtractionOut
     )
     return parsed
 
+_PRICE_LINE_AMOUNT_RE = re.compile(
+    r"(?:(€|eur|euro|лв\.?|bgn)\s*([\d][\d\s.,]*))|(?:([\d][\d\s.,]*)\s*(€|eur|euro|лв\.?|bgn))",
+    flags=re.IGNORECASE,
+)
+
+
+def _clean_price_line(raw: str) -> str:
+    line = re.sub(r"\[(.*?)\]\([^)]*\)", r"\1", raw or "")
+    line = re.sub(r"^[#>*\-\s`_]+", "", line)
+    line = line.replace("**", "").replace("__", "")
+    line = re.sub(r"\s+", " ", line).strip(" -:\t")
+    return line.strip()
+
+
+def _parse_price_amount_token(raw: str) -> float | None:
+    token = re.sub(r"[^0-9,.\s]", "", str(raw or "")).replace("\xa0", " ").strip()
+    if not token:
+        return None
+
+    token = re.sub(r"\s+", "", token)
+    if not token:
+        return None
+
+    if "," in token and "." in token:
+        if token.rfind(",") > token.rfind("."):
+            token = token.replace(".", "").replace(",", ".")
+        else:
+            token = token.replace(",", "")
+    elif token.count(",") > 1:
+        token = token.replace(",", "")
+    elif token.count(".") > 1:
+        token = token.replace(".", "")
+    elif "," in token:
+        head, tail = token.split(",", 1)
+        token = head + tail if len(tail) == 3 else f"{head}.{tail}"
+    elif "." in token:
+        head, tail = token.split(".", 1)
+        token = head + tail if len(tail) == 3 else f"{head}.{tail}"
+
+    try:
+        return float(token)
+    except ValueError:
+        return None
+
+
+def _extract_price_amount_currency(value: str) -> tuple[float | None, str | None]:
+    match = _PRICE_LINE_AMOUNT_RE.search(value or "")
+    if not match:
+        return None, None
+    currency_token = match.group(1) or match.group(4) or ""
+    amount_token = match.group(2) or match.group(3) or ""
+    amount = _parse_price_amount_token(amount_token)
+    if amount is None:
+        return None, None
+    currency_normalized = currency_token.lower().strip(". ")
+    if currency_normalized in {"€", "eur", "euro"}:
+        return amount, "EUR"
+    if currency_normalized in {"лв", "bgn"}:
+        return amount, "BGN"
+    return amount, None
+
+
+def _detect_price_category(value: str, *, allow_generic_heading: bool = False) -> str | None:
+    lowered = value.lower()
+    if "обучение по " in lowered:
+        return "extracurricular"
+    if "обуч" in lowered or "tuition" in lowered:
+        return "tuition"
+    if "храна" in lowered or "food" in lowered:
+        return "food"
+    if "транспорт" in lowered or "transport" in lowered:
+        return "transport"
+    if "учебниц" in lowered or "консуматив" in lowered or "materials" in lowered:
+        return "materials"
+    if "униформ" in lowered or "uniform" in lowered:
+        return "uniforms"
+    if any(token in lowered for token in ("регистрац", "admission", "enrollment", "кандидатств", "application fee", "deposit", "депозит")):
+        return "registration"
+    if "лагер" in lowered or "camp" in lowered:
+        return "camp"
+    if any(token in lowered for token in ("извънклас", "extracurricular", "допълнителни дейности", "additional activities")):
+        return "extracurricular"
+    if "удължен" in lowered or "extended day" in lowered:
+        return "extended_day"
+    if allow_generic_heading and re.search(r"\b(такси|fees?)\b", lowered):
+        return "tuition"
+    return None
+
+
+def _detect_price_age_group(value: str) -> str | None:
+    lowered = value.lower()
+    if "предучилищ" in lowered:
+        return "preschool"
+    range_match = re.search(r"(\d+\s*[-–]\s*\d+\s*клас)", value, flags=re.IGNORECASE)
+    if range_match:
+        return range_match.group(1)
+    multi_grade_match = re.search(r"(\d(?:\s*,\s*\d+)+(?:\s*и\s*\d+)?\s*клас)", value, flags=re.IGNORECASE)
+    if multi_grade_match:
+        digits = [int(part) for part in re.findall(r"\d+", multi_grade_match.group(1))]
+        if digits:
+            return f"{min(digits)}-{max(digits)} клас"
+    single_grade_match = re.search(r"(\d+\s*клас)", value, flags=re.IGNORECASE)
+    if single_grade_match:
+        return single_grade_match.group(1)
+    return None
+
+
+def _detect_explicit_price_period(value: str) -> str | None:
+    lowered = value.lower()
+    if any(token in lowered for token in ("еднократ", "one-time", "one time", "депозит", "deposit")):
+        return "one_time"
+    if "семест" in lowered or "semester" in lowered:
+        return "semester"
+    if "четвърт" in lowered or "quarter" in lowered:
+        return "quarter"
+    if any(token in lowered for token in ("годиш", "annual", "yearly", "учебна")):
+        return "yearly"
+    if any(token in lowered for token in ("ежемес", "месеч", "monthly", "на месец", "per month")):
+        return "monthly"
+    return None
+
+
+def _detect_price_period(
+    value: str,
+    category: str | None,
+    has_year: bool,
+    default_period: str | None = None,
+) -> str:
+    explicit = _detect_explicit_price_period(value)
+    if explicit is not None:
+        return explicit
+    if has_year or "вноск" in value.lower():
+        return "yearly"
+    amount_matches = _PRICE_LINE_AMOUNT_RE.findall(value or "")
+    if default_period == "monthly" and category == "tuition" and len(amount_matches) > 2:
+        return "yearly"
+    if default_period is not None:
+        return default_period
+    if category in {"food", "materials", "extended_day"}:
+        return "yearly"
+    if category == "registration":
+        return "one_time"
+    return "monthly" if category in {"tuition", "extracurricular", "transport"} else "one_time"
+
+
+def _iter_price_line_signals(text: str) -> list[dict[str, Any]]:
+    lines = [_clean_price_line(raw) for raw in re.split(r"[\n\r]+", text) if _clean_price_line(raw)]
+    if not lines:
+        return []
+
+    signals: list[dict[str, Any]] = []
+    current_category: str | None = None
+    current_age_group: str | None = None
+    current_academic_year: str | None = None
+    current_period: str | None = None
+
+    for line in lines:
+        lowered = line.lower()
+        line_amount, line_currency = _extract_price_amount_currency(line)
+        academic_year_match = re.search(r"(20\d{2}\s*[-/]\s*20\d{2})", line)
+        if academic_year_match:
+            current_academic_year = academic_year_match.group(1).replace(" ", "")
+
+        line_category = _detect_price_category(line, allow_generic_heading=True)
+        if line_category is not None and line_amount is None:
+            if line_category != current_category:
+                current_period = None
+            current_category = line_category
+            detected_age_group = _detect_price_age_group(line)
+            if detected_age_group is not None:
+                current_age_group = detected_age_group
+
+        explicit_period = _detect_explicit_price_period(line)
+        if explicit_period is not None:
+            current_period = explicit_period
+
+        installment_match = re.search(r"\b(?:на|за)\s*(\d+)\s*вноск", lowered)
+        if installment_match and int(installment_match.group(1)) != 1:
+            continue
+
+        if line_amount is None:
+            continue
+
+        row_category = _detect_price_category(line) or current_category
+        if row_category is None:
+            continue
+
+        row_age_group = _detect_price_age_group(line) or current_age_group
+        row_year = academic_year_match.group(1).replace(" ", "") if academic_year_match else current_academic_year
+        row_period = _detect_price_period(
+            line,
+            row_category,
+            has_year=bool(row_year),
+            default_period=current_period,
+        )
+        current_period = row_period
+        signals.append(
+            {
+                "line": line,
+                "amount": line_amount,
+                "currency": line_currency or "BGN",
+                "category": row_category,
+                "period": row_period,
+                "academic_year": row_year,
+                "age_group": row_age_group,
+            }
+        )
+
+    return signals
+
+
+def _extract_prices_deterministic(text: str) -> PriceExtractionOutput:
+    if not text:
+        return PriceExtractionOutput()
+
+    lines = [_clean_price_line(raw) for raw in re.split(r"[\n\r]+", text) if _clean_price_line(raw)]
+    if not lines:
+        return PriceExtractionOutput()
+
+    prices: list[ExtractedPrice] = []
+    current_category: str | None = None
+    current_age_group: str | None = None
+    current_academic_year: str | None = None
+    current_period: str | None = None
+    current_plan_name: str | None = None
+    current_includes: list[str] = []
+    active_price: ExtractedPrice | None = None
+    seen: set[tuple[str, float, str, str | None, str | None]] = set()
+
+    for line in lines:
+        lowered = line.lower()
+        line_amount, line_currency = _extract_price_amount_currency(line)
+        academic_year_match = re.search(r"(20\d{2}\s*[-/]\s*20\d{2})", line)
+        if academic_year_match:
+            current_academic_year = academic_year_match.group(1).replace(" ", "")
+
+        line_category = _detect_price_category(line, allow_generic_heading=True)
+        if line_category is not None and line_amount is None:
+            if line_category != current_category:
+                current_period = None
+            current_category = line_category
+            detected_age_group = _detect_price_age_group(line)
+            if detected_age_group is not None:
+                current_age_group = detected_age_group
+            current_plan_name = "Standard" if "стандарт" in lowered or "standard" in lowered else current_plan_name
+            current_includes = []
+            active_price = None
+
+        explicit_period = _detect_explicit_price_period(line)
+        if explicit_period is not None:
+            current_period = explicit_period
+
+        if "включва" in lowered and current_category is not None:
+            current_includes.append(line)
+            if active_price is not None and line not in active_price.includes:
+                active_price.includes.append(line)
+            continue
+
+        installment_match = re.search(r"\b(?:на|за)\s*(\d+)\s*вноск", lowered)
+        if installment_match:
+            installment_count = int(installment_match.group(1))
+            if installment_count != 1:
+                if active_price is not None and line not in active_price.installments:
+                    active_price.installments.append(line)
+                continue
+
+        if line_amount is None:
+            continue
+
+        row_category = _detect_price_category(line) or current_category
+        if row_category is None:
+            continue
+
+        row_age_group = _detect_price_age_group(line) or current_age_group
+        row_year = academic_year_match.group(1).replace(" ", "") if academic_year_match else current_academic_year
+        row_plan_name = "Standard" if "стандарт" in lowered or "standard" in lowered else current_plan_name
+        row_period = _detect_price_period(
+            line,
+            row_category,
+            has_year=bool(row_year),
+            default_period=current_period,
+        )
+        current_period = row_period
+        signature = (row_category, line_amount, line_currency or "BGN", row_age_group, row_year)
+        if signature in seen:
+            continue
+        seen.add(signature)
+
+        price = ExtractedPrice(
+            category=row_category,
+            amount=line_amount,
+            currency=line_currency or "BGN",
+            period=row_period,
+            plan_name=row_plan_name,
+            academic_year=row_year,
+            age_group=row_age_group,
+            includes=list(current_includes),
+            confidence=0.7,
+        )
+        prices.append(price)
+        active_price = price
+
+    return PriceExtractionOutput(
+        prices=prices,
+        has_pricing_info=bool(prices),
+        confidence_notes="Deterministic fallback parsed structured pricing lines.",
+    )
+
+
+def _filter_supported_prices(prices: list[ExtractedPrice], text: str) -> list[ExtractedPrice]:
+    if not prices or not text:
+        return []
+
+    signals = _iter_price_line_signals(text)
+    if not signals:
+        return []
+
+    refined: list[ExtractedPrice] = []
+    for price in prices:
+        amount = _to_optional_float(price.amount)
+        if amount is None:
+            continue
+
+        currency = (price.currency or "BGN")[:3].upper()
+        supporting_signal = next(
+            (
+                signal
+                for signal in signals
+                if signal["currency"] == currency and abs(float(signal["amount"]) - amount) < 0.01
+            ),
+            None,
+        )
+        if supporting_signal is None:
+            continue
+
+        normalized = price.model_copy(deep=True)
+        if supporting_signal.get("category"):
+            normalized.category = supporting_signal["category"]
+        if supporting_signal.get("period"):
+            normalized.period = supporting_signal["period"]
+        if supporting_signal.get("academic_year") and not normalized.academic_year:
+            normalized.academic_year = supporting_signal["academic_year"]
+        if supporting_signal.get("age_group") and not normalized.age_group:
+            normalized.age_group = supporting_signal["age_group"]
+        refined.append(normalized)
+
+    return refined
+
+
+def _price_amount_lookup_tokens(amount: float) -> list[str]:
+    if abs(amount - round(amount)) < 0.01:
+        whole = int(round(amount))
+        grouped = f"{whole:,}"
+        return [
+            str(whole),
+            grouped,
+            grouped.replace(",", "."),
+            grouped.replace(",", " "),
+            f"{whole}.00",
+            f"{whole},00",
+        ]
+
+    fixed = f"{amount:.2f}"
+    whole, frac = fixed.split(".")
+    grouped = f"{int(whole):,}"
+    return [
+        fixed,
+        fixed.replace(".", ","),
+        f"{grouped}.{frac}",
+        f"{grouped.replace(',', '.')},{frac}",
+        f"{grouped.replace(',', ' ')}.{frac}",
+        f"{grouped.replace(',', ' ')},{frac}",
+    ]
+
+
+def _find_supporting_price_source_url(
+    school: School,
+    pages: list[SourcePage],
+    price: ExtractedPrice,
+) -> str | None:
+    amount = _to_optional_float(price.amount)
+    if amount is None:
+        return None
+
+    school_host = _canonical_host(school.website_url)
+    candidate_pages = [
+        page
+        for page in pages
+        if page.raw_markdown and _host_matches(_canonical_host(page.source_url), school_host)
+    ] or [page for page in pages if page.raw_markdown]
+    category_priority = {"pricing": 0, "admission": 1, "contact": 2}
+    candidate_pages.sort(
+        key=lambda page: (
+            category_priority.get((page.page_category or "").lower(), 9),
+            len(page.source_url or ""),
+        )
+    )
+
+    tokens = _price_amount_lookup_tokens(amount)
+    for page in candidate_pages:
+        page_text = page.raw_markdown or ""
+        if any(token in page_text for token in tokens):
+            return page.source_url
+    return None
+
 def _collect_matching_lines(
     text: str,
     patterns: tuple[str, ...],
@@ -1786,7 +2194,10 @@ def _select_pages(
             if category in {"admission", "pricing"}:
                 score -= 35
         elif use_case == "pricing":
-            if any(token in page_url for token in ("pricing", "prices", "fees", "tuition", "taksi", "ceni", "price")):
+            if any(
+                token in page_url
+                for token in ("pricing", "prices", "fees", "tuition", "taksi", "ceni", "tseni", "цени", "grafik-i-tseni", "price")
+            ):
                 score += 60
         elif use_case == "general_summary_source":
             classification = summary_page_classifications.get(id(page))
@@ -1995,6 +2406,8 @@ def _is_low_quality_display_name(value: str | None) -> bool:
     lowered = raw_value.lower()
     if not lowered:
         return True
+    if is_generic_numbered_display_label(raw_value):
+        return True
     if lowered.startswith("към портал "):
         return True
     if lowered.startswith(("close submenu", "open submenu", "затвори подменю", "отвори подменю")):
@@ -2032,8 +2445,6 @@ def _is_low_quality_display_name(value: str | None) -> bool:
     if any(marker in lowered for marker in ("магазин", "shop", "store")):
         return True
     if len(raw_value) <= 4 and raw_value.isupper() and raw_value.isalpha() and not re.search(r"[А-Яа-я]", raw_value):
-        return True
-    if re.fullmatch(r"\d+\.?\s+(?:основно|начално|средно|обединено)\s+училище", lowered):
         return True
     return False
 

@@ -363,7 +363,7 @@ async def test_extract_school_promotes_repeated_fuller_display_name_from_page_ev
 
     with patch(
         "app.scrapers.extractor._run_typed_agent",
-        new=AsyncMock(side_effect=[(mock_price, 10, 2, 0.0), (mock_general, 20, 4, 0.001)]),
+        new=AsyncMock(side_effect=[(mock_price, 10, 2, 0.0), (mock_general, 20, 4, 0.001), (None, 0, 0, 0.0)]),
     ):
         result = await extractor_module.extract_school(db_session, school.id, "bg")
 
@@ -933,6 +933,278 @@ def test_select_pages_for_summary_source_filters_operational_pages_when_narrativ
     assert source_urls == ["https://example-school.bg/filosofia"]
 
 
+def test_select_pages_for_pricing_prefers_tseni_slug_even_without_pricing_category():
+    school = School(
+        name_i18n={"bg": "Тест"},
+        website_url="https://example-school.bg",
+        country_code="bg",
+        city="sofia",
+        school_type="private",
+        education_level="primary",
+    )
+    pages = [
+        SourcePage(
+            source_url="https://example-school.bg/zashto-fusion/programa",
+            page_category="programs",
+            raw_markdown="Project-based learning and classroom routines.",
+        ),
+        SourcePage(
+            source_url="https://example-school.bg/priem/grafik-i-tseni",
+            page_category=None,
+            raw_markdown='График и цени\nТакси "Обучение" за 1-4 клас\nТакса "Храна".',
+        ),
+    ]
+
+    selected_text, source_urls = extractor_module.helpers._select_pages(
+        school=school,
+        pages=pages,
+        preferred_categories=["pricing", "admission", "contact"],
+        use_case="pricing",
+        include_tokens=("price", "pricing", "fees", "tuition", "такси", "цени"),
+    )
+
+    assert 'Такси "Обучение"' in selected_text
+    assert source_urls[0] == "https://example-school.bg/priem/grafik-i-tseni"
+
+
+def test_extract_prices_deterministic_parses_fusion_style_pricing_sections():
+    parsed = extractor_module.helpers._extract_prices_deterministic(
+        """
+        # График и цени
+        ## Такси „Обучение“ за Предучилищна – учебна 2025-2026 година
+        ### Стандартна такса:
+        За 1 вноска: €6650
+        На 2 вноски: 2 вноски по €3475
+        На 4 вноски: 4 вноски по €1775
+        На 9 вноски: 9 вноски по €811
+        таксата включва обучение до 17:30 ч., без допълнителни такси за удължен ден
+        ## Такси „Обучение“ за 1, 2, 3, 4, 5, 6 и 7 клас – учебна 2025-2026 година
+        ### Стандартна такса:
+        За 1 вноска: €7150
+        На 2 вноски: 2 вноски по €3775
+        ## Учебници и всички необходими консумативи – €545
+        """
+    )
+
+    assert parsed.has_pricing_info is True
+    assert len(parsed.prices) == 3
+    assert parsed.prices[0].category == "tuition"
+    assert parsed.prices[0].amount == 6650
+    assert parsed.prices[0].currency == "EUR"
+    assert parsed.prices[0].period == "yearly"
+    assert parsed.prices[0].age_group == "preschool"
+    assert parsed.prices[0].academic_year == "2025-2026"
+    assert any("2 вноски" in item for item in parsed.prices[0].installments)
+    assert parsed.prices[1].age_group == "1-7 клас"
+    assert parsed.prices[2].category == "materials"
+    assert parsed.prices[2].amount == 545
+
+
+def test_extract_prices_deterministic_handles_generic_monthly_fee_page():
+    parsed = extractor_module.helpers._extract_prices_deterministic(
+        """
+        ## ТАКСИ
+        € 530 | 1037 лв. - целодневно гледане, ежемесечно заплащане
+        € 350 | 685 лв. - половин ден с включен обяд
+        € 265 | 518 лв. – депозит за запазване на място
+        € 510 | 997 лв. - при предплащане за 3 месеца
+        € 490 | 958 лв. - при предплащане над 6 месеца
+        Допълнителните дейности не са включени в таксата и се заплащат отделно.
+        обучение по английски език - € 20 / 39.12 лв. месечна такса
+        """
+    )
+
+    by_amount = {price.amount: price for price in parsed.prices}
+
+    assert parsed.has_pricing_info is True
+    assert by_amount[530].category == "tuition"
+    assert by_amount[530].period == "monthly"
+    assert by_amount[350].period == "monthly"
+    assert by_amount[265].category == "registration"
+    assert by_amount[265].period == "one_time"
+    assert by_amount[510].category == "tuition"
+    assert by_amount[490].category == "tuition"
+    assert by_amount[20].category == "extracurricular"
+    assert by_amount[20].period == "monthly"
+
+
+def test_filter_supported_prices_drops_unsupported_llm_rows():
+    text = """
+    # Book a visit
+    Enrollment visits are planned in the Spring.
+    Ad-hoc visits are allowed if we have confirmed that a free space is available.
+    Contact Us
+    """
+    prices = [
+        ExtractedPrice(category="tuition", amount=750, currency="EUR", period="monthly"),
+        ExtractedPrice(category="tuition", amount=400, currency="EUR", period="monthly"),
+    ]
+
+    refined = extractor_module.helpers._filter_supported_prices(prices, text)
+
+    assert refined == []
+
+
+def test_filter_supported_prices_uses_source_line_to_fix_period_and_category():
+    text = """
+    ## ТАКСИ
+    € 530 | 1037 лв. - целодневно гледане, ежемесечно заплащане
+    € 350 | 685 лв. - половин ден с включен обяд
+    € 265 | 518 лв. – депозит за запазване на място
+    """
+    prices = [
+        ExtractedPrice(category="tuition", amount=530, currency="EUR", period="yearly"),
+        ExtractedPrice(category="tuition", amount=350, currency="EUR", period="yearly"),
+        ExtractedPrice(category="tuition", amount=265, currency="EUR", period="yearly"),
+    ]
+
+    refined = extractor_module.helpers._filter_supported_prices(prices, text)
+    by_amount = {price.amount: price for price in refined}
+
+    assert by_amount[530].period == "monthly"
+    assert by_amount[350].period == "monthly"
+    assert by_amount[265].category == "registration"
+    assert by_amount[265].period == "one_time"
+
+
+def test_find_supporting_price_source_url_returns_page_with_matching_amount():
+    school = School(
+        name_i18n={"bg": "Тест"},
+        website_url="https://example-school.bg",
+        country_code="bg",
+        city="sofia",
+        school_type="private",
+        education_level="primary",
+    )
+    pages = [
+        SourcePage(
+            source_url="https://example-school.bg/enroll/book-a-visit",
+            page_category="admission",
+            raw_markdown="Book a visit and contact us for details.",
+        ),
+        SourcePage(
+            source_url="https://example-school.bg/enroll",
+            page_category="admission",
+            raw_markdown="## Tuition Costs\nHalf-day Program\n400 €\n/per month\nFull-day Program\n750 €",
+        ),
+    ]
+    price = ExtractedPrice(category="tuition", amount=750, currency="EUR", period="monthly")
+
+    source_url = extractor_module.helpers._find_supporting_price_source_url(school, pages, price)
+
+    assert source_url == "https://example-school.bg/enroll"
+
+
+def test_extract_prices_deterministic_prefers_yearly_when_mixed_fee_table_line_mentions_monthly_installments():
+    parsed = extractor_module.helpers._extract_prices_deterministic(
+        """
+        #### 02
+        #### Годишна такса „Обучение“
+        Размерът на годишната такса „Обучение“ е различен в зависимост от избрания начин на плащане – еднократно, на две равни вноски или на равни ежемесечни вноски.
+        Клас | Продължителност на обучението | Плащане на пълна такса | Плащане на две вноски | Месечно заплащане*
+        1. - 4. клас | 01.09. - 30.06. | 7,950€ | 2×4,094€ | 10×843€
+        """
+    )
+
+    assert parsed.has_pricing_info is True
+    assert parsed.prices[0].amount == 7950
+    assert parsed.prices[0].period == "yearly"
+
+
+@pytest.mark.asyncio
+async def test_extract_school_uses_deterministic_pricing_fallback_when_llm_reports_no_pricing(
+    db_session,
+    sample_school_for_extraction,
+):
+    school = sample_school_for_extraction
+    pricing_page = (
+        await db_session.execute(select(SourcePage).where(SourcePage.school_id == school.id, SourcePage.page_category == "pricing"))
+    ).scalar_one()
+    pricing_page.source_url = "https://test-school.bg/priem/grafik-i-tseni"
+    pricing_page.raw_markdown = """
+        # График и цени
+        ## Такси „Обучение“ за Предучилищна – учебна 2025-2026 година
+        ### Стандартна такса:
+        За 1 вноска: €6650
+        На 2 вноски: 2 вноски по €3475
+        ## Такси „Обучение“ за 1, 2, 3, 4, 5, 6 и 7 клас – учебна 2025-2026 година
+        ### Стандартна такса:
+        За 1 вноска: €7150
+        ## Учебници и всички необходими консумативи – €545
+    """
+    await db_session.commit()
+
+    mock_price = PriceExtractionOutput(prices=[], has_pricing_info=False)
+    mock_general = GeneralInfoExtractionOutput(
+        facilities=["pool"],
+        programs=["STEM"],
+        has_useful_info=True,
+    )
+
+    with patch(
+        "app.scrapers.extractor._run_typed_agent",
+        new=AsyncMock(side_effect=[(mock_price, 10, 2, 0.0), (mock_general, 20, 4, 0.001), (None, 0, 0, 0.0)]),
+    ):
+        result = await extractor_module.extract_school(db_session, school.id, "bg")
+
+    assert result["status"] == "extracted"
+    assert result["pricing_count"] == 3
+    assert any("deterministic fallback" in detail for detail in result["details"])
+
+    pricing_rows = (
+        await db_session.execute(select(Pricing).where(Pricing.school_id == school.id).order_by(Pricing.id))
+    ).scalars().all()
+    assert [(row.category.value, float(row.amount), row.currency, row.period.value) for row in pricing_rows] == [
+        ("tuition", 6650.0, "EUR", "yearly"),
+        ("tuition", 7150.0, "EUR", "yearly"),
+        ("materials", 545.0, "EUR", "yearly"),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_extract_school_discards_unsupported_llm_pricing_rows(db_session, sample_school_for_extraction):
+    school = sample_school_for_extraction
+    pricing_page = (
+        await db_session.execute(select(SourcePage).where(SourcePage.school_id == school.id, SourcePage.page_category == "pricing"))
+    ).scalar_one()
+    pricing_page.raw_markdown = """
+        # Book a visit
+        Enrollment visits are planned in the Spring.
+        Ad-hoc visits are allowed if a free space is available.
+        Contact us for details.
+    """
+    await db_session.commit()
+
+    mock_price = PriceExtractionOutput(
+        prices=[ExtractedPrice(category="tuition", amount=750, currency="EUR", period="monthly")],
+        has_pricing_info=True,
+    )
+    mock_general = GeneralInfoExtractionOutput(
+        facilities=["pool"],
+        programs=["STEM"],
+        has_useful_info=True,
+    )
+
+    with patch(
+        "app.scrapers.extractor._run_typed_agent",
+        new=AsyncMock(
+            side_effect=[
+                (mock_price, 10, 2, 0.0),
+                (mock_general, 20, 4, 0.001),
+                (None, 0, 0, 0.0),
+                (None, 0, 0, 0.0),
+            ]
+        ),
+    ):
+        result = await extractor_module.extract_school(db_session, school.id, "bg")
+
+    assert result["status"] == "extracted"
+    assert result["pricing_count"] == 0
+    assert any("No pricing info detected" in detail for detail in result["details"])
+    pricing_rows = (await db_session.execute(select(Pricing).where(Pricing.school_id == school.id))).scalars().all()
+    assert pricing_rows == []
+
+
 def test_prepare_summary_source_page_text_drops_navigation_and_keeps_narrative_lines():
     prepared = extractor_module.helpers._prepare_summary_source_page_text(
         """
@@ -1226,6 +1498,15 @@ def test_normalize_display_name_i18n_rejects_report_titles():
 def test_normalize_display_name_i18n_rejects_generic_numbered_school_labels():
     normalized = extractor_module.helpers._normalize_display_name_i18n(
         {"bg": "131. средно училище"},
+        "bg",
+    )
+
+    assert normalized is None
+
+
+def test_normalize_display_name_i18n_rejects_generic_numbered_school_abbreviations():
+    normalized = extractor_module.helpers._normalize_display_name_i18n(
+        {"bg": "21. СУ", "en": "21 Secondary School"},
         "bg",
     )
 

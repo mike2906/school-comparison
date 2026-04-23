@@ -23,6 +23,18 @@ def test_classify_page_treats_school_profile_slug_as_about():
     assert navigator.classify_page("https://pberon.com/za-chou-d-r-petar-beron/") == "about"
 
 
+def test_classify_page_treats_tseni_slug_as_pricing():
+    navigator = WebsiteNavigator(country_code="bg")
+
+    assert navigator.classify_page("https://school.fusion.bg/priem/grafik-i-tseni/") == "pricing"
+
+
+def test_classify_page_treats_preschool_admission_slug_as_admission():
+    navigator = WebsiteNavigator(country_code="bg")
+
+    assert navigator.classify_page("https://21su.bg/priem/predutchilishtni-grupi/") == "admission"
+
+
 def test_extract_markdown_prefers_richer_markdown_candidate():
     navigator = WebsiteNavigator(country_code="bg")
 
@@ -88,6 +100,68 @@ def test_extract_markdown_appends_html_contact_signals_from_site_chrome():
     assert "Phone: 02/1234567" in extracted
 
 
+def test_extract_markdown_prefers_focused_main_content_html_over_menu_heavy_markdown():
+    navigator = WebsiteNavigator(country_code="bg")
+
+    crawl_result = type(
+        "Result",
+        (),
+        {
+            "markdown": type(
+                "Markdown",
+                (),
+                {
+                    "raw_markdown": "\n".join(
+                        [
+                            "НАЧАЛО",
+                            "АКТУАЛНО",
+                            "ЗА НАС",
+                            "УЧИЛИЩЕ",
+                            "ПРИЕМ",
+                            "ОБУЧЕНИЕ",
+                            "ПРОЕКТИ",
+                        ]
+                        * 500
+                    ),
+                },
+            )(),
+            "html": """
+                <html>
+                  <body>
+                    <div id="layout-menu">
+                      <ul class="top-menu">
+                        <li>НАЧАЛО</li>
+                        <li>АКТУАЛНО</li>
+                      </ul>
+                    </div>
+                    <div id="layout-page-105">
+                      <h3>Класни ръководители</h3>
+                      <div class="Text inline-block" id="text-edit-2870">
+                        <table class="table-inner">
+                          <tr><th>Клас</th><th>Класен ръководител</th></tr>
+                          <tr><td>3. група</td><td>Вергиния Николова</td></tr>
+                          <tr><td>4. група</td><td>Елка Вълкова</td></tr>
+                          <tr><td>1 а</td><td>Дорина Христова</td></tr>
+                          <tr><td>4 в</td><td>Петя Крачунова</td></tr>
+                          <tr><td>5 а</td><td>Стефани Витанова</td></tr>
+                        </table>
+                      </div>
+                    </div>
+                  </body>
+                </html>
+            """,
+        },
+    )()
+
+    extracted = navigator._extract_markdown(crawl_result)
+
+    assert extracted is not None
+    assert "3. група | Вергиния Николова" in extracted
+    assert "1 а | Дорина Христова" in extracted
+    assert "5 а | Стефани Витанова" in extracted
+    assert "Класни ръководители" in extracted
+
+
 def test_extract_map_link_coordinates_supports_center_param():
     navigator = WebsiteNavigator(country_code="bg")
 
@@ -103,10 +177,12 @@ def test_build_run_config_uses_raw_html_for_about_and_contact_pages():
 
     about_config = navigator._build_run_config("https://pberon.com/za-chou-d-r-petar-beron/")
     contact_config = navigator._build_run_config("https://pberon.com/kontakti/")
+    class_teachers_config = navigator._build_run_config("https://21su.bg/obuchenie/klasni-rakovoditeli/")
     program_config = navigator._build_run_config("https://pberon.com/programirane/")
 
     assert about_config.markdown_generator.content_source == "raw_html"
     assert contact_config.markdown_generator.content_source == "raw_html"
+    assert class_teachers_config.markdown_generator.content_source == "raw_html"
     assert program_config.markdown_generator.content_source == "cleaned_html"
 
 

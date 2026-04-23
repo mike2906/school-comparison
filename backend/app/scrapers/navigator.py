@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from math import ceil
 from typing import Any
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 from bs4 import BeautifulSoup
 from sqlalchemy import select
@@ -94,10 +94,14 @@ class WebsiteNavigator:
             "екип",
             "team",
         ],
-        "pricing": ["price", "prices", "pricing", "fees", "tuition", "ceni", "taksi", "цен", "такс"],
-        "admission": ["admission", "apply", "enroll", "priem", "прием", "кандидат", "запис"],
+        "pricing": ["price", "prices", "pricing", "fees", "tuition", "ceni", "tseni", "taksi", "цен", "цени", "такс"],
+        "admission": [
+            "admission", "apply", "enroll", "priem", "прием", "кандидат", "запис",
+            "предучилищ", "preduchilisht", "първи-клас", "parvi-klas", "пети-клас", "peti-klas",
+            "след-седми-клас", "sled-sedmi-klas",
+        ],
         "contact": ["contact", "contacts", "kontakti", "контакт", "телефон", "адрес", "address", "phone"],
-        "programs": ["program", "curriculum", "courses", "programi", "обуч", "програм"],
+        "programs": ["program", "curriculum", "courses", "programi", "обуч", "програм", "класни", "klasni-rakovoditeli"],
         "facilities": ["facility", "campus", "baza", "база", "кампус", "infrastructure"],
     }
 
@@ -115,8 +119,15 @@ class WebsiteNavigator:
         "fee",
         "fees",
         "ceni",
+        "tseni",
+        "цени",
+        "grafik-i-tseni",
         "taksi",
         "прием",
+        "предучилищ",
+        "първи-клас",
+        "пети-клас",
+        "след-седми-клас",
         "admission",
         "apply",
         "enroll",
@@ -126,6 +137,8 @@ class WebsiteNavigator:
         "program",
         "програм",
         "обуч",
+        "класни",
+        "klasni-rakovoditeli",
         "facility",
         "база",
         "кампус",
@@ -161,6 +174,43 @@ class WebsiteNavigator:
     ]
     CONTACT_SIGNAL_CLASS_HINTS = ("contact", "adress", "address", "location", "map")
     MAP_LINK_HINTS = ("google.com/maps", "maps.app.goo.gl", "mapclient=embed", "/maps/")
+    MAIN_CONTENT_SELECTORS = (
+        '[id^="layout-page-"]',
+        "main",
+        "article",
+        '[role="main"]',
+        ".page-content",
+        ".entry-content",
+        ".post-content",
+        ".content-area",
+        ".layout-custom",
+        ".layout-container",
+        ".content-frame",
+    )
+    MAIN_CONTENT_NOISE_SELECTORS = (
+        "script",
+        "style",
+        "noscript",
+        "header",
+        "footer",
+        "nav",
+        "aside",
+        "form",
+        "#layout-menu",
+        "#header-content",
+        "#mobile-menu",
+        ".menu",
+        ".menu-content",
+        ".top-menu",
+        ".section-menu",
+        ".main-menu",
+        ".sub-menu",
+        ".breadcrumb",
+        ".breadcrumbs",
+        "#search-form",
+        ".search",
+        ".swiper",
+    )
     PHONE_HREF_RE = re.compile(r"^tel:\s*(.+)$", flags=re.IGNORECASE)
     EMAIL_HREF_RE = re.compile(r"^mailto:\s*(.+)$", flags=re.IGNORECASE)
     EMAIL_TEXT_RE = re.compile(r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", flags=re.IGNORECASE)
@@ -210,9 +260,13 @@ class WebsiteNavigator:
         )
 
         page_category = self.classify_page(website_url)
+        decoded_url = unquote(website_url or "").lower()
+        use_raw_html = page_category in {"about", "contact"} or any(
+            token in decoded_url for token in ("класни-ръководители", "klasni-rakovoditeli")
+        )
         markdown_generator = DefaultMarkdownGenerator(
             content_filter=PruningContentFilter(threshold=0.45),
-            content_source="raw_html" if page_category in {"about", "contact"} else "cleaned_html",
+            content_source="raw_html" if use_raw_html else "cleaned_html",
         )
 
         return CrawlerRunConfig(
@@ -262,6 +316,13 @@ class WebsiteNavigator:
             self._extract_html_contact_signals(raw_html if isinstance(raw_html, str) else None)
             + self._extract_html_contact_signals(cleaned_html if isinstance(cleaned_html, str) else None)
         )
+        focused_html_candidates = [
+            self._extract_main_content_text(raw_html if isinstance(raw_html, str) else None),
+            self._extract_main_content_text(cleaned_html if isinstance(cleaned_html, str) else None),
+        ]
+        focused_html_candidates = [candidate for candidate in focused_html_candidates if candidate]
+        if focused_html_candidates:
+            return self._append_contact_signals(max(focused_html_candidates, key=len), contact_signals)
 
         if isinstance(markdown_obj, str) and markdown_obj.strip():
             candidates.append(markdown_obj.strip())
@@ -292,6 +353,53 @@ class WebsiteNavigator:
         if not extracted_candidates:
             return self._append_contact_signals(None, contact_signals)
         return self._append_contact_signals(max(extracted_candidates, key=len), contact_signals)
+
+    def _extract_main_content_text(self, html: str | None) -> str | None:
+        if not isinstance(html, str) or not html.strip():
+            return None
+
+        soup = BeautifulSoup(html, "html.parser")
+        for selector in self.MAIN_CONTENT_SELECTORS:
+            selector_candidates = soup.select(selector)
+            extracted_candidates: list[str] = []
+            for candidate in selector_candidates:
+                extracted = self._extract_text_from_candidate(candidate)
+                if extracted:
+                    extracted_candidates.append(extracted)
+            if extracted_candidates:
+                return max(extracted_candidates, key=len)[: self.MAX_CONTENT_CHARS]
+
+        extracted = self._extract_text_from_candidate(soup.body or soup)
+        return extracted[: self.MAX_CONTENT_CHARS] if extracted else None
+
+    def _extract_text_from_candidate(self, candidate: Any) -> str | None:
+        fragment = BeautifulSoup(str(candidate), "html.parser")
+        root = fragment.find()
+        if root is None:
+            return None
+
+        for selector in self.MAIN_CONTENT_NOISE_SELECTORS:
+            for node in root.select(selector):
+                node.decompose()
+
+        table_lines: list[str] = []
+        for table in root.find_all("table"):
+            for row in table.find_all("tr"):
+                cells = [
+                    self._clean_text(cell.get_text(" ", strip=True))
+                    for cell in row.find_all(["th", "td"])
+                ]
+                cells = [cell for cell in cells if cell]
+                if cells:
+                    table_lines.append(" | ".join(cells))
+
+        text_lines = root.get_text("\n", strip=True).splitlines()
+        lines = self._dedupe_lines(table_lines + text_lines)
+        if len(lines) < 3:
+            return None
+
+        extracted = "\n".join(lines).strip()
+        return extracted if len(extracted) >= 80 else None
 
     def _normalize_contact_signal_text(self, text: str) -> str:
         normalized = self._clean_text(text)
