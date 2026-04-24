@@ -343,7 +343,9 @@ async def _sync_primary_location_from_contact_address(
     primary_location = locations[0]
     address_i18n = dict(primary_location.address_i18n or {})
     current_bg = helpers._normalize_contact_address_candidate(address_i18n.get("bg") or "")
-    tags = [tag for tag in list(primary_location.location_tags or []) if not str(tag).startswith("coords_source=")]
+    existing_tags = list(primary_location.location_tags or [])
+    coord_tags = [tag for tag in existing_tags if str(tag).startswith("coords_source=")]
+    tags = [tag for tag in existing_tags if not str(tag).startswith("coords_source=")]
     same_address = _normalize_address_for_compare(current_bg) == _normalize_address_for_compare(website_address)
 
     if same_address and coord_lat is not None and coord_lng is not None:
@@ -373,8 +375,10 @@ async def _sync_primary_location_from_contact_address(
         if "coords_source=website_map_link" not in tags:
             tags.append("coords_source=website_map_link")
     elif current_bg and _normalize_address_for_compare(current_bg) != _normalize_address_for_compare(website_address):
-        primary_location.lat = None
-        primary_location.lng = None
+        # Keep prior coordinates until we have a better replacement source.
+        # Otherwise a later contact-page extract can make the school disappear
+        # from map/search results even when the previous point was valid.
+        tags.extend(tag for tag in coord_tags if tag not in tags)
     if "address_source=website_contact" not in tags:
         tags.append("address_source=website_contact")
     primary_location.location_tags = tags

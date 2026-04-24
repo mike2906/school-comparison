@@ -684,6 +684,61 @@ async def test_extract_school_does_not_replace_with_office_like_website_contact_
 
 
 @pytest.mark.asyncio
+async def test_extract_school_keeps_existing_coords_when_contact_address_changes_without_map_link(
+    db_session,
+    sample_school_for_extraction,
+):
+    school = sample_school_for_extraction
+    location = SchoolLocation(
+        school_id=school.id,
+        address_i18n={"bg": "гр. София"},
+        lat=42.65,
+        lng=23.31,
+        location_tags=["coords_source=geojson"],
+        is_primary=True,
+    )
+    db_session.add(location)
+
+    contact_page = SourcePage(
+        school_id=school.id,
+        source_url="https://test-school.bg/contact",
+        page_category="contact",
+        scrape_type=ScrapeType.WEBSITE,
+        is_valid=True,
+        raw_markdown="""
+        ## Контакти
+        **Адрес**
+        гр. София, ул. "Флора Кънева" № 7
+        **Телефон** 02/1234567
+        """,
+        content_hash="hash-contact-keep-existing-coords",
+        last_scraped_at=datetime.datetime.now(datetime.UTC),
+    )
+    db_session.add(contact_page)
+    await db_session.commit()
+
+    mock_price = PriceExtractionOutput(prices=[], has_pricing_info=False)
+    mock_general = GeneralInfoExtractionOutput(
+        facilities=["pool"],
+        has_useful_info=True,
+    )
+
+    with patch(
+        "app.scrapers.extractor._run_typed_agent",
+        new=AsyncMock(side_effect=[(mock_price, 10, 2, 0.0), (mock_general, 20, 4, 0.001), (None, 0, 0, 0.0)]),
+    ):
+        result = await extractor_module.extract_school(db_session, school.id, "bg")
+
+    assert result["status"] == "extracted"
+    await db_session.refresh(location)
+    assert location.address_i18n == {"bg": 'гр. София, ул. "Флора Кънева" № 7'}
+    assert location.lat == pytest.approx(42.65)
+    assert location.lng == pytest.approx(23.31)
+    assert "coords_source=geojson" in (location.location_tags or [])
+    assert "address_source=website_contact" in (location.location_tags or [])
+
+
+@pytest.mark.asyncio
 async def test_run_typed_agent_model_retry_recovers(monkeypatch):
     llm_stats = extractor_module.ExtractionLLMStats()
 
