@@ -1096,6 +1096,27 @@ def test_extract_prices_deterministic_maps_installment_multipliers_to_periods():
     assert by_amount[843].period == "monthly"
 
 
+def test_dedupe_price_rows_drops_currency_and_installment_duplicates():
+    prices = [
+        ExtractedPrice(
+            category="food", amount=7880, currency="EUR", period="yearly",
+            academic_year="2026-2027",
+            installments=["8100 € – 2 вноски", "8250 € – 3 вноски"],
+        ),
+        ExtractedPrice(category="food", amount=8100, currency="EUR", period="yearly", academic_year="2026-2027"),
+        ExtractedPrice(category="food", amount=8250, currency="EUR", period="yearly", academic_year="2026-2027"),
+        ExtractedPrice(category="food", amount=15411.94, currency="BGN", period="yearly", academic_year="2026-2027"),
+    ]
+
+    deduped = extractor_module.helpers._dedupe_price_rows(prices)
+    by_amount = {p.amount: p for p in deduped}
+
+    assert 7880 in by_amount
+    assert 8100 not in by_amount
+    assert 8250 not in by_amount
+    assert 15411.94 not in by_amount
+
+
 def test_filter_supported_prices_drops_unsupported_llm_rows():
     text = """
     # Book a visit
