@@ -52,7 +52,7 @@ class Settings(BaseSettings):
     url_recovery_concurrency: int = 3
 
     # Extraction settings
-    extraction_llm_timeout_seconds: float = 15.0
+    extraction_llm_timeout_seconds: float = 45.0
     extraction_max_content_chars: int = 15000
     extraction_general_info_min_quality_score: int = 4
     extraction_output_retries: int = 2
