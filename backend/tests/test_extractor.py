@@ -1172,6 +1172,33 @@ def test_dedupe_price_rows_drops_currency_and_installment_duplicates():
     assert 15411.94 not in by_amount
 
 
+def test_dedupe_price_rows_drops_installment_plan_name_variants():
+    # Pythagoras pattern: per-grade-band, three rows with the same age_group —
+    # one full-pay row (plan_name=None) plus "2 installments" and "10 installments"
+    # variants that hold per-installment amounts rather than annual totals.
+    prices = [
+        ExtractedPrice(
+            category="tuition", amount=7580, currency="EUR", period="yearly",
+            age_group="ПГ - 4 .клас", academic_year="2026-2027",
+        ),
+        ExtractedPrice(
+            category="tuition", amount=3975, currency="EUR", period="yearly",
+            age_group="ПГ - 4 .клас", academic_year="2026-2027",
+            plan_name="2 installments",
+        ),
+        ExtractedPrice(
+            category="tuition", amount=827, currency="EUR", period="yearly",
+            age_group="ПГ - 4 .клас", academic_year="2026-2027",
+            plan_name="10 installments",
+        ),
+    ]
+
+    deduped = extractor_module.helpers._dedupe_price_rows(prices)
+    amounts = sorted(p.amount for p in deduped)
+
+    assert amounts == [7580]
+
+
 def test_filter_supported_prices_drops_unsupported_llm_rows():
     text = """
     # Book a visit
