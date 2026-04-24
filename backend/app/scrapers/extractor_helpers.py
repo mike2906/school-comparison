@@ -2654,6 +2654,10 @@ def _is_low_quality_display_name(value: str | None) -> bool:
         return True
     if lowered.startswith(("тримесечен отчет", "годишен отчет", "quarterly report", "annual report")):
         return True
+    if re.search(r"\b(?:стана|беше|бе)\s+домакин\b", lowered):
+        return True
+    if re.search(r"(?i)\b(?:hosted|hosts?|became\s+host)\b", raw_value):
+        return True
     if raw_value.startswith("!["):
         return True
     if re.fullmatch(r"\d{1,3}", raw_value):

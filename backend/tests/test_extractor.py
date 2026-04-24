@@ -1571,6 +1571,19 @@ def test_extract_display_name_i18n_deterministic_rejects_blog_title_noise():
     assert extracted is None
 
 
+def test_extract_display_name_i18n_deterministic_rejects_school_news_host_title():
+    text = "# 21-во училище стана домакин"
+
+    extracted = extractor_module.helpers._extract_display_name_i18n_deterministic(
+        text,
+        registry_name='21 СРЕДНО УЧИЛИЩЕ "ХРИСТО БОТЕВ"',
+        country_code="bg",
+        website_url="https://21su.bg",
+    )
+
+    assert extracted is None
+
+
 def test_extract_display_name_i18n_deterministic_rejects_reference_school_noise():
     text = '[Google Reference School](https://espa.bg)'
 
@@ -1660,6 +1673,15 @@ def test_normalize_display_name_i18n_rejects_low_quality_headings():
 def test_normalize_display_name_i18n_rejects_report_titles():
     normalized = extractor_module.helpers._normalize_display_name_i18n(
         {"bg": "Тримесечен отчет на 145. ОУ Симеон Радев за м.Декември"},
+        "bg",
+    )
+
+    assert normalized is None
+
+
+def test_normalize_display_name_i18n_rejects_news_host_titles():
+    normalized = extractor_module.helpers._normalize_display_name_i18n(
+        {"bg": "21-во училище стана домакин"},
         "bg",
     )
 

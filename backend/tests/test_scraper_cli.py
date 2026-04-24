@@ -831,3 +831,22 @@ def test_clean_display_name_i18n_for_school_clears_generic_numbered_abbreviation
     assert cleaned is None
     assert changed is True
     assert reason == "clear-junk"
+
+
+def test_clean_display_name_i18n_for_school_clears_news_host_title():
+    school = School(
+        name_i18n={"bg": '21 СРЕДНО УЧИЛИЩЕ "ХРИСТО БОТЕВ"'},
+        country_code="bg",
+        school_type="state",
+        education_level="upper_secondary",
+        city="sofia",
+        website_url="https://21su.bg",
+        scrape_status="extracted",
+        attributes={"display_name_i18n": {"bg": "21-во училище стана домакин"}},
+    )
+
+    cleaned, changed, reason = scraper_cli._clean_display_name_i18n_for_school(school)
+
+    assert cleaned is None
+    assert changed is True
+    assert reason == "clear-junk"
