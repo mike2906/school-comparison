@@ -238,8 +238,16 @@ function getYearlyEquivalent(item) {
   return null
 }
 
+const INSTALLMENT_PLAN_NAME_RE = /(\d+\s*(installment|monthly|вноск)|(installment|monthly|вноск)\s*\d+)/i
+
+function isInstallmentPlan(item) {
+  return !!(item?.plan_name && INSTALLMENT_PLAN_NAME_RE.test(item.plan_name))
+}
+
 function getMinTuitionPriceYearly(pricing = []) {
-  const tuition = pricing.filter(item => item.category === 'tuition')
+  const tuition = pricing.filter(
+    item => item.category === 'tuition' && !isInstallmentPlan(item),
+  )
   if (tuition.length === 0) return null
 
   let minValue = null

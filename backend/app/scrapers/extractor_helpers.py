@@ -1592,6 +1592,10 @@ def _extract_prices_deterministic(text: str) -> PriceExtractionOutput:
 
 _BGN_EUR_PEG = 1.95583
 _INSTALLMENT_TEXT_AMOUNT_RE = re.compile(r"(\d[\d\s.,]*)")
+_INSTALLMENT_PLAN_NAME_RE = re.compile(
+    r"(?:(\d+)\s*(?:installment|monthly|вноск)|(?:installment|monthly|вноск)\s*(\d+))",
+    flags=re.IGNORECASE,
+)
 
 
 def _amounts_in_installment_text(text: str) -> list[float]:
@@ -1603,9 +1607,20 @@ def _amounts_in_installment_text(text: str) -> list[float]:
     return amounts
 
 
+def _is_installment_plan_name(plan_name: Optional[str]) -> bool:
+    # "10 installments", "2 вноски", "monthly installment", etc. signal that a
+    # row represents a payment-schedule variant rather than a distinct fee.
+    if not plan_name:
+        return False
+    return bool(_INSTALLMENT_PLAN_NAME_RE.search(plan_name))
+
+
 def _dedupe_installment_variants(prices: list[ExtractedPrice]) -> list[ExtractedPrice]:
-    # If row B lists row A's amount in its `installments` text, row A is a
-    # payment-plan variant of row B — drop it so only the primary row remains.
+    # Drop rows that represent payment-schedule variants of another row:
+    # - amount is listed in another row's `installments` strings, OR
+    # - plan_name is labelled as "N installments" / "N вноски" while a sibling
+    #   row in the same (category, period, academic_year, age_group) has no
+    #   such label.
     if not prices:
         return prices
 
@@ -1630,18 +1645,22 @@ def _dedupe_installment_variants(prices: list[ExtractedPrice]) -> list[Extracted
         for row in group:
             for line in row.installments or []:
                 installment_amounts.update(_amounts_in_installment_text(line))
-        if not installment_amounts:
-            kept.extend(group)
-            continue
+        has_non_installment_sibling = any(
+            not _is_installment_plan_name(row.plan_name) for row in group
+        )
         for row in group:
             row_amount = _to_optional_float(row.amount)
+            if has_non_installment_sibling and _is_installment_plan_name(row.plan_name):
+                continue
             if row_amount is None:
                 kept.append(row)
                 continue
             if row.installments:
                 kept.append(row)
                 continue
-            if any(abs(row_amount - inst) < 0.5 for inst in installment_amounts):
+            if installment_amounts and any(
+                abs(row_amount - inst) < 0.5 for inst in installment_amounts
+            ):
                 continue
             kept.append(row)
     return kept
