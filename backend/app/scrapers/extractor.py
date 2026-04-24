@@ -658,10 +658,12 @@ async def _extract_prices(
         used_deterministic_pricing = True
 
     supported_prices = helpers._filter_supported_prices(parsed.prices, selected_text) if parsed.prices else []
+    supported_prices = helpers._dedupe_price_rows(supported_prices)
     if supported_prices:
         parsed = parsed.model_copy(update={"prices": supported_prices, "has_pricing_info": True})
     elif deterministic_pricing.has_pricing_info:
         deterministic_supported_prices = helpers._filter_supported_prices(deterministic_pricing.prices, selected_text)
+        deterministic_supported_prices = helpers._dedupe_price_rows(deterministic_supported_prices)
         if deterministic_supported_prices:
             parsed = deterministic_pricing.model_copy(
                 update={"prices": deterministic_supported_prices, "has_pricing_info": True}

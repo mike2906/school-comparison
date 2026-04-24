@@ -1590,6 +1590,121 @@ def _extract_prices_deterministic(text: str) -> PriceExtractionOutput:
     )
 
 
+_BGN_EUR_PEG = 1.95583
+_INSTALLMENT_TEXT_AMOUNT_RE = re.compile(r"(\d[\d\s.,]*)")
+
+
+def _amounts_in_installment_text(text: str) -> list[float]:
+    amounts: list[float] = []
+    for match in _INSTALLMENT_TEXT_AMOUNT_RE.finditer(text or ""):
+        value = _parse_price_amount_token(match.group(1))
+        if value is not None and value >= 1:
+            amounts.append(value)
+    return amounts
+
+
+def _dedupe_installment_variants(prices: list[ExtractedPrice]) -> list[ExtractedPrice]:
+    # If row B lists row A's amount in its `installments` text, row A is a
+    # payment-plan variant of row B — drop it so only the primary row remains.
+    if not prices:
+        return prices
+
+    def group_key(price: ExtractedPrice) -> tuple:
+        return (
+            (price.category or "").lower(),
+            (price.period or "").lower(),
+            price.academic_year,
+            price.age_group,
+        )
+
+    grouped: dict[tuple, list[ExtractedPrice]] = {}
+    for price in prices:
+        grouped.setdefault(group_key(price), []).append(price)
+
+    kept: list[ExtractedPrice] = []
+    for group in grouped.values():
+        if len(group) == 1:
+            kept.extend(group)
+            continue
+        installment_amounts: set[float] = set()
+        for row in group:
+            for line in row.installments or []:
+                installment_amounts.update(_amounts_in_installment_text(line))
+        if not installment_amounts:
+            kept.extend(group)
+            continue
+        for row in group:
+            row_amount = _to_optional_float(row.amount)
+            if row_amount is None:
+                kept.append(row)
+                continue
+            if row.installments:
+                kept.append(row)
+                continue
+            if any(abs(row_amount - inst) < 0.5 for inst in installment_amounts):
+                continue
+            kept.append(row)
+    return kept
+
+
+def _dedupe_currency_variants(prices: list[ExtractedPrice]) -> list[ExtractedPrice]:
+    # Drop BGN rows that are the currency-converted duplicate of an EUR row
+    # in the same logical group. Prefer EUR since Bulgaria adopted euro in 2026.
+    if not prices:
+        return prices
+
+    def group_key(price: ExtractedPrice) -> tuple:
+        return (
+            (price.category or "").lower(),
+            (price.period or "").lower(),
+            price.academic_year,
+            price.age_group,
+            price.plan_name,
+        )
+
+    grouped: dict[tuple, list[ExtractedPrice]] = {}
+    for price in prices:
+        grouped.setdefault(group_key(price), []).append(price)
+
+    kept: list[ExtractedPrice] = []
+    for group in grouped.values():
+        if len(group) == 1:
+            kept.extend(group)
+            continue
+        eur_rows = [p for p in group if (p.currency or "").upper() == "EUR"]
+        bgn_rows = [p for p in group if (p.currency or "").upper() == "BGN"]
+        other_rows = [p for p in group if (p.currency or "").upper() not in {"EUR", "BGN"}]
+        kept.extend(other_rows)
+
+        if not eur_rows or not bgn_rows:
+            kept.extend(eur_rows)
+            kept.extend(bgn_rows)
+            continue
+
+        eur_amounts = [_to_optional_float(p.amount) for p in eur_rows]
+        bgn_remaining = []
+        for bgn in bgn_rows:
+            bgn_amount = _to_optional_float(bgn.amount)
+            if bgn_amount is None:
+                bgn_remaining.append(bgn)
+                continue
+            converted = bgn_amount / _BGN_EUR_PEG
+            matched = any(
+                eur_amount is not None and abs(eur_amount - converted) / converted < 0.01
+                for eur_amount in eur_amounts
+            )
+            if matched:
+                continue
+            bgn_remaining.append(bgn)
+        kept.extend(eur_rows)
+        kept.extend(bgn_remaining)
+    return kept
+
+
+def _dedupe_price_rows(prices: list[ExtractedPrice]) -> list[ExtractedPrice]:
+    return _dedupe_currency_variants(_dedupe_installment_variants(prices))
+
+
 def _filter_supported_prices(prices: list[ExtractedPrice], text: str) -> list[ExtractedPrice]:
     if not prices or not text:
         return []
