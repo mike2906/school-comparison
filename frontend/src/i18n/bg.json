@@ -233,6 +233,7 @@
     "flowUnavailable": "Маршрутът изисква 2 локации с координати",
     "mapLocationMissing": "Липсват координати",
     "clearLocations": "Изчисти локациите",
+    "locationsShownOnMap": "Локациите са показани на картата.",
     "locationFlowHint": "Маршрутът е подреден по възрастови групи."
   },
   "shifts": {

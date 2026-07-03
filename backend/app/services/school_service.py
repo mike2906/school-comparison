@@ -1,3 +1,4 @@
+import re
 from typing import Optional
 
 from sqlalchemy import and_, exists, or_, select
@@ -225,9 +226,26 @@ class SchoolService:
         Returns:
             List of schools matching the search query
         """
-        # Escape special SQL ILIKE wildcards to prevent unintended pattern matching
-        sanitized_query = search_query.replace("%", "\\%").replace("_", "\\_")
-        pattern = f"%{sanitized_query}%"
+        # Escape special SQL ILIKE wildcards to prevent unintended pattern matching.
+        # Parents often type school numbers without the Bulgarian "№" marker
+        # (for example "ДГ 5" instead of stored "ДГ №5"), so search both forms.
+        patterns = [
+            f"%{variant.replace('%', '\\%').replace('_', '\\_')}%"
+            for variant in self._school_search_variants(search_query)
+        ]
+        search_fields = (
+            School.name_i18n["bg"].as_string(),
+            School.name_i18n["en"].as_string(),
+            School.attributes["display_name_i18n"]["bg"].as_string(),
+            School.attributes["display_name_i18n"]["en"].as_string(),
+            SchoolLocation.address_i18n["bg"].as_string(),
+            SchoolLocation.address_i18n["en"].as_string(),
+        )
+        search_clauses = [
+            field.ilike(pattern, escape="\\")
+            for pattern in patterns
+            for field in search_fields
+        ]
 
         # Match on school names, branded display names, and location addresses.
         # Query matching ids first so multiple matching locations do not duplicate
@@ -237,16 +255,7 @@ class SchoolService:
             .outerjoin(SchoolLocation, SchoolLocation.school_id == School.id)
             .where(School.country_code == country_code)
             .where(self._has_resolved_location())
-            .where(
-                or_(
-                    School.name_i18n["bg"].as_string().ilike(pattern, escape="\\"),
-                    School.name_i18n["en"].as_string().ilike(pattern, escape="\\"),
-                    School.attributes["display_name_i18n"]["bg"].as_string().ilike(pattern, escape="\\"),
-                    School.attributes["display_name_i18n"]["en"].as_string().ilike(pattern, escape="\\"),
-                    SchoolLocation.address_i18n["bg"].as_string().ilike(pattern, escape="\\"),
-                    SchoolLocation.address_i18n["en"].as_string().ilike(pattern, escape="\\"),
-                )
-            )
+            .where(or_(*search_clauses))
             .distinct()
             .limit(limit)
             .subquery()
@@ -258,6 +267,30 @@ class SchoolService:
         )
         result = await self.db.execute(query)
         return result.scalars().unique().all()
+
+    @staticmethod
+    def _school_search_variants(search_query: str) -> list[str]:
+        query = re.sub(r"\s+", " ", search_query.strip())
+        variants = [query]
+
+        if "№" in query:
+            variants.append(re.sub(r"\s*№\s*", " ", query))
+        else:
+            variants.append(re.sub(r"\b(\D+?)\s+(\d+)\b", r"\1 №\2", query, count=1))
+            variants.append(re.sub(r"\b(\D+?)\s+(\d+)\b", r"\1 № \2", query, count=1))
+
+        out: list[str] = []
+        seen: set[str] = set()
+        for variant in variants:
+            normalized = re.sub(r"\s+", " ", variant).strip()
+            if not normalized:
+                continue
+            key = normalized.casefold()
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append(normalized)
+        return out
 
     async def get_schools_by_ids(self, school_ids: list[int]) -> list[School]:
         """
