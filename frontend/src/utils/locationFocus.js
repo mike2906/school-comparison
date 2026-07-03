@@ -7,6 +7,10 @@ const FOCUS_EMOJIS = {
   language_focus: '🗣️',
 }
 
+export const isLocationFocusTag = (tag) => Object.prototype.hasOwnProperty.call(FOCUS_EMOJIS, tag)
+
+export const getLocationFocusTags = (tags) => (tags || []).filter(isLocationFocusTag)
+
 export const getFocusEmoji = (tag) => FOCUS_EMOJIS[tag] || ''
 
 export const getFocusEmojis = (tags) => (tags || [])
@@ -14,5 +18,5 @@ export const getFocusEmojis = (tags) => (tags || [])
   .filter(Boolean)
 
 export const getFocusLabels = (t, tags) => (tags || [])
-  .map(tag => t(`locationTags.${tag}`, { defaultValue: tag }))
-
+  .filter(isLocationFocusTag)
+  .map(tag => t(`locationTags.${tag}`))

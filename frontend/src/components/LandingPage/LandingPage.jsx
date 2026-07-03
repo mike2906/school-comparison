@@ -202,7 +202,7 @@ function LandingPage() {
   const handleSearchSelect = (school) => {
     setShowSearchDropdown(false)
     setSearchQuery('')
-    navigate(`/schools/${school.id}`)
+    navigate(`/search?selected_school_id=${school.id}`)
   }
 
   const handleUseCalculatedGroup = () => {

@@ -81,6 +81,7 @@ function SearchPage() {
   const educationLevel = searchParams.get('education_level')
   const includeCrossover = searchParams.get('include_crossover') === 'true'
   const targetYearParam = searchParams.get('target_year')
+  const selectedSchoolIdParam = searchParams.get('selected_school_id')
   const promptLocation = searchParams.get('prompt_location') === '1'
   const getParamList = (key) => {
     const values = searchParams.getAll(key)
@@ -101,6 +102,13 @@ function SearchPage() {
     facilities: getParamList('facilities'),
     teachingApproach: getParamList('teaching_approach'),
   })
+
+  const clearSelectedSchoolParam = () => {
+    if (!searchParams.has('selected_school_id')) return
+    const params = new URLSearchParams(searchParams)
+    params.delete('selected_school_id')
+    navigate(`/search?${params.toString()}`, { replace: true })
+  }
 
 
   const [availableFilters, setAvailableFilters] = useState({
@@ -335,6 +343,7 @@ function SearchPage() {
 
   const handleSchoolSelect = (school, { source = 'list' } = {}) => {
     if (!school) return
+    clearSelectedSchoolParam()
     if (locationOverlay.schoolId && locationOverlay.schoolId !== school.id) {
       clearLocationOverlay()
     }
@@ -354,6 +363,7 @@ function SearchPage() {
   }
 
   const handleClearSelection = () => {
+    clearSelectedSchoolParam()
     setSelectedSchoolId(null)
   }
 
@@ -748,6 +758,30 @@ function SearchPage() {
     if (!searchInBounds || !mapBounds) return filteredSchools
     return filteredSchools.filter(school => isSchoolInBounds(school, mapBounds))
   }, [filteredSchools, searchInBounds, mapBounds])
+
+  useEffect(() => {
+    if (!selectedSchoolIdParam) return
+    const schoolId = Number.parseInt(selectedSchoolIdParam, 10)
+    if (!Number.isFinite(schoolId)) return
+
+    const school = schools.find(item => item.id === schoolId)
+    if (!school) return
+
+    if (searchInBounds) {
+      setSearchInBounds(false)
+    }
+    setSelectedSchoolId(schoolId)
+    scrollOnSelectRef.current = true
+
+    if ((school.locations?.length || 0) > 1) {
+      setOpenLocationsId(schoolId)
+      setLocationOverlay({ schoolId, focusLocationId: null, hideOthers: true })
+    }
+
+    if (window.innerWidth < 768) {
+      setMobileTab('map')
+    }
+  }, [schools, searchInBounds, selectedSchoolIdParam])
 
   useEffect(() => {
     if (!selectedSchoolId) return
@@ -1949,7 +1983,7 @@ function SearchPage() {
                   isPickingLocation={isPickingLocation}
                   onPickLocation={handleMapPickLocation}
                   onBoundsChange={handleBoundsChange}
-                  autoFit={!searchInBounds}
+                  autoFit={!searchInBounds && !selectedSchoolId && !locationOverlay.schoolId}
                   hasCompare={hasCompare}
                   resizeKey={`${viewMode}-${mobileTab}-${showMap}`}
                   locationOverlay={locationOverlay}

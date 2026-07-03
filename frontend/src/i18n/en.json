@@ -233,6 +233,7 @@
     "flowUnavailable": "Flow needs two mapped locations",
     "mapLocationMissing": "Missing map coordinates",
     "clearLocations": "Clear locations",
+    "locationsShownOnMap": "Locations are shown on the map.",
     "locationFlowHint": "Flow is ordered by age group."
   },
   "shifts": {

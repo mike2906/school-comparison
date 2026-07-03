@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { useCompare } from '../../context/CompareContext'
 import { getSchoolName, getAddress } from '../../utils/i18n'
 import { formatDistance } from '../../utils/distance'
-import { getFocusEmoji } from '../../utils/locationFocus'
+import { getFocusEmoji, getLocationFocusTags } from '../../utils/locationFocus'
 import { getBenchmarkComparison, getNvoDetail as getSharedNvoDetail } from '../../utils/nvo'
 
 const typeColors = {
@@ -489,7 +489,7 @@ function getAgeGroupShifts(location) {
 function getLocationTags(location) {
   if (!location?.location_tags) return []
   if (!Array.isArray(location.location_tags)) return []
-  return location.location_tags.filter(Boolean)
+  return getLocationFocusTags(location.location_tags.filter(Boolean))
 }
 
 function getShiftForAgeGroup(location, ageGroup) {
@@ -1333,7 +1333,7 @@ const SchoolCard = forwardRef(function SchoolCard(
 
           {overlayActive && (
             <div className="flex items-center justify-between text-xs text-neutral-400">
-              <span>{t('schools.locationFlowHint')}</span>
+              <span>{t('schools.locationsShownOnMap')}</span>
               <button
                 type="button"
                 className="text-xs font-semibold text-neutral-500 hover:text-neutral-700"

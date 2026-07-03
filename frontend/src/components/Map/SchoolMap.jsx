@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, memo, useCallback, useState } from 'react'
-import { MapContainer, TileLayer, Marker, Popup, Polyline, Pane, Tooltip, useMap, useMapEvents } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup, Pane, Tooltip, useMap, useMapEvents } from 'react-leaflet'
 import MarkerClusterGroup from 'react-leaflet-cluster'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
@@ -10,7 +10,7 @@ import { getSchoolName, getAddress } from '../../utils/i18n'
 import { useCompare } from '../../context/CompareContext'
 import { useCountry } from '../../context/CountryContext'
 import { getAgeGroupKeys } from '../../utils/countryConfig'
-import { getFocusEmojis, getFocusLabels } from '../../utils/locationFocus'
+import { getFocusEmojis, getFocusLabels, getLocationFocusTags } from '../../utils/locationFocus'
 import { AGE_GROUP_KEYS } from '../../utils/education'
 
 // Fallback values (used when country config hasn't loaded yet)
@@ -130,7 +130,7 @@ const getAgeGroupShifts = (location) => {
 const getLocationTags = (location) => {
   if (!location?.location_tags) return []
   if (!Array.isArray(location.location_tags)) return []
-  return location.location_tags.filter(Boolean)
+  return getLocationFocusTags(location.location_tags.filter(Boolean))
 }
 
 const getLocationFocusLabels = (t, location) => {
@@ -366,10 +366,16 @@ function MapOverlayNavigator({ overlaySchoolId, overlayLocations, focusLocation 
       lastOverlayRef.current = null
       return
     }
-    if (lastOverlayRef.current === overlaySchoolId) return
+    const overlayKey = overlayLocations
+      .map(location => `${location.id || ''}:${location.__lat ?? location.lat},${location.__lng ?? location.lng}`)
+      .join('|')
+    if (lastOverlayRef.current === overlayKey) return
     const points = overlayLocations.map(location => [location.__lat ?? location.lat, location.__lng ?? location.lng])
-    fitMapToPoints(map, points)
-    lastOverlayRef.current = overlaySchoolId
+    const fitOverlay = () => fitMapToPoints(map, points)
+    fitOverlay()
+    const timer = setTimeout(fitOverlay, 120)
+    lastOverlayRef.current = overlayKey
+    return () => clearTimeout(timer)
   }, [overlaySchoolId, overlayLocations, map])
 
   useEffect(() => {
@@ -640,6 +646,8 @@ const OverlayLocationMarker = memo(function OverlayLocationMarker({
   const focusLabels = getLocationFocusLabels(t, marker.location)
   const label = labelMode === 'focus' && focusLabels.length
     ? getLocationFocusMarkerLabel(t, marker.location)
+    : labelMode === 'number'
+    ? marker.label
     : getLocationShortLabel(t, marker.location, ageGroupOrder, activeAgeGroup)
   const icon = createLocationMarkerIcon(marker.school.school_type, {
     label,
@@ -647,6 +655,8 @@ const OverlayLocationMarker = memo(function OverlayLocationMarker({
   })
   const fullLabel = labelMode === 'focus' && focusLabels.length
     ? focusLabels.join(', ')
+    : labelMode === 'number'
+    ? getAddress(marker.location, language)
     : getLocationFullLabel(t, marker.location, ageGroupOrder)
 
   useEffect(() => {
@@ -837,25 +847,6 @@ function SchoolMap({
     return keys.length > 0 ? keys : AGE_GROUP_KEYS
   }, [config])
 
-  const overlayFlowPath = useMemo(() => {
-    if (!overlayLocations.length) return []
-    const orderMap = new globalThis.Map(ageGroupOrder.map((key, idx) => [key, idx]))
-    const getLocationOrder = (location) => {
-      const groups = normalizeAgeGroups(location)
-      if (!groups.length) return 999
-      return Math.min(...groups.map(group => (orderMap.has(group) ? orderMap.get(group) : 999)))
-    }
-    const ordered = [...overlayLocations].sort((a, b) => {
-      const aIndex = getLocationOrder(a)
-      const bIndex = getLocationOrder(b)
-      if (aIndex !== bIndex) return aIndex - bIndex
-      if (a.is_primary !== b.is_primary) return a.is_primary ? -1 : 1
-      if (a.id != null && b.id != null) return a.id - b.id
-      return 0
-    })
-    return ordered.map(location => [location.__lat, location.__lng])
-  }, [overlayLocations, ageGroupOrder])
-  const overlayFlowAvailable = overlayFlowPath.length > 1
   const overlayFocusLabels = useMemo(() => {
     if (overlayLocations.length < 2) return false
     const orderedGroups = overlayLocations.map(location =>
@@ -875,6 +866,7 @@ function SchoolMap({
       location,
       position: [location.__lat, location.__lng],
       key: `overlay-${overlaySchool.id}-${location.id || idx}`,
+      label: String(idx + 1),
     }))
   }, [overlaySchool, overlayLocations])
 
@@ -995,7 +987,7 @@ function SchoolMap({
                   isSelected={marker.location.id === overlaySelectedLocationId}
                   ageGroupOrder={ageGroupOrder}
                   activeAgeGroup={activeAgeGroup}
-                  labelMode={overlayFocusLabels ? 'focus' : 'age'}
+                  labelMode={overlayFocusLabels ? 'focus' : 'number'}
                   showPopup={!isMobile}
                   t={t}
                   language={i18n.language}
@@ -1012,19 +1004,6 @@ function SchoolMap({
                 />
               ))}
 
-              {overlayFlowAvailable && (
-                <Polyline
-                  positions={overlayFlowPath}
-                  pathOptions={{
-                    color: getTypeColor(overlaySchool?.school_type),
-                    weight: 3,
-                    opacity: 0.7,
-                    dashArray: '8 6',
-                  }}
-                  className={overlayFocusLabels ? 'flow-line flow-line--static' : 'flow-line'}
-                  pane="overlayFlow"
-                />
-              )}
             </>
           )}
         </Pane>
@@ -1080,7 +1059,7 @@ function SchoolMap({
           iconCreateFunction={(cluster) => createClusterIcon(cluster, { dimmed: overlayActiveOnMap && !hideOthers })}
           showCoverageOnHover={false}
           animate
-          spiderfyOnMaxZoom
+          spiderfyOnMaxZoom={false}
         >
           {regularMarkers.map(marker => (
             <SchoolMarker
