@@ -44,13 +44,6 @@ const parseCoordinate = (value) => {
   return Number.isFinite(parsed) ? parsed : null
 }
 
-const hasValidLatLng = (location) => {
-  if (!location) return false
-  const lat = parseCoordinate(location.lat)
-  const lng = parseCoordinate(location.lng)
-  return Number.isFinite(lat) && Number.isFinite(lng)
-}
-
 // Custom marker icons
 const createMarkerIcon = (type, { isSelected, isHovered, isDimmed }) => {
   const color = isSelected ? HIGHLIGHT_COLOR : getTypeColor(type)
@@ -844,11 +837,6 @@ function SchoolMap({
       }))
       .filter(location => Number.isFinite(location.__lat) && Number.isFinite(location.__lng))
   }, [overlaySchool])
-
-  const overlayPrimaryLocation = useMemo(() => {
-    if (!overlayLocations.length) return null
-    return overlayLocations.find(location => location.is_primary) || overlayLocations[0]
-  }, [overlayLocations])
 
   const overlayFocusLocation = useMemo(() => {
     if (!locationOverlay?.focusLocationId) return null

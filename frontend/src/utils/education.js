@@ -8,7 +8,6 @@
 import {
   calculateAgeGroup as configCalculateAgeGroup,
   gradeToPoints as configGradeToPoints,
-  getAgeGroupKeys as configGetAgeGroupKeys,
 } from './countryConfig'
 
 // Default Bulgaria age groups for backwards compatibility

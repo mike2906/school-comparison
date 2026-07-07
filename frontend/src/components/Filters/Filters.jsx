@@ -44,11 +44,6 @@ function Filters({ filters, onFilterChange }) {
     }
   }
 
-  const handleAgeGroupChange = (e) => {
-    const ageGroup = e.target.value || null
-    onFilterChange({ ageGroup, birthYear: null })
-  }
-
   const handleClear = () => {
     onFilterChange({
       ageGroup: null,

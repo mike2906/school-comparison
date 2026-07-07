@@ -430,7 +430,7 @@ function ComparePage() {
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
-  const { compareList, removeFromCompare, clearCompare, maxCompare } = useCompare()
+  const { compareList, removeFromCompare, clearCompare } = useCompare()
   const [schools, setSchools] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
