@@ -247,6 +247,14 @@ const fitMapToPoints = (map, points) => {
   return bounds
 }
 
+const getAutoFitKey = (schools, userLocation, countryBounds) => {
+  const points = collectPoints(schools, userLocation)
+    .map(([lat, lng]) => `${lat},${lng}`)
+    .sort()
+
+  return points.length > 0 ? points.join('|') : `bounds:${countryBounds.toBBoxString()}`
+}
+
 const serializeBounds = (bounds) => ({
   southWest: {
     lat: bounds.getSouthWest().lat,
@@ -260,12 +268,17 @@ const serializeBounds = (bounds) => ({
 
 function MapUpdater({ schools, userLocation, autoFit, lastValidBoundsRef, defaultZoom, countryBounds }) {
   const map = useMap()
+  const lastAutoFitKeyRef = useRef(null)
 
   useEffect(() => {
     if (!autoFit) return
 
+    const autoFitKey = getAutoFitKey(schools, userLocation, countryBounds)
+    if (lastAutoFitKeyRef.current === autoFitKey) return
+
     const schoolPoints = collectSchoolPoints(schools)
     const points = collectPoints(schools, userLocation)
+    lastAutoFitKeyRef.current = autoFitKey
 
     if (schoolPoints.length > 0) {
       const bounds = fitMapToPoints(map, points)
