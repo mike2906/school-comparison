@@ -53,7 +53,7 @@ const createMarkerIcon = (type, { isSelected, isHovered, isDimmed }) => {
         <path d="M21 0C9.402 0 0 9.402 0 21c0 14.7 21 31 21 31s21-16.3 21-31C42 9.402 32.598 0 21 0z" fill="${color}"/>
         <circle cx="21" cy="19" r="8.5" fill="white"/>
       </svg>`
-    : `<svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+    : `<svg width="32" height="40" viewBox="-1 -1 34 42" fill="none" overflow="visible" xmlns="http://www.w3.org/2000/svg">
         <path d="M16 0C7.163 0 0 7.163 0 16c0 11.2 16 24 16 24s16-12.8 16-24C32 7.163 24.837 0 16 0z" fill="white" stroke="${color}" stroke-width="2"/>
         <circle cx="16" cy="14" r="5" fill="${color}"/>
       </svg>`
