@@ -1,11 +1,19 @@
 import re
 from typing import Optional
 
-from sqlalchemy import and_, exists, or_, select
+from sqlalchemy import and_, exists, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased, selectinload
 
 from app.models.school import School, SchoolLocation, SchoolLocationAgeGroupShift
+
+
+SOFIA_MAP_BOUNDS = {
+    "south": 42.55,
+    "west": 23.15,
+    "north": 42.85,
+    "east": 23.55,
+}
 
 
 class SchoolService:
@@ -20,16 +28,54 @@ class SchoolService:
         )
 
     @staticmethod
-    def _has_resolved_location():
+    def _has_resolved_location(city: Optional[str] = None):
         resolved_location = aliased(SchoolLocation)
         return exists(
             select(1)
             .select_from(resolved_location)
             .where(
                 resolved_location.school_id == School.id,
-                SchoolService._resolved_location_clause(resolved_location),
+                SchoolService._scoped_resolved_location_clause(resolved_location, city),
             )
             .correlate(School)
+        )
+
+    @staticmethod
+    def _normalize_city_filter(city: Optional[str]) -> Optional[str]:
+        if city is None:
+            return None
+        normalized = city.strip().lower()
+        if not normalized or normalized == "all":
+            return None
+        return normalized
+
+    @staticmethod
+    def _city_clause(city: Optional[str]):
+        normalized = SchoolService._normalize_city_filter(city)
+        if normalized is None:
+            return None
+        return func.lower(School.city) == normalized
+
+    @staticmethod
+    def _location_bounds_clause(location_model=SchoolLocation, city: Optional[str] = None):
+        normalized = SchoolService._normalize_city_filter(city)
+        if normalized != "sofia":
+            return None
+        return and_(
+            location_model.lat >= SOFIA_MAP_BOUNDS["south"],
+            location_model.lat <= SOFIA_MAP_BOUNDS["north"],
+            location_model.lng >= SOFIA_MAP_BOUNDS["west"],
+            location_model.lng <= SOFIA_MAP_BOUNDS["east"],
+        )
+
+    @staticmethod
+    def _scoped_resolved_location_clause(location_model=SchoolLocation, city: Optional[str] = None):
+        bounds_clause = SchoolService._location_bounds_clause(location_model, city)
+        if bounds_clause is None:
+            return SchoolService._resolved_location_clause(location_model)
+        return and_(
+            SchoolService._resolved_location_clause(location_model),
+            bounds_clause,
         )
 
     def _base_query(self):
@@ -41,7 +87,12 @@ class SchoolService:
             selectinload(School.field_sources),
         )
 
-    async def get_schools_by_age_group(self, age_group: str, country_code: str = "bg") -> list[School]:
+    async def get_schools_by_age_group(
+        self,
+        age_group: str,
+        country_code: str = "bg",
+        city: Optional[str] = "sofia",
+    ) -> list[School]:
         """Get all schools that have locations for a specific age group."""
         query = (
             self._base_query()
@@ -49,8 +100,11 @@ class SchoolService:
             .join(SchoolLocationAgeGroupShift, SchoolLocationAgeGroupShift.location_id == SchoolLocation.id)
             .where(SchoolLocationAgeGroupShift.age_group == age_group)
             .where(School.country_code == country_code)
-            .where(self._resolved_location_clause(SchoolLocation))
+            .where(self._scoped_resolved_location_clause(SchoolLocation, city))
         )
+        city_clause = self._city_clause(city)
+        if city_clause is not None:
+            query = query.where(city_clause)
         result = await self.db.execute(query)
         return result.scalars().unique().all()
 
@@ -66,6 +120,7 @@ class SchoolService:
     async def list_schools_filtered(
         self,
         country_code: str = "bg",
+        city: Optional[str] = "sofia",
         age_group: Optional[str] = None,
         school_type: Optional[str] = None,
         education_level: Optional[str] = None,
@@ -92,8 +147,11 @@ class SchoolService:
         query = (
             self._base_query()
             .where(School.country_code == country_code)
-            .where(self._has_resolved_location())
+            .where(self._has_resolved_location(city))
         )
+        city_clause = self._city_clause(city)
+        if city_clause is not None:
+            query = query.where(city_clause)
 
         # Filter by age group if specified
         if age_group:
@@ -102,7 +160,7 @@ class SchoolService:
                 .join(SchoolLocation)
                 .join(SchoolLocationAgeGroupShift, SchoolLocationAgeGroupShift.location_id == SchoolLocation.id)
                 .where(SchoolLocationAgeGroupShift.age_group == age_group)
-                .where(self._resolved_location_clause(SchoolLocation))
+                .where(self._scoped_resolved_location_clause(SchoolLocation, city))
             )
 
         # Apply education_level filter. Preschool is special:
@@ -166,12 +224,19 @@ class SchoolService:
 
         return [school for school in schools if matches_filter(school)]
 
-    async def get_available_filters(self, country_code: str = "bg") -> dict[str, list[str]]:
+    async def get_available_filters(
+        self,
+        country_code: str = "bg",
+        city: Optional[str] = "sofia",
+    ) -> dict[str, list[str]]:
         query = (
             select(School.attributes)
             .where(School.country_code == country_code)
-            .where(self._has_resolved_location())
+            .where(self._has_resolved_location(city))
         )
+        city_clause = self._city_clause(city)
+        if city_clause is not None:
+            query = query.where(city_clause)
         result = await self.db.execute(query)
         rows = result.scalars().all()
 
@@ -214,7 +279,13 @@ class SchoolService:
 
         return {key: sorted(values) for key, values in categories.items()}
 
-    async def search_schools(self, search_query: str, country_code: str = "bg", limit: int = 10) -> list[School]:
+    async def search_schools(
+        self,
+        search_query: str,
+        country_code: str = "bg",
+        city: Optional[str] = "sofia",
+        limit: int = 10,
+    ) -> list[School]:
         """
         Search schools by name or location.
 
@@ -250,16 +321,19 @@ class SchoolService:
         # Match on school names, branded display names, and location addresses.
         # Query matching ids first so multiple matching locations do not duplicate
         # schools or consume the result limit.
+        city_clause = self._city_clause(city)
         matching_school_ids = (
             select(School.id)
             .outerjoin(SchoolLocation, SchoolLocation.school_id == School.id)
             .where(School.country_code == country_code)
-            .where(self._has_resolved_location())
+            .where(self._has_resolved_location(city))
             .where(or_(*search_clauses))
             .distinct()
             .limit(limit)
-            .subquery()
         )
+        if city_clause is not None:
+            matching_school_ids = matching_school_ids.where(city_clause)
+        matching_school_ids = matching_school_ids.subquery()
 
         query = (
             self._base_query()

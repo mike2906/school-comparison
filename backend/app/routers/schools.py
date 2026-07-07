@@ -22,6 +22,7 @@ router = APIRouter()
 @router.get("", response_model=list[SchoolListResponse])
 async def list_schools(
     country_code: str = Query("bg", description="Country code (ISO 3166-1 alpha-2)"),
+    city: Optional[str] = Query("sofia", description="City scope; use 'all' for country-wide results"),
     age_group: Optional[str] = Query(None, description="Filter by age group"),
     school_type: Optional[str] = Query(None, description="Filter by school type (state, private, international)"),
     education_level: Optional[str] = Query(None, description="Filter by education level (nursery, kindergarten, primary, etc.)"),
@@ -40,6 +41,7 @@ async def list_schools(
             school_type = "private"
         schools = await service.list_schools_filtered(
             country_code=country_code,
+            city=city,
             age_group=age_group,
             school_type=school_type,
             education_level=education_level,
@@ -61,6 +63,7 @@ async def list_schools(
 @router.get("/counts", response_model=dict[str, int])
 async def get_school_counts(
     country_code: str = Query("bg", description="Country code (ISO 3166-1 alpha-2)"),
+    city: Optional[str] = Query("sofia", description="City scope; use 'all' for country-wide results"),
     db: AsyncSession = Depends(get_db),
 ):
     """Get counts of schools per age group."""
@@ -70,9 +73,12 @@ async def get_school_counts(
             .join(SchoolLocation, SchoolLocation.id == SchoolLocationAgeGroupShift.location_id)
             .join(School, SchoolLocation.school_id == School.id)
             .where(School.country_code == country_code)
-            .where(SchoolService._resolved_location_clause(SchoolLocation))
+            .where(SchoolService._scoped_resolved_location_clause(SchoolLocation, city))
             .group_by(SchoolLocationAgeGroupShift.age_group)
         )
+        city_clause = SchoolService._city_clause(city)
+        if city_clause is not None:
+            query = query.where(city_clause)
         result = await db.execute(query)
         rows = result.all()
 
@@ -90,12 +96,13 @@ async def get_school_counts(
 @router.get("/filters", response_model=dict[str, list[str]])
 async def get_available_filters(
     country_code: str = Query("bg", description="Country code (ISO 3166-1 alpha-2)"),
+    city: Optional[str] = Query("sofia", description="City scope; use 'all' for country-wide results"),
     db: AsyncSession = Depends(get_db),
 ):
     """Get available advanced filter options based on school attributes."""
     try:
         service = SchoolService(db)
-        return await service.get_available_filters(country_code=country_code)
+        return await service.get_available_filters(country_code=country_code, city=city)
     except Exception as e:
         logger.error(f"Error getting available filters: {e}", exc_info=True)
         raise HTTPException(
@@ -113,12 +120,13 @@ async def search_schools(
         description="Search query for school name"
     ),
     country_code: str = Query("bg", description="Country code (ISO 3166-1 alpha-2)"),
+    city: Optional[str] = Query("sofia", description="City scope; use 'all' for country-wide results"),
     db: AsyncSession = Depends(get_db),
 ):
     """Search schools by name."""
     try:
         service = SchoolService(db)
-        schools = await service.search_schools(search_query=q, country_code=country_code, limit=10)
+        schools = await service.search_schools(search_query=q, country_code=country_code, city=city, limit=10)
         return schools
     except Exception as e:
         logger.error(f"Error searching schools: {e}", exc_info=True)

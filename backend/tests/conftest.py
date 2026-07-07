@@ -89,6 +89,7 @@ async def seeded_db(db_session):
         country_code="bg",
         school_type="state",
         education_level="kindergarten",
+        city="sofia",
         summary_i18n={
             "bg": {"short": "Държавна детска градина в центъра на София.", "long": "Държавна детска градина в центъра на София."},
             "en": {"short": "State kindergarten in central Sofia.", "long": "State kindergarten in central Sofia."},
@@ -135,6 +136,7 @@ async def seeded_db(db_session):
         country_code="bg",
         school_type="private",
         education_level="kindergarten",
+        city="sofia",
         website_url="https://example.com",
         summary_i18n={
             "bg": {"short": "Модерна частна детска градина.", "long": "Модерна частна детска градина."},
@@ -167,6 +169,7 @@ async def seeded_db(db_session):
         country_code="bg",
         school_type="state",
         education_level="primary",
+        city="sofia",
         summary_i18n={
             "bg": {"short": "Популярно столично училище.", "long": "Популярно столично училище."},
             "en": {"short": "Popular Sofia school.", "long": "Popular Sofia school."},

@@ -205,13 +205,20 @@ const createClusterIcon = (cluster, { dimmed = false } = {}) => {
   })
 }
 
-const collectSchoolPoints = (schools) => {
+const pointInBounds = (lat, lng, bounds) => {
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return false
+  return !bounds || bounds.contains([lat, lng])
+}
+
+const collectSchoolPoints = (schools, countryBounds) => {
   const points = []
 
   schools.forEach(school => {
     school.locations?.forEach(location => {
-      if (location.lat && location.lng) {
-        points.push([location.lat, location.lng])
+      const lat = parseCoordinate(location.lat)
+      const lng = parseCoordinate(location.lng)
+      if (pointInBounds(lat, lng, countryBounds)) {
+        points.push([lat, lng])
       }
     })
   })
@@ -219,8 +226,8 @@ const collectSchoolPoints = (schools) => {
   return points
 }
 
-const collectPoints = (schools, userLocation) => {
-  const points = collectSchoolPoints(schools)
+const collectPoints = (schools, userLocation, countryBounds) => {
+  const points = collectSchoolPoints(schools, countryBounds)
 
   if (userLocation?.lat && userLocation?.lng) {
     points.push([userLocation.lat, userLocation.lng])
@@ -243,7 +250,7 @@ const fitMapToPoints = (map, points) => {
 }
 
 const getAutoFitKey = (schools, userLocation, countryBounds) => {
-  const points = collectPoints(schools, userLocation)
+  const points = collectPoints(schools, userLocation, countryBounds)
     .map(([lat, lng]) => `${lat},${lng}`)
     .sort()
 
@@ -271,8 +278,8 @@ function MapUpdater({ schools, userLocation, autoFit, lastValidBoundsRef, defaul
     const autoFitKey = getAutoFitKey(schools, userLocation, countryBounds)
     if (lastAutoFitKeyRef.current === autoFitKey) return
 
-    const schoolPoints = collectSchoolPoints(schools)
-    const points = collectPoints(schools, userLocation)
+    const schoolPoints = collectSchoolPoints(schools, countryBounds)
+    const points = collectPoints(schools, userLocation, countryBounds)
     lastAutoFitKeyRef.current = autoFitKey
 
     if (schoolPoints.length > 0) {
@@ -748,8 +755,8 @@ function ResetViewControl({ schools, userLocation, lastValidBoundsRef, label, de
   const map = useMap()
 
   const handleResetView = useCallback(() => {
-    const schoolPoints = collectSchoolPoints(schools)
-    const points = collectPoints(schools, userLocation)
+    const schoolPoints = collectSchoolPoints(schools, countryBounds)
+    const points = collectPoints(schools, userLocation, countryBounds)
 
     if (schoolPoints.length > 0) {
       const bounds = fitMapToPoints(map, points)
@@ -836,7 +843,7 @@ function SchoolMap({
       eligibleLocations?.forEach((location, idx) => {
         const lat = parseCoordinate(location.lat)
         const lng = parseCoordinate(location.lng)
-        if (Number.isFinite(lat) && Number.isFinite(lng)) {
+        if (pointInBounds(lat, lng, countryBounds)) {
           result.push({
             school,
             location,
@@ -847,7 +854,7 @@ function SchoolMap({
       })
     })
     return result
-  }, [schools, activeAgeGroup])
+  }, [schools, activeAgeGroup, countryBounds])
 
   const overlaySchoolId = locationOverlay?.schoolId ?? null
   const hideOthers = Boolean(locationOverlay?.hideOthers)
@@ -864,8 +871,8 @@ function SchoolMap({
         __lat: parseCoordinate(location.lat),
         __lng: parseCoordinate(location.lng),
       }))
-      .filter(location => Number.isFinite(location.__lat) && Number.isFinite(location.__lng))
-  }, [overlaySchool])
+      .filter(location => pointInBounds(location.__lat, location.__lng, countryBounds))
+  }, [overlaySchool, countryBounds])
 
   const overlayFocusLocation = useMemo(() => {
     if (!locationOverlay?.focusLocationId) return null

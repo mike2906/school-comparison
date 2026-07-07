@@ -757,6 +757,42 @@ class TestGeoJSONMatching:
                     assert result.lng == 23.3219
 
     @pytest.mark.asyncio
+    async def test_sofia_match_outside_city_bounds_is_rejected(self):
+        """GeoJSON sometimes labels a row as Stolichna but stores bad coordinates."""
+        from app.services.geocoding.bg.geojson import GeoJSONProvider
+        from unittest.mock import patch
+
+        mock_geojson = {
+            'features': [
+                {
+                    'type': 'Feature',
+                    'geometry': {'coordinates': [24.82002, 43.064]},
+                    'properties': {
+                        'name': '6 ОУ "ГРАФ ИГНАТИЕВ"',
+                        'city': 'СТОЛИЧНА',
+                        'street': 'УЛ. ШЕСТИ СЕПТЕМВРИ 16',
+                    }
+                }
+            ]
+        }
+
+        with patch('pathlib.Path.exists', return_value=True):
+            with patch('builtins.open', create=True):
+                with patch('json.load', return_value=mock_geojson):
+                    provider = GeoJSONProvider()
+                    provider._load_index()
+
+                    result = await provider.geocode(
+                        address='ул. Шести септември 16',
+                        country_code='bg',
+                        school_name='6 ОУ "Граф Игнатиев"',
+                        city='sofia'
+                    )
+
+                    assert not result.success
+                    assert "outside expected city bounds" in result.error
+
+    @pytest.mark.asyncio
     async def test_ambiguous_name_rejection(self):
         """Test that ambiguous names (multiple cities) are rejected."""
         from app.services.geocoding.bg.geojson import GeoJSONProvider

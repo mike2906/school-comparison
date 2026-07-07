@@ -155,6 +155,84 @@ class TestSchoolsEndpoint:
         ids = {school["id"] for school in response.json()}
         assert hidden_school.id not in ids
 
+    @pytest.mark.asyncio
+    async def test_list_defaults_to_sofia_city_scope(self, seeded_db, seeded_client):
+        outside_school = School(
+            name_i18n={"bg": "Пловдивско училище", "en": "Plovdiv School"},
+            country_code="bg",
+            school_type="state",
+            education_level="primary",
+            city="plovdiv",
+        )
+        seeded_db.add(outside_school)
+        await seeded_db.flush()
+        outside_location = SchoolLocation(
+            school_id=outside_school.id,
+            address_i18n={"bg": "ул. Пловдив 1", "en": "1 Plovdiv St"},
+            lat=42.1354,
+            lng=24.7453,
+            is_primary=True,
+        )
+        seeded_db.add(outside_location)
+        await seeded_db.flush()
+        seeded_db.add(
+            SchoolLocationAgeGroupShift(
+                location_id=outside_location.id,
+                age_group="grade_1_4",
+                shift="morning",
+            )
+        )
+        await seeded_db.commit()
+
+        response = await seeded_client.get("/schools")
+        assert response.status_code == 200
+        ids = {school["id"] for school in response.json()}
+        assert outside_school.id not in ids
+
+        response = await seeded_client.get("/schools?city=all")
+        assert response.status_code == 200
+        ids = {school["id"] for school in response.json()}
+        assert outside_school.id in ids
+
+    @pytest.mark.asyncio
+    async def test_list_excludes_sofia_schools_with_out_of_bounds_coordinates(self, seeded_db, seeded_client):
+        bad_geo_school = School(
+            name_i18n={"bg": '6 ОУ "Граф Игнатиев"', "en": "6 OU Graf Ignatiev"},
+            country_code="bg",
+            school_type="state",
+            education_level="lower_secondary",
+            city="sofia",
+        )
+        seeded_db.add(bad_geo_school)
+        await seeded_db.flush()
+        bad_location = SchoolLocation(
+            school_id=bad_geo_school.id,
+            address_i18n={"bg": "ул. Шести септември 16", "en": "16 Shesti Septemvri St"},
+            lat=43.064,
+            lng=24.82002,
+            is_primary=True,
+        )
+        seeded_db.add(bad_location)
+        await seeded_db.flush()
+        seeded_db.add(
+            SchoolLocationAgeGroupShift(
+                location_id=bad_location.id,
+                age_group="grade_5_7",
+                shift="morning",
+            )
+        )
+        await seeded_db.commit()
+
+        response = await seeded_client.get("/schools")
+        assert response.status_code == 200
+        ids = {school["id"] for school in response.json()}
+        assert bad_geo_school.id not in ids
+
+        response = await seeded_client.get("/schools?city=all")
+        assert response.status_code == 200
+        ids = {school["id"] for school in response.json()}
+        assert bad_geo_school.id in ids
+
 
 class TestSchoolsFilterEndpoint:
     """Test advanced filtering capabilities."""
@@ -424,6 +502,36 @@ class TestSchoolsSearchEndpoint:
         assert response.status_code == 200
         assert response.json() == []
 
+    @pytest.mark.asyncio
+    async def test_search_defaults_to_sofia_city_scope(self, seeded_db, seeded_client):
+        outside_school = School(
+            name_i18n={"bg": "Варненско училище", "en": "Varna Search School"},
+            country_code="bg",
+            school_type="state",
+            education_level="primary",
+            city="varna",
+        )
+        seeded_db.add(outside_school)
+        await seeded_db.flush()
+        seeded_db.add(
+            SchoolLocation(
+                school_id=outside_school.id,
+                address_i18n={"bg": "ул. Варна 1", "en": "1 Varna St"},
+                lat=43.2141,
+                lng=27.9147,
+                is_primary=True,
+            )
+        )
+        await seeded_db.commit()
+
+        response = await seeded_client.get("/schools/search?q=Varna")
+        assert response.status_code == 200
+        assert response.json() == []
+
+        response = await seeded_client.get("/schools/search?q=Varna&city=all")
+        assert response.status_code == 200
+        assert len(response.json()) == 1
+
 
 class TestSchoolsCountsEndpoint:
     """Test counts endpoint."""
@@ -531,6 +639,43 @@ class TestSchoolsCountsEndpoint:
         assert response.status_code == 200
         data = response.json()
         assert data["grade_1_4"] == 1
+
+    @pytest.mark.asyncio
+    async def test_counts_default_to_sofia_city_scope(self, seeded_db, seeded_client):
+        outside_school = School(
+            name_i18n={"bg": "Бургаско училище", "en": "Burgas Count School"},
+            country_code="bg",
+            school_type="state",
+            education_level="primary",
+            city="burgas",
+        )
+        seeded_db.add(outside_school)
+        await seeded_db.flush()
+        outside_location = SchoolLocation(
+            school_id=outside_school.id,
+            address_i18n={"bg": "ул. Бургас 1", "en": "1 Burgas St"},
+            lat=42.5048,
+            lng=27.4626,
+            is_primary=True,
+        )
+        seeded_db.add(outside_location)
+        await seeded_db.flush()
+        seeded_db.add(
+            SchoolLocationAgeGroupShift(
+                location_id=outside_location.id,
+                age_group="grade_1_4",
+                shift="morning",
+            )
+        )
+        await seeded_db.commit()
+
+        response = await seeded_client.get("/schools/counts")
+        assert response.status_code == 200
+        assert response.json()["grade_1_4"] == 1
+
+        response = await seeded_client.get("/schools/counts?city=all")
+        assert response.status_code == 200
+        assert response.json()["grade_1_4"] == 2
 
 
 class TestSchoolValidation:

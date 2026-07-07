@@ -16,6 +16,13 @@ from app.services.geocoding.base import BaseGeocodingProvider, GeocodingResult
 
 logger = logging.getLogger(__name__)
 
+SOFIA_MAP_BOUNDS = {
+    "south": 42.55,
+    "west": 23.15,
+    "north": 42.85,
+    "east": 23.55,
+}
+
 
 class GeoJSONProvider(BaseGeocodingProvider):
     """
@@ -272,6 +279,17 @@ class GeoJSONProvider(BaseGeocodingProvider):
             formatted_address=formatted_address,
         )
 
+    def _feature_matches_city_bounds(self, feature: dict, normalized_city: Optional[str]) -> bool:
+        if normalized_city != "СТОЛИЧНА":
+            return True
+
+        coords = feature["geometry"]["coordinates"]
+        lng, lat = coords[0], coords[1]
+        return (
+            SOFIA_MAP_BOUNDS["south"] <= lat <= SOFIA_MAP_BOUNDS["north"]
+            and SOFIA_MAP_BOUNDS["west"] <= lng <= SOFIA_MAP_BOUNDS["east"]
+        )
+
     async def geocode(self, address: str, country_code: str = "bg", school_name: Optional[str] = None, city: Optional[str] = None) -> GeocodingResult:
         """
         Geocode by matching school name and city in GeoJSON index.
@@ -361,6 +379,19 @@ class GeoJSONProvider(BaseGeocodingProvider):
             )
 
         props = feature['properties']
+        if not self._feature_matches_city_bounds(feature, normalized_city):
+            logger.warning(
+                "GeoJSON match outside expected city bounds: '%s' in %s at %s",
+                school_name,
+                props.get("city", ""),
+                feature["geometry"]["coordinates"],
+            )
+            return GeocodingResult(
+                success=False,
+                error="GeoJSON match outside expected city bounds",
+                provider=self.provider_name,
+            )
+
         logger.info(f"GeoJSON match: '{school_name}' in {props.get('city', '')}")
         return self._result_from_feature(feature)
 

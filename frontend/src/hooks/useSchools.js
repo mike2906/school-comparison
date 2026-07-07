@@ -12,7 +12,8 @@ export function useSchools(
   specialPrograms = [],
   facilities = [],
   teachingApproach = [],
-  countryCode = 'bg'
+  countryCode = 'bg',
+  city = 'sofia'
 ) {
   const [schools, setSchools] = useState([])
   const [loading, setLoading] = useState(true)
@@ -35,6 +36,7 @@ export function useSchools(
           specialPrograms,
           facilities,
           teachingApproach,
+          city,
         })
         setSchools(data)
       } catch (err) {
@@ -45,7 +47,7 @@ export function useSchools(
     }
 
     loadSchools()
-  }, [countryCode, ageGroup, schoolType, educationLevel, includeCrossover, languageFocus, specialPrograms, facilities, teachingApproach])
+  }, [countryCode, city, ageGroup, schoolType, educationLevel, includeCrossover, languageFocus, specialPrograms, facilities, teachingApproach])
 
   const localizedSchools = useMemo(
     () => normalizeSchoolList(schools, i18n.language),

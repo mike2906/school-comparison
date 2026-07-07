@@ -2,6 +2,7 @@ const API_BASE = '/api'
 
 export async function fetchSchools({
   countryCode = 'bg',
+  city = 'sofia',
   ageGroup = null,
   schoolType = null,
   educationLevel = null,
@@ -13,6 +14,9 @@ export async function fetchSchools({
 } = {}) {
   const params = new URLSearchParams()
   params.set('country_code', countryCode)
+  if (city) {
+    params.set('city', city)
+  }
   if (ageGroup) {
     params.set('age_group', ageGroup)
   }
@@ -40,9 +44,12 @@ export async function fetchSchools({
   return response.json()
 }
 
-export async function fetchAvailableFilters({ countryCode = 'bg' } = {}) {
+export async function fetchAvailableFilters({ countryCode = 'bg', city = 'sofia' } = {}) {
   const params = new URLSearchParams()
   params.set('country_code', countryCode)
+  if (city) {
+    params.set('city', city)
+  }
   const response = await fetch(`${API_BASE}/schools/filters?${params.toString()}`)
   if (!response.ok) {
     throw new Error(`Failed to fetch available filters: ${response.statusText}`)
@@ -70,9 +77,12 @@ export async function fetchCompare(ids) {
   return response.json()
 }
 
-export async function fetchSchoolCounts({ countryCode = 'bg' } = {}) {
+export async function fetchSchoolCounts({ countryCode = 'bg', city = 'sofia' } = {}) {
   const params = new URLSearchParams()
   params.set('country_code', countryCode)
+  if (city) {
+    params.set('city', city)
+  }
   const response = await fetch(`${API_BASE}/schools/counts?${params.toString()}`)
   if (!response.ok) {
     throw new Error(`Failed to fetch school counts: ${response.statusText}`)
@@ -81,10 +91,13 @@ export async function fetchSchoolCounts({ countryCode = 'bg' } = {}) {
   return response.json()
 }
 
-export async function searchSchools(query, { countryCode = 'bg' } = {}) {
+export async function searchSchools(query, { countryCode = 'bg', city = 'sofia' } = {}) {
   const params = new URLSearchParams()
   params.set('q', query)
   params.set('country_code', countryCode)
+  if (city) {
+    params.set('city', city)
+  }
 
   const response = await fetch(`${API_BASE}/schools/search?${params.toString()}`)
   if (!response.ok) {
