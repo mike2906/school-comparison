@@ -110,6 +110,10 @@
   transform: translateY(-2px);
 }
 
+.custom-div-icon.is-click-through {
+  pointer-events: none;
+}
+
 .location-marker-wrapper {
   background: transparent;
   border: none;

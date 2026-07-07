@@ -348,7 +348,9 @@ function SearchPage() {
       clearLocationOverlay()
     }
     setSelectedSchoolId((prev) => {
-      const nextId = prev === school.id ? null : school.id
+      const nextId = source === 'map'
+        ? school.id
+        : (prev === school.id ? null : school.id)
       scrollOnSelectRef.current = source === 'map' && nextId !== null
       return nextId
     })
@@ -785,11 +787,11 @@ function SearchPage() {
 
   useEffect(() => {
     if (!selectedSchoolId) return
-    const visibleIds = new Set((searchInBounds ? boundedSchools : filteredSchools).map(school => school.id))
+    const visibleIds = new Set(filteredSchools.map(school => school.id))
     if (!visibleIds.has(selectedSchoolId)) {
       setSelectedSchoolId(null)
     }
-  }, [boundedSchools, filteredSchools, searchInBounds, selectedSchoolId])
+  }, [filteredSchools, selectedSchoolId])
 
   useEffect(() => {
     if (!locationOverlay.schoolId) return

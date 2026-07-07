@@ -21,6 +21,7 @@ const FALLBACK_BOUNDS = L.latLngBounds([41.235, 22.357], [44.216, 28.887])
 const SINGLE_POINT_ZOOM = 13
 const MAX_FIT_ZOOM = 14
 const FIT_PADDING = [60, 60]
+const MARKER_CLICK_GUARD_MS = 350
 
 const HIGHLIGHT_COLOR = '#f97316'
 const TYPE_COLORS = {
@@ -63,6 +64,7 @@ const createMarkerIcon = (type, { isSelected, isHovered, isDimmed }) => {
     className: [
       'custom-div-icon',
       isSelected ? 'is-selected' : '',
+      isSelected ? 'is-click-through' : '',
       isHovered ? 'is-hovered' : '',
       isDimmed ? 'is-dimmed' : '',
     ].filter(Boolean).join(' '),
@@ -334,9 +336,10 @@ function MapResizer({ resizeKey }) {
   return null
 }
 
-function MapClickHandler({ onClearSelection }) {
+function MapClickHandler({ onClearSelection, markerInteractionRef }) {
   useMapEvents({
     click: (event) => {
+      if (Date.now() - (markerInteractionRef.current || 0) < MARKER_CLICK_GUARD_MS) return
       const target = event.originalEvent?.target
       if (target?.closest?.('.leaflet-marker-icon')) return
       if (target?.closest?.('.leaflet-popup')) return
@@ -348,10 +351,11 @@ function MapClickHandler({ onClearSelection }) {
   return null
 }
 
-function MapLocationPicker({ enabled, onPickLocation }) {
+function MapLocationPicker({ enabled, onPickLocation, markerInteractionRef }) {
   useMapEvents({
     click: (event) => {
       if (!enabled) return
+      if (Date.now() - (markerInteractionRef.current || 0) < MARKER_CLICK_GUARD_MS) return
       const target = event.originalEvent?.target
       if (target?.closest?.('.leaflet-marker-icon')) return
       if (target?.closest?.('.leaflet-popup')) return
@@ -576,6 +580,7 @@ const SchoolMarker = memo(function SchoolMarker({
   canAddMore,
   onShowLocations,
   overlayActive,
+  onMarkerInteraction,
 }) {
   const markerRef = useRef(null)
 
@@ -595,8 +600,17 @@ const SchoolMarker = memo(function SchoolMarker({
       icon={createMarkerIcon(marker.school.school_type, { isSelected, isHovered, isDimmed })}
       zIndexOffset={isSelected ? 1200 : 0}
       eventHandlers={{
+        mousedown: (event) => {
+          onMarkerInteraction?.()
+          if (event.originalEvent) {
+            L.DomEvent.stop(event.originalEvent)
+          }
+        },
         click: (event) => {
-          event.originalEvent?.stopPropagation()
+          onMarkerInteraction?.()
+          if (event.originalEvent) {
+            L.DomEvent.stop(event.originalEvent)
+          }
           onSelect(marker.school)
         },
       }}
@@ -647,6 +661,7 @@ const OverlayLocationMarker = memo(function OverlayLocationMarker({
   canAddMore,
   onShowLocations,
   overlayActive,
+  onMarkerInteraction,
 }) {
   const markerRef = useRef(null)
   const focusLabels = getLocationFocusLabels(t, marker.location)
@@ -681,8 +696,17 @@ const OverlayLocationMarker = memo(function OverlayLocationMarker({
       icon={icon}
       zIndexOffset={isSelected ? 1600 : 900}
       eventHandlers={{
+        mousedown: (event) => {
+          onMarkerInteraction?.()
+          if (event.originalEvent) {
+            L.DomEvent.stop(event.originalEvent)
+          }
+        },
         click: (event) => {
-          event.originalEvent?.stopPropagation()
+          onMarkerInteraction?.()
+          if (event.originalEvent) {
+            L.DomEvent.stop(event.originalEvent)
+          }
           onFocusLocation?.(marker.school.id, marker.location.id)
           if (!isSchoolSelected) {
             onSelect?.(marker.school)
@@ -784,9 +808,14 @@ function SchoolMap({
   const { addToCompare, removeFromCompare, isInCompare, canAddMore } = useCompare()
   const { config } = useCountry()
   const lastValidBoundsRef = useRef(null)
+  const markerInteractionRef = useRef(0)
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768)
   const [sheetOffset, setSheetOffset] = useState(120)
   const sheetStartRef = useRef(null)
+
+  const noteMarkerInteraction = useCallback(() => {
+    markerInteractionRef.current = Date.now()
+  }, [])
 
   const mapCenter = config?.map_config?.center || FALLBACK_CENTER
   const defaultZoom = config?.map_config?.default_zoom || FALLBACK_ZOOM
@@ -1002,6 +1031,7 @@ function SchoolMap({
                   canAddMore={canAddMore}
                   onShowLocations={onShowLocations}
                   overlayActive={locationOverlay?.schoolId === marker.school.id}
+                  onMarkerInteraction={noteMarkerInteraction}
                 />
               ))}
 
@@ -1020,8 +1050,15 @@ function SchoolMap({
 
         <MapBoundsWatcher onBoundsChange={onBoundsChange} />
         <MapResizer resizeKey={resizeKey} />
-        <MapClickHandler onClearSelection={onClearSelection} />
-        <MapLocationPicker enabled={isPickingLocation} onPickLocation={onPickLocation} />
+        <MapClickHandler
+          onClearSelection={onClearSelection}
+          markerInteractionRef={markerInteractionRef}
+        />
+        <MapLocationPicker
+          enabled={isPickingLocation}
+          onPickLocation={onPickLocation}
+          markerInteractionRef={markerInteractionRef}
+        />
         <MapSelectionPan marker={selectedMarker} />
         <MapOverlayNavigator
           overlaySchoolId={overlaySchoolId}
@@ -1083,6 +1120,7 @@ function SchoolMap({
               canAddMore={canAddMore}
               onShowLocations={onShowLocations}
               overlayActive={locationOverlay?.schoolId === marker.school.id}
+              onMarkerInteraction={noteMarkerInteraction}
             />
           ))}
         </MarkerClusterGroup>
@@ -1108,6 +1146,7 @@ function SchoolMap({
             canAddMore={canAddMore}
             onShowLocations={onShowLocations}
             overlayActive={locationOverlay?.schoolId === marker.school.id}
+            onMarkerInteraction={noteMarkerInteraction}
           />
         ))}
 
