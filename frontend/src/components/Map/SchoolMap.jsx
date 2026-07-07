@@ -44,13 +44,6 @@ const parseCoordinate = (value) => {
   return Number.isFinite(parsed) ? parsed : null
 }
 
-const hasValidLatLng = (location) => {
-  if (!location) return false
-  const lat = parseCoordinate(location.lat)
-  const lng = parseCoordinate(location.lng)
-  return Number.isFinite(lat) && Number.isFinite(lng)
-}
-
 // Custom marker icons
 const createMarkerIcon = (type, { isSelected, isHovered, isDimmed }) => {
   const color = isSelected ? HIGHLIGHT_COLOR : getTypeColor(type)
@@ -247,6 +240,14 @@ const fitMapToPoints = (map, points) => {
   return bounds
 }
 
+const getAutoFitKey = (schools, userLocation, countryBounds) => {
+  const points = collectPoints(schools, userLocation)
+    .map(([lat, lng]) => `${lat},${lng}`)
+    .sort()
+
+  return points.length > 0 ? points.join('|') : `bounds:${countryBounds.toBBoxString()}`
+}
+
 const serializeBounds = (bounds) => ({
   southWest: {
     lat: bounds.getSouthWest().lat,
@@ -260,12 +261,17 @@ const serializeBounds = (bounds) => ({
 
 function MapUpdater({ schools, userLocation, autoFit, lastValidBoundsRef, defaultZoom, countryBounds }) {
   const map = useMap()
+  const lastAutoFitKeyRef = useRef(null)
 
   useEffect(() => {
     if (!autoFit) return
 
+    const autoFitKey = getAutoFitKey(schools, userLocation, countryBounds)
+    if (lastAutoFitKeyRef.current === autoFitKey) return
+
     const schoolPoints = collectSchoolPoints(schools)
     const points = collectPoints(schools, userLocation)
+    lastAutoFitKeyRef.current = autoFitKey
 
     if (schoolPoints.length > 0) {
       const bounds = fitMapToPoints(map, points)
@@ -831,11 +837,6 @@ function SchoolMap({
       }))
       .filter(location => Number.isFinite(location.__lat) && Number.isFinite(location.__lng))
   }, [overlaySchool])
-
-  const overlayPrimaryLocation = useMemo(() => {
-    if (!overlayLocations.length) return null
-    return overlayLocations.find(location => location.is_primary) || overlayLocations[0]
-  }, [overlayLocations])
 
   const overlayFocusLocation = useMemo(() => {
     if (!locationOverlay?.focusLocationId) return null
