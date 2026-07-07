@@ -502,12 +502,6 @@ function getShiftForAgeGroup(location, ageGroup) {
   return shifts[0] || null
 }
 
-function getLocationAgeGroupLabel(location, t) {
-  const groups = getLocationAgeGroups(location)
-  if (!groups.length) return ''
-  return groups.map(group => t(`ageGroups.${group}`)).join(', ')
-}
-
 function buildExpandedSections({
   school,
   attributes,
@@ -687,7 +681,6 @@ const SchoolCard = forwardRef(function SchoolCard(
 
   const attributes = school.attributes || {}
   const pricing = school.pricing || []
-  const examResults = school.exam_results || []
   const locations = school.locations || []
 
   const schoolName = getSchoolName(school, i18n.language)

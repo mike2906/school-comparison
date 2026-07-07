@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next'
 
 function ComparePanel({ schools, onRemove }) {
-  const { t, i18n } = useTranslation()
+  const { t } = useTranslation()
 
   if (schools.length === 0) {
     return (

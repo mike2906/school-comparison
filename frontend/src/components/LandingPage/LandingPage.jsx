@@ -25,7 +25,7 @@ function LandingPage() {
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const { config, countryCode } = useCountry()
+  const { config } = useCountry()
 
   const kindergartenAgeGroups = config ? getAgeGroupsByCategory(config, 'kindergarten') : FALLBACK_KINDERGARTEN_GROUPS
   const schoolAgeGroups = config ? getAgeGroupsByCategory(config, 'school') : FALLBACK_SCHOOL_GROUPS
