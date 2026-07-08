@@ -1,5 +1,7 @@
 # School Comparison
 
+[![CI](https://github.com/mike2906/school-comparison/actions/workflows/ci.yml/badge.svg)](https://github.com/mike2906/school-comparison/actions/workflows/ci.yml)
+
 Bilingual (Bulgarian/English) web app for parents in Sofia to discover, filter, and compare kindergartens and schools.
 
 ## Features
