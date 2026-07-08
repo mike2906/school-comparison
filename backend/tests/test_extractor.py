@@ -460,38 +460,38 @@ async def test_extract_school_does_not_promote_footer_network_name(db_session):
 def test_display_name_evidence_requires_domain_alias_and_repeated_identity():
     school = School(
         id=1,
-        name_i18n={"bg": "Частно училище Maple Bear Sofia"},
+        name_i18n={"bg": 'Частна гимназия "Стив Джобс"'},
         country_code="bg",
         city="sofia",
         school_type="private",
-        education_level="kindergarten",
-        website_url="https://sofia-school.maplebear.bg/en/",
+        education_level="upper_secondary",
+        website_url="https://abcschool.bg",
     )
     pages = [
         SourcePage(
             school_id=1,
-            source_url="https://sofia-school.maplebear.bg/en/about-us",
+            source_url="https://abcschool.bg/about-us",
             page_category="about",
             scrape_type=ScrapeType.WEBSITE,
             is_valid=True,
-            raw_markdown="Maple Bear Sofia School helps children.\nWelcome to Maple Bear Sofia School.",
-            content_hash="maple-about",
+            raw_markdown="ABC School helps students grow.\nWelcome to ABC School.",
+            content_hash="abc-about",
             last_scraped_at=datetime.datetime.now(datetime.UTC),
         ),
         SourcePage(
             school_id=1,
-            source_url="https://sofia-school.maplebear.bg/en/admission",
+            source_url="https://abcschool.bg/admission",
             page_category="admission",
             scrape_type=ScrapeType.WEBSITE,
             is_valid=True,
-            raw_markdown="Admissions at Maple Bear Sofia School are open.",
-            content_hash="maple-admission",
+            raw_markdown="Admissions at ABC School are open.",
+            content_hash="abc-admission",
             last_scraped_at=datetime.datetime.now(datetime.UTC),
         ),
     ]
 
     evidence = extractor_module._build_display_name_evidence(
-        {"bg": "Maple Bear Sofia School", "en": "Maple Bear Sofia School"},
+        {"bg": "ABC School", "en": "ABC School"},
         school=school,
         pages=pages,
     )
@@ -527,6 +527,48 @@ def test_display_name_evidence_rejects_uncorroborated_headline():
 
     evidence = extractor_module._build_display_name_evidence(
         {"bg": "21-во училище стана домакин"},
+        school=school,
+        pages=pages,
+    )
+
+    assert evidence is None
+
+
+def test_display_name_evidence_requires_same_repeated_identity():
+    school = School(
+        id=1,
+        name_i18n={"bg": "Частно училище Maple Bear Sofia"},
+        country_code="bg",
+        city="sofia",
+        school_type="private",
+        education_level="kindergarten",
+        website_url="https://sofia-school.maplebear.bg/en/",
+    )
+    pages = [
+        SourcePage(
+            school_id=1,
+            source_url="https://sofia-school.maplebear.bg/en/about-us",
+            page_category="about",
+            scrape_type=ScrapeType.WEBSITE,
+            is_valid=True,
+            raw_markdown="Maple Bear Global Schools helps children.",
+            content_hash="maple-global",
+            last_scraped_at=datetime.datetime.now(datetime.UTC),
+        ),
+        SourcePage(
+            school_id=1,
+            source_url="https://sofia-school.maplebear.bg/en/admission",
+            page_category="admission",
+            scrape_type=ScrapeType.WEBSITE,
+            is_valid=True,
+            raw_markdown="Admissions at Maple Bear Academy are open.",
+            content_hash="maple-academy",
+            last_scraped_at=datetime.datetime.now(datetime.UTC),
+        ),
+    ]
+
+    evidence = extractor_module._build_display_name_evidence(
+        {"bg": "Maple Bear Sofia", "en": "Maple Bear Sofia"},
         school=school,
         pages=pages,
     )

@@ -1,7 +1,7 @@
 import re
 from typing import Optional
 
-from sqlalchemy import and_, exists, func, select
+from sqlalchemy import String, and_, cast, exists, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased, selectinload
 
@@ -300,33 +300,135 @@ class SchoolService:
         Returns:
             List of schools matching the search query
         """
+        # Escape special SQL ILIKE wildcards to prevent unintended pattern matching.
         # Parents often type school numbers without the Bulgarian "№" marker
         # (for example "ДГ 5" instead of stored "ДГ №5"), so search both forms.
-        variants = [variant.casefold() for variant in self._school_search_variants(search_query)]
+        variants = self._school_search_variants(search_query)
+        if not variants:
+            return []
+
+        escaped_variants = [
+            variant.replace("%", r"\%").replace("_", r"\_")
+            for variant in variants
+        ]
+        patterns = [f"%{variant}%" for variant in escaped_variants]
+        registry_and_address_fields = (
+            School.name_i18n["bg"].as_string(),
+            School.name_i18n["en"].as_string(),
+            SchoolLocation.address_i18n["bg"].as_string(),
+            SchoolLocation.address_i18n["en"].as_string(),
+        )
+        display_fields = (
+            School.attributes["display_name_i18n"]["bg"].as_string(),
+            School.attributes["display_name_i18n"]["en"].as_string(),
+        )
+        registry_and_address_clauses = [
+            field.ilike(pattern, escape="\\")
+            for pattern in patterns
+            for field in registry_and_address_fields
+        ]
+        display_match_clauses = [
+            field.ilike(pattern, escape="\\")
+            for pattern in patterns
+            for field in display_fields
+        ]
+        evidence_signals = cast(School.attributes["display_name_evidence"]["signals"], String)
+        corroborated_display_clause = and_(
+            or_(*display_match_clauses),
+            evidence_signals.like('%"website_domain_alias_match"%'),
+            evidence_signals.like('%"repeated_on_page_identity"%'),
+        )
+
+        # Match IDs first so multiple matching locations do not duplicate schools
+        # or consume the result limit, while keeping autocomplete work in SQL.
         city_clause = self._city_clause(city)
+        matching_school_ids = (
+            select(School.id)
+            .outerjoin(SchoolLocation, SchoolLocation.school_id == School.id)
+            .where(School.country_code == country_code)
+            .where(self._has_resolved_location(city))
+            .where(or_(*registry_and_address_clauses, corroborated_display_clause))
+            .distinct()
+            .limit(limit)
+        )
+        if city_clause is not None:
+            matching_school_ids = matching_school_ids.where(city_clause)
+        matching_school_ids = matching_school_ids.subquery()
+
+        matched_ids = (
+            await self.db.execute(select(matching_school_ids.c.id))
+        ).scalars().all()
+        if len(matched_ids) < limit:
+            matched_ids.extend(
+                await self._search_resolved_fallback_ids(
+                    variants=variants,
+                    country_code=country_code,
+                    city=city,
+                    exclude_ids=set(matched_ids),
+                    limit=limit - len(matched_ids),
+                )
+            )
+        if not matched_ids:
+            return []
+
         query = (
             self._base_query()
+            .where(School.id.in_(matched_ids))
+        )
+        result = await self.db.execute(query)
+        schools_by_id = {school.id: school for school in result.scalars().unique().all()}
+        return [schools_by_id[school_id] for school_id in matched_ids if school_id in schools_by_id]
+
+    async def _search_resolved_fallback_ids(
+        self,
+        *,
+        variants: list[str],
+        country_code: str,
+        city: Optional[str],
+        exclude_ids: set[int],
+        limit: int,
+    ) -> list[int]:
+        """Search derived display fallbacks without hydrating the full response graph."""
+        if limit <= 0:
+            return []
+
+        folded_variants = [variant.casefold() for variant in variants]
+        city_clause = self._city_clause(city)
+        query = (
+            select(School.id, School.name_i18n, School.attributes, SchoolLocation.address_i18n)
+            .outerjoin(SchoolLocation, SchoolLocation.school_id == School.id)
             .where(School.country_code == country_code)
             .where(self._has_resolved_location(city))
         )
         if city_clause is not None:
             query = query.where(city_clause)
+        if exclude_ids:
+            query = query.where(School.id.not_in(exclude_ids))
+
         result = await self.db.execute(query)
-        schools = result.scalars().unique().all()
+        matched_ids: list[int] = []
+        seen_ids: set[int] = set()
+        for school_id, name_i18n, attributes, address_i18n in result.all():
+            if school_id in seen_ids:
+                continue
+            searchable_values = list((name_i18n or {}).values())
+            searchable_values.extend(resolve_name_i18n(name_i18n, attributes).values())
+            searchable_values.extend((address_i18n or {}).values())
+            searchable_values.extend(resolve_address_i18n(address_i18n).values())
 
-        def matches_school(school: School) -> bool:
-            searchable_values = list((school.name_i18n or {}).values())
-            searchable_values.extend(resolve_name_i18n(school.name_i18n, school.attributes).values())
-            for location in school.locations:
-                searchable_values.extend((location.address_i18n or {}).values())
-                searchable_values.extend(resolve_address_i18n(location.address_i18n).values())
-            return any(
+            if not any(
                 variant in str(value).casefold()
-                for variant in variants
+                for variant in folded_variants
                 for value in searchable_values
-            )
+            ):
+                continue
 
-        return [school for school in schools if matches_school(school)][:limit]
+            seen_ids.add(school_id)
+            matched_ids.append(school_id)
+            if len(matched_ids) >= limit:
+                break
+
+        return matched_ids
 
     @staticmethod
     def _school_search_variants(search_query: str) -> list[str]:
