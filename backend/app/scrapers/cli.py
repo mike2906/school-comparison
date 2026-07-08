@@ -310,6 +310,27 @@ def repair_oblast_geocodes(school, school_id, city, country, limit, dry_run):
     )
 
 
+@cli.command("repair-out-of-bounds-geocodes")
+@click.option("--school", help="School name (fuzzy match)")
+@click.option("--school-id", type=int, help="School ID")
+@click.option("--city", default="sofia", help="City to filter by")
+@click.option("--country", default="bg", help="Country code")
+@click.option("--limit", type=int, help="Limit number of schools to inspect")
+@click.option("--dry-run", is_flag=True, help="Preview affected locations without writing data")
+def repair_out_of_bounds_geocodes(school, school_id, city, country, limit, dry_run):
+    """Repair city-scoped coordinates that fall outside the configured city bounds."""
+    asyncio.run(
+        _repair_out_of_bounds_geocodes_command(
+            school_name=school,
+            school_id=school_id,
+            city=city,
+            country=country,
+            limit=limit,
+            dry_run=dry_run,
+        )
+    )
+
+
 @cli.command()
 @click.option("--school", help="School name (fuzzy match)")
 @click.option("--school-id", type=int, help="School ID")
@@ -814,6 +835,60 @@ def _expected_locality_tokens(*values: Optional[str]) -> set[str]:
     return tokens
 
 
+def _is_sofia_oblast_school(school) -> bool:
+    attrs = dict(school.attributes or {})
+    return attrs.get("moe_region_code") == 23 or attrs.get("moe_region_name") == "София-област"
+
+
+def _location_out_of_bounds(location, bounds: dict[str, float]) -> bool:
+    if location.lat is None or location.lng is None:
+        return False
+    try:
+        lat = float(location.lat)
+        lng = float(location.lng)
+    except (TypeError, ValueError):
+        return False
+
+    from app.services.geocoding.bounds import point_in_bounds
+
+    return not point_in_bounds(lat, lng, bounds)
+
+
+def _out_of_bounds_repair_address_candidates(school, location) -> list[str]:
+    attrs = dict(school.attributes or {})
+    extracted = attrs.get("extracted") if isinstance(attrs.get("extracted"), dict) else {}
+    contact = extracted.get("contact") if isinstance(extracted.get("contact"), dict) else {}
+
+    raw_candidates: list[object] = [
+        contact.get("address"),
+        *(contact.get("addresses") if isinstance(contact.get("addresses"), builtins.list) else []),
+    ]
+    address_i18n = dict(location.address_i18n or {})
+    raw_candidates.extend([address_i18n.get("bg"), address_i18n.get("en")])
+
+    candidates: list[str] = []
+    seen: set[str] = set()
+    for candidate in raw_candidates:
+        if not isinstance(candidate, str):
+            continue
+        text = re.sub(r"\s+", " ", candidate).strip(" ,")
+        if not text:
+            continue
+        variants = [
+            text,
+            re.sub(r",?\s*(?:п\.?\s*к\.?|ПК)\s*\d{4}\b", "", text, flags=re.IGNORECASE).strip(" ,"),
+        ]
+        for variant in variants:
+            if not variant:
+                continue
+            key = variant.casefold()
+            if key in seen:
+                continue
+            seen.add(key)
+            candidates.append(variant)
+    return candidates
+
+
 def _sanitize_oblast_query_text(value: Optional[str]) -> str:
     if not isinstance(value, str):
         return ""
@@ -962,16 +1037,21 @@ async def _load_moe_lookup_maps() -> tuple[dict[int, str], dict[int, str], dict[
         "Content-Type": "application/json",
     }
 
-    async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
-        region_payload = (await client.post(MoeRegistryAdapter.REGIONS_URL, json={}, headers=headers)).json()
-        municipality_payload = (await client.post(MoeRegistryAdapter.MUNICIPALITIES_URL, json={}, headers=headers)).json()
-        town_payload = (await client.post(MoeRegistryAdapter.TOWNS_URL, json={}, headers=headers)).json()
+    async def load_map(client: httpx.AsyncClient, url: str) -> dict[int, str]:
+        try:
+            response = await client.post(url, json={}, headers=headers)
+            response.raise_for_status()
+            return MoeRegistryAdapter._extract_code_label_map(response.json())
+        except Exception as exc:
+            logger.warning("Failed to load MoE lookup labels from %s: %s", url, exc)
+            return {}
 
-    return (
-        MoeRegistryAdapter._extract_code_label_map(region_payload),
-        MoeRegistryAdapter._extract_code_label_map(municipality_payload),
-        MoeRegistryAdapter._extract_code_label_map(town_payload),
-    )
+    async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+        return (
+            await load_map(client, MoeRegistryAdapter.REGIONS_URL),
+            await load_map(client, MoeRegistryAdapter.MUNICIPALITIES_URL),
+            await load_map(client, MoeRegistryAdapter.TOWNS_URL),
+        )
 
 
 async def _reverse_geocode_payload(client, *, lat: float, lng: float) -> dict:
@@ -1054,13 +1134,21 @@ async def _repair_oblast_geocodes_command(
                 municipality_code = attrs.get("moe_municipality_code")
                 town_code = attrs.get("moe_town_code")
 
-                region_name = region_map.get(region_code) if isinstance(region_code, int) else attrs.get("moe_region_name")
+                region_name = (
+                    region_map.get(region_code) or attrs.get("moe_region_name")
+                    if isinstance(region_code, int)
+                    else attrs.get("moe_region_name")
+                )
                 municipality_name = (
-                    municipality_map.get(municipality_code)
+                    municipality_map.get(municipality_code) or attrs.get("moe_municipality_name")
                     if isinstance(municipality_code, int)
                     else attrs.get("moe_municipality_name")
                 )
-                town_name = town_map.get(town_code) if isinstance(town_code, int) else attrs.get("moe_town_name")
+                town_name = (
+                    town_map.get(town_code) or attrs.get("moe_town_name")
+                    if isinstance(town_code, int)
+                    else attrs.get("moe_town_name")
+                )
 
                 attrs["moe_region_name"] = region_name
                 attrs["moe_municipality_name"] = municipality_name
@@ -1180,6 +1268,12 @@ async def _repair_oblast_geocodes_command(
                             await db.commit()
                             cleared += 1
                             continue
+                    marker = "coords_cleared=oblast_locality_mismatch"
+                    tags = [tag for tag in builtins.list(location.location_tags or []) if str(tag) != marker]
+                    if tags != builtins.list(location.location_tags or []):
+                        location.location_tags = tags
+                        db.add(location)
+                        await db.commit()
                     repaired += 1
                     continue
 
@@ -1243,6 +1337,7 @@ async def _repair_oblast_geocodes_command(
                             for tag in builtins.list(location.location_tags or [])
                             if not str(tag).startswith("coords_precision=")
                             and str(tag) != "coords_source=nominatim_approximate"
+                            and str(tag) != "coords_cleared=oblast_locality_mismatch"
                         ]
                         tags.append("coords_source=nominatim_approximate")
                         tags.append(f"coords_precision={precision}")
@@ -1256,6 +1351,167 @@ async def _repair_oblast_geocodes_command(
         console.print(
             f"[green]Oblast repair complete[/green] repaired={repaired} cleared={cleared} failed={failed}"
         )
+
+
+async def _repair_out_of_bounds_geocodes_command(
+    *,
+    school_name: Optional[str],
+    school_id: Optional[int],
+    city: Optional[str],
+    country: str,
+    limit: Optional[int],
+    dry_run: bool,
+):
+    from sqlalchemy import select
+    from sqlalchemy.orm import selectinload
+
+    from app.config import get_settings
+    from app.database import async_session_maker
+    from app.models import School
+    from app.services.geocoding.bounds import get_city_bounds, point_in_bounds
+    from app.services.geocoding.nominatim import NominatimProvider
+
+    bounds = get_city_bounds(country, city)
+    if bounds is None:
+        console.print(f"[yellow]No configured city bounds for {country}/{city}; nothing to repair.[/yellow]")
+        return
+
+    settings = get_settings()
+    user_agent = f"SofiaSchoolComparison/1.0 ({settings.geocoding_contact_email})"
+
+    async with async_session_maker() as db:
+        if school_name and not school_id:
+            school_id = await _find_school_by_name(db, school_name, country)
+            if not school_id:
+                console.print(f"[red]School not found: {school_name}[/red]")
+                return
+
+        query = (
+            select(School)
+            .options(selectinload(School.locations))
+            .where(School.country_code == country)
+        )
+        if city:
+            query = query.where(School.city == city)
+        if school_id:
+            query = query.where(School.id == school_id)
+        if limit:
+            query = query.limit(limit)
+
+        schools = (await db.execute(query)).scalars().all()
+        candidate_rows: list[dict[str, object]] = []
+        skipped_oblast = 0
+
+        for school in schools:
+            if country == "bg" and (city or "").casefold() == "sofia" and _is_sofia_oblast_school(school):
+                skipped_oblast += 1
+                continue
+            for location in builtins.list(school.locations or []):
+                if not _location_out_of_bounds(location, bounds):
+                    continue
+                address_candidates = _out_of_bounds_repair_address_candidates(school, location)
+                candidate_rows.append(
+                    {
+                        "school": school,
+                        "location": location,
+                        "school_id": school.id,
+                        "location_id": location.id,
+                        "school_label": _school_label(school),
+                        "current": f"{location.lat}, {location.lng}",
+                        "address": address_candidates[0] if address_candidates else "",
+                        "address_candidates": address_candidates,
+                    }
+                )
+
+        if not candidate_rows:
+            console.print("[green]No out-of-bounds city geocode repair candidates found.[/green]")
+            if skipped_oblast:
+                console.print(f"[dim]Skipped {skipped_oblast} Sofia-oblast schools outside the Sofia municipality scope.[/dim]")
+            return
+
+        console.print(f"[cyan]Found {len(candidate_rows)} out-of-bounds city geocode repair candidates[/cyan]")
+        if skipped_oblast:
+            console.print(f"[dim]Skipped {skipped_oblast} Sofia-oblast schools outside the Sofia municipality scope.[/dim]")
+
+        preview_table = Table(title="Out-of-Bounds Geocode Repair Candidates")
+        preview_table.add_column("School ID", style="cyan", no_wrap=True)
+        preview_table.add_column("Location ID", style="cyan", no_wrap=True)
+        preview_table.add_column("School")
+        preview_table.add_column("Current")
+        preview_table.add_column("First repair address")
+        for row in candidate_rows[:20]:
+            preview_table.add_row(
+                str(row["school_id"]),
+                str(row["location_id"]),
+                str(row["school_label"]),
+                str(row["current"]),
+                str(row["address"]),
+            )
+        console.print(preview_table)
+        if len(candidate_rows) > 20:
+            console.print(f"[dim]Showing first 20 of {len(candidate_rows)} repair candidates[/dim]")
+
+        if dry_run:
+            return
+
+        geocoder = NominatimProvider(user_agent=user_agent)
+        repaired = 0
+        failed = 0
+
+        for row in candidate_rows:
+            location = row["location"]
+            if location is None:
+                continue
+            match = None
+            for address in builtins.list(row["address_candidates"]):
+                result = await geocoder.geocode(
+                    address=str(address),
+                    country_code=country,
+                    city=city,
+                )
+                if not result.success or result.lat is None or result.lng is None:
+                    continue
+                if not point_in_bounds(float(result.lat), float(result.lng), bounds):
+                    logger.warning(
+                        "Rejected repaired geocode outside bounds for location %s: %s, %s from %s",
+                        getattr(location, "id", None),
+                        result.lat,
+                        result.lng,
+                        address,
+                    )
+                    continue
+                match = (result, str(address))
+                break
+
+            if not match:
+                failed += 1
+                continue
+
+            result, matched_address = match
+            location.lat = result.lat
+            location.lng = result.lng
+            tags = [
+                tag
+                for tag in builtins.list(location.location_tags or [])
+                if not str(tag).startswith("coords_source=")
+                and not str(tag).startswith("coords_repair=")
+            ]
+            tags.extend(
+                [
+                    "coords_source=nominatim_repair",
+                    "coords_repair=out_of_bounds",
+                ]
+            )
+            location.location_tags = tags
+            db.add(location)
+            await db.commit()
+            console.print(
+                f"[green]Repaired location {location.id}[/green] → "
+                f"({result.lat}, {result.lng}) from {matched_address}"
+            )
+            repaired += 1
+
+        console.print(f"[green]Out-of-bounds repair complete[/green] repaired={repaired} failed={failed}")
 
 
 async def _repair_locations_command(

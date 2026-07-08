@@ -6,15 +6,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased, selectinload
 
 from app.models.school import School, SchoolLocation, SchoolLocationAgeGroupShift
+from app.services.geocoding.bounds import SOFIA_MUNICIPALITY_BOUNDS, get_city_bounds
 
-
-SOFIA_MAP_BOUNDS = {
-    "south": 42.55,
-    "west": 23.15,
-    "north": 42.85,
-    "east": 23.55,
-}
-
+SOFIA_MAP_BOUNDS = SOFIA_MUNICIPALITY_BOUNDS
 
 class SchoolService:
     def __init__(self, db: AsyncSession):
@@ -58,14 +52,14 @@ class SchoolService:
 
     @staticmethod
     def _location_bounds_clause(location_model=SchoolLocation, city: Optional[str] = None):
-        normalized = SchoolService._normalize_city_filter(city)
-        if normalized != "sofia":
+        bounds = get_city_bounds("bg", SchoolService._normalize_city_filter(city))
+        if bounds is None:
             return None
         return and_(
-            location_model.lat >= SOFIA_MAP_BOUNDS["south"],
-            location_model.lat <= SOFIA_MAP_BOUNDS["north"],
-            location_model.lng >= SOFIA_MAP_BOUNDS["west"],
-            location_model.lng <= SOFIA_MAP_BOUNDS["east"],
+            location_model.lat >= bounds["south"],
+            location_model.lat <= bounds["north"],
+            location_model.lng >= bounds["west"],
+            location_model.lng <= bounds["east"],
         )
 
     @staticmethod

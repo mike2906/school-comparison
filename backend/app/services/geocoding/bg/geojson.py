@@ -13,15 +13,11 @@ from typing import Optional
 from urllib.parse import urlparse
 
 from app.services.geocoding.base import BaseGeocodingProvider, GeocodingResult
+from app.services.geocoding.bounds import SOFIA_MUNICIPALITY_BOUNDS, point_in_bounds
 
 logger = logging.getLogger(__name__)
 
-SOFIA_MAP_BOUNDS = {
-    "south": 42.55,
-    "west": 23.15,
-    "north": 42.85,
-    "east": 23.55,
-}
+SOFIA_MAP_BOUNDS = SOFIA_MUNICIPALITY_BOUNDS
 
 
 class GeoJSONProvider(BaseGeocodingProvider):
@@ -285,10 +281,7 @@ class GeoJSONProvider(BaseGeocodingProvider):
 
         coords = feature["geometry"]["coordinates"]
         lng, lat = coords[0], coords[1]
-        return (
-            SOFIA_MAP_BOUNDS["south"] <= lat <= SOFIA_MAP_BOUNDS["north"]
-            and SOFIA_MAP_BOUNDS["west"] <= lng <= SOFIA_MAP_BOUNDS["east"]
-        )
+        return point_in_bounds(lat, lng, SOFIA_MAP_BOUNDS)
 
     async def geocode(self, address: str, country_code: str = "bg", school_name: Optional[str] = None, city: Optional[str] = None) -> GeocodingResult:
         """

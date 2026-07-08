@@ -17,6 +17,29 @@ from app.scrapers.url_validator import ValidationResult
 from app.utils.transliteration import transliterate_address, transliterate_bulgarian
 
 
+@pytest.mark.asyncio
+async def test_load_moe_lookup_maps_tolerates_non_json_response():
+    class MockResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            raise ValueError("not json")
+
+    class MockClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return None
+
+        async def post(self, *args, **kwargs):
+            return MockResponse()
+
+    with patch("httpx.AsyncClient", return_value=MockClient()):
+        assert await scraper_cli._load_moe_lookup_maps() == ({}, {}, {})
+
+
 def test_select_brand_aliases_for_school_accepts_host_aligned_brand():
     school = School(
         name_i18n={"bg": "Тест"},
@@ -33,6 +56,34 @@ def test_select_brand_aliases_for_school_accepts_host_aligned_brand():
     )
 
     assert aliases == ["BRITANICA Park School"]
+
+
+def test_out_of_bounds_repair_address_candidates_prefer_extracted_contact():
+    school = School(
+        name_i18n={"bg": "Тест"},
+        country_code="bg",
+        school_type="private",
+        education_level="kindergarten",
+        city="sofia",
+        attributes={
+            "extracted": {
+                "contact": {
+                    "address": "ул. Гео Милев 158",
+                    "addresses": ["ул. 6 септември №16, София, България, ПК 1000"],
+                }
+            }
+        },
+    )
+    location = SchoolLocation(
+        school_id=1,
+        address_i18n={"bg": 'ж. к. Слатина, ул. "Гео Милев" № 158, ВТУ "Т. Каблешков", корпус 6'},
+    )
+
+    candidates = scraper_cli._out_of_bounds_repair_address_candidates(school, location)
+
+    assert candidates[0] == "ул. Гео Милев 158"
+    assert "ул. 6 септември №16, София, България" in candidates
+    assert candidates[-1] == 'ж. к. Слатина, ул. "Гео Милев" № 158, ВТУ "Т. Каблешков", корпус 6'
 
 
 def test_select_brand_aliases_for_school_rejects_noisy_aliases():

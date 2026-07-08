@@ -63,7 +63,7 @@ BULGARIA_CONFIG = Country(
     },
     map_config={
         "center": [42.6977, 23.3219],
-        "bounds": [[42.55, 23.15], [42.85, 23.55]],
+        "bounds": [[42.50, 23.10], [42.86, 23.60]],
         "default_zoom": 12,
         "geocoding": {
             "country_codes": "bg",

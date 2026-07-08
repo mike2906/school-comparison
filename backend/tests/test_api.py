@@ -233,6 +233,40 @@ class TestSchoolsEndpoint:
         ids = {school["id"] for school in response.json()}
         assert bad_geo_school.id in ids
 
+    @pytest.mark.asyncio
+    async def test_list_includes_sofia_municipality_edge_coordinates(self, seeded_db, seeded_client):
+        bankya_school = School(
+            name_i18n={"bg": "ДГ №25 Изворче", "en": "KG 25 Izvorche"},
+            country_code="bg",
+            school_type="state",
+            education_level="kindergarten",
+            city="sofia",
+        )
+        seeded_db.add(bankya_school)
+        await seeded_db.flush()
+        bankya_location = SchoolLocation(
+            school_id=bankya_school.id,
+            address_i18n={"bg": 'гр. Банкя, ул. "П. Д. Петков", №15'},
+            lat=42.71125,
+            lng=23.14131,
+            is_primary=True,
+        )
+        seeded_db.add(bankya_location)
+        await seeded_db.flush()
+        seeded_db.add(
+            SchoolLocationAgeGroupShift(
+                location_id=bankya_location.id,
+                age_group="first",
+                shift="morning",
+            )
+        )
+        await seeded_db.commit()
+
+        response = await seeded_client.get("/schools")
+        assert response.status_code == 200
+        ids = {school["id"] for school in response.json()}
+        assert bankya_school.id in ids
+
 
 class TestSchoolsFilterEndpoint:
     """Test advanced filtering capabilities."""
