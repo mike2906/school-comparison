@@ -58,7 +58,7 @@ Order matters within this phase; tasks touch overlapping files — run sequentia
       client-side merge verified on all 540 schools × 2 locales × 6 fields: 0 mismatches.
       `SchoolService.matches_filter` now reads the same projection, so `?facilities=…`
       matches extracted data instead of nothing. See P1.9 for the part deliberately
-      left out.
+      left out, and P1.11 for the dead UI reads this exposed.
 - [ ] **P1.2 Validate inside extract.** `backend/app/scrapers/extractor.py:~1023-1025`
       overwrites `attributes.extracted` and deletes the previous validation report at
       commit time, so unvalidated data is live until Stage 6 runs. Fix: run
@@ -132,6 +132,18 @@ Order matters within this phase; tasks touch overlapping files — run sequentia
       `_pick_primary_text_lang`: always populate the primary-language slot, or translate.
       Related: extraction of `class_size` from `"5 students"` yields `5` (school 510).
       Both are extraction-quality bugs — add fixtures under P1.5.
+- [ ] **P1.11 Dead attribute reads in the UI.** The frontend reads 23 `attributes.*`
+      keys; 11 of them are written by *nothing* — not the scrapers, not `seed_data.py`:
+      `accessible`, `admission_requirement`, `admission_status`, `after_school_care`,
+      `application_deadline`, `enrollment_status`, `entry_requirements`,
+      `operating_hours`, `schedule_hours`, `spots_available`,
+      `transportation_available` (`ComparePage.jsx`, `SchoolCard.jsx`,
+      `SchoolDetailPage/helpers.js`). They render as permanently-absent sections.
+      Real data for several of them sits unused in `extracted.admission` /
+      `extracted.operations`, which the projection does not surface. Decide per field:
+      wire it through the allowlist, or delete the read. Guard: the
+      `TestAllowlistCoversWrittenFields` invariant in `tests/test_school_attributes.py`
+      only covers what `seed_data.py` writes; extend it once these are resolved.
 
 ## Phase 2 — User-facing correctness bugs
 

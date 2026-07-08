@@ -5,12 +5,20 @@ what the API is allowed to serve, and that the merge of `extracted` / `extracted
 happens server-side rather than in the browser.
 """
 
+import ast
+from pathlib import Path
+
 import pytest
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.models.school import School, SchoolLocation
-from app.schemas.school import SchoolListResponse, SchoolResponse
+from app.schemas.school import (
+    SchoolDisplayAttributes,
+    SchoolListResponse,
+    SchoolLocalizedAttributes,
+    SchoolResponse,
+)
 from app.utils.school_attributes import (
     build_base_attributes,
     build_display_attributes,
@@ -167,6 +175,43 @@ class TestLocalizedProjection:
         assert localized["en"]["facilities"] == []
 
 
+class TestSeededDisplayFields:
+    """Fields only `scripts/seed_data.py` writes, but `SchoolDetailPage` renders.
+
+    No scraped school has these, so the allowlist silently dropped them at first and
+    the demo/seed UI lost three tiles. Keep them pinned.
+    """
+
+    SEEDED = {
+        "teacher_student_ratio": "1:12",
+        "school_hours": "8:00-17:00",
+        "established_year": 1975,
+    }
+
+    def test_seeded_display_fields_survive_the_allowlist(self):
+        base = build_base_attributes(self.SEEDED)
+        assert base["teacher_student_ratio"] == "1:12"
+        assert base["school_hours"] == "8:00-17:00"
+        assert base["established_year"] == 1975
+
+    @pytest.mark.parametrize("value", ["", "  ", None])
+    def test_blank_ratio_is_dropped(self, value):
+        assert build_base_attributes({"teacher_student_ratio": value})["teacher_student_ratio"] is None
+
+    @pytest.mark.parametrize("value", ["not a year", 75, 12345, True, None, 3000])
+    def test_implausible_established_year_is_dropped(self, value):
+        assert build_base_attributes({"established_year": value})["established_year"] is None
+
+    def test_numeric_string_year_is_coerced(self):
+        assert build_base_attributes({"established_year": "1975"})["established_year"] == 1975
+
+    def test_founded_year_is_not_silently_promoted(self):
+        # extracted.founded_year is the scraped analogue; surfacing it would be a
+        # behaviour change, not a port. See P1.10.
+        base = build_base_attributes({"extracted": {"founded_year": 1998}})
+        assert base["established_year"] is None
+
+
 class TestFilterableProjection:
     def test_unions_locales_so_either_language_matches(self):
         filterable = build_filterable_attributes(INTERNAL_ATTRIBUTES)
@@ -180,6 +225,42 @@ class TestFilterableProjection:
         filterable = build_filterable_attributes({"facilities": ["cafeteria"], "teaching_approach": ["montessori"]})
         assert filterable["facilities"] == ["cafeteria"]
         assert filterable["teaching_approach"] == ["montessori"]
+
+
+class TestAllowlistCoversWrittenFields:
+    """The allowlist must not silently drop fields the app actually writes.
+
+    `seed_data.py` is the reference dataset (AGENTS.md), so every attribute key it
+    writes has to survive the projection. This is the check that was missing when the
+    allowlist first landed and quietly dropped three SchoolDetailPage tiles.
+    """
+
+    @staticmethod
+    def _seed_attribute_keys() -> set[str]:
+        source = (Path(__file__).resolve().parents[1] / "scripts" / "seed_data.py").read_text()
+        keys: set[str] = set()
+        for node in ast.walk(ast.parse(source)):
+            if isinstance(node, ast.keyword) and node.arg == "attributes":
+                if isinstance(node.value, ast.Dict):
+                    keys.update(
+                        key.value for key in node.value.keys if isinstance(key, ast.Constant)
+                    )
+        return keys
+
+    def test_every_seeded_attribute_key_is_served(self):
+        seed_keys = self._seed_attribute_keys()
+        assert seed_keys, "failed to parse seed_data.py — did the fixture shape change?"
+
+        served = set(SchoolDisplayAttributes.model_fields) | set(
+            SchoolLocalizedAttributes.model_fields
+        )
+        assert seed_keys <= served, f"allowlist drops seeded fields: {sorted(seed_keys - served)}"
+
+    def test_projection_output_matches_the_schemas(self):
+        base, localized = build_display_attributes({})
+        assert set(base) == set(SchoolDisplayAttributes.model_fields)
+        for values in localized.values():
+            assert set(values) == set(SchoolLocalizedAttributes.model_fields)
 
 
 class TestSerializationAllowlist:

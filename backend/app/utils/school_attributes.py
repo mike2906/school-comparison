@@ -26,19 +26,10 @@ from typing import Any, Iterable, Mapping, Optional, Union
 
 DISPLAY_LOCALES: tuple[str, ...] = ("bg", "en")
 
-# Locale-independent display fields, read straight from the top level of `attributes`.
-BASE_FIELDS: tuple[str, ...] = (
-    "class_size",
-    "has_canteen",
-    "uniform_required",
-    "special_focus",
-    "teaching_approach",
-)
-
-# Free-text display fields, resolved per locale by merging `extracted` with
-# `extracted_i18n[locale]`.
-LOCALIZED_FIELDS: tuple[str, ...] = (
-    "language_focus",
+# Free-text display fields whose values are plain string lists. Resolved per locale by
+# merging `extracted` with `extracted_i18n[locale]`. (`language_focus` is localized too
+# but carries objects, so it is handled separately.)
+TEXT_LIST_FIELDS: tuple[str, ...] = (
     "languages_of_instruction",
     "facilities",
     "special_programs",
@@ -308,6 +299,20 @@ def build_localized_attributes(
     }
 
 
+def _bool_or_none(value: Any) -> Optional[bool]:
+    return value if isinstance(value, bool) else None
+
+
+def _year_or_none(value: Any) -> Optional[int]:
+    if isinstance(value, bool) or value is None:
+        return None
+    try:
+        year = int(value)
+    except (TypeError, ValueError):
+        return None
+    return year if 1000 <= year <= 2999 else None
+
+
 def build_base_attributes(attributes: Mapping[str, Any] | None) -> dict[str, Any]:
     """Resolve the locale-independent display fields."""
     attrs = _as_mapping(attributes)
@@ -319,10 +324,16 @@ def build_base_attributes(attributes: Mapping[str, Any] | None) -> dict[str, Any
 
     return {
         "class_size": class_size,
-        "has_canteen": attrs.get("has_canteen") if isinstance(attrs.get("has_canteen"), bool) else None,
-        "uniform_required": attrs.get("uniform_required") if isinstance(attrs.get("uniform_required"), bool) else None,
+        "has_canteen": _bool_or_none(attrs.get("has_canteen")),
+        "uniform_required": _bool_or_none(attrs.get("uniform_required")),
         "special_focus": _normalize_text(attrs.get("special_focus")),
         "teaching_approach": _merged_list(attrs.get("teaching_approach")),
+        # Rendered by SchoolDetailPage; currently only ever written by seed_data.py.
+        # `extracted.founded_year` is the scraped equivalent of established_year but is
+        # deliberately not mapped here — surfacing it is a behaviour change, not a port.
+        "teacher_student_ratio": _normalize_text(attrs.get("teacher_student_ratio")),
+        "school_hours": _normalize_text(attrs.get("school_hours")),
+        "established_year": _year_or_none(attrs.get("established_year")),
     }
 
 
@@ -345,7 +356,6 @@ def build_filterable_attributes(
     is per-locale, so we match against the union of every locale's values.
     """
     localized = [build_localized_attributes(attributes, locale) for locale in DISPLAY_LOCALES]
-    text_fields = ("languages_of_instruction", "facilities", "special_programs", "activities_offered")
 
     merged: dict[str, Any] = {
         "teaching_approach": build_base_attributes(attributes)["teaching_approach"],
@@ -353,7 +363,7 @@ def build_filterable_attributes(
             [entry for values in localized for entry in values["language_focus"]]
         ),
     }
-    for field in text_fields:
+    for field in TEXT_LIST_FIELDS:
         merged[field] = _dedupe_strings(value for values in localized for value in values[field])
 
     return merged

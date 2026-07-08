@@ -47,6 +47,9 @@ class SchoolDisplayAttributes(BaseModel):
     uniform_required: Optional[bool] = None
     special_focus: Optional[str] = None
     teaching_approach: list[str] = []
+    teacher_student_ratio: Optional[str] = None
+    school_hours: Optional[str] = None
+    established_year: Optional[int] = None
 
     model_config = ConfigDict(extra="forbid")
 
