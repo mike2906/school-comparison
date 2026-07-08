@@ -246,15 +246,15 @@ class SchoolService:
             "teaching_approach": set(),
         }
 
-        # NOTE: deliberately reads the raw top-level keys, not the merged display
-        # projection. Extracted values are free text ("Medical care", "3D printers")
-        # while the filter UI expects a controlled vocabulary ("cafeteria", "library").
-        # Serving the merged view here would return ~355 facility options and blow up
-        # the advanced-filter panel. Needs a free-text -> canonical-tag mapping first.
+        # NOTE: non-language filters deliberately read raw top-level keys, not the
+        # merged display projection. Extracted facilities/programs are free text
+        # ("Medical care", "3D printers") while the filter UI expects controlled
+        # vocabulary tags ("cafeteria", "library"). Languages use the normalized
+        # filterable projection so emitted options match the list endpoint matcher.
         for attrs in rows:
             if not attrs:
                 continue
-            language_values = attrs.get("language_focus") or []
+            language_values = build_filterable_attributes(attrs).get("language_focus") or []
             for value in language_values:
                 if isinstance(value, dict):
                     language = value.get("language")
