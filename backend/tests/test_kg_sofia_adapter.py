@@ -631,14 +631,14 @@ class TestKgSofiaAgeGroupExtraction:
         assert result == ['grade_1_4', 'grade_5_7', 'grade_8_12']
     
     def test_extract_age_groups_secondary_school(self):
-        """Test age groups for secondary school (СУ) serving grades 5-12."""
+        """Test age groups for secondary school (СУ) serving grades 1-12."""
         from app.scrapers.sources.bg.kg_sofia import KgSofiaBgAdapter
-        
+
         adapter = KgSofiaBgAdapter(db=None)
-        
-        # СУ (Средно училище) = grades 5-12 (NOT 1-12)
+
+        # СУ (Средно училище) = grades 1-12
         result = adapter._extract_age_groups('СУ', 'upper_secondary')
-        assert result == ['grade_5_7', 'grade_8_12']
+        assert result == ['grade_1_4', 'grade_5_7', 'grade_8_12']
     
     def test_extract_age_groups_gymnasium(self):
         """Test age groups for specialized gymnasium (ПГ) serving grades 8-12."""
