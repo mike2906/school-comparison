@@ -309,6 +309,21 @@ uv run pytest tests/test_api.py -v
 
 ---
 
+## GitHub Process
+
+When the user says **"follow github process"**, use the full PR flow:
+1. Create a new `agent/*` branch from `main`.
+2. Make a focused change and avoid unrelated files.
+3. Run the relevant local checks.
+4. Commit only the files that belong to the change.
+5. Push the branch and open a PR to `main`.
+6. Wait for GitHub Actions.
+7. If CI is green and the PR is mergeable, merge it to `main` and delete the branch.
+
+Only commit directly to `main` when the user explicitly asks for that.
+
+---
+
 ## Common Tasks
 
 ### Add a new route
