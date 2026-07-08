@@ -48,6 +48,7 @@ logs/
 # Tool outputs
 repomix-output.xml
 repomix-*.xml
+NVO_CHART_EXAMPLE.html
 backend/reports/
 searxng/limiter.toml
 
