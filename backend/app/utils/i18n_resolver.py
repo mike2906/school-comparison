@@ -243,6 +243,31 @@ def is_generic_numbered_display_label(text: str | None) -> bool:
     )
 
 
+_DISPLAY_NAME_CORROBORATION_SIGNALS = frozenset(
+    {
+        "website_domain_alias_match",
+        "repeated_on_page_identity",
+    }
+)
+
+
+def _has_corroborated_display_name(attributes: Mapping[str, Any]) -> bool:
+    evidence = attributes.get("display_name_evidence")
+    if not isinstance(evidence, Mapping):
+        return False
+
+    raw_signals = evidence.get("signals")
+    if not isinstance(raw_signals, list):
+        return False
+
+    signals = {
+        str(signal)
+        for signal in raw_signals
+        if str(signal) in _DISPLAY_NAME_CORROBORATION_SIGNALS
+    }
+    return len(signals) >= 2
+
+
 def _filter_display_name_i18n(display_name: Mapping[str, Any] | None) -> dict[str, str]:
     display = _clean_i18n_map(display_name)
     return {
@@ -260,7 +285,11 @@ def resolve_name_i18n(
     raw_name = _clean_i18n_map(name_i18n)
     raw_attributes = dict(attributes or {})
     display_name = raw_attributes.get("display_name_i18n")
-    display = _filter_display_name_i18n(display_name if isinstance(display_name, Mapping) else None)
+    display = (
+        _filter_display_name_i18n(display_name if isinstance(display_name, Mapping) else None)
+        if _has_corroborated_display_name(raw_attributes)
+        else {}
+    )
 
     resolved: dict[str, str] = {}
     raw_primary_name = raw_name.get("bg") or raw_name.get("en")

@@ -471,7 +471,7 @@ class TestSchoolsSearchEndpoint:
 
     @pytest.mark.asyncio
     async def test_search_matches_display_name_i18n(self, seeded_db, seeded_client):
-        """Search also matches branded display names stored in attributes."""
+        """Search matches corroborated branded display names stored in attributes."""
         school = (
             await seeded_db.execute(
                 select(School).where(School.school_type == "private")
@@ -481,7 +481,11 @@ class TestSchoolsSearchEndpoint:
             "display_name_i18n": {
                 "bg": "Fusion School",
                 "en": "Fusion School",
-            }
+            },
+            "display_name_evidence": {
+                "signals": ["website_domain_alias_match", "repeated_on_page_identity"],
+                "status": "corroborated",
+            },
         }
         await seeded_db.commit()
 
@@ -492,6 +496,26 @@ class TestSchoolsSearchEndpoint:
         # display_name_i18n is internal; the resolved name is what reaches the client.
         assert data[0]["resolved_name_i18n"]["en"] == "Fusion School"
         assert "display_name_i18n" not in data[0]["attributes"]
+
+    @pytest.mark.asyncio
+    async def test_search_ignores_uncorroborated_display_name_i18n(self, seeded_db, seeded_client):
+        """Uncorroborated internal display names should not affect public search."""
+        school = (
+            await seeded_db.execute(
+                select(School).where(School.school_type == "private")
+            )
+        ).scalar_one()
+        school.attributes = {
+            "display_name_i18n": {
+                "bg": "Admissions Headline",
+                "en": "Admissions Headline",
+            }
+        }
+        await seeded_db.commit()
+
+        response = await seeded_client.get("/schools/search?q=Admissions%20Headline")
+        assert response.status_code == 200
+        assert response.json() == []
 
     @pytest.mark.asyncio
     async def test_search_min_length_violation(self, seeded_client):

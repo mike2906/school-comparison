@@ -2,6 +2,14 @@ from app.utils.transliteration import transliterate_address, transliterate_bulga
 from app.utils.i18n_resolver import derive_english_name, resolve_address_i18n, resolve_name_i18n
 
 
+CORROBORATED_DISPLAY = {
+    "display_name_evidence": {
+        "signals": ["website_domain_alias_match", "repeated_on_page_identity"],
+        "status": "corroborated",
+    }
+}
+
+
 def test_transliterate_bulgarian_basic():
     assert transliterate_bulgarian("София") == "Sofia"
     assert transliterate_bulgarian("СОФИЯ") == "SOFIA"
@@ -35,7 +43,10 @@ def test_derive_english_name_translates_common_institution_types():
 def test_resolve_name_i18n_keeps_bg_display_name_but_derives_english_from_legal_name():
     resolved = resolve_name_i18n(
         {"bg": 'Частно основно училище "Д-р Петър Берон"'},
-        {"display_name_i18n": {"bg": "ЧОУ ПЕТЪР БЕРОН", "en": "ЧОУ ПЕТЪР БЕРОН"}},
+        {
+            "display_name_i18n": {"bg": "ЧОУ ПЕТЪР БЕРОН", "en": "ЧОУ ПЕТЪР БЕРОН"},
+            **CORROBORATED_DISPLAY,
+        },
     )
 
     assert resolved == {
@@ -47,7 +58,10 @@ def test_resolve_name_i18n_keeps_bg_display_name_but_derives_english_from_legal_
 def test_resolve_name_i18n_handles_malformed_nested_quotes_in_legal_name():
     resolved = resolve_name_i18n(
         {"bg": '"ЧАСТНО ОСНОВНО УЧИЛИЩЕ "Д-Р ПЕТЪР БЕРОН" ЕООД'},
-        {"display_name_i18n": {"bg": "ЧОУ ПЕТЪР БЕРОН", "en": "ЧОУ ПЕТЪР БЕРОН"}},
+        {
+            "display_name_i18n": {"bg": "ЧОУ ПЕТЪР БЕРОН", "en": "ЧОУ ПЕТЪР БЕРОН"},
+            **CORROBORATED_DISPLAY,
+        },
     )
 
     assert resolved == {
@@ -59,7 +73,7 @@ def test_resolve_name_i18n_handles_malformed_nested_quotes_in_legal_name():
 def test_resolve_name_i18n_prefers_non_generic_bg_display_name_for_english_fallback():
     resolved = resolve_name_i18n(
         {"bg": '"ЧАСТНА ДЕТСКА ГРАДИНА НИКАТОР" ЕООД', "en": '"Chastna detska gradina Nikator" EOOD'},
-        {"display_name_i18n": {"bg": "НИКАТОР"}},
+        {"display_name_i18n": {"bg": "НИКАТОР"}, **CORROBORATED_DISPLAY},
     )
 
     assert resolved == {
@@ -71,7 +85,7 @@ def test_resolve_name_i18n_prefers_non_generic_bg_display_name_for_english_fallb
 def test_resolve_name_i18n_does_not_prefer_raw_legal_english_when_display_bg_exists():
     resolved = resolve_name_i18n(
         {"bg": '"ЧАСТНА ДЕТСКА ГРАДИНА "ДЕТСКА МЕЧТА" ООД', "en": '"Chastna detska gradina "Detska mechta" OOD'},
-        {"display_name_i18n": {"bg": "Детска мечта"}},
+        {"display_name_i18n": {"bg": "Детска мечта"}, **CORROBORATED_DISPLAY},
     )
 
     assert resolved == {
@@ -83,7 +97,7 @@ def test_resolve_name_i18n_does_not_prefer_raw_legal_english_when_display_bg_exi
 def test_resolve_name_i18n_prefers_clean_display_brand_for_english_alignment():
     resolved = resolve_name_i18n(
         {"bg": '"ЧАСТНА ПРОФЕСИОНАЛНА ГИМНАЗИЯ ПО ПРОГРАМИРАНЕ И РОБОТИКА "СТИВ ДЖОБС" ЕООД'},
-        {"display_name_i18n": {"bg": "СофтУни БУДИТЕЛ"}},
+        {"display_name_i18n": {"bg": "СофтУни БУДИТЕЛ"}, **CORROBORATED_DISPLAY},
     )
 
     assert resolved == {
@@ -95,7 +109,7 @@ def test_resolve_name_i18n_prefers_clean_display_brand_for_english_alignment():
 def test_resolve_name_i18n_strips_generic_german_school_prefix_for_english():
     resolved = resolve_name_i18n(
         {"bg": '"Частна немска гимназия Ерих Кестнер" ООД'},
-        {"display_name_i18n": {"bg": "немска гимназия Ерих Кестнер"}},
+        {"display_name_i18n": {"bg": "немска гимназия Ерих Кестнер"}, **CORROBORATED_DISPLAY},
     )
 
     assert resolved == {
@@ -140,7 +154,19 @@ def test_resolve_name_i18n_preserves_clean_raw_english_when_no_display_name_exis
 def test_resolve_name_i18n_ignores_generic_numbered_school_display_label():
     resolved = resolve_name_i18n(
         {"bg": '21 СРЕДНО УЧИЛИЩЕ "ХРИСТО БОТЕВ"'},
-        {"display_name_i18n": {"bg": "21. СУ"}},
+        {"display_name_i18n": {"bg": "21. СУ"}, **CORROBORATED_DISPLAY},
+    )
+
+    assert resolved == {
+        "bg": '21 СРЕДНО УЧИЛИЩЕ "ХРИСТО БОТЕВ"',
+        "en": '21 Secondary School "Hristo Botev"',
+    }
+
+
+def test_resolve_name_i18n_ignores_uncorroborated_display_name():
+    resolved = resolve_name_i18n(
+        {"bg": '21 СРЕДНО УЧИЛИЩЕ "ХРИСТО БОТЕВ"'},
+        {"display_name_i18n": {"bg": "Прием след 7. клас", "en": "Admissions news"}},
     )
 
     assert resolved == {

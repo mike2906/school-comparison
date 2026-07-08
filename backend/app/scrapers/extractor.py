@@ -594,6 +594,89 @@ def _promote_repeated_display_name_candidate(
     )
 
 
+def _labels_match(left: str | None, right: str | None) -> bool:
+    left_tokens = helpers._display_name_match_tokens(left)
+    right_tokens = helpers._display_name_match_tokens(right)
+    return bool(left_tokens and right_tokens and left_tokens & right_tokens)
+
+
+def _display_name_has_domain_alias_match(
+    display_name_i18n: dict[str, str],
+    *,
+    registry_name: str | None,
+    website_url: str | None,
+) -> bool:
+    aliases = helpers._extract_host_seed_aliases(website_url)
+    host_aligned = helpers._extract_host_aligned_display_name(registry_name, website_url)
+    if host_aligned:
+        aliases.extend(host_aligned.values())
+
+    return any(
+        _labels_match(display_label, alias)
+        for display_label in display_name_i18n.values()
+        for alias in aliases
+    )
+
+
+def _display_name_has_repeated_page_identity(
+    display_name_i18n: dict[str, str],
+    *,
+    school: School,
+    pages: list[SourcePage],
+) -> bool:
+    from app.scrapers.display_name_audit import audit_school_display_name
+
+    finding = audit_school_display_name(
+        {
+            "id": school.id,
+            "name_i18n": school.name_i18n or {},
+            "attributes": {},
+            "website_url": school.website_url,
+        },
+        [
+            {
+                "source_url": page.source_url,
+                "page_category": page.page_category,
+                "raw_markdown": page.raw_markdown,
+            }
+            for page in pages
+        ],
+    )
+    if finding is None or finding.repeated_pages < 2 or finding.core_pages < 1 or finding.score < 12:
+        return False
+
+    return any(_labels_match(display_label, finding.candidate_name) for display_label in display_name_i18n.values())
+
+
+def _build_display_name_evidence(
+    display_name_i18n: dict[str, str] | None,
+    *,
+    school: School,
+    pages: list[SourcePage],
+) -> dict[str, Any] | None:
+    if not display_name_i18n:
+        return None
+
+    registry_name = (school.name_i18n or {}).get("bg") or (school.name_i18n or {}).get("en")
+    signals: list[str] = []
+    if _display_name_has_domain_alias_match(
+        display_name_i18n,
+        registry_name=registry_name,
+        website_url=school.website_url,
+    ):
+        signals.append("website_domain_alias_match")
+    if _display_name_has_repeated_page_identity(display_name_i18n, school=school, pages=pages):
+        signals.append("repeated_on_page_identity")
+
+    if len(set(signals)) < 2:
+        return None
+
+    return {
+        "signals": signals,
+        "status": "corroborated",
+    }
+
+
 async def _extract_prices(
     db: AsyncSession,
     school: School,
@@ -991,6 +1074,11 @@ async def _extract_general_info(
             )
 
     normalized, extracted_i18n, display_name_i18n = helpers._normalize_general_info_output(parsed, school.country_code)
+    display_name_evidence = _build_display_name_evidence(
+        display_name_i18n,
+        school=school,
+        pages=pages,
+    )
     contact_info = helpers._extract_contact_info_deterministic(all_page_text)
     location_address_update = await _sync_primary_location_from_contact_address(db, school, contact_info)
 
@@ -1035,6 +1123,13 @@ async def _extract_general_info(
 
     if display_name_i18n:
         attrs["display_name_i18n"] = display_name_i18n
+        if display_name_evidence:
+            attrs["display_name_evidence"] = display_name_evidence
+        else:
+            attrs.pop("display_name_evidence", None)
+    else:
+        attrs.pop("display_name_i18n", None)
+        attrs.pop("display_name_evidence", None)
 
     school.attributes = attrs
     clear_summary_state(school)

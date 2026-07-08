@@ -88,7 +88,7 @@ Order matters within this phase; tasks touch overlapping files — run sequentia
       and source-adapter upserts, so MoE-imported coordinates pass through it too.
       The write gate uses the same Sofia municipality bounds as the API/map filters,
       so Bankya-style Stolichna municipality locations remain visible.
-- [ ] **P1.4 Display-name corroboration gate.** Display name currently overrides the
+- [x] **P1.4 Display-name corroboration gate.** Display name currently overrides the
       registry name in `i18n_resolver.resolve_name_i18n` with no corroboration. Fix:
       only allow override when ≥2 independent signals agree (website-domain alias match
       + repeated on-page identity — both already computed in
@@ -97,6 +97,12 @@ Order matters within this phase; tasks touch overlapping files — run sequentia
       repair command.
       *Verify:* tests covering corroborated vs uncorroborated cases; audit query
       (display vs registry names) shows overrides are plausible names, not headlines.
+      **Done.** Extraction now stores private `display_name_evidence` only when the
+      display name matches both a website-domain alias and repeated on-page identity.
+      `resolve_name_i18n` ignores `display_name_i18n` without that corroboration, so
+      stale or headline-like display names fall back to registry-derived names at the
+      API boundary. The `cleanup-display-names` repair command and its mutation helper
+      were removed; `audit-display-names` remains for inspection.
 - [ ] **P1.5 Golden-fixture corpus.** Commit ~20 real cached `source_pages.raw_markdown`
       pages + expected pricing/display-name/general-info outputs as pytest fixtures.
       Run the deterministic extraction path against them in CI. Every future pricing/
