@@ -45,6 +45,10 @@ INTERNAL_ATTRIBUTES = {
     "_extraction_hashes": {"general_info": "abc123"},
     "data_validation": {"status": "needs_review", "issues": [{"field": "pricing"}]},
     "display_name_i18n": {"bg": "Училище Пример", "en": "Example School"},
+    "display_name_evidence": {
+        "signals": ["website_domain_alias_match", "repeated_on_page_identity"],
+        "status": "corroborated",
+    },
     "extracted": {
         "_schema_version": 1,
         "languages": [{"language": "Английски", "level": "intensive"}],
@@ -78,6 +82,7 @@ INTERNAL_KEY_MARKERS = (
     "data_validation",
     "source_refs",
     "display_name_i18n",
+    "display_name_evidence",
     "moe_",
     "kg_sofia",
     "website_candidate",

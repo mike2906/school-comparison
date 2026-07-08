@@ -457,6 +457,83 @@ async def test_extract_school_does_not_promote_footer_network_name(db_session):
     }
 
 
+def test_display_name_evidence_requires_domain_alias_and_repeated_identity():
+    school = School(
+        id=1,
+        name_i18n={"bg": "Частно училище Maple Bear Sofia"},
+        country_code="bg",
+        city="sofia",
+        school_type="private",
+        education_level="kindergarten",
+        website_url="https://sofia-school.maplebear.bg/en/",
+    )
+    pages = [
+        SourcePage(
+            school_id=1,
+            source_url="https://sofia-school.maplebear.bg/en/about-us",
+            page_category="about",
+            scrape_type=ScrapeType.WEBSITE,
+            is_valid=True,
+            raw_markdown="Maple Bear Sofia School helps children.\nWelcome to Maple Bear Sofia School.",
+            content_hash="maple-about",
+            last_scraped_at=datetime.datetime.now(datetime.UTC),
+        ),
+        SourcePage(
+            school_id=1,
+            source_url="https://sofia-school.maplebear.bg/en/admission",
+            page_category="admission",
+            scrape_type=ScrapeType.WEBSITE,
+            is_valid=True,
+            raw_markdown="Admissions at Maple Bear Sofia School are open.",
+            content_hash="maple-admission",
+            last_scraped_at=datetime.datetime.now(datetime.UTC),
+        ),
+    ]
+
+    evidence = extractor_module._build_display_name_evidence(
+        {"bg": "Maple Bear Sofia School", "en": "Maple Bear Sofia School"},
+        school=school,
+        pages=pages,
+    )
+
+    assert evidence == {
+        "signals": ["website_domain_alias_match", "repeated_on_page_identity"],
+        "status": "corroborated",
+    }
+
+
+def test_display_name_evidence_rejects_uncorroborated_headline():
+    school = School(
+        id=1,
+        name_i18n={"bg": '21 СРЕДНО УЧИЛИЩЕ "ХРИСТО БОТЕВ"'},
+        country_code="bg",
+        city="sofia",
+        school_type="state",
+        education_level="upper_secondary",
+        website_url="https://21su.bg",
+    )
+    pages = [
+        SourcePage(
+            school_id=1,
+            source_url="https://21su.bg/news",
+            page_category="news",
+            scrape_type=ScrapeType.WEBSITE,
+            is_valid=True,
+            raw_markdown="# 21-во училище стана домакин\nНовина за събитие.",
+            content_hash="headline",
+            last_scraped_at=datetime.datetime.now(datetime.UTC),
+        )
+    ]
+
+    evidence = extractor_module._build_display_name_evidence(
+        {"bg": "21-во училище стана домакин"},
+        school=school,
+        pages=pages,
+    )
+
+    assert evidence is None
+
+
 @pytest.mark.asyncio
 async def test_extract_school_clears_stale_summary_metadata_on_success(db_session, sample_school_for_extraction):
     school = sample_school_for_extraction

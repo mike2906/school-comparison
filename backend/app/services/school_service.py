@@ -1,12 +1,13 @@
 import re
 from typing import Optional
 
-from sqlalchemy import and_, exists, func, or_, select
+from sqlalchemy import and_, exists, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased, selectinload
 
 from app.models.school import School, SchoolLocation, SchoolLocationAgeGroupShift
 from app.services.geocoding.bounds import SOFIA_MUNICIPALITY_BOUNDS, get_city_bounds
+from app.utils.i18n_resolver import resolve_address_i18n, resolve_name_i18n
 from app.utils.school_attributes import build_filterable_attributes
 
 SOFIA_MAP_BOUNDS = SOFIA_MUNICIPALITY_BOUNDS
@@ -299,50 +300,33 @@ class SchoolService:
         Returns:
             List of schools matching the search query
         """
-        # Escape special SQL ILIKE wildcards to prevent unintended pattern matching.
         # Parents often type school numbers without the Bulgarian "№" marker
         # (for example "ДГ 5" instead of stored "ДГ №5"), so search both forms.
-        patterns = [
-            f"%{variant.replace('%', '\\%').replace('_', '\\_')}%"
-            for variant in self._school_search_variants(search_query)
-        ]
-        search_fields = (
-            School.name_i18n["bg"].as_string(),
-            School.name_i18n["en"].as_string(),
-            School.attributes["display_name_i18n"]["bg"].as_string(),
-            School.attributes["display_name_i18n"]["en"].as_string(),
-            SchoolLocation.address_i18n["bg"].as_string(),
-            SchoolLocation.address_i18n["en"].as_string(),
-        )
-        search_clauses = [
-            field.ilike(pattern, escape="\\")
-            for pattern in patterns
-            for field in search_fields
-        ]
-
-        # Match on school names, branded display names, and location addresses.
-        # Query matching ids first so multiple matching locations do not duplicate
-        # schools or consume the result limit.
+        variants = [variant.casefold() for variant in self._school_search_variants(search_query)]
         city_clause = self._city_clause(city)
-        matching_school_ids = (
-            select(School.id)
-            .outerjoin(SchoolLocation, SchoolLocation.school_id == School.id)
-            .where(School.country_code == country_code)
-            .where(self._has_resolved_location(city))
-            .where(or_(*search_clauses))
-            .distinct()
-            .limit(limit)
-        )
-        if city_clause is not None:
-            matching_school_ids = matching_school_ids.where(city_clause)
-        matching_school_ids = matching_school_ids.subquery()
-
         query = (
             self._base_query()
-            .join(matching_school_ids, School.id == matching_school_ids.c.id)
+            .where(School.country_code == country_code)
+            .where(self._has_resolved_location(city))
         )
+        if city_clause is not None:
+            query = query.where(city_clause)
         result = await self.db.execute(query)
-        return result.scalars().unique().all()
+        schools = result.scalars().unique().all()
+
+        def matches_school(school: School) -> bool:
+            searchable_values = list((school.name_i18n or {}).values())
+            searchable_values.extend(resolve_name_i18n(school.name_i18n, school.attributes).values())
+            for location in school.locations:
+                searchable_values.extend((location.address_i18n or {}).values())
+                searchable_values.extend(resolve_address_i18n(location.address_i18n).values())
+            return any(
+                variant in str(value).casefold()
+                for variant in variants
+                for value in searchable_values
+            )
+
+        return [school for school in schools if matches_school(school)][:limit]
 
     @staticmethod
     def _school_search_variants(search_query: str) -> list[str]:
