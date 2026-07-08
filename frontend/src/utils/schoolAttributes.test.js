@@ -1,66 +1,64 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { normalizeSchoolAttributes } from './schoolAttributes.js'
+import { normalizeSchool, normalizeSchoolAttributes } from './schoolAttributes.js'
 
-test('class size parses when student/class context exists', () => {
-  const normalized = normalizeSchoolAttributes({
-    extracted: {
-      class_size: 'Up to 16 students per class'
-    }
-  })
+// Merging/parsing now lives in backend/app/utils/school_attributes.py — see
+// backend/tests/test_school_attributes.py. These cover locale selection only.
 
+const ATTRIBUTES = { class_size: 16, has_canteen: true, teaching_approach: [] }
+const ATTRIBUTES_I18N = {
+  bg: { facilities: ['Библиотека'], special_programs: ['Спортна програма'] },
+  en: { facilities: ['Library'], special_programs: ['Sports program'] },
+}
+
+test('picks the requested locale', () => {
+  const normalized = normalizeSchoolAttributes(ATTRIBUTES, ATTRIBUTES_I18N, 'en')
+
+  assert.deepEqual(normalized.facilities, ['Library'])
   assert.equal(normalized.class_size, 16)
+  assert.equal(normalized.has_canteen, true)
 })
 
-test('class size does not parse unrelated numeric text', () => {
-  const normalized = normalizeSchoolAttributes({
-    extracted: {
-      class_size: 'Grades 1-4 program'
-    }
-  })
+test('defaults to bulgarian', () => {
+  const normalized = normalizeSchoolAttributes(ATTRIBUTES, ATTRIBUTES_I18N, 'bg')
 
-  assert.equal(normalized.class_size, undefined)
+  assert.deepEqual(normalized.facilities, ['Библиотека'])
 })
 
-test('existing numeric class size remains usable', () => {
-  const normalized = normalizeSchoolAttributes({
-    class_size: 18
-  })
+test('treats en-US as english', () => {
+  const normalized = normalizeSchoolAttributes(ATTRIBUTES, ATTRIBUTES_I18N, 'en-US')
 
-  assert.equal(normalized.class_size, 18)
+  assert.deepEqual(normalized.facilities, ['Library'])
 })
 
-test('prefers extracted_i18n values when language is en', () => {
+test('falls back to localStorage when no locale is passed', () => {
   const previousStorage = global.localStorage
   global.localStorage = { getItem: () => 'en' }
 
-  const normalized = normalizeSchoolAttributes({
-    extracted: {
-      facilities: ['Библиотека']
-    },
-    extracted_i18n: {
-      en: {
-        facilities: ['Library']
-      }
-    }
-  })
+  const normalized = normalizeSchoolAttributes(ATTRIBUTES, ATTRIBUTES_I18N)
 
   assert.deepEqual(normalized.facilities, ['Library'])
   global.localStorage = previousStorage
 })
 
-test('falls back to bg extracted values when extracted_i18n is missing', () => {
-  const previousStorage = global.localStorage
-  global.localStorage = { getItem: () => 'en' }
+test('tolerates a missing attributes_i18n payload', () => {
+  const normalized = normalizeSchoolAttributes(ATTRIBUTES, undefined, 'en')
 
-  const normalized = normalizeSchoolAttributes({
-    extracted: {
-      facilities: ['Библиотека']
-    },
-    extracted_i18n: {}
-  })
+  assert.equal(normalized.class_size, 16)
+  assert.equal(normalized.facilities, undefined)
+})
 
-  assert.deepEqual(normalized.facilities, ['Библиотека'])
-  global.localStorage = previousStorage
+test('tolerates missing attributes entirely', () => {
+  assert.deepEqual(normalizeSchoolAttributes(null, null, 'bg'), {})
+})
+
+test('normalizeSchool flattens attributes_i18n onto the school', () => {
+  const school = normalizeSchool(
+    { id: 1, attributes: ATTRIBUTES, attributes_i18n: ATTRIBUTES_I18N },
+    'en'
+  )
+
+  assert.deepEqual(school.attributes.special_programs, ['Sports program'])
+  assert.equal(school.id, 1)
 })

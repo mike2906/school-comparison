@@ -40,7 +40,7 @@ Agents can only work autonomously when there's a cheap objective pass/fail signa
 
 Order matters within this phase; tasks touch overlapping files — run sequentially.
 
-- [ ] **P1.1 Serialization allowlist (CRITICAL).** `backend/app/schemas/school.py`:
+- [x] **P1.1 Serialization allowlist (CRITICAL).** `backend/app/schemas/school.py`:
       `SchoolAttributes` currently `extra="allow"` and `SchoolListResponse.attributes`
       is a raw dict — the API ships `data_validation`, raw `extracted` LLM payloads,
       `source_refs`, `moe_*` codes to the browser, and `frontend/src/utils/schoolAttributes.js:180-236`
@@ -50,6 +50,15 @@ Order matters within this phase; tasks touch overlapping files — run sequentia
       Update frontend to consume the merged payload (it mostly just renders what it's given).
       *Verify:* API response for a scraped school contains no internal keys; UI unchanged
       for a clean school.
+      **Done.** Projection lives in `app/utils/school_attributes.py`; API serves
+      `attributes` + `attributes_i18n: {bg, en}` (both `extra="forbid"`). `SchoolResponse`
+      leaked identically to `SchoolListResponse` and was fixed too. `display_name_i18n`
+      is no longer served (`resolved_name_i18n` supersedes it). Attributes payload
+      shrank 74% (1349 KiB → 346 KiB across 540 schools). Parity with the old
+      client-side merge verified on all 540 schools × 2 locales × 6 fields: 0 mismatches.
+      `SchoolService.matches_filter` now reads the same projection, so `?facilities=…`
+      matches extracted data instead of nothing. See P1.9 for the part deliberately
+      left out, and P1.11 for the dead UI reads this exposed.
 - [ ] **P1.2 Validate inside extract.** `backend/app/scrapers/extractor.py:~1023-1025`
       overwrites `attributes.extracted` and deletes the previous validation report at
       commit time, so unvalidated data is live until Stage 6 runs. Fix: run
@@ -100,6 +109,41 @@ Order matters within this phase; tasks touch overlapping files — run sequentia
       `source_esri_id=…`) move to `geocode_meta`; `location_tags` stays purely semantic;
       delete the client-side allowlist filter in `frontend/src/utils/locationFocus.js`.
       *Verify:* no provenance strings in API responses; focus tags still render.
+- [ ] **P1.9 Controlled vocabulary for `facilities` / `special_programs`** (found while
+      doing P1.1). The advanced-filter UI offers a canonical vocabulary
+      (`SearchPage.jsx:27` `DEFAULT_ADVANCED_OPTIONS`: `cafeteria`, `library`,
+      `computer_lab`…) but the extractor emits free text (`"Medical care"`,
+      `"Медицински кабинет"`, `"3D printers"`). The two have never intersected, so
+      those filters only ever matched seeded schools. `GET /schools/filters` currently
+      hides this by returning `[]` — it reads raw top-level keys that no scraped school
+      has. Wiring it to the merged projection returns ~355 facility / ~400 program
+      options and would render ~360 checkboxes, so it was left reading raw on purpose
+      (see the comment in `school_service.get_available_filters`). Real fix: map free
+      text → canonical tags at extraction time, then serve the vocabulary from the
+      endpoint. Best done after P1.5's golden corpus exists.
+      *Verify:* `/schools/filters` returns only canonical keys; filter counts non-zero
+      for scraped schools.
+- [ ] **P1.10 BG users see no attributes for English-primary schools.** When a school's
+      site is English, `attributes.extracted.<lists>` come back empty and all content
+      lands under `extracted_i18n.en`, so the `bg` projection is empty (e.g. school 510:
+      `extracted.facilities == []`, `extracted_i18n.en.facilities == ["Medical care", …]`).
+      Pre-existing — the old client-side merge behaved identically — but now visible in
+      `attributes_i18n.bg`. Fix in `extractor_helpers._build_general_info_i18n` /
+      `_pick_primary_text_lang`: always populate the primary-language slot, or translate.
+      Related: extraction of `class_size` from `"5 students"` yields `5` (school 510).
+      Both are extraction-quality bugs — add fixtures under P1.5.
+- [ ] **P1.11 Dead attribute reads in the UI.** The frontend reads 23 `attributes.*`
+      keys; 11 of them are written by *nothing* — not the scrapers, not `seed_data.py`:
+      `accessible`, `admission_requirement`, `admission_status`, `after_school_care`,
+      `application_deadline`, `enrollment_status`, `entry_requirements`,
+      `operating_hours`, `schedule_hours`, `spots_available`,
+      `transportation_available` (`ComparePage.jsx`, `SchoolCard.jsx`,
+      `SchoolDetailPage/helpers.js`). They render as permanently-absent sections.
+      Real data for several of them sits unused in `extracted.admission` /
+      `extracted.operations`, which the projection does not surface. Decide per field:
+      wire it through the allowlist, or delete the read. Guard: the
+      `TestAllowlistCoversWrittenFields` invariant in `tests/test_school_attributes.py`
+      only covers what `seed_data.py` writes; extend it once these are resolved.
 
 ## Phase 2 — User-facing correctness bugs
 

@@ -1,11 +1,12 @@
 from datetime import datetime
-from typing import Optional, Union
+from typing import Any, Optional, Union
 
-from pydantic import BaseModel, ConfigDict, computed_field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 from app.schemas.pricing import PricingResponse
 from app.schemas.field_source import FieldSourceResponse
 from app.utils.i18n_resolver import resolve_address_i18n, resolve_name_i18n
+from app.utils.school_attributes import build_display_attributes
 
 
 class SummaryText(BaseModel):
@@ -21,20 +22,65 @@ class LanguageFocusItem(BaseModel):
     level: Optional[str] = None
 
 
-class SchoolAttributes(BaseModel):
-    display_name_i18n: Optional[dict[str, str]] = None
-    languages_of_instruction: Optional[list[str]] = None
+class SchoolLocalizedAttributes(BaseModel):
+    """Free-text display attributes, resolved for one locale."""
+
+    language_focus: list[LanguageFocusItem] = []
+    languages_of_instruction: list[str] = []
+    facilities: list[str] = []
+    special_programs: list[str] = []
+    activities_offered: list[str] = []
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class SchoolDisplayAttributes(BaseModel):
+    """Locale-independent display attributes.
+
+    `extra="forbid"` is the gate: `schools.attributes` is an internal scratchpad
+    (`moe_*` codes, `extracted`, `data_validation`, `source_refs`), and nothing may
+    reach the browser unless it is declared here. See `app.utils.school_attributes`.
+    """
+
+    class_size: Optional[Union[int, float]] = None
     has_canteen: Optional[bool] = None
-    activities_offered: Optional[list[str]] = None
-    language_focus: Optional[list[Union[LanguageFocusItem, str]]] = None
-    special_programs: Optional[list[str]] = None
-    facilities: Optional[list[str]] = None
-    teaching_approach: Optional[list[str]] = None
-    class_size: Optional[int] = None
     uniform_required: Optional[bool] = None
     special_focus: Optional[str] = None
+    teaching_approach: list[str] = []
+    teacher_student_ratio: Optional[str] = None
+    school_hours: Optional[str] = None
+    established_year: Optional[int] = None
 
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="forbid")
+
+
+class SchoolAttributesMixin(BaseModel):
+    """Projects the raw `attributes` JSONB into the public display payload.
+
+    The raw column is validated into `raw_attributes` and excluded from output;
+    `attributes` and `attributes_i18n` are computed from it.
+    """
+
+    raw_attributes: Optional[dict[str, Any]] = Field(
+        default=None,
+        validation_alias="attributes",
+        exclude=True,
+    )
+
+    @computed_field(return_type=SchoolDisplayAttributes)
+    @property
+    def attributes(self) -> SchoolDisplayAttributes:
+        base, _ = build_display_attributes(self.raw_attributes)
+        return SchoolDisplayAttributes.model_validate(base)
+
+    @computed_field(return_type=dict[str, SchoolLocalizedAttributes])
+    @property
+    def attributes_i18n(self) -> dict[str, SchoolLocalizedAttributes]:
+        _, localized = build_display_attributes(self.raw_attributes)
+        return {
+            locale: SchoolLocalizedAttributes.model_validate(values)
+            for locale, values in localized.items()
+        }
 
 
 class SchoolLocationAgeGroupShift(BaseModel):
@@ -81,7 +127,7 @@ class ExamResultResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class SchoolBase(BaseModel):
+class SchoolBase(SchoolAttributesMixin):
     country_code: str = "bg"
     name_i18n: dict
     school_type: str
@@ -91,13 +137,13 @@ class SchoolBase(BaseModel):
     summary_i18n: Optional[SummaryI18n] = None
     num_pupils: Optional[int] = None
     admission_info: Optional[dict] = None
-    attributes: Optional[SchoolAttributes] = None
+
+    model_config = ConfigDict(populate_by_name=True)
 
     @computed_field(return_type=dict[str, str])
     @property
     def resolved_name_i18n(self) -> dict[str, str]:
-        attributes = self.attributes.model_dump(exclude_none=True) if self.attributes is not None else None
-        return resolve_name_i18n(self.name_i18n, attributes)
+        return resolve_name_i18n(self.name_i18n, self.raw_attributes)
 
 
 class SchoolCreate(SchoolBase):
@@ -113,28 +159,24 @@ class SchoolResponse(SchoolBase):
     exam_results: list[ExamResultResponse] = []
     field_sources: list[FieldSourceResponse] = []
 
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 
-class SchoolListResponse(BaseModel):
+class SchoolListResponse(SchoolAttributesMixin):
     id: int
     country_code: str = "bg"
     name_i18n: dict
     school_type: str
     education_level: str
     admission_info: Optional[dict] = None
-    attributes: Optional[dict] = None
     locations: list[SchoolLocationResponse] = []
     pricing: list[PricingResponse] = []
     exam_results: list[ExamResultResponse] = []
     field_sources: list[FieldSourceResponse] = []
 
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
     @computed_field(return_type=dict[str, str])
     @property
     def resolved_name_i18n(self) -> dict[str, str]:
-        attributes = None
-        if self.attributes is not None:
-            attributes = SchoolAttributes.model_validate(self.attributes).model_dump(exclude_none=True)
-        return resolve_name_i18n(self.name_i18n, attributes)
+        return resolve_name_i18n(self.name_i18n, self.raw_attributes)
