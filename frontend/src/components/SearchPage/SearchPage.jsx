@@ -15,6 +15,7 @@ import { useCountry } from '../../context/CountryContext'
 import { fetchAvailableFilters, fetchExamAverages } from '../../api/schools'
 import { getAgeGroupKeys } from '../../utils/countryConfig'
 import { AGE_GROUP_KEYS } from '../../utils/education'
+import { getLanguageFocusPairs } from '../../utils/schoolAttributes'
 
 const TYPE_SORT_ORDER = {
   state: 0,
@@ -1155,25 +1156,6 @@ function SearchPage() {
   const formatLanguageLevelLabel = (key) => t(`advancedFilters.levels.${key}`, { defaultValue: key.replace(/_/g, ' ') })
 
   const advancedCounts = useMemo(() => {
-    const getLanguageFocusPairs = (school) => {
-      const values = school.attributes?.language_focus || []
-      const pairs = new Set()
-      values.forEach(value => {
-        if (value && typeof value === 'object') {
-          const language = value.language
-          const level = value.level
-          if (language && level) {
-            pairs.add(`${language}:${level}`)
-          } else if (language) {
-            pairs.add(language)
-          }
-        } else if (typeof value === 'string') {
-          pairs.add(value)
-        }
-      })
-      return pairs
-    }
-
     const groups = {
       special_programs: filters.specialPrograms,
       facilities: filters.facilities,
@@ -1249,21 +1231,12 @@ function SearchPage() {
       const derivedPairs = new Set()
 
       baseSchools.forEach(school => {
-        const values = school.attributes?.language_focus || []
-        values.forEach(value => {
-          if (value && typeof value === 'object') {
-            const language = value.language
-            const level = value.level
+        getLanguageFocusPairs(school).forEach(pair => {
+          derivedPairs.add(pair)
+          if (pair.includes(':')) {
+            const [language, level] = pair.split(':')
             if (language) derivedLanguages.add(language)
             if (level) derivedLevels.add(level)
-            if (language && level) derivedPairs.add(`${language}:${level}`)
-          } else if (typeof value === 'string') {
-            derivedPairs.add(value)
-            if (value.includes(':')) {
-              const [language, level] = value.split(':')
-              if (language) derivedLanguages.add(language)
-              if (level) derivedLevels.add(level)
-            }
           }
         })
       })

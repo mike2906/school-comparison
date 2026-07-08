@@ -318,7 +318,10 @@ When the user says **"follow github process"**, use the full PR flow:
 4. Commit only the files that belong to the change.
 5. Push the branch and open a PR to `main`.
 6. Wait for GitHub Actions.
-7. If CI is green and the PR is mergeable, merge it to `main` and delete the branch.
+7. Wait for the automated Codex PR review to finish. If it posts findings, address
+   them in the PR or explicitly record why they are accepted before merging.
+8. If CI is green, Codex review is clear or resolved, and the PR is mergeable, merge
+   it to `main` and delete the branch.
 
 Only commit directly to `main` when the user explicitly asks for that.
 

@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { normalizeSchool, normalizeSchoolAttributes } from './schoolAttributes.js'
+import {
+  getLanguageFocusPairs,
+  normalizeSchool,
+  normalizeSchoolAttributes,
+} from './schoolAttributes.js'
 
 // Merging/parsing now lives in backend/app/utils/school_attributes.py — see
 // backend/tests/test_school_attributes.py. These cover locale selection only.
@@ -61,4 +65,21 @@ test('normalizeSchool flattens attributes_i18n onto the school', () => {
 
   assert.deepEqual(school.attributes.special_programs, ['Sports program'])
   assert.equal(school.id, 1)
+})
+
+test('getLanguageFocusPairs includes every attributes_i18n locale for filter counts', () => {
+  const pairs = getLanguageFocusPairs({
+    attributes: {
+      language_focus: [{ language: 'English', level: 'mother_tongue' }],
+    },
+    attributes_i18n: {
+      bg: { language_focus: [{ language: 'Английски', level: 'mother_tongue' }] },
+      en: { language_focus: ['German:early_foreign'] },
+    },
+  })
+
+  assert.deepEqual(
+    [...pairs].sort(),
+    ['English:mother_tongue', 'German:early_foreign', 'Английски:mother_tongue'].sort()
+  )
 })

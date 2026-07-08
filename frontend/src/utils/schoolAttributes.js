@@ -40,3 +40,35 @@ export function normalizeSchoolList(schools, locale) {
   if (!Array.isArray(schools)) return []
   return schools.map((school) => normalizeSchool(school, locale))
 }
+
+function addLanguageFocusPairs(values, pairs) {
+  if (!Array.isArray(values)) return
+
+  values.forEach((value) => {
+    if (isObject(value)) {
+      const language = value.language
+      const level = value.level
+      if (language && level) {
+        pairs.add(`${language}:${level}`)
+      } else if (language) {
+        pairs.add(language)
+      }
+    } else if (typeof value === 'string') {
+      pairs.add(value)
+    }
+  })
+}
+
+export function getLanguageFocusPairs(school) {
+  const pairs = new Set()
+  addLanguageFocusPairs(school?.attributes?.language_focus, pairs)
+
+  const byLocale = isObject(school?.attributes_i18n) ? school.attributes_i18n : {}
+  Object.values(byLocale).forEach((attributes) => {
+    if (isObject(attributes)) {
+      addLanguageFocusPairs(attributes.language_focus, pairs)
+    }
+  })
+
+  return pairs
+}

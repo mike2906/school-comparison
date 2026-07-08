@@ -19,6 +19,7 @@ from app.schemas.school import (
     SchoolLocalizedAttributes,
     SchoolResponse,
 )
+from app.services.school_service import SchoolService
 from app.utils.school_attributes import (
     build_base_attributes,
     build_display_attributes,
@@ -225,6 +226,29 @@ class TestFilterableProjection:
         filterable = build_filterable_attributes({"facilities": ["cafeteria"], "teaching_approach": ["montessori"]})
         assert filterable["facilities"] == ["cafeteria"]
         assert filterable["teaching_approach"] == ["montessori"]
+
+    @pytest.mark.asyncio
+    async def test_language_filter_options_match_filter_normalization(self, seeded_db):
+        school = (await seeded_db.execute(select(School))).scalars().first()
+        school.attributes = {
+            "language_focus": [
+                {"language": "English", "level": "Mother tongue"},
+                "German:Early Foreign",
+            ]
+        }
+        await seeded_db.commit()
+
+        service = SchoolService(seeded_db)
+
+        filters = await service.get_available_filters()
+        assert "English:mother_tongue" in filters["language_focus_pairs"]
+        assert "German:early_foreign" in filters["language_focus_pairs"]
+        assert "Mother tongue" not in filters["language_focus_levels"]
+        assert "German:Early Foreign" not in filters["language_focus_pairs"]
+
+        for language_focus in ("English:mother_tongue", "German:early_foreign"):
+            schools = await service.list_schools_filtered(language_focus=[language_focus])
+            assert school.id in {matched.id for matched in schools}
 
 
 class TestAllowlistCoversWrittenFields:
