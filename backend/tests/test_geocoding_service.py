@@ -420,6 +420,8 @@ class TestGeocodingService:
         await db_session.refresh(location)
         assert location.lat == 42.6977
         assert location.lng == 23.3219
+        assert location.geocode_meta["status"] == "accepted"
+        assert location.geocode_meta["provider"] == "mock"
 
     async def test_geocode_location_failure(self, db_session: AsyncSession):
         """Test geocoding when provider fails."""
@@ -464,6 +466,148 @@ class TestGeocodingService:
         await db_session.refresh(location)
         assert location.lat is None
         assert location.lng is None
+
+    async def test_geocode_location_rejects_duplicate_geojson_name_match_with_different_address(
+        self,
+        db_session: AsyncSession,
+    ):
+        """Approximate GeoJSON name matches must not collapse distinct addresses to one point."""
+        mock_provider = AsyncMock()
+        mock_provider.provider_name = "mock"
+        mock_provider.geocode.return_value = GeocodingResult(
+            lat=42.6977,
+            lng=23.3219,
+            success=True,
+            provider="geojson_bg",
+            method="geojson_name_match",
+            precision="approximate",
+        )
+
+        service = GeocodingService(db=db_session, provider=mock_provider)
+
+        school = School(
+            name_i18n={"bg": "Test School"},
+            country_code="bg",
+            city="sofia",
+            school_type="state",
+            education_level="primary",
+        )
+        db_session.add(school)
+        await db_session.flush()
+
+        existing_location = SchoolLocation(
+            school_id=school.id,
+            address_i18n={"bg": "ул. Първа 1, София"},
+            lat=42.6977,
+            lng=23.3219,
+            is_primary=True,
+        )
+        candidate_location = SchoolLocation(
+            school_id=school.id,
+            address_i18n={"bg": "ул. Втора 2, София"},
+            is_primary=False,
+        )
+        db_session.add_all([existing_location, candidate_location])
+        await db_session.commit()
+
+        result = await service.geocode_location(candidate_location)
+
+        assert result.success is False
+        assert result.error == "duplicate_geojson_name_match_different_address"
+        await db_session.refresh(candidate_location)
+        assert candidate_location.lat is None
+        assert candidate_location.lng is None
+        assert candidate_location.geocode_meta["status"] == "rejected"
+        assert candidate_location.geocode_meta["rejection_reason"] == result.error
+
+    async def test_geocode_location_rejects_sofia_points_outside_write_bounds(
+        self,
+        db_session: AsyncSession,
+    ):
+        """Sofia writes use municipality bounds and store NULL instead of bad points."""
+        mock_provider = AsyncMock()
+        mock_provider.provider_name = "mock"
+        mock_provider.geocode.return_value = GeocodingResult(
+            lat=43.064,
+            lng=24.82002,
+            success=True,
+            provider="nominatim",
+            method="nominatim_address",
+            precision="exact",
+        )
+
+        service = GeocodingService(db=db_session, provider=mock_provider)
+
+        school = School(
+            name_i18n={"bg": "Test School"},
+            country_code="bg",
+            city="sofia",
+            school_type="state",
+            education_level="primary",
+        )
+        db_session.add(school)
+        await db_session.flush()
+
+        location = SchoolLocation(
+            school_id=school.id,
+            address_i18n={"bg": "ул. Шести септември 16, София"},
+            is_primary=True,
+        )
+        db_session.add(location)
+        await db_session.commit()
+
+        result = await service.geocode_location(location)
+
+        assert result.success is False
+        assert result.error == "outside_sofia_write_bounds"
+        await db_session.refresh(location)
+        assert location.lat is None
+        assert location.lng is None
+        assert location.geocode_meta["candidate"] == {"lat": 43.064, "lng": 24.82002}
+
+    async def test_geocode_location_accepts_bankya_within_sofia_municipality_bounds(
+        self,
+        db_session: AsyncSession,
+    ):
+        """Bankya is part of Stolichna municipality and should remain visible."""
+        mock_provider = AsyncMock()
+        mock_provider.provider_name = "mock"
+        mock_provider.geocode.return_value = GeocodingResult(
+            lat=42.71125,
+            lng=23.14131,
+            success=True,
+            provider="nominatim",
+            method="nominatim_address",
+            precision="exact",
+        )
+
+        service = GeocodingService(db=db_session, provider=mock_provider)
+
+        school = School(
+            name_i18n={"bg": "ДГ №25 Изворче"},
+            country_code="bg",
+            city="sofia",
+            school_type="state",
+            education_level="kindergarten",
+        )
+        db_session.add(school)
+        await db_session.flush()
+
+        location = SchoolLocation(
+            school_id=school.id,
+            address_i18n={"bg": 'гр. Банкя, ул. "П. Д. Петков", №15'},
+            is_primary=True,
+        )
+        db_session.add(location)
+        await db_session.commit()
+
+        result = await service.geocode_location(location)
+
+        assert result.success is True
+        await db_session.refresh(location)
+        assert location.lat == pytest.approx(42.71125)
+        assert location.lng == pytest.approx(23.14131)
+        assert location.geocode_meta["status"] == "accepted"
 
     async def test_geocode_all_missing(self, db_session: AsyncSession):
         """Test geocoding all locations without coordinates."""
@@ -567,7 +711,7 @@ class TestGeocodingService:
                     {
                         "geocode": AsyncMock(return_value=GeocodingResult(
                             lat=42.71125,
-                            lng=23.14131,
+                            lng=23.24131,
                             success=True,
                             provider="geojson_bg",
                         ))

@@ -273,6 +273,8 @@ class GeoJSONProvider(BaseGeocodingProvider):
             success=True,
             provider=self.provider_name,
             formatted_address=formatted_address,
+            method="geojson_name_match",
+            precision="approximate",
         )
 
     def _feature_matches_city_bounds(self, feature: dict, normalized_city: Optional[str]) -> bool:

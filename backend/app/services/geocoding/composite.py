@@ -89,6 +89,8 @@ class CompositeGeocodingProvider(BaseGeocodingProvider):
             country_code=country_code,
             city=city,
         )
+        if result.success:
+            result.method = "nominatim_fallback"
 
         if result.success:
             logger.info(f"✓ Nominatim match: '{address}' → ({result.lat}, {result.lng})")

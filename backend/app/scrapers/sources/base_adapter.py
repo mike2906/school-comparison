@@ -84,6 +84,8 @@ class BaseSourceAdapter(ABC):
             Dict with counts: {"created": N, "updated": M, "skipped": K}
         """
         from app.models import School, SchoolLocation, SchoolLocationAgeGroupShift
+        from app.services.geocoding.base import GeocodingResult
+        from app.services.geocoding.write_gate import apply_geocode_result_to_location
         from sqlalchemy import select, and_, func, delete
         import logging
 
@@ -181,6 +183,7 @@ class BaseSourceAdapter(ABC):
                     existing_school.scrape_status = "pending"  # Reset to pending for re-scraping
 
                     school_id = existing_school.id
+                    school_for_gate = existing_school
                     updated += 1
                 else:
                     # Create new
@@ -200,6 +203,7 @@ class BaseSourceAdapter(ABC):
                     self.db.add(new_school)
                     await self.db.flush()
                     school_id = new_school.id
+                    school_for_gate = new_school
                     created += 1
                 touched_school_ids.add(school_id)
 
@@ -233,10 +237,27 @@ class BaseSourceAdapter(ABC):
                             lng=loc.lng,
                             phone=loc.phone,
                             location_tags=loc.location_tags,
+                            geocode_meta=loc.geocode_meta,
                             is_primary=loc.is_primary,
                         )
                         self.db.add(new_location)
                         await self.db.flush()
+                        if new_location.lat is not None and new_location.lng is not None:
+                            meta = new_location.geocode_meta or {}
+                            await apply_geocode_result_to_location(
+                                self.db,
+                                new_location,
+                                GeocodingResult(
+                                    success=True,
+                                    lat=new_location.lat,
+                                    lng=new_location.lng,
+                                    provider=meta.get("provider", ""),
+                                    formatted_address=meta.get("formatted_address"),
+                                    method=meta.get("method"),
+                                    precision=meta.get("precision"),
+                                ),
+                                school=school_for_gate,
+                            )
 
                         # Add age group shifts
                         for age_group in loc.age_groups:

@@ -375,6 +375,8 @@ class NominatimProvider(BaseGeocodingProvider):
                         success=True,
                         provider=self.provider_name,
                         formatted_address=formatted_address,
+                        method="nominatim_address",
+                        precision="exact",
                     )
 
                 logger.warning(
@@ -452,6 +454,8 @@ class NominatimProvider(BaseGeocodingProvider):
                     success=True,
                     provider=self.provider_name,
                     formatted_address=formatted_address,
+                    method="nominatim_address",
+                    precision="exact",
                 )
 
         except httpx.HTTPStatusError as e:
