@@ -217,6 +217,7 @@ class GeocodingService:
                 "precision": result.precision,
                 "rejection_reason": result.error,
             }
+            await self.db.commit()
             logger.warning(f"Failed to geocode location {location.id}: {result.error}")
 
         return result
