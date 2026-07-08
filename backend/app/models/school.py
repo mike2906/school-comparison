@@ -62,6 +62,7 @@ class SchoolLocation(Base):
     phone: Mapped[Optional[str]] = mapped_column(String(100))
     district: Mapped[Optional[str]] = mapped_column(String(100))  # District/neighborhood for idempotency matching
     location_tags: Mapped[Optional[list[str]]] = mapped_column(JSON, default=list)
+    geocode_meta: Mapped[Optional[dict]] = mapped_column(JSON, default=dict)
     is_primary: Mapped[bool] = mapped_column(Boolean, default=True)
 
     school: Mapped["School"] = relationship("School", back_populates="locations")

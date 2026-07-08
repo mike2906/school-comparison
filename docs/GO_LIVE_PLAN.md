@@ -72,16 +72,22 @@ Order matters within this phase; tasks touch overlapping files — run sequentia
       validation-filtered payload plus `data_validation`. Validation failure rolls back
       the extraction transaction instead of publishing. The extractor test now asserts
       unsupported fields are removed before commit and a current validation report exists.
-- [ ] **P1.3 Geocode precision model + write-time rejection.** `backend/app/services/geocoding/base.py`:
+- [x] **P1.3 Geocode precision model + write-time rejection.** `backend/app/services/geocoding/base.py`:
       add `method` (`geojson_name_match` | `nominatim_address` | `nominatim_fallback`)
       and `precision` (`exact` | `approximate`) to `GeocodingResult`; persist to a new
       non-serialized `SchoolLocation.geocode_meta` JSON column (autogenerate migration);
       refuse to write a GeoJSON name-match point another location already holds with a
       different address; write NULL instead of wrong (UI already hides NULL coords).
-      Add Sofia bbox sanity check at write time: `city='sofia'` ⇒ lat 42.60–42.80,
-      lng 23.20–23.45, else NULL + warning.
+      Add Sofia municipality bbox sanity check at write time, else NULL + warning.
       *Verify:* duplicate-coordinate audit query returns fewer groups after a re-geocode
       of affected schools; unit tests for the rejection paths.
+      **Done.** `GeocodingResult` now carries controlled `method` / `precision`, accepted
+      and rejected writes persist private `geocode_meta`, and the shared write gate rejects
+      duplicate approximate GeoJSON name matches with different addresses plus strict
+      Sofia-city out-of-bounds points. The gate is wired through both `GeocodingService`
+      and source-adapter upserts, so MoE-imported coordinates pass through it too.
+      The write gate uses the same Sofia municipality bounds as the API/map filters,
+      so Bankya-style Stolichna municipality locations remain visible.
 - [ ] **P1.4 Display-name corroboration gate.** Display name currently overrides the
       registry name in `i18n_resolver.resolve_name_i18n` with no corroboration. Fix:
       only allow override when ≥2 independent signals agree (website-domain alias match

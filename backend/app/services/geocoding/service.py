@@ -8,6 +8,7 @@ from app.models import SchoolLocation, School
 from app.services.geocoding.base import BaseGeocodingProvider, GeocodingResult
 from app.services.geocoding.nominatim import NominatimProvider
 from app.services.geocoding.composite import CompositeGeocodingProvider
+from app.services.geocoding.write_gate import apply_geocode_result_to_location
 from app.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -116,6 +117,8 @@ class GeocodingService:
                 lng=location.lng,
                 success=True,
                 provider="cached",
+                method=(location.geocode_meta or {}).get("method"),
+                precision=(location.geocode_meta or {}).get("precision"),
             )
 
         # Get address from i18n dict (prefer Bulgarian for Bulgaria)
@@ -196,12 +199,24 @@ class GeocodingService:
 
         # Update database if successful
         if result.success and result.lat is not None and result.lng is not None:
-            location.lat = result.lat
-            location.lng = result.lng
+            result = await apply_geocode_result_to_location(
+                self.db,
+                location,
+                result,
+                school=school,
+            )
             # TODO: Consider batching commits for better performance when geocoding many locations
             await self.db.commit()
-            logger.info(f"Updated location {location.id} with coordinates ({result.lat}, {result.lng})")
+            if result.success:
+                logger.info(f"Updated location {location.id} with coordinates ({result.lat}, {result.lng})")
         else:
+            location.geocode_meta = {
+                "status": "failed",
+                "provider": result.provider,
+                "method": result.method,
+                "precision": result.precision,
+                "rejection_reason": result.error,
+            }
             logger.warning(f"Failed to geocode location {location.id}: {result.error}")
 
         return result

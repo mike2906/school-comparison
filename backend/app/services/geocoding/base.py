@@ -1,7 +1,11 @@
 """Base geocoding provider interface."""
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import Literal, Optional
 from dataclasses import dataclass
+
+
+GeocodingMethod = Literal["geojson_name_match", "nominatim_address", "nominatim_fallback"]
+GeocodingPrecision = Literal["exact", "approximate"]
 
 
 @dataclass
@@ -14,6 +18,8 @@ class GeocodingResult:
     error: Optional[str] = None
     provider: str = ""
     formatted_address: Optional[str] = None  # Normalized address from provider
+    method: Optional[GeocodingMethod] = None
+    precision: Optional[GeocodingPrecision] = None
 
 
 class BaseGeocodingProvider(ABC):

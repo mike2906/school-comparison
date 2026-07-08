@@ -16,6 +16,10 @@ class DiscoveredLocation(BaseModel):
         default_factory=list,
         description="Location-level tags/refs (e.g. source-specific branch identifiers)",
     )
+    geocode_meta: dict = Field(
+        default_factory=dict,
+        description="Internal geocoding provenance and rejection metadata",
+    )
 
     # Age group shifts (many-to-many relationship data)
     age_groups: list[str] = Field(default_factory=list, description="Age groups served at this location")

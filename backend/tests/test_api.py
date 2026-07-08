@@ -120,6 +120,7 @@ class TestSchoolsEndpoint:
                 assert "address_i18n" in location
                 assert "age_groups" in location  # Changed to age_groups (list property)
                 assert "age_group_shifts" in location  # Junction table data
+                assert "geocode_meta" not in location
 
     @pytest.mark.asyncio
     async def test_list_excludes_schools_without_resolved_locations(self, seeded_db, seeded_client):

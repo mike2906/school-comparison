@@ -443,6 +443,16 @@ class MoeRegistryAdapter(BaseSourceAdapter):
 
             location.lat = result.lat
             location.lng = result.lng
+            location.geocode_meta = {
+                "status": "accepted",
+                "provider": result.provider,
+                "method": result.method,
+                "precision": result.precision,
+                "formatted_address": result.formatted_address,
+            }
+            location.geocode_meta = {
+                key: value for key, value in location.geocode_meta.items() if value is not None
+            }
 
             if provider_tag and provider_tag not in location.location_tags:
                 location.location_tags.append(provider_tag)
@@ -536,6 +546,13 @@ class MoeRegistryAdapter(BaseSourceAdapter):
             phone=phone_number,
             is_primary=True,
             location_tags=["source=moe_registry", "location_recovered=geojson"],
+            geocode_meta={
+                "status": "accepted",
+                "provider": geo_result.provider,
+                "method": geo_result.method,
+                "precision": geo_result.precision,
+                "formatted_address": geo_result.formatted_address,
+            },
             age_groups=age_groups,
             shifts={},
             has_organised_groups={},
