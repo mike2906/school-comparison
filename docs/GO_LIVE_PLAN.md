@@ -25,12 +25,12 @@ Agents can only work autonomously when there's a cheap objective pass/fail signa
 - [x] **P0.1 Fix the failing test.** `backend/tests/test_pipeline_integration.py::test_validate_invalid_url`
       fails on current branch. Diagnose and fix (test or code, whichever is wrong).
       *Verify:* `cd backend && uv run pytest` → 0 failures.
-- [ ] **P0.2 GitHub Actions CI.** Two jobs: backend (`uv sync`, `uv run pytest`,
+- [x] **P0.2 GitHub Actions CI.** Two jobs: backend (`uv sync`, `uv run pytest`,
       `uv run ruff check` once P4.2 lands — until then pytest only) and frontend
       (`npm ci`, `npm run lint` if configured, `npm run build`, `npm test` if vitest exists).
       Use `astral-sh/setup-uv`. Badge in README.
       *Verify:* workflow green on push.
-- [ ] **P0.3 Clean the tree.** Delete `*Zone.Identifier`, `repomix-output.xml`,
+- [x] **P0.3 Clean the tree.** Delete `*Zone.Identifier`, `repomix-output.xml`,
       `NVO_CHART_EXAMPLE.html`; move `sofia_school_compare_plan_v2.md` and
       `PROJECT_STATUS.md` to `docs/`. Add patterns to `.gitignore` (note: repo has a
       file literally named `gitignore:Zone.Identifier` — remove it too).
