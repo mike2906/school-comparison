@@ -101,8 +101,8 @@ class KgSofiaBgAdapter(BaseSourceAdapter):
         'НУ': ['grade_1_4'],  # Начално училище (grades 1-4)
         'ОУ': ['grade_1_4', 'grade_5_7'],  # Основно училище (grades 1-8; no dedicated grade-8 bucket)
         'ОбУ': ['grade_1_4', 'grade_5_7', 'grade_8_12'],  # Обединено училище (grades 1-12)
-        'СУ': ['grade_5_7', 'grade_8_12'],  # Средно училище (grades 5-12)
-        'СЕУ': ['grade_5_7', 'grade_8_12'],  # Средно езиково училище (grades 5-12)
+        'СУ': ['grade_1_4', 'grade_5_7', 'grade_8_12'],  # Средно училище (grades 1-12)
+        'СЕУ': ['grade_1_4', 'grade_5_7', 'grade_8_12'],  # Средно езиково училище (grades 1-12)
         'ПГ': ['grade_8_12'],  # Профилирана гимназия (grades 8-12)
     }
 

@@ -93,7 +93,7 @@ class MoeRegistryAdapter(BaseSourceAdapter):
         121: "primary",  # начално (grades 1-4)
         122: "lower_secondary",  # основно (grades 1-8)
         123: "upper_secondary",  # обединено (grades 1-12)
-        124: "upper_secondary",  # средно (grades 5-12)
+        124: "upper_secondary",  # средно (grades 1-12)
         125: "upper_secondary",  # профилирана гимназия (grades 8-12)
         126: "upper_secondary",  # професионална гимназия (vocational)
         131: "lower_secondary",  # за обучение и подкрепа на ученици с увреден слух
@@ -122,7 +122,7 @@ class MoeRegistryAdapter(BaseSourceAdapter):
         121: ['grade_1_4'],  # начално (grades 1-4)
         122: ['grade_1_4', 'grade_5_7'],  # основно (grades 1-8; no dedicated grade-8 bucket)
         123: ['grade_1_4', 'grade_5_7', 'grade_8_12'],  # обединено (grades 1-12)
-        124: ['grade_5_7', 'grade_8_12'],  # средно (grades 5-12, NOT 1-12)
+        124: ['grade_1_4', 'grade_5_7', 'grade_8_12'],  # средно (grades 1-12)
         125: ['grade_8_12'],  # профилирана гимназия (grades 8-12)
         126: ['grade_8_12'],  # професионална гимназия (grades 8-12)
         151: ['first', 'second', 'third', 'preschool'],  # детска градина

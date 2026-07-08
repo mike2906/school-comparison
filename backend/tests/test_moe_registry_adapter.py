@@ -589,12 +589,12 @@ class TestMoeRegistryAgeGroupExtraction:
         assert result == ['grade_1_4', 'grade_5_7', 'grade_8_12']
     
     def test_age_groups_secondary_school(self):
-        """Test age groups for secondary school (type 124) serving grades 5-12."""
+        """Test age groups for secondary school (type 124) serving grades 1-12."""
         from app.scrapers.sources.bg.moe_registry import MoeRegistryAdapter
-        
-        # Type 124 = средно (grades 5-12, NOT 1-12)
+
+        # Type 124 = средно (grades 1-12)
         result = MoeRegistryAdapter._get_age_groups_for_detailed_type(124, 'upper_secondary')
-        assert result == ['grade_5_7', 'grade_8_12']
+        assert result == ['grade_1_4', 'grade_5_7', 'grade_8_12']
     
     def test_age_groups_specialized_gymnasium(self):
         """Test age groups for specialized gymnasium (type 125) serving grades 8-12."""
