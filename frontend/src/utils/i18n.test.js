@@ -3,7 +3,7 @@ import test from 'node:test'
 
 import { getAddress, getSchoolName } from './i18n.js'
 
-test('getSchoolName prefers display_name_i18n over legal name', () => {
+test('getSchoolName prefers resolved_name_i18n over legal name', () => {
   const school = {
     resolved_name_i18n: {
       bg: 'Fusion School',
@@ -12,12 +12,6 @@ test('getSchoolName prefers display_name_i18n over legal name', () => {
     name_i18n: {
       bg: 'Частно основно училище Фюжън ЕООД',
       en: 'CHASTNO OSNOVNO UCHILISHTE FYUZHAN EOOD'
-    },
-    attributes: {
-      display_name_i18n: {
-        bg: 'Fusion School',
-        en: 'Fusion School'
-      }
     }
   }
 

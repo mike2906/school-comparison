@@ -7,6 +7,7 @@ from sqlalchemy.orm import aliased, selectinload
 
 from app.models.school import School, SchoolLocation, SchoolLocationAgeGroupShift
 from app.services.geocoding.bounds import SOFIA_MUNICIPALITY_BOUNDS, get_city_bounds
+from app.utils.school_attributes import build_filterable_attributes
 
 SOFIA_MAP_BOUNDS = SOFIA_MUNICIPALITY_BOUNDS
 
@@ -180,7 +181,9 @@ class SchoolService:
             return schools
 
         def matches_filter(school: School) -> bool:
-            attributes = school.attributes or {}
+            # Match against the same projection the API serves, not the raw JSONB:
+            # facilities/programs/languages only exist nested inside `attributes.extracted`.
+            attributes = build_filterable_attributes(school.attributes)
 
             if language_focus:
                 values = attributes.get("language_focus") or []
@@ -243,6 +246,11 @@ class SchoolService:
             "teaching_approach": set(),
         }
 
+        # NOTE: deliberately reads the raw top-level keys, not the merged display
+        # projection. Extracted values are free text ("Medical care", "3D printers")
+        # while the filter UI expects a controlled vocabulary ("cafeteria", "library").
+        # Serving the merged view here would return ~355 facility options and blow up
+        # the advanced-filter panel. Needs a free-text -> canonical-tag mapping first.
         for attrs in rows:
             if not attrs:
                 continue

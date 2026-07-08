@@ -488,7 +488,9 @@ class TestSchoolsSearchEndpoint:
         assert response.status_code == 200
         data = response.json()
         assert len(data) == 1
-        assert data[0]["attributes"]["display_name_i18n"]["en"] == "Fusion School"
+        # display_name_i18n is internal; the resolved name is what reaches the client.
+        assert data[0]["resolved_name_i18n"]["en"] == "Fusion School"
+        assert "display_name_i18n" not in data[0]["attributes"]
 
     @pytest.mark.asyncio
     async def test_search_min_length_violation(self, seeded_client):
