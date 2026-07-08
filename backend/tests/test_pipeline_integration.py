@@ -61,19 +61,19 @@ class TestURLValidationIntegration:
     async def test_validate_invalid_url(self, db_session, sample_schools):
         """Invalid URL is rejected by validator."""
         school = sample_schools[0]
-        school.website_url = "https://not-a-school.bg"
+        school.website_url = "https://generic-example.bg"
 
-        # Mock response with no school keywords
+        # Mock response with no configured school keywords.
         html_content = """
         <html><body>
             <h1>Generic Website</h1>
-            <p>Not a school</p>
+            <p>General information about unrelated topics.</p>
         </body></html>
         """
 
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_response.url = "https://not-a-school.bg"
+        mock_response.url = "https://generic-example.bg"
         mock_response.text = html_content
 
         with patch("httpx.AsyncClient") as mock_client_class:
