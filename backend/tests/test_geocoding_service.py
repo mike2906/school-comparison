@@ -463,9 +463,13 @@ class TestGeocodingService:
         assert result.error == "API error"
 
         # Verify location was not updated
+        await db_session.rollback()
         await db_session.refresh(location)
         assert location.lat is None
         assert location.lng is None
+        assert location.geocode_meta["status"] == "failed"
+        assert location.geocode_meta["provider"] == "mock"
+        assert location.geocode_meta["rejection_reason"] == "API error"
 
     async def test_geocode_location_rejects_duplicate_geojson_name_match_with_different_address(
         self,
