@@ -59,7 +59,7 @@ Order matters within this phase; tasks touch overlapping files — run sequentia
       `SchoolService.matches_filter` now reads the same projection, so `?facilities=…`
       matches extracted data instead of nothing. See P1.9 for the part deliberately
       left out, and P1.11 for the dead UI reads this exposed.
-- [ ] **P1.2 Validate inside extract.** `backend/app/scrapers/extractor.py:~1023-1025`
+- [x] **P1.2 Validate inside extract.** `backend/app/scrapers/extractor.py:~1023-1025`
       overwrites `attributes.extracted` and deletes the previous validation report at
       commit time, so unvalidated data is live until Stage 6 runs. Fix: run
       `validate_school_data` (deterministic checks + evidence filtering) inside the
@@ -67,6 +67,11 @@ Order matters within this phase; tasks touch overlapping files — run sequentia
       live. Stage 6 becomes audit + sampling (spot checks, cross-school checks).
       *Verify:* extraction of a fixture school never leaves an unvalidated window;
       existing pipeline tests pass.
+      **Done.** `extract_school` now flushes staged pricing/general-info/provenance rows,
+      runs deterministic validation in the same transaction, and commits only the
+      validation-filtered payload plus `data_validation`. Validation failure rolls back
+      the extraction transaction instead of publishing. The extractor test now asserts
+      unsupported fields are removed before commit and a current validation report exists.
 - [ ] **P1.3 Geocode precision model + write-time rejection.** `backend/app/services/geocoding/base.py`:
       add `method` (`geojson_name_match` | `nominatim_address` | `nominatim_fallback`)
       and `precision` (`exact` | `approximate`) to `GeocodingResult`; persist to a new

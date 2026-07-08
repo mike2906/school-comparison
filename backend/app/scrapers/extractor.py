@@ -33,6 +33,7 @@ from app.schemas.extraction import (
     SummarySourceExtractionOutput,
 )
 from app.scrapers.summarizer import clear_summary_state
+from app.scrapers.validator import validate_school_data
 from . import extractor_helpers as helpers
 
 logger = logging.getLogger(__name__)
@@ -1424,6 +1425,7 @@ async def extract_school(
         "pricing_count": 0,
         "pricing_success": False,
         "general_info_success": False,
+        "validation_status": None,
         "details": [],
         "input_tokens": 0,
         "output_tokens": 0,
@@ -1473,6 +1475,29 @@ async def extract_school(
 
     school.updated_at = datetime.datetime.now(datetime.timezone.utc)
     db.add(school)
+
+    if stats["status"] == "extracted":
+        await db.flush()
+        validation_result = await validate_school_data(
+            db=db,
+            school_id=school_id,
+            country_code=country_code,
+            run_spot_check=False,
+        )
+        validation_status = validation_result.get("status")
+        stats["validation_status"] = validation_status
+        stats["validation_issue_counts"] = validation_result.get("issue_counts")
+        stats["validation_auto_fixes"] = validation_result.get("auto_fixes")
+        if validation_status == "validation_failed":
+            await db.rollback()
+            stats["status"] = "extraction_failed"
+            stats["error"] = f"Validation failed during extraction: {validation_result.get('error') or 'unknown error'}"
+            stats["details"].append("Validation failed before commit; extracted data was not published")
+            stats["token_cost_usd"] = round(float(stats["token_cost_usd"] or 0.0), 6)
+            stats["llm_stats"] = llm_stats.as_dict()
+            return stats
+        stats["details"].append(f"Validation completed before commit ({validation_status})")
+
     await db.commit()
 
     stats["token_cost_usd"] = round(float(stats["token_cost_usd"] or 0.0), 6)
