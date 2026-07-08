@@ -104,6 +104,8 @@ async def test_extract_school_persists_pricing_and_general_info(db_session, samp
     assert result["status"] == "extracted"
     assert result["pricing_count"] == 1
     assert result["general_info_success"] is True
+    assert result["validation_status"] == "ok"
+    assert result["validation_auto_fixes"] > 0
 
     pricing_rows = (await db_session.execute(select(Pricing).where(Pricing.school_id == school.id))).scalars().all()
     assert len(pricing_rows) == 1
@@ -111,7 +113,16 @@ async def test_extract_school_persists_pricing_and_general_info(db_session, samp
     await db_session.refresh(school)
     extracted = (school.attributes or {}).get("extracted", {})
     assert extracted.get("facilities") == ["pool"]
-    assert extracted.get("summary_source", {}).get("teaching_approach") == ["project-based learning"]
+    assert extracted.get("programs") == []
+    assert extracted.get("class_size") is None
+    assert extracted.get("founded_year") is None
+    assert extracted.get("summary_source", {}).get("teaching_approach") == []
+    data_validation = (school.attributes or {}).get("data_validation", {})
+    assert data_validation.get("status") == "ok"
+    assert any(
+        fix.get("code") == "programs_missing_evidence"
+        for fix in data_validation.get("auto_fixes", [])
+    )
     assert (school.attributes or {}).get("display_name_i18n") == {
         "bg": "Fusion School",
         "en": "Fusion School",
