@@ -28,7 +28,7 @@ def deterministic_pricing_rows(school: School, pages: list[SourcePage]) -> list[
     selected_text, _source_urls = helpers._select_pages(
         school=school,
         pages=pages,
-        preferred_categories=["pricing", "admission", "contact"],
+        preferred_categories=extractor.PRICING_PAGE_CATEGORIES,
         use_case="pricing",
     )
     if not selected_text:
@@ -60,7 +60,7 @@ def deterministic_general_info(
     narrative_text, _ = helpers._select_pages(
         school=school,
         pages=pages,
-        preferred_categories=["about", "programs", "facilities"],
+        preferred_categories=extractor.SUMMARY_SOURCE_PAGE_CATEGORIES,
         use_case="general_summary_source",
         include_tokens=extractor.GENERAL_INFO_HINT_TOKENS,
     )

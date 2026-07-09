@@ -380,6 +380,15 @@ Optional filters:
 - `--exam-type nvo_7` (repeatable)
 - `--school-id 123` for a targeted import
 
+### Data-quality scoreboard
+```bash
+cd backend
+uv run python -m app.scrapers.cli data-quality --city sofia --country bg
+```
+Prints the six go-live quality metrics + recent pipeline runs. Every batch `run`
+(extract/validate-data/summarize/all/…) also records a `pipeline_runs` row with a
+`metrics` snapshot via `app/services/pipeline_runs.py`.
+
 ---
 
 ## Known Issues & Gotchas

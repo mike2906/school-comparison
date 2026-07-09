@@ -27,10 +27,6 @@ class Settings(BaseSettings):
     validation_spot_check_max_content_chars: int = 12000
     validation_spot_check_max_extracted_chars: int = 8000
 
-    # Pipeline alerting
-    alert_webhook_url: str = ""  # Slack/Discord webhook URL for pipeline alerts
-    alert_failure_threshold: float = 0.10  # Alert if >10% of schools fail
-
     # App settings
     debug: bool = True
     secret_key: str = "change-this-in-production"

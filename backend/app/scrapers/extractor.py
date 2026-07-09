@@ -81,6 +81,20 @@ GENERAL_INFO_HINT_TOKENS: tuple[str, ...] = (
     "лаборатория",
 )
 
+# Preferred `_select_pages` category orderings. Kept as module constants (not inline
+# literals) so the deterministic path in `deterministic.py` imports the same lists and
+# page selection can never silently diverge between production and the golden corpus.
+PRICING_PAGE_CATEGORIES: list[str] = ["pricing", "admission", "contact"]
+GENERAL_INFO_PAGE_CATEGORIES: list[str] = [
+    "about",
+    "contact",
+    "programs",
+    "facilities",
+    "admission",
+    "pricing",
+]
+SUMMARY_SOURCE_PAGE_CATEGORIES: list[str] = ["about", "programs", "facilities"]
+
 
 @dataclass
 class ExtractionLLMStats:
@@ -816,7 +830,7 @@ async def _extract_prices(
     selected_text, source_urls = helpers._select_pages(
         school=school,
         pages=pages,
-        preferred_categories=["pricing", "admission", "contact"],
+        preferred_categories=PRICING_PAGE_CATEGORIES,
         use_case="pricing",
     )
     if not selected_text:
@@ -1039,14 +1053,14 @@ async def _extract_general_info(
     selected_text, source_urls = helpers._select_pages(
         school=school,
         pages=pages,
-        preferred_categories=["about", "contact", "programs", "facilities", "admission", "pricing"],
+        preferred_categories=GENERAL_INFO_PAGE_CATEGORIES,
         use_case="general_info",
         include_tokens=GENERAL_INFO_HINT_TOKENS,
     )
     narrative_text, _ = helpers._select_pages(
         school=school,
         pages=pages,
-        preferred_categories=["about", "programs", "facilities"],
+        preferred_categories=SUMMARY_SOURCE_PAGE_CATEGORIES,
         use_case="general_summary_source",
         include_tokens=GENERAL_INFO_HINT_TOKENS,
     )

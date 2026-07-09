@@ -142,7 +142,7 @@ Order matters within this phase; tasks touch overlapping files — run sequentia
       the live DB with `uv run python -m scripts.build_golden_corpus`. Coverage spans
       private/international/state types, pricing tables, display-name overrides, and the
       Fusion (520) / English-primary (510) cases.
-- [ ] **P1.6 Quality scoreboard.** Wire `PipelineRun` (modeled in
+- [x] **P1.6 Quality scoreboard.** Wire `PipelineRun` (modeled in
       `app/models/pipeline_run.py`, currently never written) into the CLI batch runners,
       and snapshot 6 metrics per run: % schools validation-ok, duplicate-coordinate
       groups, % locations precision=exact, % display-name overrides, spot-check
@@ -150,20 +150,45 @@ Order matters within this phase; tasks touch overlapping files — run sequentia
       Add a `data-quality` CLI report reusing queries from the repair commands.
       Implement the webhook alert or delete `alert_webhook_url`/`alert_failure_threshold`.
       *Verify:* run pipeline on a few schools → PipelineRun row exists with metrics.
-      - [ ] *Cleanup (low priority, from P1.5 review; bundle into this PR).*
-            `app/scrapers/deterministic.py` still duplicates the `_select_pages`
-            category-list literals from `extractor._extract_prices` /
-            `_extract_general_info` (e.g. `["pricing", "admission", "contact"]` and the
-            general-info/narrative lists). They match today, but a category-list change
-            in the extractor alone would silently shift which pages the golden corpus
-            selects. Hoist those lists into module-level constants in `extractor.py`
-            and import them in `deterministic.py` so the selection can't drift.
+      **Done.** `app/services/data_quality.py::compute_quality_metrics` computes the six
+      metrics in Python (portable across Postgres/SQLite) over schools in country/city
+      scope. Note two metrics read where the data actually lives, not the plan's first
+      guess: spot-check discrepancy comes from `attributes.data_validation.spot_check`
+      (the `spot_check_results` table is unused), and precision from
+      `SchoolLocation.geocode_meta.precision` (P1.3). `app/services/pipeline_runs.py`
+      wraps the batch `run` path: `start_pipeline_run` (status=running) →
+      stage execution → `finalize_pipeline_run` snapshots metrics + per-school counts
+      (extract/validate-data/summarize batch runners now return summary dicts) + status
+      (completed/partial/failed) into the new `pipeline_runs.metrics` JSON column
+      (autogenerate migration `6cb27777e0d2`). A `data-quality` CLI command prints the
+      scoreboard + recent runs. Deleted `alert_webhook_url`/`alert_failure_threshold`
+      (no alerting infra; scoreboard supersedes). Verified live: a `validate-data` run
+      recorded a `completed` PipelineRun with a full metrics snapshot. The report also
+      confirms the gate-based metrics are near-empty on current data (10 duplicate-coord
+      groups, 0 precision records, 0 corroborated overrides) because it predates the
+      P1.1–P1.4 gates — this is the "prove the fixes helped" baseline for P2.4's re-scrape.
+      - [x] *Cleanup (from P1.5 review).* Hoisted the `_select_pages` category-list
+            literals into `extractor.PRICING_PAGE_CATEGORIES` /
+            `GENERAL_INFO_PAGE_CATEGORIES` / `SUMMARY_SOURCE_PAGE_CATEGORIES`, imported by
+            `deterministic.py`, so page selection can't drift between production and the
+            golden corpus (verified byte-identical).
 - [ ] **P1.7 Field-level display gating.** Mirror the summarizer's
       `_blocked_summary_sections` pattern in serialization: a field with an error-level
       issue in the current validation report is excluded from the API response.
       Pricing: hide rows with confidence <0.7 or no `source_url`. Summaries: drop
       `needs_review` from `SUMMARY_ELIGIBLE_VALIDATION_STATUSES` (keep `ok` only).
       *Verify:* tests: school with error-level validation issue on field X → X absent from API.
+      - [ ] *From P1.6 review:* the pricing gate threshold already exists as
+            `app/services/data_quality.py::PRICING_CONFIDENCE_FLOOR` (= 0.7), written to
+            mirror this gate. Import/reuse it here (or move it to a shared location) rather
+            than hardcoding `0.7` a second time, so the scoreboard metric and the display
+            gate can never diverge.
+      - [ ] *From P1.6 review (finding-1 last corner; low priority, bundle here or in any
+            future PR):* in `cli._run_discover_batch`, a whole-adapter exception is caught
+            per-adapter without incrementing any failure count, so a discover run whose only
+            adapter crashes still records `COMPLETED` with all-zero counts. Count adapter
+            exceptions as `failed` in the returned `_stage_summary` (per-school failures
+            don't exist at the discover level, only whole-adapter ones).
 - [ ] **P1.8 Split `location_tags`.** Provenance strings (`source=moe_registry`,
       `source_esri_id=…`) move to `geocode_meta`; `location_tags` stays purely semantic;
       delete the client-side allowlist filter in `frontend/src/utils/locationFocus.js`.
