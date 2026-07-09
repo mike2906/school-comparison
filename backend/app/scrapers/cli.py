@@ -81,6 +81,22 @@ logger = logging.getLogger(__name__)
 
 console = Console()
 
+
+def _stage_summary(processed: int = 0, succeeded: int = 0, failed: int = 0, skipped: int = 0) -> dict:
+    """Per-stage school-outcome counts consumed by the PipelineRun lifecycle."""
+    return {"processed": processed, "succeeded": succeeded, "failed": failed, "skipped": skipped}
+
+
+def _navigate_summary(results) -> dict:
+    """Convert `_run_navigate_batch`'s per-school results list into a stage summary.
+
+    Navigation keeps returning its results list (a repair command consumes it), so
+    the batch dispatch derives run counts here instead of changing that contract.
+    """
+    rows = builtins.list(results or [])
+    succeeded = sum(1 for row in rows if row and row.get("success"))
+    return _stage_summary(processed=len(rows), succeeded=succeeded, failed=len(rows) - succeeded)
+
 _BRAND_ALIAS_GENERIC_EXACT = {
     "school",
     "kindergarten",
@@ -523,6 +539,7 @@ async def _run_sync(
 
             stage_summaries: list = []
             run_error: Optional[str] = None
+            raised: Optional[BaseException] = None
             try:
                 if stage == "discover":
                     stage_summaries.append(await _run_discover_batch(db, country, city, limit, sample_ratio))
@@ -534,7 +551,9 @@ async def _run_sync(
                     stage_summaries.append(await _run_validate_urls_batch(db, country, city, limit))
                 elif stage == "navigate":
                     stage_summaries.append(
-                        await _run_navigate_batch(db, country, city, limit, include_navigated=include_navigated)
+                        _navigate_summary(
+                            await _run_navigate_batch(db, country, city, limit, include_navigated=include_navigated)
+                        )
                     )
                 elif stage == "extract":
                     stage_summaries.append(
@@ -559,7 +578,9 @@ async def _run_sync(
                 elif stage == "all":
                     stage_summaries.append(await _run_validate_urls_batch(db, country, city, limit))
                     stage_summaries.append(
-                        await _run_navigate_batch(db, country, city, limit, include_navigated=include_navigated)
+                        _navigate_summary(
+                            await _run_navigate_batch(db, country, city, limit, include_navigated=include_navigated)
+                        )
                     )
                     stage_summaries.append(
                         await _run_extract_batch(db, country, city, limit, include_extracted=include_extracted)
@@ -571,9 +592,14 @@ async def _run_sync(
                 else:
                     console.print(f"[yellow]Batch mode for '{stage}' not yet implemented[/yellow]")
             except Exception as exc:
+                raised = exc
                 run_error = str(exc)
                 logger.exception("Batch stage execution failed")
                 console.print(f"[red]✗ Error: {run_error}[/red]")
+                # A stage that raised mid-transaction leaves the session unusable;
+                # clear it so the run can still be finalized.
+                if db.in_transaction():
+                    await db.rollback()
             finally:
                 if run is not None:
                     await finalize_pipeline_run(
@@ -585,6 +611,9 @@ async def _run_sync(
                         error_summary=run_error,
                     )
                     console.print(f"[dim]Recorded pipeline run {run.id} ({run.status.value}).[/dim]")
+            # Batch mode is the automation path: a stage failure must exit non-zero.
+            if raised is not None:
+                raise raised
 
 
 async def _run_nvo_import(
@@ -2305,10 +2334,13 @@ async def _run_discover_batch(db, country: str, city: str, limit: Optional[int],
 
     if not adapters:
         console.print(f"[red]No adapters found for country={country}, city={city}[/red]")
-        return
+        return _stage_summary()
 
     console.print(f"[cyan]Found {len(adapters)} adapter(s)[/cyan]")
 
+    created_total = 0
+    updated_total = 0
+    skipped_total = 0
     for adapter_class in adapters:
         adapter = adapter_class(db=db)
         console.print(f"\n[cyan]Running {adapter.ADAPTER_NAME}...[/cyan]")
@@ -2324,6 +2356,9 @@ async def _run_discover_batch(db, country: str, city: str, limit: Optional[int],
                 result = await adapter.run(limit=limit, sample_ratio=sample_ratio)
                 progress.update(task, completed=True)
 
+                created_total += int(result["created"])
+                updated_total += int(result["updated"])
+                skipped_total += int(result["skipped"])
                 console.print(f"[green]✓ Discovery complete:[/green]")
                 console.print(f"  Created: {result['created']}")
                 console.print(f"  Updated: {result['updated']}")
@@ -2332,6 +2367,12 @@ async def _run_discover_batch(db, country: str, city: str, limit: Optional[int],
             except Exception as e:
                 console.print(f"[red]✗ Error: {str(e)}[/red]")
                 logger.exception("Discovery failed")
+
+    return _stage_summary(
+        processed=created_total + updated_total + skipped_total,
+        succeeded=created_total + updated_total,
+        skipped=skipped_total,
+    )
 
 
 async def _run_validate_urls_batch(
@@ -2370,7 +2411,7 @@ async def _run_validate_urls_batch(
 
     if not schools:
         console.print("[yellow]No schools to validate[/yellow]")
-        return
+        return _stage_summary()
 
     settings = get_settings()
     requested_concurrency = max(1, int(settings.url_validation_concurrency))
@@ -2450,6 +2491,13 @@ async def _run_validate_urls_batch(
     console.print(f"  Ambiguous: {ambiguous_count}")
     console.print(f"  Errors: {error_count}")
 
+    return _stage_summary(
+        processed=len(schools),
+        succeeded=valid_count,
+        failed=invalid_count + error_count,
+        skipped=ambiguous_count,
+    )
+
 
 async def _run_recover_failed_school(db, school_id: int, country: str) -> dict:
     """Rediscover + revalidate URL for one failed school, trying multiple candidates."""
@@ -2509,7 +2557,7 @@ async def _run_recover_failed_urls_batch(db, country: str, city: str, limit: Opt
 
     if not school_ids:
         console.print("[yellow]No failed_validate schools to recover[/yellow]")
-        return
+        return _stage_summary()
 
     console.print(f"[cyan]Recovering {len(school_ids)} failed school URLs...[/cyan]")
 
@@ -2564,6 +2612,13 @@ async def _run_recover_failed_urls_batch(db, country: str, city: str, limit: Opt
     console.print(f"  No official website: {terminal_count}")
     console.print(f"  Skipped: {skipped_count}")
 
+    return _stage_summary(
+        processed=len(school_ids),
+        succeeded=validated_count,
+        failed=still_failed_count,
+        skipped=terminal_count + skipped_count,
+    )
+
 
 async def _run_discover_website(db, school_id: int, country: str):
     """Run website discovery for a single school."""
@@ -2606,7 +2661,7 @@ async def _run_discover_websites_batch(db, country: str, city: str, limit: Optio
 
     if not schools:
         console.print("[yellow]No schools to discover websites for[/yellow]")
-        return
+        return _stage_summary()
 
     console.print(f"[cyan]Discovering websites for {len(schools)} schools...[/cyan]")
 
@@ -2619,6 +2674,7 @@ async def _run_discover_websites_batch(db, country: str, city: str, limit: Optio
 
         found_count = 0
         updated_count = 0
+        error_count = 0
 
         for school in schools:
             try:
@@ -2628,6 +2684,7 @@ async def _run_discover_websites_batch(db, country: str, city: str, limit: Optio
                 if result and result.get("updated"):
                     updated_count += 1
             except Exception as e:
+                error_count += 1
                 logger.error(f"Error discovering website for school {school.id}: {e}")
             progress.update(task, advance=1)
 
@@ -2635,6 +2692,13 @@ async def _run_discover_websites_batch(db, country: str, city: str, limit: Optio
     console.print(f"  Found: {found_count}")
     console.print(f"  Updated: {updated_count}")
     console.print(f"  Unchanged: {len(schools) - updated_count}")
+
+    return _stage_summary(
+        processed=len(schools),
+        succeeded=found_count,
+        failed=error_count,
+        skipped=len(schools) - found_count - error_count,
+    )
 
 
 async def _run_validate_url(db, school_id: int, country: str):
@@ -3058,13 +3122,13 @@ async def _show_data_quality(city, country, runs):
         console.print(table)
 
         if runs > 0:
+            runs_query = select(PipelineRun).where(PipelineRun.country_code == country)
+            if city:
+                runs_query = runs_query.where(PipelineRun.city == city)
             recent = builtins.list(
                 (
                     await db.execute(
-                        select(PipelineRun)
-                        .where(PipelineRun.country_code == country)
-                        .order_by(PipelineRun.started_at.desc())
-                        .limit(runs)
+                        runs_query.order_by(PipelineRun.started_at.desc()).limit(runs)
                     )
                 )
                 .scalars()
@@ -3243,7 +3307,7 @@ async def _run_validate_data_batch(
             console.print("[yellow]No schools to validate (must be extracted or summarized)[/yellow]")
         else:
             console.print("[yellow]No schools to validate (all extracted/summarized schools already have current Stage 6 reports)[/yellow]")
-        return {"processed": 0, "succeeded": 0, "failed": 0, "skipped": 0}
+        return _stage_summary()
 
     requested_concurrency = max(1, int(getattr(settings, "validation_batch_concurrency", 1)))
     max_concurrency = 8
@@ -3303,12 +3367,7 @@ async def _run_validate_data_batch(
     console.print(f"  Needs review: {review_count}")
     console.print(f"  Failed: {failed_count}")
 
-    validation_summary = {
-        "processed": len(school_ids),
-        "succeeded": ok_count + review_count,
-        "failed": failed_count,
-        "skipped": 0,
-    }
+    validation_summary = _stage_summary(processed=len(school_ids), succeeded=ok_count + review_count, failed=failed_count)
 
     sample_size = int(getattr(settings, "spot_check_sample_size", 0))
     sample_ids = sorted(validated_ids)
@@ -3473,7 +3532,7 @@ async def _run_extract_batch(
 
     if not school_ids:
         console.print("[yellow]No schools to extract (must be navigated or extraction_failed)[/yellow]")
-        return {"processed": 0, "succeeded": 0, "failed": 0, "skipped": 0}
+        return _stage_summary()
 
     if explicit_school_ids:
         status_label = "explicit repair selection"
@@ -3581,12 +3640,7 @@ async def _run_extract_batch(
     console.print(f"  Skipped: {skipped_count}")
     console.print(f"  Failed: {fail_count}")
 
-    return {
-        "processed": len(school_ids),
-        "succeeded": success_count,
-        "failed": fail_count,
-        "skipped": skipped_count,
-    }
+    return _stage_summary(processed=len(school_ids), succeeded=success_count, failed=fail_count, skipped=skipped_count)
 
 
 async def _run_summarize_school(db, school_id: int, country: str):
@@ -3627,7 +3681,7 @@ async def _run_summarize_batch(
 
     if not school_ids:
         console.print("[yellow]No schools to summarize (all eligible summaries are current or ineligible)[/yellow]")
-        return {"processed": 0, "succeeded": 0, "failed": 0, "skipped": 0}
+        return _stage_summary()
 
     requested_concurrency = max(1, int(getattr(settings, "summarization_batch_concurrency", 1)))
     max_concurrency = 8
@@ -3692,12 +3746,7 @@ async def _run_summarize_batch(
     console.print(f"  Failed: {failed_count}")
     console.print(f"  Tokens: in={input_tokens}, out={output_tokens}")
     console.print(f"  Cost: ${token_cost:.6f}")
-    return {
-        "processed": len(school_ids),
-        "succeeded": summarized_count,
-        "failed": failed_count,
-        "skipped": skipped_count,
-    }
+    return _stage_summary(processed=len(school_ids), succeeded=summarized_count, failed=failed_count, skipped=skipped_count)
 
 
 if __name__ == "__main__":

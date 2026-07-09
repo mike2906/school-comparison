@@ -152,3 +152,30 @@ async def test_pipeline_run_status_failed_on_error(quality_fixture):
     )
     assert finalized.status == PipelineStatus.FAILED
     assert finalized.error_summary == "boom"
+
+
+async def test_pipeline_run_all_failures_not_recorded_completed(quality_fixture):
+    """Finding 1 regression: a stage that fails every school must not read COMPLETED."""
+    run = await start_pipeline_run(quality_fixture, country="bg", city="sofia", cli_stage="validate-urls")
+    finalized = await finalize_pipeline_run(
+        quality_fixture, run, country="bg", city="sofia",
+        stage_summaries=[{"processed": 5, "succeeded": 0, "failed": 5, "skipped": 0}],
+    )
+    assert finalized.status == PipelineStatus.FAILED
+    assert finalized.schools_processed == 5
+    assert finalized.schools_failed == 5
+
+
+async def test_navigate_summary_converts_results_list():
+    """`navigate` keeps returning its list; the dispatch derives real counts from it."""
+    from app.scrapers.cli import _navigate_summary
+
+    summary = _navigate_summary(
+        [
+            {"school_id": 1, "success": True},
+            {"school_id": 2, "success": False},
+            {"school_id": 3, "success": True},
+        ]
+    )
+    assert summary == {"processed": 3, "succeeded": 2, "failed": 1, "skipped": 0}
+    assert _navigate_summary(None) == {"processed": 0, "succeeded": 0, "failed": 0, "skipped": 0}
