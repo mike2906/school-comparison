@@ -114,6 +114,11 @@ Order matters within this phase; tasks touch overlapping files — run sequentia
       **Done.** The repeated-page identity key now preserves the normalized full
       display label instead of collapsing to brand-core tokens, so institution and
       location qualifiers remain part of the repeated-name proof.
+      - [ ] *Cleanup (low priority, non-blocking).* `_refine_display_identity_label`
+            (`backend/app/scrapers/extractor.py`) duplicates the prefix-stripping
+            sequence in `helpers._normalize_display_name_case`. Dedupe into a shared
+            helper in a focused PR — the two intentionally diverge (identity keying is
+            more aggressive), so keep regression tests green and change no gate behavior.
 - [ ] **P1.5 Golden-fixture corpus.** Commit ~20 real cached `source_pages.raw_markdown`
       pages + expected pricing/display-name/general-info outputs as pytest fixtures.
       Run the deterministic extraction path against them in CI. Every future pricing/
