@@ -24,6 +24,8 @@ from __future__ import annotations
 import re
 from typing import Any, Iterable, Mapping, Optional, Union
 
+from app.utils.display_gating import blocked_display_fields
+
 DISPLAY_LOCALES: tuple[str, ...] = ("bg", "en")
 
 # Free-text display fields whose values are plain string lists. Resolved per locale by
@@ -271,16 +273,21 @@ def build_localized_attributes(
     attributes: Mapping[str, Any] | None,
     locale: str,
 ) -> dict[str, Any]:
-    """Resolve the free-text display fields for a single locale."""
+    """Resolve the free-text display fields for a single locale.
+
+    Fields flagged by the current validation report (P1.7) are emitted empty so a
+    validator-rejected value never reaches the browser.
+    """
     attrs = _as_mapping(attributes)
     extracted = _localized_extracted(attrs, locale)
+    blocked = blocked_display_fields(attrs)
 
     focus = _normalize_focus_entries(
         _normalize_focus_entries(attrs.get("language_focus"))
         + _normalize_focus_entries(extracted.get("languages"))
     )
 
-    return {
+    resolved = {
         "language_focus": focus,
         "languages_of_instruction": _merged_list(
             attrs.get("languages_of_instruction"),
@@ -297,6 +304,10 @@ def build_localized_attributes(
             extracted.get("extracurricular"),
         ),
     }
+    for field in blocked:
+        if field in resolved:
+            resolved[field] = []
+    return resolved
 
 
 def _bool_or_none(value: Any) -> Optional[bool]:
@@ -314,13 +325,19 @@ def _year_or_none(value: Any) -> Optional[int]:
 
 
 def build_base_attributes(attributes: Mapping[str, Any] | None) -> dict[str, Any]:
-    """Resolve the locale-independent display fields."""
+    """Resolve the locale-independent display fields.
+
+    Fields flagged by the current validation report (P1.7) are emitted as ``None``.
+    """
     attrs = _as_mapping(attributes)
     extracted = _as_mapping(attrs.get("extracted"))
+    blocked = blocked_display_fields(attrs)
 
     class_size = _parse_class_size(attrs.get("class_size"))
     if class_size is None:
         class_size = _parse_class_size(extracted.get("class_size"))
+    if "class_size" in blocked:
+        class_size = None
 
     return {
         "class_size": class_size,

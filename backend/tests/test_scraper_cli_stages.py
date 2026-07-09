@@ -28,6 +28,29 @@ async def test_stage_choices_use_canonical_names():
 
 
 @pytest.mark.asyncio
+async def test_run_discover_batch_counts_crashed_adapter_as_failed(db_session):
+    class _BoomAdapter:
+        ADAPTER_NAME = "boom"
+
+        def __init__(self, db):
+            self.db = db
+
+        async def run(self, limit=None, sample_ratio=1.0):
+            raise RuntimeError("kaboom")
+
+    with patch(
+        "app.scrapers.sources.get_adapters_for_country",
+        return_value=[_BoomAdapter],
+    ):
+        summary = await scraper_cli._run_discover_batch(db_session, "bg", "sofia", None, 1.0)
+
+    # A crashed adapter must not record COMPLETED with all-zero counts.
+    assert summary["failed"] == 1
+    assert summary["succeeded"] == 0
+    assert summary["processed"] == 1
+
+
+@pytest.mark.asyncio
 async def test_run_all_stages_routes_to_canonical_handlers(db_session):
     school = School(
         name_i18n={"bg": "Тест"},

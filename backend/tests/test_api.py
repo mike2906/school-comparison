@@ -2,7 +2,20 @@
 import pytest
 from sqlalchemy import select
 
+from app.models.pricing import Pricing, PriceSource
 from app.models.school import School, SchoolLocation, SchoolLocationAgeGroupShift
+
+
+def _validation_report(issues=None, spot_check=None, status="needs_review"):
+    return {
+        "_schema_version": 1,
+        "validated_at": "2026-03-11T00:00:00+00:00",
+        "status": status,
+        "issue_counts": {"error": len(issues or []), "warning": 0},
+        "issues": issues or [],
+        "auto_fixes": [],
+        "spot_check": spot_check,
+    }
 
 
 class TestHealthEndpoint:
@@ -920,3 +933,183 @@ class TestCompareEndpoint:
         assert "lat" in location
         assert "lng" in location
         assert "address_i18n" in location
+
+
+class TestDisplayGating:
+    """P1.7: validator-rejected fields and ungated pricing never reach the API."""
+
+    @pytest.mark.asyncio
+    async def test_pricing_rows_gated_by_source_url_and_confidence(self, seeded_db, seeded_client):
+        school = School(
+            name_i18n={"bg": "Ценово училище", "en": "Pricing School"},
+            country_code="bg",
+            school_type="private",
+            education_level="primary",
+            city="sofia",
+            attributes={},
+        )
+        seeded_db.add(school)
+        await seeded_db.flush()
+        seeded_db.add_all(
+            [
+                Pricing(
+                    school_id=school.id,
+                    category="tuition",
+                    amount=500,
+                    currency="BGN",
+                    period="monthly",
+                    source=PriceSource.SCRAPED_WEBSITE,
+                    source_url="https://example.com/fees",
+                    pricing_context={"confidence": 0.9},
+                ),
+                # No source_url → withheld.
+                Pricing(
+                    school_id=school.id,
+                    category="food",
+                    amount=100,
+                    currency="BGN",
+                    period="monthly",
+                    source=PriceSource.SCRAPED_WEBSITE,
+                    source_url=None,
+                    pricing_context={"confidence": 0.9},
+                ),
+                # Confidence below the floor → withheld.
+                Pricing(
+                    school_id=school.id,
+                    category="transport",
+                    amount=80,
+                    currency="BGN",
+                    period="monthly",
+                    source=PriceSource.SCRAPED_WEBSITE,
+                    source_url="https://example.com/fees",
+                    pricing_context={"confidence": 0.4},
+                ),
+            ]
+        )
+        await seeded_db.commit()
+
+        response = await seeded_client.get(f"/schools/{school.id}")
+        assert response.status_code == 200
+        pricing = response.json()["pricing"]
+        assert [row["category"] for row in pricing] == ["tuition"]
+
+    @pytest.mark.asyncio
+    async def test_pricing_row_with_validation_error_is_hidden(self, seeded_db, seeded_client):
+        school = School(
+            name_i18n={"bg": "Ценово училище 2", "en": "Pricing School 2"},
+            country_code="bg",
+            school_type="private",
+            education_level="primary",
+            city="sofia",
+            attributes={},
+        )
+        seeded_db.add(school)
+        await seeded_db.flush()
+        good = Pricing(
+            school_id=school.id,
+            category="tuition",
+            amount=500,
+            currency="BGN",
+            period="monthly",
+            source=PriceSource.SCRAPED_WEBSITE,
+            source_url="https://example.com/fees",
+            pricing_context={"confidence": 0.9},
+        )
+        # Clears the source/confidence gate, but Stage 6 flagged it as a bad price.
+        flagged = Pricing(
+            school_id=school.id,
+            category="food",
+            amount=-10,
+            currency="BGN",
+            period="monthly",
+            source=PriceSource.SCRAPED_WEBSITE,
+            source_url="https://example.com/fees",
+            pricing_context={"confidence": 0.9},
+        )
+        seeded_db.add_all([good, flagged])
+        await seeded_db.flush()
+        school.attributes = {
+            "data_validation": _validation_report(
+                issues=[
+                    {
+                        "code": "negative_price_amount",
+                        "severity": "error",
+                        "field_path": f"pricing[{flagged.id}].amount",
+                        "message": "negative amount",
+                    }
+                ],
+            )
+        }
+        await seeded_db.commit()
+
+        response = await seeded_client.get(f"/schools/{school.id}")
+        assert response.status_code == 200
+        pricing = response.json()["pricing"]
+        assert [row["category"] for row in pricing] == ["tuition"]
+
+    @pytest.mark.asyncio
+    async def test_stored_summary_hidden_when_validation_not_ok(self, seeded_db, seeded_client):
+        summary = {"bg": {"short": "кратко", "long": "дълго"}}
+        needs_review = School(
+            name_i18n={"bg": "Резюме А", "en": "Summary A"},
+            country_code="bg",
+            school_type="private",
+            education_level="primary",
+            city="sofia",
+            summary_i18n=summary,
+            attributes={"data_validation": _validation_report(status="needs_review")},
+        )
+        clean = School(
+            name_i18n={"bg": "Резюме Б", "en": "Summary B"},
+            country_code="bg",
+            school_type="private",
+            education_level="primary",
+            city="sofia",
+            summary_i18n=summary,
+            attributes={"data_validation": _validation_report(status="ok", issues=[])},
+        )
+        seeded_db.add_all([needs_review, clean])
+        await seeded_db.commit()
+
+        hidden = (await seeded_client.get(f"/schools/{needs_review.id}")).json()
+        assert hidden["summary_i18n"] is None
+
+        shown = (await seeded_client.get(f"/schools/{clean.id}")).json()
+        assert shown["summary_i18n"] == summary
+
+    @pytest.mark.asyncio
+    async def test_display_field_hidden_when_validation_error(self, seeded_db, seeded_client):
+        school = School(
+            name_i18n={"bg": "Тест атрибути", "en": "Attr School"},
+            country_code="bg",
+            school_type="private",
+            education_level="primary",
+            city="sofia",
+            attributes={
+                "extracted": {
+                    "facilities": ["Library", "Gym"],
+                    "programs": ["STEM"],
+                },
+                "data_validation": _validation_report(
+                    issues=[
+                        {
+                            "code": "facilities_unsupported",
+                            "severity": "error",
+                            "field_path": "attributes.extracted.facilities",
+                            "message": "not supported by source",
+                        }
+                    ],
+                ),
+            },
+        )
+        seeded_db.add(school)
+        await seeded_db.commit()
+
+        response = await seeded_client.get(f"/schools/{school.id}")
+        assert response.status_code == 200
+        attributes_i18n = response.json()["attributes_i18n"]
+        # Flagged field is withheld in every locale...
+        assert attributes_i18n["bg"]["facilities"] == []
+        assert attributes_i18n["en"]["facilities"] == []
+        # ...while an unaffected field still comes through.
+        assert attributes_i18n["bg"]["special_programs"] == ["STEM"]

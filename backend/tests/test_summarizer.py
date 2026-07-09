@@ -30,7 +30,9 @@ def _validation_payload(status: str = "ok", issues: list[dict] | None = None, sp
 
 
 @pytest.mark.asyncio
-async def test_prepare_summary_candidate_drops_errored_pricing_for_needs_review(db_session):
+async def test_prepare_summary_candidate_rejects_needs_review(db_session):
+    # P1.7: a whole-school summary is only published for a clean (`ok`) report; a
+    # `needs_review` report still carries error-level issues.
     school = School(
         name_i18n={"bg": "Сумиране Тест", "en": "Summary Test"},
         country_code="bg",
@@ -42,7 +44,6 @@ async def test_prepare_summary_candidate_drops_errored_pricing_for_needs_review(
             "extracted": {
                 "languages": [{"language": "English", "level": None}],
                 "programs": ["STEM"],
-                "pricing_terms": {"discounts": ["Sibling discount"]},
             },
             "data_validation": _validation_payload(
                 status="needs_review",
@@ -58,17 +59,56 @@ async def test_prepare_summary_candidate_drops_errored_pricing_for_needs_review(
         },
     )
     db_session.add(school)
-    await db_session.flush()
-    db_session.add(
-        Pricing(
-            school_id=school.id,
-            category="tuition",
-            amount=500,
-            currency="BGN",
-            period="monthly",
-            source=PriceSource.SCRAPED_WEBSITE,
+    await db_session.commit()
+
+    school = (
+        await db_session.execute(
+            select(School).options(
+                selectinload(School.locations),
+                selectinload(School.pricing),
+                selectinload(School.exam_results),
+            ).where(School.id == school.id)
         )
+    ).scalar_one()
+    prepared = summarizer_module.prepare_summary_candidate(school)
+
+    assert prepared.summary_input is None
+    assert prepared.validation_status == "needs_review"
+
+
+@pytest.mark.asyncio
+async def test_prepare_summary_candidate_drops_pricing_flagged_by_spot_check(db_session):
+    # An `ok` report can still carry an actionable spot-check discrepancy; the
+    # affected section is dropped while other sections still summarise.
+    school = School(
+        name_i18n={"bg": "Сумиране Тест", "en": "Summary Test"},
+        country_code="bg",
+        school_type="private",
+        education_level="primary",
+        city="sofia",
+        scrape_status="summarized",
+        attributes={
+            "extracted": {
+                "languages": [{"language": "English", "level": None}],
+                "programs": ["STEM"],
+                "pricing_terms": {"discounts": ["Sibling discount"]},
+            },
+            "data_validation": _validation_payload(
+                status="ok",
+                spot_check={
+                    "has_discrepancy": True,
+                    "discrepancies": [
+                        {
+                            "field_path": "attributes.extracted.pricing_terms",
+                            "kind": "contradiction",
+                            "issue": "price mismatch",
+                        }
+                    ],
+                },
+            ),
+        },
     )
+    db_session.add(school)
     await db_session.commit()
 
     school = (
@@ -83,7 +123,7 @@ async def test_prepare_summary_candidate_drops_errored_pricing_for_needs_review(
     prepared = summarizer_module.prepare_summary_candidate(school)
 
     assert prepared.summary_input is not None
-    assert prepared.validation_status == "needs_review"
+    assert prepared.validation_status == "ok"
     assert prepared.summary_input.offering is not None
     assert prepared.summary_input.pricing is None
 

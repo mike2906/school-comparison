@@ -2341,6 +2341,7 @@ async def _run_discover_batch(db, country: str, city: str, limit: Optional[int],
     created_total = 0
     updated_total = 0
     skipped_total = 0
+    failed_adapters = 0
     for adapter_class in adapters:
         adapter = adapter_class(db=db)
         console.print(f"\n[cyan]Running {adapter.ADAPTER_NAME}...[/cyan]")
@@ -2367,10 +2368,15 @@ async def _run_discover_batch(db, country: str, city: str, limit: Optional[int],
             except Exception as e:
                 console.print(f"[red]✗ Error: {str(e)}[/red]")
                 logger.exception("Discovery failed")
+                # Discovery has no per-school unit that can fail, so count the whole
+                # crashed adapter — otherwise a run whose only adapter throws records
+                # COMPLETED with all-zero counts.
+                failed_adapters += 1
 
     return _stage_summary(
-        processed=created_total + updated_total + skipped_total,
+        processed=created_total + updated_total + skipped_total + failed_adapters,
         succeeded=created_total + updated_total,
+        failed=failed_adapters,
         skipped=skipped_total,
     )
 

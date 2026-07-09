@@ -28,7 +28,11 @@ from app.utils.i18n_resolver import derive_english_name, resolve_address_i18n, r
 
 SUMMARY_GENERATION_SCHEMA_VERSION = 18
 SUMMARY_GENERATION_KEY = "summary_generation"
-SUMMARY_ELIGIBLE_VALIDATION_STATUSES = {"ok", "needs_review"}
+# P1.7: only fully-clean reports are summary-eligible. `needs_review` schools still
+# carry error-level issues, and a summary is a whole-school narrative — we don't
+# publish one until validation is clean, even though field-level display gating
+# lets individual clean fields through.
+SUMMARY_ELIGIBLE_VALIDATION_STATUSES = {"ok"}
 _ACTIONABLE_DISCREPANCY_KINDS = {"contradiction", "unsupported"}
 _NARRATIVE_ADMIN_MARKERS = (
     "правилник",
