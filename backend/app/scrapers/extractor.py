@@ -600,11 +600,46 @@ def _labels_match(left: str | None, right: str | None) -> bool:
     return bool(left_tokens and right_tokens and left_tokens & right_tokens)
 
 
-def _display_identity_key(value: str | None) -> str | None:
-    tokens = helpers._display_name_match_tokens(value)
-    if not tokens:
+def _refine_display_identity_label(value: str | None) -> str | None:
+    label = helpers._sanitize_label(str(value or ""), max_len=200)
+    if not label:
         return None
-    return " ".join(sorted(tokens))
+    label = re.sub(r"^(?:лого|logo)\s+", "", label, flags=re.IGNORECASE).strip()
+    lowered = label.lower()
+    if lowered.startswith(helpers._DISPLAY_NAME_ROLE_PREFIXES):
+        return None
+
+    stripped = helpers._DISPLAY_NAME_BG_STRIP_PREFIX.sub("", label).strip(" -,\"'“”„")
+    stripped = re.sub(
+        (
+            r"^(?:с\s+ранно\s+чуждоезиково\s+обучение|с\s+немски\s+език|немска\s+гимназия|"
+            r"английска\s+гимназия|френска\s+гимназия)\s+"
+        ),
+        "",
+        stripped,
+        flags=re.IGNORECASE,
+    ).strip(" -,\"'“”„")
+    stripped = re.sub(r"\s+софия\s+\d+$", "", stripped, flags=re.IGNORECASE).strip()
+    if stripped and stripped != label and helpers._display_name_tokens(stripped):
+        label = helpers._normalize_display_name_case(stripped) or stripped
+
+    stripped = helpers._DISPLAY_NAME_EN_STRIP_PREFIX.sub("", label).strip(" -,\"'“”„")
+    if stripped and stripped != label and helpers._display_name_tokens(stripped):
+        label = helpers._normalize_display_name_case(stripped) or stripped
+
+    return label
+
+
+def _display_identity_key(value: str | None) -> str | None:
+    label = _refine_display_identity_label(value)
+    if not label:
+        return None
+    label = label.replace("’", "'").replace("“", '"').replace("”", '"')
+    label = re.sub(r"\s*&\s*", " and ", label)
+    label = helpers.transliterate_bulgarian(label) if re.search(r"[А-Яа-я]", label) else label
+    label = re.sub(r"[^a-z0-9]+", " ", label.casefold())
+    label = re.sub(r"\s+", " ", label).strip()
+    return label or None
 
 
 def _display_name_has_domain_alias_match(

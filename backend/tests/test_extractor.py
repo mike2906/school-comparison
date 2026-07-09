@@ -551,8 +551,8 @@ def test_display_name_evidence_requires_same_repeated_identity():
             page_category="about",
             scrape_type=ScrapeType.WEBSITE,
             is_valid=True,
-            raw_markdown="Maple Bear Global Schools helps children.",
-            content_hash="maple-global",
+            raw_markdown="Maple Bear Academy helps children.",
+            content_hash="maple-academy-about",
             last_scraped_at=datetime.datetime.now(datetime.UTC),
         ),
         SourcePage(
@@ -574,6 +574,180 @@ def test_display_name_evidence_requires_same_repeated_identity():
     )
 
     assert evidence is None
+
+
+def test_display_name_evidence_preserves_comma_qualifiers():
+    school = School(
+        id=1,
+        name_i18n={"bg": "Частно училище Maple Bear Academy Sofia"},
+        country_code="bg",
+        city="sofia",
+        school_type="private",
+        education_level="kindergarten",
+        website_url="https://sofia-school.maplebear.bg/en/",
+    )
+    pages = [
+        SourcePage(
+            school_id=1,
+            source_url="https://sofia-school.maplebear.bg/en/about-us",
+            page_category="about",
+            scrape_type=ScrapeType.WEBSITE,
+            is_valid=True,
+            raw_markdown="Maple Bear Academy, Plovdiv helps children.",
+            content_hash="maple-plovdiv-about",
+            last_scraped_at=datetime.datetime.now(datetime.UTC),
+        ),
+        SourcePage(
+            school_id=1,
+            source_url="https://sofia-school.maplebear.bg/en/admission",
+            page_category="admission",
+            scrape_type=ScrapeType.WEBSITE,
+            is_valid=True,
+            raw_markdown="Admissions at Maple Bear Academy, Plovdiv are open.",
+            content_hash="maple-plovdiv-admission",
+            last_scraped_at=datetime.datetime.now(datetime.UTC),
+        ),
+    ]
+
+    evidence = extractor_module._build_display_name_evidence(
+        {"bg": "Maple Bear Academy, Sofia", "en": "Maple Bear Academy, Sofia"},
+        school=school,
+        pages=pages,
+    )
+
+    assert evidence is None
+
+
+def test_display_name_evidence_preserves_qualifiers_outside_quotes():
+    school = School(
+        id=1,
+        name_i18n={"bg": 'ЧДГ "Светлина" София'},
+        country_code="bg",
+        city="sofia",
+        school_type="private",
+        education_level="kindergarten",
+        website_url="https://svetlina-sofia.bg",
+    )
+    pages = [
+        SourcePage(
+            school_id=1,
+            source_url="https://svetlina-sofia.bg/about-us",
+            page_category="about",
+            scrape_type=ScrapeType.WEBSITE,
+            is_valid=True,
+            raw_markdown='ЧДГ "Светлина" Пловдив помага на децата.',
+            content_hash="svetlina-plovdiv-about",
+            last_scraped_at=datetime.datetime.now(datetime.UTC),
+        ),
+        SourcePage(
+            school_id=1,
+            source_url="https://svetlina-sofia.bg/admission",
+            page_category="admission",
+            scrape_type=ScrapeType.WEBSITE,
+            is_valid=True,
+            raw_markdown='Прием в ЧДГ "Светлина" Пловдив.',
+            content_hash="svetlina-plovdiv-admission",
+            last_scraped_at=datetime.datetime.now(datetime.UTC),
+        ),
+    ]
+
+    evidence = extractor_module._build_display_name_evidence(
+        {"bg": 'ЧДГ "Светлина" София'},
+        school=school,
+        pages=pages,
+    )
+
+    assert evidence is None
+
+
+def test_display_name_evidence_strips_generic_bg_prefixes():
+    school = School(
+        id=1,
+        name_i18n={"bg": "Частно средно училище Дорис Тенеди"},
+        country_code="bg",
+        city="sofia",
+        school_type="private",
+        education_level="primary",
+        website_url="https://doristenedi.bg",
+    )
+    pages = [
+        SourcePage(
+            school_id=1,
+            source_url="https://doristenedi.bg/about-us",
+            page_category="about",
+            scrape_type=ScrapeType.WEBSITE,
+            is_valid=True,
+            raw_markdown="# Частно средно училище Дорис Тенеди\nЗа нас.",
+            content_hash="doris-about",
+            last_scraped_at=datetime.datetime.now(datetime.UTC),
+        ),
+        SourcePage(
+            school_id=1,
+            source_url="https://doristenedi.bg/admission",
+            page_category="admission",
+            scrape_type=ScrapeType.WEBSITE,
+            is_valid=True,
+            raw_markdown="# Частно средно училище Дорис Тенеди\nПрием.",
+            content_hash="doris-admission",
+            last_scraped_at=datetime.datetime.now(datetime.UTC),
+        ),
+    ]
+
+    evidence = extractor_module._build_display_name_evidence(
+        {"bg": "Дорис Тенеди"},
+        school=school,
+        pages=pages,
+    )
+
+    assert evidence == {
+        "signals": ["website_domain_alias_match", "repeated_on_page_identity"],
+        "status": "corroborated",
+    }
+
+
+def test_display_name_evidence_canonicalizes_connector_variants():
+    school = School(
+        id=1,
+        name_i18n={"bg": "Частно училище St. George"},
+        country_code="bg",
+        city="sofia",
+        school_type="private",
+        education_level="primary",
+        website_url="https://stgeorgeschool.bg",
+    )
+    pages = [
+        SourcePage(
+            school_id=1,
+            source_url="https://stgeorgeschool.bg/about-us",
+            page_category="about",
+            scrape_type=ScrapeType.WEBSITE,
+            is_valid=True,
+            raw_markdown="# St. George School & Preschool\nWe help children grow.",
+            content_hash="st-george-about",
+            last_scraped_at=datetime.datetime.now(datetime.UTC),
+        ),
+        SourcePage(
+            school_id=1,
+            source_url="https://stgeorgeschool.bg/admission",
+            page_category="admission",
+            scrape_type=ScrapeType.WEBSITE,
+            is_valid=True,
+            raw_markdown="# St. George School & Preschool\nAdmissions are open.",
+            content_hash="st-george-admission",
+            last_scraped_at=datetime.datetime.now(datetime.UTC),
+        ),
+    ]
+
+    evidence = extractor_module._build_display_name_evidence(
+        {"bg": "St. George School And Preschool", "en": "St. George School And Preschool"},
+        school=school,
+        pages=pages,
+    )
+
+    assert evidence == {
+        "signals": ["website_domain_alias_match", "repeated_on_page_identity"],
+        "status": "corroborated",
+    }
 
 
 @pytest.mark.asyncio
