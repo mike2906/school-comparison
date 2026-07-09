@@ -14,7 +14,8 @@ can never diverge.
 
 from __future__ import annotations
 
-from typing import Any, Mapping
+import re
+from typing import Any, Iterator, Mapping
 
 # Pricing rows below this per-row confidence are withheld from the API. Imported by
 # ``app.services.data_quality`` so the "pricing rows failing gates" metric measures
@@ -37,6 +38,36 @@ _FIELD_PATH_DISPLAY_FIELDS: dict[str, tuple[str, ...]] = {
     "attributes.extracted.class_size": ("class_size",),
 }
 
+# Validator pricing paths are `pricing[{row.id}]` / `pricing[{row.id}].{field}`.
+_PRICING_ROW_RE = re.compile(r"^pricing\[(\d+)\]")
+
+
+def _blocking_field_paths(attributes: Mapping[str, Any] | None) -> Iterator[str]:
+    """Yield the ``field_path`` of every entry that should withhold its target.
+
+    That is, error-level issues plus actionable spot-check discrepancies in the
+    current ``attributes.data_validation`` report. Callers map each path onto the
+    display field or pricing row it governs.
+    """
+    if not isinstance(attributes, Mapping):
+        return
+    report = attributes.get("data_validation")
+    if not isinstance(report, Mapping):
+        return
+
+    for issue in report.get("issues", []) or []:
+        if isinstance(issue, Mapping) and str(issue.get("severity") or "").lower() == "error":
+            yield str(issue.get("field_path") or "")
+
+    spot_check = report.get("spot_check")
+    if isinstance(spot_check, Mapping):
+        for discrepancy in spot_check.get("discrepancies", []) or []:
+            if (
+                isinstance(discrepancy, Mapping)
+                and str(discrepancy.get("kind") or "").lower() in _ACTIONABLE_DISCREPANCY_KINDS
+            ):
+                yield str(discrepancy.get("field_path") or "")
+
 
 def _display_fields_for_path(field_path: str) -> tuple[str, ...]:
     path = (field_path or "").strip()
@@ -55,29 +86,40 @@ def blocked_display_fields(attributes: Mapping[str, Any] | None) -> set[str]:
     spot-check discrepancies whose ``field_path`` feeds a display field block it.
     """
     blocked: set[str] = set()
+    for path in _blocking_field_paths(attributes):
+        blocked.update(_display_fields_for_path(path))
+    return blocked
+
+
+def blocked_pricing_row_ids(attributes: Mapping[str, Any] | None) -> set[int]:
+    """Pricing row ids withheld by an error-level issue / actionable discrepancy.
+
+    Stage 6 flags a bad price at ``pricing[{row.id}]`` (e.g. ``negative_price_amount``);
+    the display gate must drop that specific row even when it has a source_url and
+    is confident enough to clear :func:`passes_pricing_gate`.
+    """
+    blocked: set[int] = set()
+    for path in _blocking_field_paths(attributes):
+        match = _PRICING_ROW_RE.match(path.strip())
+        if match:
+            blocked.add(int(match.group(1)))
+    return blocked
+
+
+def summary_is_publishable(attributes: Mapping[str, Any] | None) -> bool:
+    """False when the current validation report is present but not ``ok`` (P1.7).
+
+    A whole-school summary is only published for a clean report; a stored summary
+    from an earlier run must be withheld once validation regresses to
+    ``needs_review``, mirroring the generation-side eligibility rule.
+    """
     if not isinstance(attributes, Mapping):
-        return blocked
+        return True
     report = attributes.get("data_validation")
     if not isinstance(report, Mapping):
-        return blocked
-
-    for issue in report.get("issues", []) or []:
-        if not isinstance(issue, Mapping):
-            continue
-        if str(issue.get("severity") or "").lower() != "error":
-            continue
-        blocked.update(_display_fields_for_path(str(issue.get("field_path") or "")))
-
-    spot_check = report.get("spot_check")
-    if isinstance(spot_check, Mapping):
-        for discrepancy in spot_check.get("discrepancies", []) or []:
-            if not isinstance(discrepancy, Mapping):
-                continue
-            if str(discrepancy.get("kind") or "").lower() not in _ACTIONABLE_DISCREPANCY_KINDS:
-                continue
-            blocked.update(_display_fields_for_path(str(discrepancy.get("field_path") or "")))
-
-    return blocked
+        return True
+    status = str(report.get("status") or "").strip().lower()
+    return status in ("", "ok")
 
 
 def passes_pricing_gate(source_url: Any, pricing_context: Any) -> bool:

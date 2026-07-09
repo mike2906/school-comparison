@@ -5,7 +5,11 @@ from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 from app.schemas.pricing import PricingResponse
 from app.schemas.field_source import FieldSourceResponse
-from app.utils.display_gating import passes_pricing_gate
+from app.utils.display_gating import (
+    blocked_pricing_row_ids,
+    passes_pricing_gate,
+    summary_is_publishable,
+)
 from app.utils.i18n_resolver import resolve_address_i18n, resolve_name_i18n
 from app.utils.school_attributes import build_display_attributes
 
@@ -84,11 +88,14 @@ class SchoolAttributesMixin(BaseModel):
         }
 
 
-class SchoolPricingMixin(BaseModel):
+class SchoolPricingMixin(SchoolAttributesMixin):
     """Projects the ORM pricing rows into the public payload, gated by P1.7.
 
-    Rows with no ``source_url`` or a confidence below the shared floor are dropped
-    so the API never publishes a price a parent can't trace or that we're unsure of.
+    A row is withheld when it has no ``source_url``, a confidence below the shared
+    floor, or an error-level validation issue on its ``pricing[{id}]`` path — so the
+    API never publishes a price a parent can't trace, that we're unsure of, or that
+    Stage 6 already flagged as wrong. Extends ``SchoolAttributesMixin`` to reach the
+    validation report via ``raw_attributes``.
     """
 
     raw_pricing: list[Any] = Field(
@@ -100,8 +107,13 @@ class SchoolPricingMixin(BaseModel):
     @computed_field(return_type=list[PricingResponse])
     @property
     def pricing(self) -> list[PricingResponse]:
+        blocked_ids = blocked_pricing_row_ids(self.raw_attributes)
         rows = [PricingResponse.model_validate(row) for row in self.raw_pricing]
-        return [row for row in rows if passes_pricing_gate(row.source_url, row.pricing_context)]
+        return [
+            row
+            for row in rows
+            if row.id not in blocked_ids and passes_pricing_gate(row.source_url, row.pricing_context)
+        ]
 
 
 class SchoolLocationAgeGroupShift(BaseModel):
@@ -155,11 +167,24 @@ class SchoolBase(SchoolAttributesMixin):
     education_level: str
     source_url: Optional[str] = None
     website_url: Optional[str] = None
-    summary_i18n: Optional[SummaryI18n] = None
+    raw_summary_i18n: Optional[SummaryI18n] = Field(
+        default=None,
+        validation_alias="summary_i18n",
+        exclude=True,
+    )
     num_pupils: Optional[int] = None
     admission_info: Optional[dict] = None
 
     model_config = ConfigDict(populate_by_name=True)
+
+    @computed_field(return_type=Optional[SummaryI18n])
+    @property
+    def summary_i18n(self) -> Optional[SummaryI18n]:
+        # P1.7: a stored summary is withheld once validation regresses below `ok`,
+        # not just blocked from regeneration.
+        if not summary_is_publishable(self.raw_attributes):
+            return None
+        return self.raw_summary_i18n
 
     @computed_field(return_type=dict[str, str])
     @property
@@ -182,7 +207,7 @@ class SchoolResponse(SchoolBase, SchoolPricingMixin):
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 
-class SchoolListResponse(SchoolAttributesMixin, SchoolPricingMixin):
+class SchoolListResponse(SchoolPricingMixin):
     id: int
     country_code: str = "bg"
     name_i18n: dict

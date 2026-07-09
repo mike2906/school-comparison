@@ -202,6 +202,15 @@ Order matters within this phase; tasks touch overlapping files — run sequentia
             a crashed adapter as `failed` in its `_stage_summary` (covered by
             `test_run_discover_batch_counts_crashed_adapter_as_failed`), so a discover run
             whose only adapter crashes records FAILED, not COMPLETED with all-zero counts.
+      - [x] *From P1.7 Codex review (two P2 findings):* (1) the pricing gate now also drops a
+            row whose `pricing[{id}]` path carries an error-level issue even when it clears
+            the source_url/confidence gate — `blocked_pricing_row_ids` + `SchoolPricingMixin`
+            (extends `SchoolAttributesMixin` to reach the report). (2) a *stored* summary is
+            withheld in serialization once validation regresses below `ok`, not just blocked
+            from regeneration — `summary_is_publishable` gates `SchoolBase.summary_i18n`.
+            Both inert on current data (no school has a summary or a non-ok report yet);
+            covered by `test_pricing_row_with_validation_error_is_hidden` and
+            `test_stored_summary_hidden_when_validation_not_ok`.
 - [ ] **P1.8 Split `location_tags`.** Provenance strings (`source=moe_registry`,
       `source_esri_id=…`) move to `geocode_meta`; `location_tags` stays purely semantic;
       delete the client-side allowlist filter in `frontend/src/utils/locationFocus.js`.

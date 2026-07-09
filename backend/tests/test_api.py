@@ -994,6 +994,90 @@ class TestDisplayGating:
         assert [row["category"] for row in pricing] == ["tuition"]
 
     @pytest.mark.asyncio
+    async def test_pricing_row_with_validation_error_is_hidden(self, seeded_db, seeded_client):
+        school = School(
+            name_i18n={"bg": "Ценово училище 2", "en": "Pricing School 2"},
+            country_code="bg",
+            school_type="private",
+            education_level="primary",
+            city="sofia",
+            attributes={},
+        )
+        seeded_db.add(school)
+        await seeded_db.flush()
+        good = Pricing(
+            school_id=school.id,
+            category="tuition",
+            amount=500,
+            currency="BGN",
+            period="monthly",
+            source=PriceSource.SCRAPED_WEBSITE,
+            source_url="https://example.com/fees",
+            pricing_context={"confidence": 0.9},
+        )
+        # Clears the source/confidence gate, but Stage 6 flagged it as a bad price.
+        flagged = Pricing(
+            school_id=school.id,
+            category="food",
+            amount=-10,
+            currency="BGN",
+            period="monthly",
+            source=PriceSource.SCRAPED_WEBSITE,
+            source_url="https://example.com/fees",
+            pricing_context={"confidence": 0.9},
+        )
+        seeded_db.add_all([good, flagged])
+        await seeded_db.flush()
+        school.attributes = {
+            "data_validation": _validation_report(
+                issues=[
+                    {
+                        "code": "negative_price_amount",
+                        "severity": "error",
+                        "field_path": f"pricing[{flagged.id}].amount",
+                        "message": "negative amount",
+                    }
+                ],
+            )
+        }
+        await seeded_db.commit()
+
+        response = await seeded_client.get(f"/schools/{school.id}")
+        assert response.status_code == 200
+        pricing = response.json()["pricing"]
+        assert [row["category"] for row in pricing] == ["tuition"]
+
+    @pytest.mark.asyncio
+    async def test_stored_summary_hidden_when_validation_not_ok(self, seeded_db, seeded_client):
+        summary = {"bg": {"short": "кратко", "long": "дълго"}}
+        needs_review = School(
+            name_i18n={"bg": "Резюме А", "en": "Summary A"},
+            country_code="bg",
+            school_type="private",
+            education_level="primary",
+            city="sofia",
+            summary_i18n=summary,
+            attributes={"data_validation": _validation_report(status="needs_review")},
+        )
+        clean = School(
+            name_i18n={"bg": "Резюме Б", "en": "Summary B"},
+            country_code="bg",
+            school_type="private",
+            education_level="primary",
+            city="sofia",
+            summary_i18n=summary,
+            attributes={"data_validation": _validation_report(status="ok", issues=[])},
+        )
+        seeded_db.add_all([needs_review, clean])
+        await seeded_db.commit()
+
+        hidden = (await seeded_client.get(f"/schools/{needs_review.id}")).json()
+        assert hidden["summary_i18n"] is None
+
+        shown = (await seeded_client.get(f"/schools/{clean.id}")).json()
+        assert shown["summary_i18n"] == summary
+
+    @pytest.mark.asyncio
     async def test_display_field_hidden_when_validation_error(self, seeded_db, seeded_client):
         school = School(
             name_i18n={"bg": "Тест атрибути", "en": "Attr School"},
