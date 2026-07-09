@@ -600,6 +600,13 @@ def _labels_match(left: str | None, right: str | None) -> bool:
     return bool(left_tokens and right_tokens and left_tokens & right_tokens)
 
 
+def _display_identity_key(value: str | None) -> str | None:
+    tokens = helpers._display_name_match_tokens(value)
+    if not tokens:
+        return None
+    return " ".join(sorted(tokens))
+
+
 def _display_name_has_domain_alias_match(
     display_name_i18n: dict[str, str],
     *,
@@ -624,28 +631,42 @@ def _display_name_has_repeated_page_identity(
     school: School,
     pages: list[SourcePage],
 ) -> bool:
-    from app.scrapers.display_name_audit import audit_school_display_name
+    from app.scrapers.display_name_audit import _extract_candidates_from_page, _page_bonus
 
-    finding = audit_school_display_name(
-        {
-            "id": school.id,
-            "name_i18n": school.name_i18n or {},
-            "attributes": {},
-            "website_url": school.website_url,
-        },
-        [
-            {
-                "source_url": page.source_url,
-                "page_category": page.page_category,
-                "raw_markdown": page.raw_markdown,
-            }
-            for page in pages
-        ],
-    )
-    if finding is None or finding.repeated_pages < 2 or finding.core_pages < 1 or finding.score < 12:
+    display_keys = {
+        key
+        for display_label in display_name_i18n.values()
+        if (key := _display_identity_key(display_label))
+    }
+    if not display_keys:
         return False
 
-    return any(_labels_match(display_label, finding.candidate_name) for display_label in display_name_i18n.values())
+    matching_page_urls_by_key: dict[str, set[str]] = {}
+    matching_core_urls_by_key: dict[str, set[str]] = {}
+    for page in pages:
+        page_payload = {
+            "source_url": page.source_url,
+            "page_category": page.page_category,
+            "raw_markdown": page.raw_markdown,
+        }
+        candidates = _extract_candidates_from_page(page_payload)
+        if not candidates:
+            continue
+
+        page_key = page.source_url or f"page:{page.id or len(matching_page_urls_by_key)}"
+        is_core_page = _page_bonus(page_payload) > 0
+        for candidate, _source_kind in candidates:
+            candidate_key = _display_identity_key(candidate)
+            if candidate_key not in display_keys:
+                continue
+            matching_page_urls_by_key.setdefault(candidate_key, set()).add(page_key)
+            if is_core_page:
+                matching_core_urls_by_key.setdefault(candidate_key, set()).add(page_key)
+
+    return any(
+        len(page_urls) >= 2 and len(matching_core_urls_by_key.get(candidate_key, set())) >= 1
+        for candidate_key, page_urls in matching_page_urls_by_key.items()
+    )
 
 
 def _build_display_name_evidence(

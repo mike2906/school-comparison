@@ -518,6 +518,67 @@ class TestSchoolsSearchEndpoint:
         assert response.json() == []
 
     @pytest.mark.asyncio
+    async def test_search_requires_exact_display_evidence_signals(self, seeded_db, seeded_client):
+        """Malformed lookalike evidence values must not unlock internal display-name search."""
+        school = (
+            await seeded_db.execute(
+                select(School).where(School.school_type == "private")
+            )
+        ).scalar_one()
+        school.attributes = {
+            "display_name_i18n": {
+                "bg": "Hidden Brand",
+                "en": "Hidden Brand",
+            },
+            "display_name_evidence": {
+                "signals": ["not_website_domain_alias_match", "not_repeated_on_page_identity"],
+                "status": "uncorroborated",
+            },
+        }
+        await seeded_db.commit()
+
+        response = await seeded_client.get("/schools/search?q=Hidden%20Brand")
+        assert response.status_code == 200
+        assert response.json() == []
+
+    @pytest.mark.asyncio
+    async def test_search_matches_resolved_english_name_fallback(self, seeded_db, seeded_client):
+        """Search includes derived English names visible in the API response."""
+        school = School(
+            name_i18n={"bg": "Д-р Петър Берон"},
+            country_code="bg",
+            school_type="state",
+            education_level="primary",
+            city="sofia",
+            attributes={},
+        )
+        seeded_db.add(school)
+        await seeded_db.flush()
+        seeded_db.add(
+            SchoolLocation(
+                school_id=school.id,
+                address_i18n={"bg": "ул. Рила 1, София"},
+                lat=42.7,
+                lng=23.3,
+                is_primary=True,
+            )
+        )
+        await seeded_db.commit()
+
+        response = await seeded_client.get("/schools/search?q=Petar%20Beron")
+        assert response.status_code == 200
+        data = response.json()
+
+        assert any(item["id"] == school.id for item in data)
+
+    @pytest.mark.asyncio
+    async def test_search_blank_normalized_query_returns_empty(self, seeded_client):
+        """Whitespace-only terms satisfy min length but should not match everything."""
+        response = await seeded_client.get("/schools/search?q=%20%20")
+        assert response.status_code == 200
+        assert response.json() == []
+
+    @pytest.mark.asyncio
     async def test_search_min_length_violation(self, seeded_client):
         """Search query must be at least 2 characters."""
         response = await seeded_client.get("/schools/search?q=a")
