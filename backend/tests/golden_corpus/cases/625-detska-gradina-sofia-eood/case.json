@@ -1,0 +1,254 @@
+{
+  "country_code": "bg",
+  "expected": {
+    "display_name_evidence": null,
+    "general_info": {
+      "display_name_i18n": {
+        "bg": "Частна Детска Градина “София”"
+      },
+      "extracted": {
+        "_schema_version": 1,
+        "accreditations": [
+          "МОН лиценз"
+        ],
+        "admission": {
+          "application_steps": [
+            "2. Писмено заявление от родителите (настойниците) – по образец",
+            "* Писмено заявление от родителите (настойниците) – по образец"
+          ],
+          "available_spots": [],
+          "deadlines": [],
+          "entrance_requirements": [],
+          "has_useful_info": true,
+          "required_documents": [
+            "3. Копие от Акт за раждане на детето",
+            "5. Медицински документи – издадени от Личния лекар",
+            "* Данни от личния лекар за имунизационния статус на детето",
+            "* Копие от Акт за раждане на детето"
+          ]
+        },
+        "class_size": "30 students",
+        "contact": {
+          "emails": [
+            "info@dgsofia.com"
+          ],
+          "phones": [
+            "022/10/16642",
+            "0368750450",
+            "0887 656 443"
+          ]
+        },
+        "extracurricular": [],
+        "facilities": [],
+        "founded_year": null,
+        "languages": [],
+        "operations": {
+          "daily_schedule": [],
+          "day_options": [
+            "## Месечноцелодневно гледане"
+          ],
+          "has_useful_info": true,
+          "meals": [
+            "Разбиране на значението на „здравето на човек” –хранене",
+            "* Четирикратно хранене",
+            "Закуска",
+            "Подкрепителна закуска",
+            "Подготовка за обяд",
+            "Обяд"
+          ],
+          "transport": [],
+          "uniforms": [],
+          "working_hours": "7.30 – 8.30"
+        },
+        "pricing_terms": {
+          "application_fees": [],
+          "deposits": [],
+          "discounts": [],
+          "excluded_items": [],
+          "has_useful_info": true,
+          "included_items": [
+            "В цените ни са включени:"
+          ],
+          "installments": [],
+          "registration_fees": []
+        },
+        "programs": [],
+        "services": {
+          "has_useful_info": true,
+          "safety_features": [],
+          "support_services": [
+            "* Психолог",
+            "* Логопед"
+          ]
+        },
+        "summary_source": {
+          "canonical_tags": [
+            "German-focused"
+          ],
+          "community_signals": [],
+          "differentiators": [],
+          "has_useful_info": true,
+          "positioning": "!Людмила Шотарова - Директор на Частна Детска Градина \"София",
+          "student_experience": [
+            "Можете да присъствате на нашите занимания",
+            "Разбиране на значението на „здравето на човек” –хранене"
+          ],
+          "teaching_approach": [
+            "Малките размери на нашите групи ни позволяват да осигурим индивидуален подход съобразен с нуждите на Вашето дете",
+            "Обучение и възпитание",
+            "като чрез нея предоставяме нужното обучение на децата"
+          ]
+        }
+      },
+      "extracted_i18n": {
+        "bg": {
+          "accreditations": [
+            "МОН лиценз"
+          ]
+        },
+        "en": {
+          "languages": [
+            {
+              "language": "English",
+              "level": null
+            },
+            {
+              "language": "Bulgarian",
+              "level": null
+            },
+            {
+              "language": "Russian",
+              "level": null
+            },
+            {
+              "language": "German",
+              "level": null
+            },
+            {
+              "language": "Italian",
+              "level": null
+            }
+          ]
+        }
+      }
+    },
+    "pricing": [
+      {
+        "academic_year": null,
+        "age_group": null,
+        "amount": 409.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "monthly",
+        "plan_name": null
+      },
+      {
+        "academic_year": null,
+        "age_group": null,
+        "amount": 613.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "monthly",
+        "plan_name": null
+      },
+      {
+        "academic_year": null,
+        "age_group": null,
+        "amount": 550.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "tuition",
+        "currency": "BGN",
+        "period": "monthly",
+        "plan_name": null
+      },
+      {
+        "academic_year": null,
+        "age_group": null,
+        "amount": 582.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "one_time",
+        "plan_name": null
+      },
+      {
+        "academic_year": null,
+        "age_group": null,
+        "amount": 552.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "one_time",
+        "plan_name": null
+      }
+    ]
+  },
+  "known_issues": [
+    {
+      "field": "expected.general_info.extracted.class_size",
+      "issue": "Deterministic class_size heuristic parses bare 'N students' phrases and can conflate teacher ratios / group sizes with real class size (e.g. '5 students').",
+      "task": "P1.10"
+    }
+  ],
+  "name_aliases": [
+    "Частна Детска Градина “София”",
+    "Частна детска градина София"
+  ],
+  "name_i18n": {
+    "bg": "\"Частна детска градина СОФИЯ\" ЕООД"
+  },
+  "pages": [
+    {
+      "file": "page01.md",
+      "id": 26649,
+      "page_category": null,
+      "source_url": "https://dgsofia.com/"
+    },
+    {
+      "file": "page02.md",
+      "id": 26650,
+      "page_category": null,
+      "source_url": "https://dgsofia.com"
+    },
+    {
+      "file": "page03.md",
+      "id": 26651,
+      "page_category": null,
+      "source_url": "https://dgsofia.com/cookie-policy"
+    },
+    {
+      "file": "page04.md",
+      "id": 26652,
+      "page_category": null,
+      "source_url": "https://dgsofia.com/blog"
+    },
+    {
+      "file": "page05.md",
+      "id": 26653,
+      "page_category": "programs",
+      "source_url": "https://dgsofia.com/%d0%bf%d1%80%d0%be%d0%b3%d1%80%d0%b0%d0%bc%d0%b0"
+    },
+    {
+      "file": "page06.md",
+      "id": 26654,
+      "page_category": "admission",
+      "source_url": "https://dgsofia.com/%d0%bf%d1%80%d0%b8%d0%b5%d0%bc"
+    },
+    {
+      "file": "page07.md",
+      "id": 26655,
+      "page_category": "admission",
+      "source_url": "https://dgsofia.com/%d0%b7%d0%b0%d0%bf%d0%b8%d1%81%d0%b2%d0%b0%d0%bd%d0%b5"
+    }
+  ],
+  "school_id": 625,
+  "school_type": "private",
+  "website_url": "https://dgsofia.com/"
+}

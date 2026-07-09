@@ -1,0 +1,206 @@
+{
+  "country_code": "bg",
+  "expected": {
+    "display_name_evidence": null,
+    "general_info": {
+      "display_name_i18n": {
+        "bg": "American College of Sofia",
+        "en": "American College of Sofia"
+      },
+      "extracted": {
+        "_schema_version": 1,
+        "accreditations": [],
+        "admission": {
+          "application_steps": [
+            "които кандидатстват за намаляване на таксата за обучение",
+            "са поканени да предоставят информация за:",
+            "КОНКРЕТНИ ВЪПРОСИ ОТНОСНО ИЗИСКВАНИТЕ ДОКУМЕНТИ ЗА КАНДИДАТСТВАНЕ:"
+          ],
+          "available_spots": [],
+          "deadlines": [],
+          "entrance_requirements": [],
+          "has_useful_info": true,
+          "required_documents": [
+            "КОНКРЕТНИ ВЪПРОСИ ОТНОСНО ИЗИСКВАНИТЕ ДОКУМЕНТИ ЗА КАНДИДАТСТВАНЕ:"
+          ]
+        },
+        "class_size": "20 students",
+        "contact": {
+          "emails": [
+            "acs@acsbg.org",
+            "g.metodiev@acsbg.org",
+            "g.yaneva@acsbg.org"
+          ]
+        },
+        "extracurricular": [],
+        "facilities": [],
+        "founded_year": "1992",
+        "languages": [],
+        "operations": {
+          "daily_schedule": [],
+          "day_options": [],
+          "has_useful_info": false,
+          "meals": [],
+          "transport": [],
+          "uniforms": [],
+          "working_hours": null
+        },
+        "pricing_terms": {
+          "application_fees": [],
+          "deposits": [],
+          "discounts": [
+            "Има ли намаление на таксата при записване в Колежа на второ дете от семейството?"
+          ],
+          "excluded_items": [],
+          "has_useful_info": true,
+          "included_items": [
+            "Средствата за намаляването на учебната такса включват дарения от частни лица и фондации.",
+            "Какво включва таксата за обучение?"
+          ],
+          "installments": [],
+          "registration_fees": []
+        },
+        "programs": [],
+        "services": {
+          "has_useful_info": true,
+          "safety_features": [
+            "Началник охрана / Мениджър на общежитието"
+          ],
+          "support_services": []
+        },
+        "summary_source": {
+          "canonical_tags": [],
+          "community_signals": [],
+          "differentiators": [
+            "Американският колеж получи пълна акредитация от",
+            "Международната бакалауреатска организация (IBO)",
+            "Американският колеж получи пълна акредитация и от"
+          ],
+          "has_useful_info": true,
+          "positioning": "Американският колеж в София е една от най-старите американски образователни институции извън Съединените щати и е сред водещите частни гимназии на Балканите",
+          "student_experience": [],
+          "teaching_approach": [
+            "подкрепят професионалното развитие на преподавателите и подобрения по учебния комплекс"
+          ]
+        }
+      },
+      "extracted_i18n": {
+        "en": {
+          "languages": [
+            {
+              "language": "Bulgarian",
+              "level": null
+            },
+            {
+              "language": "English",
+              "level": null
+            }
+          ]
+        }
+      }
+    },
+    "pricing": [
+      {
+        "academic_year": "2025-2026",
+        "age_group": null,
+        "amount": 10040.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "yearly",
+        "plan_name": null
+      },
+      {
+        "academic_year": "2025-2026",
+        "age_group": null,
+        "amount": 21700.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "yearly",
+        "plan_name": null
+      }
+    ]
+  },
+  "known_issues": [
+    {
+      "field": "expected.general_info.extracted.class_size",
+      "issue": "Deterministic class_size heuristic parses bare 'N students' phrases and can conflate teacher ratios / group sizes with real class size (e.g. '5 students').",
+      "task": "P1.10"
+    }
+  ],
+  "name_aliases": [
+    "American College of Sofia",
+    "ACS"
+  ],
+  "name_i18n": {
+    "bg": "АМЕРИКАНСКИ КОЛЕЖ В  СОФИЯ"
+  },
+  "pages": [
+    {
+      "file": "page01.md",
+      "id": 26630,
+      "page_category": "about",
+      "source_url": "https://www.acs.bg/bg/about-acs"
+    },
+    {
+      "file": "page02.md",
+      "id": 26631,
+      "page_category": "about",
+      "source_url": "https://www.acs.bg/bg/giving/contact-our-development-team"
+    },
+    {
+      "file": "page03.md",
+      "id": 26632,
+      "page_category": "pricing",
+      "source_url": "https://www.acs.bg/bg/admissions/tuition-rates-reduction-program"
+    },
+    {
+      "file": "page04.md",
+      "id": 26633,
+      "page_category": "about",
+      "source_url": "https://www.acs.bg/bg/about-acs/contact-us"
+    },
+    {
+      "file": "page05.md",
+      "id": 26634,
+      "page_category": "about",
+      "source_url": "https://www.acs.bg/bg/about-acs/history"
+    },
+    {
+      "file": "page06.md",
+      "id": 26635,
+      "page_category": "about",
+      "source_url": "https://www.acs.bg/bg/about-acs/careers-at-acs"
+    },
+    {
+      "file": "page07.md",
+      "id": 26906,
+      "page_category": "about",
+      "source_url": "https://www.acs.bg/bg/about-acs/innovative-education"
+    },
+    {
+      "file": "page08.md",
+      "id": 26907,
+      "page_category": "about",
+      "source_url": "https://www.acs.bg/bg/about-acs/campus-dormitory"
+    },
+    {
+      "file": "page09.md",
+      "id": 26908,
+      "page_category": "about",
+      "source_url": "https://www.acs.bg/bg/about-acs/campus-dormitory/perske-house-dormitory"
+    },
+    {
+      "file": "page10.md",
+      "id": 26909,
+      "page_category": "about",
+      "source_url": "https://www.acs.bg/bg/about-acs/campus"
+    }
+  ],
+  "school_id": 301,
+  "school_type": "private",
+  "website_url": "https://www.acs.bg/bg/"
+}

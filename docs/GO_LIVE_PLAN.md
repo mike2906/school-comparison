@@ -119,11 +119,29 @@ Order matters within this phase; tasks touch overlapping files — run sequentia
             sequence in `helpers._normalize_display_name_case`. Dedupe into a shared
             helper in a focused PR — the two intentionally diverge (identity keying is
             more aggressive), so keep regression tests green and change no gate behavior.
-- [ ] **P1.5 Golden-fixture corpus.** Commit ~20 real cached `source_pages.raw_markdown`
+- [x] **P1.5 Golden-fixture corpus.** Commit ~20 real cached `source_pages.raw_markdown`
       pages + expected pricing/display-name/general-info outputs as pytest fixtures.
       Run the deterministic extraction path against them in CI. Every future pricing/
       display-name fix adds a fixture instead of gambling.
       *Verify:* `uv run pytest tests/test_golden_corpus*` green in CI.
+      **Done.** 20 real Sofia schools captured under `tests/golden_corpus/cases/`
+      (167 pages, ~2 MB; low-signal uncategorized gallery/news pages trimmed, all
+      categorized pages kept). The deterministic (no-LLM/no-network/no-DB) path lives
+      in the app as `app/scrapers/deterministic.py::run_deterministic_extraction`,
+      composed entirely of the same leaf helpers production runs — `_supported_price_rows`,
+      `_normalized_price_fields`, `_build_extracted_attributes`,
+      `_build_deterministic_general_info_output`, `_build_display_name_evidence` — which
+      were extracted from `_extract_prices`/`_extract_general_info` so the corpus can't
+      silently drift from production (refactor verified byte-identical extraction output).
+      `test_golden_corpus.py` re-runs that shared function against the committed markdown
+      and asserts each `case.json` snapshot. Snapshots are characterization baselines of
+      *current* behavior; each case carries a `known_issues` list naming fields that are
+      wrong-on-purpose plus the plan task that fixes them (e.g. `class_size` → P1.10).
+      Review rule: a snapshot diff touching a field with no matching `known_issues` entry
+      is an unexplained behavior change and must be justified in the PR. Regenerate from
+      the live DB with `uv run python -m scripts.build_golden_corpus`. Coverage spans
+      private/international/state types, pricing tables, display-name overrides, and the
+      Fusion (520) / English-primary (510) cases.
 - [ ] **P1.6 Quality scoreboard.** Wire `PipelineRun` (modeled in
       `app/models/pipeline_run.py`, currently never written) into the CLI batch runners,
       and snapshot 6 metrics per run: % schools validation-ok, duplicate-coordinate
@@ -132,6 +150,14 @@ Order matters within this phase; tasks touch overlapping files — run sequentia
       Add a `data-quality` CLI report reusing queries from the repair commands.
       Implement the webhook alert or delete `alert_webhook_url`/`alert_failure_threshold`.
       *Verify:* run pipeline on a few schools → PipelineRun row exists with metrics.
+      - [ ] *Cleanup (low priority, from P1.5 review; bundle into this PR).*
+            `app/scrapers/deterministic.py` still duplicates the `_select_pages`
+            category-list literals from `extractor._extract_prices` /
+            `_extract_general_info` (e.g. `["pricing", "admission", "contact"]` and the
+            general-info/narrative lists). They match today, but a category-list change
+            in the extractor alone would silently shift which pages the golden corpus
+            selects. Hoist those lists into module-level constants in `extractor.py`
+            and import them in `deterministic.py` so the selection can't drift.
 - [ ] **P1.7 Field-level display gating.** Mirror the summarizer's
       `_blocked_summary_sections` pattern in serialization: a field with an error-level
       issue in the current validation report is excluded from the API response.

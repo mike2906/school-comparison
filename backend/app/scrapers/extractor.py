@@ -25,6 +25,7 @@ from app.models.scrape_log import ScrapeType
 from app.models.source_page import SourcePage
 from app.schemas.extraction import (
     AdmissionExtractionOutput,
+    ExtractedPrice,
     GeneralInfoExtractionOutput,
     OperationsExtractionOutput,
     PriceExtractionOutput,
@@ -733,6 +734,77 @@ def _build_display_name_evidence(
     }
 
 
+def _supported_price_rows(
+    prices: list[ExtractedPrice], selected_text: str
+) -> list[ExtractedPrice]:
+    """Evidence-filter then de-duplicate extracted price rows.
+
+    Shared by the price-extraction path (LLM and deterministic branches) and the
+    golden-corpus harness so the filter/dedupe sequence can never drift between them.
+    """
+    if not prices:
+        return []
+    return helpers._dedupe_price_rows(helpers._filter_supported_prices(prices, selected_text))
+
+
+def _normalized_price_fields(extracted: ExtractedPrice) -> dict[str, Any] | None:
+    """Coerce one ``ExtractedPrice`` into normalized persisted-row field values.
+
+    Returns ``None`` when the row cannot be persisted (unknown category/period or
+    no amount). Shared by ``_extract_prices`` row assembly and the golden-corpus
+    harness so coercion stays identical between production and the regression suite.
+    """
+    category = helpers._coerce_price_category(extracted.category)
+    period = helpers._coerce_price_period(extracted.period)
+    amount = helpers._to_optional_float(extracted.amount)
+    amount_min = helpers._to_optional_float(extracted.amount_min)
+    amount_max = helpers._to_optional_float(extracted.amount_max)
+    if category is None or period is None:
+        return None
+    if amount is None and amount_min is None and amount_max is None:
+        return None
+    return {
+        "category": category,
+        "period": period,
+        "amount": amount,
+        "amount_min": amount_min,
+        "amount_max": amount_max,
+        "currency": (extracted.currency or "BGN")[:3].upper(),
+        "plan_name": helpers._normalize_scalar_text(extracted.plan_name, max_len=100),
+        "academic_year": helpers._normalize_scalar_text(extracted.academic_year, max_len=20),
+        "age_group": helpers._normalize_scalar_text(extracted.age_group, max_len=50),
+    }
+
+
+def _build_extracted_attributes(
+    normalized: GeneralInfoExtractionOutput,
+    contact_info: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Assemble the ``attributes.extracted`` payload from normalized general info.
+
+    Shared by ``_extract_general_info`` and the golden-corpus harness so the
+    display projection built from extraction output stays identical between them.
+    """
+    extracted: dict[str, Any] = {
+        "_schema_version": 1,
+        "languages": [entry.model_dump() for entry in normalized.languages],
+        "facilities": normalized.facilities,
+        "programs": normalized.programs,
+        "extracurricular": normalized.extracurricular,
+        "class_size": normalized.class_size,
+        "founded_year": normalized.founded_year,
+        "accreditations": normalized.accreditations,
+        "admission": normalized.admission.model_dump(),
+        "operations": normalized.operations.model_dump(),
+        "services": normalized.services.model_dump(),
+        "pricing_terms": normalized.pricing_terms.model_dump(),
+        "summary_source": normalized.summary_source.model_dump(),
+    }
+    if contact_info:
+        extracted["contact"] = contact_info
+    return extracted
+
+
 async def _extract_prices(
     db: AsyncSession,
     school: School,
@@ -801,13 +873,11 @@ async def _extract_prices(
         parsed = deterministic_pricing
         used_deterministic_pricing = True
 
-    supported_prices = helpers._filter_supported_prices(parsed.prices, selected_text) if parsed.prices else []
-    supported_prices = helpers._dedupe_price_rows(supported_prices)
+    supported_prices = _supported_price_rows(parsed.prices, selected_text)
     if supported_prices:
         parsed = parsed.model_copy(update={"prices": supported_prices, "has_pricing_info": True})
     elif deterministic_pricing.has_pricing_info:
-        deterministic_supported_prices = helpers._filter_supported_prices(deterministic_pricing.prices, selected_text)
-        deterministic_supported_prices = helpers._dedupe_price_rows(deterministic_supported_prices)
+        deterministic_supported_prices = _supported_price_rows(deterministic_pricing.prices, selected_text)
         if deterministic_supported_prices:
             parsed = deterministic_pricing.model_copy(
                 update={"prices": deterministic_supported_prices, "has_pricing_info": True}
@@ -856,24 +926,19 @@ async def _extract_prices(
     source_rows: list[FieldSource] = []
 
     for extracted in parsed.prices:
-        category = helpers._coerce_price_category(extracted.category)
-        period = helpers._coerce_price_period(extracted.period)
-        amount = helpers._to_optional_float(extracted.amount)
-        amount_min = helpers._to_optional_float(extracted.amount_min)
-        amount_max = helpers._to_optional_float(extracted.amount_max)
-
-        if category is None or period is None:
+        fields = _normalized_price_fields(extracted)
+        if fields is None:
             continue
-        if amount is None and amount_min is None and amount_max is None:
-            continue
+        category = fields["category"]
+        period = fields["period"]
+        amount = fields["amount"]
+        amount_min = fields["amount_min"]
+        amount_max = fields["amount_max"]
 
         normalized_discounts = helpers._normalize_text_list(extracted.discounts)
         normalized_installments = helpers._normalize_text_list(extracted.installments)
         normalized_includes = helpers._normalize_text_list(extracted.includes)
         normalized_excludes = helpers._normalize_text_list(extracted.excludes)
-        normalized_plan_name = helpers._normalize_scalar_text(extracted.plan_name, max_len=100)
-        normalized_academic_year = helpers._normalize_scalar_text(extracted.academic_year, max_len=20)
-        normalized_age_group = helpers._normalize_scalar_text(extracted.age_group, max_len=50)
         row_source_url = helpers._find_supporting_price_source_url(school, pages, extracted) or source_url
 
         pricing_rows.append(
@@ -883,11 +948,11 @@ async def _extract_prices(
                 amount=amount,
                 amount_min=amount_min,
                 amount_max=amount_max,
-                currency=(extracted.currency or "BGN")[:3].upper(),
+                currency=fields["currency"],
                 period=period,
-                plan_name=normalized_plan_name,
-                academic_year=normalized_academic_year,
-                age_group=normalized_age_group,
+                plan_name=fields["plan_name"],
+                academic_year=fields["academic_year"],
+                age_group=fields["age_group"],
                 source=PriceSource.SCRAPED_WEBSITE,
                 source_url=row_source_url,
                 pricing_context={
@@ -1147,23 +1212,7 @@ async def _extract_general_info(
     pricing_terms_payload = normalized.pricing_terms.model_dump()
     summary_source_payload = normalized.summary_source.model_dump()
 
-    extracted: dict[str, Any] = {
-        "_schema_version": 1,
-        "languages": [entry.model_dump() for entry in normalized.languages],
-        "facilities": normalized.facilities,
-        "programs": normalized.programs,
-        "extracurricular": normalized.extracurricular,
-        "class_size": normalized.class_size,
-        "founded_year": normalized.founded_year,
-        "accreditations": normalized.accreditations,
-        "admission": admission_payload,
-        "operations": operations_payload,
-        "services": services_payload,
-        "pricing_terms": pricing_terms_payload,
-        "summary_source": summary_source_payload,
-    }
-    if contact_info:
-        extracted["contact"] = contact_info
+    extracted = _build_extracted_attributes(normalized, contact_info)
 
     attrs["extracted"] = extracted
     # Invalidate previous Stage 6 report because extracted payload just changed.

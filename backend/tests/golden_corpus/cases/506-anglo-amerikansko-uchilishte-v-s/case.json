@@ -1,0 +1,387 @@
+{
+  "country_code": "bg",
+  "expected": {
+    "display_name_evidence": null,
+    "general_info": {
+      "display_name_i18n": {
+        "bg": "The Anglo-American School of Sofia",
+        "en": "The Anglo-American School of Sofia"
+      },
+      "extracted": {
+        "_schema_version": 1,
+        "accreditations": [],
+        "admission": {
+          "application_steps": [],
+          "available_spots": [
+            "* Loss of working capacity for one or both parents"
+          ],
+          "deadlines": [
+            "Application for Admission is via our online application system.",
+            "* The admission procedure may require placement tests and/or interviews.",
+            "**Pre-K Admission For 3 Year Olds**"
+          ],
+          "entrance_requirements": [],
+          "has_useful_info": true,
+          "required_documents": []
+        },
+        "class_size": "5 students",
+        "contact": {
+          "address": "St. Pancharevo, Sofia 1137 Bulgaria +359 2 9238810 frontdesk@aas-sofia.org",
+          "emails": [
+            "admissions@aas-sofia.org",
+            "tfries@aas-sofia.org",
+            "jvillers@aas-sofia.org"
+          ],
+          "phones": [
+            "+359 2 9238810",
+            "+359 2 923 8822",
+            "+359 2 923 8811"
+          ]
+        },
+        "extracurricular": [],
+        "facilities": [],
+        "founded_year": null,
+        "languages": [
+          {
+            "language": "English",
+            "level": null
+          },
+          {
+            "language": "Bulgarian",
+            "level": null
+          }
+        ],
+        "operations": {
+          "daily_schedule": [],
+          "day_options": [
+            "* After-School Activities: +359 88 433 6418"
+          ],
+          "has_useful_info": true,
+          "meals": [],
+          "transport": [
+            "* [School Bus Services (Optional)](https://www.aas-sofia.org/join/tuition-and-fees#fs-panel-3586)",
+            "## [School Bus Services (Optional)](https://www.aas-sofia.org/join/tuition-and-fees#fs-panel-3586)",
+            "Full School Bus Service Fee",
+            "€2,900"
+          ],
+          "uniforms": [],
+          "working_hours": "18:00-7:00"
+        },
+        "pricing_terms": {
+          "application_fees": [],
+          "deposits": [],
+          "discounts": [
+            "10% discount is available for a third child using the bus service."
+          ],
+          "excluded_items": [
+            "Please note that a semester is 90 school days (this excludes weekends and holidays)."
+          ],
+          "has_useful_info": true,
+          "included_items": [],
+          "installments": [],
+          "registration_fees": [
+            "##### Registration Fee",
+            "TOTAL Fees (New Students) = Tuition + Entrance Fee + Capital Fee + Registration Fee"
+          ]
+        },
+        "programs": [],
+        "services": {
+          "has_useful_info": true,
+          "safety_features": [],
+          "support_services": [
+            "Ms. Kelli Anderson -- Elementary School Counselor",
+            "Mr. James Villers -- Middle School Counselor",
+            "Ms. Kelley Christman - College and Career Counselor"
+          ]
+        },
+        "summary_source": {
+          "canonical_tags": [],
+          "community_signals": [],
+          "differentiators": [],
+          "has_useful_info": true,
+          "positioning": "Each division of the school has a dedicated and experienced counselor to support students through any struggles they may have",
+          "student_experience": [],
+          "teaching_approach": []
+        }
+      },
+      "extracted_i18n": {
+        "en": {
+          "languages": [
+            {
+              "language": "English",
+              "level": null
+            },
+            {
+              "language": "Bulgarian",
+              "level": null
+            }
+          ]
+        }
+      }
+    },
+    "pricing": [
+      {
+        "academic_year": "2026-2027",
+        "age_group": null,
+        "amount": 12008.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "yearly",
+        "plan_name": null
+      },
+      {
+        "academic_year": "2026-2027",
+        "age_group": null,
+        "amount": 22300.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "yearly",
+        "plan_name": null
+      },
+      {
+        "academic_year": "2026-2027",
+        "age_group": null,
+        "amount": 23983.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "yearly",
+        "plan_name": null
+      },
+      {
+        "academic_year": "2026-2027",
+        "age_group": null,
+        "amount": 25619.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "yearly",
+        "plan_name": null
+      },
+      {
+        "academic_year": "2026-2027",
+        "age_group": null,
+        "amount": 3402.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "yearly",
+        "plan_name": null
+      },
+      {
+        "academic_year": "2026-2027",
+        "age_group": null,
+        "amount": 1707.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "yearly",
+        "plan_name": null
+      },
+      {
+        "academic_year": "2026-2027",
+        "age_group": null,
+        "amount": 18219.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "yearly",
+        "plan_name": null
+      },
+      {
+        "academic_year": "2026-2027",
+        "age_group": null,
+        "amount": 28511.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "yearly",
+        "plan_name": null
+      },
+      {
+        "academic_year": "2026-2027",
+        "age_group": null,
+        "amount": 30194.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "yearly",
+        "plan_name": null
+      },
+      {
+        "academic_year": "2026-2027",
+        "age_group": null,
+        "amount": 31830.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "yearly",
+        "plan_name": null
+      },
+      {
+        "academic_year": "2026-2027",
+        "age_group": null,
+        "amount": 1500.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "yearly",
+        "plan_name": null
+      },
+      {
+        "academic_year": "2026-2027",
+        "age_group": null,
+        "amount": 10000.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "yearly",
+        "plan_name": null
+      },
+      {
+        "academic_year": "2026-2027",
+        "age_group": null,
+        "amount": 20000.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "yearly",
+        "plan_name": null
+      },
+      {
+        "academic_year": "2026-2027",
+        "age_group": null,
+        "amount": 1500.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "yearly",
+        "plan_name": null
+      },
+      {
+        "academic_year": "2026-2027",
+        "age_group": null,
+        "amount": 1102.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "registration",
+        "currency": "EUR",
+        "period": "one_time",
+        "plan_name": null
+      },
+      {
+        "academic_year": "2026-2027",
+        "age_group": null,
+        "amount": 2900.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "camp",
+        "currency": "EUR",
+        "period": "yearly",
+        "plan_name": null
+      },
+      {
+        "academic_year": "2026-2027",
+        "age_group": null,
+        "amount": 1885.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "camp",
+        "currency": "EUR",
+        "period": "yearly",
+        "plan_name": null
+      },
+      {
+        "academic_year": "2026-2027",
+        "age_group": null,
+        "amount": 250.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "registration",
+        "currency": "EUR",
+        "period": "semester",
+        "plan_name": null
+      }
+    ]
+  },
+  "known_issues": [
+    {
+      "field": "expected.general_info.extracted.class_size",
+      "issue": "Deterministic class_size heuristic parses bare 'N students' phrases and can conflate teacher ratios / group sizes with real class size (e.g. '5 students').",
+      "task": "P1.10"
+    }
+  ],
+  "name_aliases": [],
+  "name_i18n": {
+    "bg": "Англо-американско училище в София"
+  },
+  "pages": [
+    {
+      "file": "page01.md",
+      "id": 26531,
+      "page_category": null,
+      "source_url": "https://www.aas-sofia.org/"
+    },
+    {
+      "file": "page02.md",
+      "id": 26565,
+      "page_category": "pricing",
+      "source_url": "https://www.aas-sofia.org/join/tuition-and-fees"
+    },
+    {
+      "file": "page03.md",
+      "id": 26566,
+      "page_category": "contact",
+      "source_url": "https://www.aas-sofia.org/discover/contact-us"
+    },
+    {
+      "file": "page04.md",
+      "id": 26567,
+      "page_category": "admission",
+      "source_url": "https://www.aas-sofia.org/join/applying"
+    },
+    {
+      "file": "page05.md",
+      "id": 26568,
+      "page_category": null,
+      "source_url": "https://www.aas-sofia.org/board-portal"
+    },
+    {
+      "file": "page06.md",
+      "id": 26569,
+      "page_category": "about",
+      "source_url": "https://www.aas-sofia.org/support/meet-the-team"
+    },
+    {
+      "file": "page07.md",
+      "id": 27165,
+      "page_category": "pricing",
+      "source_url": "https://www.aas-sofia.org/join/tuition-and-fees/tuition-insurance"
+    },
+    {
+      "file": "page08.md",
+      "id": 27166,
+      "page_category": "admission",
+      "source_url": "https://www.aas-sofia.org/join/admissions-criteria-and-age-and-class-placement"
+    }
+  ],
+  "school_id": 506,
+  "school_type": "international",
+  "website_url": "https://www.aas-sofia.org/"
+}

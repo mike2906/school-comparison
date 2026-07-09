@@ -1,0 +1,287 @@
+{
+  "country_code": "bg",
+  "expected": {
+    "display_name_evidence": null,
+    "general_info": {
+      "display_name_i18n": null,
+      "extracted": {
+        "_schema_version": 1,
+        "accreditations": [
+          "МОН лиценз"
+        ],
+        "admission": {
+          "application_steps": [],
+          "available_spots": [],
+          "deadlines": [
+            "* [Admission & Programs](https://cosmos-kids.org/prices/)"
+          ],
+          "entrance_requirements": [],
+          "has_useful_info": true,
+          "required_documents": []
+        },
+        "class_size": "9 students",
+        "contact": {
+          "address": "ул. Георги Георгиев-Гец 48, Драгалевци, София, България",
+          "emails": [
+            "cosmoskids@gmail.com",
+            "osmoskids@gmail.com"
+          ],
+          "phones": [
+            "+359 884 788 274",
+            "0417014254",
+            "02/21041701"
+          ]
+        },
+        "extracurricular": [],
+        "facilities": [],
+        "founded_year": "2009",
+        "languages": [],
+        "operations": {
+          "daily_schedule": [],
+          "day_options": [],
+          "has_useful_info": true,
+          "meals": [
+            "## food projects",
+            "Cosmos Kids organizes and participates in different projects related to the food:",
+            "* Food Revolution Day",
+            "* Healthy food projects",
+            "* Food – for which we can offer the following options:",
+            "* Food from children’s caterer “Vegas Kids” – 7"
+          ],
+          "transport": [
+            "* Transport – 230 Euro/month"
+          ],
+          "uniforms": [],
+          "working_hours": null
+        },
+        "pricing_terms": {
+          "application_fees": [],
+          "deposits": [
+            "Subscription is made after filling a contract and paying a deposit amounting to 1 monthly payment.",
+            "declarations and deposit payment."
+          ],
+          "discounts": [
+            "1. For 2nd and 3rd child from one family – 10% discount",
+            "2. “Bring a friend” – 5% discount",
+            "3. 6 months payment – 5% discount",
+            "4. 12 months payment – 10% discount.",
+            "The maximum discount cannot be more than 15%."
+          ],
+          "excluded_items": [],
+          "has_useful_info": true,
+          "included_items": [
+            "* The sport lessons and the trainings include: windsurf",
+            "##### price includes:",
+            "price does not include:"
+          ],
+          "installments": [],
+          "registration_fees": []
+        },
+        "programs": [],
+        "services": {
+          "has_useful_info": false,
+          "safety_features": [],
+          "support_services": []
+        },
+        "summary_source": {
+          "canonical_tags": [
+            "Cambridge",
+            "Early foreign language education",
+            "German-focused",
+            "Spanish-focused"
+          ],
+          "community_signals": [
+            "COSMOS KIDS is an English language Nursery and Kindergarten aiming to introduce children to multilingual environment",
+            "We Are Providing an Environment for Our Children to Grow & Excel",
+            "the parents",
+            "We feel like a family !🙂"
+          ],
+          "differentiators": [
+            "Cambridge Mathematicians have led the world",
+            "The kindergarten is licensed by the Ministry of Education and Science",
+            "Cosmos Kids uses Mathematics and Science with Cambridge curriculum since 2018"
+          ],
+          "has_useful_info": true,
+          "positioning": "Science with Cambridge curriculum – The kindergarten science curriculum is taught through a hands-on program that encourages investigation, purposeful thinking and problem solving",
+          "student_experience": [
+            "Cosmos Kids is a part of Piccolingo Campaign for early foreign language learning since 2011"
+          ],
+          "teaching_approach": [
+            "The world to the COSMOS KIDS children is an invitation to learning and discovery",
+            "Cosmos Kids is a part of Piccolingo Campaign for early foreign language learning since 2011"
+          ]
+        }
+      },
+      "extracted_i18n": {
+        "bg": {
+          "accreditations": [
+            "МОН лиценз"
+          ]
+        },
+        "en": {
+          "languages": [
+            {
+              "language": "English",
+              "level": null
+            },
+            {
+              "language": "Bulgarian",
+              "level": null
+            },
+            {
+              "language": "German",
+              "level": null
+            },
+            {
+              "language": "Spanish",
+              "level": null
+            }
+          ]
+        }
+      }
+    },
+    "pricing": [
+      {
+        "academic_year": null,
+        "age_group": null,
+        "amount": 650.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "camp",
+        "currency": "EUR",
+        "period": "monthly",
+        "plan_name": null
+      },
+      {
+        "academic_year": null,
+        "age_group": null,
+        "amount": 450.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "camp",
+        "currency": "EUR",
+        "period": "monthly",
+        "plan_name": null
+      },
+      {
+        "academic_year": null,
+        "age_group": null,
+        "amount": 800.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "registration",
+        "currency": "EUR",
+        "period": "monthly",
+        "plan_name": null
+      },
+      {
+        "academic_year": null,
+        "age_group": null,
+        "amount": 500.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "registration",
+        "currency": "EUR",
+        "period": "monthly",
+        "plan_name": null
+      },
+      {
+        "academic_year": null,
+        "age_group": null,
+        "amount": 7.5,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "food",
+        "currency": "EUR",
+        "period": "yearly",
+        "plan_name": null
+      },
+      {
+        "academic_year": null,
+        "age_group": null,
+        "amount": 230.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "transport",
+        "currency": "EUR",
+        "period": "yearly",
+        "plan_name": null
+      },
+      {
+        "academic_year": null,
+        "age_group": null,
+        "amount": 55.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "materials",
+        "currency": "EUR",
+        "period": "yearly",
+        "plan_name": null
+      }
+    ]
+  },
+  "known_issues": [
+    {
+      "field": "expected.general_info.extracted.class_size",
+      "issue": "Deterministic class_size heuristic parses bare 'N students' phrases and can conflate teacher ratios / group sizes with real class size (e.g. '5 students').",
+      "task": "P1.10"
+    }
+  ],
+  "name_aliases": [],
+  "name_i18n": {
+    "bg": "\"ЧАСТНА ДЕТСКА ГРАДИНА КОСМИЧЕСКИ ДЕЦА\" ЕООД"
+  },
+  "pages": [
+    {
+      "file": "page01.md",
+      "id": 18606,
+      "page_category": "about",
+      "source_url": "https://cosmos-kids.org"
+    },
+    {
+      "file": "page02.md",
+      "id": 18607,
+      "page_category": null,
+      "source_url": "https://bg.cosmos-kids.org"
+    },
+    {
+      "file": "page03.md",
+      "id": 18608,
+      "page_category": null,
+      "source_url": "https://cosmos-kids.org/blog"
+    },
+    {
+      "file": "page04.md",
+      "id": 18609,
+      "page_category": null,
+      "source_url": "https://cosmos-kids.org/sport-camps"
+    },
+    {
+      "file": "page05.md",
+      "id": 18610,
+      "page_category": null,
+      "source_url": "https://cosmos-kids.org/projects"
+    },
+    {
+      "file": "page06.md",
+      "id": 18611,
+      "page_category": "pricing",
+      "source_url": "https://cosmos-kids.org/prices"
+    },
+    {
+      "file": "page07.md",
+      "id": 25054,
+      "page_category": "about",
+      "source_url": "https://cosmos-kids.org/"
+    },
+    {
+      "file": "page08.md",
+      "id": 26749,
+      "page_category": "contact",
+      "source_url": "https://cosmos-kids.org/contact-us"
+    }
+  ],
+  "school_id": 154,
+  "school_type": "private",
+  "website_url": "https://cosmos-kids.org/"
+}

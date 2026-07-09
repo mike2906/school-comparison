@@ -1,0 +1,205 @@
+{
+  "country_code": "bg",
+  "expected": {
+    "display_name_evidence": null,
+    "general_info": {
+      "display_name_i18n": {
+        "bg": "МААРИФ СОФИЯ"
+      },
+      "extracted": {
+        "_schema_version": 1,
+        "accreditations": [],
+        "admission": {
+          "application_steps": [],
+          "available_spots": [],
+          "deadlines": [],
+          "entrance_requirements": [],
+          "has_useful_info": false,
+          "required_documents": []
+        },
+        "class_size": null,
+        "contact": {
+          "emails": [
+            "bulgaria@turkiyemaarif.org"
+          ],
+          "phones": [
+            "+359 88 4465600",
+            "0260202163",
+            "0260407174"
+          ]
+        },
+        "extracurricular": [],
+        "facilities": [],
+        "founded_year": null,
+        "languages": [],
+        "operations": {
+          "daily_schedule": [],
+          "day_options": [],
+          "has_useful_info": true,
+          "meals": [
+            "Меню за храна"
+          ],
+          "transport": [],
+          "uniforms": [],
+          "working_hours": null
+        },
+        "pricing_terms": {
+          "application_fees": [],
+          "deposits": [],
+          "discounts": [
+            "*При предварително плащане на годишната такса за обучение се прилага отстъпка от 5 процента.",
+            "Отстъпка за братя и сестри в размер на 10 процента се прилага за всяко братче или сестриче"
+          ],
+          "excluded_items": [],
+          "has_useful_info": true,
+          "included_items": [],
+          "installments": [],
+          "registration_fees": []
+        },
+        "programs": [],
+        "services": {
+          "has_useful_info": false,
+          "safety_features": [],
+          "support_services": []
+        },
+        "summary_source": {
+          "canonical_tags": [],
+          "community_signals": [],
+          "differentiators": [
+            "web sitemizin çalışması için gereklidir ve sistemlerimizde kapatılamaz"
+          ],
+          "has_useful_info": true,
+          "positioning": "Тези програми имат за цел да предоставят на учениците международни и местни ценности, научни знания и практически умения за всекидневния живот и да създадат вътрешна дисциплина",
+          "student_experience": [
+            "Целта е концепциите в Профила на учащия се да станат част от личността на децата чрез всички дейности в училищния живот"
+          ],
+          "teaching_approach": [
+            "Нашият педагогически персонал",
+            "Такси за обучение",
+            "материали за преподаване и обучение",
+            "Програми за обучение",
+            "Области на обучение"
+          ]
+        }
+      },
+      "extracted_i18n": {
+        "en": {
+          "languages": [
+            {
+              "language": "Turkish",
+              "level": null
+            },
+            {
+              "language": "English",
+              "level": null
+            }
+          ]
+        }
+      }
+    },
+    "pricing": [
+      {
+        "academic_year": null,
+        "age_group": null,
+        "amount": 13000.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "tuition",
+        "currency": "BGN",
+        "period": "yearly",
+        "plan_name": null
+      },
+      {
+        "academic_year": null,
+        "age_group": null,
+        "amount": 1444.44,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "tuition",
+        "currency": "BGN",
+        "period": "monthly",
+        "plan_name": null
+      },
+      {
+        "academic_year": null,
+        "age_group": null,
+        "amount": 250.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "registration",
+        "currency": "BGN",
+        "period": "one_time",
+        "plan_name": null
+      },
+      {
+        "academic_year": null,
+        "age_group": null,
+        "amount": 300.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "food",
+        "currency": "BGN",
+        "period": "yearly",
+        "plan_name": null
+      }
+    ]
+  },
+  "known_issues": [],
+  "name_aliases": [],
+  "name_i18n": {
+    "bg": "\"ЧАСТНА ДЕТСКА ГРАДИНА МААРИФ СОФИЯ\" ЕООД"
+  },
+  "pages": [
+    {
+      "file": "page01.md",
+      "id": 26558,
+      "page_category": null,
+      "source_url": "https://bg.maarifschools.org/page/detska-gradina"
+    },
+    {
+      "file": "page02.md",
+      "id": 26559,
+      "page_category": null,
+      "source_url": "https://bg.maarifschools.org/"
+    },
+    {
+      "file": "page03.md",
+      "id": 26560,
+      "page_category": "about",
+      "source_url": "https://bg.maarifschools.org/page/misiya-i-viziya"
+    },
+    {
+      "file": "page04.md",
+      "id": 26561,
+      "page_category": null,
+      "source_url": "https://bg.maarifschools.org/page/da-bdesh-prepodavatel-v-uchilishe-maarif"
+    },
+    {
+      "file": "page05.md",
+      "id": 26562,
+      "page_category": null,
+      "source_url": "https://bg.maarifschools.org/page/kvalifikatsii"
+    },
+    {
+      "file": "page06.md",
+      "id": 26563,
+      "page_category": "programs",
+      "source_url": "https://bg.maarifschools.org/page/uchebna-programa"
+    },
+    {
+      "file": "page07.md",
+      "id": 26564,
+      "page_category": "pricing",
+      "source_url": "https://bg.maarifschools.org/page/taksi-za-obuchenie"
+    },
+    {
+      "file": "page08.md",
+      "id": 26584,
+      "page_category": "programs",
+      "source_url": "https://bg.maarifschools.org/page/programi-za-obuchenie"
+    }
+  ],
+  "school_id": 608,
+  "school_type": "private",
+  "website_url": "https://bg.maarifschools.org/page/detska-gradina"
+}

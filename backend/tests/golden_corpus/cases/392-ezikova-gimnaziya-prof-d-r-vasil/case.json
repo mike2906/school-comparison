@@ -1,0 +1,296 @@
+{
+  "country_code": "bg",
+  "expected": {
+    "display_name_evidence": {
+      "signals": [
+        "website_domain_alias_match",
+        "repeated_on_page_identity"
+      ],
+      "status": "corroborated"
+    },
+    "general_info": {
+      "display_name_i18n": {
+        "bg": "Zlatarski School",
+        "en": "Zlatarski School"
+      },
+      "extracted": {
+        "_schema_version": 1,
+        "accreditations": [
+          "International Baccalaureate (IB)",
+          "Cambridge International"
+        ],
+        "admission": {
+          "application_steps": [],
+          "available_spots": [],
+          "deadlines": [
+            "Admissions: I intake",
+            "Admissions: II intake",
+            "Admissions: III intake",
+            "Admission: 20 – 28 February",
+            "Admission: 20 – 30 March"
+          ],
+          "entrance_requirements": [
+            "The school is selective and entry is based on student exam results",
+            "past grades and interview performance."
+          ],
+          "has_useful_info": true,
+          "required_documents": []
+        },
+        "class_size": "12 students",
+        "contact": {
+          "emails": [
+            "admissions@zlatarskischool.org",
+            "info@zlatarskischool.org",
+            "finance@zlatarskischool.org"
+          ]
+        },
+        "extracurricular": [],
+        "facilities": [],
+        "founded_year": "1995",
+        "languages": [
+          {
+            "language": "English",
+            "level": null
+          },
+          {
+            "language": "Bulgarian",
+            "level": null
+          }
+        ],
+        "operations": {
+          "daily_schedule": [],
+          "day_options": [],
+          "has_useful_info": true,
+          "meals": [
+            "Cafeteria Meals (optional): € 345 (per quarter)",
+            "school lunch"
+          ],
+          "transport": [
+            "School Transport (optional): € 2100 (in two installments)",
+            "-transport",
+            "notebooks",
+            "school lunch"
+          ],
+          "uniforms": [],
+          "working_hours": "10:00 - 12:00"
+        },
+        "pricing_terms": {
+          "application_fees": [
+            "-application fee"
+          ],
+          "deposits": [],
+          "discounts": [],
+          "excluded_items": [],
+          "has_useful_info": true,
+          "included_items": [],
+          "installments": [
+            "– paid first installment and a signed contract for tuition"
+          ],
+          "registration_fees": [
+            "Registration fee (for all candidates): € 200"
+          ]
+        },
+        "programs": [],
+        "services": {
+          "has_useful_info": false,
+          "safety_features": [],
+          "support_services": []
+        },
+        "summary_source": {
+          "canonical_tags": [
+            "IB",
+            "Cambridge"
+          ],
+          "community_signals": [],
+          "differentiators": [
+            "International Program: Cambridge Secondary (integrated with the national program)",
+            "International Program: Cambridge Secondary Pre-IGCSE (integrated with the national program)",
+            "International Program: Cambridge IGCSE (integrated with the national program)",
+            "International Baccalaureate Diploma Program (integrated with the national program)",
+            "Zlatarski International School is a leading school in Sofia"
+          ],
+          "has_useful_info": true,
+          "positioning": "5 – 7 grade | International Program: Cambridge Secondary (integrated with the national program)",
+          "student_experience": [
+            "Sofia celebrates 30 years since its foundation"
+          ],
+          "teaching_approach": [
+            "Thanks to the well-designed learning pathways and excellent teaching"
+          ]
+        }
+      },
+      "extracted_i18n": {
+        "en": {
+          "accreditations": [
+            "International Baccalaureate (IB)",
+            "Cambridge International"
+          ],
+          "languages": [
+            {
+              "language": "English",
+              "level": null
+            },
+            {
+              "language": "Bulgarian",
+              "level": null
+            }
+          ]
+        }
+      }
+    },
+    "pricing": [
+      {
+        "academic_year": "2025/2026",
+        "age_group": null,
+        "amount": 8890.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "yearly",
+        "plan_name": null
+      },
+      {
+        "academic_year": "2025/2026",
+        "age_group": null,
+        "amount": 8980.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "yearly",
+        "plan_name": null
+      },
+      {
+        "academic_year": "2025/2026",
+        "age_group": null,
+        "amount": 9200.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "yearly",
+        "plan_name": null
+      },
+      {
+        "academic_year": "2025/2026",
+        "age_group": null,
+        "amount": 9680.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "yearly",
+        "plan_name": null
+      },
+      {
+        "academic_year": "2025/2026",
+        "age_group": null,
+        "amount": 200.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "food",
+        "currency": "EUR",
+        "period": "quarter",
+        "plan_name": null
+      },
+      {
+        "academic_year": "2025/2026",
+        "age_group": null,
+        "amount": 200.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "food",
+        "currency": "EUR",
+        "period": "quarter",
+        "plan_name": null
+      },
+      {
+        "academic_year": "2025/2026",
+        "age_group": null,
+        "amount": 345.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "food",
+        "currency": "EUR",
+        "period": "quarter",
+        "plan_name": null
+      },
+      {
+        "academic_year": "2025/2026",
+        "age_group": null,
+        "amount": 2100.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "transport",
+        "currency": "EUR",
+        "period": "yearly",
+        "plan_name": null
+      }
+    ]
+  },
+  "known_issues": [
+    {
+      "field": "expected.general_info.extracted.class_size",
+      "issue": "Deterministic class_size heuristic parses bare 'N students' phrases and can conflate teacher ratios / group sizes with real class size (e.g. '5 students').",
+      "task": "P1.10"
+    }
+  ],
+  "name_aliases": [],
+  "name_i18n": {
+    "bg": "\"ЧАСТНА ЕЗИКОВА ГИМНАЗИЯ \"Проф. д-р Васил Златарски\" ЕООД"
+  },
+  "pages": [
+    {
+      "file": "page01.md",
+      "id": 26858,
+      "page_category": "admission",
+      "source_url": "https://zlatarskischool.org/admission-to-grades-567"
+    },
+    {
+      "file": "page02.md",
+      "id": 26860,
+      "page_category": "pricing",
+      "source_url": "https://zlatarskischool.org/admissions/school-fees"
+    },
+    {
+      "file": "page03.md",
+      "id": 26861,
+      "page_category": "admission",
+      "source_url": "https://zlatarskischool.org/admissions/international-students"
+    },
+    {
+      "file": "page04.md",
+      "id": 26862,
+      "page_category": "admission",
+      "source_url": "https://zlatarskischool.org/admissions/ib-diploma"
+    },
+    {
+      "file": "page05.md",
+      "id": 26863,
+      "page_category": "contact",
+      "source_url": "https://zlatarskischool.org/contact-us"
+    },
+    {
+      "file": "page06.md",
+      "id": 26864,
+      "page_category": "admission",
+      "source_url": "https://zlatarskischool.org/admissions"
+    },
+    {
+      "file": "page07.md",
+      "id": 26865,
+      "page_category": "admission",
+      "source_url": "https://zlatarskischool.org/admissions/8-grade/"
+    },
+    {
+      "file": "page08.md",
+      "id": 27050,
+      "page_category": "admission",
+      "source_url": "https://zlatarskischool.org/admissions/8-grade"
+    }
+  ],
+  "school_id": 392,
+  "school_type": "private",
+  "website_url": "https://zlatarskischool.org"
+}

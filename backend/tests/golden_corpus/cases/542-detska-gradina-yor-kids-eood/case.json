@@ -1,0 +1,276 @@
+{
+  "country_code": "bg",
+  "expected": {
+    "display_name_evidence": null,
+    "general_info": {
+      "display_name_i18n": {
+        "bg": "Йор Кидс",
+        "en": "Your Kids"
+      },
+      "extracted": {
+        "_schema_version": 1,
+        "accreditations": [
+          "МОН лиценз"
+        ],
+        "admission": {
+          "application_steps": [
+            "дата на подаване на заявлението и адрес за кореспонденция.",
+            "Заявлението се изпраща на email: OFFICE@YOURKIDSBG.COM"
+          ],
+          "available_spots": [],
+          "deadlines": [
+            "##### Краен срок"
+          ],
+          "entrance_requirements": [],
+          "has_useful_info": true,
+          "required_documents": [
+            "## Необходими документи за прием:",
+            "* Копие от имунизационен паспорт с нанесени имунизации"
+          ]
+        },
+        "class_size": "12 students",
+        "contact": {
+          "address": "гр. София, ул. „Подполковник Калитин“ № 216",
+          "addresses": [
+            "гр. София, ул. „Подполковник Калитин“ № 216",
+            "гр. София 1592, бул. „Проф. Цветан Лазаров“ № 2",
+            "ул. „подполк. Калитин“ 216, 1233 ж.к. Захарна фабрика, София"
+          ],
+          "emails": [
+            "office@yourkidsbg.com",
+            "kzld@cpdp.bg",
+            "office@ex.comyourkidsbg.com"
+          ],
+          "phones": [
+            "023/07/0-02-0",
+            "033416709",
+            "0212825201"
+          ]
+        },
+        "extracurricular": [],
+        "facilities": [],
+        "founded_year": null,
+        "languages": [],
+        "operations": {
+          "daily_schedule": [
+            "## Дневен режим"
+          ],
+          "day_options": [
+            "* Целодневен престой – 1100 лв.",
+            "* Полудневен престой – 800 лв.",
+            "* Целодневен престой – 950 лв.",
+            "* Полудневен престой – 750 лв."
+          ],
+          "has_useful_info": true,
+          "meals": [
+            "· 8.45 – 9.15 ч. – Подготовка за закуска и закуска",
+            "· 9.30 – 11.00 ч. – Занимания според възрастта и междинна закуска със сезонни плодове",
+            "· 11.30 – 12.30 ч. – Подготовка за обяд и обяд",
+            "· 15.30 – 16.00 ч. – Следобедна закуска",
+            "## Хранене",
+            "* предвидено е здравословно и вкусно меню"
+          ],
+          "transport": [],
+          "uniforms": [],
+          "working_hours": "7.30 – 8.45"
+        },
+        "pricing_terms": {
+          "application_fees": [],
+          "deposits": [],
+          "discounts": [
+            "**Месечни такси и отстъпки в Частна Детска Ясла",
+            "**Месечни такси и отстъпки в Частна Детска Градина",
+            "## Отстъпки:",
+            "– При авансово плащане за срок от една календарна година се ползва отстъпка от 10 % от цялата сума",
+            "– При авансово плащане за срок от шест месеца се ползва отстъпка от 5% от цялата сума",
+            "– При едновременно посещение на две деца от семейство второто дете ползва 10% отстъпка от таксата."
+          ],
+          "excluded_items": [],
+          "has_useful_info": true,
+          "included_items": [
+            "В таксата за месеца са включени:"
+          ],
+          "installments": [],
+          "registration_fees": []
+        },
+        "programs": [],
+        "services": {
+          "has_useful_info": true,
+          "safety_features": [
+            "* постоянно видеонаблюдение..",
+            "* постоянно видеонаблюдение."
+          ],
+          "support_services": []
+        },
+        "summary_source": {
+          "canonical_tags": [],
+          "community_signals": [],
+          "differentiators": [],
+          "has_useful_info": true,
+          "positioning": "Дейността на детска градина и ясла ,,Йор Кидс“ се осъществява по одобрена от МОН програма- лиценз от МОН – РД 14-187 / 27.06.2017 г",
+          "student_experience": [],
+          "teaching_approach": [
+            "Основна форма на педагогическо взаимодействие е педагогичекката ситуация",
+            "което дава възможност за индивидуален подход към всяко дете",
+            "по методика съобразена с възрастта на децата",
+            "Тези преживявания не са просто игра или обучение … Това е работата"
+          ]
+        }
+      },
+      "extracted_i18n": {
+        "bg": {
+          "accreditations": [
+            "МОН лиценз"
+          ]
+        },
+        "en": {
+          "languages": [
+            {
+              "language": "English",
+              "level": null
+            },
+            {
+              "language": "Bulgarian",
+              "level": null
+            }
+          ]
+        }
+      }
+    },
+    "pricing": [
+      {
+        "academic_year": null,
+        "age_group": null,
+        "amount": 1100.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "tuition",
+        "currency": "BGN",
+        "period": "monthly",
+        "plan_name": null
+      },
+      {
+        "academic_year": null,
+        "age_group": null,
+        "amount": 800.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "tuition",
+        "currency": "BGN",
+        "period": "monthly",
+        "plan_name": null
+      },
+      {
+        "academic_year": null,
+        "age_group": null,
+        "amount": 950.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "tuition",
+        "currency": "BGN",
+        "period": "monthly",
+        "plan_name": null
+      },
+      {
+        "academic_year": null,
+        "age_group": null,
+        "amount": 750.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "tuition",
+        "currency": "BGN",
+        "period": "monthly",
+        "plan_name": null
+      },
+      {
+        "academic_year": null,
+        "age_group": null,
+        "amount": 400.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "registration",
+        "currency": "BGN",
+        "period": "one_time",
+        "plan_name": null
+      },
+      {
+        "academic_year": null,
+        "age_group": null,
+        "amount": 150.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "extracurricular",
+        "currency": "BGN",
+        "period": "yearly",
+        "plan_name": null
+      }
+    ]
+  },
+  "known_issues": [
+    {
+      "field": "expected.general_info.extracted.class_size",
+      "issue": "Deterministic class_size heuristic parses bare 'N students' phrases and can conflate teacher ratios / group sizes with real class size (e.g. '5 students').",
+      "task": "P1.10"
+    }
+  ],
+  "name_aliases": [
+    "Йор Кидс",
+    "Your Kids"
+  ],
+  "name_i18n": {
+    "bg": "\"ЧАСТНА ДЕТСКА ГРАДИНА ЙОР КИДС\" ЕООД"
+  },
+  "pages": [
+    {
+      "file": "page01.md",
+      "id": 22425,
+      "page_category": null,
+      "source_url": "https://yourkidsbg.com"
+    },
+    {
+      "file": "page02.md",
+      "id": 26642,
+      "page_category": null,
+      "source_url": "https://www.yourkidsbg.com"
+    },
+    {
+      "file": "page03.md",
+      "id": 26643,
+      "page_category": null,
+      "source_url": "https://yourkidsbg.com/galeria"
+    },
+    {
+      "file": "page04.md",
+      "id": 26644,
+      "page_category": null,
+      "source_url": "https://www.yourkidsbg.com/privacy-policy"
+    },
+    {
+      "file": "page05.md",
+      "id": 26645,
+      "page_category": null,
+      "source_url": "https://yourkidsbg.com/politika-za-biskvitki-es"
+    },
+    {
+      "file": "page06.md",
+      "id": 26646,
+      "page_category": "pricing",
+      "source_url": "https://yourkidsbg.com/priem-i-taksi"
+    },
+    {
+      "file": "page07.md",
+      "id": 26647,
+      "page_category": "programs",
+      "source_url": "https://yourkidsbg.com/obuchenie"
+    },
+    {
+      "file": "page08.md",
+      "id": 26718,
+      "page_category": "contact",
+      "source_url": "https://yourkidsbg.com/kontakti"
+    }
+  ],
+  "school_id": 542,
+  "school_type": "private",
+  "website_url": "https://yourkidsbg.com"
+}
