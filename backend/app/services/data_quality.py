@@ -20,9 +20,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.pricing import PriceSource, Pricing
 from app.models.school import School, SchoolLocation
+# Re-exported for callers that import it from here; it now lives in
+# `app.utils.display_gating` so the scoreboard metric and the P1.7 display gate
+# share one source of truth.
+from app.utils.display_gating import PRICING_CONFIDENCE_FLOOR  # noqa: F401
 
-# Pricing rows are gated below this per-row confidence (mirrors P1.7's display gate).
-PRICING_CONFIDENCE_FLOOR = 0.7
 # Precision used to group coordinates when detecting shared/duplicate points.
 _COORD_ROUNDING = 5
 

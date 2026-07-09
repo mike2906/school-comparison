@@ -1,0 +1,94 @@
+"""Field-level display gating (P1.7).
+
+Mirrors the summarizer's ``_blocked_summary_sections`` pattern, but at field
+granularity for the public API projection: a display field that carries an
+error-level issue (or an actionable spot-check discrepancy) in the current
+Stage 6 validation report is withheld from the response, so a parent never sees a
+value the validator has already flagged as wrong.
+
+Pricing rows are gated separately by a hard rule: a row with no ``source_url`` or a
+confidence below :data:`PRICING_CONFIDENCE_FLOOR` is withheld. The floor is shared
+with ``app.services.data_quality`` so the scoreboard metric and this display gate
+can never diverge.
+"""
+
+from __future__ import annotations
+
+from typing import Any, Mapping
+
+# Pricing rows below this per-row confidence are withheld from the API. Imported by
+# ``app.services.data_quality`` so the "pricing rows failing gates" metric measures
+# exactly what the display gate hides.
+PRICING_CONFIDENCE_FLOOR = 0.7
+
+# Spot-check discrepancy kinds that are actionable enough to withhold a field.
+# Matches the summarizer's `_ACTIONABLE_DISCREPANCY_KINDS` (omissions are only a
+# monitoring signal, not a reason to hide an otherwise-supported value).
+_ACTIONABLE_DISCREPANCY_KINDS = {"contradiction", "unsupported"}
+
+# Maps validation-report field paths to the public display fields they feed. A path
+# matches a key when it equals the key or is nested under it (``key`` + ``.``).
+_FIELD_PATH_DISPLAY_FIELDS: dict[str, tuple[str, ...]] = {
+    "attributes.extracted.languages": ("language_focus", "languages_of_instruction"),
+    "attributes.extracted.facilities": ("facilities",),
+    "attributes.extracted.programs": ("special_programs",),
+    "attributes.extracted.accreditations": ("special_programs",),
+    "attributes.extracted.extracurricular": ("activities_offered",),
+    "attributes.extracted.class_size": ("class_size",),
+}
+
+
+def _display_fields_for_path(field_path: str) -> tuple[str, ...]:
+    path = (field_path or "").strip()
+    if not path:
+        return ()
+    for prefix, fields in _FIELD_PATH_DISPLAY_FIELDS.items():
+        if path == prefix or path.startswith(f"{prefix}."):
+            return fields
+    return ()
+
+
+def blocked_display_fields(attributes: Mapping[str, Any] | None) -> set[str]:
+    """Display fields to withhold given a school's raw ``attributes`` blob.
+
+    Reads ``attributes.data_validation``: error-level issues and actionable
+    spot-check discrepancies whose ``field_path`` feeds a display field block it.
+    """
+    blocked: set[str] = set()
+    if not isinstance(attributes, Mapping):
+        return blocked
+    report = attributes.get("data_validation")
+    if not isinstance(report, Mapping):
+        return blocked
+
+    for issue in report.get("issues", []) or []:
+        if not isinstance(issue, Mapping):
+            continue
+        if str(issue.get("severity") or "").lower() != "error":
+            continue
+        blocked.update(_display_fields_for_path(str(issue.get("field_path") or "")))
+
+    spot_check = report.get("spot_check")
+    if isinstance(spot_check, Mapping):
+        for discrepancy in spot_check.get("discrepancies", []) or []:
+            if not isinstance(discrepancy, Mapping):
+                continue
+            if str(discrepancy.get("kind") or "").lower() not in _ACTIONABLE_DISCREPANCY_KINDS:
+                continue
+            blocked.update(_display_fields_for_path(str(discrepancy.get("field_path") or "")))
+
+    return blocked
+
+
+def passes_pricing_gate(source_url: Any, pricing_context: Any) -> bool:
+    """True when a pricing row is safe to publish (has a source, confident enough)."""
+    if not str(source_url or "").strip():
+        return False
+    confidence = pricing_context.get("confidence") if isinstance(pricing_context, Mapping) else None
+    if (
+        isinstance(confidence, (int, float))
+        and not isinstance(confidence, bool)
+        and confidence < PRICING_CONFIDENCE_FLOOR
+    ):
+        return False
+    return True

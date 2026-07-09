@@ -5,6 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 from app.schemas.pricing import PricingResponse
 from app.schemas.field_source import FieldSourceResponse
+from app.utils.display_gating import passes_pricing_gate
 from app.utils.i18n_resolver import resolve_address_i18n, resolve_name_i18n
 from app.utils.school_attributes import build_display_attributes
 
@@ -83,6 +84,26 @@ class SchoolAttributesMixin(BaseModel):
         }
 
 
+class SchoolPricingMixin(BaseModel):
+    """Projects the ORM pricing rows into the public payload, gated by P1.7.
+
+    Rows with no ``source_url`` or a confidence below the shared floor are dropped
+    so the API never publishes a price a parent can't trace or that we're unsure of.
+    """
+
+    raw_pricing: list[Any] = Field(
+        default_factory=list,
+        validation_alias="pricing",
+        exclude=True,
+    )
+
+    @computed_field(return_type=list[PricingResponse])
+    @property
+    def pricing(self) -> list[PricingResponse]:
+        rows = [PricingResponse.model_validate(row) for row in self.raw_pricing]
+        return [row for row in rows if passes_pricing_gate(row.source_url, row.pricing_context)]
+
+
 class SchoolLocationAgeGroupShift(BaseModel):
     age_group: str
     shift: Optional[str] = None
@@ -150,19 +171,18 @@ class SchoolCreate(SchoolBase):
     locations: list[SchoolLocationBase] = []
 
 
-class SchoolResponse(SchoolBase):
+class SchoolResponse(SchoolBase, SchoolPricingMixin):
     id: int
     created_at: datetime
     updated_at: datetime
     locations: list[SchoolLocationResponse] = []
-    pricing: list[PricingResponse] = []
     exam_results: list[ExamResultResponse] = []
     field_sources: list[FieldSourceResponse] = []
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 
-class SchoolListResponse(SchoolAttributesMixin):
+class SchoolListResponse(SchoolAttributesMixin, SchoolPricingMixin):
     id: int
     country_code: str = "bg"
     name_i18n: dict
@@ -170,7 +190,6 @@ class SchoolListResponse(SchoolAttributesMixin):
     education_level: str
     admission_info: Optional[dict] = None
     locations: list[SchoolLocationResponse] = []
-    pricing: list[PricingResponse] = []
     exam_results: list[ExamResultResponse] = []
     field_sources: list[FieldSourceResponse] = []
 

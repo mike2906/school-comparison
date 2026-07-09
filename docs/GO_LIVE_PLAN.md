@@ -172,23 +172,36 @@ Order matters within this phase; tasks touch overlapping files — run sequentia
             `GENERAL_INFO_PAGE_CATEGORIES` / `SUMMARY_SOURCE_PAGE_CATEGORIES`, imported by
             `deterministic.py`, so page selection can't drift between production and the
             golden corpus (verified byte-identical).
-- [ ] **P1.7 Field-level display gating.** Mirror the summarizer's
+- [x] **P1.7 Field-level display gating.** Mirror the summarizer's
       `_blocked_summary_sections` pattern in serialization: a field with an error-level
       issue in the current validation report is excluded from the API response.
       Pricing: hide rows with confidence <0.7 or no `source_url`. Summaries: drop
       `needs_review` from `SUMMARY_ELIGIBLE_VALIDATION_STATUSES` (keep `ok` only).
       *Verify:* tests: school with error-level validation issue on field X → X absent from API.
-      - [ ] *From P1.6 review:* the pricing gate threshold already exists as
-            `app/services/data_quality.py::PRICING_CONFIDENCE_FLOOR` (= 0.7), written to
-            mirror this gate. Import/reuse it here (or move it to a shared location) rather
-            than hardcoding `0.7` a second time, so the scoreboard metric and the display
-            gate can never diverge.
-      - [ ] *From P1.6 review (finding-1 last corner; low priority, bundle here or in any
-            future PR):* in `cli._run_discover_batch`, a whole-adapter exception is caught
-            per-adapter without incrementing any failure count, so a discover run whose only
-            adapter crashes still records `COMPLETED` with all-zero counts. Count adapter
-            exceptions as `failed` in the returned `_stage_summary` (per-school failures
-            don't exist at the discover level, only whole-adapter ones).
+      **Done.** New `app/utils/display_gating.py` is the single home for the gate:
+      `blocked_display_fields(attributes)` reads `attributes.data_validation` and maps
+      error-level issues + actionable spot-check discrepancies (`contradiction`/
+      `unsupported`, same kinds the summarizer treats as actionable) onto the public
+      display fields they feed (`attributes.extracted.{languages,facilities,programs,
+      accreditations,extracurricular,class_size}` → `language_focus`/
+      `languages_of_instruction`/`facilities`/`special_programs`/`activities_offered`/
+      `class_size`). `school_attributes.build_base_attributes`/`build_localized_attributes`
+      empty those fields, so the gate applies to both the API payload *and* the filter
+      matcher (they share this projection). Pricing gating lives in the same module
+      (`passes_pricing_gate`) and is applied by a new `SchoolPricingMixin` computed field
+      on `SchoolResponse`/`SchoolListResponse` (drops rows with no `source_url` or
+      `pricing_context.confidence` < floor). Summarizer now keeps only `{"ok"}` eligible.
+      Tests: `test_api.py::TestDisplayGating` (field + pricing gates through the real
+      endpoint) and updated `test_summarizer.py` (needs_review now rejected; pricing-section
+      drop re-covered via an `ok`-status spot-check discrepancy).
+      - [x] *From P1.6 review:* `PRICING_CONFIDENCE_FLOOR` moved to
+            `app/utils/display_gating.py`; `app/services/data_quality.py` now imports it
+            (re-exported for existing callers), so the scoreboard metric and the display
+            gate share one constant.
+      - [x] *From P1.6 review (finding-1 last corner):* `cli._run_discover_batch` now counts
+            a crashed adapter as `failed` in its `_stage_summary` (covered by
+            `test_run_discover_batch_counts_crashed_adapter_as_failed`), so a discover run
+            whose only adapter crashes records FAILED, not COMPLETED with all-zero counts.
 - [ ] **P1.8 Split `location_tags`.** Provenance strings (`source=moe_registry`,
       `source_esri_id=…`) move to `geocode_meta`; `location_tags` stays purely semantic;
       delete the client-side allowlist filter in `frontend/src/utils/locationFocus.js`.
