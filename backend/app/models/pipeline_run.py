@@ -49,6 +49,7 @@ class PipelineRun(Base):
     total_llm_cost_usd: Mapped[float] = mapped_column(Float, default=0.0)
     error_summary: Mapped[Optional[str]] = mapped_column(Text)  # Aggregated error messages
     config: Mapped[Optional[dict]] = mapped_column(JSON, default=dict)  # Snapshot of pipeline config
+    metrics: Mapped[Optional[dict]] = mapped_column(JSON, default=dict)  # Data-quality scoreboard snapshot
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
