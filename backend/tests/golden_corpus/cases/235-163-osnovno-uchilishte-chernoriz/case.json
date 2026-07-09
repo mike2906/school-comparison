@@ -1,0 +1,147 @@
+{
+  "country_code": "bg",
+  "expected": {
+    "display_name_evidence": null,
+    "general_info": {
+      "display_name_i18n": {
+        "bg": "ЧЕРНОРИЗЕЦ ХРАБЪР"
+      },
+      "extracted": {
+        "_schema_version": 1,
+        "accreditations": [],
+        "admission": {
+          "application_steps": [],
+          "available_spots": [
+            "* [Свободни места](https://163ou.bg/priem/svobodni-mesta/)"
+          ],
+          "deadlines": [],
+          "entrance_requirements": [],
+          "has_useful_info": true,
+          "required_documents": []
+        },
+        "class_size": "16 students",
+        "contact": {
+          "address": "гр. София",
+          "emails": [
+            "info-2207163@edu.mon.bg"
+          ],
+          "phones": [
+            "024/04/2023-4",
+            "023/04/4519",
+            "023/04/8357"
+          ]
+        },
+        "extracurricular": [],
+        "facilities": [],
+        "founded_year": null,
+        "languages": [],
+        "operations": {
+          "daily_schedule": [],
+          "day_options": [],
+          "has_useful_info": true,
+          "meals": [],
+          "transport": [],
+          "uniforms": [
+            "* [Униформено облекло](https://163ou.bg/uchenitzi/uniformeno-obleklo/)"
+          ],
+          "working_hours": null
+        },
+        "pricing_terms": {
+          "application_fees": [],
+          "deposits": [],
+          "discounts": [],
+          "excluded_items": [],
+          "has_useful_info": true,
+          "included_items": [
+            "Enable or Disable Cookies Включено Изключено"
+          ],
+          "installments": [],
+          "registration_fees": []
+        },
+        "programs": [],
+        "services": {
+          "has_useful_info": false,
+          "safety_features": [],
+          "support_services": []
+        },
+        "summary_source": {
+          "canonical_tags": [],
+          "community_signals": [
+            "Игри от наръчника на Просвета с родители и ученици по време на деня на отворените врати на училището"
+          ],
+          "differentiators": [
+            "Това отличие дава възможност на училището да продължи да работи активно и да разшири международните си връзки"
+          ],
+          "has_useful_info": true,
+          "positioning": "Това отличие дава възможност на училището да продължи да работи активно и да разшири международните си връзки, като",
+          "student_experience": [],
+          "teaching_approach": [
+            "♥️Обучение чрез общуване с обич♥️",
+            "На 31.01.23г беше проведено вътреучилищно събитие по проекта \"Обучение чрез общуване с обич\" 🇪🇺Erasmus +",
+            "Предстояща квалификация на педагогическите специалисти от 163.ОУ",
+            "Тема на обучението: „Стратегии и техники за мотивация за учене на новите поколения ученици“…"
+          ]
+        }
+      },
+      "extracted_i18n": null
+    },
+    "pricing": []
+  },
+  "name_aliases": [],
+  "name_i18n": {
+    "bg": "163 ОСНОВНО УЧИЛИЩЕ  \"ЧЕРНОРИЗЕЦ ХРАБЪР\""
+  },
+  "pages": [
+    {
+      "file": "page01.md",
+      "id": 24310,
+      "page_category": null,
+      "source_url": "https://163ou.bg/"
+    },
+    {
+      "file": "page02.md",
+      "id": 24311,
+      "page_category": "contact",
+      "source_url": "https://163ou.bg/kontakti/"
+    },
+    {
+      "file": "page03.md",
+      "id": 24312,
+      "page_category": null,
+      "source_url": "https://163ou.bg/aktualno/vrazki/"
+    },
+    {
+      "file": "page04.md",
+      "id": 24313,
+      "page_category": "programs",
+      "source_url": "https://163ou.bg/proekti-i-programi-2/"
+    },
+    {
+      "file": "page05.md",
+      "id": 24314,
+      "page_category": null,
+      "source_url": "https://163ou.bg/aktualno/"
+    },
+    {
+      "file": "page06.md",
+      "id": 24912,
+      "page_category": "programs",
+      "source_url": "https://163ou.bg/natzionalni-programi"
+    },
+    {
+      "file": "page07.md",
+      "id": 24913,
+      "page_category": "contact",
+      "source_url": "https://163ou.bg/kontakti"
+    },
+    {
+      "file": "page08.md",
+      "id": 24914,
+      "page_category": "programs",
+      "source_url": "https://163ou.bg/proekti-i-programi-2"
+    }
+  ],
+  "school_id": 235,
+  "school_type": "state",
+  "website_url": "https://163ou.bg/"
+}

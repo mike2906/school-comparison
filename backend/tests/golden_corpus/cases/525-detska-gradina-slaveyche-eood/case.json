@@ -1,0 +1,222 @@
+{
+  "country_code": "bg",
+  "expected": {
+    "display_name_evidence": null,
+    "general_info": {
+      "display_name_i18n": {
+        "bg": "Славейче частна детска ясла и градина"
+      },
+      "extracted": {
+        "_schema_version": 1,
+        "accreditations": [],
+        "admission": {
+          "application_steps": [],
+          "available_spots": [],
+          "deadlines": [],
+          "entrance_requirements": [],
+          "has_useful_info": false,
+          "required_documents": []
+        },
+        "class_size": null,
+        "contact": {
+          "address": "ул. Росица №12",
+          "addresses": [
+            "ул. Росица №12",
+            "ул. Отец Паисий № 47",
+            "гр. София, район Възраждане, ул. Отец Паисий № 47"
+          ]
+        },
+        "extracurricular": [],
+        "facilities": [],
+        "founded_year": null,
+        "languages": [],
+        "operations": {
+          "daily_schedule": [],
+          "day_options": [
+            "**€ 530",
+            "1037 лв.** - целодневно гледане, ежемесечно заплащане",
+            "**Отстъпки при предплащане на целодневна такса:**"
+          ],
+          "has_useful_info": true,
+          "meals": [
+            "Сгънато меню",
+            "685 лв.** - половин ден с включен обяд"
+          ],
+          "transport": [],
+          "uniforms": [],
+          "working_hours": null
+        },
+        "pricing_terms": {
+          "application_fees": [],
+          "deposits": [
+            "518 лв. **– депозит за запазване на място"
+          ],
+          "discounts": [
+            "**Отстъпки при предплащане на целодневна такса:**",
+            "**Допълнителна отстъпка от 10% ползват родители с второ дете в детската градина.**"
+          ],
+          "excluded_items": [
+            "**Допълнителните дейности не са включени в таксата и се заплащат отделно.**"
+          ],
+          "has_useful_info": true,
+          "included_items": [
+            "685 лв.** - половин ден с включен обяд",
+            "детето може да бъде включено в група по английски език"
+          ],
+          "installments": [],
+          "registration_fees": []
+        },
+        "programs": [],
+        "services": {
+          "has_useful_info": false,
+          "safety_features": [],
+          "support_services": []
+        },
+        "summary_source": {
+          "canonical_tags": [],
+          "community_signals": [],
+          "differentiators": [],
+          "has_useful_info": true,
+          "positioning": "Славейче частна детска ясла и градина",
+          "student_experience": [],
+          "teaching_approach": []
+        }
+      },
+      "extracted_i18n": {
+        "en": {
+          "languages": [
+            {
+              "language": "English",
+              "level": null
+            }
+          ]
+        }
+      }
+    },
+    "pricing": [
+      {
+        "academic_year": null,
+        "age_group": null,
+        "amount": 530.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "monthly",
+        "plan_name": null
+      },
+      {
+        "academic_year": null,
+        "age_group": null,
+        "amount": 350.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "food",
+        "currency": "EUR",
+        "period": "monthly",
+        "plan_name": null
+      },
+      {
+        "academic_year": null,
+        "age_group": null,
+        "amount": 265.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "registration",
+        "currency": "EUR",
+        "period": "one_time",
+        "plan_name": null
+      },
+      {
+        "academic_year": null,
+        "age_group": null,
+        "amount": 510.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "one_time",
+        "plan_name": null
+      },
+      {
+        "academic_year": null,
+        "age_group": null,
+        "amount": 490.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "one_time",
+        "plan_name": null
+      },
+      {
+        "academic_year": null,
+        "age_group": null,
+        "amount": 20.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "extracurricular",
+        "currency": "EUR",
+        "period": "monthly",
+        "plan_name": null
+      }
+    ]
+  },
+  "name_aliases": [],
+  "name_i18n": {
+    "bg": "\"Частна детска градина Славейче\" ЕООД"
+  },
+  "pages": [
+    {
+      "file": "page01.md",
+      "id": 23865,
+      "page_category": null,
+      "source_url": "https://slaveiche.com/"
+    },
+    {
+      "file": "page02.md",
+      "id": 23866,
+      "page_category": "pricing",
+      "source_url": "https://slaveiche.com/taksi/"
+    },
+    {
+      "file": "page03.md",
+      "id": 23867,
+      "page_category": null,
+      "source_url": "https://slaveiche.com/gallery/"
+    },
+    {
+      "file": "page04.md",
+      "id": 23868,
+      "page_category": null,
+      "source_url": "https://slaveiche.com/map-ul-otec-paisiy/"
+    },
+    {
+      "file": "page05.md",
+      "id": 23869,
+      "page_category": "facilities",
+      "source_url": "https://slaveiche.com/karawelow-gal/"
+    },
+    {
+      "file": "page06.md",
+      "id": 25916,
+      "page_category": "pricing",
+      "source_url": "https://slaveiche.com/taksi"
+    },
+    {
+      "file": "page07.md",
+      "id": 25917,
+      "page_category": "facilities",
+      "source_url": "https://slaveiche.com/index.php/proba"
+    },
+    {
+      "file": "page08.md",
+      "id": 25919,
+      "page_category": "facilities",
+      "source_url": "https://slaveiche.com/index.php/karawelow-gal"
+    }
+  ],
+  "school_id": 525,
+  "school_type": "private",
+  "website_url": "https://slaveiche.com/"
+}

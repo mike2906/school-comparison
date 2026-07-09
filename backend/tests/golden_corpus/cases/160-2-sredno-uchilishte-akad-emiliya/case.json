@@ -1,0 +1,153 @@
+{
+  "country_code": "bg",
+  "expected": {
+    "display_name_evidence": null,
+    "general_info": {
+      "display_name_i18n": null,
+      "extracted": {
+        "_schema_version": 1,
+        "accreditations": [],
+        "admission": {
+          "application_steps": [],
+          "available_spots": [
+            "Свободни места"
+          ],
+          "deadlines": [
+            "План-прием за 1. клас",
+            "План-прием след 7. клас"
+          ],
+          "entrance_requirements": [],
+          "has_useful_info": true,
+          "required_documents": []
+        },
+        "class_size": "7 students",
+        "contact": {
+          "address": "гр. София, жк. Бъкстон, ул. “Ген. Суворов” №36",
+          "emails": [
+            "2su.em.stanev@2su.bg"
+          ],
+          "phones": [
+            "+359 2 955 62 52",
+            "+359 886 00 51 38",
+            "+359 2 856 71 79"
+          ]
+        },
+        "extracurricular": [],
+        "facilities": [],
+        "founded_year": null,
+        "languages": [],
+        "operations": {
+          "daily_schedule": [],
+          "day_options": [],
+          "has_useful_info": true,
+          "meals": [
+            "* [ Обедно меню ](https://2su.bg/%D0%BE%D0%B1%D0%B5%D0%B4%D0%BD%D0%BE-%D0%BC%D0%B5%D0%BD%D1%8E)"
+          ],
+          "transport": [],
+          "uniforms": [],
+          "working_hours": null
+        },
+        "pricing_terms": {
+          "application_fees": [],
+          "deposits": [],
+          "discounts": [],
+          "excluded_items": [],
+          "has_useful_info": false,
+          "included_items": [],
+          "installments": [],
+          "registration_fees": []
+        },
+        "programs": [],
+        "services": {
+          "has_useful_info": false,
+          "safety_features": [],
+          "support_services": []
+        },
+        "summary_source": {
+          "canonical_tags": [
+            "STEM-focused"
+          ],
+          "community_signals": [],
+          "differentiators": [],
+          "has_useful_info": true,
+          "positioning": null,
+          "student_experience": [
+            "В рамките на Занимания по интереси учениците от 2"
+          ],
+          "teaching_approach": [
+            "Чрез интегриран подход малките ученици се запознаха с…",
+            "Вдъхновение след посещението в Space Camp Турция нови идеи за STEM обучението…"
+          ]
+        }
+      },
+      "extracted_i18n": {
+        "en": {
+          "languages": [
+            {
+              "language": "Bulgarian",
+              "level": null
+            }
+          ]
+        }
+      }
+    },
+    "pricing": []
+  },
+  "name_aliases": [],
+  "name_i18n": {
+    "bg": "2. Средно училище \"Акад. Емилиян Станев\""
+  },
+  "pages": [
+    {
+      "file": "page01.md",
+      "id": 19103,
+      "page_category": null,
+      "source_url": "https://2su.bg"
+    },
+    {
+      "file": "page02.md",
+      "id": 19104,
+      "page_category": null,
+      "source_url": "https://2su.bg/%D0%A1%D0%B5%D0%B4%D0%BC%D0%B8%D1%87%D0%BD%D0%BE%20%D1%80%D0%B0%D0%B7%D0%BF%D0%B8%D1%81%D0%B0%D0%BD%D0%B8%D0%B5/2"
+    },
+    {
+      "file": "page03.md",
+      "id": 19105,
+      "page_category": null,
+      "source_url": "https://2su.bg/%D0%B3%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D1%8F/%D0%B4%D0%B8%D0%BF%D0%BB%D0%BE%D0%BC%D0%B8%D1%80%D0%B0%D0%BD%D0%B5-%D0%B2%D0%B8%D0%BF%D1%83%D1%81%D0%BA-2025"
+    },
+    {
+      "file": "page04.md",
+      "id": 19106,
+      "page_category": null,
+      "source_url": "https://2su.bg/%D0%B3%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D1%8F/%D0%B3%D0%B5%D0%BD%D0%B5%D1%80%D0%B0%D0%BB%D0%BD%D0%B0-%D1%80%D0%B5%D0%BF%D0%B5%D1%82%D0%B8%D1%86%D0%B8%D1%8F-%D0%BA%D0%BE%D0%BD%D1%86%D0%B5%D1%80%D1%82-%D1%81%D0%BF%D0%B5%D0%BA%D1%82%D0%B0%D0%BA%D1%8A%D0%BB%D0%B0-%D0%BD%D0%B4%D0%BA"
+    },
+    {
+      "file": "page05.md",
+      "id": 19107,
+      "page_category": "programs",
+      "source_url": "https://2su.bg/%D0%B3%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D1%8F/%D0%B2%D1%8A%D0%BB%D0%BD%D1%83%D0%B2%D0%B0%D1%89%D0%B0-%D1%81%D1%80%D0%B5%D1%89%D0%B0-%D1%8F%D0%BD%D0%B0-%D0%BC%D0%B0%D1%80%D0%B8%D0%BD%D0%BE%D0%B2%D0%B0-%D0%BF%D0%B5%D1%82%D0%BE%D0%BA%D0%BB%D0%B0%D1%81%D0%BD%D0%B8%D1%86%D0%B8%D1%82%D0%B5-2-%D1%81%D1%83-%D0%BF%D1%80%D0%BE%D0%B5%D0%BA%D1%82%D0%B0-%E2%80%9E%D1%83%D1%87%D0%B8%D0%BC-%D0%B7%D0%B0%D0%B5%D0%B4%D0%BD%D0%BE%E2%80%9C"
+    },
+    {
+      "file": "page06.md",
+      "id": 19108,
+      "page_category": null,
+      "source_url": "https://2su.bg/%D0%B3%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D1%8F/%D0%B4%D0%B8%D0%BF%D0%BB%D0%BE%D0%BC%D0%B8%D1%80%D0%B0%D0%BD%D0%B5-%D0%B2%D0%B8%D0%BF%D1%83%D1%81%D0%BA-2024"
+    },
+    {
+      "file": "page07.md",
+      "id": 19109,
+      "page_category": null,
+      "source_url": "https://2su.bg/%D0%B3%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D1%8F/%D0%B2%D0%BE%D0%BB%D0%B5%D0%B9%D0%B1%D0%BE%D0%BB%D0%B5%D0%BD-%D1%82%D1%83%D1%80%D0%BD%D0%B8%D1%80-%D1%83%D1%87%D0%B5%D0%BD%D0%B8%D1%86%D0%B8-%D0%B8-%D1%83%D1%87%D0%B8%D1%82%D0%B5%D0%BB%D0%B8"
+    },
+    {
+      "file": "page08.md",
+      "id": 26120,
+      "page_category": "programs",
+      "source_url": "https://2su.bg/%D0%B3%D0%B0%D0%BB%D0%B5%D1%80%D0%B8%D1%8F/%D0%B2%D0%B4%D1%8A%D1%85%D0%BD%D0%BE%D0%B2%D0%B5%D0%BD%D0%B8%D0%B5-%D0%BF%D0%BE%D1%81%D0%B5%D1%89%D0%B5%D0%BD%D0%B8%D0%B5%D1%82%D0%BE-space-camp-%D1%82%D1%83%D1%80%D1%86%D0%B8%D1%8F-%D0%BD%D0%BE%D0%B2%D0%B8-%D0%B8%D0%B4%D0%B5%D0%B8-stem-%D0%BE%D0%B1%D1%83%D1%87%D0%B5%D0%BD%D0%B8%D0%B5%D1%82%D0%BE-2-%D1%81%D1%83"
+    }
+  ],
+  "school_id": 160,
+  "school_type": "state",
+  "website_url": "https://2su.bg/"
+}

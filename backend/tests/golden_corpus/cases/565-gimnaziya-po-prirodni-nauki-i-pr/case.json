@@ -1,0 +1,165 @@
+{
+  "country_code": "bg",
+  "expected": {
+    "display_name_evidence": null,
+    "general_info": {
+      "display_name_i18n": null,
+      "extracted": {
+        "_schema_version": 1,
+        "accreditations": [],
+        "admission": {
+          "application_steps": [],
+          "available_spots": [],
+          "deadlines": [
+            "Краен срок за подаване на заявления:"
+          ],
+          "entrance_requirements": [
+            "Приемен изпит:"
+          ],
+          "has_useful_info": true,
+          "required_documents": []
+        },
+        "class_size": "5 students",
+        "contact": {
+          "emails": [
+            "office@tzarsimeon.bg"
+          ],
+          "phones": [
+            "02 9977454",
+            "+359 879 216 099",
+            "0889188858"
+          ]
+        },
+        "extracurricular": [],
+        "facilities": [],
+        "founded_year": null,
+        "languages": [],
+        "operations": {
+          "daily_schedule": [
+            "Заповед за утвърждаване на дневен режим –"
+          ],
+          "day_options": [
+            "целодневно обучение във времевия интервал от 08:30 до 16:30 ч.",
+            "· полудневно"
+          ],
+          "has_useful_info": true,
+          "meals": [],
+          "transport": [],
+          "uniforms": [
+            "един комплект ежедневна униформа"
+          ],
+          "working_hours": null
+        },
+        "pricing_terms": {
+          "application_fees": [],
+          "deposits": [],
+          "discounts": [
+            "Отстъпка – 10% от таксата за обучение за второ дете",
+            "Отстъпка – 15% от таксата за обучение за трето дете"
+          ],
+          "excluded_items": [],
+          "has_useful_info": true,
+          "included_items": [
+            "Таксата за прием в ЧОУ „Цар Симеон Велики“ включва:",
+            "Таксата за прием в Частна гимназия по природни науки и предприемачество „Асен Йорданов“ включва:"
+          ],
+          "installments": [
+            "Размер на една вноска",
+            "2 вноски",
+            "9 вноски"
+          ],
+          "registration_fees": []
+        },
+        "programs": [],
+        "services": {
+          "has_useful_info": false,
+          "safety_features": [],
+          "support_services": []
+        },
+        "summary_source": {
+          "canonical_tags": [],
+          "community_signals": [
+            "родители и учители"
+          ],
+          "differentiators": [
+            "Ади спечели индивидуална награда за най-добър защитник на международния турнир"
+          ],
+          "has_useful_info": true,
+          "positioning": "Инициативата е част от дългогодишната благотворителна практика на училището, която възпитава у децата съпричастност, отговорност и желание да помагат",
+          "student_experience": [],
+          "teaching_approach": [
+            "Ние сме лидер и модел за образование в България"
+          ]
+        }
+      },
+      "extracted_i18n": {
+        "en": {
+          "languages": [
+            {
+              "language": "Bulgarian",
+              "level": null
+            }
+          ]
+        }
+      }
+    },
+    "pricing": []
+  },
+  "name_aliases": [],
+  "name_i18n": {
+    "bg": "\"ЧАСТНА ГИМНАЗИЯ ПО ПРИРОДНИ НАУКИ И ПРЕДПРИЕМАЧЕСТВО \"АСЕН ЙОРДАНОВ\" ЕООД"
+  },
+  "pages": [
+    {
+      "file": "page01.md",
+      "id": 22435,
+      "page_category": null,
+      "source_url": "https://tzarsimeon.bg/"
+    },
+    {
+      "file": "page02.md",
+      "id": 23969,
+      "page_category": null,
+      "source_url": "https://tzarsimeon.bg"
+    },
+    {
+      "file": "page03.md",
+      "id": 23970,
+      "page_category": "facilities",
+      "source_url": "https://tzarsimeon.bg/%d1%81%d1%8a%d1%81-%d1%81%d1%80%d0%b5%d0%b4%d1%81%d1%82%d0%b2%d0%b0%d1%82%d0%b0-%d0%be%d1%82-%d0%b1%d0%b0%d0%b7%d0%b0%d1%80%d0%b0-%d0%bd%d0%b0%d1%88%d0%b8%d1%82%d0%b5-%d1%83%d1%87%d0%b5%d0%bd%d0%b8"
+    },
+    {
+      "file": "page04.md",
+      "id": 23971,
+      "page_category": "pricing",
+      "source_url": "https://tzarsimeon.bg/schoolfees"
+    },
+    {
+      "file": "page05.md",
+      "id": 23972,
+      "page_category": "contact",
+      "source_url": "https://tzarsimeon.bg/contacts"
+    },
+    {
+      "file": "page06.md",
+      "id": 23973,
+      "page_category": null,
+      "source_url": "https://tzarsimeon.bg/%d0%bd%d0%be%d0%b2%d0%be-%d0%bc%d0%b0%d1%82%d0%b5%d0%bc%d0%b0%d1%82%d0%b8%d1%87%d0%b5%d1%81%d0%ba%d0%b0-%d0%bf%d0%b0%d1%80%d0%b0%d0%bb%d0%b5%d0%bb%d0%ba%d0%b0-5-%d0%ba%d0%bb%d0%b0%d1%81"
+    },
+    {
+      "file": "page07.md",
+      "id": 23974,
+      "page_category": null,
+      "source_url": "https://tzarsimeon.bg/%d0%b3%d0%be%d1%80%d0%b4%d0%b8-%d1%81%d0%bc%d0%b5-%d1%81-%d0%bd%d0%b0%d1%88%d0%b8%d1%8f-%d0%b0%d0%b4%d0%b8-%d0%be%d1%82-1%d0%b1-%d0%ba%d0%bb%d0%b0%d1%81"
+    },
+    {
+      "file": "page08.md",
+      "id": 25979,
+      "page_category": null,
+      "source_url": "https://tzarsimeon.bg/%d0%b4%d0%be%d0%ba%d1%83%d0%bc%d0%b5%d0%bd%d1%82%d0%b8"
+    }
+  ],
+  "school_id": 565,
+  "school_type": "private",
+  "website_url": "https://tzarsimeon.bg/"
+}

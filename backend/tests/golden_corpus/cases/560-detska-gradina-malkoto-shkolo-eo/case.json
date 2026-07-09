@@ -1,0 +1,266 @@
+{
+  "country_code": "bg",
+  "expected": {
+    "display_name_evidence": null,
+    "general_info": {
+      "display_name_i18n": {
+        "bg": "Българско школо"
+      },
+      "extracted": {
+        "_schema_version": 1,
+        "accreditations": [],
+        "admission": {
+          "application_steps": [
+            "* [Кандидатстване](https://bgshkolo.com/enrollment/)",
+            "* [Кандидатствай](https://bgshkolo.com/enrollment/)",
+            "[КАНДИДАТСТВАЙ](https://bgshkolo.com/enrollment-montesory/ \"КАНДИДАТСТВАЙ\")",
+            "[КАНДИДАТСТВАЙ](https://bgshkolo.com/enrollment-puk/ \"КАНДИДАТСТВАЙ\")",
+            "[КАНДИДАТСТВАЙ](https://bgshkolo.com/enrollment/#1673363762820-699898cf-2483 \"КАНДИДАТСТВАЙ\")",
+            "[КАНДИДАТСТВАЙ](https://bgshkolo.com/enrollment/#1673362806127-b627df9c-06ab \"КАНДИДАТСТВАЙ\")"
+          ],
+          "available_spots": [],
+          "deadlines": [],
+          "entrance_requirements": [],
+          "has_useful_info": true,
+          "required_documents": []
+        },
+        "class_size": "5 students",
+        "contact": {
+          "address": "ж.к. „Младост 2“",
+          "addresses": [
+            "ж.к. „Младост 2“",
+            "ж.к. \"Младост 2",
+            "ул. „Генерал-Майор Васил Делов“ 10"
+          ],
+          "emails": [
+            "shkolo@bgshkolo.com",
+            "detska_gradina@bgshkolo.com",
+            "overgasarena@gmail.com"
+          ],
+          "phones": [
+            "+359 878 208 975",
+            "+359 889 108 519",
+            "+359 884 256 736"
+          ]
+        },
+        "extracurricular": [],
+        "facilities": [],
+        "founded_year": null,
+        "languages": [],
+        "operations": {
+          "daily_schedule": [],
+          "day_options": [],
+          "has_useful_info": true,
+          "meals": [],
+          "transport": [],
+          "uniforms": [
+            "* Комплект униформа"
+          ],
+          "working_hours": "###### РАБОТНО ВРЕМЕ: 09:00 - 17:00ч."
+        },
+        "pricing_terms": {
+          "application_fees": [],
+          "deposits": [],
+          "discounts": [
+            "## ДОПЪЛНИТЕЛНИ ТАКСИ И ОТСТЪПКИ",
+            "ОТСТЪПКА",
+            "#### Допълнителна отстъпка"
+          ],
+          "excluded_items": [
+            "ГОДИШНАТА ТАКСА НЕ ВКЛЮЧВА:"
+          ],
+          "has_useful_info": true,
+          "included_items": [
+            "ГОДИШНАТА ТАКСА ВКЛЮЧВА:",
+            "която включва:",
+            "Включва 4 часа спорт на седмица",
+            "Включва:"
+          ],
+          "installments": [],
+          "registration_fees": []
+        },
+        "programs": [],
+        "services": {
+          "has_useful_info": true,
+          "safety_features": [
+            "* Денонощна охрана"
+          ],
+          "support_services": [
+            "* Екип от психолог",
+            "ресурсен учител и логопед в помощ на учебния процес",
+            "* Стойността на индивидуални сесии с детски психолог и логопед"
+          ]
+        },
+        "summary_source": {
+          "canonical_tags": [
+            "IB",
+            "German-focused",
+            "Spanish-focused"
+          ],
+          "community_signals": [
+            "Създаваме среда"
+          ],
+          "differentiators": [
+            "IB programme by International Baccalaureate"
+          ],
+          "has_useful_info": true,
+          "positioning": "IB programme by International Baccalaureate",
+          "student_experience": [
+            "Тези бисквитки не съхраняват никакви лични данни",
+            "творчески натури и разсъдливи млади хора",
+            "Така опитът се превръща в практическо"
+          ],
+          "teaching_approach": []
+        }
+      },
+      "extracted_i18n": {
+        "en": {
+          "languages": [
+            {
+              "language": "English",
+              "level": null
+            },
+            {
+              "language": "German",
+              "level": null
+            },
+            {
+              "language": "Spanish",
+              "level": null
+            },
+            {
+              "language": "Bulgarian",
+              "level": null
+            }
+          ]
+        }
+      }
+    },
+    "pricing": [
+      {
+        "academic_year": "2026/2027",
+        "age_group": null,
+        "amount": 7950.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "yearly",
+        "plan_name": null
+      },
+      {
+        "academic_year": "2026/2027",
+        "age_group": null,
+        "amount": 7200.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "yearly",
+        "plan_name": "Standard"
+      },
+      {
+        "academic_year": "2026/2027",
+        "age_group": "preschool",
+        "amount": 7950.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "yearly",
+        "plan_name": "Standard"
+      },
+      {
+        "academic_year": "2026/2027",
+        "age_group": null,
+        "amount": 250.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "materials",
+        "currency": "EUR",
+        "period": "yearly",
+        "plan_name": null
+      },
+      {
+        "academic_year": "2026/2027",
+        "age_group": null,
+        "amount": 500.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "materials",
+        "currency": "EUR",
+        "period": "yearly",
+        "plan_name": null
+      }
+    ]
+  },
+  "name_aliases": [],
+  "name_i18n": {
+    "bg": "\"ЧАСТНА ДЕТСКА ГРАДИНА МАЛКОТО ШКОЛО\" ЕООД"
+  },
+  "pages": [
+    {
+      "file": "page01.md",
+      "id": 26842,
+      "page_category": "about",
+      "source_url": "https://bgshkolo.com/about-us"
+    },
+    {
+      "file": "page02.md",
+      "id": 26843,
+      "page_category": "about",
+      "source_url": "https://bgshkolo.com/the-others-about-us"
+    },
+    {
+      "file": "page03.md",
+      "id": 26844,
+      "page_category": "about",
+      "source_url": "https://bgshkolo.com/team"
+    },
+    {
+      "file": "page04.md",
+      "id": 26845,
+      "page_category": "pricing",
+      "source_url": "https://bgshkolo.com/pricing-plans"
+    },
+    {
+      "file": "page05.md",
+      "id": 26846,
+      "page_category": "admission",
+      "source_url": "https://bgshkolo.com/enrollment-puk"
+    },
+    {
+      "file": "page06.md",
+      "id": 26847,
+      "page_category": "admission",
+      "source_url": "https://bgshkolo.com/enrollment"
+    },
+    {
+      "file": "page07.md",
+      "id": 26848,
+      "page_category": "admission",
+      "source_url": "https://bgshkolo.com/enrollment-school-early-stage"
+    },
+    {
+      "file": "page08.md",
+      "id": 26849,
+      "page_category": "admission",
+      "source_url": "https://bgshkolo.com/enrollment-montesory"
+    },
+    {
+      "file": "page09.md",
+      "id": 26850,
+      "page_category": "programs",
+      "source_url": "https://bgshkolo.com/ib-programme"
+    },
+    {
+      "file": "page10.md",
+      "id": 26851,
+      "page_category": "contact",
+      "source_url": "https://bgshkolo.com/contact-us"
+    }
+  ],
+  "school_id": 560,
+  "school_type": "private",
+  "website_url": "https://bgshkolo.com"
+}

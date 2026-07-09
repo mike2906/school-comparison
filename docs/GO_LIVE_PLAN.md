@@ -119,11 +119,23 @@ Order matters within this phase; tasks touch overlapping files — run sequentia
             sequence in `helpers._normalize_display_name_case`. Dedupe into a shared
             helper in a focused PR — the two intentionally diverge (identity keying is
             more aggressive), so keep regression tests green and change no gate behavior.
-- [ ] **P1.5 Golden-fixture corpus.** Commit ~20 real cached `source_pages.raw_markdown`
+- [x] **P1.5 Golden-fixture corpus.** Commit ~20 real cached `source_pages.raw_markdown`
       pages + expected pricing/display-name/general-info outputs as pytest fixtures.
       Run the deterministic extraction path against them in CI. Every future pricing/
       display-name fix adds a fixture instead of gambling.
       *Verify:* `uv run pytest tests/test_golden_corpus*` green in CI.
+      **Done.** 20 real Sofia schools captured under `tests/golden_corpus/cases/`
+      (167 pages, ~2 MB; low-signal uncategorized gallery/news pages trimmed, all
+      categorized pages kept). `tests/golden_corpus/harness.py` reproduces the
+      deterministic (no-LLM/no-network/no-DB) portions of `_extract_prices`,
+      `_extract_general_info`, and `_build_display_name_evidence`; `test_golden_corpus.py`
+      re-runs it against the committed markdown and asserts the snapshot in each
+      `case.json`. Snapshots are characterization baselines of *current* behavior, so
+      they intentionally capture existing bugs (e.g. `class_size: "5 students"` from
+      P1.10) — a future fix updates the snapshot and the diff makes the change reviewable.
+      Regenerate from the live DB with `uv run python -m scripts.build_golden_corpus`.
+      Coverage spans private/international/state types, pricing tables, display-name
+      overrides, and the Fusion (520) / English-primary (510) cases.
 - [ ] **P1.6 Quality scoreboard.** Wire `PipelineRun` (modeled in
       `app/models/pipeline_run.py`, currently never written) into the CLI batch runners,
       and snapshot 6 metrics per run: % schools validation-ok, duplicate-coordinate

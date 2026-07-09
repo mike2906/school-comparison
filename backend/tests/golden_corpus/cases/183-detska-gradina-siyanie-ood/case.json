@@ -1,0 +1,166 @@
+{
+  "country_code": "bg",
+  "expected": {
+    "display_name_evidence": null,
+    "general_info": {
+      "display_name_i18n": null,
+      "extracted": {
+        "_schema_version": 1,
+        "accreditations": [],
+        "admission": {
+          "application_steps": [],
+          "available_spots": [],
+          "deadlines": [],
+          "entrance_requirements": [],
+          "has_useful_info": false,
+          "required_documents": []
+        },
+        "class_size": "20 students",
+        "contact": {
+          "address": "кв. Бояна, София, ул. Бели Брези 1",
+          "emails": [
+            "office@sianie-bg.com"
+          ],
+          "phones": [
+            "0897 958561"
+          ]
+        },
+        "extracurricular": [],
+        "facilities": [],
+        "founded_year": "1996",
+        "languages": [],
+        "operations": {
+          "daily_schedule": [],
+          "day_options": [
+            "Целодневно пребиваване:",
+            "Полудневно пребиваване"
+          ],
+          "has_useful_info": true,
+          "meals": [],
+          "transport": [],
+          "uniforms": [],
+          "working_hours": "7:30 – 18:30"
+        },
+        "pricing_terms": {
+          "application_fees": [],
+          "deposits": [
+            "Депозит"
+          ],
+          "discounts": [
+            "Отстъпки:",
+            "2% отстъпка"
+          ],
+          "excluded_items": [],
+          "has_useful_info": true,
+          "included_items": [
+            "В такса детска градина са включени заниманията по Йога"
+          ],
+          "installments": [],
+          "registration_fees": []
+        },
+        "programs": [],
+        "services": {
+          "has_useful_info": true,
+          "safety_features": [],
+          "support_services": [
+            "Марина Митова - Логопед",
+            "Логопедия – комуникативни нарушения на развитието. Има богат опит в обучението",
+            "Марина МитоваЛогопед"
+          ]
+        },
+        "summary_source": {
+          "canonical_tags": [],
+          "community_signals": [],
+          "differentiators": [
+            "Учебно-възпитателната работа във всички групи е съобразена с изискванията и Програмата на МОН и с международния опит"
+          ],
+          "has_useful_info": true,
+          "positioning": "Учебно-възпитателната работа във всички групи е съобразена с изискванията и Програмата на МОН и с международния опит",
+          "student_experience": [
+            "Английският език се овладява в учебни занимания",
+            "творческия й заряд намират приложение в широк спектър от дейности – от"
+          ],
+          "teaching_approach": [
+            "Чуждоезиковото обучение се осъществява програми одобрени от МОН",
+            "Английски език групово и индивидуално обучение",
+            "Магистър по предучилищна педагогика и",
+            "Има богат опит в обучението",
+            "Автор е на иновативна методика за работа с"
+          ]
+        }
+      },
+      "extracted_i18n": {
+        "en": {
+          "languages": [
+            {
+              "language": "Bulgarian",
+              "level": null
+            },
+            {
+              "language": "English",
+              "level": null
+            }
+          ]
+        }
+      }
+    },
+    "pricing": []
+  },
+  "name_aliases": [],
+  "name_i18n": {
+    "bg": "\"Частна детска градина \"Сияние\" ООД"
+  },
+  "pages": [
+    {
+      "file": "page01.md",
+      "id": 18698,
+      "page_category": null,
+      "source_url": "https://www.sianie-bg.com"
+    },
+    {
+      "file": "page02.md",
+      "id": 18699,
+      "page_category": "pricing",
+      "source_url": "https://www.sianie-bg.com?pg=ceni"
+    },
+    {
+      "file": "page03.md",
+      "id": 18700,
+      "page_category": "about",
+      "source_url": "https://www.sianie-bg.com?pg=za-nas"
+    },
+    {
+      "file": "page04.md",
+      "id": 18701,
+      "page_category": null,
+      "source_url": "https://www.sianie-bg.com?pg=profile&sp=1"
+    },
+    {
+      "file": "page05.md",
+      "id": 18702,
+      "page_category": null,
+      "source_url": "https://www.sianie-bg.com?pg=profile&sp=4"
+    },
+    {
+      "file": "page06.md",
+      "id": 18703,
+      "page_category": null,
+      "source_url": "https://www.sianie-bg.com?pg=profile&sp=0"
+    },
+    {
+      "file": "page07.md",
+      "id": 18704,
+      "page_category": null,
+      "source_url": "https://www.sianie-bg.com?pg=profile&sp=3"
+    },
+    {
+      "file": "page08.md",
+      "id": 26985,
+      "page_category": "contact",
+      "source_url": "https://www.sianie-bg.com?pg=kontakti"
+    }
+  ],
+  "school_id": 183,
+  "school_type": "private",
+  "website_url": "https://www.sianie-bg.com"
+}

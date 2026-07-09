@@ -1,0 +1,392 @@
+{
+  "country_code": "bg",
+  "expected": {
+    "display_name_evidence": null,
+    "general_info": {
+      "display_name_i18n": {
+        "bg": "Uwekind International School",
+        "en": "Uwekind International School"
+      },
+      "extracted": {
+        "_schema_version": 1,
+        "accreditations": [
+          "МОН лиценз"
+        ],
+        "admission": {
+          "application_steps": [
+            "Административна такса за кандидатстване за прием",
+            "Такса кандидатстване:",
+            "Кандидатстване",
+            "**[КАНДИДАТСТВАЙТЕ](https://uwekind.com/admission/procedure/)**"
+          ],
+          "available_spots": [],
+          "deadlines": [
+            "ВТОРАТА приемна сесия за учебната 2026/27 година ще се проведе на",
+            "ТРЕТАТА приемна сесия за учебната 2026/27 година ще се проведе на",
+            "* [Прием](https://uwekind.com/admission/)",
+            "* [Процедура по прием](https://uwekind.com/admission/procedure/)",
+            "* [Финансови условия](https://uwekind.com/admission/fees/)",
+            "* [Въпроси и отговори](https://uwekind.com/admission/faq/)"
+          ],
+          "entrance_requirements": [
+            "Сесията включва три етапа - задачи в писмен вид",
+            "интервю и изпращане на обратна връзка за кандидата.",
+            "Интервю – комуникативни и социални умения",
+            "мотивация за учене."
+          ],
+          "has_useful_info": true,
+          "required_documents": []
+        },
+        "class_size": "5 students",
+        "contact": {
+          "address": "ул. Владайска 48",
+          "addresses": [
+            "ул. Владайска 48",
+            "ул. “Владайска” 48.",
+            "ул. Манастирска воденица 71"
+          ],
+          "emails": [
+            "info@uwekind.bg",
+            "kindergarten@uwekind.bg",
+            "primaryschool@uwekind.bg"
+          ],
+          "phones": [
+            "066047818",
+            "+359 879 888 920",
+            "+359 885 888 940"
+          ]
+        },
+        "extracurricular": [],
+        "facilities": [],
+        "founded_year": null,
+        "languages": [],
+        "operations": {
+          "daily_schedule": [],
+          "day_options": [],
+          "has_useful_info": true,
+          "meals": [
+            "Храна обяд",
+            "сутрешна и следобедна закуска –",
+            "Храна обяд –",
+            "Храна – сутрешна и следобедна закуска –",
+            "Храна – сутрешна закуска –"
+          ],
+          "transport": [
+            "Такса транспорт"
+          ],
+          "uniforms": [],
+          "working_hours": null
+        },
+        "pricing_terms": {
+          "application_fees": [
+            "Административна такса за кандидатстване за прием"
+          ],
+          "deposits": [],
+          "discounts": [
+            "Отстъпки",
+            "Училището предвижда отстъпки от такса „Образователни услуги“ за семейства с две и повече деца",
+            "постъпил в УВЕКИНД – 5 % отстъпка",
+            "постъпил в УВЕКИНД – 10 % отстъпка",
+            "3. При повече деца – отстъпка по договаряне"
+          ],
+          "excluded_items": [],
+          "has_useful_info": true,
+          "included_items": [
+            "включена храна",
+            "Сесията включва три етапа - задачи в писмен вид"
+          ],
+          "installments": [
+            "– при разсрочено плащане на 2 вноски",
+            "– при разсрочено плащане на 10 вноски",
+            "– при разсрочено плащане на 3 вноски",
+            "падежа на първа вноска",
+            "Първа вноска или еднократно плащане :",
+            "Втора вноска:"
+          ],
+          "registration_fees": []
+        },
+        "programs": [],
+        "services": {
+          "has_useful_info": false,
+          "safety_features": [],
+          "support_services": []
+        },
+        "summary_source": {
+          "canonical_tags": [
+            "German-focused"
+          ],
+          "community_signals": [
+            "В нашето училище създаваме подходящи условия и среда за академичен напредък",
+            "В Увекинд детето Ви ще бъде част от подкрепяща и приветлива училищна общност"
+          ],
+          "differentiators": [],
+          "has_useful_info": true,
+          "positioning": null,
+          "student_experience": [
+            "Ние предлагаме разнообразие от извънкласни занимания и часове за допълнителна подготовка"
+          ],
+          "teaching_approach": [
+            "В нашето училище създаваме подходящи условия и среда за академичен напредък",
+            "Нашите преподаватели прилагат иновативни методи и не спират да се развиват като професионалисти"
+          ]
+        }
+      },
+      "extracted_i18n": {
+        "bg": {
+          "accreditations": [
+            "МОН лиценз"
+          ]
+        },
+        "en": {
+          "languages": [
+            {
+              "language": "Bulgarian",
+              "level": null
+            },
+            {
+              "language": "German",
+              "level": null
+            },
+            {
+              "language": "English",
+              "level": null
+            }
+          ]
+        }
+      }
+    },
+    "pricing": [
+      {
+        "academic_year": "2026-2027",
+        "age_group": null,
+        "amount": 7000.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "registration",
+        "currency": "EUR",
+        "period": "one_time",
+        "plan_name": null
+      },
+      {
+        "academic_year": "2026-2027",
+        "age_group": null,
+        "amount": 7400.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "registration",
+        "currency": "EUR",
+        "period": "one_time",
+        "plan_name": null
+      },
+      {
+        "academic_year": "2026-2027",
+        "age_group": null,
+        "amount": 8100.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "food",
+        "currency": "EUR",
+        "period": "yearly",
+        "plan_name": null
+      },
+      {
+        "academic_year": "2026-2027",
+        "age_group": null,
+        "amount": 8250.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "food",
+        "currency": "EUR",
+        "period": "yearly",
+        "plan_name": null
+      },
+      {
+        "academic_year": "2026-2027",
+        "age_group": null,
+        "amount": 13690.81,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "food",
+        "currency": "BGN",
+        "period": "yearly",
+        "plan_name": null
+      },
+      {
+        "academic_year": "2026-2027",
+        "age_group": null,
+        "amount": 14473.14,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "food",
+        "currency": "BGN",
+        "period": "yearly",
+        "plan_name": null
+      },
+      {
+        "academic_year": "2026/2027",
+        "age_group": null,
+        "amount": 1260.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "food",
+        "currency": "EUR",
+        "period": "yearly",
+        "plan_name": null
+      },
+      {
+        "academic_year": "2026/2027",
+        "age_group": null,
+        "amount": 1450.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "food",
+        "currency": "EUR",
+        "period": "yearly",
+        "plan_name": null
+      },
+      {
+        "academic_year": "2026/2027",
+        "age_group": null,
+        "amount": 550.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "food",
+        "currency": "EUR",
+        "period": "yearly",
+        "plan_name": null
+      },
+      {
+        "academic_year": "2026/2027",
+        "age_group": null,
+        "amount": 1480.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "food",
+        "currency": "EUR",
+        "period": "yearly",
+        "plan_name": null
+      },
+      {
+        "academic_year": "2026/2027",
+        "age_group": null,
+        "amount": 370.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "food",
+        "currency": "EUR",
+        "period": "yearly",
+        "plan_name": null
+      },
+      {
+        "academic_year": "2026/2027",
+        "age_group": null,
+        "amount": 150.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "registration",
+        "currency": "EUR",
+        "period": "one_time",
+        "plan_name": null
+      },
+      {
+        "academic_year": "2026/2027",
+        "age_group": null,
+        "amount": 100.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "registration",
+        "currency": "EUR",
+        "period": "one_time",
+        "plan_name": null
+      },
+      {
+        "academic_year": "2026/2027",
+        "age_group": null,
+        "amount": 500.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "registration",
+        "currency": "EUR",
+        "period": "one_time",
+        "plan_name": null
+      }
+    ]
+  },
+  "name_aliases": [
+    "Uwekind International School"
+  ],
+  "name_i18n": {
+    "bg": "\"ЧАСТНА НЕМСКА ДЕТСКА ГРАДИНА УВЕКИНД\" ООД"
+  },
+  "pages": [
+    {
+      "file": "page01.md",
+      "id": 24165,
+      "page_category": "about",
+      "source_url": "https://uwekind.com/about"
+    },
+    {
+      "file": "page02.md",
+      "id": 24166,
+      "page_category": "pricing",
+      "source_url": "https://uwekind.com/admission/fees"
+    },
+    {
+      "file": "page03.md",
+      "id": 24167,
+      "page_category": "about",
+      "source_url": "https://uwekind.com/about/mission"
+    },
+    {
+      "file": "page04.md",
+      "id": 24168,
+      "page_category": "about",
+      "source_url": "https://uwekind.com/about/story"
+    },
+    {
+      "file": "page05.md",
+      "id": 24169,
+      "page_category": "admission",
+      "source_url": "https://uwekind.com/admission"
+    },
+    {
+      "file": "page06.md",
+      "id": 24170,
+      "page_category": "about",
+      "source_url": "https://uwekind.com/about/jobs"
+    },
+    {
+      "file": "page07.md",
+      "id": 26223,
+      "page_category": "about",
+      "source_url": "https://uwekind.com/about/contact-us"
+    },
+    {
+      "file": "page08.md",
+      "id": 27047,
+      "page_category": "about",
+      "source_url": "https://uwekind.com/about-us/contact-us"
+    },
+    {
+      "file": "page09.md",
+      "id": 27048,
+      "page_category": "about",
+      "source_url": "https://uwekind.com/about/%d1%83%d1%87%d0%b8%d0%bb%d0%b8%d1%89%d0%b5%d0%bd-%d0%ba%d0%b0%d0%bb%d0%b5%d0%bd%d0%b4%d0%b0%d1%80"
+    },
+    {
+      "file": "page10.md",
+      "id": 27049,
+      "page_category": "about",
+      "source_url": "https://uwekind.com/about/team/"
+    },
+    {
+      "file": "page11.md",
+      "id": 27600,
+      "page_category": "about",
+      "source_url": "https://uwekind.com/about/team"
+    }
+  ],
+  "school_id": 634,
+  "school_type": "private",
+  "website_url": "https://uwekind.com/"
+}

@@ -1,0 +1,186 @@
+{
+  "country_code": "bg",
+  "expected": {
+    "display_name_evidence": null,
+    "general_info": {
+      "display_name_i18n": {
+        "bg": "БЪЛГАРАНЧЕ"
+      },
+      "extracted": {
+        "_schema_version": 1,
+        "accreditations": [],
+        "admission": {
+          "application_steps": [],
+          "available_spots": [],
+          "deadlines": [
+            "![](https://balgaranche.com/wp-content/uploads/2023/05/Admission.jpg)"
+          ],
+          "entrance_requirements": [],
+          "has_useful_info": true,
+          "required_documents": []
+        },
+        "class_size": "20 students",
+        "contact": {
+          "emails": [
+            "info@balgaranche.com"
+          ],
+          "phones": [
+            "0885 555 621",
+            "0258542541",
+            "0563290827"
+          ]
+        },
+        "extracurricular": [],
+        "facilities": [],
+        "founded_year": null,
+        "languages": [],
+        "operations": {
+          "daily_schedule": [
+            "**ДНЕВЕН РЕЖИМ НА ДЕТСКА ГРАДИНА БЪЛГАРАНЧЕ**"
+          ],
+          "day_options": [
+            "Такса за целодневно обучение – 1300 лв.",
+            "Такса за полудневно обучение – 1000 лв."
+          ],
+          "has_useful_info": true,
+          "meals": [
+            "* 08:35 – 09:00 – Закуска",
+            "* 10:00 – Втора закуска – плод",
+            "* 12:00 – 12:10 – Подготовка за обяд",
+            "* 12:10 – 12:40 – Обяд",
+            "* 15:15 – 15:30 – Раздвижване и подготовка за следобедна закуска",
+            "* 15:30 – 16:00 – Следобедна закуска"
+          ],
+          "transport": [],
+          "uniforms": [],
+          "working_hours": "07:30 – 18:30"
+        },
+        "pricing_terms": {
+          "application_fees": [],
+          "deposits": [],
+          "discounts": [],
+          "excluded_items": [],
+          "has_useful_info": false,
+          "included_items": [],
+          "installments": [],
+          "registration_fees": []
+        },
+        "programs": [],
+        "services": {
+          "has_useful_info": true,
+          "safety_features": [],
+          "support_services": [
+            "Опитни педагози и детски психолог ще полагат грижа за Вашите деца."
+          ]
+        },
+        "summary_source": {
+          "canonical_tags": [],
+          "community_signals": [],
+          "differentiators": [],
+          "has_useful_info": true,
+          "positioning": null,
+          "student_experience": [
+            "Обучението се провежда от квалифицирани специалисти с богат практически опит",
+            "Заниманията по плуване се осъществяват в плувния басейн на МБАЛ „Света София“",
+            "Плуването е изключително развиващ спорт",
+            "които посещават заниманията по плуване са активни"
+          ],
+          "teaching_approach": [
+            "Танцова формация „РОКО“ предлага обучение по български народни и модерни танци на деца от всички възрастови групи",
+            "Обучението се провежда от квалифицирани специалисти с богат практически опит",
+            "Хореографите са с необходимото педагогическо образование за работа с деца"
+          ]
+        }
+      },
+      "extracted_i18n": {
+        "en": {
+          "languages": [
+            {
+              "language": "English",
+              "level": null
+            },
+            {
+              "language": "Bulgarian",
+              "level": null
+            }
+          ]
+        }
+      }
+    },
+    "pricing": [
+      {
+        "academic_year": null,
+        "age_group": null,
+        "amount": 1300.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "tuition",
+        "currency": "BGN",
+        "period": "monthly",
+        "plan_name": null
+      },
+      {
+        "academic_year": null,
+        "age_group": null,
+        "amount": 1000.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "tuition",
+        "currency": "BGN",
+        "period": "monthly",
+        "plan_name": null
+      }
+    ]
+  },
+  "name_aliases": [],
+  "name_i18n": {
+    "bg": "\"ЧАСТНА ДЕТСКА ГРАДИНА БЪЛГАРАНЧЕ\" ЕООД"
+  },
+  "pages": [
+    {
+      "file": "page01.md",
+      "id": 18662,
+      "page_category": null,
+      "source_url": "https://balgaranche.com"
+    },
+    {
+      "file": "page02.md",
+      "id": 18663,
+      "page_category": null,
+      "source_url": "http://balgaranche.com"
+    },
+    {
+      "file": "page03.md",
+      "id": 18664,
+      "page_category": "pricing",
+      "source_url": "https://balgaranche.com/taksi"
+    },
+    {
+      "file": "page04.md",
+      "id": 18665,
+      "page_category": null,
+      "source_url": "https://balgaranche.com/rejim"
+    },
+    {
+      "file": "page05.md",
+      "id": 18666,
+      "page_category": "admission",
+      "source_url": "https://balgaranche.com/priem"
+    },
+    {
+      "file": "page06.md",
+      "id": 18667,
+      "page_category": null,
+      "source_url": "https://balgaranche.com/geleria"
+    },
+    {
+      "file": "page07.md",
+      "id": 18668,
+      "page_category": "programs",
+      "source_url": "https://balgaranche.com/obuchenie"
+    }
+  ],
+  "school_id": 176,
+  "school_type": "private",
+  "website_url": "https://balgaranche.bg"
+}

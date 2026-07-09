@@ -1,0 +1,208 @@
+{
+  "country_code": "bg",
+  "expected": {
+    "display_name_evidence": null,
+    "general_info": {
+      "display_name_i18n": {
+        "bg": "ЧОУ „Фюжън“",
+        "en": "Fusion School"
+      },
+      "extracted": {
+        "_schema_version": 1,
+        "accreditations": [],
+        "admission": {
+          "application_steps": [
+            "* [Кандидатстване](https://school.fusion.bg/priem/kandidatstvane/)"
+          ],
+          "available_spots": [],
+          "deadlines": [],
+          "entrance_requirements": [],
+          "has_useful_info": true,
+          "required_documents": []
+        },
+        "class_size": "5 students",
+        "contact": {
+          "address": "ул. Витошка Зорница 2, кв. Драгалевци, гр. София.",
+          "emails": [
+            "school@fusion.bg"
+          ],
+          "phones": [
+            "026/02/1199-6",
+            "026/02/745-42",
+            "+359 883 363 777"
+          ]
+        },
+        "extracurricular": [],
+        "facilities": [],
+        "founded_year": null,
+        "languages": [],
+        "operations": {
+          "daily_schedule": [],
+          "day_options": [],
+          "has_useful_info": true,
+          "meals": [
+            "* [Хранене](https://school.fusion.bg/kak-zhiveem/hranene/)",
+            "# Хранене"
+          ],
+          "transport": [
+            "* [Транспорт](https://school.fusion.bg/kak-zhiveem/transport/)"
+          ],
+          "uniforms": [
+            "### Униформа – опростен вариант"
+          ],
+          "working_hours": null
+        },
+        "pricing_terms": {
+          "application_fees": [],
+          "deposits": [],
+          "discounts": [],
+          "excluded_items": [],
+          "has_useful_info": true,
+          "included_items": [],
+          "installments": [
+            "**За 1 вноска: €6650**",
+            "На 2 вноски: 2 вноски по €3475",
+            "На 4 вноски: 4 вноски по €1775",
+            "На 9 вноски: 9 вноски по €811",
+            "**За 1 вноска: €7150**",
+            "На 2 вноски: 2 вноски по €3775"
+          ],
+          "registration_fees": []
+        },
+        "programs": [],
+        "services": {
+          "has_useful_info": true,
+          "safety_features": [],
+          "support_services": [
+            "[Психолог](https://school.fusion.bg/team_category/psiholog/)",
+            "[Логопед](https://school.fusion.bg/team_category/logoped/)"
+          ]
+        },
+        "summary_source": {
+          "canonical_tags": [],
+          "community_signals": [],
+          "differentiators": [
+            "Fusion – сплотяване",
+            "но в нашия тълковен речник Fusion означава “синтез на най-доброто“",
+            "съмишленици и най-вече неуморими мечтатели създадохме Fusion Academy",
+            "защото сме fusion",
+            "осъществяваме най-голямата си мечта и отваряме Fusion School – от предучилищна до 7 клас"
+          ],
+          "has_useful_info": true,
+          "positioning": null,
+          "student_experience": [],
+          "teaching_approach": [
+            "Индивидуален подход към всяко дете и съобразяване със собствения му стил на учене",
+            "Засиленото обучение по английски език започва в предучилищните групи и се засилва в следващите класове"
+          ]
+        }
+      },
+      "extracted_i18n": {
+        "en": {
+          "languages": [
+            {
+              "language": "English",
+              "level": null
+            },
+            {
+              "language": "Bulgarian",
+              "level": null
+            }
+          ]
+        }
+      }
+    },
+    "pricing": [
+      {
+        "academic_year": "2025-2026",
+        "age_group": "preschool",
+        "amount": 6650.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "yearly",
+        "plan_name": null
+      },
+      {
+        "academic_year": "2025-2026",
+        "age_group": "1-7 клас",
+        "amount": 7150.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "yearly",
+        "plan_name": null
+      },
+      {
+        "academic_year": "2025-2026",
+        "age_group": "1-7 клас",
+        "amount": 545.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "materials",
+        "currency": "EUR",
+        "period": "yearly",
+        "plan_name": null
+      }
+    ]
+  },
+  "name_aliases": [],
+  "name_i18n": {
+    "bg": "ЧАСТНО ОСНОВНО УЧИЛИЩЕ ФЮЖЪН ЕООД"
+  },
+  "pages": [
+    {
+      "file": "page01.md",
+      "id": 22407,
+      "page_category": null,
+      "source_url": "https://school.fusion.bg/"
+    },
+    {
+      "file": "page02.md",
+      "id": 23824,
+      "page_category": null,
+      "source_url": "https://school.fusion.bg"
+    },
+    {
+      "file": "page03.md",
+      "id": 23825,
+      "page_category": "programs",
+      "source_url": "https://school.fusion.bg/zashto-fusion/programa"
+    },
+    {
+      "file": "page04.md",
+      "id": 23826,
+      "page_category": null,
+      "source_url": "https://school.fusion.bg/kak-zhiveem/galeriya"
+    },
+    {
+      "file": "page05.md",
+      "id": 23827,
+      "page_category": null,
+      "source_url": "https://school.fusion.bg/kak-zhiveem/hranene"
+    },
+    {
+      "file": "page06.md",
+      "id": 23828,
+      "page_category": null,
+      "source_url": "https://school.fusion.bg/kak-zhiveem"
+    },
+    {
+      "file": "page07.md",
+      "id": 26886,
+      "page_category": "about",
+      "source_url": "https://school.fusion.bg/za-uchilishteto"
+    },
+    {
+      "file": "page08.md",
+      "id": 26887,
+      "page_category": "pricing",
+      "source_url": "https://school.fusion.bg/priem/grafik-i-tseni"
+    }
+  ],
+  "school_id": 520,
+  "school_type": "private",
+  "website_url": "https://school.fusion.bg/"
+}

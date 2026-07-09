@@ -1,0 +1,358 @@
+{
+  "country_code": "bg",
+  "expected": {
+    "display_name_evidence": null,
+    "general_info": {
+      "display_name_i18n": {
+        "bg": "Uwekind International School",
+        "en": "Uwekind International School"
+      },
+      "extracted": {
+        "_schema_version": 1,
+        "accreditations": [
+          "МОН лиценз"
+        ],
+        "admission": {
+          "application_steps": [
+            "**[КАНДИДАТСТВАЙТЕ](https://uwekind.com/admission/procedure/)**",
+            "* [Административна такса за кандидатстване за прием ](https://uwekind.com/admission/fees/)",
+            "Такса кандидатстване: **150 € (ПК – 12. клас)**",
+            "Такса кандидатстване: **100 € (детска градина)**",
+            "[Кандидатстване](https://uwekind.com/admission/procedure/)"
+          ],
+          "available_spots": [],
+          "deadlines": [
+            "* [Прием](https://uwekind.com/admission/)",
+            "* [Процедура по прием](https://uwekind.com/admission/procedure/)",
+            "* [Финансови условия](https://uwekind.com/admission/fees/)",
+            "* [Въпроси и отговори](https://uwekind.com/admission/faq/)",
+            "**[КАНДИДАТСТВАЙТЕ](https://uwekind.com/admission/procedure/)**",
+            "* [{title}](https://uwekind.com/admission/fees/)"
+          ],
+          "entrance_requirements": [
+            "#### Сесията включва три етапа - задачи в писмен вид",
+            "интервю и изпращане на обратна връзка за кандидата.",
+            "Интервю – комуникативни и социални умения",
+            "мотивация за учене."
+          ],
+          "has_useful_info": true,
+          "required_documents": []
+        },
+        "class_size": "6 students",
+        "contact": {
+          "address": "ул. Владайска 48",
+          "addresses": [
+            "ул. Владайска 48",
+            "ул. “Владайска” 48.",
+            "ул. Манастирска воденица 71"
+          ],
+          "emails": [
+            "info@uwekind.bg",
+            "kindergarten@uwekind.bg",
+            "primaryschool@uwekind.bg"
+          ],
+          "phones": [
+            "088843330651",
+            "+359 879 888 920",
+            "+359 885 614 724"
+          ]
+        },
+        "extracurricular": [],
+        "facilities": [],
+        "founded_year": null,
+        "languages": [],
+        "operations": {
+          "daily_schedule": [],
+          "day_options": [],
+          "has_useful_info": true,
+          "meals": [
+            "Храна обяд",
+            "сутрешна и следобедна закуска – **1260 €**",
+            "Храна обяд – **1450 €**",
+            "Храна – сутрешна и следобедна закуска – **550 €**",
+            "Храна обяд – **1480 €**",
+            "Храна – сутрешна закуска –**370 €**"
+          ],
+          "transport": [
+            "**__Такса транспорт__** _/По избор за учениците в Лозен и децата от детската градина/_**_*_**"
+          ],
+          "uniforms": [],
+          "working_hours": null
+        },
+        "pricing_terms": {
+          "application_fees": [
+            "* [Административна такса за кандидатстване за прием ](https://uwekind.com/admission/fees/)"
+          ],
+          "deposits": [],
+          "discounts": [
+            "### Отстъпки",
+            "Училището предвижда отстъпки от такса „Образователни услуги“ за семейства с две и повече деца",
+            "постъпил в УВЕКИНД – 5 % отстъпка",
+            "постъпил в УВЕКИНД – 10 % отстъпка",
+            "3. При повече деца – отстъпка по договаряне"
+          ],
+          "excluded_items": [
+            "* В таксата **не е** включена храна",
+            "* В таксата **не e** включена храна"
+          ],
+          "has_useful_info": true,
+          "included_items": [
+            "#### Сесията включва три етапа - задачи в писмен вид"
+          ],
+          "installments": [
+            "* **7000 €** – при разсрочено плащане на 2 вноски",
+            "* **7400 €** – при разсрочено плащане на 10 вноски",
+            "* **8100 €** – при разсрочено плащане на 2 вноски",
+            "* **8250 €** – при разсрочено плащане на 3 вноски",
+            "81 лв** – при разсрочено плащане на 2 вноски",
+            "14 лв** – при разсрочено плащане на 10 вноски"
+          ],
+          "registration_fees": []
+        },
+        "programs": [],
+        "services": {
+          "has_useful_info": false,
+          "safety_features": [],
+          "support_services": []
+        },
+        "summary_source": {
+          "canonical_tags": [
+            "German-focused"
+          ],
+          "community_signals": [
+            "В нашето училище създаваме подходящи условия и среда за академичен напредък",
+            "В Увекинд детето Ви ще бъде част от подкрепяща и приветлива училищна общност"
+          ],
+          "differentiators": [],
+          "has_useful_info": true,
+          "positioning": null,
+          "student_experience": [
+            "Ние предлагаме разнообразие от извънкласни занимания и часове за допълнителна подготовка"
+          ],
+          "teaching_approach": [
+            "В нашето училище създаваме подходящи условия и среда за академичен напредък",
+            "Нашите преподаватели прилагат иновативни методи и не спират да се развиват като професионалисти"
+          ]
+        }
+      },
+      "extracted_i18n": {
+        "bg": {
+          "accreditations": [
+            "МОН лиценз"
+          ]
+        },
+        "en": {
+          "languages": [
+            {
+              "language": "English",
+              "level": null
+            },
+            {
+              "language": "Bulgarian",
+              "level": null
+            },
+            {
+              "language": "German",
+              "level": null
+            }
+          ]
+        }
+      }
+    },
+    "pricing": [
+      {
+        "academic_year": "2026-2027",
+        "age_group": null,
+        "amount": 6820.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "yearly",
+        "plan_name": null
+      },
+      {
+        "academic_year": "2026-2027",
+        "age_group": null,
+        "amount": 7880.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "food",
+        "currency": "EUR",
+        "period": "yearly",
+        "plan_name": null
+      },
+      {
+        "academic_year": "2026-2027",
+        "age_group": null,
+        "amount": 13338.76,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "food",
+        "currency": "BGN",
+        "period": "yearly",
+        "plan_name": null
+      },
+      {
+        "academic_year": "2026/2027",
+        "age_group": "12 клас",
+        "amount": 1260.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "food",
+        "currency": "EUR",
+        "period": "yearly",
+        "plan_name": null
+      },
+      {
+        "academic_year": "2026/2027",
+        "age_group": "12 клас",
+        "amount": 1450.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "food",
+        "currency": "EUR",
+        "period": "yearly",
+        "plan_name": null
+      },
+      {
+        "academic_year": "2026/2027",
+        "age_group": "12 клас",
+        "amount": 550.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "food",
+        "currency": "EUR",
+        "period": "yearly",
+        "plan_name": null
+      },
+      {
+        "academic_year": "2026/2027",
+        "age_group": "12 клас",
+        "amount": 1480.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "food",
+        "currency": "EUR",
+        "period": "yearly",
+        "plan_name": null
+      },
+      {
+        "academic_year": "2026/2027",
+        "age_group": "12 клас",
+        "amount": 370.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "food",
+        "currency": "EUR",
+        "period": "yearly",
+        "plan_name": null
+      },
+      {
+        "academic_year": "2026/2027",
+        "age_group": "12 клас",
+        "amount": 150.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "registration",
+        "currency": "EUR",
+        "period": "one_time",
+        "plan_name": null
+      },
+      {
+        "academic_year": "2026/2027",
+        "age_group": "12 клас",
+        "amount": 100.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "registration",
+        "currency": "EUR",
+        "period": "one_time",
+        "plan_name": null
+      },
+      {
+        "academic_year": "2026/2027",
+        "age_group": "12 клас",
+        "amount": 500.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "registration",
+        "currency": "EUR",
+        "period": "one_time",
+        "plan_name": null
+      }
+    ]
+  },
+  "name_aliases": [
+    "Uwekind International School",
+    "Uwekind"
+  ],
+  "name_i18n": {
+    "bg": "\"ЧАСТНО СРЕДНО УЧИЛИЩЕ УВЕКИНД\" ООД"
+  },
+  "pages": [
+    {
+      "file": "page01.md",
+      "id": 26657,
+      "page_category": "about",
+      "source_url": "https://uwekind.com/about"
+    },
+    {
+      "file": "page02.md",
+      "id": 26658,
+      "page_category": "about",
+      "source_url": "https://uwekind.com/about/contact-us"
+    },
+    {
+      "file": "page03.md",
+      "id": 26659,
+      "page_category": "about",
+      "source_url": "https://uwekind.com/about/mission"
+    },
+    {
+      "file": "page04.md",
+      "id": 26660,
+      "page_category": "pricing",
+      "source_url": "https://uwekind.com/admission/fees"
+    },
+    {
+      "file": "page05.md",
+      "id": 26661,
+      "page_category": "about",
+      "source_url": "https://uwekind.com/about/jobs"
+    },
+    {
+      "file": "page06.md",
+      "id": 26662,
+      "page_category": "about",
+      "source_url": "https://uwekind.com/about/%d1%83%d1%87%d0%b8%d0%bb%d0%b8%d1%89%d0%b5%d0%bd-%d0%ba%d0%b0%d0%bb%d0%b5%d0%bd%d0%b4%d0%b0%d1%80"
+    },
+    {
+      "file": "page07.md",
+      "id": 27131,
+      "page_category": "admission",
+      "source_url": "https://uwekind.com/admission"
+    },
+    {
+      "file": "page08.md",
+      "id": 27132,
+      "page_category": "about",
+      "source_url": "https://uwekind.com/about/team"
+    },
+    {
+      "file": "page09.md",
+      "id": 27133,
+      "page_category": "about",
+      "source_url": "https://uwekind.com/about/story"
+    },
+    {
+      "file": "page10.md",
+      "id": 27134,
+      "page_category": "about",
+      "source_url": "https://uwekind.com/about-us/contact-us"
+    }
+  ],
+  "school_id": 635,
+  "school_type": "private",
+  "website_url": "https://uwekind.com/"
+}

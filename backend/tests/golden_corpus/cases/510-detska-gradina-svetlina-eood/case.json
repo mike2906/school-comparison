@@ -1,0 +1,335 @@
+{
+  "country_code": "bg",
+  "expected": {
+    "display_name_evidence": null,
+    "general_info": {
+      "display_name_i18n": {
+        "bg": "Светлина"
+      },
+      "extracted": {
+        "_schema_version": 1,
+        "accreditations": [],
+        "admission": {
+          "application_steps": [
+            "Кандидатствай",
+            "Получаваме ли точка с Вас за кандидатстване в държавна детска градина?",
+            "Как да кандидатствам в ЧОУ „Светлина“?",
+            "Форма за кандидатстване:",
+            "Application form: https://svetlina.net/priem-za-chastno-inovativno-uchilishte/",
+            "Такса „Приемен изпит“ при кандидатстване"
+          ],
+          "available_spots": [
+            "Имате ли свободни места?"
+          ],
+          "deadlines": [],
+          "entrance_requirements": [
+            "Архитектура на бъдещето: интервю с Галина Милкова",
+            "Think Forward",
+            "Такса „Приемен изпит“ при кандидатстване"
+          ],
+          "has_useful_info": true,
+          "required_documents": []
+        },
+        "class_size": "5 students",
+        "contact": {
+          "emails": [
+            "kinder.communication.manager@svetlina.net",
+            "communication.manager@svetlina.net",
+            "info-2217618@edu.mon.bg"
+          ],
+          "phones": [
+            "0895 560 647",
+            "+359 897 820 996",
+            "+359 895 560 647"
+          ]
+        },
+        "extracurricular": [],
+        "facilities": [],
+        "founded_year": "1999",
+        "languages": [],
+        "operations": {
+          "daily_schedule": [],
+          "day_options": [
+            "Практикуват английския език целодневно в ежедневната си комуникация в училищната среда."
+          ],
+          "has_useful_info": true,
+          "meals": [
+            "Сутрешна закуска",
+            "Междинна закуска с пресни плодове и зеленчуци",
+            "Обяд с тристепенно меню – супа",
+            "Следобедна закуска",
+            "12:30 – 14:00 часа – Обяд и игра навън"
+          ],
+          "transport": [],
+          "uniforms": [
+            "Задължителна официална училищна униформа съгласно одобрена оферта от доставчик.",
+            "Задължителна училищна униформа съгласно одобрена оферта от доставчик."
+          ],
+          "working_hours": "### What are the working hours?"
+        },
+        "pricing_terms": {
+          "application_fees": [],
+          "deposits": [],
+          "discounts": [],
+          "excluded_items": [
+            "Годишната такса „Обучение“ не включва:"
+          ],
+          "has_useful_info": true,
+          "included_items": [
+            "Годишната такса за обучение включва:"
+          ],
+          "installments": [
+            "Плащане на две вноски"
+          ],
+          "registration_fees": []
+        },
+        "programs": [],
+        "services": {
+          "has_useful_info": true,
+          "safety_features": [],
+          "support_services": [
+            "Системна подкрепа от училищния психолог в индивидуални или групови дейности и консултации",
+            "Индивидуални консултации с училищния психолог",
+            "Обследване от логопед",
+            "Индивидуални консултации с логопед"
+          ]
+        },
+        "summary_source": {
+          "canonical_tags": [],
+          "community_signals": [
+            "които са и наши партньори по пътя на детското развитие"
+          ],
+          "differentiators": [
+            "– международна мрежа"
+          ],
+          "has_useful_info": true,
+          "positioning": "В Частна детска градина и ясла „Светлина“ поставяме основите на увереното, радостно и смислено порастване",
+          "student_experience": [
+            "модули по професионални компетенции и практически проекти",
+            "като споделяме и прилагаме високи образователни стандарти в ежедневната си работа",
+            "Практикуване на различни видове спорт и изкуства"
+          ],
+          "teaching_approach": [
+            "С холистичен подход и индивидуално внимание",
+            "Обучението включва интензивно изучаване на английски език",
+            "Въвеждаме иновативни подходи",
+            "който първи въвежда в България холистичния подход в образованието",
+            "Индивидуален подход към всяко едно дете"
+          ]
+        }
+      },
+      "extracted_i18n": {
+        "en": {
+          "languages": [
+            {
+              "language": "English",
+              "level": null
+            }
+          ]
+        }
+      }
+    },
+    "pricing": [
+      {
+        "academic_year": null,
+        "age_group": "8 клас",
+        "amount": 8000.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "yearly",
+        "plan_name": null
+      },
+      {
+        "academic_year": null,
+        "age_group": "8 клас",
+        "amount": 8000.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "yearly",
+        "plan_name": null
+      },
+      {
+        "academic_year": null,
+        "age_group": null,
+        "amount": 450.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "registration",
+        "currency": "EUR",
+        "period": "one_time",
+        "plan_name": null
+      },
+      {
+        "academic_year": null,
+        "age_group": null,
+        "amount": 100.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "registration",
+        "currency": "EUR",
+        "period": "one_time",
+        "plan_name": null
+      },
+      {
+        "academic_year": null,
+        "age_group": null,
+        "amount": 4120.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "semester",
+        "plan_name": null
+      },
+      {
+        "academic_year": null,
+        "age_group": null,
+        "amount": 4094.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "semester",
+        "plan_name": null
+      },
+      {
+        "academic_year": null,
+        "age_group": null,
+        "amount": 4275.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "semester",
+        "plan_name": null
+      },
+      {
+        "academic_year": null,
+        "age_group": null,
+        "amount": 840.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "monthly",
+        "plan_name": null
+      },
+      {
+        "academic_year": null,
+        "age_group": null,
+        "amount": 843.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "monthly",
+        "plan_name": null
+      },
+      {
+        "academic_year": null,
+        "age_group": null,
+        "amount": 880.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "monthly",
+        "plan_name": null
+      },
+      {
+        "academic_year": null,
+        "age_group": null,
+        "amount": 250.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "one_time",
+        "plan_name": "Standard"
+      },
+      {
+        "academic_year": null,
+        "age_group": null,
+        "amount": 7950.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "yearly",
+        "plan_name": null
+      },
+      {
+        "academic_year": null,
+        "age_group": null,
+        "amount": 8300.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "yearly",
+        "plan_name": null
+      }
+    ]
+  },
+  "name_aliases": [],
+  "name_i18n": {
+    "bg": "\"Частна детска градина Светлина\" ЕООД"
+  },
+  "pages": [
+    {
+      "file": "page01.md",
+      "id": 22555,
+      "page_category": null,
+      "source_url": "https://svetlina.net"
+    },
+    {
+      "file": "page02.md",
+      "id": 24580,
+      "page_category": null,
+      "source_url": "https://svetlina.net/arhitektura-na-budehsteto-intervu-s-galina-milkova-think-forward"
+    },
+    {
+      "file": "page03.md",
+      "id": 24581,
+      "page_category": "contact",
+      "source_url": "https://svetlina.net/kontakti"
+    },
+    {
+      "file": "page04.md",
+      "id": 24582,
+      "page_category": null,
+      "source_url": "https://svetlina.net/en"
+    },
+    {
+      "file": "page05.md",
+      "id": 24583,
+      "page_category": "pricing",
+      "source_url": "https://svetlina.net/high-school/taksi-i-finansovi-usloviq"
+    },
+    {
+      "file": "page06.md",
+      "id": 24584,
+      "page_category": "about",
+      "source_url": "https://svetlina.net/ekip"
+    },
+    {
+      "file": "page07.md",
+      "id": 24585,
+      "page_category": "pricing",
+      "source_url": "https://svetlina.net/school/taksi-i-finansovi-usloviq"
+    },
+    {
+      "file": "page08.md",
+      "id": 25751,
+      "page_category": null,
+      "source_url": "https://svetlina.net/"
+    }
+  ],
+  "school_id": 510,
+  "school_type": "private",
+  "website_url": "https://svetlina.net/"
+}
