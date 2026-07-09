@@ -126,16 +126,22 @@ Order matters within this phase; tasks touch overlapping files — run sequentia
       *Verify:* `uv run pytest tests/test_golden_corpus*` green in CI.
       **Done.** 20 real Sofia schools captured under `tests/golden_corpus/cases/`
       (167 pages, ~2 MB; low-signal uncategorized gallery/news pages trimmed, all
-      categorized pages kept). `tests/golden_corpus/harness.py` reproduces the
-      deterministic (no-LLM/no-network/no-DB) portions of `_extract_prices`,
-      `_extract_general_info`, and `_build_display_name_evidence`; `test_golden_corpus.py`
-      re-runs it against the committed markdown and asserts the snapshot in each
-      `case.json`. Snapshots are characterization baselines of *current* behavior, so
-      they intentionally capture existing bugs (e.g. `class_size: "5 students"` from
-      P1.10) — a future fix updates the snapshot and the diff makes the change reviewable.
-      Regenerate from the live DB with `uv run python -m scripts.build_golden_corpus`.
-      Coverage spans private/international/state types, pricing tables, display-name
-      overrides, and the Fusion (520) / English-primary (510) cases.
+      categorized pages kept). The deterministic (no-LLM/no-network/no-DB) path lives
+      in the app as `app/scrapers/deterministic.py::run_deterministic_extraction`,
+      composed entirely of the same leaf helpers production runs — `_supported_price_rows`,
+      `_normalized_price_fields`, `_build_extracted_attributes`,
+      `_build_deterministic_general_info_output`, `_build_display_name_evidence` — which
+      were extracted from `_extract_prices`/`_extract_general_info` so the corpus can't
+      silently drift from production (refactor verified byte-identical extraction output).
+      `test_golden_corpus.py` re-runs that shared function against the committed markdown
+      and asserts each `case.json` snapshot. Snapshots are characterization baselines of
+      *current* behavior; each case carries a `known_issues` list naming fields that are
+      wrong-on-purpose plus the plan task that fixes them (e.g. `class_size` → P1.10).
+      Review rule: a snapshot diff touching a field with no matching `known_issues` entry
+      is an unexplained behavior change and must be justified in the PR. Regenerate from
+      the live DB with `uv run python -m scripts.build_golden_corpus`. Coverage spans
+      private/international/state types, pricing tables, display-name overrides, and the
+      Fusion (520) / English-primary (510) cases.
 - [ ] **P1.6 Quality scoreboard.** Wire `PipelineRun` (modeled in
       `app/models/pipeline_run.py`, currently never written) into the CLI batch runners,
       and snapshot 6 metrics per run: % schools validation-ok, duplicate-coordinate

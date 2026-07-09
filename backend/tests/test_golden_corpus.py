@@ -9,6 +9,12 @@ To (re)generate fixtures from the live database:
 
 When a deterministic pricing/display-name/general-info fix intentionally changes
 output, regenerate (or hand-edit) the affected ``case.json`` and review the diff.
+
+Snapshots are characterization baselines of *current* behavior, so they can
+enshrine known bugs. Each ``case.json`` carries a ``known_issues`` list naming the
+fields that are wrong-on-purpose and the plan task that will fix them. Review rule:
+**a snapshot diff that touches a field without a matching ``known_issues`` entry is
+an unexplained behavior change and must be justified in the PR.**
 """
 
 from __future__ import annotations
@@ -64,3 +70,13 @@ def test_deterministic_extraction_matches_snapshot(case_dir: Path):
     result = run_deterministic_extraction(school, pages)
 
     assert result == case["expected"]
+
+
+@pytest.mark.parametrize("case_dir", CASE_DIRS, ids=[p.name for p in CASE_DIRS])
+def test_known_issues_are_well_formed(case_dir: Path):
+    """Each known-issue annotation must name a field, a plan task, and a description."""
+    case = json.loads((case_dir / "case.json").read_text(encoding="utf-8"))
+    for issue in case.get("known_issues", []):
+        assert issue.get("field"), f"known_issue missing 'field' in {case_dir.name}"
+        assert issue.get("task"), f"known_issue missing 'task' in {case_dir.name}"
+        assert issue.get("issue"), f"known_issue missing 'issue' in {case_dir.name}"

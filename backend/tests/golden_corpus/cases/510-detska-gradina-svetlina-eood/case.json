@@ -275,6 +275,13 @@
       }
     ]
   },
+  "known_issues": [
+    {
+      "field": "expected.general_info.extracted.class_size",
+      "issue": "Deterministic class_size heuristic parses bare 'N students' phrases and can conflate teacher ratios / group sizes with real class size (e.g. '5 students').",
+      "task": "P1.10"
+    }
+  ],
   "name_aliases": [],
   "name_i18n": {
     "bg": "\"Частна детска градина Светлина\" ЕООД"

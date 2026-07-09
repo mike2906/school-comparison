@@ -73,6 +73,31 @@ def _slug(text: str) -> str:
     return ascii_text or "school"
 
 
+def _detect_known_issues(expected: dict) -> list[dict]:
+    """Flag snapshot fields that enshrine a *known*, plan-tracked extraction bug.
+
+    Characterization snapshots deliberately capture current (sometimes wrong)
+    behavior. These annotations keep the wrongness greppable so a bug can't gain
+    silent legitimacy, and they anchor a review rule (see test_golden_corpus.py):
+    a snapshot diff that touches a field WITHOUT a matching known_issues entry is
+    an unexplained behavior change and must be justified in the PR.
+    """
+    issues: list[dict] = []
+    class_size = expected.get("general_info", {}).get("extracted", {}).get("class_size")
+    if isinstance(class_size, str) and re.search(r"\d", class_size):
+        issues.append(
+            {
+                "field": "expected.general_info.extracted.class_size",
+                "task": "P1.10",
+                "issue": (
+                    "Deterministic class_size heuristic parses bare 'N students' phrases and can "
+                    "conflate teacher ratios / group sizes with real class size (e.g. '5 students')."
+                ),
+            }
+        )
+    return issues
+
+
 async def build_case(session, school_id: int) -> str | None:
     school = (
         await session.execute(select(School).where(School.id == school_id))
@@ -145,6 +170,7 @@ async def build_case(session, school_id: int) -> str | None:
     built_school = build_school(case)
     built_pages = build_pages(fixture_pages)
     case["expected"] = run_deterministic_extraction(built_school, built_pages)
+    case["known_issues"] = _detect_known_issues(case["expected"])
 
     (case_dir / "case.json").write_text(
         json.dumps(case, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
