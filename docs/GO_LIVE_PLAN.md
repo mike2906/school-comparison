@@ -178,6 +178,17 @@ Order matters within this phase; tasks touch overlapping files — run sequentia
       Pricing: hide rows with confidence <0.7 or no `source_url`. Summaries: drop
       `needs_review` from `SUMMARY_ELIGIBLE_VALIDATION_STATUSES` (keep `ok` only).
       *Verify:* tests: school with error-level validation issue on field X → X absent from API.
+      - [ ] *From P1.6 review:* the pricing gate threshold already exists as
+            `app/services/data_quality.py::PRICING_CONFIDENCE_FLOOR` (= 0.7), written to
+            mirror this gate. Import/reuse it here (or move it to a shared location) rather
+            than hardcoding `0.7` a second time, so the scoreboard metric and the display
+            gate can never diverge.
+      - [ ] *From P1.6 review (finding-1 last corner; low priority, bundle here or in any
+            future PR):* in `cli._run_discover_batch`, a whole-adapter exception is caught
+            per-adapter without incrementing any failure count, so a discover run whose only
+            adapter crashes still records `COMPLETED` with all-zero counts. Count adapter
+            exceptions as `failed` in the returned `_stage_summary` (per-school failures
+            don't exist at the discover level, only whole-adapter ones).
 - [ ] **P1.8 Split `location_tags`.** Provenance strings (`source=moe_registry`,
       `source_esri_id=…`) move to `geocode_meta`; `location_tags` stays purely semantic;
       delete the client-side allowlist filter in `frontend/src/utils/locationFocus.js`.
