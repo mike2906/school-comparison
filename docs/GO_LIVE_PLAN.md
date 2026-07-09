@@ -150,6 +150,14 @@ Order matters within this phase; tasks touch overlapping files — run sequentia
       Add a `data-quality` CLI report reusing queries from the repair commands.
       Implement the webhook alert or delete `alert_webhook_url`/`alert_failure_threshold`.
       *Verify:* run pipeline on a few schools → PipelineRun row exists with metrics.
+      - [ ] *Cleanup (low priority, from P1.5 review; bundle into this PR).*
+            `app/scrapers/deterministic.py` still duplicates the `_select_pages`
+            category-list literals from `extractor._extract_prices` /
+            `_extract_general_info` (e.g. `["pricing", "admission", "contact"]` and the
+            general-info/narrative lists). They match today, but a category-list change
+            in the extractor alone would silently shift which pages the golden corpus
+            selects. Hoist those lists into module-level constants in `extractor.py`
+            and import them in `deterministic.py` so the selection can't drift.
 - [ ] **P1.7 Field-level display gating.** Mirror the summarizer's
       `_blocked_summary_sections` pattern in serialization: a field with an error-level
       issue in the current validation report is excluded from the API response.
