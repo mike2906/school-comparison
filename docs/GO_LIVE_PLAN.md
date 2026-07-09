@@ -103,6 +103,17 @@ Order matters within this phase; tasks touch overlapping files — run sequentia
       stale or headline-like display names fall back to registry-derived names at the
       API boundary. The `cleanup-display-names` repair command and its mutation helper
       were removed; `audit-display-names` remains for inspection.
+- [x] **P1.4a Tighten repeated display-name identity.** Follow-up from PR review:
+      `repeated_on_page_identity` currently compares normalized brand-core tokens, so
+      related labels such as `Maple Bear Sofia` and `Maple Bear Academy` can collapse
+      to the same identity key. Require the same normalized display label (or an
+      equivalently strict canonical label) to appear on at least 2 pages before the
+      repeated-page signal is granted.
+      *Verify:* regression test: proposed `Maple Bear Sofia` is rejected when pages
+      repeat `Maple Bear Academy`; existing valid repeated-name cases still pass.
+      **Done.** The repeated-page identity key now preserves the normalized full
+      display label instead of collapsing to brand-core tokens, so institution and
+      location qualifiers remain part of the repeated-name proof.
 - [ ] **P1.5 Golden-fixture corpus.** Commit ~20 real cached `source_pages.raw_markdown`
       pages + expected pricing/display-name/general-info outputs as pytest fixtures.
       Run the deterministic extraction path against them in CI. Every future pricing/
