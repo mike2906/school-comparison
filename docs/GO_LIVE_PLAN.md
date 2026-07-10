@@ -257,7 +257,7 @@ Order matters within this phase; tasks touch overlapping files — run sequentia
       `geocode_meta` already carries P1.3's structured `method`/`precision` — overloading it
       with legacy string tags would clash. Test:
       `test_api.py::test_location_tags_serialize_semantic_only`.
-- [ ] **P1.9 Controlled vocabulary for `facilities` / `special_programs`** (found while
+- [x] **P1.9 Controlled vocabulary for `facilities` / `special_programs`** (found while
       doing P1.1). The advanced-filter UI offers a canonical vocabulary
       (`SearchPage.jsx:27` `DEFAULT_ADVANCED_OPTIONS`: `cafeteria`, `library`,
       `computer_lab`…) but the extractor emits free text (`"Medical care"`,
@@ -271,6 +271,66 @@ Order matters within this phase; tasks touch overlapping files — run sequentia
       endpoint. Best done after P1.5's golden corpus exists.
       *Verify:* `/schools/filters` returns only canonical keys; filter counts non-zero
       for scraped schools.
+      **Done.** Mapped at the publish/projection boundary (like P1.7/P1.8), not by
+      rewriting `attributes` — so it applies to the existing 540 schools with no
+      re-scrape, and the free text stays intact for display. New
+      `app/utils/facility_vocabulary.py` holds the canonical vocab (kept in sync with
+      `SearchPage.DEFAULT_ADVANCED_OPTIONS`) and a deterministic BG/EN free-text →
+      tag mapper (`canonical_tags`) using conservative substring/exact/whole-word rules
+      (whole-word guards short latin stems like `stem` inside `system`; exact-token
+      guards `стол`/`ib`). `build_filterable_attributes` now emits canonical tags for
+      `facilities`/`special_programs`/`teaching_approach` (programs + extracurricular
+      feed special_programs; programs feed teaching_approach for Montessori/IB), and
+      `get_available_filters` reads that same projection instead of raw top-level keys —
+      so options and the matcher can't diverge. The free-text display lists are left
+      intact (they still render via the frontend's `getOptionLabel`); the canonical tags
+      are served *additively* as `attributes.filter_tags` (see the Sol-review follow-up
+      below), not by replacing the free text. Verified on
+      live data: `/schools/filters` returns only canonical keys, non-zero coverage
+      (facilities 74 / special_programs 134 / teaching_approach 29 schools), and
+      `facilities=cafeteria` matches 8 schools (was 0 for scraped schools). Tests:
+      `test_facility_vocabulary.py` (mapping + false-positive guards) and
+      `test_school_attributes.py::TestFilterableProjection` (endpoint canonical options
+      + matching). The frontend amenity-flag booleans (`facilities.includes('cafeteria')`)
+      and the P1.10/P1.11 display gaps are separate and left as-is.
+      - *From Sol review (two P1 findings):* (1) **Counts stayed 0 in the UI.** Canonical
+        tags existed only in the backend's private filter projection, but the frontend
+        counted canonical keys against the free-text display lists (`school.attributes.
+        facilities`), so every count was 0 and zero-count checkboxes are disabled —
+        parents couldn't select the now-working filters. Fix: serve the canonical tags to
+        the browser. New `SchoolFilterTags` on `SchoolDisplayAttributes` exposes
+        `attributes.filter_tags.{facilities,special_programs,teaching_approach}` (built by
+        `school_attributes.compute_filter_tags`, shared with `build_filterable_attributes`
+        so payload/matcher/options never diverge); free-text lists stay for display.
+        `SearchPage.advancedCounts` + `matchesSelected` now count against `filter_tags`.
+        Live check: computer_lab 39 / sports_program 101 / arts_program 84 schools, etc.
+        (2) **Substring false positives.** Bare `спорт`/`sport` matched inside
+        `транспорт`/`transport`; `стем`/`stem` inside `система`/`system`; `хран` inside
+        `охрана`; `based learning` matched `play-based learning`. Added a word-boundary
+        `prefix` rule type (`\b<stem>`, suffix allowed) so `спортна`/`sports` match but
+        `транспорт`/`transport` don't, `STEM` matches but `система` doesn't, `хранене`
+        matches but `охрана` doesn't; tightened `project_based` to require an explicit
+        project reference. Regression tests in `test_facility_vocabulary.py`. Verified
+        schools 380/422 no longer tagged sports (620 is a true positive — real
+        Футбол/Волейбол).
+      - *From P1.9 Codex review (one P2):* scraped rows store transport/meals under
+        `extracted.operations.{transport,meals}` and pedagogy under
+        `extracted.summary_source.teaching_approach` — outside the projected lists — so
+        `transportation`/`meals_provided`/`project_based` stayed near-zero.
+        `compute_filter_tags` now also seeds the mapper from those nested lists (locale
+        overlay included), gated the same way as their sibling display field (transport
+        ↔ `facilities` block, meals ↔ `special_programs` block). Live coverage went
+        `transportation` 0→36, `meals_provided` 5→137, `project_based` 0→11; every
+        canonical option is now non-zero. Tests:
+        `test_filter_tags_include_nested_extraction_sources` +
+        `test_nested_sources_respect_validation_gating`.
+      - *From P1.9 Codex re-review (two P2 recall gaps):* (1) an approach recorded only in
+        `summary_source.{canonical_tags,positioning,differentiators}` (with an empty
+        `teaching_approach`) was dropped — now mined into the approach mapper (the vocab
+        is narrow/distinctive, so prose mining is low-risk; live counts moved only
+        `ib_program` 18→19 / `montessori` 12→13). (2) English-only meal text (`Food`,
+        `breakfast`, `snack`) missed `meals_provided` — added those words. Verified against
+        the cited golden cases (560 → `ib_program`, 154 `Food…` → `meals_provided`).
 - [ ] **P1.10 BG users see no attributes for English-primary schools.** When a school's
       site is English, `attributes.extracted.<lists>` come back empty and all content
       lands under `extracted_i18n.en`, so the `bg` projection is empty (e.g. school 510:

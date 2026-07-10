@@ -40,6 +40,21 @@ class SchoolLocalizedAttributes(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class SchoolFilterTags(BaseModel):
+    """Canonical advanced-filter tags mapped from free text (P1.9).
+
+    Locale-independent option keys (`cafeteria`, `sports_program` …) matching the
+    frontend `DEFAULT_ADVANCED_OPTIONS`. Served alongside — not instead of — the
+    free-text lists in `SchoolLocalizedAttributes`, which are kept for display.
+    """
+
+    facilities: list[str] = []
+    special_programs: list[str] = []
+    teaching_approach: list[str] = []
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class SchoolDisplayAttributes(BaseModel):
     """Locale-independent display attributes.
 
@@ -56,6 +71,7 @@ class SchoolDisplayAttributes(BaseModel):
     teacher_student_ratio: Optional[str] = None
     school_hours: Optional[str] = None
     established_year: Optional[int] = None
+    filter_tags: SchoolFilterTags = Field(default_factory=SchoolFilterTags)
 
     model_config = ConfigDict(extra="forbid")
 

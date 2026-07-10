@@ -25,6 +25,12 @@ import re
 from typing import Any, Iterable, Mapping, Optional, Union
 
 from app.utils.display_gating import blocked_display_fields
+from app.utils.facility_vocabulary import (
+    APPROACH_VOCAB,
+    FACILITY_VOCAB,
+    PROGRAM_VOCAB,
+    canonical_tags,
+)
 
 DISPLAY_LOCALES: tuple[str, ...] = ("bg", "en")
 
@@ -324,6 +330,70 @@ def _year_or_none(value: Any) -> Optional[int]:
     return year if 1000 <= year <= 2999 else None
 
 
+def compute_filter_tags(attributes: Mapping[str, Any] | None) -> dict[str, list[str]]:
+    """Map the free-text display fields onto the advanced filter's controlled vocabulary.
+
+    Locale-independent canonical tags (``cafeteria``, ``sports_program`` …) derived from
+    the (validation-gated) free text, so the browser can count/select filters and the
+    ``/schools`` matcher agrees. The free text itself stays in the localized projection
+    for display. See ``app.utils.facility_vocabulary`` (P1.9).
+    """
+    attrs = _as_mapping(attributes)
+    localized = [build_localized_attributes(attrs, locale) for locale in DISPLAY_LOCALES]
+    blocked = blocked_display_fields(attrs)
+
+    def _union(field: str) -> list[str]:
+        return _dedupe_strings(value for values in localized for value in values[field])
+
+    def _nested(*path: str) -> list[str]:
+        """Free text from a nested `extracted`/`extracted_i18n[locale]` list, per locale.
+
+        Scraped rows store transport/meals and pedagogy phrases outside the projected
+        lists (`extracted.operations.{transport,meals}`,
+        `extracted.summary_source.teaching_approach`), so seed the mapper from them too.
+        """
+        collected: list[Any] = []
+        for locale in DISPLAY_LOCALES:
+            node = _localized_extracted(attrs, locale)
+            for key in path[:-1]:
+                node = _as_mapping(node.get(key))
+            collected.append(node.get(path[-1]))
+        return _merged_list(*collected)
+
+    facilities_text = _union("facilities")
+    programs_text = _union("special_programs")
+    activities_text = _union("activities_offered")
+    # The extractor often records an approach only in `summary_source` — sometimes in a
+    # dedicated `teaching_approach` list, but also as distilled `canonical_tags` ("IB",
+    # "Montessori") or in the `positioning`/`differentiators` marketing prose. The
+    # approach vocabulary is narrow and distinctive, so mining that prose is low-risk.
+    approach_text = (
+        _merged_list(attrs.get("teaching_approach"))
+        + _nested("summary_source", "teaching_approach")
+        + _nested("summary_source", "canonical_tags")
+        + _nested("summary_source", "positioning")
+        + _nested("summary_source", "differentiators")
+    )
+
+    # Nested extraction sources feed the same canonical tag as their sibling display
+    # field, so they are gated the same way (P1.7): transport → facilities, meals →
+    # special_programs. Pedagogy → teaching_approach, which has no display-field gate.
+    if "facilities" not in blocked:
+        facilities_text = facilities_text + _nested("operations", "transport")
+    meals_text = [] if "special_programs" in blocked else _nested("operations", "meals")
+
+    return {
+        "facilities": canonical_tags(facilities_text, FACILITY_VOCAB),
+        # Programs and extracurricular both feed the "special programs" filter (a sports
+        # club is a sports program); Montessori/IB live in programs, so they feed
+        # teaching_approach as well.
+        "special_programs": canonical_tags(
+            programs_text + activities_text + meals_text, PROGRAM_VOCAB
+        ),
+        "teaching_approach": canonical_tags(programs_text + approach_text, APPROACH_VOCAB),
+    }
+
+
 def build_base_attributes(attributes: Mapping[str, Any] | None) -> dict[str, Any]:
     """Resolve the locale-independent display fields.
 
@@ -351,6 +421,8 @@ def build_base_attributes(attributes: Mapping[str, Any] | None) -> dict[str, Any
         "teacher_student_ratio": _normalize_text(attrs.get("teacher_student_ratio")),
         "school_hours": _normalize_text(attrs.get("school_hours")),
         "established_year": _year_or_none(attrs.get("established_year")),
+        # Canonical advanced-filter tags (P1.9), consumed by the frontend filter counts.
+        "filter_tags": compute_filter_tags(attrs),
     }
 
 
@@ -371,16 +443,28 @@ def build_filterable_attributes(
 
     Filter values are language-agnostic option keys, but the underlying free text
     is per-locale, so we match against the union of every locale's values.
+
+    ``facilities`` / ``special_programs`` / ``teaching_approach`` are the advanced-filter
+    categories that offer a controlled vocabulary (``cafeteria``, ``sports_program`` …).
+    The extractor emits free text for them, so here we map that free text onto the
+    canonical tags (P1.9) — the display projection keeps the free text intact. The
+    ``/schools`` matcher and ``/schools/filters`` both read this projection, so they
+    agree on the vocabulary.
     """
     localized = [build_localized_attributes(attributes, locale) for locale in DISPLAY_LOCALES]
 
-    merged: dict[str, Any] = {
-        "teaching_approach": build_base_attributes(attributes)["teaching_approach"],
+    def _union(field: str) -> list[str]:
+        return _dedupe_strings(value for values in localized for value in values[field])
+
+    return {
         "language_focus": _normalize_focus_entries(
             [entry for values in localized for entry in values["language_focus"]]
         ),
+        # Free-text lists kept for any caller that wants the raw union; the three
+        # controlled-vocabulary fields (facilities/special_programs/teaching_approach)
+        # come from the shared canonical projection so options, counts, and the matcher
+        # can never diverge.
+        "languages_of_instruction": _union("languages_of_instruction"),
+        "activities_offered": _union("activities_offered"),
+        **compute_filter_tags(attributes),
     }
-    for field in TEXT_LIST_FIELDS:
-        merged[field] = _dedupe_strings(value for values in localized for value in values[field])
-
-    return merged

@@ -104,7 +104,7 @@ def test_filter_projection_drops_validation_flagged_field():
     school stops matching a `facilities` filter on that value entirely, by design.
     """
     attrs = {
-        "extracted": {"facilities": ["Library"], "programs": ["STEM"]},
+        "extracted": {"facilities": ["Library"], "programs": ["Футбол"]},
         "data_validation": {
             "status": "ok",
             "issues": [],
@@ -117,8 +117,8 @@ def test_filter_projection_drops_validation_flagged_field():
     }
     filterable = build_filterable_attributes(attrs)
     assert filterable["facilities"] == []
-    # An unaffected field is untouched.
-    assert filterable["special_programs"] == ["STEM"]
+    # An unaffected field is untouched (free text maps to its canonical tag, P1.9).
+    assert filterable["special_programs"] == ["sports_program"]
 
 
 def test_summary_publishable_is_lenient_without_a_report():
