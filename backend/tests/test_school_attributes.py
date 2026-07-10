@@ -124,6 +124,20 @@ class TestClassSize:
     def test_rejects_non_sizes(self, value):
         assert build_base_attributes({"class_size": value})["class_size"] is None
 
+    @pytest.mark.parametrize("value", ["5 students", "6 students", "7 students", 5, 3])
+    def test_rejects_implausibly_small_sizes(self, value):
+        # "5 students" and friends are almost always a teacher:student ratio the extractor
+        # mislabelled as class size (P1.10, school 510) — reject below the plausible floor.
+        assert build_base_attributes({"extracted": {"class_size": value}})["class_size"] is None
+
+    @pytest.mark.parametrize("value,expected", [("8 students", 8), ("20 students", 20), (24, 24)])
+    def test_keeps_plausible_sizes(self, value, expected):
+        assert build_base_attributes({"extracted": {"class_size": value}})["class_size"] == expected
+
+    def test_rejects_size_above_ceiling(self):
+        # A number this large is total enrolment, not a class size.
+        assert build_base_attributes({"extracted": {"class_size": "120 students"}})["class_size"] is None
+
 
 class TestLocalizedProjection:
     def test_prefers_extracted_i18n_for_locale(self):
@@ -179,6 +193,36 @@ class TestLocalizedProjection:
         assert base["class_size"] is None
         assert localized["bg"]["facilities"] == []
         assert localized["en"]["facilities"] == []
+
+    def test_english_primary_school_backfills_bg_from_en(self):
+        # English-primary schools stash every list under `extracted_i18n.en` with an empty
+        # primary slot, so a BG viewer used to see nothing (P1.10). Backfill from en.
+        attrs = {
+            "extracted": {"facilities": [], "programs": [], "languages": []},
+            "extracted_i18n": {
+                "en": {
+                    "facilities": ["Medical care", "Playground"],
+                    "programs": ["IB Diploma"],
+                    "languages": [{"language": "English", "level": "intensive"}],
+                }
+            },
+        }
+        bg = build_localized_attributes(attrs, "bg")
+        assert bg["facilities"] == ["Medical care", "Playground"]
+        assert bg["special_programs"] == ["IB Diploma"]
+        assert [e["language"] for e in bg["language_focus"]] == ["English"]
+
+    def test_backfill_does_not_override_populated_locale(self):
+        # A locale that already has its own content is never overwritten by another's.
+        attrs = {
+            "extracted": {"facilities": ["Библиотека"]},
+            "extracted_i18n": {
+                "bg": {"facilities": ["Библиотека"]},
+                "en": {"facilities": ["Library"]},
+            },
+        }
+        assert build_localized_attributes(attrs, "bg")["facilities"] == ["Библиотека"]
+        assert build_localized_attributes(attrs, "en")["facilities"] == ["Library"]
 
 
 class TestSeededDisplayFields:

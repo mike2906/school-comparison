@@ -44,6 +44,11 @@ TEXT_LIST_FIELDS: tuple[str, ...] = (
     "activities_offered",
 )
 
+# Plausible bounds for a class/group size. Below the floor is almost certainly a
+# teacher:student ratio or small-group figure; above the ceiling is total enrolment.
+_MIN_CLASS_SIZE = 8
+_MAX_CLASS_SIZE = 40
+
 # Markers that make a bare number in free text plausibly a class size.
 _CLASS_SIZE_MARKERS: tuple[str, ...] = (
     "class",
@@ -222,16 +227,31 @@ def _normalize_focus_entries(language_focus: Any) -> list[dict[str, Optional[str
     return deduped
 
 
+def _plausible_class_size(size: Union[int, float]) -> Optional[Union[int, float]]:
+    """Reject class sizes outside a plausible range.
+
+    A "class" of a handful of children is almost always a teacher:student ratio or a
+    small-group figure that the extractor conflated with class size (e.g. ``"5 students"``
+    → 5, school 510 — P1.10). Values above the ceiling are usually total enrolment. The
+    smallest genuinely advertised private class sizes are ~8, so ``_MIN_CLASS_SIZE`` keeps
+    those while dropping ratios; ``_MAX_CLASS_SIZE`` covers the largest kindergarten groups.
+    """
+    if size < _MIN_CLASS_SIZE or size > _MAX_CLASS_SIZE:
+        return None
+    return size
+
+
 def _parse_class_size(value: Any) -> Optional[Union[int, float]]:
     """Parse a class size, refusing bare numbers with no class/group context.
 
-    ``"Up to 16 students per class"`` → 16, but ``"Grades 1-4 program"`` → None.
+    ``"Up to 16 students per class"`` → 16, but ``"Grades 1-4 program"`` → None and
+    ``"5 students"`` → None (implausible; see :func:`_plausible_class_size`).
     """
     if value is None or isinstance(value, bool):
         return None
 
     if isinstance(value, (int, float)):
-        return value if value > 0 else None
+        return _plausible_class_size(value) if value > 0 else None
 
     if isinstance(value, str):
         normalized = value.replace(",", ".")
@@ -242,7 +262,8 @@ def _parse_class_size(value: Any) -> Optional[Union[int, float]]:
         if direct is not None:
             if direct <= 0:
                 return None
-            return int(direct) if direct.is_integer() else direct
+            direct = int(direct) if direct.is_integer() else direct
+            return _plausible_class_size(direct)
 
         lower = normalized.lower()
         if not any(marker in lower for marker in _CLASS_SIZE_MARKERS):
@@ -254,7 +275,8 @@ def _parse_class_size(value: Any) -> Optional[Union[int, float]]:
         parsed = float(match.group(0))
         if parsed <= 0:
             return None
-        return int(parsed) if parsed.is_integer() else parsed
+        parsed = int(parsed) if parsed.is_integer() else parsed
+        return _plausible_class_size(parsed)
 
     if isinstance(value, Mapping):
         for key in ("class_size", "average", "size", "max", "value"):
@@ -266,13 +288,27 @@ def _parse_class_size(value: Any) -> Optional[Union[int, float]]:
 
 
 def _localized_extracted(attributes: Mapping[str, Any], locale: str) -> dict[str, Any]:
-    """`extracted` overlaid with this locale's overrides from `extracted_i18n`."""
+    """`extracted` overlaid with this locale's overrides from `extracted_i18n`.
+
+    English-primary schools (and any single-locale site) stash every free-text list
+    under one locale's override — e.g. all facilities land in ``extracted_i18n.en`` with
+    an empty primary ``extracted.facilities`` — so the requested locale's slot is empty
+    and a BG viewer sees a blank section (P1.10). After applying this locale's override
+    we backfill any field it left empty from another locale's override, so a viewer sees
+    the extracted facts (in whatever language they exist) rather than nothing. Fields the
+    requested locale already populated are never touched, so healthy per-locale content
+    is never cross-contaminated.
+    """
     extracted = _as_mapping(attributes.get("extracted"))
     extracted_i18n = _as_mapping(attributes.get("extracted_i18n"))
-    override = extracted_i18n.get(locale)
-    if isinstance(override, Mapping):
-        return {**extracted, **override}
-    return extracted
+    merged = {**extracted, **_as_mapping(extracted_i18n.get(locale))}
+    for other_locale in DISPLAY_LOCALES:
+        if other_locale == locale:
+            continue
+        for key, value in _as_mapping(extracted_i18n.get(other_locale)).items():
+            if not merged.get(key):
+                merged[key] = value
+    return merged
 
 
 def build_localized_attributes(
