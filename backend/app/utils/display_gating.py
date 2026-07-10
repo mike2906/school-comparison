@@ -30,11 +30,12 @@ _ACTIONABLE_DISCREPANCY_KINDS = {"contradiction", "unsupported"}
 # Maps validation-report field paths to the public display fields they feed. A path
 # matches a key when it equals the key or is nested under it (``key`` + ``.``).
 #
-# The ``attributes.extracted.<key>`` keys must stay within the validator's spot-check
-# vocabulary (`validator.SPOT_CHECK_EXTRACTED_ROOT_KEYS`) — that is where a discrepancy
-# ``field_path`` is normalized before it lands in the report. A drift-guard test
-# (`test_display_gating`) fails if a mapped key falls outside that vocabulary, so this
-# table can't silently stop matching when the validator's paths change.
+# Each ``attributes.extracted.<key>`` must be reachable — i.e. a spot-check discrepancy
+# on it must actually survive to the report. `_normalize_spot_check_output` drops any
+# discrepancy outside `validator.SPOT_CHECK_CORE_FIELD_PREFIXES`, so a mapping key that
+# is not core can never match and would give false confidence. A drift-guard test
+# (`test_display_gating`) fails if a mapped key falls outside that core set, keeping the
+# gate's coverage and the spot-check's scope in lockstep.
 _FIELD_PATH_DISPLAY_FIELDS: dict[str, tuple[str, ...]] = {
     "attributes.extracted.languages": ("language_focus", "languages_of_instruction"),
     "attributes.extracted.facilities": ("facilities",),

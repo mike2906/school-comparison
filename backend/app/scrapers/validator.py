@@ -40,6 +40,13 @@ SPOT_CHECK_CORE_FIELD_PREFIXES: tuple[str, ...] = (
     "attributes.extracted.founded_year",
     "attributes.extracted.programs",
     "attributes.extracted.admission",
+    # Free-text display fields the P1.7 gate withholds when flagged. In scope so a
+    # spot-check discrepancy on them survives `_normalize_spot_check_output` and
+    # reaches the report; `app.utils.display_gating._FIELD_PATH_DISPLAY_FIELDS` maps
+    # each to its display field, and a guard test keeps the two sets aligned.
+    "attributes.extracted.facilities",
+    "attributes.extracted.extracurricular",
+    "attributes.extracted.accreditations",
 )
 SPOT_CHECK_DISCREPANCY_KINDS: tuple[str, ...] = ("contradiction", "omission", "unsupported")
 SPOT_CHECK_GENERIC_ISSUES: set[str] = {

@@ -225,6 +225,17 @@ Order matters within this phase; tasks touch overlapping files — run sequentia
             `_blocked_summary_sections` and the display gate now share
             `iter_blocking_field_paths` (one definition of "blocking"). (4) Filter-coupling
             and no-report summary leniency are now documented + tested.
+      - [x] *From P1.7-hardening Codex review:* the drift guard originally checked mapping
+            keys against `SPOT_CHECK_EXTRACTED_ROOT_KEYS`, a broader vocabulary than the
+            spot-check *core* scope — `_normalize_spot_check_output` drops discrepancies
+            outside `SPOT_CHECK_CORE_FIELD_PREFIXES`, so facilities/extracurricular/
+            accreditations were mapped but unreachable (false confidence). Fix: widened the
+            spot-check core scope to include those free-text display fields (deliberate
+            decision — makes the capable model evaluate them and can raise the spot-check
+            discrepancy-rate metric), and re-pointed the guard at `_spot_check_path_is_core`
+            so the gate's coverage and the spot-check scope stay in lockstep. Added an
+            end-to-end test that a facilities discrepancy now survives normalization and
+            drives the gate.
 - [ ] **P1.8 Split `location_tags`.** Provenance strings (`source=moe_registry`,
       `source_esri_id=…`) move to `geocode_meta`; `location_tags` stays purely semantic;
       delete the client-side allowlist filter in `frontend/src/utils/locationFocus.js`.

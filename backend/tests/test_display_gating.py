@@ -15,31 +15,66 @@ from sqlalchemy.orm import selectinload
 from app.models import Pricing, School, SchoolLocation
 from app.models.pricing import PriceSource
 from app.schemas.school import SchoolResponse
+from app.schemas.validation import SpotCheckDiscrepancy, SpotCheckOutput
 from app.scrapers import validator as validator_module
-from app.scrapers.validator import SPOT_CHECK_EXTRACTED_ROOT_KEYS
+from app.scrapers.validator import _spot_check_path_is_core
 from app.utils.display_gating import (
     _FIELD_PATH_DISPLAY_FIELDS,
+    blocked_display_fields,
     iter_blocking_field_paths,
     summary_is_publishable,
 )
 from app.utils.school_attributes import build_filterable_attributes
 
 
-def test_display_field_mapping_stays_within_validator_vocabulary():
-    """Guard: every gated `attributes.extracted.<key>` is a key the validator can emit.
+def test_display_field_mapping_is_reachable_via_spot_check_scope():
+    """Guard: every gated `attributes.extracted.<key>` is actually reachable.
 
-    A spot-check discrepancy is re-rooted to `attributes.extracted.<key>` using
-    `validator.SPOT_CHECK_EXTRACTED_ROOT_KEYS`. If the gate maps a key outside that
-    set, no report path will ever match it and the field silently stops being gated.
+    `_normalize_spot_check_output` drops any discrepancy outside the spot-check core
+    scope, so a mapped key that is not core can never match — the gate would silently
+    no-op while a guard on a broader vocabulary still passed (the bug Codex caught).
+    Asserting against the validator's own `_spot_check_path_is_core` keeps the gate's
+    coverage and the spot-check scope in lockstep.
     """
-    prefix = "attributes.extracted."
     for path in _FIELD_PATH_DISPLAY_FIELDS:
-        assert path.startswith(prefix), f"{path} is not an extracted path"
-        key = path[len(prefix):]
-        assert key in SPOT_CHECK_EXTRACTED_ROOT_KEYS, (
-            f"{key!r} is mapped for display gating but is not in the validator's "
-            "spot-check vocabulary — the gate can never match it."
+        assert path.startswith("attributes.extracted."), f"{path} is not an extracted path"
+        assert _spot_check_path_is_core(path), (
+            f"{path!r} is mapped for display gating but is outside the spot-check core "
+            "scope (SPOT_CHECK_CORE_FIELD_PREFIXES) — a discrepancy on it is dropped "
+            "before it reaches the report, so the gate can never withhold it."
         )
+
+
+def test_free_text_field_discrepancy_survives_spot_check_and_gates_field():
+    """A `facilities` discrepancy now survives normalization and drives the gate.
+
+    Before the spot-check scope was widened, `_normalize_spot_check_output` dropped
+    this discrepancy (facilities was outside core scope) and the gate could never
+    withhold the field. This is the end-to-end proof the widening is effective.
+    """
+    parsed = SpotCheckOutput(
+        has_discrepancy=True,
+        discrepancies=[
+            SpotCheckDiscrepancy(
+                field_path="facilities",
+                kind="contradiction",
+                issue="listed facility contradicts source",
+                evidence="site states there is no swimming pool",
+                cheap_value=["Swimming pool"],
+                capable_value=[],
+                confidence=0.9,
+            )
+        ],
+    )
+
+    normalized = validator_module._normalize_spot_check_output(parsed)
+
+    # Retained (in scope) and re-rooted to its canonical extracted path...
+    assert normalized.has_discrepancy is True
+    assert [d.field_path for d in normalized.discrepancies] == ["attributes.extracted.facilities"]
+    # ...and the display gate withholds the facilities field because of it.
+    attributes = {"data_validation": {"issues": [], "spot_check": normalized.model_dump()}}
+    assert "facilities" in blocked_display_fields(attributes)
 
 
 def test_iter_blocking_field_paths_selects_errors_and_actionable_discrepancies():
