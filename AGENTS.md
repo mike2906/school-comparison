@@ -318,13 +318,20 @@ When the user says **"follow github process"**, use the full PR flow:
 4. Commit only the files that belong to the change.
 5. Push the branch and open a PR to `main`.
 6. Wait for GitHub Actions.
-7. Mark the PR ready for review, then wait for the automated Codex PR review to
-   actually appear and finish after that ready-for-review event. Do not merge just
-   because CI is green. Poll PR reviews/comments until Codex has either posted
-   findings or clearly completed with no findings. If it posts findings, address
-   them in the PR or explicitly record why they are accepted before merging.
-8. If CI is green, Codex review is clear or resolved, and the PR is mergeable, merge
-   it to `main` and delete the branch.
+7. Mark the PR ready for review, then **trigger the Codex review manually** by posting
+   a `@codex review` comment on the PR. Codex auto-review is intentionally **off** to
+   avoid wasting usage on trivial/docs-only PRs, so the review will NOT appear on its
+   own — you must request it. For a code change, do not merge just because CI is green:
+   after requesting, poll the PR until Codex has either posted findings or clearly
+   completed with no findings. Codex signals completion inconsistently — watch **both**
+   the PR reviews AND the issue comments for author `chatgpt-codex-connector[bot]` (a
+   clean `@codex review` result often comes back as an issue comment like "Didn't find
+   any major issues", not a formal review or a 👍). If it posts findings, address them
+   in the PR or explicitly record why they are accepted before merging.
+   - **Docs-only / trivial PRs:** skip the `@codex review` request to conserve usage;
+     merge on green CI once mergeable.
+8. If CI is green, the Codex review is clear or resolved (or was intentionally skipped
+   for a docs-only PR), and the PR is mergeable, merge it to `main` and delete the branch.
 
 Only commit directly to `main` when the user explicitly asks for that.
 
@@ -410,6 +417,17 @@ Prints the six go-live quality metrics + recent pipeline runs. Every batch `run`
 6. **School names and addresses:** Stored in both Bulgarian and English (`name_en`, `address_en`). The frontend displays the appropriate version based on the user's language preference.
 
 7. **NVO import is independent of the website pipeline:** Use the dedicated `nvo` stage when refreshing official exam results; it is not part of `all`.
+
+8. **Publish boundary — API responses are gated (P1.7):** `schools.attributes` is an
+   internal scratchpad; nothing reaches the wire unless it is (a) declared in the display
+   allowlist (`SchoolDisplayAttributes` / `SchoolLocalizedAttributes`, projected by
+   `app/utils/school_attributes.py`) AND (b) not withheld by the Stage 6 validation report.
+   `app/utils/display_gating.py` drops display fields, pricing rows, and summaries flagged
+   by error-level issues / actionable spot-check discrepancies, plus pricing rows with no
+   `source_url` or confidence below `PRICING_CONFIDENCE_FLOOR`. When adding a response
+   field, go through those projections/gates — never serialize raw `attributes` or pricing
+   directly, or you silently bypass the boundary. Gate coverage is coupled to the
+   validator's spot-check scope (`SPOT_CHECK_CORE_FIELD_PREFIXES`) by a guard test.
 
 ---
 
