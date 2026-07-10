@@ -24,6 +24,7 @@ from app.ai.summariser import (
 )
 from app.models import School, SchoolLocation
 from app.scrapers.extractor_helpers import _is_low_quality_display_name
+from app.utils.display_gating import iter_blocking_field_paths
 from app.utils.i18n_resolver import derive_english_name, resolve_address_i18n, resolve_name_i18n
 
 SUMMARY_GENERATION_SCHEMA_VERSION = 18
@@ -33,7 +34,6 @@ SUMMARY_GENERATION_KEY = "summary_generation"
 # publish one until validation is clean, even though field-level display gating
 # lets individual clean fields through.
 SUMMARY_ELIGIBLE_VALIDATION_STATUSES = {"ok"}
-_ACTIONABLE_DISCREPANCY_KINDS = {"contradiction", "unsupported"}
 _NARRATIVE_ADMIN_MARKERS = (
     "правилник",
     "документи",
@@ -251,52 +251,27 @@ def _combine_pricing_terms(pricing_terms: Mapping[str, Any] | None) -> list[str]
 def _blocked_summary_sections(validation_payload: Mapping[str, Any] | None) -> tuple[set[str], bool]:
     blocked: set[str] = set()
     identity_optional_blocked = False
-    if not isinstance(validation_payload, Mapping):
-        return blocked, identity_optional_blocked
 
-    def register(field_path: str | None, actionable: bool = True) -> None:
-        nonlocal identity_optional_blocked
-        if not actionable:
-            return
-        path = str(field_path or "")
+    # Shared with the API display gate: `iter_blocking_field_paths` yields exactly the
+    # error-level issue + actionable spot-check discrepancy paths. This function maps
+    # each path onto the coarse summary *section* it withholds.
+    for path in iter_blocking_field_paths(validation_payload):
         if not path:
-            return
+            continue
         if path.startswith("pricing["):
             blocked.add("pricing")
-            return
-        if path.startswith("attributes.display_name_i18n"):
+        elif path.startswith("attributes.display_name_i18n"):
             identity_optional_blocked = True
-            return
-        if path.startswith("attributes.extracted.admission") or path.startswith("attributes.extracted.operations"):
+        elif path.startswith("attributes.extracted.admission") or path.startswith("attributes.extracted.operations"):
             blocked.add("operations")
-            return
-        if path.startswith("attributes.extracted.services"):
+        elif path.startswith("attributes.extracted.services"):
             blocked.add("operations")
-            return
-        if path.startswith("attributes.extracted.pricing_terms"):
+        elif path.startswith("attributes.extracted.pricing_terms"):
             blocked.add("pricing")
-            return
-        if path.startswith("admission_info.website_extracted"):
+        elif path.startswith("admission_info.website_extracted"):
             blocked.add("operations")
-            return
-        if path.startswith("attributes.extracted"):
+        elif path.startswith("attributes.extracted"):
             blocked.add("offering")
-
-    for issue in validation_payload.get("issues", []) or []:
-        if not isinstance(issue, Mapping):
-            continue
-        if str(issue.get("severity") or "").lower() == "error":
-            register(issue.get("field_path"))
-
-    spot_check = validation_payload.get("spot_check")
-    if isinstance(spot_check, Mapping):
-        for discrepancy in spot_check.get("discrepancies", []) or []:
-            if not isinstance(discrepancy, Mapping):
-                continue
-            register(
-                discrepancy.get("field_path"),
-                actionable=str(discrepancy.get("kind") or "").lower() in _ACTIONABLE_DISCREPANCY_KINDS,
-            )
 
     return blocked, identity_optional_blocked
 

@@ -40,6 +40,13 @@ SPOT_CHECK_CORE_FIELD_PREFIXES: tuple[str, ...] = (
     "attributes.extracted.founded_year",
     "attributes.extracted.programs",
     "attributes.extracted.admission",
+    # Free-text display fields the P1.7 gate withholds when flagged. In scope so a
+    # spot-check discrepancy on them survives `_normalize_spot_check_output` and
+    # reaches the report; `app.utils.display_gating._FIELD_PATH_DISPLAY_FIELDS` maps
+    # each to its display field, and a guard test keeps the two sets aligned.
+    "attributes.extracted.facilities",
+    "attributes.extracted.extracurricular",
+    "attributes.extracted.accreditations",
 )
 SPOT_CHECK_DISCREPANCY_KINDS: tuple[str, ...] = ("contradiction", "omission", "unsupported")
 SPOT_CHECK_GENERIC_ISSUES: set[str] = {
@@ -355,21 +362,12 @@ def _normalize_summary_source(
     return normalized
 
 
-def _normalize_spot_check_field_path(field_path: str) -> str:
-    path = (field_path or "").strip()
-    if not path:
-        return "attributes.extracted"
-    if path.startswith("attributes.extracted."):
-        return path
-    if path == "extracted":
-        return "attributes.extracted"
-    if path.startswith("extracted."):
-        return f"attributes.{path}"
-    if path == "language":
-        return "attributes.extracted.languages"
-    if path == "address":
-        return "attributes.extracted.contact.address"
-    root_keys = {
+# Bare keys a spot-check may report under `extracted`; used to re-root a discrepancy
+# `field_path` back to its canonical `attributes.extracted.<key>` form. This is the
+# source of truth for the field-path vocabulary that downstream display gating maps
+# (see `app.utils.display_gating`); a drift-guard test asserts the two stay in sync.
+SPOT_CHECK_EXTRACTED_ROOT_KEYS: frozenset[str] = frozenset(
+    {
         "languages",
         "facilities",
         "programs",
@@ -384,9 +382,26 @@ def _normalize_spot_check_field_path(field_path: str) -> str:
         "summary_source",
         "contact",
     }
-    if path in root_keys:
+)
+
+
+def _normalize_spot_check_field_path(field_path: str) -> str:
+    path = (field_path or "").strip()
+    if not path:
+        return "attributes.extracted"
+    if path.startswith("attributes.extracted."):
+        return path
+    if path == "extracted":
+        return "attributes.extracted"
+    if path.startswith("extracted."):
+        return f"attributes.{path}"
+    if path == "language":
+        return "attributes.extracted.languages"
+    if path == "address":
+        return "attributes.extracted.contact.address"
+    if path in SPOT_CHECK_EXTRACTED_ROOT_KEYS:
         return f"attributes.extracted.{path}"
-    if any(path.startswith(f"{key}.") for key in root_keys):
+    if any(path.startswith(f"{key}.") for key in SPOT_CHECK_EXTRACTED_ROOT_KEYS):
         return f"attributes.extracted.{path}"
     return path
 
