@@ -29,6 +29,12 @@ _ACTIONABLE_DISCREPANCY_KINDS = {"contradiction", "unsupported"}
 
 # Maps validation-report field paths to the public display fields they feed. A path
 # matches a key when it equals the key or is nested under it (``key`` + ``.``).
+#
+# The ``attributes.extracted.<key>`` keys must stay within the validator's spot-check
+# vocabulary (`validator.SPOT_CHECK_EXTRACTED_ROOT_KEYS`) — that is where a discrepancy
+# ``field_path`` is normalized before it lands in the report. A drift-guard test
+# (`test_display_gating`) fails if a mapped key falls outside that vocabulary, so this
+# table can't silently stop matching when the validator's paths change.
 _FIELD_PATH_DISPLAY_FIELDS: dict[str, tuple[str, ...]] = {
     "attributes.extracted.languages": ("language_focus", "languages_of_instruction"),
     "attributes.extracted.facilities": ("facilities",),
@@ -42,16 +48,13 @@ _FIELD_PATH_DISPLAY_FIELDS: dict[str, tuple[str, ...]] = {
 _PRICING_ROW_RE = re.compile(r"^pricing\[(\d+)\]")
 
 
-def _blocking_field_paths(attributes: Mapping[str, Any] | None) -> Iterator[str]:
+def iter_blocking_field_paths(report: Mapping[str, Any] | None) -> Iterator[str]:
     """Yield the ``field_path`` of every entry that should withhold its target.
 
-    That is, error-level issues plus actionable spot-check discrepancies in the
-    current ``attributes.data_validation`` report. Callers map each path onto the
-    display field or pricing row it governs.
+    That is, error-level issues plus actionable spot-check discrepancies in a
+    ``data_validation`` report mapping. Shared by the API display gate and the
+    summarizer's section gate so the two can't diverge on what "blocking" means.
     """
-    if not isinstance(attributes, Mapping):
-        return
-    report = attributes.get("data_validation")
     if not isinstance(report, Mapping):
         return
 
@@ -67,6 +70,13 @@ def _blocking_field_paths(attributes: Mapping[str, Any] | None) -> Iterator[str]
                 and str(discrepancy.get("kind") or "").lower() in _ACTIONABLE_DISCREPANCY_KINDS
             ):
                 yield str(discrepancy.get("field_path") or "")
+
+
+def _blocking_field_paths(attributes: Mapping[str, Any] | None) -> Iterator[str]:
+    """`iter_blocking_field_paths` over a school's raw ``attributes`` blob."""
+    if not isinstance(attributes, Mapping):
+        return
+    yield from iter_blocking_field_paths(attributes.get("data_validation"))
 
 
 def _display_fields_for_path(field_path: str) -> tuple[str, ...]:
@@ -112,6 +122,12 @@ def summary_is_publishable(attributes: Mapping[str, Any] | None) -> bool:
     A whole-school summary is only published for a clean report; a stored summary
     from an earlier run must be withheld once validation regresses to
     ``needs_review``, mirroring the generation-side eligibility rule.
+
+    Deliberately *lenient* when there is no report (or no status): summaries are only
+    ever generated off an ``ok`` report, so a summary without a current report is an
+    already-vetted artifact — withholding it would blank legitimate content rather
+    than protect against a known-bad one. The gate hides only on an explicit non-``ok``
+    status.
     """
     if not isinstance(attributes, Mapping):
         return True

@@ -355,21 +355,12 @@ def _normalize_summary_source(
     return normalized
 
 
-def _normalize_spot_check_field_path(field_path: str) -> str:
-    path = (field_path or "").strip()
-    if not path:
-        return "attributes.extracted"
-    if path.startswith("attributes.extracted."):
-        return path
-    if path == "extracted":
-        return "attributes.extracted"
-    if path.startswith("extracted."):
-        return f"attributes.{path}"
-    if path == "language":
-        return "attributes.extracted.languages"
-    if path == "address":
-        return "attributes.extracted.contact.address"
-    root_keys = {
+# Bare keys a spot-check may report under `extracted`; used to re-root a discrepancy
+# `field_path` back to its canonical `attributes.extracted.<key>` form. This is the
+# source of truth for the field-path vocabulary that downstream display gating maps
+# (see `app.utils.display_gating`); a drift-guard test asserts the two stay in sync.
+SPOT_CHECK_EXTRACTED_ROOT_KEYS: frozenset[str] = frozenset(
+    {
         "languages",
         "facilities",
         "programs",
@@ -384,9 +375,26 @@ def _normalize_spot_check_field_path(field_path: str) -> str:
         "summary_source",
         "contact",
     }
-    if path in root_keys:
+)
+
+
+def _normalize_spot_check_field_path(field_path: str) -> str:
+    path = (field_path or "").strip()
+    if not path:
+        return "attributes.extracted"
+    if path.startswith("attributes.extracted."):
+        return path
+    if path == "extracted":
+        return "attributes.extracted"
+    if path.startswith("extracted."):
+        return f"attributes.{path}"
+    if path == "language":
+        return "attributes.extracted.languages"
+    if path == "address":
+        return "attributes.extracted.contact.address"
+    if path in SPOT_CHECK_EXTRACTED_ROOT_KEYS:
         return f"attributes.extracted.{path}"
-    if any(path.startswith(f"{key}.") for key in root_keys):
+    if any(path.startswith(f"{key}.") for key in SPOT_CHECK_EXTRACTED_ROOT_KEYS):
         return f"attributes.extracted.{path}"
     return path
 

@@ -211,6 +211,20 @@ Order matters within this phase; tasks touch overlapping files — run sequentia
             Both inert on current data (no school has a summary or a non-ok report yet);
             covered by `test_pricing_row_with_validation_error_is_hidden` and
             `test_stored_summary_hidden_when_validation_not_ok`.
+      - [x] *Hardening (self-review of P1.7).* (1) **Drift guard:** the extracted-field
+            mapping keys are now coupled to `validator.SPOT_CHECK_EXTRACTED_ROOT_KEYS`
+            (hoisted to a module constant) with a guard test — the mapping can't silently
+            stop matching if the validator's spot-check path vocabulary changes. Note the
+            extracted-field gate is only reachable via LLM spot-check discrepancies; the
+            deterministic validator emits `attributes.extracted.*` as auto-fixes, and its
+            only error-level issues are on pricing amounts. (2) **Real-validator test:**
+            `test_display_gating.py::test_real_validator_error_gates_pricing_row_and_summary`
+            runs the actual `validate_school_data` on a negative price and asserts the
+            serialized payload hides that row + the summary — so the gate is proven against
+            real validator output, not just hand-written reports. (3) **DRY:** summarizer's
+            `_blocked_summary_sections` and the display gate now share
+            `iter_blocking_field_paths` (one definition of "blocking"). (4) Filter-coupling
+            and no-report summary leniency are now documented + tested.
 - [ ] **P1.8 Split `location_tags`.** Provenance strings (`source=moe_registry`,
       `source_esri_id=…`) move to `geocode_meta`; `location_tags` stays purely semantic;
       delete the client-side allowlist filter in `frontend/src/utils/locationFocus.js`.
