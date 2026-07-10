@@ -10,7 +10,7 @@ import { getSchoolName, getAddress } from '../../utils/i18n'
 import { useCompare } from '../../context/CompareContext'
 import { useCountry } from '../../context/CountryContext'
 import { getAgeGroupKeys } from '../../utils/countryConfig'
-import { getFocusEmojis, getFocusLabels, getLocationFocusTags } from '../../utils/locationFocus'
+import { getFocusEmojis, getFocusLabels } from '../../utils/locationFocus'
 import { AGE_GROUP_KEYS } from '../../utils/education'
 
 // Fallback values (used when country config hasn't loaded yet)
@@ -125,7 +125,7 @@ const getAgeGroupShifts = (location) => {
 const getLocationTags = (location) => {
   if (!location?.location_tags) return []
   if (!Array.isArray(location.location_tags)) return []
-  return getLocationFocusTags(location.location_tags.filter(Boolean))
+  return location.location_tags.filter(Boolean)
 }
 
 const getLocationFocusLabels = (t, location) => {

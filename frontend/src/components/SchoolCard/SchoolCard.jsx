@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { useCompare } from '../../context/CompareContext'
 import { getSchoolName, getAddress } from '../../utils/i18n'
 import { formatDistance } from '../../utils/distance'
-import { getFocusEmoji, getLocationFocusTags } from '../../utils/locationFocus'
+import { getFocusEmoji } from '../../utils/locationFocus'
 import { getBenchmarkComparison, getNvoDetail as getSharedNvoDetail } from '../../utils/nvo'
 
 const typeColors = {
@@ -489,7 +489,7 @@ function getAgeGroupShifts(location) {
 function getLocationTags(location) {
   if (!location?.location_tags) return []
   if (!Array.isArray(location.location_tags)) return []
-  return getLocationFocusTags(location.location_tags.filter(Boolean))
+  return location.location_tags.filter(Boolean)
 }
 
 function getShiftForAgeGroup(location, ageGroup) {

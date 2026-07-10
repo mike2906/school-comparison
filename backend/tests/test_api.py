@@ -136,6 +136,46 @@ class TestSchoolsEndpoint:
                 assert "geocode_meta" not in location
 
     @pytest.mark.asyncio
+    async def test_location_tags_serialize_semantic_only(self, seeded_db, seeded_client):
+        """P1.8: provenance/coords tags are withheld; semantic focus tags still render."""
+        school = School(
+            name_i18n={"bg": "Училище с етикети", "en": "Tagged School"},
+            country_code="bg",
+            school_type="state",
+            education_level="primary",
+            city="sofia",
+        )
+        seeded_db.add(school)
+        await seeded_db.flush()
+        location = SchoolLocation(
+            school_id=school.id,
+            address_i18n={"bg": "ул. Тест 1, София", "en": "1 Test St, Sofia"},
+            lat=42.7,
+            lng=23.3,
+            is_primary=True,
+            location_tags=[
+                "source=moe_registry",
+                "source_esri_id=123",
+                "coords_source=nominatim_approximate",
+                "science_focus",
+            ],
+        )
+        seeded_db.add(location)
+        await seeded_db.flush()
+        seeded_db.add(
+            SchoolLocationAgeGroupShift(
+                location_id=location.id, age_group="grade_1_4", shift="morning"
+            )
+        )
+        await seeded_db.commit()
+
+        response = await seeded_client.get(f"/schools/{school.id}")
+        assert response.status_code == 200
+        tags = response.json()["locations"][0]["location_tags"]
+        assert tags == ["science_focus"]
+        assert not any("source" in tag or "coords" in tag for tag in tags)
+
+    @pytest.mark.asyncio
     async def test_list_excludes_schools_without_resolved_locations(self, seeded_db, seeded_client):
         hidden_school = School(
             name_i18n={"bg": "Скрито училище", "en": "Hidden School"},
