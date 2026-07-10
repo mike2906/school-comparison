@@ -6,7 +6,7 @@ import { useCompare } from '../../context/CompareContext'
 import { fetchCompare, fetchExamAverages } from '../../api/schools'
 import { calculateDistance, formatDistance } from '../../utils/distance'
 import { getSchoolName, getAddress, getSummary } from '../../utils/i18n'
-import { normalizeSchoolList } from '../../utils/schoolAttributes'
+import { getCanonicalAmenityFlags, normalizeSchoolList } from '../../utils/schoolAttributes'
 import { getBenchmarkComparison, getNvoDetail as getSharedNvoDetail } from '../../utils/nvo'
 
 const SOURCE_BADGE_STYLES = {
@@ -922,45 +922,44 @@ function ComparePage() {
       {
         label: t('compare.labels.afterSchoolCare'),
         getValue: (school) => {
-          const hasAfterSchool = Boolean(
-            getPrimaryShiftInfo(school)?.has_organised_groups ||
-            school.attributes?.after_school_care ||
-            (school.attributes?.special_programs || []).includes('extended_day')
-          )
+          const hasAfterSchool = getCanonicalAmenityFlags(
+            school.attributes,
+            getPrimaryShiftInfo(school)?.has_organised_groups
+          ).extended
           return (
             <span className={`text-sm ${hasAfterSchool ? 'text-emerald-600 font-medium' : 'text-neutral-500'}`}>
               {hasAfterSchool ? t('common.yes') : t('common.no')}
             </span>
           )
         },
-        getCompare: (school) => Boolean(getPrimaryShiftInfo(school)?.has_organised_groups || school.attributes?.after_school_care),
+        getCompare: (school) => getCanonicalAmenityFlags(
+          school.attributes,
+          getPrimaryShiftInfo(school)?.has_organised_groups
+        ).extended,
       },
       {
         label: t('compare.labels.meals'),
         getValue: (school) => {
-          const facilities = school.attributes?.facilities || []
-          const specialPrograms = school.attributes?.special_programs || []
-          const hasMeals = Boolean(school.attributes?.has_canteen || facilities.includes('cafeteria') || specialPrograms.includes('meals_provided'))
+          const hasMeals = getCanonicalAmenityFlags(school.attributes).meals
           return (
             <span className={`text-sm ${hasMeals ? 'text-emerald-600 font-medium' : 'text-neutral-500'}`}>
               {hasMeals ? t('common.yes') : t('common.no')}
             </span>
           )
         },
-        getCompare: (school) => Boolean(school.attributes?.has_canteen || (school.attributes?.facilities || []).includes('cafeteria')),
+        getCompare: (school) => getCanonicalAmenityFlags(school.attributes).meals,
       },
       {
         label: t('compare.labels.transport'),
         getValue: (school) => {
-          const facilities = school.attributes?.facilities || []
-          const hasTransport = Boolean(facilities.includes('transportation') || school.attributes?.transportation_available)
+          const hasTransport = getCanonicalAmenityFlags(school.attributes).transport
           return (
             <span className={`text-sm ${hasTransport ? 'text-emerald-600 font-medium' : 'text-neutral-500'}`}>
               {hasTransport ? t('common.yes') : t('common.no')}
             </span>
           )
         },
-        getCompare: (school) => Boolean((school.attributes?.facilities || []).includes('transportation') || school.attributes?.transportation_available),
+        getCompare: (school) => getCanonicalAmenityFlags(school.attributes).transport,
       },
       {
         label: t('compare.labels.facilities'),

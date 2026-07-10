@@ -6,6 +6,7 @@ import { getSchoolName, getAddress } from '../../utils/i18n'
 import { formatDistance } from '../../utils/distance'
 import { getFocusEmoji } from '../../utils/locationFocus'
 import { getBenchmarkComparison, getNvoDetail as getSharedNvoDetail } from '../../utils/nvo'
+import { getCanonicalAmenityFlags } from '../../utils/schoolAttributes'
 
 const typeColors = {
   state: 'bg-teal-500 text-white',
@@ -443,11 +444,12 @@ function getNvoDetail(school, t) {
 function getAmenityFlags(attributes, hasAfterSchool) {
   const facilities = attributes?.facilities || []
   const specialPrograms = attributes?.special_programs || []
+  const canonical = getCanonicalAmenityFlags(attributes, hasAfterSchool)
 
   return {
-    meals: Boolean(attributes?.has_canteen || facilities.includes('cafeteria') || specialPrograms.includes('meals_provided')),
-    transport: Boolean(facilities.includes('transportation') || attributes?.transportation_available),
-    extended: Boolean(hasAfterSchool || specialPrograms.includes('extended_day') || attributes?.after_school_care),
+    meals: canonical.meals,
+    transport: canonical.transport,
+    extended: canonical.extended,
     smallClasses: Boolean(attributes?.class_size && Number(attributes.class_size) < 16),
     accessible: Boolean(attributes?.accessible || facilities.includes('accessible')),
     specialPrograms: Boolean(specialPrograms.length > 0),
@@ -462,11 +464,10 @@ function getScheduleLine(primaryShiftInfo, attributes, t) {
   const label = shiftLabel !== shiftLabelKey ? shiftLabel : t(`shifts.${shift}`)
   const hours = attributes?.schedule_hours?.[shift]
   const baseText = hours ? `${label} (${hours})` : label
-  const hasAfterSchool = Boolean(
-    primaryShiftInfo?.has_organised_groups ||
-    attributes?.after_school_care ||
-    (attributes?.special_programs || []).includes('extended_day')
-  )
+  const hasAfterSchool = getCanonicalAmenityFlags(
+    attributes,
+    primaryShiftInfo?.has_organised_groups
+  ).extended
 
   return {
     text: hasAfterSchool ? `${baseText} • ${t('schoolCard.afterSchoolCare')}` : baseText,
@@ -516,6 +517,7 @@ function buildExpandedSections({
   const specialPrograms = attributes?.special_programs || []
   const teachingApproach = attributes?.teaching_approach || []
   const activities = attributes?.activities_offered || []
+  const canonicalAmenities = getCanonicalAmenityFlags(attributes)
 
   const languageFocus = normalizeLanguageFocus(attributes?.language_focus)
   const languagesOfInstruction = attributes?.languages_of_instruction || []
@@ -554,10 +556,10 @@ function buildExpandedSections({
   }
 
   const amenityLines = []
-  if (attributes?.has_canteen || facilities.includes('cafeteria')) {
+  if (canonicalAmenities.meals) {
     amenityLines.push(`🍽️ ${t('schoolCard.amenities.meals')}`)
   }
-  if (facilities.includes('transportation') || attributes?.transportation_available) {
+  if (canonicalAmenities.transport) {
     amenityLines.push(`🚌 ${t('schoolCard.amenities.transport')}`)
   }
   if (attributes?.class_size && Number(attributes.class_size) > 0) {

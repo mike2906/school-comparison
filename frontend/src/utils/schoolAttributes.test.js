@@ -2,6 +2,8 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
+  getCanonicalAmenityFlags,
+  getFilterTags,
   getLanguageFocusPairs,
   normalizeSchool,
   normalizeSchoolAttributes,
@@ -65,6 +67,57 @@ test('normalizeSchool flattens attributes_i18n onto the school', () => {
 
   assert.deepEqual(school.attributes.special_programs, ['Sports program'])
   assert.equal(school.id, 1)
+})
+
+test('getFilterTags prefers canonical tags over localized free text', () => {
+  const attributes = {
+    facilities: ['Библиотека', 'Училищен транспорт'],
+    filter_tags: { facilities: ['library', 'transportation'] },
+  }
+
+  assert.deepEqual(getFilterTags(attributes, 'facilities'), ['library', 'transportation'])
+})
+
+test('getFilterTags supports legacy canonical payloads and missing groups', () => {
+  assert.deepEqual(getFilterTags({ facilities: ['cafeteria'] }, 'facilities'), ['cafeteria'])
+  assert.deepEqual(getFilterTags({}, 'facilities'), [])
+})
+
+test('canonical amenity flags use filter tags instead of localized free text', () => {
+  const attributes = {
+    facilities: ['Библиотека', 'Училищен транспорт'],
+    special_programs: ['Целодневна организация', 'Осигурено хранене'],
+    filter_tags: {
+      facilities: ['computer_lab', 'library', 'sports_facilities', 'transportation'],
+      special_programs: ['extended_day', 'meals_provided'],
+    },
+  }
+
+  assert.deepEqual(getCanonicalAmenityFlags(attributes), {
+    meals: true,
+    transport: true,
+    extended: true,
+    library: true,
+    computerLab: true,
+    sportsFacilities: true,
+  })
+})
+
+test('canonical amenity flags do not treat arbitrary display text as tags', () => {
+  const attributes = {
+    facilities: ['Library'],
+    special_programs: ['Food Revolution Day'],
+    filter_tags: { facilities: [], special_programs: [] },
+  }
+
+  assert.deepEqual(getCanonicalAmenityFlags(attributes), {
+    meals: false,
+    transport: false,
+    extended: false,
+    library: false,
+    computerLab: false,
+    sportsFacilities: false,
+  })
 })
 
 test('getLanguageFocusPairs includes every attributes_i18n locale for filter counts', () => {

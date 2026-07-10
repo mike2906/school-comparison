@@ -1,5 +1,8 @@
 """Unit tests for the free-text → controlled-vocabulary mapping (P1.9)."""
 
+import json
+from pathlib import Path
+
 from app.utils.facility_vocabulary import (
     APPROACH_VOCAB,
     FACILITY_VOCAB,
@@ -68,6 +71,25 @@ class TestProgramMapping:
     def test_security_is_not_meals(self):
         # "охрана"/"съхранение" contain "хран" mid-word but are not meals.
         assert canonical_tags(["охрана", "съхранение на данни"], PROGRAM_VOCAB) == []
+
+    def test_golden_meal_fixture_rejects_projects_but_keeps_service_evidence(self):
+        case_path = (
+            Path(__file__).parent
+            / "golden_corpus/cases/154-detska-gradina-kosmicheski-detsa/case.json"
+        )
+        case = json.loads(case_path.read_text(encoding="utf-8"))
+        meals = case["expected"]["general_info"]["extracted"]["operations"]["meals"]
+
+        project_noise = [
+            value
+            for value in meals
+            if "project" in value.lower() or "food revolution day" in value.lower()
+        ]
+        service_evidence = [value for value in meals if value not in project_noise]
+
+        assert canonical_tags(project_noise, PROGRAM_VOCAB) == []
+        assert canonical_tags(service_evidence, PROGRAM_VOCAB) == ["meals_provided"]
+        assert canonical_tags(meals, PROGRAM_VOCAB) == ["meals_provided"]
 
     def test_already_canonical_program_values_pass_through(self):
         for tag in ("music_program", "sports_program", "arts_program", "extended_day", "meals_provided"):

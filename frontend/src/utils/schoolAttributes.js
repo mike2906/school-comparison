@@ -41,6 +41,46 @@ export function normalizeSchoolList(schools, locale) {
   return schools.map((school) => normalizeSchool(school, locale))
 }
 
+/**
+ * Return the locale-independent canonical tags used by advanced filters and amenity
+ * flags. The fallback keeps older/pre-projection payloads usable when their values were
+ * already canonical; current API responses always use `attributes.filter_tags`.
+ */
+export function getFilterTags(attributes, group) {
+  const canonical = attributes?.filter_tags?.[group]
+  if (Array.isArray(canonical)) return canonical
+
+  const legacy = attributes?.[group]
+  return Array.isArray(legacy) ? legacy : []
+}
+
+/**
+ * Shared canonical amenity signals for cards, detail, and comparison views.
+ */
+export function getCanonicalAmenityFlags(attributes, hasAfterSchool = false) {
+  const facilityTags = getFilterTags(attributes, 'facilities')
+  const programTags = getFilterTags(attributes, 'special_programs')
+
+  return {
+    meals: Boolean(
+      attributes?.has_canteen ||
+      facilityTags.includes('cafeteria') ||
+      programTags.includes('meals_provided')
+    ),
+    transport: Boolean(
+      facilityTags.includes('transportation') || attributes?.transportation_available
+    ),
+    extended: Boolean(
+      hasAfterSchool ||
+      programTags.includes('extended_day') ||
+      attributes?.after_school_care
+    ),
+    library: facilityTags.includes('library'),
+    computerLab: facilityTags.includes('computer_lab'),
+    sportsFacilities: facilityTags.includes('sports_facilities'),
+  }
+}
+
 function addLanguageFocusPairs(values, pairs) {
   if (!Array.isArray(values)) return
 
