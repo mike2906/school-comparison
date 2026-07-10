@@ -29,6 +29,11 @@ class TestFacilityMapping:
         for tag in ("sports_facilities", "cafeteria", "library", "computer_lab", "transportation"):
             assert canonical_tags([tag], FACILITY_VOCAB) == [tag]
 
+    def test_legacy_underscore_key_maps_to_canonical_tag(self):
+        # seed_data.py stores the legacy underscore key "sports_field"; it must still
+        # match the spaced "sports field" phrase in the vocab.
+        assert canonical_tags(["sports_field"], FACILITY_VOCAB) == ["sports_facilities"]
+
     def test_multiple_values_collapse_and_sort(self):
         assert canonical_tags(["библиотека", "физкултурен салон"], FACILITY_VOCAB) == [
             "library",

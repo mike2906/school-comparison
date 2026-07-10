@@ -167,11 +167,19 @@ def canonical_tags(values: Iterable[object], vocab: Mapping[str, _Rule]) -> list
         normalized = _normalize(value)
         if not normalized:
             continue
+        # Legacy underscore keys (seeded "sports_field") should match spaced phrases in
+        # the vocab ("sports field"), so match on both the raw and space-normalized form.
+        spaced = normalized.replace("_", " ")
         for tag, rule in vocab.items():
             if tag in matched:
                 continue
             # An already-canonical value (seeded "sports_facilities", "extended_day")
             # passes through even when the tag key is not one of its match substrings.
-            if normalized == tag or _matches(normalized, rule):
+            if (
+                normalized == tag
+                or spaced == tag.replace("_", " ")
+                or _matches(normalized, rule)
+                or _matches(spaced, rule)
+            ):
                 matched.add(tag)
     return sorted(matched)
