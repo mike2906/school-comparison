@@ -217,11 +217,25 @@ class TestSeededDisplayFields:
         base = build_base_attributes({"extracted": {"founded_year": 1998}})
         assert base["established_year"] is None
 
+    def test_filter_tags_are_served_and_canonical(self):
+        # The frontend counts advanced-filter checkboxes against these locale-independent
+        # canonical tags (P1.9); free text in either locale collapses onto them.
+        base = build_base_attributes(INTERNAL_ATTRIBUTES)
+        assert base["filter_tags"] == {
+            "facilities": ["library"],
+            "special_programs": ["sports_program"],
+            "teaching_approach": [],
+        }
+
 
 class TestFilterableProjection:
-    def test_unions_locales_so_either_language_matches(self):
+    def test_unions_locales_and_maps_to_canonical_vocabulary(self):
+        # Free-text facilities/programs in either locale collapse onto the controlled
+        # vocabulary the advanced filter offers (P1.9): "Библиотека"/"Library" → library,
+        # "Спортна програма"/"Sports program" → sports_program.
         filterable = build_filterable_attributes(INTERNAL_ATTRIBUTES)
-        assert filterable["facilities"] == ["Библиотека", "Library"]
+        assert filterable["facilities"] == ["library"]
+        assert filterable["special_programs"] == ["sports_program"]
         assert {entry["language"] for entry in filterable["language_focus"]} == {
             "Английски",
             "English",
@@ -254,6 +268,39 @@ class TestFilterableProjection:
         for language_focus in ("English:mother_tongue", "German:early_foreign"):
             schools = await service.list_schools_filtered(language_focus=[language_focus])
             assert school.id in {matched.id for matched in schools}
+
+    @pytest.mark.asyncio
+    async def test_free_text_facilities_surface_as_canonical_options(self, seeded_db):
+        """A scraped school's free text becomes canonical filter options that match.
+
+        This is the P1.9 regression: options and the matcher share the projection, so
+        a free-text "библиотека" both shows up as the `library` option and matches the
+        `facilities=library` filter — the two used to never intersect.
+        """
+        school = (await seeded_db.execute(select(School))).scalars().first()
+        school.attributes = {
+            "extracted": {
+                "facilities": ["библиотека", "физкултурен салон"],
+                "programs": ["Футбол", "Montessori"],
+            }
+        }
+        await seeded_db.commit()
+
+        service = SchoolService(seeded_db)
+
+        filters = await service.get_available_filters()
+        assert "library" in filters["facilities"]
+        assert "sports_facilities" in filters["facilities"]
+        assert "sports_program" in filters["special_programs"]
+        assert "montessori" in filters["teaching_approach"]
+        # Only canonical vocabulary is ever emitted — never the raw free text.
+        assert "библиотека" not in filters["facilities"]
+        assert all(":" not in option for option in filters["facilities"])
+
+        matched = await service.list_schools_filtered(facilities=["library"])
+        assert school.id in {s.id for s in matched}
+        matched = await service.list_schools_filtered(special_programs=["sports_program"])
+        assert school.id in {s.id for s in matched}
 
 
 class TestAllowlistCoversWrittenFields:
@@ -335,6 +382,14 @@ class TestSerializationAllowlist:
         assert data["attributes"]["class_size"] == 16
         assert data["attributes_i18n"]["bg"]["facilities"] == ["Библиотека"]
         assert data["attributes_i18n"]["en"]["facilities"] == ["Library"]
+        # Canonical advanced-filter tags ship alongside the free text (P1.9), mapped
+        # from it: "Библиотека"/"Library" → library, "Спортна програма" → sports_program.
+        # These are what the frontend counts checkboxes against.
+        assert data["attributes"]["filter_tags"] == {
+            "facilities": ["library"],
+            "special_programs": ["sports_program"],
+            "teaching_approach": [],
+        }
         # display_name_i18n stays internal but still drives the resolved name.
         assert data["resolved_name_i18n"]["en"] == "Example School"
 

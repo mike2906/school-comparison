@@ -247,37 +247,27 @@ class SchoolService:
             "teaching_approach": set(),
         }
 
-        # NOTE: non-language filters deliberately read raw top-level keys, not the
-        # merged display projection. Extracted facilities/programs are free text
-        # ("Medical care", "3D printers") while the filter UI expects controlled
-        # vocabulary tags ("cafeteria", "library"). Languages use the normalized
-        # filterable projection so emitted options match the list endpoint matcher.
+        # Options come from the same filterable projection the list endpoint matches
+        # against, so emitted options can never diverge from what actually matches.
+        # facilities/special_programs/teaching_approach are already mapped onto the
+        # controlled vocabulary there (P1.9), so only canonical tags are surfaced.
         for attrs in rows:
             if not attrs:
                 continue
-            language_values = build_filterable_attributes(attrs).get("language_focus") or []
-            for value in language_values:
-                if isinstance(value, dict):
-                    language = value.get("language")
-                    level = value.get("level")
-                    if language:
-                        categories["language_focus_languages"].add(language)
-                    if level:
-                        categories["language_focus_levels"].add(level)
-                    if language and level:
-                        categories["language_focus_pairs"].add(f"{language}:{level}")
-                elif isinstance(value, str):
-                    categories["language_focus_pairs"].add(value)
-                    if ":" in value:
-                        language, level = value.split(":", 1)
-                        if language:
-                            categories["language_focus_languages"].add(language)
-                        if level:
-                            categories["language_focus_levels"].add(level)
+            filterable = build_filterable_attributes(attrs)
+
+            for value in filterable.get("language_focus") or []:
+                language = value.get("language")
+                level = value.get("level")
+                if language:
+                    categories["language_focus_languages"].add(language)
+                if level:
+                    categories["language_focus_levels"].add(level)
+                if language and level:
+                    categories["language_focus_pairs"].add(f"{language}:{level}")
 
             for key in ["special_programs", "facilities", "teaching_approach"]:
-                values = attrs.get(key) or []
-                for value in values:
+                for value in filterable.get(key) or []:
                     categories[key].add(value)
 
         return {key: sorted(values) for key, values in categories.items()}

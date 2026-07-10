@@ -1175,7 +1175,8 @@ function SearchPage() {
       return Object.entries(groups).every(([key, selected]) => {
         if (key === groupToIgnore) return true
         if (!selected || selected.length === 0) return true
-        const values = attributes[key] || []
+        // Canonical advanced-filter tags (P1.9), not the free-text display lists.
+        const values = attributes.filter_tags?.[key] || []
         return selected.some(value => values.includes(value))
       })
     }
@@ -1209,7 +1210,7 @@ function SearchPage() {
         options.forEach(option => {
           counts[groupKey][option] = baseSchools.filter(school => {
             if (!matchesSelected(school, groupKey)) return false
-            const values = school.attributes?.[groupKey] || []
+            const values = school.attributes?.filter_tags?.[groupKey] || []
             return values.includes(option)
           }).length
         })
