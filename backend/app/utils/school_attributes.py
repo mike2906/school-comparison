@@ -340,21 +340,48 @@ def compute_filter_tags(attributes: Mapping[str, Any] | None) -> dict[str, list[
     """
     attrs = _as_mapping(attributes)
     localized = [build_localized_attributes(attrs, locale) for locale in DISPLAY_LOCALES]
+    blocked = blocked_display_fields(attrs)
 
     def _union(field: str) -> list[str]:
         return _dedupe_strings(value for values in localized for value in values[field])
 
+    def _nested(*path: str) -> list[str]:
+        """Free text from a nested `extracted`/`extracted_i18n[locale]` list, per locale.
+
+        Scraped rows store transport/meals and pedagogy phrases outside the projected
+        lists (`extracted.operations.{transport,meals}`,
+        `extracted.summary_source.teaching_approach`), so seed the mapper from them too.
+        """
+        collected: list[Any] = []
+        for locale in DISPLAY_LOCALES:
+            node = _localized_extracted(attrs, locale)
+            for key in path[:-1]:
+                node = _as_mapping(node.get(key))
+            collected.append(node.get(path[-1]))
+        return _merged_list(*collected)
+
     facilities_text = _union("facilities")
     programs_text = _union("special_programs")
     activities_text = _union("activities_offered")
-    approach_text = _merged_list(attrs.get("teaching_approach"))
+    approach_text = _merged_list(attrs.get("teaching_approach")) + _nested(
+        "summary_source", "teaching_approach"
+    )
+
+    # Nested extraction sources feed the same canonical tag as their sibling display
+    # field, so they are gated the same way (P1.7): transport → facilities, meals →
+    # special_programs. Pedagogy → teaching_approach, which has no display-field gate.
+    if "facilities" not in blocked:
+        facilities_text = facilities_text + _nested("operations", "transport")
+    meals_text = [] if "special_programs" in blocked else _nested("operations", "meals")
 
     return {
         "facilities": canonical_tags(facilities_text, FACILITY_VOCAB),
         # Programs and extracurricular both feed the "special programs" filter (a sports
         # club is a sports program); Montessori/IB live in programs, so they feed
         # teaching_approach as well.
-        "special_programs": canonical_tags(programs_text + activities_text, PROGRAM_VOCAB),
+        "special_programs": canonical_tags(
+            programs_text + activities_text + meals_text, PROGRAM_VOCAB
+        ),
         "teaching_approach": canonical_tags(programs_text + approach_text, APPROACH_VOCAB),
     }
 

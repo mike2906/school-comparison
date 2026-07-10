@@ -313,6 +313,17 @@ Order matters within this phase; tasks touch overlapping files — run sequentia
         project reference. Regression tests in `test_facility_vocabulary.py`. Verified
         schools 380/422 no longer tagged sports (620 is a true positive — real
         Футбол/Волейбол).
+      - *From P1.9 Codex review (one P2):* scraped rows store transport/meals under
+        `extracted.operations.{transport,meals}` and pedagogy under
+        `extracted.summary_source.teaching_approach` — outside the projected lists — so
+        `transportation`/`meals_provided`/`project_based` stayed near-zero.
+        `compute_filter_tags` now also seeds the mapper from those nested lists (locale
+        overlay included), gated the same way as their sibling display field (transport
+        ↔ `facilities` block, meals ↔ `special_programs` block). Live coverage went
+        `transportation` 0→36, `meals_provided` 5→137, `project_based` 0→11; every
+        canonical option is now non-zero. Tests:
+        `test_filter_tags_include_nested_extraction_sources` +
+        `test_nested_sources_respect_validation_gating`.
 - [ ] **P1.10 BG users see no attributes for English-primary schools.** When a school's
       site is English, `attributes.extracted.<lists>` come back empty and all content
       lands under `extracted_i18n.en`, so the `bg` projection is empty (e.g. school 510:

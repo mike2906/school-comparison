@@ -223,9 +223,49 @@ class TestSeededDisplayFields:
         base = build_base_attributes(INTERNAL_ATTRIBUTES)
         assert base["filter_tags"] == {
             "facilities": ["library"],
-            "special_programs": ["sports_program"],
+            # "Обяд" (lunch) under operations.meals maps to meals_provided (P1.9 nested).
+            "special_programs": ["meals_provided", "sports_program"],
             "teaching_approach": [],
         }
+
+    def test_filter_tags_include_nested_extraction_sources(self):
+        # Scraped rows store transport/meals under `operations` and pedagogy under
+        # `summary_source`, outside the projected lists. These still feed the filter tags.
+        base = build_base_attributes(
+            {
+                "extracted": {
+                    "operations": {
+                        "transport": ["Buses: 213", "автобус №150"],
+                        "meals": ["Столово хранене", "Cafeteria Meals (optional)"],
+                    },
+                    "summary_source": {"teaching_approach": ["проектно-базирано обучение"]},
+                }
+            }
+        )
+        assert base["filter_tags"]["facilities"] == ["transportation"]
+        assert base["filter_tags"]["special_programs"] == ["meals_provided"]
+        assert base["filter_tags"]["teaching_approach"] == ["project_based"]
+
+    def test_nested_sources_respect_validation_gating(self):
+        # A validation error on facilities/programs blocks the nested transport/meals too.
+        attrs = {
+            "extracted": {
+                "operations": {"transport": ["Buses: 213"], "meals": ["Столово хранене"]},
+            },
+            "data_validation": {
+                "status": "ok",
+                "issues": [],
+                "spot_check": {
+                    "discrepancies": [
+                        {"field_path": "attributes.extracted.facilities", "kind": "contradiction"},
+                        {"field_path": "attributes.extracted.programs", "kind": "contradiction"},
+                    ]
+                },
+            },
+        }
+        tags = build_base_attributes(attrs)["filter_tags"]
+        assert tags["facilities"] == []
+        assert tags["special_programs"] == []
 
 
 class TestFilterableProjection:
@@ -235,7 +275,7 @@ class TestFilterableProjection:
         # "Спортна програма"/"Sports program" → sports_program.
         filterable = build_filterable_attributes(INTERNAL_ATTRIBUTES)
         assert filterable["facilities"] == ["library"]
-        assert filterable["special_programs"] == ["sports_program"]
+        assert filterable["special_programs"] == ["meals_provided", "sports_program"]
         assert {entry["language"] for entry in filterable["language_focus"]} == {
             "Английски",
             "English",
@@ -387,7 +427,7 @@ class TestSerializationAllowlist:
         # These are what the frontend counts checkboxes against.
         assert data["attributes"]["filter_tags"] == {
             "facilities": ["library"],
-            "special_programs": ["sports_program"],
+            "special_programs": ["meals_provided", "sports_program"],
             "teaching_approach": [],
         }
         # display_name_i18n stays internal but still drives the resolved name.
