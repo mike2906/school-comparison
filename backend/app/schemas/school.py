@@ -11,6 +11,7 @@ from app.utils.display_gating import (
     summary_is_publishable,
 )
 from app.utils.i18n_resolver import resolve_address_i18n, resolve_name_i18n
+from app.utils.location_tags import semantic_location_tags
 from app.utils.school_attributes import build_display_attributes
 
 
@@ -131,10 +132,20 @@ class SchoolLocationBase(BaseModel):
     lat: Optional[float] = None
     lng: Optional[float] = None
     phone: Optional[str] = None
-    location_tags: Optional[list[str]] = None
+    raw_location_tags: Optional[list[str]] = Field(
+        default=None,
+        validation_alias="location_tags",
+        exclude=True,
+    )
     is_primary: bool = True
 
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    @computed_field(return_type=list[str])
+    @property
+    def location_tags(self) -> list[str]:
+        """Public focus tags only; provenance/coords metadata is withheld (P1.8)."""
+        return semantic_location_tags(self.raw_location_tags)
 
     @computed_field(return_type=dict[str, str])
     @property

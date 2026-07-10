@@ -236,10 +236,27 @@ Order matters within this phase; tasks touch overlapping files — run sequentia
             so the gate's coverage and the spot-check scope stay in lockstep. Added an
             end-to-end test that a facilities discrepancy now survives normalization and
             drives the gate.
-- [ ] **P1.8 Split `location_tags`.** Provenance strings (`source=moe_registry`,
+- [x] **P1.8 Split `location_tags`.** Provenance strings (`source=moe_registry`,
       `source_esri_id=…`) move to `geocode_meta`; `location_tags` stays purely semantic;
       delete the client-side allowlist filter in `frontend/src/utils/locationFocus.js`.
       *Verify:* no provenance strings in API responses; focus tags still render.
+      **Done.** Enforced at the publish boundary rather than by physically relocating the
+      strings — consistent with P1.1/P1.7's model, where `location_tags` (like `attributes`)
+      is an internal scratchpad and the allowlist runs at serialization. New
+      `app/utils/location_tags.py::semantic_location_tags` projects raw tags down to the six
+      public focus tags (`science_focus`/`arts_focus`/`sports_focus`/`music_focus`/
+      `technology_focus`/`language_focus`); `SchoolLocationBase` now ingests the column as
+      excluded `raw_location_tags` and exposes `location_tags` as a computed field over that
+      projection, so provenance/coords metadata (`source=…`, `source_esri_id=…`,
+      `coords_source=…`, `address_source=…`, `location_recovered=…`, `coords_cleared=…`,
+      `coords_precision=…`) never ship even though they stay in the column for the repair
+      commands that read them. Frontend `locationFocus.js` lost `isLocationFocusTag` /
+      `getLocationFocusTags` (the client-side allowlist); `SchoolMap.jsx` / `SchoolCard.jsx`
+      now render tags as-is. Deliberate divergence from the literal "move to `geocode_meta`":
+      those tags are read by-string across `cli.py`/`extractor.py` repair paths, and
+      `geocode_meta` already carries P1.3's structured `method`/`precision` — overloading it
+      with legacy string tags would clash. Test:
+      `test_api.py::test_location_tags_serialize_semantic_only`.
 - [ ] **P1.9 Controlled vocabulary for `facilities` / `special_programs`** (found while
       doing P1.1). The advanced-filter UI offers a canonical vocabulary
       (`SearchPage.jsx:27` `DEFAULT_ADVANCED_OPTIONS`: `cafeteria`, `library`,
