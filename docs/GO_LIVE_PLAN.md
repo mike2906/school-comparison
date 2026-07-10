@@ -409,6 +409,10 @@ Order matters within this phase; tasks touch overlapping files — run sequentia
       deterministic validation now evidence-filters `working_hours` and `daily_schedule`
       against cached source pages as well, so new runs cannot open an unvalidated window
       before the capable-model Stage 6 audit.
+      Codex review follow-up: whole-section `admission` / `operations` discrepancies now
+      block every projected child (child-level discrepancies remain narrow), and mixed
+      requirement lists no longer let “no exam” hide a separately required interview or
+      test; multiple distinct requirements fall back to the full extracted text.
 
 ## Phase 2 — User-facing correctness bugs
 

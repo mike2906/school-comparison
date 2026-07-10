@@ -23,6 +23,28 @@ test('negative phrases win over embedded test and interview keywords', () => {
   assert.equal(classifyAdmissionRequirement('Тест не се изисква').kind, 'none')
 })
 
+test('required steps outrank separate no-exam fragments', () => {
+  assert.equal(
+    classifyAdmissionRequirement(['No entrance exam', 'Interview with the family']).kind,
+    'interview'
+  )
+  assert.equal(
+    classifyAdmissionRequirement(['Без изпит', 'Входящ тест по английски']).kind,
+    'test'
+  )
+})
+
+test('preserves full text when multiple distinct requirements are present', () => {
+  assert.deepEqual(classifyAdmissionRequirement(['Interview', 'Entrance test']), {
+    kind: 'other',
+    text: 'Interview • Entrance test',
+  })
+  assert.deepEqual(classifyAdmissionRequirement(['No entrance exam', 'Document review']), {
+    kind: 'other',
+    text: 'No entrance exam • Document review',
+  })
+})
+
 test('preserves unknown free text and joins extracted arrays for fallback rendering', () => {
   assert.deepEqual(classifyAdmissionRequirement(['Оценка на документи', 'Среща със семейството']), {
     kind: 'other',

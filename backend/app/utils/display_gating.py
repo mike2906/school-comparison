@@ -48,6 +48,15 @@ _FIELD_PATH_DISPLAY_FIELDS: dict[str, tuple[str, ...]] = {
     "attributes.extracted.admission.available_spots": ("available_spots",),
     "attributes.extracted.operations.working_hours": ("school_hours",),
     "attributes.extracted.operations.daily_schedule": ("daily_schedule",),
+    # Keep these parent mappings after the child paths above: a discrepancy on one
+    # child should block only that child, while a whole-section discrepancy blocks
+    # every public field fed by the section.
+    "attributes.extracted.admission": (
+        "application_deadlines",
+        "entry_requirements",
+        "available_spots",
+    ),
+    "attributes.extracted.operations": ("school_hours", "daily_schedule"),
 }
 
 # Validator pricing paths are `pricing[{row.id}]` / `pricing[{row.id}].{field}`.

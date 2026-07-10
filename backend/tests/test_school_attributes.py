@@ -190,6 +190,41 @@ class TestLocalizedProjection:
         assert localized["daily_schedule"] == []
         assert localized["entry_requirements"] == ["Входящ тест"]
 
+    @pytest.mark.parametrize(
+        "field_path,blocked_fields",
+        [
+            (
+                "attributes.extracted.admission",
+                {"entry_requirements", "application_deadlines", "available_spots"},
+            ),
+            (
+                "attributes.extracted.operations",
+                {"daily_schedule"},
+            ),
+        ],
+    )
+    def test_parent_section_discrepancy_blocks_all_projected_children(
+        self, field_path, blocked_fields
+    ):
+        attributes = {
+            **INTERNAL_ATTRIBUTES,
+            "data_validation": {
+                "status": "needs_review",
+                "spot_check": {
+                    "discrepancies": [
+                        {"field_path": field_path, "kind": "unsupported"}
+                    ]
+                },
+            },
+        }
+        localized = build_localized_attributes(attributes, "bg")
+        for field in blocked_fields:
+            assert localized[field] == []
+
+        base = build_base_attributes(attributes)
+        if field_path.endswith("operations"):
+            assert base["school_hours"] is None
+
     def test_scraper_display_fields_are_declared_in_the_allowlist(self):
         projected_scraper_fields = {
             "entry_requirements",

@@ -15,32 +15,44 @@ const TEST_PATTERNS = [
   /(?:тест|изпит)/i,
 ]
 
-function requirementText(rawRequirement) {
+function requirementParts(rawRequirement) {
   if (Array.isArray(rawRequirement)) {
-    const values = rawRequirement.map(value => String(value || '').trim()).filter(Boolean)
-    return values.join(' • ')
+    return rawRequirement.flatMap(requirementParts)
   }
-  if (typeof rawRequirement === 'string') return rawRequirement.trim()
-  if (!rawRequirement || typeof rawRequirement !== 'object') return ''
+  if (!rawRequirement) return []
+  if (typeof rawRequirement === 'object') {
+    const value = rawRequirement.type || rawRequirement.requirement || rawRequirement.method
+    return value == null ? [] : requirementParts(value)
+  }
 
-  const value = rawRequirement.type || rawRequirement.requirement || rawRequirement.method
-  return value == null ? '' : String(value).trim()
+  return String(rawRequirement)
+    .split(/[•;\n]+/)
+    .map(value => value.trim())
+    .filter(Boolean)
+}
+
+function classifyPart(text) {
+  if (NO_REQUIREMENT_PATTERNS.some(pattern => pattern.test(text))) return 'none'
+  if (INTERVIEW_PATTERNS.some(pattern => pattern.test(text))) return 'interview'
+  if (TEST_PATTERNS.some(pattern => pattern.test(text))) return 'test'
+  return 'other'
 }
 
 export function classifyAdmissionRequirement(rawRequirement) {
-  const text = requirementText(rawRequirement)
-  if (!text) return null
+  const parts = requirementParts(rawRequirement)
+  if (parts.length === 0) return null
 
-  // Negative phrases must win over their embedded keyword ("без изпит" is not a
-  // required exam). This order also fixes the old broad `includes('no')` matcher.
-  if (NO_REQUIREMENT_PATTERNS.some(pattern => pattern.test(text))) {
-    return { kind: 'none', text }
-  }
-  if (INTERVIEW_PATTERNS.some(pattern => pattern.test(text))) {
-    return { kind: 'interview', text }
-  }
-  if (TEST_PATTERNS.some(pattern => pattern.test(text))) {
-    return { kind: 'test', text }
-  }
+  const text = parts.join(' • ')
+  const kinds = new Set(parts.map(classifyPart))
+  const hasInterview = kinds.has('interview')
+  const hasTest = kinds.has('test')
+
+  // A real required step must outrank a separate "no exam" fragment. If both an
+  // interview and a test are required (or an unknown step accompanies "none"), keep
+  // the full source text rather than hiding one detail behind a single generic label.
+  if (hasInterview && hasTest) return { kind: 'other', text }
+  if (hasInterview) return { kind: 'interview', text }
+  if (hasTest) return { kind: 'test', text }
+  if (kinds.size === 1 && kinds.has('none')) return { kind: 'none', text }
   return { kind: 'other', text }
 }
