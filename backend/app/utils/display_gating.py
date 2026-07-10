@@ -43,6 +43,11 @@ _FIELD_PATH_DISPLAY_FIELDS: dict[str, tuple[str, ...]] = {
     "attributes.extracted.accreditations": ("special_programs",),
     "attributes.extracted.extracurricular": ("activities_offered",),
     "attributes.extracted.class_size": ("class_size",),
+    "attributes.extracted.admission.deadlines": ("application_deadlines",),
+    "attributes.extracted.admission.entrance_requirements": ("entry_requirements",),
+    "attributes.extracted.admission.available_spots": ("available_spots",),
+    "attributes.extracted.operations.working_hours": ("school_hours",),
+    "attributes.extracted.operations.daily_schedule": ("daily_schedule",),
 }
 
 # Validator pricing paths are `pricing[{row.id}]` / `pricing[{row.id}].{field}`.

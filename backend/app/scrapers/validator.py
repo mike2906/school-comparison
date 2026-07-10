@@ -40,6 +40,7 @@ SPOT_CHECK_CORE_FIELD_PREFIXES: tuple[str, ...] = (
     "attributes.extracted.founded_year",
     "attributes.extracted.programs",
     "attributes.extracted.admission",
+    "attributes.extracted.operations",
     # Free-text display fields the P1.7 gate withholds when flagged. In scope so a
     # spot-check discrepancy on them survives `_normalize_spot_check_output` and
     # reaches the report; `app.utils.display_gating._FIELD_PATH_DISPLAY_FIELDS` maps
@@ -755,7 +756,15 @@ async def validate_school_data(
                 extracted_has_meaningful_payload = _has_meaningful_payload(extracted_dict)
                 needs_evidence_checks = any(
                     extracted_dict.get(key)
-                    for key in ("languages", "class_size", "founded_year", "programs", "admission", "summary_source")
+                    for key in (
+                        "languages",
+                        "class_size",
+                        "founded_year",
+                        "programs",
+                        "admission",
+                        "operations",
+                        "summary_source",
+                    )
                 )
                 if needs_evidence_checks:
                     pages_result = await db.execute(
@@ -954,6 +963,68 @@ async def validate_school_data(
                             "has_useful_info is false."
                         ),
                     )
+
+                extracted_operations = (
+                    extracted_dict.get("operations")
+                    if isinstance(extracted_dict.get("operations"), dict)
+                    else {}
+                )
+                if source_text and extracted_operations:
+                    normalized_operations = dict(extracted_operations)
+                    original_working_hours = extracted_operations.get("working_hours")
+                    working_hours = (
+                        str(original_working_hours).strip()
+                        if original_working_hours is not None
+                        else None
+                    )
+                    if not working_hours or not _source_mentions_text_value(
+                        source_text, working_hours
+                    ):
+                        working_hours = None
+                    if working_hours != original_working_hours:
+                        _add_fix(
+                            report,
+                            code="operations_working_hours_missing_evidence",
+                            field_path="attributes.extracted.operations.working_hours",
+                            original_value=original_working_hours,
+                            fixed_value=working_hours,
+                            reason=(
+                                "Cleared working_hours because no explicit supporting "
+                                "text exists in the scraped source pages."
+                            ),
+                        )
+                    normalized_operations["working_hours"] = working_hours
+
+                    original_daily_schedule = extracted_operations.get("daily_schedule")
+                    daily_schedule = _normalize_text_list(original_daily_schedule)
+                    evidence_daily_schedule = _filter_values_by_source_evidence(
+                        source_text, daily_schedule
+                    )
+                    if evidence_daily_schedule != original_daily_schedule:
+                        _add_fix(
+                            report,
+                            code="operations_daily_schedule_missing_evidence",
+                            field_path="attributes.extracted.operations.daily_schedule",
+                            original_value=original_daily_schedule,
+                            fixed_value=evidence_daily_schedule,
+                            reason=(
+                                "Dropped daily_schedule entries not explicitly supported "
+                                "by scraped source text."
+                            ),
+                        )
+                    normalized_operations["daily_schedule"] = evidence_daily_schedule
+                    operation_value_keys = (
+                        "working_hours",
+                        "day_options",
+                        "daily_schedule",
+                        "meals",
+                        "transport",
+                        "uniforms",
+                    )
+                    normalized_operations["has_useful_info"] = any(
+                        normalized_operations.get(key) for key in operation_value_keys
+                    )
+                    extracted_dict["operations"] = normalized_operations
 
                 original_summary_source = extracted_dict.get("summary_source")
                 if original_summary_source is not None:

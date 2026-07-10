@@ -87,6 +87,11 @@ _NAMED_PAIR_RE = re.compile(
 )
 _NUMBER_RE = re.compile(r"\d+(?:\.\d+)?")
 _WHITESPACE_RE = re.compile(r"\s+")
+_SCHOOL_HOURS_RANGE_RE = re.compile(
+    r"(?<!\d)([01]?\d|2[0-3])[:.]([0-5]\d)\s*(?:-|–|—|до|to)\s*"
+    r"([01]?\d|2[0-3])[:.]([0-5]\d)(?!\d)",
+    re.IGNORECASE,
+)
 
 
 def _as_mapping(value: Any) -> dict[str, Any]:
@@ -323,6 +328,8 @@ def build_localized_attributes(
     attrs = _as_mapping(attributes)
     extracted = _localized_extracted(attrs, locale)
     blocked = blocked_display_fields(attrs)
+    admission = _as_mapping(extracted.get("admission"))
+    operations = _as_mapping(extracted.get("operations"))
 
     focus = _normalize_focus_entries(
         _normalize_focus_entries(attrs.get("language_focus"))
@@ -345,6 +352,10 @@ def build_localized_attributes(
             attrs.get("activities_offered"),
             extracted.get("extracurricular"),
         ),
+        "entry_requirements": _merged_list(admission.get("entrance_requirements")),
+        "application_deadlines": _merged_list(admission.get("deadlines")),
+        "available_spots": _merged_list(admission.get("available_spots")),
+        "daily_schedule": _merged_list(operations.get("daily_schedule")),
     }
     for field in blocked:
         if field in resolved:
@@ -364,6 +375,28 @@ def _year_or_none(value: Any) -> Optional[int]:
     except (TypeError, ValueError):
         return None
     return year if 1000 <= year <= 2999 else None
+
+
+def _scraped_school_hours(value: Any) -> Optional[str]:
+    """Return a plausible daytime operating-hours range from scraped text.
+
+    Golden fixtures contain false captures such as a heading with no value,
+    ``18:00-7:00`` (reversed), and one-hour contact/arrival windows. Schools are not
+    overnight businesses, so require an explicit forward range lasting 4–14 hours.
+    The matched range is returned without surrounding Markdown heading noise.
+    """
+    text = _normalize_text(value)
+    if not text:
+        return None
+    match = _SCHOOL_HOURS_RANGE_RE.search(text)
+    if not match:
+        return None
+    start = int(match.group(1)) * 60 + int(match.group(2))
+    end = int(match.group(3)) * 60 + int(match.group(4))
+    duration = end - start
+    if duration < 4 * 60 or duration > 14 * 60:
+        return None
+    return match.group(0)
 
 
 def compute_filter_tags(attributes: Mapping[str, Any] | None) -> dict[str, list[str]]:
@@ -437,6 +470,7 @@ def build_base_attributes(attributes: Mapping[str, Any] | None) -> dict[str, Any
     """
     attrs = _as_mapping(attributes)
     extracted = _as_mapping(attrs.get("extracted"))
+    operations = _as_mapping(extracted.get("operations"))
     blocked = blocked_display_fields(attrs)
 
     class_size = _parse_class_size(attrs.get("class_size"))
@@ -444,6 +478,12 @@ def build_base_attributes(attributes: Mapping[str, Any] | None) -> dict[str, Any
         class_size = _parse_class_size(extracted.get("class_size"))
     if "class_size" in blocked:
         class_size = None
+
+    school_hours = _normalize_text(attrs.get("school_hours")) or _scraped_school_hours(
+        operations.get("working_hours")
+    )
+    if "school_hours" in blocked:
+        school_hours = None
 
     return {
         "class_size": class_size,
@@ -455,7 +495,7 @@ def build_base_attributes(attributes: Mapping[str, Any] | None) -> dict[str, Any
         # `extracted.founded_year` is the scraped equivalent of established_year but is
         # deliberately not mapped here — surfacing it is a behaviour change, not a port.
         "teacher_student_ratio": _normalize_text(attrs.get("teacher_student_ratio")),
-        "school_hours": _normalize_text(attrs.get("school_hours")),
+        "school_hours": school_hours,
         "established_year": _year_or_none(attrs.get("established_year")),
         # Canonical advanced-filter tags (P1.9), consumed by the frontend filter counts.
         "filter_tags": compute_filter_tags(attrs),

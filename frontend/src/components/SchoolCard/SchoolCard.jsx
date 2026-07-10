@@ -7,6 +7,7 @@ import { formatDistance } from '../../utils/distance'
 import { getFocusEmoji } from '../../utils/locationFocus'
 import { getBenchmarkComparison, getNvoDetail as getSharedNvoDetail } from '../../utils/nvo'
 import { getCanonicalAmenityFlags } from '../../utils/schoolAttributes'
+import { classifyAdmissionRequirement } from '../../utils/admission'
 
 const typeColors = {
   state: 'bg-teal-500 text-white',
@@ -117,8 +118,6 @@ function normalizeLanguageFocus(languageFocus = []) {
 function getStatusInfo(school, t) {
   const rawStatus =
     school.admission_info?.status ||
-    school.attributes?.admission_status ||
-    school.attributes?.enrollment_status ||
     ''
   const statusValue = String(rawStatus).toLowerCase()
 
@@ -282,25 +281,18 @@ function getLatestAcademicYear(pricing = []) {
 }
 
 function getAdmissionRequirement(rawRequirement, t) {
-  if (!rawRequirement) return null
-  const requirementValue = typeof rawRequirement === 'string'
-    ? rawRequirement
-    : rawRequirement?.type || rawRequirement?.requirement || rawRequirement?.method
-
-  if (!requirementValue) return null
-
-  const normalized = String(requirementValue).toLowerCase()
-  if (normalized.includes('interview')) {
+  const requirement = classifyAdmissionRequirement(rawRequirement)
+  if (!requirement) return null
+  if (requirement.kind === 'interview') {
     return { icon: '📝', text: t('schoolCard.admissions.interviewRequired') }
   }
-  if (normalized.includes('test') || normalized.includes('exam')) {
+  if (requirement.kind === 'test') {
     return { icon: '📋', text: t('schoolCard.admissions.testRequired') }
   }
-  if (normalized.includes('none') || normalized.includes('no')) {
+  if (requirement.kind === 'none') {
     return { icon: '✅', text: t('schoolCard.admissions.noEntranceExam') }
   }
-
-  return null
+  return { icon: 'ℹ️', text: requirement.text }
 }
 
 function getLastAdmittedPoints(admissionInfo, ageGroup) {
@@ -451,7 +443,7 @@ function getAmenityFlags(attributes, hasAfterSchool) {
     transport: canonical.transport,
     extended: canonical.extended,
     smallClasses: Boolean(attributes?.class_size && Number(attributes.class_size) < 16),
-    accessible: Boolean(attributes?.accessible || facilities.includes('accessible')),
+    accessible: facilities.includes('accessible'),
     specialPrograms: Boolean(specialPrograms.length > 0),
   }
 }
@@ -462,8 +454,7 @@ function getScheduleLine(primaryShiftInfo, attributes, t) {
   const shiftLabelKey = `schoolCard.shift.${shift}`
   const shiftLabel = t(shiftLabelKey)
   const label = shiftLabel !== shiftLabelKey ? shiftLabel : t(`shifts.${shift}`)
-  const hours = attributes?.schedule_hours?.[shift]
-  const baseText = hours ? `${label} (${hours})` : label
+  const baseText = label
   const hasAfterSchool = getCanonicalAmenityFlags(
     attributes,
     primaryShiftInfo?.has_organised_groups
@@ -567,7 +558,7 @@ function buildExpandedSections({
   } else if (attributes?.class_size && Number(attributes.class_size) < 16) {
     amenityLines.push(`👥 ${t('schoolCard.amenities.smallClasses')}`)
   }
-  if (attributes?.accessible || facilities.includes('accessible')) {
+  if (facilities.includes('accessible')) {
     amenityLines.push(`♿ ${t('schoolCard.amenities.accessible')}`)
   }
   if (specialPrograms.length > 0) {
@@ -588,17 +579,20 @@ function buildExpandedSections({
       const shiftLabelKey = `schoolCard.shift.${item.shift}`
       const shiftLabel = t(shiftLabelKey)
       const label = shiftLabel !== shiftLabelKey ? shiftLabel : t(`shifts.${item.shift}`)
-      const hours = attributes?.schedule_hours?.[item.shift]
-      const baseText = hours ? `${label} (${hours})` : label
+      const baseText = label
       const afterSchool = item.has_organised_groups ? ` • ${t('schoolCard.afterSchoolCare')}` : ''
       return `${ageGroupLabel}: ${baseText}${afterSchool}`
     })
   })
 
-  if (scheduleLines.length > 0) {
+  const scheduleDetails = [
+    ...scheduleLines,
+    ...(attributes?.daily_schedule || []),
+  ]
+  if (scheduleDetails.length > 0) {
     sections.push({
       title: t('schoolCard.sections.scheduleDetails'),
-      content: scheduleLines,
+      content: scheduleDetails,
     })
   }
 
@@ -770,7 +764,7 @@ const SchoolCard = forwardRef(function SchoolCard(
         : null
 
       const requirement = getAdmissionRequirement(
-        admissionInfo?.requirements || attributes?.entry_requirements || attributes?.admission_requirement,
+        admissionInfo?.requirements || attributes?.entry_requirements,
         t
       )
 

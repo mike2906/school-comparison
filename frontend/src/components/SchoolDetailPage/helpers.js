@@ -6,6 +6,7 @@ import {
   getLatestScoreForExamType as getSharedLatestScoreForExamType,
 } from '../../utils/nvo'
 import { getCanonicalAmenityFlags } from '../../utils/schoolAttributes'
+import { classifyAdmissionRequirement } from '../../utils/admission'
 
 /**
  * SchoolDetailPage Helper Functions
@@ -32,8 +33,6 @@ const SOURCE_BADGE_COLORS = {
 export function getStatusInfo(school, t) {
   const rawStatus =
     school.admission_info?.status ||
-    school.attributes?.admission_status ||
-    school.attributes?.enrollment_status ||
     ''
   const statusValue = String(rawStatus).toLowerCase()
 
@@ -107,25 +106,18 @@ export function getMinNvoScore(admissionInfo) {
  * Get admission requirement for private schools
  */
 export function getAdmissionRequirement(rawRequirement, t) {
-  if (!rawRequirement) return null
-  const requirementValue = typeof rawRequirement === 'string'
-    ? rawRequirement
-    : rawRequirement?.type || rawRequirement?.requirement || rawRequirement?.method
-
-  if (!requirementValue) return null
-
-  const normalized = String(requirementValue).toLowerCase()
-  if (normalized.includes('interview')) {
+  const requirement = classifyAdmissionRequirement(rawRequirement)
+  if (!requirement) return null
+  if (requirement.kind === 'interview') {
     return { icon: '📝', text: t('schoolCard.admissions.interviewRequired') }
   }
-  if (normalized.includes('test') || normalized.includes('exam')) {
+  if (requirement.kind === 'test') {
     return { icon: '📋', text: t('schoolCard.admissions.testRequired') }
   }
-  if (normalized.includes('none') || normalized.includes('no')) {
+  if (requirement.kind === 'none') {
     return { icon: '✅', text: t('schoolCard.admissions.noEntranceExam') }
   }
-
-  return null
+  return { icon: 'ℹ️', text: requirement.text }
 }
 
 /**
@@ -218,7 +210,7 @@ export function getAmenityFlags(attributes, hasAfterSchool) {
     transport: canonical.transport,
     extended: canonical.extended,
     smallClasses: Boolean(attributes?.class_size && Number(attributes.class_size) < 16),
-    accessible: Boolean(attributes?.accessible || facilities.includes('accessible')),
+    accessible: facilities.includes('accessible'),
     library: canonical.library,
     computerLab: Boolean(canonical.computerLab || facilities.includes('technology_lab')),
     musicRoom: Boolean(facilities.includes('music_room')),

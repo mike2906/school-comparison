@@ -8,6 +8,7 @@ import { calculateDistance, formatDistance } from '../../utils/distance'
 import { getSchoolName, getAddress, getSummary } from '../../utils/i18n'
 import { getCanonicalAmenityFlags, normalizeSchoolList } from '../../utils/schoolAttributes'
 import { getBenchmarkComparison, getNvoDetail as getSharedNvoDetail } from '../../utils/nvo'
+import { classifyAdmissionRequirement } from '../../utils/admission'
 
 const SOURCE_BADGE_STYLES = {
   official: 'bg-emerald-50 text-emerald-700',
@@ -133,8 +134,6 @@ function getOptionLabel(option, t) {
 function getStatusInfo(school, t) {
   const rawStatus =
     school.admission_info?.status ||
-    school.attributes?.admission_status ||
-    school.attributes?.enrollment_status ||
     ''
   const statusValue = String(rawStatus).toLowerCase()
 
@@ -152,25 +151,18 @@ function getStatusInfo(school, t) {
 }
 
 function getAdmissionRequirement(rawRequirement, t) {
-  if (!rawRequirement) return null
-  const requirementValue = typeof rawRequirement === 'string'
-    ? rawRequirement
-    : rawRequirement?.type || rawRequirement?.requirement || rawRequirement?.method
-
-  if (!requirementValue) return null
-
-  const normalized = String(requirementValue).toLowerCase()
-  if (normalized.includes('interview')) {
+  const requirement = classifyAdmissionRequirement(rawRequirement)
+  if (!requirement) return null
+  if (requirement.kind === 'interview') {
     return t('schoolCard.admissions.interviewRequired')
   }
-  if (normalized.includes('test') || normalized.includes('exam')) {
+  if (requirement.kind === 'test') {
     return t('schoolCard.admissions.testRequired')
   }
-  if (normalized.includes('none') || normalized.includes('no')) {
+  if (requirement.kind === 'none') {
     return t('schoolCard.admissions.noEntranceExam')
   }
-
-  return requirementValue
+  return requirement.text
 }
 
 function getLastAdmittedPoints(admissionInfo, ageGroup) {
@@ -743,10 +735,9 @@ function ComparePage() {
           const shiftLabelKey = `schoolCard.shift.${shift}`
           const shiftLabel = t(shiftLabelKey)
           const label = shiftLabel !== shiftLabelKey ? shiftLabel : t(`shifts.${shift}`)
-          const hours = school.attributes?.schedule_hours?.[shift]
           return (
             <div className="text-sm text-neutral-700">
-              {hours ? `${label} (${hours})` : label}
+              {label}
             </div>
           )
         },
@@ -973,14 +964,14 @@ function ComparePage() {
         label: t('compare.labels.accessibility'),
         getValue: (school) => {
           const facilities = school.attributes?.facilities || []
-          const isAccessible = Boolean(school.attributes?.accessible || facilities.includes('accessible'))
+          const isAccessible = facilities.includes('accessible')
           return (
             <span className={`text-sm ${isAccessible ? 'text-emerald-600 font-medium' : 'text-neutral-500'}`}>
               {isAccessible ? t('common.yes') : t('common.no')}
             </span>
           )
         },
-        getCompare: (school) => Boolean(school.attributes?.accessible || (school.attributes?.facilities || []).includes('accessible')),
+        getCompare: (school) => (school.attributes?.facilities || []).includes('accessible'),
       },
     ]
 
@@ -990,8 +981,7 @@ function ComparePage() {
         getValue: (school) => {
           const requirement = getAdmissionRequirement(
             school.admission_info?.requirements ||
-            school.attributes?.entry_requirements ||
-            school.attributes?.admission_requirement,
+            school.attributes?.entry_requirements,
             t
           )
           return requirement ? (
@@ -1046,18 +1036,26 @@ function ComparePage() {
       {
         label: t('compare.labels.applicationDeadline'),
         getValue: (school) => {
-          const deadline = school.admission_info?.deadline || school.attributes?.application_deadline
-          return deadline ? <span className="text-sm text-neutral-700">{deadline}</span> : renderPlaceholder()
+          const deadlines = school.attributes?.application_deadlines || []
+          const deadline = school.admission_info?.deadline
+          return deadline
+            ? <span className="text-sm text-neutral-700">{deadline}</span>
+            : deadlines.length > 0 ? makeTags(deadlines) : renderPlaceholder()
         },
-        getCompare: (school) => school.admission_info?.deadline || school.attributes?.application_deadline || null,
+        getCompare: (school) => school.admission_info?.deadline ||
+          (school.attributes?.application_deadlines?.length > 0 ? school.attributes.application_deadlines : null),
       },
       {
         label: t('compare.labels.spotsAvailable'),
         getValue: (school) => {
-          const spots = school.admission_info?.spots_available || school.attributes?.spots_available
-          return spots ? <span className="text-sm text-neutral-700">{spots}</span> : renderPlaceholder()
+          const extractedSpots = school.attributes?.available_spots || []
+          const spots = school.admission_info?.spots_available
+          return spots != null
+            ? <span className="text-sm text-neutral-700">{spots}</span>
+            : extractedSpots.length > 0 ? makeTags(extractedSpots) : renderPlaceholder()
         },
-        getCompare: (school) => school.admission_info?.spots_available || school.attributes?.spots_available || null,
+        getCompare: (school) => school.admission_info?.spots_available ??
+          (school.attributes?.available_spots?.length > 0 ? school.attributes.available_spots : null),
       },
       {
         label: t('compare.labels.eligibleAgeGroups'),
@@ -1217,7 +1215,7 @@ function ComparePage() {
         present.add('locations')
       }
       const hasSchedule = (school.locations || []).some(location => (location.age_group_shifts || []).some(item => item.shift)) ||
-        Boolean(school.attributes?.schedule_hours)
+        Boolean(school.attributes?.school_hours || school.attributes?.daily_schedule?.length)
       if (hasSchedule) {
         present.add('schedule')
       }
@@ -1233,8 +1231,7 @@ function ComparePage() {
       }
       const hasAdmission = Boolean(
         (school.admission_info && Object.keys(school.admission_info).length > 0) ||
-        school.attributes?.entry_requirements ||
-        school.attributes?.admission_requirement
+        school.attributes?.entry_requirements?.length
       )
       if (hasAdmission) {
         present.add('admission')

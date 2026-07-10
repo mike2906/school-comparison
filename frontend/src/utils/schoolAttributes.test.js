@@ -120,6 +120,18 @@ test('canonical amenity flags do not treat arbitrary display text as tags', () =
   })
 })
 
+test('canonical amenity flags ignore retired unproduced boolean aliases', () => {
+  const attributes = {
+    transportation_available: true,
+    after_school_care: true,
+    filter_tags: { facilities: [], special_programs: [] },
+  }
+
+  const flags = getCanonicalAmenityFlags(attributes)
+  assert.equal(flags.transport, false)
+  assert.equal(flags.extended, false)
+})
+
 test('getLanguageFocusPairs includes every attributes_i18n locale for filter counts', () => {
   const pairs = getLanguageFocusPairs({
     attributes: {

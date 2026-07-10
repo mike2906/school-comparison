@@ -67,13 +67,10 @@ export function getCanonicalAmenityFlags(attributes, hasAfterSchool = false) {
       facilityTags.includes('cafeteria') ||
       programTags.includes('meals_provided')
     ),
-    transport: Boolean(
-      facilityTags.includes('transportation') || attributes?.transportation_available
-    ),
+    transport: facilityTags.includes('transportation'),
     extended: Boolean(
       hasAfterSchool ||
-      programTags.includes('extended_day') ||
-      attributes?.after_school_care
+      programTags.includes('extended_day')
     ),
     library: facilityTags.includes('library'),
     computerLab: facilityTags.includes('computer_lab'),

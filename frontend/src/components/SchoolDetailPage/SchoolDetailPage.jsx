@@ -332,13 +332,13 @@ function SchoolDetailPage() {
             )}
 
             {/* School Hours */}
-            {(attributes.school_hours || attributes.operating_hours) && (
+            {attributes.school_hours && (
               <div className="flex flex-col items-center gap-2 p-4 bg-neutral-50 rounded-lg border border-neutral-200">
                 <svg className="w-8 h-8 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 <div className="text-center">
-                  <div className="text-sm font-bold text-neutral-900">{attributes.school_hours || attributes.operating_hours}</div>
+                  <div className="text-sm font-bold text-neutral-900">{attributes.school_hours}</div>
                   <div className="text-xs text-neutral-600 mt-1">{t('schools.schoolHours')}</div>
                 </div>
               </div>
@@ -412,7 +412,7 @@ function SchoolDetailPage() {
                   }
                 } else if (school.school_type === 'private' || school.school_type === 'international') {
                   const requirement = getAdmissionRequirement(
-                    school.admission_info?.requirements || attributes.entry_requirements || attributes.admission_requirement,
+                    school.admission_info?.requirements || attributes.entry_requirements,
                     t
                   )
                   if (requirement) {
