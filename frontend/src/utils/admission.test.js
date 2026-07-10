@@ -19,6 +19,8 @@ test('negative phrases win over embedded test and interview keywords', () => {
   assert.equal(classifyAdmissionRequirement('No test required').kind, 'none')
   assert.equal(classifyAdmissionRequirement('Without an interview').kind, 'none')
   assert.equal(classifyAdmissionRequirement('Без входен изпит').kind, 'none')
+  assert.equal(classifyAdmissionRequirement('Няма приемен изпит').kind, 'none')
+  assert.equal(classifyAdmissionRequirement('Без приемен изпит').kind, 'none')
   assert.equal(classifyAdmissionRequirement('Не се изисква интервю').kind, 'none')
   assert.equal(classifyAdmissionRequirement('Тест не се изисква').kind, 'none')
 })

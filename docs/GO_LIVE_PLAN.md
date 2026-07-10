@@ -413,6 +413,9 @@ Order matters within this phase; tasks touch overlapping files — run sequentia
       block every projected child (child-level discrepancies remain narrow), and mixed
       requirement lists no longer let “no exam” hide a separately required interview or
       test; multiple distinct requirements fall back to the full extracted text.
+      Re-review tightened the section gate so broad parent blocks apply only to the exact
+      parent path (an unrelated `operations.transport` issue cannot hide schedules), and
+      added common Bulgarian negative forms such as `няма/без приемен изпит`.
 
 ## Phase 2 — User-facing correctness bugs
 

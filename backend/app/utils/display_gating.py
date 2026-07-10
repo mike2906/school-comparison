@@ -59,6 +59,13 @@ _FIELD_PATH_DISPLAY_FIELDS: dict[str, tuple[str, ...]] = {
     "attributes.extracted.operations": ("school_hours", "daily_schedule"),
 }
 
+# Whole-section paths above deliberately block every public child, but an unrelated
+# nested discrepancy (e.g. ``operations.transport``) must not inherit that broad block.
+_EXACT_ONLY_FIELD_PATHS = {
+    "attributes.extracted.admission",
+    "attributes.extracted.operations",
+}
+
 # Validator pricing paths are `pricing[{row.id}]` / `pricing[{row.id}].{field}`.
 _PRICING_ROW_RE = re.compile(r"^pricing\[(\d+)\]")
 
@@ -99,7 +106,9 @@ def _display_fields_for_path(field_path: str) -> tuple[str, ...]:
     if not path:
         return ()
     for prefix, fields in _FIELD_PATH_DISPLAY_FIELDS.items():
-        if path == prefix or path.startswith(f"{prefix}."):
+        if path == prefix:
+            return fields
+        if prefix not in _EXACT_ONLY_FIELD_PATHS and path.startswith(f"{prefix}."):
             return fields
     return ()
 

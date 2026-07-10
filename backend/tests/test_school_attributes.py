@@ -225,6 +225,36 @@ class TestLocalizedProjection:
         if field_path.endswith("operations"):
             assert base["school_hours"] is None
 
+    @pytest.mark.parametrize(
+        "field_path",
+        [
+            "attributes.extracted.operations.transport",
+            "attributes.extracted.operations.meals",
+            "attributes.extracted.admission.required_documents",
+            "attributes.extracted.admission.application_steps",
+        ],
+    )
+    def test_unmapped_section_child_does_not_block_unrelated_display_fields(
+        self, field_path
+    ):
+        attributes = {
+            **INTERNAL_ATTRIBUTES,
+            "data_validation": {
+                "status": "needs_review",
+                "spot_check": {
+                    "discrepancies": [
+                        {"field_path": field_path, "kind": "unsupported"}
+                    ]
+                },
+            },
+        }
+        localized = build_localized_attributes(attributes, "bg")
+        assert localized["entry_requirements"] == ["Входящ тест"]
+        assert localized["application_deadlines"] == ["30 юни"]
+        assert localized["available_spots"] == ["12 свободни места"]
+        assert localized["daily_schedule"] == ["Учебни занятия до 15:00"]
+        assert build_base_attributes(attributes)["school_hours"] == "8:00-18:00"
+
     def test_scraper_display_fields_are_declared_in_the_allowlist(self):
         projected_scraper_fields = {
             "entry_requirements",
