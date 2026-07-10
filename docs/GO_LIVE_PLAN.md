@@ -342,7 +342,7 @@ Order matters within this phase; tasks touch overlapping files — run sequentia
         precision/recall changes must add a regression backed by a committed golden case
         when one demonstrates the behavior; synthetic unit cases remain useful for
         boundary mechanics only.
-- [ ] **P1.10 BG users see no attributes for English-primary schools.** When a school's
+- [x] **P1.10 BG users see no attributes for English-primary schools.** When a school's
       site is English, `attributes.extracted.<lists>` come back empty and all content
       lands under `extracted_i18n.en`, so the `bg` projection is empty (e.g. school 510:
       `extracted.facilities == []`, `extracted_i18n.en.facilities == ["Medical care", …]`).
@@ -351,6 +351,23 @@ Order matters within this phase; tasks touch overlapping files — run sequentia
       `_pick_primary_text_lang`: always populate the primary-language slot, or translate.
       Related: extraction of `class_size` from `"5 students"` yields `5` (school 510).
       Both are extraction-quality bugs — add fixtures under P1.5.
+      **Done.** Fixed at the projection boundary (like P1.7–P1.9), not by re-scraping —
+      current extraction already populates the primary slot (`_pick_primary_text_lang`
+      returns the dominant on-site language), so the residual gap was 328/540 *existing*
+      schools whose stale rows left the primary slot empty with content only under
+      `extracted_i18n.<other>`. `school_attributes._localized_extracted` now backfills any
+      field the requested locale left empty from another locale's override, so a BG viewer
+      of an English-primary school sees the extracted facts (in whatever language they
+      exist) instead of a blank section; fields the requested locale already populated are
+      never touched (no cross-contamination). Because it's in the shared projection it heals
+      all existing schools with no re-scrape and feeds the filter matcher too.
+      `class_size`: `_parse_class_size` now rejects values outside `[8, 40]` — the DB shows a
+      large mislabelled cluster of `"5 students"` (teacher:student ratios / small-group
+      figures) with a clean break at 8, and >40 is total enrolment. The raw `"5 students"`
+      capture stays in the golden snapshots (faithful extraction); the conflation is
+      discarded downstream, so the 17 `P1.10` class_size `known_issues` were removed.
+      Tests: `test_school_attributes.py` (locale backfill + no-override guard; class_size
+      floor/ceiling), full suite green (656).
 - [ ] **P1.11 Dead attribute reads in the UI.** The frontend reads 23 `attributes.*`
       keys; 11 of them are written by *nothing* — not the scrapers, not `seed_data.py`:
       `accessible`, `admission_requirement`, `admission_status`, `after_school_care`,
