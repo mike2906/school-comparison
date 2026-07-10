@@ -324,6 +324,13 @@ Order matters within this phase; tasks touch overlapping files — run sequentia
         canonical option is now non-zero. Tests:
         `test_filter_tags_include_nested_extraction_sources` +
         `test_nested_sources_respect_validation_gating`.
+      - *From P1.9 Codex re-review (two P2 recall gaps):* (1) an approach recorded only in
+        `summary_source.{canonical_tags,positioning,differentiators}` (with an empty
+        `teaching_approach`) was dropped — now mined into the approach mapper (the vocab
+        is narrow/distinctive, so prose mining is low-risk; live counts moved only
+        `ib_program` 18→19 / `montessori` 12→13). (2) English-only meal text (`Food`,
+        `breakfast`, `snack`) missed `meals_provided` — added those words. Verified against
+        the cited golden cases (560 → `ib_program`, 154 `Food…` → `meals_provided`).
 - [ ] **P1.10 BG users see no attributes for English-primary schools.** When a school's
       site is English, `attributes.extracted.<lists>` come back empty and all content
       lands under `extracted_i18n.en`, so the `bg` projection is empty (e.g. school 510:

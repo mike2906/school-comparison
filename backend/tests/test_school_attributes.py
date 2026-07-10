@@ -246,6 +246,23 @@ class TestSeededDisplayFields:
         assert base["filter_tags"]["special_programs"] == ["meals_provided"]
         assert base["filter_tags"]["teaching_approach"] == ["project_based"]
 
+    def test_approach_tags_from_summary_source_prose(self):
+        # The extractor often records an approach only as summary_source canonical_tags
+        # or positioning/differentiators prose, with teaching_approach left empty.
+        base = build_base_attributes(
+            {
+                "extracted": {
+                    "summary_source": {
+                        "teaching_approach": [],
+                        "canonical_tags": ["IB", "Cambridge"],
+                        "positioning": "IB programme by International Baccalaureate",
+                        "differentiators": ["Montessori-inspired classrooms"],
+                    }
+                }
+            }
+        )
+        assert base["filter_tags"]["teaching_approach"] == ["ib_program", "montessori"]
+
     def test_nested_sources_respect_validation_gating(self):
         # A validation error on facilities/programs blocks the nested transport/meals too.
         attrs = {

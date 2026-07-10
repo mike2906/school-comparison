@@ -112,7 +112,10 @@ PROGRAM_VOCAB: dict[str, _Rule] = {
         "equals": (),
     },
     "meals_provided": {
-        "contains": ("кетъринг", "catering", "meal", "обяд", "lunch", "закуск", "столов"),
+        "contains": (
+            "кетъринг", "catering", "meal", "обяд", "lunch", "закуск", "столов",
+            "food", "breakfast", "snack",
+        ),
         # "хран" matches "храна"/"хранене" but not "охрана" (security) / "съхранение".
         "prefix": ("хран",),
         "equals": ("стол",),

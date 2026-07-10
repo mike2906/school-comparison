@@ -55,6 +55,9 @@ class TestProgramMapping:
     def test_meals_and_extended_day(self):
         assert canonical_tags(["Кетъринг"], PROGRAM_VOCAB) == ["meals_provided"]
         assert canonical_tags(["здравословно хранене"], PROGRAM_VOCAB) == ["meals_provided"]
+        # English-only meal text without "meal"/"lunch" still maps.
+        assert canonical_tags(["Food from children's caterer"], PROGRAM_VOCAB) == ["meals_provided"]
+        assert canonical_tags(["Morning breakfast", "afternoon snack"], PROGRAM_VOCAB) == ["meals_provided"]
         assert canonical_tags(["целодневна организация"], PROGRAM_VOCAB) == ["extended_day"]
 
     def test_security_is_not_meals(self):

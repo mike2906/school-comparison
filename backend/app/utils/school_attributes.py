@@ -363,8 +363,16 @@ def compute_filter_tags(attributes: Mapping[str, Any] | None) -> dict[str, list[
     facilities_text = _union("facilities")
     programs_text = _union("special_programs")
     activities_text = _union("activities_offered")
-    approach_text = _merged_list(attrs.get("teaching_approach")) + _nested(
-        "summary_source", "teaching_approach"
+    # The extractor often records an approach only in `summary_source` — sometimes in a
+    # dedicated `teaching_approach` list, but also as distilled `canonical_tags` ("IB",
+    # "Montessori") or in the `positioning`/`differentiators` marketing prose. The
+    # approach vocabulary is narrow and distinctive, so mining that prose is low-risk.
+    approach_text = (
+        _merged_list(attrs.get("teaching_approach"))
+        + _nested("summary_source", "teaching_approach")
+        + _nested("summary_source", "canonical_tags")
+        + _nested("summary_source", "positioning")
+        + _nested("summary_source", "differentiators")
     )
 
     # Nested extraction sources feed the same canonical tag as their sibling display
