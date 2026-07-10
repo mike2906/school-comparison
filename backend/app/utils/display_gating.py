@@ -43,6 +43,27 @@ _FIELD_PATH_DISPLAY_FIELDS: dict[str, tuple[str, ...]] = {
     "attributes.extracted.accreditations": ("special_programs",),
     "attributes.extracted.extracurricular": ("activities_offered",),
     "attributes.extracted.class_size": ("class_size",),
+    "attributes.extracted.admission.deadlines": ("application_deadlines",),
+    "attributes.extracted.admission.entrance_requirements": ("entry_requirements",),
+    "attributes.extracted.admission.available_spots": ("available_spots",),
+    "attributes.extracted.operations.working_hours": ("school_hours",),
+    "attributes.extracted.operations.daily_schedule": ("daily_schedule",),
+    # Keep these parent mappings after the child paths above: a discrepancy on one
+    # child should block only that child, while a whole-section discrepancy blocks
+    # every public field fed by the section.
+    "attributes.extracted.admission": (
+        "application_deadlines",
+        "entry_requirements",
+        "available_spots",
+    ),
+    "attributes.extracted.operations": ("school_hours", "daily_schedule"),
+}
+
+# Whole-section paths above deliberately block every public child, but an unrelated
+# nested discrepancy (e.g. ``operations.transport``) must not inherit that broad block.
+_EXACT_ONLY_FIELD_PATHS = {
+    "attributes.extracted.admission",
+    "attributes.extracted.operations",
 }
 
 # Validator pricing paths are `pricing[{row.id}]` / `pricing[{row.id}].{field}`.
@@ -85,7 +106,9 @@ def _display_fields_for_path(field_path: str) -> tuple[str, ...]:
     if not path:
         return ()
     for prefix, fields in _FIELD_PATH_DISPLAY_FIELDS.items():
-        if path == prefix or path.startswith(f"{prefix}."):
+        if path == prefix:
+            return fields
+        if prefix not in _EXACT_ONLY_FIELD_PATHS and path.startswith(f"{prefix}."):
             return fields
     return ()
 

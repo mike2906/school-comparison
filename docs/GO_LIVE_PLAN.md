@@ -368,7 +368,7 @@ Order matters within this phase; tasks touch overlapping files — run sequentia
       discarded downstream, so the 17 `P1.10` class_size `known_issues` were removed.
       Tests: `test_school_attributes.py` (locale backfill + no-override guard; class_size
       floor/ceiling), full suite green (656).
-- [ ] **P1.11 Dead attribute reads in the UI.** The frontend reads 23 `attributes.*`
+- [x] **P1.11 Dead attribute reads in the UI.** The frontend reads 23 `attributes.*`
       keys; 11 of them are written by *nothing* — not the scrapers, not `seed_data.py`:
       `accessible`, `admission_requirement`, `admission_status`, `after_school_care`,
       `application_deadline`, `enrollment_status`, `entry_requirements`,
@@ -380,6 +380,42 @@ Order matters within this phase; tasks touch overlapping files — run sequentia
       wire it through the allowlist, or delete the read. Guard: the
       `TestAllowlistCoversWrittenFields` invariant in `tests/test_school_attributes.py`
       only covers what `seed_data.py` writes; extend it once these are resolved.
+      **Done.** The publish projection now surfaces the scraper-backed values parents
+      can actually use: `admission.{entrance_requirements,deadlines,available_spots}`
+      become localized `entry_requirements` / `application_deadlines` /
+      `available_spots`; `operations.daily_schedule` becomes `daily_schedule`; and
+      `operations.working_hours` fills the existing `school_hours` field (an explicit
+      seeded `school_hours` still wins). All five paths are coupled to the P1.7 display
+      gate, and `operations` joined the capable-model spot-check core scope so an
+      unsupported schedule/hours value can be withheld. Compare/card/detail views now
+      consume those projected fields. Reads with no producer were deleted:
+      attribute-level admission/enrollment status aliases, `accessible`,
+      `after_school_care`, `transportation_available`, `operating_hours`,
+      `schedule_hours`, singular deadline/spots aliases, and `admission_requirement`.
+      Status continues to use `admission_info.status`; after-school care uses location
+      `has_organised_groups` / the canonical `extended_day` tag; transport uses the
+      canonical `transportation` tag; accessibility can still render from a real
+      facilities value. The allowlist invariant now pins the four new localized
+      scraper fields, with projection/gating tests for all five paths and a frontend
+      regression proving the retired boolean aliases no longer affect amenity flags.
+      Follow-up review fixed the newly reachable Bulgarian admission snippets too:
+      one shared classifier recognizes BG/EN interview/test/no-exam phrases, evaluates
+      negative phrases first (`без изпит` is not “test required”), and preserves unknown
+      extracted text as a visible fallback instead of silently dropping it.
+      Self-review also found pre-existing false `working_hours` captures in the golden
+      corpus (headings, reversed ranges, and 1–2 hour contact windows); the projection
+      now publishes only explicit forward daytime ranges lasting 4–14 hours and strips
+      surrounding heading noise, healing existing rows without a re-scrape. Extract-time
+      deterministic validation now evidence-filters `working_hours` and `daily_schedule`
+      against cached source pages as well, so new runs cannot open an unvalidated window
+      before the capable-model Stage 6 audit.
+      Codex review follow-up: whole-section `admission` / `operations` discrepancies now
+      block every projected child (child-level discrepancies remain narrow), and mixed
+      requirement lists no longer let “no exam” hide a separately required interview or
+      test; multiple distinct requirements fall back to the full extracted text.
+      Re-review tightened the section gate so broad parent blocks apply only to the exact
+      parent path (an unrelated `operations.transport` issue cannot hide schedules), and
+      added common Bulgarian negative forms such as `няма/без приемен изпит`.
 
 ## Phase 2 — User-facing correctness bugs
 

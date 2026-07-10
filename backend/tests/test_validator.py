@@ -67,6 +67,11 @@ async def test_validate_school_data_applies_safe_fixes_and_persists_report(db_se
                     "has_useful_info": True,
                 },
                 "admission": {"has_useful_info": True, "deadlines": ["April"]},
+                "operations": {
+                    "working_hours": "08:00-17:00",
+                    "daily_schedule": ["Morning lessons", "Invented midnight classes"],
+                    "has_useful_info": True,
+                },
             }
         },
         admission_info={"website_extracted": {"old": True}},
@@ -112,7 +117,10 @@ async def test_validate_school_data_applies_safe_fixes_and_persists_report(db_se
             page_category="about",
             scrape_type=ScrapeType.WEBSITE,
             is_valid=True,
-            raw_markdown="The school uses project-based learning and works in partnership with parents.",
+            raw_markdown=(
+                "The school uses project-based learning and works in partnership with parents. "
+                "Working hours: 08:00-17:00. Morning lessons begin after arrival."
+            ),
             content_hash="hash-validator-summary-source",
             last_scraped_at=datetime.datetime.now(datetime.timezone.utc),
         )
@@ -145,6 +153,8 @@ async def test_validate_school_data_applies_safe_fixes_and_persists_report(db_se
     assert extracted.get("summary_source", {}).get("community_signals") == ["parent partnership"]
     assert extracted.get("summary_source", {}).get("canonical_tags") == ["Project-based learning"]
     assert extracted.get("admission", {}).get("deadlines") == []
+    assert extracted.get("operations", {}).get("working_hours") == "08:00-17:00"
+    assert extracted.get("operations", {}).get("daily_schedule") == ["Morning lessons"]
     assert school.admission_info.get("website_extracted") is None
 
     data_validation = (school.attributes or {}).get("data_validation", {})

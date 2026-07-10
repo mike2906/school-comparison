@@ -58,8 +58,16 @@ INTERNAL_ATTRIBUTES = {
         "extracurricular": ["Шахмат"],
         "class_size": "до 16 ученици в клас",
         "founded_year": 1998,
-        "admission": {"deadlines": ["30 юни"]},
-        "operations": {"meals": ["Обяд"]},
+        "admission": {
+            "deadlines": ["30 юни"],
+            "entrance_requirements": ["Входящ тест"],
+            "available_spots": ["12 свободни места"],
+        },
+        "operations": {
+            "working_hours": "8:00-18:00",
+            "daily_schedule": ["Учебни занятия до 15:00"],
+            "meals": ["Обяд"],
+        },
         "services": {"support_services": ["Психолог"]},
         "pricing_terms": {"discounts": ["10% за второ дете"]},
         "summary_source": {"highlights": ["Silver medal"]},
@@ -150,6 +158,111 @@ class TestLocalizedProjection:
         localized = build_localized_attributes(INTERNAL_ATTRIBUTES, "bg")
         assert localized["facilities"] == ["Библиотека"]
         assert localized["activities_offered"] == ["Шахмат"]
+
+    def test_projects_scraped_admission_and_schedule_fields(self):
+        localized = build_localized_attributes(INTERNAL_ATTRIBUTES, "bg")
+        assert localized["entry_requirements"] == ["Входящ тест"]
+        assert localized["application_deadlines"] == ["30 юни"]
+        assert localized["available_spots"] == ["12 свободни места"]
+        assert localized["daily_schedule"] == ["Учебни занятия до 15:00"]
+
+    def test_validation_blocks_scraped_admission_and_schedule_fields(self):
+        attributes = {
+            **INTERNAL_ATTRIBUTES,
+            "data_validation": {
+                "status": "needs_review",
+                "spot_check": {
+                    "discrepancies": [
+                        {
+                            "field_path": "attributes.extracted.admission.deadlines",
+                            "kind": "unsupported",
+                        },
+                        {
+                            "field_path": "attributes.extracted.operations.daily_schedule",
+                            "kind": "contradiction",
+                        },
+                    ]
+                },
+            },
+        }
+        localized = build_localized_attributes(attributes, "bg")
+        assert localized["application_deadlines"] == []
+        assert localized["daily_schedule"] == []
+        assert localized["entry_requirements"] == ["Входящ тест"]
+
+    @pytest.mark.parametrize(
+        "field_path,blocked_fields",
+        [
+            (
+                "attributes.extracted.admission",
+                {"entry_requirements", "application_deadlines", "available_spots"},
+            ),
+            (
+                "attributes.extracted.operations",
+                {"daily_schedule"},
+            ),
+        ],
+    )
+    def test_parent_section_discrepancy_blocks_all_projected_children(
+        self, field_path, blocked_fields
+    ):
+        attributes = {
+            **INTERNAL_ATTRIBUTES,
+            "data_validation": {
+                "status": "needs_review",
+                "spot_check": {
+                    "discrepancies": [
+                        {"field_path": field_path, "kind": "unsupported"}
+                    ]
+                },
+            },
+        }
+        localized = build_localized_attributes(attributes, "bg")
+        for field in blocked_fields:
+            assert localized[field] == []
+
+        base = build_base_attributes(attributes)
+        if field_path.endswith("operations"):
+            assert base["school_hours"] is None
+
+    @pytest.mark.parametrize(
+        "field_path",
+        [
+            "attributes.extracted.operations.transport",
+            "attributes.extracted.operations.meals",
+            "attributes.extracted.admission.required_documents",
+            "attributes.extracted.admission.application_steps",
+        ],
+    )
+    def test_unmapped_section_child_does_not_block_unrelated_display_fields(
+        self, field_path
+    ):
+        attributes = {
+            **INTERNAL_ATTRIBUTES,
+            "data_validation": {
+                "status": "needs_review",
+                "spot_check": {
+                    "discrepancies": [
+                        {"field_path": field_path, "kind": "unsupported"}
+                    ]
+                },
+            },
+        }
+        localized = build_localized_attributes(attributes, "bg")
+        assert localized["entry_requirements"] == ["Входящ тест"]
+        assert localized["application_deadlines"] == ["30 юни"]
+        assert localized["available_spots"] == ["12 свободни места"]
+        assert localized["daily_schedule"] == ["Учебни занятия до 15:00"]
+        assert build_base_attributes(attributes)["school_hours"] == "8:00-18:00"
+
+    def test_scraper_display_fields_are_declared_in_the_allowlist(self):
+        projected_scraper_fields = {
+            "entry_requirements",
+            "application_deadlines",
+            "available_spots",
+            "daily_schedule",
+        }
+        assert projected_scraper_fields <= set(SchoolLocalizedAttributes.model_fields)
 
     def test_language_focus_is_structured(self):
         localized = build_localized_attributes(INTERNAL_ATTRIBUTES, "en")
@@ -243,6 +356,52 @@ class TestSeededDisplayFields:
         assert base["teacher_student_ratio"] == "1:12"
         assert base["school_hours"] == "8:00-17:00"
         assert base["established_year"] == 1975
+
+    def test_scraped_working_hours_fill_school_hours(self):
+        base = build_base_attributes(INTERNAL_ATTRIBUTES)
+        assert base["school_hours"] == "8:00-18:00"
+
+    @pytest.mark.parametrize(
+        "value",
+        [
+            "### What are the working hours?",
+            "18:00-7:00",
+            "7.30 – 8.30",
+            "10:00 - 12:00",
+        ],
+    )
+    def test_implausible_scraped_working_hours_are_dropped(self, value):
+        base = build_base_attributes({"extracted": {"operations": {"working_hours": value}}})
+        assert base["school_hours"] is None
+
+    def test_markdown_noise_is_removed_from_scraped_working_hours(self):
+        base = build_base_attributes(
+            {"extracted": {"operations": {"working_hours": "###### РАБОТНО ВРЕМЕ: 09:00 - 17:00ч."}}}
+        )
+        assert base["school_hours"] == "09:00 - 17:00"
+
+    def test_seeded_school_hours_override_scraped_hours(self):
+        base = build_base_attributes(
+            {**INTERNAL_ATTRIBUTES, "school_hours": "7:30-17:30"}
+        )
+        assert base["school_hours"] == "7:30-17:30"
+
+    def test_validation_blocks_scraped_working_hours(self):
+        attributes = {
+            **INTERNAL_ATTRIBUTES,
+            "data_validation": {
+                "status": "needs_review",
+                "spot_check": {
+                    "discrepancies": [
+                        {
+                            "field_path": "attributes.extracted.operations.working_hours",
+                            "kind": "unsupported",
+                        }
+                    ]
+                },
+            },
+        }
+        assert build_base_attributes(attributes)["school_hours"] is None
 
     @pytest.mark.parametrize("value", ["", "  ", None])
     def test_blank_ratio_is_dropped(self, value):

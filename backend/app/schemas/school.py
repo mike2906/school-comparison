@@ -36,6 +36,10 @@ class SchoolLocalizedAttributes(BaseModel):
     facilities: list[str] = []
     special_programs: list[str] = []
     activities_offered: list[str] = []
+    entry_requirements: list[str] = []
+    application_deadlines: list[str] = []
+    available_spots: list[str] = []
+    daily_schedule: list[str] = []
 
     model_config = ConfigDict(extra="forbid")
 
