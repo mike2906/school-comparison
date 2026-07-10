@@ -39,6 +39,8 @@ def _normalize(value: object) -> str:
 #                their own inflections: "спорт"/"sport" matches "спортна"/"sports" but
 #                not "транспорт"/"transport"; "стем"/"stem" matches "STEM" but not
 #                "система"/"system"; "хран" matches "хранене" but not "охрана".
+#   "reject_contains" — reject a value containing any of these phrases before positive
+#                matching. Used sparingly for known extraction-category noise.
 _Rule = Mapping[str, tuple[str, ...]]
 
 FACILITY_VOCAB: dict[str, _Rule] = {
@@ -118,6 +120,10 @@ PROGRAM_VOCAB: dict[str, _Rule] = {
         ),
         # "хран" matches "храна"/"хранене" but not "охрана" (security) / "съхранение".
         "prefix": ("хран",),
+        # Real extraction can put curriculum/news items in operations.meals. Golden
+        # case 154 contains "food projects" and "Food Revolution Day" alongside a
+        # genuine caterer offer; reject the project lines but retain the service lines.
+        "reject_contains": ("project", "food revolution day"),
         "equals": ("стол",),
     },
 }
@@ -145,6 +151,8 @@ APPROACH_VOCAB: dict[str, _Rule] = {
 
 
 def _matches(normalized: str, rule: _Rule) -> bool:
+    if any(needle in normalized for needle in rule.get("reject_contains", ())):
+        return False
     if normalized in rule.get("equals", ()):
         return True
     if any(needle in normalized for needle in rule.get("contains", ())):

@@ -5,6 +5,7 @@ import {
   getExamTypeLabel as getSharedExamTypeLabel,
   getLatestScoreForExamType as getSharedLatestScoreForExamType,
 } from '../../utils/nvo'
+import { getCanonicalAmenityFlags } from '../../utils/schoolAttributes'
 
 /**
  * SchoolDetailPage Helper Functions
@@ -210,19 +211,19 @@ export function formatCurrency(amount, locale) {
  */
 export function getAmenityFlags(attributes, hasAfterSchool) {
   const facilities = attributes?.facilities || []
-  const specialPrograms = attributes?.special_programs || []
+  const canonical = getCanonicalAmenityFlags(attributes, hasAfterSchool)
 
   return {
-    meals: Boolean(attributes?.has_canteen || facilities.includes('cafeteria') || specialPrograms.includes('meals_provided')),
-    transport: Boolean(facilities.includes('transportation') || attributes?.transportation_available),
-    extended: Boolean(hasAfterSchool || specialPrograms.includes('extended_day') || attributes?.after_school_care),
+    meals: canonical.meals,
+    transport: canonical.transport,
+    extended: canonical.extended,
     smallClasses: Boolean(attributes?.class_size && Number(attributes.class_size) < 16),
     accessible: Boolean(attributes?.accessible || facilities.includes('accessible')),
-    library: Boolean(facilities.includes('library')),
-    computerLab: Boolean(facilities.includes('computer_lab') || facilities.includes('technology_lab')),
+    library: canonical.library,
+    computerLab: Boolean(canonical.computerLab || facilities.includes('technology_lab')),
     musicRoom: Boolean(facilities.includes('music_room')),
     scienceLab: Boolean(facilities.includes('science_lab')),
-    sportsField: Boolean(facilities.includes('sports_field') || facilities.includes('gym')),
+    sportsField: Boolean(canonical.sportsFacilities || facilities.includes('sports_field') || facilities.includes('gym')),
   }
 }
 

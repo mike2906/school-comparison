@@ -331,6 +331,17 @@ Order matters within this phase; tasks touch overlapping files — run sequentia
         `ib_program` 18→19 / `montessori` 12→13). (2) English-only meal text (`Food`,
         `breakfast`, `snack`) missed `meals_provided` — added those words. Verified against
         the cited golden cases (560 → `ib_program`, 154 `Food…` → `meals_provided`).
+      - *Post-merge follow-up:* amenity flags in SchoolCard, SchoolDetailPage, and
+        ComparePage now read the same `attributes.filter_tags` as the advanced filters;
+        the localized free-text lists remain display-only. This fixes meals, transport,
+        extended-day, library, computer-lab, and sports-facility indicators for scraped
+        schools and removes inconsistent compare display/sort values. English `food`
+        recall was also tightened using golden case 154: curriculum/news phrases such as
+        `food projects` and `Food Revolution Day` no longer imply meal service, while the
+        case's real caterer offer still maps to `meals_provided`. Future vocabulary
+        precision/recall changes must add a regression backed by a committed golden case
+        when one demonstrates the behavior; synthetic unit cases remain useful for
+        boundary mechanics only.
 - [ ] **P1.10 BG users see no attributes for English-primary schools.** When a school's
       site is English, `attributes.extracted.<lists>` come back empty and all content
       lands under `extracted_i18n.en`, so the `bg` projection is empty (e.g. school 510:
