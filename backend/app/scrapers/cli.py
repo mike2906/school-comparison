@@ -49,11 +49,12 @@ Usage:
 import asyncio
 import builtins
 from collections import defaultdict
-from math import ceil
+from math import ceil, isfinite
 import sys
 import logging
 import random
 import re
+from pathlib import Path
 from urllib.parse import unquote, urlparse
 from typing import Optional
 import click
@@ -87,6 +88,44 @@ def _stage_summary(processed: int = 0, succeeded: int = 0, failed: int = 0, skip
     return {"processed": processed, "succeeded": succeeded, "failed": failed, "skipped": skipped}
 
 
+def _add_llm_usage(total: dict, result: dict) -> None:
+    """Add one school's bounded usage counters to a batch accumulator."""
+    for key in ("input_tokens", "output_tokens"):
+        try:
+            value = int(result.get(key, 0) or 0)
+        except (TypeError, ValueError, OverflowError):
+            value = 0
+        total[key] += max(0, value)
+    try:
+        cost = float(result.get("token_cost_usd", 0.0) or 0.0)
+    except (TypeError, ValueError, OverflowError):
+        cost = 0.0
+    if isfinite(cost) and cost >= 0:
+        total["token_cost_usd"] += cost
+
+
+def _stage_summary_with_usage(*, usage: dict, **counts: int) -> dict:
+    """Enrich a count summary without changing existing count keys/contracts."""
+    return {
+        **_stage_summary(**counts),
+        "input_tokens": int(usage["input_tokens"]),
+        "output_tokens": int(usage["output_tokens"]),
+        "token_cost_usd": round(float(usage["token_cost_usd"]), 6),
+    }
+
+
+def _pipeline_run_cost_usd(run) -> float:
+    """Read persisted run cost, including the legacy dedicated column fallback."""
+    metrics = run.metrics if isinstance(run.metrics, dict) else {}
+    usage = metrics.get("llm_usage") if isinstance(metrics.get("llm_usage"), dict) else {}
+    raw_cost = usage.get("token_cost_usd", run.total_llm_cost_usd)
+    try:
+        cost = float(raw_cost or 0.0)
+    except (TypeError, ValueError, OverflowError):
+        return 0.0
+    return cost if isfinite(cost) and cost >= 0 else 0.0
+
+
 def _navigate_summary(results) -> dict:
     """Convert `_run_navigate_batch`'s per-school results list into a stage summary.
 
@@ -96,6 +135,32 @@ def _navigate_summary(results) -> dict:
     rows = builtins.list(results or [])
     succeeded = sum(1 for row in rows if row and row.get("success"))
     return _stage_summary(processed=len(rows), succeeded=succeeded, failed=len(rows) - succeeded)
+
+
+def _read_cohort_file(path: Path) -> list[int]:
+    """Read positive school IDs from a newline/comma file with ``#`` comments."""
+    tokens: list[str] = []
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.partition("#")[0]
+        tokens.extend(line.replace(",", " ").split())
+    if not tokens:
+        raise click.UsageError(f"Cohort file is empty: {path}")
+
+    school_ids: list[int] = []
+    seen: set[int] = set()
+    for token in tokens:
+        try:
+            school_id = int(token)
+        except ValueError as exc:
+            raise click.UsageError(f"Invalid school ID {token!r} in cohort file {path}") from exc
+        if school_id <= 0:
+            raise click.UsageError(f"School IDs must be positive; got {school_id} in {path}")
+        if school_id in seen:
+            raise click.UsageError(f"Duplicate school ID {school_id} in cohort file {path}")
+        seen.add(school_id)
+        school_ids.append(school_id)
+    return sorted(school_ids)
+
 
 _BRAND_ALIAS_GENERIC_EXACT = {
     "school",
@@ -376,6 +441,11 @@ def repair_out_of_bounds_geocodes(school, school_id, city, country, limit, dry_r
 @click.option("--include-navigated", is_flag=True, help="For navigate stage, recrawl already navigated schools")
 @click.option("--include-extracted", is_flag=True, help="For extract stage, re-extract already extracted schools")
 @click.option(
+    "--cohort-file",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    help="For batch all stage, process the exact school IDs listed in this file",
+)
+@click.option(
     "--force-validate",
     is_flag=True,
     help="For validate-data stage, include schools that already have a current validation report",
@@ -395,11 +465,21 @@ def run(
     sample_ratio,
     include_navigated,
     include_extracted,
+    cohort_file,
     force_validate,
     sync,
     dry_run,
 ):
     """Run a pipeline stage."""
+    if cohort_file is not None:
+        if stage.lower() != "all" or school or school_id:
+            raise click.UsageError("--cohort-file is only valid for batch --stage all")
+        if limit is not None:
+            raise click.UsageError("--cohort-file cannot be combined with --limit")
+        cohort_ids = _read_cohort_file(cohort_file)
+    else:
+        cohort_ids = None
+
     if dry_run:
         console.print(f"[yellow]DRY RUN - would execute:[/yellow]")
         console.print(f"  Stage: {stage}")
@@ -413,6 +493,7 @@ def run(
         console.print(f"  Sample ratio: {sample_ratio}")
         console.print(f"  Include navigated: {include_navigated}")
         console.print(f"  Include extracted: {include_extracted}")
+        console.print(f"  Cohort IDs: {cohort_ids or 'automatic'}")
         console.print(f"  Force validate: {force_validate}")
         console.print(f"  Mode: {'sync' if sync else 'celery'}")
         return
@@ -434,6 +515,7 @@ def run(
                 include_navigated,
                 include_extracted,
                 force_validate,
+                cohort_ids,
             )
         )
     else:
@@ -456,6 +538,7 @@ async def _run_sync(
     include_navigated: bool,
     include_extracted: bool,
     force_validate: bool,
+    cohort_ids: Optional[list[int]] = None,
 ):
     """Run pipeline stage synchronously."""
     from app.database import async_session_maker
@@ -534,6 +617,7 @@ async def _run_sync(
                         "include_navigated": include_navigated,
                         "include_extracted": include_extracted,
                         "force_validate": force_validate,
+                        "explicit_cohort": cohort_ids is not None,
                     },
                 )
 
@@ -576,19 +660,18 @@ async def _run_sync(
                         school_ids=None,
                     )
                 elif stage == "all":
-                    stage_summaries.append(await _run_validate_urls_batch(db, country, city, limit))
-                    stage_summaries.append(
-                        _navigate_summary(
-                            await _run_navigate_batch(db, country, city, limit, include_navigated=include_navigated)
-                        )
+                    await _run_all_stages_batch(
+                        db,
+                        country=country,
+                        city=city,
+                        limit=limit,
+                        include_navigated=include_navigated,
+                        include_extracted=include_extracted,
+                        force_validate=force_validate,
+                        requested_school_ids=cohort_ids,
+                        pipeline_run=run,
+                        stage_summaries=stage_summaries,
                     )
-                    stage_summaries.append(
-                        await _run_extract_batch(db, country, city, limit, include_extracted=include_extracted)
-                    )
-                    stage_summaries.append(
-                        await _run_validate_data_batch(db, country, city, limit, force_validate=force_validate)
-                    )
-                    stage_summaries.append(await _run_summarize_batch(db, country, city, limit))
                 else:
                     console.print(f"[yellow]Batch mode for '{stage}' not yet implemented[/yellow]")
             except Exception as exc:
@@ -2395,19 +2478,19 @@ async def _run_validate_urls_batch(
     from sqlalchemy import select
     from app.scrapers.url_validator import extract_validation_aliases, validate_school_url
 
-    statuses = statuses or ["pending", "failed_validate"]
-
     query = select(School.id, School.website_url, School.name_i18n, School.attributes).where(
         School.country_code == country,
-        School.scrape_status.in_(statuses),
         School.website_url.isnot(None),
     )
 
+    if school_ids is None:
+        statuses = statuses or ["pending", "failed_validate"]
+        query = query.where(School.scrape_status.in_(statuses))
+    else:
+        query = query.where(School.id.in_(school_ids))
+
     if city:
         query = query.where(School.city == city)
-
-    if school_ids:
-        query = query.where(School.id.in_(school_ids))
 
     if limit:
         query = query.limit(limit)
@@ -2417,7 +2500,7 @@ async def _run_validate_urls_batch(
 
     if not schools:
         console.print("[yellow]No schools to validate[/yellow]")
-        return _stage_summary()
+        return {**_stage_summary(), "validated_school_ids": []}
 
     settings = get_settings()
     requested_concurrency = max(1, int(settings.url_validation_concurrency))
@@ -2450,7 +2533,7 @@ async def _run_validate_urls_batch(
             website_url: str,
             school_name: Optional[str],
             school_aliases: list[str],
-        ) -> str:
+        ) -> tuple[int, str]:
             async with semaphore:
                 try:
                     result, _, _ = await validate_school_url(
@@ -2461,10 +2544,10 @@ async def _run_validate_urls_batch(
                         school_name=school_name,
                         school_aliases=school_aliases,
                     )
-                    return result.value
+                    return school_id, result.value
                 except Exception as exc:
                     logger.error(f"Error validating school {school_id}: {exc}")
-                    return "error"
+                    return school_id, "error"
 
         tasks = [
             asyncio.create_task(
@@ -2479,10 +2562,12 @@ async def _run_validate_urls_batch(
             if website_url
         ]
 
+        validated_school_ids: list[int] = []
         for completed in asyncio.as_completed(tasks):
-            outcome = await completed
+            school_id, outcome = await completed
             if outcome == "valid":
                 valid_count += 1
+                validated_school_ids.append(school_id)
             elif outcome == "invalid":
                 invalid_count += 1
             elif outcome == "ambiguous":
@@ -2497,12 +2582,15 @@ async def _run_validate_urls_batch(
     console.print(f"  Ambiguous: {ambiguous_count}")
     console.print(f"  Errors: {error_count}")
 
-    return _stage_summary(
-        processed=len(schools),
-        succeeded=valid_count,
-        failed=invalid_count + error_count,
-        skipped=ambiguous_count,
-    )
+    return {
+        **_stage_summary(
+            processed=len(schools),
+            succeeded=valid_count,
+            failed=invalid_count + error_count,
+            skipped=ambiguous_count,
+        ),
+        "validated_school_ids": sorted(validated_school_ids),
+    }
 
 
 async def _run_recover_failed_school(db, school_id: int, country: str) -> dict:
@@ -2774,8 +2862,9 @@ async def _run_navigate_batch(
         School.website_url.isnot(None),
     )
 
+    explicit_selection = school_ids is not None
     explicit_school_ids = builtins.list(school_ids or [])
-    if explicit_school_ids:
+    if explicit_selection:
         query = query.where(School.id.in_(explicit_school_ids))
     else:
         statuses = ["validated", "navigated"] if include_navigated else ["validated"]
@@ -2795,7 +2884,7 @@ async def _run_navigate_batch(
         console.print("[yellow]No schools to navigate[/yellow]")
         return
 
-    if explicit_school_ids:
+    if explicit_selection:
         status_label = "explicit repair selection"
     else:
         status_label = "validated+navigated" if include_navigated else "validated"
@@ -2965,6 +3054,164 @@ async def _run_all_stages(db, school_id: int, country: str):
             console.print(f"[yellow]{stage} not yet implemented[/yellow]")
 
 
+async def _select_all_stage_cohort(
+    db,
+    *,
+    country: str,
+    city: Optional[str],
+    limit: Optional[int],
+    include_navigated: bool,
+    include_extracted: bool,
+    force_validate: bool,
+    requested_school_ids: Optional[list[int]] = None,
+) -> list[int]:
+    """Select one deterministic cohort for every stage in a batch ``all`` run."""
+    from app.models import School
+    from sqlalchemy import select
+
+    query = (
+        select(School.id)
+        .where(
+            School.country_code == country,
+            School.website_url.isnot(None),
+        )
+        .order_by(School.id)
+    )
+    if city:
+        query = query.where(School.city == city)
+    if requested_school_ids is not None:
+        query = query.where(School.id.in_(requested_school_ids))
+    else:
+        statuses = {
+            "pending",
+            "failed_validate",
+            "validated",
+            "navigated",
+            "extraction_failed",
+        }
+        if include_navigated or include_extracted or force_validate:
+            statuses.update({"extracted", "summarized"})
+        query = query.where(School.scrape_status.in_(sorted(statuses)))
+        if limit is not None:
+            query = query.limit(limit)
+
+    selected = [row[0] for row in (await db.execute(query)).all()]
+    if requested_school_ids is not None:
+        missing = sorted(set(requested_school_ids) - set(selected))
+        if missing:
+            raise click.UsageError(
+                "Cohort IDs are outside the requested country/city scope or have no website URL: "
+                + ", ".join(str(school_id) for school_id in missing)
+            )
+    return selected
+
+
+async def _run_all_stages_batch(
+    db,
+    *,
+    country: str,
+    city: Optional[str],
+    limit: Optional[int],
+    include_navigated: bool,
+    include_extracted: bool,
+    force_validate: bool,
+    requested_school_ids: Optional[list[int]] = None,
+    pipeline_run=None,
+    stage_summaries: Optional[list[dict]] = None,
+) -> list[dict]:
+    """Run the batch website pipeline over one fixed school-ID cohort.
+
+    The original cohort is recorded for reproducibility. Each subsequent stage is
+    narrowed to schools that produced usable fresh output in the preceding stage.
+    Summaries are appended as stages finish so a later exception cannot erase usage
+    and outcome accounting from already-completed stages.
+    """
+    school_ids = await _select_all_stage_cohort(
+        db,
+        country=country,
+        city=city,
+        limit=limit,
+        include_navigated=include_navigated,
+        include_extracted=include_extracted,
+        force_validate=force_validate,
+        requested_school_ids=requested_school_ids,
+    )
+    if not school_ids:
+        console.print("[yellow]No schools matched the batch all-stage cohort[/yellow]")
+        return []
+
+    if pipeline_run is not None:
+        config = dict(pipeline_run.config or {})
+        config["cohort_school_ids"] = school_ids
+        pipeline_run.config = config
+        db.add(pipeline_run)
+        await db.commit()
+
+    console.print(
+        f"[cyan]Selected fixed all-stage cohort: {len(school_ids)} schools "
+        f"(IDs {school_ids[0]}–{school_ids[-1]})[/cyan]"
+    )
+    completed = stage_summaries if stage_summaries is not None else []
+
+    url_summary = await _run_validate_urls_batch(
+        db,
+        country,
+        city,
+        None,
+        school_ids=school_ids,
+    )
+    completed.append(url_summary)
+    validated_url_ids = builtins.list(url_summary.get("validated_school_ids") or [])
+
+    navigation_results = await _run_navigate_batch(
+        db,
+        country,
+        city or "",
+        None,
+        include_navigated=include_navigated,
+        school_ids=validated_url_ids,
+    )
+    completed.append(_navigate_summary(navigation_results))
+    navigated_ids = sorted(
+        int(result["school_id"])
+        for result in (navigation_results or [])
+        if result and result.get("success") and result.get("school_id") in school_ids
+    )
+
+    extract_summary = await _run_extract_batch(
+        db,
+        country,
+        city or "",
+        None,
+        include_extracted=include_extracted,
+        school_ids=navigated_ids,
+    )
+    completed.append(extract_summary)
+    extracted_ids = builtins.list(extract_summary.get("ready_school_ids") or [])
+
+    validation_summary = await _run_validate_data_batch(
+        db,
+        country,
+        city,
+        None,
+        force_validate=force_validate,
+        school_ids=extracted_ids,
+    )
+    completed.append(validation_summary)
+    validated_ids = builtins.list(validation_summary.get("validated_school_ids") or [])
+
+    completed.append(
+        await _run_summarize_batch(
+            db,
+            country,
+            city,
+            None,
+            school_ids=validated_ids,
+        )
+    )
+    return completed
+
+
 @cli.command()
 @click.option("--school", help="School name (fuzzy match)")
 @click.option("--school-id", type=int, help="School ID")
@@ -3114,12 +3361,36 @@ async def _show_data_quality(city, country, runs):
         table.add_column("Detail")
 
         v = metrics["validation_ok"]
-        table.add_row("Validation OK", _pct(v["pct"]), f"{v['ok']}/{v['total']} with a report")
+        table.add_row("Validation OK", _pct(v["pct"]), f"{v['ok']}/{v['total']} schools")
+        table.add_row(
+            "Validation-report coverage",
+            _pct(v["coverage_pct"]),
+            f"{v['with_report']}/{v['total']} schools",
+        )
         table.add_row("Duplicate coordinate groups", str(metrics["duplicate_coordinate_groups"]), "points shared by ≥2 schools")
         p = metrics["location_precision_exact"]
-        table.add_row("Location precision=exact", _pct(p["pct"]), f"{p['exact']}/{p['with_precision']} with precision")
+        table.add_row(
+            "Location precision=exact",
+            _pct(p["pct"]),
+            f"{p['exact']}/{p['geocoded']} geocoded",
+        )
+        table.add_row(
+            "Precision-metadata coverage",
+            _pct(p["coverage_pct"]),
+            f"{p['with_precision']}/{p['geocoded']} geocoded",
+        )
         d = metrics["display_name_overrides"]
-        table.add_row("Display-name overrides", _pct(d["pct"]), f"{d['overrides']}/{d['candidates']} candidates")
+        table.add_row(
+            "Display-name overrides",
+            _pct(d["pct"]),
+            f"{d['overrides']}/{d['total']} schools",
+        )
+        table.add_row(
+            "Display-name candidates",
+            _pct(d["candidate_coverage_pct"]),
+            f"{d['candidates']}/{d['total']} schools; "
+            f"{_pct(d['conversion_pct'])} corroborated",
+        )
         s = metrics["spot_check_discrepancy_rate"]
         rate = "n/a" if s["rate"] is None else f"{s['rate']:.1%}"
         table.add_row("Spot-check discrepancy rate", rate, f"{s['discrepancies']}/{s['schools_checked']} checked")
@@ -3148,7 +3419,8 @@ async def _show_data_quality(city, country, runs):
                 console.print(
                     f"  {started}  {run.config.get('cli_stage', run.stage.value) if run.config else run.stage.value:<14} "
                     f"{run.status.value:<10} "
-                    f"processed={run.schools_processed} ok={run.schools_succeeded} failed={run.schools_failed}"
+                    f"processed={run.schools_processed} ok={run.schools_succeeded} failed={run.schools_failed} "
+                    f"cost=${_pipeline_run_cost_usd(run):.6f}"
                 )
 
 
@@ -3277,6 +3549,7 @@ async def _run_validate_data_batch(
     city: Optional[str],
     limit: Optional[int],
     force_validate: bool = False,
+    school_ids: Optional[list[int]] = None,
 ):
     """Run Stage 6 validation in batch mode, then sampled monitoring spot-checks."""
     from app.config import get_settings as _get_settings
@@ -3290,18 +3563,19 @@ async def _run_validate_data_batch(
     from sqlalchemy import select
 
     settings = _get_settings()
-    query = select(School.id, School.attributes).where(
-        School.country_code == country,
-        School.scrape_status.in_(["extracted", "summarized"]),
-    )
+    query = select(School.id, School.attributes).where(School.country_code == country)
+    if school_ids is None:
+        query = query.where(School.scrape_status.in_(["extracted", "summarized"]))
+    else:
+        query = query.where(School.id.in_(school_ids))
     if city:
         query = query.where(School.city == city)
-    if limit:
+    if limit is not None:
         query = query.limit(limit)
 
     result = await db.execute(query)
     school_rows = result.all()
-    if force_validate:
+    if force_validate or school_ids is not None:
         school_ids = [row[0] for row in school_rows]
     else:
         school_ids = [
@@ -3373,7 +3647,14 @@ async def _run_validate_data_batch(
     console.print(f"  Needs review: {review_count}")
     console.print(f"  Failed: {failed_count}")
 
-    validation_summary = _stage_summary(processed=len(school_ids), succeeded=ok_count + review_count, failed=failed_count)
+    validation_summary = {
+        **_stage_summary(
+            processed=len(school_ids),
+            succeeded=ok_count + review_count,
+            failed=failed_count,
+        ),
+        "validated_school_ids": sorted(validated_ids),
+    }
 
     sample_size = int(getattr(settings, "spot_check_sample_size", 0))
     sample_ids = sorted(validated_ids)
@@ -3512,13 +3793,14 @@ async def _run_extract_batch(
     from app.models import School
     from sqlalchemy import select
 
+    explicit_selection = school_ids is not None
     explicit_school_ids = builtins.list(school_ids or [])
     query = select(School).where(
         School.country_code == country,
         School.website_url.isnot(None),
     )
 
-    if explicit_school_ids:
+    if explicit_selection:
         query = query.where(School.id.in_(explicit_school_ids))
     else:
         statuses = ["navigated", "extraction_failed"]
@@ -3540,7 +3822,7 @@ async def _run_extract_batch(
         console.print("[yellow]No schools to extract (must be navigated or extraction_failed)[/yellow]")
         return _stage_summary()
 
-    if explicit_school_ids:
+    if explicit_selection:
         status_label = "explicit repair selection"
     else:
         status_label = "navigated/failed + extracted/summarized" if include_extracted else "navigated/failed"
@@ -3557,6 +3839,8 @@ async def _run_extract_batch(
         success_count = 0
         skipped_count = 0
         fail_count = 0
+        ready_school_ids: list[int] = []
+        usage = {"input_tokens": 0, "output_tokens": 0, "token_cost_usd": 0.0}
 
         from app.config import get_settings as _get_settings
         from app.database import async_session_maker
@@ -3581,10 +3865,13 @@ async def _run_extract_batch(
                         result = await asyncio.wait_for(coro, timeout=_ext_timeout)
                     else:
                         result = await coro
+                    _add_llm_usage(usage, result)
                     if result.get("skipped"):
                         skipped_count += 1
+                        ready_school_ids.append(school_id)
                     elif result.get("status") == "extracted":
                         success_count += 1
+                        ready_school_ids.append(school_id)
                     else:
                         fail_count += 1
                 except asyncio.TimeoutError:
@@ -3632,11 +3919,14 @@ async def _run_extract_batch(
 
             tasks = [asyncio.create_task(_extract_single(school_id)) for school_id in school_ids]
             for task_result in asyncio.as_completed(tasks):
-                _, result = await task_result
+                school_id, result = await task_result
+                _add_llm_usage(usage, result)
                 if result.get("skipped"):
                     skipped_count += 1
+                    ready_school_ids.append(school_id)
                 elif result.get("status") == "extracted":
                     success_count += 1
+                    ready_school_ids.append(school_id)
                 else:
                     fail_count += 1
                 progress.update(task, advance=1)
@@ -3645,8 +3935,19 @@ async def _run_extract_batch(
     console.print(f"  Successful: {success_count}")
     console.print(f"  Skipped: {skipped_count}")
     console.print(f"  Failed: {fail_count}")
+    console.print(f"  Tokens: in={usage['input_tokens']}, out={usage['output_tokens']}")
+    console.print(f"  Cost: ${usage['token_cost_usd']:.6f}")
 
-    return _stage_summary(processed=len(school_ids), succeeded=success_count, failed=fail_count, skipped=skipped_count)
+    return {
+        **_stage_summary_with_usage(
+            processed=len(school_ids),
+            succeeded=success_count,
+            failed=fail_count,
+            skipped=skipped_count,
+            usage=usage,
+        ),
+        "ready_school_ids": sorted(ready_school_ids),
+    }
 
 
 async def _run_summarize_school(db, school_id: int, country: str):
@@ -3675,6 +3976,7 @@ async def _run_summarize_batch(
     country: str,
     city: Optional[str],
     limit: Optional[int],
+    school_ids: Optional[list[int]] = None,
 ):
     """Run Stage 7 summarization in batch mode."""
     from app.config import get_settings as _get_settings
@@ -3682,10 +3984,13 @@ async def _run_summarize_batch(
     from app.scrapers.summarizer import get_schools_requiring_summary, summarize_school
 
     settings = _get_settings()
-    schools = await get_schools_requiring_summary(db=db, country_code=country, city=city, limit=limit)
-    school_ids = [school.id for school in schools]
+    if school_ids is None:
+        schools = await get_schools_requiring_summary(db=db, country_code=country, city=city, limit=limit)
+        selected_school_ids = [school.id for school in schools]
+    else:
+        selected_school_ids = builtins.list(school_ids)
 
-    if not school_ids:
+    if not selected_school_ids:
         console.print("[yellow]No schools to summarize (all eligible summaries are current or ineligible)[/yellow]")
         return _stage_summary()
 
@@ -3697,15 +4002,13 @@ async def _run_summarize_batch(
             f"[yellow]Requested concurrency {requested_concurrency} capped to {max_concurrency}[/yellow]"
         )
 
-    console.print(f"[cyan]Summarizing {len(school_ids)} schools...[/cyan]")
+    console.print(f"[cyan]Summarizing {len(selected_school_ids)} schools...[/cyan]")
     console.print(f"  Concurrency: {concurrency}")
 
     summarized_count = 0
     skipped_count = 0
     failed_count = 0
-    input_tokens = 0
-    output_tokens = 0
-    token_cost = 0.0
+    usage = {"input_tokens": 0, "output_tokens": 0, "token_cost_usd": 0.0}
     results: list[dict] = []
 
     with Progress(
@@ -3713,7 +4016,7 @@ async def _run_summarize_batch(
         TextColumn("[progress.description]{task.description}"),
         console=console,
     ) as progress:
-        task = progress.add_task("Generating summaries...", total=len(school_ids))
+        task = progress.add_task("Generating summaries...", total=len(selected_school_ids))
         semaphore = asyncio.Semaphore(concurrency)
 
         async def _summarize_single(school_id: int) -> tuple[int, dict]:
@@ -3730,16 +4033,14 @@ async def _run_summarize_batch(
                         out = {"status": "summary_failed", "reason": str(exc)}
                     return school_id, out
 
-        tasks = [asyncio.create_task(_summarize_single(school_id)) for school_id in school_ids]
+        tasks = [asyncio.create_task(_summarize_single(school_id)) for school_id in selected_school_ids]
         for completed in asyncio.as_completed(tasks):
             _, out = await completed
             results.append(out)
+            _add_llm_usage(usage, out)
             status = out.get("status")
             if status == "summarized":
                 summarized_count += 1
-                input_tokens += int(out.get("input_tokens", 0) or 0)
-                output_tokens += int(out.get("output_tokens", 0) or 0)
-                token_cost += float(out.get("token_cost_usd", 0.0) or 0.0)
             elif status == "skipped":
                 skipped_count += 1
             else:
@@ -3750,9 +4051,15 @@ async def _run_summarize_batch(
     console.print(f"  Summarized: {summarized_count}")
     console.print(f"  Skipped: {skipped_count}")
     console.print(f"  Failed: {failed_count}")
-    console.print(f"  Tokens: in={input_tokens}, out={output_tokens}")
-    console.print(f"  Cost: ${token_cost:.6f}")
-    return _stage_summary(processed=len(school_ids), succeeded=summarized_count, failed=failed_count, skipped=skipped_count)
+    console.print(f"  Tokens: in={usage['input_tokens']}, out={usage['output_tokens']}")
+    console.print(f"  Cost: ${usage['token_cost_usd']:.6f}")
+    return _stage_summary_with_usage(
+        processed=len(selected_school_ids),
+        succeeded=summarized_count,
+        failed=failed_count,
+        skipped=skipped_count,
+        usage=usage,
+    )
 
 
 if __name__ == "__main__":

@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from app.models import School
+from app.models import PipelineRun, PipelineStage, School
 from app.scrapers import cli as scraper_cli
 
 
@@ -25,6 +25,22 @@ async def test_stage_choices_use_canonical_names():
     assert "navigate-v2" not in choices
     assert "extract-v2" not in choices
     assert "all-v2" not in choices
+
+
+def test_read_cohort_file_supports_comments_commas_and_deterministic_order(tmp_path):
+    cohort_file = tmp_path / "pilot.txt"
+    cohort_file.write_text("# representative pilot\n23, 7\n15 # private school\n", encoding="utf-8")
+
+    assert scraper_cli._read_cohort_file(cohort_file) == [7, 15, 23]
+
+
+@pytest.mark.parametrize("contents", ["", "7, seven", "0", "7\n7"])
+def test_read_cohort_file_rejects_invalid_or_ambiguous_ids(tmp_path, contents):
+    cohort_file = tmp_path / "pilot.txt"
+    cohort_file.write_text(contents, encoding="utf-8")
+
+    with pytest.raises(scraper_cli.click.UsageError):
+        scraper_cli._read_cohort_file(cohort_file)
 
 
 @pytest.mark.asyncio
@@ -80,6 +96,297 @@ async def test_run_all_stages_routes_to_canonical_handlers(db_session):
     extract_mock.assert_awaited_once()
     validate_data_mock.assert_awaited_once()
     summarize_mock.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_select_all_stage_cohort_is_deterministic_and_includes_refresh_rows(db_session):
+    schools = [
+        School(
+            name_i18n={"bg": "Summarized"},
+            country_code="bg",
+            school_type="state",
+            education_level="primary",
+            city="sofia",
+            website_url="https://summarized.example",
+            scrape_status="summarized",
+        ),
+        School(
+            name_i18n={"bg": "Pending"},
+            country_code="bg",
+            school_type="state",
+            education_level="primary",
+            city="sofia",
+            website_url="https://pending.example",
+            scrape_status="pending",
+        ),
+        School(
+            name_i18n={"bg": "Extracted"},
+            country_code="bg",
+            school_type="state",
+            education_level="primary",
+            city="sofia",
+            website_url="https://extracted.example",
+            scrape_status="extracted",
+        ),
+        School(
+            name_i18n={"bg": "Other city"},
+            country_code="bg",
+            school_type="state",
+            education_level="primary",
+            city="plovdiv",
+            website_url="https://plovdiv.example",
+            scrape_status="pending",
+        ),
+    ]
+    db_session.add_all(schools)
+    await db_session.commit()
+
+    ordinary_ids = await scraper_cli._select_all_stage_cohort(
+        db_session,
+        country="bg",
+        city="sofia",
+        limit=2,
+        include_navigated=False,
+        include_extracted=False,
+        force_validate=False,
+    )
+    refresh_ids = await scraper_cli._select_all_stage_cohort(
+        db_session,
+        country="bg",
+        city="sofia",
+        limit=2,
+        include_navigated=True,
+        include_extracted=True,
+        force_validate=True,
+    )
+    explicit_ids = await scraper_cli._select_all_stage_cohort(
+        db_session,
+        country="bg",
+        city="sofia",
+        limit=None,
+        include_navigated=True,
+        include_extracted=True,
+        force_validate=True,
+        requested_school_ids=[schools[2].id, schools[0].id],
+    )
+
+    assert ordinary_ids == [schools[1].id]
+    assert refresh_ids == [schools[0].id, schools[1].id]
+    assert explicit_ids == [schools[0].id, schools[2].id]
+
+    with pytest.raises(scraper_cli.click.UsageError, match="outside the requested"):
+        await scraper_cli._select_all_stage_cohort(
+            db_session,
+            country="bg",
+            city="sofia",
+            limit=None,
+            include_navigated=True,
+            include_extracted=True,
+            force_validate=True,
+            requested_school_ids=[schools[3].id],
+        )
+
+
+@pytest.mark.asyncio
+async def test_run_all_stages_batch_propagates_one_cohort_to_every_stage(db_session):
+    cohort = [17, 23]
+    summary = {"processed": 2, "succeeded": 2, "failed": 0, "skipped": 0}
+    url_summary = {**summary, "validated_school_ids": cohort}
+    extract_summary = {**summary, "ready_school_ids": cohort}
+    validation_summary = {**summary, "validated_school_ids": cohort}
+    pipeline_run = PipelineRun(
+        id="fixed-cohort-test",
+        country_code="bg",
+        city="sofia",
+        stage=PipelineStage.FULL,
+        config={"cli_stage": "all"},
+    )
+    db_session.add(pipeline_run)
+    await db_session.commit()
+
+    with (
+        patch.object(scraper_cli, "_select_all_stage_cohort", new=AsyncMock(return_value=cohort)),
+        patch.object(scraper_cli, "_run_validate_urls_batch", new=AsyncMock(return_value=url_summary)) as urls_mock,
+        patch.object(
+            scraper_cli,
+            "_run_navigate_batch",
+            new=AsyncMock(return_value=[{"school_id": school_id, "success": True} for school_id in cohort]),
+        ) as navigate_mock,
+        patch.object(
+            scraper_cli,
+            "_run_extract_batch",
+            new=AsyncMock(return_value=extract_summary),
+        ) as extract_mock,
+        patch.object(
+            scraper_cli,
+            "_run_validate_data_batch",
+            new=AsyncMock(return_value=validation_summary),
+        ) as validate_mock,
+        patch.object(scraper_cli, "_run_summarize_batch", new=AsyncMock(return_value=summary)) as summarize_mock,
+    ):
+        results = await scraper_cli._run_all_stages_batch(
+            db_session,
+            country="bg",
+            city="sofia",
+            limit=2,
+            include_navigated=True,
+            include_extracted=True,
+            force_validate=True,
+            requested_school_ids=cohort,
+            pipeline_run=pipeline_run,
+        )
+
+    assert len(results) == 5
+    for mock in (urls_mock, navigate_mock, extract_mock, validate_mock, summarize_mock):
+        assert mock.await_args.kwargs["school_ids"] == cohort
+    assert urls_mock.await_args.args[3] is None
+    assert navigate_mock.await_args.kwargs["include_navigated"] is True
+    assert extract_mock.await_args.kwargs["include_extracted"] is True
+    assert validate_mock.await_args.kwargs["force_validate"] is True
+    assert pipeline_run.config["cohort_school_ids"] == cohort
+
+
+@pytest.mark.asyncio
+async def test_run_all_stages_batch_narrows_follow_on_stages_to_fresh_successes(db_session):
+    cohort = [17, 23, 42]
+    count_summary = {"processed": 3, "succeeded": 2, "failed": 1, "skipped": 0}
+    url_summary = {**count_summary, "validated_school_ids": [17, 42]}
+    navigation_results = [
+        {"school_id": 17, "success": True},
+        {"school_id": 23, "success": False},
+        {"school_id": 42, "success": True},
+    ]
+    extract_summary = {
+        "processed": 2,
+        "succeeded": 1,
+        "failed": 1,
+        "skipped": 0,
+        "ready_school_ids": [42],
+    }
+    validation_summary = {
+        "processed": 1,
+        "succeeded": 1,
+        "failed": 0,
+        "skipped": 0,
+        "validated_school_ids": [42],
+    }
+
+    with (
+        patch.object(scraper_cli, "_select_all_stage_cohort", new=AsyncMock(return_value=cohort)),
+        patch.object(scraper_cli, "_run_validate_urls_batch", new=AsyncMock(return_value=url_summary)) as urls_mock,
+        patch.object(
+            scraper_cli,
+            "_run_navigate_batch",
+            new=AsyncMock(return_value=navigation_results),
+        ) as navigate_mock,
+        patch.object(scraper_cli, "_run_extract_batch", new=AsyncMock(return_value=extract_summary)) as extract_mock,
+        patch.object(
+            scraper_cli,
+            "_run_validate_data_batch",
+            new=AsyncMock(return_value=validation_summary),
+        ) as validate_mock,
+        patch.object(scraper_cli, "_run_summarize_batch", new=AsyncMock(return_value=count_summary)) as summarize_mock,
+    ):
+        await scraper_cli._run_all_stages_batch(
+            db_session,
+            country="bg",
+            city="sofia",
+            limit=None,
+            include_navigated=True,
+            include_extracted=True,
+            force_validate=True,
+        )
+
+    assert urls_mock.await_args.kwargs["school_ids"] == cohort
+    assert navigate_mock.await_args.kwargs["school_ids"] == [17, 42]
+    assert extract_mock.await_args.kwargs["school_ids"] == [17, 42]
+    assert validate_mock.await_args.kwargs["school_ids"] == [42]
+    assert summarize_mock.await_args.kwargs["school_ids"] == [42]
+
+
+@pytest.mark.asyncio
+async def test_run_all_stages_batch_preserves_completed_summaries_when_later_stage_raises(db_session):
+    cohort = [17]
+    completed: list[dict] = []
+    extraction = {
+        "processed": 1,
+        "succeeded": 1,
+        "failed": 0,
+        "skipped": 0,
+        "input_tokens": 120,
+        "output_tokens": 30,
+        "token_cost_usd": 0.01,
+        "ready_school_ids": [17],
+    }
+
+    with (
+        patch.object(scraper_cli, "_select_all_stage_cohort", new=AsyncMock(return_value=cohort)),
+        patch.object(
+            scraper_cli,
+            "_run_validate_urls_batch",
+            new=AsyncMock(
+                return_value={
+                    "processed": 1,
+                    "succeeded": 1,
+                    "failed": 0,
+                    "skipped": 0,
+                    "validated_school_ids": [17],
+                }
+            ),
+        ),
+        patch.object(
+            scraper_cli,
+            "_run_navigate_batch",
+            new=AsyncMock(return_value=[{"school_id": 17, "success": True}]),
+        ),
+        patch.object(scraper_cli, "_run_extract_batch", new=AsyncMock(return_value=extraction)),
+        patch.object(
+            scraper_cli,
+            "_run_validate_data_batch",
+            new=AsyncMock(side_effect=RuntimeError("validation crashed")),
+        ),
+    ):
+        with pytest.raises(RuntimeError, match="validation crashed"):
+            await scraper_cli._run_all_stages_batch(
+                db_session,
+                country="bg",
+                city="sofia",
+                limit=None,
+                include_navigated=True,
+                include_extracted=True,
+                force_validate=True,
+                stage_summaries=completed,
+            )
+
+    assert len(completed) == 3
+    assert completed[-1]["token_cost_usd"] == pytest.approx(0.01)
+
+
+@pytest.mark.asyncio
+async def test_empty_explicit_cohort_never_falls_back_to_status_selection(db_session):
+    school = School(
+        name_i18n={"bg": "Не трябва да се обработи"},
+        country_code="bg",
+        school_type="state",
+        education_level="primary",
+        city="sofia",
+        website_url="https://school.example",
+        scrape_status="validated",
+    )
+    db_session.add(school)
+    await db_session.commit()
+
+    with patch("app.scrapers.navigator.navigate_schools_batch", new=AsyncMock()) as navigate_mock:
+        navigation_results = await scraper_cli._run_navigate_batch(
+            db_session, "bg", "sofia", None, school_ids=[]
+        )
+    extraction_summary = await scraper_cli._run_extract_batch(
+        db_session, "bg", "sofia", None, school_ids=[]
+    )
+
+    assert navigation_results is None
+    navigate_mock.assert_not_awaited()
+    assert extraction_summary["processed"] == 0
 
 
 @pytest.mark.asyncio
@@ -366,13 +673,20 @@ async def test_run_extract_batch_with_explicit_school_ids_ignores_status_filter(
     await db_session.commit()
 
     settings = SimpleNamespace(extraction_school_timeout_seconds=0, extraction_batch_concurrency=1)
-    run_mock = AsyncMock(return_value={"status": "extracted"})
+    run_mock = AsyncMock(
+        return_value={
+            "status": "extracted",
+            "input_tokens": 123,
+            "output_tokens": 45,
+            "token_cost_usd": 0.006789,
+        }
+    )
 
     with (
         patch("app.config.get_settings", return_value=settings),
         patch.object(scraper_cli, "_run_extract_school", new=run_mock),
     ):
-        await scraper_cli._run_extract_batch(
+        summary = await scraper_cli._run_extract_batch(
             db=db_session,
             country="bg",
             city="sofia",
@@ -382,3 +696,64 @@ async def test_run_extract_batch_with_explicit_school_ids_ignores_status_filter(
         )
 
     run_mock.assert_awaited_once_with(db_session, school.id, "bg")
+    assert summary == {
+        "processed": 1,
+        "succeeded": 1,
+        "failed": 0,
+        "skipped": 0,
+        "input_tokens": 123,
+        "output_tokens": 45,
+        "token_cost_usd": pytest.approx(0.006789),
+        "ready_school_ids": [school.id],
+    }
+
+
+@pytest.mark.asyncio
+async def test_run_summarize_batch_aggregates_usage_for_all_results(db_session):
+    class SessionCtx:
+        async def __aenter__(self):
+            return db_session
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+    settings = SimpleNamespace(summarization_batch_concurrency=1)
+    summarize_mock = AsyncMock(
+        side_effect=[
+            {
+                "status": "summarized",
+                "input_tokens": 70,
+                "output_tokens": 20,
+                "token_cost_usd": 0.004,
+            },
+            {
+                "status": "summary_failed",
+                "input_tokens": 30,
+                "output_tokens": 5,
+                "token_cost_usd": 0.001,
+            },
+        ]
+    )
+
+    with (
+        patch("app.config.get_settings", return_value=settings),
+        patch("app.database.async_session_maker", return_value=SessionCtx()),
+        patch("app.scrapers.summarizer.summarize_school", new=summarize_mock),
+    ):
+        summary = await scraper_cli._run_summarize_batch(
+            db=db_session,
+            country="bg",
+            city="sofia",
+            limit=None,
+            school_ids=[101, 102],
+        )
+
+    assert summary == {
+        "processed": 2,
+        "succeeded": 1,
+        "failed": 1,
+        "skipped": 0,
+        "input_tokens": 100,
+        "output_tokens": 25,
+        "token_cost_usd": pytest.approx(0.005),
+    }

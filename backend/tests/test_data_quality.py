@@ -1,12 +1,14 @@
 """Tests for the P1.6 data-quality scoreboard and PipelineRun lifecycle."""
 
+from types import SimpleNamespace
+
 import pytest
 
 from app.models.pipeline_run import PipelineStatus
 from app.models.pricing import PriceCategory, PricePeriod, PriceSource, Pricing
 from app.models.school import School, SchoolLocation
 from app.services.data_quality import compute_quality_metrics
-from app.services.pipeline_runs import finalize_pipeline_run, start_pipeline_run
+from app.services.pipeline_runs import _aggregate_usage, finalize_pipeline_run, start_pipeline_run
 
 pytestmark = pytest.mark.asyncio
 
@@ -92,10 +94,29 @@ async def test_metrics_cover_all_six(quality_fixture):
     m = await compute_quality_metrics(quality_fixture, country="bg", city="sofia")
 
     assert m["schools_in_scope"] == 2
-    assert m["validation_ok"] == {"ok": 1, "total": 2, "pct": 50.0}
+    assert m["validation_ok"] == {
+        "ok": 1,
+        "total": 2,
+        "pct": 50.0,
+        "with_report": 2,
+        "coverage_pct": 100.0,
+    }
     assert m["duplicate_coordinate_groups"] == 1
-    assert m["location_precision_exact"] == {"exact": 1, "with_precision": 2, "pct": 50.0}
-    assert m["display_name_overrides"] == {"overrides": 1, "candidates": 2, "pct": 50.0}
+    assert m["location_precision_exact"] == {
+        "exact": 1,
+        "geocoded": 2,
+        "pct": 50.0,
+        "with_precision": 2,
+        "coverage_pct": 100.0,
+    }
+    assert m["display_name_overrides"] == {
+        "overrides": 1,
+        "total": 2,
+        "pct": 50.0,
+        "candidates": 2,
+        "candidate_coverage_pct": 100.0,
+        "conversion_pct": 50.0,
+    }
     assert m["spot_check_discrepancy_rate"] == {"discrepancies": 1, "schools_checked": 2, "rate": 0.5}
     assert m["pricing_rows_failing_gates"] == {"failing": 2, "total": 3, "pct": pytest.approx(66.7)}
 
@@ -104,7 +125,86 @@ async def test_city_scope_excludes_other_cities(quality_fixture):
     m = await compute_quality_metrics(quality_fixture, country="bg", city="plovdiv")
     assert m["schools_in_scope"] == 1
     assert m["location_precision_exact"]["with_precision"] == 1
+    assert m["display_name_overrides"] == {
+        "overrides": 0,
+        "total": 1,
+        "pct": 0.0,
+        "candidates": 0,
+        "candidate_coverage_pct": 0.0,
+        "conversion_pct": None,
+    }
     assert m["duplicate_coordinate_groups"] == 0
+
+
+async def test_missing_reports_and_precision_count_against_coverage(db_session):
+    schools = [await _make_school(db_session) for _ in range(10)]
+    schools[0].attributes = {"data_validation": {"status": "ok"}}
+    schools[1].attributes = {"data_validation": {"status": "ok"}}
+    db_session.add_all(
+        [
+            SchoolLocation(
+                school_id=school.id,
+                address_i18n={"bg": f"ул. {index}"},
+                lat=42.7 + index / 1000,
+                lng=23.3 + index / 1000,
+                geocode_meta={"precision": "exact"} if index == 0 else {},
+            )
+            for index, school in enumerate(schools)
+        ]
+    )
+    await db_session.commit()
+
+    metrics = await compute_quality_metrics(db_session, country="bg", city="sofia")
+
+    assert metrics["validation_ok"] == {
+        "ok": 2,
+        "total": 10,
+        "pct": 20.0,
+        "with_report": 2,
+        "coverage_pct": 20.0,
+    }
+    assert metrics["location_precision_exact"] == {
+        "exact": 1,
+        "geocoded": 10,
+        "pct": 10.0,
+        "with_precision": 1,
+        "coverage_pct": 10.0,
+    }
+
+
+async def test_pricing_failure_metric_matches_fail_closed_publication_gate(db_session):
+    school = await _make_school(db_session)
+    contexts = [
+        {"confidence": 0.9},
+        {},
+        {"confidence": True},
+        {"confidence": "0.9"},
+        {"confidence": 1.1},
+        {"confidence": 0.69},
+    ]
+    db_session.add_all(
+        [
+            Pricing(
+                school_id=school.id,
+                category=PriceCategory.TUITION,
+                period=PricePeriod.MONTHLY,
+                amount=500 + index,
+                source=PriceSource.SCRAPED_WEBSITE,
+                source_url="https://example.com/fees",
+                pricing_context=context,
+            )
+            for index, context in enumerate(contexts)
+        ]
+    )
+    await db_session.commit()
+
+    metrics = await compute_quality_metrics(db_session, country="bg", city="sofia")
+
+    assert metrics["pricing_rows_failing_gates"] == {
+        "failing": 5,
+        "total": 6,
+        "pct": pytest.approx(83.3),
+    }
 
 
 async def test_empty_scope_returns_none_ratios(db_session):
@@ -122,16 +222,47 @@ async def test_pipeline_run_lifecycle_writes_metrics(quality_fixture):
     assert run.status == PipelineStatus.RUNNING
     assert run.config["cli_stage"] == "extract"
 
-    summaries = [{"processed": 2, "succeeded": 1, "failed": 1, "skipped": 0}]
+    summaries = [
+        {
+            "processed": 2,
+            "succeeded": 1,
+            "failed": 1,
+            "skipped": 0,
+            "input_tokens": 120,
+            "output_tokens": 30,
+            "token_cost_usd": 0.012345,
+        },
+        {
+            "processed": 1,
+            "succeeded": 1,
+            "failed": 0,
+            "skipped": 0,
+            "input_tokens": 80,
+            "output_tokens": 20,
+            "token_cost_usd": 0.004321,
+        },
+    ]
     finalized = await finalize_pipeline_run(
         quality_fixture, run, country="bg", city="sofia", stage_summaries=summaries
     )
 
     assert finalized.status == PipelineStatus.PARTIAL  # some succeeded, some failed
     assert finalized.completed_at is not None
-    assert finalized.schools_succeeded == 1
+    assert finalized.schools_succeeded == 2
     assert finalized.schools_failed == 1
-    assert finalized.metrics["validation_ok"] == {"ok": 1, "total": 2, "pct": 50.0}
+    assert finalized.total_llm_cost_usd == pytest.approx(0.016666)
+    assert finalized.metrics["llm_usage"] == {
+        "input_tokens": 200,
+        "output_tokens": 50,
+        "token_cost_usd": pytest.approx(0.016666),
+    }
+    assert finalized.metrics["validation_ok"] == {
+        "ok": 1,
+        "total": 2,
+        "pct": 50.0,
+        "with_report": 2,
+        "coverage_pct": 100.0,
+    }
 
 
 async def test_pipeline_run_status_completed_when_no_failures(quality_fixture):
@@ -179,3 +310,26 @@ async def test_navigate_summary_converts_results_list():
     )
     assert summary == {"processed": 3, "succeeded": 2, "failed": 1, "skipped": 0}
     assert _navigate_summary(None) == {"processed": 0, "succeeded": 0, "failed": 0, "skipped": 0}
+
+
+async def test_recent_run_cost_prefers_usage_metrics_with_legacy_fallback():
+    from app.scrapers.cli import _pipeline_run_cost_usd
+
+    run = SimpleNamespace(
+        metrics={"llm_usage": {"token_cost_usd": 0.123456}},
+        total_llm_cost_usd=9.0,
+    )
+    assert _pipeline_run_cost_usd(run) == pytest.approx(0.123456)
+
+    legacy = SimpleNamespace(metrics={"validation_ok": {}}, total_llm_cost_usd=0.25)
+    assert _pipeline_run_cost_usd(legacy) == pytest.approx(0.25)
+
+
+async def test_pipeline_usage_rejects_negative_and_non_finite_values():
+    usage = _aggregate_usage(
+        [
+            {"input_tokens": -10, "output_tokens": "bad", "token_cost_usd": float("nan")},
+            {"input_tokens": 25, "output_tokens": 5, "token_cost_usd": 0.01},
+        ]
+    )
+    assert usage == {"input_tokens": 25, "output_tokens": 5, "token_cost_usd": 0.01}

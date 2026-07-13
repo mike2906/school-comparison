@@ -686,6 +686,154 @@ class TestGeocodingService:
         assert location3.lat == 42.0  # Unchanged
         assert location3.lng == 23.0  # Unchanged
 
+    async def test_geocode_all_locations_force_refreshes_existing_with_limit(
+        self,
+        db_session: AsyncSession,
+    ):
+        """Forced bulk geocoding includes existing coordinates and honors limit."""
+        mock_provider = AsyncMock()
+        mock_provider.provider_name = "mock"
+        mock_provider.geocode.side_effect = [
+            GeocodingResult(
+                lat=42.71,
+                lng=23.31,
+                success=True,
+                provider="mock",
+                method="nominatim_address",
+                precision="exact",
+            ),
+            GeocodingResult(
+                lat=42.72,
+                lng=23.32,
+                success=True,
+                provider="mock",
+                method="nominatim_address",
+                precision="exact",
+            ),
+        ]
+        service = GeocodingService(db=db_session, provider=mock_provider)
+
+        school = School(
+            name_i18n={"bg": "Test School"},
+            country_code="bg",
+            city="sofia",
+            school_type="state",
+            education_level="primary",
+        )
+        db_session.add(school)
+        await db_session.flush()
+
+        existing = SchoolLocation(
+            school_id=school.id,
+            address_i18n={"bg": "ул. Тестова 1"},
+            lat=42.0,
+            lng=23.0,
+            is_primary=True,
+        )
+        missing = SchoolLocation(
+            school_id=school.id,
+            address_i18n={"bg": "ул. Тестова 2"},
+            is_primary=False,
+        )
+        beyond_limit = SchoolLocation(
+            school_id=school.id,
+            address_i18n={"bg": "ул. Тестова 3"},
+            lat=41.0,
+            lng=22.0,
+            is_primary=False,
+        )
+        db_session.add_all([existing, missing, beyond_limit])
+        await db_session.commit()
+
+        summary = await service.geocode_all_locations(force=True, limit=2)
+
+        assert summary == {"total": 2, "success": 2, "failed": 0}
+        assert mock_provider.geocode.await_count == 2
+        await db_session.refresh(existing)
+        await db_session.refresh(missing)
+        await db_session.refresh(beyond_limit)
+        assert (existing.lat, existing.lng) == pytest.approx((42.71, 23.31))
+        assert existing.geocode_meta["status"] == "accepted"
+        assert existing.geocode_meta["provider"] == "mock"
+        assert existing.geocode_meta["method"] == "nominatim_address"
+        assert existing.geocode_meta["precision"] == "exact"
+        assert existing.geocode_meta["candidate"] == {"lat": 42.71, "lng": 23.31}
+        assert (missing.lat, missing.lng) == pytest.approx((42.72, 23.32))
+        assert missing.geocode_meta["status"] == "accepted"
+        assert (beyond_limit.lat, beyond_limit.lng) == (41.0, 22.0)
+        assert beyond_limit.geocode_meta == {}
+
+    async def test_geocode_all_locations_scopes_schools_and_propagates_country(
+        self,
+        db_session: AsyncSession,
+    ):
+        """Bulk geocoding filters by school scope and uses its country code."""
+        mock_provider = AsyncMock()
+        mock_provider.provider_name = "mock"
+        mock_provider.geocode.return_value = GeocodingResult(
+            lat=42.71,
+            lng=23.31,
+            success=True,
+            provider="mock",
+            method="nominatim_address",
+            precision="exact",
+        )
+        service = GeocodingService(db=db_session, provider=mock_provider)
+
+        schools = [
+            School(
+                name_i18n={"bg": "Sofia School"},
+                country_code="bg",
+                city="sofia",
+                school_type="state",
+                education_level="primary",
+            ),
+            School(
+                name_i18n={"bg": "Plovdiv School"},
+                country_code="bg",
+                city="plovdiv",
+                school_type="state",
+                education_level="primary",
+            ),
+            School(
+                name_i18n={"en": "London School"},
+                country_code="gb",
+                city="london",
+                school_type="state",
+                education_level="primary",
+            ),
+        ]
+        db_session.add_all(schools)
+        await db_session.flush()
+        locations = [
+            SchoolLocation(
+                school_id=school.id,
+                address_i18n={"bg": f"Address {index}"},
+                lat=42.0,
+                lng=23.0,
+                is_primary=True,
+            )
+            for index, school in enumerate(schools)
+        ]
+        db_session.add_all(locations)
+        await db_session.commit()
+
+        summary = await service.geocode_all_locations(
+            force=True,
+            country_code="bg",
+            city="sofia",
+        )
+
+        assert summary == {"total": 1, "success": 1, "failed": 0}
+        mock_provider.geocode.assert_awaited_once()
+        assert mock_provider.geocode.await_args.kwargs["country_code"] == "bg"
+        await db_session.refresh(locations[0])
+        await db_session.refresh(locations[1])
+        await db_session.refresh(locations[2])
+        assert (locations[0].lat, locations[0].lng) == pytest.approx((42.71, 23.31))
+        assert (locations[1].lat, locations[1].lng) == (42.0, 23.0)
+        assert (locations[2].lat, locations[2].lng) == (42.0, 23.0)
+
     async def test_merged_kg_branches_skip_geojson_name_lookup(self, db_session: AsyncSession):
         """Merged kg.sofia branch families should bypass GeoJSON name-only matching."""
         class _CompositeLikeProvider:

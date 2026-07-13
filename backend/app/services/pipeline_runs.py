@@ -7,6 +7,7 @@ a data-quality metrics snapshot. Previously the model was never written.
 from __future__ import annotations
 
 import datetime
+import math
 from typing import Any, Iterable, Optional
 from uuid import uuid4
 
@@ -73,6 +74,40 @@ def _aggregate_counts(stage_summaries: Iterable[Any]) -> dict[str, int]:
     return {"processed": processed, "succeeded": succeeded, "failed": failed, "skipped": skipped}
 
 
+def _non_negative_int(value: Any) -> int:
+    """Coerce trusted stage usage to a safe persisted counter."""
+    try:
+        parsed = int(value or 0)
+    except (TypeError, ValueError, OverflowError):
+        return 0
+    return max(0, parsed)
+
+
+def _non_negative_float(value: Any) -> float:
+    """Coerce cost values while preventing NaN/inf from reaching JSON."""
+    try:
+        parsed = float(value or 0.0)
+    except (TypeError, ValueError, OverflowError):
+        return 0.0
+    return parsed if math.isfinite(parsed) and parsed >= 0 else 0.0
+
+
+def _aggregate_usage(stage_summaries: Iterable[Any]) -> dict[str, int | float]:
+    input_tokens = output_tokens = 0
+    token_cost_usd = 0.0
+    for summary in stage_summaries:
+        if not isinstance(summary, dict):
+            continue
+        input_tokens += _non_negative_int(summary.get("input_tokens"))
+        output_tokens += _non_negative_int(summary.get("output_tokens"))
+        token_cost_usd += _non_negative_float(summary.get("token_cost_usd"))
+    return {
+        "input_tokens": input_tokens,
+        "output_tokens": output_tokens,
+        "token_cost_usd": round(token_cost_usd, 6),
+    }
+
+
 async def finalize_pipeline_run(
     db: AsyncSession,
     run: PipelineRun,
@@ -82,13 +117,19 @@ async def finalize_pipeline_run(
     stage_summaries: Iterable[Any],
     error_summary: Optional[str] = None,
 ) -> PipelineRun:
-    counts = _aggregate_counts(stage_summaries)
+    # Materialize once because callers may supply a generator and both aggregates
+    # must see the same stage results.
+    summaries = list(stage_summaries)
+    counts = _aggregate_counts(summaries)
+    usage = _aggregate_usage(summaries)
     run.schools_processed = counts["processed"]
     run.schools_succeeded = counts["succeeded"]
     run.schools_failed = counts["failed"]
     run.schools_skipped = counts["skipped"]
+    run.total_llm_cost_usd = usage["token_cost_usd"]
     run.error_summary = error_summary
-    run.metrics = await compute_quality_metrics(db, country=country, city=city)
+    quality_metrics = await compute_quality_metrics(db, country=country, city=city)
+    run.metrics = {**quality_metrics, "llm_usage": usage}
     run.completed_at = _now()
 
     if error_summary:

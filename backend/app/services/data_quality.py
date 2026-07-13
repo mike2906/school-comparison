@@ -23,7 +23,7 @@ from app.models.school import School, SchoolLocation
 # Re-exported for callers that import it from here; it now lives in
 # `app.utils.display_gating` so the scoreboard metric and the P1.7 display gate
 # share one source of truth.
-from app.utils.display_gating import PRICING_CONFIDENCE_FLOOR  # noqa: F401
+from app.utils.display_gating import PRICING_CONFIDENCE_FLOOR, passes_pricing_gate  # noqa: F401
 
 # Precision used to group coordinates when detecting shared/duplicate points.
 _COORD_ROUNDING = 5
@@ -48,19 +48,27 @@ def _as_dict(value: Any) -> dict:
 
 
 def _validation_ok(schools: list[School]) -> dict[str, Any]:
-    total = 0
+    total = len(schools)
+    with_report = 0
     ok = 0
     for school in schools:
         report = _as_dict(_as_dict(school.attributes).get("data_validation"))
         if not report:
             continue
-        total += 1
+        with_report += 1
         if report.get("status") == "ok":
             ok += 1
-    return {"ok": ok, "total": total, "pct": _pct(ok, total)}
+    return {
+        "ok": ok,
+        "total": total,
+        "pct": _pct(ok, total),
+        "with_report": with_report,
+        "coverage_pct": _pct(with_report, total),
+    }
 
 
 def _display_name_overrides(schools: list[School]) -> dict[str, Any]:
+    total = len(schools)
     candidates = 0
     overrides = 0
     for school in schools:
@@ -71,21 +79,30 @@ def _display_name_overrides(schools: list[School]) -> dict[str, Any]:
         evidence = _as_dict(attrs.get("display_name_evidence"))
         if evidence.get("status") == "corroborated":
             overrides += 1
-    return {"overrides": overrides, "candidates": candidates, "pct": _pct(overrides, candidates)}
+    return {
+        "overrides": overrides,
+        "total": total,
+        "pct": _pct(overrides, total),
+        "candidates": candidates,
+        "candidate_coverage_pct": _pct(candidates, total),
+        "conversion_pct": _pct(overrides, candidates),
+    }
 
 
 def _location_metrics(locations: list[SchoolLocation]) -> tuple[dict[str, Any], int]:
     precise = 0
     with_precision = 0
+    geocoded = 0
     coord_groups: dict[tuple[float, float], set[int]] = {}
     for loc in locations:
-        meta = _as_dict(loc.geocode_meta)
-        precision = meta.get("precision")
-        if precision:
-            with_precision += 1
-            if precision == "exact":
-                precise += 1
         if loc.lat is not None and loc.lng is not None:
+            geocoded += 1
+            meta = _as_dict(loc.geocode_meta)
+            precision = meta.get("precision")
+            if precision in {"exact", "approximate"}:
+                with_precision += 1
+                if precision == "exact":
+                    precise += 1
             key = (round(float(loc.lat), _COORD_ROUNDING), round(float(loc.lng), _COORD_ROUNDING))
             coord_groups.setdefault(key, set()).add(loc.school_id)
 
@@ -93,8 +110,10 @@ def _location_metrics(locations: list[SchoolLocation]) -> tuple[dict[str, Any], 
     duplicate_groups = sum(1 for schools in coord_groups.values() if len(schools) >= 2)
     precision_metric = {
         "exact": precise,
+        "geocoded": geocoded,
         "with_precision": with_precision,
-        "pct": _pct(precise, with_precision),
+        "pct": _pct(precise, geocoded),
+        "coverage_pct": _pct(with_precision, geocoded),
     }
     return precision_metric, duplicate_groups
 
@@ -104,10 +123,7 @@ def _pricing_gate_failures(rows: list[Pricing]) -> dict[str, Any]:
     failing = 0
     for row in rows:
         total += 1
-        confidence = _as_dict(row.pricing_context).get("confidence")
-        no_source = not (row.source_url or "").strip()
-        low_confidence = isinstance(confidence, (int, float)) and confidence < PRICING_CONFIDENCE_FLOOR
-        if no_source or low_confidence:
+        if not passes_pricing_gate(row.source_url, row.pricing_context):
             failing += 1
     return {"failing": failing, "total": total, "pct": _pct(failing, total)}
 

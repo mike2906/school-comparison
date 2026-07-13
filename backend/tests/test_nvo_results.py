@@ -466,6 +466,22 @@ async def test_exam_averages_endpoint_uses_canonical_average_score_metric(client
                 metric="average_score",
                 value=61.0,
             ),
+            ExamResult(
+                school_id=school.id,
+                year=2025,
+                exam_type="nvo_7",
+                subject="foreign_language",
+                metric="average_score",
+                value=80.0,
+            ),
+            ExamResult(
+                school_id=school.id,
+                year=2025,
+                exam_type="nvo_7",
+                subject="history",
+                metric="school_average",
+                value=99.0,
+            ),
         ]
     )
     await db_session.commit()
@@ -476,3 +492,5 @@ async def test_exam_averages_endpoint_uses_canonical_average_score_metric(client
     payload = response.json()
     assert payload["by_year"]["nvo_7"]["2025"]["bulgarian"] == 72.5
     assert payload["by_year"]["nvo_7"]["2025"]["math"] == 61.0
+    assert payload["by_year"]["nvo_7"]["2025"]["foreign_language"] == 80.0
+    assert "history" not in payload["by_year"]["nvo_7"]["2025"]
