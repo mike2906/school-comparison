@@ -4,7 +4,6 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query, Path
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from app.config import get_settings
 from app.database import get_db
@@ -146,7 +145,7 @@ async def get_exam_averages(
     Returns averages grouped by exam_type, year, and subject.
     """
     try:
-        # Query all exam results with average metrics
+        # Query canonical school-level average scores only.
         query = (
             select(
                 ExamResult.exam_type,
@@ -156,7 +155,7 @@ async def get_exam_averages(
             )
             .join(School, ExamResult.school_id == School.id)
             .where(School.country_code == country_code)
-            .where(ExamResult.metric.ilike('%average%'))
+            .where(ExamResult.metric == "average_score")
             .group_by(ExamResult.exam_type, ExamResult.year, ExamResult.subject)
             .order_by(ExamResult.exam_type, ExamResult.year)
         )
@@ -169,7 +168,6 @@ async def get_exam_averages(
         for row in rows:
             exam_type = row.exam_type
             year = row.year
-            subject_key = 'math' if 'math' in row.subject.lower() else 'bulgarian'
             average_value = float(row.average)
 
             if exam_type not in averages:
@@ -177,7 +175,7 @@ async def get_exam_averages(
             if year not in averages[exam_type]:
                 averages[exam_type][year] = {}
 
-            averages[exam_type][year][subject_key] = round(average_value, 1)
+            averages[exam_type][year][row.subject] = round(average_value, 1)
 
         # Also calculate overall average per exam type (across all years and subjects)
         overall = {}

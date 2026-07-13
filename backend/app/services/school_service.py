@@ -74,11 +74,16 @@ class SchoolService:
             bounds_clause,
         )
 
-    def _base_query(self):
-        """Base query with all relationships eager-loaded."""
+    def _list_query(self):
+        """Query relationships required by list and search responses."""
         return select(School).options(
             selectinload(School.locations).selectinload(SchoolLocation.age_group_shifts),
             selectinload(School.pricing),
+        )
+
+    def _detail_query(self):
+        """Query the complete relationship graph used by detail and compare responses."""
+        return self._list_query().options(
             selectinload(School.exam_results),
             selectinload(School.field_sources),
         )
@@ -91,7 +96,7 @@ class SchoolService:
     ) -> list[School]:
         """Get all schools that have locations for a specific age group."""
         query = (
-            self._base_query()
+            self._list_query()
             .join(SchoolLocation)
             .join(SchoolLocationAgeGroupShift, SchoolLocationAgeGroupShift.location_id == SchoolLocation.id)
             .where(SchoolLocationAgeGroupShift.age_group == age_group)
@@ -107,7 +112,7 @@ class SchoolService:
     async def get_school_with_details(self, school_id: int) -> School | None:
         """Get a school with all related data loaded."""
         query = (
-            self._base_query()
+            self._detail_query()
             .where(School.id == school_id)
         )
         result = await self.db.execute(query)
@@ -138,10 +143,10 @@ class SchoolService:
                               kindergartens and primary schools with preschool programs
 
         Returns:
-            List of schools matching the filters with all relationships eager-loaded
+            List of schools matching the filters with list-response relationships loaded
         """
         query = (
-            self._base_query()
+            self._list_query()
             .where(School.country_code == country_code)
             .where(self._has_resolved_location(city))
         )
@@ -362,7 +367,7 @@ class SchoolService:
             return []
 
         query = (
-            self._base_query()
+            self._list_query()
             .where(School.id.in_(matched_ids))
         )
         result = await self.db.execute(query)
@@ -458,7 +463,7 @@ class SchoolService:
             return []
 
         query = (
-            self._base_query()
+            self._detail_query()
             .where(School.id.in_(school_ids))
         )
         result = await self.db.execute(query)

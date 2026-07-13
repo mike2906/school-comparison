@@ -1,7 +1,7 @@
 """Main geocoding service that coordinates geocoding operations."""
 import logging
 from typing import Optional
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import SchoolLocation, School
@@ -255,6 +255,85 @@ class GeocodingService:
 
         return results
 
+    async def geocode_all_locations(
+        self,
+        *,
+        force: bool = False,
+        limit: Optional[int] = None,
+        country_code: Optional[str] = None,
+        city: Optional[str] = None,
+    ) -> dict:
+        """Geocode locations in bulk, optionally refreshing existing coordinates.
+
+        Args:
+            force: If True, include locations that already have coordinates and
+                send every selected location through the provider and write gate.
+            limit: Maximum number of locations to geocode.
+            country_code: Include only schools in this country when provided.
+            city: Include only schools in this city when provided.
+
+        Returns:
+            Summary dict with counts.
+        """
+        query = (
+            select(SchoolLocation, School.country_code)
+            .join(School, School.id == SchoolLocation.school_id)
+            .order_by(SchoolLocation.id)
+        )
+        if not force:
+            query = query.where(
+                (SchoolLocation.lat.is_(None)) | (SchoolLocation.lng.is_(None))
+            )
+        if country_code is not None:
+            query = query.where(func.lower(School.country_code) == country_code.strip().lower())
+        if city is not None:
+            query = query.where(func.lower(School.city) == city.strip().lower())
+        if limit is not None:
+            query = query.limit(limit)
+
+        result = await self.db.execute(query)
+        locations = result.all()
+
+        if not locations:
+            logger.info(
+                "No school locations require geocoding"
+                if not force
+                else "No school locations found"
+            )
+            return {"total": 0, "success": 0, "failed": 0}
+
+        logger.info(
+            "Found %s locations to %s",
+            len(locations),
+            "re-geocode" if force else "geocode",
+        )
+
+        success_count = 0
+        failed_count = 0
+        for location, school_country_code in locations:
+            geocode_result = await self.geocode_location(
+                location,
+                force=force,
+                country_code=school_country_code,
+            )
+            if geocode_result.success:
+                success_count += 1
+            else:
+                failed_count += 1
+
+        logger.info(
+            "Geocoding complete: %s success, %s failed out of %s total",
+            success_count,
+            failed_count,
+            len(locations),
+        )
+
+        return {
+            "total": len(locations),
+            "success": success_count,
+            "failed": failed_count,
+        }
+
     async def geocode_all_missing(self, limit: Optional[int] = None) -> dict:
         """
         Geocode all school locations that don't have coordinates yet.
@@ -265,41 +344,4 @@ class GeocodingService:
         Returns:
             Summary dict with counts
         """
-        # Find locations without coordinates
-        result = await self.db.execute(
-            select(SchoolLocation).where(
-                (SchoolLocation.lat.is_(None)) | (SchoolLocation.lng.is_(None))
-            )
-        )
-        locations = result.scalars().all()
-
-        if not locations:
-            logger.info("All locations already have coordinates")
-            return {"total": 0, "success": 0, "failed": 0}
-
-        # Apply limit if specified
-        if limit:
-            locations = locations[:limit]
-
-        logger.info(f"Found {len(locations)} locations without coordinates")
-
-        # Geocode each location
-        success_count = 0
-        failed_count = 0
-
-        for location in locations:
-            geocode_result = await self.geocode_location(location, force=False)
-            if geocode_result.success:
-                success_count += 1
-            else:
-                failed_count += 1
-
-        logger.info(
-            f"Geocoding complete: {success_count} success, {failed_count} failed out of {len(locations)} total"
-        )
-
-        return {
-            "total": len(locations),
-            "success": success_count,
-            "failed": failed_count,
-        }
+        return await self.geocode_all_locations(force=False, limit=limit)

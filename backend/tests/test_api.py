@@ -52,6 +52,8 @@ class TestSchoolsEndpoint:
         assert "locations" in school
         assert "country_code" in school
         assert "resolved_name_i18n" in school
+        assert "exam_results" not in school
+        assert "field_sources" not in school
 
     @pytest.mark.asyncio
     async def test_list_schools_filter_by_age_group(self, seeded_client):
@@ -91,6 +93,8 @@ class TestSchoolsEndpoint:
         assert "resolved_name_i18n" in school
         assert "locations" in school
         assert "summary_i18n" in school
+        assert "exam_results" in school
+        assert "field_sources" in school
 
     @pytest.mark.asyncio
     async def test_resolved_name_i18n_derives_english_fallback(self, seeded_db, seeded_client):
@@ -1090,6 +1094,15 @@ class TestDisplayGating:
     @pytest.mark.asyncio
     async def test_stored_summary_hidden_when_validation_not_ok(self, seeded_db, seeded_client):
         summary = {"bg": {"short": "кратко", "long": "дълго"}}
+        unvalidated = School(
+            name_i18n={"bg": "Резюме без отчет", "en": "Summary Without Report"},
+            country_code="bg",
+            school_type="private",
+            education_level="primary",
+            city="sofia",
+            summary_i18n=summary,
+            attributes={},
+        )
         needs_review = School(
             name_i18n={"bg": "Резюме А", "en": "Summary A"},
             country_code="bg",
@@ -1108,8 +1121,11 @@ class TestDisplayGating:
             summary_i18n=summary,
             attributes={"data_validation": _validation_report(status="ok", issues=[])},
         )
-        seeded_db.add_all([needs_review, clean])
+        seeded_db.add_all([unvalidated, needs_review, clean])
         await seeded_db.commit()
+
+        no_report = (await seeded_client.get(f"/schools/{unvalidated.id}")).json()
+        assert no_report["summary_i18n"] is None
 
         hidden = (await seeded_client.get(f"/schools/{needs_review.id}")).json()
         assert hidden["summary_i18n"] is None

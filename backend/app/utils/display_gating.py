@@ -141,25 +141,22 @@ def blocked_pricing_row_ids(attributes: Mapping[str, Any] | None) -> set[int]:
 
 
 def summary_is_publishable(attributes: Mapping[str, Any] | None) -> bool:
-    """False when the current validation report is present but not ``ok`` (P1.7).
+    """True only when the current validation report is explicitly ``ok`` (P1.7).
 
     A whole-school summary is only published for a clean report; a stored summary
     from an earlier run must be withheld once validation regresses to
     ``needs_review``, mirroring the generation-side eligibility rule.
 
-    Deliberately *lenient* when there is no report (or no status): summaries are only
-    ever generated off an ``ok`` report, so a summary without a current report is an
-    already-vetted artifact — withholding it would blank legitimate content rather
-    than protect against a known-bad one. The gate hides only on an explicit non-``ok``
-    status.
+    Missing and malformed reports fail closed. This prevents a stored summary from an
+    earlier run being published without evidence that it passed the current validator.
     """
     if not isinstance(attributes, Mapping):
-        return True
+        return False
     report = attributes.get("data_validation")
     if not isinstance(report, Mapping):
-        return True
+        return False
     status = str(report.get("status") or "").strip().lower()
-    return status in ("", "ok")
+    return status == "ok"
 
 
 def passes_pricing_gate(source_url: Any, pricing_context: Any) -> bool:
@@ -167,10 +164,7 @@ def passes_pricing_gate(source_url: Any, pricing_context: Any) -> bool:
     if not str(source_url or "").strip():
         return False
     confidence = pricing_context.get("confidence") if isinstance(pricing_context, Mapping) else None
-    if (
-        isinstance(confidence, (int, float))
-        and not isinstance(confidence, bool)
-        and confidence < PRICING_CONFIDENCE_FLOOR
-    ):
+    if not isinstance(confidence, (int, float)) or isinstance(confidence, bool):
         return False
-    return True
+    # The bounds also reject NaN and infinities without coercing arbitrary values.
+    return PRICING_CONFIDENCE_FLOOR <= confidence <= 1.0

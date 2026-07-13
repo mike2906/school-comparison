@@ -12,8 +12,11 @@ Usage:
     # Geocode with limit (for testing)
     uv run python scripts/geocode_locations.py --limit 10
 
-    # Force re-geocode all locations (even if they have coordinates)
+    # Force re-geocode Sofia, Bulgaria locations (even with coordinates)
     uv run python scripts/geocode_locations.py --force
+
+    # Deliberately remove the default Bulgaria/Sofia scope
+    uv run python scripts/geocode_locations.py --force --all-locations
 
     # Geocode specific school
     uv run python scripts/geocode_locations.py --school-id 123
@@ -47,6 +50,21 @@ async def main():
         "--school-id",
         type=int,
         help="Geocode only locations for this school ID",
+    )
+    parser.add_argument(
+        "--country",
+        default="bg",
+        help="School country code to process (default: bg)",
+    )
+    parser.add_argument(
+        "--city",
+        default="sofia",
+        help="School city to process (default: sofia)",
+    )
+    parser.add_argument(
+        "--all-locations",
+        action="store_true",
+        help="Process all countries and cities instead of the default bg/sofia scope",
     )
 
     args = parser.parse_args()
@@ -85,21 +103,41 @@ async def main():
                     print(f"  {status} Location {location_id}: {result.error}")
 
         else:
+            country_code = None if args.all_locations else args.country
+            city = None if args.all_locations else args.city
+
             # Geocode all missing locations
             if args.force:
-                print("WARNING: --force flag will re-geocode ALL locations!")
+                scope = (
+                    "all locations"
+                    if args.all_locations
+                    else f"{args.country}/{args.city} locations"
+                )
+                print(f"WARNING: --force flag will re-geocode {scope}!")
                 print("This may take a long time and make many API requests.")
                 response = input("Continue? (yes/no): ")
                 if response.lower() != "yes":
                     print("Aborted.")
                     return
 
-            print("Geocoding all locations without coordinates...")
+            if args.force:
+                print("Re-geocoding selected locations...")
+            else:
+                print("Geocoding selected locations without coordinates...")
+            if args.all_locations:
+                print("Scope: all countries and cities")
+            else:
+                print(f"Scope: country={args.country}, city={args.city}")
             if args.limit:
                 print(f"Limit: {args.limit} locations")
             print()
 
-            summary = await service.geocode_all_missing(limit=args.limit)
+            summary = await service.geocode_all_locations(
+                force=args.force,
+                limit=args.limit,
+                country_code=country_code,
+                city=city,
+            )
 
             print()
             print("=" * 60)

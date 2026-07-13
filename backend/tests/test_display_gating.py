@@ -22,6 +22,7 @@ from app.utils.display_gating import (
     _FIELD_PATH_DISPLAY_FIELDS,
     blocked_display_fields,
     iter_blocking_field_paths,
+    passes_pricing_gate,
     summary_is_publishable,
 )
 from app.utils.school_attributes import build_filterable_attributes
@@ -121,14 +122,37 @@ def test_filter_projection_drops_validation_flagged_field():
     assert filterable["special_programs"] == ["sports_program"]
 
 
-def test_summary_publishable_is_lenient_without_a_report():
-    # No report / no status → keep the (already-vetted) summary.
-    assert summary_is_publishable({}) is True
-    assert summary_is_publishable({"data_validation": {}}) is True
-    assert summary_is_publishable(None) is True
-    # Explicit statuses gate as documented.
+def test_summary_publishable_requires_an_ok_report():
+    assert summary_is_publishable({}) is False
+    assert summary_is_publishable({"data_validation": {}}) is False
+    assert summary_is_publishable(None) is False
     assert summary_is_publishable({"data_validation": {"status": "ok"}}) is True
     assert summary_is_publishable({"data_validation": {"status": "needs_review"}}) is False
+
+
+@pytest.mark.parametrize(
+    ("confidence", "expected"),
+    [
+        (0.7, True),
+        (1.0, True),
+        (0.699, False),
+        (-0.1, False),
+        (1.1, False),
+        (None, False),
+        (True, False),
+        ("0.9", False),
+        (float("nan"), False),
+    ],
+)
+def test_pricing_gate_requires_bounded_numeric_confidence(confidence, expected):
+    context = {} if confidence is None else {"confidence": confidence}
+    assert passes_pricing_gate("https://example.com/fees", context) is expected
+
+
+def test_pricing_gate_requires_a_source_and_context():
+    assert passes_pricing_gate(None, {"confidence": 0.9}) is False
+    assert passes_pricing_gate("  ", {"confidence": 0.9}) is False
+    assert passes_pricing_gate("https://example.com/fees", None) is False
 
 
 @pytest.mark.asyncio
@@ -167,6 +191,7 @@ async def test_real_validator_error_gates_pricing_row_and_summary(db_session):
         period="monthly",
         source=PriceSource.SCRAPED_WEBSITE,
         source_url="https://example.com/fees",
+        pricing_context={"confidence": 0.9},
     )
     bad = Pricing(
         school_id=school.id,
@@ -176,6 +201,7 @@ async def test_real_validator_error_gates_pricing_row_and_summary(db_session):
         period="monthly",
         source=PriceSource.SCRAPED_WEBSITE,
         source_url="https://example.com/fees",
+        pricing_context={"confidence": 0.9},
     )
     db_session.add_all([good, bad])
     await db_session.commit()

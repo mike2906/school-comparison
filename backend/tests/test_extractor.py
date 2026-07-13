@@ -1069,7 +1069,15 @@ async def test_run_typed_agent_model_retry_recovers(monkeypatch):
                 except Exception:
                     pass
             good = PriceExtractionOutput(
-                prices=[ExtractedPrice(category="tuition", amount=500, currency="BGN", period="monthly")],
+                prices=[
+                    ExtractedPrice(
+                        category="tuition",
+                        amount=500,
+                        currency="BGN",
+                        period="monthly",
+                        confidence=0.9,
+                    )
+                ],
                 has_pricing_info=True,
             )
             return FakeAgentResult(good)
@@ -1461,10 +1469,11 @@ def test_dedupe_price_rows_drops_currency_and_installment_duplicates():
             category="food", amount=7880, currency="EUR", period="yearly",
             academic_year="2026-2027",
             installments=["8100 € – 2 вноски", "8250 € – 3 вноски"],
+            confidence=0.9,
         ),
-        ExtractedPrice(category="food", amount=8100, currency="EUR", period="yearly", academic_year="2026-2027"),
-        ExtractedPrice(category="food", amount=8250, currency="EUR", period="yearly", academic_year="2026-2027"),
-        ExtractedPrice(category="food", amount=15411.94, currency="BGN", period="yearly", academic_year="2026-2027"),
+        ExtractedPrice(category="food", amount=8100, currency="EUR", period="yearly", academic_year="2026-2027", confidence=0.9),
+        ExtractedPrice(category="food", amount=8250, currency="EUR", period="yearly", academic_year="2026-2027", confidence=0.9),
+        ExtractedPrice(category="food", amount=15411.94, currency="BGN", period="yearly", academic_year="2026-2027", confidence=0.9),
     ]
 
     deduped = extractor_module.helpers._dedupe_price_rows(prices)
@@ -1484,16 +1493,19 @@ def test_dedupe_price_rows_drops_installment_plan_name_variants():
         ExtractedPrice(
             category="tuition", amount=7580, currency="EUR", period="yearly",
             age_group="ПГ - 4 .клас", academic_year="2026-2027",
+            confidence=0.9,
         ),
         ExtractedPrice(
             category="tuition", amount=3975, currency="EUR", period="yearly",
             age_group="ПГ - 4 .клас", academic_year="2026-2027",
             plan_name="2 installments",
+            confidence=0.9,
         ),
         ExtractedPrice(
             category="tuition", amount=827, currency="EUR", period="yearly",
             age_group="ПГ - 4 .клас", academic_year="2026-2027",
             plan_name="10 installments",
+            confidence=0.9,
         ),
     ]
 
@@ -1511,8 +1523,8 @@ def test_filter_supported_prices_drops_unsupported_llm_rows():
     Contact Us
     """
     prices = [
-        ExtractedPrice(category="tuition", amount=750, currency="EUR", period="monthly"),
-        ExtractedPrice(category="tuition", amount=400, currency="EUR", period="monthly"),
+        ExtractedPrice(category="tuition", amount=750, currency="EUR", period="monthly", confidence=0.9),
+        ExtractedPrice(category="tuition", amount=400, currency="EUR", period="monthly", confidence=0.9),
     ]
 
     refined = extractor_module.helpers._filter_supported_prices(prices, text)
@@ -1528,9 +1540,9 @@ def test_filter_supported_prices_uses_source_line_to_fix_period_and_category():
     € 265 | 518 лв. – депозит за запазване на място
     """
     prices = [
-        ExtractedPrice(category="tuition", amount=530, currency="EUR", period="yearly"),
-        ExtractedPrice(category="tuition", amount=350, currency="EUR", period="yearly"),
-        ExtractedPrice(category="tuition", amount=265, currency="EUR", period="yearly"),
+        ExtractedPrice(category="tuition", amount=530, currency="EUR", period="yearly", confidence=0.9),
+        ExtractedPrice(category="tuition", amount=350, currency="EUR", period="yearly", confidence=0.9),
+        ExtractedPrice(category="tuition", amount=265, currency="EUR", period="yearly", confidence=0.9),
     ]
 
     refined = extractor_module.helpers._filter_supported_prices(prices, text)
@@ -1563,7 +1575,9 @@ def test_find_supporting_price_source_url_returns_page_with_matching_amount():
             raw_markdown="## Tuition Costs\nHalf-day Program\n400 €\n/per month\nFull-day Program\n750 €",
         ),
     ]
-    price = ExtractedPrice(category="tuition", amount=750, currency="EUR", period="monthly")
+    price = ExtractedPrice(
+        category="tuition", amount=750, currency="EUR", period="monthly", confidence=0.9
+    )
 
     source_url = extractor_module.helpers._find_supporting_price_source_url(school, pages, price)
 
@@ -1651,7 +1665,15 @@ async def test_extract_school_discards_unsupported_llm_pricing_rows(db_session, 
     await db_session.commit()
 
     mock_price = PriceExtractionOutput(
-        prices=[ExtractedPrice(category="tuition", amount=750, currency="EUR", period="monthly")],
+        prices=[
+            ExtractedPrice(
+                category="tuition",
+                amount=750,
+                currency="EUR",
+                period="monthly",
+                confidence=0.9,
+            )
+        ],
         has_pricing_info=True,
     )
     mock_general = GeneralInfoExtractionOutput(

@@ -20,7 +20,11 @@ class ExtractedPrice(BaseModel):
     includes: list[str] = Field(default_factory=list, description="Items explicitly included in this fee")
     excludes: list[str] = Field(default_factory=list, description="Items explicitly excluded from this fee")
     confidence: float = Field(
-        default=1.0, description="Confidence score 0-1, lower if price not clearly stated"
+        ge=0.0,
+        le=1.0,
+        allow_inf_nan=False,
+        strict=True,
+        description="Required confidence score from 0 to 1",
     )
 
 

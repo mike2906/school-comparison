@@ -224,7 +224,8 @@ Order matters within this phase; tasks touch overlapping files — run sequentia
             real validator output, not just hand-written reports. (3) **DRY:** summarizer's
             `_blocked_summary_sections` and the display gate now share
             `iter_blocking_field_paths` (one definition of "blocking"). (4) Filter-coupling
-            and no-report summary leniency are now documented + tested.
+            and the then-current no-report summary behavior were documented + tested;
+            P1.13 later replaced that leniency with a strict fail-closed rule.
       - [x] *From P1.7-hardening Codex review:* the drift guard originally checked mapping
             keys against `SPOT_CHECK_EXTRACTED_ROOT_KEYS`, a broader vocabulary than the
             spot-check *core* scope — `_normalize_spot_check_output` drops discrepancies
@@ -417,6 +418,59 @@ Order matters within this phase; tasks touch overlapping files — run sequentia
       parent path (an unrelated `operations.transport` issue cannot hide schedules), and
       added common Bulgarian negative forms such as `няма/без приемен изпит`.
 
+### Phase 1 closeout findings (audit 2026-07-13)
+
+The Phase 1 implementation and automated coverage are strong, but the live Sofia
+scoreboard exposed three fail-closed/measurement gaps that must be fixed before the
+one-time P2.4 data refresh. Do not run the full scrape before these land, or the refresh
+will need to be repeated.
+
+- [x] **P1.12 Make quality metrics report coverage honestly.**
+      `services/data_quality.py::_validation_ok` currently divides by schools that already
+      have a report, so the live scoreboard says `100%` for `25/25` although only 25 of 540
+      Sofia schools have reports (4.6% coverage). Likewise, location precision reports
+      `n/a` because it divides by the zero locations carrying precision metadata, while
+      491 locations already have coordinates. Report quality and coverage separately:
+      validation-ok / all schools plus validation-report coverage; exact / geocoded
+      locations plus precision-metadata coverage. Review the display-name denominator for
+      the same ambiguity. Keep PipelineRun snapshots and CLI output on the same definitions.
+      *Verify:* a fixture with 10 schools, 2 `ok` reports, and 8 missing reports displays
+      20% validation-ok and 20% report coverage, never 100%; a location with coordinates
+      but no precision counts against precision coverage.
+      **Done.** Validation-ok and exact-precision percentages now use all schools and all
+      geocoded locations respectively, with separate report/metadata coverage. Display-name
+      overrides use all schools, with candidate coverage and corroboration conversion shown
+      separately. CLI and PipelineRun snapshots share these definitions.
+- [x] **P1.13 Fail closed when summary validation is absent.**
+      `display_gating.summary_is_publishable` currently publishes a stored summary when
+      `data_validation` or its status is missing. This conflicts with P1.7's “keep `ok`
+      only” rule and would publish a stored summary without a current report. The audit
+      initially mistook the JSON `{}` default for content; current Sofia data has zero
+      non-empty summaries, but the fail-open path still had to be closed before regeneration.
+      Require a current `status == "ok"` to publish a summary. Decide explicitly whether
+      all other scraped display fields should also require a current report; the safest
+      launch policy is to fail closed after P2.4 has backfilled every school.
+      *Verify:* missing/empty/`needs_review` reports hide stored summaries; only `ok`
+      publishes them; real API tests cover the behavior.
+      **Done.** Stored summaries now require an explicit current `ok` report. Other
+      allowlisted display fields remain field-gated rather than globally hidden during the
+      transition; P2.4 requires 100% report coverage before launch, removing the missing-
+      report state from production.
+- [x] **P1.14 Make the pricing-confidence gate fail closed.**
+      `passes_pricing_gate` currently accepts missing, non-numeric, and boolean confidence,
+      while `ExtractedPrice.confidence` defaults omitted model output to `1.0` and is not
+      constrained to `[0, 1]`. Make extraction confidence required and bounded (the
+      deterministic fallback already supplies `0.7`), and publish only a real numeric
+      confidence `>= PRICING_CONFIDENCE_FLOOR`. Reuse the exact gate predicate in the
+      scoreboard rather than duplicating near-equivalent logic. Per the project testing
+      rule, add price-validation edge-case tests before implementation.
+      *Verify:* missing, boolean, negative, over-1, and below-floor confidence cannot be
+      published; scoreboard failure counts exactly match serialization.
+      **Done.** `ExtractedPrice.confidence` is required, strict, finite, and bounded to
+      `[0, 1]`; the publish gate accepts only numeric `[0.7, 1]` values with a source URL;
+      the scoreboard calls that same predicate. Schema, gate, API, and metric regressions
+      cover malformed and boundary values.
+
 ## Phase 2 — User-facing correctness bugs
 
 - [x] **P2.1 diff=2 age-group gap.** `app/utils/education.py:15-24`: nursery covers
@@ -433,17 +487,91 @@ Order matters within this phase; tasks touch overlapping files — run sequentia
       fallback and country-config paths. Existing databases pick up the persisted country
       JSON change by rerunning `uv run python scripts/seed_country_bg.py` during deployment.
       Verified: 672 backend tests, 30 frontend tests, frontend lint, and frontend build pass.
-- [ ] **P2.2 Slim the list endpoint.** Drop `exam_results` and `field_sources` from
+- [x] **P2.2 Slim the list endpoint.** Drop `exam_results` and `field_sources` from
       `SchoolListResponse` and remove the corresponding `selectinload`s in
       `app/services/school_service.py:34-41` (detail view fetches them).
-- [ ] **P2.3 exam-averages tightening.** `app/routers/schools.py:164`: match
+      **Done.** List/search queries load locations and gated pricing only; detail and
+      compare queries retain exam results and field sources. API regressions pin both
+      response shapes.
+- [x] **P2.3 exam-averages tightening.** `app/routers/schools.py:164`: match
       `metric == "average_score"` exactly and pass subjects through instead of the
       math/bulgarian binary bucket.
-- [ ] **P2.4 Run the data audits and re-scrape/repair Sofia.** SQL audits (duplicate
-      coords, out-of-bbox, internal keys shipped, validation status distribution,
-      display-name overrides, gate-failing pricing) are in the 2026-07-06 review /
-      below in `docs/audits.sql` if extracted. After Phase 1 gates are in, re-run the
-      pipeline for affected schools so historical bad data is regenerated through gates.
+      **Done.** The query accepts only the canonical metric and preserves the stored
+      subject key. A regression covers a third subject and rejects a misleading
+      `school_average` metric.
+- [ ] **P2.4 Audit and perform the one-time Sofia data refresh.** This is the point at
+      which to run the scraping process again: after P1.12–P1.14 and the audit/re-geocode
+      tooling below are merged and green, and before Phase 3. P2.2/P2.3 do not change
+      extraction, so they do not technically block the refresh, but completing them first
+      keeps this as the single release-candidate data run. Do not start a full scrape while
+      publish-gate behavior is still changing.
+      - [x] Commit `docs/audits.sql` (the plan currently references it, but the file does
+            not exist) with repeatable queries for validation coverage/status, duplicate
+            and out-of-bounds coordinates, precision coverage, display-name overrides,
+            raw gate-failing pricing, and API checks for internal-key leakage.
+            **Done.** The psql audit is executable with `ON_ERROR_STOP` and documents the
+            separate live-API `curl`/`jq` boundary check.
+      - [x] Fix and test the force-regeocode path before using it:
+            `scripts/geocode_locations.py --force` previously warned that it would process
+            every location but still called `geocode_all_missing()`, so existing coordinates
+            were skipped. It must route all locations through the P1.3 write gate and persist
+            `geocode_meta.method` / `precision` for accepted and rejected results.
+            **Done.** Bulk geocoding can now include existing coordinates, is deterministically
+            ordered/limited, defaults the script to `bg`/`sofia`, propagates each school's
+            country code, and requires `--all-locations` to remove scope. Focused tests cover
+            refresh, metadata persistence, limit, scope exclusion, and country propagation.
+      - [x] Make batch `all` operate on one explicit cohort from start to finish. Previously,
+            each stage independently reapplied status filters and `--limit`, so a nominal
+            20-school pilot could validate, navigate, extract, and summarize different
+            schools; extracted/summarized schools could also avoid the recrawl. The batch
+            runner now selects once and persists `PipelineRun.config.cohort_school_ids`.
+            It keeps the original cohort for accounting, then narrows downstream work to
+            URL-validation, navigation, extraction, and data-validation successes so a failed
+            URL or crawl cannot publish stale cached content as a fresh result. `--cohort-file` accepts a reviewed,
+            repeatable list of IDs and validates country/city/website scope. Automatic
+            `--limit` is deterministic but must not be called representative (the current
+            lowest IDs are all state kindergartens).
+      - [x] Persist LLM usage for cost control. Extraction and summarization stage summaries
+            now retain input/output tokens and USD cost; `PipelineRun.metrics.llm_usage`
+            aggregates them and the recent-run scoreboard prints cost. Invalid/negative/
+            non-finite counters fail closed to zero, and completed-stage usage survives a
+            later stage exception. The pilot is the cost probe: calculate
+            `(pilot cost / completed cohort schools) × full cohort size × 1.25`; do not start
+            the full run until that headroom fits the configured provider limit and the user
+            has approved the projection.
+      - [x] Take a database backup and capture the pre-run audit + `data-quality` output.
+            Current baseline: 540 schools; 25 reports / 515 missing reports; 0 non-empty summaries;
+            579 locations / 491 with coordinates / 0 with precision metadata; 10 duplicate
+            coordinate groups; 463 display-name candidates / 0 corroborated overrides;
+            0 spot checks; 259 scraped prices, all currently clearing source/confidence.
+            Store the ignored artifacts under `backend/reports/pre-scrape/<timestamp>/`:
+            a custom-format `pg_dump`, its SHA-256, `audits.txt`, `scoreboard.txt`, and the
+            reviewed `pilot-cohort.txt`. Confirm the dump is non-empty and `pg_restore -l`
+            can read it before continuing.
+            **Done 2026-07-13.** Local ignored artifacts are in
+            `backend/reports/pre-scrape/20260713T102828Z/`. The 9.2 MB dump passes its
+            SHA-256 check and produces a 110-line restore manifest. The audit and corrected
+            scoreboard were captured, and `cohort-validation.txt` confirms the reviewed
+            18-school stratified cohort is in Sofia scope and every member has a website URL.
+      - [ ] Run a 10–20 school pilot through the complete website path, explicitly
+            including already navigated/extracted schools and forced validation. Inspect
+            API payloads, rejected coordinates, pricing, display names, localized fields,
+            spot checks, summaries, and the PipelineRun snapshot before scaling up.
+            Build a deterministic stratified cohort across school type and education level,
+            with private/international pricing cases, then run batch `all` with
+            `--cohort-file`, `--include-navigated`, `--include-extracted`, and
+            `--force-validate`. Stop after the pilot to review quality and projected cost.
+            Batch `--stage all` starts at URL validation and does not run website discovery;
+            run `discover-websites` separately first only for missing/stale website records.
+      - [ ] If the pilot is clean, run the full Sofia website refresh once, then run the
+            corrected force-regeocode process. NVO remains independent and must not be
+            refreshed as part of `all` unless a separate NVO audit calls for it.
+      - [ ] Re-run audits and the scoreboard, triage failures, and targeted-rerun only the
+            affected schools. Launch acceptance: 100% validation-report coverage; summaries
+            published only for `ok`; 100% precision-metadata coverage for geocoded locations;
+            no unexplained duplicate/out-of-bounds coordinates; no internal API keys;
+            pricing gate/scoreboard parity; and a representative spot-check sample with all
+            actionable discrepancies resolved or withheld.
 
 ## Phase 3 — Go live
 

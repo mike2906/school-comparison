@@ -246,8 +246,6 @@ class SchoolListResponse(SchoolPricingMixin):
     education_level: str
     admission_info: Optional[dict] = None
     locations: list[SchoolLocationResponse] = []
-    exam_results: list[ExamResultResponse] = []
-    field_sources: list[FieldSourceResponse] = []
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
