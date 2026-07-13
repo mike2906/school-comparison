@@ -37,7 +37,7 @@ class TestModelTier:
 
     def test_model_costs_defined(self):
         assert MODEL_COSTS == {
-            "cheap": (0.075, 0.30),
+            "cheap": (0.10, 0.40),
             "capable": (0.15, 0.60),
         }
 
@@ -47,8 +47,8 @@ class TestModelTier:
 
     def test_get_model_costs_cheap(self):
         input_cost, output_cost = get_model_costs("cheap")
-        assert input_cost == 0.075
-        assert output_cost == 0.30
+        assert input_cost == 0.10
+        assert output_cost == 0.40
 
     def test_get_model_capable(self):
         model = get_model("capable")
@@ -65,7 +65,7 @@ class TestCostCalculation:
 
     def test_calculate_cost_cheap(self):
         cost = calculate_cost("cheap", 1000, 500)
-        expected = (1000 / 1_000_000 * 0.075) + (500 / 1_000_000 * 0.30)
+        expected = (1000 / 1_000_000 * 0.10) + (500 / 1_000_000 * 0.40)
         assert cost == pytest.approx(expected)
 
     def test_calculate_cost_zero_tokens(self):
@@ -74,7 +74,7 @@ class TestCostCalculation:
 
     def test_calculate_cost_large_numbers(self):
         cost = calculate_cost("cheap", 1_000_000, 500_000)
-        expected = (1_000_000 / 1_000_000 * 0.075) + (500_000 / 1_000_000 * 0.30)
+        expected = (1_000_000 / 1_000_000 * 0.10) + (500_000 / 1_000_000 * 0.40)
         assert cost == pytest.approx(expected)
 
 
@@ -83,22 +83,22 @@ class TestCostEstimates:
 
     def test_navigation_stage_estimate(self):
         total_cost = sum(calculate_cost("cheap", 2000, 500) for _ in range(500))
-        assert 0.10 < total_cost < 0.20
+        assert total_cost == pytest.approx(0.20)
 
     def test_extraction_stage_estimate(self):
         total_cost = sum(calculate_cost("cheap", 4000, 800) for _ in range(500))
-        assert 0.20 < total_cost < 0.30
+        assert total_cost == pytest.approx(0.36)
 
     def test_summarization_stage_estimate(self):
-        total_cost = sum(calculate_cost("cheap", 3000, 1000) for _ in range(500))
-        assert 0.20 < total_cost < 0.30
+        total_cost = sum(calculate_cost("capable", 3000, 1000) for _ in range(500))
+        assert total_cost == pytest.approx(0.525)
 
     def test_full_pipeline_estimate(self):
         navigation = 500 * calculate_cost("cheap", 2000, 500)
         extraction = 500 * calculate_cost("cheap", 4000, 800)
-        summarization = 500 * calculate_cost("cheap", 3000, 1000)
+        summarization = 500 * calculate_cost("capable", 3000, 1000)
         total = navigation + extraction + summarization
-        assert 0.50 < total < 0.80
+        assert total == pytest.approx(1.085)
 
 
 class TestOpenAIModelCompat:
