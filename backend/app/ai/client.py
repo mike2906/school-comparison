@@ -21,9 +21,9 @@ MODEL_TIERS = {
     "capable": "openrouter/openai/gpt-4o-mini",  # stronger tier for spot-check validation
 }
 
-# Cost per 1M tokens (input/output)
+# Cost per 1M tokens (input/output), verified against OpenRouter 2026-07-13.
 MODEL_COSTS = {
-    "cheap": (0.075, 0.30),
+    "cheap": (0.10, 0.40),
     "capable": (0.15, 0.60),
 }
 
@@ -64,7 +64,7 @@ def get_model_costs(tier: ModelTier) -> tuple[float, float]:
 
     Example:
         >>> get_model_costs("cheap")
-        (0.075, 0.30)
+        (0.10, 0.40)
     """
     return MODEL_COSTS[tier]
 
@@ -83,7 +83,7 @@ def calculate_cost(tier: ModelTier, input_tokens: int, output_tokens: int) -> fl
 
     Example:
         >>> calculate_cost("cheap", 1000, 500)
-        0.00022500000000000003
+        0.0003
     """
     input_cost, output_cost = get_model_costs(tier)
     return (input_tokens / 1_000_000 * input_cost) + (output_tokens / 1_000_000 * output_cost)
