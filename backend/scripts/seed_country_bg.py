@@ -14,7 +14,7 @@ BULGARIA_CONFIG = Country(
     name_i18n={"bg": "България", "en": "Bulgaria"},
     education_config={
         "age_groups": [
-            {"key": "nursery", "label_i18n": {"bg": "Ясла", "en": "Nursery"}, "min_diff": 0, "max_diff": 1, "category": "kindergarten"},
+            {"key": "nursery", "label_i18n": {"bg": "Ясла", "en": "Nursery"}, "min_diff": 0, "max_diff": 2, "category": "kindergarten"},
             {"key": "first", "label_i18n": {"bg": "Първа група", "en": "First group"}, "min_diff": 3, "max_diff": 3, "category": "kindergarten"},
             {"key": "second", "label_i18n": {"bg": "Втора група", "en": "Second group"}, "min_diff": 4, "max_diff": 4, "category": "kindergarten"},
             {"key": "third", "label_i18n": {"bg": "Трета група", "en": "Third group"}, "min_diff": 5, "max_diff": 5, "category": "kindergarten"},

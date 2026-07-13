@@ -390,7 +390,7 @@ async def seed_database():
                     {"key": "upper_secondary", "label_i18n": make_i18n("Гимназия", "Upper secondary")},
                 ],
                 "age_groups": [
-                    {"key": "nursery", "label_i18n": make_i18n("Ясла", "Nursery"), "category": "kindergarten", "min_diff": 0, "max_diff": 1},
+                    {"key": "nursery", "label_i18n": make_i18n("Ясла", "Nursery"), "category": "kindergarten", "min_diff": 0, "max_diff": 2},
                     {"key": "first", "label_i18n": make_i18n("I група", "First group"), "category": "kindergarten", "min_diff": 3, "max_diff": 3},
                     {"key": "second", "label_i18n": make_i18n("II група", "Second group"), "category": "kindergarten", "min_diff": 4, "max_diff": 4},
                     {"key": "third", "label_i18n": make_i18n("III група", "Third group"), "category": "kindergarten", "min_diff": 5, "max_diff": 5},

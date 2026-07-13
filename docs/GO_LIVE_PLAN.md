@@ -419,11 +419,20 @@ Order matters within this phase; tasks touch overlapping files — run sequentia
 
 ## Phase 2 — User-facing correctness bugs
 
-- [ ] **P2.1 diff=2 age-group gap.** `app/utils/education.py:15-24`: nursery covers
+- [x] **P2.1 diff=2 age-group gap.** `app/utils/education.py:15-24`: nursery covers
       diff 0–1, `first` starts at 3, so 2-year-olds get zero results.
       `tests/test_education.py:111-116` asserts the bug. Extend nursery to `max_diff: 2`
       (confirm against kg.sofia.bg group definitions), fix test, mirror in
       `countries.education_config` and frontend config.
+      **Done.** Sofia's current admission material continues to separate nursery-age
+      candidates from first kindergarten group, which begins at calendar-year difference
+      3, so the existing enrollment-year-minus-birth-year model now maps the complete
+      0–2 range to `nursery`. Updated the backend fallback, Bulgaria country seed/update
+      config, reference data seed, and frontend fallback. Replaced the tests that preserved
+      the gap with backend boundary assertions and added frontend regressions for both the
+      fallback and country-config paths. Existing databases pick up the persisted country
+      JSON change by rerunning `uv run python scripts/seed_country_bg.py` during deployment.
+      Verified: 672 backend tests, 30 frontend tests, frontend lint, and frontend build pass.
 - [ ] **P2.2 Slim the list endpoint.** Drop `exam_results` and `field_sources` from
       `SchoolListResponse` and remove the corresponding `selectinload`s in
       `app/services/school_service.py:34-41` (detail view fetches them).
