@@ -470,6 +470,48 @@ will need to be repeated.
       `[0, 1]`; the publish gate accepts only numeric `[0.7, 1]` values with a source URL;
       the scoreboard calls that same predicate. Schema, gate, API, and metric regressions
       cover malformed and boundary values.
+- [x] **P1.15 Finish the serialization allowlist across sibling JSON payloads.** The
+      original P1.1 boundary covered `schools.attributes`, but `admission_info`,
+      `FieldSource.value_json`, and `pricing_context` still crossed the API as unrestricted
+      dictionaries. Live re-audit found 341 schools exposing
+      `admission_info.website_extracted` and 4,158 field-source rows exposing raw structured
+      values; 14/18 and 18/18 pilot schools respectively exercised those paths.
+      **Done.** Admission data now uses a positive official/curated-key projection and never
+      serializes `website_extracted`; scraped admission display fields continue through the
+      localized attribute gate. Parent-facing provenance exposes only the fields the source
+      UI consumes, never raw values, internal paths, notes, or submitter metadata. Pricing
+      context is typed and drops unknown internal keys. List, detail, and compare share the
+      boundary, with an API regression containing deliberate secret keys.
+- [x] **P1.16 Treat website-derived data as one publishable lifecycle.** URL failures
+      previously removed only some extracted attributes for a few strong failure reasons,
+      leaving validation state, admission mirrors, pricing, provenance, and sometimes old
+      content public. Seven existing `no_official_website` schools still demonstrated the
+      stale-data state.
+      **Done.** A shared website publication predicate gates extracted attributes, branded
+      names, filters/search, summaries, scraped pricing, and scraped provenance. Invalid or
+      ambiguous URL validation sets a persistent withholding marker; successful URL
+      validation alone cannot reopen the old payload. Only extraction plus deterministic
+      validation in the same transaction clears the marker. Confirmed identity mismatches
+      additionally purge every website-derived branch/row atomically while preserving
+      government/official data. Tests cover transient withholding, strong cleanup, API,
+      search, filters, and marker clearance.
+- [x] **P1.17 Route website-map coordinates through the geocode write gate.** Contact-page
+      map-link coordinates were written directly, bypassing Sofia bounds and leaving six
+      current rows without precision metadata.
+      **Done.** `website_map_link` is a controlled exact geocoding method and extraction now
+      calls the shared write gate. Accepted points persist method/precision/provider metadata;
+      rejected points remain NULL with the rejection reason. Tests cover accepted refreshes
+      and out-of-bounds rejection. The six legacy rows will receive metadata during the
+      planned force-regeocode after the website refresh.
+- [x] **P1.18 Separate global report coverage from launch eligibility.** A literal 100% of
+      all schools was not achievable or meaningful for registry-only schools: at re-audit,
+      42 schools without a website URL also had no website-validation report and batch `all`
+      could never select them.
+      **Done.** The scoreboard retains global report coverage as an informational measure and
+      adds coverage among schools whose website-derived data is currently publishable, plus
+      a hard `published_without_report` count. Registry-only and explicitly withheld payloads
+      are excluded from that denominator. Pipeline snapshots and CLI output share the same
+      definitions; launch requires 100% eligible coverage and zero published-without-report.
 
 ## Phase 2 — User-facing correctness bugs
 
@@ -567,7 +609,8 @@ will need to be repeated.
             corrected force-regeocode process. NVO remains independent and must not be
             refreshed as part of `all` unless a separate NVO audit calls for it.
       - [ ] Re-run audits and the scoreboard, triage failures, and targeted-rerun only the
-            affected schools. Launch acceptance: 100% validation-report coverage; summaries
+            affected schools. Launch acceptance: 100% validation-report coverage among
+            schools with publishable website-derived data and zero such schools without a report; summaries
             published only for `ok`; 100% precision-metadata coverage for geocoded locations;
             no unexplained duplicate/out-of-bounds coordinates; no internal API keys;
             pricing gate/scoreboard parity; and a representative spot-check sample with all

@@ -24,6 +24,7 @@ from app.models.school import School, SchoolLocation
 # `app.utils.display_gating` so the scoreboard metric and the P1.7 display gate
 # share one source of truth.
 from app.utils.display_gating import PRICING_CONFIDENCE_FLOOR, passes_pricing_gate  # noqa: F401
+from app.utils.website_data import website_data_is_publishable
 
 # Precision used to group coordinates when detecting shared/duplicate points.
 _COORD_ROUNDING = 5
@@ -45,6 +46,26 @@ def _rate(numerator: int, denominator: int) -> Optional[float]:
 
 def _as_dict(value: Any) -> dict:
     return value if isinstance(value, dict) else {}
+
+
+def _has_meaningful_value(value: Any) -> bool:
+    if value is None:
+        return False
+    if isinstance(value, str):
+        return bool(value.strip())
+    if isinstance(value, dict):
+        return any(_has_meaningful_value(item) for item in value.values())
+    if isinstance(value, (list, tuple, set)):
+        return any(_has_meaningful_value(item) for item in value)
+    return bool(value)
+
+
+def _report_is_current(report: dict[str, Any]) -> bool:
+    version = report.get("_schema_version", report.get("schema_version"))
+    try:
+        return int(version) == 1
+    except (TypeError, ValueError):
+        return False
 
 
 def _validation_ok(schools: list[School]) -> dict[str, Any]:
@@ -73,6 +94,8 @@ def _display_name_overrides(schools: list[School]) -> dict[str, Any]:
     overrides = 0
     for school in schools:
         attrs = _as_dict(school.attributes)
+        if not website_data_is_publishable(attrs, school.scrape_status):
+            continue
         if not attrs.get("display_name_i18n"):
             continue
         candidates += 1
@@ -86,6 +109,44 @@ def _display_name_overrides(schools: list[School]) -> dict[str, Any]:
         "candidates": candidates,
         "candidate_coverage_pct": _pct(candidates, total),
         "conversion_pct": _pct(overrides, candidates),
+    }
+
+
+def _website_validation_coverage(
+    schools: list[School],
+    publishable_pricing_school_ids: set[int],
+) -> dict[str, Any]:
+    """Coverage for schools whose website-derived data is currently publishable."""
+    eligible = 0
+    with_report = 0
+    ok = 0
+    for school in schools:
+        attrs = _as_dict(school.attributes)
+        admission_info = _as_dict(school.admission_info)
+        has_website_data = any(
+            (
+                _has_meaningful_value(attrs.get("extracted")),
+                _has_meaningful_value(attrs.get("display_name_i18n")),
+                _has_meaningful_value(admission_info.get("website_extracted")),
+                _has_meaningful_value(school.summary_i18n),
+                school.id in publishable_pricing_school_ids,
+            )
+        )
+        if not has_website_data or not website_data_is_publishable(attrs, school.scrape_status):
+            continue
+        eligible += 1
+        report = _as_dict(attrs.get("data_validation"))
+        if _report_is_current(report):
+            with_report += 1
+            if report.get("status") == "ok":
+                ok += 1
+    return {
+        "eligible": eligible,
+        "with_report": with_report,
+        "coverage_pct": _pct(with_report, eligible),
+        "ok": ok,
+        "ok_pct": _pct(ok, eligible),
+        "published_without_report": eligible - with_report,
     }
 
 
@@ -190,10 +251,19 @@ async def compute_quality_metrics(
         locations, pricing_rows = [], []
 
     precision_metric, duplicate_groups = _location_metrics(locations)
+    publishable_pricing_school_ids = {
+        row.school_id
+        for row in pricing_rows
+        if passes_pricing_gate(row.source_url, row.pricing_context)
+    }
 
     return {
         "schools_in_scope": len(school_ids),
         "validation_ok": _validation_ok(schools),
+        "website_validation_coverage": _website_validation_coverage(
+            schools,
+            publishable_pricing_school_ids,
+        ),
         "duplicate_coordinate_groups": duplicate_groups,
         "location_precision_exact": precision_metric,
         "display_name_overrides": _display_name_overrides(schools),

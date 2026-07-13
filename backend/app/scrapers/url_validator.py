@@ -19,6 +19,7 @@ from app.ai.client import create_agent
 from app.config import get_settings
 from app.scrapers.school_tokens import extract_school_name_tokens
 from app.utils.transliteration import transliterate_bulgarian
+from app.utils.website_data import WEBSITE_DATA_WITHHELD_KEY
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
@@ -1057,14 +1058,77 @@ def _should_clear_website_derived_data(result: ValidationResult, reason: Optiona
     return any(marker in lowered for marker in strong_markers)
 
 
-def _clear_website_derived_school_data(school) -> None:
-    """Remove fields that were derived from an invalidated website."""
+async def _clear_website_derived_school_data(db, school) -> None:
+    """Remove fields derived from a confirmed wrong website in the same transaction."""
+    from sqlalchemy import delete, select
+
+    from app.models import FieldSource, Pricing, SchoolLocation
+    from app.models.field_source import SourceType
+    from app.models.pricing import PriceSource
+
     school.summary_i18n = {}
     attrs = dict(school.attributes or {})
     attrs.pop("display_name_i18n", None)
+    attrs.pop("display_name_evidence", None)
     attrs.pop("extracted", None)
     attrs.pop("extracted_i18n", None)
+    attrs.pop("data_validation", None)
+    attrs.pop("summary_generation", None)
+    attrs.pop("validated_website_url", None)
     school.attributes = attrs
+    admission_info = dict(school.admission_info or {})
+    admission_info.pop("website_extracted", None)
+    school.admission_info = admission_info
+
+    locations = list(
+        (
+            await db.execute(
+                select(SchoolLocation).where(SchoolLocation.school_id == school.id)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    for location in locations:
+        tags = [str(tag) for tag in (location.location_tags or [])]
+        website_address = "address_source=website_contact" in tags
+        website_coords = (
+            "coords_source=website_map_link" in tags
+            or (location.geocode_meta or {}).get("method") == "website_map_link"
+        )
+        if website_address:
+            # The previous registry address is not retained when contact extraction
+            # replaces it, so fail closed instead of publishing the wrong address.
+            location.address_i18n = {}
+        if website_coords:
+            location.lat = None
+            location.lng = None
+            location.geocode_meta = {}
+        if website_address or website_coords:
+            location.location_tags = [
+                tag
+                for tag in tags
+                if tag not in {
+                    "address_source=website_contact",
+                    "coords_source=website_map_link",
+                }
+            ]
+            db.add(location)
+
+    await db.execute(
+        delete(Pricing).where(
+            Pricing.school_id == school.id,
+            Pricing.source == PriceSource.SCRAPED_WEBSITE,
+        )
+    )
+    await db.execute(
+        delete(FieldSource).where(
+            FieldSource.school_id == school.id,
+            FieldSource.source_type.in_(
+                [SourceType.SCRAPED_WEBSITE, SourceType.OFFICIAL_WEBSITE]
+            ),
+        )
+    )
 
 
 def extract_validation_aliases(attributes: object) -> list[str]:
@@ -1294,8 +1358,9 @@ async def _update_validation_result(
                 if school.scrape_status in ("pending", "failed_validate", "no_official_website"):
                     school.scrape_status = "validated"
             elif result == ValidationResult.INVALID:
+                school.attributes[WEBSITE_DATA_WITHHELD_KEY] = True
                 if _should_clear_website_derived_data(result, reason):
-                    _clear_website_derived_school_data(school)
+                    await _clear_website_derived_school_data(db, school)
                 school.attributes.pop("validated_website_url", None)
                 if timeout_terminal:
                     school.scrape_status = "no_official_website"
@@ -1309,6 +1374,7 @@ async def _update_validation_result(
                     school.scrape_status = "failed_validate"
                     school.website_url = None
             elif result == ValidationResult.AMBIGUOUS:
+                school.attributes[WEBSITE_DATA_WITHHELD_KEY] = True
                 school.attributes.pop("validated_website_url", None)
                 school.scrape_status = "failed_validate"
                 school.website_url = None

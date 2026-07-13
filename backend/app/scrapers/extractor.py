@@ -35,6 +35,9 @@ from app.schemas.extraction import (
 )
 from app.scrapers.summarizer import clear_summary_state
 from app.scrapers.validator import validate_school_data
+from app.services.geocoding.base import GeocodingResult
+from app.services.geocoding.write_gate import apply_geocode_result_to_location
+from app.utils.website_data import WEBSITE_DATA_WITHHELD_KEY
 from . import extractor_helpers as helpers
 
 logger = logging.getLogger(__name__)
@@ -364,10 +367,28 @@ async def _sync_primary_location_from_contact_address(
     tags = [tag for tag in existing_tags if not str(tag).startswith("coords_source=")]
     same_address = _normalize_address_for_compare(current_bg) == _normalize_address_for_compare(website_address)
 
+    async def apply_website_coordinates() -> bool:
+        if coord_lat is None or coord_lng is None:
+            return False
+        applied = await apply_geocode_result_to_location(
+            db,
+            primary_location,
+            GeocodingResult(
+                success=True,
+                lat=float(coord_lat),
+                lng=float(coord_lng),
+                provider="website",
+                formatted_address=website_address,
+                method="website_map_link",
+                precision="exact",
+            ),
+            school=school,
+        )
+        return applied.success
+
     if same_address and coord_lat is not None and coord_lng is not None:
-        primary_location.lat = float(coord_lat)
-        primary_location.lng = float(coord_lng)
-        if "coords_source=website_map_link" not in tags:
+        coordinates_accepted = await apply_website_coordinates()
+        if coordinates_accepted and "coords_source=website_map_link" not in tags:
             tags.append("coords_source=website_map_link")
         if "address_source=website_contact" not in tags:
             tags.append("address_source=website_contact")
@@ -386,9 +407,8 @@ async def _sync_primary_location_from_contact_address(
     address_i18n.pop("en", None)
     primary_location.address_i18n = address_i18n
     if coord_lat is not None and coord_lng is not None:
-        primary_location.lat = float(coord_lat)
-        primary_location.lng = float(coord_lng)
-        if "coords_source=website_map_link" not in tags:
+        coordinates_accepted = await apply_website_coordinates()
+        if coordinates_accepted and "coords_source=website_map_link" not in tags:
             tags.append("coords_source=website_map_link")
     elif current_bg and _normalize_address_for_compare(current_bg) != _normalize_address_for_compare(website_address):
         # Keep prior coordinates until we have a better replacement source.
@@ -1710,6 +1730,17 @@ async def extract_school(
             stats["token_cost_usd"] = round(float(stats["token_cost_usd"] or 0.0), 6)
             stats["llm_stats"] = llm_stats.as_dict()
             return stats
+        if stats["general_info_success"]:
+            # General extraction replaces (or explicitly clears) every website-derived
+            # attribute branch. A pricing-only success cannot safely reopen preserved
+            # attributes from a URL that was previously invalidated.
+            attrs = dict(school.attributes or {})
+            attrs.pop(WEBSITE_DATA_WITHHELD_KEY, None)
+            school.attributes = attrs
+        elif (school.attributes or {}).get(WEBSITE_DATA_WITHHELD_KEY):
+            stats["details"].append(
+                "Website data remains withheld until general information is refreshed"
+            )
         stats["details"].append(f"Validation completed before commit ({validation_status})")
 
     await db.commit()

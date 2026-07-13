@@ -338,15 +338,20 @@ migrations (never hand-write), and the **NVO import is independent** of the webs
 
 7. **NVO import is independent of the website pipeline:** Use the dedicated `nvo` stage when refreshing official exam results; it is not part of `all`.
 
-8. **Publish boundary — API responses are gated (P1.7):** `schools.attributes` is an
-   internal scratchpad; nothing reaches the wire unless it is (a) declared in the display
-   allowlist (`SchoolDisplayAttributes` / `SchoolLocalizedAttributes`, projected by
-   `app/utils/school_attributes.py`) AND (b) not withheld by the Stage 6 validation report.
+8. **Publish boundary — API responses are gated (P1.7/P1.15–P1.16):** `schools.attributes`,
+   `admission_info`, `pricing_context`, and raw `FieldSource` values are internal storage;
+   nothing reaches the wire unless it is declared in the corresponding response allowlist.
+   Website-derived fields must additionally pass `app/utils/website_data.py` (publishable
+   scrape status and no withholding marker) and the Stage 6 field-level validation gate.
+   Useful scraped admission fields are projected through localized attributes; never expose
+   `admission_info.website_extracted` or `FieldSource.value_json` directly.
    `app/utils/display_gating.py` drops display fields, pricing rows, and summaries flagged
    by error-level issues / actionable spot-check discrepancies, plus pricing rows with no
    `source_url` or confidence below `PRICING_CONFIDENCE_FLOOR`. When adding a response
-   field, go through those projections/gates — never serialize raw `attributes` or pricing
-   directly, or you silently bypass the boundary. Gate coverage is coupled to the
+   field, go through those projections/gates — never serialize raw JSON or ORM rows directly,
+   or you silently bypass the boundary. URL validation failures set a persistent website-data
+   withholding marker; only extraction plus deterministic validation may clear it. Gate
+   coverage is coupled to the
    validator's spot-check scope (`SPOT_CHECK_CORE_FIELD_PREFIXES`) by a guard test.
 
 ---

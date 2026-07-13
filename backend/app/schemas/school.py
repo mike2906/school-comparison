@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any, Optional, Union
 
-from pydantic import BaseModel, ConfigDict, Field, computed_field
+from pydantic import BaseModel, ConfigDict, Field, JsonValue, computed_field
 
 from app.schemas.pricing import PricingResponse
 from app.schemas.field_source import FieldSourceResponse
@@ -13,6 +13,7 @@ from app.utils.display_gating import (
 from app.utils.i18n_resolver import resolve_address_i18n, resolve_name_i18n
 from app.utils.location_tags import semantic_location_tags
 from app.utils.school_attributes import build_display_attributes
+from app.utils.website_data import attributes_for_publication, website_data_is_publishable
 
 
 class SummaryText(BaseModel):
@@ -80,6 +81,28 @@ class SchoolDisplayAttributes(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class SchoolAdmissionInfo(BaseModel):
+    """Allowlisted official/curated admission data.
+
+    The internal ``website_extracted`` mirror is intentionally absent: its useful
+    fields are projected through ``attributes_i18n`` and validation gates instead.
+    """
+
+    system: Optional[JsonValue] = None
+    status: Optional[JsonValue] = None
+    requirements: Optional[JsonValue] = None
+    deadline: Optional[JsonValue] = None
+    spots_available: Optional[JsonValue] = None
+    platform_url: Optional[str] = None
+    rounds: list[dict[str, JsonValue]] = Field(default_factory=list)
+    historical_rounds: list[dict[str, JsonValue]] = Field(default_factory=list)
+    historical_thresholds: list[dict[str, JsonValue]] = Field(default_factory=list)
+    min_score: Optional[JsonValue] = None
+    historical_min_scores: list[dict[str, JsonValue]] = Field(default_factory=list)
+
+    model_config = ConfigDict(extra="ignore")
+
+
 class SchoolAttributesMixin(BaseModel):
     """Projects the raw `attributes` JSONB into the public display payload.
 
@@ -92,21 +115,48 @@ class SchoolAttributesMixin(BaseModel):
         validation_alias="attributes",
         exclude=True,
     )
+    raw_admission_info: Optional[dict[str, Any]] = Field(
+        default=None,
+        validation_alias="admission_info",
+        exclude=True,
+    )
+    raw_scrape_status: Optional[str] = Field(
+        default=None,
+        validation_alias="scrape_status",
+        exclude=True,
+    )
+
+    @property
+    def website_data_publishable(self) -> bool:
+        return website_data_is_publishable(self.raw_attributes, self.raw_scrape_status)
+
+    @property
+    def public_attributes_input(self) -> dict[str, Any]:
+        return attributes_for_publication(self.raw_attributes, self.raw_scrape_status)
 
     @computed_field(return_type=SchoolDisplayAttributes)
     @property
     def attributes(self) -> SchoolDisplayAttributes:
-        base, _ = build_display_attributes(self.raw_attributes)
+        base, _ = build_display_attributes(self.public_attributes_input)
         return SchoolDisplayAttributes.model_validate(base)
 
     @computed_field(return_type=dict[str, SchoolLocalizedAttributes])
     @property
     def attributes_i18n(self) -> dict[str, SchoolLocalizedAttributes]:
-        _, localized = build_display_attributes(self.raw_attributes)
+        _, localized = build_display_attributes(self.public_attributes_input)
         return {
             locale: SchoolLocalizedAttributes.model_validate(values)
             for locale, values in localized.items()
         }
+
+    @computed_field(return_type=Optional[dict[str, JsonValue]])
+    @property
+    def admission_info(self) -> Optional[dict[str, JsonValue]]:
+        if not isinstance(self.raw_admission_info, dict):
+            return None
+        public = SchoolAdmissionInfo.model_validate(self.raw_admission_info)
+        payload = public.model_dump(mode="json", exclude_none=True, exclude_defaults=True)
+        return payload or None
 
 
 class SchoolPricingMixin(SchoolAttributesMixin):
@@ -128,13 +178,28 @@ class SchoolPricingMixin(SchoolAttributesMixin):
     @computed_field(return_type=list[PricingResponse])
     @property
     def pricing(self) -> list[PricingResponse]:
-        blocked_ids = blocked_pricing_row_ids(self.raw_attributes)
-        rows = [PricingResponse.model_validate(row) for row in self.raw_pricing]
-        return [
-            row
-            for row in rows
-            if row.id not in blocked_ids and passes_pricing_gate(row.source_url, row.pricing_context)
-        ]
+        blocked_ids = blocked_pricing_row_ids(self.public_attributes_input)
+        published: list[PricingResponse] = []
+        for raw_row in self.raw_pricing:
+            if isinstance(raw_row, dict):
+                source_url = raw_row.get("source_url")
+                pricing_context = raw_row.get("pricing_context")
+            else:
+                source_url = getattr(raw_row, "source_url", None)
+                pricing_context = getattr(raw_row, "pricing_context", None)
+
+            # Gate the stored values before Pydantic can coerce malformed input
+            # (for example, a string confidence of "0.9") into a valid public type.
+            if not passes_pricing_gate(source_url, pricing_context):
+                continue
+
+            row = PricingResponse.model_validate(raw_row)
+            if row.id in blocked_ids:
+                continue
+            if row.source.value == "scraped_website" and not self.website_data_publishable:
+                continue
+            published.append(row)
+        return published
 
 
 class SchoolLocationAgeGroupShift(BaseModel):
@@ -204,8 +269,6 @@ class SchoolBase(SchoolAttributesMixin):
         exclude=True,
     )
     num_pupils: Optional[int] = None
-    admission_info: Optional[dict] = None
-
     model_config = ConfigDict(populate_by_name=True)
 
     @computed_field(return_type=Optional[SummaryI18n])
@@ -213,14 +276,14 @@ class SchoolBase(SchoolAttributesMixin):
     def summary_i18n(self) -> Optional[SummaryI18n]:
         # P1.7: a stored summary is withheld once validation regresses below `ok`,
         # not just blocked from regeneration.
-        if not summary_is_publishable(self.raw_attributes):
+        if not self.website_data_publishable or not summary_is_publishable(self.public_attributes_input):
             return None
         return self.raw_summary_i18n
 
     @computed_field(return_type=dict[str, str])
     @property
     def resolved_name_i18n(self) -> dict[str, str]:
-        return resolve_name_i18n(self.name_i18n, self.raw_attributes)
+        return resolve_name_i18n(self.name_i18n, self.public_attributes_input)
 
 
 class SchoolCreate(SchoolBase):
@@ -233,9 +296,25 @@ class SchoolResponse(SchoolBase, SchoolPricingMixin):
     updated_at: datetime
     locations: list[SchoolLocationResponse] = []
     exam_results: list[ExamResultResponse] = []
-    field_sources: list[FieldSourceResponse] = []
+    raw_field_sources: list[Any] = Field(
+        default_factory=list,
+        validation_alias="field_sources",
+        exclude=True,
+    )
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    @computed_field(return_type=list[FieldSourceResponse])
+    @property
+    def field_sources(self) -> list[FieldSourceResponse]:
+        rows = [FieldSourceResponse.model_validate(row) for row in self.raw_field_sources]
+        if self.website_data_publishable:
+            return rows
+        return [
+            row
+            for row in rows
+            if row.source_type.value not in {"scraped_website", "official_website"}
+        ]
 
 
 class SchoolListResponse(SchoolPricingMixin):
@@ -244,7 +323,6 @@ class SchoolListResponse(SchoolPricingMixin):
     name_i18n: dict
     school_type: str
     education_level: str
-    admission_info: Optional[dict] = None
     locations: list[SchoolLocationResponse] = []
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
@@ -252,4 +330,4 @@ class SchoolListResponse(SchoolPricingMixin):
     @computed_field(return_type=dict[str, str])
     @property
     def resolved_name_i18n(self) -> dict[str, str]:
-        return resolve_name_i18n(self.name_i18n, self.raw_attributes)
+        return resolve_name_i18n(self.name_i18n, self.public_attributes_input)

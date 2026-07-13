@@ -35,11 +35,16 @@ async def quality_fixture(db_session):
     a = await _make_school(
         db_session,
         website_url="https://a.bg",
+        scrape_status="extracted",
         attributes={
             "extracted": {"languages": []},
             "display_name_i18n": {"bg": "Бранд А"},
             "display_name_evidence": {"status": "corroborated", "signals": ["x", "y"]},
-            "data_validation": {"status": "ok", "spot_check": {"has_discrepancy": True}},
+            "data_validation": {
+                "_schema_version": 1,
+                "status": "ok",
+                "spot_check": {"has_discrepancy": True},
+            },
         },
     )
     db_session.add(
@@ -65,10 +70,15 @@ async def quality_fixture(db_session):
     b = await _make_school(
         db_session,
         website_url="https://b.bg",
+        scrape_status="extracted",
         attributes={
             "extracted": {"languages": []},
             "display_name_i18n": {"bg": "Бранд Б"},
-            "data_validation": {"status": "needs_review", "spot_check": {"has_discrepancy": False}},
+            "data_validation": {
+                "_schema_version": 1,
+                "status": "needs_review",
+                "spot_check": {"has_discrepancy": False},
+            },
         },
     )
     db_session.add(
@@ -100,6 +110,14 @@ async def test_metrics_cover_all_six(quality_fixture):
         "pct": 50.0,
         "with_report": 2,
         "coverage_pct": 100.0,
+    }
+    assert m["website_validation_coverage"] == {
+        "eligible": 2,
+        "with_report": 2,
+        "coverage_pct": 100.0,
+        "ok": 1,
+        "ok_pct": 50.0,
+        "published_without_report": 0,
     }
     assert m["duplicate_coordinate_groups"] == 1
     assert m["location_precision_exact"] == {
@@ -172,6 +190,42 @@ async def test_missing_reports_and_precision_count_against_coverage(db_session):
     }
 
 
+async def test_website_validation_coverage_excludes_registry_only_and_withheld_data(db_session):
+    publishable = await _make_school(
+        db_session,
+        scrape_status="extracted",
+        website_url="https://publishable.bg",
+        attributes={"extracted": {"programs": ["STEM"]}},
+    )
+    await _make_school(
+        db_session,
+        scrape_status="no_official_website",
+        attributes={"extracted": {"programs": ["Legacy"]}},
+    )
+    await _make_school(
+        db_session,
+        scrape_status="extracted",
+        website_url="https://withheld.bg",
+        attributes={
+            "website_data_withheld": True,
+            "extracted": {"programs": ["Stored"]},
+        },
+    )
+    await db_session.commit()
+
+    metrics = await compute_quality_metrics(db_session, country="bg", city="sofia")
+
+    assert publishable.id is not None
+    assert metrics["website_validation_coverage"] == {
+        "eligible": 1,
+        "with_report": 0,
+        "coverage_pct": 0.0,
+        "ok": 0,
+        "ok_pct": 0.0,
+        "published_without_report": 1,
+    }
+
+
 async def test_pricing_failure_metric_matches_fail_closed_publication_gate(db_session):
     school = await _make_school(db_session)
     contexts = [
@@ -204,6 +258,45 @@ async def test_pricing_failure_metric_matches_fail_closed_publication_gate(db_se
         "failing": 5,
         "total": 6,
         "pct": pytest.approx(83.3),
+    }
+
+
+async def test_validation_coverage_counts_only_gate_passing_scraped_pricing(db_session):
+    publishable = await _make_school(db_session, scrape_status="extracted", attributes={})
+    withheld = await _make_school(db_session, scrape_status="extracted", attributes={})
+    db_session.add_all(
+        [
+            Pricing(
+                school_id=publishable.id,
+                category=PriceCategory.TUITION,
+                period=PricePeriod.MONTHLY,
+                amount=500,
+                source=PriceSource.SCRAPED_WEBSITE,
+                source_url="https://example.com/fees",
+                pricing_context={"confidence": 0.9},
+            ),
+            Pricing(
+                school_id=withheld.id,
+                category=PriceCategory.TUITION,
+                period=PricePeriod.MONTHLY,
+                amount=500,
+                source=PriceSource.SCRAPED_WEBSITE,
+                source_url=None,
+                pricing_context={"confidence": "0.9"},
+            ),
+        ]
+    )
+    await db_session.commit()
+
+    metrics = await compute_quality_metrics(db_session, country="bg", city="sofia")
+
+    assert metrics["website_validation_coverage"] == {
+        "eligible": 1,
+        "with_report": 0,
+        "coverage_pct": 0.0,
+        "ok": 0,
+        "ok_pct": 0.0,
+        "published_without_report": 1,
     }
 
 

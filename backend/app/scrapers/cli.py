@@ -3367,6 +3367,13 @@ async def _show_data_quality(city, country, runs):
             _pct(v["coverage_pct"]),
             f"{v['with_report']}/{v['total']} schools",
         )
+        w = metrics["website_validation_coverage"]
+        table.add_row(
+            "Publishable website-data coverage",
+            _pct(w["coverage_pct"]),
+            f"{w['with_report']}/{w['eligible']} eligible; "
+            f"{w['published_without_report']} published without report",
+        )
         table.add_row("Duplicate coordinate groups", str(metrics["duplicate_coordinate_groups"]), "points shared by ≥2 schools")
         p = metrics["location_precision_exact"]
         table.add_row(

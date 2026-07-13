@@ -19,6 +19,9 @@
 --   jq -s -e '[.[] | .. | objects | keys[]? | select(
 --       . == "extracted" or . == "extracted_i18n" or
 --       . == "data_validation" or . == "source_refs" or
+--       . == "website_extracted" or . == "value_json" or
+--       . == "field_path" or . == "confidence_score" or
+--       . == "submitted_by" or
 --       startswith("moe_")
 --     )] | length == 0' "$tmp/list.json" "$tmp/detail.json" "$tmp/compare.json"
 
@@ -63,6 +66,73 @@ FROM schools
 WHERE country_code = :'country' AND lower(city) = lower(:'city')
 GROUP BY 1
 ORDER BY 2 DESC, 1;
+
+\echo '1a. Validation coverage among publishable website-derived data'
+WITH scoped AS (
+    SELECT school.*
+    FROM schools AS school
+    WHERE school.country_code = :'country'
+      AND lower(school.city) = lower(:'city')
+), eligible AS (
+    SELECT school.*
+    FROM scoped AS school
+    WHERE school.scrape_status IN ('extracted', 'summarized')
+      AND coalesce(school.attributes->>'website_data_withheld', 'false') <> 'true'
+      AND (
+          coalesce(school.attributes->'extracted', '{}'::json)::text <> '{}'
+          OR coalesce(school.attributes->'display_name_i18n', '{}'::json)::text <> '{}'
+          OR coalesce(school.admission_info->'website_extracted', '{}'::json)::text <> '{}'
+          OR coalesce(school.summary_i18n, '{}'::json)::text <> '{}'
+          OR EXISTS (
+              SELECT 1 FROM pricing
+              WHERE pricing.school_id = school.id
+                AND pricing.source = 'SCRAPED_WEBSITE'
+                AND nullif(btrim(pricing.source_url), '') IS NOT NULL
+                AND json_typeof(pricing.pricing_context->'confidence') = 'number'
+                AND (pricing.pricing_context->>'confidence')::numeric BETWEEN 0.7 AND 1.0
+          )
+      )
+)
+SELECT
+    count(*) AS eligible_schools,
+    count(*) FILTER (
+        WHERE json_typeof(attributes->'data_validation') = 'object'
+          AND attributes->'data_validation'->>'_schema_version' = '1'
+    ) AS with_current_report,
+    round(
+        100.0 * count(*) FILTER (
+            WHERE json_typeof(attributes->'data_validation') = 'object'
+              AND attributes->'data_validation'->>'_schema_version' = '1'
+        ) / nullif(count(*), 0),
+        1
+    ) AS eligible_coverage_pct,
+    count(*) FILTER (
+        WHERE coalesce(attributes->'data_validation'->>'_schema_version', '') <> '1'
+    ) AS published_without_report
+FROM eligible;
+
+\echo '1b. Stored website data currently withheld by URL state'
+SELECT
+    scrape_status,
+    count(*) AS schools_with_stored_website_data
+FROM schools AS school
+WHERE school.country_code = :'country'
+  AND lower(school.city) = lower(:'city')
+  AND (
+      school.scrape_status NOT IN ('extracted', 'summarized')
+      OR coalesce(school.attributes->>'website_data_withheld', 'false') = 'true'
+  )
+  AND (
+      coalesce(school.attributes->'extracted', '{}'::json)::text <> '{}'
+      OR coalesce(school.admission_info->'website_extracted', '{}'::json)::text <> '{}'
+      OR EXISTS (
+          SELECT 1 FROM pricing
+          WHERE pricing.school_id = school.id
+            AND pricing.source = 'SCRAPED_WEBSITE'
+      )
+  )
+GROUP BY scrape_status
+ORDER BY scrape_status;
 
 \echo '2. Stored summary publication eligibility'
 WITH scoped AS (
@@ -113,6 +183,18 @@ SELECT
         1
     ) AS exact_pct_of_geocoded
 FROM scoped;
+
+SELECT
+    count(*) AS website_map_points,
+    count(*) FILTER (
+        WHERE geocode_meta->>'method' = 'website_map_link'
+          AND geocode_meta->>'precision' = 'exact'
+    ) AS website_map_points_with_expected_meta
+FROM school_locations AS location
+JOIN schools AS school ON school.id = location.school_id
+WHERE school.country_code = :'country'
+  AND lower(school.city) = lower(:'city')
+  AND location.location_tags::jsonb @> '["coords_source=website_map_link"]'::jsonb;
 
 \echo '4. Duplicate coordinate groups (review legitimate co-located schools manually)'
 SELECT
