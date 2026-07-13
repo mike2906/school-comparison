@@ -14,17 +14,17 @@ def _base_payload() -> dict:
     }
 
 
-def test_value_json_accepts_list_payload():
+def test_value_json_list_payload_is_not_public():
     payload = _base_payload()
     payload["value_json"] = ["STEM Кабинет", "физкултурен салон", "външно спортно игрище"]
 
     model = FieldSourceResponse.model_validate(payload)
 
-    assert isinstance(model.value_json, list)
-    assert model.value_json[0] == "STEM Кабинет"
+    assert "value_json" not in model.model_dump()
+    assert not hasattr(model, "value_json")
 
 
-def test_value_json_accepts_nested_object_payload():
+def test_value_json_object_payload_is_not_public():
     payload = _base_payload()
     payload["value_json"] = {
         "languages": [
@@ -35,5 +35,5 @@ def test_value_json_accepts_nested_object_payload():
 
     model = FieldSourceResponse.model_validate(payload)
 
-    assert isinstance(model.value_json, dict)
-    assert "languages" in model.value_json
+    assert "value_json" not in model.model_dump()
+    assert not hasattr(model, "value_json")

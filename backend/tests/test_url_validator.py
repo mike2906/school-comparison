@@ -18,7 +18,9 @@ from app.scrapers.url_validator import (
     _update_timeout_failure_state,
     TIMEOUT_FAILURE_ATTR_KEY,
 )
-from app.models import School, SourcePage, ScrapeType
+from app.models import School, SchoolLocation, SourcePage, ScrapeType
+from app.models.field_source import FieldSource, SourceType
+from app.models.pricing import PriceSource, Pricing
 from app.scrapers.base import BaseScraper
 
 
@@ -1044,21 +1046,86 @@ async def test_update_validation_result_clears_stale_validated_website_on_invali
         attributes={
             "validated_website_url": "https://old-school.bg",
             "display_name_i18n": {"bg": "ЧОУ Азбуки", "en": "Azbuki School"},
+            "display_name_evidence": {"status": "corroborated"},
             "extracted": {"programs": ["Wrong data"]},
             "extracted_i18n": {"en": {"programs": ["Wrong data"]}},
+            "data_validation": {"_schema_version": 1, "status": "ok"},
+            "summary_generation": {"_schema_version": 1},
         },
+        admission_info={"status": "accepting", "website_extracted": {"deadlines": ["Wrong"]}},
     )
     db_session.add(school)
     await db_session.flush()
-    db_session.add(
-        SourcePage(
-            school_id=school.id,
-            scrape_type=ScrapeType.WEBSITE,
-            source_url="https://wrong-school.bg/about",
-            content_hash=BaseScraper.compute_hash("wrong"),
-            is_valid=True,
-            raw_markdown="wrong",
-        )
+    website_location = SchoolLocation(
+        school_id=school.id,
+        address_i18n={"bg": "Адрес на грешното училище"},
+        lat=42.7,
+        lng=23.3,
+        location_tags=[
+            "address_source=website_contact",
+            "coords_source=website_map_link",
+        ],
+        geocode_meta={"method": "website_map_link", "precision": "exact"},
+        is_primary=True,
+    )
+    official_location = SchoolLocation(
+        school_id=school.id,
+        address_i18n={"bg": "Официален втори адрес"},
+        lat=42.71,
+        lng=23.31,
+        location_tags=["registry"],
+        geocode_meta={"method": "geojson", "precision": "approximate"},
+        is_primary=False,
+    )
+    db_session.add_all(
+        [
+            SourcePage(
+                school_id=school.id,
+                scrape_type=ScrapeType.WEBSITE,
+                source_url="https://wrong-school.bg/about",
+                content_hash=BaseScraper.compute_hash("wrong"),
+                is_valid=True,
+                raw_markdown="wrong",
+            ),
+            website_location,
+            official_location,
+        ]
+    )
+    db_session.add_all(
+        [
+            Pricing(
+                school_id=school.id,
+                category="tuition",
+                amount=500,
+                currency="BGN",
+                period="monthly",
+                source=PriceSource.SCRAPED_WEBSITE,
+                source_url="https://wrong-school.bg/fees",
+                pricing_context={"confidence": 0.9},
+            ),
+            Pricing(
+                school_id=school.id,
+                category="activities",
+                amount=50,
+                currency="BGN",
+                period="monthly",
+                source=PriceSource.OFFICIAL,
+                source_url="https://registry.bg/fees",
+                pricing_context={"confidence": 1.0},
+            ),
+            FieldSource(
+                school_id=school.id,
+                field_key="attributes.programs",
+                source_type=SourceType.SCRAPED_WEBSITE,
+                source_url="https://wrong-school.bg",
+            ),
+            FieldSource(
+                school_id=school.id,
+                field_key="admission_info",
+                source_type=SourceType.GOVERNMENT,
+                source_url="https://registry.bg",
+            ),
+        ]
     )
     await db_session.commit()
 
@@ -1087,6 +1154,11 @@ async def test_update_validation_result_clears_stale_validated_website_on_invali
     assert "display_name_i18n" not in school.attributes
     assert "extracted" not in school.attributes
     assert "extracted_i18n" not in school.attributes
+    assert "display_name_evidence" not in school.attributes
+    assert "data_validation" not in school.attributes
+    assert "summary_generation" not in school.attributes
+    assert school.attributes.get("website_data_withheld") is True
+    assert school.admission_info == {"status": "accepting"}
     assert "ЧОУ Азбуки" in school.attributes.get("website_mismatch_reason", "")
     invalidated_page = (
         await db_session.execute(
@@ -1094,6 +1166,69 @@ async def test_update_validation_result_clears_stale_validated_website_on_invali
         )
     ).scalar_one()
     assert invalidated_page.is_valid is False
+    pricing = (
+        await db_session.execute(select(Pricing).where(Pricing.school_id == school.id))
+    ).scalars().all()
+    assert [row.source for row in pricing] == [PriceSource.OFFICIAL]
+    sources = (
+        await db_session.execute(select(FieldSource).where(FieldSource.school_id == school.id))
+    ).scalars().all()
+    assert [row.source_type for row in sources] == [SourceType.GOVERNMENT]
+    await db_session.refresh(website_location)
+    await db_session.refresh(official_location)
+    assert website_location.address_i18n == {}
+    assert website_location.lat is None
+    assert website_location.lng is None
+    assert website_location.geocode_meta == {}
+    assert "address_source=website_contact" not in (website_location.location_tags or [])
+    assert "coords_source=website_map_link" not in (website_location.location_tags or [])
+    assert official_location.address_i18n == {"bg": "Официален втори адрес"}
+    assert official_location.lat == 42.71
+    assert official_location.lng == 23.31
+    assert official_location.geocode_meta == {
+        "method": "geojson",
+        "precision": "approximate",
+    }
+
+
+@pytest.mark.asyncio
+async def test_ambiguous_url_withholds_but_preserves_stored_data_for_recovery(db_session):
+    school = School(
+        name_i18n={"bg": "Тест"},
+        country_code="bg",
+        school_type="private",
+        education_level="primary",
+        website_url="https://uncertain.bg",
+        scrape_status="extracted",
+        attributes={
+            "extracted": {"programs": ["Stored"]},
+            "data_validation": {"_schema_version": 1, "status": "ok"},
+        },
+    )
+    db_session.add(school)
+    await db_session.commit()
+
+    class SessionCtx:
+        async def __aenter__(self):
+            return db_session
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+    with patch("app.database.async_session_maker", return_value=SessionCtx()):
+        await _update_validation_result(
+            school_id=school.id,
+            url="https://uncertain.bg",
+            result=ValidationResult.AMBIGUOUS,
+            final_url=None,
+            reason="Identity could not be confirmed",
+        )
+
+    await db_session.refresh(school)
+    assert school.scrape_status == "failed_validate"
+    assert school.website_url is None
+    assert school.attributes["website_data_withheld"] is True
+    assert school.attributes["extracted"] == {"programs": ["Stored"]}
 
 
 class TestBotProtectionDetection:

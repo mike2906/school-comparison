@@ -4,7 +4,12 @@ from typing import Literal, Optional
 from dataclasses import dataclass
 
 
-GeocodingMethod = Literal["geojson_name_match", "nominatim_address", "nominatim_fallback"]
+GeocodingMethod = Literal[
+    "geojson_name_match",
+    "nominatim_address",
+    "nominatim_fallback",
+    "website_map_link",
+]
 GeocodingPrecision = Literal["exact", "approximate"]
 
 

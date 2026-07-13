@@ -2,6 +2,7 @@
 import pytest
 from sqlalchemy import select
 
+from app.models.field_source import FieldSource, SourceType
 from app.models.pricing import Pricing, PriceSource
 from app.models.school import School, SchoolLocation, SchoolLocationAgeGroupShift
 
@@ -95,6 +96,168 @@ class TestSchoolsEndpoint:
         assert "summary_i18n" in school
         assert "exam_results" in school
         assert "field_sources" in school
+
+    @pytest.mark.asyncio
+    async def test_json_backed_response_fields_use_positive_allowlists(self, seeded_db, seeded_client):
+        school = School(
+            name_i18n={"bg": "Публично училище", "en": "Public School"},
+            country_code="bg",
+            city="sofia",
+            school_type="private",
+            education_level="primary",
+            website_url="https://public-school.bg",
+            scrape_status="extracted",
+            attributes={"data_validation": _validation_report(status="ok")},
+            admission_info={
+                "system": "interview",
+                "status": "accepting",
+                "website_extracted": {"has_useful_info": True, "deadlines": ["Internal raw value"]},
+                "internal_note": "must not ship",
+            },
+        )
+        seeded_db.add(school)
+        await seeded_db.flush()
+        seeded_db.add(
+            SchoolLocation(
+                school_id=school.id,
+                address_i18n={"bg": "София"},
+                lat=42.7,
+                lng=23.3,
+                is_primary=True,
+            )
+        )
+        seeded_db.add(
+            Pricing(
+                school_id=school.id,
+                category="tuition",
+                amount=500,
+                currency="BGN",
+                period="monthly",
+                source=PriceSource.SCRAPED_WEBSITE,
+                source_url="https://public-school.bg/fees",
+                pricing_context={
+                    "confidence": 0.9,
+                    "includes": ["Books"],
+                    "internal_prompt_trace": "must not ship",
+                },
+            )
+        )
+        seeded_db.add(
+            FieldSource(
+                school_id=school.id,
+                category="general_info",
+                field_key="attributes.admission",
+                field_path="attributes.extracted.admission",
+                value_text="Admissions",
+                value_json={"raw": "must not ship"},
+                source_type=SourceType.SCRAPED_WEBSITE,
+                source_url="https://public-school.bg/admissions",
+                notes="internal note",
+            )
+        )
+        await seeded_db.commit()
+
+        list_response = await seeded_client.get("/schools")
+        listed = next(row for row in list_response.json() if row["id"] == school.id)
+        assert listed["admission_info"]["system"] == "interview"
+        assert listed["admission_info"]["status"] == "accepting"
+        assert "website_extracted" not in listed["admission_info"]
+        assert "internal_note" not in listed["admission_info"]
+
+        detail_response = await seeded_client.get(f"/schools/{school.id}")
+        detail = detail_response.json()
+        assert "website_extracted" not in detail["admission_info"]
+        assert "internal_note" not in detail["admission_info"]
+        assert "internal_prompt_trace" not in detail["pricing"][0]["pricing_context"]
+        assert detail["pricing"][0]["pricing_context"]["includes"] == ["Books"]
+        source = detail["field_sources"][0]
+        assert set(source) == {
+            "id",
+            "category",
+            "value_text",
+            "source_type",
+            "source_url",
+            "display_url",
+            "scraped_at",
+            "last_verified",
+            "confidence",
+        }
+
+    @pytest.mark.asyncio
+    async def test_unpublishable_website_state_withholds_all_scraped_payloads(
+        self, seeded_db, seeded_client
+    ):
+        school = School(
+            name_i18n={"bg": "Регистърно име", "en": "Registry Name"},
+            country_code="bg",
+            city="sofia",
+            school_type="private",
+            education_level="primary",
+            website_url=None,
+            scrape_status="no_official_website",
+            summary_i18n={
+                "bg": {"short": "Старо", "long": "Старо резюме"},
+                "en": {"short": "Old", "long": "Old summary"},
+            },
+            attributes={
+                "display_name_i18n": {"bg": "Старо име", "en": "Old name"},
+                "display_name_evidence": {"status": "corroborated"},
+                "extracted": {"facilities": ["Old pool"]},
+                "data_validation": _validation_report(status="ok"),
+            },
+            admission_info={"status": "accepting", "website_extracted": {"deadlines": ["Old"]}},
+        )
+        seeded_db.add(school)
+        await seeded_db.flush()
+        seeded_db.add_all(
+            [
+                Pricing(
+                    school_id=school.id,
+                    category="tuition",
+                    amount=500,
+                    currency="BGN",
+                    period="monthly",
+                    source=PriceSource.SCRAPED_WEBSITE,
+                    source_url="https://old.bg/fees",
+                    pricing_context={"confidence": 0.9},
+                ),
+                Pricing(
+                    school_id=school.id,
+                    category="activities",
+                    amount=50,
+                    currency="BGN",
+                    period="monthly",
+                    source=PriceSource.OFFICIAL,
+                    source_url="https://registry.bg/fees",
+                    pricing_context={"confidence": 1.0},
+                ),
+                FieldSource(
+                    school_id=school.id,
+                    category="general_info",
+                    field_key="attributes.facilities",
+                    source_type=SourceType.SCRAPED_WEBSITE,
+                    source_url="https://old.bg",
+                ),
+                FieldSource(
+                    school_id=school.id,
+                    category="admission",
+                    field_key="admission_info",
+                    source_type=SourceType.GOVERNMENT,
+                    source_url="https://registry.bg",
+                ),
+            ]
+        )
+        await seeded_db.commit()
+
+        response = await seeded_client.get(f"/schools/{school.id}")
+        payload = response.json()
+        assert payload["resolved_name_i18n"] == school.name_i18n
+        assert payload["attributes_i18n"]["bg"]["facilities"] == []
+        assert payload["summary_i18n"] is None
+        assert [row["source"] for row in payload["pricing"]] == ["official"]
+        assert [row["source_type"] for row in payload["field_sources"]] == ["government"]
+        assert payload["admission_info"]["status"] == "accepting"
+        assert "website_extracted" not in payload["admission_info"]
 
     @pytest.mark.asyncio
     async def test_resolved_name_i18n_derives_english_fallback(self, seeded_db, seeded_client):
@@ -544,6 +707,7 @@ class TestSchoolsSearchEndpoint:
                 "status": "corroborated",
             },
         }
+        school.scrape_status = "extracted"
         await seeded_db.commit()
 
         response = await seeded_client.get("/schools/search?q=Fusion")
@@ -553,6 +717,44 @@ class TestSchoolsSearchEndpoint:
         # display_name_i18n is internal; the resolved name is what reaches the client.
         assert data[0]["resolved_name_i18n"]["en"] == "Fusion School"
         assert "display_name_i18n" not in data[0]["attributes"]
+
+    @pytest.mark.asyncio
+    async def test_search_ignores_withheld_display_name(self, seeded_db, seeded_client):
+        school = (
+            await seeded_db.execute(select(School).where(School.school_type == "private"))
+        ).scalar_one()
+        school.scrape_status = "extracted"
+        school.attributes = {
+            "website_data_withheld": True,
+            "display_name_i18n": {"bg": "Hidden Fusion", "en": "Hidden Fusion"},
+            "display_name_evidence": {
+                "signals": ["website_domain_alias_match", "repeated_on_page_identity"],
+                "status": "corroborated",
+            },
+        }
+        await seeded_db.commit()
+
+        response = await seeded_client.get("/schools/search?q=Hidden%20Fusion")
+
+        assert response.status_code == 200
+        assert response.json() == []
+
+    @pytest.mark.asyncio
+    async def test_advanced_filter_ignores_withheld_extracted_values(self, seeded_db, seeded_client):
+        school = (
+            await seeded_db.execute(select(School).where(School.school_type == "private"))
+        ).scalar_one()
+        school.scrape_status = "extracted"
+        school.attributes = {
+            "website_data_withheld": True,
+            "extracted": {"programs": ["Montessori"]},
+        }
+        await seeded_db.commit()
+
+        response = await seeded_client.get("/schools?teaching_approach=montessori")
+
+        assert response.status_code == 200
+        assert all(row["id"] != school.id for row in response.json())
 
     @pytest.mark.asyncio
     async def test_search_ignores_uncorroborated_display_name_i18n(self, seeded_db, seeded_client):
@@ -607,6 +809,7 @@ class TestSchoolsSearchEndpoint:
             school_type="state",
             education_level="primary",
             city="sofia",
+            scrape_status="extracted",
             attributes={},
         )
         seeded_db.add(school)
@@ -990,6 +1193,7 @@ class TestDisplayGating:
             school_type="private",
             education_level="primary",
             city="sofia",
+            scrape_status="extracted",
             attributes={},
         )
         seeded_db.add(school)
@@ -1028,6 +1232,17 @@ class TestDisplayGating:
                     source_url="https://example.com/fees",
                     pricing_context={"confidence": 0.4},
                 ),
+                # A numeric-looking string must not be coerced through the gate.
+                Pricing(
+                    school_id=school.id,
+                    category="activities",
+                    amount=50,
+                    currency="BGN",
+                    period="monthly",
+                    source=PriceSource.SCRAPED_WEBSITE,
+                    source_url="https://example.com/fees",
+                    pricing_context={"confidence": "0.9"},
+                ),
             ]
         )
         await seeded_db.commit()
@@ -1045,6 +1260,7 @@ class TestDisplayGating:
             school_type="private",
             education_level="primary",
             city="sofia",
+            scrape_status="extracted",
             attributes={},
         )
         seeded_db.add(school)
@@ -1100,6 +1316,7 @@ class TestDisplayGating:
             school_type="private",
             education_level="primary",
             city="sofia",
+            scrape_status="summarized",
             summary_i18n=summary,
             attributes={},
         )
@@ -1109,6 +1326,7 @@ class TestDisplayGating:
             school_type="private",
             education_level="primary",
             city="sofia",
+            scrape_status="summarized",
             summary_i18n=summary,
             attributes={"data_validation": _validation_report(status="needs_review")},
         )
@@ -1118,6 +1336,7 @@ class TestDisplayGating:
             school_type="private",
             education_level="primary",
             city="sofia",
+            scrape_status="summarized",
             summary_i18n=summary,
             attributes={"data_validation": _validation_report(status="ok", issues=[])},
         )
@@ -1141,6 +1360,7 @@ class TestDisplayGating:
             school_type="private",
             education_level="primary",
             city="sofia",
+            scrape_status="extracted",
             attributes={
                 "extracted": {
                     "facilities": ["Library", "Gym"],

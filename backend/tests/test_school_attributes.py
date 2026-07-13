@@ -544,6 +544,7 @@ class TestFilterableProjection:
                 "programs": ["Футбол", "Montessori"],
             }
         }
+        school.scrape_status = "extracted"
         await seeded_db.commit()
 
         service = SchoolService(seeded_db)
@@ -606,6 +607,7 @@ class TestSerializationAllowlist:
     async def _school_with_attributes(self, db, attributes: dict) -> School:
         school = (await db.execute(select(School))).scalars().first()
         school.attributes = attributes
+        school.scrape_status = "extracted"
         await db.commit()
         return (
             await db.execute(
@@ -632,6 +634,7 @@ class TestSerializationAllowlist:
     async def test_api_serves_merged_attributes(self, seeded_db, seeded_client):
         school = (await seeded_db.execute(select(School))).scalars().first()
         school.attributes = INTERNAL_ATTRIBUTES
+        school.scrape_status = "extracted"
         await seeded_db.commit()
 
         response = await seeded_client.get(f"/schools/{school.id}")

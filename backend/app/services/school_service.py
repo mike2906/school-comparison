@@ -9,6 +9,11 @@ from app.models.school import School, SchoolLocation, SchoolLocationAgeGroupShif
 from app.services.geocoding.bounds import SOFIA_MUNICIPALITY_BOUNDS, get_city_bounds
 from app.utils.i18n_resolver import resolve_address_i18n, resolve_name_i18n
 from app.utils.school_attributes import build_filterable_attributes
+from app.utils.website_data import (
+    WEBSITE_DATA_WITHHELD_KEY,
+    WEBSITE_PUBLISHABLE_STATUSES,
+    attributes_for_publication,
+)
 
 SOFIA_MAP_BOUNDS = SOFIA_MUNICIPALITY_BOUNDS
 
@@ -189,7 +194,9 @@ class SchoolService:
         def matches_filter(school: School) -> bool:
             # Match against the same projection the API serves, not the raw JSONB:
             # facilities/programs/languages only exist nested inside `attributes.extracted`.
-            attributes = build_filterable_attributes(school.attributes)
+            attributes = build_filterable_attributes(
+                attributes_for_publication(school.attributes, school.scrape_status)
+            )
 
             if language_focus:
                 values = attributes.get("language_focus") or []
@@ -233,7 +240,7 @@ class SchoolService:
         city: Optional[str] = "sofia",
     ) -> dict[str, list[str]]:
         query = (
-            select(School.attributes)
+            select(School.attributes, School.scrape_status)
             .where(School.country_code == country_code)
             .where(self._has_resolved_location(city))
         )
@@ -241,7 +248,7 @@ class SchoolService:
         if city_clause is not None:
             query = query.where(city_clause)
         result = await self.db.execute(query)
-        rows = result.scalars().all()
+        rows = result.all()
 
         categories = {
             "language_focus_pairs": set(),
@@ -256,10 +263,12 @@ class SchoolService:
         # against, so emitted options can never diverge from what actually matches.
         # facilities/special_programs/teaching_approach are already mapped onto the
         # controlled vocabulary there (P1.9), so only canonical tags are surfaced.
-        for attrs in rows:
+        for attrs, scrape_status in rows:
             if not attrs:
                 continue
-            filterable = build_filterable_attributes(attrs)
+            filterable = build_filterable_attributes(
+                attributes_for_publication(attrs, scrape_status)
+            )
 
             for value in filterable.get("language_focus") or []:
                 language = value.get("language")
@@ -330,6 +339,8 @@ class SchoolService:
         evidence_signals = cast(School.attributes["display_name_evidence"]["signals"], String)
         corroborated_display_clause = and_(
             or_(*display_match_clauses),
+            School.scrape_status.in_(WEBSITE_PUBLISHABLE_STATUSES),
+            School.attributes[WEBSITE_DATA_WITHHELD_KEY].as_boolean().is_not(True),
             evidence_signals.like('%"website_domain_alias_match"%'),
             evidence_signals.like('%"repeated_on_page_identity"%'),
         )
@@ -390,7 +401,13 @@ class SchoolService:
         folded_variants = [variant.casefold() for variant in variants]
         city_clause = self._city_clause(city)
         query = (
-            select(School.id, School.name_i18n, School.attributes, SchoolLocation.address_i18n)
+            select(
+                School.id,
+                School.name_i18n,
+                School.attributes,
+                School.scrape_status,
+                SchoolLocation.address_i18n,
+            )
             .outerjoin(SchoolLocation, SchoolLocation.school_id == School.id)
             .where(School.country_code == country_code)
             .where(self._has_resolved_location(city))
@@ -403,11 +420,16 @@ class SchoolService:
         result = await self.db.execute(query)
         matched_ids: list[int] = []
         seen_ids: set[int] = set()
-        for school_id, name_i18n, attributes, address_i18n in result.all():
+        for school_id, name_i18n, attributes, scrape_status, address_i18n in result.all():
             if school_id in seen_ids:
                 continue
             searchable_values = list((name_i18n or {}).values())
-            searchable_values.extend(resolve_name_i18n(name_i18n, attributes).values())
+            searchable_values.extend(
+                resolve_name_i18n(
+                    name_i18n,
+                    attributes_for_publication(attributes, scrape_status),
+                ).values()
+            )
             searchable_values.extend((address_i18n or {}).values())
             searchable_values.extend(resolve_address_i18n(address_i18n).values())
 

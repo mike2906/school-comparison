@@ -65,6 +65,8 @@ async def sample_school_for_extraction(db_session):
 @pytest.mark.asyncio
 async def test_extract_school_persists_pricing_and_general_info(db_session, sample_school_for_extraction):
     school = sample_school_for_extraction
+    school.attributes = {"website_data_withheld": True}
+    await db_session.commit()
 
     mock_price = PriceExtractionOutput(
         prices=[
@@ -127,6 +129,7 @@ async def test_extract_school_persists_pricing_and_general_info(db_session, samp
         "bg": "Fusion School",
         "en": "Fusion School",
     }
+    assert "website_data_withheld" not in (school.attributes or {})
 
     field_sources = (
         await db_session.execute(select(FieldSource).where(FieldSource.school_id == school.id))
@@ -169,6 +172,57 @@ async def test_extract_school_uses_deterministic_fallback_when_general_llm_fails
     await db_session.refresh(school)
     extracted = (school.attributes or {}).get("extracted", {})
     assert extracted.get("languages"), "deterministic fallback should preserve at least detected languages"
+
+
+@pytest.mark.asyncio
+async def test_pricing_only_success_does_not_republish_withheld_general_data(
+    db_session,
+    sample_school_for_extraction,
+):
+    school = sample_school_for_extraction
+    school.attributes = {
+        "website_data_withheld": True,
+        "extracted": {"programs": ["Stale program"]},
+        "display_name_i18n": {"bg": "Грешно име"},
+    }
+    await db_session.commit()
+
+    with (
+        patch(
+            "app.scrapers.extractor._extract_prices",
+            new=AsyncMock(
+                return_value={
+                    "count": 0,
+                    "success": True,
+                    "detail": "No pricing information found",
+                    "input_tokens": 0,
+                    "output_tokens": 0,
+                    "token_cost_usd": 0.0,
+                }
+            ),
+        ),
+        patch(
+            "app.scrapers.extractor._extract_general_info",
+            new=AsyncMock(
+                return_value={
+                    "success": False,
+                    "detail": "No general-info content found",
+                    "input_tokens": 0,
+                    "output_tokens": 0,
+                    "token_cost_usd": 0.0,
+                }
+            ),
+        ),
+    ):
+        result = await extractor_module.extract_school(db_session, school.id, "bg")
+
+    await db_session.refresh(school)
+    assert result["status"] == "extracted"
+    assert result["general_info_success"] is False
+    assert school.attributes["website_data_withheld"] is True
+    assert "extracted" in school.attributes
+    assert school.attributes["display_name_i18n"] == {"bg": "Грешно име"}
+    assert any("remains withheld" in detail for detail in result["details"])
 
 
 @pytest.mark.asyncio
@@ -871,6 +925,9 @@ async def test_extract_school_replaces_office_like_registry_address_with_website
     assert location.lng == pytest.approx(23.319464)
     assert "address_source=website_contact" in (location.location_tags or [])
     assert "coords_source=website_map_link" in (location.location_tags or [])
+    assert location.geocode_meta["status"] == "accepted"
+    assert location.geocode_meta["method"] == "website_map_link"
+    assert location.geocode_meta["precision"] == "exact"
 
     field_sources = (
         await db_session.execute(select(FieldSource).where(FieldSource.school_id == school.id))
@@ -931,6 +988,49 @@ async def test_extract_school_refreshes_coords_from_website_map_link_when_addres
     assert location.lat == pytest.approx(42.65034)
     assert location.lng == pytest.approx(23.319464)
     assert "coords_source=website_map_link" in (location.location_tags or [])
+    assert location.geocode_meta["status"] == "accepted"
+    assert location.geocode_meta["method"] == "website_map_link"
+
+
+@pytest.mark.asyncio
+async def test_website_map_coordinates_use_write_gate_and_reject_out_of_bounds(db_session):
+    school = School(
+        name_i18n={"bg": "Тестово училище"},
+        country_code="bg",
+        city="sofia",
+        school_type="private",
+        education_level="primary",
+    )
+    db_session.add(school)
+    await db_session.flush()
+    location = SchoolLocation(
+        school_id=school.id,
+        address_i18n={"bg": 'гр. София, ул. "Флора Кънева" № 7'},
+        lat=42.65,
+        lng=23.31,
+        is_primary=True,
+    )
+    db_session.add(location)
+    await db_session.commit()
+
+    result = await extractor_module._sync_primary_location_from_contact_address(
+        db_session,
+        school,
+        {
+            "address": 'гр. София, ул. "Флора Кънева" № 7',
+            "coordinates": {"lat": 41.0, "lng": 24.0},
+        },
+    )
+    await db_session.commit()
+
+    assert result is not None
+    await db_session.refresh(location)
+    assert location.lat is None
+    assert location.lng is None
+    assert location.geocode_meta["status"] == "rejected"
+    assert location.geocode_meta["method"] == "website_map_link"
+    assert location.geocode_meta["rejection_reason"] == "outside_sofia_write_bounds"
+    assert "coords_source=website_map_link" not in (location.location_tags or [])
 
 
 @pytest.mark.asyncio
