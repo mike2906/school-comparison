@@ -8,11 +8,11 @@
 import {
   calculateAgeGroup as configCalculateAgeGroup,
   gradeToPoints as configGradeToPoints,
-} from './countryConfig'
+} from './countryConfig.js'
 
 // Default Bulgaria age groups for backwards compatibility
 const BG_AGE_GROUPS = [
-  { key: 'nursery', min_diff: 0, max_diff: 1 },
+  { key: 'nursery', min_diff: 0, max_diff: 2 },
   { key: 'first', min_diff: 3, max_diff: 3 },
   { key: 'second', min_diff: 4, max_diff: 4 },
   { key: 'third', min_diff: 5, max_diff: 5 },

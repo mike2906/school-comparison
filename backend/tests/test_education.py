@@ -25,12 +25,7 @@ class TestCalculateAgeGroup:
 
     def test_nursery_age_2(self):
         """Child born 2 years before enrollment is nursery (2 years old)."""
-        # Edge case: diff <= 1 means 0-2 years old
-        # Actually this should be 'nursery' based on the logic
-        # Let me check: diff = 2025 - 2023 = 2, which is > 1, so not nursery
-        # According to the logic, diff=2 returns None
-        # Let me reconsider the test
-        pass
+        assert calculate_age_group(2025, 2023) == 'nursery'
 
     def test_first_group_age_3(self):
         """Child born 3 years before enrollment is first group (3 years old)."""
@@ -107,13 +102,6 @@ class TestCalculateAgeGroup:
     def test_invalid_too_old(self):
         """Child born 19+ years before enrollment is invalid (too old)."""
         assert calculate_age_group(2025, 2006) is None
-
-    def test_invalid_diff_2(self):
-        """Diff of 2 years is a gap in the system (returns None)."""
-        # This seems like a bug in the original logic
-        # diff=2 should probably be nursery or first
-        # But testing what currently exists
-        assert calculate_age_group(2025, 2023) is None
 
     def test_negative_diff(self):
         """Birth year after enrollment year returns None (invalid)."""
@@ -269,12 +257,9 @@ class TestEdgeCases:
     """Test edge cases and boundary conditions."""
 
     def test_boundary_nursery_to_first(self):
-        """Boundary between nursery (diff<=1) and first (diff=3)."""
-        # diff=1 is nursery
+        """Nursery covers differences 0-2 and first starts at 3."""
         assert calculate_age_group(2025, 2024) == 'nursery'
-        # diff=2 is gap (returns None)
-        assert calculate_age_group(2025, 2023) is None
-        # diff=3 is first
+        assert calculate_age_group(2025, 2023) == 'nursery'
         assert calculate_age_group(2025, 2022) == 'first'
 
     def test_boundary_preschool_to_grade_1_4(self):

@@ -12,7 +12,7 @@ def bg_country():
         name_i18n={"bg": "България", "en": "Bulgaria"},
         education_config={
             "age_groups": [
-                {"key": "nursery", "label_i18n": {"bg": "Ясла", "en": "Nursery"}, "min_diff": 0, "max_diff": 1, "category": "kindergarten"},
+                {"key": "nursery", "label_i18n": {"bg": "Ясла", "en": "Nursery"}, "min_diff": 0, "max_diff": 2, "category": "kindergarten"},
                 {"key": "first", "label_i18n": {"bg": "Първа група", "en": "First group"}, "min_diff": 3, "max_diff": 3, "category": "kindergarten"},
             ],
             "education_levels": [
@@ -115,6 +115,9 @@ class TestCountriesEndpoint:
         assert "grade_scale" in config
         assert "grade_to_points_table" in config
         assert "age_calculation_method" in config
+        nursery = next(group for group in config["age_groups"] if group["key"] == "nursery")
+        assert nursery["min_diff"] == 0
+        assert nursery["max_diff"] == 2
 
     @pytest.mark.asyncio
     async def test_get_country_map_config_structure(self, db_session, client, bg_country):
