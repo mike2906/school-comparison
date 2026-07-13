@@ -1194,6 +1194,10 @@ def _extract_pricing_terms_deterministic(text: str) -> PricingTermsExtractionOut
     return parsed
 
 _PRICE_LINE_AMOUNT_RE = re.compile(
+    r"(?:(€|eur|euro|евро|лв\.?|лева?|bgn)\s*([\d][\d\s.,]*))|(?:([\d][\d\s.,]*)\s*(€|eur|euro|евро|лв\.?|лева?|bgn))",
+    flags=re.IGNORECASE,
+)
+_PRICE_LINE_AMOUNT_LATIN_RE = re.compile(
     r"(?:(€|eur|euro|лв\.?|bgn)\s*([\d][\d\s.,]*))|(?:([\d][\d\s.,]*)\s*(€|eur|euro|лв\.?|bgn))",
     flags=re.IGNORECASE,
 )
@@ -1249,8 +1253,15 @@ def _parse_price_amount_token(raw: str) -> float | None:
         return None
 
 
-def _extract_price_amount_currency(value: str) -> tuple[float | None, str | None]:
-    match = _PRICE_LINE_AMOUNT_RE.search(value or "")
+def _extract_price_amount_currency(
+    value: str, *, allow_cyrillic_currency_words: bool = True
+) -> tuple[float | None, str | None]:
+    pattern = (
+        _PRICE_LINE_AMOUNT_RE
+        if allow_cyrillic_currency_words
+        else _PRICE_LINE_AMOUNT_LATIN_RE
+    )
+    match = pattern.search(value or "")
     if not match:
         return None, None
     currency_token = match.group(1) or match.group(4) or ""
@@ -1259,25 +1270,33 @@ def _extract_price_amount_currency(value: str) -> tuple[float | None, str | None
     if amount is None:
         return None, None
     currency_normalized = currency_token.lower().strip(". ")
-    if currency_normalized in {"€", "eur", "euro"}:
+    if currency_normalized in {"€", "eur", "euro", "евро"}:
         return amount, "EUR"
-    if currency_normalized in {"лв", "bgn"}:
+    if currency_normalized in {"лв", "лев", "лева", "bgn"}:
         return amount, "BGN"
     return amount, None
 
 
 def _detect_price_category(value: str, *, allow_generic_heading: bool = False) -> str | None:
     lowered = value.lower()
+    if any(
+        token in lowered
+        for token in ("school bus", "bus service", "автобус", "транспорт", "transport")
+    ):
+        return "transport"
     if "обучение по " in lowered:
         return "extracurricular"
-    if "обуч" in lowered or "tuition" in lowered:
+    if "обуч" in lowered or "образователни услуги" in lowered or "tuition" in lowered:
+        return "tuition"
+    if any(
+        token in lowered
+        for token in ("образователни ресурси", "учебниц", "консуматив", "materials")
+    ):
+        return "materials"
+    if re.search(r"\b(?:месечна|годишна)\s+такса\b", lowered):
         return "tuition"
     if any(token in lowered for token in ("храна", "food", "meal", "meals", "lunch", "snack", "закуска", "обяд")):
         return "food"
-    if "транспорт" in lowered or "transport" in lowered:
-        return "transport"
-    if "учебниц" in lowered or "консуматив" in lowered or "materials" in lowered:
-        return "materials"
     if "униформ" in lowered or "uniform" in lowered:
         return "uniforms"
     if any(
@@ -1291,6 +1310,9 @@ def _detect_price_category(value: str, *, allow_generic_heading: bool = False) -
             "application fee",
             "deposit",
             "депозит",
+            "capital fee",
+            "late fee",
+            "новопостъп",
         )
     ):
         return "registration"
@@ -1315,6 +1337,14 @@ def _detect_price_category(value: str, *, allow_generic_heading: bool = False) -
             "отбор",
             "teams",
             "музикален инструмент",
+            "танц",
+            "плуване",
+            "тенис",
+            "футбол",
+            "балет",
+            "гимнастика",
+            "volleyball",
+            "english lessons",
         )
     ):
         return "extracurricular"
@@ -1325,6 +1355,23 @@ def _detect_price_category(value: str, *, allow_generic_heading: bool = False) -
     if allow_generic_heading and re.search(r"\b(такси|fees?)\b", lowered):
         return "tuition"
     return None
+
+
+def _is_price_category_heading(value: str) -> bool:
+    lowered = value.casefold()
+    return not any(
+        token in lowered
+        for token in (
+            "включ",
+            "изключ",
+            "не е",
+            "не e",
+            "заплаща",
+            "included",
+            "excluded",
+            "does not include",
+        )
+    )
 
 
 def _detect_price_age_group(value: str) -> str | None:
@@ -1380,7 +1427,7 @@ def _detect_explicit_price_period(value: str) -> str | None:
         return "yearly"
     if any(token in lowered for token in ("годиш", "annual", "yearly", "учебна")):
         return "yearly"
-    if any(token in lowered for token in ("ежемес", "месеч", "monthly", "на месец", "per month")):
+    if any(token in lowered for token in ("ежемес", "месеч", "месец", "monthly", "на месец", "per month")):
         return "monthly"
     return None
 
@@ -1394,11 +1441,11 @@ def _detect_price_period(
     installment = _detect_installment_period(value)
     if installment is not None:
         return installment
+    if category == "registration":
+        return "one_time"
     explicit = _detect_explicit_price_period(value)
     if explicit is not None:
         return explicit
-    if category == "registration":
-        return "one_time"
     if has_year or "вноск" in value.lower():
         return "yearly"
     amount_matches = _PRICE_LINE_AMOUNT_RE.findall(value or "")
@@ -1421,9 +1468,17 @@ def _iter_price_line_signals(text: str) -> list[dict[str, Any]]:
     current_age_group: str | None = None
     current_academic_year: str | None = None
     current_period: str | None = None
+    current_heading: str | None = None
 
-    for line in lines:
+    for line_index, line in enumerate(lines):
         lowered = line.lower()
+        if lowered.startswith("source:"):
+            current_category = None
+            current_age_group = None
+            current_academic_year = None
+            current_period = None
+            current_heading = None
+            continue
         line_amount, line_currency = _extract_price_amount_currency(line)
         academic_year_match = re.search(r"(20\d{2}\s*[-/]\s*20\d{2})", line)
         if academic_year_match:
@@ -1433,13 +1488,15 @@ def _iter_price_line_signals(text: str) -> list[dict[str, Any]]:
             current_category = None
             current_age_group = None
             current_period = None
+            current_heading = None
             continue
 
         line_category = _detect_price_category(line, allow_generic_heading=True)
-        if line_category is not None and line_amount is None:
+        if line_category is not None and line_amount is None and _is_price_category_heading(line):
             if line_category != current_category:
                 current_period = None
             current_category = line_category
+            current_heading = line
             detected_age_group = _detect_price_age_group(line)
             if detected_age_group is not None:
                 current_age_group = detected_age_group
@@ -1455,7 +1512,14 @@ def _iter_price_line_signals(text: str) -> list[dict[str, Any]]:
         if line_amount is None:
             continue
 
-        row_category = _detect_price_category(line) or current_category
+        previous_line = lines[line_index - 1] if line_index > 0 else ""
+        previous_amount, _ = _extract_price_amount_currency(previous_line)
+        semantic_line = (
+            f"{previous_line} {line}"
+            if previous_line and previous_amount is None and len(previous_line) <= 120
+            else line
+        )
+        row_category = _detect_price_category(semantic_line) or current_category
         if row_category is None:
             continue
 
@@ -1468,15 +1532,18 @@ def _iter_price_line_signals(text: str) -> list[dict[str, Any]]:
             default_period=current_period,
         )
         current_period = row_period
+        evidence_line = " ".join(part for part in (current_heading, semantic_line) if part)
         signals.append(
             {
-                "line": line,
+                "line": evidence_line,
                 "amount": line_amount,
                 "currency": line_currency or "BGN",
                 "category": row_category,
+                "category_on_amount_line": _detect_price_category(line) is not None,
                 "period": row_period,
                 "academic_year": row_year,
                 "age_group": row_age_group,
+                "section_heading": current_heading,
             }
         )
 
@@ -1503,7 +1570,18 @@ def _extract_prices_deterministic(text: str) -> PriceExtractionOutput:
 
     for line in lines:
         lowered = line.lower()
-        line_amount, line_currency = _extract_price_amount_currency(line)
+        if lowered.startswith("source:"):
+            current_category = None
+            current_age_group = None
+            current_academic_year = None
+            current_period = None
+            current_plan_name = None
+            current_includes = []
+            active_price = None
+            continue
+        line_amount, line_currency = _extract_price_amount_currency(
+            line, allow_cyrillic_currency_words=False
+        )
         academic_year_match = re.search(r"(20\d{2}\s*[-/]\s*20\d{2})", line)
         if academic_year_match:
             current_academic_year = academic_year_match.group(1).replace(" ", "")
@@ -1634,6 +1712,14 @@ def _dedupe_installment_variants(prices: list[ExtractedPrice]) -> list[Extracted
 
     grouped: dict[tuple, list[ExtractedPrice]] = {}
     for price in prices:
+        row_context = " ".join(
+            str(value or "") for value in (price.plan_name, price.notes)
+        ).casefold()
+        if any(
+            token in row_context
+            for token in ("eal", "learning support", "additional language support", "total fee")
+        ):
+            continue
         grouped.setdefault(group_key(price), []).append(price)
 
     kept: list[ExtractedPrice] = []
@@ -1721,7 +1807,81 @@ def _dedupe_currency_variants(prices: list[ExtractedPrice]) -> list[ExtractedPri
 
 
 def _dedupe_price_rows(prices: list[ExtractedPrice]) -> list[ExtractedPrice]:
-    return _dedupe_currency_variants(_dedupe_installment_variants(prices))
+    rows = _dedupe_currency_variants(_dedupe_installment_variants(prices))
+    explicit_years = {
+        normalized
+        for row in rows
+        if (normalized := _normalize_academic_year(row.academic_year)) is not None
+    }
+    if not explicit_years:
+        return rows
+    latest_year = max(
+        explicit_years,
+        key=lambda value: tuple(int(part) for part in value.split("/")),
+    )
+    return [row for row in rows if _normalize_academic_year(row.academic_year) == latest_year]
+
+
+def _normalize_academic_year(value: str | None) -> str | None:
+    match = re.search(r"(20\d{2})\s*[-/]\s*(20\d{2})", str(value or ""))
+    if not match:
+        return None
+    return f"{match.group(1)}/{match.group(2)}"
+
+
+_PRICE_MATCH_STOPWORDS = {
+    "annual",
+    "fee",
+    "fees",
+    "full",
+    "plan",
+    "service",
+    "the",
+    "for",
+    "school",
+    "такса",
+    "такси",
+    "годишна",
+    "за",
+    "на",
+}
+
+
+def _price_signal_match_score(price: ExtractedPrice, signal: dict[str, Any]) -> int:
+    context = " ".join(
+        str(value or "")
+        for value in (price.plan_name, price.notes, price.category, price.period)
+    ).casefold()
+    line = str(signal.get("line") or "").casefold()
+    context_tokens = {
+        token for token in re.findall(r"[^\W\d_]{3,}", context) if token not in _PRICE_MATCH_STOPWORDS
+    }
+    line_tokens = set(re.findall(r"[^\W\d_]{3,}", line))
+    score = 3 * len(context_tokens & line_tokens)
+    if price.category == signal.get("category"):
+        score += 2
+    if price.period == signal.get("period"):
+        score += 1
+    return score
+
+
+def _yearless_pricing_text_is_stale(text: str, *, current_year: int | None = None) -> bool:
+    """Detect clearly dated legacy fee tables without treating general history as pricing dates."""
+    current_year = current_year or datetime.datetime.now(datetime.timezone.utc).year
+    academic_year_ends = [
+        int(match.group(2))
+        for match in re.finditer(r"(20\d{2})\s*[-/]\s*(20\d{2})", text or "")
+    ]
+    if academic_year_ends:
+        return max(academic_year_ends) < current_year
+
+    deadline_years: list[int] = []
+    for raw_line in re.split(r"[\n\r]+", text or ""):
+        lowered = raw_line.casefold()
+        if not any(token in lowered for token in ("deadline", "payment", "плащ", "краен срок")):
+            continue
+        deadline_years.extend(int(year) for year in re.findall(r"\b(20\d{2})\b", raw_line))
+    return bool(deadline_years) and max(deadline_years) <= current_year - 2
 
 
 def _filter_supported_prices(prices: list[ExtractedPrice], text: str) -> list[ExtractedPrice]:
@@ -1734,24 +1894,48 @@ def _filter_supported_prices(prices: list[ExtractedPrice], text: str) -> list[Ex
 
     refined: list[ExtractedPrice] = []
     for price in prices:
+        row_context = " ".join(
+            str(value or "") for value in (price.plan_name, price.notes)
+        ).strip().casefold()
+        if not price.academic_year and _yearless_pricing_text_is_stale(text):
+            continue
         amount = _to_optional_float(price.amount)
         if amount is None:
             continue
 
         currency = (price.currency or "BGN")[:3].upper()
-        supporting_signal = next(
-            (
-                signal
-                for signal in signals
-                if signal["currency"] == currency and abs(float(signal["amount"]) - amount) < 0.01
-            ),
-            None,
-        )
-        if supporting_signal is None:
+        candidates = [
+            signal
+            for signal in signals
+            if signal["currency"] == currency and abs(float(signal["amount"]) - amount) < 0.01
+        ]
+        if not candidates:
+            continue
+        candidate_semantics = {
+            (signal.get("category"), signal.get("period"), signal.get("academic_year"))
+            for signal in candidates
+        }
+        if not row_context and len(candidate_semantics) > 1:
+            continue
+        scored = [(_price_signal_match_score(price, signal), signal) for signal in candidates]
+        best_score = max(score for score, _signal in scored)
+        best_signals = [signal for score, signal in scored if score == best_score]
+        best_semantics = {
+            (signal.get("category"), signal.get("period"), signal.get("academic_year"))
+            for signal in best_signals
+        }
+        if len(best_semantics) != 1:
+            continue
+        supporting_signal = best_signals[0]
+        if "total fee" in str(supporting_signal.get("section_heading") or "").casefold():
             continue
 
         normalized = price.model_copy(deep=True)
-        if supporting_signal.get("category"):
+        if supporting_signal.get("category") and (
+            bool(supporting_signal.get("category_on_amount_line"))
+            or best_score >= 3
+            or float(price.confidence or 0.0) < 0.8
+        ):
             normalized.category = supporting_signal["category"]
         if supporting_signal.get("period"):
             normalized.period = supporting_signal["period"]
@@ -1762,32 +1946,6 @@ def _filter_supported_prices(prices: list[ExtractedPrice], text: str) -> list[Ex
         refined.append(normalized)
 
     return refined
-
-
-def _price_amount_lookup_tokens(amount: float) -> list[str]:
-    if abs(amount - round(amount)) < 0.01:
-        whole = int(round(amount))
-        grouped = f"{whole:,}"
-        return [
-            str(whole),
-            grouped,
-            grouped.replace(",", "."),
-            grouped.replace(",", " "),
-            f"{whole}.00",
-            f"{whole},00",
-        ]
-
-    fixed = f"{amount:.2f}"
-    whole, frac = fixed.split(".")
-    grouped = f"{int(whole):,}"
-    return [
-        fixed,
-        fixed.replace(".", ","),
-        f"{grouped}.{frac}",
-        f"{grouped.replace(',', '.')},{frac}",
-        f"{grouped.replace(',', ' ')}.{frac}",
-        f"{grouped.replace(',', ' ')},{frac}",
-    ]
 
 
 def _find_supporting_price_source_url(
@@ -1813,10 +1971,20 @@ def _find_supporting_price_source_url(
         )
     )
 
-    tokens = _price_amount_lookup_tokens(amount)
     for page in candidate_pages:
         page_text = page.raw_markdown or ""
-        if any(token in page_text for token in tokens):
+        page_context = f"--- SOURCE: {page.source_url} ---\n{page_text}"
+        supported = _filter_supported_prices([price], page_context)
+        if any(
+            row.category == price.category
+            and row.period == price.period
+            and (
+                not price.academic_year
+                or _normalize_academic_year(row.academic_year)
+                == _normalize_academic_year(price.academic_year)
+            )
+            for row in supported
+        ):
             return page.source_url
     return None
 

@@ -10,6 +10,7 @@ import pytest
 from sqlalchemy import select
 
 from app.models import FieldSource, Pricing, School, SchoolLocation
+from app.models.pricing import PriceSource
 from app.models.scrape_log import ScrapeType
 from app.models.source_page import SourcePage
 from app.schemas.extraction import (
@@ -1654,6 +1655,168 @@ def test_filter_supported_prices_uses_source_line_to_fix_period_and_category():
     assert by_amount[265].period == "one_time"
 
 
+def test_filter_supported_prices_uses_plan_context_when_amount_repeats():
+    text = """
+    ## Meals
+    Annual meal plan | EUR 2,900
+    ## Transport
+    Full School Bus Service Fee | EUR 2,900
+    """
+    prices = [
+        ExtractedPrice(
+            category="tuition",
+            amount=2900,
+            currency="EUR",
+            period="yearly",
+            plan_name="Full School Bus Service Fee",
+            confidence=0.9,
+        )
+    ]
+
+    refined = extractor_module.helpers._filter_supported_prices(prices, text)
+
+    assert len(refined) == 1
+    assert refined[0].category == "transport"
+
+
+def test_dedupe_price_rows_keeps_only_latest_academic_year():
+    prices = [
+        ExtractedPrice(
+            category="tuition", amount=9000, currency="EUR", period="yearly",
+            academic_year="2024/2025", confidence=0.9,
+        ),
+        ExtractedPrice(
+            category="tuition", amount=11000, currency="EUR", period="yearly",
+            academic_year="2026/2027", confidence=0.9,
+        ),
+        ExtractedPrice(
+            category="registration", amount=500, currency="EUR", period="one_time",
+            academic_year="2026/2027", confidence=0.9,
+        ),
+    ]
+
+    deduped = extractor_module.helpers._dedupe_price_rows(prices)
+
+    assert {(row.amount, row.academic_year) for row in deduped} == {
+        (11000, "2026/2027"),
+        (500, "2026/2027"),
+    }
+
+
+def test_dedupe_price_rows_drops_yearless_rows_when_explicit_year_exists():
+    prices = [
+        ExtractedPrice(
+            category="tuition", amount=500, currency="EUR", period="monthly",
+            academic_year=None, confidence=0.9,
+        ),
+        ExtractedPrice(
+            category="tuition", amount=6000, currency="EUR", period="yearly",
+            academic_year="2026/2027", confidence=0.9,
+        ),
+    ]
+
+    deduped = extractor_module.helpers._dedupe_price_rows(prices)
+
+    assert [(row.amount, row.academic_year) for row in deduped] == [(6000, "2026/2027")]
+
+
+def test_price_signals_reset_semantic_state_between_source_pages():
+    text = """
+    --- SOURCE: https://school.test/meals ---
+    Food fees 2024/2025
+    EUR 2,900
+    --- SOURCE: https://school.test/bus ---
+    EUR 1,885
+    """
+
+    signals = extractor_module.helpers._iter_price_line_signals(text)
+
+    assert [signal for signal in signals if signal["amount"] == 1885] == []
+
+
+@pytest.mark.parametrize(
+    ("text", "price"),
+    [
+        (
+            "Annual meal plan | EUR 2,900\nFull School Bus Service Fee | EUR 2,900",
+            ExtractedPrice(category="tuition", amount=2900, currency="EUR", period="yearly", confidence=0.9),
+        ),
+        (
+            "English as an Additional Language (EAL) support fee | EUR 1,500",
+            ExtractedPrice(
+                category="tuition", amount=1500, currency="EUR", period="yearly",
+                plan_name="EAL support fee", confidence=0.9,
+            ),
+        ),
+        (
+            "Tuition Fee EUR 10,000\nCapital Fee EUR 2,000\nTotal Fee EUR 12,000",
+            ExtractedPrice(
+                category="tuition", amount=12000, currency="EUR", period="yearly",
+                plan_name="Total Fee", confidence=0.9,
+            ),
+        ),
+    ],
+)
+def test_filter_supported_prices_withholds_ambiguous_or_composite_rows(text, price):
+    assert extractor_module.helpers._filter_supported_prices([price], text) == []
+
+
+def test_filter_supported_prices_withholds_stale_yearless_fee_table():
+    text = """
+    ## Tuition fees
+    Annual tuition EUR 8,000
+    Payment deadline: 15 September 2023
+    Second payment deadline: 15 January 2024
+    """
+    assert extractor_module.helpers._yearless_pricing_text_is_stale(text, current_year=2026) is True
+
+
+def test_filter_supported_prices_supports_bulgarian_euro_fee_table():
+    text = """
+    Месечна такса – 580 евро
+    Допълнителни занимания
+    Модерни танци – 25 евро/месец
+    Транспорт - 160 евро/месец
+    """
+    prices = [
+        ExtractedPrice(category="tuition", amount=580, currency="EUR", period="monthly", confidence=0.9),
+        ExtractedPrice(category="extracurricular", amount=25, currency="EUR", period="monthly", confidence=0.9),
+        ExtractedPrice(category="transport", amount=160, currency="EUR", period="monthly", confidence=0.9),
+    ]
+
+    refined = extractor_module.helpers._filter_supported_prices(prices, text)
+
+    assert [(row.category, row.amount, row.period) for row in refined] == [
+        ("tuition", 580, "monthly"),
+        ("extracurricular", 25, "monthly"),
+        ("transport", 160, "monthly"),
+    ]
+
+
+def test_price_signals_do_not_treat_inclusion_text_as_section_heading():
+    text = """
+    Такса "Образователни услуги"
+    В таксата не е включена храна
+    Предучилищен клас
+    8100 €
+    Месечна такса – 510 евро
+    Храната се заплаща допълнително
+    Модерни танци
+    25 евро/месец
+    """
+    prices = [
+        ExtractedPrice(category="tuition", amount=8100, currency="EUR", period="yearly", confidence=0.9),
+        ExtractedPrice(category="extracurricular", amount=25, currency="EUR", period="monthly", confidence=0.9),
+    ]
+
+    refined = extractor_module.helpers._filter_supported_prices(prices, text)
+
+    assert [(row.category, row.amount) for row in refined] == [
+        ("tuition", 8100),
+        ("extracurricular", 25),
+    ]
+
+
 def test_find_supporting_price_source_url_returns_page_with_matching_amount():
     school = School(
         name_i18n={"bg": "Тест"},
@@ -1682,6 +1845,31 @@ def test_find_supporting_price_source_url_returns_page_with_matching_amount():
     source_url = extractor_module.helpers._find_supporting_price_source_url(school, pages, price)
 
     assert source_url == "https://example-school.bg/enroll"
+
+
+def test_find_supporting_price_source_url_uses_semantics_when_amount_repeats():
+    school = School(
+        name_i18n={"bg": "Тест"}, website_url="https://school.test",
+        country_code="bg", city="sofia", school_type="private", education_level="primary",
+    )
+    pages = [
+        SourcePage(
+            source_url="https://school.test/meals", page_category="pricing",
+            raw_markdown="Annual meal plan | EUR 2,900",
+        ),
+        SourcePage(
+            source_url="https://school.test/bus", page_category="pricing",
+            raw_markdown="School Bus Fees 2026/2027\nFull School Bus Service Fee | EUR 2,900",
+        ),
+    ]
+    price = ExtractedPrice(
+        category="transport", amount=2900, currency="EUR", period="yearly",
+        plan_name="Full School Bus Service Fee", confidence=0.9,
+    )
+
+    source_url = extractor_module.helpers._find_supporting_price_source_url(school, pages, price)
+
+    assert source_url == "https://school.test/bus"
 
 
 def test_extract_prices_deterministic_prefers_yearly_when_mixed_fee_table_line_mentions_monthly_installments():
@@ -1753,15 +1941,22 @@ async def test_extract_school_uses_deterministic_pricing_fallback_when_llm_repor
 @pytest.mark.asyncio
 async def test_extract_school_discards_unsupported_llm_pricing_rows(db_session, sample_school_for_extraction):
     school = sample_school_for_extraction
+    db_session.add(
+        Pricing(
+            school_id=school.id,
+            category="tuition",
+            amount=999,
+            currency="EUR",
+            period="monthly",
+            source=PriceSource.SCRAPED_WEBSITE,
+            source_url="https://test-school.bg/old-prices",
+            pricing_context={"confidence": 0.9},
+        )
+    )
     pricing_page = (
         await db_session.execute(select(SourcePage).where(SourcePage.school_id == school.id, SourcePage.page_category == "pricing"))
     ).scalar_one()
-    pricing_page.raw_markdown = """
-        # Book a visit
-        Enrollment visits are planned in the Spring.
-        Ad-hoc visits are allowed if a free space is available.
-        Contact us for details.
-    """
+    pricing_page.raw_markdown = "Monthly tuition EUR 750"
     await db_session.commit()
 
     mock_price = PriceExtractionOutput(
@@ -1792,12 +1987,16 @@ async def test_extract_school_discards_unsupported_llm_pricing_rows(db_session, 
                 (None, 0, 0, 0.0),
             ]
         ),
+    ), patch.object(
+        extractor_module.helpers,
+        "_find_supporting_price_source_url",
+        return_value=None,
     ):
         result = await extractor_module.extract_school(db_session, school.id, "bg")
 
     assert result["status"] == "extracted"
     assert result["pricing_count"] == 0
-    assert any("No pricing info detected" in detail for detail in result["details"])
+    assert any("cleared existing scraped pricing" in detail for detail in result["details"])
     pricing_rows = (await db_session.execute(select(Pricing).where(Pricing.school_id == school.id))).scalars().all()
     assert pricing_rows == []
 

@@ -614,7 +614,7 @@ will need to be repeated.
             ($0.004936), for $0.020347 recorded usage. The run was correctly `partial`.
             Evidence is stored in ignored local artifacts under
             `backend/reports/pilot/54da254d-df10-4985-b157-664cd4f0f9ec/`.
-      - [ ] **Fix price semantic validation before another pilot.** The source/confidence
+      - [x] **Fix price semantic validation before another pilot.** The source/confidence
             gate reported 0 failures, but manual inspection found rows crossing the API
             with incorrect categories/periods: tuition labeled as food (school 153), bus
             and learning-support fees labeled as tuition (506), and implausible transport
@@ -622,7 +622,13 @@ will need to be repeated.
             implementation per the project price-validation rule. Validate category against
             plan/section context, period against source wording, current academic-year
             selection, and duplicate/ambiguous rows; withhold rows that cannot be supported.
-      - [ ] **Calibrate spot-check discrepancy semantics before another pilot.** Ten schools
+            **Done 2026-07-13.** Price evidence matching now considers all matching amounts
+            plus plan/section context, supports Bulgarian currency wording, corrects explicit
+            bus/activity/materials context, removes older explicit academic years and
+            installment/currency duplicates, and fails closed for ambiguous, composite,
+            unsupported-service, and clearly stale yearless fee tables. Cached-pilot
+            regressions cover the failure patterns and a clean yearless control.
+      - [x] **Calibrate spot-check discrepancy semantics before another pilot.** Ten schools
             were checked; 3 were actionable (30%, above the 15% advisory threshold), with
             61 omissions, 7 unsupported claims, and 0 contradictions. Several `unsupported`
             findings actually describe missing/incomplete extraction, while at least one
@@ -630,10 +636,19 @@ will need to be repeated.
             `omission`. Require evidence for unsupported/contradiction, keep genuine omission
             monitoring separate from publish blocking, and regression-test the three pilot
             schools (506, 516, 529) against their cached source pages.
-      - [ ] **Include spot-check LLM usage in the PipelineRun cost snapshot.** The recorded
+            **Done 2026-07-13.** Spot-check context is deduplicated and category-balanced
+            instead of truncated in database order. Direction is derived from concrete
+            extracted/source values; every retained finding requires evidence, and omission/
+            contradiction quotes must occur in the supplied context. Genuine omissions stay
+            monitoring-only while supported actionable findings continue to gate publication.
+      - [x] **Include spot-check LLM usage in the PipelineRun cost snapshot.** The recorded
             $0.020347 includes extraction and summarization but excludes the ten capable-model
             spot-check calls, so it is not yet a complete provider-cost probe. Persist their
             token/cost usage and include it in the aggregate and CLI report.
+            **Done 2026-07-13.** Each spot check persists tokens, exact provider cost when
+            available (tier-price fallback otherwise), and model identity. The Stage 6 batch
+            aggregates successful and post-call non-success usage into the existing
+            `PipelineRun` usage snapshot and CLI totals.
       - [ ] Repeat the same reviewed pilot cohort after the pricing and spot-check fixes.
             Require semantically correct published prices, a calibrated actionable discrepancy
             rate within threshold, complete usage accounting, clean API boundary checks, and

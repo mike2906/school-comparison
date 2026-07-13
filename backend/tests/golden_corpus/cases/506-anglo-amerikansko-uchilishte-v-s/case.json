@@ -167,83 +167,6 @@
       {
         "academic_year": "2026-2027",
         "age_group": null,
-        "amount": 3402.0,
-        "amount_max": null,
-        "amount_min": null,
-        "category": "tuition",
-        "currency": "EUR",
-        "period": "yearly",
-        "plan_name": null
-      },
-      {
-        "academic_year": "2026-2027",
-        "age_group": null,
-        "amount": 1707.0,
-        "amount_max": null,
-        "amount_min": null,
-        "category": "tuition",
-        "currency": "EUR",
-        "period": "yearly",
-        "plan_name": null
-      },
-      {
-        "academic_year": "2026-2027",
-        "age_group": null,
-        "amount": 18219.0,
-        "amount_max": null,
-        "amount_min": null,
-        "category": "tuition",
-        "currency": "EUR",
-        "period": "yearly",
-        "plan_name": null
-      },
-      {
-        "academic_year": "2026-2027",
-        "age_group": null,
-        "amount": 28511.0,
-        "amount_max": null,
-        "amount_min": null,
-        "category": "tuition",
-        "currency": "EUR",
-        "period": "yearly",
-        "plan_name": null
-      },
-      {
-        "academic_year": "2026-2027",
-        "age_group": null,
-        "amount": 30194.0,
-        "amount_max": null,
-        "amount_min": null,
-        "category": "tuition",
-        "currency": "EUR",
-        "period": "yearly",
-        "plan_name": null
-      },
-      {
-        "academic_year": "2026-2027",
-        "age_group": null,
-        "amount": 31830.0,
-        "amount_max": null,
-        "amount_min": null,
-        "category": "tuition",
-        "currency": "EUR",
-        "period": "yearly",
-        "plan_name": null
-      },
-      {
-        "academic_year": "2026-2027",
-        "age_group": null,
-        "amount": 1500.0,
-        "amount_max": null,
-        "amount_min": null,
-        "category": "tuition",
-        "currency": "EUR",
-        "period": "yearly",
-        "plan_name": null
-      },
-      {
-        "academic_year": "2026-2027",
-        "age_group": null,
         "amount": 10000.0,
         "amount_max": null,
         "amount_min": null,
@@ -266,12 +189,23 @@
       {
         "academic_year": "2026-2027",
         "age_group": null,
-        "amount": 1500.0,
+        "amount": 3402.0,
         "amount_max": null,
         "amount_min": null,
-        "category": "tuition",
+        "category": "registration",
         "currency": "EUR",
-        "period": "yearly",
+        "period": "one_time",
+        "plan_name": null
+      },
+      {
+        "academic_year": "2026-2027",
+        "age_group": null,
+        "amount": 1707.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "registration",
+        "currency": "EUR",
+        "period": "one_time",
         "plan_name": null
       },
       {
@@ -288,10 +222,21 @@
       {
         "academic_year": "2026-2027",
         "age_group": null,
+        "amount": 250.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "registration",
+        "currency": "EUR",
+        "period": "one_time",
+        "plan_name": null
+      },
+      {
+        "academic_year": "2026-2027",
+        "age_group": null,
         "amount": 2900.0,
         "amount_max": null,
         "amount_min": null,
-        "category": "camp",
+        "category": "transport",
         "currency": "EUR",
         "period": "yearly",
         "plan_name": null
@@ -302,20 +247,9 @@
         "amount": 1885.0,
         "amount_max": null,
         "amount_min": null,
-        "category": "camp",
+        "category": "transport",
         "currency": "EUR",
         "period": "yearly",
-        "plan_name": null
-      },
-      {
-        "academic_year": "2026-2027",
-        "age_group": null,
-        "amount": 250.0,
-        "amount_max": null,
-        "amount_min": null,
-        "category": "registration",
-        "currency": "EUR",
-        "period": "semester",
         "plan_name": null
       }
     ]

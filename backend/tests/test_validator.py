@@ -337,8 +337,9 @@ async def test_run_spot_check_for_school_persists_payload(db_session, monkeypatc
                     SpotCheckDiscrepancy(
                         field_path="attributes.extracted.languages",
                         issue="unsupported_language_level",
+                        evidence="English language classes are available, but no C2 level is stated.",
                         cheap_value={"language": "English", "level": "C2"},
-                        capable_value={"language": "English", "level": None},
+                        capable_value=None,
                         confidence=0.9,
                     )
                 ],
@@ -346,7 +347,11 @@ async def test_run_spot_check_for_school_persists_payload(db_session, monkeypatc
             )
             for validator in self._validators:
                 output = validator(output)
-            return SimpleNamespace(output=output)
+            return SimpleNamespace(
+                output=output,
+                usage=lambda: SimpleNamespace(input_tokens=321, output_tokens=45),
+                all_messages=lambda: [SimpleNamespace(provider_details={"cost": 0.0123})],
+            )
 
     monkeypatch.setattr(validator_module, "create_agent", lambda **_kwargs: FakeAgent())
 
@@ -358,3 +363,99 @@ async def test_run_spot_check_for_school_persists_payload(db_session, monkeypatc
     payload = (school.attributes or {}).get("data_validation", {}).get("spot_check", {})
     assert payload.get("has_discrepancy") is True
     assert payload.get("model_tier") == "capable"
+    assert payload.get("input_tokens") == 321
+    assert payload.get("output_tokens") == 45
+    assert payload.get("token_cost_usd") == 0.0123
+    assert result["input_tokens"] == 321
+    assert result["output_tokens"] == 45
+    assert result["token_cost_usd"] == 0.0123
+
+
+def test_normalize_spot_check_output_derives_direction_and_requires_evidence():
+    parsed = SpotCheckOutput(
+        has_discrepancy=True,
+        discrepancies=[
+            SpotCheckDiscrepancy(
+                field_path="programs",
+                kind="unsupported",
+                issue="High school programme is missing from extraction",
+                cheap_value=None,
+                capable_value="High School",
+                evidence="High School Programme",
+            ),
+            SpotCheckDiscrepancy(
+                field_path="class_size",
+                kind="omission",
+                issue="The extracted class size is not supported",
+                cheap_value="12 students",
+                capable_value=None,
+                evidence="No class-size claim appears in the reviewed school pages.",
+            ),
+            SpotCheckDiscrepancy(
+                field_path="facilities",
+                kind="unsupported",
+                issue="Claim is not supported",
+                cheap_value=["pool"],
+                capable_value=None,
+                evidence=None,
+            ),
+        ],
+    )
+
+    normalized = validator_module._normalize_spot_check_output(parsed)
+
+    assert [(item.field_path, item.kind) for item in normalized.discrepancies] == [
+        ("attributes.extracted.programs", "omission"),
+        ("attributes.extracted.class_size", "unsupported"),
+    ]
+    assert normalized.has_discrepancy is True
+
+
+def test_build_spot_check_context_balances_categories_and_deduplicates():
+    pages = [
+        SimpleNamespace(id=1, source_url="https://school.test/", page_category="homepage", raw_markdown="HOME " * 1000),
+        SimpleNamespace(id=2, source_url="https://school.test/admission", page_category="admission", raw_markdown="ADMISSION " * 500),
+        SimpleNamespace(id=3, source_url="https://school.test/programs", page_category="programs", raw_markdown="PROGRAMS " * 500),
+        SimpleNamespace(id=4, source_url="https://school.test/facilities", page_category="facilities", raw_markdown="FACILITIES " * 500),
+        SimpleNamespace(id=5, source_url="https://school.test/programs#copy", page_category="programs", raw_markdown="PROGRAMS " * 500),
+    ]
+
+    context = validator_module._build_spot_check_context(pages, max_chars=3000)
+
+    assert "[admission] https://school.test/admission" in context
+    assert "[programs] https://school.test/programs" in context
+    assert "[facilities] https://school.test/facilities" in context
+    assert context.count("PROGRAMS") < 500
+    assert len(context) <= 3000
+
+
+def test_filter_spot_check_evidence_requires_source_quote_for_omission_and_contradiction():
+    parsed = SpotCheckOutput(
+        has_discrepancy=True,
+        discrepancies=[
+            SpotCheckDiscrepancy(
+                field_path="programs",
+                kind="omission",
+                issue="Programme omitted",
+                cheap_value=None,
+                capable_value="IB Diploma",
+                evidence="IB Diploma Programme",
+            ),
+            SpotCheckDiscrepancy(
+                field_path="facilities",
+                kind="contradiction",
+                issue="Facility conflicts",
+                cheap_value="pool",
+                capable_value="gym",
+                evidence="A swimming pool is available",
+            ),
+        ],
+    )
+
+    filtered = validator_module._filter_spot_check_evidence(
+        parsed,
+        "The school offers the IB Diploma Programme for grades 11 and 12.",
+    )
+
+    assert [item.field_path for item in filtered.discrepancies] == ["programs"]
+    assert filtered.has_discrepancy is False

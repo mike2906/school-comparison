@@ -44,6 +44,67 @@ def test_read_cohort_file_rejects_invalid_or_ambiguous_ids(tmp_path, contents):
 
 
 @pytest.mark.asyncio
+async def test_validate_batch_aggregates_spot_check_usage(db_session):
+    school = School(
+        name_i18n={"bg": "Usage school"},
+        country_code="bg",
+        city="sofia",
+        school_type="private",
+        education_level="primary",
+        scrape_status="extracted",
+        attributes={"extracted": {"programs": ["Primary"]}},
+    )
+    db_session.add(school)
+    await db_session.commit()
+
+    class SessionContext:
+        async def __aenter__(self):
+            return db_session
+
+        async def __aexit__(self, *_args):
+            return False
+
+    settings = SimpleNamespace(
+        validation_batch_concurrency=1,
+        spot_check_sample_size=-1,
+        spot_check_discrepancy_threshold=0.15,
+    )
+    with (
+        patch("app.config.get_settings", return_value=settings),
+        patch("app.database.async_session_maker", side_effect=lambda: SessionContext()),
+        patch(
+            "app.scrapers.validator.validate_school_data",
+            new=AsyncMock(return_value={"status": "ok"}),
+        ),
+        patch(
+            "app.scrapers.validator.run_spot_check_for_school",
+            new=AsyncMock(
+                return_value={
+                    "status": "checked",
+                    "has_discrepancy": False,
+                    "kind_counts": {},
+                    "input_tokens": 500,
+                    "output_tokens": 75,
+                    "token_cost_usd": 0.0042,
+                }
+            ),
+        ),
+    ):
+        summary = await scraper_cli._run_validate_data_batch(
+            db_session,
+            country="bg",
+            city="sofia",
+            limit=None,
+            force_validate=True,
+            school_ids=[school.id],
+        )
+
+    assert summary["input_tokens"] == 500
+    assert summary["output_tokens"] == 75
+    assert summary["token_cost_usd"] == 0.0042
+
+
+@pytest.mark.asyncio
 async def test_run_discover_batch_counts_crashed_adapter_as_failed(db_session):
     class _BoomAdapter:
         ADAPTER_NAME = "boom"

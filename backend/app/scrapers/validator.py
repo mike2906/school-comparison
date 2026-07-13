@@ -4,18 +4,20 @@ from __future__ import annotations
 
 import asyncio
 import datetime
+import hashlib
 import json
 import logging
 import re
 from decimal import Decimal
 from typing import Any, Literal
+from urllib.parse import urldefrag
 
 from pydantic_ai import ModelRetry
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import flag_modified
 
-from app.ai.client import create_agent
+from app.ai.client import calculate_cost, create_agent, extract_provider_cost_usd, get_model
 from app.config import get_settings
 from app.models.field_source import FieldSource, SourceType
 from app.models.pricing import PriceSource, Pricing
@@ -508,10 +510,26 @@ def _normalize_spot_check_output(parsed: SpotCheckOutput) -> SpotCheckOutput:
             changed = True
             continue
 
-        # Contradictions must include source evidence; otherwise degrade to omission.
-        if kind == "contradiction" and not evidence:
+        # Derive direction from the values. Model labels are not reliable enough to
+        # decide whether a finding should cross the publish boundary.
+        if cheap_empty and capable_empty:
             changed = True
-            discrepancy = discrepancy.model_copy(update={"kind": "omission"})
+            continue
+        if cheap_empty:
+            derived_kind = "omission"
+        elif capable_empty:
+            derived_kind = "unsupported"
+        else:
+            derived_kind = "contradiction"
+        if kind != derived_kind:
+            changed = True
+            discrepancy = discrepancy.model_copy(update={"kind": derived_kind})
+
+        # Every retained finding must be auditable. In particular, an unsupported
+        # extracted claim without an audit note must not silently block publication.
+        if not evidence:
+            changed = True
+            continue
 
         normalized.append(discrepancy)
 
@@ -522,6 +540,74 @@ def _normalize_spot_check_output(parsed: SpotCheckOutput) -> SpotCheckOutput:
     if not changed:
         return parsed
     return parsed.model_copy(update={"has_discrepancy": has_discrepancy, "discrepancies": normalized})
+
+
+def _filter_spot_check_evidence(parsed: SpotCheckOutput, source_text: str) -> SpotCheckOutput:
+    """Drop quote-based findings whose purported evidence is not in the supplied context."""
+    normalized_source = re.sub(r"\s+", " ", source_text).casefold()
+    kept = []
+    for discrepancy in parsed.discrepancies:
+        if discrepancy.kind in {"omission", "contradiction"}:
+            evidence = re.sub(r"\s+", " ", discrepancy.evidence or "").casefold()
+            if not evidence or evidence not in normalized_source:
+                continue
+        kept.append(discrepancy)
+    has_discrepancy = any(_is_actionable_discrepancy_kind(item.kind) for item in kept)
+    return parsed.model_copy(update={"has_discrepancy": has_discrepancy, "discrepancies": kept})
+
+
+_SPOT_CONTEXT_CATEGORY_PRIORITY = {
+    "admission": 0,
+    "programs": 1,
+    "facilities": 2,
+    "about": 3,
+    "activities": 4,
+    "contact": 5,
+    "pricing": 6,
+    "homepage": 7,
+}
+
+
+def _build_spot_check_context(pages: list[Any], *, max_chars: int) -> str:
+    """Build a category-balanced, deduplicated audit context within a hard cap."""
+    unique: list[tuple[str, str, str]] = []
+    seen_urls: set[str] = set()
+    seen_content: set[str] = set()
+    for page in sorted(pages, key=lambda item: int(getattr(item, "id", 0) or 0), reverse=True):
+        content = str(getattr(page, "raw_markdown", None) or "").strip()
+        if not content:
+            continue
+        url = urldefrag(str(getattr(page, "source_url", None) or ""))[0]
+        content_hash = hashlib.sha256(re.sub(r"\s+", " ", content).encode()).hexdigest()
+        if url in seen_urls or content_hash in seen_content:
+            continue
+        seen_urls.add(url)
+        seen_content.add(content_hash)
+        category = str(getattr(page, "page_category", None) or "other").casefold()
+        unique.append((category, url, content))
+
+    if not unique:
+        return ""
+    buckets: dict[str, list[tuple[str, str, str]]] = {}
+    for row in sorted(unique, key=lambda item: item[1]):
+        buckets.setdefault(row[0], []).append(row)
+    categories = sorted(
+        buckets,
+        key=lambda category: (_SPOT_CONTEXT_CATEGORY_PRIORITY.get(category, 50), category),
+    )
+    max_pages = max(1, min(len(unique), max_chars // 1000))
+    selected: list[tuple[str, str, str]] = []
+    while len(selected) < max_pages and any(buckets.values()):
+        for category in categories:
+            if buckets[category] and len(selected) < max_pages:
+                selected.append(buckets[category].pop(0))
+
+    per_page = max(200, max_chars // len(selected))
+    sections = [
+        f"[{category}] {url}\n{content}"[:per_page]
+        for category, url, content in selected
+    ]
+    return "\n\n".join(sections)[:max_chars]
 
 
 def _has_meaningful_payload(value: Any) -> bool:
@@ -1141,9 +1227,8 @@ async def run_spot_check_for_school(
         .order_by(SourcePage.id)
     )
     pages = pages_result.scalars().all()
-    source_text = "\n\n".join((page.raw_markdown or "").strip() for page in pages if (page.raw_markdown or "").strip())
     source_text_cap = max(2000, int(settings.validation_spot_check_max_content_chars))
-    source_text = source_text[:source_text_cap]
+    source_text = _build_spot_check_context(pages, max_chars=source_text_cap)
     if not source_text:
         return {"school_id": school_id, "status": "skipped", "reason": "No source page content"}
 
@@ -1158,8 +1243,12 @@ async def run_spot_check_for_school(
         f"{core_fields}. "
         "Treat all other fields as informational and do not include them in discrepancies. "
         "Return has_discrepancy=true only for actionable core discrepancies. "
-        "Every discrepancy must include: field_path, kind (contradiction|omission|unsupported), and short issue. "
-        "For contradiction, include a short evidence snippet copied from source text. "
+        "Every discrepancy must include field_path, kind, short issue, cheap_value, capable_value, and evidence. "
+        "Omission means cheap_value is empty and capable_value is a concrete source value. "
+        "Unsupported means cheap_value is concrete and capable_value is empty. "
+        "Contradiction means both values are concrete and conflict. "
+        "For omission and contradiction, evidence must be a short exact quote from source text. "
+        "For unsupported, evidence must briefly identify the reviewed source context that lacks support. "
         "Do not emit discrepancies when both extracted and source values are absent/unknown."
     )
     user_prompt = (
@@ -1210,19 +1299,41 @@ async def run_spot_check_for_school(
                 )
         return data
 
+    input_tokens = 0
+    output_tokens = 0
+    token_cost_usd = 0.0
     try:
         raw_result = await asyncio.wait_for(
             agent.run(user_prompt),
             timeout=max(5.0, float(settings.validation_spot_check_timeout_seconds)),
         )
+        input_tokens, output_tokens = extraction_helpers._get_usage(raw_result)
+        token_cost_usd = extract_provider_cost_usd(raw_result) or calculate_cost(
+            "capable", input_tokens, output_tokens
+        )
         parsed = _parse_spot_check_output(raw_result)
         if parsed is None:
-            return {"school_id": school_id, "status": "skipped", "reason": "Invalid spot-check output"}
+            return {
+                "school_id": school_id,
+                "status": "skipped",
+                "reason": "Invalid spot-check output",
+                "input_tokens": input_tokens,
+                "output_tokens": output_tokens,
+                "token_cost_usd": round(float(token_cost_usd), 6),
+            }
         parsed = _normalize_spot_check_output(parsed)
+        parsed = _filter_spot_check_evidence(parsed, source_text)
     except Exception as exc:
         # Agent/model failures are expected transient conditions (timeouts/provider issues).
         logger.warning("Spot-check failed for school %s: %s", school_id, exc)
-        return {"school_id": school_id, "status": "failed", "error": str(exc)}
+        return {
+            "school_id": school_id,
+            "status": "failed",
+            "error": str(exc),
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+            "token_cost_usd": round(float(token_cost_usd), 6),
+        }
 
     kind_counts = _count_spot_check_kinds(parsed)
     payload = parsed.model_dump(mode="json")
@@ -1230,6 +1341,10 @@ async def run_spot_check_for_school(
     payload["model_tier"] = "capable"
     payload["quality_scope"] = "core_fields_only"
     payload["kind_counts"] = kind_counts
+    payload["input_tokens"] = input_tokens
+    payload["output_tokens"] = output_tokens
+    payload["token_cost_usd"] = round(float(token_cost_usd), 6)
+    payload["model"] = get_model("capable")
 
     try:
         async with _tx_context(db):
@@ -1266,7 +1381,14 @@ async def run_spot_check_for_school(
         logger.exception("Failed to persist spot-check payload for school %s: %s", school_id, exc)
         if db.in_transaction():
             await db.rollback()
-        return {"school_id": school_id, "status": "failed", "error": str(exc)}
+        return {
+            "school_id": school_id,
+            "status": "failed",
+            "error": str(exc),
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+            "token_cost_usd": round(float(token_cost_usd), 6),
+        }
 
     return {
         "school_id": school_id,
@@ -1275,6 +1397,9 @@ async def run_spot_check_for_school(
         "discrepancies": len(parsed.discrepancies),
         "kind_counts": kind_counts,
         "summary": parsed.summary,
+        "input_tokens": input_tokens,
+        "output_tokens": output_tokens,
+        "token_cost_usd": round(float(token_cost_usd), 6),
     }
 
 

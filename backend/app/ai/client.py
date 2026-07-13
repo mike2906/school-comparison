@@ -7,7 +7,8 @@ This module provides:
 - Cost tracking helpers
 """
 import inspect
-from typing import Literal
+from math import isfinite
+from typing import Any, Literal
 from pydantic_ai import Agent
 from pydantic_ai.models.openai import OpenAIModel
 from pydantic_ai.providers.openai import OpenAIProvider
@@ -87,6 +88,39 @@ def calculate_cost(tier: ModelTier, input_tokens: int, output_tokens: int) -> fl
     """
     input_cost, output_cost = get_model_costs(tier)
     return (input_tokens / 1_000_000 * input_cost) + (output_tokens / 1_000_000 * output_cost)
+
+
+def extract_provider_cost_usd(result: Any) -> float:
+    """Read exact provider-reported cost from a PydanticAI result when available."""
+    messages = []
+    if callable(getattr(result, "all_messages", None)):
+        try:
+            messages = result.all_messages()
+        except Exception:
+            messages = []
+    total = 0.0
+    for message in messages:
+        details = getattr(message, "provider_details", None)
+        if not isinstance(details, dict) or details.get("cost") is None:
+            continue
+        try:
+            value = float(details["cost"])
+        except (TypeError, ValueError, OverflowError):
+            continue
+        if isfinite(value) and value >= 0:
+            total += value
+    if total > 0:
+        return total
+
+    response = getattr(result, "response", None)
+    details = getattr(response, "provider_details", None) if response is not None else None
+    if isinstance(details, dict):
+        try:
+            value = float(details.get("cost") or 0.0)
+        except (TypeError, ValueError, OverflowError):
+            return 0.0
+        return value if isfinite(value) and value >= 0 else 0.0
+    return 0.0
 
 
 def get_openai_model(tier: ModelTier) -> OpenAIModel:
@@ -192,6 +226,7 @@ __all__ = [
     "get_model",
     "get_model_costs",
     "calculate_cost",
+    "extract_provider_cost_usd",
     "get_openai_model",
     "create_agent",
     "MODEL_TIERS",

@@ -3611,6 +3611,7 @@ async def _run_validate_data_batch(
     review_count = 0
     failed_count = 0
     validated_ids: list[int] = []
+    spot_usage = {"input_tokens": 0, "output_tokens": 0, "token_cost_usd": 0.0}
 
     with Progress(
         SpinnerColumn(),
@@ -3655,7 +3656,8 @@ async def _run_validate_data_batch(
     console.print(f"  Failed: {failed_count}")
 
     validation_summary = {
-        **_stage_summary(
+        **_stage_summary_with_usage(
+            usage=spot_usage,
             processed=len(school_ids),
             succeeded=ok_count + review_count,
             failed=failed_count,
@@ -3712,6 +3714,7 @@ async def _run_validate_data_batch(
         tasks = [asyncio.create_task(_spot_check_single(school_id)) for school_id in sample_ids]
         for completed in asyncio.as_completed(tasks):
             _, out = await completed
+            _add_llm_usage(spot_usage, out)
             if out.get("status") == "checked":
                 checked_count += 1
                 if out.get("has_discrepancy"):
@@ -3723,6 +3726,14 @@ async def _run_validate_data_batch(
             else:
                 spot_failed_count += 1
             progress.update(task, advance=1)
+
+    validation_summary.update(
+        {
+            "input_tokens": int(spot_usage["input_tokens"]),
+            "output_tokens": int(spot_usage["output_tokens"]),
+            "token_cost_usd": round(float(spot_usage["token_cost_usd"]), 6),
+        }
+    )
 
     console.print("[green]✓ Spot-check complete:[/green]")
     console.print(f"  Checked: {checked_count}")

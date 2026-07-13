@@ -216,38 +216,9 @@ def _parse_agent_output(result: Any, result_type: type) -> Any | None:
 
 
 def _extract_openrouter_cost_usd(result: Any) -> float:
-    all_messages = []
-    if callable(getattr(result, "all_messages", None)):
-        try:
-            all_messages = result.all_messages()
-        except Exception:
-            all_messages = []
+    from app.ai.client import extract_provider_cost_usd
 
-    total_cost = 0.0
-    for message in all_messages:
-        provider_details = getattr(message, "provider_details", None)
-        if not isinstance(provider_details, dict):
-            continue
-        raw_cost = provider_details.get("cost")
-        if raw_cost is None:
-            continue
-        try:
-            total_cost += float(raw_cost)
-        except (TypeError, ValueError):
-            continue
-
-    if total_cost > 0:
-        return total_cost
-
-    response = getattr(result, "response", None)
-    response_details = getattr(response, "provider_details", None) if response is not None else None
-    if isinstance(response_details, dict):
-        raw_cost = response_details.get("cost")
-        try:
-            return float(raw_cost or 0.0)
-        except (TypeError, ValueError):
-            return 0.0
-    return 0.0
+    return extract_provider_cost_usd(result)
 
 
 def _normalize_address_for_compare(value: str | None) -> str:
@@ -847,7 +818,7 @@ async def _extract_prices(
     llm_stats: ExtractionLLMStats,
 ) -> dict[str, Any]:
     settings = get_settings()
-    selected_text, source_urls = helpers._select_pages(
+    selected_text, _source_urls = helpers._select_pages(
         school=school,
         pages=pages,
         preferred_categories=PRICING_PAGE_CATEGORIES,
@@ -955,7 +926,6 @@ async def _extract_prices(
             "token_cost_usd": token_cost_usd,
         }
 
-    source_url = source_urls[0] if source_urls else None
     pricing_rows: list[Pricing] = []
     source_rows: list[FieldSource] = []
 
@@ -973,7 +943,19 @@ async def _extract_prices(
         normalized_installments = helpers._normalize_text_list(extracted.installments)
         normalized_includes = helpers._normalize_text_list(extracted.includes)
         normalized_excludes = helpers._normalize_text_list(extracted.excludes)
-        row_source_url = helpers._find_supporting_price_source_url(school, pages, extracted) or source_url
+        row_source_url = helpers._find_supporting_price_source_url(school, pages, extracted)
+        if not row_source_url:
+            continue
+        supporting_page = next(
+            (page for page in pages if page.source_url == row_source_url),
+            None,
+        )
+        if (
+            not fields["academic_year"]
+            and supporting_page is not None
+            and helpers._yearless_pricing_text_is_stale(supporting_page.raw_markdown or "")
+        ):
+            continue
 
         pricing_rows.append(
             Pricing(
@@ -1020,10 +1002,23 @@ async def _extract_prices(
         )
 
     if not pricing_rows:
+        await db.execute(
+            delete(Pricing).where(
+                Pricing.school_id == school.id,
+                Pricing.source == PriceSource.SCRAPED_WEBSITE,
+            )
+        )
+        await db.execute(
+            delete(FieldSource).where(
+                FieldSource.school_id == school.id,
+                FieldSource.source_type == SourceType.SCRAPED_WEBSITE,
+                FieldSource.category == "pricing",
+            )
+        )
         return {
             "success": True,
             "count": 0,
-            "detail": "Pricing info detected but no valid rows after normalization",
+            "detail": "Pricing info detected but no valid rows after normalization (cleared existing scraped pricing)",
             "input_tokens": input_tokens,
             "output_tokens": output_tokens,
             "token_cost_usd": token_cost_usd,
