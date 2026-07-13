@@ -595,7 +595,7 @@ will need to be repeated.
             SHA-256 check and produces a 110-line restore manifest. The audit and corrected
             scoreboard were captured, and `cohort-validation.txt` confirms the reviewed
             18-school stratified cohort is in Sofia scope and every member has a website URL.
-      - [ ] Run a 10–20 school pilot through the complete website path, explicitly
+      - [x] Run a 10–20 school pilot through the complete website path, explicitly
             including already navigated/extracted schools and forced validation. Inspect
             API payloads, rejected coordinates, pricing, display names, localized fields,
             spot checks, summaries, and the PipelineRun snapshot before scaling up.
@@ -605,6 +605,39 @@ will need to be repeated.
             `--force-validate`. Stop after the pilot to review quality and projected cost.
             Batch `--stage all` starts at URL validation and does not run website discovery;
             run `discover-websites` separately first only for missing/stale website records.
+            **Completed 2026-07-13 — not approved for scale-up.** Run
+            `54da254d-df10-4985-b157-664cd4f0f9ec` processed the reviewed 18-school cohort:
+            17 URLs validated, navigated, extracted, and passed deterministic validation;
+            one directory/construction-page mismatch was correctly rejected and withheld;
+            16 schools were summarized. Extraction used 117,933 input / 7,088 output
+            tokens ($0.015411) and summarization used 16,439 input / 4,119 output tokens
+            ($0.004936), for $0.020347 recorded usage. The run was correctly `partial`.
+            Evidence is stored in ignored local artifacts under
+            `backend/reports/pilot/54da254d-df10-4985-b157-664cd4f0f9ec/`.
+      - [ ] **Fix price semantic validation before another pilot.** The source/confidence
+            gate reported 0 failures, but manual inspection found rows crossing the API
+            with incorrect categories/periods: tuition labeled as food (school 153), bus
+            and learning-support fees labeled as tuition (506), and implausible transport
+            / yearly mappings plus mixed old/current fee tables (570). Add tests before
+            implementation per the project price-validation rule. Validate category against
+            plan/section context, period against source wording, current academic-year
+            selection, and duplicate/ambiguous rows; withhold rows that cannot be supported.
+      - [ ] **Calibrate spot-check discrepancy semantics before another pilot.** Ten schools
+            were checked; 3 were actionable (30%, above the 15% advisory threshold), with
+            61 omissions, 7 unsupported claims, and 0 contradictions. Several `unsupported`
+            findings actually describe missing/incomplete extraction, while at least one
+            potentially unsupported class-size value remained public because it was labeled
+            `omission`. Require evidence for unsupported/contradiction, keep genuine omission
+            monitoring separate from publish blocking, and regression-test the three pilot
+            schools (506, 516, 529) against their cached source pages.
+      - [ ] **Include spot-check LLM usage in the PipelineRun cost snapshot.** The recorded
+            $0.020347 includes extraction and summarization but excludes the ten capable-model
+            spot-check calls, so it is not yet a complete provider-cost probe. Persist their
+            token/cost usage and include it in the aggregate and CLI report.
+      - [ ] Repeat the same reviewed pilot cohort after the pricing and spot-check fixes.
+            Require semantically correct published prices, a calibrated actionable discrepancy
+            rate within threshold, complete usage accounting, clean API boundary checks, and
+            no unresolved publishable claims before approving the full refresh.
       - [ ] If the pilot is clean, run the full Sofia website refresh once, then run the
             corrected force-regeocode process. NVO remains independent and must not be
             refreshed as part of `all` unless a separate NVO audit calls for it.
