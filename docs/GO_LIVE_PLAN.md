@@ -699,6 +699,14 @@ will need to be repeated.
             before changing extraction, clear superseded scraped rows on a successful no-price
             refresh, and prove stored-row freshness/source semantics rather than only the current
             source/confidence gate.
+            **Progress 2026-07-14 (PR #48, merged as `2efaea9`).** Successful no-price
+            refreshes now clear superseded scraped rows while provider failures preserve them;
+            stale cross-category schedules, late-payment penalties, unsupported optional-service
+            periods, and exact duplicates have regression coverage. The repeat confirmed that the
+            old 2024/2025 school-570 rows and school-506 late penalties are gone, school 584 has
+            zero stale prices, explicit monthly tuition and materials survive, and activities with
+            distinct plan names are not collapsed. This remains unchecked because the fresh repeat
+            exposed new heading/entity-association failures below.
       - [ ] **Preserve or supersede actionable spot-check gates safely.** Fresh deterministic
             validation replaces the complete `data_validation` payload, so an unsampled school can
             lose its earlier actionable spot-check withholding. School 529 consequently republishes
@@ -706,12 +714,24 @@ will need to be repeated.
             evidence check. Fix the deterministic class-size evidence rule and define when an old
             spot finding may be cleared. Also raise or otherwise handle the 20-second capable-model
             timeout so sampled coverage does not require an out-of-band retry.
+            **Progress 2026-07-14 (PR #48).** Class-size evidence now requires a pupil/class
+            relationship, deterministic-only reruns preserve prior spot gates, explicit new checks
+            supersede them, summaries fail closed on actionable blocking paths, and the timeout is
+            45 seconds. All ten repeat-run spot checks completed. This remains unchecked because
+            provenance still exposes rejected `FieldSource.value_text` values, including school
+            529's withheld `9 students`, through detail/compare responses.
       - [ ] **Tighten admission-field semantic validation before publication.** The `ok` reports
             still permit a 2020 procurement deadline (103), navigation labels/links as available
             places or entry requirements (324), a Markdown image URL as an application deadline
             (404), stale 2025/2026 admission text (570), and incomplete deadline fragments (153).
             Add cached-page regressions and withhold unsupported/stale admission children through
             the existing projection gate.
+            **Progress 2026-07-14 (PR #48).** Stale-year, procurement, navigation-label,
+            Markdown URL/image, incomplete-ending, and unsupported available-place values now fail
+            closed in deterministic validation and the API projection. The named 324/404/570
+            failures no longer publish. This remains unchecked because the repeat still publishes
+            fragmented admission children and a misclassified interview requirement (details
+            below), and a Markdown daily-schedule link bypasses the admission-specific filter.
       - [ ] **Make summary inputs and outputs obey the publish boundary.** Summarization still passes
             uncorroborated display-name candidates even though API name resolution rejects them,
             trusts the import scope `city=sofia` over the primary location, and has no semantic
@@ -720,6 +740,63 @@ will need to be repeated.
             or promotional narrative, and unstable proportions. Reuse the corroborated resolved
             identity/location, strengthen filler/unsupported-claim validation, and withhold failed
             summaries before another pilot.
+            **Progress 2026-07-14 (PR #48).** Stage 7 now reuses the corroborated public name,
+            derives locality from the primary address/in-bounds coordinates instead of import
+            scope, and validates short/long output again at persistence. The repeat correctly says
+            Svoge, Elin Pelin, Etropole, and Osoitsa for schools 440/454/460/570. This remains
+            unchecked because the output gate still accepts the semantic/presentation failures
+            documented below.
+      - [x] **Repeat the reviewed 18-school cohort after the PR #48 blocker pass.** Preflight
+            used clean `main` at `2efaea9`, healthy Postgres at Alembic head `6cb27777e0d2`, the
+            checksum-valid 9.2 MB backup/110-entry restore manifest, and the unchanged reviewed
+            cohort. All 18 records were in `bg`/`sofia` scope with website URLs. The configured and
+            live-available models remained Gemini 2.5 Flash Lite (`$0.10/$0.40` per million
+            input/output tokens) and GPT-4o-mini (`$0.15/$0.60`), with GPT-4o-mini as extraction
+            fallback. OpenRouter again reported `limit=null`; pre-run balance was about $7.61.
+
+            Run `9d2c837f-aaf9-4924-a884-899f9cbcf4e0` completed in about 6m39s with zero stage
+            failures: 18/18 URL-valid, navigated, extracted, deterministic-validation `ok`, and
+            summarized. URL validation used no LLM fallback. Extraction used 118,968 input / 9,482
+            output tokens ($0.016399); all ten capable-model spot checks completed at the new
+            timeout and used 44,936 / 6,515 ($0.010649); summarization used 14,989 / 3,890
+            ($0.004581). Complete attributed usage was 178,893 input / 19,887 output and $0.031629.
+            The final provider delta was about $0.033112, leaving about $7.58. For 474 current
+            website URLs, `(pilot cost / 18) × 474 × 1.25` projects to $1.09 from provider charges
+            ($1.04 from attributed telemetry).
+
+            Spot checks reported zero actionable contradiction/unsupported findings (0%, below
+            the 15% advisory threshold), eight monitoring-only omissions, and no failures. NVO was
+            not run and remained at 5,115 rows. Ignored evidence is under
+            `backend/reports/pilot/9d2c837f-aaf9-4924-a884-899f9cbcf4e0/`.
+
+            **Recommendation: no-go for the full refresh.** Perfect stage/validator counts and zero
+            source/confidence gate failures do not establish semantic correctness. Manual stored,
+            source-page, list/detail/compare, and summary review found the blockers below.
+      - [ ] **Fix fresh pricing heading/entity association, then repeat the cohort.** School 538
+            publishes nursery tuition EUR 580 and after-hours care EUR 26 as transport; EUR 160 is
+            the actual transport fee. School 570 publishes EUR 300 supplies, EUR 1,000 deposit, and
+            EUR 850 monthly tuition as registration, plus EUR 180 meals as tuition. School 153
+            mixes kindergarten, preschool, gymnasium, and primary-school prices from a combined
+            Uwekind page without plan/age applicability. School 506's seven published rows are
+            correctly classified, but omitted mandatory capital fees understate the total cost.
+            Add fresh-page regressions and reject rows whose heading/entity/plan association cannot
+            be retained. The scoreboard's 0/234 gate failures currently misses these errors.
+      - [ ] **Close provenance and localized-field publish bypasses.** Detail/compare expose raw
+            `field_sources[].value_text` even when the corresponding field was rejected (school 529
+            publishes `9 students` through provenance while `attributes.class_size` is null; the
+            cohort has several analogous guesses). Remove raw values from the parent-facing schema
+            or apply the same field-level gate. Also reject/coalesce fragmented admission children:
+            school 103 publishes seven split medical phrases, 105 a standalone `Деца`, 153 four
+            split interview fragments, and 506 splits self-care text and misclassifies a possible
+            placement-test/interview requirement as an application deadline. Apply the general
+            projection sanitizer to school 324's Markdown daily-schedule link as well.
+      - [ ] **Make summary persistence parent-ready, not merely schema-valid.** Manual review passed
+            only 6/18 summaries (105, 440, 454, 460, 516, 570). The other 12 include identity/entity
+            collisions (153/529), testimonial or marketing prose (506/610/631), unsupported
+            negatives (233/584), stale relative claims (404), mistranslation/unstable operational
+            details (538), or raw/generic extraction artifacts (103/297/324). Extend deterministic
+            input cleanup and semantic output validation; clear/downgrade these failures, then
+            inspect every regenerated cohort summary before scale-up.
       - [ ] **Set an OpenRouter spend guardrail (or explicitly approve operating without one).**
             The projected refresh is affordable, but the active key reports `limit=null`; record a
             cap with headroom before treating the cost-control precondition as met.
