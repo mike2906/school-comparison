@@ -1725,6 +1725,18 @@ def test_filter_supported_prices_keeps_tuition_when_transport_is_included():
     assert refined[0].category == "tuition"
 
 
+def test_filter_supported_prices_prefers_food_over_generic_monthly_fee():
+    text = "Месечна такса за храна – 100 лв"
+    price = ExtractedPrice(
+        category="food", amount=100, currency="BGN", period="monthly", confidence=0.9,
+    )
+
+    refined = extractor_module.helpers._filter_supported_prices([price], text)
+
+    assert len(refined) == 1
+    assert refined[0].category == "food"
+
+
 def test_dedupe_price_rows_keeps_only_latest_academic_year():
     prices = [
         ExtractedPrice(

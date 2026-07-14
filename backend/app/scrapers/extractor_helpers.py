@@ -1293,10 +1293,10 @@ def _detect_price_category(value: str, *, allow_generic_heading: bool = False) -
         for token in ("образователни ресурси", "учебниц", "консуматив", "materials")
     ):
         return "materials"
-    if re.search(r"\b(?:месечна|годишна)\s+такса\b", lowered):
-        return "tuition"
     if any(token in lowered for token in ("храна", "food", "meal", "meals", "lunch", "snack", "закуска", "обяд")):
         return "food"
+    if re.search(r"\b(?:месечна|годишна)\s+такса\b", lowered):
+        return "tuition"
     if "униформ" in lowered or "uniform" in lowered:
         return "uniforms"
     if any(
