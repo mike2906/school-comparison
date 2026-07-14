@@ -1464,7 +1464,14 @@ def _detect_price_period(
     if explicit is not None:
         return explicit
     if re.search(r"\b(?:in\s+)?two\s+installments\b|\bдве\s+вноски\b", lowered_value):
-        return "yearly"
+        per_installment = bool(
+            re.search(
+                r"\b(?:each|per\s+installment)\b|\btwo\s+installments\s+of\b|"
+                r"\bдве\s+вноски\s+по\b|:\s*по\s+\d",
+                lowered_value,
+            )
+        )
+        return "semester" if per_installment else "yearly"
     if default_period == "monthly" and category == "tuition" and len(amount_matches) > 2:
         return "yearly"
     if default_period is not None:

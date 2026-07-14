@@ -1564,6 +1564,25 @@ def test_extract_prices_deterministic_maps_installment_multipliers_to_periods():
     assert by_amount[843].period == "monthly"
 
 
+@pytest.mark.parametrize(
+    ("line", "expected_period"),
+    [
+        ("School Transport: €2,100 total, payable in two installments", "yearly"),
+        ("Tuition in two installments: €4,000 each", "semester"),
+        ("Обучение на две вноски: по 4 000 EUR", "semester"),
+    ],
+)
+def test_detect_price_period_distinguishes_total_from_per_installment_amounts(
+    line,
+    expected_period,
+):
+    assert extractor_module.helpers._detect_price_period(
+        line,
+        "tuition" if "Tuition" in line or "Обучение" in line else "transport",
+        has_year=True,
+    ) == expected_period
+
+
 def test_dedupe_price_rows_drops_currency_and_installment_duplicates():
     prices = [
         ExtractedPrice(
