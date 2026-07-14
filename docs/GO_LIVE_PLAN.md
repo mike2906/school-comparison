@@ -649,10 +649,80 @@ will need to be repeated.
             available (tier-price fallback otherwise), and model identity. The Stage 6 batch
             aggregates successful and post-call non-success usage into the existing
             `PipelineRun` usage snapshot and CLI totals.
-      - [ ] Repeat the same reviewed pilot cohort after the pricing and spot-check fixes.
+      - [x] Repeat the same reviewed pilot cohort after the pricing and spot-check fixes.
             Require semantically correct published prices, a calibrated actionable discrepancy
             rate within threshold, complete usage accounting, clean API boundary checks, and
             no unresolved publishable claims before approving the full refresh.
+            **Completed 2026-07-14 — not approved for scale-up.** Before the run, `main` was at
+            merged PR #45 (`5e82450`), Postgres was healthy and at Alembic head
+            `6cb27777e0d2`, the backup checksum/restore manifest were valid, and all 18 reviewed
+            cohort IDs were in Sofia scope. The previous false-positive URL for school 103 had
+            been correctly cleared; targeted website discovery found `https://dg3sofia.com`,
+            which then passed deterministic URL identity validation. The configured models were
+            unchanged and available (Gemini 2.5 Flash Lite cheap tier, GPT-4o-mini capable tier,
+            with GPT-4o-mini as the extraction fallback). OpenRouter reported no key spend limit,
+            about $7.65 balance before the run, and matching live model prices.
+
+            Run `a6d78e0c-e67a-4ac7-b4a4-a3ca48b83582` completed the full website path for all
+            18 schools: 18 URL-valid, navigated, extracted, deterministic-validation `ok`, and
+            summarized. Extraction used 120,017 input / 8,530 output tokens ($0.015900), and
+            summarization used 17,627 input / 4,231 output tokens ($0.005181). Seven of ten
+            sampled spot checks completed in the main run; three hit the configured 20-second
+            timeout. The same capable model completed targeted rechecks for those three under
+            recorded run `8361f509-99fb-4c01-9d98-40f896920e58` with a justified 45-second
+            timeout (14,205 input / 1,990 output, $0.003325). Across the main run and rechecks,
+            attributed telemetry was 183,780 input / 19,091 output tokens and $0.031800; the
+            authoritative provider usage delta was $0.034100, capturing any timeout/provider
+            billing not visible to result telemetry. No URL reached the unmetered LLM fallback.
+            All ten completed checks had zero actionable contradiction/unsupported findings
+            (0%, below 15%) and seven monitoring-only omissions. With 474 current website URLs,
+            the required `(cost / 18) × 474 × 1.25` projection is $1.12 using provider charges
+            ($1.05 using attributed telemetry). The balance covers it, but `limit=null` means the
+            configured-limit precondition is not literally satisfied.
+
+            The structural list/detail/compare boundary check returned `true` with no internal-key
+            leakage. Cohort validation coverage was 18/18 and all stored cohort summaries were
+            publishable under the current `status=ok` gate. NVO was not run and remained at 5,115
+            rows. Ignored evidence is under
+            `backend/reports/pilot/a6d78e0c-e67a-4ac7-b4a4-a3ca48b83582/`.
+
+            Manual semantic review nevertheless found release blockers below, so the next full-
+            refresh checkbox remains unauthorized.
+      - [ ] **Fail stale and semantically unsupported pricing closed, then repeat the pilot.**
+            School 570 still publishes old 2024/2025 food/activity values beside 2026/2027 fees,
+            converts explicitly monthly tuition to yearly, invents yearly periods for unlabeled
+            transport, and labels foreign-language books as extracurricular. School 506 publishes
+            late-payment penalties as registration fees. Schools 538 and 584 retained stale rows
+            when the repeat extraction produced no replacement: 538 includes unsupported activity
+            amounts and cites a contact page, while 584 exposes fee tables dated by 2023/2024
+            payment deadlines with lost grade/plan semantics. Add price-validation regressions
+            before changing extraction, clear superseded scraped rows on a successful no-price
+            refresh, and prove stored-row freshness/source semantics rather than only the current
+            source/confidence gate.
+      - [ ] **Preserve or supersede actionable spot-check gates safely.** Fresh deterministic
+            validation replaces the complete `data_validation` payload, so an unsampled school can
+            lose its earlier actionable spot-check withholding. School 529 consequently republishes
+            unsupported `class_size=9`; a grade-9 news reference satisfied the current loose numeric
+            evidence check. Fix the deterministic class-size evidence rule and define when an old
+            spot finding may be cleared. Also raise or otherwise handle the 20-second capable-model
+            timeout so sampled coverage does not require an out-of-band retry.
+      - [ ] **Tighten admission-field semantic validation before publication.** The `ok` reports
+            still permit a 2020 procurement deadline (103), navigation labels/links as available
+            places or entry requirements (324), a Markdown image URL as an application deadline
+            (404), stale 2025/2026 admission text (570), and incomplete deadline fragments (153).
+            Add cached-page regressions and withhold unsupported/stale admission children through
+            the existing projection gate.
+      - [ ] **Make summary inputs and outputs obey the publish boundary.** Summarization still passes
+            uncorroborated display-name candidates even though API name resolution rejects them,
+            trusts the import scope `city=sofia` over the primary location, and has no semantic
+            post-generation gate. The repeat produced misidentified schools (153/529), false Sofia
+            locations (440/454/460/570), missing-data filler and unsupported negative claims, stale
+            or promotional narrative, and unstable proportions. Reuse the corroborated resolved
+            identity/location, strengthen filler/unsupported-claim validation, and withhold failed
+            summaries before another pilot.
+      - [ ] **Set an OpenRouter spend guardrail (or explicitly approve operating without one).**
+            The projected refresh is affordable, but the active key reports `limit=null`; record a
+            cap with headroom before treating the cost-control precondition as met.
       - [ ] If the pilot is clean, run the full Sofia website refresh once, then run the
             corrected force-regeocode process. NVO remains independent and must not be
             refreshed as part of `all` unless a separate NVO audit calls for it.
