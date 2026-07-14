@@ -1825,14 +1825,29 @@ def _dedupe_currency_variants(prices: list[ExtractedPrice]) -> list[ExtractedPri
 
 def _dedupe_price_rows(prices: list[ExtractedPrice]) -> list[ExtractedPrice]:
     rows = _dedupe_currency_variants(_dedupe_installment_variants(prices))
-    grouped: dict[tuple[str, str, str], list[ExtractedPrice]] = {}
-    for row in rows:
-        key = (
+
+    def comparable_group_key(row: ExtractedPrice) -> tuple[str, str, str]:
+        return (
             (row.category or "").casefold(),
             (row.plan_name or "").strip().casefold(),
             (row.age_group or "").strip().casefold(),
         )
-        grouped.setdefault(key, []).append(row)
+
+    def exact_fee_identity(
+        row: ExtractedPrice,
+    ) -> tuple[str, str, str, str, float | None, str]:
+        return (
+            (row.category or "").casefold(),
+            (row.period or "").casefold(),
+            (row.plan_name or "").strip().casefold(),
+            (row.age_group or "").strip().casefold(),
+            _to_optional_float(row.amount),
+            (row.currency or "").upper(),
+        )
+
+    grouped: dict[tuple[str, str, str], list[ExtractedPrice]] = {}
+    for row in rows:
+        grouped.setdefault(comparable_group_key(row), []).append(row)
 
     latest_year_by_group: dict[tuple[str, str, str], str] = {}
     for key, group in grouped.items():
@@ -1847,17 +1862,18 @@ def _dedupe_price_rows(prices: list[ExtractedPrice]) -> list[ExtractedPrice]:
                 key=lambda value: tuple(int(part) for part in value.split("/")),
             )
 
+    explicit_fee_identities = {
+        exact_fee_identity(row)
+        for row in rows
+        if _normalize_academic_year(row.academic_year) is not None
+    }
     return [
         row
         for row in rows
-        if (
-            key := (
-                (row.category or "").casefold(),
-                (row.plan_name or "").strip().casefold(),
-                (row.age_group or "").strip().casefold(),
-            )
-        ) not in latest_year_by_group
-        or _normalize_academic_year(row.academic_year) == latest_year_by_group[key]
+        if (key := comparable_group_key(row)) not in latest_year_by_group
+        or (year := _normalize_academic_year(row.academic_year))
+        == latest_year_by_group[key]
+        or (year is None and exact_fee_identity(row) not in explicit_fee_identities)
     ]
 
 

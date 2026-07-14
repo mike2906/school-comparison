@@ -1792,7 +1792,7 @@ def test_dedupe_price_rows_keeps_only_latest_academic_year():
 def test_dedupe_price_rows_drops_yearless_rows_when_explicit_year_exists():
     prices = [
         ExtractedPrice(
-            category="tuition", amount=500, currency="EUR", period="monthly",
+            category="tuition", amount=6000, currency="EUR", period="yearly",
             academic_year=None, confidence=0.9,
         ),
         ExtractedPrice(
@@ -1804,6 +1804,26 @@ def test_dedupe_price_rows_drops_yearless_rows_when_explicit_year_exists():
     deduped = extractor_module.helpers._dedupe_price_rows(prices)
 
     assert [(row.amount, row.academic_year) for row in deduped] == [(6000, "2026/2027")]
+
+
+def test_dedupe_price_rows_preserves_distinct_yearless_fee_in_same_category():
+    prices = [
+        ExtractedPrice(
+            category="registration", amount=500, currency="EUR", period="one_time",
+            confidence=0.9,
+        ),
+        ExtractedPrice(
+            category="registration", amount=1000, currency="EUR", period="one_time",
+            academic_year="2026/2027", confidence=0.9,
+        ),
+    ]
+
+    deduped = extractor_module.helpers._dedupe_price_rows(prices)
+
+    assert {(row.amount, row.academic_year) for row in deduped} == {
+        (500, None),
+        (1000, "2026/2027"),
+    }
 
 
 def test_dedupe_price_rows_preserves_yearless_fee_in_other_category():
