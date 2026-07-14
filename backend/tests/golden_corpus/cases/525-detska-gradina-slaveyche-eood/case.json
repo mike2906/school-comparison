@@ -108,6 +108,28 @@
       {
         "academic_year": null,
         "age_group": null,
+        "amount": 510.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "monthly",
+        "plan_name": null
+      },
+      {
+        "academic_year": null,
+        "age_group": null,
+        "amount": 490.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "monthly",
+        "plan_name": null
+      },
+      {
+        "academic_year": null,
+        "age_group": null,
         "amount": 350.0,
         "amount_max": null,
         "amount_min": null,
@@ -125,39 +147,6 @@
         "category": "registration",
         "currency": "EUR",
         "period": "one_time",
-        "plan_name": null
-      },
-      {
-        "academic_year": null,
-        "age_group": null,
-        "amount": 510.0,
-        "amount_max": null,
-        "amount_min": null,
-        "category": "tuition",
-        "currency": "EUR",
-        "period": "one_time",
-        "plan_name": null
-      },
-      {
-        "academic_year": null,
-        "age_group": null,
-        "amount": 490.0,
-        "amount_max": null,
-        "amount_min": null,
-        "category": "tuition",
-        "currency": "EUR",
-        "period": "one_time",
-        "plan_name": null
-      },
-      {
-        "academic_year": null,
-        "age_group": null,
-        "amount": 20.0,
-        "amount_max": null,
-        "amount_min": null,
-        "category": "extracurricular",
-        "currency": "EUR",
-        "period": "monthly",
         "plan_name": null
       }
     ]

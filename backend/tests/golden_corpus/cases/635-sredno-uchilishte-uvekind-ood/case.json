@@ -177,19 +177,8 @@
         "amount": 7880.0,
         "amount_max": null,
         "amount_min": null,
-        "category": "food",
+        "category": "tuition",
         "currency": "EUR",
-        "period": "yearly",
-        "plan_name": null
-      },
-      {
-        "academic_year": "2026-2027",
-        "age_group": null,
-        "amount": 13338.76,
-        "amount_max": null,
-        "amount_min": null,
-        "category": "food",
-        "currency": "BGN",
         "period": "yearly",
         "plan_name": null
       },

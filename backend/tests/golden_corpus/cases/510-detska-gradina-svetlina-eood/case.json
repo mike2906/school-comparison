@@ -132,28 +132,6 @@
     "pricing": [
       {
         "academic_year": null,
-        "age_group": "8 клас",
-        "amount": 8000.0,
-        "amount_max": null,
-        "amount_min": null,
-        "category": "tuition",
-        "currency": "EUR",
-        "period": "yearly",
-        "plan_name": null
-      },
-      {
-        "academic_year": null,
-        "age_group": "8 клас",
-        "amount": 8000.0,
-        "amount_max": null,
-        "amount_min": null,
-        "category": "tuition",
-        "currency": "EUR",
-        "period": "yearly",
-        "plan_name": null
-      },
-      {
-        "academic_year": null,
         "age_group": null,
         "amount": 450.0,
         "amount_max": null,
@@ -221,6 +199,17 @@
       {
         "academic_year": null,
         "age_group": null,
+        "amount": 8300.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "monthly",
+        "plan_name": null
+      },
+      {
+        "academic_year": null,
+        "age_group": null,
         "amount": 843.0,
         "amount_max": null,
         "amount_min": null,
@@ -250,28 +239,6 @@
         "currency": "EUR",
         "period": "one_time",
         "plan_name": "Standard"
-      },
-      {
-        "academic_year": null,
-        "age_group": null,
-        "amount": 7950.0,
-        "amount_max": null,
-        "amount_min": null,
-        "category": "tuition",
-        "currency": "EUR",
-        "period": "yearly",
-        "plan_name": null
-      },
-      {
-        "academic_year": null,
-        "age_group": null,
-        "amount": 8300.0,
-        "amount_max": null,
-        "amount_min": null,
-        "category": "tuition",
-        "currency": "EUR",
-        "period": "yearly",
-        "plan_name": null
       }
     ]
   },

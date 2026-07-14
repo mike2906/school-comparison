@@ -162,9 +162,9 @@
         "amount": 7000.0,
         "amount_max": null,
         "amount_min": null,
-        "category": "registration",
+        "category": "tuition",
         "currency": "EUR",
-        "period": "one_time",
+        "period": "yearly",
         "plan_name": null
       },
       {
@@ -173,9 +173,9 @@
         "amount": 7400.0,
         "amount_max": null,
         "amount_min": null,
-        "category": "registration",
+        "category": "tuition",
         "currency": "EUR",
-        "period": "one_time",
+        "period": "yearly",
         "plan_name": null
       },
       {
@@ -184,7 +184,7 @@
         "amount": 8100.0,
         "amount_max": null,
         "amount_min": null,
-        "category": "food",
+        "category": "tuition",
         "currency": "EUR",
         "period": "yearly",
         "plan_name": null
@@ -195,30 +195,8 @@
         "amount": 8250.0,
         "amount_max": null,
         "amount_min": null,
-        "category": "food",
+        "category": "tuition",
         "currency": "EUR",
-        "period": "yearly",
-        "plan_name": null
-      },
-      {
-        "academic_year": "2026-2027",
-        "age_group": null,
-        "amount": 13690.81,
-        "amount_max": null,
-        "amount_min": null,
-        "category": "food",
-        "currency": "BGN",
-        "period": "yearly",
-        "plan_name": null
-      },
-      {
-        "academic_year": "2026-2027",
-        "age_group": null,
-        "amount": 14473.14,
-        "amount_max": null,
-        "amount_min": null,
-        "category": "food",
-        "currency": "BGN",
         "period": "yearly",
         "plan_name": null
       },

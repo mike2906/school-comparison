@@ -169,28 +169,6 @@
         "currency": "EUR",
         "period": "yearly",
         "plan_name": "Standard"
-      },
-      {
-        "academic_year": "2026/2027",
-        "age_group": null,
-        "amount": 250.0,
-        "amount_max": null,
-        "amount_min": null,
-        "category": "materials",
-        "currency": "EUR",
-        "period": "yearly",
-        "plan_name": null
-      },
-      {
-        "academic_year": "2026/2027",
-        "age_group": null,
-        "amount": 500.0,
-        "amount_max": null,
-        "amount_min": null,
-        "category": "materials",
-        "currency": "EUR",
-        "period": "yearly",
-        "plan_name": null
       }
     ]
   },

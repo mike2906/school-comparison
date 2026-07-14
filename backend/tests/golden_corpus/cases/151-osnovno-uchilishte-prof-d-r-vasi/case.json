@@ -191,23 +191,12 @@
       {
         "academic_year": "2025/2026",
         "age_group": null,
-        "amount": 200.0,
+        "amount": 2100.0,
         "amount_max": null,
         "amount_min": null,
-        "category": "food",
+        "category": "transport",
         "currency": "EUR",
-        "period": "quarter",
-        "plan_name": null
-      },
-      {
-        "academic_year": "2025/2026",
-        "age_group": null,
-        "amount": 200.0,
-        "amount_max": null,
-        "amount_min": null,
-        "category": "food",
-        "currency": "EUR",
-        "period": "quarter",
+        "period": "yearly",
         "plan_name": null
       },
       {
@@ -219,17 +208,6 @@
         "category": "food",
         "currency": "EUR",
         "period": "quarter",
-        "plan_name": null
-      },
-      {
-        "academic_year": "2025/2026",
-        "age_group": null,
-        "amount": 2100.0,
-        "amount_max": null,
-        "amount_min": null,
-        "category": "transport",
-        "currency": "EUR",
-        "period": "yearly",
         "plan_name": null
       }
     ]
