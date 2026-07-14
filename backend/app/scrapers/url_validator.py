@@ -6,6 +6,7 @@ Uses heuristic keyword matching (~90% of cases) with optional LLM validation
 for ambiguous cases.
 """
 import logging
+import inspect
 from collections.abc import Mapping
 from typing import Optional
 from enum import Enum
@@ -15,7 +16,7 @@ from urllib.parse import unquote, urlparse
 import httpx
 from bs4 import BeautifulSoup
 
-from app.ai.client import create_agent
+from app.ai.client import calculate_cost, create_agent, extract_provider_cost_usd
 from app.config import get_settings
 from app.scrapers.school_tokens import extract_school_name_tokens
 from app.utils.transliteration import transliterate_bulgarian
@@ -190,6 +191,7 @@ class URLValidator:
         self.http_timeout = max(1.0, float(settings.url_validation_http_timeout_seconds))
         self.retry_http_timeout = max(self.http_timeout, float(settings.url_validation_retry_http_timeout_seconds))
         self.llm_timeout = max(5.0, float(settings.url_validation_llm_timeout_seconds))
+        self.llm_usage = {"input_tokens": 0, "output_tokens": 0, "token_cost_usd": 0.0}
 
     def _load_keywords(self, country_code: str) -> list[str]:
         """
@@ -1007,6 +1009,24 @@ Be strict:
             result_type=URLValidationOutput,
         )
         result = await asyncio.wait_for(agent.run(prompt), timeout=self.llm_timeout)
+        try:
+            from app.scrapers import extractor_helpers
+
+            usage_method = getattr(result, "usage", None)
+            if inspect.iscoroutinefunction(usage_method):
+                input_tokens = output_tokens = 0
+                token_cost_usd = 0.0
+            else:
+                input_tokens, output_tokens = extractor_helpers._get_usage(result)
+                token_cost_usd = extract_provider_cost_usd(result) or calculate_cost(
+                    tier, input_tokens, output_tokens  # type: ignore[arg-type]
+                )
+            self.llm_usage["input_tokens"] += input_tokens
+            self.llm_usage["output_tokens"] += output_tokens
+            self.llm_usage["token_cost_usd"] += float(token_cost_usd)
+        except Exception as exc:
+            # Telemetry must never change the URL classification outcome.
+            logger.warning("Could not read URL-validation LLM usage for %s: %s", tier, exc)
         return self._parse_llm_output(result)
 
     def _parse_llm_output(self, result) -> URLValidationOutput:
@@ -1202,6 +1222,7 @@ async def validate_school_url(
     update_db: bool = True,
     school_name: Optional[str] = None,
     school_aliases: Optional[list[str]] = None,
+    usage_out: Optional[dict] = None,
 ) -> tuple[ValidationResult, Optional[str], Optional[str]]:
     """
     Validate a school's website URL and optionally update the database.
@@ -1232,6 +1253,14 @@ async def validate_school_url(
         school_name=school_name,
         school_aliases=school_aliases,
     )
+    if usage_out is not None:
+        usage_out.update(
+            {
+                "input_tokens": int(validator.llm_usage["input_tokens"]),
+                "output_tokens": int(validator.llm_usage["output_tokens"]),
+                "token_cost_usd": round(float(validator.llm_usage["token_cost_usd"]), 6),
+            }
+        )
 
     if update_db:
         # Persist normalized input URL when available to reduce duplicate source pages.

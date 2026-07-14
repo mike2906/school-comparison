@@ -889,6 +889,29 @@ class TestURLValidatorLLM:
             assert final_url == "https://school.bg"
             assert "confidence: 0.90" in reason
 
+    async def test_llm_validate_records_usage_for_pipeline_accounting(self):
+        validator = URLValidator("bg")
+        mock_agent = AsyncMock()
+        mock_result = SimpleNamespace(
+            output=URLValidationOutput(
+                is_school_website=True,
+                matches_expected_school=True,
+                confidence=0.9,
+                reason="Expected school identity matches",
+            ),
+            usage=lambda: SimpleNamespace(input_tokens=100, output_tokens=20),
+        )
+        mock_agent.run.return_value = mock_result
+
+        with patch("app.scrapers.url_validator.create_agent", return_value=mock_agent):
+            await validator._llm_validate("School page", "https://school.bg")
+
+        assert validator.llm_usage == {
+            "input_tokens": 100,
+            "output_tokens": 20,
+            "token_cost_usd": pytest.approx(0.000018),
+        }
+
     async def test_llm_validate_not_school(self):
         """LLM correctly rejects non-school website."""
         validator = URLValidator("bg")

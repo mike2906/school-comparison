@@ -24,7 +24,10 @@ from __future__ import annotations
 import re
 from typing import Any, Iterable, Mapping, Optional, Union
 
-from app.utils.display_gating import blocked_display_fields
+from app.utils.display_gating import (
+    admission_value_is_semantically_valid,
+    blocked_display_fields,
+)
 from app.utils.facility_vocabulary import (
     APPROACH_VOCAB,
     FACILITY_VOCAB,
@@ -336,6 +339,13 @@ def build_localized_attributes(
         + _normalize_focus_entries(extracted.get("languages"))
     )
 
+    def admission_values(field_name: str) -> list[str]:
+        return [
+            value
+            for value in _merged_list(admission.get(field_name))
+            if admission_value_is_semantically_valid(field_name, value)
+        ]
+
     resolved = {
         "language_focus": focus,
         "languages_of_instruction": _merged_list(
@@ -352,9 +362,9 @@ def build_localized_attributes(
             attrs.get("activities_offered"),
             extracted.get("extracurricular"),
         ),
-        "entry_requirements": _merged_list(admission.get("entrance_requirements")),
-        "application_deadlines": _merged_list(admission.get("deadlines")),
-        "available_spots": _merged_list(admission.get("available_spots")),
+        "entry_requirements": admission_values("entrance_requirements"),
+        "application_deadlines": admission_values("deadlines"),
+        "available_spots": admission_values("available_spots"),
         "daily_schedule": _merged_list(operations.get("daily_schedule")),
     }
     for field in blocked:

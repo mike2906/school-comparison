@@ -817,7 +817,6 @@ async def _extract_prices(
     timeout_seconds: float,
     llm_stats: ExtractionLLMStats,
 ) -> dict[str, Any]:
-    settings = get_settings()
     selected_text, _source_urls = helpers._select_pages(
         school=school,
         pages=pages,
@@ -894,33 +893,27 @@ async def _extract_prices(
         parsed = parsed.model_copy(update={"prices": [], "has_pricing_info": False})
 
     if not parsed.has_pricing_info:
-        if settings.extraction_clear_pricing_on_no_info:
-            await db.execute(
-                delete(Pricing).where(
-                    Pricing.school_id == school.id,
-                    Pricing.source == PriceSource.SCRAPED_WEBSITE,
-                )
+        # A completed model call plus deterministic evidence pass is an
+        # authoritative refresh result. Keeping prior website rows here would
+        # silently republish fees that the current source no longer supports.
+        # Provider failures return above and deliberately preserve old rows.
+        await db.execute(
+            delete(Pricing).where(
+                Pricing.school_id == school.id,
+                Pricing.source == PriceSource.SCRAPED_WEBSITE,
             )
-            await db.execute(
-                delete(FieldSource).where(
-                    FieldSource.school_id == school.id,
-                    FieldSource.source_type == SourceType.SCRAPED_WEBSITE,
-                    FieldSource.category == "pricing",
-                )
+        )
+        await db.execute(
+            delete(FieldSource).where(
+                FieldSource.school_id == school.id,
+                FieldSource.source_type == SourceType.SCRAPED_WEBSITE,
+                FieldSource.category == "pricing",
             )
-            return {
-                "success": True,
-                "count": 0,
-                "detail": "No pricing info detected (cleared existing scraped pricing)",
-                "input_tokens": input_tokens,
-                "output_tokens": output_tokens,
-                "token_cost_usd": token_cost_usd,
-            }
-
+        )
         return {
             "success": True,
             "count": 0,
-            "detail": "No pricing info detected",
+            "detail": "No pricing info detected (cleared existing scraped pricing)",
             "input_tokens": input_tokens,
             "output_tokens": output_tokens,
             "token_cost_usd": token_cost_usd,

@@ -277,6 +277,17 @@ def _filter_display_name_i18n(display_name: Mapping[str, Any] | None) -> dict[st
     }
 
 
+def resolve_display_name_i18n(attributes: Mapping[str, Any] | None = None) -> dict[str, str]:
+    """Return only display names that clear the public corroboration gate."""
+    raw_attributes = dict(attributes or {})
+    display_name = raw_attributes.get("display_name_i18n")
+    if not _has_corroborated_display_name(raw_attributes):
+        return {}
+    return _filter_display_name_i18n(
+        display_name if isinstance(display_name, Mapping) else None
+    )
+
+
 def resolve_name_i18n(
     name_i18n: Mapping[str, Any] | None,
     attributes: Mapping[str, Any] | None = None,
@@ -284,12 +295,7 @@ def resolve_name_i18n(
     """Resolve the best user-facing name while preserving source-backed stored fields."""
     raw_name = _clean_i18n_map(name_i18n)
     raw_attributes = dict(attributes or {})
-    display_name = raw_attributes.get("display_name_i18n")
-    display = (
-        _filter_display_name_i18n(display_name if isinstance(display_name, Mapping) else None)
-        if _has_corroborated_display_name(raw_attributes)
-        else {}
-    )
+    display = resolve_display_name_i18n(raw_attributes)
 
     resolved: dict[str, str] = {}
     raw_primary_name = raw_name.get("bg") or raw_name.get("en")

@@ -2526,6 +2526,7 @@ async def _run_validate_urls_batch(
         invalid_count = 0
         ambiguous_count = 0
         error_count = 0
+        usage = {"input_tokens": 0, "output_tokens": 0, "token_cost_usd": 0.0}
         semaphore = asyncio.Semaphore(concurrency)
 
         async def _validate_single(
@@ -2533,8 +2534,9 @@ async def _run_validate_urls_batch(
             website_url: str,
             school_name: Optional[str],
             school_aliases: list[str],
-        ) -> tuple[int, str]:
+        ) -> tuple[int, str, dict]:
             async with semaphore:
+                school_usage: dict = {}
                 try:
                     result, _, _ = await validate_school_url(
                         school_id=school_id,
@@ -2543,11 +2545,12 @@ async def _run_validate_urls_batch(
                         update_db=True,
                         school_name=school_name,
                         school_aliases=school_aliases,
+                        usage_out=school_usage,
                     )
-                    return school_id, result.value
+                    return school_id, result.value, school_usage
                 except Exception as exc:
                     logger.error(f"Error validating school {school_id}: {exc}")
-                    return school_id, "error"
+                    return school_id, "error", school_usage
 
         tasks = [
             asyncio.create_task(
@@ -2564,7 +2567,8 @@ async def _run_validate_urls_batch(
 
         validated_school_ids: list[int] = []
         for completed in asyncio.as_completed(tasks):
-            school_id, outcome = await completed
+            school_id, outcome, school_usage = await completed
+            _add_llm_usage(usage, school_usage)
             if outcome == "valid":
                 valid_count += 1
                 validated_school_ids.append(school_id)
@@ -2583,7 +2587,8 @@ async def _run_validate_urls_batch(
     console.print(f"  Errors: {error_count}")
 
     return {
-        **_stage_summary(
+        **_stage_summary_with_usage(
+            usage=usage,
             processed=len(schools),
             succeeded=valid_count,
             failed=invalid_count + error_count,

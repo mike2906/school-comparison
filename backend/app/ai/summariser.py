@@ -23,6 +23,7 @@ class SummaryIdentity(BaseModel):
     school_type: str
     education_level: str
     city: str | None = None
+    locality_i18n: dict[str, str] = Field(default_factory=dict)
     primary_address_i18n: dict[str, str] = Field(default_factory=dict)
     district: str | None = None
 
@@ -198,6 +199,24 @@ _SHORT_SIGNAL_TOKENS = {
     "bg": ("подход", "програма", "модел", "обучение", "предлага", "следва", "език"),
     "en": ("approach", "programme", "program", "model", "offers", "provides", "follows", "language"),
 }
+_SEMANTIC_BLOCK_PATTERNS = {
+    "bg": (
+        r"\b(?:няма|липсва(?:т)?|не\s+(?:предлага|разполага|предоставя|са?\s+уточнен))\b",
+        r"\b(?:в\s+момента|днес|тази\s+година|наскоро)\b",
+        r"\b(?:родител(?:и|ите)|семейств(?:а|ата))\s+(?:хвалят|споделят|казват|оценяват)\b",
+        r"\b(?:най-добр|водещ|изключител|престиж|ненадминат|вдъхнов|динамичн|световна\s+класа)\w*\b",
+        r"\b(?:една|две|три|четири)\s+(?:трет[аи]|четвърт[аи]|пет[аи])\b",
+        r"\b(?:не\s+е\s+наличн|не\s+са\s+наличн|няма\s+данни|не\s+са\s+посочен)\w*\b",
+    ),
+    "en": (
+        r"\b(?:does\s+not|doesn't|do\s+not|don't|is\s+not|isn't|are\s+not|aren't)\s+(?:offer|provide|have|available|specified|listed|given)\b",
+        r"\b(?:no\s+(?:information|details|data)|lacks?|without)\b",
+        r"\b(?:currently|today|this\s+year|recently|at\s+present)\b",
+        r"\b(?:parents?|families)\s+(?:praise|say|report|describe|commend)\b",
+        r"\b(?:best|leading|exceptional|prestigious|unrivalled|unparalleled|world-class|top-tier|outstanding|dynamic|inspir(?:e|es|ed|ing))\b",
+        r"\b(?:one|two|three|four)-(?:third|thirds|quarter|quarters|fifth|fifths)\b",
+    ),
+}
 
 
 def _parse_school_summary(result: Any) -> SchoolSummaryStrict:
@@ -233,17 +252,33 @@ def _validate_summary_payload(summary: SchoolSummaryStrict) -> SchoolSummaryStri
         long = " ".join((raw_value.get("long") or "").split()).strip()
         if not short or not long:
             raise ModelRetry(f"{lang} summary must include non-empty short and long fields")
-        lowered_long = long.lower()
-        if "no information available" in lowered_long or "няма информация" in lowered_long:
-            raise ModelRetry(f"{lang} summary must omit missing-data filler")
-        if re.search(r"\b\d{1,2}:\d{2}\b", long):
-            raise ModelRetry(f"{lang} summary must omit exact time ranges")
-        if re.search(r"\b20\d{2}/20\d{2}\b", long):
-            raise ModelRetry(f"{lang} summary must omit academic-year ranges")
-        if re.search(r"\b\d+\s+(?:учени(?:ка|ци)|students?|тома|volumes|classrooms?|rooms?)\b", lowered_long):
-            raise ModelRetry(f"{lang} summary must omit exact counts")
+        for field_name, text in (("short", short), ("long", long)):
+            lowered = text.casefold()
+            if "no information available" in lowered or "няма информация" in lowered:
+                raise ModelRetry(f"{lang} summary must omit missing-data filler")
+            if any(
+                re.search(pattern, lowered, flags=re.IGNORECASE)
+                for pattern in _SEMANTIC_BLOCK_PATTERNS[lang]
+            ):
+                raise ModelRetry(f"{lang} {field_name} summary contains an unsafe semantic claim")
+            if re.search(r"\b\d{1,2}:\d{2}\b", text):
+                raise ModelRetry(f"{lang} summary must omit exact time ranges")
+            if re.search(r"\b20\d{2}/20\d{2}\b", text):
+                raise ModelRetry(f"{lang} summary must omit academic-year ranges")
+            if re.search(r"\b\d+\s+(?:учени(?:ка|ци)|students?|тома|volumes|classrooms?|rooms?)\b", lowered):
+                raise ModelRetry(f"{lang} summary must omit exact counts")
+            if "%" in text or re.search(r"\b\d+\s*(?:percent|per\s+cent|процента?)\b", lowered):
+                raise ModelRetry(f"{lang} summary must omit unstable proportions")
         cleaned_i18n[lang] = {"short": short, "long": long}
     return SchoolSummaryStrict.model_validate({"summary_i18n": cleaned_i18n})
+
+
+def validate_summary_i18n(summary_i18n: Any) -> dict[str, dict[str, str]]:
+    """Validate a summary at the persistence boundary."""
+    validated = _validate_summary_payload(
+        SchoolSummaryStrict.model_validate({"summary_i18n": summary_i18n})
+    )
+    return validated.summary_i18n.model_dump()
 
 
 async def generate_school_summary(summary_input: SummaryInput) -> dict[str, Any]:
@@ -318,6 +353,12 @@ async def generate_school_summary(summary_input: SummaryInput) -> dict[str, Any]
         }
     except Exception as exc:
         summary_i18n = _build_fallback_summary(summary_input)
+        try:
+            summary_i18n = validate_summary_i18n(summary_i18n)
+        except Exception as fallback_exc:
+            raise ValueError(
+                f"Generated summary and deterministic fallback failed validation: {fallback_exc}"
+            ) from exc
         return {
             "summary_i18n": summary_i18n,
             "input_tokens": 0,
@@ -641,7 +682,10 @@ def _build_fallback_summary(summary_input: SummaryInput) -> dict[str, dict[str, 
 def _build_fallback_summary_for_lang(summary_input: SummaryInput, lang: str) -> dict[str, str]:
     name = _pick_name(summary_input, lang)
     school_kind = _format_school_kind(summary_input, lang)
-    city = _human_city(summary_input.identity.city, lang)
+    city = summary_input.identity.locality_i18n.get(lang) or _human_city(
+        summary_input.identity.city,
+        lang,
+    )
     focus_phrase = _short_focus_phrase(summary_input, lang)
 
     if lang == "bg":
@@ -753,4 +797,5 @@ __all__ = [
     "SummaryOperations",
     "SummaryPricing",
     "generate_school_summary",
+    "validate_summary_i18n",
 ]

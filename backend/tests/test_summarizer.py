@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.ai import summariser as ai_summariser
-from app.models import Pricing, School
+from app.models import Pricing, School, SchoolLocation
 from app.models.pricing import PriceSource
 from app.schemas.llm_outputs import SchoolSummaryStrict
 from app.scrapers import summarizer as summarizer_module
@@ -160,6 +160,82 @@ async def test_prepare_summary_candidate_ignores_low_quality_display_name(db_ses
     assert prepared.summary_input is not None
     assert prepared.summary_input.identity.display_name_i18n == {}
     assert prepared.summary_input.identity.name_i18n["bg"] == '145 Основно училище "Симеон Радев"'
+
+
+@pytest.mark.asyncio
+async def test_prepare_summary_candidate_only_exposes_corroborated_display_name(db_session):
+    school = School(
+        name_i18n={"bg": 'Частно училище "Истинско име"'},
+        country_code="bg",
+        school_type="private",
+        education_level="primary",
+        city="sofia",
+        scrape_status="extracted",
+        attributes={
+            "display_name_i18n": {"bg": "Прием след 7. клас", "en": "Admissions News"},
+            "extracted": {"programs": ["STEM"]},
+            "data_validation": _validation_payload(),
+        },
+    )
+    db_session.add(school)
+    await db_session.commit()
+
+    school = (
+        await db_session.execute(
+            select(School).options(
+                selectinload(School.locations),
+                selectinload(School.pricing),
+                selectinload(School.exam_results),
+            ).where(School.id == school.id)
+        )
+    ).scalar_one()
+    prepared = summarizer_module.prepare_summary_candidate(school)
+
+    assert prepared.summary_input is not None
+    assert prepared.summary_input.identity.display_name_i18n == {}
+    assert prepared.summary_input.identity.name_i18n["bg"] == 'Частно училище "Истинско име"'
+
+
+@pytest.mark.asyncio
+async def test_prepare_summary_candidate_derives_locality_from_primary_location(db_session):
+    school = School(
+        name_i18n={"bg": "Космос"},
+        country_code="bg",
+        school_type="private",
+        education_level="upper_secondary",
+        city="sofia",
+        scrape_status="extracted",
+        attributes={
+            "extracted": {"programs": ["IB"]},
+            "data_validation": _validation_payload(),
+        },
+    )
+    school.locations.append(
+        SchoolLocation(
+            address_i18n={"bg": "с. Осоица 2121"},
+            is_primary=True,
+        )
+    )
+    db_session.add(school)
+    await db_session.commit()
+
+    school = (
+        await db_session.execute(
+            select(School).options(
+                selectinload(School.locations),
+                selectinload(School.pricing),
+                selectinload(School.exam_results),
+            ).where(School.id == school.id)
+        )
+    ).scalar_one()
+    prepared = summarizer_module.prepare_summary_candidate(school)
+
+    assert prepared.summary_input is not None
+    assert prepared.summary_input.identity.city is None
+    assert prepared.summary_input.identity.locality_i18n == {"bg": "Осоица", "en": "Osoitsa"}
+    fallback = ai_summariser._build_fallback_summary(prepared.summary_input)
+    assert "в Осоица" in fallback["bg"]["short"]
+    assert "in Osoitsa" in fallback["en"]["short"]
 
 
 @pytest.mark.asyncio
@@ -1021,6 +1097,49 @@ def test_validate_summary_payload_rejects_missing_data_filler():
         ai_summariser._validate_summary_payload(summary)
 
 
+@pytest.mark.parametrize(
+    ("bg_text", "en_text"),
+    [
+        (
+            "Училището не предлага транспорт.",
+            "The school does not offer transport.",
+        ),
+        (
+            "Родителите хвалят изключителната среда.",
+            "Parents praise its exceptional learning environment.",
+        ),
+        (
+            "В момента училището е водещо в града.",
+            "The school is currently a leading choice in the city.",
+        ),
+        (
+            "Подробностите за приема не са уточнени.",
+            "Admissions details are not specified.",
+        ),
+        (
+            "Две трети от учениците са международни.",
+            "Two-thirds of the students are international.",
+        ),
+        (
+            "Методите вдъхновяват любов към ученето.",
+            "Its methods inspire a love of learning.",
+        ),
+    ],
+)
+def test_validate_summary_payload_rejects_unsupported_or_unsafe_semantic_claims(bg_text, en_text):
+    summary = SchoolSummaryStrict.model_validate(
+        {
+            "summary_i18n": {
+                "bg": {"short": bg_text, "long": bg_text},
+                "en": {"short": en_text, "long": en_text},
+            }
+        }
+    )
+
+    with pytest.raises(ai_summariser.ModelRetry):
+        ai_summariser._validate_summary_payload(summary)
+
+
 def test_validate_summary_payload_rejects_exact_counts_and_times():
     summary = SchoolSummaryStrict.model_validate(
         {
@@ -1033,3 +1152,56 @@ def test_validate_summary_payload_rejects_exact_counts_and_times():
 
     with pytest.raises(ai_summariser.ModelRetry):
         ai_summariser._validate_summary_payload(summary)
+
+
+@pytest.mark.asyncio
+async def test_summarize_school_fails_closed_when_generated_summary_is_semantically_invalid(db_session):
+    school = School(
+        name_i18n={"bg": "Затворено резюме", "en": "Closed Summary"},
+        country_code="bg",
+        school_type="private",
+        education_level="primary",
+        city="sofia",
+        scrape_status="summarized",
+        summary_i18n={
+            "bg": {"short": "Старо.", "long": "Старо резюме."},
+            "en": {"short": "Old.", "long": "Old summary."},
+        },
+        attributes={
+            "extracted": {"programs": ["STEM"]},
+            "data_validation": _validation_payload(),
+            "summary_generation": {"_schema_version": 1, "input_fingerprint": "stale"},
+        },
+    )
+    db_session.add(school)
+    await db_session.commit()
+
+    invalid_result = {
+        "summary_i18n": {
+            "bg": {
+                "short": "Училището не предлага транспорт.",
+                "long": "Училището не предлага транспорт.",
+            },
+            "en": {
+                "short": "The school does not offer transport.",
+                "long": "The school does not offer transport.",
+            },
+        },
+        "input_tokens": 100,
+        "output_tokens": 25,
+        "token_cost_usd": 0.001,
+        "model_tier": "capable",
+        "model": "test-model",
+        "generation_mode": "llm",
+    }
+
+    with patch("app.scrapers.summarizer.generate_school_summary", new=AsyncMock(return_value=invalid_result)):
+        result = await summarizer_module.summarize_school(db_session, school.id, "bg")
+
+    assert result["status"] == "summary_failed"
+    await db_session.refresh(school)
+    assert school.summary_i18n == {}
+    assert school.scrape_status == "extracted"
+    metadata = (school.attributes or {}).get("summary_generation", {})
+    assert metadata.get("last_error")
+    assert "generated_at" not in metadata

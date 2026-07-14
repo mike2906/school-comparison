@@ -130,6 +130,26 @@ def test_summary_publishable_requires_an_ok_report():
     assert summary_is_publishable({"data_validation": {"status": "needs_review"}}) is False
 
 
+def test_summary_publishable_rejects_actionable_spot_check_even_when_status_is_ok():
+    attributes = {
+        "data_validation": {
+            "status": "ok",
+            "issues": [],
+            "spot_check": {
+                "has_discrepancy": True,
+                "discrepancies": [
+                    {
+                        "field_path": "attributes.extracted.class_size",
+                        "kind": "unsupported",
+                    }
+                ],
+            },
+        }
+    }
+
+    assert summary_is_publishable(attributes) is False
+
+
 @pytest.mark.parametrize(
     ("confidence", "expected"),
     [

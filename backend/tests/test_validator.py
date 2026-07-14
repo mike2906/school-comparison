@@ -38,6 +38,75 @@ def test_normalize_summary_source_clears_narrative_fields_without_source_text():
     assert normalized["has_useful_info"] is True
 
 
+@pytest.mark.parametrize(
+    "source_text",
+    [
+        "Учениците от 9 клас участваха в благотворителната инициатива.",
+        "Nine students won prizes in the regional competition.",
+        (
+            "исторически проект в 9. клас, който до 9 ноември се занимаваше "
+            "самостоятелно с отделни аспекти"
+        ),
+    ],
+)
+def test_class_size_evidence_rejects_grade_and_news_counts(source_text):
+    assert validator_module._source_mentions_class_size(source_text, "9 students") is False
+
+
+@pytest.mark.parametrize(
+    "source_text,class_size",
+    [
+        ("Класовете са с до 16 ученици.", "16"),
+        ("До 16 ученици в клас.", "16 students"),
+        ("The maximum class size is 18 students.", "18"),
+        ("Classes have no more than 20 children.", "20"),
+    ],
+)
+def test_class_size_evidence_requires_size_relationship(source_text, class_size):
+    assert validator_module._source_mentions_class_size(source_text, class_size) is True
+
+
+@pytest.mark.parametrize(
+    "field_name,value",
+    [
+        ("deadlines", "Краен срок за подаване на оферта-05.06.2020г. 16:00ч."),
+        ("available_spots", "* [Свободни места](https://school.test/admission)"),
+        ("available_spots", "Свободни места"),
+        ("entrance_requirements", "интервютата"),
+        ("entrance_requirements", "училищен живот"),
+        ("deadlines", "![admission](https://school.test/admission.png)"),
+        ("deadlines", "Admission for 2025/2026 is"),
+        ("deadlines", "ВТОРАТА приемна сесия за учебната 2026/27 година ще се проведе на"),
+    ],
+)
+def test_admission_semantics_reject_pilot_garbage(field_name, value):
+    assert (
+        validator_module._admission_value_is_semantically_valid(
+            field_name,
+            value,
+            today=datetime.date(2026, 7, 14),
+        )
+        is False
+    )
+
+
+@pytest.mark.parametrize(
+    "field_name,value",
+    [
+        ("deadlines", "Крайният срок е 30 юни 2027 г."),
+        ("deadlines", "Applications are accepted year-round."),
+        ("available_spots", "Остават 12 свободни места за първи клас."),
+        ("entrance_requirements", "Приемът включва писмен тест и интервю."),
+    ],
+)
+def test_admission_semantics_keeps_complete_current_facts(field_name, value):
+    assert validator_module._admission_value_is_semantically_valid(
+        field_name,
+        value,
+        today=datetime.date(2026, 7, 14),
+    )
+
+
 @pytest.mark.asyncio
 async def test_validate_school_data_applies_safe_fixes_and_persists_report(db_session):
     school = School(
@@ -210,6 +279,106 @@ async def test_validate_school_data_sets_needs_review_on_errors(db_session):
 
 
 @pytest.mark.asyncio
+async def test_deterministic_revalidation_preserves_prior_actionable_spot_check(db_session):
+    spot_check = {
+        "has_discrepancy": True,
+        "discrepancies": [
+            {
+                "field_path": "attributes.extracted.class_size",
+                "kind": "unsupported",
+                "issue": "Unsupported class-size claim",
+                "evidence": "No class-size claim appears in the reviewed pages.",
+                "cheap_value": "9 students",
+                "capable_value": None,
+                "confidence": 0.95,
+            }
+        ],
+        "checked_at": "2026-07-14T09:00:00+00:00",
+    }
+    school = School(
+        name_i18n={"bg": "Пазене на спот проверка"},
+        country_code="bg",
+        school_type="private",
+        education_level="primary",
+        city="sofia",
+        scrape_status="extracted",
+        attributes={
+            "extracted": {"class_size": "9 students"},
+            "data_validation": {
+                "_schema_version": 1,
+                "validated_at": "2026-07-14T08:00:00+00:00",
+                "status": "ok",
+                "issue_counts": {"error": 0, "warning": 0},
+                "issues": [],
+                "auto_fixes": [],
+                "spot_check": spot_check,
+            },
+        },
+    )
+    db_session.add(school)
+    await db_session.commit()
+
+    result = await validator_module.validate_school_data(db_session, school.id, "bg")
+
+    assert result["status"] == "ok"
+    await db_session.refresh(school)
+    assert school.attributes["data_validation"]["spot_check"] == spot_check
+
+
+@pytest.mark.asyncio
+async def test_validation_removes_semantically_invalid_admission_values(db_session):
+    invalid_values = {
+        "deadlines": [
+            "Краен срок за подаване на оферта-05.06.2020г. 16:00ч.",
+            "![admission](https://school.test/admission.png)",
+            "Admission for 2025/2026 is",
+            "ВТОРАТА приемна сесия за учебната 2026/27 година ще се проведе на",
+        ],
+        "entrance_requirements": ["интервютата", "Приемът включва писмен тест и интервю."],
+        "available_spots": [
+            "* [Свободни места](https://school.test/admission)",
+            "Остават 12 свободни места за първи клас.",
+        ],
+    }
+    source_text = "\n".join(value for values in invalid_values.values() for value in values)
+    school = School(
+        name_i18n={"bg": "Семантика на прием"},
+        country_code="bg",
+        school_type="private",
+        education_level="primary",
+        city="sofia",
+        scrape_status="extracted",
+        attributes={"extracted": {"admission": {**invalid_values, "has_useful_info": True}}},
+    )
+    db_session.add(school)
+    await db_session.flush()
+    db_session.add(
+        SourcePage(
+            school_id=school.id,
+            source_url="https://school.test/admission",
+            page_category="admission",
+            scrape_type=ScrapeType.WEBSITE,
+            is_valid=True,
+            raw_markdown=source_text,
+            content_hash="admission-semantics",
+            last_scraped_at=datetime.datetime.now(datetime.timezone.utc),
+        )
+    )
+    await db_session.commit()
+
+    result = await validator_module.validate_school_data(db_session, school.id, "bg")
+
+    assert result["status"] == "ok"
+    await db_session.refresh(school)
+    admission = school.attributes["extracted"]["admission"]
+    assert admission["deadlines"] == []
+    assert admission["entrance_requirements"] == ["Приемът включва писмен тест и интервю."]
+    assert admission["available_spots"] == ["Остават 12 свободни места за първи клас."]
+    fixes = school.attributes["data_validation"]["auto_fixes"]
+    assert any(fix["code"] == "admission_deadlines_semantically_invalid" for fix in fixes)
+
+
+@pytest.mark.asyncio
 async def test_validate_school_data_clears_stale_summary_after_auto_fixes(db_session):
     school = School(
         name_i18n={"bg": "Summary Reset"},
@@ -304,7 +473,28 @@ async def test_run_spot_check_for_school_persists_payload(db_session, monkeypatc
         education_level="primary",
         city="sofia",
         scrape_status="extracted",
-        attributes={"extracted": {"languages": [{"language": "English", "level": None}]}},
+        attributes={
+            "extracted": {"languages": [{"language": "English", "level": None}]},
+            "data_validation": {
+                "_schema_version": 1,
+                "validated_at": "2026-07-13T09:00:00+00:00",
+                "status": "ok",
+                "issue_counts": {"error": 0, "warning": 0},
+                "issues": [],
+                "auto_fixes": [],
+                "spot_check": {
+                    "has_discrepancy": True,
+                    "discrepancies": [
+                        {
+                            "field_path": "attributes.extracted.facilities",
+                            "kind": "unsupported",
+                            "issue": "Old finding",
+                            "evidence": "Old evidence",
+                        }
+                    ],
+                },
+            },
+        },
     )
     db_session.add(school)
     await db_session.flush()
@@ -366,6 +556,9 @@ async def test_run_spot_check_for_school_persists_payload(db_session, monkeypatc
     assert payload.get("input_tokens") == 321
     assert payload.get("output_tokens") == 45
     assert payload.get("token_cost_usd") == 0.0123
+    assert [item["field_path"] for item in payload["discrepancies"]] == [
+        "attributes.extracted.languages"
+    ]
     assert result["input_tokens"] == 321
     assert result["output_tokens"] == 45
     assert result["token_cost_usd"] == 0.0123

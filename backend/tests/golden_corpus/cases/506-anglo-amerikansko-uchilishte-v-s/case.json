@@ -222,17 +222,6 @@
       {
         "academic_year": "2026-2027",
         "age_group": null,
-        "amount": 250.0,
-        "amount_max": null,
-        "amount_min": null,
-        "category": "registration",
-        "currency": "EUR",
-        "period": "one_time",
-        "plan_name": null
-      },
-      {
-        "academic_year": "2026-2027",
-        "age_group": null,
         "amount": 2900.0,
         "amount_max": null,
         "amount_min": null,
