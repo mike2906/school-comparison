@@ -30,8 +30,27 @@ for that.
    why they are accepted before merging.
    - **Docs-only / trivial PRs:** skip the `@codex review` request to conserve usage; merge
      on green CI once mergeable.
+   - **Review budget:** make at most two Codex review requests by default: the initial review
+     and one re-review after fixes. Never request a new review after every small fix or
+     commit. An idle session does not justify another request, and do not repost while a
+     review is still in flight.
+   - **Batch findings before re-review:** wait for the full review, collect all actionable
+     threads, and fix them together. Before requesting the one re-review, audit the affected
+     subsystem for neighboring versions of the same bug, add regression tests for the
+     findings and nearby edge cases, run the relevant focused tests plus the full applicable
+     suite, and push one consolidated fix batch.
+   - **Stop a review loop:** if the re-review finds new issues, do not automatically enter
+     another fix → commit → review cycle. Collect and address the new findings as one batch,
+     perform a broader local audit, and report the result to the user. A third or later Codex
+     review requires explicit user approval after stating the prior review count, the PR
+     size, and why another full review is worth the usage. Otherwise, merge only when the
+     latest findings are resolved or explicitly accepted, CI is green, and the local audit
+     supports the fixes.
 8. If CI is green, the Codex review is clear or resolved (or was intentionally skipped for a
    docs-only PR), and the PR is mergeable, merge it to `main` and delete the branch.
+   Immediately before merging, verify that the latest reviewed commit SHA is still the PR
+   head. After merging, verify that the merge commit contains that exact PR-head tree and
+   that post-merge `main` CI passes.
 
 ## Commit / PR conventions
 
