@@ -21,11 +21,18 @@ from app.ai.summariser import (
     SummaryOperations,
     SummaryPricing,
     generate_school_summary,
+    validate_summary_i18n,
 )
 from app.models import School, SchoolLocation
 from app.scrapers.extractor_helpers import _is_low_quality_display_name
+from app.services.geocoding.bounds import get_city_bounds
 from app.utils.display_gating import iter_blocking_field_paths
-from app.utils.i18n_resolver import derive_english_name, resolve_address_i18n, resolve_name_i18n
+from app.utils.i18n_resolver import (
+    derive_english_name,
+    resolve_address_i18n,
+    resolve_display_name_i18n,
+    resolve_name_i18n,
+)
 
 SUMMARY_GENERATION_SCHEMA_VERSION = 18
 SUMMARY_GENERATION_KEY = "summary_generation"
@@ -68,6 +75,10 @@ _NARRATIVE_STAFF_MARKERS = (
     "учители -",
     "advisor",
     "department",
+)
+_LOCALITY_RE = re.compile(
+    r"(?:^|[,;]\s*)(?:гр|с|gr|s|city|village)\.?\s+([^,;\d]+?)(?=\s+\d{4}\b|[,;]|$)",
+    flags=re.IGNORECASE,
 )
 
 
@@ -285,28 +296,67 @@ def _select_primary_location(school: School) -> SchoolLocation | None:
     return school.locations[0]
 
 
+def _extract_locality(value: str | None) -> str | None:
+    match = _LOCALITY_RE.search(str(value or "").strip())
+    if not match:
+        return None
+    locality = re.sub(r"\s+", " ", match.group(1)).strip(" .")
+    return locality or None
+
+
+def _primary_location_locality_i18n(
+    school: School,
+    location: SchoolLocation | None,
+    address_i18n: Mapping[str, str],
+) -> dict[str, str]:
+    if location is None:
+        return {}
+
+    locality = {
+        lang: extracted
+        for lang in ("bg", "en")
+        if (extracted := _extract_locality(address_i18n.get(lang)))
+    }
+    if locality:
+        if "bg" not in locality and locality.get("en"):
+            locality["bg"] = locality["en"]
+        if "en" not in locality and locality.get("bg"):
+            locality["en"] = derive_english_name(locality["bg"]) or locality["bg"]
+        return locality
+
+    bounds = get_city_bounds(school.country_code, school.city)
+    if (
+        bounds
+        and location.lat is not None
+        and location.lng is not None
+        and bounds["south"] <= location.lat <= bounds["north"]
+        and bounds["west"] <= location.lng <= bounds["east"]
+    ):
+        normalized_city = str(school.city or "").strip().lower()
+        if normalized_city == "sofia":
+            return {"bg": "София", "en": "Sofia"}
+        raw_city = str(school.city or "").strip()
+        if raw_city:
+            return {"bg": raw_city, "en": raw_city}
+    return {}
+
+
 def _build_identity(
     school: School,
     attrs: Mapping[str, Any],
     *,
     identity_optional_blocked: bool,
 ) -> SummaryIdentity:
-    raw_display_name = attrs.get("display_name_i18n")
-    sanitized_display_name = {}
-    if isinstance(raw_display_name, Mapping):
-        candidate_display_name = {
-            str(lang): str(text)
-            for lang, text in raw_display_name.items()
-            if str(lang).strip() and str(text).strip()
-        }
-        if candidate_display_name and not any(_is_low_quality_display_name(value) for value in candidate_display_name.values()):
-            sanitized_display_name = candidate_display_name
-
     effective_attrs = dict(attrs)
-    if identity_optional_blocked or not sanitized_display_name:
+    if identity_optional_blocked:
         effective_attrs.pop("display_name_i18n", None)
-    else:
-        effective_attrs["display_name_i18n"] = sanitized_display_name
+        effective_attrs.pop("display_name_evidence", None)
+
+    sanitized_display_name = resolve_display_name_i18n(effective_attrs)
+    if any(_is_low_quality_display_name(value) for value in sanitized_display_name.values()):
+        sanitized_display_name = {}
+        effective_attrs.pop("display_name_i18n", None)
+        effective_attrs.pop("display_name_evidence", None)
 
     resolved_name = resolve_name_i18n(school.name_i18n, effective_attrs)
     if not resolved_name:
@@ -318,7 +368,7 @@ def _build_identity(
             if en_name:
                 resolved_name["en"] = en_name
 
-    display_name = {} if identity_optional_blocked else sanitized_display_name
+    display_name = sanitized_display_name
 
     primary_location = _select_primary_location(school)
     primary_address_i18n: dict[str, str] = {}
@@ -326,13 +376,19 @@ def _build_identity(
     if not identity_optional_blocked and primary_location is not None:
         primary_address_i18n = resolve_address_i18n(primary_location.address_i18n)
         district = primary_location.district
+    locality_i18n = _primary_location_locality_i18n(
+        school,
+        primary_location,
+        primary_address_i18n,
+    )
 
     return SummaryIdentity(
         name_i18n=resolved_name,
         display_name_i18n=display_name,
         school_type=school.school_type,
         education_level=school.education_level,
-        city=school.city,
+        city=None,
+        locality_i18n=locality_i18n,
         primary_address_i18n=primary_address_i18n,
         district=district,
     )
@@ -583,7 +639,12 @@ async def summarize_school(
     attrs = dict(school.attributes or {})
     try:
         summary_result = await generate_school_summary(prepared.summary_input)
+        summary_result["summary_i18n"] = validate_summary_i18n(
+            summary_result.get("summary_i18n")
+        )
     except Exception as exc:
+        clear_summary_state(school, downgrade_status=True)
+        attrs = dict(school.attributes or {})
         attrs[SUMMARY_GENERATION_KEY] = {
             "_schema_version": SUMMARY_GENERATION_SCHEMA_VERSION,
             "attempted_at": _now_iso(),

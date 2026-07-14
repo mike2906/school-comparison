@@ -33,6 +33,7 @@ from app.schemas.validation import (
 )
 from app.scrapers import extractor_helpers as extraction_helpers
 from app.scrapers.summarizer import clear_summary_state
+from app.utils.display_gating import admission_value_is_semantically_valid
 
 logger = logging.getLogger(__name__)
 
@@ -241,16 +242,39 @@ def _source_mentions_class_size(source_text: str, class_size: str) -> bool:
     numbers = {m.group(0) for m in re.finditer(r"\b\d{1,2}\b", str(class_size))}
     if not numbers:
         return False
-    context_patterns = (
-        r"(?:деца|ученици|students|children)",
-        r"(?:клас|класа|класове|група|групи|class|classes|group|groups)",
-    )
+    people = r"(?:деца|ученици|students|children)"
+    container = r"(?:клас|класа|класове|група|групи|class|classes|group|groups)"
     for number in numbers:
-        if re.search(rf"(?<!\d){re.escape(number)}(?!\d)\s*{context_patterns[0]}", source):
+        escaped = re.escape(number)
+        # A pupil count on its own can be a news item, and ``9. клас`` is a grade,
+        # not nine pupils per class. Require the number, pupil noun, and class/group
+        # noun to participate in the same short size statement.
+        if re.search(
+            rf"(?<!\d){escaped}(?!\d)[^\n]{{0,18}}{people}[^\n]{{0,18}}{container}",
+            source,
+        ):
             return True
-        if re.search(rf"{context_patterns[1]}[^\n]{{0,25}}(?<!\d){re.escape(number)}(?!\d)", source):
+        if re.search(
+            rf"{container}[^\n]{{0,25}}(?<!\d){escaped}(?!\d)[^\n]{{0,12}}{people}",
+            source,
+        ):
+            return True
+        if re.search(
+            rf"{container}[^\n]{{0,18}}(?:size|capacity|размер|капацитет)"
+            rf"[^\n]{{0,12}}(?<!\d){escaped}(?!\d)",
+            source,
+        ):
             return True
     return False
+
+
+def _admission_value_is_semantically_valid(
+    field_name: str,
+    value: str,
+    *,
+    today: datetime.date | None = None,
+) -> bool:
+    return admission_value_is_semantically_valid(field_name, value, today=today)
 
 
 def _normalize_match_text(value: str) -> str:
@@ -701,6 +725,11 @@ async def validate_school_data(
                 }
 
             attrs = dict(school.attributes) if isinstance(school.attributes, dict) else {}
+            prior_validation = (
+                dict(attrs.get("data_validation"))
+                if isinstance(attrs.get("data_validation"), dict)
+                else {}
+            )
             admission_info = (
                 dict(school.admission_info) if isinstance(school.admission_info, dict) else {}
             )
@@ -1007,7 +1036,24 @@ async def validate_school_data(
                                 fixed_value=evidence_values,
                                 reason="Dropped admission entries not explicitly supported by source text.",
                             )
-                        normalized_admission[admission_key] = evidence_values
+                        semantic_values = [
+                            value
+                            for value in evidence_values
+                            if _admission_value_is_semantically_valid(admission_key, value)
+                        ]
+                        if semantic_values != evidence_values:
+                            _add_fix(
+                                report,
+                                code=f"admission_{admission_key}_semantically_invalid",
+                                field_path=f"attributes.extracted.admission.{admission_key}",
+                                original_value=evidence_values,
+                                fixed_value=semantic_values,
+                                reason=(
+                                    "Dropped stale, fragmentary, procurement, or navigation "
+                                    "content that is not a publishable admission fact."
+                                ),
+                            )
+                        normalized_admission[admission_key] = semantic_values
                     has_useful_info = any(normalized_admission.get(k) for k in admission_keys)
                     if bool(normalized_admission.get("has_useful_info")) != has_useful_info:
                         _add_fix(
@@ -1158,6 +1204,12 @@ async def validate_school_data(
             report.validated_at = _now_iso()
 
             validation_payload = report.model_dump(mode="json", by_alias=True)
+            # An unsampled deterministic rerun is not evidence that a capable-model
+            # finding was resolved. Preserve the prior audit (and therefore its
+            # actionable publish gates); only a new explicit spot check supersedes it.
+            prior_spot_check = prior_validation.get("spot_check")
+            if isinstance(prior_spot_check, dict):
+                validation_payload["spot_check"] = prior_spot_check
             attrs["data_validation"] = validation_payload
 
             school.attributes = attrs

@@ -14,6 +14,7 @@ can never diverge.
 
 from __future__ import annotations
 
+import datetime
 import re
 from typing import Any, Iterator, Mapping
 
@@ -68,6 +69,81 @@ _EXACT_ONLY_FIELD_PATHS = {
 
 # Validator pricing paths are `pricing[{row.id}]` / `pricing[{row.id}].{field}`.
 _PRICING_ROW_RE = re.compile(r"^pricing\[(\d+)\]")
+
+_ADMISSION_NAV_LABELS = {
+    "admission",
+    "admissions",
+    "прием",
+    "кандидатстване",
+    "apply",
+    "интервюта",
+    "интервютата",
+    "school life",
+    "училищен живот",
+    "available places",
+    "available spots",
+    "свободни места",
+}
+_ADMISSION_PROCUREMENT_RE = re.compile(
+    r"\b(?:оферт(?:а|и|ата)|обществен[аио]\s+поръчк|procurement|tender|bid submission)\b",
+    re.IGNORECASE,
+)
+_ADMISSION_INCOMPLETE_END_RE = re.compile(
+    r"\b(?:is|are|on|at|from|to|на|в|от|до|за)\s*[.:,;\-–—]*$",
+    re.IGNORECASE,
+)
+_ADMISSION_MONTH_RE = re.compile(
+    r"\b(?:january|february|march|april|may|june|july|august|september|october|"
+    r"november|december|януари|февруари|март|април|май|юни|юли|август|"
+    r"септември|октомври|ноември|декември)\b",
+    re.IGNORECASE,
+)
+
+
+def admission_value_is_semantically_valid(
+    field_name: str,
+    value: str,
+    *,
+    today: datetime.date | None = None,
+) -> bool:
+    """Return whether extracted admission text is safe to show to parents."""
+    text = re.sub(r"\s+", " ", str(value or "")).strip()
+    if not text:
+        return False
+    lowered = text.casefold()
+
+    if re.search(r"!?\[[^\]]*\]\s*\([^)]*\)|https?://", text, re.IGNORECASE):
+        return False
+    label = re.sub(r"^[\s#*+\-←→]+|[\s:;.!?]+$", "", lowered).strip()
+    if label in _ADMISSION_NAV_LABELS:
+        return False
+    if _ADMISSION_PROCUREMENT_RE.search(text) or _ADMISSION_INCOMPLETE_END_RE.search(text):
+        return False
+
+    reference_date = today or datetime.datetime.now(datetime.timezone.utc).date()
+    current_cycle_start = reference_date.year if reference_date.month >= 7 else reference_date.year - 1
+    for match in re.finditer(r"(?<!\d)(20\d{2})\s*[/\-]\s*(20\d{2}|\d{2})(?!\d)", text):
+        if int(match.group(1)) < current_cycle_start:
+            return False
+    years = [int(year) for year in re.findall(r"(?<!\d)(20\d{2})(?!\d)", text)]
+    if years and max(years) < current_cycle_start:
+        return False
+
+    if field_name == "deadlines":
+        if not (
+            re.search(r"(?<!\d)\d{1,2}[./-]\d{1,2}(?:[./-]\d{2,4})?(?!\d)", text)
+            or _ADMISSION_MONTH_RE.search(text)
+            or re.search(
+                r"\b(?:year[- ]round|rolling admissions|целогодишно)\b",
+                text,
+                re.IGNORECASE,
+            )
+        ):
+            return False
+    elif field_name == "available_spots" and not re.search(r"(?<!\d)\d{1,3}(?!\d)", text):
+        return False
+
+    return True
 
 
 def iter_blocking_field_paths(report: Mapping[str, Any] | None) -> Iterator[str]:

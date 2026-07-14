@@ -366,6 +366,43 @@ async def test_run_all_stages_batch_narrows_follow_on_stages_to_fresh_successes(
 
 
 @pytest.mark.asyncio
+async def test_validate_urls_batch_aggregates_llm_usage(db_session):
+    school = School(
+        name_i18n={"bg": "Тестово училище"},
+        country_code="bg",
+        school_type="state",
+        education_level="primary",
+        city="sofia",
+        website_url="https://school.example",
+        scrape_status="pending",
+    )
+    db_session.add(school)
+    await db_session.commit()
+
+    async def fake_validate_school_url(*_args, usage_out=None, **_kwargs):
+        usage_out.update(
+            {"input_tokens": 120, "output_tokens": 30, "token_cost_usd": 0.000024}
+        )
+        return SimpleNamespace(value="valid"), "https://school.example", "LLM validation: valid"
+
+    with patch(
+        "app.scrapers.url_validator.validate_school_url",
+        new=fake_validate_school_url,
+    ):
+        summary = await scraper_cli._run_validate_urls_batch(
+            db_session,
+            "bg",
+            "sofia",
+            None,
+            school_ids=[school.id],
+        )
+
+    assert summary["input_tokens"] == 120
+    assert summary["output_tokens"] == 30
+    assert summary["token_cost_usd"] == pytest.approx(0.000024)
+
+
+@pytest.mark.asyncio
 async def test_run_all_stages_batch_preserves_completed_summaries_when_later_stage_raises(db_session):
     cohort = [17]
     completed: list[dict] = []

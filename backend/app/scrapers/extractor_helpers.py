@@ -1279,6 +1279,8 @@ def _extract_price_amount_currency(
 
 def _detect_price_category(value: str, *, allow_generic_heading: bool = False) -> str | None:
     lowered = value.lower()
+    if any(token in lowered for token in ("late fee", "late-payment", "late payment", "просроч")):
+        return None
     if "обучение по " in lowered:
         return "extracurricular"
     if "обуч" in lowered or "образователни услуги" in lowered or "tuition" in lowered:
@@ -1290,7 +1292,14 @@ def _detect_price_category(value: str, *, allow_generic_heading: bool = False) -
         return "transport"
     if any(
         token in lowered
-        for token in ("образователни ресурси", "учебниц", "консуматив", "materials")
+        for token in (
+            "образователни ресурси",
+            "учебниц",
+            "консуматив",
+            "materials",
+            "language books",
+            "foreign language books",
+        )
     ):
         return "materials"
     if any(token in lowered for token in ("храна", "food", "meal", "meals", "lunch", "snack", "закуска", "обяд")):
@@ -1311,7 +1320,6 @@ def _detect_price_category(value: str, *, allow_generic_heading: bool = False) -
             "deposit",
             "депозит",
             "capital fee",
-            "late fee",
             "новопостъп",
         )
     ):
@@ -1437,25 +1445,60 @@ def _detect_price_period(
     category: str | None,
     has_year: bool,
     default_period: str | None = None,
-) -> str:
+    context_value: str | None = None,
+) -> str | None:
     installment = _detect_installment_period(value)
     if installment is not None:
         return installment
     if category == "registration":
         return "one_time"
+    amount_matches = _PRICE_LINE_AMOUNT_RE.findall(value or "")
+    lowered_value = value.casefold()
+    if (
+        category == "tuition"
+        and len(amount_matches) > 2
+        and any(token in lowered_value for token in ("full fee", "пълна такса"))
+    ):
+        return "yearly"
     explicit = _detect_explicit_price_period(value)
     if explicit is not None:
         return explicit
-    if has_year or "вноск" in value.lower():
+    if re.search(r"\b(?:in\s+)?two\s+installments\b|\bдве\s+вноски\b", lowered_value):
         return "yearly"
-    amount_matches = _PRICE_LINE_AMOUNT_RE.findall(value or "")
     if default_period == "monthly" and category == "tuition" and len(amount_matches) > 2:
         return "yearly"
     if default_period is not None:
         return default_period
+    if has_year or "вноск" in value.lower():
+        if category in {"transport", "extracurricular"}:
+            # An academic-year heading dates a fee structure; it does not say
+            # whether an optional service is charged once, monthly, or yearly.
+            # A labelled fee/course can still be supported as a whole-year
+            # charge; a bare route, club, or activity amount cannot.
+            lowered = (context_value or value).casefold()
+            if not any(token in lowered for token in ("fee", "такса", "course", "курс")):
+                return None
+        return "yearly"
     if category in {"food", "materials", "extended_day"}:
         return "yearly"
-    return "monthly" if category in {"tuition", "extracurricular", "transport"} else "one_time"
+    if category in {"extracurricular", "transport"}:
+        return "monthly"
+    return "monthly" if category == "tuition" else "one_time"
+
+
+def _is_penalty_price_line(value: str) -> bool:
+    lowered = (value or "").casefold()
+    return any(
+        token in lowered
+        for token in (
+            "late fee",
+            "late-payment",
+            "late payment",
+            "surcharge for any payments made after",
+            "такса за просроч",
+            "неустойк",
+        )
+    )
 
 
 def _iter_price_line_signals(text: str) -> list[dict[str, Any]]:
@@ -1524,6 +1567,8 @@ def _iter_price_line_signals(text: str) -> list[dict[str, Any]]:
             if previous_line and previous_amount is None and len(previous_line) <= 120
             else line
         )
+        if _is_penalty_price_line(semantic_line):
+            continue
         row_category = _detect_price_category(semantic_line) or current_category
         if row_category is None:
             continue
@@ -1535,7 +1580,10 @@ def _iter_price_line_signals(text: str) -> list[dict[str, Any]]:
             row_category,
             has_year=bool(row_year),
             default_period=current_period,
+            context_value=semantic_line,
         )
+        if row_period is None:
+            continue
         current_period = row_period
         evidence_line = " ".join(part for part in (current_heading, semantic_line) if part)
         signals.append(
@@ -1572,6 +1620,7 @@ def _extract_prices_deterministic(text: str) -> PriceExtractionOutput:
     current_academic_year: str | None = None
     current_period: str | None = None
     current_plan_name: str | None = None
+    current_heading: str | None = None
     current_includes: list[str] = []
     active_price: ExtractedPrice | None = None
     seen: set[tuple[str, float, str, str | None, str | None]] = set()
@@ -1584,6 +1633,7 @@ def _extract_prices_deterministic(text: str) -> PriceExtractionOutput:
             current_academic_year = None
             current_period = None
             current_plan_name = None
+            current_heading = None
             current_includes = []
             active_price = None
             continue
@@ -1599,6 +1649,7 @@ def _extract_prices_deterministic(text: str) -> PriceExtractionOutput:
             current_age_group = None
             current_period = None
             current_plan_name = None
+            current_heading = None
             current_includes = []
             active_price = None
             continue
@@ -1608,6 +1659,7 @@ def _extract_prices_deterministic(text: str) -> PriceExtractionOutput:
             if line_category != current_category:
                 current_period = None
             current_category = line_category
+            current_heading = line
             detected_age_group = _detect_price_age_group(line)
             if detected_age_group is not None:
                 current_age_group = detected_age_group
@@ -1636,6 +1688,9 @@ def _extract_prices_deterministic(text: str) -> PriceExtractionOutput:
         if line_amount is None:
             continue
 
+        if _is_penalty_price_line(line):
+            continue
+
         row_category = _detect_price_category(line) or current_category
         if row_category is None:
             continue
@@ -1648,7 +1703,10 @@ def _extract_prices_deterministic(text: str) -> PriceExtractionOutput:
             row_category,
             has_year=bool(row_year),
             default_period=current_period,
+            context_value=" ".join(part for part in (current_heading, line) if part),
         )
+        if row_period is None:
+            continue
         current_period = row_period
         signature = (row_category, line_amount, line_currency or "BGN", row_age_group, row_year)
         if signature in seen:
@@ -1826,6 +1884,16 @@ def _dedupe_currency_variants(prices: list[ExtractedPrice]) -> list[ExtractedPri
 def _dedupe_price_rows(prices: list[ExtractedPrice]) -> list[ExtractedPrice]:
     rows = _dedupe_currency_variants(_dedupe_installment_variants(prices))
 
+    distinct_rows: list[ExtractedPrice] = []
+    seen_rows: set[str] = set()
+    for row in rows:
+        identity = row.model_dump_json(exclude_none=False)
+        if identity in seen_rows:
+            continue
+        seen_rows.add(identity)
+        distinct_rows.append(row)
+    rows = distinct_rows
+
     def comparable_group_key(row: ExtractedPrice) -> tuple[str, str, str]:
         return (
             (row.category or "").casefold(),
@@ -1867,13 +1935,38 @@ def _dedupe_price_rows(prices: list[ExtractedPrice]) -> list[ExtractedPrice]:
         for row in rows
         if _normalize_academic_year(row.academic_year) is not None
     }
+    explicit_years = {
+        normalized
+        for row in rows
+        if (normalized := _normalize_academic_year(row.academic_year)) is not None
+    }
+    latest_explicit_year = (
+        max(
+            explicit_years,
+            key=lambda value: tuple(int(part) for part in value.split("/")),
+        )
+        if explicit_years
+        else None
+    )
+    latest_start_year = (
+        int(latest_explicit_year.split("/", 1)[0]) if latest_explicit_year else None
+    )
     return [
         row
         for row in rows
-        if (key := comparable_group_key(row)) not in latest_year_by_group
-        or (year := _normalize_academic_year(row.academic_year))
-        == latest_year_by_group[key]
-        or (year is None and exact_fee_identity(row) not in explicit_fee_identities)
+        if (
+            (year := _normalize_academic_year(row.academic_year)) is None
+            or latest_start_year is None
+            # Keep the immediately preceding/current academic year when a
+            # page legitimately mixes adjacent schedules. Older fee tables
+            # are superseded even when the new table has different categories.
+            or int(year.split("/", 1)[0]) >= latest_start_year - 1
+        )
+        and (
+            (key := comparable_group_key(row)) not in latest_year_by_group
+            or year == latest_year_by_group[key]
+            or (year is None and exact_fee_identity(row) not in explicit_fee_identities)
+        )
     ]
 
 

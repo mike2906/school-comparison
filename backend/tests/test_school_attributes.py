@@ -166,6 +166,35 @@ class TestLocalizedProjection:
         assert localized["available_spots"] == ["12 свободни места"]
         assert localized["daily_schedule"] == ["Учебни занятия до 15:00"]
 
+    def test_admission_projection_fails_closed_for_stale_and_navigation_content(self):
+        attributes = {
+            "extracted": {
+                "admission": {
+                    "deadlines": [
+                        "Краен срок за подаване на оферта-05.06.2020г. 16:00ч.",
+                        "![admission](https://school.test/admission.png)",
+                        "Admission for 2025/2026 is",
+                        "Крайният срок е 30 юни 2099 г.",
+                    ],
+                    "entrance_requirements": [
+                        "интервютата",
+                        "Приемът включва писмен тест и интервю.",
+                    ],
+                    "available_spots": [
+                        "* [Свободни места](https://school.test/admission)",
+                        "Свободни места",
+                        "Остават 12 свободни места за първи клас.",
+                    ],
+                }
+            }
+        }
+
+        localized = build_localized_attributes(attributes, "bg")
+
+        assert localized["application_deadlines"] == ["Крайният срок е 30 юни 2099 г."]
+        assert localized["entry_requirements"] == ["Приемът включва писмен тест и интервю."]
+        assert localized["available_spots"] == ["Остават 12 свободни места за първи клас."]
+
     def test_validation_blocks_scraped_admission_and_schedule_fields(self):
         attributes = {
             **INTERNAL_ATTRIBUTES,

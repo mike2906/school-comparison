@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     spot_check_sample_size: int = 10  # Number of schools to spot-check per run (-1 = all, for calibration)
     spot_check_discrepancy_threshold: float = 0.15  # Advisory monitoring alert threshold (non-gating)
     validation_batch_concurrency: int = 3
-    validation_spot_check_timeout_seconds: float = 20.0
+    validation_spot_check_timeout_seconds: float = 45.0
     validation_spot_check_max_content_chars: int = 12000
     validation_spot_check_max_extracted_chars: int = 8000
 
