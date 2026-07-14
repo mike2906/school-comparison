@@ -1734,6 +1734,44 @@ def test_price_signals_reset_semantic_state_between_source_pages():
     assert [signal for signal in signals if signal["amount"] == 1885] == []
 
 
+def test_filter_supported_prices_uses_academic_year_to_resolve_repeated_amount():
+    text = """
+    --- SOURCE: https://school.test/fees-2025 ---
+    Tuition fees 2025/2026
+    Annual tuition EUR 5,000
+    --- SOURCE: https://school.test/fees-2026 ---
+    Tuition fees 2026/2027
+    Annual tuition EUR 5,000
+    """
+    price = ExtractedPrice(
+        category="tuition", amount=5000, currency="EUR", period="yearly",
+        academic_year="2026-2027", confidence=0.9,
+    )
+
+    refined = extractor_module.helpers._filter_supported_prices([price], text)
+
+    assert len(refined) == 1
+    assert refined[0].academic_year == "2026-2027"
+
+
+def test_filter_supported_prices_scopes_staleness_to_supporting_page():
+    text = """
+    --- SOURCE: https://school.test/old-fees ---
+    Monthly tuition EUR 500
+    Payment deadline: September 2023
+    --- SOURCE: https://school.test/current-fees ---
+    Current monthly tuition EUR 500
+    """
+    price = ExtractedPrice(
+        category="tuition", amount=500, currency="EUR", period="monthly", confidence=0.9,
+    )
+
+    refined = extractor_module.helpers._filter_supported_prices([price], text)
+
+    assert len(refined) == 1
+    assert refined[0].amount == 500
+
+
 @pytest.mark.parametrize(
     ("text", "price"),
     [

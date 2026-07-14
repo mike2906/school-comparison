@@ -1469,10 +1469,15 @@ def _iter_price_line_signals(text: str) -> list[dict[str, Any]]:
     current_academic_year: str | None = None
     current_period: str | None = None
     current_heading: str | None = None
+    current_source_url: str | None = None
+    source_staleness = _pricing_source_staleness(text)
 
     for line_index, line in enumerate(lines):
         lowered = line.lower()
         if lowered.startswith("source:"):
+            current_source_url = re.sub(
+                r"\s*---\s*$", "", line.split(":", 1)[1]
+            ).strip() or None
             current_category = None
             current_age_group = None
             current_academic_year = None
@@ -1544,6 +1549,10 @@ def _iter_price_line_signals(text: str) -> list[dict[str, Any]]:
                 "academic_year": row_year,
                 "age_group": row_age_group,
                 "section_heading": current_heading,
+                "source_url": current_source_url,
+                "source_is_stale": source_staleness.get(
+                    current_source_url, source_staleness.get(None, False)
+                ),
             }
         )
 
@@ -1884,6 +1893,32 @@ def _yearless_pricing_text_is_stale(text: str, *, current_year: int | None = Non
     return bool(deadline_years) and max(deadline_years) <= current_year - 2
 
 
+def _pricing_source_staleness(text: str) -> dict[str | None, bool]:
+    """Return staleness per source block, falling back to the whole text for one page."""
+    source_headers = list(
+        re.finditer(
+            r"^\s*---\s*SOURCE:\s*(.*?)\s*---\s*$",
+            text or "",
+            flags=re.IGNORECASE | re.MULTILINE,
+        )
+    )
+    if not source_headers:
+        return {None: _yearless_pricing_text_is_stale(text)}
+
+    staleness: dict[str | None, bool] = {}
+    for index, header in enumerate(source_headers):
+        block_end = (
+            source_headers[index + 1].start()
+            if index + 1 < len(source_headers)
+            else len(text)
+        )
+        source_url = header.group(1).strip() or None
+        staleness[source_url] = _yearless_pricing_text_is_stale(
+            text[header.end() : block_end]
+        )
+    return staleness
+
+
 def _filter_supported_prices(prices: list[ExtractedPrice], text: str) -> list[ExtractedPrice]:
     if not prices or not text:
         return []
@@ -1897,8 +1932,6 @@ def _filter_supported_prices(prices: list[ExtractedPrice], text: str) -> list[Ex
         row_context = " ".join(
             str(value or "") for value in (price.plan_name, price.notes)
         ).strip().casefold()
-        if not price.academic_year and _yearless_pricing_text_is_stale(text):
-            continue
         amount = _to_optional_float(price.amount)
         if amount is None:
             continue
@@ -1909,6 +1942,19 @@ def _filter_supported_prices(prices: list[ExtractedPrice], text: str) -> list[Ex
             for signal in signals
             if signal["currency"] == currency and abs(float(signal["amount"]) - amount) < 0.01
         ]
+        if not candidates:
+            continue
+        academic_year = _normalize_academic_year(price.academic_year)
+        if academic_year:
+            candidates = [
+                signal
+                for signal in candidates
+                if _normalize_academic_year(signal.get("academic_year")) == academic_year
+            ]
+        else:
+            candidates = [
+                signal for signal in candidates if not signal.get("source_is_stale", False)
+            ]
         if not candidates:
             continue
         candidate_semantics = {
