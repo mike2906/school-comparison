@@ -1827,7 +1827,20 @@ def _dedupe_price_rows(prices: list[ExtractedPrice]) -> list[ExtractedPrice]:
         explicit_years,
         key=lambda value: tuple(int(part) for part in value.split("/")),
     )
-    return [row for row in rows if _normalize_academic_year(row.academic_year) == latest_year]
+    explicit_categories = {
+        (row.category or "").casefold()
+        for row in rows
+        if _normalize_academic_year(row.academic_year) is not None
+    }
+    return [
+        row
+        for row in rows
+        if _normalize_academic_year(row.academic_year) == latest_year
+        or (
+            _normalize_academic_year(row.academic_year) is None
+            and (row.category or "").casefold() not in explicit_categories
+        )
+    ]
 
 
 def _normalize_academic_year(value: str | None) -> str | None:

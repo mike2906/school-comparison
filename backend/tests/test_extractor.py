@@ -1754,6 +1754,26 @@ def test_dedupe_price_rows_drops_yearless_rows_when_explicit_year_exists():
     assert [(row.amount, row.academic_year) for row in deduped] == [(6000, "2026/2027")]
 
 
+def test_dedupe_price_rows_preserves_yearless_fee_in_other_category():
+    prices = [
+        ExtractedPrice(
+            category="tuition", amount=6000, currency="EUR", period="yearly",
+            academic_year="2026/2027", confidence=0.9,
+        ),
+        ExtractedPrice(
+            category="registration", amount=500, currency="EUR", period="one_time",
+            confidence=0.9,
+        ),
+    ]
+
+    deduped = extractor_module.helpers._dedupe_price_rows(prices)
+
+    assert {(row.category, row.amount) for row in deduped} == {
+        ("tuition", 6000),
+        ("registration", 500),
+    }
+
+
 def test_price_signals_reset_semantic_state_between_source_pages():
     text = """
     --- SOURCE: https://school.test/meals ---
