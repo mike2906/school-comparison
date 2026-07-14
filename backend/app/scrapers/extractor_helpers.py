@@ -1544,7 +1544,6 @@ def _iter_price_line_signals(text: str) -> list[dict[str, Any]]:
                 "amount": line_amount,
                 "currency": line_currency or "BGN",
                 "category": row_category,
-                "category_on_amount_line": _detect_price_category(line) is not None,
                 "period": row_period,
                 "academic_year": row_year,
                 "age_group": row_age_group,
@@ -1977,11 +1976,7 @@ def _filter_supported_prices(prices: list[ExtractedPrice], text: str) -> list[Ex
             continue
 
         normalized = price.model_copy(deep=True)
-        if supporting_signal.get("category") and (
-            bool(supporting_signal.get("category_on_amount_line"))
-            or best_score >= 3
-            or float(price.confidence or 0.0) < 0.8
-        ):
+        if supporting_signal.get("category"):
             normalized.category = supporting_signal["category"]
         if supporting_signal.get("period"):
             normalized.period = supporting_signal["period"]

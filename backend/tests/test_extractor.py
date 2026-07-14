@@ -1679,6 +1679,21 @@ def test_filter_supported_prices_uses_plan_context_when_amount_repeats():
     assert refined[0].category == "transport"
 
 
+def test_filter_supported_prices_uses_heading_to_fix_high_confidence_category():
+    text = """
+    ## Transport
+    EUR 160
+    """
+    price = ExtractedPrice(
+        category="tuition", amount=160, currency="EUR", period="monthly", confidence=0.9,
+    )
+
+    refined = extractor_module.helpers._filter_supported_prices([price], text)
+
+    assert len(refined) == 1
+    assert refined[0].category == "transport"
+
+
 def test_dedupe_price_rows_keeps_only_latest_academic_year():
     prices = [
         ExtractedPrice(
