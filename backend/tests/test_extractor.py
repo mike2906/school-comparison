@@ -1713,6 +1713,18 @@ def test_filter_supported_prices_uses_heading_to_fix_high_confidence_category():
     assert refined[0].category == "transport"
 
 
+def test_filter_supported_prices_keeps_tuition_when_transport_is_included():
+    text = "Tuition fee including transport EUR 10,000"
+    price = ExtractedPrice(
+        category="tuition", amount=10000, currency="EUR", period="yearly", confidence=0.9,
+    )
+
+    refined = extractor_module.helpers._filter_supported_prices([price], text)
+
+    assert len(refined) == 1
+    assert refined[0].category == "tuition"
+
+
 def test_dedupe_price_rows_keeps_only_latest_academic_year():
     prices = [
         ExtractedPrice(
@@ -1763,6 +1775,26 @@ def test_dedupe_price_rows_preserves_yearless_fee_in_other_category():
         ExtractedPrice(
             category="registration", amount=500, currency="EUR", period="one_time",
             confidence=0.9,
+        ),
+    ]
+
+    deduped = extractor_module.helpers._dedupe_price_rows(prices)
+
+    assert {(row.category, row.amount) for row in deduped} == {
+        ("tuition", 6000),
+        ("registration", 500),
+    }
+
+
+def test_dedupe_price_rows_keeps_latest_year_per_comparable_fee_group():
+    prices = [
+        ExtractedPrice(
+            category="tuition", amount=6000, currency="EUR", period="yearly",
+            academic_year="2025/2026", confidence=0.9,
+        ),
+        ExtractedPrice(
+            category="registration", amount=500, currency="EUR", period="one_time",
+            academic_year="2026/2027", confidence=0.9,
         ),
     ]
 

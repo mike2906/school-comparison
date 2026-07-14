@@ -1279,15 +1279,15 @@ def _extract_price_amount_currency(
 
 def _detect_price_category(value: str, *, allow_generic_heading: bool = False) -> str | None:
     lowered = value.lower()
+    if "обучение по " in lowered:
+        return "extracurricular"
+    if "обуч" in lowered or "образователни услуги" in lowered or "tuition" in lowered:
+        return "tuition"
     if any(
         token in lowered
         for token in ("school bus", "bus service", "автобус", "транспорт", "transport")
     ):
         return "transport"
-    if "обучение по " in lowered:
-        return "extracurricular"
-    if "обуч" in lowered or "образователни услуги" in lowered or "tuition" in lowered:
-        return "tuition"
     if any(
         token in lowered
         for token in ("образователни ресурси", "учебниц", "консуматив", "materials")
@@ -1816,30 +1816,39 @@ def _dedupe_currency_variants(prices: list[ExtractedPrice]) -> list[ExtractedPri
 
 def _dedupe_price_rows(prices: list[ExtractedPrice]) -> list[ExtractedPrice]:
     rows = _dedupe_currency_variants(_dedupe_installment_variants(prices))
-    explicit_years = {
-        normalized
-        for row in rows
-        if (normalized := _normalize_academic_year(row.academic_year)) is not None
-    }
-    if not explicit_years:
-        return rows
-    latest_year = max(
-        explicit_years,
-        key=lambda value: tuple(int(part) for part in value.split("/")),
-    )
-    explicit_categories = {
-        (row.category or "").casefold()
-        for row in rows
-        if _normalize_academic_year(row.academic_year) is not None
-    }
+    grouped: dict[tuple[str, str, str], list[ExtractedPrice]] = {}
+    for row in rows:
+        key = (
+            (row.category or "").casefold(),
+            (row.plan_name or "").strip().casefold(),
+            (row.age_group or "").strip().casefold(),
+        )
+        grouped.setdefault(key, []).append(row)
+
+    latest_year_by_group: dict[tuple[str, str, str], str] = {}
+    for key, group in grouped.items():
+        explicit_years = {
+            normalized
+            for row in group
+            if (normalized := _normalize_academic_year(row.academic_year)) is not None
+        }
+        if explicit_years:
+            latest_year_by_group[key] = max(
+                explicit_years,
+                key=lambda value: tuple(int(part) for part in value.split("/")),
+            )
+
     return [
         row
         for row in rows
-        if _normalize_academic_year(row.academic_year) == latest_year
-        or (
-            _normalize_academic_year(row.academic_year) is None
-            and (row.category or "").casefold() not in explicit_categories
-        )
+        if (
+            key := (
+                (row.category or "").casefold(),
+                (row.plan_name or "").strip().casefold(),
+                (row.age_group or "").strip().casefold(),
+            )
+        ) not in latest_year_by_group
+        or _normalize_academic_year(row.academic_year) == latest_year_by_group[key]
     ]
 
 
