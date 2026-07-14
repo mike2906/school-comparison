@@ -1870,6 +1870,23 @@ def test_filter_supported_prices_scopes_staleness_to_supporting_page():
     assert refined[0].amount == 500
 
 
+def test_filter_supported_prices_ignores_unrelated_old_year_on_current_page():
+    text = """
+    --- SOURCE: https://school.test/current-fees ---
+    Archived admissions results for 2023/2024
+    ## Current tuition
+    Monthly tuition EUR 500
+    """
+    price = ExtractedPrice(
+        category="tuition", amount=500, currency="EUR", period="monthly", confidence=0.9,
+    )
+
+    refined = extractor_module.helpers._filter_supported_prices([price], text)
+
+    assert len(refined) == 1
+    assert refined[0].amount == 500
+
+
 @pytest.mark.parametrize(
     ("text", "price"),
     [

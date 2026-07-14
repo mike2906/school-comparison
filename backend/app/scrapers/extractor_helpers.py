@@ -1898,15 +1898,53 @@ def _price_signal_match_score(price: ExtractedPrice, signal: dict[str, Any]) -> 
 def _yearless_pricing_text_is_stale(text: str, *, current_year: int | None = None) -> bool:
     """Detect clearly dated legacy fee tables without treating general history as pricing dates."""
     current_year = current_year or datetime.datetime.now(datetime.timezone.utc).year
-    academic_year_ends = [
-        int(match.group(2))
-        for match in re.finditer(r"(20\d{2})\s*[-/]\s*(20\d{2})", text or "")
-    ]
+    raw_lines = re.split(r"[\n\r]+", text or "")
+    academic_year_ends: list[int] = []
+    pricing_tokens = (
+        "tuition",
+        "fee",
+        "fees",
+        "price",
+        "pricing",
+        "такс",
+        "цена",
+        "цени",
+        "плащ",
+    )
+    for index, raw_line in enumerate(raw_lines):
+        year_matches = list(
+            re.finditer(r"(20\d{2})\s*[-/]\s*(20\d{2})", raw_line)
+        )
+        if not year_matches:
+            continue
+        lowered = raw_line.casefold()
+        directly_pricing_related = any(token in lowered for token in pricing_tokens)
+        remaining = re.sub(
+            r"(20\d{2})\s*[-/]\s*(20\d{2})", "", lowered
+        )
+        remaining = re.sub(r"[^\w\s]+", " ", remaining).strip()
+        is_academic_year_heading = remaining in {
+            "",
+            "academic year",
+            "school year",
+            "учебна година",
+            "учебната година",
+        }
+        nearby_lines = (
+            raw_lines[max(0, index - 1) : index]
+            + raw_lines[index + 1 : index + 2]
+        )
+        nearby_pricing_related = any(
+            any(token in nearby.casefold() for token in pricing_tokens)
+            for nearby in nearby_lines
+        )
+        if directly_pricing_related or (is_academic_year_heading and nearby_pricing_related):
+            academic_year_ends.extend(int(match.group(2)) for match in year_matches)
     if academic_year_ends:
         return max(academic_year_ends) < current_year
 
     deadline_years: list[int] = []
-    for raw_line in re.split(r"[\n\r]+", text or ""):
+    for raw_line in raw_lines:
         lowered = raw_line.casefold()
         if not any(token in lowered for token in ("deadline", "payment", "плащ", "краен срок")):
             continue
