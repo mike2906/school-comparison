@@ -1539,7 +1539,7 @@ def test_extract_prices_deterministic_keeps_registration_and_optional_services_o
     assert tuition_amounts == [8890]
     assert by_amount[200].category == "registration"
     assert by_amount[200].period == "one_time"
-    assert by_amount[2100].category == "transport"
+    assert 2100 not in by_amount
     assert by_amount[345].category == "food"
     assert by_amount[345].period == "quarter"
 
@@ -2067,6 +2067,20 @@ def test_supported_prices_keep_only_current_fee_structure_across_categories():
 )
 def test_filter_supported_prices_withholds_unlabeled_service_periods(text, price):
     assert extractor_module.helpers._filter_supported_prices([price], text) == []
+
+
+def test_deterministic_pricing_does_not_inherit_tuition_period_for_bare_transport_amount():
+    parsed = extractor_module.helpers._extract_prices_deterministic(
+        """
+        TUITION FEES FOR THE ACADEMIC 2026/2027 YEAR
+        Grade 1 tuition fee: 8,000 EUR
+        Transportation with school buses from and to Sofia 250 EUR
+        """
+    )
+
+    assert [(row.category, row.amount) for row in parsed.prices] == [
+        ("tuition", 8000.0),
+    ]
 
 
 def test_filter_supported_prices_withholds_late_payment_penalties():

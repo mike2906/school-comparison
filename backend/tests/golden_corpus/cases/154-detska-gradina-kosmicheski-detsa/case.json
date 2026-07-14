@@ -204,7 +204,7 @@
         "amount_min": null,
         "category": "transport",
         "currency": "EUR",
-        "period": "yearly",
+        "period": "monthly",
         "plan_name": null
       },
       {

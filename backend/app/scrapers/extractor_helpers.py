@@ -1475,14 +1475,25 @@ def _detect_price_period(
     if default_period == "monthly" and category == "tuition" and len(amount_matches) > 2:
         return "yearly"
     if default_period is not None:
-        return default_period
+        if category not in {"transport", "extracurricular"}:
+            return default_period
+        context = context_value or ""
+        if (
+            _detect_price_category(context) == category
+            and _detect_explicit_price_period(context) == default_period
+        ):
+            return default_period
     if has_year or "вноск" in value.lower():
         if category in {"transport", "extracurricular"}:
             # An academic-year heading dates a fee structure; it does not say
             # whether an optional service is charged once, monthly, or yearly.
             # A labelled fee/course can still be supported as a whole-year
             # charge; a bare route, club, or activity amount cannot.
-            lowered = (context_value or value).casefold()
+            context = context_value or ""
+            category_context = (
+                context if _detect_price_category(context) == category else value
+            )
+            lowered = category_context.casefold()
             if not any(token in lowered for token in ("fee", "такса", "course", "курс")):
                 return None
         return "yearly"

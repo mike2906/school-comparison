@@ -232,7 +232,7 @@ def summary_is_publishable(attributes: Mapping[str, Any] | None) -> bool:
     if not isinstance(report, Mapping):
         return False
     status = str(report.get("status") or "").strip().lower()
-    return status == "ok"
+    return status == "ok" and not any(_blocking_field_paths(attributes))
 
 
 def passes_pricing_gate(source_url: Any, pricing_context: Any) -> bool:
