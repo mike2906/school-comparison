@@ -1616,6 +1616,34 @@ def test_dedupe_price_rows_drops_installment_plan_name_variants():
     assert amounts == [7580]
 
 
+def test_dedupe_price_rows_preserves_a_sole_total_fee():
+    price = ExtractedPrice(
+        category="tuition", amount=12000, currency="EUR", period="yearly",
+        plan_name="Total Fee", confidence=0.9,
+    )
+
+    deduped = extractor_module.helpers._dedupe_price_rows([price])
+
+    assert [(row.amount, row.plan_name) for row in deduped] == [(12000, "Total Fee")]
+
+
+def test_dedupe_price_rows_drops_total_fee_when_component_sibling_exists():
+    prices = [
+        ExtractedPrice(
+            category="tuition", amount=10000, currency="EUR", period="yearly",
+            plan_name="Tuition Fee", confidence=0.9,
+        ),
+        ExtractedPrice(
+            category="tuition", amount=12000, currency="EUR", period="yearly",
+            plan_name="Total Fee", confidence=0.9,
+        ),
+    ]
+
+    deduped = extractor_module.helpers._dedupe_price_rows(prices)
+
+    assert [(row.amount, row.plan_name) for row in deduped] == [(10000, "Tuition Fee")]
+
+
 def test_filter_supported_prices_drops_unsupported_llm_rows():
     text = """
     # Book a visit

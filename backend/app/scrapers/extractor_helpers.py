@@ -1718,6 +1718,12 @@ def _dedupe_installment_variants(prices: list[ExtractedPrice]) -> list[Extracted
             price.age_group,
         )
 
+    def is_total_fee_row(price: ExtractedPrice) -> bool:
+        context = " ".join(
+            str(value or "") for value in (price.plan_name, price.notes)
+        ).casefold()
+        return "total fee" in context
+
     grouped: dict[tuple, list[ExtractedPrice]] = {}
     for price in prices:
         row_context = " ".join(
@@ -1725,7 +1731,7 @@ def _dedupe_installment_variants(prices: list[ExtractedPrice]) -> list[Extracted
         ).casefold()
         if any(
             token in row_context
-            for token in ("eal", "learning support", "additional language support", "total fee")
+            for token in ("eal", "learning support", "additional language support")
         ):
             continue
         grouped.setdefault(group_key(price), []).append(price)
@@ -1742,7 +1748,10 @@ def _dedupe_installment_variants(prices: list[ExtractedPrice]) -> list[Extracted
         has_non_installment_sibling = any(
             not _is_installment_plan_name(row.plan_name) for row in group
         )
+        has_component_sibling = any(not is_total_fee_row(row) for row in group)
         for row in group:
+            if has_component_sibling and is_total_fee_row(row):
+                continue
             row_amount = _to_optional_float(row.amount)
             if has_non_installment_sibling and _is_installment_plan_name(row.plan_name):
                 continue
