@@ -1961,7 +1961,23 @@ def _filter_supported_prices(prices: list[ExtractedPrice], text: str) -> list[Ex
             for signal in candidates
         }
         if not row_context and len(candidate_semantics) > 1:
-            continue
+            # Deterministic/low-confidence rows do not carry enough context to
+            # safely disambiguate repeated amounts from composite source lines.
+            if float(price.confidence or 0.0) < 0.8:
+                continue
+            semantic_matches = [
+                signal
+                for signal in candidates
+                if signal.get("category") == price.category
+                and signal.get("period") == price.period
+            ]
+            matched_semantics = {
+                (signal.get("category"), signal.get("period"), signal.get("academic_year"))
+                for signal in semantic_matches
+            }
+            if len(matched_semantics) != 1:
+                continue
+            candidates = semantic_matches
         scored = [(_price_signal_match_score(price, signal), signal) for signal in candidates]
         best_score = max(score for score, _signal in scored)
         best_signals = [signal for score, signal in scored if score == best_score]

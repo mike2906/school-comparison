@@ -1679,6 +1679,25 @@ def test_filter_supported_prices_uses_plan_context_when_amount_repeats():
     assert refined[0].category == "transport"
 
 
+def test_filter_supported_prices_uses_category_when_amount_repeats():
+    text = """
+    ## Tuition
+    Monthly fee EUR 500
+    ## Transport
+    Monthly fee EUR 500
+    """
+    prices = [
+        ExtractedPrice(
+            category=category, amount=500, currency="EUR", period="monthly", confidence=0.9,
+        )
+        for category in ("tuition", "transport")
+    ]
+
+    refined = extractor_module.helpers._filter_supported_prices(prices, text)
+
+    assert {price.category for price in refined} == {"tuition", "transport"}
+
+
 def test_filter_supported_prices_uses_heading_to_fix_high_confidence_category():
     text = """
     ## Transport
