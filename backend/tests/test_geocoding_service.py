@@ -471,6 +471,49 @@ class TestGeocodingService:
         assert location.geocode_meta["provider"] == "mock"
         assert location.geocode_meta["rejection_reason"] == "API error"
 
+    async def test_force_failure_clears_stale_coordinates_and_records_attempt_metadata(
+        self,
+        db_session: AsyncSession,
+    ):
+        mock_provider = AsyncMock()
+        mock_provider.provider_name = "mock"
+        mock_provider.geocode.return_value = GeocodingResult(
+            success=False,
+            error="No supported match",
+            provider="mock",
+            method="nominatim_address",
+            precision="approximate",
+        )
+        service = GeocodingService(db=db_session, provider=mock_provider)
+        school = School(
+            name_i18n={"bg": "Test School"},
+            country_code="bg",
+            city="sofia",
+            school_type="state",
+            education_level="primary",
+        )
+        db_session.add(school)
+        await db_session.flush()
+        location = SchoolLocation(
+            school_id=school.id,
+            address_i18n={"bg": "Unsupported Address"},
+            lat=42.7,
+            lng=23.3,
+            is_primary=True,
+        )
+        db_session.add(location)
+        await db_session.commit()
+
+        result = await service.geocode_location(location, force=True)
+
+        assert result.success is False
+        await db_session.refresh(location)
+        assert location.lat is None
+        assert location.lng is None
+        assert location.geocode_meta["status"] == "failed"
+        assert location.geocode_meta["method"] == "nominatim_address"
+        assert location.geocode_meta["precision"] == "approximate"
+
     async def test_geocode_location_rejects_duplicate_geojson_name_match_with_different_address(
         self,
         db_session: AsyncSession,
@@ -568,6 +611,58 @@ class TestGeocodingService:
         assert location.lat is None
         assert location.lng is None
         assert location.geocode_meta["candidate"] == {"lat": 43.064, "lng": 24.82002}
+        assert location.geocode_meta["method"] == "nominatim_address"
+        assert location.geocode_meta["precision"] == "exact"
+
+    async def test_sofia_labeled_oblast_record_no_longer_bypasses_write_bounds(
+        self,
+        db_session: AsyncSession,
+    ):
+        class MockProvider:
+            provider_name = "mock"
+
+            def __init__(self):
+                self.geocode = AsyncMock(
+                    return_value=GeocodingResult(
+                        lat=42.97,
+                        lng=23.35,
+                        success=True,
+                        provider="nominatim",
+                        method="nominatim_address",
+                        precision="exact",
+                    )
+                )
+
+        mock_provider = MockProvider()
+        service = GeocodingService(db=db_session, provider=mock_provider)
+        school = School(
+            name_i18n={"bg": "Province school"},
+            country_code="bg",
+            city="sofia",
+            school_type="state",
+            education_level="primary",
+            attributes={"moe_region_code": 23},
+        )
+        db_session.add(school)
+        await db_session.flush()
+        location = SchoolLocation(
+            school_id=school.id,
+            address_i18n={"bg": "гр. Своге, ул. Тест 1"},
+            is_primary=True,
+        )
+        db_session.add(location)
+        await db_session.commit()
+
+        result = await service.geocode_location(location)
+
+        assert result.success is False
+        assert result.error == "outside_sofia_write_bounds"
+        await db_session.refresh(location)
+        assert location.lat is None
+        assert location.lng is None
+        assert location.geocode_meta["status"] == "rejected"
+        assert location.geocode_meta["method"] == "nominatim_address"
+        assert location.geocode_meta["precision"] == "exact"
 
     async def test_geocode_location_accepts_bankya_within_sofia_municipality_bounds(
         self,

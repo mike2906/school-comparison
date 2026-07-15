@@ -23,7 +23,7 @@ from app.scrapers.sources import register_adapter
 from app.scrapers.base import BaseScraper
 from app.models.scrape_log import ScrapeType
 from app.services.geocoding.base import GeocodingResult
-from app.services.geocoding.bg import GeoJSONProvider
+from app.services.geocoding.bg import GeoJSONProvider, city_storage_value
 from app.services.geocoding.nominatim import NominatimProvider
 
 logger = logging.getLogger(__name__)
@@ -231,6 +231,31 @@ class MoeRegistryAdapter(BaseSourceAdapter):
                 or city
             )
         return city
+
+    @classmethod
+    def _derive_record_city(
+        cls,
+        *,
+        region_code: Optional[int],
+        municipality_name: Optional[str],
+        town_name: Optional[str],
+    ) -> Optional[str]:
+        """Derive city from this registry record, never from the import scope."""
+        settlement_city = city_storage_value(town_name)
+        municipality_city = city_storage_value(municipality_name)
+        # Bankya and other settlements inside Stolichna municipality remain in
+        # Sofia scope even when the record's settlement is not named Sofia.
+        if municipality_city == "sofia":
+            return "sofia"
+        if settlement_city:
+            return settlement_city
+        if municipality_city:
+            return municipality_city
+        # Missing lookup labels must not cause Sofia-oblast rows to inherit the
+        # Sofia batch scope. Only Sofia-city has a safe region-level fallback.
+        if region_code == cls.SOFIA_CITY_REGION:
+            return "sofia"
+        return None
 
     @staticmethod
     def _address_with_locality_hint(address: str, locality_name: Optional[str]) -> str:
@@ -753,9 +778,10 @@ class MoeRegistryAdapter(BaseSourceAdapter):
             if inst_category == "kindergarten":
                 education_level = "kindergarten"
 
-            # Determine city (based on region code)
+            # Derive city from the record's settlement/municipality labels. The
+            # Sofia import scope includes both Sofia-city and Sofia-oblast, so it
+            # must never be used as the persisted city value.
             region_code = data.get("region")
-            city = "sofia" if region_code in [self.SOFIA_CITY_REGION, self.SOFIA_OBLAST_REGION] else None
             municipality_code = data.get("municipality")
             town_code = data.get("town")
             region_name = self._region_labels.get(region_code) if isinstance(region_code, int) else None
@@ -763,6 +789,11 @@ class MoeRegistryAdapter(BaseSourceAdapter):
                 self._municipality_labels.get(municipality_code) if isinstance(municipality_code, int) else None
             )
             town_name = self._town_labels.get(town_code) if isinstance(town_code, int) else None
+            city = self._derive_record_city(
+                region_code=region_code,
+                municipality_name=municipality_name,
+                town_name=town_name,
+            )
 
             # Extract location data from detail_data if available
             locations = []

@@ -125,10 +125,16 @@ class GeocodingService:
         address = location.address_i18n.get("bg") or location.address_i18n.get("en")
         if not address:
             logger.error(f"Location {location.id} has no address in address_i18n")
-            return GeocodingResult(
+            result = GeocodingResult(
                 success=False,
                 error="No address available",
             )
+            if force:
+                location.lat = None
+                location.lng = None
+            await apply_geocode_result_to_location(self.db, location, result)
+            await self.db.commit()
+            return result
 
         # Fetch school data for GeoJSON matching and locality-aware city hints.
         school_name = None
@@ -210,13 +216,17 @@ class GeocodingService:
             if result.success:
                 logger.info(f"Updated location {location.id} with coordinates ({result.lat}, {result.lng})")
         else:
-            location.geocode_meta = {
-                "status": "failed",
-                "provider": result.provider,
-                "method": result.method,
-                "precision": result.precision,
-                "rejection_reason": result.error,
-            }
+            if force:
+                # A forced refresh is an evidence rebuild: stale coordinates
+                # that the current providers cannot support must not survive.
+                location.lat = None
+                location.lng = None
+            await apply_geocode_result_to_location(
+                self.db,
+                location,
+                result,
+                school=school,
+            )
             await self.db.commit()
             logger.warning(f"Failed to geocode location {location.id}: {result.error}")
 

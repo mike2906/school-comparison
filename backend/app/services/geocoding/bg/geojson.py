@@ -8,16 +8,40 @@ Data source: https://gisco-services.ec.europa.eu/pub/education/
 import json
 import logging
 import re
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 from urllib.parse import urlparse
 
 from app.services.geocoding.base import BaseGeocodingProvider, GeocodingResult
 from app.services.geocoding.bounds import SOFIA_MUNICIPALITY_BOUNDS, point_in_bounds
+from app.utils.transliteration import transliterate_bulgarian
 
 logger = logging.getLogger(__name__)
 
 SOFIA_MAP_BOUNDS = SOFIA_MUNICIPALITY_BOUNDS
+
+
+@dataclass(frozen=True)
+class AdminMunicipalityResolution:
+    """Fail-closed administrative classification from the GeoJSON dataset."""
+
+    municipality: Optional[str]
+    evidence: str
+    ambiguous: bool = False
+
+
+def city_storage_value(value: Optional[str]) -> Optional[str]:
+    """Convert a Bulgarian settlement label to the database city convention."""
+    if not value:
+        return None
+
+    cleaned = re.sub(r"^(?:гр\.?|с\.?|село)\s+", "", value.strip(), flags=re.IGNORECASE)
+    transliterated = transliterate_bulgarian(cleaned).casefold()
+    normalized = re.sub(r"[^a-z0-9]+", " ", transliterated).strip()
+    if normalized in {"sofia", "stolichna"}:
+        return "sofia"
+    return normalized or None
 
 
 class GeoJSONProvider(BaseGeocodingProvider):
@@ -46,6 +70,8 @@ class GeoJSONProvider(BaseGeocodingProvider):
         self.geojson_path = Path(geojson_path)
         self._index = None  # Lazy-loaded on first use
         self._website_index = None  # Lazy-loaded host -> feature index
+        self._features_by_name = None  # Lazy-loaded normalized name -> all matching features
+        self._admin_municipalities = None  # Lazy-loaded normalized municipality -> source label
 
     @property
     def provider_name(self) -> str:
@@ -62,6 +88,8 @@ class GeoJSONProvider(BaseGeocodingProvider):
             logger.error(f"GeoJSON file not found: {self.geojson_path}")
             self._index = {}
             self._website_index = {}
+            self._features_by_name = {}
+            self._admin_municipalities = {}
             return
 
         with open(self.geojson_path, 'r', encoding='utf-8') as f:
@@ -70,6 +98,8 @@ class GeoJSONProvider(BaseGeocodingProvider):
         # Build index: (normalized_name, normalized_city) -> feature
         self._index = {}
         self._website_index = {}
+        self._features_by_name = {}
+        self._admin_municipalities = {}
         for feature in data.get('features', []):
             props = feature['properties']
             name = props.get('name', '').strip()
@@ -81,6 +111,9 @@ class GeoJSONProvider(BaseGeocodingProvider):
             normalized_name = self._normalize_name(name)
             normalized_city = self._normalize_city(city)
             key = (normalized_name, normalized_city)
+            self._features_by_name.setdefault(normalized_name, []).append(feature)
+            if normalized_city:
+                self._admin_municipalities.setdefault(normalized_city, city.upper().strip())
 
             # Keep the best match (prefer entries with more complete data)
             if key not in self._index or self._has_better_data(feature, self._index[key]):
@@ -94,6 +127,67 @@ class GeoJSONProvider(BaseGeocodingProvider):
                 self._website_index[website_host] = feature
 
         logger.info(f"Indexed {len(self._index)} schools from GeoJSON")
+
+    def resolve_admin_municipality(
+        self,
+        *,
+        school_name: str,
+        addresses: list[str],
+        municipality_hint: Optional[str] = None,
+    ) -> AdminMunicipalityResolution:
+        """Resolve a municipality without consulting stored coordinates.
+
+        MoE municipality labels are authoritative hints, but must exist in the
+        GeoJSON administrative values. Records without such a hint may only be
+        resolved when their school-name match points to one municipality and an
+        address is present; multiple municipality matches fail closed.
+        """
+        self._load_index()
+
+        if municipality_hint:
+            normalized_hint = self._normalize_city(municipality_hint)
+            source_label = (self._admin_municipalities or {}).get(normalized_hint)
+            if source_label:
+                return AdminMunicipalityResolution(
+                    municipality=source_label,
+                    evidence="moe_municipality_confirmed_by_geojson",
+                )
+            return AdminMunicipalityResolution(
+                municipality=None,
+                evidence=f"municipality_not_in_geojson:{municipality_hint}",
+                ambiguous=True,
+            )
+
+        normalized_name = self._normalize_name(school_name or "")
+        matches = (self._features_by_name or {}).get(normalized_name, [])
+        municipalities = {
+            self._normalize_city((feature.get("properties") or {}).get("city", ""))
+            for feature in matches
+            if (feature.get("properties") or {}).get("city")
+        }
+        if not any((address or "").strip() for address in addresses):
+            return AdminMunicipalityResolution(
+                municipality=None,
+                evidence="missing_address",
+                ambiguous=True,
+            )
+        if len(municipalities) == 1:
+            normalized = next(iter(municipalities))
+            return AdminMunicipalityResolution(
+                municipality=(self._admin_municipalities or {}).get(normalized, normalized),
+                evidence="addressed_school_unique_geojson_municipality",
+            )
+        if len(municipalities) > 1:
+            return AdminMunicipalityResolution(
+                municipality=None,
+                evidence="school_name_matches_multiple_geojson_municipalities",
+                ambiguous=True,
+            )
+        return AdminMunicipalityResolution(
+            municipality=None,
+            evidence="school_not_found_in_geojson",
+            ambiguous=True,
+        )
 
     def _normalize_city(self, city: str) -> str:
         """

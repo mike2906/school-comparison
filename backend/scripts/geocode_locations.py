@@ -66,6 +66,11 @@ async def main():
         action="store_true",
         help="Process all countries and cities instead of the default bg/sofia scope",
     )
+    parser.add_argument(
+        "--yes",
+        action="store_true",
+        help="Confirm a force run non-interactively",
+    )
 
     args = parser.parse_args()
 
@@ -115,10 +120,11 @@ async def main():
                 )
                 print(f"WARNING: --force flag will re-geocode {scope}!")
                 print("This may take a long time and make many API requests.")
-                response = input("Continue? (yes/no): ")
-                if response.lower() != "yes":
-                    print("Aborted.")
-                    return
+                if not args.yes:
+                    response = input("Continue? (yes/no): ")
+                    if response.lower() != "yes":
+                        print("Aborted.")
+                        return
 
             if args.force:
                 print("Re-geocoding selected locations...")

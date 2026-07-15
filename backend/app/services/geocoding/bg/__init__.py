@@ -1,4 +1,8 @@
 """Bulgarian geocoding providers."""
-from app.services.geocoding.bg.geojson import GeoJSONProvider
+from app.services.geocoding.bg.geojson import (
+    AdminMunicipalityResolution,
+    GeoJSONProvider,
+    city_storage_value,
+)
 
-__all__ = ['GeoJSONProvider']
+__all__ = ["AdminMunicipalityResolution", "GeoJSONProvider", "city_storage_value"]

@@ -50,6 +50,45 @@ class TestMoeRegistryAdapterMappings:
         assert MoeRegistryAdapter.DETAILED_TYPE_MAPPING[125] == "upper_secondary"
         assert MoeRegistryAdapter.DETAILED_TYPE_MAPPING[151] == "kindergarten"
 
+    def test_sofia_scoped_province_record_keeps_its_real_city(self):
+        """The Sofia batch includes region 23 but must not stamp it as Sofia city."""
+        adapter = MoeRegistryAdapter(db=object())
+        adapter._region_labels = {23: "София-област"}
+        adapter._municipality_labels = {2306: "Своге"}
+        adapter._town_labels = {65869: "Своге"}
+
+        school = adapter._parse_institution_data(
+            {
+                "instid": 2300001,
+                "name": 'СРЕДНО УЧИЛИЩЕ "ИВАН ВАЗОВ"',
+                "region": 23,
+                "municipality": 2306,
+                "town": 65869,
+                "instType": 1,
+                "detailedSchoolType": 124,
+                "financialSchoolType": 2,
+            },
+            {"settlementAddress": 'гр. Своге, ул. "Искър" № 1'},
+        )
+
+        assert school is not None
+        assert school.city == "svoge"
+        assert school.attributes["moe_municipality_name"] == "Своге"
+
+    def test_province_record_without_lookup_labels_does_not_inherit_sofia(self):
+        assert MoeRegistryAdapter._derive_record_city(
+            region_code=MoeRegistryAdapter.SOFIA_OBLAST_REGION,
+            municipality_name=None,
+            town_name=None,
+        ) is None
+
+    def test_stolichna_settlement_stays_in_sofia_scope(self):
+        assert MoeRegistryAdapter._derive_record_city(
+            region_code=MoeRegistryAdapter.SOFIA_CITY_REGION,
+            municipality_name="Столична",
+            town_name="Банкя",
+        ) == "sofia"
+
 
 @pytest.mark.asyncio
 class TestMoeRegistryAdapterIntegration:
