@@ -6,6 +6,7 @@ import { useCompare } from '../../context/CompareContext'
 import { fetchCompare, fetchExamAverages } from '../../api/schools'
 import { calculateDistance, formatDistance } from '../../utils/distance'
 import { getSchoolName, getAddress, getSummary } from '../../utils/i18n'
+import { hasAnySchoolSummary } from './summaryVisibility'
 import { getCanonicalAmenityFlags, normalizeSchoolList } from '../../utils/schoolAttributes'
 import { getBenchmarkComparison, getNvoDetail as getSharedNvoDetail } from '../../utils/nvo'
 import { classifyAdmissionRequirement } from '../../utils/admission'
@@ -640,16 +641,18 @@ function ComparePage() {
         ),
         getCompare: (school) => school.school_type,
       },
-      {
-        label: t('compare.summary'),
-        getValue: (school) => {
-          const summary = getSummary(school, i18n.language, 'short')
-          return summary
-            ? <span className="text-sm text-neutral-700">{summary}</span>
-            : renderPlaceholder()
-        },
-        getCompare: (school) => getSummary(school, i18n.language, 'short') || null,
-      },
+      ...(hasAnySchoolSummary(schools, i18n.language)
+        ? [{
+            label: t('compare.summary'),
+            getValue: (school) => {
+              const summary = getSummary(school, i18n.language, 'short')
+              return summary
+                ? <span className="text-sm text-neutral-700">{summary}</span>
+                : renderPlaceholder()
+            },
+            getCompare: (school) => getSummary(school, i18n.language, 'short') || null,
+          }]
+        : []),
       {
         label: t('compare.labels.educationLevel'),
         getValue: (school) => (
@@ -1197,7 +1200,7 @@ function ComparePage() {
       { key: 'locations', title: t('compare.sections.locations'), rows: locationRows },
       { key: 'contact', title: t('compare.sections.contact'), rows: contactRows },
     ]
-  }, [t, i18n.language, metricsById, userLocation])
+  }, [t, i18n.language, metricsById, userLocation, schools])
 
   const completenessById = useMemo(() => {
     const map = new Map()

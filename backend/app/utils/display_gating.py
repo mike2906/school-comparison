@@ -18,6 +18,8 @@ import datetime
 import re
 from typing import Any, Iterator, Mapping
 
+from app.config import get_settings
+
 # Pricing rows below this per-row confidence are withheld from the API. Imported by
 # ``app.services.data_quality`` so the "pricing rows failing gates" metric measures
 # exactly what the display gate hides.
@@ -112,8 +114,6 @@ def admission_value_is_semantically_valid(
         return False
     lowered = text.casefold()
 
-    if re.search(r"!?\[[^\]]*\]\s*\([^)]*\)|https?://", text, re.IGNORECASE):
-        return False
     label = re.sub(r"^[\s#*+\-←→]+|[\s:;.!?]+$", "", lowered).strip()
     if label in _ADMISSION_NAV_LABELS:
         return False
@@ -226,6 +226,8 @@ def summary_is_publishable(attributes: Mapping[str, Any] | None) -> bool:
     Missing and malformed reports fail closed. This prevents a stored summary from an
     earlier run being published without evidence that it passed the current validator.
     """
+    if not get_settings().publish_summaries:
+        return False
     if not isinstance(attributes, Mapping):
         return False
     report = attributes.get("data_validation")
@@ -244,3 +246,9 @@ def passes_pricing_gate(source_url: Any, pricing_context: Any) -> bool:
         return False
     # The bounds also reject NaN and infinities without coercing arbitrary values.
     return PRICING_CONFIDENCE_FLOOR <= confidence <= 1.0
+
+
+def pricing_row_is_publishable(source: Any, source_url: Any, pricing_context: Any) -> bool:
+    """Launch gate shared by API serialization and the quality scoreboard."""
+    source_value = getattr(source, "value", source)
+    return source_value == "official" and passes_pricing_gate(source_url, pricing_context)

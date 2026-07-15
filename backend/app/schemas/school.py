@@ -7,7 +7,7 @@ from app.schemas.pricing import PricingResponse
 from app.schemas.field_source import FieldSourceResponse
 from app.utils.display_gating import (
     blocked_pricing_row_ids,
-    passes_pricing_gate,
+    pricing_row_is_publishable,
     summary_is_publishable,
 )
 from app.utils.i18n_resolver import resolve_address_i18n, resolve_name_i18n
@@ -182,21 +182,21 @@ class SchoolPricingMixin(SchoolAttributesMixin):
         published: list[PricingResponse] = []
         for raw_row in self.raw_pricing:
             if isinstance(raw_row, dict):
+                source = raw_row.get("source")
                 source_url = raw_row.get("source_url")
                 pricing_context = raw_row.get("pricing_context")
             else:
+                source = getattr(raw_row, "source", None)
                 source_url = getattr(raw_row, "source_url", None)
                 pricing_context = getattr(raw_row, "pricing_context", None)
 
             # Gate the stored values before Pydantic can coerce malformed input
             # (for example, a string confidence of "0.9") into a valid public type.
-            if not passes_pricing_gate(source_url, pricing_context):
+            if not pricing_row_is_publishable(source, source_url, pricing_context):
                 continue
 
             row = PricingResponse.model_validate(raw_row)
             if row.id in blocked_ids:
-                continue
-            if row.source.value == "scraped_website" and not self.website_data_publishable:
                 continue
             published.append(row)
         return published

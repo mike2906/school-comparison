@@ -18,12 +18,16 @@ from typing import Any, Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.pricing import PriceSource, Pricing
+from app.models.pricing import Pricing
 from app.models.school import School, SchoolLocation
 # Re-exported for callers that import it from here; it now lives in
 # `app.utils.display_gating` so the scoreboard metric and the P1.7 display gate
 # share one source of truth.
-from app.utils.display_gating import PRICING_CONFIDENCE_FLOOR, passes_pricing_gate  # noqa: F401
+from app.utils.display_gating import (  # noqa: F401
+    PRICING_CONFIDENCE_FLOOR,
+    passes_pricing_gate,
+    pricing_row_is_publishable,
+)
 from app.utils.website_data import website_data_is_publishable
 
 # Precision used to group coordinates when detecting shared/duplicate points.
@@ -114,7 +118,6 @@ def _display_name_overrides(schools: list[School]) -> dict[str, Any]:
 
 def _website_validation_coverage(
     schools: list[School],
-    publishable_pricing_school_ids: set[int],
 ) -> dict[str, Any]:
     """Coverage for schools whose website-derived data is currently publishable."""
     eligible = 0
@@ -129,7 +132,6 @@ def _website_validation_coverage(
                 _has_meaningful_value(attrs.get("display_name_i18n")),
                 _has_meaningful_value(admission_info.get("website_extracted")),
                 _has_meaningful_value(school.summary_i18n),
-                school.id in publishable_pricing_school_ids,
             )
         )
         if not has_website_data or not website_data_is_publishable(attrs, school.scrape_status):
@@ -182,11 +184,19 @@ def _location_metrics(locations: list[SchoolLocation]) -> tuple[dict[str, Any], 
 def _pricing_gate_failures(rows: list[Pricing]) -> dict[str, Any]:
     total = 0
     failing = 0
+    publishable = 0
     for row in rows:
         total += 1
-        if not passes_pricing_gate(row.source_url, row.pricing_context):
+        if pricing_row_is_publishable(row.source, row.source_url, row.pricing_context):
+            publishable += 1
+        else:
             failing += 1
-    return {"failing": failing, "total": total, "pct": _pct(failing, total)}
+    return {
+        "publishable": publishable,
+        "failing": failing,
+        "total": total,
+        "pct": _pct(failing, total),
+    }
 
 
 def _spot_check_rate(schools: list[School]) -> dict[str, Any]:
@@ -238,10 +248,7 @@ async def compute_quality_metrics(
         pricing_rows = list(
             (
                 await db.execute(
-                    select(Pricing).where(
-                        Pricing.school_id.in_(school_ids),
-                        Pricing.source == PriceSource.SCRAPED_WEBSITE,
-                    )
+                    select(Pricing).where(Pricing.school_id.in_(school_ids))
                 )
             )
             .scalars()
@@ -251,19 +258,10 @@ async def compute_quality_metrics(
         locations, pricing_rows = [], []
 
     precision_metric, duplicate_groups = _location_metrics(locations)
-    publishable_pricing_school_ids = {
-        row.school_id
-        for row in pricing_rows
-        if passes_pricing_gate(row.source_url, row.pricing_context)
-    }
-
     return {
         "schools_in_scope": len(school_ids),
         "validation_ok": _validation_ok(schools),
-        "website_validation_coverage": _website_validation_coverage(
-            schools,
-            publishable_pricing_school_ids,
-        ),
+        "website_validation_coverage": _website_validation_coverage(schools),
         "duplicate_coordinate_groups": duplicate_groups,
         "location_precision_exact": precision_metric,
         "display_name_overrides": _display_name_overrides(schools),

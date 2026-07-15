@@ -7,14 +7,10 @@ from app.models.field_source import SourceType, SourceConfidence
 
 
 class FieldSourceBase(BaseModel):
-    """Parent-facing provenance only; raw extracted values remain internal."""
+    """Metadata-only parent-facing provenance; extracted values remain internal."""
 
-    category: Optional[str] = None
-    value_text: Optional[str] = None
     source_type: SourceType
     source_url: Optional[str] = None
-    display_url: Optional[str] = None
-    scraped_at: Optional[datetime] = None
     last_verified: Optional[datetime] = None
     confidence: Optional[SourceConfidence] = None
 
@@ -22,4 +18,4 @@ class FieldSourceBase(BaseModel):
 
 
 class FieldSourceResponse(FieldSourceBase):
-    id: int
+    pass
