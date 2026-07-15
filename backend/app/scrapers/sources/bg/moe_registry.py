@@ -639,12 +639,17 @@ class MoeRegistryAdapter(BaseSourceAdapter):
         result = await self.db.execute(
             select(School).where(
                 School.country_code == "bg",
-                School.city == "sofia",
                 School.institutional_id.isnot(None),
             )
         )
         for school in result.scalars().all():
-            attrs = school.attributes or {}
+            attrs = dict(school.attributes or {})
+            region_code = attrs.get("moe_region_code")
+            # The Sofia registry batch covers both Sofia-city and
+            # Sofia-oblast. Relabeled province rows must remain in this active
+            # reconciliation, while future imports for other regions must not.
+            if region_code not in {22, 23, "22", "23"} and (school.city or "").casefold() != "sofia":
+                continue
             instid = school.institutional_id
             if not instid:
                 continue

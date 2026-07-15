@@ -1,4 +1,6 @@
 """Tests for MoeRegistryAdapter."""
+from datetime import datetime, timezone
+
 import pytest
 from unittest.mock import AsyncMock, patch
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -598,6 +600,55 @@ class TestMoeRegistryAdapterUpsert:
         assert "(updated)" in school.name_i18n["bg"]
         assert school.city == "sofia"
         assert school.education_level == "upper_secondary"
+
+    async def test_active_flags_include_relabelled_sofia_oblast_rows(
+        self,
+        db_session: AsyncSession,
+    ):
+        from app.models import School
+
+        province = School(
+            institutional_id="230001",
+            name_i18n={"bg": "Province school"},
+            country_code="bg",
+            city="svoge",
+            school_type="state",
+            education_level="primary",
+            attributes={"moe_region_code": 23, "moe_registry_active": True},
+        )
+        other_region = School(
+            institutional_id="160001",
+            name_i18n={"bg": "Other region school"},
+            country_code="bg",
+            city="plovdiv",
+            school_type="state",
+            education_level="primary",
+            attributes={"moe_region_code": 16, "moe_registry_active": True},
+        )
+        legacy_sofia = School(
+            institutional_id="220001",
+            name_i18n={"bg": "Legacy Sofia school"},
+            country_code="bg",
+            city="sofia",
+            school_type="state",
+            education_level="primary",
+            attributes={"moe_registry_active": True},
+        )
+        db_session.add_all([province, other_region, legacy_sofia])
+        await db_session.commit()
+
+        adapter = MoeRegistryAdapter(db=db_session)
+        await adapter._update_active_flags(set(), datetime.now(timezone.utc))
+        await db_session.commit()
+        await db_session.refresh(province)
+        await db_session.refresh(other_region)
+        await db_session.refresh(legacy_sofia)
+
+        assert province.attributes["moe_registry_active"] is False
+        assert province.attributes["moe_registry_inactive_since"]
+        assert legacy_sofia.attributes["moe_registry_active"] is False
+        assert "moe_registry_inactive_since" in legacy_sofia.attributes
+        assert other_region.attributes == {"moe_region_code": 16, "moe_registry_active": True}
 
 
 class TestMoeRegistryAgeGroupExtraction:
