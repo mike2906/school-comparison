@@ -27,7 +27,10 @@ from app.utils.display_gating import (  # noqa: F401
     PRICING_CONFIDENCE_FLOOR,
     passes_pricing_gate,
     pricing_row_is_publishable,
+    summary_is_publishable,
 )
+from app.utils.i18n_resolver import resolve_display_name_i18n
+from app.utils.school_attributes import build_display_attributes
 from app.utils.website_data import website_data_is_publishable
 
 # Precision used to group coordinates when detecting shared/duplicate points.
@@ -125,13 +128,19 @@ def _website_validation_coverage(
     ok = 0
     for school in schools:
         attrs = _as_dict(school.attributes)
-        admission_info = _as_dict(school.admission_info)
+        website_only_attrs = {
+            key: attrs[key]
+            for key in ("extracted", "extracted_i18n", "data_validation")
+            if key in attrs
+        }
+        base, localized = build_display_attributes(website_only_attrs)
         has_website_data = any(
             (
-                _has_meaningful_value(attrs.get("extracted")),
-                _has_meaningful_value(attrs.get("display_name_i18n")),
-                _has_meaningful_value(admission_info.get("website_extracted")),
-                _has_meaningful_value(school.summary_i18n),
+                _has_meaningful_value(base),
+                _has_meaningful_value(localized),
+                _has_meaningful_value(resolve_display_name_i18n(attrs)),
+                summary_is_publishable(attrs)
+                and _has_meaningful_value(school.summary_i18n),
             )
         )
         if not has_website_data or not website_data_is_publishable(attrs, school.scrape_status):

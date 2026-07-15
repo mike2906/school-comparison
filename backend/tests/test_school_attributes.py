@@ -314,6 +314,9 @@ class TestLocalizedProjection:
                     "operations": {
                         "daily_schedule": [
                             "Учебни занятия до 15:00",
+                            "08:00 - 19:00",
+                            "Сесията включва три етапа - задачи, интервю и среща.",
+                            "- Самостоятелен Markdown bullet",
                             "* [Дневен режим](https://school324.test/schedule)",
                         ]
                     },
@@ -327,7 +330,11 @@ class TestLocalizedProjection:
         assert localized["language_focus"] == [
             {"language": "English", "level": "intensive"}
         ]
-        assert localized["daily_schedule"] == ["Учебни занятия до 15:00"]
+        assert localized["daily_schedule"] == [
+            "Учебни занятия до 15:00",
+            "08:00 - 19:00",
+            "Сесията включва три етапа - задачи, интервю и среща.",
+        ]
 
     def test_scraper_display_fields_are_declared_in_the_allowlist(self):
         projected_scraper_fields = {

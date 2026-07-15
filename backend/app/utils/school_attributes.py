@@ -99,10 +99,11 @@ _SCHOOL_HOURS_RANGE_RE = re.compile(
 _MARKDOWN_OR_URL_RE = re.compile(
     r"https?://|\b(?:www\.)?[\w.-]+\.(?:bg|com|org|net|edu)(?:/\S*)?|"
     r"!?\[[^\]]*\]\s*\([^)]*\)|(?:^|\s)#{1,6}\s|"
-    r"(?:^|\s)[*+\-]\s+|`{1,3}|\*\*|__|~~|"
+    r"`{1,3}|\*\*|__|~~|"
     r"(?:^|\s)\*[^*]+\*(?:\s|$)|(?:^|\s)_[^_]+_(?:\s|$)",
     re.IGNORECASE,
 )
+_MARKDOWN_LIST_MARKER_RE = re.compile(r"^\s*[*+\-]\s+")
 
 
 def _as_mapping(value: Any) -> dict[str, Any]:
@@ -127,7 +128,11 @@ def _normalize_text(value: Any) -> Optional[str]:
 def _publishable_display_text(value: Any) -> Optional[str]:
     """Normalize plain display text and reject Markdown or bare URLs globally."""
     text = _normalize_text(value)
-    if not text or _MARKDOWN_OR_URL_RE.search(text):
+    if (
+        not text
+        or _MARKDOWN_OR_URL_RE.search(text)
+        or _MARKDOWN_LIST_MARKER_RE.search(str(value))
+    ):
         return None
     return text
 

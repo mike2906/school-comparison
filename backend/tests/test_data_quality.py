@@ -38,9 +38,12 @@ async def quality_fixture(db_session):
         website_url="https://a.bg",
         scrape_status="extracted",
         attributes={
-            "extracted": {"languages": []},
+            "extracted": {"languages": [], "facilities": ["Library"]},
             "display_name_i18n": {"bg": "Бранд А"},
-            "display_name_evidence": {"status": "corroborated", "signals": ["x", "y"]},
+            "display_name_evidence": {
+                "status": "corroborated",
+                "signals": ["website_domain_alias_match", "repeated_on_page_identity"],
+            },
             "data_validation": {
                 "_schema_version": 1,
                 "status": "ok",
@@ -73,7 +76,7 @@ async def quality_fixture(db_session):
         website_url="https://b.bg",
         scrape_status="extracted",
         attributes={
-            "extracted": {"languages": []},
+            "extracted": {"languages": [], "programs": ["STEM"]},
             "display_name_i18n": {"bg": "Бранд Б"},
             "data_validation": {
                 "_schema_version": 1,
@@ -366,6 +369,64 @@ async def test_scraped_pricing_never_counts_as_publishable_website_data(db_sessi
         "ok": 0,
         "ok_pct": None,
         "published_without_report": 0,
+    }
+
+
+async def test_validation_coverage_tracks_launch_flags_and_public_projection(
+    db_session, monkeypatch
+):
+    from app.config import get_settings
+
+    await _make_school(
+        db_session,
+        scrape_status="summarized",
+        summary_i18n={"bg": {"short": "Кратко", "long": "Дълго"}},
+        attributes={"data_validation": {"_schema_version": 1, "status": "ok"}},
+    )
+    await _make_school(
+        db_session,
+        scrape_status="extracted",
+        attributes={
+            "extracted": {
+                "admission": {
+                    "deadlines": ["30 юни"],
+                    "application_steps": ["Internal-only child"],
+                }
+            }
+        },
+    )
+    await _make_school(
+        db_session,
+        scrape_status="extracted",
+        attributes={"extracted": {"contact": {"phone": "+359 2 000 0000"}}},
+    )
+    await db_session.commit()
+
+    settings = get_settings()
+    monkeypatch.setattr(settings, "publish_summaries", False)
+    monkeypatch.setattr(settings, "publish_website_admission_fields", False)
+    hidden = await compute_quality_metrics(db_session, country="bg", city="sofia")
+    assert hidden["website_validation_coverage"]["eligible"] == 0
+
+    monkeypatch.setattr(settings, "publish_summaries", True)
+    summary_enabled = await compute_quality_metrics(db_session, country="bg", city="sofia")
+    assert summary_enabled["website_validation_coverage"] == {
+        "eligible": 1,
+        "with_report": 1,
+        "coverage_pct": 100.0,
+        "ok": 1,
+        "ok_pct": 100.0,
+        "published_without_report": 0,
+    }
+    monkeypatch.setattr(settings, "publish_website_admission_fields", True)
+    admissions_enabled = await compute_quality_metrics(db_session, country="bg", city="sofia")
+    assert admissions_enabled["website_validation_coverage"] == {
+        "eligible": 2,
+        "with_report": 1,
+        "coverage_pct": 50.0,
+        "ok": 1,
+        "ok_pct": 50.0,
+        "published_without_report": 1,
     }
 
 
