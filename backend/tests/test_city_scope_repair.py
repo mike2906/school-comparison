@@ -124,6 +124,7 @@ async def test_candidate_sweep_includes_both_required_populations(db_session, tm
                 "type": "FeatureCollection",
                 "features": [
                     _feature("Province School", "СВОГЕ"),
+                    _feature("In-bounds Province School", "БОЖУРИЩЕ"),
                     _feature("Sofia School", "СТОЛИЧНА"),
                 ],
             }
@@ -146,6 +147,17 @@ async def test_candidate_sweep_includes_both_required_populations(db_session, tm
             school_type="state",
             education_level="primary",
         ),
+        School(
+            name_i18n={"bg": "In-bounds Province School"},
+            country_code="bg",
+            city="sofia",
+            school_type="state",
+            education_level="primary",
+            attributes={
+                "moe_municipality_name": "Божурище",
+                "moe_town_name": "Божурище",
+            },
+        ),
     ]
     db_session.add_all(schools)
     await db_session.flush()
@@ -163,6 +175,13 @@ async def test_candidate_sweep_includes_both_required_populations(db_session, tm
                 address_i18n={"bg": "гр. София, ул. Тест 1"},
                 is_primary=True,
             ),
+            SchoolLocation(
+                school_id=schools[2].id,
+                address_i18n={"bg": "гр. Божурище, ул. Тест 1"},
+                lat=42.75,
+                lng=23.20,
+                is_primary=True,
+            ),
         ]
     )
     await db_session.commit()
@@ -177,3 +196,5 @@ async def test_candidate_sweep_includes_both_required_populations(db_session, tm
     assert by_name["Province School"].target_city == "svoge"
     assert by_name["Sofia School"].population == "no_coordinates"
     assert by_name["Sofia School"].action == "keep sofia"
+    assert by_name["In-bounds Province School"].population == "municipality_hint"
+    assert by_name["In-bounds Province School"].target_city == "bozhurishte"

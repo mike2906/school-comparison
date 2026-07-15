@@ -59,6 +59,10 @@ def _school_population(school: School) -> Optional[str]:
         return "out_of_bounds"
     if not coordinate_pairs:
         return "no_coordinates"
+    attrs = school.attributes if isinstance(school.attributes, dict) else {}
+    municipality_hint = city_storage_value(attrs.get("moe_municipality_name"))
+    if municipality_hint and municipality_hint != "sofia":
+        return "municipality_hint"
     return None
 
 
@@ -147,7 +151,7 @@ def write_classification_report(
 
     population_counts = {
         population: sum(row.population == population for row in classifications)
-        for population in ("out_of_bounds", "no_coordinates")
+        for population in ("out_of_bounds", "no_coordinates", "municipality_hint")
     }
     action_counts = {
         "relabel": sum(row.target_city is not None for row in classifications),
@@ -160,7 +164,8 @@ def write_classification_report(
         f"Generated: `{timestamp}`",
         "",
         f"Populations: out-of-bounds={population_counts['out_of_bounds']}, "
-        f"no-coordinates={population_counts['no_coordinates']}",
+        f"no-coordinates={population_counts['no_coordinates']}, "
+        f"municipality-hint={population_counts['municipality_hint']}",
         "",
         f"Actions: relabel={action_counts['relabel']}, keep={action_counts['keep']}, "
         f"ambiguous={action_counts['ambiguous']}",
@@ -236,6 +241,9 @@ async def run_repair(
         "applied": apply,
         "out_of_bounds": counts["out_of_bounds"],
         "no_coordinates": counts["no_coordinates"],
+        "municipality_hint": sum(
+            row.population == "municipality_hint" for row in classifications
+        ),
         "classified": len(classifications),
         "relabeled": relabeled,
         "keep": sum(row.action == "keep sofia" for row in classifications),
