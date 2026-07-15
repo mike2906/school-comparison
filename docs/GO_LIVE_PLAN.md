@@ -869,10 +869,11 @@ enter the release path; that work continues on the post-launch enrichment track 
 this file), informed by the P2.10 model experiment.
 
 **Order:** P2.5 → P2.6/P2.7/P2.8 (independent, any order) → P2.9 boundary pilot →
-P2.10 model experiment → the still-open P2.4 items (spend guardrail, full refresh,
+P2.11 city-scope repair (from P2.9 run-1 findings) → P2.9 rerun → P2.10 model
+experiment → the still-open P2.4 items (spend guardrail, full refresh,
 audits/acceptance).
 
-- [ ] **P2.5 Close the two remaining publish-boundary bugs.**
+- [x] **P2.5 Close the two remaining publish-boundary bugs.**
       (a) **Provenance becomes metadata-only.** Detail/compare responses still expose raw
       `field_sources[].value_text` even when the corresponding field was rejected — run
       `9d2c837f` school 529 serves `9 students` through provenance while
@@ -887,7 +888,10 @@ audits/acceptance).
       *Verify:* API sweep of the 18-school cohort (list/detail/compare, both locales) finds
       no rejected value and no Markdown token anywhere; regression tests for the 529
       provenance case and the 324 schedule-link case.
-- [ ] **P2.6 Take generative summaries out of launch scope.** Add a launch-scope setting
+      **Done (PR #51, merged `c93c8d3`; Codex review clean).** Verified by P2.9 run 1:
+      209 provenance rows expose metadata only, school 529 rejected value and school 324
+      Markdown link absent from all payloads.
+- [x] **P2.6 Take generative summaries out of launch scope.** Add a launch-scope setting
       (e.g. `publish_summaries: bool = False` in `app/config.py`) enforced inside
       `display_gating.summary_is_publishable`, so serialization withholds every stored
       summary regardless of validation status. Keep generation/storage code intact for the
@@ -898,7 +902,8 @@ audits/acceptance).
       near-empty filler.
       *Verify:* with the flag off, no `summary_i18n` content in any list/detail/compare
       response; flag on restores the existing `ok`-only gate; UI regression.
-- [ ] **P2.7 Withhold website-derived admission fields.** The localized scraped admission
+      **Done (PR #51).** Verified by P2.9 run 1: zero summaries serialized.
+- [x] **P2.7 Withhold website-derived admission fields.** The localized scraped admission
       fields projected by P1.11 (`entry_requirements`, `application_deadlines`,
       `available_spots`) and every other `extracted.admission` child stop serializing,
       behind the same launch-scope settings group (e.g.
@@ -910,7 +915,9 @@ audits/acceptance).
       *Verify:* cohort responses contain no website-derived admission values in either
       locale; official admission data (points thresholds, status) still renders; tests
       cover flag on/off.
-- [ ] **P2.8 Publish curated pricing only.** Gate `SchoolPricingMixin` (and the scoreboard's
+      **Done (PR #51).** Verified by P2.9 run 1: zero website-derived admission fields
+      serialized; official admission data unaffected.
+- [x] **P2.8 Publish curated pricing only.** Gate `SchoolPricingMixin` (and the scoreboard's
       publishable-pricing predicate — keep parity) so only rows with `source='official'`
       (curated) serialize; `scraped_website` rows stay stored as curation candidates.
       Existing source_url/confidence/error-level gates still apply to curated rows. Add a
@@ -923,6 +930,9 @@ audits/acceptance).
       available".
       *Verify:* no `scraped_website` row in any API response; a curated row renders with
       its source badge; scoreboard counts publishable = curated and matches serialization.
+      **Done (PR #51).** Verified by P2.9 run 1: 0/39 stored scraped rows serialized;
+      gate/scoreboard/API parity confirmed; curation worklist written to
+      `backend/reports/curation/pricing-worklist.md`.
 - [ ] **P2.9 Boundary-focused pilot (launch configuration).** After P2.5–P2.8, rerun the
       same reviewed 18-school cohort on the **current cheap models** (the launch
       configuration — do not combine with the P2.10 model change). Acceptance is
@@ -932,6 +942,22 @@ audits/acceptance).
       100% eligible validation coverage, complete cost accounting. Explicitly out of
       scope: judging prose or extraction richness. If green, the full refresh may be
       approved (subject to the spend-guardrail item).
+      **Run 1 (2026-07-15, after PR #51 `c93c8d3`) — boundary clean; location repairs
+      required; rerun after P2.11.** Run `07ffb261-5cb7-42c8-85c9-47a8bb7b81b1`
+      ($0.028893; 172,229 input / 17,595 output tokens): every P2.5–P2.8 boundary
+      criterion passed — zero summaries, website-derived admission fields, or scraped
+      pricing rows serialized; provenance metadata-only including the school 529 rejected
+      value; no Markdown including the school 324 link; no internal keys; pricing
+      gate/scoreboard parity; 17/17 eligible validation coverage. The failures were
+      location-scope, not boundary: schools 440/454/460/570 are Sofia-*province* towns
+      (Svoge, Elin Pelin, Etropole, с. Осоица) mislabeled `city='sofia'` — dataset-wide,
+      65 sofia-labeled schools have coordinates outside the gate bbox — school 233 (real
+      Sofia, ж.к. Дружба) lacks coordinates (76 sofia-labeled schools have none), and
+      precision-metadata 0/17 is a sequencing artifact (legacy coordinates predate P1.3;
+      P2.11(c) performs the regeocode). Evidence:
+      `backend/reports/pilot/07ffb261-5cb7-42c8-85c9-47a8bb7b81b1/acceptance.md`.
+      The rerun after P2.11 uses the regenerated cohort, and precision-metadata coverage
+      is then fully in scope.
 - [ ] **P2.10 Model-capability experiment (informs the refresh and the enrichment track;
       NOT a launch gate).** Question to answer: is the semantic long tail a
       model-capability ceiling or an architecture ceiling — and which extraction model
@@ -964,6 +990,41 @@ audits/acceptance).
       *Verify:* a short findings note (which model, blocker-list pass/fail per case, cost
       per run) recorded in this file under the enrichment track; the refresh item above
       references the chosen model.
+- [ ] **P2.11 City-scope repair + import gate, then cohort regeocode.** (From P2.9 run 1.
+      Executes between P2.9 run 1 and the P2.9 rerun — see the Order line above.) The
+      registry import stamped `city='sofia'` onto Sofia-*province* schools: 65
+      sofia-labeled schools have coordinates outside the gate bbox
+      (`SOFIA_MUNICIPALITY_BOUNDS` in `app/services/geocoding/bounds.py`) with addresses
+      in Botevgrad, Samokov, Pirdop, Svoge, Elin Pelin, Etropole, Dragoman, Godech,
+      Zlatitsa, Slivnitsa, and villages; some of the 76 sofia-labeled schools *without*
+      coordinates are also province (570, с. Осоица). Their coordinates are mostly
+      correct — the label is wrong. **Decision (user-approved 2026-07-15): relabel to the
+      real city, don't delete** — these schools leave Sofia MVP scope but stay in the DB
+      for the multi-city expansion.
+      (a) **Data repair:** derive each school's real city from its address/municipality
+      using the GeoJSON admin dataset (read `skills/geocoding/SKILL.md` first — Sofia is
+      СТОЛИЧНА, and province/municipality naming has landmines). Classify by
+      address/municipality, never by coordinates alone. Sweep BOTH populations: the 65
+      out-of-bbox schools and the 76 no-coordinate schools (each is either real Sofia →
+      keep and geocode, or province → relabel). Write the classification table to
+      `backend/reports/scope-repair/<timestamp>/classification.md` before mutating, and
+      store the repair as a reviewable script, not ad-hoc SQL.
+      (b) **Import gate (standing rule — a repair may only merge with the gate that makes
+      it unnecessary):** the registry adapter derives `city` from the record's own
+      municipality/settlement field, never from the import batch scope. Regression: a
+      province record imported in a "sofia"-scoped run gets its real city.
+      (c) **Cohort regeocode:** after relabeling, run the corrected force-regeocode
+      (P2.4 tooling, `scripts/geocode_locations.py`) over Sofia scope so every geocoded
+      location carries precision metadata and gaps like school 233 (ж.к. Дружба) resolve;
+      the write gate NULLs what it cannot support.
+      (d) **Cohort + projection refresh:** regenerate the reviewed 18-school pilot cohort
+      with the same stratification (440/454/460/570 leave Sofia scope) and recompute the
+      full-refresh cohort size and cost projection (was 474 website URLs; will shrink).
+      *Verify:* audits show zero sofia-labeled out-of-bounds coordinates; 100%
+      precision-metadata coverage among sofia geocoded locations; school 233 has
+      coordinates or a documented rejection; relabeled schools absent from Sofia
+      list/map but present in the DB; import regression green. Then rerun P2.9 with the
+      regenerated cohort.
 
 ## Phase 3 — Go live
 
