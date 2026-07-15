@@ -91,6 +91,20 @@ class TestMoeRegistryAdapterMappings:
             town_name="Банкя",
         ) == "sofia"
 
+    def test_sofia_city_partial_lookup_keeps_bankya_in_sofia_scope(self):
+        assert MoeRegistryAdapter._derive_record_city(
+            region_code=MoeRegistryAdapter.SOFIA_CITY_REGION,
+            municipality_name=None,
+            town_name="Банкя",
+        ) == "sofia"
+
+    def test_sofia_oblast_partial_lookup_uses_the_record_settlement(self):
+        assert MoeRegistryAdapter._derive_record_city(
+            region_code=MoeRegistryAdapter.SOFIA_OBLAST_REGION,
+            municipality_name=None,
+            town_name="Своге",
+        ) == "svoge"
+
 
 @pytest.mark.asyncio
 class TestMoeRegistryAdapterIntegration:

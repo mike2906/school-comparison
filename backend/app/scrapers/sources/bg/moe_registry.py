@@ -243,8 +243,13 @@ class MoeRegistryAdapter(BaseSourceAdapter):
         """Derive city from this registry record, never from the import scope."""
         settlement_city = city_storage_value(town_name)
         municipality_city = city_storage_value(municipality_name)
+        # Region 22 is Sofia-city (Stolichna municipality), including Bankya
+        # and its other settlements. Keep it in Sofia scope even if the
+        # municipality lookup failed while the independent town lookup worked.
+        if region_code == cls.SOFIA_CITY_REGION:
+            return "sofia"
         # Bankya and other settlements inside Stolichna municipality remain in
-        # Sofia scope even when the record's settlement is not named Sofia.
+        # Sofia scope when the municipality label is available.
         if municipality_city == "sofia":
             return "sofia"
         if settlement_city:
@@ -252,9 +257,7 @@ class MoeRegistryAdapter(BaseSourceAdapter):
         if municipality_city:
             return municipality_city
         # Missing lookup labels must not cause Sofia-oblast rows to inherit the
-        # Sofia batch scope. Only Sofia-city has a safe region-level fallback.
-        if region_code == cls.SOFIA_CITY_REGION:
-            return "sofia"
+        # Sofia batch scope.
         return None
 
     @staticmethod
