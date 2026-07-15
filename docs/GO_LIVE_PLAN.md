@@ -15,6 +15,9 @@ that makes it unnecessary for future runs. No more compensating transactions.
 
 **Definition of "live":** deployed, Sofia data passing the quality gates, README
 presentable, CI green. Not: TypeScript migration, multi-country polish, dashboards.
+**Revised 2026-07-15:** launch is deliberately sparse and fail-closed — generative
+summaries, website-derived admission fields, and scraped pricing are out of launch scope.
+See "Launch-scope revision (2026-07-15)" at the end of Phase 2.
 
 ---
 
@@ -688,7 +691,7 @@ will need to be repeated.
 
             Manual semantic review nevertheless found release blockers below, so the next full-
             refresh checkbox remains unauthorized.
-      - [ ] **Fail stale and semantically unsupported pricing closed, then repeat the pilot.**
+      - [x] **Fail stale and semantically unsupported pricing closed, then repeat the pilot.**
             School 570 still publishes old 2024/2025 food/activity values beside 2026/2027 fees,
             converts explicitly monthly tuition to yearly, invents yearly periods for unlabeled
             transport, and labels foreign-language books as extracurricular. School 506 publishes
@@ -707,7 +710,10 @@ will need to be repeated.
             zero stale prices, explicit monthly tuition and materials survive, and activities with
             distinct plan names are not collapsed. This remains unchecked because the fresh repeat
             exposed new heading/entity-association failures below.
-      - [ ] **Preserve or supersede actionable spot-check gates safely.** Fresh deterministic
+            **Superseded 2026-07-15.** The merged staleness/penalty/duplicate rules stay; the
+            residual heading/entity failures leave the release path via **P2.8** (curated-only
+            pricing at launch).
+      - [x] **Preserve or supersede actionable spot-check gates safely.** Fresh deterministic
             validation replaces the complete `data_validation` payload, so an unsampled school can
             lose its earlier actionable spot-check withholding. School 529 consequently republishes
             unsupported `class_size=9`; a grade-9 news reference satisfied the current loose numeric
@@ -720,7 +726,9 @@ will need to be repeated.
             45 seconds. All ten repeat-run spot checks completed. This remains unchecked because
             provenance still exposes rejected `FieldSource.value_text` values, including school
             529's withheld `9 students`, through detail/compare responses.
-      - [ ] **Tighten admission-field semantic validation before publication.** The `ok` reports
+            **Rescoped 2026-07-15.** The gate-preservation and timeout work is done; the one
+            remaining failure (the `value_text` provenance leak) is now tracked as **P2.5a**.
+      - [x] **Tighten admission-field semantic validation before publication.** The `ok` reports
             still permit a 2020 procurement deadline (103), navigation labels/links as available
             places or entry requirements (324), a Markdown image URL as an application deadline
             (404), stale 2025/2026 admission text (570), and incomplete deadline fragments (153).
@@ -732,7 +740,11 @@ will need to be repeated.
             failures no longer publish. This remains unchecked because the repeat still publishes
             fragmented admission children and a misclassified interview requirement (details
             below), and a Markdown daily-schedule link bypasses the admission-specific filter.
-      - [ ] **Make summary inputs and outputs obey the publish boundary.** Summarization still passes
+            **Superseded 2026-07-15.** The residual failures are removed from the release path by
+            **P2.7** (website-derived admission fields withheld at launch) and **P2.5b** (general
+            Markdown sanitizer). The merged PR #48 validation rules stay. Further admission
+            semantic work moves to the post-launch enrichment track.
+      - [x] **Make summary inputs and outputs obey the publish boundary.** Summarization still passes
             uncorroborated display-name candidates even though API name resolution rejects them,
             trusts the import scope `city=sofia` over the primary location, and has no semantic
             post-generation gate. The repeat produced misidentified schools (153/529), false Sofia
@@ -746,6 +758,9 @@ will need to be repeated.
             Svoge, Elin Pelin, Etropole, and Osoitsa for schools 440/454/460/570. This remains
             unchecked because the output gate still accepts the semantic/presentation failures
             documented below.
+            **Superseded 2026-07-15.** The merged identity/locality fixes stay; summaries are out
+            of launch scope entirely (**P2.6**), so the remaining output-quality gap is no longer
+            a release blocker.
       - [x] **Repeat the reviewed 18-school cohort after the PR #48 blocker pass.** Preflight
             used clean `main` at `2efaea9`, healthy Postgres at Alembic head `6cb27777e0d2`, the
             checksum-valid 9.2 MB backup/110-entry restore manifest, and the unchanged reviewed
@@ -772,7 +787,7 @@ will need to be repeated.
             **Recommendation: no-go for the full refresh.** Perfect stage/validator counts and zero
             source/confidence gate failures do not establish semantic correctness. Manual stored,
             source-page, list/detail/compare, and summary review found the blockers below.
-      - [ ] **Fix fresh pricing heading/entity association, then repeat the cohort.** School 538
+      - [x] **Fix fresh pricing heading/entity association, then repeat the cohort.** School 538
             publishes nursery tuition EUR 580 and after-hours care EUR 26 as transport; EUR 160 is
             the actual transport fee. School 570 publishes EUR 300 supplies, EUR 1,000 deposit, and
             EUR 850 monthly tuition as registration, plus EUR 180 meals as tuition. School 153
@@ -781,7 +796,12 @@ will need to be repeated.
             correctly classified, but omitted mandatory capital fees understate the total cost.
             Add fresh-page regressions and reject rows whose heading/entity/plan association cannot
             be retained. The scoreboard's 0/234 gate failures currently misses these errors.
-      - [ ] **Close provenance and localized-field publish bypasses.** Detail/compare expose raw
+            **Superseded 2026-07-15 (not implemented).** Scraped pricing no longer publishes at
+            launch — P2.8 gates the API to curated rows only, which removes these failures from
+            the release path without another extraction iteration. The PR #48 pricing regressions
+            stay merged. Heading/entity association work moves to the post-launch enrichment
+            track, informed by the P2.10 model experiment.
+      - [x] **Close provenance and localized-field publish bypasses.** Detail/compare expose raw
             `field_sources[].value_text` even when the corresponding field was rejected (school 529
             publishes `9 students` through provenance while `attributes.class_size` is null; the
             cohort has several analogous guesses). Remove raw values from the parent-facing schema
@@ -790,26 +810,160 @@ will need to be repeated.
             split interview fragments, and 506 splits self-care text and misclassifies a possible
             placement-test/interview requirement as an application deadline. Apply the general
             projection sanitizer to school 324's Markdown daily-schedule link as well.
-      - [ ] **Make summary persistence parent-ready, not merely schema-valid.** Manual review passed
+            **Rescoped 2026-07-15.** The `value_text` provenance leak and the Markdown sanitizer
+            gap are genuine boundary bugs and remain launch blockers — now tracked as **P2.5**.
+            The fragmented-admission coalescing (103/105/153/506) is mooted for launch by
+            **P2.7** (website-derived admission fields are withheld) and moves to the
+            post-launch enrichment track.
+      - [x] **Make summary persistence parent-ready, not merely schema-valid.** Manual review passed
             only 6/18 summaries (105, 440, 454, 460, 516, 570). The other 12 include identity/entity
             collisions (153/529), testimonial or marketing prose (506/610/631), unsupported
             negatives (233/584), stale relative claims (404), mistranslation/unstable operational
             details (538), or raw/generic extraction artifacts (103/297/324). Extend deterministic
             input cleanup and semantic output validation; clear/downgrade these failures, then
             inspect every regenerated cohort summary before scale-up.
+            **Superseded 2026-07-15 (not implemented).** Generative summaries are out of launch
+            scope — **P2.6** withholds them globally at serialization. A 6/18 manual pass rate
+            after three fix iterations is a model-capability signal, not a bug list;
+            parent-readiness work moves to the post-launch enrichment track and depends on the
+            P2.10 model experiment.
       - [ ] **Set an OpenRouter spend guardrail (or explicitly approve operating without one).**
             The projected refresh is affordable, but the active key reports `limit=null`; record a
             cap with headroom before treating the cost-control precondition as met.
-      - [ ] If the pilot is clean, run the full Sofia website refresh once, then run the
-            corrected force-regeocode process. NVO remains independent and must not be
-            refreshed as part of `all` unless a separate NVO audit calls for it.
+      - [ ] If the boundary pilot (P2.9) is clean and the P2.10 model decision is recorded,
+            run the full Sofia website refresh once, using the extraction model selected in
+            P2.10 and with the summarize stage skipped (summaries are out of launch scope —
+            don't pay for prose nobody sees). Then run the corrected force-regeocode process.
+            NVO remains independent and must not be refreshed as part of `all` unless a
+            separate NVO audit calls for it.
       - [ ] Re-run audits and the scoreboard, triage failures, and targeted-rerun only the
-            affected schools. Launch acceptance: 100% validation-report coverage among
-            schools with publishable website-derived data and zero such schools without a report; summaries
-            published only for `ok`; 100% precision-metadata coverage for geocoded locations;
-            no unexplained duplicate/out-of-bounds coordinates; no internal API keys;
-            pricing gate/scoreboard parity; and a representative spot-check sample with all
-            actionable discrepancies resolved or withheld.
+            affected schools. **Launch acceptance (revised 2026-07-15 — boundary-only, no
+            prose-quality judgment):** 100% validation-report coverage among schools with
+            publishable website-derived data and zero such schools without a report; zero
+            summaries serialized (P2.6 flag off); zero website-derived admission fields
+            serialized (P2.7); only curated pricing serialized, each row with source_url and
+            verification date (P2.8); no rejected value reachable via provenance and no raw
+            `value_text` in responses (P2.5); no Markdown syntax in published display fields;
+            100% precision-metadata coverage for geocoded locations; no unexplained
+            duplicate/out-of-bounds coordinates; no internal API keys; pricing gate/scoreboard
+            parity; and a representative spot-check sample with all actionable discrepancies
+            resolved or withheld.
+
+### Launch-scope revision (2026-07-15) — sparse, fail-closed launch
+
+**Decision.** Two repeat pilots (`a6d78e0c…`, `9d2c837f…`) passed every structural gate and
+every stage, and each still failed manual semantic review with a *new* class of LLM
+misjudgment (first category/period errors, then heading/entity association, identity
+collisions, promotional prose). That is a long tail, not a converging bug list: the
+cheap-tier models cannot be gated into publication-quality semantics across arbitrary
+school websites, and manual review of every cohort does not scale to 474 schools. Phase 1
+did its job — failures now stop at the reviewer instead of reaching parents. The mistake
+was keeping LLM semantic quality as a go-live criterion.
+
+**Launch scope (published):** map + locations, filters, official NVO results,
+official/curated `admission_info`, manually curated pricing, registry/corroborated names.
+**Out of launch scope (stored internally, never serialized):** generative summaries,
+website-derived admission fields, scraped pricing rows, raw provenance values. Once
+P2.5–P2.8 land, the public boundary is **frozen** — no further extraction-semantics fixes
+enter the release path; that work continues on the post-launch enrichment track (end of
+this file), informed by the P2.10 model experiment.
+
+**Order:** P2.5 → P2.6/P2.7/P2.8 (independent, any order) → P2.9 boundary pilot →
+P2.10 model experiment → the still-open P2.4 items (spend guardrail, full refresh,
+audits/acceptance).
+
+- [ ] **P2.5 Close the two remaining publish-boundary bugs.**
+      (a) **Provenance becomes metadata-only.** Detail/compare responses still expose raw
+      `field_sources[].value_text` even when the corresponding field was rejected — run
+      `9d2c837f` school 529 serves `9 students` through provenance while
+      `attributes.class_size` is correctly withheld. Remove `value_text` (and any other
+      value-bearing field) from the parent-facing provenance schema entirely; publish only
+      source URL, source type, verification date, and confidence. Do not try to field-gate
+      the value — provenance must never be a second route around field validation.
+      (b) **General Markdown/URL sanitizer.** Run `9d2c837f` school 324 publishes a Markdown
+      daily-schedule link because the Markdown filter is admission-specific. Move it into
+      the shared projection layer (`app/utils/school_attributes.py`) so no Markdown
+      syntax or bare URL publishes through *any* localized display field.
+      *Verify:* API sweep of the 18-school cohort (list/detail/compare, both locales) finds
+      no rejected value and no Markdown token anywhere; regression tests for the 529
+      provenance case and the 324 schedule-link case.
+- [ ] **P2.6 Take generative summaries out of launch scope.** Add a launch-scope setting
+      (e.g. `publish_summaries: bool = False` in `app/config.py`) enforced inside
+      `display_gating.summary_is_publishable`, so serialization withholds every stored
+      summary regardless of validation status. Keep generation/storage code intact for the
+      enrichment track, but the release refresh runs with the summarize stage skipped.
+      Check the frontend renders summary-less schools without empty sections or layout
+      gaps (card, detail, compare). Do NOT build deterministic text-assembly fallback
+      summaries — with admissions and scraped fields also withheld they would be
+      near-empty filler.
+      *Verify:* with the flag off, no `summary_i18n` content in any list/detail/compare
+      response; flag on restores the existing `ok`-only gate; UI regression.
+- [ ] **P2.7 Withhold website-derived admission fields.** The localized scraped admission
+      fields projected by P1.11 (`entry_requirements`, `application_deadlines`,
+      `available_spots`) and every other `extracted.admission` child stop serializing,
+      behind the same launch-scope settings group (e.g.
+      `publish_website_admission_fields: bool = False`). The official/curated
+      `admission_info` projection from P1.15 is untouched and continues to publish. The
+      extracted data stays stored in `attributes` for the enrichment track. This removes
+      the fragmented-phrase and misclassified-requirement failures (103/105/153/506) from
+      the release path.
+      *Verify:* cohort responses contain no website-derived admission values in either
+      locale; official admission data (points thresholds, status) still renders; tests
+      cover flag on/off.
+- [ ] **P2.8 Publish curated pricing only.** Gate `SchoolPricingMixin` (and the scoreboard's
+      publishable-pricing predicate — keep parity) so only rows with `source='official'`
+      (curated) serialize; `scraped_website` rows stay stored as curation candidates.
+      Existing source_url/confidence/error-level gates still apply to curated rows. Add a
+      lightweight curation path: a script or documented manual process that records
+      school, category, amount, currency, period, age_group, `source_url`, and a
+      verification date, writing `source='official'`. Launch slice: the 57 schools that
+      currently have scraped rows — surface those rows (school, page URL, extracted values)
+      as a human-verification worklist; the full 175 private + 3 international schools are
+      post-launch work. Sparse is acceptable; the UI already displays "pricing not
+      available".
+      *Verify:* no `scraped_website` row in any API response; a curated row renders with
+      its source badge; scoreboard counts publishable = curated and matches serialization.
+- [ ] **P2.9 Boundary-focused pilot (launch configuration).** After P2.5–P2.8, rerun the
+      same reviewed 18-school cohort on the **current cheap models** (the launch
+      configuration — do not combine with the P2.10 model change). Acceptance is
+      boundary-only, per the revised launch-acceptance list above: zero internal/raw/
+      rejected-value leakage including provenance, zero summaries, zero website-derived
+      admission fields, zero scraped pricing, clean names/locations/filters/NVO/API checks,
+      100% eligible validation coverage, complete cost accounting. Explicitly out of
+      scope: judging prose or extraction richness. If green, the full refresh may be
+      approved (subject to the spend-guardrail item).
+- [ ] **P2.10 Model-capability experiment (informs the refresh and the enrichment track;
+      NOT a launch gate).** Question to answer: is the semantic long tail a
+      model-capability ceiling or an architecture ceiling — and which extraction model
+      should power the one-time full refresh? All runs reuse the same 18-school cohort
+      tooling; model tiers are configuration. OpenRouter prices checked live 2026-07-15
+      (per M input/output).
+      (a) **Ceiling run:** rerun the cohort with a frontier model as the extraction tier —
+      `google/gemini-2.5-pro` or `openai/gpt-5.1` ($1.25/$10; ≈$0.40 per cohort run).
+      Include summarize (evaluation only — summaries stay unpublished). Compare stored
+      outputs against the documented `9d2c837f` blocker list: 538 transport/tuition
+      association, 570 registration/deposit/meals headings, 153 combined Uwekind page
+      entity association, admission fragments (103/105/153/506), summary identity/tone
+      failures. The human review pass against that checklist is the user's step.
+      If the frontier model fails the same associations → the architecture is the
+      ceiling; stop here, run the refresh on the current cheap tier, and the enrichment
+      track becomes curation-first.
+      (b) **Value run (only if (a) passes):** `deepseek/deepseek-v3.2` ($0.269/$0.40;
+      ≈$0.06 per cohort run; ≈$1.50 full-refresh projection). Alternates if it
+      disappoints: `z-ai/glm-4.7` ($0.40/$1.75), `moonshotai/kimi-k2.5` ($0.57/$2.85).
+      Pick the cheapest model that reproduces the frontier's correct behavior on the
+      blocker list; that model powers the full refresh.
+      (c) **Regardless of outcome:** upgrade the spot-check (capable) tier from
+      `openai/gpt-4o-mini` ($0.15/$0.60) to `deepseek/deepseek-v3.2` — roughly
+      price-neutral, and the auditor should be smarter than the extractor.
+      Caveats: pin OpenRouter provider routing / use `require_parameters` so PydanticAI
+      structured output is honored, and watch the first run for schema-validation retries
+      (they surface as extra cost and silently missing fields, not errors). Chinese models
+      read Bulgarian better than they write it — retest Bulgarian *generation* before ever
+      re-enabling summaries on one.
+      *Verify:* a short findings note (which model, blocker-list pass/fail per case, cost
+      per run) recorded in this file under the enrichment track; the refresh item above
+      references the chosen model.
 
 ## Phase 3 — Go live
 
@@ -827,8 +981,10 @@ will need to be repeated.
 - [ ] **P3.4 ARCHITECTURE.md** on the LLM pipeline: structured extraction with
       PydanticAI, validation gates, evidence checks, spot-checking, per-field
       provenance, cost/timeout tuning. This is the portfolio differentiator.
-- [ ] **P3.5 Prompt-injection guard for summaries** (pre-launch): flag summaries
-      containing URLs, phone numbers not in source, or promotional anomalies.
+- [ ] **P3.5 Prompt-injection guard for summaries**: flag summaries containing URLs,
+      phone numbers not in source, or promotional anomalies. *No longer pre-launch*
+      (summaries are out of launch scope per the 2026-07-15 revision) — required before
+      E2 ever re-enables summary publication.
 
 ## Phase 4 — Post-live / portfolio polish (parallelizable, low risk)
 
@@ -845,6 +1001,31 @@ will need to be repeated.
 - [ ] **P4.6 Tests for `/schools/filters`** and `SchoolService.list_schools_filtered`
       attribute matching.
 - [ ] **P4.7 TypeScript** for new frontend files (optional; market signal, not product).
+
+## Post-launch enrichment track (unblocked by launch; sequenced by P2.10's outcome)
+
+Semantic-richness work moved off the release path by the 2026-07-15 launch-scope
+revision. None of this may widen the public boundary without a reviewed pilot.
+
+- [ ] **E1 Rich scraped pricing.** Publish a scraped price only when all semantics are
+      explicit: identifiable school/entity, category stated in the same heading/row,
+      explicit period, plan/age applicability retained where the page distinguishes them,
+      current academic year where supplied, no category coercion (deposit ≠ registration).
+      Ambiguous groups are withheld whole. Carries the 538/570/153 heading/entity
+      regressions. If P2.10(b) found a passing value model, re-extract with it first —
+      the gate work may shrink dramatically.
+- [ ] **E2 Generative summaries.** Re-enable behind the P2.6 flag only after: the P2.10
+      winner (or better) generates them, deterministic input cleanup + semantic output
+      validation cover the 12 documented failure modes (identity collisions, marketing
+      prose, unsupported negatives, stale claims, mistranslation, raw artifacts), and a
+      full regenerated cohort passes manual parent-readiness review. Bulgarian generation
+      quality must be re-tested per model. P3.5 (prompt-injection guard) applies before
+      any summary publishes.
+- [ ] **E3 Website-derived admission fields.** Re-enable behind the P2.7 flag after
+      fragment coalescing/classification is reliable (103/105/153/506 cases as
+      regressions).
+- [ ] **E4 Finish pricing curation** beyond the launch slice: remaining private/
+      international schools (178 total), using scraped rows as verification candidates.
 
 ## Explicitly deferred (from the reviews' "don't do yet" list)
 
