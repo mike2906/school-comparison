@@ -23,6 +23,7 @@ from app.utils.display_gating import (
     blocked_display_fields,
     iter_blocking_field_paths,
     passes_pricing_gate,
+    pricing_row_is_publishable,
     summary_is_publishable,
 )
 from app.utils.school_attributes import build_filterable_attributes
@@ -122,7 +123,12 @@ def test_filter_projection_drops_validation_flagged_field():
     assert filterable["special_programs"] == ["sports_program"]
 
 
-def test_summary_publishable_requires_an_ok_report():
+def test_summary_publishable_requires_flag_and_an_ok_report(monkeypatch):
+    settings = validator_module.get_settings()
+    monkeypatch.setattr(settings, "publish_summaries", False)
+    assert summary_is_publishable({"data_validation": {"status": "ok"}}) is False
+
+    monkeypatch.setattr(settings, "publish_summaries", True)
     assert summary_is_publishable({}) is False
     assert summary_is_publishable({"data_validation": {}}) is False
     assert summary_is_publishable(None) is False
@@ -130,7 +136,8 @@ def test_summary_publishable_requires_an_ok_report():
     assert summary_is_publishable({"data_validation": {"status": "needs_review"}}) is False
 
 
-def test_summary_publishable_rejects_actionable_spot_check_even_when_status_is_ok():
+def test_summary_publishable_rejects_actionable_spot_check_even_when_status_is_ok(monkeypatch):
+    monkeypatch.setattr(validator_module.get_settings(), "publish_summaries", True)
     attributes = {
         "data_validation": {
             "status": "ok",
@@ -175,6 +182,33 @@ def test_pricing_gate_requires_a_source_and_context():
     assert passes_pricing_gate("https://example.com/fees", None) is False
 
 
+@pytest.mark.parametrize(
+    ("source", "expected"),
+    [
+        (PriceSource.OFFICIAL, True),
+        ("official", True),
+        (PriceSource.SCRAPED_WEBSITE, False),
+        ("scraped_website", False),
+        (None, False),
+    ],
+)
+def test_launch_pricing_gate_publishes_only_curated_rows(source, expected):
+    assert pricing_row_is_publishable(
+        source,
+        "https://example.com/fees",
+        {"confidence": 0.9},
+    ) is expected
+
+
+def test_launch_pricing_gate_keeps_existing_fail_closed_checks_for_curated_rows():
+    assert pricing_row_is_publishable(PriceSource.OFFICIAL, None, {"confidence": 0.9}) is False
+    assert pricing_row_is_publishable(
+        PriceSource.OFFICIAL,
+        "https://example.com/fees",
+        {"confidence": 0.69},
+    ) is False
+
+
 @pytest.mark.asyncio
 async def test_real_validator_error_gates_pricing_row_and_summary(db_session):
     """End-to-end: a real `validate_school_data` run drives the serialization gate.
@@ -209,7 +243,7 @@ async def test_real_validator_error_gates_pricing_row_and_summary(db_session):
         amount=500,
         currency="BGN",
         period="monthly",
-        source=PriceSource.SCRAPED_WEBSITE,
+        source=PriceSource.OFFICIAL,
         source_url="https://example.com/fees",
         pricing_context={"confidence": 0.9},
     )
@@ -244,7 +278,7 @@ async def test_real_validator_error_gates_pricing_row_and_summary(db_session):
 
     payload = SchoolResponse.model_validate(loaded).model_dump()
 
-    # The validator-flagged (negative) row is withheld; the clean row survives.
+    # The validator-flagged (negative) row is withheld; the clean curated row survives.
     assert [row["category"] for row in payload["pricing"]] == ["tuition"]
     # needs_review withholds the stored whole-school summary too.
     assert payload["summary_i18n"] is None

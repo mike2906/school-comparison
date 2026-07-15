@@ -24,6 +24,7 @@ from __future__ import annotations
 import re
 from typing import Any, Iterable, Mapping, Optional, Union
 
+from app.config import get_settings
 from app.utils.display_gating import (
     admission_value_is_semantically_valid,
     blocked_display_fields,
@@ -95,6 +96,14 @@ _SCHOOL_HOURS_RANGE_RE = re.compile(
     r"([01]?\d|2[0-3])[:.]([0-5]\d)(?!\d)",
     re.IGNORECASE,
 )
+_MARKDOWN_OR_URL_RE = re.compile(
+    r"https?://|\b(?:www\.)?[\w.-]+\.(?:bg|com|org|net|edu)(?:/\S*)?|"
+    r"!?\[[^\]]*\]\s*\([^)]*\)|(?:^|\s)#{1,6}\s|"
+    r"`{1,3}|\*\*|__|~~|"
+    r"(?:^|\s)\*[^*]+\*(?:\s|$)|(?:^|\s)_[^_]+_(?:\s|$)",
+    re.IGNORECASE,
+)
+_MARKDOWN_LIST_MARKER_RE = re.compile(r"^\s*[*+\-]\s+")
 
 
 def _as_mapping(value: Any) -> dict[str, Any]:
@@ -114,6 +123,18 @@ def _normalize_text(value: Any) -> Optional[str]:
         return None
     text = _WHITESPACE_RE.sub(" ", str(value)).strip()
     return text or None
+
+
+def _publishable_display_text(value: Any) -> Optional[str]:
+    """Normalize plain display text and reject Markdown or bare URLs globally."""
+    text = _normalize_text(value)
+    if (
+        not text
+        or _MARKDOWN_OR_URL_RE.search(text)
+        or _MARKDOWN_LIST_MARKER_RE.search(str(value))
+    ):
+        return None
+    return text
 
 
 def _normalize_language_level(value: Any) -> Optional[str]:
@@ -346,6 +367,9 @@ def build_localized_attributes(
             if admission_value_is_semantically_valid(field_name, value)
         ]
 
+    if not get_settings().publish_website_admission_fields:
+        admission = {}
+
     resolved = {
         "language_focus": focus,
         "languages_of_instruction": _merged_list(
@@ -370,6 +394,23 @@ def build_localized_attributes(
     for field in blocked:
         if field in resolved:
             resolved[field] = []
+    resolved["language_focus"] = [
+        entry
+        for entry in resolved["language_focus"]
+        if _publishable_display_text(entry.get("language"))
+        and (
+            entry.get("level") is None
+            or _publishable_display_text(entry.get("level"))
+        )
+    ]
+    for field, values in resolved.items():
+        if field == "language_focus":
+            continue
+        resolved[field] = [
+            text
+            for value in values
+            if (text := _publishable_display_text(value)) is not None
+        ]
     return resolved
 
 

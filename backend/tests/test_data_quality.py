@@ -7,6 +7,7 @@ import pytest
 from app.models.pipeline_run import PipelineStatus
 from app.models.pricing import PriceCategory, PricePeriod, PriceSource, Pricing
 from app.models.school import School, SchoolLocation
+from app.schemas.school import SchoolListResponse
 from app.services.data_quality import compute_quality_metrics
 from app.services.pipeline_runs import _aggregate_usage, finalize_pipeline_run, start_pipeline_run
 
@@ -37,9 +38,12 @@ async def quality_fixture(db_session):
         website_url="https://a.bg",
         scrape_status="extracted",
         attributes={
-            "extracted": {"languages": []},
+            "extracted": {"languages": [], "facilities": ["Library"]},
             "display_name_i18n": {"bg": "Бранд А"},
-            "display_name_evidence": {"status": "corroborated", "signals": ["x", "y"]},
+            "display_name_evidence": {
+                "status": "corroborated",
+                "signals": ["website_domain_alias_match", "repeated_on_page_identity"],
+            },
             "data_validation": {
                 "_schema_version": 1,
                 "status": "ok",
@@ -53,7 +57,7 @@ async def quality_fixture(db_session):
     db_session.add(
         Pricing(
             school_id=a.id, category=PriceCategory.TUITION, period=PricePeriod.MONTHLY,
-            amount=500, source=PriceSource.SCRAPED_WEBSITE, source_url="https://a.bg/fees",
+            amount=500, source=PriceSource.OFFICIAL, source_url="https://a.bg/fees",
             pricing_context={"confidence": 0.9},
         )
     )
@@ -72,7 +76,7 @@ async def quality_fixture(db_session):
         website_url="https://b.bg",
         scrape_status="extracted",
         attributes={
-            "extracted": {"languages": []},
+            "extracted": {"languages": [], "programs": ["STEM"]},
             "display_name_i18n": {"bg": "Бранд Б"},
             "data_validation": {
                 "_schema_version": 1,
@@ -136,7 +140,12 @@ async def test_metrics_cover_all_six(quality_fixture):
         "conversion_pct": 50.0,
     }
     assert m["spot_check_discrepancy_rate"] == {"discrepancies": 1, "schools_checked": 2, "rate": 0.5}
-    assert m["pricing_rows_failing_gates"] == {"failing": 2, "total": 3, "pct": pytest.approx(66.7)}
+    assert m["pricing_rows_failing_gates"] == {
+        "publishable": 1,
+        "failing": 2,
+        "total": 3,
+        "pct": pytest.approx(66.7),
+    }
 
 
 async def test_city_scope_excludes_other_cities(quality_fixture):
@@ -243,25 +252,88 @@ async def test_pricing_failure_metric_matches_fail_closed_publication_gate(db_se
                 category=PriceCategory.TUITION,
                 period=PricePeriod.MONTHLY,
                 amount=500 + index,
-                source=PriceSource.SCRAPED_WEBSITE,
+                source=PriceSource.OFFICIAL,
                 source_url="https://example.com/fees",
                 pricing_context=context,
             )
             for index, context in enumerate(contexts)
         ]
     )
+    db_session.add(
+        Pricing(
+            school_id=school.id,
+            category=PriceCategory.FOOD,
+            period=PricePeriod.MONTHLY,
+            amount=100,
+            source=PriceSource.SCRAPED_WEBSITE,
+            source_url="https://example.com/fees",
+            pricing_context={"confidence": 0.99},
+        )
+    )
     await db_session.commit()
 
     metrics = await compute_quality_metrics(db_session, country="bg", city="sofia")
 
     assert metrics["pricing_rows_failing_gates"] == {
-        "failing": 5,
-        "total": 6,
-        "pct": pytest.approx(83.3),
+        "publishable": 1,
+        "failing": 6,
+        "total": 7,
+        "pct": pytest.approx(85.7),
     }
 
 
-async def test_validation_coverage_counts_only_gate_passing_scraped_pricing(db_session):
+async def test_scoreboard_publishable_pricing_matches_schema_serialization(db_session):
+    school = await _make_school(db_session)
+    rows = [
+        Pricing(
+            school_id=school.id,
+            category=PriceCategory.TUITION,
+            period=PricePeriod.YEARLY,
+            amount=5000,
+            source=PriceSource.OFFICIAL,
+            source_url="https://example.com/verified-fees",
+            pricing_context={"confidence": 1.0},
+        ),
+        Pricing(
+            school_id=school.id,
+            category=PriceCategory.FOOD,
+            period=PricePeriod.MONTHLY,
+            amount=100,
+            source=PriceSource.OFFICIAL,
+            source_url="https://example.com/verified-fees",
+            pricing_context={"confidence": 0.5},
+        ),
+        Pricing(
+            school_id=school.id,
+            category=PriceCategory.TRANSPORT,
+            period=PricePeriod.YEARLY,
+            amount=900,
+            source=PriceSource.SCRAPED_WEBSITE,
+            source_url="https://example.com/scraped-fees",
+            pricing_context={"confidence": 0.99},
+        ),
+    ]
+    db_session.add_all(rows)
+    await db_session.commit()
+
+    public = SchoolListResponse.model_validate(
+        {
+            "id": school.id,
+            "country_code": school.country_code,
+            "name_i18n": school.name_i18n,
+            "school_type": school.school_type,
+            "education_level": school.education_level,
+            "attributes": school.attributes,
+            "pricing": rows,
+        }
+    )
+    metrics = await compute_quality_metrics(db_session, country="bg", city="sofia")
+
+    assert [row.source for row in public.pricing] == [PriceSource.OFFICIAL]
+    assert metrics["pricing_rows_failing_gates"]["publishable"] == len(public.pricing)
+
+
+async def test_scraped_pricing_never_counts_as_publishable_website_data(db_session):
     publishable = await _make_school(db_session, scrape_status="extracted", attributes={})
     withheld = await _make_school(db_session, scrape_status="extracted", attributes={})
     db_session.add_all(
@@ -291,11 +363,69 @@ async def test_validation_coverage_counts_only_gate_passing_scraped_pricing(db_s
     metrics = await compute_quality_metrics(db_session, country="bg", city="sofia")
 
     assert metrics["website_validation_coverage"] == {
-        "eligible": 1,
+        "eligible": 0,
         "with_report": 0,
-        "coverage_pct": 0.0,
+        "coverage_pct": None,
         "ok": 0,
-        "ok_pct": 0.0,
+        "ok_pct": None,
+        "published_without_report": 0,
+    }
+
+
+async def test_validation_coverage_tracks_launch_flags_and_public_projection(
+    db_session, monkeypatch
+):
+    from app.config import get_settings
+
+    await _make_school(
+        db_session,
+        scrape_status="summarized",
+        summary_i18n={"bg": {"short": "Кратко", "long": "Дълго"}},
+        attributes={"data_validation": {"_schema_version": 1, "status": "ok"}},
+    )
+    await _make_school(
+        db_session,
+        scrape_status="extracted",
+        attributes={
+            "extracted": {
+                "admission": {
+                    "deadlines": ["30 юни"],
+                    "application_steps": ["Internal-only child"],
+                }
+            }
+        },
+    )
+    await _make_school(
+        db_session,
+        scrape_status="extracted",
+        attributes={"extracted": {"contact": {"phone": "+359 2 000 0000"}}},
+    )
+    await db_session.commit()
+
+    settings = get_settings()
+    monkeypatch.setattr(settings, "publish_summaries", False)
+    monkeypatch.setattr(settings, "publish_website_admission_fields", False)
+    hidden = await compute_quality_metrics(db_session, country="bg", city="sofia")
+    assert hidden["website_validation_coverage"]["eligible"] == 0
+
+    monkeypatch.setattr(settings, "publish_summaries", True)
+    summary_enabled = await compute_quality_metrics(db_session, country="bg", city="sofia")
+    assert summary_enabled["website_validation_coverage"] == {
+        "eligible": 1,
+        "with_report": 1,
+        "coverage_pct": 100.0,
+        "ok": 1,
+        "ok_pct": 100.0,
+        "published_without_report": 0,
+    }
+    monkeypatch.setattr(settings, "publish_website_admission_fields", True)
+    admissions_enabled = await compute_quality_metrics(db_session, country="bg", city="sofia")
+    assert admissions_enabled["website_validation_coverage"] == {
+        "eligible": 2,
+        "with_report": 1,
+        "coverage_pct": 50.0,
+        "ok": 1,
+        "ok_pct": 50.0,
         "published_without_report": 1,
     }
 

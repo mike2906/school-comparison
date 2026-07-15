@@ -6,6 +6,8 @@ import { useCompare } from '../../context/CompareContext'
 import { fetchCompare, fetchExamAverages } from '../../api/schools'
 import { calculateDistance, formatDistance } from '../../utils/distance'
 import { getSchoolName, getAddress, getSummary } from '../../utils/i18n'
+import { hasAnySchoolSummary } from './summaryVisibility'
+import { getProvenanceSourceKey } from './sourceMetadata'
 import { getCanonicalAmenityFlags, normalizeSchoolList } from '../../utils/schoolAttributes'
 import { getBenchmarkComparison, getNvoDetail as getSharedNvoDetail } from '../../utils/nvo'
 import { classifyAdmissionRequirement } from '../../utils/admission'
@@ -640,16 +642,18 @@ function ComparePage() {
         ),
         getCompare: (school) => school.school_type,
       },
-      {
-        label: t('compare.summary'),
-        getValue: (school) => {
-          const summary = getSummary(school, i18n.language, 'short')
-          return summary
-            ? <span className="text-sm text-neutral-700">{summary}</span>
-            : renderPlaceholder()
-        },
-        getCompare: (school) => getSummary(school, i18n.language, 'short') || null,
-      },
+      ...(hasAnySchoolSummary(schools, i18n.language)
+        ? [{
+            label: t('compare.summary'),
+            getValue: (school) => {
+              const summary = getSummary(school, i18n.language, 'short')
+              return summary
+                ? <span className="text-sm text-neutral-700">{summary}</span>
+                : renderPlaceholder()
+            },
+            getCompare: (school) => getSummary(school, i18n.language, 'short') || null,
+          }]
+        : []),
       {
         label: t('compare.labels.educationLevel'),
         getValue: (school) => (
@@ -1197,7 +1201,7 @@ function ComparePage() {
       { key: 'locations', title: t('compare.sections.locations'), rows: locationRows },
       { key: 'contact', title: t('compare.sections.contact'), rows: contactRows },
     ]
-  }, [t, i18n.language, metricsById, userLocation])
+  }, [t, i18n.language, metricsById, userLocation, schools])
 
   const completenessById = useMemo(() => {
     const map = new Map()
@@ -1572,17 +1576,6 @@ function CompareRow({ label, cells, highlightDiffs }) {
 function SourcesPanel({ school, t, locale, completeness, open }) {
   const fieldSources = school.field_sources || []
 
-  const groupedSources = useMemo(() => {
-    if (fieldSources.length === 0) return null
-    const groups = {}
-    fieldSources.forEach((source) => {
-      const category = source.category || 'other'
-      if (!groups[category]) groups[category] = []
-      groups[category].push(source)
-    })
-    return groups
-  }, [fieldSources])
-
   const presentText = completeness?.presentLabels?.length
     ? completeness.presentLabels.join(', ')
     : null
@@ -1609,38 +1602,26 @@ function SourcesPanel({ school, t, locale, completeness, open }) {
         </div>
       </div>
 
-      {open && groupedSources ? (
+      {open && fieldSources.length > 0 ? (
         <div className="space-y-3 text-sm text-neutral-700">
-          {Object.entries(groupedSources).map(([category, items]) => {
-            const categoryKey = SOURCE_CATEGORY_LABELS[category] || SOURCE_CATEGORY_LABELS.other
-
-            return (
-              <div key={category}>
-                <div className="text-xs font-semibold uppercase text-neutral-500">{t(categoryKey)}</div>
-                {items.length === 0 ? (
-                  <div className="text-xs text-neutral-400">{t('compare.notAvailable')}</div>
-                ) : (
-                  <ul className="mt-1 space-y-1">
-                    {items.map((item) => (
-                      <li key={item.id}>
-                        <InlineSource
-                          badgeKey={item.source_type}
-                          badgeLabel={t(`compare.sourceTypes.${item.source_type}`)}
-                          url={item.source_url}
-                          displayUrl={item.display_url}
-                          dateLabel={formatDate(item.last_verified || item.scraped_at, locale)}
-                          t={t}
-                        />
-                        {item.value_text && (
-                          <div className="text-xs text-neutral-500">{item.value_text}</div>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            )
-          })}
+          <div>
+            <div className="text-xs font-semibold uppercase text-neutral-500">
+              {t(SOURCE_CATEGORY_LABELS.other)}
+            </div>
+            <ul className="mt-1 space-y-1">
+              {fieldSources.map((item, index) => (
+                <li key={getProvenanceSourceKey(item, index)}>
+                  <InlineSource
+                    badgeKey={item.source_type}
+                    badgeLabel={t(`compare.sourceTypes.${item.source_type}`)}
+                    url={item.source_url}
+                    dateLabel={formatDate(item.last_verified, locale)}
+                    t={t}
+                  />
+                </li>
+              ))}
+            </ul>
+          </div>
 
           <div className="text-xs text-neutral-500">
             {t('compare.lastUpdated', { date: formatDate(school.updated_at, locale) || t('compare.notAvailable') })}

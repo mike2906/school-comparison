@@ -133,7 +133,7 @@ class TestSchoolsEndpoint:
                 amount=500,
                 currency="BGN",
                 period="monthly",
-                source=PriceSource.SCRAPED_WEBSITE,
+                source=PriceSource.OFFICIAL,
                 source_url="https://public-school.bg/fees",
                 pricing_context={
                     "confidence": 0.9,
@@ -172,13 +172,8 @@ class TestSchoolsEndpoint:
         assert detail["pricing"][0]["pricing_context"]["includes"] == ["Books"]
         source = detail["field_sources"][0]
         assert set(source) == {
-            "id",
-            "category",
-            "value_text",
             "source_type",
             "source_url",
-            "display_url",
-            "scraped_at",
             "last_verified",
             "confidence",
         }
@@ -258,6 +253,57 @@ class TestSchoolsEndpoint:
         assert [row["source_type"] for row in payload["field_sources"]] == ["government"]
         assert payload["admission_info"]["status"] == "accepting"
         assert "website_extracted" not in payload["admission_info"]
+
+    @pytest.mark.asyncio
+    async def test_rejected_school_529_value_cannot_escape_through_provenance(
+        self, seeded_db, seeded_client
+    ):
+        school = School(
+            id=529,
+            name_i18n={"bg": "Училище 529", "en": "School 529"},
+            country_code="bg",
+            city="sofia",
+            school_type="private",
+            education_level="primary",
+            scrape_status="extracted",
+            attributes={
+                "extracted": {"class_size": "9 students"},
+                "data_validation": _validation_report(
+                    issues=[
+                        {
+                            "code": "unsupported_class_size",
+                            "severity": "error",
+                            "field_path": "attributes.extracted.class_size",
+                            "message": "unsupported",
+                        }
+                    ]
+                ),
+            },
+        )
+        seeded_db.add(school)
+        await seeded_db.flush()
+        seeded_db.add(
+            FieldSource(
+                school_id=school.id,
+                category="general_info",
+                field_key="class_size",
+                field_path="attributes.extracted.class_size",
+                value_text="9 students",
+                value_json={"class_size": 9},
+                source_type=SourceType.SCRAPED_WEBSITE,
+                source_url="https://school529.test/about",
+            )
+        )
+        await seeded_db.commit()
+
+        responses = [
+            await seeded_client.get(f"/schools/{school.id}"),
+            await seeded_client.get(f"/compare?ids={school.id}"),
+        ]
+        for response in responses:
+            assert response.status_code == 200
+            assert "9 students" not in response.text
+            assert "value_text" not in response.text
 
     @pytest.mark.asyncio
     async def test_resolved_name_i18n_derives_english_fallback(self, seeded_db, seeded_client):
@@ -1186,7 +1232,9 @@ class TestDisplayGating:
     """P1.7: validator-rejected fields and ungated pricing never reach the API."""
 
     @pytest.mark.asyncio
-    async def test_pricing_rows_gated_by_source_url_and_confidence(self, seeded_db, seeded_client):
+    async def test_pricing_rows_are_curated_only_across_parent_endpoints(
+        self, seeded_db, seeded_client
+    ):
         school = School(
             name_i18n={"bg": "Ценово училище", "en": "Pricing School"},
             country_code="bg",
@@ -1198,6 +1246,15 @@ class TestDisplayGating:
         )
         seeded_db.add(school)
         await seeded_db.flush()
+        seeded_db.add(
+            SchoolLocation(
+                school_id=school.id,
+                address_i18n={"bg": "София", "en": "Sofia"},
+                lat=42.72,
+                lng=23.32,
+                is_primary=True,
+            )
+        )
         seeded_db.add_all(
             [
                 Pricing(
@@ -1209,6 +1266,16 @@ class TestDisplayGating:
                     source=PriceSource.SCRAPED_WEBSITE,
                     source_url="https://example.com/fees",
                     pricing_context={"confidence": 0.9},
+                ),
+                Pricing(
+                    school_id=school.id,
+                    category="activities",
+                    amount=50,
+                    currency="BGN",
+                    period="monthly",
+                    source=PriceSource.OFFICIAL,
+                    source_url="https://example.com/verified-fees",
+                    pricing_context={"confidence": 1.0},
                 ),
                 # No source_url → withheld.
                 Pricing(
@@ -1235,7 +1302,7 @@ class TestDisplayGating:
                 # A numeric-looking string must not be coerced through the gate.
                 Pricing(
                     school_id=school.id,
-                    category="activities",
+                    category="registration",
                     amount=50,
                     currency="BGN",
                     period="monthly",
@@ -1247,10 +1314,19 @@ class TestDisplayGating:
         )
         await seeded_db.commit()
 
-        response = await seeded_client.get(f"/schools/{school.id}")
-        assert response.status_code == 200
-        pricing = response.json()["pricing"]
-        assert [row["category"] for row in pricing] == ["tuition"]
+        responses = [
+            await seeded_client.get(f"/schools/{school.id}"),
+            await seeded_client.get("/schools"),
+            await seeded_client.get(f"/compare?ids={school.id}"),
+        ]
+        for response in responses:
+            assert response.status_code == 200
+            payload = response.json()
+            school_payload = payload if isinstance(payload, dict) else next(
+                row for row in payload if row["id"] == school.id
+            )
+            assert [row["category"] for row in school_payload["pricing"]] == ["activities"]
+            assert school_payload["pricing"][0]["source"] == "official"
 
     @pytest.mark.asyncio
     async def test_pricing_row_with_validation_error_is_hidden(self, seeded_db, seeded_client):
@@ -1271,7 +1347,7 @@ class TestDisplayGating:
             amount=500,
             currency="BGN",
             period="monthly",
-            source=PriceSource.SCRAPED_WEBSITE,
+            source=PriceSource.OFFICIAL,
             source_url="https://example.com/fees",
             pricing_context={"confidence": 0.9},
         )
@@ -1282,7 +1358,7 @@ class TestDisplayGating:
             amount=-10,
             currency="BGN",
             period="monthly",
-            source=PriceSource.SCRAPED_WEBSITE,
+            source=PriceSource.OFFICIAL,
             source_url="https://example.com/fees",
             pricing_context={"confidence": 0.9},
         )
@@ -1308,7 +1384,12 @@ class TestDisplayGating:
         assert [row["category"] for row in pricing] == ["tuition"]
 
     @pytest.mark.asyncio
-    async def test_stored_summary_hidden_when_validation_not_ok(self, seeded_db, seeded_client):
+    async def test_stored_summary_hidden_when_validation_not_ok(
+        self, seeded_db, seeded_client, monkeypatch
+    ):
+        from app.config import get_settings
+
+        monkeypatch.setattr(get_settings(), "publish_summaries", True)
         summary = {"bg": {"short": "кратко", "long": "дълго"}}
         unvalidated = School(
             name_i18n={"bg": "Резюме без отчет", "en": "Summary Without Report"},
@@ -1351,6 +1432,95 @@ class TestDisplayGating:
 
         shown = (await seeded_client.get(f"/schools/{clean.id}")).json()
         assert shown["summary_i18n"] == summary
+
+    @pytest.mark.asyncio
+    async def test_launch_flag_withholds_clean_summaries_from_all_endpoints(
+        self, seeded_db, seeded_client
+    ):
+        summary = {"bg": {"short": "кратко", "long": "дълго"}}
+        school = School(
+            name_i18n={"bg": "Резюме", "en": "Summary"},
+            country_code="bg",
+            school_type="private",
+            education_level="primary",
+            city="sofia",
+            scrape_status="summarized",
+            summary_i18n=summary,
+            attributes={"data_validation": _validation_report(status="ok")},
+        )
+        seeded_db.add(school)
+        await seeded_db.flush()
+        seeded_db.add(
+            SchoolLocation(
+                school_id=school.id,
+                address_i18n={"bg": "София", "en": "Sofia"},
+                lat=42.71,
+                lng=23.31,
+                is_primary=True,
+            )
+        )
+        await seeded_db.commit()
+
+        responses = [
+            await seeded_client.get("/schools"),
+            await seeded_client.get(f"/schools/{school.id}"),
+            await seeded_client.get(f"/compare?ids={school.id}"),
+        ]
+        for response in responses:
+            assert response.status_code == 200
+            payload = response.json()
+            school_payload = payload if isinstance(payload, dict) else next(
+                row for row in payload if row["id"] == school.id
+            )
+            assert school_payload.get("summary_i18n") is None
+
+    @pytest.mark.asyncio
+    async def test_website_admission_flag_preserves_curated_admission_info(
+        self, seeded_db, seeded_client, monkeypatch
+    ):
+        from app.config import get_settings
+
+        school = School(
+            name_i18n={"bg": "Прием", "en": "Admission"},
+            country_code="bg",
+            school_type="private",
+            education_level="primary",
+            city="sofia",
+            scrape_status="extracted",
+            admission_info={"status": "accepting", "requirements": "Official interview"},
+            attributes={
+                "extracted": {
+                    "admission": {
+                        "entrance_requirements": ["Website test"],
+                        "deadlines": ["30 юни"],
+                        "available_spots": ["12 свободни места"],
+                        "application_steps": ["Internal extra child"],
+                    }
+                },
+                "data_validation": _validation_report(status="ok"),
+            },
+        )
+        seeded_db.add(school)
+        await seeded_db.commit()
+
+        hidden = (await seeded_client.get(f"/schools/{school.id}")).json()
+        assert hidden["admission_info"] == {
+            "status": "accepting",
+            "requirements": "Official interview",
+        }
+        for locale in ("bg", "en"):
+            assert hidden["attributes_i18n"][locale]["entry_requirements"] == []
+            assert hidden["attributes_i18n"][locale]["application_deadlines"] == []
+            assert hidden["attributes_i18n"][locale]["available_spots"] == []
+        assert "Internal extra child" not in str(hidden)
+
+        monkeypatch.setattr(get_settings(), "publish_website_admission_fields", True)
+        shown = (await seeded_client.get(f"/schools/{school.id}")).json()
+        for locale in ("bg", "en"):
+            assert shown["attributes_i18n"][locale]["entry_requirements"] == ["Website test"]
+            assert shown["attributes_i18n"][locale]["application_deadlines"] == ["30 юни"]
+            assert shown["attributes_i18n"][locale]["available_spots"] == ["12 свободни места"]
+        assert shown["admission_info"] == hidden["admission_info"]
 
     @pytest.mark.asyncio
     async def test_display_field_hidden_when_validation_error(self, seeded_db, seeded_client):

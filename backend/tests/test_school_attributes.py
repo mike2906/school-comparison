@@ -20,6 +20,7 @@ from app.schemas.school import (
     SchoolResponse,
 )
 from app.services.school_service import SchoolService
+from app.config import get_settings
 from app.utils.school_attributes import (
     build_base_attributes,
     build_display_attributes,
@@ -104,6 +105,11 @@ INTERNAL_KEY_MARKERS = (
 )
 
 
+@pytest.fixture
+def website_admission_enabled(monkeypatch):
+    monkeypatch.setattr(get_settings(), "publish_website_admission_fields", True)
+
+
 class TestClassSize:
     """Ported from frontend/src/utils/schoolAttributes.test.js."""
 
@@ -159,14 +165,16 @@ class TestLocalizedProjection:
         assert localized["facilities"] == ["Библиотека"]
         assert localized["activities_offered"] == ["Шахмат"]
 
-    def test_projects_scraped_admission_and_schedule_fields(self):
+    def test_projects_scraped_admission_and_schedule_fields(self, website_admission_enabled):
         localized = build_localized_attributes(INTERNAL_ATTRIBUTES, "bg")
         assert localized["entry_requirements"] == ["Входящ тест"]
         assert localized["application_deadlines"] == ["30 юни"]
         assert localized["available_spots"] == ["12 свободни места"]
         assert localized["daily_schedule"] == ["Учебни занятия до 15:00"]
 
-    def test_admission_projection_fails_closed_for_stale_and_navigation_content(self):
+    def test_admission_projection_fails_closed_for_stale_and_navigation_content(
+        self, website_admission_enabled
+    ):
         attributes = {
             "extracted": {
                 "admission": {
@@ -195,7 +203,9 @@ class TestLocalizedProjection:
         assert localized["entry_requirements"] == ["Приемът включва писмен тест и интервю."]
         assert localized["available_spots"] == ["Остават 12 свободни места за първи клас."]
 
-    def test_validation_blocks_scraped_admission_and_schedule_fields(self):
+    def test_validation_blocks_scraped_admission_and_schedule_fields(
+        self, website_admission_enabled
+    ):
         attributes = {
             **INTERNAL_ATTRIBUTES,
             "data_validation": {
@@ -233,7 +243,7 @@ class TestLocalizedProjection:
         ],
     )
     def test_parent_section_discrepancy_blocks_all_projected_children(
-        self, field_path, blocked_fields
+        self, field_path, blocked_fields, website_admission_enabled
     ):
         attributes = {
             **INTERNAL_ATTRIBUTES,
@@ -264,7 +274,7 @@ class TestLocalizedProjection:
         ],
     )
     def test_unmapped_section_child_does_not_block_unrelated_display_fields(
-        self, field_path
+        self, field_path, website_admission_enabled
     ):
         attributes = {
             **INTERNAL_ATTRIBUTES,
@@ -283,6 +293,48 @@ class TestLocalizedProjection:
         assert localized["available_spots"] == ["12 свободни места"]
         assert localized["daily_schedule"] == ["Учебни занятия до 15:00"]
         assert build_base_attributes(attributes)["school_hours"] == "8:00-18:00"
+
+    def test_website_admission_fields_are_withheld_by_default(self):
+        localized = build_localized_attributes(INTERNAL_ATTRIBUTES, "bg")
+
+        assert localized["entry_requirements"] == []
+        assert localized["application_deadlines"] == []
+        assert localized["available_spots"] == []
+
+    def test_shared_projection_drops_markdown_and_urls_from_every_localized_field(self):
+        localized = build_localized_attributes(
+            {
+                "extracted": {
+                    "facilities": ["Library", "[Pool](https://school.test/pool)"],
+                    "programs": ["https://school.test/stem"],
+                    "languages": [
+                        {"language": "English", "level": "intensive"},
+                        {"language": "[German](https://school.test/de)", "level": None},
+                    ],
+                    "operations": {
+                        "daily_schedule": [
+                            "Учебни занятия до 15:00",
+                            "08:00 - 19:00",
+                            "Сесията включва три етапа - задачи, интервю и среща.",
+                            "- Самостоятелен Markdown bullet",
+                            "* [Дневен режим](https://school324.test/schedule)",
+                        ]
+                    },
+                }
+            },
+            "bg",
+        )
+
+        assert localized["facilities"] == ["Library"]
+        assert localized["special_programs"] == []
+        assert localized["language_focus"] == [
+            {"language": "English", "level": "intensive"}
+        ]
+        assert localized["daily_schedule"] == [
+            "Учебни занятия до 15:00",
+            "08:00 - 19:00",
+            "Сесията включва три етапа - задачи, интервю и среща.",
+        ]
 
     def test_scraper_display_fields_are_declared_in_the_allowlist(self):
         projected_scraper_fields = {

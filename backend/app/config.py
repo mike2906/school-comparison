@@ -83,6 +83,10 @@ class Settings(BaseSettings):
     max_schools_to_compare: int = 5
     max_search_query_length: int = 100
 
+    # Launch-scope publication flags (sparse/fail-closed by default)
+    publish_summaries: bool = False
+    publish_website_admission_fields: bool = False
+
     model_config = {
         "env_file": ".env",
         "env_file_encoding": "utf-8",
