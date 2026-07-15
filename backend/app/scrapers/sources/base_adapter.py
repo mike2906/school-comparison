@@ -173,7 +173,7 @@ class BaseSourceAdapter(ABC):
                         existing_school.name_i18n = disc.name_i18n
                         existing_school.school_type = disc.school_type
                         existing_school.education_level = disc.education_level
-                        existing_school.city = disc.city
+                        existing_school.city = disc.city or existing_school.city
                         existing_school.website_url = disc.website_url or existing_school.website_url
                         existing_school.source_url = disc.source_url or existing_school.source_url
                         existing_school.institutional_id = disc.institutional_id or existing_school.institutional_id

@@ -272,6 +272,20 @@ class MoeRegistryAdapter(BaseSourceAdapter):
             return normalized_address
         return f"{locality}, {normalized_address}"
 
+    def _filter_incoming_attributes(self, incoming: dict) -> dict:
+        """Preserve last-known MoE labels across partial lookup failures."""
+        filtered = super()._filter_incoming_attributes(incoming)
+        lookup_label_keys = {
+            "moe_region_name",
+            "moe_municipality_name",
+            "moe_town_name",
+        }
+        return {
+            key: value
+            for key, value in filtered.items()
+            if value is not None or key not in lookup_label_keys
+        }
+
     async def discover(
         self,
         limit: Optional[int] = None,

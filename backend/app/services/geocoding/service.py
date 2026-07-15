@@ -13,6 +13,16 @@ from app.config import get_settings
 
 logger = logging.getLogger(__name__)
 
+_DETERMINISTIC_FORCE_FAILURES = {
+    "No address available",
+    "No results found",
+}
+
+
+def _is_deterministic_force_failure(result: GeocodingResult) -> bool:
+    """Return whether a failed refresh proves the stored point is unsupported."""
+    return result.error in _DETERMINISTIC_FORCE_FAILURES
+
 
 def _preferred_geocoding_city(school: School | None) -> Optional[str]:
     if school is None:
@@ -121,6 +131,9 @@ class GeocodingService:
                 precision=(location.geocode_meta or {}).get("precision"),
             )
 
+        had_coordinates = location.lat is not None and location.lng is not None
+        previous_geocode_meta = dict(location.geocode_meta or {})
+
         # Get address from i18n dict (prefer Bulgarian for Bulgaria)
         address = location.address_i18n.get("bg") or location.address_i18n.get("en")
         if not address:
@@ -188,12 +201,14 @@ class GeocodingService:
                 city=city,
             )
             if not result.success and fallback_school_name:
-                result = await self.provider.geojson_provider.geocode(
+                geojson_result = await self.provider.geojson_provider.geocode(
                     address=address,
                     country_code=country_code,
                     school_name=fallback_school_name,
                     city=city,
                 )
+                if geojson_result.success:
+                    result = geojson_result
 
         if result is None:
             result = await self.provider.geocode(
@@ -216,9 +231,8 @@ class GeocodingService:
             if result.success:
                 logger.info(f"Updated location {location.id} with coordinates ({result.lat}, {result.lng})")
         else:
-            if force:
-                # A forced refresh is an evidence rebuild: stale coordinates
-                # that the current providers cannot support must not survive.
+            clear_stale_coordinates = force and _is_deterministic_force_failure(result)
+            if clear_stale_coordinates:
                 location.lat = None
                 location.lng = None
             await apply_geocode_result_to_location(
@@ -227,6 +241,14 @@ class GeocodingService:
                 result,
                 school=school,
             )
+            if force and had_coordinates and not clear_stale_coordinates:
+                # Preserve the last accepted evidence across transient provider
+                # failures, while retaining the failed refresh for diagnostics.
+                failed_attempt = dict(location.geocode_meta or {})
+                location.geocode_meta = {
+                    **previous_geocode_meta,
+                    "last_attempt": failed_attempt,
+                }
             await self.db.commit()
             logger.warning(f"Failed to geocode location {location.id}: {result.error}")
 
