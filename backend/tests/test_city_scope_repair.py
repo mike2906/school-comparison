@@ -54,6 +54,35 @@ def test_geojson_admin_resolution_confirms_hint_and_fails_closed(tmp_path):
     assert ambiguous.ambiguous is True
 
 
+def test_geojson_admin_resolution_requires_address_agreement_without_hint(tmp_path):
+    path = tmp_path / "education.geojson"
+    path.write_text(
+        json.dumps(
+            {
+                "type": "FeatureCollection",
+                "features": [_feature("Уникално училище", "СВОГЕ")],
+            }
+        ),
+        encoding="utf-8",
+    )
+    provider = GeoJSONProvider(str(path))
+
+    confirmed = provider.resolve_admin_municipality(
+        school_name="Уникално училище",
+        addresses=["гр. Своге, ул. Тест 1"],
+    )
+    assert confirmed.municipality == "СВОГЕ"
+    assert confirmed.ambiguous is False
+
+    mismatch = provider.resolve_admin_municipality(
+        school_name="Уникално училище",
+        addresses=["гр. София, ул. Тест 1"],
+    )
+    assert mismatch.municipality is None
+    assert mismatch.ambiguous is True
+    assert mismatch.evidence == "address_locality_does_not_confirm_geojson_municipality"
+
+
 @pytest.mark.asyncio
 async def test_run_repair_writes_report_before_mutation(monkeypatch, tmp_path):
     events = []

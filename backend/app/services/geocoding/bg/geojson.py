@@ -140,7 +140,8 @@ class GeoJSONProvider(BaseGeocodingProvider):
         MoE municipality labels are authoritative hints, but must exist in the
         GeoJSON administrative values. Records without such a hint may only be
         resolved when their school-name match points to one municipality and an
-        address is present; multiple municipality matches fail closed.
+        address locality agrees with that municipality; all other cases fail
+        closed.
         """
         self._load_index()
 
@@ -165,7 +166,8 @@ class GeoJSONProvider(BaseGeocodingProvider):
             for feature in matches
             if (feature.get("properties") or {}).get("city")
         }
-        if not any((address or "").strip() for address in addresses):
+        populated_addresses = [address for address in addresses if (address or "").strip()]
+        if not populated_addresses:
             return AdminMunicipalityResolution(
                 municipality=None,
                 evidence="missing_address",
@@ -173,9 +175,20 @@ class GeoJSONProvider(BaseGeocodingProvider):
             )
         if len(municipalities) == 1:
             normalized = next(iter(municipalities))
+            address_localities = {
+                self._normalize_city(locality)
+                for address in populated_addresses
+                if (locality := self._extract_city_from_address(address))
+            }
+            if normalized not in address_localities:
+                return AdminMunicipalityResolution(
+                    municipality=None,
+                    evidence="address_locality_does_not_confirm_geojson_municipality",
+                    ambiguous=True,
+                )
             return AdminMunicipalityResolution(
                 municipality=(self._admin_municipalities or {}).get(normalized, normalized),
-                evidence="addressed_school_unique_geojson_municipality",
+                evidence="address_locality_confirms_unique_geojson_municipality",
             )
         if len(municipalities) > 1:
             return AdminMunicipalityResolution(
