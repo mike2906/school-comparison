@@ -23,7 +23,7 @@ from app.scrapers.sources import register_adapter
 from app.scrapers.base import BaseScraper
 from app.models.scrape_log import ScrapeType
 from app.services.geocoding.base import GeocodingResult
-from app.services.geocoding.bg import GeoJSONProvider
+from app.services.geocoding.bg import GeoJSONProvider, city_storage_value
 from app.services.geocoding.nominatim import NominatimProvider
 
 logger = logging.getLogger(__name__)
@@ -232,6 +232,34 @@ class MoeRegistryAdapter(BaseSourceAdapter):
             )
         return city
 
+    @classmethod
+    def _derive_record_city(
+        cls,
+        *,
+        region_code: Optional[int],
+        municipality_name: Optional[str],
+        town_name: Optional[str],
+    ) -> Optional[str]:
+        """Derive city from this registry record, never from the import scope."""
+        settlement_city = city_storage_value(town_name)
+        municipality_city = city_storage_value(municipality_name)
+        # Region 22 is Sofia-city (Stolichna municipality), including Bankya
+        # and its other settlements. Keep it in Sofia scope even if the
+        # municipality lookup failed while the independent town lookup worked.
+        if region_code == cls.SOFIA_CITY_REGION:
+            return "sofia"
+        # Bankya and other settlements inside Stolichna municipality remain in
+        # Sofia scope when the municipality label is available.
+        if municipality_city == "sofia":
+            return "sofia"
+        if settlement_city:
+            return settlement_city
+        if municipality_city:
+            return municipality_city
+        # Missing lookup labels must not cause Sofia-oblast rows to inherit the
+        # Sofia batch scope.
+        return None
+
     @staticmethod
     def _address_with_locality_hint(address: str, locality_name: Optional[str]) -> str:
         normalized_address = (address or "").strip()
@@ -243,6 +271,20 @@ class MoeRegistryAdapter(BaseSourceAdapter):
         if _LOCALITY_MARKER_RE.search(normalized_address):
             return normalized_address
         return f"{locality}, {normalized_address}"
+
+    def _filter_incoming_attributes(self, incoming: dict) -> dict:
+        """Preserve last-known MoE labels across partial lookup failures."""
+        filtered = super()._filter_incoming_attributes(incoming)
+        lookup_label_keys = {
+            "moe_region_name",
+            "moe_municipality_name",
+            "moe_town_name",
+        }
+        return {
+            key: value
+            for key, value in filtered.items()
+            if value is not None or key not in lookup_label_keys
+        }
 
     async def discover(
         self,
@@ -614,12 +656,17 @@ class MoeRegistryAdapter(BaseSourceAdapter):
         result = await self.db.execute(
             select(School).where(
                 School.country_code == "bg",
-                School.city == "sofia",
                 School.institutional_id.isnot(None),
             )
         )
         for school in result.scalars().all():
-            attrs = school.attributes or {}
+            attrs = dict(school.attributes or {})
+            region_code = attrs.get("moe_region_code")
+            # The Sofia registry batch covers both Sofia-city and
+            # Sofia-oblast. Relabeled province rows must remain in this active
+            # reconciliation, while future imports for other regions must not.
+            if region_code not in {22, 23, "22", "23"} and (school.city or "").casefold() != "sofia":
+                continue
             instid = school.institutional_id
             if not instid:
                 continue
@@ -753,9 +800,10 @@ class MoeRegistryAdapter(BaseSourceAdapter):
             if inst_category == "kindergarten":
                 education_level = "kindergarten"
 
-            # Determine city (based on region code)
+            # Derive city from the record's settlement/municipality labels. The
+            # Sofia import scope includes both Sofia-city and Sofia-oblast, so it
+            # must never be used as the persisted city value.
             region_code = data.get("region")
-            city = "sofia" if region_code in [self.SOFIA_CITY_REGION, self.SOFIA_OBLAST_REGION] else None
             municipality_code = data.get("municipality")
             town_code = data.get("town")
             region_name = self._region_labels.get(region_code) if isinstance(region_code, int) else None
@@ -763,6 +811,11 @@ class MoeRegistryAdapter(BaseSourceAdapter):
                 self._municipality_labels.get(municipality_code) if isinstance(municipality_code, int) else None
             )
             town_name = self._town_labels.get(town_code) if isinstance(town_code, int) else None
+            city = self._derive_record_city(
+                region_code=region_code,
+                municipality_name=municipality_name,
+                town_name=town_name,
+            )
 
             # Extract location data from detail_data if available
             locations = []

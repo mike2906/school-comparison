@@ -1,4 +1,6 @@
 """Tests for MoeRegistryAdapter."""
+from datetime import datetime, timezone
+
 import pytest
 from unittest.mock import AsyncMock, patch
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -49,6 +51,59 @@ class TestMoeRegistryAdapterMappings:
         assert MoeRegistryAdapter.DETAILED_TYPE_MAPPING[122] == "lower_secondary"
         assert MoeRegistryAdapter.DETAILED_TYPE_MAPPING[125] == "upper_secondary"
         assert MoeRegistryAdapter.DETAILED_TYPE_MAPPING[151] == "kindergarten"
+
+    def test_sofia_scoped_province_record_keeps_its_real_city(self):
+        """The Sofia batch includes region 23 but must not stamp it as Sofia city."""
+        adapter = MoeRegistryAdapter(db=object())
+        adapter._region_labels = {23: "София-област"}
+        adapter._municipality_labels = {2306: "Своге"}
+        adapter._town_labels = {65869: "Своге"}
+
+        school = adapter._parse_institution_data(
+            {
+                "instid": 2300001,
+                "name": 'СРЕДНО УЧИЛИЩЕ "ИВАН ВАЗОВ"',
+                "region": 23,
+                "municipality": 2306,
+                "town": 65869,
+                "instType": 1,
+                "detailedSchoolType": 124,
+                "financialSchoolType": 2,
+            },
+            {"settlementAddress": 'гр. Своге, ул. "Искър" № 1'},
+        )
+
+        assert school is not None
+        assert school.city == "svoge"
+        assert school.attributes["moe_municipality_name"] == "Своге"
+
+    def test_province_record_without_lookup_labels_does_not_inherit_sofia(self):
+        assert MoeRegistryAdapter._derive_record_city(
+            region_code=MoeRegistryAdapter.SOFIA_OBLAST_REGION,
+            municipality_name=None,
+            town_name=None,
+        ) is None
+
+    def test_stolichna_settlement_stays_in_sofia_scope(self):
+        assert MoeRegistryAdapter._derive_record_city(
+            region_code=MoeRegistryAdapter.SOFIA_CITY_REGION,
+            municipality_name="Столична",
+            town_name="Банкя",
+        ) == "sofia"
+
+    def test_sofia_city_partial_lookup_keeps_bankya_in_sofia_scope(self):
+        assert MoeRegistryAdapter._derive_record_city(
+            region_code=MoeRegistryAdapter.SOFIA_CITY_REGION,
+            municipality_name=None,
+            town_name="Банкя",
+        ) == "sofia"
+
+    def test_sofia_oblast_partial_lookup_uses_the_record_settlement(self):
+        assert MoeRegistryAdapter._derive_record_city(
+            region_code=MoeRegistryAdapter.SOFIA_OBLAST_REGION,
+            municipality_name=None,
+            town_name="Своге",
+        ) == "svoge"
 
 
 @pytest.mark.asyncio
@@ -559,6 +614,103 @@ class TestMoeRegistryAdapterUpsert:
         assert "(updated)" in school.name_i18n["bg"]
         assert school.city == "sofia"
         assert school.education_level == "upper_secondary"
+
+    async def test_active_flags_include_relabelled_sofia_oblast_rows(
+        self,
+        db_session: AsyncSession,
+    ):
+        from app.models import School
+
+        province = School(
+            institutional_id="230001",
+            name_i18n={"bg": "Province school"},
+            country_code="bg",
+            city="svoge",
+            school_type="state",
+            education_level="primary",
+            attributes={"moe_region_code": 23, "moe_registry_active": True},
+        )
+        other_region = School(
+            institutional_id="160001",
+            name_i18n={"bg": "Other region school"},
+            country_code="bg",
+            city="plovdiv",
+            school_type="state",
+            education_level="primary",
+            attributes={"moe_region_code": 16, "moe_registry_active": True},
+        )
+        legacy_sofia = School(
+            institutional_id="220001",
+            name_i18n={"bg": "Legacy Sofia school"},
+            country_code="bg",
+            city="sofia",
+            school_type="state",
+            education_level="primary",
+            attributes={"moe_registry_active": True},
+        )
+        db_session.add_all([province, other_region, legacy_sofia])
+        await db_session.commit()
+
+        adapter = MoeRegistryAdapter(db=db_session)
+        await adapter._update_active_flags(set(), datetime.now(timezone.utc))
+        await db_session.commit()
+        await db_session.refresh(province)
+        await db_session.refresh(other_region)
+        await db_session.refresh(legacy_sofia)
+
+        assert province.attributes["moe_registry_active"] is False
+        assert province.attributes["moe_registry_inactive_since"]
+        assert legacy_sofia.attributes["moe_registry_active"] is False
+        assert "moe_registry_inactive_since" in legacy_sofia.attributes
+        assert other_region.attributes == {"moe_region_code": 16, "moe_registry_active": True}
+
+    async def test_partial_label_failure_preserves_repaired_city_and_last_known_labels(
+        self,
+        db_session: AsyncSession,
+    ):
+        from app.models import School
+
+        school = School(
+            institutional_id="230099",
+            name_i18n={"bg": "Province school"},
+            country_code="bg",
+            city="svoge",
+            school_type="state",
+            education_level="primary",
+            attributes={
+                "moe_region_code": 23,
+                "moe_region_name": "София-област",
+                "moe_municipality_name": "Своге",
+                "moe_town_name": "Своге",
+            },
+        )
+        db_session.add(school)
+        await db_session.commit()
+
+        adapter = MoeRegistryAdapter(db=db_session)
+        discovered = adapter._parse_institution_data(
+            {
+                "instid": 230099,
+                "name": "Province school",
+                "region": 23,
+                "municipality": 2306,
+                "town": 65869,
+                "instType": 1,
+                "detailedSchoolType": 121,
+                "financialSchoolType": 2,
+            }
+        )
+        assert discovered is not None
+        assert discovered.city is None
+
+        result = await adapter.upsert_schools([discovered])
+
+        assert result["updated"] == 1
+        await db_session.refresh(school)
+        assert school.city == "svoge"
+        assert school.attributes["moe_region_name"] == "София-област"
+        assert school.attributes["moe_municipality_name"] == "Своге"
+        assert school.attributes["moe_town_name"] == "Своге"
 
 
 class TestMoeRegistryAgeGroupExtraction:

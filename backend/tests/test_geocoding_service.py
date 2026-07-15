@@ -471,6 +471,97 @@ class TestGeocodingService:
         assert location.geocode_meta["provider"] == "mock"
         assert location.geocode_meta["rejection_reason"] == "API error"
 
+    async def test_force_deterministic_miss_clears_stale_coordinates_and_records_attempt_metadata(
+        self,
+        db_session: AsyncSession,
+    ):
+        mock_provider = AsyncMock()
+        mock_provider.provider_name = "mock"
+        mock_provider.geocode.return_value = GeocodingResult(
+            success=False,
+            error="No results found",
+            provider="nominatim",
+            method="nominatim_address",
+            precision="approximate",
+        )
+        service = GeocodingService(db=db_session, provider=mock_provider)
+        school = School(
+            name_i18n={"bg": "Test School"},
+            country_code="bg",
+            city="sofia",
+            school_type="state",
+            education_level="primary",
+        )
+        db_session.add(school)
+        await db_session.flush()
+        location = SchoolLocation(
+            school_id=school.id,
+            address_i18n={"bg": "Unsupported Address"},
+            lat=42.7,
+            lng=23.3,
+            is_primary=True,
+        )
+        db_session.add(location)
+        await db_session.commit()
+
+        result = await service.geocode_location(location, force=True)
+
+        assert result.success is False
+        await db_session.refresh(location)
+        assert location.lat is None
+        assert location.lng is None
+        assert location.geocode_meta["status"] == "failed"
+        assert location.geocode_meta["method"] == "nominatim_address"
+        assert location.geocode_meta["precision"] == "approximate"
+
+    async def test_force_transient_failure_preserves_coordinates_and_accepted_metadata(
+        self,
+        db_session: AsyncSession,
+    ):
+        mock_provider = AsyncMock()
+        mock_provider.provider_name = "mock"
+        mock_provider.geocode.return_value = GeocodingResult(
+            success=False,
+            error="HTTP 429",
+            provider="nominatim",
+        )
+        service = GeocodingService(db=db_session, provider=mock_provider)
+        school = School(
+            name_i18n={"bg": "Test School"},
+            country_code="bg",
+            city="sofia",
+            school_type="state",
+            education_level="primary",
+        )
+        db_session.add(school)
+        await db_session.flush()
+        location = SchoolLocation(
+            school_id=school.id,
+            address_i18n={"bg": "Temporarily unavailable address"},
+            lat=42.7,
+            lng=23.3,
+            geocode_meta={
+                "status": "accepted",
+                "provider": "nominatim",
+                "method": "nominatim_address",
+                "precision": "exact",
+            },
+            is_primary=True,
+        )
+        db_session.add(location)
+        await db_session.commit()
+
+        result = await service.geocode_location(location, force=True)
+
+        assert result.success is False
+        await db_session.refresh(location)
+        assert (location.lat, location.lng) == pytest.approx((42.7, 23.3))
+        assert location.geocode_meta["status"] == "accepted"
+        assert location.geocode_meta["method"] == "nominatim_address"
+        assert location.geocode_meta["precision"] == "exact"
+        assert location.geocode_meta["last_attempt"]["status"] == "failed"
+        assert location.geocode_meta["last_attempt"]["rejection_reason"] == "HTTP 429"
+
     async def test_geocode_location_rejects_duplicate_geojson_name_match_with_different_address(
         self,
         db_session: AsyncSession,
@@ -568,6 +659,58 @@ class TestGeocodingService:
         assert location.lat is None
         assert location.lng is None
         assert location.geocode_meta["candidate"] == {"lat": 43.064, "lng": 24.82002}
+        assert location.geocode_meta["method"] == "nominatim_address"
+        assert location.geocode_meta["precision"] == "exact"
+
+    async def test_sofia_labeled_oblast_record_no_longer_bypasses_write_bounds(
+        self,
+        db_session: AsyncSession,
+    ):
+        class MockProvider:
+            provider_name = "mock"
+
+            def __init__(self):
+                self.geocode = AsyncMock(
+                    return_value=GeocodingResult(
+                        lat=42.97,
+                        lng=23.35,
+                        success=True,
+                        provider="nominatim",
+                        method="nominatim_address",
+                        precision="exact",
+                    )
+                )
+
+        mock_provider = MockProvider()
+        service = GeocodingService(db=db_session, provider=mock_provider)
+        school = School(
+            name_i18n={"bg": "Province school"},
+            country_code="bg",
+            city="sofia",
+            school_type="state",
+            education_level="primary",
+            attributes={"moe_region_code": 23},
+        )
+        db_session.add(school)
+        await db_session.flush()
+        location = SchoolLocation(
+            school_id=school.id,
+            address_i18n={"bg": "гр. Своге, ул. Тест 1"},
+            is_primary=True,
+        )
+        db_session.add(location)
+        await db_session.commit()
+
+        result = await service.geocode_location(location)
+
+        assert result.success is False
+        assert result.error == "outside_sofia_write_bounds"
+        await db_session.refresh(location)
+        assert location.lat is None
+        assert location.lng is None
+        assert location.geocode_meta["status"] == "rejected"
+        assert location.geocode_meta["method"] == "nominatim_address"
+        assert location.geocode_meta["precision"] == "exact"
 
     async def test_geocode_location_accepts_bankya_within_sofia_municipality_bounds(
         self,
@@ -974,6 +1117,75 @@ class TestGeocodingService:
         mock_provider.geocode.assert_not_called()
         assert result.success is True
         assert result.provider == "nominatim"
+
+    async def test_sofia_oblast_transient_nominatim_failure_is_not_hidden_by_geojson_miss(
+        self,
+        db_session: AsyncSession,
+    ):
+        class _CompositeLikeProvider:
+            provider_name = "composite-mock"
+
+            def __init__(self):
+                self.geocode = AsyncMock()
+                self.nominatim_provider = type(
+                    "NomProvider",
+                    (),
+                    {
+                        "geocode": AsyncMock(return_value=GeocodingResult(
+                            success=False,
+                            error="HTTP 503",
+                            provider="nominatim",
+                        ))
+                    },
+                )()
+                self.geojson_provider = type(
+                    "GeoProvider",
+                    (),
+                    {
+                        "geocode": AsyncMock(return_value=GeocodingResult(
+                            success=False,
+                            error="No match in GeoJSON index",
+                            provider="geojson_bg",
+                        ))
+                    },
+                )()
+
+        mock_provider = _CompositeLikeProvider()
+        service = GeocodingService(db=db_session, provider=mock_provider)
+        school = School(
+            name_i18n={"bg": "Province school"},
+            country_code="bg",
+            city="svoge",
+            school_type="state",
+            education_level="primary",
+            attributes={"moe_region_code": 23, "moe_town_name": "Своге"},
+        )
+        db_session.add(school)
+        await db_session.flush()
+        location = SchoolLocation(
+            school_id=school.id,
+            address_i18n={"bg": "гр. Своге, ул. Тест 1"},
+            lat=42.96,
+            lng=23.35,
+            geocode_meta={
+                "status": "accepted",
+                "provider": "nominatim",
+                "method": "nominatim_address",
+                "precision": "exact",
+            },
+            is_primary=True,
+        )
+        db_session.add(location)
+        await db_session.commit()
+
+        result = await service.geocode_location(location, force=True)
+
+        assert result.error == "HTTP 503"
+        await db_session.refresh(location)
+        assert (location.lat, location.lng) == pytest.approx((42.96, 23.35))
+        assert location.geocode_meta["status"] == "accepted"
+        assert location.geocode_meta["last_attempt"]["provider"] == "nominatim"
+        mock_provider.geojson_provider.geocode.assert_awaited_once()
 
 
 class TestGeoJSONProvider:

@@ -59,12 +59,9 @@ async def apply_geocode_result_to_location(
         location.geocode_meta = _result_meta(result, status="failed", reason=result.error)
         return result
 
-    attrs = (school.attributes or {}) if school else {}
-    is_sofia_oblast_record = isinstance(attrs, dict) and attrs.get("moe_region_code") == 23
     if (
         school
         and (school.city or "").casefold() == "sofia"
-        and not is_sofia_oblast_record
         and not _point_in_sofia_write_bounds(float(result.lat), float(result.lng))
     ):
         reason = "outside_sofia_write_bounds"
