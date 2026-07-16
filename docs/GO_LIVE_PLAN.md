@@ -941,7 +941,7 @@ extraction/prompt-tuning iterations.
       **Done (PR #51).** Verified by P2.9 run 1: 0/39 stored scraped rows serialized;
       gate/scoreboard/API parity confirmed; curation worklist written to
       `backend/reports/curation/pricing-worklist.md`.
-- [ ] **P2.9 Boundary-focused pilot (launch configuration).** After P2.5–P2.8, rerun the
+- [x] **P2.9 Boundary-focused pilot (launch configuration).** After P2.5–P2.8, rerun the
       same reviewed 18-school cohort on the **current cheap models** (the launch
       configuration — do not combine with the P2.10 model change). Acceptance is
       boundary-only, per the revised launch-acceptance list above: zero internal/raw/
@@ -987,6 +987,15 @@ extraction/prompt-tuning iterations.
       Evidence: `backend/reports/pilot/db4ba90d-6894-4164-a873-34ee79687fad/acceptance.md`.
       P2.9 closes when P2.12(a)–(d) are fixed and re-verified by targeted API/DB checks
       against the stored run — not by another LLM rerun.
+      **Closed by PR #54 (2026-07-16), with zero LLM calls.** The stored-run sweep made
+      54 list/detail/compare requests across BG/EN headers: 54/54 HTTP 200, zero
+      Markdown/bare-URL display hits, and school 367 clean in all six payloads where it
+      appeared. Location 119 was corrected from checked-in GeoJSON feature
+      `BG_30912207846`; the duplicate audit now has seven explained shared groups and
+      zero unexplained groups. Locations 1143/1145/1188 remain safely null with complete
+      terminal failure evidence. School 161 returned 503 on both permitted plain HTTP
+      retries and remains fail-closed (`failed_validate`, null `website_url`, persistent
+      withholding marker). Full backend suite: 827 passed.
 - [ ] **P2.10 Model-capability experiment (informs the refresh and the enrichment track;
       NOT a launch gate).** **Deferred to post-launch (decision 2026-07-16, from the
       P2.9-rerun reviews): the full refresh runs on the current cheap tier; this
@@ -1063,6 +1072,18 @@ extraction/prompt-tuning iterations.
 - [ ] **P2.12 Release-boundary hardening (from P2.9 run 2 + 2026-07-16 reviews).** All
       verification is deterministic (targeted tests, API sweeps, DB audits) — no LLM
       cohort reruns.
+      - [x] **Run-2 bounded failures (a)–(d): done in PR #54 (2026-07-16).** Shared
+        address sanitization, the 119/1147 collision repair, terminal handling for
+        1143/1145/1188, and school-161 fail-closed evidence are implemented and covered
+        by the P2.9 closure evidence above. Routine geocoding no longer retries terminal
+        failures; explicit `force=True` is required. Terminally unresolved schools stay
+        in list/search/filter/count results while the existing map coordinate gate omits
+        them. Deterministic audit: 54/54 API requests, zero Markdown hits, zero
+        unexplained duplicate groups; 827 backend tests passed.
+      - [ ] **Remaining P2.12 work (e)–(g): not part of PR #54.** Curated-pricing
+        hardening, high-risk scraped-field withholding, and the UI truthfulness pass
+        remain open below; do not treat the parent P2.12 checkbox as complete until they
+        land.
       (a) **Fix the school 367 address Markdown leak.** Location 897 serializes
       `](https://60ousvsvkirilimetodii.com/index.php)` in list address text — the P2.5(b)
       sanitizer does not cover address/location display fields. Extend it in the shared
