@@ -1074,7 +1074,7 @@ extraction/prompt-tuning iterations.
       **Done (PR #53, merged `df0a032`).** Verified by P2.9 run 2: 0 Sofia out-of-bounds
       coordinates; 394/394 precision-metadata coverage; school 233 documented-unresolved;
       cohort regenerated (363 full-refresh eligible schools, ≈$0.75 projection).
-- [x] **P2.12 Release-boundary hardening (from P2.9 run 2 + 2026-07-16 reviews).** All
+- [ ] **P2.12 Release-boundary hardening (from P2.9 run 2 + 2026-07-16 reviews).** All
       verification is deterministic (targeted tests, API sweeps, DB audits) — no LLM
       cohort reruns.
       - [x] **Run-2 bounded failures (a)–(d): done in PR #54 (2026-07-16).** Shared
@@ -1089,8 +1089,9 @@ extraction/prompt-tuning iterations.
         automatically retryable. The audit calls the shared production sanitizer and
         therefore covers both scheme URLs and bare domains, and its tracked default
         cohort makes the command runnable without the local P2.9 report directory.
-      - [x] **Remaining P2.12 work (e)–(g): done in PR #56 (2026-07-16; zero LLM
-        calls).** Curated pricing now requires an official source, traceable URL,
+      - [ ] **Remaining P2.12 work (e)–(g): implementation candidate in PR #56
+        (2026-07-16; zero LLM calls), held for the pricing-date decision below.**
+        Curated pricing now requires an official source, traceable URL,
         bounded confidence, explicit verifier identity plus timezone-aware verification
         time, a verification date, and a valid positive single amount or ordered range;
         malformed and prose-bearing unverified rows fail closed through the shared API/
@@ -1104,6 +1105,21 @@ extraction/prompt-tuning iterations.
         build; stored-data audit 54/54 HTTP 200 with zero Markdown, dynamic-field, or
         invalid-pricing hits, zero unexplained duplicate groups, terminal-location and
         school-161 withholding evidence intact, and `llm_calls=0`.
+        **Review hold (Codex round 4, 2026-07-16):** round 3 required the public
+        verification date to correspond to `human_verification.verified_at`; round 4
+        then asserted that `scraped_at` must remain the original extraction timestamp
+        and requested a dedicated verification-date field. That conflicts with the P2.8
+        contract and tracked curation process, which explicitly designate `scraped_at`
+        as the existing verification-date field and require curators to update it.
+        Adding a dedicated field would require schema/migration/API/UI changes beyond
+        the agreed lightweight curation path. Round 4 also found one bounded UI edge
+        case: a location with no publishable address but usable age-group/shift/distance
+        evidence can still be hidden by the comparison-section visibility predicate.
+        **Recommendation:** preserve the existing P2.8 `scraped_at`-as-verification-date
+        contract, explicitly accept the conflicting round-4 pricing comment, fix the
+        bounded location-evidence predicate, rerun deterministic checks, and re-review.
+        If extraction and verification timestamps must instead be preserved separately,
+        approve that scope expansion explicitly before implementation.
       (a) **Fix the school 367 address Markdown leak.** Location 897 serializes
       `](https://60ousvsvkirilimetodii.com/index.php)` in list address text — the P2.5(b)
       sanitizer does not cover address/location display fields. Extend it in the shared
