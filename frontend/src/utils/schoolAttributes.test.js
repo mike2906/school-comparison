@@ -188,6 +188,19 @@ test('after-school evidence is unknown unless a location records a boolean', () 
     ]),
     true
   )
+  assert.equal(
+    getAfterSchoolEvidence([
+      { age_group_shifts: [{ has_organised_groups: false }, {}] },
+    ]),
+    null
+  )
+  assert.equal(
+    getAfterSchoolEvidence([
+      { age_group_shifts: [{ has_organised_groups: false }] },
+      { age_group_shifts: [] },
+    ]),
+    null
+  )
 })
 
 test('admission status omits unknown and unrecognized values', () => {

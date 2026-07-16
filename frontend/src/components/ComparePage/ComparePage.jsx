@@ -1131,7 +1131,9 @@ function ComparePage() {
             </div>
           )
         },
-        getCompare: (school) => (school.locations || []).map(location => location.address),
+        getCompare: (school) => (school.locations || [])
+          .map(location => getAddress(location, i18n.language))
+          .filter(Boolean),
       },
     ]
 

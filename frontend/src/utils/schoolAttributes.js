@@ -96,14 +96,27 @@ export function getCanonicalAmenityEvidence(attributes, afterSchoolEvidence = nu
 }
 
 export function getAfterSchoolEvidence(locations) {
-  if (!Array.isArray(locations)) return null
-  const values = locations
-    .flatMap(location => location?.age_group_shifts || [])
-    .map(shift => shift?.has_organised_groups)
-    .filter(value => typeof value === 'boolean')
+  if (!Array.isArray(locations) || locations.length === 0) return null
+  let sawFalse = false
+  let sawUnknown = false
 
-  if (values.includes(true)) return true
-  return values.includes(false) ? false : null
+  for (const location of locations) {
+    const shifts = Array.isArray(location?.age_group_shifts)
+      ? location.age_group_shifts
+      : []
+    if (shifts.length === 0) {
+      sawUnknown = true
+      continue
+    }
+    for (const shift of shifts) {
+      const value = shift?.has_organised_groups
+      if (value === true) return true
+      if (value === false) sawFalse = true
+      else sawUnknown = true
+    }
+  }
+
+  return sawFalse && !sawUnknown ? false : null
 }
 
 export function getAdmissionStatusKey(rawStatus) {
