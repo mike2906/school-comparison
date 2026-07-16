@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import argparse
 import asyncio
 import json
 import sys
@@ -22,12 +23,25 @@ from app.utils.school_attributes import publishable_display_text
 from app.utils.website_data import WEBSITE_DATA_WITHHELD_KEY
 
 
-DEFAULT_COHORT_FILE = (
-    Path(__file__).parent.parent
-    / "reports"
-    / "pilot"
-    / "db4ba90d-6894-4164-a873-34ee79687fad"
-    / "pilot-cohort.txt"
+DEFAULT_COHORT_IDS = (
+    506,
+    529,
+    538,
+    631,
+    584,
+    404,
+    609,
+    516,
+    593,
+    610,
+    103,
+    105,
+    297,
+    163,
+    310,
+    161,
+    191,
+    324,
 )
 REGRESSION_SCHOOL_ID = 367
 TERMINAL_LOCATION_IDS = (1143, 1145, 1188)
@@ -51,7 +65,9 @@ DISPLAY_KEYS = {
 }
 
 
-def read_cohort(path: Path = DEFAULT_COHORT_FILE) -> list[int]:
+def read_cohort(path: Path | None = None) -> list[int]:
+    if path is None:
+        return list(DEFAULT_COHORT_IDS)
     return [
         int(line)
         for raw in path.read_text(encoding="utf-8").splitlines()
@@ -219,7 +235,14 @@ async def database_audit() -> dict[str, Any]:
 
 
 async def main() -> None:
-    cohort_ids = read_cohort()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--cohort-file",
+        type=Path,
+        help="Optional cohort file; defaults to the tracked P2.9 run-2 school IDs",
+    )
+    args = parser.parse_args()
+    cohort_ids = read_cohort(args.cohort_file)
     api = await api_audit(cohort_ids)
     database = await database_audit()
     result = {

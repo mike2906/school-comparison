@@ -507,6 +507,45 @@ class TestGeocodingService:
         assert result.provider == "nominatim"
         mock_provider.geocode.assert_not_awaited()
 
+    async def test_missing_address_records_terminal_local_validation_evidence(
+        self,
+        db_session: AsyncSession,
+    ):
+        mock_provider = AsyncMock()
+        mock_provider.provider_name = "mock"
+        service = GeocodingService(db=db_session, provider=mock_provider)
+        school = School(
+            name_i18n={"bg": "Missing address school"},
+            country_code="bg",
+            city="sofia",
+            school_type="private",
+            education_level="primary",
+        )
+        db_session.add(school)
+        await db_session.flush()
+        location = SchoolLocation(
+            school_id=school.id,
+            address_i18n={},
+            is_primary=True,
+        )
+        db_session.add(location)
+        await db_session.commit()
+
+        first = await service.geocode_location(location)
+        second = await service.geocode_location(location)
+
+        assert first.error == "No address available"
+        assert first.provider == "local_validation"
+        assert second.error == "No address available"
+        assert second.provider == "local_validation"
+        assert geocode_failure_is_terminal(location.geocode_meta)
+        assert location.geocode_meta == {
+            "status": "failed",
+            "provider": "local_validation",
+            "rejection_reason": "No address available",
+        }
+        mock_provider.geocode.assert_not_awaited()
+
     async def test_transient_failure_evidence_is_not_terminal(self):
         assert not geocode_failure_is_terminal(
             {

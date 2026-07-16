@@ -175,6 +175,7 @@ class GeocodingService:
             result = GeocodingResult(
                 success=False,
                 error="No address available",
+                provider="local_validation",
             )
             if force:
                 location.lat = None

@@ -22,6 +22,17 @@ def test_boundary_audit_does_not_treat_plain_hyphens_as_markdown():
     assert hits == []
 
 
+def test_boundary_audit_has_tracked_default_cohort_and_accepts_override(tmp_path):
+    assert audit_p2_12_boundary.read_cohort() == list(
+        audit_p2_12_boundary.DEFAULT_COHORT_IDS
+    )
+
+    cohort_file = tmp_path / "cohort.txt"
+    cohort_file.write_text("# custom\n161\n367  # regression\n", encoding="utf-8")
+
+    assert audit_p2_12_boundary.read_cohort(cohort_file) == [161, 367]
+
+
 def _school(
     school_id: int,
     name: str,
