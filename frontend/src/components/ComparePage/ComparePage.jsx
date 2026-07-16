@@ -1096,7 +1096,7 @@ function ComparePage() {
             </div>
           )
         },
-        getCompare: (school) => metricsById.get(school.id)?.pricingRange?.min ?? null,
+        getCompare: (school) => (school.pricing || []).map(price => price.id),
       },
     ]
 

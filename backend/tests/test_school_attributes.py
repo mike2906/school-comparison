@@ -162,6 +162,26 @@ class TestDynamicWebsiteLaunchScope:
         assert base["established_year"] == 1998
         assert localized["daily_schedule"] == ["Classes until 15:00"]
 
+    def test_validator_rejected_founded_year_stays_withheld(
+        self, website_dynamic_fields_enabled
+    ):
+        attributes = {
+            **self.SCRAPED_DYNAMIC_FIELDS,
+            "data_validation": {
+                "status": "needs_review",
+                "spot_check": {
+                    "discrepancies": [
+                        {
+                            "field_path": "attributes.extracted.founded_year",
+                            "kind": "contradiction",
+                        }
+                    ]
+                },
+            },
+        }
+
+        assert build_base_attributes(attributes)["established_year"] is None
+
 
 @pytest.mark.usefixtures("website_dynamic_fields_enabled")
 class TestClassSize:

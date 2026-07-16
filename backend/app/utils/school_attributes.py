@@ -560,6 +560,8 @@ def build_base_attributes(attributes: Mapping[str, Any] | None) -> dict[str, Any
     established_year = _year_or_none(attrs.get("established_year"))
     if established_year is None and publish_dynamic_fields:
         established_year = _year_or_none(extracted.get("founded_year"))
+    if "established_year" in blocked:
+        established_year = None
 
     return {
         "class_size": class_size,

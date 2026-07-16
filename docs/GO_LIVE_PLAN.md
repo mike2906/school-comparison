@@ -1100,7 +1100,7 @@ extraction/prompt-tuning iterations.
         values remain publishable. Sparse UI views hide empty sections and unknown-status
         badges, omit the unsupported “standard curriculum” fallback, render absent
         amenity evidence as unavailable rather than “No”, and qualify pricing/admission/
-        map copy. Verification: 849 backend tests; frontend tests, lint, and production
+        map copy. Verification: 850 backend tests; frontend tests, lint, and production
         build; stored-data audit 54/54 HTTP 200 with zero Markdown, dynamic-field, or
         invalid-pricing hits, zero unexplained duplicate groups, terminal-location and
         school-161 withholding evidence intact, and `llm_calls=0`.

@@ -50,6 +50,7 @@ _FIELD_PATH_DISPLAY_FIELDS: dict[str, tuple[str, ...]] = {
     "attributes.extracted.accreditations": ("special_programs",),
     "attributes.extracted.extracurricular": ("activities_offered",),
     "attributes.extracted.class_size": ("class_size",),
+    "attributes.extracted.founded_year": ("established_year",),
     "attributes.extracted.admission.deadlines": ("application_deadlines",),
     "attributes.extracted.admission.entrance_requirements": ("entry_requirements",),
     "attributes.extracted.admission.available_spots": ("available_spots",),
