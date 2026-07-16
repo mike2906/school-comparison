@@ -389,7 +389,7 @@ class TestSchoolsEndpoint:
         assert not any("source" in tag or "coords" in tag for tag in tags)
 
     @pytest.mark.asyncio
-    async def test_list_excludes_schools_without_resolved_locations(self, seeded_db, seeded_client):
+    async def test_list_keeps_terminally_unresolved_school(self, seeded_db, seeded_client):
         hidden_school = School(
             name_i18n={"bg": "Скрито училище", "en": "Hidden School"},
             country_code="bg",
@@ -404,6 +404,11 @@ class TestSchoolsEndpoint:
             address_i18n={"bg": "ул. Без координати 1, София", "en": "1 No Coordinates St, Sofia"},
             lat=None,
             lng=None,
+            geocode_meta={
+                "status": "failed",
+                "provider": "nominatim",
+                "rejection_reason": "No results found",
+            },
             is_primary=True,
         )
         seeded_db.add(hidden_location)
@@ -419,8 +424,76 @@ class TestSchoolsEndpoint:
 
         response = await seeded_client.get("/schools")
         assert response.status_code == 200
-        ids = {school["id"] for school in response.json()}
-        assert hidden_school.id not in ids
+        schools = {school["id"]: school for school in response.json()}
+        assert hidden_school.id in schools
+        assert schools[hidden_school.id]["locations"][0]["lat"] is None
+        assert schools[hidden_school.id]["locations"][0]["lng"] is None
+
+    @pytest.mark.asyncio
+    async def test_list_still_excludes_unresolved_school_without_failure_evidence(
+        self,
+        seeded_db,
+        seeded_client,
+    ):
+        pending_school = School(
+            name_i18n={"bg": "Непроверено училище", "en": "Pending School"},
+            country_code="bg",
+            school_type="state",
+            education_level="primary",
+            city="sofia",
+        )
+        seeded_db.add(pending_school)
+        await seeded_db.flush()
+        seeded_db.add(
+            SchoolLocation(
+                school_id=pending_school.id,
+                address_i18n={"bg": "ул. Непроверена 1, София"},
+                lat=None,
+                lng=None,
+                geocode_meta={"status": "failed", "provider": "nominatim"},
+                is_primary=True,
+            )
+        )
+        await seeded_db.commit()
+
+        response = await seeded_client.get("/schools")
+
+        assert response.status_code == 200
+        assert pending_school.id not in {school["id"] for school in response.json()}
+
+    @pytest.mark.asyncio
+    async def test_list_excludes_transiently_unresolved_school(
+        self,
+        seeded_db,
+        seeded_client,
+    ):
+        school = School(
+            name_i18n={"bg": "Временно недостъпно училище"},
+            country_code="bg",
+            school_type="state",
+            education_level="primary",
+            city="sofia",
+        )
+        seeded_db.add(school)
+        await seeded_db.flush()
+        seeded_db.add(
+            SchoolLocation(
+                school_id=school.id,
+                address_i18n={"bg": "ул. Временна 503"},
+                geocode_meta={
+                    "status": "failed",
+                    "provider": "nominatim",
+                    "rejection_reason": "HTTP 503",
+                },
+                is_primary=True,
+            )
+        )
+        await seeded_db.commit()
+
+        response = await seeded_client.get("/schools")
+
+        assert response.status_code == 200
+        assert school.id not in {item["id"] for item in response.json()}
 
     @pytest.mark.asyncio
     async def test_list_defaults_to_sofia_city_scope(self, seeded_db, seeded_client):
@@ -579,7 +652,7 @@ class TestSchoolsFilterEndpoint:
         assert data[0]["school_type"] == "state"
 
     @pytest.mark.asyncio
-    async def test_age_group_filter_excludes_schools_with_only_unresolved_matching_location(self, seeded_db, seeded_client):
+    async def test_age_group_filter_keeps_terminally_unresolved_matching_location(self, seeded_db, seeded_client):
         school = School(
             name_i18n={"bg": "Смесени локации", "en": "Mixed Locations School"},
             country_code="bg",
@@ -602,6 +675,11 @@ class TestSchoolsFilterEndpoint:
             address_i18n={"bg": "ул. Невидима 5, София", "en": "5 Invisible St, Sofia"},
             lat=None,
             lng=None,
+            geocode_meta={
+                "status": "failed",
+                "provider": "nominatim",
+                "rejection_reason": "No results found",
+            },
             is_primary=False,
         )
         seeded_db.add_all([resolved_location, unresolved_location])
@@ -626,7 +704,7 @@ class TestSchoolsFilterEndpoint:
         response = await seeded_client.get("/schools?age_group=grade_1_4")
         assert response.status_code == 200
         ids = {item["id"] for item in response.json()}
-        assert school.id not in ids
+        assert school.id in ids
 
     @pytest.mark.asyncio
     async def test_include_crossover_preschool(self, seeded_client):
@@ -905,7 +983,7 @@ class TestSchoolsSearchEndpoint:
         assert response.json() == []
 
     @pytest.mark.asyncio
-    async def test_search_excludes_schools_without_resolved_locations(self, seeded_db, seeded_client):
+    async def test_search_keeps_terminally_unresolved_school(self, seeded_db, seeded_client):
         hidden_school = School(
             name_i18n={"bg": "Невидимо училище", "en": "Invisible School"},
             country_code="bg",
@@ -921,6 +999,11 @@ class TestSchoolsSearchEndpoint:
                 address_i18n={"bg": "ул. Невидима 2, София", "en": "2 Invisible St, Sofia"},
                 lat=None,
                 lng=None,
+                geocode_meta={
+                    "status": "failed",
+                    "provider": "nominatim",
+                    "rejection_reason": "No results found",
+                },
                 is_primary=True,
             )
         )
@@ -928,7 +1011,7 @@ class TestSchoolsSearchEndpoint:
 
         response = await seeded_client.get("/schools/search?q=Invisible")
         assert response.status_code == 200
-        assert response.json() == []
+        assert [school["id"] for school in response.json()] == [hidden_school.id]
 
     @pytest.mark.asyncio
     async def test_search_defaults_to_sofia_city_scope(self, seeded_db, seeded_client):
@@ -985,7 +1068,7 @@ class TestSchoolsCountsEndpoint:
         assert response.json() == {}
 
     @pytest.mark.asyncio
-    async def test_counts_exclude_schools_without_resolved_locations(self, seeded_db, seeded_client):
+    async def test_counts_include_terminally_unresolved_locations(self, seeded_db, seeded_client):
         hidden_school = School(
             name_i18n={"bg": "Брояч скрито училище", "en": "Hidden Count School"},
             country_code="bg",
@@ -1000,6 +1083,11 @@ class TestSchoolsCountsEndpoint:
             address_i18n={"bg": "ул. Пропусната 3, София", "en": "3 Missing St, Sofia"},
             lat=None,
             lng=None,
+            geocode_meta={
+                "status": "failed",
+                "provider": "nominatim",
+                "rejection_reason": "No results found",
+            },
             is_primary=True,
         )
         seeded_db.add(hidden_location)
@@ -1016,10 +1104,10 @@ class TestSchoolsCountsEndpoint:
         response = await seeded_client.get("/schools/counts")
         assert response.status_code == 200
         data = response.json()
-        assert data["first"] == 2
+        assert data["first"] == 3
 
     @pytest.mark.asyncio
-    async def test_counts_exclude_unresolved_locations_for_matching_age_group(self, seeded_db, seeded_client):
+    async def test_counts_include_terminally_unresolved_matching_age_group(self, seeded_db, seeded_client):
         school = School(
             name_i18n={"bg": "Брояч смесени локации", "en": "Mixed Count School"},
             country_code="bg",
@@ -1042,6 +1130,11 @@ class TestSchoolsCountsEndpoint:
             address_i18n={"bg": "ул. Невидима 7, София", "en": "7 Invisible St, Sofia"},
             lat=None,
             lng=None,
+            geocode_meta={
+                "status": "rejected",
+                "provider": "geojson_bg",
+                "rejection_reason": "duplicate_geojson_name_match_different_address",
+            },
             is_primary=False,
         )
         seeded_db.add_all([resolved_location, unresolved_location])
@@ -1066,7 +1159,7 @@ class TestSchoolsCountsEndpoint:
         response = await seeded_client.get("/schools/counts")
         assert response.status_code == 200
         data = response.json()
-        assert data["grade_1_4"] == 1
+        assert data["grade_1_4"] == 2
 
     @pytest.mark.asyncio
     async def test_counts_default_to_sofia_city_scope(self, seeded_db, seeded_client):

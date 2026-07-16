@@ -7,6 +7,7 @@ from sqlalchemy.orm import aliased, selectinload
 
 from app.models.school import School, SchoolLocation, SchoolLocationAgeGroupShift
 from app.services.geocoding.bounds import SOFIA_MUNICIPALITY_BOUNDS, get_city_bounds
+from app.services.geocoding.service import TERMINAL_GEOCODE_FAILURE_REASONS
 from app.utils.i18n_resolver import resolve_address_i18n, resolve_name_i18n
 from app.utils.school_attributes import build_filterable_attributes
 from app.utils.website_data import (
@@ -37,6 +38,42 @@ class SchoolService:
             .where(
                 resolved_location.school_id == School.id,
                 SchoolService._scoped_resolved_location_clause(resolved_location, city),
+            )
+            .correlate(School)
+        )
+
+    @staticmethod
+    def _terminal_location_clause(location_model=SchoolLocation):
+        """Null coordinates with durable failure evidence are listable, not mappable."""
+        provider = location_model.geocode_meta["provider"].as_string()
+        reason = location_model.geocode_meta["rejection_reason"].as_string()
+        return and_(
+            location_model.lat.is_(None),
+            location_model.lng.is_(None),
+            location_model.geocode_meta["status"].as_string().in_(("failed", "rejected")),
+            provider.is_not(None),
+            func.length(func.trim(provider)) > 0,
+            reason.is_not(None),
+            func.length(func.trim(reason)) > 0,
+            func.trim(reason).in_(tuple(sorted(TERMINAL_GEOCODE_FAILURE_REASONS))),
+        )
+
+    @staticmethod
+    def _listable_location_clause(location_model=SchoolLocation, city: Optional[str] = None):
+        return or_(
+            SchoolService._scoped_resolved_location_clause(location_model, city),
+            SchoolService._terminal_location_clause(location_model),
+        )
+
+    @staticmethod
+    def _has_listable_location(city: Optional[str] = None):
+        location = aliased(SchoolLocation)
+        return exists(
+            select(1)
+            .select_from(location)
+            .where(
+                location.school_id == School.id,
+                SchoolService._listable_location_clause(location, city),
             )
             .correlate(School)
         )
@@ -106,7 +143,7 @@ class SchoolService:
             .join(SchoolLocationAgeGroupShift, SchoolLocationAgeGroupShift.location_id == SchoolLocation.id)
             .where(SchoolLocationAgeGroupShift.age_group == age_group)
             .where(School.country_code == country_code)
-            .where(self._scoped_resolved_location_clause(SchoolLocation, city))
+            .where(self._listable_location_clause(SchoolLocation, city))
         )
         city_clause = self._city_clause(city)
         if city_clause is not None:
@@ -153,7 +190,7 @@ class SchoolService:
         query = (
             self._list_query()
             .where(School.country_code == country_code)
-            .where(self._has_resolved_location(city))
+            .where(self._has_listable_location(city))
         )
         city_clause = self._city_clause(city)
         if city_clause is not None:
@@ -166,7 +203,7 @@ class SchoolService:
                 .join(SchoolLocation)
                 .join(SchoolLocationAgeGroupShift, SchoolLocationAgeGroupShift.location_id == SchoolLocation.id)
                 .where(SchoolLocationAgeGroupShift.age_group == age_group)
-                .where(self._scoped_resolved_location_clause(SchoolLocation, city))
+                .where(self._listable_location_clause(SchoolLocation, city))
             )
 
         # Apply education_level filter. Preschool is special:
@@ -242,7 +279,7 @@ class SchoolService:
         query = (
             select(School.attributes, School.scrape_status)
             .where(School.country_code == country_code)
-            .where(self._has_resolved_location(city))
+            .where(self._has_listable_location(city))
         )
         city_clause = self._city_clause(city)
         if city_clause is not None:
@@ -352,7 +389,7 @@ class SchoolService:
             select(School.id)
             .outerjoin(SchoolLocation, SchoolLocation.school_id == School.id)
             .where(School.country_code == country_code)
-            .where(self._has_resolved_location(city))
+            .where(self._has_listable_location(city))
             .where(or_(*registry_and_address_clauses, corroborated_display_clause))
             .distinct()
             .limit(limit)
@@ -410,7 +447,7 @@ class SchoolService:
             )
             .outerjoin(SchoolLocation, SchoolLocation.school_id == School.id)
             .where(School.country_code == country_code)
-            .where(self._has_resolved_location(city))
+            .where(self._has_listable_location(city))
         )
         if city_clause is not None:
             query = query.where(city_clause)
