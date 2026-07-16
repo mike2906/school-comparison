@@ -8,6 +8,8 @@ rather than only on hand-written report payloads.
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 import pytest
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -27,6 +29,28 @@ from app.utils.display_gating import (
     summary_is_publishable,
 )
 from app.utils.school_attributes import build_filterable_attributes
+
+
+def _curated_pricing_row(**overrides):
+    row = {
+        "source": PriceSource.OFFICIAL,
+        "source_url": "https://example.com/fees",
+        "pricing_context": {
+            "confidence": 0.9,
+            "human_verification": {
+                "verified_by": "test-curator",
+                "verified_at": "2026-07-16T09:00:00Z",
+            },
+        },
+        "scraped_at": datetime(2026, 7, 16, 9, 0, tzinfo=timezone.utc),
+        "amount": 500,
+        "amount_min": None,
+        "amount_max": None,
+        "currency": "BGN",
+        "period": "monthly",
+    }
+    row.update(overrides)
+    return row
 
 
 def test_display_field_mapping_is_reachable_via_spot_check_scope():
@@ -193,20 +217,64 @@ def test_pricing_gate_requires_a_source_and_context():
     ],
 )
 def test_launch_pricing_gate_publishes_only_curated_rows(source, expected):
-    assert pricing_row_is_publishable(
-        source,
-        "https://example.com/fees",
-        {"confidence": 0.9},
-    ) is expected
+    assert pricing_row_is_publishable(_curated_pricing_row(source=source)) is expected
 
 
 def test_launch_pricing_gate_keeps_existing_fail_closed_checks_for_curated_rows():
-    assert pricing_row_is_publishable(PriceSource.OFFICIAL, None, {"confidence": 0.9}) is False
+    assert pricing_row_is_publishable(_curated_pricing_row(source_url=None)) is False
     assert pricing_row_is_publishable(
-        PriceSource.OFFICIAL,
-        "https://example.com/fees",
-        {"confidence": 0.69},
+        _curated_pricing_row(
+            pricing_context={
+                "confidence": 0.69,
+                "human_verification": {
+                    "verified_by": "test-curator",
+                    "verified_at": "2026-07-16T09:00:00Z",
+                },
+            }
+        )
     ) is False
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"pricing_context": {"confidence": 1.0}},
+        {
+            "pricing_context": {
+                "confidence": 1.0,
+                "human_verification": {
+                    "verified_by": "",
+                    "verified_at": "2026-07-16T09:00:00Z",
+                },
+            }
+        },
+        {
+            "pricing_context": {
+                "confidence": 1.0,
+                "human_verification": {
+                    "verified_by": "test-curator",
+                    "verified_at": "2026-07-16T09:00:00",
+                },
+            }
+        },
+        {"scraped_at": None},
+        {"amount": 0},
+        {"amount": None, "amount_min": 600, "amount_max": 500},
+        {"amount": None, "amount_min": 500, "amount_max": None},
+        {"amount": 500, "amount_min": 400, "amount_max": 600},
+        {"currency": "bgn"},
+        {"currency": "EURO"},
+        {"period": "weekly"},
+    ],
+)
+def test_launch_pricing_gate_rejects_malformed_curated_rows(overrides):
+    assert pricing_row_is_publishable(_curated_pricing_row(**overrides)) is False
+
+
+def test_launch_pricing_gate_accepts_well_formed_range():
+    assert pricing_row_is_publishable(
+        _curated_pricing_row(amount=None, amount_min=500, amount_max=600)
+    ) is True
 
 
 @pytest.mark.asyncio
@@ -245,7 +313,13 @@ async def test_real_validator_error_gates_pricing_row_and_summary(db_session):
         period="monthly",
         source=PriceSource.OFFICIAL,
         source_url="https://example.com/fees",
-        pricing_context={"confidence": 0.9},
+        pricing_context={
+            "confidence": 0.9,
+            "human_verification": {
+                "verified_by": "test-curator",
+                "verified_at": "2026-07-16T09:00:00Z",
+            },
+        },
     )
     bad = Pricing(
         school_id=school.id,

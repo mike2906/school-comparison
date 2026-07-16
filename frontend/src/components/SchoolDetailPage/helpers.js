@@ -5,7 +5,7 @@ import {
   getExamTypeLabel as getSharedExamTypeLabel,
   getLatestScoreForExamType as getSharedLatestScoreForExamType,
 } from '../../utils/nvo'
-import { getCanonicalAmenityFlags } from '../../utils/schoolAttributes'
+import { getAdmissionStatusKey, getCanonicalAmenityFlags } from '../../utils/schoolAttributes'
 import { classifyAdmissionRequirement } from '../../utils/admission'
 
 /**
@@ -17,7 +17,6 @@ const STATUS_COLORS = {
   accepting: '#10b981',
   waitlist: '#f59e0b',
   full: '#ef4444',
-  unknown: '#9ca3af',
 }
 
 const SOURCE_BADGE_COLORS = {
@@ -31,22 +30,17 @@ const SOURCE_BADGE_COLORS = {
  * Get enrollment/admission status information
  */
 export function getStatusInfo(school, t) {
-  const rawStatus =
-    school.admission_info?.status ||
-    ''
-  const statusValue = String(rawStatus).toLowerCase()
-
-  if (statusValue.includes('accept') || statusValue.includes('open') || statusValue.includes('available')) {
+  const statusKey = getAdmissionStatusKey(school.admission_info?.status)
+  if (statusKey === 'accepting') {
     return { key: 'accepting', color: STATUS_COLORS.accepting, label: t('schoolCard.status.accepting') }
   }
-  if (statusValue.includes('wait')) {
+  if (statusKey === 'waitlist') {
     return { key: 'waitlist', color: STATUS_COLORS.waitlist, label: t('schoolCard.status.waitlist') }
   }
-  if (statusValue.includes('full') || statusValue.includes('closed')) {
+  if (statusKey === 'full') {
     return { key: 'full', color: STATUS_COLORS.full, label: t('schoolCard.status.full') }
   }
-
-  return { key: 'unknown', color: STATUS_COLORS.unknown, label: t('schoolCard.status.unknown') }
+  return null
 }
 
 /**

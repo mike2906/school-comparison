@@ -19,6 +19,17 @@ def _validation_report(issues=None, spot_check=None, status="needs_review"):
     }
 
 
+def _verified_pricing_context(confidence=1.0, **extra):
+    return {
+        "confidence": confidence,
+        "human_verification": {
+            "verified_by": "test-curator",
+            "verified_at": "2026-07-16T09:00:00Z",
+        },
+        **extra,
+    }
+
+
 class TestHealthEndpoint:
     @pytest.mark.asyncio
     async def test_health_check(self, client):
@@ -135,11 +146,11 @@ class TestSchoolsEndpoint:
                 period="monthly",
                 source=PriceSource.OFFICIAL,
                 source_url="https://public-school.bg/fees",
-                pricing_context={
-                    "confidence": 0.9,
-                    "includes": ["Books"],
-                    "internal_prompt_trace": "must not ship",
-                },
+                pricing_context=_verified_pricing_context(
+                    0.9,
+                    includes=["Books"],
+                    internal_prompt_trace="must not ship",
+                ),
             )
         )
         seeded_db.add(
@@ -224,7 +235,7 @@ class TestSchoolsEndpoint:
                     period="monthly",
                     source=PriceSource.OFFICIAL,
                     source_url="https://registry.bg/fees",
-                    pricing_context={"confidence": 1.0},
+                    pricing_context=_verified_pricing_context(),
                 ),
                 FieldSource(
                     school_id=school.id,
@@ -1368,7 +1379,7 @@ class TestDisplayGating:
                     period="monthly",
                     source=PriceSource.OFFICIAL,
                     source_url="https://example.com/verified-fees",
-                    pricing_context={"confidence": 1.0},
+                    pricing_context=_verified_pricing_context(),
                 ),
                 # No source_url → withheld.
                 Pricing(
@@ -1442,7 +1453,7 @@ class TestDisplayGating:
             period="monthly",
             source=PriceSource.OFFICIAL,
             source_url="https://example.com/fees",
-            pricing_context={"confidence": 0.9},
+            pricing_context=_verified_pricing_context(0.9),
         )
         # Clears the source/confidence gate, but Stage 6 flagged it as a bad price.
         flagged = Pricing(
@@ -1453,7 +1464,7 @@ class TestDisplayGating:
             period="monthly",
             source=PriceSource.OFFICIAL,
             source_url="https://example.com/fees",
-            pricing_context={"confidence": 0.9},
+            pricing_context=_verified_pricing_context(0.9),
         )
         seeded_db.add_all([good, flagged])
         await seeded_db.flush()

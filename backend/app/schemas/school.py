@@ -181,18 +181,9 @@ class SchoolPricingMixin(SchoolAttributesMixin):
         blocked_ids = blocked_pricing_row_ids(self.public_attributes_input)
         published: list[PricingResponse] = []
         for raw_row in self.raw_pricing:
-            if isinstance(raw_row, dict):
-                source = raw_row.get("source")
-                source_url = raw_row.get("source_url")
-                pricing_context = raw_row.get("pricing_context")
-            else:
-                source = getattr(raw_row, "source", None)
-                source_url = getattr(raw_row, "source_url", None)
-                pricing_context = getattr(raw_row, "pricing_context", None)
-
             # Gate the stored values before Pydantic can coerce malformed input
             # (for example, a string confidence of "0.9") into a valid public type.
-            if not pricing_row_is_publishable(source, source_url, pricing_context):
+            if not pricing_row_is_publishable(raw_row):
                 continue
 
             row = PricingResponse.model_validate(raw_row)

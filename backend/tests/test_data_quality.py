@@ -14,6 +14,16 @@ from app.services.pipeline_runs import _aggregate_usage, finalize_pipeline_run, 
 pytestmark = pytest.mark.asyncio
 
 
+def _verified_context(confidence):
+    return {
+        "confidence": confidence,
+        "human_verification": {
+            "verified_by": "test-curator",
+            "verified_at": "2026-07-16T09:00:00Z",
+        },
+    }
+
+
 async def _make_school(db, **kwargs):
     school = School(
         country_code=kwargs.pop("country_code", "bg"),
@@ -58,7 +68,7 @@ async def quality_fixture(db_session):
         Pricing(
             school_id=a.id, category=PriceCategory.TUITION, period=PricePeriod.MONTHLY,
             amount=500, source=PriceSource.OFFICIAL, source_url="https://a.bg/fees",
-            pricing_context={"confidence": 0.9},
+            pricing_context=_verified_context(0.9),
         )
     )
     db_session.add(
@@ -238,12 +248,12 @@ async def test_website_validation_coverage_excludes_registry_only_and_withheld_d
 async def test_pricing_failure_metric_matches_fail_closed_publication_gate(db_session):
     school = await _make_school(db_session)
     contexts = [
-        {"confidence": 0.9},
+        _verified_context(0.9),
         {},
-        {"confidence": True},
-        {"confidence": "0.9"},
-        {"confidence": 1.1},
-        {"confidence": 0.69},
+        _verified_context(True),
+        _verified_context("0.9"),
+        _verified_context(1.1),
+        _verified_context(0.69),
     ]
     db_session.add_all(
         [
@@ -292,7 +302,7 @@ async def test_scoreboard_publishable_pricing_matches_schema_serialization(db_se
             amount=5000,
             source=PriceSource.OFFICIAL,
             source_url="https://example.com/verified-fees",
-            pricing_context={"confidence": 1.0},
+            pricing_context=_verified_context(1.0),
         ),
         Pricing(
             school_id=school.id,
@@ -301,7 +311,7 @@ async def test_scoreboard_publishable_pricing_matches_schema_serialization(db_se
             amount=100,
             source=PriceSource.OFFICIAL,
             source_url="https://example.com/verified-fees",
-            pricing_context={"confidence": 0.5},
+            pricing_context=_verified_context(0.5),
         ),
         Pricing(
             school_id=school.id,

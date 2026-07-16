@@ -367,6 +367,7 @@ def build_localized_attributes(
     attrs = _as_mapping(attributes)
     extracted = _localized_extracted(attrs, locale)
     blocked = blocked_display_fields(attrs)
+    publish_dynamic_fields = get_settings().publish_website_dynamic_fields
     admission = _as_mapping(extracted.get("admission"))
     operations = _as_mapping(extracted.get("operations"))
 
@@ -404,7 +405,11 @@ def build_localized_attributes(
         "entry_requirements": admission_values("entrance_requirements"),
         "application_deadlines": admission_values("deadlines"),
         "available_spots": admission_values("available_spots"),
-        "daily_schedule": _merged_list(operations.get("daily_schedule")),
+        "daily_schedule": (
+            _merged_list(operations.get("daily_schedule"))
+            if publish_dynamic_fields
+            else []
+        ),
     }
     for field in blocked:
         if field in resolved:
@@ -538,18 +543,23 @@ def build_base_attributes(attributes: Mapping[str, Any] | None) -> dict[str, Any
     extracted = _as_mapping(attrs.get("extracted"))
     operations = _as_mapping(extracted.get("operations"))
     blocked = blocked_display_fields(attrs)
+    publish_dynamic_fields = get_settings().publish_website_dynamic_fields
 
     class_size = _parse_class_size(attrs.get("class_size"))
-    if class_size is None:
+    if class_size is None and publish_dynamic_fields:
         class_size = _parse_class_size(extracted.get("class_size"))
     if "class_size" in blocked:
         class_size = None
 
-    school_hours = _normalize_text(attrs.get("school_hours")) or _scraped_school_hours(
-        operations.get("working_hours")
-    )
+    school_hours = _normalize_text(attrs.get("school_hours"))
+    if school_hours is None and publish_dynamic_fields:
+        school_hours = _scraped_school_hours(operations.get("working_hours"))
     if "school_hours" in blocked:
         school_hours = None
+
+    established_year = _year_or_none(attrs.get("established_year"))
+    if established_year is None and publish_dynamic_fields:
+        established_year = _year_or_none(extracted.get("founded_year"))
 
     return {
         "class_size": class_size,
@@ -557,12 +567,11 @@ def build_base_attributes(attributes: Mapping[str, Any] | None) -> dict[str, Any
         "uniform_required": _bool_or_none(attrs.get("uniform_required")),
         "special_focus": _normalize_text(attrs.get("special_focus")),
         "teaching_approach": _merged_list(attrs.get("teaching_approach")),
-        # Rendered by SchoolDetailPage; currently only ever written by seed_data.py.
-        # `extracted.founded_year` is the scraped equivalent of established_year but is
-        # deliberately not mapped here — surfacing it is a behaviour change, not a port.
+        # Curated top-level values remain publishable; their website-derived equivalents
+        # stay behind the launch-scope dynamic-fields flag.
         "teacher_student_ratio": _normalize_text(attrs.get("teacher_student_ratio")),
         "school_hours": school_hours,
-        "established_year": _year_or_none(attrs.get("established_year")),
+        "established_year": established_year,
         # Canonical advanced-filter tags (P1.9), consumed by the frontend filter counts.
         "filter_tags": compute_filter_tags(attrs),
     }

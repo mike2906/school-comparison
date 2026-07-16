@@ -8,7 +8,13 @@ import { calculateDistance, formatDistance } from '../../utils/distance'
 import { getSchoolName, getAddress, getSummary } from '../../utils/i18n'
 import { hasAnySchoolSummary } from './summaryVisibility'
 import { getProvenanceSourceKey } from './sourceMetadata'
-import { getCanonicalAmenityFlags, normalizeSchoolList } from '../../utils/schoolAttributes'
+import {
+  getAdmissionStatusKey,
+  getAfterSchoolEvidence,
+  getCanonicalAmenityEvidence,
+  hasDisplayEvidence,
+  normalizeSchoolList,
+} from '../../utils/schoolAttributes'
 import { getBenchmarkComparison, getNvoDetail as getSharedNvoDetail } from '../../utils/nvo'
 import { classifyAdmissionRequirement } from '../../utils/admission'
 
@@ -134,22 +140,17 @@ function getOptionLabel(option, t) {
 }
 
 function getStatusInfo(school, t) {
-  const rawStatus =
-    school.admission_info?.status ||
-    ''
-  const statusValue = String(rawStatus).toLowerCase()
-
-  if (statusValue.includes('accept') || statusValue.includes('open') || statusValue.includes('available')) {
+  const statusKey = getAdmissionStatusKey(school.admission_info?.status)
+  if (statusKey === 'accepting') {
     return { key: 'accepting', label: t('schoolCard.status.accepting'), color: 'bg-emerald-50 text-emerald-700' }
   }
-  if (statusValue.includes('wait')) {
+  if (statusKey === 'waitlist') {
     return { key: 'waitlist', label: t('schoolCard.status.waitlist'), color: 'bg-amber-50 text-amber-700' }
   }
-  if (statusValue.includes('full') || statusValue.includes('closed')) {
+  if (statusKey === 'full') {
     return { key: 'full', label: t('schoolCard.status.full'), color: 'bg-red-50 text-red-700' }
   }
-
-  return { key: 'unknown', label: t('schoolCard.status.unknown'), color: 'bg-neutral-100 text-neutral-600' }
+  return null
 }
 
 function getAdmissionRequirement(rawRequirement, t) {
@@ -621,6 +622,15 @@ function ComparePage() {
   )
 
   const sections = useMemo(() => {
+    const amenityEvidenceForSchool = (school) => getCanonicalAmenityEvidence(
+      school.attributes,
+      getAfterSchoolEvidence(school.locations)
+    )
+    const renderBinaryEvidence = (value) => value == null ? renderPlaceholder() : (
+      <span className={`text-sm ${value ? 'text-emerald-600 font-medium' : 'text-neutral-500'}`}>
+        {value ? t('common.yes') : t('common.no')}
+      </span>
+    )
     const languageForSchool = (school) => {
       const attributes = school.attributes || {}
       const focus = normalizeLanguageFocus(attributes.language_focus)
@@ -772,13 +782,13 @@ function ComparePage() {
         label: t('compare.labels.enrollmentStatus'),
         getValue: (school) => {
           const status = getStatusInfo(school, t)
-          return (
+          return status ? (
             <span className={`inline-flex rounded px-2 py-0.5 text-xs font-medium ${status.color}`}>
               {status.label}
             </span>
-          )
+          ) : renderPlaceholder()
         },
-        getCompare: (school) => getStatusInfo(school, t).key,
+        getCompare: (school) => getStatusInfo(school, t)?.key || null,
       },
     ]
 
@@ -916,45 +926,18 @@ function ComparePage() {
     const practicalRows = [
       {
         label: t('compare.labels.afterSchoolCare'),
-        getValue: (school) => {
-          const hasAfterSchool = getCanonicalAmenityFlags(
-            school.attributes,
-            getPrimaryShiftInfo(school)?.has_organised_groups
-          ).extended
-          return (
-            <span className={`text-sm ${hasAfterSchool ? 'text-emerald-600 font-medium' : 'text-neutral-500'}`}>
-              {hasAfterSchool ? t('common.yes') : t('common.no')}
-            </span>
-          )
-        },
-        getCompare: (school) => getCanonicalAmenityFlags(
-          school.attributes,
-          getPrimaryShiftInfo(school)?.has_organised_groups
-        ).extended,
+        getValue: (school) => renderBinaryEvidence(amenityEvidenceForSchool(school).extended),
+        getCompare: (school) => amenityEvidenceForSchool(school).extended,
       },
       {
         label: t('compare.labels.meals'),
-        getValue: (school) => {
-          const hasMeals = getCanonicalAmenityFlags(school.attributes).meals
-          return (
-            <span className={`text-sm ${hasMeals ? 'text-emerald-600 font-medium' : 'text-neutral-500'}`}>
-              {hasMeals ? t('common.yes') : t('common.no')}
-            </span>
-          )
-        },
-        getCompare: (school) => getCanonicalAmenityFlags(school.attributes).meals,
+        getValue: (school) => renderBinaryEvidence(amenityEvidenceForSchool(school).meals),
+        getCompare: (school) => amenityEvidenceForSchool(school).meals,
       },
       {
         label: t('compare.labels.transport'),
-        getValue: (school) => {
-          const hasTransport = getCanonicalAmenityFlags(school.attributes).transport
-          return (
-            <span className={`text-sm ${hasTransport ? 'text-emerald-600 font-medium' : 'text-neutral-500'}`}>
-              {hasTransport ? t('common.yes') : t('common.no')}
-            </span>
-          )
-        },
-        getCompare: (school) => getCanonicalAmenityFlags(school.attributes).transport,
+        getValue: (school) => renderBinaryEvidence(amenityEvidenceForSchool(school).transport),
+        getCompare: (school) => amenityEvidenceForSchool(school).transport,
       },
       {
         label: t('compare.labels.facilities'),
@@ -966,16 +949,8 @@ function ComparePage() {
       },
       {
         label: t('compare.labels.accessibility'),
-        getValue: (school) => {
-          const facilities = school.attributes?.facilities || []
-          const isAccessible = facilities.includes('accessible')
-          return (
-            <span className={`text-sm ${isAccessible ? 'text-emerald-600 font-medium' : 'text-neutral-500'}`}>
-              {isAccessible ? t('common.yes') : t('common.no')}
-            </span>
-          )
-        },
-        getCompare: (school) => (school.attributes?.facilities || []).includes('accessible'),
+        getValue: (school) => renderBinaryEvidence(amenityEvidenceForSchool(school).accessibility),
+        getCompare: (school) => amenityEvidenceForSchool(school).accessibility,
       },
     ]
 
@@ -1202,6 +1177,15 @@ function ComparePage() {
       { key: 'contact', title: t('compare.sections.contact'), rows: contactRows },
     ]
   }, [t, i18n.language, metricsById, userLocation, schools])
+
+  const visibleSections = useMemo(() => sections
+    .map(section => ({
+      ...section,
+      rows: section.rows.filter(row => sortedSchools.some(school => (
+        hasDisplayEvidence(row.getCompare?.(school))
+      ))),
+    }))
+    .filter(section => section.rows.length > 0), [sections, sortedSchools])
 
   const completenessById = useMemo(() => {
     const map = new Map()
@@ -1434,7 +1418,7 @@ function ComparePage() {
                 </tr>
               </thead>
               <tbody>
-                {sections.map((section) => (
+                {visibleSections.map((section) => (
                   <FragmentSection
                     key={section.key}
                     section={section}

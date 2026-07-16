@@ -86,6 +86,7 @@ class Settings(BaseSettings):
     # Launch-scope publication flags (sparse/fail-closed by default)
     publish_summaries: bool = False
     publish_website_admission_fields: bool = False
+    publish_website_dynamic_fields: bool = False
 
     model_config = {
         "env_file": ".env",

@@ -6,10 +6,31 @@ Generated from the local Sofia database on 2026-07-15. Scope: 57 schools / 234 r
 
 1. Open every source page and verify the school, category, amount/range, currency, period, age group, plan, and academic year.
 2. Correct or delete inaccurate rows; keep uncertain rows as SCRAPED_WEBSITE so they remain withheld.
-3. For each verified row, set source=OFFICIAL, preserve its source_url, set scraped_at to the UTC verification time, and set numeric pricing_context.confidence to at least 0.7.
+3. For each verified row, set `source=OFFICIAL`, preserve its `source_url`, and set
+   `scraped_at` to the UTC verification time. Record numeric
+   `pricing_context.confidence` of at least 0.7 plus explicit human-verification
+   metadata in this exact shape:
+
+   ```json
+   {
+     "confidence": 1.0,
+     "human_verification": {
+       "verified_by": "curator name or account",
+       "verified_at": "2026-07-16T12:00:00+03:00"
+     }
+   }
+   ```
+
+   The verifier must check any public notes, discounts, installments, includes, and
+   excludes together with the numeric row; otherwise remove that prose before promotion.
+   The gate rejects missing/naive verification times, blank verifier identities,
+   non-positive amounts, incomplete or reversed ranges, non-uppercase three-letter
+   currencies, and unsupported periods.
 4. Re-open the parent-facing detail and compare views and confirm the official source badge, page link, and verification date.
 
-Promote rows individually inside a transaction; never bulk-promote this worklist. scraped_at is the existing pricing verification-date field exposed by the API.
+Promote rows individually inside a transaction; never bulk-promote this worklist.
+`scraped_at` is the existing pricing verification-date field exposed by the API; the
+human-verification metadata remains internal.
 
 ## 150 — "ЧАСТНА ПРОФЕСИОНАЛНА ГИМНАЗИЯ ПО ПРОГРАМИРАНЕ И РОБОТИКА "СТИВ ДЖОБС" ЕООД
 Source pages: [https://buditel.softuni.bg/fees](https://buditel.softuni.bg/fees)

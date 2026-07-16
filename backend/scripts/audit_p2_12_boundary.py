@@ -17,8 +17,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from app.database import async_session_maker
 from app.main import app
-from app.models import School, SchoolLocation
+from app.models import Pricing, School, SchoolLocation
 from app.services.geocoding.service import geocode_failure_is_terminal
+from app.utils.display_gating import pricing_row_is_publishable
 from app.utils.school_attributes import publishable_display_text
 from app.utils.website_data import WEBSITE_DATA_WITHHELD_KEY
 
@@ -110,6 +111,19 @@ def display_markdown_hits(payload: Any, *, endpoint: str) -> list[dict[str, str]
 
 
 async def api_audit(cohort_ids: list[int]) -> dict[str, Any]:
+    async with async_session_maker() as db:
+        raw_attributes = {
+            school_id: attributes if isinstance(attributes, dict) else {}
+            for school_id, attributes in (
+                await db.execute(select(School.id, School.attributes))
+            ).all()
+        }
+        publishable_pricing_ids = {
+            row.id
+            for row in (await db.execute(select(Pricing))).scalars()
+            if pricing_row_is_publishable(row)
+        }
+
     requests: list[tuple[str, str]] = [("list", "/schools")]
     requests.extend(
         (f"detail-{school_id}", f"/schools/{school_id}")
@@ -132,6 +146,9 @@ async def api_audit(cohort_ids: list[int]) -> dict[str, Any]:
     statuses: dict[str, int] = {}
     school_367_payloads = 0
     school_367_address_values: list[str] = []
+    dynamic_field_hits: list[dict[str, Any]] = []
+    withheld_pricing_hits: list[dict[str, Any]] = []
+    published_pricing_ids: set[int] = set()
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://p2-12-audit") as client:
         for locale in ("bg", "en"):
@@ -145,7 +162,47 @@ async def api_audit(cohort_ids: list[int]) -> dict[str, Any]:
                 hits.extend(display_markdown_hits(payload, endpoint=request_key))
                 rows = payload if isinstance(payload, list) else [payload]
                 for school in rows:
-                    if isinstance(school, dict) and school.get("id") == REGRESSION_SCHOOL_ID:
+                    if not isinstance(school, dict):
+                        continue
+                    school_id = school.get("id")
+                    stored_attributes = raw_attributes.get(school_id, {})
+                    public_attributes = school.get("attributes") or {}
+                    for field in ("class_size", "school_hours", "established_year"):
+                        if (
+                            public_attributes.get(field) is not None
+                            and stored_attributes.get(field) is None
+                        ):
+                            dynamic_field_hits.append(
+                                {
+                                    "endpoint": request_key,
+                                    "school_id": school_id,
+                                    "field": field,
+                                }
+                            )
+                    for localized in (school.get("attributes_i18n") or {}).values():
+                        if isinstance(localized, dict) and localized.get("daily_schedule"):
+                            dynamic_field_hits.append(
+                                {
+                                    "endpoint": request_key,
+                                    "school_id": school_id,
+                                    "field": "daily_schedule",
+                                }
+                            )
+                    for pricing in school.get("pricing") or []:
+                        pricing_id = pricing.get("id") if isinstance(pricing, dict) else None
+                        if pricing_id is None:
+                            continue
+                        published_pricing_ids.add(pricing_id)
+                        if pricing_id not in publishable_pricing_ids:
+                            withheld_pricing_hits.append(
+                                {
+                                    "endpoint": request_key,
+                                    "school_id": school_id,
+                                    "pricing_id": pricing_id,
+                                }
+                            )
+
+                    if school_id == REGRESSION_SCHOOL_ID:
                         school_367_payloads += 1
                         for location in school.get("locations", []):
                             school_367_address_values.extend(
@@ -165,6 +222,9 @@ async def api_audit(cohort_ids: list[int]) -> dict[str, Any]:
             for value in school_367_address_values
             if publishable_display_text(value) is None
         ],
+        "dynamic_field_hits": dynamic_field_hits,
+        "withheld_pricing_hits": withheld_pricing_hits,
+        "published_pricing_ids": sorted(published_pricing_ids),
     }
 
 
@@ -256,6 +316,8 @@ async def main() -> None:
         and not api["markdown_hits"]
         and api["school_367_payloads"] > 0
         and not api["school_367_tainted_address_hits"]
+        and not api["dynamic_field_hits"]
+        and not api["withheld_pricing_hits"]
         and not database["unexplained_duplicate_groups"]
         and all(database["terminal_locations"].values())
         and database["school_161_withheld"]

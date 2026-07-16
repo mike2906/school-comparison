@@ -15,6 +15,7 @@ can never diverge.
 from __future__ import annotations
 
 import datetime
+import decimal
 import re
 from typing import Any, Iterator, Mapping
 
@@ -24,6 +25,9 @@ from app.config import get_settings
 # ``app.services.data_quality`` so the "pricing rows failing gates" metric measures
 # exactly what the display gate hides.
 PRICING_CONFIDENCE_FLOOR = 0.7
+
+_CURRENCY_RE = re.compile(r"^[A-Z]{3}$")
+_PRICE_PERIODS = {"monthly", "yearly", "one_time", "quarter", "term", "semester"}
 
 # Spot-check discrepancy kinds that are actionable enough to withhold a field.
 # Matches the summarizer's `_ACTIONABLE_DISCREPANCY_KINDS` (omissions are only a
@@ -248,7 +252,79 @@ def passes_pricing_gate(source_url: Any, pricing_context: Any) -> bool:
     return PRICING_CONFIDENCE_FLOOR <= confidence <= 1.0
 
 
-def pricing_row_is_publishable(source: Any, source_url: Any, pricing_context: Any) -> bool:
-    """Launch gate shared by API serialization and the quality scoreboard."""
+def _pricing_row_value(row: Any, field: str) -> Any:
+    return row.get(field) if isinstance(row, Mapping) else getattr(row, field, None)
+
+
+def _positive_price(value: Any) -> decimal.Decimal | None:
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        parsed = decimal.Decimal(str(value))
+    except (decimal.InvalidOperation, ValueError):
+        return None
+    return parsed if parsed.is_finite() and parsed > 0 else None
+
+
+def _valid_price_shape(row: Any) -> bool:
+    amount_raw = _pricing_row_value(row, "amount")
+    low_raw = _pricing_row_value(row, "amount_min")
+    high_raw = _pricing_row_value(row, "amount_max")
+    amount = _positive_price(amount_raw)
+    low = _positive_price(low_raw)
+    high = _positive_price(high_raw)
+
+    if amount_raw is not None:
+        return amount is not None and low_raw is None and high_raw is None
+    return low is not None and high is not None and low <= high
+
+
+def _aware_verification_time(value: Any) -> datetime.datetime | None:
+    if isinstance(value, datetime.datetime):
+        parsed = value
+    elif isinstance(value, str):
+        try:
+            parsed = datetime.datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    else:
+        return None
+    return parsed if parsed.tzinfo is not None and parsed.utcoffset() is not None else None
+
+
+def _has_human_verification(pricing_context: Any, verification_date: Any) -> bool:
+    if not isinstance(pricing_context, Mapping):
+        return False
+    verification = pricing_context.get("human_verification")
+    if not isinstance(verification, Mapping):
+        return False
+    verified_by = verification.get("verified_by")
+    if not isinstance(verified_by, str) or not verified_by.strip():
+        return False
+    if _aware_verification_time(verification.get("verified_at")) is None:
+        return False
+    return isinstance(verification_date, (datetime.date, datetime.datetime))
+
+
+def pricing_row_is_publishable(row: Any) -> bool:
+    """Fail-closed launch gate shared by API serialization and the scoreboard."""
+    source = _pricing_row_value(row, "source")
     source_value = getattr(source, "value", source)
-    return source_value == "official" and passes_pricing_gate(source_url, pricing_context)
+    source_url = _pricing_row_value(row, "source_url")
+    pricing_context = _pricing_row_value(row, "pricing_context")
+    currency = _pricing_row_value(row, "currency")
+    period = _pricing_row_value(row, "period")
+    period_value = getattr(period, "value", period)
+
+    return (
+        source_value == "official"
+        and passes_pricing_gate(source_url, pricing_context)
+        and _has_human_verification(
+            pricing_context,
+            _pricing_row_value(row, "scraped_at"),
+        )
+        and _valid_price_shape(row)
+        and isinstance(currency, str)
+        and _CURRENCY_RE.fullmatch(currency) is not None
+        and period_value in _PRICE_PERIODS
+    )
