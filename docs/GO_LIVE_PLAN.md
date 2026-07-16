@@ -830,10 +830,12 @@ will need to be repeated.
       - [ ] **Set an OpenRouter spend guardrail (or explicitly approve operating without one).**
             The projected refresh is affordable, but the active key reports `limit=null`; record a
             cap with headroom before treating the cost-control precondition as met.
-      - [ ] If the boundary pilot (P2.9) is clean and the P2.10 model decision is recorded,
-            run the full Sofia website refresh once, using the extraction model selected in
-            P2.10 and with the summarize stage skipped (summaries are out of launch scope —
-            don't pay for prose nobody sees). Then run the corrected force-regeocode process.
+      - [ ] If the boundary pilot (P2.9) is closed, P2.12/P2.13 are green, and the user
+            has explicitly approved, run the full Sofia website refresh once on the
+            **current cheap extraction tier** (P2.10 deferred to post-launch,
+            2026-07-16) with the summarize stage skipped (summaries are out of launch
+            scope — don't pay for prose nobody sees). Then run the corrected
+            force-regeocode process.
             NVO remains independent and must not be refreshed as part of `all` unless a
             separate NVO audit calls for it.
       - [ ] Re-run audits and the scoreboard, triage failures, and targeted-rerun only the
@@ -868,10 +870,16 @@ P2.5–P2.8 land, the public boundary is **frozen** — no further extraction-se
 enter the release path; that work continues on the post-launch enrichment track (end of
 this file), informed by the P2.10 model experiment.
 
-**Order:** P2.5 → P2.6/P2.7/P2.8 (independent, any order) → P2.9 boundary pilot →
-P2.11 city-scope repair (from P2.9 run-1 findings) → P2.9 rerun → P2.10 model
-experiment → the still-open P2.4 items (spend guardrail, full refresh,
-audits/acceptance).
+**Order (revised 2026-07-16, after the P2.9 rerun reviews):** P2.5 →
+P2.6/P2.7/P2.8 (independent, any order) → P2.9 run 1 → P2.11 city-scope repair →
+P2.9 rerun (done, run `db4ba90d…` — see P2.9) → **P2.12 release-boundary
+hardening** → **P2.13 exhaustive no-LLM audit** → spend guardrail → **stop and
+request user approval** → full refresh → audits/acceptance.
+**P2.10 is deferred to the post-launch enrichment track** (decision 2026-07-16):
+no more full-cohort LLM reruns before launch; the refresh runs on the current
+cheap tier. The release boundary is fixed and fail-closed — a future quality
+failure removes a field family from launch scope rather than reopening
+extraction/prompt-tuning iterations.
 
 - [x] **P2.5 Close the two remaining publish-boundary bugs.**
       (a) **Provenance becomes metadata-only.** Detail/compare responses still expose raw
@@ -958,8 +966,32 @@ audits/acceptance).
       `backend/reports/pilot/07ffb261-5cb7-42c8-85c9-47a8bb7b81b1/acceptance.md`.
       The rerun after P2.11 uses the regenerated cohort, and precision-metadata coverage
       is then fully in scope.
+      **Run 2 (2026-07-16, after P2.11 merged `df0a032`) — substantially green; NO-GO
+      pending the bounded fixes now tracked as P2.12; no further LLM reruns required
+      (P2.12/P2.13 verification is deterministic).** Run
+      `db4ba90d-6894-4164-a873-34ee79687fad` ($0.029856; 181,922 input / 17,374 output
+      tokens; status `partial`: school 161 URL returned HTTP 503): 17/17 eligible
+      validation coverage; zero summaries, website-derived admission fields, or scraped
+      pricing serialized (0/27 stored rows pass the launch predicate); provenance
+      metadata-only (202 rows; school 529 rejected values absent); no internal API keys;
+      pricing gate/scoreboard/API parity; 394/394 Sofia geocoded locations (100%) carry
+      precision metadata; 0 Sofia out-of-bounds coordinates; school 233 unresolved with
+      persisted `failed`/`nominatim` failure evidence (accepted per the P2.12(d) rule);
+      NVO not refreshed. Revised full-refresh projection: 363 eligible schools,
+      ≈$0.75 including 25% contingency. FAILs, all bounded and tracked in P2.12:
+      (a) school 367 location 897 leaks Markdown link syntax
+      (`](https://…index.php)`) into list address text; (b) one unexplained coordinate
+      collision (locations 119/1147; the other 7 duplicate groups are explained
+      shared-address/campus); (c) 3 of 21 cohort locations unresolved (school 593:
+      locations 1143/1145; school 631: location 1188); (d) school 161 transient 503.
+      Evidence: `backend/reports/pilot/db4ba90d-6894-4164-a873-34ee79687fad/acceptance.md`.
+      P2.9 closes when P2.12(a)–(d) are fixed and re-verified by targeted API/DB checks
+      against the stored run — not by another LLM rerun.
 - [ ] **P2.10 Model-capability experiment (informs the refresh and the enrichment track;
-      NOT a launch gate).** Question to answer: is the semantic long tail a
+      NOT a launch gate).** **Deferred to post-launch (decision 2026-07-16, from the
+      P2.9-rerun reviews): the full refresh runs on the current cheap tier; this
+      experiment now sequences the enrichment track only. Do not run before launch.**
+      Question to answer: is the semantic long tail a
       model-capability ceiling or an architecture ceiling — and which extraction model
       should power the one-time full refresh? All runs reuse the same 18-school cohort
       tooling; model tiers are configuration. OpenRouter prices checked live 2026-07-15
@@ -990,7 +1022,7 @@ audits/acceptance).
       *Verify:* a short findings note (which model, blocker-list pass/fail per case, cost
       per run) recorded in this file under the enrichment track; the refresh item above
       references the chosen model.
-- [ ] **P2.11 City-scope repair + import gate, then cohort regeocode.** (From P2.9 run 1.
+- [x] **P2.11 City-scope repair + import gate, then cohort regeocode.** (From P2.9 run 1.
       Executes between P2.9 run 1 and the P2.9 rerun — see the Order line above.) The
       registry import stamped `city='sofia'` onto Sofia-*province* schools: 65
       sofia-labeled schools have coordinates outside the gate bbox
@@ -1025,6 +1057,56 @@ audits/acceptance).
       coordinates or a documented rejection; relabeled schools absent from Sofia
       list/map but present in the DB; import regression green. Then rerun P2.9 with the
       regenerated cohort.
+      **Done (PR #53, merged `df0a032`).** Verified by P2.9 run 2: 0 Sofia out-of-bounds
+      coordinates; 394/394 precision-metadata coverage; school 233 documented-unresolved;
+      cohort regenerated (363 full-refresh eligible schools, ≈$0.75 projection).
+- [ ] **P2.12 Release-boundary hardening (from P2.9 run 2 + 2026-07-16 reviews).** All
+      verification is deterministic (targeted tests, API sweeps, DB audits) — no LLM
+      cohort reruns.
+      (a) **Fix the school 367 address Markdown leak.** Location 897 serializes
+      `](https://60ousvsvkirilimetodii.com/index.php)` in list address text — the P2.5(b)
+      sanitizer does not cover address/location display fields. Extend it in the shared
+      projection layer and add a regression test for the 367/897 case; re-sweep the
+      cohort for Markdown tokens in every published display field.
+      (b) **Classify or correct the unexplained coordinate collision** (locations
+      119/1147). Either document it as a legitimate shared-address/campus group (like the
+      other 7) or repair the wrong coordinate; the audit must end with zero *unexplained*
+      duplicate groups.
+      (c) **Resolve or safely withhold the unresolved cohort locations** (school 593:
+      1143/1145; school 631: 1188). Retry school 161's URL at most twice; if the 503
+      persists, withhold its website-derived data via the standing withholding marker and
+      record the evidence.
+      (d) **Standing rule — accept unresolved coordinates.** A location whose geocode
+      remains null WITH recorded failure evidence is an accepted terminal state (school
+      233 is the exemplar). Missing coordinates must never trigger another pipeline
+      cycle; the UI simply omits the school from the map while keeping it in the list.
+      (e) **Harden curated pricing before publishing any row.** The curation path must
+      require explicit human-verification metadata (who/when) and a verification date;
+      validate amount/range shape (positive amount, sane currency/period, range low ≤
+      high); never publish uncurated pricing prose. Extend the P2.8 gate tests to cover
+      malformed curated rows failing closed.
+      (f) **Withhold remaining high-risk scraped numeric/dynamic fields** unless curated:
+      class size, schedules/opening hours, established year, and any similar
+      easily-stale or easily-misassociated numeric — same launch-scope settings pattern
+      as P2.6/P2.7. Sweep the localized-attributes allowlist for other members of this
+      class while there.
+      (g) **UI truthfulness pass.** Hide empty sections and unknown-status badges; never
+      render missing evidence as a negative claim ("No", "standard curriculum") — absence
+      of data is "not available", not "not offered"; temper any UI copy that overstates
+      pricing/admission coverage (the launch dataset is sparse by design).
+      *Verify:* regression tests for (a)/(e)/(f); cohort API sweep clean on Markdown and
+      withheld fields; duplicate-coordinate audit shows zero unexplained groups; UI
+      renders sparse schools without fabricated negatives.
+- [ ] **P2.13 Exhaustive Sofia audit (deterministic, no LLM).** After P2.12: run the full
+      audit battery over the entire Sofia scope, not just the cohort — API
+      boundary sweep (list/detail/compare, both locales) against the launch-acceptance
+      list; geocode audits (bounds, precision metadata, duplicates); cached truth-set
+      checks against stored extraction runs; scoreboard parity. Zero LLM spend.
+      *Verify:* a written audit report under `backend/reports/`; every launch-acceptance
+      criterion green or explicitly waived in this file.
+      **Then STOP.** With P2.13 green and the OpenRouter spend-cap decision recorded,
+      request the user's explicit approval before the one-time full Sofia refresh
+      (363 schools, ≈$0.75 projected, current cheap tier, summarize skipped).
 
 ## Phase 3 — Go live
 
