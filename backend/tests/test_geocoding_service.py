@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.services.geocoding.base import GeocodingResult
 from app.services.geocoding.nominatim import NominatimProvider
-from app.services.geocoding.service import GeocodingService
+from app.services.geocoding.service import GeocodingService, geocode_failure_is_terminal
 from app.scrapers.cli import _oblast_fallback_query_specs
 from app.models import School, SchoolLocation
 
@@ -507,6 +507,64 @@ class TestGeocodingService:
         assert result.provider == "nominatim"
         mock_provider.geocode.assert_not_awaited()
 
+    async def test_transient_failure_evidence_is_not_terminal(self):
+        assert not geocode_failure_is_terminal(
+            {
+                "status": "failed",
+                "provider": "nominatim",
+                "rejection_reason": "HTTP 503",
+            }
+        )
+        assert not geocode_failure_is_terminal(
+            {
+                "status": "failed",
+                "provider": "nominatim",
+                "rejection_reason": "HTTP 429",
+            }
+        )
+
+    async def test_transient_failure_evidence_is_retried_automatically(
+        self,
+        db_session: AsyncSession,
+    ):
+        mock_provider = AsyncMock()
+        mock_provider.provider_name = "mock"
+        mock_provider.geocode.return_value = GeocodingResult(
+            lat=42.7,
+            lng=23.3,
+            success=True,
+            provider="mock",
+            method="nominatim_address",
+            precision="exact",
+        )
+        service = GeocodingService(db=db_session, provider=mock_provider)
+        school = School(
+            name_i18n={"bg": "Transient retry school"},
+            country_code="bg",
+            city="sofia",
+            school_type="private",
+            education_level="primary",
+        )
+        db_session.add(school)
+        await db_session.flush()
+        location = SchoolLocation(
+            school_id=school.id,
+            address_i18n={"bg": "ул. Тест 503"},
+            geocode_meta={
+                "status": "failed",
+                "provider": "nominatim",
+                "rejection_reason": "HTTP 503",
+            },
+            is_primary=True,
+        )
+        db_session.add(location)
+        await db_session.commit()
+
+        result = await service.geocode_location(location)
+
+        assert result.success is True
+        mock_provider.geocode.assert_awaited_once()
+
     async def test_force_explicitly_retries_terminal_failure(
         self,
         db_session: AsyncSession,
@@ -537,7 +595,7 @@ class TestGeocodingService:
             geocode_meta={
                 "status": "rejected",
                 "provider": "geojson_bg",
-                "rejection_reason": "address mismatch",
+                "rejection_reason": "duplicate_geojson_name_match_different_address",
             },
             is_primary=True,
         )

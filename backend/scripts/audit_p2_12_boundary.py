@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import re
 import sys
 from pathlib import Path
 from typing import Any, Iterable
@@ -19,6 +18,7 @@ from app.database import async_session_maker
 from app.main import app
 from app.models import School, SchoolLocation
 from app.services.geocoding.service import geocode_failure_is_terminal
+from app.utils.school_attributes import publishable_display_text
 from app.utils.website_data import WEBSITE_DATA_WITHHELD_KEY
 
 
@@ -40,11 +40,6 @@ KNOWN_SHARED_COORDINATE_GROUPS = {
     frozenset({853, 854}),
     frozenset({1104, 1111}),
 }
-MARKDOWN_OR_URL_RE = re.compile(
-    r"https?://|\]\s*\(|!\[|`{1,3}|\*\*|__|~~|(?:^|\s)#{1,6}\s|"
-    r"^\s*[*+\-]\s+",
-    re.IGNORECASE,
-)
 DISPLAY_KEYS = {
     "name_i18n",
     "resolved_name_i18n",
@@ -84,7 +79,7 @@ def display_markdown_hits(payload: Any, *, endpoint: str) -> list[dict[str, str]
                 child_path = (*path, str(key))
                 if key in DISPLAY_KEYS:
                     for display_path, text in iter_strings(child, child_path):
-                        if MARKDOWN_OR_URL_RE.search(text):
+                        if publishable_display_text(text) is None:
                             hits.append(
                                 {"endpoint": endpoint, "path": display_path, "value": text}
                             )
@@ -152,7 +147,7 @@ async def api_audit(cohort_ids: list[int]) -> dict[str, Any]:
         "school_367_tainted_address_hits": [
             value
             for value in school_367_address_values
-            if MARKDOWN_OR_URL_RE.search(value)
+            if publishable_display_text(value) is None
         ],
     }
 

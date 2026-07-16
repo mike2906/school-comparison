@@ -462,6 +462,40 @@ class TestSchoolsEndpoint:
         assert pending_school.id not in {school["id"] for school in response.json()}
 
     @pytest.mark.asyncio
+    async def test_list_excludes_transiently_unresolved_school(
+        self,
+        seeded_db,
+        seeded_client,
+    ):
+        school = School(
+            name_i18n={"bg": "Временно недостъпно училище"},
+            country_code="bg",
+            school_type="state",
+            education_level="primary",
+            city="sofia",
+        )
+        seeded_db.add(school)
+        await seeded_db.flush()
+        seeded_db.add(
+            SchoolLocation(
+                school_id=school.id,
+                address_i18n={"bg": "ул. Временна 503"},
+                geocode_meta={
+                    "status": "failed",
+                    "provider": "nominatim",
+                    "rejection_reason": "HTTP 503",
+                },
+                is_primary=True,
+            )
+        )
+        await seeded_db.commit()
+
+        response = await seeded_client.get("/schools")
+
+        assert response.status_code == 200
+        assert school.id not in {item["id"] for item in response.json()}
+
+    @pytest.mark.asyncio
     async def test_list_defaults_to_sofia_city_scope(self, seeded_db, seeded_client):
         outside_school = School(
             name_i18n={"bg": "Пловдивско училище", "en": "Plovdiv School"},
@@ -1099,7 +1133,7 @@ class TestSchoolsCountsEndpoint:
             geocode_meta={
                 "status": "rejected",
                 "provider": "geojson_bg",
-                "rejection_reason": "address mismatch",
+                "rejection_reason": "duplicate_geojson_name_match_different_address",
             },
             is_primary=False,
         )

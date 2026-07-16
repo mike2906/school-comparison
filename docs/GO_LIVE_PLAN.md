@@ -995,7 +995,10 @@ extraction/prompt-tuning iterations.
       zero unexplained groups. Locations 1143/1145/1188 remain safely null with complete
       terminal failure evidence. School 161 returned 503 on both permitted plain HTTP
       retries and remains fail-closed (`failed_validate`, null `website_url`, persistent
-      withholding marker). Full backend suite: 827 passed.
+      withholding marker). Full backend suite: 832 passed. Codex review fixes additionally
+      pin terminal status to deterministic miss/rejection reasons (transient 429/503
+      failures remain retryable) and make the audit reuse the production sanitizer so
+      bare domains cannot evade the sweep.
 - [ ] **P2.10 Model-capability experiment (informs the refresh and the enrichment track;
       NOT a launch gate).** **Deferred to post-launch (decision 2026-07-16, from the
       P2.9-rerun reviews): the full refresh runs on the current cheap tier; this
@@ -1079,7 +1082,10 @@ extraction/prompt-tuning iterations.
         failures; explicit `force=True` is required. Terminally unresolved schools stay
         in list/search/filter/count results while the existing map coordinate gate omits
         them. Deterministic audit: 54/54 API requests, zero Markdown hits, zero
-        unexplained duplicate groups; 827 backend tests passed.
+        unexplained duplicate groups; 832 backend tests passed. The terminal predicate
+        is restricted to deterministic outcomes; transient provider errors remain
+        automatically retryable. The audit calls the shared production sanitizer and
+        therefore covers both scheme URLs and bare domains.
       - [ ] **Remaining P2.12 work (e)–(g): not part of PR #54.** Curated-pricing
         hardening, high-risk scraped-field withholding, and the UI truthfulness pass
         remain open below; do not treat the parent P2.12 checkbox as complete until they

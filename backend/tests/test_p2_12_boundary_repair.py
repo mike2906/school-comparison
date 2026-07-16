@@ -1,7 +1,25 @@
 import pytest
 
 from app.models import School, SchoolLocation
-from scripts import repair_p2_12_boundary
+from scripts import audit_p2_12_boundary, repair_p2_12_boundary
+
+
+def test_boundary_audit_uses_shared_sanitizer_for_bare_domains():
+    hits = audit_p2_12_boundary.display_markdown_hits(
+        {"name_i18n": {"bg": "school.bg/path", "en": "www.school.com"}},
+        endpoint="test",
+    )
+
+    assert {hit["value"] for hit in hits} == {"school.bg/path", "www.school.com"}
+
+
+def test_boundary_audit_does_not_treat_plain_hyphens_as_markdown():
+    hits = audit_p2_12_boundary.display_markdown_hits(
+        {"address_i18n": {"bg": "ж.к. Обеля - 1, бл. 102"}},
+        endpoint="test",
+    )
+
+    assert hits == []
 
 
 def _school(

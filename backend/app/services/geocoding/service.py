@@ -13,15 +13,17 @@ from app.config import get_settings
 
 logger = logging.getLogger(__name__)
 
-_DETERMINISTIC_FORCE_FAILURES = {
+TERMINAL_GEOCODE_FAILURE_REASONS = frozenset({
     "No address available",
     "No results found",
-}
+    "outside_sofia_write_bounds",
+    "duplicate_geojson_name_match_different_address",
+})
 
 
 def _is_deterministic_force_failure(result: GeocodingResult) -> bool:
     """Return whether a failed refresh proves the stored point is unsupported."""
-    return result.error in _DETERMINISTIC_FORCE_FAILURES
+    return result.error in TERMINAL_GEOCODE_FAILURE_REASONS
 
 
 def geocode_failure_is_terminal(meta: object) -> bool:
@@ -32,12 +34,13 @@ def geocode_failure_is_terminal(meta: object) -> bool:
     """
     if not isinstance(meta, dict):
         return False
+    reason = meta.get("rejection_reason")
     return (
         meta.get("status") in {"failed", "rejected"}
         and isinstance(meta.get("provider"), str)
         and bool(meta["provider"].strip())
-        and isinstance(meta.get("rejection_reason"), str)
-        and bool(meta["rejection_reason"].strip())
+        and isinstance(reason, str)
+        and reason.strip() in TERMINAL_GEOCODE_FAILURE_REASONS
     )
 
 
