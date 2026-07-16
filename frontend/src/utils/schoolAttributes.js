@@ -119,6 +119,29 @@ export function getAfterSchoolEvidence(locations) {
   return sawFalse && !sawUnknown ? false : null
 }
 
+/**
+ * Return only location fields that the comparison row can actually display. Keeping this
+ * separate from the address prevents an address-less location with useful enrollment,
+ * shift, or distance evidence from making the whole locations section look empty.
+ */
+export function getLocationDisplayEvidence(location, address = null, distance = null) {
+  const ageGroups = (Array.isArray(location?.age_groups)
+    ? location.age_groups
+    : [location?.age_group]
+  ).filter(Boolean)
+  const shifts = (Array.isArray(location?.age_group_shifts)
+    ? location.age_group_shifts
+    : []
+  ).map(item => item?.shift).filter(Boolean)
+
+  return {
+    address: typeof address === 'string' && address.trim() ? address.trim() : null,
+    ageGroups,
+    shifts,
+    distance: Number.isFinite(distance) ? distance : null,
+  }
+}
+
 export function getAdmissionStatusKey(rawStatus) {
   const status = String(rawStatus || '').trim().toLowerCase()
   if (status.includes('accept') || status.includes('open') || status.includes('available')) {

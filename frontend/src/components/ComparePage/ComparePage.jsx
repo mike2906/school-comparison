@@ -12,6 +12,7 @@ import {
   getAdmissionStatusKey,
   getAfterSchoolEvidence,
   getCanonicalAmenityEvidence,
+  getLocationDisplayEvidence,
   hasDisplayEvidence,
   normalizeSchoolList,
 } from '../../utils/schoolAttributes'
@@ -1111,7 +1112,7 @@ function ComparePage() {
                 const distance = userLocation && location.lat && location.lng
                   ? calculateDistance(userLocation.lat, userLocation.lng, location.lat, location.lng)
                   : null
-                const shiftInfo = (location.age_group_shifts || [])[0]
+                const shiftInfo = (location.age_group_shifts || []).find(item => item?.shift)
                 return (
                   <div key={`${location.id || idx}`} className="text-sm text-neutral-700">
                     <div className="font-medium text-neutral-900">
@@ -1131,9 +1132,16 @@ function ComparePage() {
             </div>
           )
         },
-        getCompare: (school) => (school.locations || [])
-          .map(location => getAddress(location, i18n.language))
-          .filter(Boolean),
+        getCompare: (school) => (school.locations || []).map((location) => {
+          const distance = userLocation && location.lat && location.lng
+            ? calculateDistance(userLocation.lat, userLocation.lng, location.lat, location.lng)
+            : null
+          return getLocationDisplayEvidence(
+            location,
+            getAddress(location, i18n.language),
+            distance
+          )
+        }),
       },
     ]
 

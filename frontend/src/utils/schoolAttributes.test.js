@@ -8,6 +8,7 @@ import {
   getCanonicalAmenityFlags,
   getFilterTags,
   getLanguageFocusPairs,
+  getLocationDisplayEvidence,
   hasDisplayEvidence,
   normalizeSchool,
   normalizeSchoolAttributes,
@@ -218,6 +219,17 @@ test('display evidence treats explicit false as evidence but empty values as abs
   assert.equal(hasDisplayEvidence([]), false)
   assert.equal(hasDisplayEvidence({ nested: [] }), false)
   assert.equal(hasDisplayEvidence({ nested: ['value'] }), true)
+})
+
+test('address-less locations remain visible when comparison evidence is usable', () => {
+  const withAgeGroup = getLocationDisplayEvidence({ age_groups: ['grade_1_4'] })
+  const withShift = getLocationDisplayEvidence({ age_group_shifts: [{ shift: 'morning' }] })
+  const withDistance = getLocationDisplayEvidence({}, null, 1.25)
+
+  assert.equal(hasDisplayEvidence(withAgeGroup), true)
+  assert.equal(hasDisplayEvidence(withShift), true)
+  assert.equal(hasDisplayEvidence(withDistance), true)
+  assert.equal(hasDisplayEvidence(getLocationDisplayEvidence({})), false)
 })
 
 test('getLanguageFocusPairs includes every attributes_i18n locale for filter counts', () => {
