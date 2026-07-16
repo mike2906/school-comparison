@@ -1,10 +1,14 @@
 """Tests for API endpoints."""
+from datetime import datetime
+
 import pytest
 from sqlalchemy import select
 
 from app.models.field_source import FieldSource, SourceType
 from app.models.pricing import Pricing, PriceSource
 from app.models.school import School, SchoolLocation, SchoolLocationAgeGroupShift
+
+PRICING_VERIFIED_AT = datetime(2026, 7, 16, 9, 0)
 
 
 def _validation_report(issues=None, spot_check=None, status="needs_review"):
@@ -145,6 +149,7 @@ class TestSchoolsEndpoint:
                 currency="BGN",
                 period="monthly",
                 source=PriceSource.OFFICIAL,
+                scraped_at=PRICING_VERIFIED_AT,
                 source_url="https://public-school.bg/fees",
                 pricing_context=_verified_pricing_context(
                     0.9,
@@ -234,6 +239,7 @@ class TestSchoolsEndpoint:
                     currency="BGN",
                     period="monthly",
                     source=PriceSource.OFFICIAL,
+                    scraped_at=PRICING_VERIFIED_AT,
                     source_url="https://registry.bg/fees",
                     pricing_context=_verified_pricing_context(),
                 ),
@@ -1378,6 +1384,7 @@ class TestDisplayGating:
                     currency="BGN",
                     period="monthly",
                     source=PriceSource.OFFICIAL,
+                    scraped_at=PRICING_VERIFIED_AT,
                     source_url="https://example.com/verified-fees",
                     pricing_context=_verified_pricing_context(),
                 ),
@@ -1452,6 +1459,7 @@ class TestDisplayGating:
             currency="BGN",
             period="monthly",
             source=PriceSource.OFFICIAL,
+            scraped_at=PRICING_VERIFIED_AT,
             source_url="https://example.com/fees",
             pricing_context=_verified_pricing_context(0.9),
         )
@@ -1463,6 +1471,7 @@ class TestDisplayGating:
             currency="BGN",
             period="monthly",
             source=PriceSource.OFFICIAL,
+            scraped_at=PRICING_VERIFIED_AT,
             source_url="https://example.com/fees",
             pricing_context=_verified_pricing_context(0.9),
         )

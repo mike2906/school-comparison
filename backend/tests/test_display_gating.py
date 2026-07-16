@@ -258,6 +258,7 @@ def test_launch_pricing_gate_keeps_existing_fail_closed_checks_for_curated_rows(
             }
         },
         {"scraped_at": None},
+        {"scraped_at": datetime(2026, 7, 15, 9, 0, tzinfo=timezone.utc)},
         {"amount": 0},
         {"amount": None, "amount_min": 600, "amount_max": 500},
         {"amount": None, "amount_min": 500, "amount_max": None},
@@ -312,6 +313,7 @@ async def test_real_validator_error_gates_pricing_row_and_summary(db_session):
         currency="BGN",
         period="monthly",
         source=PriceSource.OFFICIAL,
+        scraped_at=datetime(2026, 7, 16, 9, 0),
         source_url="https://example.com/fees",
         pricing_context={
             "confidence": 0.9,

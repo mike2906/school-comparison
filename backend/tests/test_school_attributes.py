@@ -182,6 +182,27 @@ class TestDynamicWebsiteLaunchScope:
 
         assert build_base_attributes(attributes)["established_year"] is None
 
+    def test_rejected_scraped_year_does_not_hide_curated_year(
+        self, website_dynamic_fields_enabled
+    ):
+        attributes = {
+            **self.SCRAPED_DYNAMIC_FIELDS,
+            "established_year": 1975,
+            "data_validation": {
+                "status": "needs_review",
+                "spot_check": {
+                    "discrepancies": [
+                        {
+                            "field_path": "attributes.extracted.founded_year",
+                            "kind": "contradiction",
+                        }
+                    ]
+                },
+            },
+        }
+
+        assert build_base_attributes(attributes)["established_year"] == 1975
+
 
 @pytest.mark.usefixtures("website_dynamic_fields_enabled")
 class TestClassSize:

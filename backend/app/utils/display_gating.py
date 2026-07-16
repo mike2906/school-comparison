@@ -302,9 +302,19 @@ def _has_human_verification(pricing_context: Any, verification_date: Any) -> boo
     verified_by = verification.get("verified_by")
     if not isinstance(verified_by, str) or not verified_by.strip():
         return False
-    if _aware_verification_time(verification.get("verified_at")) is None:
+    verified_at = _aware_verification_time(verification.get("verified_at"))
+    if verified_at is None:
         return False
-    return isinstance(verification_date, (datetime.date, datetime.datetime))
+    if isinstance(verification_date, datetime.datetime):
+        if verification_date.tzinfo is None:
+            public_date = verification_date.date()
+        else:
+            public_date = verification_date.astimezone(datetime.timezone.utc).date()
+    elif isinstance(verification_date, datetime.date):
+        public_date = verification_date
+    else:
+        return False
+    return public_date == verified_at.astimezone(datetime.timezone.utc).date()
 
 
 def pricing_row_is_publishable(row: Any) -> bool:

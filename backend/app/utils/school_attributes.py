@@ -558,9 +558,11 @@ def build_base_attributes(attributes: Mapping[str, Any] | None) -> dict[str, Any
         school_hours = None
 
     established_year = _year_or_none(attrs.get("established_year"))
+    established_year_is_scraped = False
     if established_year is None and publish_dynamic_fields:
         established_year = _year_or_none(extracted.get("founded_year"))
-    if "established_year" in blocked:
+        established_year_is_scraped = established_year is not None
+    if established_year_is_scraped and "established_year" in blocked:
         established_year = None
 
     return {
