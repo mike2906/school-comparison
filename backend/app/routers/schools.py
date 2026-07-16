@@ -72,7 +72,7 @@ async def get_school_counts(
             .join(SchoolLocation, SchoolLocation.id == SchoolLocationAgeGroupShift.location_id)
             .join(School, SchoolLocation.school_id == School.id)
             .where(School.country_code == country_code)
-            .where(SchoolService._scoped_resolved_location_clause(SchoolLocation, city))
+            .where(SchoolService._listable_location_clause(SchoolLocation, city))
             .group_by(SchoolLocationAgeGroupShift.age_group)
         )
         city_clause = SchoolService._city_clause(city)

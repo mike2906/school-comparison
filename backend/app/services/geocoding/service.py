@@ -24,6 +24,23 @@ def _is_deterministic_force_failure(result: GeocodingResult) -> bool:
     return result.error in _DETERMINISTIC_FORCE_FAILURES
 
 
+def geocode_failure_is_terminal(meta: object) -> bool:
+    """Return whether a null coordinate has durable failure evidence.
+
+    Routine runs leave these accepted terminal states alone. An operator may still
+    deliberately retry one with ``force=True`` after the underlying data changes.
+    """
+    if not isinstance(meta, dict):
+        return False
+    return (
+        meta.get("status") in {"failed", "rejected"}
+        and isinstance(meta.get("provider"), str)
+        and bool(meta["provider"].strip())
+        and isinstance(meta.get("rejection_reason"), str)
+        and bool(meta["rejection_reason"].strip())
+    )
+
+
 def _preferred_geocoding_city(school: School | None) -> Optional[str]:
     if school is None:
         return None
@@ -129,6 +146,20 @@ class GeocodingService:
                 provider="cached",
                 method=(location.geocode_meta or {}).get("method"),
                 precision=(location.geocode_meta or {}).get("precision"),
+            )
+
+        if not force and geocode_failure_is_terminal(location.geocode_meta):
+            meta = location.geocode_meta or {}
+            logger.debug(
+                "Location %s has terminal geocode failure evidence; skipping automatic retry",
+                location.id,
+            )
+            return GeocodingResult(
+                success=False,
+                error=meta["rejection_reason"],
+                provider=meta["provider"],
+                method=meta.get("method"),
+                precision=meta.get("precision"),
             )
 
         had_coordinates = location.lat is not None and location.lng is not None
@@ -320,11 +351,19 @@ class GeocodingService:
             query = query.where(func.lower(School.country_code) == country_code.strip().lower())
         if city is not None:
             query = query.where(func.lower(School.city) == city.strip().lower())
-        if limit is not None:
+        if limit is not None and force:
             query = query.limit(limit)
 
         result = await self.db.execute(query)
         locations = result.all()
+        if not force:
+            locations = [
+                row
+                for row in locations
+                if not geocode_failure_is_terminal(row[0].geocode_meta)
+            ]
+            if limit is not None:
+                locations = locations[:limit]
 
         if not locations:
             logger.info(

@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any, Optional, Union
 
-from pydantic import BaseModel, ConfigDict, Field, JsonValue, computed_field
+from pydantic import BaseModel, ConfigDict, Field, JsonValue, computed_field, field_validator
 
 from app.schemas.pricing import PricingResponse
 from app.schemas.field_source import FieldSourceResponse
@@ -12,7 +12,7 @@ from app.utils.display_gating import (
 )
 from app.utils.i18n_resolver import resolve_address_i18n, resolve_name_i18n
 from app.utils.location_tags import semantic_location_tags
-from app.utils.school_attributes import build_display_attributes
+from app.utils.school_attributes import build_display_attributes, publishable_display_i18n
 from app.utils.website_data import attributes_for_publication, website_data_is_publishable
 
 
@@ -226,6 +226,12 @@ class SchoolLocationBase(BaseModel):
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
+    @field_validator("address_i18n", mode="before")
+    @classmethod
+    def sanitize_address_i18n(cls, value: Any) -> dict[str, str]:
+        """Withhold tainted locale values before either address field is serialized."""
+        return publishable_display_i18n(value)
+
     @computed_field(return_type=list[str])
     @property
     def location_tags(self) -> list[str]:
@@ -235,7 +241,7 @@ class SchoolLocationBase(BaseModel):
     @computed_field(return_type=dict[str, str])
     @property
     def resolved_address_i18n(self) -> dict[str, str]:
-        return resolve_address_i18n(self.address_i18n)
+        return publishable_display_i18n(resolve_address_i18n(self.address_i18n))
 
 
 class SchoolLocationResponse(SchoolLocationBase):

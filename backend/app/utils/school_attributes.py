@@ -125,7 +125,7 @@ def _normalize_text(value: Any) -> Optional[str]:
     return text or None
 
 
-def _publishable_display_text(value: Any) -> Optional[str]:
+def publishable_display_text(value: Any) -> Optional[str]:
     """Normalize plain display text and reject Markdown or bare URLs globally."""
     text = _normalize_text(value)
     if (
@@ -135,6 +135,21 @@ def _publishable_display_text(value: Any) -> Optional[str]:
     ):
         return None
     return text
+
+
+def publishable_display_i18n(value: Any) -> dict[str, str]:
+    """Project an i18n mapping through the shared fail-closed text sanitizer."""
+    if not isinstance(value, Mapping):
+        return {}
+
+    published: dict[str, str] = {}
+    for locale, raw_text in value.items():
+        if not isinstance(locale, str):
+            continue
+        text = publishable_display_text(raw_text)
+        if text is not None:
+            published[locale] = text
+    return published
 
 
 def _normalize_language_level(value: Any) -> Optional[str]:
@@ -397,10 +412,10 @@ def build_localized_attributes(
     resolved["language_focus"] = [
         entry
         for entry in resolved["language_focus"]
-        if _publishable_display_text(entry.get("language"))
+        if publishable_display_text(entry.get("language"))
         and (
             entry.get("level") is None
-            or _publishable_display_text(entry.get("level"))
+            or publishable_display_text(entry.get("level"))
         )
     ]
     for field, values in resolved.items():
@@ -409,7 +424,7 @@ def build_localized_attributes(
         resolved[field] = [
             text
             for value in values
-            if (text := _publishable_display_text(value)) is not None
+            if (text := publishable_display_text(value)) is not None
         ]
     return resolved
 

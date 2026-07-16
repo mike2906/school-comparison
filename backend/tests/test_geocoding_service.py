@@ -471,6 +471,84 @@ class TestGeocodingService:
         assert location.geocode_meta["provider"] == "mock"
         assert location.geocode_meta["rejection_reason"] == "API error"
 
+    async def test_terminal_failure_evidence_prevents_automatic_retry(
+        self,
+        db_session: AsyncSession,
+    ):
+        mock_provider = AsyncMock()
+        mock_provider.provider_name = "mock"
+        service = GeocodingService(db=db_session, provider=mock_provider)
+        school = School(
+            name_i18n={"bg": "Terminally unresolved school"},
+            country_code="bg",
+            city="sofia",
+            school_type="private",
+            education_level="primary",
+        )
+        db_session.add(school)
+        await db_session.flush()
+        location = SchoolLocation(
+            school_id=school.id,
+            address_i18n={"bg": "бул. Самоков 47"},
+            geocode_meta={
+                "status": "failed",
+                "provider": "nominatim",
+                "rejection_reason": "No results found",
+            },
+            is_primary=True,
+        )
+        db_session.add(location)
+        await db_session.commit()
+
+        result = await service.geocode_location(location)
+
+        assert result.success is False
+        assert result.error == "No results found"
+        assert result.provider == "nominatim"
+        mock_provider.geocode.assert_not_awaited()
+
+    async def test_force_explicitly_retries_terminal_failure(
+        self,
+        db_session: AsyncSession,
+    ):
+        mock_provider = AsyncMock()
+        mock_provider.provider_name = "mock"
+        mock_provider.geocode.return_value = GeocodingResult(
+            lat=42.7,
+            lng=23.3,
+            success=True,
+            provider="mock",
+            method="test",
+            precision="exact",
+        )
+        service = GeocodingService(db=db_session, provider=mock_provider)
+        school = School(
+            name_i18n={"bg": "Explicit retry school"},
+            country_code="bg",
+            city="sofia",
+            school_type="private",
+            education_level="primary",
+        )
+        db_session.add(school)
+        await db_session.flush()
+        location = SchoolLocation(
+            school_id=school.id,
+            address_i18n={"bg": "ул. Тест 1"},
+            geocode_meta={
+                "status": "rejected",
+                "provider": "geojson_bg",
+                "rejection_reason": "address mismatch",
+            },
+            is_primary=True,
+        )
+        db_session.add(location)
+        await db_session.commit()
+
+        result = await service.geocode_location(location, force=True)
+
+        assert result.success is True
+        mock_provider.geocode.assert_awaited_once()
+
     async def test_force_deterministic_miss_clears_stale_coordinates_and_records_attempt_metadata(
         self,
         db_session: AsyncSession,
@@ -807,6 +885,20 @@ class TestGeocodingService:
         )
         db_session.add(location3)
 
+        # Location 4: unresolved with durable failure evidence. This is an accepted
+        # terminal state and must not be selected by a routine missing-location run.
+        location4 = SchoolLocation(
+            school_id=school.id,
+            address_i18n={"bg": "ул. Неразрешима 4"},
+            geocode_meta={
+                "status": "failed",
+                "provider": "nominatim",
+                "rejection_reason": "No results found",
+            },
+            is_primary=False,
+        )
+        db_session.add(location4)
+
         await db_session.commit()
 
         # Geocode all missing
@@ -821,6 +913,7 @@ class TestGeocodingService:
         await db_session.refresh(location1)
         await db_session.refresh(location2)
         await db_session.refresh(location3)
+        await db_session.refresh(location4)
 
         assert location1.lat == 42.6977
         assert location1.lng == 23.3219
@@ -828,6 +921,10 @@ class TestGeocodingService:
         assert location2.lng == 23.3219
         assert location3.lat == 42.0  # Unchanged
         assert location3.lng == 23.0  # Unchanged
+        assert location4.lat is None
+        assert location4.lng is None
+        assert location4.geocode_meta["status"] == "failed"
+        assert mock_provider.geocode.await_count == 2
 
     async def test_geocode_all_locations_force_refreshes_existing_with_limit(
         self,

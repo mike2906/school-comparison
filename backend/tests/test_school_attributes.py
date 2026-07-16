@@ -16,6 +16,7 @@ from app.models.school import School, SchoolLocation
 from app.schemas.school import (
     SchoolDisplayAttributes,
     SchoolListResponse,
+    SchoolLocationResponse,
     SchoolLocalizedAttributes,
     SchoolResponse,
 )
@@ -335,6 +336,32 @@ class TestLocalizedProjection:
             "08:00 - 19:00",
             "Сесията включва три етапа - задачи, интервю и среща.",
         ]
+
+    def test_location_projection_drops_school_367_markdown_address(self):
+        location = SchoolLocationResponse.model_validate(
+            {
+                "id": 897,
+                "school_id": 367,
+                "age_groups": ["grade_1_4"],
+                "address_i18n": {
+                    "bg": (
+                        'кв."Бенковски", ул."Наука" №2 '
+                        "](https://60ousvsvkirilimetodii.com/index.php) Навигация"
+                    ),
+                    "en": "2 Nauka St, Benkovski",
+                },
+            }
+        )
+
+        payload = location.model_dump(mode="json")
+
+        assert payload["address_i18n"] == {"en": "2 Nauka St, Benkovski"}
+        assert payload["resolved_address_i18n"] == {
+            "bg": "2 Nauka St, Benkovski",
+            "en": "2 Nauka St, Benkovski",
+        }
+        assert "http" not in str(payload)
+        assert "](" not in str(payload)
 
     def test_scraper_display_fields_are_declared_in_the_allowlist(self):
         projected_scraper_fields = {
