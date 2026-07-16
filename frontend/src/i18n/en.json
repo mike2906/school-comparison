@@ -21,7 +21,7 @@
   },
   "landing": {
     "title": "Find the perfect school for your child",
-    "subtitle": "Explore kindergartens and schools in Sofia with map, comparison, and admission information",
+    "subtitle": "Explore Sofia schools on the map and compare available admission and pricing data",
     "selectCategory": "Select category",
     "categoryKindergarten": "Kindergarten",
     "categoryKindergartenSubtitle": "Ages 0-6",
@@ -40,9 +40,9 @@
     "crossoverCheckboxKindergarten": "Also show pre-school programs at primary schools",
     "crossoverCheckboxSchool": "Also show kindergarten pre-school programs",
     "featureMapTitle": "Interactive Map",
-    "featureMapDesc": "See all schools on the map with location-based filters",
+    "featureMapDesc": "See schools with confirmed locations using map-based filters",
     "featureCompareTitle": "Comparison",
-    "featureCompareDesc": "Compare private schools by prices and services",
+    "featureCompareDesc": "Compare available verified prices and services",
     "featureResultsTitle": "NVO Results",
     "featureResultsDesc": "View historical exam results for state schools"
   },

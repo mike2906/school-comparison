@@ -111,6 +111,100 @@ def website_admission_enabled(monkeypatch):
     monkeypatch.setattr(get_settings(), "publish_website_admission_fields", True)
 
 
+@pytest.fixture
+def website_dynamic_fields_enabled(monkeypatch):
+    monkeypatch.setattr(get_settings(), "publish_website_dynamic_fields", True)
+
+
+class TestDynamicWebsiteLaunchScope:
+    SCRAPED_DYNAMIC_FIELDS = {
+        "extracted": {
+            "class_size": "16 students per class",
+            "founded_year": 1998,
+            "operations": {
+                "working_hours": "08:00-18:00",
+                "daily_schedule": ["Classes until 15:00"],
+            },
+        }
+    }
+
+    def test_dynamic_website_fields_are_withheld_by_default(self):
+        assert get_settings().publish_website_dynamic_fields is False
+
+        base = build_base_attributes(self.SCRAPED_DYNAMIC_FIELDS)
+        localized = build_localized_attributes(self.SCRAPED_DYNAMIC_FIELDS, "en")
+
+        assert base["class_size"] is None
+        assert base["school_hours"] is None
+        assert base["established_year"] is None
+        assert localized["daily_schedule"] == []
+
+    def test_curated_top_level_dynamic_fields_remain_publishable(self):
+        base = build_base_attributes(
+            {
+                **self.SCRAPED_DYNAMIC_FIELDS,
+                "class_size": 18,
+                "school_hours": "07:30-17:30",
+                "established_year": 1975,
+            }
+        )
+
+        assert base["class_size"] == 18
+        assert base["school_hours"] == "07:30-17:30"
+        assert base["established_year"] == 1975
+
+    def test_flag_restores_dynamic_website_fields(self, website_dynamic_fields_enabled):
+        base = build_base_attributes(self.SCRAPED_DYNAMIC_FIELDS)
+        localized = build_localized_attributes(self.SCRAPED_DYNAMIC_FIELDS, "en")
+
+        assert base["class_size"] == 16
+        assert base["school_hours"] == "08:00-18:00"
+        assert base["established_year"] == 1998
+        assert localized["daily_schedule"] == ["Classes until 15:00"]
+
+    def test_validator_rejected_founded_year_stays_withheld(
+        self, website_dynamic_fields_enabled
+    ):
+        attributes = {
+            **self.SCRAPED_DYNAMIC_FIELDS,
+            "data_validation": {
+                "status": "needs_review",
+                "spot_check": {
+                    "discrepancies": [
+                        {
+                            "field_path": "attributes.extracted.founded_year",
+                            "kind": "contradiction",
+                        }
+                    ]
+                },
+            },
+        }
+
+        assert build_base_attributes(attributes)["established_year"] is None
+
+    def test_rejected_scraped_year_does_not_hide_curated_year(
+        self, website_dynamic_fields_enabled
+    ):
+        attributes = {
+            **self.SCRAPED_DYNAMIC_FIELDS,
+            "established_year": 1975,
+            "data_validation": {
+                "status": "needs_review",
+                "spot_check": {
+                    "discrepancies": [
+                        {
+                            "field_path": "attributes.extracted.founded_year",
+                            "kind": "contradiction",
+                        }
+                    ]
+                },
+            },
+        }
+
+        assert build_base_attributes(attributes)["established_year"] == 1975
+
+
+@pytest.mark.usefixtures("website_dynamic_fields_enabled")
 class TestClassSize:
     """Ported from frontend/src/utils/schoolAttributes.test.js."""
 
@@ -154,6 +248,7 @@ class TestClassSize:
         assert build_base_attributes({"extracted": {"class_size": "120 students"}})["class_size"] is None
 
 
+@pytest.mark.usefixtures("website_dynamic_fields_enabled")
 class TestLocalizedProjection:
     def test_prefers_extracted_i18n_for_locale(self):
         localized = build_localized_attributes(INTERNAL_ATTRIBUTES, "en")
@@ -446,6 +541,7 @@ class TestLocalizedProjection:
         assert build_localized_attributes(attrs, "en")["facilities"] == ["Library"]
 
 
+@pytest.mark.usefixtures("website_dynamic_fields_enabled")
 class TestSeededDisplayFields:
     """Fields only `scripts/seed_data.py` writes, but `SchoolDetailPage` renders.
 
@@ -522,11 +618,9 @@ class TestSeededDisplayFields:
     def test_numeric_string_year_is_coerced(self):
         assert build_base_attributes({"established_year": "1975"})["established_year"] == 1975
 
-    def test_founded_year_is_not_silently_promoted(self):
-        # extracted.founded_year is the scraped analogue; surfacing it would be a
-        # behaviour change, not a port. See P1.10.
+    def test_flag_restores_scraped_founded_year(self):
         base = build_base_attributes({"extracted": {"founded_year": 1998}})
-        assert base["established_year"] is None
+        assert base["established_year"] == 1998
 
     def test_filter_tags_are_served_and_canonical(self):
         # The frontend counts advanced-filter checkboxes against these locale-independent
@@ -750,7 +844,10 @@ class TestSerializationAllowlist:
         data = response.json()
 
         assert self._leaked(response.text) == []
-        assert data["attributes"]["class_size"] == 16
+        assert data["attributes"]["class_size"] is None
+        assert data["attributes"]["school_hours"] is None
+        assert data["attributes"]["established_year"] is None
+        assert data["attributes_i18n"]["bg"]["daily_schedule"] == []
         assert data["attributes_i18n"]["bg"]["facilities"] == ["Библиотека"]
         assert data["attributes_i18n"]["en"]["facilities"] == ["Library"]
         # Canonical advanced-filter tags ship alongside the free text (P1.9), mapped

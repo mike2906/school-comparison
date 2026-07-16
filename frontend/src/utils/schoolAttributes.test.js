@@ -2,9 +2,14 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
+  getAdmissionStatusKey,
+  getAfterSchoolEvidence,
+  getCanonicalAmenityEvidence,
   getCanonicalAmenityFlags,
   getFilterTags,
   getLanguageFocusPairs,
+  getLocationDisplayEvidence,
+  hasDisplayEvidence,
   normalizeSchool,
   normalizeSchoolAttributes,
 } from './schoolAttributes.js'
@@ -130,6 +135,101 @@ test('canonical amenity flags ignore retired unproduced boolean aliases', () => 
   const flags = getCanonicalAmenityFlags(attributes)
   assert.equal(flags.transport, false)
   assert.equal(flags.extended, false)
+})
+
+test('amenity evidence distinguishes explicit false from missing data', () => {
+  assert.deepEqual(getCanonicalAmenityEvidence({}), {
+    meals: null,
+    transport: null,
+    extended: null,
+    accessibility: null,
+  })
+  assert.deepEqual(
+    getCanonicalAmenityEvidence(
+      { has_canteen: false, facilities: [], filter_tags: {} },
+      false
+    ),
+    {
+      meals: false,
+      transport: null,
+      extended: false,
+      accessibility: null,
+    }
+  )
+})
+
+test('amenity evidence keeps supported positive claims', () => {
+  const evidence = getCanonicalAmenityEvidence({
+    facilities: ['accessible'],
+    filter_tags: {
+      facilities: ['transportation'],
+      special_programs: ['meals_provided', 'extended_day'],
+    },
+  })
+
+  assert.deepEqual(evidence, {
+    meals: true,
+    transport: true,
+    extended: true,
+    accessibility: true,
+  })
+})
+
+test('after-school evidence is unknown unless a location records a boolean', () => {
+  assert.equal(getAfterSchoolEvidence([]), null)
+  assert.equal(getAfterSchoolEvidence([{ age_group_shifts: [{}] }]), null)
+  assert.equal(
+    getAfterSchoolEvidence([{ age_group_shifts: [{ has_organised_groups: false }] }]),
+    false
+  )
+  assert.equal(
+    getAfterSchoolEvidence([
+      { age_group_shifts: [{ has_organised_groups: false }] },
+      { age_group_shifts: [{ has_organised_groups: true }] },
+    ]),
+    true
+  )
+  assert.equal(
+    getAfterSchoolEvidence([
+      { age_group_shifts: [{ has_organised_groups: false }, {}] },
+    ]),
+    null
+  )
+  assert.equal(
+    getAfterSchoolEvidence([
+      { age_group_shifts: [{ has_organised_groups: false }] },
+      { age_group_shifts: [] },
+    ]),
+    null
+  )
+})
+
+test('admission status omits unknown and unrecognized values', () => {
+  assert.equal(getAdmissionStatusKey(null), null)
+  assert.equal(getAdmissionStatusKey('unknown'), null)
+  assert.equal(getAdmissionStatusKey('Accepting applications'), 'accepting')
+  assert.equal(getAdmissionStatusKey('waitlist'), 'waitlist')
+  assert.equal(getAdmissionStatusKey('closed'), 'full')
+})
+
+test('display evidence treats explicit false as evidence but empty values as absent', () => {
+  assert.equal(hasDisplayEvidence(false), true)
+  assert.equal(hasDisplayEvidence(0), true)
+  assert.equal(hasDisplayEvidence('  '), false)
+  assert.equal(hasDisplayEvidence([]), false)
+  assert.equal(hasDisplayEvidence({ nested: [] }), false)
+  assert.equal(hasDisplayEvidence({ nested: ['value'] }), true)
+})
+
+test('address-less locations remain visible when comparison evidence is usable', () => {
+  const withAgeGroup = getLocationDisplayEvidence({ age_groups: ['grade_1_4'] })
+  const withShift = getLocationDisplayEvidence({ age_group_shifts: [{ shift: 'morning' }] })
+  const withDistance = getLocationDisplayEvidence({}, null, 1.25)
+
+  assert.equal(hasDisplayEvidence(withAgeGroup), true)
+  assert.equal(hasDisplayEvidence(withShift), true)
+  assert.equal(hasDisplayEvidence(withDistance), true)
+  assert.equal(hasDisplayEvidence(getLocationDisplayEvidence({})), false)
 })
 
 test('getLanguageFocusPairs includes every attributes_i18n locale for filter counts', () => {

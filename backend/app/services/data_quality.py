@@ -196,7 +196,7 @@ def _pricing_gate_failures(rows: list[Pricing]) -> dict[str, Any]:
     publishable = 0
     for row in rows:
         total += 1
-        if pricing_row_is_publishable(row.source, row.source_url, row.pricing_context):
+        if pricing_row_is_publishable(row):
             publishable += 1
         else:
             failing += 1

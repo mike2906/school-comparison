@@ -1074,7 +1074,7 @@ extraction/prompt-tuning iterations.
       **Done (PR #53, merged `df0a032`).** Verified by P2.9 run 2: 0 Sofia out-of-bounds
       coordinates; 394/394 precision-metadata coverage; school 233 documented-unresolved;
       cohort regenerated (363 full-refresh eligible schools, ≈$0.75 projection).
-- [ ] **P2.12 Release-boundary hardening (from P2.9 run 2 + 2026-07-16 reviews).** All
+- [x] **P2.12 Release-boundary hardening (from P2.9 run 2 + 2026-07-16 reviews).** All
       verification is deterministic (targeted tests, API sweeps, DB audits) — no LLM
       cohort reruns.
       - [x] **Run-2 bounded failures (a)–(d): done in PR #54 (2026-07-16).** Shared
@@ -1089,10 +1089,30 @@ extraction/prompt-tuning iterations.
         automatically retryable. The audit calls the shared production sanitizer and
         therefore covers both scheme URLs and bare domains, and its tracked default
         cohort makes the command runnable without the local P2.9 report directory.
-      - [ ] **Remaining P2.12 work (e)–(g): not part of PR #54.** Curated-pricing
-        hardening, high-risk scraped-field withholding, and the UI truthfulness pass
-        remain open below; do not treat the parent P2.12 checkbox as complete until they
-        land.
+      - [x] **Remaining P2.12 work (e)–(g): complete in PR #56
+        (2026-07-16; zero LLM calls).**
+        Curated pricing now requires an official source, traceable URL,
+        bounded confidence, explicit verifier identity plus timezone-aware verification
+        time, a verification date, and a valid positive single amount or ordered range;
+        malformed and prose-bearing unverified rows fail closed through the shared API/
+        scoreboard predicate. Class size, daily schedules/opening hours, established
+        year, and the localized allowlist's other dynamic admission members remain stored
+        but are withheld by default behind the launch-scope flags; curated top-level
+        values remain publishable. Sparse UI views hide empty sections and unknown-status
+        badges, omit the unsupported “standard curriculum” fallback, render absent amenity
+        evidence as unavailable rather than “No”, and qualify pricing/admission/map copy.
+        Address-less locations remain visible in comparison when they carry usable
+        age-group, shift, or distance evidence; a regression test covers all three evidence
+        paths and the fully empty case. Verification: 852 backend tests; frontend tests,
+        lint, and production build; stored-data audit 54/54 HTTP 200 with zero Markdown,
+        dynamic-field, or invalid-pricing hits, zero unexplained duplicate groups,
+        terminal-location and school-161 withholding evidence intact, and `llm_calls=0`.
+        **Pricing-date decision (2026-07-16; Codex round 4 accepted-and-declined):** retain
+        the P2.8 contract: `scraped_at` is the public verification date for curated rows,
+        while `pricing_context.human_verification.verified_at` is the authoritative timestamp
+        and is required by the publication gate. Extraction times remain preserved on the
+        stored `scraped_website` candidate rows. A dedicated column is outside launch scope;
+        the response naming can be revisited post-launch without a database migration (P4.8).
       (a) **Fix the school 367 address Markdown leak.** Location 897 serializes
       `](https://60ousvsvkirilimetodii.com/index.php)` in list address text — the P2.5(b)
       sanitizer does not cover address/location display fields. Extend it in the shared
@@ -1174,6 +1194,8 @@ extraction/prompt-tuning iterations.
 - [ ] **P4.6 Tests for `/schools/filters`** and `SchoolService.list_schools_filtered`
       attribute matching.
 - [ ] **P4.7 TypeScript** for new frontend files (optional; market signal, not product).
+- [ ] **P4.8 Pricing verification-date response alias.** Revisit the public `scraped_at`
+      name for curated pricing via a response-schema alias; no database migration required.
 
 ## Post-launch enrichment track (unblocked by launch; sequenced by P2.10's outcome)
 

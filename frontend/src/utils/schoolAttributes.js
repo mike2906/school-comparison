@@ -78,6 +78,88 @@ export function getCanonicalAmenityFlags(attributes, hasAfterSchool = false) {
   }
 }
 
+/**
+ * Return tri-state evidence for claims that the comparison UI previously rendered as
+ * Yes/No. `null` means the payload has no evidence either way; a missing positive tag
+ * is not evidence that a service is unavailable.
+ */
+export function getCanonicalAmenityEvidence(attributes, afterSchoolEvidence = null) {
+  const flags = getCanonicalAmenityFlags(attributes, afterSchoolEvidence === true)
+  const facilities = Array.isArray(attributes?.facilities) ? attributes.facilities : []
+
+  return {
+    meals: flags.meals ? true : attributes?.has_canteen === false ? false : null,
+    transport: flags.transport ? true : null,
+    extended: flags.extended ? true : afterSchoolEvidence === false ? false : null,
+    accessibility: facilities.includes('accessible') ? true : null,
+  }
+}
+
+export function getAfterSchoolEvidence(locations) {
+  if (!Array.isArray(locations) || locations.length === 0) return null
+  let sawFalse = false
+  let sawUnknown = false
+
+  for (const location of locations) {
+    const shifts = Array.isArray(location?.age_group_shifts)
+      ? location.age_group_shifts
+      : []
+    if (shifts.length === 0) {
+      sawUnknown = true
+      continue
+    }
+    for (const shift of shifts) {
+      const value = shift?.has_organised_groups
+      if (value === true) return true
+      if (value === false) sawFalse = true
+      else sawUnknown = true
+    }
+  }
+
+  return sawFalse && !sawUnknown ? false : null
+}
+
+/**
+ * Return only location fields that the comparison row can actually display. Keeping this
+ * separate from the address prevents an address-less location with useful enrollment,
+ * shift, or distance evidence from making the whole locations section look empty.
+ */
+export function getLocationDisplayEvidence(location, address = null, distance = null) {
+  const ageGroups = (Array.isArray(location?.age_groups)
+    ? location.age_groups
+    : [location?.age_group]
+  ).filter(Boolean)
+  const shifts = (Array.isArray(location?.age_group_shifts)
+    ? location.age_group_shifts
+    : []
+  ).map(item => item?.shift).filter(Boolean)
+
+  return {
+    address: typeof address === 'string' && address.trim() ? address.trim() : null,
+    ageGroups,
+    shifts,
+    distance: Number.isFinite(distance) ? distance : null,
+  }
+}
+
+export function getAdmissionStatusKey(rawStatus) {
+  const status = String(rawStatus || '').trim().toLowerCase()
+  if (status.includes('accept') || status.includes('open') || status.includes('available')) {
+    return 'accepting'
+  }
+  if (status.includes('wait')) return 'waitlist'
+  if (status.includes('full') || status.includes('closed')) return 'full'
+  return null
+}
+
+export function hasDisplayEvidence(value) {
+  if (value == null) return false
+  if (Array.isArray(value)) return value.some(hasDisplayEvidence)
+  if (typeof value === 'string') return value.trim().length > 0
+  if (typeof value === 'object') return Object.values(value).some(hasDisplayEvidence)
+  return true
+}
+
 function addLanguageFocusPairs(values, pairs) {
   if (!Array.isArray(values)) return
 

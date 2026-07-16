@@ -6,7 +6,7 @@ import { getSchoolName, getAddress } from '../../utils/i18n'
 import { formatDistance } from '../../utils/distance'
 import { getFocusEmoji } from '../../utils/locationFocus'
 import { getBenchmarkComparison, getNvoDetail as getSharedNvoDetail } from '../../utils/nvo'
-import { getCanonicalAmenityFlags } from '../../utils/schoolAttributes'
+import { getAdmissionStatusKey, getCanonicalAmenityFlags } from '../../utils/schoolAttributes'
 import { classifyAdmissionRequirement } from '../../utils/admission'
 
 const typeColors = {
@@ -19,7 +19,6 @@ const STATUS_COLORS = {
   accepting: '#10b981',
   waitlist: '#f59e0b',
   full: '#ef4444',
-  unknown: '#9ca3af',
 }
 
 const SHIFT_ICONS = {
@@ -116,22 +115,17 @@ function normalizeLanguageFocus(languageFocus = []) {
 }
 
 function getStatusInfo(school, t) {
-  const rawStatus =
-    school.admission_info?.status ||
-    ''
-  const statusValue = String(rawStatus).toLowerCase()
-
-  if (statusValue.includes('accept') || statusValue.includes('open') || statusValue.includes('available')) {
+  const statusKey = getAdmissionStatusKey(school.admission_info?.status)
+  if (statusKey === 'accepting') {
     return { key: 'accepting', color: STATUS_COLORS.accepting, label: t('schoolCard.status.accepting') }
   }
-  if (statusValue.includes('wait')) {
+  if (statusKey === 'waitlist') {
     return { key: 'waitlist', color: STATUS_COLORS.waitlist, label: t('schoolCard.status.waitlist') }
   }
-  if (statusValue.includes('full') || statusValue.includes('closed')) {
+  if (statusKey === 'full') {
     return { key: 'full', color: STATUS_COLORS.full, label: t('schoolCard.status.full') }
   }
-
-  return { key: 'unknown', color: STATUS_COLORS.unknown, label: t('schoolCard.status.unknown') }
+  return null
 }
 
 function getPrimaryFeature(attributes, t) {
@@ -209,10 +203,7 @@ function getPrimaryFeature(attributes, t) {
     }
   }
 
-  return {
-    icon: '📘',
-    text: t('schoolCard.feature.standardCurriculum'),
-  }
+  return null
 }
 
 function formatCurrency(amount, locale) {
@@ -900,15 +891,15 @@ const SchoolCard = forwardRef(function SchoolCard(
     : distanceValue <= 5
     ? { backgroundColor: 'rgba(245,158,11,0.1)', color: '#d97706' }
     : { backgroundColor: 'rgba(239,68,68,0.1)', color: '#dc2626' }
-  const statusStyle = {
+  const statusStyle = statusInfo ? {
     backgroundColor: statusInfo.color,
     boxShadow: `0 0 8px ${hexToRgba(statusInfo.color, 0.4)}`,
-  }
-  const statusBadgeStyle = {
+  } : null
+  const statusBadgeStyle = statusInfo ? {
     backgroundColor: hexToRgba(statusInfo.color, 0.1),
     borderColor: hexToRgba(statusInfo.color, 0.35),
     color: statusInfo.color,
-  }
+  } : null
   const featureLineClass = 'flex items-center gap-1.5 text-sm max-md:text-[13px] text-neutral-700 leading-relaxed px-2 -mx-2 py-1 rounded transition-all hover:bg-teal-50/60 hover:pl-4'
   const secondaryLineClass = 'text-[13px] text-neutral-500'
 
@@ -962,12 +953,14 @@ const SchoolCard = forwardRef(function SchoolCard(
     >
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-start gap-2">
-          <span
-            className={`h-2.5 w-2.5 rounded-full ${statusInfo.key === 'accepting' ? 'animate-pulse' : ''}`}
-            style={statusStyle}
-            aria-label={statusInfo.label}
-            role="img"
-          />
+          {statusInfo && (
+            <span
+              className={`h-2.5 w-2.5 rounded-full ${statusInfo.key === 'accepting' ? 'animate-pulse' : ''}`}
+              style={statusStyle}
+              aria-label={statusInfo.label}
+              role="img"
+            />
+          )}
           <h3 className="text-[18px] font-semibold text-neutral-900 leading-snug max-md:text-[16px]" data-testid="school-name">
             {schoolName}
           </h3>
@@ -1148,10 +1141,12 @@ const SchoolCard = forwardRef(function SchoolCard(
             </div>
           )}
 
-          <div className="inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-[13px] font-medium" style={statusBadgeStyle}>
-            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: statusInfo.color }} aria-hidden="true" />
-            <span>{statusInfo.label}</span>
-          </div>
+          {statusInfo && (
+            <div className="inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-[13px] font-medium" style={statusBadgeStyle}>
+              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: statusInfo.color }} aria-hidden="true" />
+              <span>{statusInfo.label}</span>
+            </div>
+          )}
         </div>
       </div>
 

@@ -148,11 +148,19 @@ function SchoolDetailPage() {
   const amenityFlags = getAmenityFlags(attributes, hasAfterSchool)
   const hasFacilities = Object.values(amenityFlags).some(Boolean) || (attributes.facilities || []).length > 0
   const hasSpecialPrograms = (attributes.special_programs || []).length > 0 || (attributes.activities_offered || []).length > 0
+  const hasAtAGlance = Boolean(
+    school.num_pupils != null ||
+    attributes.class_size != null ||
+    attributes.teacher_student_ratio ||
+    attributes.school_hours ||
+    normalizeLanguageFocus(attributes.language_focus).length > 0 ||
+    attributes.established_year
+  )
 
-  const statusStyle = {
+  const statusStyle = statusInfo ? {
     backgroundColor: statusInfo.color,
     boxShadow: `0 0 8px ${hexToRgba(statusInfo.color, 0.4)}`,
-  }
+  } : null
 
   const handleCompareClick = () => {
     if (inCompare) {
@@ -216,12 +224,14 @@ function SchoolDetailPage() {
         {/* Hero Section */}
         <div className="bg-white rounded-2xl shadow-card border border-neutral-200 p-6 md:p-10 mb-6">
           <div className="flex items-start gap-3 mb-4">
-            <span
-              className={`h-3 w-3 rounded-full mt-2 flex-shrink-0 ${statusInfo.key === 'accepting' ? 'animate-pulse' : ''}`}
-              style={statusStyle}
-              aria-label={statusInfo.label}
-              role="img"
-            />
+            {statusInfo && (
+              <span
+                className={`h-3 w-3 rounded-full mt-2 flex-shrink-0 ${statusInfo.key === 'accepting' ? 'animate-pulse' : ''}`}
+                style={statusStyle}
+                aria-label={statusInfo.label}
+                role="img"
+              />
+            )}
             <div className="flex-1">
               <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-neutral-900 leading-tight">{schoolName}</h1>
             </div>
@@ -242,16 +252,18 @@ function SchoolDetailPage() {
             <span className="px-4 py-2 rounded-lg text-sm font-semibold bg-neutral-100 text-neutral-700 border border-neutral-200">
               {t(`educationLevels.${school.education_level}`)}
             </span>
-            <span
-              className="px-4 py-2 rounded-lg text-sm font-semibold border"
-              style={{
-                backgroundColor: hexToRgba(statusInfo.color, 0.1),
-                borderColor: hexToRgba(statusInfo.color, 0.35),
-                color: statusInfo.color,
-              }}
-            >
-              {statusInfo.label}
-            </span>
+            {statusInfo && (
+              <span
+                className="px-4 py-2 rounded-lg text-sm font-semibold border"
+                style={{
+                  backgroundColor: hexToRgba(statusInfo.color, 0.1),
+                  borderColor: hexToRgba(statusInfo.color, 0.35),
+                  color: statusInfo.color,
+                }}
+              >
+                {statusInfo.label}
+              </span>
+            )}
           </div>
 
           {summary && (
@@ -289,7 +301,8 @@ function SchoolDetailPage() {
         </div>
 
         {/* At a Glance Section */}
-        <div className="bg-white rounded-2xl shadow-card border border-neutral-200 p-6 md:p-8 mb-6">
+        {hasAtAGlance && (
+          <div className="bg-white rounded-2xl shadow-card border border-neutral-200 p-6 md:p-8 mb-6">
           <h2 className="text-2xl font-bold text-neutral-900 mb-6">{t('schools.atAGlance')}</h2>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {/* Total Students */}
@@ -376,7 +389,8 @@ function SchoolDetailPage() {
               </div>
             )}
           </div>
-        </div>
+          </div>
+        )}
 
         {/* Locations & Admission Requirements */}
         {locations.length > 0 && (

@@ -1,5 +1,6 @@
 """Tests for the P1.6 data-quality scoreboard and PipelineRun lifecycle."""
 
+from datetime import datetime
 from types import SimpleNamespace
 
 import pytest
@@ -12,6 +13,17 @@ from app.services.data_quality import compute_quality_metrics
 from app.services.pipeline_runs import _aggregate_usage, finalize_pipeline_run, start_pipeline_run
 
 pytestmark = pytest.mark.asyncio
+PRICING_VERIFIED_AT = datetime(2026, 7, 16, 9, 0)
+
+
+def _verified_context(confidence):
+    return {
+        "confidence": confidence,
+        "human_verification": {
+            "verified_by": "test-curator",
+            "verified_at": "2026-07-16T09:00:00Z",
+        },
+    }
 
 
 async def _make_school(db, **kwargs):
@@ -58,7 +70,8 @@ async def quality_fixture(db_session):
         Pricing(
             school_id=a.id, category=PriceCategory.TUITION, period=PricePeriod.MONTHLY,
             amount=500, source=PriceSource.OFFICIAL, source_url="https://a.bg/fees",
-            pricing_context={"confidence": 0.9},
+            scraped_at=PRICING_VERIFIED_AT,
+            pricing_context=_verified_context(0.9),
         )
     )
     db_session.add(
@@ -238,12 +251,12 @@ async def test_website_validation_coverage_excludes_registry_only_and_withheld_d
 async def test_pricing_failure_metric_matches_fail_closed_publication_gate(db_session):
     school = await _make_school(db_session)
     contexts = [
-        {"confidence": 0.9},
+        _verified_context(0.9),
         {},
-        {"confidence": True},
-        {"confidence": "0.9"},
-        {"confidence": 1.1},
-        {"confidence": 0.69},
+        _verified_context(True),
+        _verified_context("0.9"),
+        _verified_context(1.1),
+        _verified_context(0.69),
     ]
     db_session.add_all(
         [
@@ -254,6 +267,7 @@ async def test_pricing_failure_metric_matches_fail_closed_publication_gate(db_se
                 amount=500 + index,
                 source=PriceSource.OFFICIAL,
                 source_url="https://example.com/fees",
+                scraped_at=PRICING_VERIFIED_AT,
                 pricing_context=context,
             )
             for index, context in enumerate(contexts)
@@ -292,7 +306,8 @@ async def test_scoreboard_publishable_pricing_matches_schema_serialization(db_se
             amount=5000,
             source=PriceSource.OFFICIAL,
             source_url="https://example.com/verified-fees",
-            pricing_context={"confidence": 1.0},
+            scraped_at=PRICING_VERIFIED_AT,
+            pricing_context=_verified_context(1.0),
         ),
         Pricing(
             school_id=school.id,
@@ -301,7 +316,8 @@ async def test_scoreboard_publishable_pricing_matches_schema_serialization(db_se
             amount=100,
             source=PriceSource.OFFICIAL,
             source_url="https://example.com/verified-fees",
-            pricing_context={"confidence": 0.5},
+            scraped_at=PRICING_VERIFIED_AT,
+            pricing_context=_verified_context(0.5),
         ),
         Pricing(
             school_id=school.id,
