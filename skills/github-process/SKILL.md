@@ -30,22 +30,26 @@ for that.
    why they are accepted before merging.
    - **Docs-only / trivial PRs:** skip the `@codex review` request to conserve usage; merge
      on green CI once mergeable.
-   - **Review budget:** make at most two Codex review requests by default: the initial review
-     and one re-review after fixes. Never request a new review after every small fix or
-     commit. An idle session does not justify another request, and do not repost while a
-     review is still in flight.
-   - **Batch findings before re-review:** wait for the full review, collect all actionable
-     threads, and fix them together. Before requesting the one re-review, audit the affected
-     subsystem for neighboring versions of the same bug, add regression tests for the
-     findings and nearby edge cases, run the relevant focused tests plus the full applicable
-     suite, and push one consolidated fix batch.
-   - **Stop a review loop:** if the re-review finds new issues, do not automatically enter
-     another fix → commit → review cycle. Collect and address the new findings as one batch,
-     perform a broader local audit, and report the result to the user. A third or later Codex
-     review requires explicit user approval after stating the prior review count, the PR
-     size, and why another full review is worth the usage. Otherwise, merge only when the
-     latest findings are resolved or explicitly accepted, CI is green, and the local audit
-     supports the fixes.
+   - **One request at a time:** never request a review after every small fix or commit. An
+     idle session does not justify another request, and do not repost while a review is still
+     in flight.
+   - **Review stable, consolidated heads:** before the initial request, finish the intended
+     implementation, tests, local checks, and supporting evidence. After a review, wait for
+     the complete result, group findings by root cause, and fix all actionable findings
+     together. Audit the affected subsystem for neighboring versions of the same bug, add
+     regression tests for the findings and nearby edge cases, run the relevant focused tests
+     plus the full applicable suite, and push one consolidated fix batch before re-review.
+   - **Converge on evidence, not a fixed review count:** continue the review → batch fixes →
+     re-review loop while each round identifies actionable correctness, security, or data-
+     integrity issues and the fixes are making measurable progress. Merge only when the
+     latest PR head has been reviewed, all actionable findings are resolved or explicitly
+     accepted, CI is green, and the local audit supports the fixes.
+   - **Pause non-converging loops:** stop and ask the user for direction when the same root-
+     cause issue survives two consecutive fix attempts, findings conflict, a proposed fix
+     materially expands the agreed scope, or a round contains only duplicate, stylistic, or
+     speculative feedback. Report the review count, the repeating or disputed findings, the
+     evidence from tests/audits, and a concrete recommendation. Do not suppress substantive
+     findings merely because several reviews have already run.
 8. If CI is green, the Codex review is clear or resolved (or was intentionally skipped for a
    docs-only PR), and the PR is mergeable, merge it to `main` and delete the branch.
    Immediately before merging, verify that the latest reviewed commit SHA is still the PR
