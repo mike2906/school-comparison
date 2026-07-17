@@ -12,11 +12,13 @@ Prompt changes: none
 
 ## Read this first
 
-This is a **partial review packet**, not a blocker-list verdict. The run was stopped during
-extraction to preserve the user-approved `$1.00` hard session budget. It completed URL
-validation and navigation for all 18 schools, then persisted 9 of 18 extractions. Stage 6
-validation and Stage 7 summarization were not reached. No second run and no other model were
-used.
+This packet is **complete enough for the blocker-taxonomy review**, not a blocker-list verdict.
+The original cohort process was stopped during extraction to preserve the user-approved `$1.00`
+hard session budget. It completed URL validation and navigation for all 18 schools, then
+persisted 9 of 18 extractions. After the user's partial-run review, one extraction-only top-up
+reused school 538's cached navigation and supplied the sole missing pricing-taxonomy case. The
+full cohort's Stage 6 validation and Stage 7 summarization were not reached; that is accepted for
+this bounded model-ceiling decision. No other school or model was run.
 
 The manual reviewer should not interpret an unavailable new value as a pass or a fail.
 
@@ -25,15 +27,17 @@ The manual reviewer should not interpret an unavailable new value as a pass or a
 | Item | Exact result |
 |---|---|
 | OpenRouter key usage before | `$9.55274413` |
-| OpenRouter key usage after settlement | `$10.39444013` |
-| Provider-accounted run cost | **`$0.841696`** |
-| Budget remaining | `$0.158304` |
-| Pipeline status | `PARTIAL` |
-| Stage outcomes | URL validation 18/18; navigation 18/18; extraction 9/18 persisted; validation not reached; summarization not reached |
-| Persisted fresh extractions | `105, 153, 404, 454, 460, 516, 570, 584, 631` |
-| No fresh extraction | `103, 233, 297, 324, 440, 506, 529, 538, 610` |
+| Original cohort usage after settlement | `$10.39444013` (`$0.841696`) |
+| School-538 top-up usage | `$10.39444013` → `$10.47598213` (**`$0.081542`**) |
+| Combined provider-accounted ceiling spend | **`$0.923238`** |
+| Original `$1.00` budget remaining | `$0.076762` |
+| Pipeline / evaluation status | Original pipeline row `PARTIAL`; ceiling evidence **complete enough for blocker-taxonomy review**; verdict pending |
+| Stage outcomes | URL validation 18/18; navigation 18/18; original extraction 9/18 persisted; school-538 extraction-only top-up succeeded; cohort Stage 6 and summarize not reached |
+| Persisted fresh extractions | Original 9: `105, 153, 404, 454, 460, 516, 570, 584, 631`; top-up: `538` |
+| No fresh extraction | `103, 233, 297, 324, 440, 506, 529, 610` |
 | Token accounting | Unavailable: the timed-out/interrupted requests did not return OpenRouter usage payloads. This is not recorded as zero. |
 | Visible call failures | Four blank `Extraction call failed (PriceExtractionOutput)` warnings before termination; the log did not identify them as typed schema retries versus provider timeouts. |
+| School-538 top-up calls | Two Gemini calls; zero model retries; zero hard failures; deterministic validation inside extraction returned `ok` |
 
 The exact provider delta is authoritative for cost. The missing token split is an observed
 failure of accounting under interrupted requests; no token estimate has been substituted.
@@ -42,9 +46,12 @@ failure of accounting under interrupted requests; no token estimate has been sub
 
 ### School 538 — transport / tuition association
 
-| `9d2c837f` stored output | Ceiling-run stored output |
+| `9d2c837f` stored output | Fresh Gemini stored output (`2026-07-17 11:24:13Z`) |
 |---|---|
-| `TUITION 510 EUR MONTHLY`; `TRANSPORT 26 EUR MONTHLY`; `TRANSPORT 160 EUR MONTHLY`; `TRANSPORT 580 EUR MONTHLY`; extracurricular rows `13/23/25/25/30/33/33 EUR MONTHLY`. The documented blocker says 26 is after-hours care, 160 is transport, and 580 is nursery tuition. | **Unavailable.** School 538 finished navigation but did not persist a Gemini extraction. Its database rows still carry the later cheap-tier timestamp `2026-07-15 14:36:02Z`, so they are not ceiling-run evidence. |
+| `TUITION 510 EUR MONTHLY`; `TRANSPORT 26 EUR MONTHLY`; `TRANSPORT 160 EUR MONTHLY`; `TRANSPORT 580 EUR MONTHLY`; extracurricular rows `13/23/25/25/30/33/33 EUR MONTHLY`. The documented blocker says 26 is after-hours care, 160 is transport, and 580 is nursery tuition. | `TUITION 510 EUR MONTHLY`; `TRANSPORT 26 EUR MONTHLY`; `TRANSPORT 160 EUR MONTHLY`; `TRANSPORT 580 EUR MONTHLY`; extracurricular rows `13/23/25/25/30/33/33 EUR MONTHLY`. All age groups remain null. Fresh confidence is `0.90–0.95`; the `580` row includes diapers, food/drinks, and cosmetics, while remaining categorized as transport. |
+
+The old and fresh tuple sets are identical. This is a factual diff only; the user decides the
+transport/tuition-association verdict against the source headings.
 
 Manual verdict: [ ] pass  [ ] fail  [ ] not reviewable
 
@@ -121,8 +128,8 @@ The prior manual blocker groups were:
 | Mistranslation / unstable operational details: 538 | **No Gemini summaries generated.** |
 | Raw/generic artifacts: 103, 297, 324 (`!▪️ Педагогически съветник...`) | **No Gemini summaries generated.** |
 
-Extraction cleared `summary_i18n` for the nine freshly extracted schools
-(`105,153,404,454,460,516,570,584,631`). The other nine retain pre-run summaries and are not
+Extraction cleared `summary_i18n` for the ten freshly extracted schools
+(`105,153,404,454,460,516,538,570,584,631`). The other eight retain pre-run summaries and are not
 Gemini evidence. Because Stage 7 was never reached, summary identity/tone is not reviewable from
 this run.
 
@@ -130,8 +137,8 @@ Manual verdict: [ ] pass  [ ] fail  [ ] not reviewable
 
 ## Frozen publish-boundary evidence
 
-Both deterministic checks made 54 requests (list, detail, and compare, BG and EN), with zero LLM
-calls:
+Both deterministic checks were rerun after the school-538 top-up and made 54 requests (list,
+detail, and compare, BG and EN), with zero LLM calls:
 
 - tracked stored-run audit: 54/54 HTTP 200, `passed=true`, no withheld-pricing leaks;
 - explicit payload scan: zero serialized summaries, zero website-derived admission values, and
@@ -146,4 +153,5 @@ See [`boundary-audit.json`](boundary-audit.json) and
 - Value-model candidates approved for a later run: ____________________
 - Extraction model selected for the full refresh: ____________________
 
-No value-model run or P2.13 work was started in this session.
+No value-model run or P2.13 work was started. The school-538 top-up is the final permitted model
+call for this ceiling evaluation.

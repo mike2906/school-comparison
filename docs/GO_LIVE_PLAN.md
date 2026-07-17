@@ -1046,8 +1046,8 @@ experiment's outcome; P2.13 remains a separate zero-LLM session.
       *Verify:* a side-by-side review packet with exact run accounting; the user records
       blocker-list pass/fail per case and chooses any value-model candidate. The refresh
       item above then references the chosen model.
-      **Ceiling-run record (2026-07-17) — `PARTIAL`, stopped at the budget guard; user
-      judgment pending.** Run `396dffe5-c905-44e2-8582-1d4c1bcdbd66` pinned both model
+      **Ceiling-run record (2026-07-17) — complete enough for the blocker-taxonomy
+      review; user judgment pending.** Run `396dffe5-c905-44e2-8582-1d4c1bcdbd66` pinned both model
       tiers to the plain `google/gemini-3.1-pro-preview`, Google AI Studio only, provider
       fallbacks off, and `require_parameters=true`; no prompt changes or other model calls.
       URL validation and navigation completed 18/18. During extraction, four visible
@@ -1055,15 +1055,21 @@ experiment's outcome; P2.13 remains a separate zero-LLM session.
       rose much faster than the ≈$0.57 projection. The run was terminated before breaching
       the $1 hard cap: 9/18 extractions persisted, Stage 6 and summarize were not reached,
       and the pipeline row is `PARTIAL` (45 succeeded / 9 failed outcomes across 54
-      attempted stage-school units). Exact OpenRouter key-usage delta: **$0.841696**
-      (`$9.55274413` → `$10.39444013`; `$0.158304` budget remained). Exact token counts
-      are unavailable rather than zero because timed-out/interrupted calls did not return
-      usage payloads. The post-run tracked audit and explicit payload scan each made 54
-      deterministic requests with zero LLM calls: 54/54 HTTP 200 and zero serialized
-      summaries, website-derived admission values, or scraped pricing. Fresh comparison
-      output exists for pricing schools 153/570 and admission school 105; 538/103/506 and
-      all summary cases have no fresh ceiling output. Do not infer a blocker verdict from
-      missing output. Manual packet:
+      attempted stage-school units). After the user's partial review, one extraction-only
+      top-up reused school 538's cached navigation: it succeeded on the first attempt with
+      two Gemini calls, zero model retries, zero hard failures, and deterministic validation
+      `ok`. The top-up cost exactly **$0.081542** (`$10.39444013` → `$10.47598213`),
+      bringing total provider-accounted ceiling spend to **$0.923238**
+      (`$9.55274413` → `$10.47598213`; `$0.076762` of the original cap remains). Exact
+      token counts for the interrupted cohort calls are unavailable rather than zero
+      because they did not return usage payloads. The resulting 9+1 fresh extractions cover
+      the blocker taxonomy; the unreached cohort Stage 6 and summarize stages are accepted
+      for this bounded decision. Both post-top-up audits made 54 deterministic requests
+      with zero LLM calls: 54/54 HTTP 200 and zero serialized summaries, website-derived
+      admission values, or scraped pricing. The packet now includes fresh comparison output
+      for pricing schools 538/570/153 and admission school 105; unavailable cases remain
+      explicitly not reviewable. The blocker-list pass/fail verdict remains the user's
+      manual review step. No full Gemini completion or other model run is authorized. Packet:
       `backend/reports/pilot/396dffe5-c905-44e2-8582-1d4c1bcdbd66/blocker-review.md`.
 - [x] **P2.11 City-scope repair + import gate, then cohort regeocode.** (From P2.9 run 1.
       Executes between P2.9 run 1 and the P2.9 rerun — see the Order line above.) The
