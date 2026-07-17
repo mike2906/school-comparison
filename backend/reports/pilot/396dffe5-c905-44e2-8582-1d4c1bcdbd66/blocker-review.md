@@ -53,7 +53,10 @@ failure of accounting under interrupted requests; no token estimate has been sub
 The old and fresh tuple sets are identical. This is a factual diff only; the user decides the
 transport/tuition-association verdict against the source headings.
 
-Manual verdict: [ ] pass  [ ] fail  [ ] not reviewable
+Manual verdict: [ ] pass  [x] fail  [ ] not reviewable — identical miscategorization
+reproduced: 580 EUR remains TRANSPORT despite the fresh row itself listing diapers,
+food/drinks, and cosmetics (nursery tuition per the documented ground truth), at 0.90–0.95
+confidence. (User review 2026-07-17.)
 
 ### School 570 — registration / deposit / meals headings
 
@@ -64,7 +67,12 @@ Manual verdict: [ ] pass  [ ] fail  [ ] not reviewable
 The old and fresh tuple sets are identical. This is a factual diff only; the user decides the
 blocker verdict against the source headings.
 
-Manual verdict: [ ] pass  [ ] fail  [ ] not reviewable
+Manual verdict: [ ] pass  [x] fail  [ ] not reviewable — user review against the live fee
+page (2026-07-17): `TUITION 180 MONTHLY` is actually **meals**; `REGISTRATION 850 ONE_TIME`
+is actually the **monthly tuition fee (Sept–June)**; `REGISTRATION 1000` is a **deposit**;
+`REGISTRATION 300` is **school supplies**; `100` is a trial-day application fee; the "local
+families" qualifier on `680 MONTHLY` is lost; annual transport (2750) and regional bus (200)
+rows were not captured. `4122 TERM` is an installment-plan variant the schema cannot express.
 
 ### School 153 — combined Uwekind page entity / plan association
 
@@ -75,7 +83,12 @@ Manual verdict: [ ] pass  [ ] fail  [ ] not reviewable
 The old and fresh tuple sets are identical. This is a factual diff only; the user decides the
 entity-association verdict against the combined source page.
 
-Manual verdict: [ ] pass  [ ] fail  [ ] not reviewable
+Manual verdict: [ ] pass  [x] fail  [ ] not reviewable — user review against
+uwekind.com/admission/fees (2026-07-17): the stored `7000/7400/8100/8250` are
+**payment-plan variants** (7000 vs 7400 = same kindergarten year in 2 vs 10 installments;
+8100/8250 = preschool *and* school in 2 vs 3 installments), while the headline base fees
+**6820 (KG) / 7880 (preschool) / 7880 (school) per year are missing entirely**. No
+entity/plan attribution survives; a parent cannot tell which price applies to which program.
 
 ## Admission-fragment cases
 
@@ -87,7 +100,7 @@ These are raw stored extraction values. They remained unpublished; see the bound
 |---|---|
 | `entrance_requirements`: `здравно-профилактична карта на детето`; `попълнена от личния лекар`; `изследвания на кръв и урина`; `извършени в едноседмичен срок преди постъпване на детето в детската градина`; `данни от личния лекар`; `че на детето са извършени задължителните имунизации за възрастта`; `при отсъствие за повече от 2 месеца – еднократен отрицателен резултат за чревни паразити`. | **Unavailable.** Navigation completed, but no Gemini extraction persisted; the old extracted value remains in storage. |
 
-Manual verdict: [ ] pass  [ ] fail  [ ] not reviewable
+Manual verdict: [ ] pass  [ ] fail  [x] not reviewable — no fresh extraction persisted.
 
 ### School 105
 
@@ -95,7 +108,10 @@ Manual verdict: [ ] pass  [ ] fail  [ ] not reviewable
 |---|---|
 | `entrance_requirements`: `Деца`; `на които не са извършени задължителните имунизации за възрастта не се приемат в ДГ № 4 „Слънчо“.` | `entrance_requirements: []`; `required_documents`: `Заявление за записване`, `Оригинал на удостоверението за раждане на детето`, `Документи за самоличност на родителите/настойника`, `Нова здравна карта за дете с данни за имунизационния статус`, `1. Оригинал на удостоверението за раждане на детето`; `application_steps`: `Подаване на заявление и декларации по образец в основната сграда`, `се извършва само чрез писмено заявление`, `Заявление за преминаване към самостоятелна организация –`, `Заявление за достъп до лични данни –`, `ДГ4 – Заявление за достъп до обществена информация –`, `ДГ4 – Протокол за приемане на устно заявление за достъп до обществена информация –`. |
 
-Manual verdict: [ ] pass  [ ] fail  [ ] not reviewable
+Manual verdict: [ ] pass  [x] fail  [ ] not reviewable — structure improved over the old
+garbled negative (real `required_documents` list), but `application_steps` misfiles GDPR
+data-access request forms and dangling fragments (`Заявление за достъп до лични данни –`)
+as enrollment steps, and duplicates a birth-certificate entry. (User review 2026-07-17.)
 
 ### School 153
 
@@ -103,7 +119,9 @@ Manual verdict: [ ] pass  [ ] fail  [ ] not reviewable
 |---|---|
 | `entrance_requirements`: `Сесията включва три етапа - задачи в писмен вид`; `интервю и изпращане на обратна връзка за кандидата.`; `Интервю – комуникативни и социални умения`; `мотивация за учене.` | The same four `entrance_requirements` fragments. Additionally, `application_steps` stores `Административна такса за кандидатстване за прием` and `Такса кандидатстване:`. |
 
-Manual verdict: [ ] pass  [ ] fail  [ ] not reviewable
+Manual verdict: [ ] pass  [x] fail  [ ] not reviewable — identical mid-sentence fragments
+reproduced, plus new dangling artifacts (a bare `Такса кандидатстване:` label stored as an
+application step). (User review 2026-07-17.)
 
 ### School 506
 
@@ -111,7 +129,7 @@ Manual verdict: [ ] pass  [ ] fail  [ ] not reviewable
 |---|---|
 | `entrance_requirements`: `Children must be able to provide self-care independently (e.g. toileting`; `changing clothes)`; `application_deadlines`: `The admission procedure may require placement tests and/or interviews.` | **Unavailable.** Navigation completed, but no Gemini extraction persisted; the old extracted value remains in storage. |
 
-Manual verdict: [ ] pass  [ ] fail  [ ] not reviewable
+Manual verdict: [ ] pass  [ ] fail  [x] not reviewable — no fresh extraction persisted.
 
 ## Summary identity and tone
 
@@ -133,7 +151,9 @@ Extraction cleared `summary_i18n` for the ten freshly extracted schools
 Gemini evidence. Because Stage 7 was never reached, summary identity/tone is not reviewable from
 this run.
 
-Manual verdict: [ ] pass  [ ] fail  [ ] not reviewable
+Manual verdict: [ ] pass  [ ] fail  [x] not reviewable — Stage 7 never ran. Moot for the
+ceiling verdict: summaries are out of launch scope, and the reviewable extraction cases
+already decide the architecture-ceiling question.
 
 ## Frozen publish-boundary evidence
 
@@ -149,9 +169,14 @@ See [`boundary-audit.json`](boundary-audit.json) and
 
 ## User decision
 
-- Blocker-list judgment: [ ] frontier passes  [ ] frontier fails  [ ] run is insufficient
-- Value-model candidates approved for a later run: ____________________
-- Extraction model selected for the full refresh: ____________________
+- Blocker-list judgment: [ ] frontier passes  [x] frontier fails  [ ] run is insufficient
+  — all five reviewable blocker cases (538, 570, 153-pricing, 105, 153-admission) fail with
+  output identical or equivalent to the cheap tier. **Verdict: architecture ceiling, not a
+  model-capability ceiling.** (User review, 2026-07-17.)
+- Value-model candidates approved for a later run: **none** — with frontier output identical
+  to the cheap tier on the blocker cases, a cheaper model cannot do better than "also
+  identical"; the value question is void until the extraction architecture changes (E1).
+- Extraction model selected for the full refresh: **current cheap tier, unchanged.**
 
 No value-model run or P2.13 work was started. The school-538 top-up is the final permitted model
 call for this ceiling evaluation.
