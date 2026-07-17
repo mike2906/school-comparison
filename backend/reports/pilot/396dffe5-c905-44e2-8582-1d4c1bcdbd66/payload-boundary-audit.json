@@ -1,0 +1,9 @@
+{
+  "requests": 54,
+  "non_200": {},
+  "serialized_summary_hits": [],
+  "website_admission_hits": [],
+  "scraped_pricing_hits": [],
+  "passed": true,
+  "llm_calls": 0
+}

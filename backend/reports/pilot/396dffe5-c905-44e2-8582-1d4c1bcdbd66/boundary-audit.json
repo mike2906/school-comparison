@@ -1,0 +1,21 @@
+{
+  "cohort_ids": [103, 105, 153, 233, 297, 324, 404, 440, 454, 460, 506, 516, 529, 538, 570, 584, 610, 631],
+  "api": {
+    "requests": 54,
+    "non_200": {},
+    "markdown_hits": [],
+    "school_367_payloads": 6,
+    "school_367_tainted_address_hits": [],
+    "dynamic_field_hits": [],
+    "withheld_pricing_hits": [],
+    "published_pricing_ids": []
+  },
+  "database": {
+    "duplicate_groups": [[1141, 1142], [130, 132], [1107, 1108, 1123], [129, 133], [1160, 1191], [853, 854], [1104, 1111]],
+    "unexplained_duplicate_groups": [],
+    "terminal_locations": {"1143": true, "1145": true, "1188": true},
+    "school_161_withheld": true
+  },
+  "llm_calls": 0,
+  "passed": true
+}
