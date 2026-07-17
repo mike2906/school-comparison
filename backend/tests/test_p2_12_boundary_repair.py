@@ -22,6 +22,70 @@ def test_boundary_audit_does_not_treat_plain_hyphens_as_markdown():
     assert hits == []
 
 
+def test_exhaustive_boundary_scan_allows_url_fields_but_rejects_display_urls():
+    hits = audit_p2_12_boundary.all_display_text_hits(
+        {
+            "website_url": "https://school.bg",
+            "source_url": "https://source.bg",
+            "attributes_i18n": {"bg": {"facilities": ["See school.bg/library"]}},
+        },
+        endpoint="test",
+    )
+
+    assert hits == [
+        {
+            "endpoint": "test",
+            "path": "attributes_i18n.bg.facilities.0",
+            "value": "See school.bg/library",
+        }
+    ]
+
+
+def test_exhaustive_boundary_scan_finds_internal_and_raw_provenance_keys():
+    hits = audit_p2_12_boundary.internal_key_hits(
+        {
+            "attributes": {"moe_code": "x", "data_validation": {}},
+            "field_sources": [{"source_type": "official", "value_text": "rejected"}],
+        },
+        endpoint="test",
+    )
+
+    assert {hit["path"] for hit in hits} == {
+        "attributes.moe_code",
+        "attributes.data_validation",
+        "field_sources.0.value_text",
+    }
+
+
+def test_cached_truth_runs_must_match_intentional_partial_run_evidence():
+    actual = {
+        "run_id": "db4ba90d-6894-4164-a873-34ee79687fad",
+        "found": True,
+        "status": "partial",
+        "cohort_size": 18,
+        "cost_usd": 0.029856,
+    }
+
+    assert audit_p2_12_boundary.cached_run_matches_expectation(actual) is True
+    assert audit_p2_12_boundary.cached_run_matches_expectation(
+        {**actual, "status": "completed"}
+    ) is False
+    assert audit_p2_12_boundary.cached_run_matches_expectation(
+        {**actual, "cost_usd": None}
+    ) is False
+
+
+def test_exhaustive_boundary_scan_rejects_partial_coordinate_pairs():
+    locations = [
+        SchoolLocation(id=1, school_id=1, lat=42.7, lng=None),
+        SchoolLocation(id=2, school_id=1, lat=None, lng=23.3),
+        SchoolLocation(id=3, school_id=1, lat=42.7, lng=23.3),
+        SchoolLocation(id=4, school_id=1, lat=None, lng=None),
+    ]
+
+    assert audit_p2_12_boundary.partial_coordinate_location_ids(locations) == [1, 2]
+
+
 def test_boundary_audit_has_tracked_default_cohort_and_accepts_override(tmp_path):
     assert audit_p2_12_boundary.read_cohort() == list(
         audit_p2_12_boundary.DEFAULT_COHORT_IDS

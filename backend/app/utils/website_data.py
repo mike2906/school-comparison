@@ -30,7 +30,19 @@ def website_data_is_publishable(attributes: Any, scrape_status: Any) -> bool:
     """
     attrs = attributes if isinstance(attributes, Mapping) else {}
     status = str(scrape_status or "").strip().lower()
-    return status in WEBSITE_PUBLISHABLE_STATUSES and not bool(attrs.get(WEBSITE_DATA_WITHHELD_KEY))
+    report = attrs.get("data_validation")
+    if not isinstance(report, Mapping):
+        return False
+    version = report.get("_schema_version", report.get("schema_version"))
+    try:
+        report_is_current = int(version) == 1
+    except (TypeError, ValueError):
+        report_is_current = False
+    return (
+        status in WEBSITE_PUBLISHABLE_STATUSES
+        and not bool(attrs.get(WEBSITE_DATA_WITHHELD_KEY))
+        and report_is_current
+    )
 
 
 def attributes_for_publication(attributes: Any, scrape_status: Any) -> dict[str, Any]:
@@ -41,4 +53,3 @@ def attributes_for_publication(attributes: Any, scrape_status: Any) -> dict[str,
     for key in _PRIVATE_WEBSITE_ATTRIBUTE_KEYS:
         attrs.pop(key, None)
     return attrs
-

@@ -830,6 +830,13 @@ will need to be repeated.
       - [ ] **Set an OpenRouter spend guardrail (or explicitly approve operating without one).**
             The projected refresh is affordable, but the active key reports `limit=null`; record a
             cap with headroom before treating the cost-control precondition as met.
+            **P2.13 evidence (2026-07-17; user decision still required):** the active key
+            reports usage `$10.47598213`, `limit=null`, and `limit_remaining=null`.
+            Recommended headroom is `$5` for the ≈`$0.752620` cheap-tier projection:
+            because current usage already exceeds `$5`, set an absolute cumulative key
+            limit of about **`$15.50`** if the dashboard retains this usage, or `$5` on a
+            reset/new key. Leave this checkbox open until the user records the dashboard
+            decision (or explicitly approves operating uncapped).
       - [ ] If the boundary pilot (P2.9) is closed, P2.10 is closed,
             P2.12/P2.13 are green, and the user has explicitly approved, run the full
             Sofia website refresh once on the **current cheap extraction tier, unchanged**
@@ -1134,7 +1141,7 @@ boundary remains fixed and fail-closed; P2.13 remains a separate zero-LLM sessio
       *Verify:* regression tests for (a)/(e)/(f); cohort API sweep clean on Markdown and
       withheld fields; duplicate-coordinate audit shows zero unexplained groups; UI
       renders sparse schools without fabricated negatives.
-- [ ] **P2.13 Exhaustive Sofia audit (deterministic, no LLM).** After P2.10's closure,
+- [x] **P2.13 Exhaustive Sofia audit (deterministic, no LLM).** After P2.10's closure,
       in a separate session: run the full
       audit battery over the entire Sofia scope, not just the cohort — API
       boundary sweep (list/detail/compare, both locales) against the launch-acceptance
@@ -1145,6 +1152,22 @@ boundary remains fixed and fail-closed; P2.13 remains a separate zero-LLM sessio
       **Then STOP.** With P2.13 green and the OpenRouter spend-cap decision recorded,
       request the user's explicit approval before the one-time full Sofia refresh
       (363 schools; update the projection for the current cheap tier; summarize skipped).
+      **Done 2026-07-17 (`llm_calls=0`).** The exhaustive sweep covered all `443`
+      Sofia DB-scoped schools (a superset of the cached 363-school refresh cohort):
+      `1,066/1,066` BG/EN list/detail/compare requests returned HTTP 200, with zero
+      summaries, website-derived admission values, scraped pricing, raw/rejected
+      provenance values, Markdown/bare-URL display text, dynamic-field leaks, or
+      internal keys. It found and boundedly fixed one fail-open edge: website-derived
+      attributes now require a current schema-version-1 validation report before
+      publication while curated top-level attributes remain available. Final coverage
+      is `14/14` (`100%`) with `0` published without a report; the other stored candidates
+      remain withheld pending refresh. Geocoding is green (`394/394` precision metadata,
+      zero out-of-bounds, seven explained duplicate groups, zero unexplained, all 86
+      terminal failures null with evidence). Cached truth sets `db4ba90d…` and
+      `396dffe5…` are present and their known rejected/incorrect cases remain withheld;
+      pricing predicate/scoreboard/API parity is exact at zero rows. Evidence:
+      `backend/reports/p2-13/20260717T124505Z/acceptance.md`. The spend recommendation is
+      recorded above, but its checkbox remains a user decision. **STOP: no refresh run.**
 
 ## Phase 3 — Go live
 
