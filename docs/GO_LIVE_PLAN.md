@@ -800,7 +800,7 @@ will need to be repeated.
             launch — P2.8 gates the API to curated rows only, which removes these failures from
             the release path without another extraction iteration. The PR #48 pricing regressions
             stay merged. Heading/entity association work moves to the post-launch enrichment
-            track, informed by the P2.10 model experiment.
+            track, where P2.10's architecture-ceiling verdict makes E1 the prerequisite.
       - [x] **Close provenance and localized-field publish bypasses.** Detail/compare expose raw
             `field_sources[].value_text` even when the corresponding field was rejected (school 529
             publishes `9 students` through provenance while `attributes.class_size` is null; the
@@ -825,17 +825,19 @@ will need to be repeated.
             **Superseded 2026-07-15 (not implemented).** Generative summaries are out of launch
             scope — **P2.6** withholds them globally at serialization. A 6/18 manual pass rate
             after three fix iterations is a model-capability signal, not a bug list;
-            parent-readiness work moves to the post-launch enrichment track and depends on the
-            P2.10 model experiment.
+            parent-readiness work moves to the post-launch enrichment track. P2.10 later
+            established an architecture ceiling, so E1 now precedes further re-extraction.
       - [ ] **Set an OpenRouter spend guardrail (or explicitly approve operating without one).**
             The projected refresh is affordable, but the active key reports `limit=null`; record a
             cap with headroom before treating the cost-control precondition as met.
-      - [ ] If the boundary pilot (P2.9) is closed, P2.12/P2.13 are green, and the user
-            has explicitly approved, run the full Sofia website refresh once on the
-            **current cheap extraction tier** (P2.10 deferred to post-launch,
-            2026-07-16) with the summarize stage skipped (summaries are out of launch
-            scope — don't pay for prose nobody sees). Then run the corrected
-            force-regeocode process.
+      - [ ] If the boundary pilot (P2.9) is closed, P2.10 is closed,
+            P2.12/P2.13 are green, and the user has explicitly approved, run the full
+            Sofia website refresh once on the **current cheap extraction tier, unchanged**
+            with the summarize stage skipped (summaries are out of launch scope — don't
+            pay for prose nobody sees). The failed frontier experiment does not delay the
+            refresh. The capable spot-check tier is
+            a separate refresh-config decision recorded in P2.10(c), not a blocker. Then
+            run the corrected force-regeocode process.
             NVO remains independent and must not be refreshed as part of `all` unless a
             separate NVO audit calls for it.
       - [ ] Re-run audits and the scoreboard, triage failures, and targeted-rerun only the
@@ -868,18 +870,16 @@ official/curated `admission_info`, manually curated pricing, registry/corroborat
 website-derived admission fields, scraped pricing rows, raw provenance values. Once
 P2.5–P2.8 land, the public boundary is **frozen** — no further extraction-semantics fixes
 enter the release path; that work continues on the post-launch enrichment track (end of
-this file), informed by the P2.10 model experiment.
+this file), constrained by P2.10's architecture-ceiling verdict.
 
-**Order (revised 2026-07-16, after the P2.9 rerun reviews):** P2.5 →
+**Order (revised 2026-07-17, after the P2.10 verdict):** P2.5 →
 P2.6/P2.7/P2.8 (independent, any order) → P2.9 run 1 → P2.11 city-scope repair →
 P2.9 rerun (done, run `db4ba90d…` — see P2.9) → **P2.12 release-boundary
-hardening** → **P2.13 exhaustive no-LLM audit** → spend guardrail → **stop and
-request user approval** → full refresh → audits/acceptance.
-**P2.10 is deferred to the post-launch enrichment track** (decision 2026-07-16):
-no more full-cohort LLM reruns before launch; the refresh runs on the current
-cheap tier. The release boundary is fixed and fail-closed — a future quality
-failure removes a field family from launch scope rather than reopening
-extraction/prompt-tuning iterations.
+hardening** → **P2.10 closed: architecture ceiling; cheap tier selected** →
+**NEXT: P2.13 exhaustive no-LLM audit (separate session)** → spend guardrail →
+**stop and request user approval** → full refresh on the current cheap tier →
+audits/acceptance. Value-model runs are no longer on the launch path. The release
+boundary remains fixed and fail-closed; P2.13 remains a separate zero-LLM session.
 
 - [x] **P2.5 Close the two remaining publish-boundary bugs.**
       (a) **Provenance becomes metadata-only.** Detail/compare responses still expose raw
@@ -943,7 +943,7 @@ extraction/prompt-tuning iterations.
       `backend/reports/curation/pricing-worklist.md`.
 - [x] **P2.9 Boundary-focused pilot (launch configuration).** After P2.5–P2.8, rerun the
       same reviewed 18-school cohort on the **current cheap models** (the launch
-      configuration — do not combine with the P2.10 model change). Acceptance is
+      configuration — do not combine with the separate P2.10 frontier experiment). Acceptance is
       boundary-only, per the revised launch-acceptance list above: zero internal/raw/
       rejected-value leakage including provenance, zero summaries, zero website-derived
       admission fields, zero scraped pricing, clean names/locations/filters/NVO/API checks,
@@ -1001,41 +1001,28 @@ extraction/prompt-tuning iterations.
       bare domains cannot evade the sweep. Deterministic no-address failures record the
       `local_validation` provider, and the audit carries a tracked default cohort plus an
       optional `--cohort-file` override (no dependency on gitignored run artifacts).
-- [ ] **P2.10 Model-capability experiment (informs the refresh and the enrichment track;
-      NOT a launch gate).** **Deferred to post-launch (decision 2026-07-16, from the
-      P2.9-rerun reviews): the full refresh runs on the current cheap tier; this
-      experiment now sequences the enrichment track only. Do not run before launch.**
-      Question to answer: is the semantic long tail a
-      model-capability ceiling or an architecture ceiling — and which extraction model
-      should power the one-time full refresh? All runs reuse the same 18-school cohort
-      tooling; model tiers are configuration. OpenRouter prices checked live 2026-07-15
-      (per M input/output).
-      (a) **Ceiling run:** rerun the cohort with a frontier model as the extraction tier —
-      `google/gemini-2.5-pro` or `openai/gpt-5.1` ($1.25/$10; ≈$0.40 per cohort run).
-      Include summarize (evaluation only — summaries stay unpublished). Compare stored
-      outputs against the documented `9d2c837f` blocker list: 538 transport/tuition
-      association, 570 registration/deposit/meals headings, 153 combined Uwekind page
-      entity association, admission fragments (103/105/153/506), summary identity/tone
-      failures. The human review pass against that checklist is the user's step.
-      If the frontier model fails the same associations → the architecture is the
-      ceiling; stop here, run the refresh on the current cheap tier, and the enrichment
-      track becomes curation-first.
-      (b) **Value run (only if (a) passes):** `deepseek/deepseek-v3.2` ($0.269/$0.40;
-      ≈$0.06 per cohort run; ≈$1.50 full-refresh projection). Alternates if it
-      disappoints: `z-ai/glm-4.7` ($0.40/$1.75), `moonshotai/kimi-k2.5` ($0.57/$2.85).
-      Pick the cheapest model that reproduces the frontier's correct behavior on the
-      blocker list; that model powers the full refresh.
-      (c) **Regardless of outcome:** upgrade the spot-check (capable) tier from
-      `openai/gpt-4o-mini` ($0.15/$0.60) to `deepseek/deepseek-v3.2` — roughly
-      price-neutral, and the auditor should be smarter than the extractor.
-      Caveats: pin OpenRouter provider routing / use `require_parameters` so PydanticAI
-      structured output is honored, and watch the first run for schema-validation retries
-      (they surface as extra cost and silently missing fields, not errors). Chinese models
-      read Bulgarian better than they write it — retest Bulgarian *generation* before ever
-      re-enabling summaries on one.
-      *Verify:* a short findings note (which model, blocker-list pass/fail per case, cost
-      per run) recorded in this file under the enrichment track; the refresh item above
-      references the chosen model.
+- [x] **P2.10 Model-capability experiment — CLOSED 2026-07-17: frontier FAILS;
+      architecture ceiling, not model capability (not a launch gate).** Run
+      `396dffe5-c905-44e2-8582-1d4c1bcdbd66` pinned extraction to the plain
+      `google/gemini-3.1-pro-preview`, Google AI Studio only, provider fallbacks off,
+      and `require_parameters=true`, with no prompt tuning. The partial cohort cost
+      **$0.841696**; the school-538 extraction-only top-up cost **$0.081542**; exact
+      combined provider-accounted spend was **$0.923238**. Ten of 18 extractions
+      persisted (nine in the cohort run plus 538). Cohort Stage 6 validation and Stage 7
+      summarize were not reached, which is sufficient because the experiment judged the
+      blocker taxonomy rather than coverage. All five reviewable cases — 538, 570,
+      153-pricing, 105, and 153-admission — failed with output identical or equivalent
+      to the cheap tier. The completed verdicts and source-grounded findings are the
+      record of decision in
+      `backend/reports/pilot/396dffe5-c905-44e2-8582-1d4c1bcdbd66/blocker-review.md`.
+      Consequences:
+      (a) the full refresh uses the **current cheap extraction tier, unchanged**;
+      (b) value-model runs are void until the extraction architecture changes and are
+      removed from the launch path;
+      (c) upgrading the capable spot-check tier to `deepseek/deepseek-v3.2` remains an
+      **open refresh-config decision**, not a blocker. Decide it when configuring the
+      refresh; it does not reopen the extraction-model verdict or P2.10.
+      The launch scope and frozen publish boundary remain unchanged.
 - [x] **P2.11 City-scope repair + import gate, then cohort regeocode.** (From P2.9 run 1.
       Executes between P2.9 run 1 and the P2.9 rerun — see the Order line above.) The
       registry import stamped `city='sofia'` onto Sofia-*province* schools: 65
@@ -1147,7 +1134,8 @@ extraction/prompt-tuning iterations.
       *Verify:* regression tests for (a)/(e)/(f); cohort API sweep clean on Markdown and
       withheld fields; duplicate-coordinate audit shows zero unexplained groups; UI
       renders sparse schools without fabricated negatives.
-- [ ] **P2.13 Exhaustive Sofia audit (deterministic, no LLM).** After P2.12: run the full
+- [ ] **P2.13 Exhaustive Sofia audit (deterministic, no LLM).** After P2.10's closure,
+      in a separate session: run the full
       audit battery over the entire Sofia scope, not just the cohort — API
       boundary sweep (list/detail/compare, both locales) against the launch-acceptance
       list; geocode audits (bounds, precision metadata, duplicates); cached truth-set
@@ -1156,7 +1144,7 @@ extraction/prompt-tuning iterations.
       criterion green or explicitly waived in this file.
       **Then STOP.** With P2.13 green and the OpenRouter spend-cap decision recorded,
       request the user's explicit approval before the one-time full Sofia refresh
-      (363 schools, ≈$0.75 projected, current cheap tier, summarize skipped).
+      (363 schools; update the projection for the current cheap tier; summarize skipped).
 
 ## Phase 3 — Go live
 
@@ -1197,28 +1185,36 @@ extraction/prompt-tuning iterations.
 - [ ] **P4.8 Pricing verification-date response alias.** Revisit the public `scraped_at`
       name for curated pricing via a response-schema alias; no database migration required.
 
-## Post-launch enrichment track (unblocked by launch; sequenced by P2.10's outcome)
+## Post-launch enrichment track (unblocked by launch; architecture-first after P2.10)
 
 Semantic-richness work moved off the release path by the 2026-07-15 launch-scope
 revision. None of this may widen the public boundary without a reviewed pilot.
 
-- [ ] **E1 Rich scraped pricing.** Publish a scraped price only when all semantics are
-      explicit: identifiable school/entity, category stated in the same heading/row,
-      explicit period, plan/age applicability retained where the page distinguishes them,
-      current academic year where supplied, no category coercion (deposit ≠ registration).
-      Ambiguous groups are withheld whole. Carries the 538/570/153 heading/entity
-      regressions. If P2.10(b) found a passing value model, re-extract with it first —
-      the gate work may shrink dramatically.
-- [ ] **E2 Generative summaries.** Re-enable behind the P2.6 flag only after: the P2.10
-      winner (or better) generates them, deterministic input cleanup + semantic output
+- [ ] **E1 Extraction re-architecture — FIRST post-launch engineering item; prerequisite
+      for ALL re-extraction work.** After the already planned launch refresh, do not run
+      any further extraction until this architecture passes its prototype on the reviewed
+      18-school cohort. Implement two-pass, entity-scoped extraction: pass 1 maps
+      each page into scoped sections carrying `entity/program`, `plan`, source `heading`,
+      and `effective_year`; pass 2 extracts each section independently into a schema that
+      retains `applies_to`, `payment_plan`, and `source_heading`. Add deterministic
+      validation that the source heading agrees with the extracted category and that
+      admission requirements are complete sentences; withhold ambiguous sections whole.
+      Only after the cohort passes the recorded regressions may re-extraction resume or
+      rich scraped pricing/admission data approach publication. Evidence and regression
+      corpus: run `396dffe5-c905-44e2-8582-1d4c1bcdbd66` and its completed blocker packet
+      (538/570/153 heading/entity/plan association; 105/153 admission classification and
+      sentence completeness). The frontier's identical/equivalent failures establish that
+      model substitution alone cannot fix these errors.
+- [ ] **E2 Generative summaries.** Re-enable behind the P2.6 flag only after E1's
+      architecture passes the cohort, deterministic input cleanup + semantic output
       validation cover the 12 documented failure modes (identity collisions, marketing
       prose, unsupported negatives, stale claims, mistranslation, raw artifacts), and a
       full regenerated cohort passes manual parent-readiness review. Bulgarian generation
-      quality must be re-tested per model. P3.5 (prompt-injection guard) applies before
-      any summary publishes.
+      quality must be re-tested for any post-architecture model choice. P3.5
+      (prompt-injection guard) applies before any summary publishes.
 - [ ] **E3 Website-derived admission fields.** Re-enable behind the P2.7 flag after
-      fragment coalescing/classification is reliable (103/105/153/506 cases as
-      regressions).
+      E1's entity-scoped extraction and sentence-completeness validation make fragment
+      coalescing/classification reliable (103/105/153/506 cases as regressions).
 - [ ] **E4 Finish pricing curation** beyond the launch slice: remaining private/
       international schools (178 total), using scraped rows as verification candidates.
 
