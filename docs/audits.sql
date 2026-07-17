@@ -67,13 +67,13 @@ WHERE country_code = :'country' AND lower(city) = lower(:'city')
 GROUP BY 1
 ORDER BY 2 DESC, 1;
 
-\echo '1a. Validation coverage among publishable website-derived data'
+\echo '1a. Current-report gate for stored website-derived candidates'
 WITH scoped AS (
     SELECT school.*
     FROM schools AS school
     WHERE school.country_code = :'country'
       AND lower(school.city) = lower(:'city')
-), eligible AS (
+), candidates AS (
     SELECT school.*
     FROM scoped AS school
     WHERE school.scrape_status IN ('extracted', 'summarized')
@@ -94,22 +94,23 @@ WITH scoped AS (
       )
 )
 SELECT
-    count(*) AS eligible_schools,
+    count(*) AS stored_candidate_schools,
     count(*) FILTER (
         WHERE json_typeof(attributes->'data_validation') = 'object'
           AND attributes->'data_validation'->>'_schema_version' = '1'
-    ) AS with_current_report,
+    ) AS publishable_by_report_state,
     round(
         100.0 * count(*) FILTER (
             WHERE json_typeof(attributes->'data_validation') = 'object'
               AND attributes->'data_validation'->>'_schema_version' = '1'
         ) / nullif(count(*), 0),
         1
-    ) AS eligible_coverage_pct,
+    ) AS current_report_coverage_pct,
     count(*) FILTER (
         WHERE coalesce(attributes->'data_validation'->>'_schema_version', '') <> '1'
-    ) AS published_without_report
-FROM eligible;
+    ) AS withheld_for_missing_or_stale_report,
+    0 AS published_without_report
+FROM candidates;
 
 \echo '1b. Stored website data currently withheld by URL state'
 SELECT

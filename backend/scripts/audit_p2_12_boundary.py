@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Run the deterministic, targeted P2.12 API and database acceptance checks."""
+"""Run deterministic P2.12/P2.13 API and database acceptance checks.
+
+The default P2.13 scope is every Sofia school serialized by the list endpoint.  The
+tracked P2.9 cohort remains available through ``--cohort-only`` for the older,
+targeted P2.12 regression check.  This script never invokes an LLM or a scraper.
+"""
 
 from __future__ import annotations
 
@@ -17,7 +22,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from app.database import async_session_maker
 from app.main import app
-from app.models import Pricing, School, SchoolLocation
+from app.models import PipelineRun, Pricing, School, SchoolLocation
+from app.services.data_quality import compute_quality_metrics
+from app.services.geocoding.bounds import SOFIA_MUNICIPALITY_BOUNDS, point_in_bounds
 from app.services.geocoding.service import geocode_failure_is_terminal
 from app.utils.display_gating import pricing_row_is_publishable
 from app.utils.school_attributes import publishable_display_text
@@ -64,6 +71,30 @@ DISPLAY_KEYS = {
     "address_i18n",
     "resolved_address_i18n",
 }
+INTERNAL_KEYS = {
+    "confidence_score",
+    "data_validation",
+    "extracted",
+    "extracted_i18n",
+    "field_path",
+    "source_refs",
+    "submitted_by",
+    "value_json",
+    "value_text",
+    "website_extracted",
+}
+PROVENANCE_KEYS = {"source_type", "source_url", "last_verified", "confidence"}
+WEBSITE_ADMISSION_FIELDS = {
+    "entry_requirements",
+    "application_deadlines",
+    "available_spots",
+}
+URL_FIELDS = {"platform_url", "source_url", "website_url"}
+CACHED_RUN_IDS = (
+    "db4ba90d-6894-4164-a873-34ee79687fad",
+    "396dffe5-c905-44e2-8582-1d4c1bcdbd66",
+)
+CACHED_TRUTH_SCHOOL_IDS = {105, 153, 310, 529, 538, 570}
 
 
 def read_cohort(path: Path | None = None) -> list[int]:
@@ -110,7 +141,71 @@ def display_markdown_hits(payload: Any, *, endpoint: str) -> list[dict[str, str]
     return hits
 
 
-async def api_audit(cohort_ids: list[int]) -> dict[str, Any]:
+def internal_key_hits(payload: Any, *, endpoint: str) -> list[dict[str, str]]:
+    hits: list[dict[str, str]] = []
+
+    def walk(value: Any, path: tuple[str, ...] = ()) -> None:
+        if isinstance(value, dict):
+            for key, child in value.items():
+                child_path = (*path, str(key))
+                if key in INTERNAL_KEYS or key.startswith("moe_"):
+                    hits.append({"endpoint": endpoint, "path": ".".join(child_path)})
+                walk(child, child_path)
+        elif isinstance(value, list):
+            for index, child in enumerate(value):
+                walk(child, (*path, str(index)))
+
+    walk(payload)
+    return hits
+
+
+def all_display_text_hits(payload: Any, *, endpoint: str) -> list[dict[str, str]]:
+    """Find Markdown/bare URLs in strings other than explicit URL fields."""
+    hits: list[dict[str, str]] = []
+
+    def walk(value: Any, path: tuple[str, ...] = ()) -> None:
+        if isinstance(value, dict):
+            for key, child in value.items():
+                child_path = (*path, str(key))
+                if isinstance(child, str) and key not in URL_FIELDS:
+                    if publishable_display_text(child) is None:
+                        hits.append(
+                            {"endpoint": endpoint, "path": ".".join(child_path), "value": child}
+                        )
+                else:
+                    walk(child, child_path)
+        elif isinstance(value, list):
+            for index, child in enumerate(value):
+                child_path = (*path, str(index))
+                if isinstance(child, str):
+                    if publishable_display_text(child) is None:
+                        hits.append(
+                            {"endpoint": endpoint, "path": ".".join(child_path), "value": child}
+                        )
+                else:
+                    walk(child, child_path)
+
+    walk(payload)
+    return hits
+
+
+async def sofia_school_ids() -> list[int]:
+    async with async_session_maker() as db:
+        return list(
+            (
+                await db.execute(
+                    select(School.id)
+                    .where(
+                        func.lower(School.country_code) == "bg",
+                        func.lower(School.city) == "sofia",
+                    )
+                    .order_by(School.id)
+                )
+            ).scalars()
+        )
+
+
+async def api_audit(school_ids: list[int]) -> dict[str, Any]:
     async with async_session_maker() as db:
         raw_attributes = {
             school_id: attributes if isinstance(attributes, dict) else {}
@@ -124,17 +219,15 @@ async def api_audit(cohort_ids: list[int]) -> dict[str, Any]:
             if pricing_row_is_publishable(row)
         }
 
-    requests: list[tuple[str, str]] = [("list", "/schools")]
+    requests: list[tuple[str, str]] = [
+        ("list", "/schools?country_code=bg&city=sofia")
+    ]
     requests.extend(
         (f"detail-{school_id}", f"/schools/{school_id}")
-        for school_id in cohort_ids
+        for school_id in school_ids
     )
-    requests.append(
-        (f"detail-{REGRESSION_SCHOOL_ID}", f"/schools/{REGRESSION_SCHOOL_ID}")
-    )
-    compare_ids = [*cohort_ids, REGRESSION_SCHOOL_ID]
-    for offset in range(0, len(compare_ids), 3):
-        batch = compare_ids[offset : offset + 3]
+    for offset in range(0, len(school_ids), 5):
+        batch = school_ids[offset : offset + 5]
         requests.append(
             (
                 f"compare-{'-'.join(map(str, batch))}",
@@ -142,13 +235,22 @@ async def api_audit(cohort_ids: list[int]) -> dict[str, Any]:
             )
         )
 
-    hits: list[dict[str, str]] = []
+    markdown_hits: list[dict[str, str]] = []
+    internal_hits: list[dict[str, str]] = []
     statuses: dict[str, int] = {}
+    list_ids_by_locale: dict[str, list[int]] = {}
+    detail_ids_by_locale: dict[str, set[int]] = {"bg": set(), "en": set()}
+    compare_ids_by_locale: dict[str, set[int]] = {"bg": set(), "en": set()}
     school_367_payloads = 0
     school_367_address_values: list[str] = []
     dynamic_field_hits: list[dict[str, Any]] = []
     withheld_pricing_hits: list[dict[str, Any]] = []
     published_pricing_ids: set[int] = set()
+    summary_hits: list[dict[str, Any]] = []
+    website_admission_hits: list[dict[str, Any]] = []
+    scraped_pricing_hits: list[dict[str, Any]] = []
+    provenance_shape_hits: list[dict[str, Any]] = []
+    truth_set_leaks: list[dict[str, Any]] = []
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://p2-12-audit") as client:
         for locale in ("bg", "en"):
@@ -159,12 +261,23 @@ async def api_audit(cohort_ids: list[int]) -> dict[str, Any]:
                 if response.status_code != 200:
                     continue
                 payload = response.json()
-                hits.extend(display_markdown_hits(payload, endpoint=request_key))
+                markdown_hits.extend(all_display_text_hits(payload, endpoint=request_key))
+                internal_hits.extend(internal_key_hits(payload, endpoint=request_key))
+                if label == "list":
+                    list_ids_by_locale[locale] = [
+                        row.get("id") for row in payload if isinstance(row, dict)
+                    ]
                 rows = payload if isinstance(payload, list) else [payload]
                 for school in rows:
                     if not isinstance(school, dict):
                         continue
                     school_id = school.get("id")
+                    if label.startswith("detail-"):
+                        detail_ids_by_locale[locale].add(school_id)
+                    elif label.startswith("compare-"):
+                        compare_ids_by_locale[locale].add(school_id)
+                    if school.get("summary_i18n") is not None:
+                        summary_hits.append({"endpoint": request_key, "school_id": school_id})
                     stored_attributes = raw_attributes.get(school_id, {})
                     public_attributes = school.get("attributes") or {}
                     for field in ("class_size", "school_hours", "established_year"):
@@ -180,7 +293,9 @@ async def api_audit(cohort_ids: list[int]) -> dict[str, Any]:
                                 }
                             )
                     for localized in (school.get("attributes_i18n") or {}).values():
-                        if isinstance(localized, dict) and localized.get("daily_schedule"):
+                        if not isinstance(localized, dict):
+                            continue
+                        if localized.get("daily_schedule"):
                             dynamic_field_hits.append(
                                 {
                                     "endpoint": request_key,
@@ -188,11 +303,28 @@ async def api_audit(cohort_ids: list[int]) -> dict[str, Any]:
                                     "field": "daily_schedule",
                                 }
                             )
+                        for field in WEBSITE_ADMISSION_FIELDS:
+                            if localized.get(field):
+                                website_admission_hits.append(
+                                    {
+                                        "endpoint": request_key,
+                                        "school_id": school_id,
+                                        "field": field,
+                                    }
+                                )
                     for pricing in school.get("pricing") or []:
                         pricing_id = pricing.get("id") if isinstance(pricing, dict) else None
                         if pricing_id is None:
                             continue
                         published_pricing_ids.add(pricing_id)
+                        if pricing.get("source") == "scraped_website":
+                            scraped_pricing_hits.append(
+                                {
+                                    "endpoint": request_key,
+                                    "school_id": school_id,
+                                    "pricing_id": pricing_id,
+                                }
+                            )
                         if pricing_id not in publishable_pricing_ids:
                             withheld_pricing_hits.append(
                                 {
@@ -201,6 +333,33 @@ async def api_audit(cohort_ids: list[int]) -> dict[str, Any]:
                                     "pricing_id": pricing_id,
                                 }
                             )
+
+                    for source in school.get("field_sources") or []:
+                        unexpected = sorted(set(source) - PROVENANCE_KEYS)
+                        if unexpected:
+                            provenance_shape_hits.append(
+                                {
+                                    "endpoint": request_key,
+                                    "school_id": school_id,
+                                    "unexpected_keys": unexpected,
+                                }
+                            )
+
+                    if school_id in CACHED_TRUTH_SCHOOL_IDS and (
+                        school.get("summary_i18n") is not None
+                        or any(
+                            (localized or {}).get(field)
+                            for localized in (school.get("attributes_i18n") or {}).values()
+                            for field in WEBSITE_ADMISSION_FIELDS
+                        )
+                        or any(
+                            row.get("source") == "scraped_website"
+                            for row in school.get("pricing") or []
+                        )
+                    ):
+                        truth_set_leaks.append(
+                            {"endpoint": request_key, "school_id": school_id}
+                        )
 
                     if school_id == REGRESSION_SCHOOL_ID:
                         school_367_payloads += 1
@@ -212,10 +371,36 @@ async def api_audit(cohort_ids: list[int]) -> dict[str, Any]:
                             )
 
     non_200 = {key: status for key, status in statuses.items() if status != 200}
+    expected_ids = set(school_ids)
+    list_id_sets = {locale: set(ids) for locale, ids in list_ids_by_locale.items()}
     return {
         "requests": len(statuses),
         "non_200": non_200,
-        "markdown_hits": hits,
+        "expected_school_count": len(school_ids),
+        "list_ids_are_scoped": {
+            locale: ids <= expected_ids for locale, ids in list_id_sets.items()
+        },
+        "list_ids_match_locales": len(list_id_sets) == 2
+        and len({frozenset(ids) for ids in list_id_sets.values()}) == 1,
+        "list_school_count": {
+            locale: len(ids) for locale, ids in list_id_sets.items()
+        },
+        "db_scoped_but_not_listed_ids": {
+            locale: sorted(expected_ids - ids) for locale, ids in list_id_sets.items()
+        },
+        "detail_ids_match_scope": {
+            locale: ids == expected_ids for locale, ids in detail_ids_by_locale.items()
+        },
+        "compare_ids_match_scope": {
+            locale: ids == expected_ids for locale, ids in compare_ids_by_locale.items()
+        },
+        "markdown_hits": markdown_hits,
+        "internal_key_hits": internal_hits,
+        "summary_hits": summary_hits,
+        "website_admission_hits": website_admission_hits,
+        "scraped_pricing_hits": scraped_pricing_hits,
+        "provenance_shape_hits": provenance_shape_hits,
+        "cached_truth_set_leaks": truth_set_leaks,
         "school_367_payloads": school_367_payloads,
         "school_367_tainted_address_hits": [
             value
@@ -230,6 +415,62 @@ async def api_audit(cohort_ids: list[int]) -> dict[str, Any]:
 
 async def database_audit() -> dict[str, Any]:
     async with async_session_maker() as db:
+        scoped_schools = list(
+            (
+                await db.execute(
+                    select(School).where(
+                        func.lower(School.country_code) == "bg",
+                        func.lower(School.city) == "sofia",
+                    )
+                )
+            ).scalars()
+        )
+        scoped_ids = [school.id for school in scoped_schools]
+        locations = list(
+            (
+                await db.execute(
+                    select(SchoolLocation).where(SchoolLocation.school_id.in_(scoped_ids))
+                )
+            ).scalars()
+        )
+        pricing_rows = list(
+            (
+                await db.execute(select(Pricing).where(Pricing.school_id.in_(scoped_ids)))
+            ).scalars()
+        )
+        quality = await compute_quality_metrics(db, country="bg", city="sofia")
+        out_of_bounds = [
+            location.id
+            for location in locations
+            if location.lat is not None
+            and location.lng is not None
+            and not point_in_bounds(
+                float(location.lat), float(location.lng), SOFIA_MUNICIPALITY_BOUNDS
+            )
+        ]
+        precision_missing = [
+            location.id
+            for location in locations
+            if location.lat is not None
+            and location.lng is not None
+            and (location.geocode_meta or {}).get("precision") not in {"exact", "approximate"}
+        ]
+        terminal_failure_ids = [
+            location.id
+            for location in locations
+            if geocode_failure_is_terminal(location.geocode_meta)
+        ]
+        invalid_terminal_failures = [
+            location.id
+            for location in locations
+            if geocode_failure_is_terminal(location.geocode_meta)
+            and (
+                location.lat is not None
+                or location.lng is not None
+                or not (location.geocode_meta or {}).get("provider")
+                or not (location.geocode_meta or {}).get("rejection_reason")
+            )
+        ]
         duplicate_points = (
             await db.execute(
                 select(SchoolLocation.lat, SchoolLocation.lng)
@@ -286,11 +527,40 @@ async def database_audit() -> dict[str, Any]:
             and school_161.attributes.get(WEBSITE_DATA_WITHHELD_KEY) is True
         )
 
+        cached_runs: dict[str, Any] = {}
+        for run_id in CACHED_RUN_IDS:
+            run = await db.get(PipelineRun, run_id)
+            cached_runs[run_id] = (
+                {
+                    "found": True,
+                    "status": run.status.value,
+                    "cohort_size": len((run.config or {}).get("cohort_school_ids") or []),
+                    "cost_usd": (run.metrics or {}).get("llm_usage", {}).get(
+                        "token_cost_usd"
+                    ),
+                }
+                if run
+                else {"found": False}
+            )
+
+        predicate_publishable_ids = {
+            row.id for row in pricing_rows if pricing_row_is_publishable(row)
+        }
+
     return {
+        "schools_in_scope": len(scoped_ids),
+        "locations_in_scope": len(locations),
+        "out_of_bounds_location_ids": out_of_bounds,
+        "precision_missing_location_ids": precision_missing,
+        "terminal_failure_location_ids": terminal_failure_ids,
+        "invalid_terminal_failure_location_ids": invalid_terminal_failures,
         "duplicate_groups": duplicate_groups,
         "unexplained_duplicate_groups": unexplained,
         "terminal_locations": terminal,
         "school_161_withheld": school_161_withheld,
+        "quality_metrics": quality,
+        "predicate_publishable_pricing_ids": sorted(predicate_publishable_ids),
+        "cached_runs": cached_runs,
     }
 
 
@@ -301,26 +571,72 @@ async def main() -> None:
         type=Path,
         help="Optional cohort file; defaults to the tracked P2.9 run-2 school IDs",
     )
+    parser.add_argument(
+        "--cohort-only",
+        action="store_true",
+        help="Run the legacy targeted P2.12 cohort instead of exhaustive Sofia scope",
+    )
     args = parser.parse_args()
-    cohort_ids = read_cohort(args.cohort_file)
-    api = await api_audit(cohort_ids)
+    if args.cohort_file and not args.cohort_only:
+        parser.error("--cohort-file requires --cohort-only")
+    school_ids = (
+        read_cohort(args.cohort_file) if args.cohort_only else await sofia_school_ids()
+    )
+    audit_ids = (
+        school_ids
+        if not args.cohort_only or REGRESSION_SCHOOL_ID in school_ids
+        else [*school_ids, REGRESSION_SCHOOL_ID]
+    )
+    api = await api_audit(audit_ids)
     database = await database_audit()
+    scoreboard_pricing_ids = database["predicate_publishable_pricing_ids"]
+    pricing_parity = (
+        api["published_pricing_ids"]
+        == scoreboard_pricing_ids
+        and database["quality_metrics"]["pricing_rows_failing_gates"]["publishable"]
+        == len(scoreboard_pricing_ids)
+    )
+    coverage = database["quality_metrics"]["website_validation_coverage"]
     result = {
-        "cohort_ids": cohort_ids,
+        "scope": "cohort" if args.cohort_only else "all_sofia_serialized_schools",
+        "school_count": len(school_ids),
         "api": api,
         "database": database,
+        "acceptance": {
+            "validation_report_coverage": coverage,
+            "pricing_gate_scoreboard_api_parity": pricing_parity,
+        },
         "llm_calls": 0,
     }
+    if args.cohort_only:
+        result["school_ids"] = school_ids
     result["passed"] = bool(
         not api["non_200"]
+        and all(api["list_ids_are_scoped"].values())
+        and api["list_ids_match_locales"]
+        and all(api["detail_ids_match_scope"].values())
+        and all(api["compare_ids_match_scope"].values())
         and not api["markdown_hits"]
+        and not api["internal_key_hits"]
+        and not api["summary_hits"]
+        and not api["website_admission_hits"]
+        and not api["scraped_pricing_hits"]
+        and not api["provenance_shape_hits"]
+        and not api["cached_truth_set_leaks"]
         and api["school_367_payloads"] > 0
         and not api["school_367_tainted_address_hits"]
         and not api["dynamic_field_hits"]
         and not api["withheld_pricing_hits"]
+        and not database["out_of_bounds_location_ids"]
+        and not database["precision_missing_location_ids"]
+        and not database["invalid_terminal_failure_location_ids"]
         and not database["unexplained_duplicate_groups"]
         and all(database["terminal_locations"].values())
         and database["school_161_withheld"]
+        and all(run["found"] for run in database["cached_runs"].values())
+        and coverage["published_without_report"] == 0
+        and coverage["coverage_pct"] in {None, 100.0}
+        and pricing_parity
     )
     print(json.dumps(result, ensure_ascii=False, indent=2))
     if not result["passed"]:

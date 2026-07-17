@@ -45,7 +45,11 @@ INTERNAL_ATTRIBUTES = {
     "url_validation_timeout_failures": 0,
     "name_aliases": ["СУ Пример"],
     "_extraction_hashes": {"general_info": "abc123"},
-    "data_validation": {"status": "needs_review", "issues": [{"field": "pricing"}]},
+    "data_validation": {
+        "_schema_version": 1,
+        "status": "needs_review",
+        "issues": [{"field": "pricing"}],
+    },
     "display_name_i18n": {"bg": "Училище Пример", "en": "Example School"},
     "display_name_evidence": {
         "signals": ["website_domain_alias_match", "repeated_on_page_identity"],
@@ -741,6 +745,7 @@ class TestFilterableProjection:
         """
         school = (await seeded_db.execute(select(School))).scalars().first()
         school.attributes = {
+            "data_validation": {"_schema_version": 1, "status": "ok"},
             "extracted": {
                 "facilities": ["библиотека", "физкултурен салон"],
                 "programs": ["Футбол", "Montessori"],

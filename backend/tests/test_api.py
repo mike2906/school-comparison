@@ -839,6 +839,7 @@ class TestSchoolsSearchEndpoint:
             )
         ).scalar_one()
         school.attributes = {
+            "data_validation": {"_schema_version": 1, "status": "ok"},
             "display_name_i18n": {
                 "bg": "Fusion School",
                 "en": "Fusion School",

@@ -11,6 +11,7 @@ from app.models.school import School, SchoolLocation
 from app.schemas.school import SchoolListResponse
 from app.services.data_quality import compute_quality_metrics
 from app.services.pipeline_runs import _aggregate_usage, finalize_pipeline_run, start_pipeline_run
+from app.utils.website_data import attributes_for_publication, website_data_is_publishable
 
 pytestmark = pytest.mark.asyncio
 PRICING_VERIFIED_AT = datetime(2026, 7, 16, 9, 0)
@@ -239,12 +240,12 @@ async def test_website_validation_coverage_excludes_registry_only_and_withheld_d
 
     assert publishable.id is not None
     assert metrics["website_validation_coverage"] == {
-        "eligible": 1,
+        "eligible": 0,
         "with_report": 0,
-        "coverage_pct": 0.0,
+        "coverage_pct": None,
         "ok": 0,
-        "ok_pct": 0.0,
-        "published_without_report": 1,
+        "ok_pct": None,
+        "published_without_report": 0,
     }
 
 
@@ -403,6 +404,7 @@ async def test_validation_coverage_tracks_launch_flags_and_public_projection(
         db_session,
         scrape_status="extracted",
         attributes={
+            "data_validation": {"_schema_version": 1, "status": "needs_review"},
             "extracted": {
                 "admission": {
                     "deadlines": ["30 юни"],
@@ -438,11 +440,27 @@ async def test_validation_coverage_tracks_launch_flags_and_public_projection(
     admissions_enabled = await compute_quality_metrics(db_session, country="bg", city="sofia")
     assert admissions_enabled["website_validation_coverage"] == {
         "eligible": 2,
-        "with_report": 1,
-        "coverage_pct": 50.0,
+        "with_report": 2,
+        "coverage_pct": 100.0,
         "ok": 1,
         "ok_pct": 50.0,
-        "published_without_report": 1,
+        "published_without_report": 0,
+    }
+
+
+async def test_website_publication_requires_current_validation_report():
+    attributes = {
+        "has_canteen": True,
+        "extracted": {"facilities": ["Website library"]},
+    }
+
+    assert website_data_is_publishable(attributes, "extracted") is False
+    assert attributes_for_publication(attributes, "extracted") == {"has_canteen": True}
+
+    attributes["data_validation"] = {"_schema_version": 1, "status": "ok"}
+    assert website_data_is_publishable(attributes, "extracted") is True
+    assert attributes_for_publication(attributes, "extracted")["extracted"] == {
+        "facilities": ["Website library"]
     }
 
 
