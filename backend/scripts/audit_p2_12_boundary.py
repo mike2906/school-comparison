@@ -94,6 +94,18 @@ CACHED_RUN_IDS = (
     "db4ba90d-6894-4164-a873-34ee79687fad",
     "396dffe5-c905-44e2-8582-1d4c1bcdbd66",
 )
+CACHED_RUN_EXPECTATIONS = {
+    "db4ba90d-6894-4164-a873-34ee79687fad": {
+        "status": "partial",
+        "cohort_size": 18,
+        "cost_usd": 0.029856,
+    },
+    "396dffe5-c905-44e2-8582-1d4c1bcdbd66": {
+        "status": "partial",
+        "cohort_size": 18,
+        "cost_usd": 0.923238,
+    },
+}
 CACHED_TRUTH_SCHOOL_IDS = {105, 153, 310, 529, 538, 570}
 
 
@@ -187,6 +199,25 @@ def all_display_text_hits(payload: Any, *, endpoint: str) -> list[dict[str, str]
 
     walk(payload)
     return hits
+
+
+def cached_run_matches_expectation(actual: dict[str, Any]) -> bool:
+    expected = CACHED_RUN_EXPECTATIONS.get(str(actual.get("run_id")))
+    return bool(
+        expected
+        and actual.get("found") is True
+        and actual.get("status") == expected["status"]
+        and actual.get("cohort_size") == expected["cohort_size"]
+        and actual.get("cost_usd") == expected["cost_usd"]
+    )
+
+
+def partial_coordinate_location_ids(locations: Iterable[Any]) -> list[int]:
+    return [
+        location.id
+        for location in locations
+        if (location.lat is None) != (location.lng is None)
+    ]
 
 
 async def sofia_school_ids() -> list[int]:
@@ -455,6 +486,7 @@ async def database_audit() -> dict[str, Any]:
             and location.lng is not None
             and (location.geocode_meta or {}).get("precision") not in {"exact", "approximate"}
         ]
+        partial_coordinate_ids = partial_coordinate_location_ids(locations)
         terminal_failure_ids = [
             location.id
             for location in locations
@@ -530,8 +562,9 @@ async def database_audit() -> dict[str, Any]:
         cached_runs: dict[str, Any] = {}
         for run_id in CACHED_RUN_IDS:
             run = await db.get(PipelineRun, run_id)
-            cached_runs[run_id] = (
+            summary = (
                 {
+                    "run_id": run_id,
                     "found": True,
                     "status": run.status.value,
                     "cohort_size": len((run.config or {}).get("cohort_school_ids") or []),
@@ -540,8 +573,12 @@ async def database_audit() -> dict[str, Any]:
                     ),
                 }
                 if run
-                else {"found": False}
+                else {"run_id": run_id, "found": False}
             )
+            cached_runs[run_id] = {
+                **summary,
+                "matches_expectation": cached_run_matches_expectation(summary),
+            }
 
         predicate_publishable_ids = {
             row.id for row in pricing_rows if pricing_row_is_publishable(row)
@@ -552,6 +589,7 @@ async def database_audit() -> dict[str, Any]:
         "locations_in_scope": len(locations),
         "out_of_bounds_location_ids": out_of_bounds,
         "precision_missing_location_ids": precision_missing,
+        "partial_coordinate_location_ids": partial_coordinate_ids,
         "terminal_failure_location_ids": terminal_failure_ids,
         "invalid_terminal_failure_location_ids": invalid_terminal_failures,
         "duplicate_groups": duplicate_groups,
@@ -629,11 +667,14 @@ async def main() -> None:
         and not api["withheld_pricing_hits"]
         and not database["out_of_bounds_location_ids"]
         and not database["precision_missing_location_ids"]
+        and not database["partial_coordinate_location_ids"]
         and not database["invalid_terminal_failure_location_ids"]
         and not database["unexplained_duplicate_groups"]
         and all(database["terminal_locations"].values())
         and database["school_161_withheld"]
-        and all(run["found"] for run in database["cached_runs"].values())
+        and all(
+            run["matches_expectation"] for run in database["cached_runs"].values()
+        )
         and coverage["published_without_report"] == 0
         and coverage["coverage_pct"] in {None, 100.0}
         and pricing_parity

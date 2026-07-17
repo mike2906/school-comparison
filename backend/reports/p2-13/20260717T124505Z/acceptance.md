@@ -31,11 +31,11 @@ refresh was not started.
 | No Markdown or bare URLs in display fields | PASS | `0` hits under the shared production sanitizer across all `1,066` responses; school 367 remained clean in six payloads. Explicit URL fields were excluded from this display-text assertion. |
 | No internal API keys | PASS | `0` raw extraction, validation, source-ref, `moe_*`, or other internal-key hits. |
 | High-risk scraped dynamic fields withheld | PASS | `0` uncurated class-size, schedule/opening-hours, established-year, or analogous launch-scope hits. |
-| Sofia coordinate bounds | PASS | `0` Sofia-labeled out-of-bounds coordinates across `480` locations. |
+| Sofia coordinate bounds | PASS | `0` Sofia-labeled out-of-bounds coordinates and `0` partial lat/lng pairs across `480` locations. |
 | Geocode precision metadata | PASS | `394/394` geocoded locations have `exact` or `approximate` precision metadata (`100%`). |
 | Duplicate coordinates | PASS | Seven known shared-address/campus groups; `0` unexplained groups. |
 | Terminal geocode failures | PASS | All `86` deterministic terminal-failure locations are null and carry status, provider, and accepted rejection-reason evidence; `0` invalid terminal states. Named regressions `1143`, `1145`, and `1188` pass. |
-| Cached truth sets | PASS | Stored runs `db4ba90d-6894-4164-a873-34ee79687fad` and `396dffe5-c905-44e2-8582-1d4c1bcdbd66` are present with their 18-school cohorts and exact costs (`$0.029856`, `$0.923238`). Known rejected/incorrect cases `105`, `153`, `310`, `529`, `538`, and `570` have `0` boundary leaks. The cached `db4ba90d` 10-school spot-check sample's actionable school-310 contradiction remains withheld. |
+| Cached truth sets | PASS | Stored runs `db4ba90d-6894-4164-a873-34ee79687fad` and `396dffe5-c905-44e2-8582-1d4c1bcdbd66` match their intentional `partial` statuses, 18-school cohorts, and exact costs (`$0.029856`, `$0.923238`). Known rejected/incorrect cases `105`, `153`, `310`, `529`, `538`, and `570` have `0` boundary leaks. The cached `db4ba90d` 10-school spot-check sample's actionable school-310 contradiction remains withheld. |
 | Pricing gate / scoreboard / API parity | PASS | Exact set parity at zero publishable row IDs. |
 
 No acceptance criterion was waived.
@@ -63,7 +63,7 @@ left to the user.
   `14/14` current-report coverage, `394/394` precision coverage, zero publishable
   pricing.
 - `docs/audits.sql` under `psql -v ON_ERROR_STOP=1` — completed without SQL errors.
-- Focused API/data-quality/boundary suites — `90 passed`.
-- Full backend suite — `855 passed` with `140` pre-existing deprecation warnings.
+- Focused API/data-quality/boundary suites — `92 passed`.
+- Full backend suite — `857 passed` with `140` pre-existing deprecation warnings.
 
 Stop condition observed: no full refresh or subsequent phase work was started.
