@@ -960,6 +960,32 @@ class TestSchoolsSearchEndpoint:
         assert response.json() == []
 
     @pytest.mark.asyncio
+    async def test_search_ignores_corroborated_non_identity_display_name(
+        self, seeded_db, seeded_client
+    ):
+        """Hidden prose must not affect search after the identity gate rejects it."""
+        school = (
+            await seeded_db.execute(select(School).where(School.school_type == "private"))
+        ).scalar_one()
+        school.scrape_status = "extracted"
+        school.attributes = {
+            "display_name_i18n": {
+                "bg": "Our Values At Hidden Academy",
+                "en": "Our Values At Hidden Academy",
+            },
+            "display_name_evidence": {
+                "signals": ["website_domain_alias_match", "repeated_on_page_identity"],
+                "status": "corroborated",
+            },
+        }
+        await seeded_db.commit()
+
+        response = await seeded_client.get("/schools/search?q=Our%20Values%20At")
+
+        assert response.status_code == 200
+        assert response.json() == []
+
+    @pytest.mark.asyncio
     async def test_search_requires_exact_display_evidence_signals(self, seeded_db, seeded_client):
         """Malformed lookalike evidence values must not unlock internal display-name search."""
         school = (

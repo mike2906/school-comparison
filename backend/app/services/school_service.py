@@ -1,7 +1,7 @@
 import re
 from typing import Optional
 
-from sqlalchemy import String, and_, cast, exists, func, or_, select
+from sqlalchemy import and_, exists, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased, selectinload
 
@@ -11,8 +11,6 @@ from app.services.geocoding.service import TERMINAL_GEOCODE_FAILURE_REASONS
 from app.utils.i18n_resolver import resolve_address_i18n, resolve_name_i18n
 from app.utils.school_attributes import build_filterable_attributes
 from app.utils.website_data import (
-    WEBSITE_DATA_WITHHELD_KEY,
-    WEBSITE_PUBLISHABLE_STATUSES,
     attributes_for_publication,
 )
 
@@ -359,38 +357,23 @@ class SchoolService:
             SchoolLocation.address_i18n["bg"].as_string(),
             SchoolLocation.address_i18n["en"].as_string(),
         )
-        display_fields = (
-            School.attributes["display_name_i18n"]["bg"].as_string(),
-            School.attributes["display_name_i18n"]["en"].as_string(),
-        )
         registry_and_address_clauses = [
             field.ilike(pattern, escape="\\")
             for pattern in patterns
             for field in registry_and_address_fields
         ]
-        display_match_clauses = [
-            field.ilike(pattern, escape="\\")
-            for pattern in patterns
-            for field in display_fields
-        ]
-        evidence_signals = cast(School.attributes["display_name_evidence"]["signals"], String)
-        corroborated_display_clause = and_(
-            or_(*display_match_clauses),
-            School.scrape_status.in_(WEBSITE_PUBLISHABLE_STATUSES),
-            School.attributes[WEBSITE_DATA_WITHHELD_KEY].as_boolean().is_not(True),
-            evidence_signals.like('%"website_domain_alias_match"%'),
-            evidence_signals.like('%"repeated_on_page_identity"%'),
-        )
 
         # Match IDs first so multiple matching locations do not duplicate schools
-        # or consume the result limit, while keeping autocomplete work in SQL.
+        # or consume the result limit. Display names are deliberately handled by
+        # _search_resolved_fallback_ids so search uses the exact same publication
+        # predicate as response serialization instead of approximating it in SQL.
         city_clause = self._city_clause(city)
         matching_school_ids = (
             select(School.id)
             .outerjoin(SchoolLocation, SchoolLocation.school_id == School.id)
             .where(School.country_code == country_code)
             .where(self._has_listable_location(city))
-            .where(or_(*registry_and_address_clauses, corroborated_display_clause))
+            .where(or_(*registry_and_address_clauses))
             .distinct()
             .limit(limit)
         )
