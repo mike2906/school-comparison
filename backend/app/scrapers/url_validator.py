@@ -17,6 +17,8 @@ import httpx
 from bs4 import BeautifulSoup
 
 from app.ai.client import calculate_cost, create_agent, extract_provider_cost_usd
+from app.ai.client import get_model
+from app.services.provider_costs import execute_billable_request
 from app.config import get_settings
 from app.scrapers.school_tokens import extract_school_name_tokens
 from app.utils.transliteration import transliterate_bulgarian
@@ -178,7 +180,7 @@ class URLValidator:
         "english",
     }
 
-    def __init__(self, country_code: str = "bg"):
+    def __init__(self, country_code: str = "bg", school_id: int | None = None):
         """
         Initialize the URL validator.
 
@@ -186,6 +188,7 @@ class URLValidator:
             country_code: Country code for locale-specific keywords
         """
         self.country_code = country_code
+        self.school_id = school_id
         self.keywords = self._load_keywords(country_code)
         settings = get_settings()
         self.http_timeout = max(1.0, float(settings.url_validation_http_timeout_seconds))
@@ -1008,7 +1011,15 @@ Be strict:
             system_prompt=system_prompt,
             result_type=URLValidationOutput,
         )
-        result = await asyncio.wait_for(agent.run(prompt), timeout=self.llm_timeout)
+        result = await asyncio.wait_for(
+            execute_billable_request(
+                lambda: agent.run(prompt),
+                model=get_model(tier),
+                school_id=self.school_id,
+                stage="validate-urls",
+            ),
+            timeout=self.llm_timeout,
+        )
         try:
             from app.scrapers import extractor_helpers
 
@@ -1246,7 +1257,7 @@ async def validate_school_url(
         ...     country_code="bg",
         ... )
     """
-    validator = URLValidator(country_code=country_code)
+    validator = URLValidator(country_code=country_code, school_id=school_id)
     normalized_url = validator.normalize_url(url)
     result, final_url, reason = await validator.validate_url(
         url,

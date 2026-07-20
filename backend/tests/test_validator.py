@@ -13,6 +13,7 @@ from app.models.field_source import SourceType
 from app.models.pricing import PriceSource
 from app.models.scrape_log import ScrapeType
 from app.models.source_page import SourcePage
+from app.utils.website_data import prepare_validation_rollover, website_data_is_publishable
 from app.schemas.validation import SpotCheckDiscrepancy, SpotCheckOutput
 from app.scrapers import validator as validator_module
 
@@ -323,6 +324,101 @@ async def test_deterministic_revalidation_preserves_prior_actionable_spot_check(
     assert result["status"] == "ok"
     await db_session.refresh(school)
     assert school.attributes["data_validation"]["spot_check"] == spot_check
+
+
+@pytest.mark.asyncio
+async def test_validation_rollover_promotes_success_and_preserves_audit_history(db_session):
+    prior = {
+        "_schema_version": 1,
+        "validated_at": "2026-07-19T08:00:00+00:00",
+        "status": "ok",
+        "issue_counts": {"error": 0, "warning": 0},
+        "issues": [],
+        "auto_fixes": [],
+    }
+    school = School(
+        name_i18n={"bg": "Успешна подмяна"},
+        country_code="bg",
+        school_type="private",
+        education_level="primary",
+        city="sofia",
+        scrape_status="extracted",
+        attributes=prepare_validation_rollover(
+            {"extracted": {"facilities": ["library"]}, "data_validation": prior},
+            started_at="2026-07-20T08:00:00+00:00",
+        ),
+    )
+    db_session.add(school)
+    await db_session.commit()
+
+    result = await validator_module.validate_school_data(db_session, school.id, "bg")
+
+    assert result["status"] == "ok"
+    await db_session.refresh(school)
+    assert school.attributes["data_validation"]["validated_at"] != prior["validated_at"]
+    assert school.attributes["data_validation_history"] == [prior]
+    assert "data_validation_attempt" not in school.attributes
+    assert "website_data_withheld" not in school.attributes
+    assert website_data_is_publishable(school.attributes, school.scrape_status) is True
+
+
+@pytest.mark.asyncio
+async def test_validation_rollover_explicit_failure_withholds_and_retains_current_report(
+    db_session, monkeypatch
+):
+    prior = {
+        "_schema_version": 1,
+        "validated_at": "2026-07-19T08:00:00+00:00",
+        "status": "ok",
+        "issue_counts": {"error": 0, "warning": 0},
+        "issues": [],
+        "auto_fixes": [],
+    }
+    school = School(
+        name_i18n={"bg": "Неуспешна подмяна"},
+        country_code="bg",
+        school_type="private",
+        education_level="primary",
+        city="sofia",
+        scrape_status="extracted",
+        attributes=prepare_validation_rollover(
+            {"extracted": {"languages": [{"language": "English"}]}, "data_validation": prior},
+            started_at="2026-07-20T08:00:00+00:00",
+        ),
+    )
+    db_session.add(school)
+    await db_session.commit()
+    monkeypatch.setattr(
+        validator_module,
+        "_normalize_extracted_languages",
+        lambda _value: (_ for _ in ()).throw(RuntimeError("deterministic validation crashed")),
+    )
+
+    result = await validator_module.validate_school_data(db_session, school.id, "bg")
+
+    assert result["status"] == "validation_failed"
+    await db_session.refresh(school)
+    assert school.attributes["data_validation"] == prior
+    assert school.attributes["data_validation_attempt"]["status"] == "failed"
+    assert school.attributes["website_data_withheld"] is True
+    assert website_data_is_publishable(school.attributes, school.scrape_status) is False
+
+
+def test_validation_rollover_interruption_retains_accepted_report_and_history():
+    prior = {
+        "_schema_version": 1,
+        "validated_at": "2026-07-19T08:00:00+00:00",
+        "status": "ok",
+    }
+    attributes = prepare_validation_rollover(
+        {"data_validation": prior, "data_validation_history": [{**prior, "validated_at": "2026-07-18T08:00:00Z"}]},
+        started_at="2026-07-20T08:00:00Z",
+    )
+
+    assert attributes["data_validation"] == prior
+    assert len(attributes["data_validation_history"]) == 1
+    assert attributes["data_validation_attempt"]["status"] == "pending"
+    assert website_data_is_publishable(attributes, "extracted") is False
 
 
 @pytest.mark.asyncio

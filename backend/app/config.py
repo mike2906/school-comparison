@@ -73,6 +73,9 @@ class Settings(BaseSettings):
     extraction_school_timeout_seconds: float = 180.0
     summarization_llm_timeout_seconds: float = 20.0
     summarization_batch_concurrency: int = 2
+    pipeline_heartbeat_interval_seconds: float = 30.0
+    pipeline_stale_after_seconds: int = 300
+    provider_request_reserve_usd: float = 0.10
 
     # Geocoding settings
     geocoding_provider: str = "composite"  # composite | nominatim | google | mapbox (composite = GeoJSON + Nominatim fallback, recommended)

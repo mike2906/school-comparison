@@ -1,6 +1,6 @@
 """Tests for the P1.6 data-quality scoreboard and PipelineRun lifecycle."""
 
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
 import pytest
@@ -10,7 +10,14 @@ from app.models.pricing import PriceCategory, PricePeriod, PriceSource, Pricing
 from app.models.school import School, SchoolLocation
 from app.schemas.school import SchoolListResponse
 from app.services.data_quality import _display_name_overrides, compute_quality_metrics
-from app.services.pipeline_runs import _aggregate_usage, finalize_pipeline_run, start_pipeline_run
+from app.services.pipeline_runs import (
+    _aggregate_usage,
+    checkpoint_pipeline_run,
+    finalize_pipeline_run,
+    heartbeat_pipeline_run,
+    start_pipeline_run,
+    terminalize_stale_pipeline_runs,
+)
 from app.utils.website_data import attributes_for_publication, website_data_is_publishable
 
 pytestmark = pytest.mark.asyncio
@@ -617,3 +624,80 @@ async def test_pipeline_usage_rejects_negative_and_non_finite_values():
         ]
     )
     assert usage == {"input_tokens": 25, "output_tokens": 5, "token_cost_usd": 0.01}
+
+
+async def test_live_pipeline_heartbeat_is_not_terminalized(db_session):
+    run = await start_pipeline_run(db_session, country="bg", city="sofia", cli_stage="all")
+    assert await heartbeat_pipeline_run(db_session, run.id) is True
+    heartbeat = run.heartbeat_at
+
+    recovered = await terminalize_stale_pipeline_runs(
+        db_session,
+        stale_before=heartbeat - timedelta(seconds=1),
+        now=heartbeat + timedelta(seconds=30),
+    )
+
+    assert recovered == []
+    assert run.status == PipelineStatus.RUNNING
+    assert run.completed_at is None
+
+
+async def test_stale_partial_run_uses_checkpoint_evidence(db_session):
+    run = await start_pipeline_run(db_session, country="bg", city="sofia", cli_stage="all")
+    await checkpoint_pipeline_run(
+        db_session,
+        run,
+        completed_stage="navigate",
+        stage_summaries=[{"processed": 3, "succeeded": 2, "failed": 1, "skipped": 0}],
+    )
+    run.heartbeat_at = datetime(2026, 7, 20, 8, 0, tzinfo=timezone.utc)
+    await db_session.commit()
+
+    recovered = await terminalize_stale_pipeline_runs(
+        db_session,
+        stale_before=datetime(2026, 7, 20, 8, 5, tzinfo=timezone.utc),
+        now=datetime(2026, 7, 20, 8, 10, tzinfo=timezone.utc),
+    )
+
+    assert [item.id for item in recovered] == [run.id]
+    assert run.status == PipelineStatus.PARTIAL
+    assert run.last_completed_stage == "navigate"
+    assert (run.schools_processed, run.schools_succeeded, run.schools_failed) == (3, 2, 1)
+    assert "stale heartbeat" in run.terminalization_reason
+
+
+async def test_stale_empty_run_is_failed(db_session):
+    run = await start_pipeline_run(db_session, country="bg", city="sofia", cli_stage="extract")
+    run.heartbeat_at = datetime(2026, 7, 20, 8, 0, tzinfo=timezone.utc)
+    await db_session.commit()
+
+    recovered = await terminalize_stale_pipeline_runs(
+        db_session,
+        stale_before=datetime(2026, 7, 20, 8, 5, tzinfo=timezone.utc),
+        now=datetime(2026, 7, 20, 8, 10, tzinfo=timezone.utc),
+    )
+
+    assert [item.id for item in recovered] == [run.id]
+    assert run.status == PipelineStatus.FAILED
+    assert run.last_completed_stage is None
+    assert run.schools_processed == run.schools_succeeded == run.schools_failed == 0
+
+
+async def test_stale_terminalization_is_idempotent(db_session):
+    run = await start_pipeline_run(db_session, country="bg", city="sofia", cli_stage="all")
+    run.heartbeat_at = datetime(2026, 7, 20, 8, 0, tzinfo=timezone.utc)
+    await db_session.commit()
+    kwargs = {
+        "stale_before": datetime(2026, 7, 20, 8, 5, tzinfo=timezone.utc),
+        "now": datetime(2026, 7, 20, 8, 10, tzinfo=timezone.utc),
+    }
+
+    first = await terminalize_stale_pipeline_runs(db_session, **kwargs)
+    completed_at = run.completed_at
+    reason = run.terminalization_reason
+    second = await terminalize_stale_pipeline_runs(db_session, **kwargs)
+
+    assert [item.id for item in first] == [run.id]
+    assert second == []
+    assert run.completed_at == completed_at
+    assert run.terminalization_reason == reason

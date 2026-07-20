@@ -48,12 +48,15 @@ Usage:
 """
 import asyncio
 import builtins
+import datetime
+from contextlib import nullcontext
 from collections import defaultdict
 from math import ceil, isfinite
 import sys
 import logging
 import random
 import re
+import time
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 from typing import Optional
@@ -63,10 +66,15 @@ from rich.table import Table
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from app.services.pipeline_runs import (
+    checkpoint_pipeline_run,
     finalize_pipeline_run,
+    pipeline_run_heartbeat,
     stage_is_tracked,
     start_pipeline_run,
+    terminalize_stale_pipeline_runs,
 )
+from app.services.provider_costs import provider_cost_scope
+from app.services.provider_costs import reconcile_provider_cost
 
 # Setup logging
 logging.basicConfig(
@@ -135,6 +143,75 @@ def _navigate_summary(results) -> dict:
     rows = builtins.list(results or [])
     succeeded = sum(1 for row in rows if row and row.get("success"))
     return _stage_summary(processed=len(rows), succeeded=succeeded, failed=len(rows) - succeeded)
+
+
+def _navigation_failure_result(
+    *,
+    school_id: int,
+    url: str | None,
+    reason: str,
+    timeout_phase: str | None,
+    elapsed_seconds: float,
+    attempt_count: int,
+) -> dict:
+    return {
+        "school_id": school_id,
+        "success": False,
+        "reason": reason,
+        "final_reason": reason,
+        "url": url,
+        "page_url": url,
+        "timeout_phase": timeout_phase,
+        "elapsed_seconds": round(max(0.0, elapsed_seconds), 3),
+        "attempt_count": max(1, attempt_count),
+    }
+
+
+async def _persist_navigation_terminal_telemetry(
+    db, results: list[dict], urls: dict[int, str | None]
+) -> None:
+    """Persist final per-school navigation evidence without broadening pipeline work."""
+    from sqlalchemy import select
+    from sqlalchemy.orm.attributes import flag_modified
+
+    from app.models import School
+
+    ids = [
+        int(result["school_id"])
+        for result in results
+        if result and result.get("school_id")
+    ]
+    if not ids:
+        return
+    schools = builtins.list((await db.execute(select(School).where(School.id.in_(ids)))).scalars())
+    result_by_id = {
+        int(result["school_id"]): result
+        for result in results
+        if result and result.get("school_id")
+    }
+    for school in schools:
+        result = result_by_id[school.id]
+        attrs = dict(school.attributes or {})
+        if result.get("success"):
+            attrs.pop("navigation_terminal_failure", None)
+        else:
+            attrs["navigation_terminal_failure"] = {
+                "url": result.get("url") or urls.get(school.id),
+                "page_url": result.get("page_url") or result.get("url") or urls.get(school.id),
+                "timeout_phase": result.get("timeout_phase"),
+                "elapsed_seconds": float(result.get("elapsed_seconds", 0.0) or 0.0),
+                "attempt_count": int(result.get("attempt_count", 1) or 1),
+                "final_reason": (
+                    result.get("final_reason")
+                    or result.get("reason")
+                    or "Navigation failed"
+                ),
+                "recorded_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            }
+        school.attributes = attrs
+        flag_modified(school, "attributes")
+        db.add(school)
+    await db.commit()
 
 
 def _read_cohort_file(path: Path) -> list[int]:
@@ -234,6 +311,70 @@ _AGE_GROUP_CLASS_PATTERNS = {
 def cli():
     """Sofia School Comparison - Scraping Pipeline CLI"""
     pass
+
+
+@cli.command("terminalize-stale-runs")
+@click.option(
+    "--stale-after-seconds",
+    type=click.IntRange(min=1),
+    default=None,
+    help="Heartbeat age required before a RUNNING run may be terminalized",
+)
+def terminalize_stale_runs(stale_after_seconds: Optional[int]):
+    """Mark only heartbeat-confirmed stale pipeline runs terminal."""
+    asyncio.run(_terminalize_stale_runs(stale_after_seconds))
+
+
+async def _terminalize_stale_runs(stale_after_seconds: Optional[int]) -> None:
+    from app.config import get_settings
+    from app.database import async_session_maker
+
+    settings = get_settings()
+    age_seconds = stale_after_seconds or int(settings.pipeline_stale_after_seconds)
+    now = datetime.datetime.now(datetime.timezone.utc)
+    async with async_session_maker() as db:
+        runs = await terminalize_stale_pipeline_runs(
+            db,
+            stale_before=now - datetime.timedelta(seconds=age_seconds),
+            now=now,
+        )
+    if not runs:
+        console.print("[green]No stale RUNNING pipeline runs found.[/green]")
+        return
+    for run in runs:
+        console.print(
+            f"[yellow]{run.id}: {run.status.value}; last_stage="
+            f"{run.last_completed_stage or 'none'}; succeeded={run.schools_succeeded}; "
+            f"failed={run.schools_failed}[/yellow]"
+        )
+
+
+@cli.command("reconcile-provider-cost")
+@click.option("--run-id", required=True, help="PipelineRun UUID")
+@click.option(
+    "--provider-total-cost-usd",
+    required=True,
+    type=click.FloatRange(min=0.0),
+    help="Exact provider-reported total for the run reconciliation window",
+)
+def reconcile_provider_cost_command(run_id: str, provider_total_cost_usd: float):
+    """Persist an exact provider-total versus request-ledger discrepancy."""
+    asyncio.run(_reconcile_provider_cost_command(run_id, provider_total_cost_usd))
+
+
+async def _reconcile_provider_cost_command(run_id: str, provider_total_cost_usd: float) -> None:
+    from app.database import async_session_maker
+
+    async with async_session_maker() as db:
+        payload = await reconcile_provider_cost(
+            db,
+            pipeline_run_id=run_id,
+            provider_total_cost_usd=provider_total_cost_usd,
+        )
+    console.print(f"[green]Reconciled provider cost for {run_id}[/green]")
+    console.print(f"  Ledger: ${payload['ledger_total_cost_usd']:.8f}")
+    console.print(f"  Provider: ${payload['provider_total_cost_usd']:.8f}")
+    console.print(f"  Discrepancy: ${payload['discrepancy_usd']:.8f}")
 
 
 @cli.command("repair-i18n")
@@ -455,6 +596,12 @@ def repair_out_of_bounds_geocodes(school, school_id, city, country, limit, dry_r
     is_flag=True,
     help="For batch all stage, stop after validation without generating summaries",
 )
+@click.option(
+    "--provider-cost-cap-usd",
+    type=click.FloatRange(min=0.0, min_open=True),
+    default=None,
+    help="Required per-run hard cap before a billable stage may dispatch a provider request",
+)
 @click.option("--sync", is_flag=True, help="Run synchronously (no Celery)")
 @click.option("--dry-run", is_flag=True, help="Show what would happen without executing")
 def run(
@@ -473,6 +620,7 @@ def run(
     cohort_file,
     force_validate,
     skip_summarize,
+    provider_cost_cap_usd,
     sync,
     dry_run,
 ):
@@ -488,6 +636,17 @@ def run(
 
     if skip_summarize and (stage.lower() != "all" or school or school_id):
         raise click.UsageError("--skip-summarize is only valid for batch --stage all")
+
+    billable_batch_stages = {"validate-urls", "extract", "validate-data", "summarize", "all"}
+    if (
+        not dry_run
+        and stage.lower() in billable_batch_stages
+        and provider_cost_cap_usd is None
+    ):
+        raise click.UsageError(
+            "--provider-cost-cap-usd is required for billable stages; "
+            "provider calls fail closed without a per-run cap"
+        )
 
     if dry_run:
         console.print(f"[yellow]DRY RUN - would execute:[/yellow]")
@@ -505,6 +664,7 @@ def run(
         console.print(f"  Cohort IDs: {cohort_ids or 'automatic'}")
         console.print(f"  Force validate: {force_validate}")
         console.print(f"  Skip summarize: {skip_summarize}")
+        console.print(f"  Provider cost cap: {provider_cost_cap_usd or 'required before execution'}")
         console.print(f"  Mode: {'sync' if sync else 'celery'}")
         return
 
@@ -527,6 +687,7 @@ def run(
                 force_validate,
                 skip_summarize,
                 cohort_ids,
+                provider_cost_cap_usd,
             )
         )
     else:
@@ -551,9 +712,17 @@ async def _run_sync(
     force_validate: bool,
     skip_summarize: bool = False,
     cohort_ids: Optional[list[int]] = None,
+    provider_cost_cap_usd: Optional[float] = None,
 ):
     """Run pipeline stage synchronously."""
+    from app.config import get_settings
     from app.database import async_session_maker
+
+    if (
+        stage in {"validate-urls", "extract", "validate-data", "summarize", "all"}
+        and provider_cost_cap_usd is None
+    ):
+        raise ValueError("provider_cost_cap_usd is required for billable stages")
 
     async with async_session_maker() as db:
         if school_name or school_id:
@@ -565,50 +734,106 @@ async def _run_sync(
                     return
 
             console.print(f"[cyan]Running stage '{stage}' for school ID {school_id}[/cyan]")
+            single_run = None
+            if stage_is_tracked(stage):
+                single_run = await start_pipeline_run(
+                    db,
+                    country=country,
+                    city=city,
+                    cli_stage=stage,
+                    config={
+                        "school_id": school_id,
+                        "provider_cost_cap_usd": provider_cost_cap_usd,
+                    },
+                )
+            heartbeat_context = (
+                pipeline_run_heartbeat(
+                    single_run.id,
+                    session_factory=async_session_maker,
+                    interval_seconds=float(get_settings().pipeline_heartbeat_interval_seconds),
+                )
+                if single_run is not None
+                else nullcontext()
+            )
+            cost_context = (
+                provider_cost_scope(
+                    pipeline_run_id=single_run.id,
+                    stage=stage,
+                    cap_usd=provider_cost_cap_usd,
+                    request_reserve_usd=float(get_settings().provider_request_reserve_usd),
+                )
+                if single_run is not None and provider_cost_cap_usd is not None
+                else nullcontext()
+            )
+            single_error: Optional[str] = None
+            with cost_context:
+                async with heartbeat_context:
+                    with Progress(
+                        SpinnerColumn(),
+                        TextColumn("[progress.description]{task.description}"),
+                        console=console,
+                    ) as progress:
+                        task = progress.add_task(f"Processing school {school_id}...", total=None)
+                        try:
+                            if stage == "discover":
+                                console.print("[yellow]Discover stage runs in batch mode only[/yellow]")
+                            elif stage == "discover-websites":
+                                await _run_discover_website(db, school_id, country)
+                            elif stage == "recover-failed-urls":
+                                await _run_recover_failed_school(db, school_id, country)
+                            elif stage == "validate-urls":
+                                await _run_validate_url(db, school_id, country)
+                            elif stage == "navigate":
+                                await _run_navigate_school(db, school_id, country)
+                            elif stage == "extract":
+                                await _run_extract_school(db, school_id, country)
+                            elif stage == "validate-data":
+                                await _run_validate_data_school(
+                                    db, school_id, country, run_spot_check=True
+                                )
+                            elif stage == "summarize":
+                                await _run_summarize_school(db, school_id, country)
+                            elif stage == "nvo":
+                                await _run_nvo_import(
+                                    db,
+                                    country=country,
+                                    city=city,
+                                    year=year,
+                                    history_years=history_years,
+                                    exam_types=exam_types,
+                                    school_ids=[school_id],
+                                )
+                            elif stage == "all":
+                                await _run_all_stages(db, school_id, country)
 
-            with Progress(
-                SpinnerColumn(),
-                TextColumn("[progress.description]{task.description}"),
-                console=console,
-            ) as progress:
-                task = progress.add_task(f"Processing school {school_id}...", total=None)
-
-                try:
-                    if stage == "discover":
-                        console.print("[yellow]Discover stage runs in batch mode only[/yellow]")
-                    elif stage == "discover-websites":
-                        await _run_discover_website(db, school_id, country)
-                    elif stage == "recover-failed-urls":
-                        await _run_recover_failed_school(db, school_id, country)
-                    elif stage == "validate-urls":
-                        await _run_validate_url(db, school_id, country)
-                    elif stage == "navigate":
-                        await _run_navigate_school(db, school_id, country)
-                    elif stage == "extract":
-                        await _run_extract_school(db, school_id, country)
-                    elif stage == "validate-data":
-                        await _run_validate_data_school(db, school_id, country, run_spot_check=True)
-                    elif stage == "summarize":
-                        await _run_summarize_school(db, school_id, country)
-                    elif stage == "nvo":
-                        await _run_nvo_import(
-                            db,
-                            country=country,
-                            city=city,
-                            year=year,
-                            history_years=history_years,
-                            exam_types=exam_types,
-                            school_ids=[school_id],
-                        )
-                    elif stage == "all":
-                        await _run_all_stages(db, school_id, country)
-
-                    progress.update(task, completed=True)
-                    console.print(f"[green]✓ Completed stage '{stage}' for school {school_id}[/green]")
-
-                except Exception as e:
-                    console.print(f"[red]✗ Error: {str(e)}[/red]")
-                    logger.exception("Stage execution failed")
+                            progress.update(task, completed=True)
+                            console.print(f"[green]✓ Completed stage '{stage}' for school {school_id}[/green]")
+                        except Exception as exc:
+                            single_error = str(exc)
+                            console.print(f"[red]✗ Error: {single_error}[/red]")
+                            logger.exception("Stage execution failed")
+                            if db.in_transaction():
+                                await db.rollback()
+                        finally:
+                            if single_run is not None:
+                                await finalize_pipeline_run(
+                                    db,
+                                    single_run,
+                                    country=country,
+                                    city=city,
+                                    stage_summaries=[
+                                        _stage_summary(
+                                            processed=1,
+                                            succeeded=0 if single_error else 1,
+                                            failed=1 if single_error else 0,
+                                        )
+                                    ],
+                                    error_summary=single_error,
+                                )
+                                console.print(
+                                    f"[dim]Recorded pipeline run {single_run.id} "
+                                    f"({single_run.status.value}).[/dim]"
+                                )
 
         else:
             # Batch mode
@@ -631,83 +856,113 @@ async def _run_sync(
                         "force_validate": force_validate,
                         "skip_summarize": skip_summarize,
                         "explicit_cohort": cohort_ids is not None,
+                        "provider_cost_cap_usd": provider_cost_cap_usd,
                     },
                 )
 
             stage_summaries: list = []
             run_error: Optional[str] = None
             raised: Optional[BaseException] = None
-            try:
-                if stage == "discover":
-                    stage_summaries.append(await _run_discover_batch(db, country, city, limit, sample_ratio))
-                elif stage == "discover-websites":
-                    stage_summaries.append(await _run_discover_websites_batch(db, country, city, limit))
-                elif stage == "recover-failed-urls":
-                    stage_summaries.append(await _run_recover_failed_urls_batch(db, country, city, limit))
-                elif stage == "validate-urls":
-                    stage_summaries.append(await _run_validate_urls_batch(db, country, city, limit))
-                elif stage == "navigate":
-                    stage_summaries.append(
-                        _navigate_summary(
-                            await _run_navigate_batch(db, country, city, limit, include_navigated=include_navigated)
-                        )
-                    )
-                elif stage == "extract":
-                    stage_summaries.append(
-                        await _run_extract_batch(db, country, city, limit, include_extracted=include_extracted)
-                    )
-                elif stage == "validate-data":
-                    stage_summaries.append(
-                        await _run_validate_data_batch(db, country, city, limit, force_validate=force_validate)
-                    )
-                elif stage == "summarize":
-                    stage_summaries.append(await _run_summarize_batch(db, country, city, limit))
-                elif stage == "nvo":
-                    await _run_nvo_import(
-                        db,
-                        country=country,
-                        city=city,
-                        year=year,
-                        history_years=history_years,
-                        exam_types=exam_types,
-                        school_ids=None,
-                    )
-                elif stage == "all":
-                    await _run_all_stages_batch(
-                        db,
-                        country=country,
-                        city=city,
-                        limit=limit,
-                        include_navigated=include_navigated,
-                        include_extracted=include_extracted,
-                        force_validate=force_validate,
-                        skip_summarize=skip_summarize,
-                        requested_school_ids=cohort_ids,
-                        pipeline_run=run,
-                        stage_summaries=stage_summaries,
-                    )
-                else:
-                    console.print(f"[yellow]Batch mode for '{stage}' not yet implemented[/yellow]")
-            except Exception as exc:
-                raised = exc
-                run_error = str(exc)
-                logger.exception("Batch stage execution failed")
-                console.print(f"[red]✗ Error: {run_error}[/red]")
-                # A stage that raised mid-transaction leaves the session unusable;
-                # clear it so the run can still be finalized.
-                if db.in_transaction():
-                    await db.rollback()
-            finally:
-                if run is not None:
-                    await finalize_pipeline_run(
-                        db,
-                        run,
-                        country=country,
-                        city=city,
-                        stage_summaries=stage_summaries,
-                        error_summary=run_error,
-                    )
-                    console.print(f"[dim]Recorded pipeline run {run.id} ({run.status.value}).[/dim]")
+            heartbeat_context = (
+                pipeline_run_heartbeat(
+                    run.id,
+                    session_factory=async_session_maker,
+                    interval_seconds=float(get_settings().pipeline_heartbeat_interval_seconds),
+                )
+                if run is not None
+                else nullcontext()
+            )
+            cost_context = (
+                provider_cost_scope(
+                    pipeline_run_id=run.id,
+                    stage=stage,
+                    cap_usd=provider_cost_cap_usd,
+                    request_reserve_usd=float(get_settings().provider_request_reserve_usd),
+                )
+                if run is not None and provider_cost_cap_usd is not None
+                else nullcontext()
+            )
+            with cost_context:
+                async with heartbeat_context:
+                    try:
+                        if stage == "discover":
+                            stage_summaries.append(
+                                await _run_discover_batch(db, country, city, limit, sample_ratio)
+                            )
+                        elif stage == "discover-websites":
+                            stage_summaries.append(await _run_discover_websites_batch(db, country, city, limit))
+                        elif stage == "recover-failed-urls":
+                            stage_summaries.append(await _run_recover_failed_urls_batch(db, country, city, limit))
+                        elif stage == "validate-urls":
+                            stage_summaries.append(await _run_validate_urls_batch(db, country, city, limit))
+                        elif stage == "navigate":
+                            stage_summaries.append(
+                                _navigate_summary(
+                                    await _run_navigate_batch(
+                                        db, country, city, limit, include_navigated=include_navigated
+                                    )
+                                )
+                            )
+                        elif stage == "extract":
+                            stage_summaries.append(
+                                await _run_extract_batch(
+                                    db, country, city, limit, include_extracted=include_extracted
+                                )
+                            )
+                        elif stage == "validate-data":
+                            stage_summaries.append(
+                                await _run_validate_data_batch(
+                                    db, country, city, limit, force_validate=force_validate
+                                )
+                            )
+                        elif stage == "summarize":
+                            stage_summaries.append(await _run_summarize_batch(db, country, city, limit))
+                        elif stage == "nvo":
+                            await _run_nvo_import(
+                                db,
+                                country=country,
+                                city=city,
+                                year=year,
+                                history_years=history_years,
+                                exam_types=exam_types,
+                                school_ids=None,
+                            )
+                        elif stage == "all":
+                            await _run_all_stages_batch(
+                                db,
+                                country=country,
+                                city=city,
+                                limit=limit,
+                                include_navigated=include_navigated,
+                                include_extracted=include_extracted,
+                                force_validate=force_validate,
+                                skip_summarize=skip_summarize,
+                                requested_school_ids=cohort_ids,
+                                pipeline_run=run,
+                                stage_summaries=stage_summaries,
+                            )
+                        else:
+                            console.print(f"[yellow]Batch mode for '{stage}' not yet implemented[/yellow]")
+                    except Exception as exc:
+                        raised = exc
+                        run_error = str(exc)
+                        logger.exception("Batch stage execution failed")
+                        console.print(f"[red]✗ Error: {run_error}[/red]")
+                        # A stage that raised mid-transaction leaves the session unusable;
+                        # clear it so the run can still be finalized.
+                        if db.in_transaction():
+                            await db.rollback()
+                    finally:
+                        if run is not None:
+                            await finalize_pipeline_run(
+                                db,
+                                run,
+                                country=country,
+                                city=city,
+                                stage_summaries=stage_summaries,
+                                error_summary=run_error,
+                            )
+                            console.print(f"[dim]Recorded pipeline run {run.id} ({run.status.value}).[/dim]")
             # Batch mode is the automation path: a stage failure must exit non-zero.
             if raised is not None:
                 raise raised
@@ -2898,6 +3153,7 @@ async def _run_navigate_batch(
     result = await db.execute(query)
     schools = result.scalars().all()
     school_ids = [school.id for school in schools]
+    school_urls = {school.id: school.website_url for school in schools}
 
     if not school_ids:
         console.print("[yellow]No schools to navigate[/yellow]")
@@ -2929,10 +3185,67 @@ async def _run_navigate_batch(
         nav_batch_concurrency = max(1, int(getattr(settings, "nav_batch_concurrency", 3)))
         console.print(f"  Batch crawl concurrency: {nav_batch_concurrency}")
 
+        async def _navigate_chunk_individually(
+            school_chunk: list[int],
+            *,
+            prior_phase: str,
+            prior_elapsed: float,
+        ) -> list[dict]:
+            isolated: list[dict] = []
+            for isolated_school_id in school_chunk:
+                started = time.monotonic()
+                try:
+                    coro = _run_navigate_school(db, isolated_school_id, country)
+                    if _nav_timeout > 0:
+                        item = await asyncio.wait_for(coro, timeout=_nav_timeout)
+                    else:
+                        item = await coro
+                    item = dict(item or {})
+                    item.setdefault("school_id", isolated_school_id)
+                    item.setdefault("url", school_urls.get(isolated_school_id))
+                    item.setdefault("page_url", item.get("url"))
+                    item.setdefault("elapsed_seconds", round(time.monotonic() - started, 3))
+                    item.setdefault("attempt_count", 2)
+                    item.setdefault(
+                        "timeout_phase", prior_phase if not item.get("success") else None
+                    )
+                    item.setdefault("final_reason", item.get("reason"))
+                except asyncio.TimeoutError:
+                    elapsed = time.monotonic() - started
+                    logger.error(
+                        "Navigation timed out after %.0fs for school %s", _nav_timeout, isolated_school_id
+                    )
+                    await db.rollback()
+                    item = _navigation_failure_result(
+                        school_id=isolated_school_id,
+                        url=school_urls.get(isolated_school_id),
+                        reason="Navigation timeout",
+                        timeout_phase="school_retry",
+                        elapsed_seconds=prior_elapsed + elapsed,
+                        attempt_count=2,
+                    )
+                except Exception as exc:
+                    elapsed = time.monotonic() - started
+                    logger.error("Error navigating school %s: %s", isolated_school_id, exc)
+                    await db.rollback()
+                    item = _navigation_failure_result(
+                        school_id=isolated_school_id,
+                        url=school_urls.get(isolated_school_id),
+                        reason=str(exc),
+                        timeout_phase=(
+                            prior_phase if "timeout" in str(exc).lower() else None
+                        ),
+                        elapsed_seconds=prior_elapsed + elapsed,
+                        attempt_count=2,
+                    )
+                isolated.append(item)
+            return isolated
+
         if skip_timed_out_chunks and explicit_school_ids:
             timed_out_school_ids: list[int] = []
             for chunk_start in range(0, len(school_ids), nav_batch_concurrency):
                 school_chunk = school_ids[chunk_start : chunk_start + nav_batch_concurrency]
+                chunk_started = time.monotonic()
                 try:
                     coro = navigate_schools_batch(
                         db=db,
@@ -2948,21 +3261,23 @@ async def _run_navigate_batch(
                     else:
                         chunk_results = await coro
                 except asyncio.TimeoutError:
+                    chunk_elapsed = time.monotonic() - chunk_started
                     logger.error(
                         "Navigation timed out after %.0fs for school chunk %s",
                         _nav_timeout,
                         school_chunk,
                     )
                     await db.rollback()
-                    timed_out_school_ids.extend(school_chunk)
-                    chunk_results = [
-                        {
-                            "school_id": timed_out_school_id,
-                            "success": False,
-                            "reason": "Navigation timeout",
-                        }
-                        for timed_out_school_id in school_chunk
-                    ]
+                    chunk_results = await _navigate_chunk_individually(
+                        school_chunk,
+                        prior_phase="batch_chunk",
+                        prior_elapsed=chunk_elapsed,
+                    )
+                    timed_out_school_ids.extend(
+                        int(item["school_id"])
+                        for item in chunk_results
+                        if not item.get("success") and item.get("timeout_phase")
+                    )
                 except Exception as exc:
                     logger.warning(
                         "Batch navigation chunk failed for %s; retrying sequentially: %s",
@@ -2970,29 +3285,11 @@ async def _run_navigate_batch(
                         exc,
                     )
                     await db.rollback()
-                    chunk_results = []
-                    for school_id in school_chunk:
-                        try:
-                            coro = _run_navigate_school(db, school_id, country)
-                            if _nav_timeout > 0:
-                                result = await asyncio.wait_for(coro, timeout=_nav_timeout)
-                            else:
-                                result = await coro
-                        except asyncio.TimeoutError:
-                            logger.error(
-                                "Navigation timed out after %.0fs for school %s", _nav_timeout, school_id
-                            )
-                            await db.rollback()
-                            result = {
-                                "school_id": school_id,
-                                "success": False,
-                                "reason": "Navigation timeout",
-                            }
-                        except Exception as e:
-                            logger.error(f"Error navigating school {school_id}: {e}")
-                            await db.rollback()
-                            result = {"school_id": school_id, "success": False, "reason": str(e)}
-                        chunk_results.append(result)
+                    chunk_results = await _navigate_chunk_individually(
+                        school_chunk,
+                        prior_phase="batch_chunk_error",
+                        prior_elapsed=time.monotonic() - chunk_started,
+                    )
 
                 results.extend(chunk_results)
                 for result in chunk_results:
@@ -3047,6 +3344,7 @@ async def _run_navigate_batch(
     console.print(f"[green]✓ Navigation complete:[/green]")
     console.print(f"  Successful: {success_count}")
     console.print(f"  Failed: {fail_count}")
+    await _persist_navigation_terminal_telemetry(db, results, school_urls)
     return results
 
 
@@ -3181,6 +3479,10 @@ async def _run_all_stages_batch(
         school_ids=school_ids,
     )
     completed.append(url_summary)
+    if pipeline_run is not None:
+        await checkpoint_pipeline_run(
+            db, pipeline_run, completed_stage="validate-urls", stage_summaries=completed
+        )
     validated_url_ids = builtins.list(url_summary.get("validated_school_ids") or [])
 
     navigation_results = await _run_navigate_batch(
@@ -3193,6 +3495,10 @@ async def _run_all_stages_batch(
         skip_timed_out_chunks=True,
     )
     completed.append(_navigate_summary(navigation_results))
+    if pipeline_run is not None:
+        await checkpoint_pipeline_run(
+            db, pipeline_run, completed_stage="navigate", stage_summaries=completed
+        )
     navigated_ids = sorted(
         int(result["school_id"])
         for result in (navigation_results or [])
@@ -3208,6 +3514,10 @@ async def _run_all_stages_batch(
         school_ids=navigated_ids,
     )
     completed.append(extract_summary)
+    if pipeline_run is not None:
+        await checkpoint_pipeline_run(
+            db, pipeline_run, completed_stage="extract", stage_summaries=completed
+        )
     extracted_ids = builtins.list(extract_summary.get("ready_school_ids") or [])
 
     validation_summary = await _run_validate_data_batch(
@@ -3219,6 +3529,10 @@ async def _run_all_stages_batch(
         school_ids=extracted_ids,
     )
     completed.append(validation_summary)
+    if pipeline_run is not None:
+        await checkpoint_pipeline_run(
+            db, pipeline_run, completed_stage="validate-data", stage_summaries=completed
+        )
     validated_ids = builtins.list(validation_summary.get("validated_school_ids") or [])
 
     if not skip_summarize:
@@ -3231,6 +3545,10 @@ async def _run_all_stages_batch(
                 school_ids=validated_ids,
             )
         )
+        if pipeline_run is not None:
+            await checkpoint_pipeline_run(
+                db, pipeline_run, completed_stage="summarize", stage_summaries=completed
+            )
     return completed
 
 

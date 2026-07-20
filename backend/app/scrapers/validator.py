@@ -18,6 +18,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import flag_modified
 
 from app.ai.client import calculate_cost, create_agent, extract_provider_cost_usd, get_model
+from app.utils.website_data import promote_validation_report, record_validation_failure
+from app.services.provider_costs import execute_billable_request
 from app.config import get_settings
 from app.models.field_source import FieldSource, SourceType
 from app.models.pricing import PriceSource, Pricing
@@ -1210,7 +1212,7 @@ async def validate_school_data(
             prior_spot_check = prior_validation.get("spot_check")
             if isinstance(prior_spot_check, dict):
                 validation_payload["spot_check"] = prior_spot_check
-            attrs["data_validation"] = validation_payload
+            attrs = promote_validation_report(attrs, validation_payload)
 
             school.attributes = attrs
             school.admission_info = admission_info
@@ -1232,6 +1234,21 @@ async def validate_school_data(
         logger.exception("Validation failed for school %s: %s", school_id, exc)
         if db.in_transaction():
             await db.rollback()
+        try:
+            failed_school = await db.get(School, school_id)
+            if failed_school is not None and failed_school.country_code == country_code:
+                failed_school.attributes = record_validation_failure(
+                    failed_school.attributes,
+                    error=str(exc),
+                )
+                failed_school.updated_at = datetime.datetime.now(datetime.timezone.utc)
+                flag_modified(failed_school, "attributes")
+                db.add(failed_school)
+                await db.commit()
+        except Exception:
+            logger.exception("Failed to persist validation-failure withholding for school %s", school_id)
+            if db.in_transaction():
+                await db.rollback()
         return {
             "school_id": school_id,
             "status": "validation_failed",
@@ -1356,7 +1373,12 @@ async def run_spot_check_for_school(
     token_cost_usd = 0.0
     try:
         raw_result = await asyncio.wait_for(
-            agent.run(user_prompt),
+            execute_billable_request(
+                lambda: agent.run(user_prompt),
+                model=get_model("capable"),
+                school_id=school_id,
+                stage="validate-data",
+            ),
             timeout=max(5.0, float(settings.validation_spot_check_timeout_seconds)),
         )
         input_tokens, output_tokens = extraction_helpers._get_usage(raw_result)
