@@ -61,7 +61,7 @@ provider billing do not reconcile exactly, so the larger segment sum is used for
 | Criterion | Result | Evidence |
 |---|---|---|
 | Full API boundary | PASS | 1,066/1,066 BG/EN list/detail/compare requests returned 200 across all 443 Sofia schools; 442 are listable and school 338 remains detail/compare-only because it has no location. |
-| List-view NVO | PASS | `/schools` again eager-loads and serializes `exam_results`; focused API regression and frontend NVO tests pass. |
+| List-view NVO | PASS | `/schools` again eager-loads and serializes `exam_results`; focused API regression and frontend NVO tests pass. SchoolCard requires both canonical subjects before rendering, so partial imported slices cannot produce `null%`. |
 | Validation-report gate | PASS | 328/328 publishable schools have current reports; zero publish without a report. |
 | Summaries/admissions/pricing | PASS | Zero summaries, website admissions, scraped pricing, or withheld pricing rows serialized. |
 | Provenance/internal keys | PASS | Zero raw/rejected provenance values and zero internal keys serialized. |

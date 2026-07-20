@@ -114,7 +114,11 @@ function getLatestResult(items) {
   return [...items].sort((a, b) => b.year - a.year)[0] || null
 }
 
-export function getNvoDetail(school, t, { minimumYearsForAverage = 3, maxAverageYears = 5 } = {}) {
+export function getNvoDetail(
+  school,
+  t,
+  { minimumYearsForAverage = 3, maxAverageYears = 5, requireCompleteSubjects = false } = {}
+) {
   const examResults = school.exam_results || []
   if (examResults.length === 0) {
     return null
@@ -143,7 +147,10 @@ export function getNvoDetail(school, t, { minimumYearsForAverage = 3, maxAverage
     subjects[subjectKey].push(result)
   })
 
-  if (subjects.bulgarian.length === 0 && subjects.math.length === 0) {
+  if (
+    (subjects.bulgarian.length === 0 && subjects.math.length === 0) ||
+    (requireCompleteSubjects && (subjects.bulgarian.length === 0 || subjects.math.length === 0))
+  ) {
     return null
   }
 

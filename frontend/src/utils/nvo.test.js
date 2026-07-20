@@ -27,6 +27,21 @@ test('getNvoDetail only exposes school averages when both subjects have enough h
   assert.equal(detail.latestYear, 2025)
 })
 
+test('getNvoDetail can hide incomplete subject pairs for SchoolCard', () => {
+  const school = {
+    education_level: 'lower_secondary',
+    exam_results: [
+      { exam_type: 'nvo_7', subject: 'math', metric: 'average_score', year: 2025, value: 61.0 },
+    ],
+  }
+
+  assert.equal(
+    getNvoDetail(school, (key) => key, { requireCompleteSubjects: true }),
+    null
+  )
+  assert.equal(getNvoDetail(school, (key) => key).latestMath, 61.0)
+})
+
 test('prepareNvoTimelineData merges subject-specific national benchmarks by year', () => {
   const chartData = prepareNvoTimelineData(
     [
