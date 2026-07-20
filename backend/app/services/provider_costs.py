@@ -307,9 +307,9 @@ async def attribute_provider_responses(
             )
         )
     ).scalar_one()
-    rows: list[ProviderRequestLedger] = []
+    normalized: list[dict[str, Any]] = []
     seen_ids: set[str] = set()
-    for index, attribution in enumerate(attributions):
+    for attribution in attributions:
         request_id = str(attribution.get("provider_request_id") or "").strip()
         if not request_id or request_id in seen_ids:
             await mark_provider_request_uncertain(
@@ -338,6 +338,18 @@ async def attribute_provider_responses(
             raise ProviderAttributionUncertain(
                 "provider token counts or exact cost are invalid"
             ) from exc
+        normalized.append(
+            {
+                "provider_request_id": request_id,
+                "input_tokens": input_tokens,
+                "output_tokens": output_tokens,
+                "provider_cost_usd": cost,
+                "attributed_at": attribution.get("attributed_at"),
+            }
+        )
+
+    rows: list[ProviderRequestLedger] = []
+    for index, attribution in enumerate(normalized):
         row = reservation if index == 0 else ProviderRequestLedger(
             client_request_id=str(uuid4()),
             pipeline_run_id=reservation.pipeline_run_id,
@@ -346,10 +358,10 @@ async def attribute_provider_responses(
             model=reservation.model,
             requested_at=reservation.requested_at,
         )
-        row.provider_request_id = request_id
-        row.input_tokens = input_tokens
-        row.output_tokens = output_tokens
-        row.provider_cost_usd = cost
+        row.provider_request_id = attribution["provider_request_id"]
+        row.input_tokens = attribution["input_tokens"]
+        row.output_tokens = attribution["output_tokens"]
+        row.provider_cost_usd = attribution["provider_cost_usd"]
         row.status = ProviderRequestStatus.ATTRIBUTED
         row.uncertainty_reason = None
         row.attributed_at = attribution.get("attributed_at") or datetime.datetime.now(

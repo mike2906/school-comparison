@@ -222,3 +222,41 @@ async def test_multi_response_dispatch_keeps_one_exact_row_per_provider_request(
         ).scalars()
     )
     assert len(persisted) == 2
+
+
+async def test_invalid_later_response_does_not_persist_partial_attribution(db_session):
+    run = await _run(db_session)
+    reservation = await _reserve(db_session, run)
+
+    with pytest.raises(ProviderAttributionUncertain):
+        await attribute_provider_responses(
+            db_session,
+            reservation_client_request_id=reservation.client_request_id,
+            attributions=[
+                {
+                    "provider_request_id": "provider-valid-first",
+                    "input_tokens": 10,
+                    "output_tokens": 2,
+                    "provider_cost_usd": "0.01",
+                },
+                {
+                    "provider_request_id": "provider-invalid-second",
+                    "input_tokens": -1,
+                    "output_tokens": 4,
+                    "provider_cost_usd": "0.02",
+                },
+            ],
+        )
+
+    persisted = list(
+        (
+            await db_session.execute(
+                select(ProviderRequestLedger).where(
+                    ProviderRequestLedger.pipeline_run_id == run.id
+                )
+            )
+        ).scalars()
+    )
+    assert len(persisted) == 1
+    assert persisted[0].provider_request_id is None
+    assert persisted[0].status == ProviderRequestStatus.UNCERTAIN
