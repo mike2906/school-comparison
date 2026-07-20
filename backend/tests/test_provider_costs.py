@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime, timezone
 from decimal import Decimal
 from types import SimpleNamespace
@@ -5,14 +6,21 @@ from types import SimpleNamespace
 import pytest
 from sqlalchemy import select
 
-from app.models.pipeline_run import ProviderRequestLedger, ProviderRequestStatus
+from app.models.pipeline_run import (
+    PipelineRun,
+    PipelineStatus,
+    ProviderRequestLedger,
+    ProviderRequestStatus,
+)
 from app.services.pipeline_runs import finalize_pipeline_run, start_pipeline_run
 from app.services.provider_costs import (
     ProviderAttributionUncertain,
     ProviderCostCapExceeded,
     attribute_provider_request,
     attribute_provider_responses,
+    execute_billable_request,
     extract_exact_provider_attributions,
+    provider_cost_scope,
     reconcile_provider_cost,
     reserve_provider_request,
 )
@@ -110,6 +118,64 @@ async def test_near_cap_refuses_pre_dispatch_reservation(db_session):
         await _reserve(db_session, run, reserve=0.1)
 
 
+async def test_billable_batch_concurrency_is_serialized_until_exact_attribution(monkeypatch):
+    import app.database as database
+    import app.services.provider_costs as provider_costs
+
+    class _Session:
+        async def __aenter__(self):
+            return object()
+
+        async def __aexit__(self, *_args):
+            return None
+
+    monkeypatch.setattr(database, "async_session_maker", lambda: _Session())
+    reservation_count = 0
+
+    async def _reserve(*_args, **_kwargs):
+        nonlocal reservation_count
+        reservation_count += 1
+        return SimpleNamespace(client_request_id=f"client-{reservation_count}")
+
+    monkeypatch.setattr(provider_costs, "reserve_provider_request", _reserve)
+    monkeypatch.setattr(
+        provider_costs,
+        "extract_exact_provider_attributions",
+        lambda _result: [{"provider_request_id": "mock"}],
+    )
+    monkeypatch.setattr(
+        provider_costs, "attribute_provider_responses", lambda *_args, **_kwargs: _noop()
+    )
+
+    active = 0
+    max_active = 0
+
+    async def _noop():
+        return None
+
+    async def _call():
+        nonlocal active, max_active
+        active += 1
+        max_active = max(max_active, active)
+        await asyncio.sleep(0)
+        active -= 1
+        return object()
+
+    with provider_cost_scope(
+        pipeline_run_id="run-1",
+        stage="extract",
+        cap_usd=1.0,
+        request_reserve_usd=0.1,
+    ):
+        await asyncio.gather(
+            execute_billable_request(_call, model="mock", school_id=1),
+            execute_billable_request(_call, model="mock", school_id=2),
+        )
+
+    assert reservation_count == 2
+    assert max_active == 1
+
+
 async def test_missing_or_delayed_attribution_blocks_following_dispatch(db_session):
     run = await _run(db_session)
     row = await _reserve(db_session, run)
@@ -172,6 +238,40 @@ async def test_pipeline_finalization_prefers_exact_ledger_over_summary_estimate(
         "attributed": 1,
         "uncertain": 0,
     }
+
+
+@pytest.mark.parametrize(
+    ("succeeded", "expected_status"),
+    [(1, PipelineStatus.PARTIAL), (0, PipelineStatus.FAILED)],
+)
+async def test_pipeline_finalization_never_completes_with_uncertain_cost(
+    db_session, succeeded, expected_status
+):
+    run = await _run(db_session)
+    row = await _reserve(db_session, run)
+    row.status = ProviderRequestStatus.UNCERTAIN
+    row.uncertainty_reason = "provider cost was delayed"
+    await db_session.commit()
+
+    finalized = await finalize_pipeline_run(
+        db_session,
+        run,
+        country="bg",
+        city="sofia",
+        stage_summaries=[
+            {
+                "processed": 1,
+                "succeeded": succeeded,
+                "failed": 1 - succeeded,
+            }
+        ],
+    )
+
+    assert finalized.status == expected_status
+    assert finalized.error_summary == "provider cost attribution incomplete for 1 request(s)"
+    assert finalized.metrics["provider_cost_ledger"]["uncertain"] == 1
+    persisted = await db_session.get(PipelineRun, run.id)
+    assert persisted.status == expected_status
 
 
 async def test_multi_response_dispatch_keeps_one_exact_row_per_provider_request(db_session):

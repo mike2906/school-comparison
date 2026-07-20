@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import contextvars
 import datetime
 import inspect
@@ -40,6 +41,7 @@ class ProviderCostScope:
     stage: str
     cap_usd: Decimal
     request_reserve_usd: Decimal
+    dispatch_lock: asyncio.Lock
 
 
 _SCOPE: contextvars.ContextVar[ProviderCostScope | None] = contextvars.ContextVar(
@@ -69,7 +71,9 @@ def provider_cost_scope(
     reserve = _usd(request_reserve_usd, field="provider request reserve")
     if cap <= 0 or reserve <= 0:
         raise ProviderAttributionUncertain("provider cost cap and request reserve must be positive")
-    token = _SCOPE.set(ProviderCostScope(pipeline_run_id, stage, cap, reserve))
+    token = _SCOPE.set(
+        ProviderCostScope(pipeline_run_id, stage, cap, reserve, asyncio.Lock())
+    )
     try:
         yield
     finally:
@@ -384,6 +388,30 @@ async def execute_billable_request(
     scope = _SCOPE.get()
     if scope is None:
         return await call()
+
+    # A scope is shared by all tasks spawned inside the batch. Serializing the
+    # dispatch-through-attribution interval makes every next cap decision use
+    # the preceding request's exact provider cost, and prevents ordinary batch
+    # concurrency from colliding with its pending reservation.
+    async with scope.dispatch_lock:
+        return await _execute_tracked_billable_request(
+            call,
+            scope=scope,
+            model=model,
+            school_id=school_id,
+            stage=stage,
+        )
+
+
+async def _execute_tracked_billable_request(
+    call: Callable[[], Awaitable[Any]],
+    *,
+    scope: ProviderCostScope,
+    model: str,
+    school_id: Optional[int],
+    stage: Optional[str],
+) -> Any:
+    """Execute one serialized request within an active provider-cost scope."""
 
     from app.database import async_session_maker
 

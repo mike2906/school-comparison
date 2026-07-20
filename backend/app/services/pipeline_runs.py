@@ -265,7 +265,15 @@ async def finalize_pipeline_run(
     run.schools_failed = counts["failed"]
     run.schools_skipped = counts["skipped"]
     run.total_llm_cost_usd = usage["token_cost_usd"]
-    run.error_summary = error_summary
+    incomplete_ledger_count = sum(
+        row.status != ProviderRequestStatus.ATTRIBUTED for row in ledger_rows
+    )
+    ledger_error = (
+        f"provider cost attribution incomplete for {incomplete_ledger_count} request(s)"
+        if incomplete_ledger_count
+        else None
+    )
+    run.error_summary = error_summary or ledger_error
     quality_metrics = await compute_quality_metrics(db, country=country, city=city)
     run.metrics = {
         **quality_metrics,
@@ -275,9 +283,7 @@ async def finalize_pipeline_run(
             "attributed": sum(
                 row.status == ProviderRequestStatus.ATTRIBUTED for row in ledger_rows
             ),
-            "uncertain": sum(
-                row.status != ProviderRequestStatus.ATTRIBUTED for row in ledger_rows
-            ),
+            "uncertain": incomplete_ledger_count,
         },
     }
     run.completed_at = _now()
@@ -285,6 +291,10 @@ async def finalize_pipeline_run(
 
     if error_summary:
         run.status = PipelineStatus.FAILED
+    elif incomplete_ledger_count:
+        run.status = (
+            PipelineStatus.PARTIAL if counts["succeeded"] else PipelineStatus.FAILED
+        )
     elif counts["failed"] and counts["succeeded"]:
         run.status = PipelineStatus.PARTIAL
     elif counts["failed"]:

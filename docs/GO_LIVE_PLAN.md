@@ -1235,9 +1235,11 @@ operational safeguards do not reopen the accepted launch boundary.
             Reconcile the ledger against provider totals and retain an explicit
             discrepancy field; interval-delta inference should remain an emergency
             fallback only. **Done locally 2026-07-20:** tracked billable runs require a
-            cap, durable pre-dispatch reservations block on missing/delayed attribution,
-            exact request evidence feeds run totals, and deterministic reconciliation
-            stores the provider discrepancy.
+            cap; concurrent batch calls serialize from durable reservation through exact
+            attribution so each next dispatch uses exact persisted spend; missing/delayed
+            attribution blocks later dispatch and forces non-success run finalization;
+            exact request evidence feeds run totals, and deterministic reconciliation stores
+            the provider discrepancy.
       - [x] **(d) Navigation timeout isolation and telemetry.** Keep bounded navigation
             chunks, but make each school independently terminal. Record the URL/page,
             timeout phase, elapsed time, attempt count, and final reason. Use the nine
@@ -1275,7 +1277,7 @@ operational safeguards do not reopen the accepted launch boundary.
       no LLM calls or real refresh; written evidence under `backend/reports/`; update this
       plan with completed items and any deliberately deferred curation counts.
       **Local evidence 2026-07-20:** `backend/reports/p2-14/20260720T124735Z/acceptance.md`;
-      backend `883 passed`; frontend lint/build and `7 passed`; migration head
+      backend `886 passed`; frontend lint/build and `7 passed`; migration head
       `5ac75d912125`; zero provider calls. P2.14(g) remains open until both PR and
       post-merge `main` workflows pass.
 
