@@ -61,6 +61,8 @@ KNOWN_SHARED_COORDINATE_GROUPS = {
     frozenset({1160, 1191}),
     frozenset({853, 854}),
     frozenset({1104, 1111}),
+    # Dr Petar Beron school and kindergarten share the same verified campus.
+    frozenset({1082, 1091}),
 }
 DISPLAY_KEYS = {
     "name_i18n",

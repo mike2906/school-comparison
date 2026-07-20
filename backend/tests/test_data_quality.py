@@ -9,7 +9,7 @@ from app.models.pipeline_run import PipelineStatus
 from app.models.pricing import PriceCategory, PricePeriod, PriceSource, Pricing
 from app.models.school import School, SchoolLocation
 from app.schemas.school import SchoolListResponse
-from app.services.data_quality import compute_quality_metrics
+from app.services.data_quality import _display_name_overrides, compute_quality_metrics
 from app.services.pipeline_runs import _aggregate_usage, finalize_pipeline_run, start_pipeline_run
 from app.utils.website_data import attributes_for_publication, website_data_is_publishable
 
@@ -39,6 +39,33 @@ async def _make_school(db, **kwargs):
     db.add(school)
     await db.flush()
     return school
+
+
+async def test_display_name_scoreboard_counts_only_semantically_publishable_overrides():
+    evidence = {
+        "status": "corroborated",
+        "signals": ["website_domain_alias_match", "repeated_on_page_identity"],
+    }
+    schools = [
+        SimpleNamespace(
+            attributes={
+                "display_name_i18n": {"en": "Fusion School"},
+                "display_name_evidence": evidence,
+                "data_validation": {"_schema_version": 1, "status": "ok"},
+            },
+            scrape_status="extracted",
+        ),
+        SimpleNamespace(
+            attributes={
+                "display_name_i18n": {"en": "Our Values At Deni Diderot School"},
+                "display_name_evidence": evidence,
+                "data_validation": {"_schema_version": 1, "status": "ok"},
+            },
+            scrape_status="extracted",
+        ),
+    ]
+
+    assert _display_name_overrides(schools)["overrides"] == 1
 
 
 @pytest.fixture

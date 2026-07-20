@@ -273,8 +273,34 @@ def _filter_display_name_i18n(display_name: Mapping[str, Any] | None) -> dict[st
     return {
         lang: value
         for lang, value in display.items()
-        if not is_generic_numbered_display_label(value)
+        if _is_identity_display_name(value)
     }
+
+
+def _is_identity_display_name(value: str | None) -> bool:
+    """Reject corroborated page labels that are still prose rather than identities."""
+    normalized = re.sub(r"\s+", " ", value or "").strip()
+    lowered = normalized.casefold()
+    if not normalized or is_generic_numbered_display_label(normalized):
+        return False
+    if len(normalized) > 80:
+        return False
+    if re.search(r"[\w.+-]+@[\w.-]+\.[a-z]{2,}", normalized, flags=re.IGNORECASE):
+        return False
+    if any(
+        marker in lowered
+        for marker in ("©", "all rights reserved", "всички права запазени")
+    ):
+        return False
+    return not lowered.startswith(
+        (
+            "приемът ",
+            "ръководство на ",
+            "нашето семейство включва ",
+            "our values at ",
+            "да бъдеш преподавател ",
+        )
+    )
 
 
 def resolve_display_name_i18n(attributes: Mapping[str, Any] | None = None) -> dict[str, str]:

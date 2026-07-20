@@ -321,6 +321,7 @@ class SchoolListResponse(SchoolPricingMixin):
     school_type: str
     education_level: str
     locations: list[SchoolLocationResponse] = []
+    exam_results: list[ExamResultResponse] = []
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 

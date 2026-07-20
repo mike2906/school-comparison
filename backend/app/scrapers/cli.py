@@ -450,6 +450,11 @@ def repair_out_of_bounds_geocodes(school, school_id, city, country, limit, dry_r
     is_flag=True,
     help="For validate-data stage, include schools that already have a current validation report",
 )
+@click.option(
+    "--skip-summarize",
+    is_flag=True,
+    help="For batch all stage, stop after validation without generating summaries",
+)
 @click.option("--sync", is_flag=True, help="Run synchronously (no Celery)")
 @click.option("--dry-run", is_flag=True, help="Show what would happen without executing")
 def run(
@@ -467,6 +472,7 @@ def run(
     include_extracted,
     cohort_file,
     force_validate,
+    skip_summarize,
     sync,
     dry_run,
 ):
@@ -479,6 +485,9 @@ def run(
         cohort_ids = _read_cohort_file(cohort_file)
     else:
         cohort_ids = None
+
+    if skip_summarize and (stage.lower() != "all" or school or school_id):
+        raise click.UsageError("--skip-summarize is only valid for batch --stage all")
 
     if dry_run:
         console.print(f"[yellow]DRY RUN - would execute:[/yellow]")
@@ -495,6 +504,7 @@ def run(
         console.print(f"  Include extracted: {include_extracted}")
         console.print(f"  Cohort IDs: {cohort_ids or 'automatic'}")
         console.print(f"  Force validate: {force_validate}")
+        console.print(f"  Skip summarize: {skip_summarize}")
         console.print(f"  Mode: {'sync' if sync else 'celery'}")
         return
 
@@ -515,6 +525,7 @@ def run(
                 include_navigated,
                 include_extracted,
                 force_validate,
+                skip_summarize,
                 cohort_ids,
             )
         )
@@ -538,6 +549,7 @@ async def _run_sync(
     include_navigated: bool,
     include_extracted: bool,
     force_validate: bool,
+    skip_summarize: bool = False,
     cohort_ids: Optional[list[int]] = None,
 ):
     """Run pipeline stage synchronously."""
@@ -617,6 +629,7 @@ async def _run_sync(
                         "include_navigated": include_navigated,
                         "include_extracted": include_extracted,
                         "force_validate": force_validate,
+                        "skip_summarize": skip_summarize,
                         "explicit_cohort": cohort_ids is not None,
                     },
                 )
@@ -668,6 +681,7 @@ async def _run_sync(
                         include_navigated=include_navigated,
                         include_extracted=include_extracted,
                         force_validate=force_validate,
+                        skip_summarize=skip_summarize,
                         requested_school_ids=cohort_ids,
                         pipeline_run=run,
                         stage_summaries=stage_summaries,
@@ -1955,7 +1969,7 @@ async def _audit_display_names_command(
             SourcePage.raw_markdown.isnot(None),
         )
         pages = (await db.execute(page_query)).scalars().all()
-        pages_by_school: dict[int, list[dict[str, object]]] = defaultdict(list)
+        pages_by_school: dict[int, list[dict[str, object]]] = defaultdict(builtins.list)
         for page in pages:
             pages_by_school[int(page.school_id)].append(
                 {
@@ -3120,6 +3134,7 @@ async def _run_all_stages_batch(
     include_navigated: bool,
     include_extracted: bool,
     force_validate: bool,
+    skip_summarize: bool = False,
     requested_school_ids: Optional[list[int]] = None,
     pipeline_run=None,
     stage_summaries: Optional[list[dict]] = None,
@@ -3175,6 +3190,7 @@ async def _run_all_stages_batch(
         None,
         include_navigated=include_navigated,
         school_ids=validated_url_ids,
+        skip_timed_out_chunks=True,
     )
     completed.append(_navigate_summary(navigation_results))
     navigated_ids = sorted(
@@ -3205,15 +3221,16 @@ async def _run_all_stages_batch(
     completed.append(validation_summary)
     validated_ids = builtins.list(validation_summary.get("validated_school_ids") or [])
 
-    completed.append(
-        await _run_summarize_batch(
-            db,
-            country,
-            city,
-            None,
-            school_ids=validated_ids,
+    if not skip_summarize:
+        completed.append(
+            await _run_summarize_batch(
+                db,
+                country,
+                city,
+                None,
+                school_ids=validated_ids,
+            )
         )
-    )
     return completed
 
 

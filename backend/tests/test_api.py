@@ -4,6 +4,7 @@ from datetime import datetime
 import pytest
 from sqlalchemy import select
 
+from app.models.exam_results import ExamResult
 from app.models.field_source import FieldSource, SourceType
 from app.models.pricing import Pricing, PriceSource
 from app.models.school import School, SchoolLocation, SchoolLocationAgeGroupShift
@@ -68,8 +69,48 @@ class TestSchoolsEndpoint:
         assert "locations" in school
         assert "country_code" in school
         assert "resolved_name_i18n" in school
-        assert "exam_results" not in school
+        assert "exam_results" in school
         assert "field_sources" not in school
+
+    @pytest.mark.asyncio
+    async def test_list_schools_serializes_exam_results_used_by_school_cards(
+        self,
+        seeded_db,
+        seeded_client,
+    ):
+        school = (
+            await seeded_db.execute(
+                select(School).where(School.education_level == "primary")
+            )
+        ).scalar_one()
+        seeded_db.add(
+            ExamResult(
+                school_id=school.id,
+                year=2025,
+                exam_type="nvo_4",
+                subject="math",
+                metric="average_score",
+                value=78.25,
+                source_url="https://example.edu/nvo-2025",
+            )
+        )
+        await seeded_db.commit()
+
+        response = await seeded_client.get("/schools")
+
+        assert response.status_code == 200
+        payload = next(item for item in response.json() if item["id"] == school.id)
+        assert len(payload["exam_results"]) == 1
+        assert payload["exam_results"][0] == {
+            "id": payload["exam_results"][0]["id"],
+            "school_id": school.id,
+            "year": 2025,
+            "exam_type": "nvo_4",
+            "subject": "math",
+            "metric": "average_score",
+            "value": 78.25,
+            "source_url": "https://example.edu/nvo-2025",
+        }
 
     @pytest.mark.asyncio
     async def test_list_schools_filter_by_age_group(self, seeded_client):
@@ -915,6 +956,32 @@ class TestSchoolsSearchEndpoint:
         await seeded_db.commit()
 
         response = await seeded_client.get("/schools/search?q=Admissions%20Headline")
+        assert response.status_code == 200
+        assert response.json() == []
+
+    @pytest.mark.asyncio
+    async def test_search_ignores_corroborated_non_identity_display_name(
+        self, seeded_db, seeded_client
+    ):
+        """Hidden prose must not affect search after the identity gate rejects it."""
+        school = (
+            await seeded_db.execute(select(School).where(School.school_type == "private"))
+        ).scalar_one()
+        school.scrape_status = "extracted"
+        school.attributes = {
+            "display_name_i18n": {
+                "bg": "Our Values At Hidden Academy",
+                "en": "Our Values At Hidden Academy",
+            },
+            "display_name_evidence": {
+                "signals": ["website_domain_alias_match", "repeated_on_page_identity"],
+                "status": "corroborated",
+            },
+        }
+        await seeded_db.commit()
+
+        response = await seeded_client.get("/schools/search?q=Our%20Values%20At")
+
         assert response.status_code == 200
         assert response.json() == []
 

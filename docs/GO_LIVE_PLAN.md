@@ -544,7 +544,7 @@ will need to be repeated.
       **Done.** The query accepts only the canonical metric and preserves the stored
       subject key. A regression covers a third subject and rejects a misleading
       `school_average` metric.
-- [ ] **P2.4 Audit and perform the one-time Sofia data refresh.** This is the point at
+- [x] **P2.4 Audit and perform the one-time Sofia data refresh.** This is the point at
       which to run the scraping process again: after P1.12–P1.14 and the audit/re-geocode
       tooling below are merged and green, and before Phase 3. P2.2/P2.3 do not change
       extraction, so they do not technically block the refresh, but completing them first
@@ -827,7 +827,7 @@ will need to be repeated.
             after three fix iterations is a model-capability signal, not a bug list;
             parent-readiness work moves to the post-launch enrichment track. P2.10 later
             established an architecture ceiling, so E1 now precedes further re-extraction.
-      - [ ] **Set an OpenRouter spend guardrail (or explicitly approve operating without one).**
+      - [x] **Set an OpenRouter spend guardrail (or explicitly approve operating without one).**
             The projected refresh is affordable, but the active key reports `limit=null`; record a
             cap with headroom before treating the cost-control precondition as met.
             **P2.13 evidence (2026-07-17; user decision still required):** the active key
@@ -837,7 +837,12 @@ will need to be repeated.
             limit of about **`$15.50`** if the dashboard retains this usage, or `$5` on a
             reset/new key. Leave this checkbox open until the user records the dashboard
             decision (or explicitly approves operating uncapped).
-      - [ ] If the boundary pilot (P2.9) is closed, P2.10 is closed,
+            **Closed 2026-07-20:** the recovery was explicitly approved with a hard
+            combined ceiling of `$1.50`, enforced from the stored `$10.47598213`
+            provider baseline. Conservative final accounting is `$0.30838240`; the
+            provider interval delta is `$0.29900793`. The provider key itself still
+            reports `limit=null`, so this approval applies only to this completed run.
+      - [x] If the boundary pilot (P2.9) is closed, P2.10 is closed,
             P2.12/P2.13 are green, and the user has explicitly approved, run the full
             Sofia website refresh once on the **current cheap extraction tier, unchanged**
             with the summarize stage skipped (summaries are out of launch scope — don't
@@ -847,7 +852,14 @@ will need to be repeated.
             run the corrected force-regeocode process.
             NVO remains independent and must not be refreshed as part of `all` unless a
             separate NVO audit calls for it.
-      - [ ] Re-run audits and the scoreboard, triage failures, and targeted-rerun only the
+            **Completed by recovery 2026-07-20.** Original run `4749f137…` was marked
+            `partial` with interruption evidence. Recovery attempts `483c1e91…`
+            (`failed`, cohort preflight only), `585370ca…` (`partial`, navigation
+            interrupted before extraction), and `882ff309…` (`partial`, bounded nine
+            navigation failures) stayed inside the original 386-school cohort. The final
+            run extracted and deterministically validated all 344 navigated schools,
+            skipped summarization, and left NVO unchanged at 5,115 rows.
+      - [x] Re-run audits and the scoreboard, triage failures, and targeted-rerun only the
             affected schools. **Launch acceptance (revised 2026-07-15 — boundary-only, no
             prose-quality judgment):** 100% validation-report coverage among schools with
             publishable website-derived data and zero such schools without a report; zero
@@ -859,6 +871,14 @@ will need to be repeated.
             duplicate/out-of-bounds coordinates; no internal API keys; pricing gate/scoreboard
             parity; and a representative spot-check sample with all actionable discrepancies
             resolved or withheld.
+            **Accepted 2026-07-20 (`llm_calls=0` for the audit battery).** Full BG/EN
+            boundary sweep passed `1,066/1,066` requests. Current-report coverage is
+            `328/328` for publishable website data with zero fail-open rows; geocoding is
+            `392/392` precision-tagged with 88 terminal NULL failures and zero unexplained
+            duplicates; pricing predicate/scoreboard/API parity is zero published rows.
+            Spot checks found discrepancies on schools 113 and 116 only; the affected
+            founded-year/class-size fields are outside launch scope and remain withheld.
+            Evidence: `backend/reports/refresh-recovery/20260720T080608Z/acceptance.md`.
 
 ### Launch-scope revision (2026-07-15) — sparse, fail-closed launch
 
@@ -879,14 +899,14 @@ P2.5–P2.8 land, the public boundary is **frozen** — no further extraction-se
 enter the release path; that work continues on the post-launch enrichment track (end of
 this file), constrained by P2.10's architecture-ceiling verdict.
 
-**Order (revised 2026-07-17, after the P2.10 verdict):** P2.5 →
+**Order (closed 2026-07-20):** P2.5 →
 P2.6/P2.7/P2.8 (independent, any order) → P2.9 run 1 → P2.11 city-scope repair →
 P2.9 rerun (done, run `db4ba90d…` — see P2.9) → **P2.12 release-boundary
 hardening** → **P2.10 closed: architecture ceiling; cheap tier selected** →
-**NEXT: P2.13 exhaustive no-LLM audit (separate session)** → spend guardrail →
-**stop and request user approval** → full refresh on the current cheap tier →
-audits/acceptance. Value-model runs are no longer on the launch path. The release
-boundary remains fixed and fail-closed; P2.13 remains a separate zero-LLM session.
+P2.13 exhaustive no-LLM audit → approved `$1.50` recovery guardrail → one-time cheap-tier
+refresh/recovery → force-regeocode → audits/acceptance → **STOP**. Value-model runs are
+no longer on the launch path. The release boundary remains fixed and fail-closed; Phase 3
+has not started.
 
 - [x] **P2.5 Close the two remaining publish-boundary bugs.**
       (a) **Provenance becomes metadata-only.** Detail/compare responses still expose raw
@@ -1168,6 +1188,20 @@ boundary remains fixed and fail-closed; P2.13 remains a separate zero-LLM sessio
       pricing predicate/scoreboard/API parity is exact at zero rows. Evidence:
       `backend/reports/p2-13/20260717T124505Z/acceptance.md`. The spend recommendation is
       recorded above, but its checkbox remains a user decision. **STOP: no refresh run.**
+
+      **Refresh closure 2026-07-20.** The approved one-time refresh was recovered without
+      discovery, summarization, NVO work, cohort broadening, or model changes. The final
+      deterministic audit is green after bounded publication fixes for list-view NVO,
+      contact/prose display-name candidates, coarse Nominatim duplicate points, and the
+      display-name audit CLI. Of the fixed 386-school cohort, 344 completed fresh
+      navigation/extraction/validation, 9 navigation failures remain withheld by the
+      current-report gate, and 33 URL-validation failures remain fail-closed. English-name
+      curation remains explicit: 117 website-backed private/international schools lack a
+      source-backed published EN identity (44 retain uncorroborated EN candidates); school
+      520 is among them. The refreshed pricing worklist is 48 schools / 205 rows, all
+      withheld pending human curation. Full evidence is in
+      `backend/reports/refresh-recovery/20260720T080608Z/acceptance.md`. **STOP: do not
+      begin Phase 3.**
 
 ## Phase 3 — Go live
 

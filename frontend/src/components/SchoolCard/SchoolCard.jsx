@@ -421,7 +421,7 @@ function hexToRgba(hex, alpha) {
 }
 
 function getNvoDetail(school, t) {
-  return getSharedNvoDetail(school, t)
+  return getSharedNvoDetail(school, t, { requireCompleteSubjects: true })
 }
 
 function getAmenityFlags(attributes, hasAfterSchool) {

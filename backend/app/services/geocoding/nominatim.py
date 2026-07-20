@@ -366,6 +366,8 @@ class NominatimProvider(BaseGeocodingProvider):
                     lat = float(result["lat"])
                     lng = float(result["lon"])
                     formatted_address = result.get("display_name")
+                    address_details = result.get("address") or {}
+                    precision = "exact" if address_details.get("house_number") else "approximate"
 
                     logger.info(f"Nominatim: Successfully geocoded '{address}' using query '{query}' → ({lat}, {lng})")
 
@@ -376,7 +378,7 @@ class NominatimProvider(BaseGeocodingProvider):
                         provider=self.provider_name,
                         formatted_address=formatted_address,
                         method="nominatim_address",
-                        precision="exact",
+                        precision=precision,
                     )
 
                 logger.warning(

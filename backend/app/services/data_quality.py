@@ -106,8 +106,7 @@ def _display_name_overrides(schools: list[School]) -> dict[str, Any]:
         if not attrs.get("display_name_i18n"):
             continue
         candidates += 1
-        evidence = _as_dict(attrs.get("display_name_evidence"))
-        if evidence.get("status") == "corroborated":
+        if resolve_display_name_i18n(attrs):
             overrides += 1
     return {
         "overrides": overrides,

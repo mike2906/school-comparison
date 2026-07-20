@@ -308,6 +308,93 @@ async def test_run_all_stages_batch_propagates_one_cohort_to_every_stage(db_sess
 
 
 @pytest.mark.asyncio
+async def test_run_all_stages_batch_can_skip_summarization():
+    cohort = [17]
+    summary = {"processed": 1, "succeeded": 1, "failed": 0, "skipped": 0}
+
+    with (
+        patch.object(scraper_cli, "_select_all_stage_cohort", new=AsyncMock(return_value=cohort)),
+        patch.object(
+            scraper_cli,
+            "_run_validate_urls_batch",
+            new=AsyncMock(return_value={**summary, "validated_school_ids": cohort}),
+        ),
+        patch.object(
+            scraper_cli,
+            "_run_navigate_batch",
+            new=AsyncMock(return_value=[{"school_id": 17, "success": True}]),
+        ),
+        patch.object(
+            scraper_cli,
+            "_run_extract_batch",
+            new=AsyncMock(return_value={**summary, "ready_school_ids": cohort}),
+        ),
+        patch.object(
+            scraper_cli,
+            "_run_validate_data_batch",
+            new=AsyncMock(return_value={**summary, "validated_school_ids": cohort}),
+        ),
+        patch.object(scraper_cli, "_run_summarize_batch", new=AsyncMock()) as summarize_mock,
+    ):
+        results = await scraper_cli._run_all_stages_batch(
+            object(),
+            country="bg",
+            city="sofia",
+            limit=None,
+            include_navigated=True,
+            include_extracted=True,
+            force_validate=True,
+            skip_summarize=True,
+        )
+
+    assert len(results) == 4
+    summarize_mock.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_run_all_stages_batch_uses_bounded_navigation_chunks():
+    cohort = [17]
+    summary = {"processed": 1, "succeeded": 1, "failed": 0, "skipped": 0}
+
+    with (
+        patch.object(scraper_cli, "_select_all_stage_cohort", new=AsyncMock(return_value=cohort)),
+        patch.object(
+            scraper_cli,
+            "_run_validate_urls_batch",
+            new=AsyncMock(return_value={**summary, "validated_school_ids": cohort}),
+        ),
+        patch.object(
+            scraper_cli,
+            "_run_navigate_batch",
+            new=AsyncMock(return_value=[{"school_id": 17, "success": True}]),
+        ) as navigate_mock,
+        patch.object(
+            scraper_cli,
+            "_run_extract_batch",
+            new=AsyncMock(return_value={**summary, "ready_school_ids": cohort}),
+        ),
+        patch.object(
+            scraper_cli,
+            "_run_validate_data_batch",
+            new=AsyncMock(return_value={**summary, "validated_school_ids": cohort}),
+        ),
+        patch.object(scraper_cli, "_run_summarize_batch", new=AsyncMock()),
+    ):
+        await scraper_cli._run_all_stages_batch(
+            object(),
+            country="bg",
+            city="sofia",
+            limit=None,
+            include_navigated=True,
+            include_extracted=True,
+            force_validate=True,
+            skip_summarize=True,
+        )
+
+    assert navigate_mock.await_args.kwargs["skip_timed_out_chunks"] is True
+
+
+@pytest.mark.asyncio
 async def test_run_all_stages_batch_narrows_follow_on_stages_to_fresh_successes(db_session):
     cohort = [17, 23, 42]
     count_summary = {"processed": 3, "succeeded": 2, "failed": 1, "skipped": 0}

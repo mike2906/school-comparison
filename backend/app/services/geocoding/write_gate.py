@@ -83,7 +83,7 @@ async def apply_geocode_result_to_location(
             precision=result.precision,
         )
 
-    if result.method == "geojson_name_match" and result.precision == "approximate":
+    if result.precision == "approximate":
         current_address = _normalize_address(_location_address(location))
         duplicate_result = await db.execute(
             select(SchoolLocation)
@@ -96,9 +96,13 @@ async def apply_geocode_result_to_location(
         )
         for duplicate in duplicate_result.scalars():
             if _normalize_address(_location_address(duplicate)) != current_address:
-                reason = "duplicate_geojson_name_match_different_address"
+                reason = (
+                    "duplicate_geojson_name_match_different_address"
+                    if result.method == "geojson_name_match"
+                    else "duplicate_approximate_match_different_address"
+                )
                 logger.warning(
-                    "Rejected GeoJSON name-match duplicate for location %s; "
+                    "Rejected approximate geocode duplicate for location %s; "
                     "candidate point is already held by location %s with a different address",
                     location.id,
                     duplicate.id,

@@ -208,6 +208,43 @@ class TestNominatimProvider:
         assert "София" in result.formatted_address
 
     @pytest.mark.asyncio
+    async def test_geocode_marks_neighborhood_only_result_approximate(self):
+        """A neighborhood centroid must not be presented as an exact street address."""
+        provider = NominatimProvider(user_agent="Test/1.0")
+        provider.MIN_REQUEST_INTERVAL = 0
+
+        class MockResponse:
+            status_code = 200
+
+            def raise_for_status(self):
+                pass
+
+            def json(self):
+                return [
+                    {
+                        "lat": "42.6548862",
+                        "lon": "23.4008491",
+                        "display_name": "ж.к. Дружба, София, България",
+                        "address": {"suburb": "Дружба", "city": "София"},
+                    }
+                ]
+
+        mock_client = AsyncMock()
+        mock_client.__aenter__.return_value = mock_client
+        mock_client.__aexit__.return_value = None
+        mock_client.get = AsyncMock(return_value=MockResponse())
+
+        with patch("httpx.AsyncClient", return_value=mock_client):
+            result = await provider.geocode(
+                'ж.к. Дружба, ул. "5006" № 2',
+                country_code="bg",
+                city="sofia",
+            )
+
+        assert result.success is True
+        assert result.precision == "approximate"
+
+    @pytest.mark.asyncio
     async def test_geocode_no_results(self):
         """Test geocoding when no results found."""
         provider = NominatimProvider(user_agent="Test/1.0")
@@ -789,6 +826,57 @@ class TestGeocodingService:
         assert candidate_location.lng is None
         assert candidate_location.geocode_meta["status"] == "rejected"
         assert candidate_location.geocode_meta["rejection_reason"] == result.error
+
+    async def test_geocode_location_rejects_duplicate_approximate_nominatim_match(
+        self,
+        db_session: AsyncSession,
+    ):
+        """A coarse Nominatim centroid must not collapse distinct addresses."""
+        mock_provider = AsyncMock()
+        mock_provider.provider_name = "mock"
+        mock_provider.geocode.return_value = GeocodingResult(
+            lat=42.6548862,
+            lng=23.4008491,
+            success=True,
+            provider="nominatim",
+            method="nominatim_fallback",
+            precision="approximate",
+            formatted_address="ж.к. Дружба, София",
+        )
+        service = GeocodingService(db=db_session, provider=mock_provider)
+
+        school = School(
+            name_i18n={"bg": "Test School"},
+            country_code="bg",
+            city="sofia",
+            school_type="state",
+            education_level="primary",
+        )
+        db_session.add(school)
+        await db_session.flush()
+        existing = SchoolLocation(
+            school_id=school.id,
+            address_i18n={"bg": "ул. 5036"},
+            lat=42.6548862,
+            lng=23.4008491,
+            is_primary=True,
+        )
+        candidate = SchoolLocation(
+            school_id=school.id,
+            address_i18n={"bg": "ул. 5006 № 2"},
+            is_primary=False,
+        )
+        db_session.add_all([existing, candidate])
+        await db_session.commit()
+
+        result = await service.geocode_location(candidate)
+
+        assert result.success is False
+        assert result.error == "duplicate_approximate_match_different_address"
+        await db_session.refresh(candidate)
+        assert candidate.lat is None
+        assert candidate.lng is None
+        assert geocode_failure_is_terminal(candidate.geocode_meta)
 
     async def test_geocode_location_rejects_sofia_points_outside_write_bounds(
         self,
