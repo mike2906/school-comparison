@@ -175,6 +175,28 @@ def test_resolve_name_i18n_ignores_uncorroborated_display_name():
     }
 
 
+def test_resolve_name_i18n_rejects_corroborated_page_prose():
+    legal_name = {"bg": 'Частно средно училище "Свети Наум"'}
+    legal_fallback = resolve_name_i18n(legal_name)
+    bad_labels = (
+        "2016 © Частно езиково училище Свети Наум. Всички права запазени.",
+        "Приемът в английска частна детска градина бива два вида:",
+        "Ръководство на частно средно училище Джани Родари",
+        "Нашето семейство включва Първа Частна Математическа Гимназия",
+        "Our Values At Deni Diderot School",
+        "Да бъдеш преподавател в училище Маариф",
+        "Email: school@example.com",
+        "KITA - Частна детска градина в ж.к. Драгалевци - Частна детска ясла-Detska gradina",
+    )
+
+    for label in bad_labels:
+        resolved = resolve_name_i18n(
+            legal_name,
+            {"display_name_i18n": {"bg": label, "en": label}, **CORROBORATED_DISPLAY},
+        )
+        assert resolved == legal_fallback
+
+
 def test_resolve_address_i18n_derives_english_without_persisting_it():
     resolved = resolve_address_i18n(
         {"bg": 'бул. "Джеймс Баучер" № 116, ет. 1, ап. 4'},

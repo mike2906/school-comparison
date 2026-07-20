@@ -1,6 +1,9 @@
 # Pricing curation worklist
 
-Generated from the local Sofia database on 2026-07-15. Scope: 57 schools / 234 rows with source=SCRAPED_WEBSITE.
+The detailed rows below are the 2026-07-15 pre-refresh snapshot. After the one-time Sofia
+refresh on 2026-07-20, the current database scope is **48 schools / 205 rows** with
+`source=SCRAPED_WEBSITE`; all 205 remain withheld. Curators must query the current database
+before promotion because refreshed row IDs and values may differ from this historical list.
 
 ## Manual curation process
 

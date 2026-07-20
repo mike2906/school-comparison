@@ -17,6 +17,7 @@ TERMINAL_GEOCODE_FAILURE_REASONS = frozenset({
     "No address available",
     "No results found",
     "outside_sofia_write_bounds",
+    "duplicate_approximate_match_different_address",
     "duplicate_geojson_name_match_different_address",
 })
 

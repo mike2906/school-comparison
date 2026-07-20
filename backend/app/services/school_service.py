@@ -121,12 +121,12 @@ class SchoolService:
         return select(School).options(
             selectinload(School.locations).selectinload(SchoolLocation.age_group_shifts),
             selectinload(School.pricing),
+            selectinload(School.exam_results),
         )
 
     def _detail_query(self):
         """Query the complete relationship graph used by detail and compare responses."""
         return self._list_query().options(
-            selectinload(School.exam_results),
             selectinload(School.field_sources),
         )
 

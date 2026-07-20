@@ -3049,6 +3049,8 @@ def _is_low_quality_display_name(value: str | None) -> bool:
     lowered = raw_value.lower()
     if not lowered:
         return True
+    if re.search(r"(?i)(?:\bemail\s*:|\b(?:e-?mail|имейл)\b|[\w.+-]+@[\w.-]+\.[a-z]{2,})", raw_value):
+        return True
     if is_generic_numbered_display_label(raw_value):
         return True
     if lowered.startswith("към портал "):

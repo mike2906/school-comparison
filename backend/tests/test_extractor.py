@@ -2695,6 +2695,18 @@ def test_normalize_display_name_i18n_rejects_low_quality_headings():
     assert normalized is None
 
 
+def test_normalize_display_name_i18n_rejects_email_contact_labels():
+    normalized = extractor_module.helpers._normalize_display_name_i18n(
+        {
+            "bg": "Email: school.p.beron@gmail.com",
+            "en": "school.p.beron@gmail.com",
+        },
+        "bg",
+    )
+
+    assert normalized is None
+
+
 def test_normalize_display_name_i18n_rejects_report_titles():
     normalized = extractor_module.helpers._normalize_display_name_i18n(
         {"bg": "Тримесечен отчет на 145. ОУ Симеон Радев за м.Декември"},
