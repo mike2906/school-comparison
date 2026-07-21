@@ -88,6 +88,17 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
+BILLABLE_STAGES = frozenset(
+    {
+        "recover-failed-urls",
+        "validate-urls",
+        "extract",
+        "validate-data",
+        "summarize",
+        "all",
+    }
+)
+
 console = Console()
 
 
@@ -637,10 +648,9 @@ def run(
     if skip_summarize and (stage.lower() != "all" or school or school_id):
         raise click.UsageError("--skip-summarize is only valid for batch --stage all")
 
-    billable_batch_stages = {"validate-urls", "extract", "validate-data", "summarize", "all"}
     if (
         not dry_run
-        and stage.lower() in billable_batch_stages
+        and stage.lower() in BILLABLE_STAGES
         and provider_cost_cap_usd is None
     ):
         raise click.UsageError(
@@ -719,7 +729,7 @@ async def _run_sync(
     from app.database import async_session_maker
 
     if (
-        stage in {"validate-urls", "extract", "validate-data", "summarize", "all"}
+        stage in BILLABLE_STAGES
         and provider_cost_cap_usd is None
     ):
         raise ValueError("provider_cost_cap_usd is required for billable stages")

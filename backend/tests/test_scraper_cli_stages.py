@@ -7,6 +7,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from click.testing import CliRunner
 
 from app.models import PipelineRun, PipelineStage, School
 from app.scrapers import cli as scraper_cli
@@ -25,6 +26,38 @@ async def test_stage_choices_use_canonical_names():
     assert "navigate-v2" not in choices
     assert "extract-v2" not in choices
     assert "all-v2" not in choices
+
+
+def test_url_recovery_fails_closed_without_provider_cost_cap():
+    result = CliRunner().invoke(
+        scraper_cli.cli,
+        ["run", "--stage", "recover-failed-urls", "--sync"],
+    )
+
+    assert result.exit_code == 2
+    assert "--provider-cost-cap-usd is required for billable stages" in result.output
+    assert "recover-failed-urls" in scraper_cli.BILLABLE_STAGES
+
+
+@pytest.mark.asyncio
+async def test_sync_url_recovery_cannot_bypass_provider_cost_cap_check():
+    with pytest.raises(ValueError, match="provider_cost_cap_usd is required"):
+        await scraper_cli._run_sync(
+            school_name=None,
+            school_id=None,
+            stage="recover-failed-urls",
+            city="sofia",
+            country="bg",
+            limit=1,
+            year=None,
+            history_years=5,
+            exam_types=[],
+            sample_ratio=0.0,
+            include_navigated=False,
+            include_extracted=False,
+            force_validate=False,
+            provider_cost_cap_usd=None,
+        )
 
 
 def test_read_cohort_file_supports_comments_commas_and_deterministic_order(tmp_path):

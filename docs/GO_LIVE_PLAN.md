@@ -1238,8 +1238,8 @@ operational safeguards do not reopen the accepted launch boundary.
             cap; concurrent batch calls serialize from durable reservation through exact
             attribution so each next dispatch uses exact persisted spend; missing/delayed
             attribution blocks later dispatch and forces non-success run finalization;
-            exact request evidence feeds run totals, and deterministic reconciliation stores
-            the provider discrepancy.
+            URL recovery shares the same mandatory-cap boundary; exact request evidence feeds
+            run totals, and deterministic reconciliation stores the provider discrepancy.
       - [x] **(d) Navigation timeout isolation and telemetry.** Keep bounded navigation
             chunks, but make each school independently terminal. Record the URL/page,
             timeout phase, elapsed time, attempt count, and final reason. Use the nine

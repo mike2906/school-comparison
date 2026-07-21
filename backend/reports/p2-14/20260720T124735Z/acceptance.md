@@ -30,7 +30,8 @@ Refresh/discovery/extraction/navigation/geocoding/summarization/model spot check
 4. Full backend suite after the first Codex review fixes: **886 passed**, 141 existing deprecation warnings, 0 failures.
 5. Frontend: ESLint passed; Vite production build passed; Node tests **7 passed**, 0 failed. Existing bundle-size and stale Browserslist-data warnings are non-failing and unrelated.
 6. `git diff --check` and Python compileall passed.
-7. Codex review round 1 on PR #60, head `ab05d5c710`, identified concurrent reservation collisions and success finalization with uncertain cost evidence. Both root causes are fixed together with neighboring regression coverage; round 2 is pending on the consolidated head.
+7. Codex review round 1 on PR #60, head `ab05d5c710`, identified concurrent reservation collisions and success finalization with uncertain cost evidence. Both root causes were fixed together with neighboring regression coverage.
+8. Codex review round 2 on head `838553101d` confirmed those fixes and identified `recover-failed-urls` as a neighboring billable-stage cap bypass. The CLI and synchronous execution boundary now share one billable-stage set that includes recovery; its two zero-provider-call refusal tests pass in the sandbox. Round 3 is pending on the consolidated head.
 
 All tests used deterministic database fixtures, fake provider outputs, and mocked navigation outcomes. No API key or provider endpoint was exercised.
 
