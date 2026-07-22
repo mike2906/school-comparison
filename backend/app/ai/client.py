@@ -11,7 +11,9 @@ from math import isfinite
 from typing import Any, Literal
 from pydantic_ai import Agent
 from pydantic_ai.models.openai import OpenAIModel
+from pydantic_ai.models.openrouter import OpenRouterModel
 from pydantic_ai.providers.openai import OpenAIProvider
+from pydantic_ai.providers.openrouter import OpenRouterProvider
 
 from app.config import get_settings
 
@@ -167,6 +169,14 @@ def get_openai_model(tier: ModelTier) -> OpenAIModel:
     )
 
 
+def get_openrouter_model(tier: ModelTier) -> OpenRouterModel:
+    """Build the native OpenRouter model required for exact usage metadata."""
+    settings = get_settings()
+    model_name = get_model(tier).replace("openrouter/", "", 1)
+    provider = OpenRouterProvider(api_key=settings.openrouter_api_key)
+    return OpenRouterModel(model_name=model_name, provider=provider)
+
+
 def create_agent(
     tier: ModelTier,
     system_prompt: str,
@@ -202,13 +212,16 @@ def create_agent(
         >>> print(result.data.name)
         'Sofia School #1'
     """
-    model = get_openai_model(tier)
+    model = get_openrouter_model(tier)
+    model_settings = dict(agent_kwargs.pop("model_settings", {}) or {})
+    model_settings.setdefault("openrouter_usage", {"include": True})
     init_params = inspect.signature(Agent.__init__).parameters
     if "output_type" in init_params:
         return Agent(
             model=model,
             system_prompt=system_prompt,
             output_type=result_type,
+            model_settings=model_settings,
             **agent_kwargs,
         )
 
@@ -216,6 +229,7 @@ def create_agent(
         model=model,
         system_prompt=system_prompt,
         result_type=result_type,
+        model_settings=model_settings,
         **agent_kwargs,
     )
 
@@ -228,6 +242,7 @@ __all__ = [
     "calculate_cost",
     "extract_provider_cost_usd",
     "get_openai_model",
+    "get_openrouter_model",
     "create_agent",
     "MODEL_TIERS",
     "MODEL_COSTS",

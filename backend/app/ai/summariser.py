@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 from pydantic_ai import ModelRetry
 
 from app.ai.client import calculate_cost, create_agent, get_model
+from app.services.provider_costs import execute_billable_request
 from app.config import get_settings
 from app.schemas.llm_outputs import SchoolSummaryStrict
 from app.utils.i18n_resolver import derive_english_name
@@ -281,7 +282,7 @@ def validate_summary_i18n(summary_i18n: Any) -> dict[str, dict[str, str]]:
     return validated.summary_i18n.model_dump()
 
 
-async def generate_school_summary(summary_input: SummaryInput) -> dict[str, Any]:
+async def generate_school_summary(summary_input: SummaryInput, *, school_id: int | None = None) -> dict[str, Any]:
     """Generate BG + EN summaries from structured facts."""
     settings = get_settings()
     system_prompt = (
@@ -324,7 +325,12 @@ async def generate_school_summary(summary_input: SummaryInput) -> dict[str, Any]
 
     try:
         result = await asyncio.wait_for(
-            agent.run(user_prompt),
+            execute_billable_request(
+                lambda: agent.run(user_prompt),
+                model=get_model(SUMMARY_MODEL_TIER),
+                school_id=school_id,
+                stage="summarize",
+            ),
             timeout=float(settings.summarization_llm_timeout_seconds),
         )
         parsed = _parse_school_summary(result)

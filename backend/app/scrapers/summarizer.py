@@ -638,7 +638,7 @@ async def summarize_school(
 
     attrs = dict(school.attributes or {})
     try:
-        summary_result = await generate_school_summary(prepared.summary_input)
+        summary_result = await generate_school_summary(prepared.summary_input, school_id=school_id)
         summary_result["summary_i18n"] = validate_summary_i18n(
             summary_result.get("summary_i18n")
         )

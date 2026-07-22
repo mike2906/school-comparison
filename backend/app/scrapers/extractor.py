@@ -37,7 +37,8 @@ from app.scrapers.summarizer import clear_summary_state
 from app.scrapers.validator import validate_school_data
 from app.services.geocoding.base import GeocodingResult
 from app.services.geocoding.write_gate import apply_geocode_result_to_location
-from app.utils.website_data import WEBSITE_DATA_WITHHELD_KEY
+from app.utils.website_data import WEBSITE_DATA_WITHHELD_KEY, prepare_validation_rollover
+from app.services.provider_costs import execute_billable_request
 from . import extractor_helpers as helpers
 
 logger = logging.getLogger(__name__)
@@ -406,6 +407,7 @@ async def _run_typed_agent(
     timeout_seconds: float,
     llm_stats: ExtractionLLMStats,
     preferred_tier: str = "cheap",
+    school_id: int | None = None,
 ) -> tuple[Any | None, int, int, float]:
     settings = get_settings()
 
@@ -451,7 +453,15 @@ async def _run_typed_agent(
             return data
 
         llm_stats.total_calls += 1
-        result = await asyncio.wait_for(agent.run(user_prompt), timeout=timeout_seconds)
+        result = await asyncio.wait_for(
+            execute_billable_request(
+                lambda: agent.run(user_prompt),
+                model=get_model(tier),
+                school_id=school_id,
+                stage="extract",
+            ),
+            timeout=timeout_seconds,
+        )
         llm_stats.model_retries += retries_state["count"]
         parsed = _parse_agent_output(result, result_type)
         input_tokens, output_tokens = helpers._get_usage(result)
@@ -526,6 +536,7 @@ async def _extract_display_name_capable_fallback(
     country_code: str,
     timeout_seconds: float,
     llm_stats: ExtractionLLMStats,
+    school_id: int | None = None,
 ) -> tuple[dict[str, str] | None, int, int, float]:
     system_prompt = (
         "Extract only the public-facing school or brand name shown on the website into display_name_i18n. "
@@ -544,6 +555,7 @@ async def _extract_display_name_capable_fallback(
         timeout_seconds=timeout_seconds,
         llm_stats=llm_stats,
         preferred_tier="capable",
+        school_id=school_id,
     )
     if parsed is None:
         return None, input_tokens, output_tokens, token_cost_usd
@@ -857,6 +869,7 @@ async def _extract_prices(
         result_type=PriceExtractionOutput,
         timeout_seconds=timeout_seconds,
         llm_stats=llm_stats,
+        school_id=school.id,
     )
 
     if parsed is None:
@@ -1110,6 +1123,7 @@ async def _extract_general_info(
         result_type=GeneralInfoExtractionOutput,
         timeout_seconds=timeout_seconds,
         llm_stats=llm_stats,
+        school_id=school.id,
     )
     detail_note: str | None = None
     if parsed is None:
@@ -1153,6 +1167,7 @@ async def _extract_general_info(
                 result_type=GeneralInfoExtractionOutput,
                 timeout_seconds=timeout_seconds,
                 llm_stats=llm_stats,
+                school_id=school.id,
             )
             input_tokens += in2
             output_tokens += out2
@@ -1183,6 +1198,7 @@ async def _extract_general_info(
                 country_code=school.country_code,
                 timeout_seconds=timeout_seconds,
                 llm_stats=llm_stats,
+                school_id=school.id,
             )
             input_tokens += in3
             output_tokens += out3
@@ -1225,7 +1241,7 @@ async def _extract_general_info(
     contact_info = helpers._extract_contact_info_deterministic(all_page_text)
     location_address_update = await _sync_primary_location_from_contact_address(db, school, contact_info)
 
-    attrs = dict(school.attributes) if isinstance(school.attributes, dict) else {}
+    attrs = prepare_validation_rollover(school.attributes)
     admission_info = dict(school.admission_info) if isinstance(school.admission_info, dict) else {}
 
     admission_payload = normalized.admission.model_dump()
@@ -1237,8 +1253,8 @@ async def _extract_general_info(
     extracted = _build_extracted_attributes(normalized, contact_info)
 
     attrs["extracted"] = extracted
-    # Invalidate previous Stage 6 report because extracted payload just changed.
-    attrs.pop("data_validation", None)
+    # The accepted Stage 6 report remains available for audit while the replacement
+    # payload is withheld. Validation promotes its successor atomically below.
     attrs.pop("operations", None)
     attrs.pop("services", None)
     attrs.pop("pricing_terms", None)

@@ -906,7 +906,8 @@ hardening** → **P2.10 closed: architecture ceiling; cheap tier selected** →
 P2.13 exhaustive no-LLM audit → approved `$1.50` recovery guardrail → one-time cheap-tier
 refresh/recovery → force-regeocode → audits/acceptance → **STOP**. Value-model runs are
 no longer on the launch path. The release boundary remains fixed and fail-closed; Phase 3
-has not started.
+has not started. Before any future city-wide refresh, complete P2.14(a)–(c); those
+operational safeguards do not reopen the accepted launch boundary.
 
 - [x] **P2.5 Close the two remaining publish-boundary bugs.**
       (a) **Provenance becomes metadata-only.** Detail/compare responses still expose raw
@@ -1202,6 +1203,85 @@ has not started.
       withheld pending human curation. Full evidence is in
       `backend/reports/refresh-recovery/20260720T080608Z/acceptance.md`. **STOP: do not
       begin Phase 3.**
+
+- [ ] **P2.14 Post-refresh operational hardening and bounded curation.** Follow-up from
+      the 2026-07-20 recovery. This work does **not** invalidate P2.13 acceptance, widen
+      the public boundary, authorize another refresh, or require LLM calls. Items (a)–(c)
+      are required before any future city-wide pipeline run; the remaining items are
+      independent bounded quality/maintenance work.
+      - [x] **(a) Pipeline heartbeat and stale-run terminalization.** Persist a run
+            heartbeat while work is live. Add a deterministic command/service that marks
+            a stale `RUNNING` run `PARTIAL` when stage evidence exists, otherwise
+            `FAILED`, recording the last completed stage, completed/failed school counts,
+            timestamps, and the terminalization reason. It must never infer that a live
+            process is dead from status alone. Cover live, stale-partial, stale-empty, and
+            idempotent rerun cases. **Done locally 2026-07-20:** heartbeat timestamps,
+            completed-stage checkpoints, row-locked stale recovery, and the deterministic
+            `terminalize-stale-runs` command are covered by all four required cases.
+      - [x] **(b) Atomic validation-evidence rollover.** A validation attempt must not
+            erase the previously accepted current report merely because replacement work
+            has started. Promote a replacement atomically after it is durably written;
+            an explicit new validation failure must still withhold immediately. Preserve
+            audit history and prove crash/interruption behavior with tests so temporary
+            coverage cannot collapse from hundreds of reports to a small completed
+            prefix. **Done locally 2026-07-20:** accepted reports survive pending and
+            crashed replacement attempts; successful replacements archive and atomically
+            promote, while explicit failures persist immediate withholding.
+      - [x] **(c) Exact per-run provider cost ledger and hard cap.** Attach provider
+            request ID, pipeline/stage/run ID, school ID where applicable, model, token
+            counts, provider-reported cost, and timestamp to every billable request.
+            Enforce the cap against persisted attributed spend before dispatching the
+            next request and fail conservatively when attribution is missing or delayed.
+            Reconcile the ledger against provider totals and retain an explicit
+            discrepancy field; interval-delta inference should remain an emergency
+            fallback only. **Done locally 2026-07-20:** tracked billable runs require a
+            cap; concurrent batch calls serialize from durable reservation through exact
+            attribution so each next dispatch uses exact persisted spend; missing/delayed
+            attribution blocks later dispatch and forces non-success run finalization;
+            URL recovery shares the same mandatory-cap boundary; exact request evidence feeds
+            run totals; native OpenRouter calls request exact usage metadata; a response that
+            crosses the cap is preserved as audit evidence and forces failed finalization; and
+            deterministic reconciliation stores the provider discrepancy.
+      - [x] **(d) Navigation timeout isolation and telemetry.** Keep bounded navigation
+            chunks, but make each school independently terminal. Record the URL/page,
+            timeout phase, elapsed time, attempt count, and final reason. Use the nine
+            recovery failures (`179, 274, 301, 369, 521, 547, 559, 630, 633`) as the
+            regression cohort; do not broaden into discovery or extraction while testing.
+            **Done locally 2026-07-20:** timed-out chunks fall back to independently
+            terminal school attempts with durable URL/page, phase, elapsed, attempt, and
+            reason telemetry; the exact nine-school fixture isolates one terminal failure.
+      - [ ] **(e) Bounded launch-data curation.** Work from the recorded queues: 117
+            website-backed private/international schools lack a source-backed published
+            English identity (44 have uncorroborated candidates; include school 520), and
+            48 schools / 205 scraped pricing rows remain withheld. Curation must preserve
+            the existing corroboration and official-pricing gates. Schools 113 and 116
+            retain their dynamic-field discrepancies unless independently curated.
+            Terminal geocodes remain accepted: the 88 NULL locations with durable failure
+            evidence are not a retry queue and must not trigger another pipeline cycle.
+            **Deliberately deferred 2026-07-20:** no curation or geocode retry was run; the
+            recorded 117-name, 48-school/205-price-row, schools 113/116, and 88-terminal-NULL
+            populations remain unchanged.
+      - [x] **(f) One public identity predicate for serialization and search.** Keep
+            display-name matching on the same resolved publication path used by API
+            serialization. Add a guard test so a future SQL optimization cannot make
+            withheld contact/prose/SEO candidates searchable. Apply this rule to any new
+            searchable website-derived field.
+            **Already satisfied on starting `main` by `0fb2a8a`:** search removed the
+            approximate JSON/SQL identity predicate and uses the serialization resolver;
+            API guards cover withheld, uncorroborated, prose-like, malformed-evidence,
+            and valid corroborated identities.
+      - [ ] **(g) GitHub Actions runtime maintenance.** Upgrade action versions that still
+            target deprecated Node.js 20, then verify backend and frontend jobs on a PR
+            and the post-merge `main` workflow. Treat the current forced Node.js 24
+            execution warning as maintenance, not a launch-acceptance failure.
+      *Verify:* focused tests for every changed lifecycle/gate; full backend and frontend
+      suites; deterministic cost-reconciliation and validation-interruption fixtures;
+      no LLM calls or real refresh; written evidence under `backend/reports/`; update this
+      plan with completed items and any deliberately deferred curation counts.
+      **Local evidence 2026-07-20:** `backend/reports/p2-14/20260720T124735Z/acceptance.md`;
+      backend `890 passed`; frontend lint/build and `7 passed`; migration head
+      `5ac75d912125`; zero provider calls. P2.14(g) remains open until both PR and
+      post-merge `main` workflows pass.
 
 ## Phase 3 — Go live
 

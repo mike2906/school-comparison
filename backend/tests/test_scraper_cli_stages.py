@@ -7,6 +7,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from click.testing import CliRunner
 
 from app.models import PipelineRun, PipelineStage, School
 from app.scrapers import cli as scraper_cli
@@ -25,6 +26,38 @@ async def test_stage_choices_use_canonical_names():
     assert "navigate-v2" not in choices
     assert "extract-v2" not in choices
     assert "all-v2" not in choices
+
+
+def test_url_recovery_fails_closed_without_provider_cost_cap():
+    result = CliRunner().invoke(
+        scraper_cli.cli,
+        ["run", "--stage", "recover-failed-urls", "--sync"],
+    )
+
+    assert result.exit_code == 2
+    assert "--provider-cost-cap-usd is required for billable stages" in result.output
+    assert "recover-failed-urls" in scraper_cli.BILLABLE_STAGES
+
+
+@pytest.mark.asyncio
+async def test_sync_url_recovery_cannot_bypass_provider_cost_cap_check():
+    with pytest.raises(ValueError, match="provider_cost_cap_usd is required"):
+        await scraper_cli._run_sync(
+            school_name=None,
+            school_id=None,
+            stage="recover-failed-urls",
+            city="sofia",
+            country="bg",
+            limit=1,
+            year=None,
+            history_years=5,
+            exam_types=[],
+            sample_ratio=0.0,
+            include_navigated=False,
+            include_extracted=False,
+            force_validate=False,
+            provider_cost_cap_usd=None,
+        )
 
 
 def test_read_cohort_file_supports_comments_commas_and_deterministic_order(tmp_path):
@@ -743,7 +776,16 @@ async def test_run_navigate_batch_uses_batch_crawler_results(db_session):
     with (
         patch("app.config.get_settings", return_value=settings),
         patch("app.scrapers.navigator.navigate_schools_batch", new=AsyncMock(return_value=batch_results)) as batch_mock,
-        patch.object(scraper_cli, "_run_navigate_school", new=AsyncMock()) as single_mock,
+        patch.object(
+            scraper_cli,
+            "_run_navigate_school",
+            new=AsyncMock(
+                side_effect=[
+                    {"school_id": schools[0].id, "success": False, "reason": "still timed out"},
+                    {"school_id": schools[1].id, "success": True},
+                ]
+            ),
+        ) as single_mock,
     ):
         await scraper_cli._run_navigate_batch(
             db=db_session,
@@ -788,7 +830,16 @@ async def test_run_navigate_batch_skips_timed_out_explicit_chunks(db_session):
         patch("app.config.get_settings", return_value=settings),
         patch("app.scrapers.navigator.navigate_schools_batch", new=batch_mock),
         patch.object(db_session, "rollback", new=rollback_spy),
-        patch.object(scraper_cli, "_run_navigate_school", new=AsyncMock()) as single_mock,
+        patch.object(
+            scraper_cli,
+            "_run_navigate_school",
+            new=AsyncMock(
+                side_effect=[
+                    {"school_id": schools[0].id, "success": False, "reason": "still timed out"},
+                    {"school_id": schools[1].id, "success": True},
+                ]
+            ),
+        ) as single_mock,
     ):
         results = await scraper_cli._run_navigate_batch(
             db=db_session,
@@ -801,9 +852,83 @@ async def test_run_navigate_batch_skips_timed_out_explicit_chunks(db_session):
         )
 
     assert [result["school_id"] for result in results] == school_ids
-    assert [result["success"] for result in results] == [False, False, True]
+    assert [result["success"] for result in results] == [False, True, True]
     assert rollback_spy.await_count == 1
-    single_mock.assert_not_awaited()
+    assert single_mock.await_count == 2
+    assert results[0]["attempt_count"] == 2
+    assert results[0]["timeout_phase"] == "batch_chunk"
+
+
+@pytest.mark.asyncio
+async def test_navigation_timeout_isolation_fixed_recovery_cohort(db_session):
+    cohort = [179, 274, 301, 369, 521, 547, 559, 630, 633]
+    for school_id in cohort:
+        db_session.add(
+            School(
+                id=school_id,
+                name_i18n={"bg": f"Навигация {school_id}"},
+                country_code="bg",
+                school_type="state",
+                education_level="primary",
+                city="sofia",
+                website_url=f"https://school-{school_id}.example",
+                scrape_status="validated",
+            )
+        )
+    await db_session.commit()
+
+    settings = SimpleNamespace(nav_school_timeout_seconds=10, nav_batch_concurrency=3)
+    batch_mock = AsyncMock(
+        side_effect=[
+            asyncio.TimeoutError(),
+            [
+                {"school_id": 369, "success": True},
+                {"school_id": 521, "success": True},
+                {"school_id": 547, "success": True},
+            ],
+            [
+                {"school_id": 559, "success": True},
+                {"school_id": 630, "success": True},
+                {"school_id": 633, "success": True},
+            ],
+        ]
+    )
+    isolated_mock = AsyncMock(
+        side_effect=[
+            {"school_id": 179, "success": False, "reason": "Navigation timeout"},
+            {"school_id": 274, "success": True, "pages_found": 1},
+            {"school_id": 301, "success": True, "pages_found": 1},
+        ]
+    )
+
+    with (
+        patch("app.config.get_settings", return_value=settings),
+        patch("app.scrapers.navigator.navigate_schools_batch", new=batch_mock),
+        patch.object(scraper_cli, "_run_navigate_school", new=isolated_mock),
+    ):
+        results = await scraper_cli._run_navigate_batch(
+            db=db_session,
+            country="bg",
+            city="sofia",
+            limit=None,
+            include_navigated=True,
+            school_ids=cohort,
+            skip_timed_out_chunks=True,
+        )
+
+    assert [item["school_id"] for item in results] == cohort
+    assert [item["school_id"] for item in results if not item["success"]] == [179]
+    assert isolated_mock.await_count == 3
+    failure = results[0]
+    assert failure["url"] == "https://school-179.example"
+    assert failure["page_url"] == failure["url"]
+    assert failure["timeout_phase"] == "batch_chunk"
+    assert failure["attempt_count"] == 2
+    assert failure["final_reason"] == "Navigation timeout"
+    school = await db_session.get(School, 179)
+    telemetry = school.attributes["navigation_terminal_failure"]
+    assert telemetry["url"] == failure["url"]
+    assert telemetry["attempt_count"] == 2
 
 
 @pytest.mark.asyncio
