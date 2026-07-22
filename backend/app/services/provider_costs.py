@@ -157,6 +157,35 @@ async def mark_provider_request_uncertain(
     return row
 
 
+async def _assert_provider_cost_cap(
+    db: AsyncSession, *, pipeline_run_id: str
+) -> None:
+    """Fail after persisting exact evidence when one response crosses the run cap."""
+    run = await db.get(PipelineRun, pipeline_run_id)
+    raw_cap = (run.config or {}).get("provider_cost_cap_usd") if run is not None else None
+    if raw_cap is None:
+        return
+    cap = _usd(raw_cap, field="provider cost cap")
+    rows = list(
+        (
+            await db.execute(
+                select(ProviderRequestLedger).where(
+                    ProviderRequestLedger.pipeline_run_id == pipeline_run_id,
+                    ProviderRequestLedger.status == ProviderRequestStatus.ATTRIBUTED,
+                )
+            )
+        ).scalars()
+    )
+    total = sum(
+        (_usd(row.provider_cost_usd, field="provider cost") for row in rows),
+        Decimal("0"),
+    )
+    if total > cap:
+        raise ProviderCostCapExceeded(
+            f"provider cost cap exceeded after exact attribution: spent={total} cap={cap}"
+        )
+
+
 async def attribute_provider_request(
     db: AsyncSession,
     *,
@@ -206,6 +235,7 @@ async def attribute_provider_request(
             raise ProviderAttributionUncertain(
                 "idempotent attribution disagrees with persisted evidence"
             )
+        await _assert_provider_cost_cap(db, pipeline_run_id=row.pipeline_run_id)
         return row
 
     row.provider_request_id = request_id
@@ -217,6 +247,7 @@ async def attribute_provider_request(
     row.attributed_at = attributed_at or datetime.datetime.now(datetime.timezone.utc)
     db.add(row)
     await db.commit()
+    await _assert_provider_cost_cap(db, pipeline_run_id=row.pipeline_run_id)
     return row
 
 
@@ -374,6 +405,7 @@ async def attribute_provider_responses(
         db.add(row)
         rows.append(row)
     await db.commit()
+    await _assert_provider_cost_cap(db, pipeline_run_id=reservation.pipeline_run_id)
     return rows
 
 

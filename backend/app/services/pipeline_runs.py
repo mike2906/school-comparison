@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import datetime
 import math
+from decimal import Decimal
 from contextlib import asynccontextmanager
 from typing import Any, Iterable, Optional
 from uuid import uuid4
@@ -260,6 +261,20 @@ async def finalize_pipeline_run(
                 sum(float(row.provider_cost_usd or 0) for row in attributed), 6
             ),
         }
+    exact_ledger_cost = sum(
+        (
+            Decimal(str(row.provider_cost_usd or 0))
+            for row in ledger_rows
+            if row.status == ProviderRequestStatus.ATTRIBUTED
+        ),
+        Decimal("0"),
+    )
+    raw_cost_cap = (run.config or {}).get("provider_cost_cap_usd")
+    try:
+        cost_cap = Decimal(str(raw_cost_cap)) if raw_cost_cap is not None else None
+    except Exception:
+        cost_cap = None
+    cost_cap_exceeded = cost_cap is not None and exact_ledger_cost > cost_cap
     run.schools_processed = counts["processed"]
     run.schools_succeeded = counts["succeeded"]
     run.schools_failed = counts["failed"]
@@ -273,7 +288,12 @@ async def finalize_pipeline_run(
         if incomplete_ledger_count
         else None
     )
-    run.error_summary = error_summary or ledger_error
+    cap_error = (
+        f"provider cost cap exceeded: spent={exact_ledger_cost} cap={cost_cap}"
+        if cost_cap_exceeded
+        else None
+    )
+    run.error_summary = error_summary or ledger_error or cap_error
     quality_metrics = await compute_quality_metrics(db, country=country, city=city)
     run.metrics = {
         **quality_metrics,
@@ -284,6 +304,7 @@ async def finalize_pipeline_run(
                 row.status == ProviderRequestStatus.ATTRIBUTED for row in ledger_rows
             ),
             "uncertain": incomplete_ledger_count,
+            "cap_exceeded": cost_cap_exceeded,
         },
     }
     run.completed_at = _now()
@@ -295,6 +316,8 @@ async def finalize_pipeline_run(
         run.status = (
             PipelineStatus.PARTIAL if counts["succeeded"] else PipelineStatus.FAILED
         )
+    elif cost_cap_exceeded:
+        run.status = PipelineStatus.FAILED
     elif counts["failed"] and counts["succeeded"]:
         run.status = PipelineStatus.PARTIAL
     elif counts["failed"]:

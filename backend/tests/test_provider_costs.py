@@ -109,6 +109,31 @@ async def test_exact_cap_is_allowed_then_next_dispatch_is_refused(db_session):
         await _reserve(db_session, run, reserve=0.00000001)
 
 
+async def test_exact_attribution_over_cap_is_persisted_and_fails_run(db_session):
+    run = await _run(db_session)
+    row = await _reserve(db_session, run, reserve=0.1)
+
+    with pytest.raises(ProviderCostCapExceeded, match="after exact attribution"):
+        await _attribute(db_session, row, cost="1.00000001")
+
+    persisted_row = await db_session.get(ProviderRequestLedger, row.id)
+    assert persisted_row.status == ProviderRequestStatus.ATTRIBUTED
+    assert Decimal(str(persisted_row.provider_cost_usd)) == Decimal("1.00000001")
+
+    finalized = await finalize_pipeline_run(
+        db_session,
+        run,
+        country="bg",
+        city="sofia",
+        stage_summaries=[{"processed": 1, "succeeded": 1, "failed": 0}],
+    )
+    assert finalized.status == PipelineStatus.FAILED
+    assert finalized.metrics["provider_cost_ledger"]["cap_exceeded"] is True
+    assert finalized.error_summary == (
+        "provider cost cap exceeded: spent=1.00000001 cap=1.0"
+    )
+
+
 async def test_near_cap_refuses_pre_dispatch_reservation(db_session):
     run = await _run(db_session)
     first = await _reserve(db_session, run, reserve=0.95)
@@ -237,6 +262,7 @@ async def test_pipeline_finalization_prefers_exact_ledger_over_summary_estimate(
         "requests": 1,
         "attributed": 1,
         "uncertain": 0,
+        "cap_exceeded": False,
     }
 
 

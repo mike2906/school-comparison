@@ -1239,7 +1239,9 @@ operational safeguards do not reopen the accepted launch boundary.
             attribution so each next dispatch uses exact persisted spend; missing/delayed
             attribution blocks later dispatch and forces non-success run finalization;
             URL recovery shares the same mandatory-cap boundary; exact request evidence feeds
-            run totals, and deterministic reconciliation stores the provider discrepancy.
+            run totals; native OpenRouter calls request exact usage metadata; a response that
+            crosses the cap is preserved as audit evidence and forces failed finalization; and
+            deterministic reconciliation stores the provider discrepancy.
       - [x] **(d) Navigation timeout isolation and telemetry.** Keep bounded navigation
             chunks, but make each school independently terminal. Record the URL/page,
             timeout phase, elapsed time, attempt count, and final reason. Use the nine
@@ -1277,7 +1279,7 @@ operational safeguards do not reopen the accepted launch boundary.
       no LLM calls or real refresh; written evidence under `backend/reports/`; update this
       plan with completed items and any deliberately deferred curation counts.
       **Local evidence 2026-07-20:** `backend/reports/p2-14/20260720T124735Z/acceptance.md`;
-      backend `886 passed`; frontend lint/build and `7 passed`; migration head
+      backend `890 passed`; frontend lint/build and `7 passed`; migration head
       `5ac75d912125`; zero provider calls. P2.14(g) remains open until both PR and
       post-merge `main` workflows pass.
 
