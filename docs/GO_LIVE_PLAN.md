@@ -1270,18 +1270,22 @@ operational safeguards do not reopen the accepted launch boundary.
             approximate JSON/SQL identity predicate and uses the serialization resolver;
             API guards cover withheld, uncorroborated, prose-like, malformed-evidence,
             and valid corroborated identities.
-      - [ ] **(g) GitHub Actions runtime maintenance.** Upgrade action versions that still
+      - [x] **(g) GitHub Actions runtime maintenance.** Upgrade action versions that still
             target deprecated Node.js 20, then verify backend and frontend jobs on a PR
             and the post-merge `main` workflow. Treat the current forced Node.js 24
             execution warning as maintenance, not a launch-acceptance failure.
+            **Done 2026-07-22:** Node.js 24-compatible action pins passed both jobs in PR
+            run 254 and post-merge `main` run 29918717740 on squash commit `b69a5c4339`;
+            the merge tree exactly matches Codex-reviewed head `afae50d924`.
       *Verify:* focused tests for every changed lifecycle/gate; full backend and frontend
       suites; deterministic cost-reconciliation and validation-interruption fixtures;
       no LLM calls or real refresh; written evidence under `backend/reports/`; update this
       plan with completed items and any deliberately deferred curation counts.
-      **Local evidence 2026-07-20:** `backend/reports/p2-14/20260720T124735Z/acceptance.md`;
+      **Final evidence 2026-07-22:** `backend/reports/p2-14/20260720T124735Z/acceptance.md`;
       backend `890 passed`; frontend lint/build and `7 passed`; migration head
-      `5ac75d912125`; zero provider calls. P2.14(g) remains open until both PR and
-      post-merge `main` workflows pass.
+      `5ac75d912125`; zero provider calls; Codex round 4 clean; PR and post-merge
+      `main` workflows passed. P2.14(e) remains deliberately open with its recorded
+      evidence requirements and unchanged curation queues.
 
 ## Phase 3 — Go live
 
