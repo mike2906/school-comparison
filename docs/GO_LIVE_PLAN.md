@@ -1261,6 +1261,51 @@ operational safeguards do not reopen the accepted launch boundary.
             **Deliberately deferred 2026-07-20:** no curation or geocode retry was run; the
             recorded 117-name, 48-school/205-price-row, schools 113/116, and 88-terminal-NULL
             populations remain unchanged.
+            **Slice 1 complete 2026-07-23; item remains open:** using cached official-site
+            evidence only, school 520 was curated as `ЧОУ „Фюжън“` / `Fusion School`
+            through the existing two-signal corroboration gate. The identity queue is now
+            116 schools; 44 remaining schools retain uncorroborated English candidates.
+            Pricing remains 48 schools / 205 withheld rows because no accountable human
+            verification metadata was supplied. Schools 113/116 and all 88 accepted
+            terminal-NULL geocodes remain untouched. The exhaustive deterministic boundary
+            audit passed with zero LLM calls. Evidence:
+            `backend/reports/p2-14e/20260723T075840Z/acceptance.md`.
+            **Slice 2 complete 2026-07-23; item remains open:** ten additional schools
+            were reviewed from cached official-site evidence. Nine identities now publish
+            through the unchanged corroboration and website-data gates. School 521's
+            `The Beehive` identity is source-backed in storage but remains correctly
+            withheld after its recorded navigation failure; the API keeps the mechanical
+            fallback and no validation evidence was invented. The effective missing-
+            published-identity queue is 107 schools, including 34 uncorroborated English
+            candidates plus school 521's corroborated-but-withheld identity. Pricing stays
+            at 48 schools / 205 withheld rows; schools 113/116 and all 88 terminal-NULL
+            geocodes remain untouched. Focused tests passed (`76`), and the exhaustive
+            1,066-request deterministic boundary audit passed with `llm_calls=0`.
+            Evidence: `backend/reports/p2-14e/20260723T091402Z/acceptance.md`.
+            **Slice 3 complete 2026-07-23; item remains open:** ten more candidates were
+            classified offline. Contact labels at schools 153/512/569, the `VISIT SCHOOL`
+            navigation label at 633, and the cross-institution Uwekind label at kindergarten
+            634 were rejected and removed with private audit metadata. Candidates at
+            178/339/404/527/542 were explicitly deferred for insufficient independent cached
+            English evidence. The missing-published-identity queue remains 107; stored
+            uncorroborated English candidates fell from 34 to 29, including five now marked
+            deferred. Pricing stays 48 schools / 205 withheld rows; schools 113/116 and all
+            88 terminal-NULL geocodes remain untouched. Focused/API tests passed (`144`),
+            the targeted affected-school leak sweep was clean, and the exhaustive
+            1,066-request audit passed with `llm_calls=0`. Evidence:
+            `backend/reports/p2-14e/20260723T103943Z/acceptance.md`.
+            **Identity queue fully classified 2026-07-23; pricing decision required:**
+            bounded offline slices classified all 117 recorded identity records: 10
+            source-backed identities publish, school 521 is corroborated but remains
+            fail-closed, 96 are explicitly deferred for lack of source-backed cached
+            English evidence, 10 unsafe contact/navigation/cross-institution candidates
+            were rejected, and zero remain unclassified. Mechanical transliterations were
+            not relabeled as curated English identities. Pricing remains 48 schools / 205
+            withheld rows and now requires an accountable human verifier or an explicit
+            launch deferral decision. Schools 113/116 and all 88 terminal-NULL geocodes
+            remain untouched. Final identity manifest and evidence:
+            `backend/reports/p2-14e/20260723T120938Z/identity-decisions.json` and
+            `backend/reports/p2-14e/20260723T120938Z/acceptance.md`.
       - [x] **(f) One public identity predicate for serialization and search.** Keep
             display-name matching on the same resolved publication path used by API
             serialization. Add a guard test so a future SQL optimization cannot make
