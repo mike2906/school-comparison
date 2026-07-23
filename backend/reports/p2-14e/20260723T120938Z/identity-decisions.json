@@ -1,0 +1,53 @@
+{
+  "cohort": "P2.14(e) recorded 117-school English-identity queue",
+  "method": "offline_cached_source_review",
+  "reviewed_by": "codex",
+  "reviewed_at": "2026-07-23T12:09:38Z",
+  "counts": {
+    "total": 117,
+    "published": 10,
+    "corroborated_but_withheld": 1,
+    "deferred": 96,
+    "rejected": 10,
+    "unclassified": 0
+  },
+  "published_ids": [393, 506, 520, 524, 556, 576, 596, 615, 624, 635],
+  "corroborated_but_withheld_ids": [521],
+  "corroborated": [
+    {"id": 393, "identity": {"bg": "Детска къща Монтесори", "en": "Montessori Children’s House"}, "source_urls": ["https://www.montessori-bulgaria.com/en/about-us/our-mission", "https://www.montessori-bulgaria.com/en/about-us/privacy-policy"]},
+    {"id": 506, "identity": {"bg": "Англо-американско училище в София", "en": "The Anglo-American School of Sofia"}, "source_urls": ["https://www.aas-sofia.org/discover/contact-us", "https://www.aas-sofia.org/connect"]},
+    {"id": 520, "identity": {"bg": "ЧОУ „Фюжън“", "en": "Fusion School"}, "source_urls": ["https://school.fusion.bg/za-uchilishteto", "https://school.fusion.bg/zashto-fusion/programa"]},
+    {"id": 521, "identity": {"bg": "Пчелното кошерче", "en": "The Beehive"}, "source_urls": ["https://www.thebeehive.bg/enroll/book-a-visit", "https://www.thebeehive.bg/programs"], "publication": "withheld_by_existing_website_data_gate"},
+    {"id": 524, "identity": {"bg": "Малките принцове", "en": "Les Petits Princes"}, "source_urls": ["https://lespetitsprinces.bg/kontakti", "https://lespetitsprinces.bg/programi"]},
+    {"id": 556, "identity": {"bg": "Maple Bear Sofia", "en": "Maple Bear Sofia"}, "source_urls": ["https://sofia-school.maplebear.bg/en/admissions", "https://sofia-school.maplebear.bg/en"]},
+    {"id": 576, "identity": {"bg": "Малки стъпки – Литъл Степс", "en": "Little Steps"}, "source_urls": ["https://littlesteps.bg/musagenitsa/musagenitsa-admission", "https://littlesteps.bg/musagenitsa/musagenica-team"]},
+    {"id": 596, "identity": {"bg": "Maple Bear", "en": "Maple Bear"}, "source_urls": ["https://maplebear.bg/preschool-program", "https://maplebear.bg/elementary-program"]},
+    {"id": 615, "identity": {"bg": "Растеж", "en": "Growers"}, "source_urls": ["https://growers.bg/priem", "https://growers.bg/kontakti"]},
+    {"id": 624, "identity": {"bg": "Фънки Мънки", "en": "Funky Monkey Kindergarten"}, "source_urls": ["https://funkymonkey.bg/%d0%bf%d1%80%d0%b8%d0%b5%d0%bc/", "https://funkymonkey.bg/%d0%b7%d0%b0-%d0%bd%d0%b0%d1%81/"]},
+    {"id": 635, "identity": {"bg": "Увекинд", "en": "Uwekind International School"}, "source_urls": ["https://uwekind.com/about/%d1%83%d1%87%d0%b8%d0%bb%d0%b8%d1%89%d0%b5%d0%bd-%d0%ba%d0%b0%d0%bb%d0%b5%d0%bd%d0%b4%d0%b0%d1%80", "https://uwekind.com/"]}
+  ],
+  "rejected": [
+    {"id": 153, "reason": "contact_label", "candidate": {"bg": "Email: kindergarten@uwekind.bg", "en": "Email: kindergarten@uwekind.bg"}},
+    {"id": 381, "reason": "cross_institution_network_label", "candidate": {"bg": "Училищата Образователни технологии", "en": "Educational Technologies Schools"}},
+    {"id": 512, "reason": "contact_label", "candidate": {"bg": "E-mail: kindergarten@busy-bg.com", "en": "E-mail: kindergarten@busy-bg.com"}},
+    {"id": 514, "reason": "cross_institution_school_label", "candidate": {"bg": "ЧСУ \"Проф. Николай Райнов", "en": "Prof. Nikolai Raynov"}},
+    {"id": 546, "reason": "cross_institution_school_label", "candidate": {"bg": "ЧОУ ПЕТЪР БЕРОН"}},
+    {"id": 569, "reason": "contact_label", "candidate": {"bg": "Email: office@busy-school.com", "en": "Email: office@busy-school.com"}},
+    {"id": 587, "reason": "cross_institution_school_label", "candidate": {"bg": "ЧСУ „ДРУЖБА“ – София", "en": "Drujba School - Sofia"}},
+    {"id": 589, "reason": "cross_institution_school_label", "candidate": {"bg": "Международно училище Откривател", "en": "Discoverer International School"}},
+    {"id": 633, "reason": "navigation_label", "candidate": {"bg": "VISIT SCHOOL", "en": "VISIT SCHOOL"}},
+    {"id": 634, "reason": "cross_institution_network_label", "candidate": {"bg": "Uwekind International School", "en": "Uwekind International School"}}
+  ],
+  "deferred_ids": [
+    149, 150, 154, 155, 157, 171, 172, 175, 177, 178, 179, 180,
+    182, 183, 184, 185, 187, 213, 214, 215, 271, 272, 286, 287,
+    300, 301, 302, 329, 330, 339, 350, 372, 404, 405, 507, 510,
+    511, 516, 522, 525, 526, 527, 529, 530, 531, 533, 534, 535,
+    536, 537, 538, 539, 541, 542, 544, 545, 547, 548, 550, 552,
+    554, 558, 561, 562, 564, 565, 568, 572, 574, 577, 581, 583,
+    584, 585, 588, 590, 591, 592, 595, 597, 598, 599, 600, 601,
+    602, 603, 606, 609, 610, 613, 625, 628, 629, 630, 631, 632
+  ],
+  "deferred_reason": "no_explicit_cached_english_identity",
+  "pricing": {"status": "blocked_pending_accountable_human_verification", "schools": 48, "rows": 205}
+}
