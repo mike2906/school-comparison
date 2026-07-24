@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import re
 from dataclasses import dataclass
@@ -312,6 +313,10 @@ class WebsiteNavigator:
         cleaned_html = getattr(crawl_result, "cleaned_html", None)
         raw_html = getattr(crawl_result, "html", None)
         html = cleaned_html or raw_html
+        identity_signals = self._dedupe_lines(
+            self._extract_html_identity_signals(raw_html if isinstance(raw_html, str) else None)
+            + self._extract_html_identity_signals(cleaned_html if isinstance(cleaned_html, str) else None)
+        )
         contact_signals = self._dedupe_lines(
             self._extract_html_contact_signals(raw_html if isinstance(raw_html, str) else None)
             + self._extract_html_contact_signals(cleaned_html if isinstance(cleaned_html, str) else None)
@@ -322,7 +327,8 @@ class WebsiteNavigator:
         ]
         focused_html_candidates = [candidate for candidate in focused_html_candidates if candidate]
         if focused_html_candidates:
-            return self._append_contact_signals(max(focused_html_candidates, key=len), contact_signals)
+            extracted = self._append_identity_signals(max(focused_html_candidates, key=len), identity_signals)
+            return self._append_contact_signals(extracted, contact_signals)
 
         if isinstance(markdown_obj, str) and markdown_obj.strip():
             candidates.append(markdown_obj.strip())
@@ -334,7 +340,8 @@ class WebsiteNavigator:
 
         if not candidates:
             if not isinstance(html, str) or not html.strip():
-                return self._append_contact_signals(None, contact_signals)
+                extracted = self._append_identity_signals(None, identity_signals)
+                return self._append_contact_signals(extracted, contact_signals)
             soup = BeautifulSoup(html, "html.parser")
             for node in soup.find_all(["script", "style", "noscript", "header", "footer", "nav", "aside"]):
                 node.decompose()
@@ -342,7 +349,8 @@ class WebsiteNavigator:
             lines = self._dedupe_lines(text.splitlines())
             extracted = "\n".join(lines)
             normalized = extracted[: self.MAX_CONTENT_CHARS] if extracted else None
-            return self._append_contact_signals(normalized, contact_signals)
+            extracted = self._append_identity_signals(normalized, identity_signals)
+            return self._append_contact_signals(extracted, contact_signals)
 
         extracted_candidates: list[str] = []
         for candidate in candidates:
@@ -351,8 +359,73 @@ class WebsiteNavigator:
             if extracted:
                 extracted_candidates.append(extracted[: self.MAX_CONTENT_CHARS])
         if not extracted_candidates:
-            return self._append_contact_signals(None, contact_signals)
-        return self._append_contact_signals(max(extracted_candidates, key=len), contact_signals)
+            extracted = self._append_identity_signals(None, identity_signals)
+            return self._append_contact_signals(extracted, contact_signals)
+        extracted = self._append_identity_signals(max(extracted_candidates, key=len), identity_signals)
+        return self._append_contact_signals(extracted, contact_signals)
+
+    def _extract_html_identity_signals(self, html: str | None) -> list[str]:
+        """Keep deterministic official-site identity metadata for later resolution."""
+        if not html or not html.strip():
+            return []
+
+        soup = BeautifulSoup(html, "html.parser")
+        candidates: list[str] = []
+        if soup.title:
+            candidates.append(soup.title.get_text(" ", strip=True))
+
+        for meta in soup.find_all("meta"):
+            key = str(meta.get("property") or meta.get("name") or "").casefold()
+            if key in {"og:site_name", "application-name"}:
+                candidates.append(str(meta.get("content") or ""))
+
+        for image in soup.find_all("img"):
+            identity_hint = " ".join(
+                str(value or "")
+                for value in (image.get("src"), image.get("class"), image.get("id"))
+            ).casefold()
+            if "logo" not in identity_hint:
+                continue
+            candidates.extend([str(image.get("alt") or ""), str(image.get("title") or "")])
+
+        organization_types = {
+            "organization",
+            "educationalorganization",
+            "school",
+            "preschool",
+            "childcare",
+        }
+        for script in soup.find_all("script", attrs={"type": "application/ld+json"}):
+            try:
+                payload = json.loads(script.string or script.get_text() or "null")
+            except (TypeError, ValueError):
+                continue
+            pending = payload if isinstance(payload, list) else [payload]
+            while pending:
+                item = pending.pop()
+                if not isinstance(item, dict):
+                    continue
+                graph = item.get("@graph")
+                if isinstance(graph, list):
+                    pending.extend(graph)
+                raw_types = item.get("@type")
+                types = raw_types if isinstance(raw_types, list) else [raw_types]
+                if any(str(value or "").casefold() in organization_types for value in types):
+                    candidates.append(str(item.get("name") or ""))
+
+        return self._dedupe_lines(candidates)[:8]
+
+    def _append_identity_signals(self, markdown: str | None, signals: list[str]) -> str | None:
+        base = (markdown or "").strip()
+        if not signals:
+            return base or None
+        existing = base.casefold()
+        missing = [signal for signal in signals if signal.casefold() not in existing]
+        if not missing:
+            return base or None
+        section = "## HTML identity signals\n" + "\n".join(missing)
+        merged = f"{base}\n\n{section}" if base else section
+        return merged[: self.MAX_CONTENT_CHARS]
 
     def _extract_main_content_text(self, html: str | None) -> str | None:
         if not isinstance(html, str) or not html.strip():

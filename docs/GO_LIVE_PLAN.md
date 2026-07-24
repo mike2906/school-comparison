@@ -1319,6 +1319,18 @@ operational safeguards do not reopen the accepted launch boundary.
             passed (`897`), and the exhaustive 1,066-request boundary audit passed with
             `llm_calls=0`. Evidence:
             `backend/reports/p2-14e/20260724T083539Z/acceptance.md`.
+            **Resolver hardening complete locally 2026-07-24; no records changed:** exact
+            official homepage/core-page identities can now pair with compact, digit-bearing,
+            or acronym domain matches while generic institution words cannot corroborate a
+            domain by themselves. English candidates require English-specific evidence, so a
+            valid Bulgarian label cannot publish an invented English translation. Future
+            navigation retains title, Open Graph site name, organization JSON-LD, and logo
+            accessibility text; OCR remains deliberately excluded. A read-only cached-page
+            evaluation accepted schools 527/542 and would replace school 541's candidate with
+            `ABC KinderCare Centre`; the other seven remained deferred, including
+            `Pythagoras School`. No refresh, provider call, geocode attempt, or persistence was
+            performed. Full backend tests passed (`909`). Evidence:
+            `backend/reports/p2-14e/20260724T110802Z/acceptance.md`.
       - [x] **(f) One public identity predicate for serialization and search.** Keep
             display-name matching on the same resolved publication path used by API
             serialization. Add a guard test so a future SQL optimization cannot make

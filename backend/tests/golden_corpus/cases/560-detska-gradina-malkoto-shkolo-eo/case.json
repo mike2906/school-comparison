@@ -1,7 +1,13 @@
 {
   "country_code": "bg",
   "expected": {
-    "display_name_evidence": null,
+    "display_name_evidence": {
+      "signals": [
+        "website_domain_alias_match",
+        "exact_official_page_identity"
+      ],
+      "status": "corroborated"
+    },
     "general_info": {
       "display_name_i18n": {
         "bg": "Българско школо"

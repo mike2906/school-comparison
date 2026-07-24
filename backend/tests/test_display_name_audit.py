@@ -108,3 +108,30 @@ def test_audit_school_display_name_ignores_copyright_corporate_footer():
     finding = audit_school_display_name(school, pages)
 
     assert finding is None
+
+
+def test_audit_recovers_kindercare_centre_identity_from_official_pages():
+    school = {
+        "id": 541,
+        "name_i18n": {"bg": "Частна детска градина АВСландия"},
+        "attributes": {"display_name_i18n": {"en": "ABC Landia"}},
+        "website_url": "https://abckinder.org",
+    }
+    pages = [
+        {
+            "source_url": "https://abckinder.org",
+            "page_category": None,
+            "raw_markdown": "ABC KinderCare Centre\nWe provide early childhood education.",
+        },
+        {
+            "source_url": "https://abckinder.org/contact-us",
+            "page_category": "contact",
+            "raw_markdown": "ABC KinderCare Centre\nContact our admissions team.",
+        },
+    ]
+
+    finding = audit_school_display_name(school, pages)
+
+    assert finding is not None
+    assert finding.candidate_name == "ABC KinderCare Centre"
+    assert finding.repeated_pages == 2

@@ -175,6 +175,24 @@ def test_resolve_name_i18n_ignores_uncorroborated_display_name():
     }
 
 
+def test_resolve_name_i18n_accepts_domain_plus_exact_official_page_identity():
+    resolved = resolve_name_i18n(
+        {"bg": 'Частна детска градина "Йор Кидс"'},
+        {
+            "display_name_i18n": {"en": "Your Kids"},
+            "display_name_evidence": {
+                "signals": [
+                    "website_domain_alias_match",
+                    "exact_official_page_identity",
+                ],
+                "status": "corroborated",
+            },
+        },
+    )
+
+    assert resolved["en"] == "Your Kids"
+
+
 def test_resolve_name_i18n_rejects_corroborated_page_prose():
     legal_name = {"bg": 'Частно средно училище "Свети Наум"'}
     legal_fallback = resolve_name_i18n(legal_name)

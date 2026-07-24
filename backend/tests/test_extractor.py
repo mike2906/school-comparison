@@ -805,6 +805,176 @@ def test_display_name_evidence_canonicalizes_connector_variants():
     }
 
 
+@pytest.mark.parametrize(
+    ("website_url", "display_name"),
+    [
+        ("https://under1roof.bg", "Under 1 Roof"),
+        ("https://yourkidsbg.com", "Your Kids"),
+        ("https://www.acs.bg", "American College of Sofia"),
+        ("https://abckinder.org", "ABC KinderCare Centre"),
+    ],
+)
+def test_display_name_domain_alias_supports_compact_brands_and_acronyms(
+    website_url,
+    display_name,
+):
+    assert extractor_module._display_name_has_domain_alias_match(
+        {"en": display_name},
+        registry_name=None,
+        website_url=website_url,
+    )
+
+
+def test_display_name_evidence_accepts_exact_identity_on_official_homepage():
+    school = School(
+        id=1,
+        name_i18n={"bg": 'Частна детска градина "Йор Кидс"'},
+        country_code="bg",
+        city="sofia",
+        school_type="private",
+        education_level="kindergarten",
+        website_url="https://yourkidsbg.com",
+    )
+    pages = [
+        SourcePage(
+            school_id=1,
+            source_url="https://yourkidsbg.com",
+            page_category=None,
+            scrape_type=ScrapeType.WEBSITE,
+            is_valid=True,
+            raw_markdown='Създавайки градина и ясла “Your Kids” ние сбъднахме една мечта.',
+            content_hash="your-kids-home",
+            last_scraped_at=datetime.datetime.now(datetime.UTC),
+        )
+    ]
+
+    evidence = extractor_module._build_display_name_evidence(
+        {"en": "Your Kids"},
+        school=school,
+        pages=pages,
+    )
+
+    assert evidence == {
+        "signals": ["website_domain_alias_match", "exact_official_page_identity"],
+        "status": "corroborated",
+    }
+
+
+def test_display_name_evidence_preserves_compact_digit_brand_styling():
+    school = School(
+        id=1,
+        name_i18n={"bg": 'Частна детска градина "Под 1 покрив"'},
+        country_code="bg",
+        city="sofia",
+        school_type="private",
+        education_level="kindergarten",
+        website_url="https://under1roof.bg",
+    )
+    page = SourcePage(
+        school_id=1,
+        source_url="https://under1roof.bg/about",
+        page_category="about",
+        scrape_type=ScrapeType.WEBSITE,
+        is_valid=True,
+        raw_markdown="Under1Roof е частна детска градина.",
+        content_hash="under-one-roof",
+        last_scraped_at=datetime.datetime.now(datetime.UTC),
+    )
+
+    evidence = extractor_module._build_display_name_evidence(
+        {"en": "Under 1 Roof"},
+        school=school,
+        pages=[page],
+    )
+
+    assert evidence == {
+        "signals": ["website_domain_alias_match", "exact_official_page_identity"],
+        "status": "corroborated",
+    }
+
+
+def test_promote_display_name_accepts_exact_official_candidate_with_domain_match():
+    school = School(
+        id=541,
+        name_i18n={"bg": "Частна детска градина АВСландия"},
+        country_code="bg",
+        city="sofia",
+        school_type="private",
+        education_level="kindergarten",
+        website_url="https://abckinder.org",
+    )
+    pages = [
+        SourcePage(
+            school_id=541,
+            source_url="https://abckinder.org",
+            page_category=None,
+            scrape_type=ScrapeType.WEBSITE,
+            is_valid=True,
+            raw_markdown="ABC KinderCare Centre\nWe provide early childhood education.",
+            content_hash="abc-home-a",
+            last_scraped_at=datetime.datetime.now(datetime.UTC),
+        ),
+        SourcePage(
+            school_id=541,
+            source_url="https://abckinder.org/",
+            page_category=None,
+            scrape_type=ScrapeType.WEBSITE,
+            is_valid=True,
+            raw_markdown="ABC KinderCare Centre\nInternational kindergarten in Sofia.",
+            content_hash="abc-home-b",
+            last_scraped_at=datetime.datetime.now(datetime.UTC),
+        ),
+    ]
+    parsed = GeneralInfoExtractionOutput(
+        display_name_i18n={"bg": "ABC Landia", "en": "ABC Landia"}
+    )
+
+    promoted, note = extractor_module._promote_repeated_display_name_candidate(
+        parsed,
+        school=school,
+        pages=pages,
+    )
+
+    assert promoted.display_name_i18n == {
+        "bg": "ABC KinderCare Centre",
+        "en": "ABC KinderCare Centre",
+    }
+    assert note == "Promoted repeated fuller display name from page evidence: ABC KinderCare Centre"
+
+
+def test_display_name_evidence_does_not_invent_pythagoras_from_pitagor_site():
+    school = School(
+        id=1,
+        name_i18n={"bg": 'Частно средно училище "Питагор"'},
+        country_code="bg",
+        city="sofia",
+        school_type="private",
+        education_level="upper_secondary",
+        website_url="https://pitagor-school.eu",
+    )
+    pages = [
+        SourcePage(
+            school_id=1,
+            source_url="https://pitagor-school.eu",
+            page_category=None,
+            scrape_type=ScrapeType.WEBSITE,
+            is_valid=True,
+            raw_markdown='Училище по математика „Питагор“',
+            content_hash="pitagor-home",
+            last_scraped_at=datetime.datetime.now(datetime.UTC),
+        )
+    ]
+
+    assert (
+        extractor_module._build_display_name_evidence(
+            {"bg": "Питагор", "en": "Pythagoras School"},
+            school=school,
+            pages=pages,
+        )
+        is None
+    )
+
+
 @pytest.mark.asyncio
 async def test_extract_school_clears_stale_summary_metadata_on_success(db_session, sample_school_for_extraction):
     school = sample_school_for_extraction
