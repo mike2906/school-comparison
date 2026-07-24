@@ -159,6 +159,26 @@ def test_extract_html_identity_signals_ignores_generic_organization_json_ld():
     assert signals == []
 
 
+@pytest.mark.parametrize(
+    "schema_type",
+    ["https://schema.org/School", "http://schema.org/Preschool", "schema:ChildCare"],
+)
+def test_extract_html_identity_signals_accepts_school_schema_type_iris(schema_type):
+    navigator = WebsiteNavigator(country_code="bg")
+
+    signals = navigator._extract_html_identity_signals(
+        f"""
+        <html><body>
+          <script type="application/ld+json">
+            {{"@type": "{schema_type}", "name": "ABC KinderCare Centre"}}
+          </script>
+        </body></html>
+        """
+    )
+
+    assert signals == ["ABC KinderCare Centre"]
+
+
 def test_append_identity_signals_reserves_space_on_max_length_page():
     navigator = WebsiteNavigator(country_code="bg")
     full_page = "x" * navigator.MAX_CONTENT_CHARS

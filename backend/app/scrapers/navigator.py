@@ -426,7 +426,11 @@ class WebsiteNavigator:
                     pending.extend(graph)
                 raw_types = item.get("@type")
                 types = raw_types if isinstance(raw_types, list) else [raw_types]
-                if any(str(value or "").casefold() in organization_types for value in types):
+                normalized_types = {
+                    re.split(r"[/#:]", str(value or "").rstrip("/"))[-1].casefold()
+                    for value in types
+                }
+                if normalized_types & organization_types:
                     candidates.append(str(item.get("name") or ""))
 
         return self._dedupe_lines(candidates)[:8]
