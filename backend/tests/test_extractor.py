@@ -860,6 +860,47 @@ def test_display_name_evidence_accepts_exact_identity_on_official_homepage():
     }
 
 
+@pytest.mark.parametrize(
+    ("website_url", "page_url"),
+    [
+        ("https://yourkidsbg.com", "https://yourkidsbg.com/en"),
+        ("https://yourkidsbg.com/international", "https://yourkidsbg.com/international/"),
+    ],
+)
+def test_display_name_evidence_accepts_exact_identity_on_official_landing_page(
+    website_url,
+    page_url,
+):
+    school = School(
+        id=1,
+        name_i18n={"bg": 'Частна детска градина "Йор Кидс"'},
+        country_code="bg",
+        city="sofia",
+        school_type="private",
+        education_level="kindergarten",
+        website_url=website_url,
+    )
+    page = SourcePage(
+        school_id=1,
+        source_url=page_url,
+        page_category=None,
+        scrape_type=ScrapeType.WEBSITE,
+        is_valid=True,
+        raw_markdown="Your Kids\nA warm place to learn and grow.",
+        content_hash="your-kids-landing",
+        last_scraped_at=datetime.datetime.now(datetime.UTC),
+    )
+
+    assert extractor_module._build_display_name_evidence(
+        {"en": "Your Kids"},
+        school=school,
+        pages=[page],
+    ) == {
+        "signals": ["website_domain_alias_match", "exact_official_page_identity"],
+        "status": "corroborated",
+    }
+
+
 def test_display_name_evidence_rejects_composite_page_title_candidate():
     school = School(
         id=1,

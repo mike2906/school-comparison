@@ -734,6 +734,7 @@ def _display_name_has_domain_alias_match(
 def _display_name_has_exact_official_page_identity(
     display_name_i18n: dict[str, str],
     *,
+    website_url: str | None,
     pages: list[SourcePage],
 ) -> bool:
     """Match a candidate literally in identity-rich cached official-page text."""
@@ -761,9 +762,25 @@ def _display_name_has_exact_official_page_identity(
     if not labels:
         return False
 
+    configured_site = urlparse(website_url or "")
+    configured_host = configured_site.netloc.casefold().removeprefix("www.")
+    configured_path = "/" + (configured_site.path or "").strip("/")
+
     for page in pages:
         parsed = urlparse(page.source_url or "")
-        is_homepage = (parsed.path or "/").strip("/") == ""
+        page_host = parsed.netloc.casefold().removeprefix("www.")
+        page_path = "/" + (parsed.path or "").strip("/")
+        is_configured_landing = (
+            bool(configured_host)
+            and page_host == configured_host
+            and page_path == configured_path
+        )
+        is_locale_root = re.fullmatch(
+            r"/[a-z]{2}(?:[-_][a-z]{2})?",
+            page_path,
+            flags=re.IGNORECASE,
+        ) is not None
+        is_homepage = page_path == "/" or is_configured_landing or is_locale_root
         page_payload = {
             "source_url": page.source_url,
             "page_category": page.page_category,
@@ -863,7 +880,11 @@ def _build_display_name_evidence(
     )
     if has_repeated_identity:
         signals.append("repeated_on_page_identity")
-    elif _display_name_has_exact_official_page_identity(evidence_display_name, pages=pages):
+    elif _display_name_has_exact_official_page_identity(
+        evidence_display_name,
+        website_url=school.website_url,
+        pages=pages,
+    ):
         signals.append("exact_official_page_identity")
 
     if len(set(signals)) < 2:
