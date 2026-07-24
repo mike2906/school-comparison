@@ -626,7 +626,7 @@ def _promote_repeated_display_name_candidate(
 
 
 def _labels_match(left: str | None, right: str | None) -> bool:
-    generic_tokens = {
+    generic_labels = {
         "academy",
         "care",
         "center",
@@ -636,6 +636,9 @@ def _labels_match(left: str | None, right: str | None) -> bool:
         "preschool",
         "school",
     }
+    generic_tokens = set().union(
+        *(helpers._display_name_match_tokens(label) for label in generic_labels)
+    )
     left_tokens = helpers._display_name_match_tokens(left) - generic_tokens
     right_tokens = helpers._display_name_match_tokens(right) - generic_tokens
     return bool(left_tokens and right_tokens and left_tokens & right_tokens)

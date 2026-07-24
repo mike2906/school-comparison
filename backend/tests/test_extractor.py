@@ -825,10 +825,19 @@ def test_display_name_domain_alias_supports_compact_brands_and_acronyms(
     )
 
 
-@pytest.mark.parametrize("host_label", ["school", "academy", "kindergarten"])
-def test_display_name_domain_alias_rejects_generic_hosts(host_label):
+@pytest.mark.parametrize(
+    ("host_label", "display_name"),
+    [
+        ("school", "School"),
+        ("academy", "Academy"),
+        ("kindergarten", "Kindergarten"),
+        ("mycollege", "College"),
+        ("mypreschool", "Preschool"),
+    ],
+)
+def test_display_name_domain_alias_rejects_generic_hosts(host_label, display_name):
     assert not extractor_module._display_name_has_domain_alias_match(
-        {"en": host_label.title()},
+        {"en": display_name},
         registry_name=None,
         website_url=f"https://{host_label}.bg",
     )
