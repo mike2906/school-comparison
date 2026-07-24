@@ -143,6 +143,22 @@ def test_extract_html_identity_signals_ignores_non_logo_image_text():
     assert signals == []
 
 
+def test_extract_html_identity_signals_ignores_generic_organization_json_ld():
+    navigator = WebsiteNavigator(country_code="bg")
+
+    signals = navigator._extract_html_identity_signals(
+        """
+        <html><body>
+          <script type="application/ld+json">
+            {"@type": "Organization", "name": "ABC Studio"}
+          </script>
+        </body></html>
+        """
+    )
+
+    assert signals == []
+
+
 def test_append_identity_signals_reserves_space_on_max_length_page():
     navigator = WebsiteNavigator(country_code="bg")
     full_page = "x" * navigator.MAX_CONTENT_CHARS

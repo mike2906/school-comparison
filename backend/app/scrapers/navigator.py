@@ -406,7 +406,6 @@ class WebsiteNavigator:
             candidates.extend([str(image.get("alt") or ""), str(image.get("title") or "")])
 
         organization_types = {
-            "organization",
             "educationalorganization",
             "school",
             "preschool",
