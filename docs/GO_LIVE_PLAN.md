@@ -1306,6 +1306,19 @@ operational safeguards do not reopen the accepted launch boundary.
             remain untouched. Final identity manifest and evidence:
             `backend/reports/p2-14e/20260723T120938Z/identity-decisions.json` and
             `backend/reports/p2-14e/20260723T120938Z/acceptance.md`.
+            **Canonical identity follow-up complete 2026-07-24; pricing remains open:**
+            the manually corroborated `The Beehive` identity for school 521 is now
+            promoted to canonical `name_i18n.en` with two official-source provenance
+            rows. A reusable dry-run-first command requires the same two identity signals,
+            manual-review metadata, same-domain official URLs, and conflict-free canonical
+            state. Authoritative imports preserve only explicitly promoted locales they
+            omit; uncurated legacy EN values are not retained. List, detail, and search now
+            agree on `The Beehive`, while the absent Stage 6 report still withholds all
+            unrelated website-derived fields. The scoreboard reports 11/11 curated
+            identities published, zero blocked, and zero conflicts. Full backend tests
+            passed (`897`), and the exhaustive 1,066-request boundary audit passed with
+            `llm_calls=0`. Evidence:
+            `backend/reports/p2-14e/20260724T083539Z/acceptance.md`.
       - [x] **(f) One public identity predicate for serialization and search.** Keep
             display-name matching on the same resolved publication path used by API
             serialization. Add a guard test so a future SQL optimization cannot make

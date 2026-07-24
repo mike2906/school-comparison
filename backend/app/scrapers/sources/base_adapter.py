@@ -170,7 +170,15 @@ class BaseSourceAdapter(ABC):
                         if disc.institutional_id and not existing_school.institutional_id:
                             existing_school.institutional_id = disc.institutional_id
                     else:
-                        existing_school.name_i18n = disc.name_i18n
+                        from app.services.identity_curation import merge_authoritative_name_i18n
+
+                        # Authoritative sources commonly provide only their native
+                        # locale. Preserve independently curated canonical locales,
+                        # while incoming values still win when supplied.
+                        existing_school.name_i18n = merge_authoritative_name_i18n(
+                            existing_school,
+                            disc.name_i18n,
+                        )
                         existing_school.school_type = disc.school_type
                         existing_school.education_level = disc.education_level
                         existing_school.city = disc.city or existing_school.city

@@ -70,3 +70,23 @@ uv run python -m app.scrapers.cli data-quality --city sofia --country bg
 Prints the six go-live quality metrics + recent pipeline runs. Every batch `run`
 (extract/validate-data/summarize/all/…) also records a `pipeline_runs` row with a
 `metrics` snapshot via `app/services/pipeline_runs.py`.
+
+## Promote a manually curated English identity
+
+Use an explicit school cohort. The command is a dry-run unless `--commit` is supplied:
+
+```bash
+cd backend
+uv run python -m app.scrapers.cli promote-curated-identities \
+  --school-id 521 --city sofia --country bg --promoted-by codex
+
+# After reviewing the candidate and decision:
+uv run python -m app.scrapers.cli promote-curated-identities \
+  --school-id 521 --city sofia --country bg --promoted-by codex --commit
+```
+
+The command requires the existing two-signal corroboration, manual-review metadata, at
+least two source URLs on the official website domain, and no conflicting canonical EN
+name. It promotes only `name_i18n.en` and records durable provenance; missing Stage 6
+validation continues to withhold all other website-derived fields. Repeat `--school-id`
+for a bounded multi-school cohort.
