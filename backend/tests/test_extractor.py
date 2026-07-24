@@ -825,6 +825,14 @@ def test_display_name_domain_alias_supports_compact_brands_and_acronyms(
     )
 
 
+def test_display_name_domain_alias_rejects_non_school_acronym_expansion():
+    assert not extractor_module._display_name_has_domain_alias_match(
+        {"en": "Admissions Calendar Sofia"},
+        registry_name=None,
+        website_url="https://acs.bg",
+    )
+
+
 @pytest.mark.parametrize(
     ("host_label", "display_name"),
     [

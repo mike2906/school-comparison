@@ -735,10 +735,30 @@ def _display_name_has_domain_alias_match(
         return "".join(word[0] for word in words if word not in ignored)
 
     generic_suffixes = ("school", "centre", "center", "carecentre", "carecenter")
+    institution_words = {
+        "academy",
+        "care",
+        "center",
+        "centre",
+        "college",
+        "education",
+        "gymnasium",
+        "institute",
+        "kindergarten",
+        "lyceum",
+        "nursery",
+        "preschool",
+        "school",
+        "university",
+    }
     for display_label in display_name_i18n.values():
         label_compact = compact(display_label)
-        if label_compact == host_compact or acronym(display_label) == host_compact:
+        if label_compact == host_compact:
             return True
+        if acronym(display_label) == host_compact:
+            label_words = set(re.findall(r"[a-z0-9]+", display_label.casefold()))
+            if label_words & institution_words or _labels_match(display_label, registry_name):
+                return True
         if label_compact.startswith(host_compact):
             remainder = label_compact[len(host_compact) :]
             if remainder in generic_suffixes:
