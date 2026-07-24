@@ -129,7 +129,7 @@ def test_extract_markdown_retains_structured_identity_signals_without_ocr():
 
     assert extracted is not None
     assert "## HTML identity signals" in extracted
-    assert "Admissions | ABC KinderCare Centre" in extracted
+    assert "Admissions | ABC KinderCare Centre" not in extracted
     assert "\nABC KinderCare Centre" in extracted
 
 

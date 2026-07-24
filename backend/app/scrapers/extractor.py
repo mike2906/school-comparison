@@ -765,17 +765,18 @@ def _display_name_has_exact_official_page_identity(
         }
         if not is_homepage and _page_bonus(page_payload) <= 0:
             continue
-        page_text = normalized((page.raw_markdown or "")[:15000])
         raw_page_text = re.sub(
             r"https?://\S+",
             " ",
             (page.raw_markdown or "")[:15000],
             flags=re.IGNORECASE,
         )
-        if any(label in page_text for label in labels) or any(
-            pattern.search(raw_page_text.casefold()) for pattern in flexible_digit_patterns
-        ):
-            return True
+        for raw_line in raw_page_text.splitlines():
+            line = normalized(raw_line)
+            if any(label in line for label in labels) or any(
+                pattern.search(raw_line.casefold()) for pattern in flexible_digit_patterns
+            ):
+                return True
     return False
 
 

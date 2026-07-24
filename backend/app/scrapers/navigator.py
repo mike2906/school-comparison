@@ -372,7 +372,9 @@ class WebsiteNavigator:
         soup = BeautifulSoup(html, "html.parser")
         candidates: list[str] = []
         if soup.title:
-            candidates.append(soup.title.get_text(" ", strip=True))
+            title = soup.title.get_text(" ", strip=True)
+            title_parts = re.split(r"\s+[|–—-]\s+|\|", title)
+            candidates.extend(part for part in title_parts if part.strip())
 
         for meta in soup.find_all("meta"):
             key = str(meta.get("property") or meta.get("name") or "").casefold()

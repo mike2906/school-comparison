@@ -860,6 +860,40 @@ def test_display_name_evidence_accepts_exact_identity_on_official_homepage():
     }
 
 
+def test_display_name_evidence_rejects_composite_page_title_candidate():
+    school = School(
+        id=1,
+        name_i18n={"bg": "Частна детска градина АВСландия"},
+        country_code="bg",
+        city="sofia",
+        school_type="private",
+        education_level="kindergarten",
+        website_url="https://abckinder.org",
+    )
+    page = SourcePage(
+        school_id=1,
+        source_url="https://abckinder.org",
+        page_category=None,
+        scrape_type=ScrapeType.WEBSITE,
+        is_valid=True,
+        raw_markdown=(
+            "Admissions and curriculum information.\n\n"
+            "## HTML identity signals\nAdmissions\nABC KinderCare Centre"
+        ),
+        content_hash="abc-split-title",
+        last_scraped_at=datetime.datetime.now(datetime.UTC),
+    )
+
+    assert (
+        extractor_module._build_display_name_evidence(
+            {"en": "Admissions | ABC KinderCare Centre"},
+            school=school,
+            pages=[page],
+        )
+        is None
+    )
+
+
 def test_display_name_evidence_preserves_compact_digit_brand_styling():
     school = School(
         id=1,
