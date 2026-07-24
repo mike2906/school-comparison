@@ -143,6 +143,20 @@ def test_extract_html_identity_signals_ignores_non_logo_image_text():
     assert signals == []
 
 
+def test_append_identity_signals_reserves_space_on_max_length_page():
+    navigator = WebsiteNavigator(country_code="bg")
+    full_page = "x" * navigator.MAX_CONTENT_CHARS
+
+    extracted = navigator._append_identity_signals(
+        full_page,
+        ["ABC KinderCare Centre"],
+    )
+
+    assert extracted is not None
+    assert len(extracted) <= navigator.MAX_CONTENT_CHARS
+    assert extracted.endswith("## HTML identity signals\nABC KinderCare Centre")
+
+
 def test_extract_markdown_prefers_focused_main_content_html_over_menu_heavy_markdown():
     navigator = WebsiteNavigator(country_code="bg")
 

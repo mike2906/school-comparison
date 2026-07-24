@@ -424,7 +424,16 @@ class WebsiteNavigator:
         if not missing:
             return base or None
         section = "## HTML identity signals\n" + "\n".join(missing)
-        merged = f"{base}\n\n{section}" if base else section
+        if not base:
+            return section[: self.MAX_CONTENT_CHARS]
+
+        separator = "\n\n"
+        available_base_chars = max(
+            0,
+            self.MAX_CONTENT_CHARS - len(separator) - len(section),
+        )
+        retained_base = base[:available_base_chars].rstrip()
+        merged = f"{retained_base}{separator}{section}" if retained_base else section
         return merged[: self.MAX_CONTENT_CHARS]
 
     def _extract_main_content_text(self, html: str | None) -> str | None:
