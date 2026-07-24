@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.pricing import Pricing
 from app.models.school import School, SchoolLocation
+from app.services.identity_curation import curated_identity_candidate
 # Re-exported for callers that import it from here; it now lives in
 # `app.utils.display_gating` so the scoreboard metric and the P1.7 display gate
 # share one source of truth.
@@ -29,9 +30,9 @@ from app.utils.display_gating import (  # noqa: F401
     pricing_row_is_publishable,
     summary_is_publishable,
 )
-from app.utils.i18n_resolver import resolve_display_name_i18n
+from app.utils.i18n_resolver import resolve_display_name_i18n, resolve_name_i18n
 from app.utils.school_attributes import build_display_attributes
-from app.utils.website_data import website_data_is_publishable
+from app.utils.website_data import attributes_for_publication, website_data_is_publishable
 
 # Precision used to group coordinates when detecting shared/duplicate points.
 _COORD_ROUNDING = 5
@@ -115,6 +116,35 @@ def _display_name_overrides(schools: list[School]) -> dict[str, Any]:
         "candidates": candidates,
         "candidate_coverage_pct": _pct(candidates, total),
         "conversion_pct": _pct(overrides, candidates),
+    }
+
+
+def _curated_identity_promotions(schools: list[School]) -> dict[str, Any]:
+    """Track reviewed EN identities that still fall back to transliteration."""
+    eligible = 0
+    published = 0
+    conflicts = 0
+    blocked_school_ids: list[int] = []
+    for school in schools:
+        candidate = curated_identity_candidate(school)
+        if not candidate.eligible:
+            continue
+        eligible += 1
+        canonical_en = str(_as_dict(school.name_i18n).get("en") or "").strip()
+        if canonical_en and canonical_en != candidate.english_name:
+            conflicts += 1
+        public_attributes = attributes_for_publication(school.attributes, school.scrape_status)
+        resolved_en = resolve_name_i18n(school.name_i18n, public_attributes).get("en")
+        if resolved_en == candidate.english_name:
+            published += 1
+        else:
+            blocked_school_ids.append(school.id)
+    return {
+        "eligible": eligible,
+        "published": published,
+        "blocked": len(blocked_school_ids),
+        "conflicts": conflicts,
+        "blocked_school_ids": sorted(blocked_school_ids),
     }
 
 
@@ -273,6 +303,7 @@ async def compute_quality_metrics(
         "duplicate_coordinate_groups": duplicate_groups,
         "location_precision_exact": precision_metric,
         "display_name_overrides": _display_name_overrides(schools),
+        "curated_identity_promotions": _curated_identity_promotions(schools),
         "spot_check_discrepancy_rate": _spot_check_rate(schools),
         "pricing_rows_failing_gates": _pricing_gate_failures(pricing_rows),
     }

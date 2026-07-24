@@ -549,6 +549,93 @@ def repair_out_of_bounds_geocodes(school, school_id, city, country, limit, dry_r
     )
 
 
+@cli.command("promote-curated-identities")
+@click.option(
+    "--school-id",
+    "school_ids",
+    type=int,
+    multiple=True,
+    required=True,
+    help="Explicit school ID to promote (repeatable)",
+)
+@click.option("--city", help="Required city scope", required=True)
+@click.option("--country", default="bg", show_default=True, help="Country code")
+@click.option("--promoted-by", required=True, help="Actor applying the reviewed curation")
+@click.option(
+    "--commit",
+    "commit_changes",
+    is_flag=True,
+    help="Persist eligible promotions (default is dry-run)",
+)
+def promote_curated_identities_command(
+    school_ids,
+    city,
+    country,
+    promoted_by,
+    commit_changes,
+):
+    """Promote reviewed website identities into canonical localized names."""
+    asyncio.run(
+        _promote_curated_identities_command(
+            school_ids=school_ids,
+            city=city,
+            country=country,
+            promoted_by=promoted_by,
+            commit_changes=commit_changes,
+        )
+    )
+
+
+async def _promote_curated_identities_command(
+    *,
+    school_ids,
+    city,
+    country,
+    promoted_by,
+    commit_changes,
+):
+    from app.database import async_session_maker
+    from app.services.identity_curation import promote_curated_identities
+
+    async with async_session_maker() as db:
+        result = await promote_curated_identities(
+            db,
+            school_ids=school_ids,
+            country=country,
+            city=city,
+            promoted_by=promoted_by,
+            commit=commit_changes,
+        )
+
+    mode = "commit" if commit_changes else "dry-run"
+    console.print(f"[cyan]Canonical identity promotion ({mode})[/cyan]")
+    table = Table(show_header=True, header_style="bold cyan")
+    table.add_column("ID", style="dim")
+    table.add_column("English identity")
+    table.add_column("Decision")
+    table.add_column("Reason")
+    for row in result["rows"]:
+        table.add_row(
+            str(row["school_id"]),
+            row["english_name"] or "—",
+            row["decision"],
+            row["reason"] or "—",
+        )
+    console.print(table)
+    console.print(
+        "  ".join(
+            [
+                f"requested={result['requested']}",
+                f"eligible={result['eligible']}",
+                f"promoted={result['promoted']}",
+                f"already={result['already_promoted']}",
+                f"conflicts={result['conflicts']}",
+                f"ineligible={result['ineligible']}",
+            ]
+        )
+    )
+
+
 @cli.command()
 @click.option("--school", help="School name (fuzzy match)")
 @click.option("--school-id", type=int, help="School ID")
@@ -3747,6 +3834,13 @@ async def _show_data_quality(city, country, runs):
             _pct(d["candidate_coverage_pct"]),
             f"{d['candidates']}/{d['total']} schools; "
             f"{_pct(d['conversion_pct'])} corroborated",
+        )
+        c = metrics["curated_identity_promotions"]
+        table.add_row(
+            "Curated EN identities blocked",
+            str(c["blocked"]),
+            f"{c['published']}/{c['eligible']} published; "
+            f"{c['conflicts']} conflicts",
         )
         s = metrics["spot_check_discrepancy_rate"]
         rate = "n/a" if s["rate"] is None else f"{s['rate']:.1%}"

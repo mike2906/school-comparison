@@ -187,6 +187,59 @@ class TestDiscoveryIntegration:
         assert result2["updated"] == 1
         assert result2["created"] == 0
 
+    async def test_authoritative_upsert_preserves_existing_curated_locale(self, db_session):
+        """A BG-only registry refresh must not erase a curated canonical EN name."""
+        from app.scrapers.sources.base_adapter import BaseSourceAdapter
+        from app.schemas.scraping import DiscoveredSchool
+
+        class TestAdapter(BaseSourceAdapter):
+            ADAPTER_NAME = "test"
+            COUNTRY_CODE = "bg"
+            CITY = "sofia"
+
+            async def discover(self, limit=None):
+                return []
+
+        existing = School(
+            institutional_id="curated-identity",
+            name_i18n={"bg": "Старо име", "en": "The Beehive"},
+            attributes={
+                "canonical_identity_curation": {
+                    "en": {
+                        "status": "promoted",
+                        "value": "The Beehive",
+                    }
+                }
+            },
+            country_code="bg",
+            school_type="private",
+            education_level="kindergarten",
+            city="sofia",
+        )
+        db_session.add(existing)
+        await db_session.commit()
+
+        result = await TestAdapter(db=db_session).upsert_schools(
+            [
+                DiscoveredSchool(
+                    institutional_id="curated-identity",
+                    name_i18n={"bg": "Ново официално име"},
+                    country_code="bg",
+                    school_type="private",
+                    education_level="kindergarten",
+                    city="sofia",
+                    locations=[],
+                )
+            ]
+        )
+        await db_session.refresh(existing)
+
+        assert result["updated"] == 1
+        assert existing.name_i18n == {
+            "bg": "Ново официално име",
+            "en": "The Beehive",
+        }
+
 
 @pytest.mark.asyncio
 class TestPipelineStateTransitions:
