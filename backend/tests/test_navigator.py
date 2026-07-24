@@ -157,6 +157,30 @@ def test_append_identity_signals_reserves_space_on_max_length_page():
     assert extracted.endswith("## HTML identity signals\nABC KinderCare Centre")
 
 
+def test_extract_markdown_reserves_space_for_identity_and_contact_signals():
+    navigator = WebsiteNavigator(country_code="bg")
+    crawl_result = type(
+        "Result",
+        (),
+        {
+            "markdown": "x" * navigator.MAX_CONTENT_CHARS,
+            "html": """
+                <html>
+                  <head><meta property="og:site_name" content="ABC KinderCare Centre"></head>
+                  <body><footer><a href="tel:+35921234567">02/1234567</a></footer></body>
+                </html>
+            """,
+        },
+    )()
+
+    extracted = navigator._extract_markdown(crawl_result)
+
+    assert extracted is not None
+    assert len(extracted) <= navigator.MAX_CONTENT_CHARS
+    assert "## HTML identity signals\nABC KinderCare Centre" in extracted
+    assert extracted.endswith("## HTML contact signals\nPhone: 02/1234567")
+
+
 def test_extract_markdown_prefers_focused_main_content_html_over_menu_heavy_markdown():
     navigator = WebsiteNavigator(country_code="bg")
 

@@ -1329,7 +1329,7 @@ operational safeguards do not reopen the accepted launch boundary.
             evaluation accepted schools 527/542 and would replace school 541's candidate with
             `ABC KinderCare Centre`; the other seven remained deferred, including
             `Pythagoras School`. No refresh, provider call, geocode attempt, or persistence was
-            performed. Full backend tests passed (`913`). Evidence:
+            performed. Full backend tests passed (`917`). Evidence:
             `backend/reports/p2-14e/20260724T110802Z/acceptance.md`.
       - [x] **(f) One public identity predicate for serialization and search.** Keep
             display-name matching on the same resolved publication path used by API

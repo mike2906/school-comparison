@@ -708,7 +708,19 @@ def _display_name_has_domain_alias_match(
     host_compact = re.sub(r"[^a-z0-9]+", "", host_label)
     if host_compact.endswith("bg") and len(host_compact) > 6:
         host_compact = host_compact[:-2]
-    if len(host_compact) < 3:
+    generic_host_labels = {
+        "academy",
+        "centre",
+        "center",
+        "college",
+        "education",
+        "kindergarten",
+        "nursery",
+        "preschool",
+        "school",
+        "schools",
+    }
+    if len(host_compact) < 3 or host_compact in generic_host_labels:
         return False
 
     def compact(value: str) -> str:

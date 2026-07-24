@@ -825,6 +825,15 @@ def test_display_name_domain_alias_supports_compact_brands_and_acronyms(
     )
 
 
+@pytest.mark.parametrize("host_label", ["school", "academy", "kindergarten"])
+def test_display_name_domain_alias_rejects_generic_hosts(host_label):
+    assert not extractor_module._display_name_has_domain_alias_match(
+        {"en": host_label.title()},
+        registry_name=None,
+        website_url=f"https://{host_label}.bg",
+    )
+
+
 def test_display_name_evidence_accepts_exact_identity_on_official_homepage():
     school = School(
         id=1,

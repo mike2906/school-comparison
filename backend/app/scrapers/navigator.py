@@ -327,8 +327,11 @@ class WebsiteNavigator:
         ]
         focused_html_candidates = [candidate for candidate in focused_html_candidates if candidate]
         if focused_html_candidates:
-            extracted = self._append_identity_signals(max(focused_html_candidates, key=len), identity_signals)
-            return self._append_contact_signals(extracted, contact_signals)
+            return self._append_html_signal_sections(
+                max(focused_html_candidates, key=len),
+                identity_signals=identity_signals,
+                contact_signals=contact_signals,
+            )
 
         if isinstance(markdown_obj, str) and markdown_obj.strip():
             candidates.append(markdown_obj.strip())
@@ -340,8 +343,11 @@ class WebsiteNavigator:
 
         if not candidates:
             if not isinstance(html, str) or not html.strip():
-                extracted = self._append_identity_signals(None, identity_signals)
-                return self._append_contact_signals(extracted, contact_signals)
+                return self._append_html_signal_sections(
+                    None,
+                    identity_signals=identity_signals,
+                    contact_signals=contact_signals,
+                )
             soup = BeautifulSoup(html, "html.parser")
             for node in soup.find_all(["script", "style", "noscript", "header", "footer", "nav", "aside"]):
                 node.decompose()
@@ -349,8 +355,11 @@ class WebsiteNavigator:
             lines = self._dedupe_lines(text.splitlines())
             extracted = "\n".join(lines)
             normalized = extracted[: self.MAX_CONTENT_CHARS] if extracted else None
-            extracted = self._append_identity_signals(normalized, identity_signals)
-            return self._append_contact_signals(extracted, contact_signals)
+            return self._append_html_signal_sections(
+                normalized,
+                identity_signals=identity_signals,
+                contact_signals=contact_signals,
+            )
 
         extracted_candidates: list[str] = []
         for candidate in candidates:
@@ -359,10 +368,16 @@ class WebsiteNavigator:
             if extracted:
                 extracted_candidates.append(extracted[: self.MAX_CONTENT_CHARS])
         if not extracted_candidates:
-            extracted = self._append_identity_signals(None, identity_signals)
-            return self._append_contact_signals(extracted, contact_signals)
-        extracted = self._append_identity_signals(max(extracted_candidates, key=len), identity_signals)
-        return self._append_contact_signals(extracted, contact_signals)
+            return self._append_html_signal_sections(
+                None,
+                identity_signals=identity_signals,
+                contact_signals=contact_signals,
+            )
+        return self._append_html_signal_sections(
+            max(extracted_candidates, key=len),
+            identity_signals=identity_signals,
+            contact_signals=contact_signals,
+        )
 
     def _extract_html_identity_signals(self, html: str | None) -> list[str]:
         """Keep deterministic official-site identity metadata for later resolution."""
@@ -418,24 +433,46 @@ class WebsiteNavigator:
         return self._dedupe_lines(candidates)[:8]
 
     def _append_identity_signals(self, markdown: str | None, signals: list[str]) -> str | None:
+        return self._append_html_signal_sections(markdown, identity_signals=signals)
+
+    def _append_html_signal_sections(
+        self,
+        markdown: str | None,
+        *,
+        identity_signals: list[str] | None = None,
+        contact_signals: list[str] | None = None,
+    ) -> str | None:
         base = (markdown or "").strip()
-        if not signals:
+        section_inputs = (
+            ("HTML identity signals", identity_signals or []),
+            ("HTML contact signals", contact_signals or []),
+        )
+        if not any(signals for _heading, signals in section_inputs):
             return base or None
+
         existing = base.casefold()
-        missing = [signal for signal in signals if signal.casefold() not in existing]
-        if not missing:
+        sections: list[str] = []
+        for heading, signals in section_inputs:
+            missing = [signal for signal in signals if signal.casefold() not in existing]
+            if not missing:
+                continue
+            section = f"## {heading}\n" + "\n".join(missing)
+            sections.append(section)
+            existing += "\n" + section.casefold()
+        if not sections:
             return base or None
-        section = "## HTML identity signals\n" + "\n".join(missing)
+
+        tail = "\n\n".join(sections)
         if not base:
-            return section[: self.MAX_CONTENT_CHARS]
+            return tail[: self.MAX_CONTENT_CHARS]
 
         separator = "\n\n"
         available_base_chars = max(
             0,
-            self.MAX_CONTENT_CHARS - len(separator) - len(section),
+            self.MAX_CONTENT_CHARS - len(separator) - len(tail),
         )
         retained_base = base[:available_base_chars].rstrip()
-        merged = f"{retained_base}{separator}{section}" if retained_base else section
+        merged = f"{retained_base}{separator}{tail}" if retained_base else tail
         return merged[: self.MAX_CONTENT_CHARS]
 
     def _extract_main_content_text(self, html: str | None) -> str | None:
@@ -591,20 +628,7 @@ class WebsiteNavigator:
         return self._dedupe_lines(candidates)[:8]
 
     def _append_contact_signals(self, markdown: str | None, signals: list[str]) -> str | None:
-        base = (markdown or "").strip()
-        if not signals:
-            return base or None
-
-        existing = (base or "").lower()
-        missing = [signal for signal in signals if signal.lower() not in existing]
-        if not missing:
-            return base or None
-
-        section = "## HTML contact signals\n" + "\n".join(missing)
-        if not base:
-            return section[: self.MAX_CONTENT_CHARS]
-        merged = f"{base}\n\n{section}"
-        return merged[: self.MAX_CONTENT_CHARS]
+        return self._append_html_signal_sections(markdown, contact_signals=signals)
 
     def classify_page(self, url: str, title: str = "", anchor_text: str = "") -> str | None:
         haystack = f"{url} {title} {anchor_text}".lower()
