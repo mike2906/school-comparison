@@ -878,7 +878,7 @@ def test_display_name_evidence_rejects_composite_page_title_candidate():
         is_valid=True,
         raw_markdown=(
             "Admissions and curriculum information.\n\n"
-            "## HTML identity signals\nAdmissions\nABC KinderCare Centre"
+            "## HTML identity signals\nAdmissions | ABC KinderCare Centre"
         ),
         content_hash="abc-split-title",
         last_scraped_at=datetime.datetime.now(datetime.UTC),

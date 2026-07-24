@@ -743,14 +743,19 @@ def _display_name_has_exact_official_page_identity(
         text = re.sub(r"https?://\S+", " ", str(value or ""), flags=re.IGNORECASE)
         return " " + re.sub(r"[^\w]+", " ", text.casefold()).strip() + " "
 
+    candidate_values = [
+        value
+        for value in display_name_i18n.values()
+        if not re.search(r"\s+[|–—-]\s+|\|", value)
+    ]
     labels = [
         key
-        for value in display_name_i18n.values()
+        for value in candidate_values
         if len((key := normalized(value)).strip()) >= 4
     ]
     flexible_digit_patterns = [
         re.compile(r"(?<!\w)" + r"\s*".join(map(re.escape, re.findall(r"\w+", value.casefold()))) + r"(?!\w)")
-        for value in display_name_i18n.values()
+        for value in candidate_values
         if re.search(r"\d", value)
     ]
     if not labels:
