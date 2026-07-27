@@ -1344,6 +1344,73 @@ operational safeguards do not reopen the accepted launch boundary.
             some candidate, most are Bulgarian-only and must not be counted as English
             candidate coverage. No LLM, provider, refresh, OCR, geocode, or persistence
             path was used. Full backend tests passed (`930`).
+            **Bounded LLM adjudication pilot complete 2026-07-27; no records changed:**
+            a read-only adjudicator (`uv run python scripts/pilot_identity_adjudication.py
+            --live`) assembles bounded evidence from cached valid official pages plus
+            shared-domain sibling institutions and asks one model question per candidate:
+            does this English label name *this* institution on its own site? On the fixed
+            population (the 4 known-good identities the resolver misses and all 10
+            known-bad traps) the final configuration recovered **3/4** missed
+            identities — 393, 506, 624 — and leaked **0/10** traps, for 10 calls and
+            $0.002. The first run, before review hardening, recovered 4/4.
+            **The model alone is not the gate**, in both directions. Across the two
+            runs it accepted two traps: `Uwekind International School` for kindergarten
+            634, whose cached pages are literally the same shared-domain pages as its
+            sibling school 635, and `Discoverer International School` for kindergarten
+            589 while quoting text absent from the cached pages (it rejected 589 on the
+            second run — the model is not deterministic). For 634 the education-level
+            guard was the *only* defense, so page evidence and sibling context cannot
+            separate a kindergarten from its sibling school on a shared domain.
+            In the other direction, 635's *correct* identity is now withheld because the
+            model attached one fabricated quote
+            (`уникалното приложение Eurobuddy в Uwekind International School`, present
+            in no supplied line) to three genuine ones. The guard is working as designed
+            and the trade-off is deliberate: a model that fabricates evidence is not
+            trusted for that case, and withholding a correct name costs far less than
+            publishing a wrong one. A future reviewer could instead require *at least
+            one* verifiable quote and drop the rest; that would recover 635 and tolerate
+            fabrication, so it is recorded as an option, not taken. Guards only ever
+            reject, an accept additionally requires the candidate to appear verbatim in
+            cached pages with verifiable quotes and two same-domain source URLs, and the
+            outcome is a recommendation for manual promotion through the unchanged
+            `identity_curation` gate — nothing publishes automatically. Four
+            contact/Bulgarian-only traps (153, 512, 546, 569) never reach the model.
+            No database write, publication, refresh, provider discovery call, OCR, or
+            geocode attempt was performed. Final evidence:
+            `backend/reports/p2-14f/20260727T112143Z/acceptance.md`; first run:
+            `backend/reports/p2-14f/20260727T103912Z/acceptance.md`.
+            Review round 1 hardened three gaps: a dispatched request that times out is
+            now reported as a call made (failed requests may still bill), an accept with
+            no non-empty quote is rejected instead of passing verification vacuously,
+            and supporting URLs require the *exact* official host rather than the
+            registrable domain, matching `curated_identity_candidate` so a
+            same-domain sibling host cannot produce a recommendation that promotion
+            would refuse with `source_domain_mismatch`. Re-scoring the recorded verdicts
+            under the hardened guards (`--replay-json`, zero new LLM calls) reproduced
+            every decision and every supporting-URL count unchanged. Review round 2
+            closed three more: candidate and quote matching now preserve token
+            boundaries (`Sunny House` no longer "appears" in `Sunny Houses`, which two
+            near-matches could otherwise have turned into a promotion recommendation),
+            an accept carrying a rejection `reason_code` fails closed, and agent
+            construction sits inside the handled block so a missing
+            `OPENROUTER_API_KEY` rejects one case instead of aborting the run. A second
+            replay again reproduced all 14 decisions and supporting-URL counts
+            unchanged. Review round 3 closed two more: quotes are verified against a
+            single evidence line rather than the concatenated corpus, so a quote
+            fabricated across a line boundary cannot corroborate an accept, and the
+            adjudication agent runs with zero retries, because a PydanticAI output
+            retry would bill a second provider request while the pilot counted one. A
+            third replay again reproduced all 14 decisions unchanged. Review round 5
+            closed the last substantive gap: a candidate occurring past a long line's
+            200-character truncation counted as supporting provenance while the excerpt
+            shown to the model and to a human reviewer omitted the identity. Evidence
+            lines are now windowed around the match, and a match that cannot be shown
+            within the bound no longer counts. Because that changes the text the model
+            sees, the recorded verdicts could no longer be replayed faithfully, so the
+            bounded live run was repeated once against the final evidence (10 calls,
+            $0.002) — which is where the 3/4 result above comes from.
+            *Open decision:* whether a named reviewer promotes the three recommended
+            identities. The pilot does not make that call.
       - [x] **(f) One public identity predicate for serialization and search.** Keep
             display-name matching on the same resolved publication path used by API
             serialization. Add a guard test so a future SQL optimization cannot make
