@@ -855,6 +855,7 @@ def test_display_name_domain_alias_matches_brand_in_any_host_label(
         ("https://ou-doganovo.idwebbg.com", "ID Web BG School"),
         ("https://child.webflow.io", "Webflow School"),
         ("https://foo.consulting", "Consulting School"),
+        ("https://school.portal.fusion.bg", "Portal School"),
     ],
 )
 def test_display_name_domain_alias_rejects_public_suffix_and_hosting_provider_labels(

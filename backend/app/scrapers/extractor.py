@@ -760,10 +760,10 @@ def _display_name_has_domain_alias_match(
     # platform-hosted sites like ``ou-doganovo.idwebbg.com``. Checking only
     # ``host.split(".")[0]`` misses the first case entirely.
     host_parts = _HOST_SUFFIX_EXTRACTOR(host)
-    raw_host_labels = [
-        *[label for label in host_parts.subdomain.split(".") if label],
-        *([host_parts.domain] if host_parts.domain else []),
-    ]
+    # Only the registrable (or private-suffix-owned) label is school-owned.
+    # Nested subdomains such as ``portal`` in ``school.portal.fusion.bg`` are
+    # technical routing labels and cannot independently corroborate a name.
+    raw_host_labels = [host_parts.domain] if host_parts.domain else []
 
     host_compacts: list[str] = []
     for raw_label in raw_host_labels:
