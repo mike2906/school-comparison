@@ -493,15 +493,9 @@ def apply_guards(
     return "recommend_manual_promotion", failures
 
 
-async def adjudicate_case(
-    case: IdentityAdjudicationCase,
-    *,
-    agent_factory: Callable[[], Any] | None = None,
-    timeout_seconds: float = ADJUDICATION_TIMEOUT_SECONDS,
-    prefilter_rejects: bool = True,
-) -> dict[str, Any]:
-    """Adjudicate one case. Fail-closed: any error rejects and never publishes."""
-    row: dict[str, Any] = {
+def case_row(case: IdentityAdjudicationCase, *, decision: str = "rejected") -> dict[str, Any]:
+    """Reportable row for a case. Defaults to the fail-closed outcome."""
+    return {
         "school_id": case.school_id,
         "candidate_en": case.candidate_en,
         "registry_name": case.registry_name,
@@ -517,11 +511,22 @@ async def adjudicate_case(
         "confidence": None,
         "quoted_evidence": [],
         "guard_failures": [],
-        "decision": "rejected",
+        "decision": decision,
         "input_tokens": 0,
         "output_tokens": 0,
         "token_cost_usd": 0.0,
     }
+
+
+async def adjudicate_case(
+    case: IdentityAdjudicationCase,
+    *,
+    agent_factory: Callable[[], Any] | None = None,
+    timeout_seconds: float = ADJUDICATION_TIMEOUT_SECONDS,
+    prefilter_rejects: bool = True,
+) -> dict[str, Any]:
+    """Adjudicate one case. Fail-closed: any error rejects and never publishes."""
+    row = case_row(case)
 
     if not case.candidate_en:
         row["reason_code"] = case.blocked_reason or "no_english_candidate"
@@ -628,5 +633,6 @@ __all__ = [
     "build_case",
     "build_cases",
     "build_user_prompt",
+    "case_row",
     "deterministic_reject_reason",
 ]

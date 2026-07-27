@@ -26,6 +26,7 @@ from app.services.identity_adjudication import (
     adjudicate_case,
     build_cases,
     build_user_prompt,
+    case_row,
 )
 from app.services.identity_resolver_benchmark import (
     evaluate_identity_resolver_benchmark,
@@ -220,28 +221,9 @@ async def main() -> None:
                     case, prefilter_rejects=args.prefilter_rejects
                 )
             else:
-                row = {
-                    "school_id": case.school_id,
-                    "candidate_en": case.candidate_en,
-                    "registry_name": case.registry_name,
-                    "education_level": case.education_level,
-                    "website_url": case.website_url,
-                    "shared_domain_siblings": [s.school_id for s in case.siblings],
-                    "deterministic_signals": dict(case.deterministic_signals),
-                    "supporting_source_urls": list(case.supporting_source_urls),
-                    "evidence_pages": len(case.excerpts),
-                    "llm_called": False,
-                    "verdict": None,
-                    "reason_code": case.blocked_reason,
-                    "confidence": None,
-                    "quoted_evidence": [],
-                    "guard_failures": [],
-                    "decision": "not_adjudicated_dry_run",
-                    "input_tokens": 0,
-                    "output_tokens": 0,
-                    "token_cost_usd": 0.0,
-                    "prompt_chars": len(build_user_prompt(case)),
-                }
+                row = case_row(case, decision="not_adjudicated_dry_run")
+                row["reason_code"] = case.blocked_reason
+                row["prompt_chars"] = len(build_user_prompt(case))
             row.update(
                 {
                     "expected": request["expected"],
