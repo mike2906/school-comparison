@@ -8,6 +8,7 @@ import logging
 import re
 from dataclasses import dataclass, field
 from typing import Any
+from urllib.parse import urlparse
 
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent, ModelRetry
@@ -588,7 +589,7 @@ def _promote_repeated_display_name_candidate(
             for page in pages
         ],
     )
-    if finding is None or finding.repeated_pages < 2 or finding.core_pages < 1 or finding.score < 12:
+    if finding is None:
         return parsed, None
 
     bucket = helpers._text_lang_bucket(finding.candidate_name)
@@ -597,6 +598,18 @@ def _promote_repeated_display_name_candidate(
         school.country_code,
     )
     if not candidate_i18n:
+        return parsed, None
+    candidate_evidence = _build_display_name_evidence(
+        candidate_i18n,
+        school=school,
+        pages=pages,
+    )
+    has_strong_repetition = (
+        finding.repeated_pages >= 2
+        and finding.core_pages >= 1
+        and finding.score >= 12
+    )
+    if not has_strong_repetition and candidate_evidence is None:
         return parsed, None
     # If we already have a display name, require the promoted candidate to be
     # clearly better. When the current display is empty, strong repeated page
@@ -613,8 +626,21 @@ def _promote_repeated_display_name_candidate(
 
 
 def _labels_match(left: str | None, right: str | None) -> bool:
-    left_tokens = helpers._display_name_match_tokens(left)
-    right_tokens = helpers._display_name_match_tokens(right)
+    generic_labels = {
+        "academy",
+        "care",
+        "center",
+        "centre",
+        "college",
+        "kindergarten",
+        "preschool",
+        "school",
+    }
+    generic_tokens = set().union(
+        *(helpers._display_name_match_tokens(label) for label in generic_labels)
+    )
+    left_tokens = helpers._display_name_match_tokens(left) - generic_tokens
+    right_tokens = helpers._display_name_match_tokens(right) - generic_tokens
     return bool(left_tokens and right_tokens and left_tokens & right_tokens)
 
 
@@ -671,11 +697,144 @@ def _display_name_has_domain_alias_match(
     if host_aligned:
         aliases.extend(host_aligned.values())
 
-    return any(
+    if any(
         _labels_match(display_label, alias)
         for display_label in display_name_i18n.values()
         for alias in aliases
-    )
+    ):
+        return True
+
+    host = urlparse(website_url or "").netloc.casefold().split(":", 1)[0]
+    if host.startswith("www."):
+        host = host[4:]
+    host_label = host.split(".", 1)[0]
+    host_compact = re.sub(r"[^a-z0-9]+", "", host_label)
+    if host_compact.endswith("bg") and len(host_compact) > 6:
+        host_compact = host_compact[:-2]
+    generic_host_labels = {
+        "academy",
+        "centre",
+        "center",
+        "college",
+        "education",
+        "kindergarten",
+        "nursery",
+        "preschool",
+        "school",
+        "schools",
+    }
+    if len(host_compact) < 3 or host_compact in generic_host_labels:
+        return False
+
+    def compact(value: str) -> str:
+        return re.sub(r"[^a-z0-9]+", "", value.casefold())
+
+    def acronym(value: str) -> str:
+        ignored = {"and", "of", "the"}
+        words = re.findall(r"[a-z0-9]+", value.casefold())
+        return "".join(word[0] for word in words if word not in ignored)
+
+    generic_suffixes = ("school", "centre", "center", "carecentre", "carecenter")
+    institution_words = {
+        "academy",
+        "care",
+        "center",
+        "centre",
+        "college",
+        "education",
+        "gymnasium",
+        "institute",
+        "kindergarten",
+        "lyceum",
+        "nursery",
+        "preschool",
+        "school",
+        "university",
+    }
+    for display_label in display_name_i18n.values():
+        label_compact = compact(display_label)
+        if label_compact == host_compact:
+            return True
+        if acronym(display_label) == host_compact:
+            label_words = set(re.findall(r"[a-z0-9]+", display_label.casefold()))
+            if label_words & institution_words or _labels_match(display_label, registry_name):
+                return True
+        if label_compact.startswith(host_compact):
+            remainder = label_compact[len(host_compact) :]
+            if remainder in generic_suffixes:
+                return True
+    return False
+
+
+def _display_name_has_exact_official_page_identity(
+    display_name_i18n: dict[str, str],
+    *,
+    website_url: str | None,
+    pages: list[SourcePage],
+) -> bool:
+    """Match a candidate literally in identity-rich cached official-page text."""
+    from app.scrapers.display_name_audit import _page_bonus
+
+    def normalized(value: str | None) -> str:
+        text = re.sub(r"https?://\S+", " ", str(value or ""), flags=re.IGNORECASE)
+        return " " + re.sub(r"[^\w]+", " ", text.casefold()).strip() + " "
+
+    candidate_values = [
+        value
+        for value in display_name_i18n.values()
+        if not re.search(r"\s+[|–—-]\s+|\|", value)
+    ]
+    labels = [
+        key
+        for value in candidate_values
+        if len((key := normalized(value)).strip()) >= 4
+    ]
+    flexible_digit_patterns = [
+        re.compile(r"(?<!\w)" + r"\s*".join(map(re.escape, re.findall(r"\w+", value.casefold()))) + r"(?!\w)")
+        for value in candidate_values
+        if re.search(r"\d", value)
+    ]
+    if not labels:
+        return False
+
+    configured_site = urlparse(website_url or "")
+    configured_host = configured_site.netloc.casefold().removeprefix("www.")
+    configured_path = "/" + (configured_site.path or "").strip("/")
+
+    for page in pages:
+        parsed = urlparse(page.source_url or "")
+        page_host = parsed.netloc.casefold().removeprefix("www.")
+        page_path = "/" + (parsed.path or "").strip("/")
+        is_configured_landing = (
+            bool(configured_host)
+            and page_host == configured_host
+            and page_path == configured_path
+        )
+        is_locale_root = re.fullmatch(
+            r"/[a-z]{2}(?:[-_][a-z]{2})?",
+            page_path,
+            flags=re.IGNORECASE,
+        ) is not None
+        is_homepage = page_path == "/" or is_configured_landing or is_locale_root
+        page_payload = {
+            "source_url": page.source_url,
+            "page_category": page.page_category,
+        }
+        if not is_homepage and _page_bonus(page_payload) <= 0:
+            continue
+        raw_page_text = re.sub(
+            r"https?://\S+",
+            " ",
+            (page.raw_markdown or "")[:15000],
+            flags=re.IGNORECASE,
+        )
+        for raw_line in raw_page_text.splitlines():
+            line = normalized(raw_line)
+            if any(label in line for label in labels) or any(
+                pattern.search(raw_line.casefold()) for pattern in flexible_digit_patterns
+            ):
+                return True
+    return False
 
 
 def _display_name_has_repeated_page_identity(
@@ -731,16 +890,37 @@ def _build_display_name_evidence(
     if not display_name_i18n:
         return None
 
+    # Evidence is stored for the localized map as a whole. When an English
+    # candidate exists, require both signals to corroborate that exact English
+    # value; a valid Bulgarian brand must not accidentally publish an invented
+    # English translation alongside it.
+    evidence_display_name = (
+        {"en": display_name_i18n["en"]}
+        if display_name_i18n.get("en")
+        else display_name_i18n
+    )
+
     registry_name = (school.name_i18n or {}).get("bg") or (school.name_i18n or {}).get("en")
     signals: list[str] = []
     if _display_name_has_domain_alias_match(
-        display_name_i18n,
+        evidence_display_name,
         registry_name=registry_name,
         website_url=school.website_url,
     ):
         signals.append("website_domain_alias_match")
-    if _display_name_has_repeated_page_identity(display_name_i18n, school=school, pages=pages):
+    has_repeated_identity = _display_name_has_repeated_page_identity(
+        evidence_display_name,
+        school=school,
+        pages=pages,
+    )
+    if has_repeated_identity:
         signals.append("repeated_on_page_identity")
+    elif _display_name_has_exact_official_page_identity(
+        evidence_display_name,
+        website_url=school.website_url,
+        pages=pages,
+    ):
+        signals.append("exact_official_page_identity")
 
     if len(set(signals)) < 2:
         return None

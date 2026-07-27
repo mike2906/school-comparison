@@ -247,6 +247,7 @@ _DISPLAY_NAME_CORROBORATION_SIGNALS = frozenset(
     {
         "website_domain_alias_match",
         "repeated_on_page_identity",
+        "exact_official_page_identity",
     }
 )
 

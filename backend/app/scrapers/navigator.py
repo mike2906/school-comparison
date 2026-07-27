@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import re
 from dataclasses import dataclass
@@ -312,6 +313,10 @@ class WebsiteNavigator:
         cleaned_html = getattr(crawl_result, "cleaned_html", None)
         raw_html = getattr(crawl_result, "html", None)
         html = cleaned_html or raw_html
+        identity_signals = self._dedupe_lines(
+            self._extract_html_identity_signals(raw_html if isinstance(raw_html, str) else None)
+            + self._extract_html_identity_signals(cleaned_html if isinstance(cleaned_html, str) else None)
+        )
         contact_signals = self._dedupe_lines(
             self._extract_html_contact_signals(raw_html if isinstance(raw_html, str) else None)
             + self._extract_html_contact_signals(cleaned_html if isinstance(cleaned_html, str) else None)
@@ -322,7 +327,11 @@ class WebsiteNavigator:
         ]
         focused_html_candidates = [candidate for candidate in focused_html_candidates if candidate]
         if focused_html_candidates:
-            return self._append_contact_signals(max(focused_html_candidates, key=len), contact_signals)
+            return self._append_html_signal_sections(
+                max(focused_html_candidates, key=len),
+                identity_signals=identity_signals,
+                contact_signals=contact_signals,
+            )
 
         if isinstance(markdown_obj, str) and markdown_obj.strip():
             candidates.append(markdown_obj.strip())
@@ -334,7 +343,11 @@ class WebsiteNavigator:
 
         if not candidates:
             if not isinstance(html, str) or not html.strip():
-                return self._append_contact_signals(None, contact_signals)
+                return self._append_html_signal_sections(
+                    None,
+                    identity_signals=identity_signals,
+                    contact_signals=contact_signals,
+                )
             soup = BeautifulSoup(html, "html.parser")
             for node in soup.find_all(["script", "style", "noscript", "header", "footer", "nav", "aside"]):
                 node.decompose()
@@ -342,7 +355,11 @@ class WebsiteNavigator:
             lines = self._dedupe_lines(text.splitlines())
             extracted = "\n".join(lines)
             normalized = extracted[: self.MAX_CONTENT_CHARS] if extracted else None
-            return self._append_contact_signals(normalized, contact_signals)
+            return self._append_html_signal_sections(
+                normalized,
+                identity_signals=identity_signals,
+                contact_signals=contact_signals,
+            )
 
         extracted_candidates: list[str] = []
         for candidate in candidates:
@@ -351,8 +368,115 @@ class WebsiteNavigator:
             if extracted:
                 extracted_candidates.append(extracted[: self.MAX_CONTENT_CHARS])
         if not extracted_candidates:
-            return self._append_contact_signals(None, contact_signals)
-        return self._append_contact_signals(max(extracted_candidates, key=len), contact_signals)
+            return self._append_html_signal_sections(
+                None,
+                identity_signals=identity_signals,
+                contact_signals=contact_signals,
+            )
+        return self._append_html_signal_sections(
+            max(extracted_candidates, key=len),
+            identity_signals=identity_signals,
+            contact_signals=contact_signals,
+        )
+
+    def _extract_html_identity_signals(self, html: str | None) -> list[str]:
+        """Keep deterministic official-site identity metadata for later resolution."""
+        if not html or not html.strip():
+            return []
+
+        soup = BeautifulSoup(html, "html.parser")
+        candidates: list[str] = []
+        if soup.title:
+            title = soup.title.get_text(" ", strip=True)
+            title_parts = re.split(r"\s+[|–—-]\s+|\|", title)
+            candidates.extend(part for part in title_parts if part.strip())
+
+        for meta in soup.find_all("meta"):
+            key = str(meta.get("property") or meta.get("name") or "").casefold()
+            if key in {"og:site_name", "application-name"}:
+                candidates.append(str(meta.get("content") or ""))
+
+        for image in soup.find_all("img"):
+            identity_hint = " ".join(
+                str(value or "")
+                for value in (image.get("src"), image.get("class"), image.get("id"))
+            ).casefold()
+            if "logo" not in identity_hint:
+                continue
+            candidates.extend([str(image.get("alt") or ""), str(image.get("title") or "")])
+
+        organization_types = {
+            "educationalorganization",
+            "school",
+            "preschool",
+            "childcare",
+        }
+        for script in soup.find_all("script", attrs={"type": "application/ld+json"}):
+            try:
+                payload = json.loads(script.string or script.get_text() or "null")
+            except (TypeError, ValueError):
+                continue
+            pending = payload if isinstance(payload, list) else [payload]
+            while pending:
+                item = pending.pop()
+                if not isinstance(item, dict):
+                    continue
+                graph = item.get("@graph")
+                if isinstance(graph, list):
+                    pending.extend(graph)
+                raw_types = item.get("@type")
+                types = raw_types if isinstance(raw_types, list) else [raw_types]
+                normalized_types = {
+                    re.split(r"[/#:]", str(value or "").rstrip("/"))[-1].casefold()
+                    for value in types
+                }
+                if normalized_types & organization_types:
+                    candidates.append(str(item.get("name") or ""))
+
+        return self._dedupe_lines(candidates)[:8]
+
+    def _append_identity_signals(self, markdown: str | None, signals: list[str]) -> str | None:
+        return self._append_html_signal_sections(markdown, identity_signals=signals)
+
+    def _append_html_signal_sections(
+        self,
+        markdown: str | None,
+        *,
+        identity_signals: list[str] | None = None,
+        contact_signals: list[str] | None = None,
+    ) -> str | None:
+        base = (markdown or "").strip()
+        section_inputs = (
+            ("HTML identity signals", identity_signals or []),
+            ("HTML contact signals", contact_signals or []),
+        )
+        if not any(signals for _heading, signals in section_inputs):
+            return base or None
+
+        existing = base.casefold()
+        sections: list[str] = []
+        for heading, signals in section_inputs:
+            missing = [signal for signal in signals if signal.casefold() not in existing]
+            if not missing:
+                continue
+            section = f"## {heading}\n" + "\n".join(missing)
+            sections.append(section)
+            existing += "\n" + section.casefold()
+        if not sections:
+            return base or None
+
+        tail = "\n\n".join(sections)
+        if not base:
+            return tail[: self.MAX_CONTENT_CHARS]
+
+        separator = "\n\n"
+        available_base_chars = max(
+            0,
+            self.MAX_CONTENT_CHARS - len(separator) - len(tail),
+        )
+        retained_base = base[:available_base_chars].rstrip()
+        merged = f"{retained_base}{separator}{tail}" if retained_base else tail
+        return merged[: self.MAX_CONTENT_CHARS]
 
     def _extract_main_content_text(self, html: str | None) -> str | None:
         if not isinstance(html, str) or not html.strip():
@@ -507,20 +631,7 @@ class WebsiteNavigator:
         return self._dedupe_lines(candidates)[:8]
 
     def _append_contact_signals(self, markdown: str | None, signals: list[str]) -> str | None:
-        base = (markdown or "").strip()
-        if not signals:
-            return base or None
-
-        existing = (base or "").lower()
-        missing = [signal for signal in signals if signal.lower() not in existing]
-        if not missing:
-            return base or None
-
-        section = "## HTML contact signals\n" + "\n".join(missing)
-        if not base:
-            return section[: self.MAX_CONTENT_CHARS]
-        merged = f"{base}\n\n{section}"
-        return merged[: self.MAX_CONTENT_CHARS]
+        return self._append_html_signal_sections(markdown, contact_signals=signals)
 
     def classify_page(self, url: str, title: str = "", anchor_text: str = "") -> str | None:
         haystack = f"{url} {title} {anchor_text}".lower()

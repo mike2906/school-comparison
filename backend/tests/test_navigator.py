@@ -100,6 +100,123 @@ def test_extract_markdown_appends_html_contact_signals_from_site_chrome():
     assert "Phone: 02/1234567" in extracted
 
 
+def test_extract_markdown_retains_structured_identity_signals_without_ocr():
+    navigator = WebsiteNavigator(country_code="bg")
+    crawl_result = type(
+        "Result",
+        (),
+        {
+            "markdown": "Admissions and curriculum information.",
+            "html": """
+                <html>
+                  <head>
+                    <title>Admissions | ABC KinderCare Centre</title>
+                    <meta property="og:site_name" content="ABC KinderCare Centre">
+                    <script type="application/ld+json">
+                      {"@type": "School", "name": "ABC KinderCare Centre"}
+                    </script>
+                  </head>
+                  <body>
+                    <header><img class="site-logo" src="logo.svg" alt="ABC KinderCare Centre"></header>
+                    <main><p>Admissions and curriculum information for families in Sofia.</p></main>
+                  </body>
+                </html>
+            """,
+        },
+    )()
+
+    extracted = navigator._extract_markdown(crawl_result)
+
+    assert extracted is not None
+    assert "## HTML identity signals" in extracted
+    assert "Admissions | ABC KinderCare Centre" not in extracted
+    assert "\nABC KinderCare Centre" in extracted
+
+
+def test_extract_html_identity_signals_ignores_non_logo_image_text():
+    navigator = WebsiteNavigator(country_code="bg")
+
+    signals = navigator._extract_html_identity_signals(
+        '<html><body><img src="event.jpg" alt="Visit School"></body></html>'
+    )
+
+    assert signals == []
+
+
+def test_extract_html_identity_signals_ignores_generic_organization_json_ld():
+    navigator = WebsiteNavigator(country_code="bg")
+
+    signals = navigator._extract_html_identity_signals(
+        """
+        <html><body>
+          <script type="application/ld+json">
+            {"@type": "Organization", "name": "ABC Studio"}
+          </script>
+        </body></html>
+        """
+    )
+
+    assert signals == []
+
+
+@pytest.mark.parametrize(
+    "schema_type",
+    ["https://schema.org/School", "http://schema.org/Preschool", "schema:ChildCare"],
+)
+def test_extract_html_identity_signals_accepts_school_schema_type_iris(schema_type):
+    navigator = WebsiteNavigator(country_code="bg")
+
+    signals = navigator._extract_html_identity_signals(
+        f"""
+        <html><body>
+          <script type="application/ld+json">
+            {{"@type": "{schema_type}", "name": "ABC KinderCare Centre"}}
+          </script>
+        </body></html>
+        """
+    )
+
+    assert signals == ["ABC KinderCare Centre"]
+
+
+def test_append_identity_signals_reserves_space_on_max_length_page():
+    navigator = WebsiteNavigator(country_code="bg")
+    full_page = "x" * navigator.MAX_CONTENT_CHARS
+
+    extracted = navigator._append_identity_signals(
+        full_page,
+        ["ABC KinderCare Centre"],
+    )
+
+    assert extracted is not None
+    assert len(extracted) <= navigator.MAX_CONTENT_CHARS
+    assert extracted.endswith("## HTML identity signals\nABC KinderCare Centre")
+
+
+def test_extract_markdown_reserves_space_for_identity_and_contact_signals():
+    navigator = WebsiteNavigator(country_code="bg")
+    crawl_result = type(
+        "Result",
+        (),
+        {
+            "markdown": "x" * navigator.MAX_CONTENT_CHARS,
+            "html": """
+                <html>
+                  <head><meta property="og:site_name" content="ABC KinderCare Centre"></head>
+                  <body><footer><a href="tel:+35921234567">02/1234567</a></footer></body>
+                </html>
+            """,
+        },
+    )()
+
+    extracted = navigator._extract_markdown(crawl_result)
+
+    assert extracted is not None
+    assert len(extracted) <= navigator.MAX_CONTENT_CHARS
+    assert "## HTML identity signals\nABC KinderCare Centre" in extracted
+    assert extracted.endswith("## HTML contact signals\nPhone: 02/1234567")
+
+
 def test_extract_markdown_prefers_focused_main_content_html_over_menu_heavy_markdown():
     navigator = WebsiteNavigator(country_code="bg")
 

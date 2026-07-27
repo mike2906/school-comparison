@@ -48,6 +48,7 @@ _AUDIT_IGNORE_SUBSTRINGS = {
     "документи",
     "author:",
     "автор:",
+    "рецепция на",
     "search for:",
     "manage consent",
     "управление на съгласието",
@@ -78,6 +79,7 @@ _AUDIT_CORE_URL_HINTS = (
 )
 _AUDIT_SCHOOL_TERM_RE = re.compile(
     r"(?i)\b(?:children(?:'s|’s)?\s+house|house|school|kindergarten|academy|college|"
+    r"centre|center|kindercare|childcare|"
     r"детска\s+къща|детска\s+градина|училище|гимназия|колеж)\b"
 )
 _AUDIT_VERB_RE = re.compile(
@@ -88,6 +90,8 @@ _AUDIT_PATTERNS = (
     re.compile(
         r"([A-Z][A-Za-z'’\-]+(?:\s+[A-Z][A-Za-z'’\-]+){0,6}\s+"
         r"(?:Children(?:'s|’s)? House|House|School|Kindergarten|Academy|College))"
+        r"|([A-Z][A-Za-z'’\-]+(?:\s+[A-Z][A-Za-z'’\-]+){0,6}\s+"
+        r"(?:Centre|Center))"
     ),
     re.compile(
         r"([А-Я][А-Яа-яA-Za-z'’\"„“\-]+(?:\s+[А-ЯA-Z][А-Яа-яA-Za-z'’\"„“\-]+){0,6}\s+"
@@ -150,6 +154,8 @@ def _audit_tokens(value: str | None) -> set[str]:
 
 def _looks_like_noise(candidate: str) -> bool:
     lowered = candidate.casefold()
+    if len(candidate) > 120:
+        return True
     if lowered in _AUDIT_IGNORE_EXACT:
         return True
     if any(marker in lowered for marker in _AUDIT_IGNORE_SUBSTRINGS):
@@ -197,7 +203,7 @@ def _extract_candidates_from_page(page: Mapping[str, Any]) -> list[tuple[str, st
                 continue
             if re.search(r"(?i)\b(?:ltd|llc|inc|eood|ood|ad)\b", line_context):
                 continue
-            candidate = _clean_candidate_text(match.group(1))
+            candidate = _clean_candidate_text(next(group for group in match.groups() if group))
             if _looks_like_noise(candidate):
                 continue
             candidates.append((candidate, "pattern"))
