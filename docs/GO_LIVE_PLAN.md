@@ -1350,22 +1350,34 @@ operational safeguards do not reopen the accepted launch boundary.
             shared-domain sibling institutions and asks one model question per candidate:
             does this English label name *this* institution on its own site? On the fixed
             population (the 4 known-good identities the resolver misses and all 10
-            known-bad traps) it recovered 4/4 missed identities — 393, 506, 624, 635 —
-            and leaked 0/10 traps, for 10 calls and $0.002.
-            **The model alone is not the gate.** It accepted two traps: `Discoverer
-            International School` for kindergarten 589 (quoting text absent from the
-            cached pages) and `Uwekind International School` for kindergarten 634, whose
-            cached pages are literally the same shared-domain pages as its sibling school
-            635. Deterministic guards stopped both; for 634 the education-level guard was
-            the *only* defense, so page evidence and sibling context cannot separate a
-            kindergarten from its sibling school on a shared domain. Guards only ever
+            known-bad traps) the final configuration recovered **3/4** missed
+            identities — 393, 506, 624 — and leaked **0/10** traps, for 10 calls and
+            $0.002. The first run, before review hardening, recovered 4/4.
+            **The model alone is not the gate**, in both directions. Across the two
+            runs it accepted two traps: `Uwekind International School` for kindergarten
+            634, whose cached pages are literally the same shared-domain pages as its
+            sibling school 635, and `Discoverer International School` for kindergarten
+            589 while quoting text absent from the cached pages (it rejected 589 on the
+            second run — the model is not deterministic). For 634 the education-level
+            guard was the *only* defense, so page evidence and sibling context cannot
+            separate a kindergarten from its sibling school on a shared domain.
+            In the other direction, 635's *correct* identity is now withheld because the
+            model attached one fabricated quote
+            (`уникалното приложение Eurobuddy в Uwekind International School`, present
+            in no supplied line) to three genuine ones. The guard is working as designed
+            and the trade-off is deliberate: a model that fabricates evidence is not
+            trusted for that case, and withholding a correct name costs far less than
+            publishing a wrong one. A future reviewer could instead require *at least
+            one* verifiable quote and drop the rest; that would recover 635 and tolerate
+            fabrication, so it is recorded as an option, not taken. Guards only ever
             reject, an accept additionally requires the candidate to appear verbatim in
             cached pages with verifiable quotes and two same-domain source URLs, and the
             outcome is a recommendation for manual promotion through the unchanged
             `identity_curation` gate — nothing publishes automatically. Four
             contact/Bulgarian-only traps (153, 512, 546, 569) never reach the model.
             No database write, publication, refresh, provider discovery call, OCR, or
-            geocode attempt was performed. Evidence:
+            geocode attempt was performed. Final evidence:
+            `backend/reports/p2-14f/20260727T112143Z/acceptance.md`; first run:
             `backend/reports/p2-14f/20260727T103912Z/acceptance.md`.
             Review round 1 hardened three gaps: a dispatched request that times out is
             now reported as a call made (failed requests may still bill), an accept with
@@ -1388,8 +1400,16 @@ operational safeguards do not reopen the accepted launch boundary.
             fabricated across a line boundary cannot corroborate an accept, and the
             adjudication agent runs with zero retries, because a PydanticAI output
             retry would bill a second provider request while the pilot counted one. A
-            third replay again reproduced all 14 decisions unchanged.
-            *Open decision:* whether a named reviewer promotes the four recommended
+            third replay again reproduced all 14 decisions unchanged. Review round 5
+            closed the last substantive gap: a candidate occurring past a long line's
+            200-character truncation counted as supporting provenance while the excerpt
+            shown to the model and to a human reviewer omitted the identity. Evidence
+            lines are now windowed around the match, and a match that cannot be shown
+            within the bound no longer counts. Because that changes the text the model
+            sees, the recorded verdicts could no longer be replayed faithfully, so the
+            bounded live run was repeated once against the final evidence (10 calls,
+            $0.002) — which is where the 3/4 result above comes from.
+            *Open decision:* whether a named reviewer promotes the three recommended
             identities. The pilot does not make that call.
       - [x] **(f) One public identity predicate for serialization and search.** Keep
             display-name matching on the same resolved publication path used by API

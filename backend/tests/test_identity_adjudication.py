@@ -140,6 +140,40 @@ class TestCaseAssembly:
         assert case.supporting_source_urls == ()
         assert all(not excerpt.contains_candidate for excerpt in case.excerpts)
 
+    def test_long_line_evidence_keeps_the_candidate_visible(self):
+        # A candidate past the truncation boundary must still appear in the
+        # excerpt, or the page would count as provenance while the evidence
+        # shown never contains the identity.
+        prefix = "We are a warm bilingual setting in Sofia. " * 8
+        assert len(prefix) > 200
+        pages = [
+            _page(1, "https://example-school.com/", prefix + "Welcome to Sunny House today"),
+            _page(
+                2,
+                "https://example-school.com/about",
+                prefix + "About Sunny House and our team",
+                "about",
+            ),
+        ]
+        case = build_case(school=_school(), candidate={"en": "Sunny House"}, pages=pages)
+
+        assert len(case.supporting_source_urls) == 2
+        for excerpt in case.excerpts:
+            assert excerpt.contains_candidate
+            assert all(len(line) <= 200 for line in excerpt.lines)
+            assert any("Sunny House" in line for line in excerpt.lines)
+
+    def test_match_that_cannot_be_shown_does_not_count_as_provenance(self):
+        # The candidate survives only inside a stripped Markdown link target, so
+        # it cannot be displayed; presence must then be false rather than
+        # counting a page whose excerpt lacks the identity.
+        pages = [
+            _page(1, "https://example-school.com/", "[Home](https://x.bg/sunny-house-sofia)"),
+        ]
+        case = build_case(school=_school(), candidate={"en": "sunny house sofia"}, pages=pages)
+        assert case.supporting_source_urls == ()
+        assert all(not excerpt.contains_candidate for excerpt in case.excerpts)
+
     def test_candidate_matching_ignores_punctuation_and_case(self):
         case = build_case(
             school=_school(),

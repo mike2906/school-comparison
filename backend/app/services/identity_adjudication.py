@@ -42,6 +42,8 @@ MAX_PAGES_PER_CASE = 6
 MAX_MATCHED_LINES_PER_PAGE = 4
 MAX_CONTEXT_LINES_PER_PAGE = 3
 MAX_LINE_CHARS = 200
+# Context kept before a candidate when a long line must be windowed.
+EVIDENCE_WINDOW_LEAD_CHARS = 60
 MAX_PAGE_SCAN_CHARS = 15000
 MAX_SIBLINGS = 6
 MAX_QUOTES = 4
@@ -210,6 +212,32 @@ def deterministic_reject_reason(candidate: str, *, education_level: str | None) 
     return None
 
 
+def _evidence_window(cleaned: str, padded_label: str) -> str | None:
+    """Bounded excerpt that still contains the candidate, or None if it cannot.
+
+    Keeping the line's first ``MAX_LINE_CHARS`` characters would drop a candidate
+    occurring later in a long Markdown line, so the page could count as
+    supporting provenance while the evidence shown to the model — and to a human
+    reviewer — never contains the identity.
+    """
+    if len(cleaned) <= MAX_LINE_CHARS:
+        return cleaned if _contains_label(cleaned, padded_label) else None
+
+    tokens = re.findall(r"\w+", padded_label)
+    if not tokens:
+        return None
+    pattern = re.compile(
+        r"(?<!\w)" + r"[^\w]*".join(map(re.escape, tokens)) + r"(?!\w)",
+        re.IGNORECASE,
+    )
+    match = pattern.search(cleaned)
+    if match is None:
+        return None
+    start = max(0, match.start() - EVIDENCE_WINDOW_LEAD_CHARS)
+    window = cleaned[start : start + MAX_LINE_CHARS]
+    return window if _contains_label(window, padded_label) else None
+
+
 def _excerpt_lines(text: str, candidate_key: str, *, limit: int) -> tuple[list[str], bool]:
     matched: list[str] = []
     context: list[str] = []
@@ -218,9 +246,14 @@ def _excerpt_lines(text: str, candidate_key: str, *, limit: int) -> tuple[list[s
         if not cleaned:
             continue
         if _contains_label(raw_line, candidate_key):
-            if len(matched) < limit:
-                matched.append(cleaned[:MAX_LINE_CHARS])
-        elif len(context) < MAX_CONTEXT_LINES_PER_PAGE:
+            window = _evidence_window(cleaned, candidate_key)
+            # A match that cannot be shown within the bound does not count as a
+            # match: presence and displayed evidence must agree.
+            if window is not None:
+                if len(matched) < limit:
+                    matched.append(window)
+                continue
+        if len(context) < MAX_CONTEXT_LINES_PER_PAGE:
             context.append(cleaned[:MAX_LINE_CHARS])
     if matched:
         return matched, True
