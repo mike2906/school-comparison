@@ -32,7 +32,7 @@ from app.models.scrape_log import ScrapeType
 from app.scrapers import extractor
 from app.scrapers import extractor_helpers as helpers
 from app.scrapers.display_name_audit import _clean_candidate_text, _page_bonus
-from app.services.identity_curation import _source_page_key
+from app.services.identity_curation import _normalized_host, _source_page_key
 from app.services.provider_costs import execute_billable_request
 
 
@@ -296,11 +296,16 @@ def build_case(
     scored.sort(key=lambda row: row[0])
     excerpts = tuple(row[1] for row in scored[:MAX_PAGES_PER_CASE])
 
-    # Supporting URLs are counted over *all* matched cached pages on the school's
-    # own registrable domain, deduplicated exactly like the promotion gate.
+    # Supporting URLs are counted over *all* matched cached pages, deduplicated
+    # exactly like the promotion gate. The host comparison must be exact rather
+    # than registrable-domain: `curated_identity_candidate` rejects any source
+    # whose normalized host differs from the configured website host, so a
+    # sibling host like `network.example.org` would produce a recommendation
+    # that promotion then refuses with `source_domain_mismatch`.
+    official_host = _normalized_host(website_url)
     supporting: dict[tuple[str, str], str] = {}
     for _rank, excerpt, url in scored:
-        if not url or _registrable_domain(url) != domain:
+        if not url or not official_host or _normalized_host(url) != official_host:
             continue
         key = _source_page_key(url)
         if key is not None:
@@ -472,12 +477,17 @@ def apply_guards(
     if reason:
         failures.append(reason)
 
+    # An accept must be justified by evidence, so an empty quote list cannot pass
+    # verification vacuously.
+    quotes = [quote for quote in verdict.quoted_evidence if _normalized_text(quote).strip()]
+    if not quotes:
+        failures.append("missing_evidence_quote")
+
     evidence_haystack = _normalized_text(
         " ".join(line for excerpt in case.excerpts for line in excerpt.lines)
     )
-    for quote in verdict.quoted_evidence:
-        fragment = _normalized_text(quote).strip()
-        if fragment and fragment not in evidence_haystack:
+    for quote in quotes:
+        if _normalized_text(quote).strip() not in evidence_haystack:
             failures.append("unverifiable_quote")
             break
 
@@ -541,6 +551,9 @@ async def adjudicate_case(
         return row
 
     agent = (agent_factory or _default_agent)()
+    # Mark the call before dispatch: a request that times out or fails may still
+    # have been billed, so a failure must not be reported as "no call made".
+    row["llm_called"] = True
     try:
         raw_result = await asyncio.wait_for(
             execute_billable_request(
@@ -557,7 +570,6 @@ async def adjudicate_case(
         row["error"] = str(exc)
         return row
 
-    row["llm_called"] = True
     input_tokens, output_tokens = _usage(raw_result)
     row["input_tokens"] = input_tokens
     row["output_tokens"] = output_tokens

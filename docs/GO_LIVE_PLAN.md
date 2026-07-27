@@ -1367,6 +1367,15 @@ operational safeguards do not reopen the accepted launch boundary.
             No database write, publication, refresh, provider discovery call, OCR, or
             geocode attempt was performed. Evidence:
             `backend/reports/p2-14f/20260727T103912Z/acceptance.md`.
+            Review round 1 hardened three gaps: a dispatched request that times out is
+            now reported as a call made (failed requests may still bill), an accept with
+            no non-empty quote is rejected instead of passing verification vacuously,
+            and supporting URLs require the *exact* official host rather than the
+            registrable domain, matching `curated_identity_candidate` so a
+            same-domain sibling host cannot produce a recommendation that promotion
+            would refuse with `source_domain_mismatch`. Re-scoring the recorded verdicts
+            under the hardened guards (`--replay-json`, zero new LLM calls) reproduced
+            every decision and every supporting-URL count unchanged.
             *Open decision:* whether a named reviewer promotes the four recommended
             identities. The pilot does not make that call.
       - [x] **(f) One public identity predicate for serialization and search.** Keep

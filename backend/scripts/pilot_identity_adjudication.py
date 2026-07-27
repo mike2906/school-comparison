@@ -23,7 +23,9 @@ from app.database import async_session_maker
 from app.services.identity_adjudication import (
     MIN_ACCEPT_CONFIDENCE,
     MIN_SUPPORTING_SOURCE_URLS,
+    IdentityAdjudicationVerdict,
     adjudicate_case,
+    apply_guards,
     build_cases,
     build_user_prompt,
     case_row,
@@ -66,6 +68,41 @@ async def _pilot_population(db) -> list[dict[str, Any]]:
         for row in benchmark["known_bad"]
     )
     return population
+
+
+def _replay_row(case, recorded: dict[str, Any] | None) -> dict[str, Any]:
+    """Re-score a recorded model verdict under the current guards, no LLM call.
+
+    Guard changes must be re-validated against the same model output rather than
+    by paying for another run.
+    """
+    row = case_row(case, decision="rejected")
+    if not recorded or not recorded.get("verdict"):
+        row["reason_code"] = case.blocked_reason or (recorded or {}).get("reason_code")
+        row["replayed"] = False
+        return row
+
+    verdict = IdentityAdjudicationVerdict(
+        verdict=recorded["verdict"],
+        reason_code=recorded["reason_code"],
+        confidence=recorded["confidence"],
+        quoted_evidence=recorded.get("quoted_evidence") or [],
+    )
+    decision, failures = apply_guards(case, verdict)
+    row.update(
+        {
+            "verdict": verdict.verdict,
+            "reason_code": verdict.reason_code,
+            "confidence": verdict.confidence,
+            "quoted_evidence": list(verdict.quoted_evidence),
+            "guard_failures": failures,
+            "decision": decision,
+            "replayed": True,
+            "recorded_decision": recorded.get("decision"),
+            "recorded_token_cost_usd": recorded.get("token_cost_usd", 0.0),
+        }
+    )
+    return row
 
 
 def _scoreboard(rows: list[dict[str, Any]]) -> dict[str, Any]:
@@ -200,6 +237,12 @@ async def main() -> None:
         type=Path,
         help="re-render acceptance.md from a recorded run without any LLM call",
     )
+    parser.add_argument(
+        "--replay-json",
+        type=Path,
+        help="re-score a recorded run's model verdicts under the current guards "
+        "(no LLM call); use after changing a guard",
+    )
     args = parser.parse_args()
 
     if args.from_json:
@@ -207,6 +250,11 @@ async def main() -> None:
         _write_acceptance(args.from_json.parent / "acceptance.md", payload)
         print(f"Re-rendered {args.from_json.parent / 'acceptance.md'} (0 LLM calls)")
         return
+
+    recorded_rows: dict[int, dict[str, Any]] = {}
+    if args.replay_json:
+        recorded_payload = json.loads(args.replay_json.read_text(encoding="utf-8"))
+        recorded_rows = {int(row["school_id"]): row for row in recorded_payload["rows"]}
 
     async with async_session_maker() as db:
         population = await _pilot_population(db)
@@ -220,6 +268,8 @@ async def main() -> None:
                 row = await adjudicate_case(
                     case, prefilter_rejects=args.prefilter_rejects
                 )
+            elif args.replay_json:
+                row = _replay_row(case, recorded_rows.get(case.school_id))
             else:
                 row = case_row(case, decision="not_adjudicated_dry_run")
                 row["reason_code"] = case.blocked_reason
@@ -242,7 +292,13 @@ async def main() -> None:
 
     payload = {
         "schema_version": 1,
-        "mode": "live_bounded_adjudication" if args.live else "dry_run_evidence_only",
+        "mode": (
+            "live_bounded_adjudication"
+            if args.live
+            else "replay_recorded_verdicts_no_llm"
+            if args.replay_json
+            else "dry_run_evidence_only"
+        ),
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "cases": len(rows),
         "rows": rows,

@@ -128,6 +128,23 @@ class TestCaseAssembly:
         )
         assert len(case.supporting_source_urls) == 1
 
+    def test_supporting_urls_require_the_exact_official_host(self):
+        # The promotion gate rejects any source whose host differs from the
+        # configured website host, so a sibling host on the same registrable
+        # domain must not count here either.
+        school = _school(website_url="https://school.example.org/")
+        markdown = "Sunny House"
+        pages = [
+            _page(1, "https://school.example.org/", markdown),
+            _page(2, "https://network.example.org/members", markdown),
+            _page(3, "https://school.example.org/about", markdown, "about"),
+        ]
+        case = build_case(school=school, candidate={"en": "Sunny House"}, pages=pages)
+        assert [
+            url for url in case.supporting_source_urls if "network.example.org" in url
+        ] == []
+        assert len(case.supporting_source_urls) == 2
+
     def test_bulgarian_only_candidate_yields_no_english_case(self):
         case = build_case(
             school=_school(),
@@ -194,6 +211,19 @@ class TestVerdictGuards:
         )
         assert decision == "rejected"
         assert "unverifiable_quote" in failures
+
+    def test_accept_without_any_quote_rejects(self):
+        # An empty quote list must not pass verification vacuously.
+        decision, failures = apply_guards(self._case(), self._verdict(quoted_evidence=[]))
+        assert decision == "rejected"
+        assert "missing_evidence_quote" in failures
+
+    def test_accept_with_only_blank_quotes_rejects(self):
+        decision, failures = apply_guards(
+            self._case(), self._verdict(quoted_evidence=["   ", "\n"])
+        )
+        assert decision == "rejected"
+        assert "missing_evidence_quote" in failures
 
     def test_candidate_absent_from_cached_pages_rejects(self):
         case = build_case(
@@ -275,6 +305,9 @@ class TestAdjudicationCall:
         assert row["decision"] == "rejected"
         assert row["reason_code"] == "adjudication_failed"
         assert row["guard_failures"] == ["error:TimeoutError"]
+        # The request was dispatched and may have been billed, so cost reporting
+        # must not claim that no call was made.
+        assert row["llm_called"] is True
 
     async def test_invalid_model_output_fails_closed(self):
         agent = self._Agent(output={"verdict": "maybe"})
