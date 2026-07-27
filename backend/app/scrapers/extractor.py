@@ -710,8 +710,17 @@ def _display_name_has_domain_alias_match(
     registry_name: str | None,
     website_url: str | None,
 ) -> bool:
-    aliases = helpers._extract_host_seed_aliases(website_url)
-    host_aligned = helpers._extract_host_aligned_display_name(registry_name, website_url)
+    host = urlparse(website_url or "").netloc.casefold().split(":", 1)[0]
+    if host.startswith("www."):
+        host = host[4:]
+    host_parts = _HOST_SUFFIX_EXTRACTOR(host)
+    owned_host_url = f"https://{host_parts.domain}" if host_parts.domain else None
+
+    aliases = helpers._extract_host_seed_aliases(owned_host_url)
+    host_aligned = helpers._extract_host_aligned_display_name(
+        registry_name,
+        owned_host_url,
+    )
     if host_aligned:
         aliases.extend(host_aligned.values())
 
@@ -722,9 +731,6 @@ def _display_name_has_domain_alias_match(
     ):
         return True
 
-    host = urlparse(website_url or "").netloc.casefold().split(":", 1)[0]
-    if host.startswith("www."):
-        host = host[4:]
     generic_host_labels = {
         "academy",
         "centre",
@@ -759,7 +765,6 @@ def _display_name_has_domain_alias_match(
     # registrable domain on ``school.fusion.bg`` and the subdomain on
     # platform-hosted sites like ``ou-doganovo.idwebbg.com``. Checking only
     # ``host.split(".")[0]`` misses the first case entirely.
-    host_parts = _HOST_SUFFIX_EXTRACTOR(host)
     # Only the registrable (or private-suffix-owned) label is school-owned.
     # Nested subdomains such as ``portal`` in ``school.portal.fusion.bg`` are
     # technical routing labels and cannot independently corroborate a name.
