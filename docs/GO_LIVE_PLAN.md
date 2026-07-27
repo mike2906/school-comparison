@@ -1331,6 +1331,19 @@ operational safeguards do not reopen the accepted launch boundary.
             `Pythagoras School`. No refresh, provider call, geocode attempt, or persistence was
             performed. Full backend tests passed (`924`). Evidence:
             `backend/reports/p2-14e/20260724T110802Z/acceptance.md`.
+            **Host-label correction and fixed benchmark complete 2026-07-27; no
+            records changed:** domain corroboration now inspects every meaningful host
+            label, so a generic subdomain no longer hides the brand in
+            `school.fusion.bg`; platform-hosted school subdomains remain supported. A
+            reusable read-only benchmark (`uv run python
+            scripts/evaluate_identity_resolver.py`) fixes the evaluation populations at
+            11 independently corroborated English identities, 10 known-unsafe labels,
+            and 96 deferred records. On 1,599 cached pages the resolver accepts 7/11
+            known-good identities, leaks 0/10 known-bad labels, and accepts 2/25 recorded
+            deferred English/Latin candidates. Although 89/96 deferred records contain
+            some candidate, most are Bulgarian-only and must not be counted as English
+            candidate coverage. No LLM, provider, refresh, OCR, geocode, or persistence
+            path was used. Full backend tests passed (`930`).
       - [x] **(f) One public identity predicate for serialization and search.** Keep
             display-name matching on the same resolved publication path used by API
             serialization. Add a guard test so a future SQL optimization cannot make

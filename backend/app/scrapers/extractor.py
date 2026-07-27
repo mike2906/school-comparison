@@ -707,10 +707,6 @@ def _display_name_has_domain_alias_match(
     host = urlparse(website_url or "").netloc.casefold().split(":", 1)[0]
     if host.startswith("www."):
         host = host[4:]
-    host_label = host.split(".", 1)[0]
-    host_compact = re.sub(r"[^a-z0-9]+", "", host_label)
-    if host_compact.endswith("bg") and len(host_compact) > 6:
-        host_compact = host_compact[:-2]
     generic_host_labels = {
         "academy",
         "centre",
@@ -723,7 +719,38 @@ def _display_name_has_domain_alias_match(
         "school",
         "schools",
     }
-    if len(host_compact) < 3 or host_compact in generic_host_labels:
+    # Public suffixes plus locale/technical subdomains, which never carry a brand.
+    non_brand_host_labels = {
+        "bg",
+        "cm",
+        "co",
+        "com",
+        "edu",
+        "eu",
+        "info",
+        "io",
+        "net",
+        "org",
+        "page",
+        "sites",
+        "space",
+        "www",
+    }
+    # The brand can sit in any host label, not just the leftmost one: it is the
+    # registrable domain on ``school.fusion.bg`` and the subdomain on
+    # platform-hosted sites like ``ou-doganovo.idwebbg.com``. Checking only
+    # ``host.split(".")[0]`` misses the first case entirely.
+    host_compacts: list[str] = []
+    for raw_label in host.split("."):
+        host_compact = re.sub(r"[^a-z0-9]+", "", raw_label)
+        if host_compact in non_brand_host_labels:
+            continue
+        if host_compact.endswith("bg") and len(host_compact) > 6:
+            host_compact = host_compact[:-2]
+        if len(host_compact) < 3 or host_compact in generic_host_labels:
+            continue
+        host_compacts.append(host_compact)
+    if not host_compacts:
         return False
 
     def compact(value: str) -> str:
@@ -753,16 +780,17 @@ def _display_name_has_domain_alias_match(
     }
     for display_label in display_name_i18n.values():
         label_compact = compact(display_label)
-        if label_compact == host_compact:
-            return True
-        if acronym(display_label) == host_compact:
-            label_words = set(re.findall(r"[a-z0-9]+", display_label.casefold()))
-            if label_words & institution_words or _labels_match(display_label, registry_name):
+        for host_compact in host_compacts:
+            if label_compact == host_compact:
                 return True
-        if label_compact.startswith(host_compact):
-            remainder = label_compact[len(host_compact) :]
-            if remainder in generic_suffixes:
-                return True
+            if acronym(display_label) == host_compact:
+                label_words = set(re.findall(r"[a-z0-9]+", display_label.casefold()))
+                if label_words & institution_words or _labels_match(display_label, registry_name):
+                    return True
+            if label_compact.startswith(host_compact):
+                remainder = label_compact[len(host_compact) :]
+                if remainder in generic_suffixes:
+                    return True
     return False
 
 
