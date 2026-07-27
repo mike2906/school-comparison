@@ -1383,7 +1383,12 @@ operational safeguards do not reopen the accepted launch boundary.
             construction sits inside the handled block so a missing
             `OPENROUTER_API_KEY` rejects one case instead of aborting the run. A second
             replay again reproduced all 14 decisions and supporting-URL counts
-            unchanged.
+            unchanged. Review round 3 closed two more: quotes are verified against a
+            single evidence line rather than the concatenated corpus, so a quote
+            fabricated across a line boundary cannot corroborate an accept, and the
+            adjudication agent runs with zero retries, because a PydanticAI output
+            retry would bill a second provider request while the pilot counted one. A
+            third replay again reproduced all 14 decisions unchanged.
             *Open decision:* whether a named reviewer promotes the four recommended
             identities. The pilot does not make that call.
       - [x] **(f) One public identity predicate for serialization and search.** Keep

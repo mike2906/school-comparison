@@ -1,7 +1,7 @@
 # Bounded English-identity LLM adjudication pilot
 
 - Mode: `replay_recorded_verdicts_no_llm`
-- Generated: 2026-07-27T10:58:43.662581+00:00
+- Generated: 2026-07-27T11:06:58.427152+00:00
 - Cases: 14 (4 missed known-good, 10 known-bad traps)
 - LLM calls: 0 (input 0 / output 0 tokens, $0.000000)
 

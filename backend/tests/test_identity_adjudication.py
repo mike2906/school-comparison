@@ -254,6 +254,28 @@ class TestVerdictGuards:
         assert decision == "rejected"
         assert "unverifiable_quote" in failures
 
+    def test_quote_spanning_two_evidence_lines_is_unverifiable(self):
+        # A quote stitched from the tail of one line and the head of the next
+        # exists in no source, so it must not corroborate an acceptance.
+        case = build_case(
+            school=_school(),
+            candidate={"en": "Sunny House"},
+            pages=[
+                _page(
+                    1,
+                    "https://example-school.com/",
+                    "Sunny House welcomes you\nOur teachers are certified",
+                ),
+                _page(2, "https://example-school.com/about", "About Sunny House", "about"),
+            ],
+        )
+        decision, failures = apply_guards(
+            case,
+            self._verdict(quoted_evidence=["welcomes you Our teachers are certified"]),
+        )
+        assert decision == "rejected"
+        assert "unverifiable_quote" in failures
+
     def test_accept_without_any_quote_rejects(self):
         # An empty quote list must not pass verification vacuously.
         decision, failures = apply_guards(self._case(), self._verdict(quoted_evidence=[]))

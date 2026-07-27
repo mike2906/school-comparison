@@ -499,9 +499,15 @@ def apply_guards(
     if not quotes:
         failures.append("missing_evidence_quote")
 
-    evidence = " ".join(line for excerpt in case.excerpts for line in excerpt.lines)
+    # Each quote must sit inside a single evidence line. Verifying against the
+    # concatenated corpus would accept a quote fabricated from the tail of one
+    # line and the head of the next — text that exists in no source.
+    evidence_lines = [
+        _normalized_text(line) for excerpt in case.excerpts for line in excerpt.lines
+    ]
     for quote in quotes:
-        if not _contains_label(evidence, _normalized_text(quote)):
+        padded_quote = _normalized_text(quote)
+        if not any(padded_quote in line for line in evidence_lines):
             failures.append("unverifiable_quote")
             break
 
@@ -618,12 +624,15 @@ async def adjudicate_case(
 
 
 def _default_agent() -> Any:
+    # No retries: PydanticAI would issue an extra billable request on output
+    # validation failure, so one case could quietly cost two provider calls while
+    # the pilot reports one. A malformed response fails closed instead.
     return create_agent(
         tier=ADJUDICATION_TIER,
         system_prompt=SYSTEM_PROMPT,
         result_type=IdentityAdjudicationVerdict,
-        retries=1,
-        output_retries=1,
+        retries=0,
+        output_retries=0,
     )
 
 
