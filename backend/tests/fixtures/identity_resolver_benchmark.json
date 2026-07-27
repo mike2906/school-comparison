@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "description": "P2.14(e) fixed English-identity gate benchmark",
+  "known_good": [
+    {"id": 393, "english_name": "Montessori Children’s House"},
+    {"id": 506, "english_name": "The Anglo-American School of Sofia"},
+    {"id": 520, "english_name": "Fusion School"},
+    {"id": 521, "english_name": "The Beehive"},
+    {"id": 524, "english_name": "Les Petits Princes"},
+    {"id": 556, "english_name": "Maple Bear Sofia"},
+    {"id": 576, "english_name": "Little Steps"},
+    {"id": 596, "english_name": "Maple Bear"},
+    {"id": 615, "english_name": "Growers"},
+    {"id": 624, "english_name": "Funky Monkey Kindergarten"},
+    {"id": 635, "english_name": "Uwekind International School"}
+  ],
+  "known_bad": [
+    {"id": 153, "reason": "contact_label", "candidate": {"bg": "Email: kindergarten@uwekind.bg", "en": "Email: kindergarten@uwekind.bg"}},
+    {"id": 381, "reason": "cross_institution_network_label", "candidate": {"bg": "Училищата Образователни технологии", "en": "Educational Technologies Schools"}},
+    {"id": 512, "reason": "contact_label", "candidate": {"bg": "E-mail: kindergarten@busy-bg.com", "en": "E-mail: kindergarten@busy-bg.com"}},
+    {"id": 514, "reason": "cross_institution_school_label", "candidate": {"bg": "ЧСУ \"Проф. Николай Райнов", "en": "Prof. Nikolai Raynov"}},
+    {"id": 546, "reason": "cross_institution_school_label", "candidate": {"bg": "ЧОУ ПЕТЪР БЕРОН"}},
+    {"id": 569, "reason": "contact_label", "candidate": {"bg": "Email: office@busy-school.com", "en": "Email: office@busy-school.com"}},
+    {"id": 587, "reason": "cross_institution_school_label", "candidate": {"bg": "ЧСУ „ДРУЖБА“ – София", "en": "Drujba School - Sofia"}},
+    {"id": 589, "reason": "cross_institution_school_label", "candidate": {"bg": "Международно училище Откривател", "en": "Discoverer International School"}},
+    {"id": 633, "reason": "navigation_label", "candidate": {"bg": "VISIT SCHOOL", "en": "VISIT SCHOOL"}},
+    {"id": 634, "reason": "cross_institution_network_label", "candidate": {"bg": "Uwekind International School", "en": "Uwekind International School"}}
+  ],
+  "deferred_ids": [
+    149, 150, 154, 155, 157, 171, 172, 175, 177, 178, 179, 180,
+    182, 183, 184, 185, 187, 213, 214, 215, 271, 272, 286, 287,
+    300, 301, 302, 329, 330, 339, 350, 372, 404, 405, 507, 510,
+    511, 516, 522, 525, 526, 527, 529, 530, 531, 533, 534, 535,
+    536, 537, 538, 539, 541, 542, 544, 545, 547, 548, 550, 552,
+    554, 558, 561, 562, 564, 565, 568, 572, 574, 577, 581, 583,
+    584, 585, 588, 590, 591, 592, 595, 597, 598, 599, 600, 601,
+    602, 603, 606, 609, 610, 613, 625, 628, 629, 630, 631, 632
+  ]
+}

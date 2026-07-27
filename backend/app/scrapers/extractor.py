@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import urlparse
 
+import tldextract
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent, ModelRetry
 from pydantic_ai.models.openrouter import OpenRouterModel
@@ -43,6 +44,23 @@ from app.services.provider_costs import execute_billable_request
 from . import extractor_helpers as helpers
 
 logger = logging.getLogger(__name__)
+
+# Use tldextract's bundled PSL snapshot only: resolver runs must never refresh
+# network data. Private suffixes separate school-owned subdomains from common
+# hosting platforms; the extras cover platforms used by this corpus that are
+# not currently declared in the PSL private section.
+_HOST_SUFFIX_EXTRACTOR = tldextract.TLDExtract(
+    cache_dir=None,
+    suffix_list_urls=(),
+    include_psl_private_domains=True,
+    extra_suffixes=(
+        "idwebbg.com",
+        "sites.google.com",
+        "weebly.com",
+        "webnode.page",
+        "wordpress.com",
+    ),
+)
 
 GENERAL_INFO_HINT_TOKENS: tuple[str, ...] = (
     "program",
@@ -692,8 +710,17 @@ def _display_name_has_domain_alias_match(
     registry_name: str | None,
     website_url: str | None,
 ) -> bool:
-    aliases = helpers._extract_host_seed_aliases(website_url)
-    host_aligned = helpers._extract_host_aligned_display_name(registry_name, website_url)
+    host = urlparse(website_url or "").netloc.casefold().split(":", 1)[0]
+    if host.startswith("www."):
+        host = host[4:]
+    host_parts = _HOST_SUFFIX_EXTRACTOR(host)
+    owned_host_url = f"https://{host_parts.domain}" if host_parts.domain else None
+
+    aliases = helpers._extract_host_seed_aliases(owned_host_url)
+    host_aligned = helpers._extract_host_aligned_display_name(
+        registry_name,
+        owned_host_url,
+    )
     if host_aligned:
         aliases.extend(host_aligned.values())
 
@@ -704,26 +731,56 @@ def _display_name_has_domain_alias_match(
     ):
         return True
 
-    host = urlparse(website_url or "").netloc.casefold().split(":", 1)[0]
-    if host.startswith("www."):
-        host = host[4:]
-    host_label = host.split(".", 1)[0]
-    host_compact = re.sub(r"[^a-z0-9]+", "", host_label)
-    if host_compact.endswith("bg") and len(host_compact) > 6:
-        host_compact = host_compact[:-2]
     generic_host_labels = {
         "academy",
         "centre",
         "center",
         "college",
         "education",
+        "international",
         "kindergarten",
         "nursery",
         "preschool",
         "school",
         "schools",
     }
-    if len(host_compact) < 3 or host_compact in generic_host_labels:
+    # Public suffixes plus locale/technical subdomains, which never carry a brand.
+    non_brand_host_labels = {
+        "bg",
+        "cm",
+        "co",
+        "com",
+        "edu",
+        "eu",
+        "info",
+        "io",
+        "net",
+        "org",
+        "page",
+        "sites",
+        "space",
+        "www",
+    }
+    # The brand can sit in any host label, not just the leftmost one: it is the
+    # registrable domain on ``school.fusion.bg`` and the subdomain on
+    # platform-hosted sites like ``ou-doganovo.idwebbg.com``. Checking only
+    # ``host.split(".")[0]`` misses the first case entirely.
+    # Only the registrable (or private-suffix-owned) label is school-owned.
+    # Nested subdomains such as ``portal`` in ``school.portal.fusion.bg`` are
+    # technical routing labels and cannot independently corroborate a name.
+    raw_host_labels = [host_parts.domain] if host_parts.domain else []
+
+    host_compacts: list[str] = []
+    for raw_label in raw_host_labels:
+        host_compact = re.sub(r"[^a-z0-9]+", "", raw_label)
+        if host_compact in non_brand_host_labels:
+            continue
+        if host_compact.endswith("bg") and len(host_compact) > 6:
+            host_compact = host_compact[:-2]
+        if len(host_compact) < 3 or host_compact in generic_host_labels:
+            continue
+        host_compacts.append(host_compact)
+    if not host_compacts:
         return False
 
     def compact(value: str) -> str:
@@ -753,16 +810,17 @@ def _display_name_has_domain_alias_match(
     }
     for display_label in display_name_i18n.values():
         label_compact = compact(display_label)
-        if label_compact == host_compact:
-            return True
-        if acronym(display_label) == host_compact:
-            label_words = set(re.findall(r"[a-z0-9]+", display_label.casefold()))
-            if label_words & institution_words or _labels_match(display_label, registry_name):
+        for host_compact in host_compacts:
+            if label_compact == host_compact:
                 return True
-        if label_compact.startswith(host_compact):
-            remainder = label_compact[len(host_compact) :]
-            if remainder in generic_suffixes:
-                return True
+            if acronym(display_label) == host_compact:
+                label_words = set(re.findall(r"[a-z0-9]+", display_label.casefold()))
+                if label_words & institution_words or _labels_match(display_label, registry_name):
+                    return True
+            if label_compact.startswith(host_compact):
+                remainder = label_compact[len(host_compact) :]
+                if remainder in generic_suffixes:
+                    return True
     return False
 
 

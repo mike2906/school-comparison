@@ -825,6 +825,63 @@ def test_display_name_domain_alias_supports_compact_brands_and_acronyms(
     )
 
 
+@pytest.mark.parametrize(
+    ("website_url", "display_name"),
+    [
+        # Brand in the registrable domain, generic or locale subdomain in front.
+        ("https://school.fusion.bg/", "Fusion School"),
+        ("https://en.fusion.bg/", "Fusion School"),
+        # Brand in the subdomain on a platform-hosted site.
+        ("https://oudoganovo.idwebbg.com/", "OU Doganovo School"),
+    ],
+)
+def test_display_name_domain_alias_matches_brand_in_any_host_label(
+    website_url,
+    display_name,
+):
+    """The brand is not always the leftmost host label."""
+    assert extractor_module._display_name_has_domain_alias_match(
+        {"en": display_name},
+        registry_name=None,
+        website_url=website_url,
+    )
+
+
+@pytest.mark.parametrize(
+    ("website_url", "display_name"),
+    [
+        ("https://foo.international", "International School"),
+        ("https://child.wordpress.com", "Wordpress School"),
+        ("https://ou-doganovo.idwebbg.com", "ID Web BG School"),
+        ("https://child.webflow.io", "Webflow School"),
+        ("https://foo.consulting", "Consulting School"),
+        ("https://school.portal.fusion.bg", "Portal School"),
+        ("https://abc.portal.fusion.bg", "ABC School"),
+    ],
+)
+def test_display_name_domain_alias_rejects_public_suffix_and_hosting_provider_labels(
+    website_url,
+    display_name,
+):
+    assert not extractor_module._display_name_has_domain_alias_match(
+        {"en": display_name},
+        registry_name=None,
+        website_url=website_url,
+    )
+
+
+def test_display_name_domain_alias_keeps_school_subdomain_on_shared_host():
+    for website_url, display_name in (
+        ("https://ou-doganovo.idwebbg.com", "OU Doganovo School"),
+        ("https://child.webflow.io", "Child School"),
+    ):
+        assert extractor_module._display_name_has_domain_alias_match(
+            {"en": display_name},
+            registry_name=None,
+            website_url=website_url,
+        )
+
+
 def test_display_name_domain_alias_rejects_non_school_acronym_expansion():
     assert not extractor_module._display_name_has_domain_alias_match(
         {"en": "Admissions Calendar Sofia"},
