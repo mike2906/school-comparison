@@ -1375,7 +1375,15 @@ operational safeguards do not reopen the accepted launch boundary.
             same-domain sibling host cannot produce a recommendation that promotion
             would refuse with `source_domain_mismatch`. Re-scoring the recorded verdicts
             under the hardened guards (`--replay-json`, zero new LLM calls) reproduced
-            every decision and every supporting-URL count unchanged.
+            every decision and every supporting-URL count unchanged. Review round 2
+            closed three more: candidate and quote matching now preserve token
+            boundaries (`Sunny House` no longer "appears" in `Sunny Houses`, which two
+            near-matches could otherwise have turned into a promotion recommendation),
+            an accept carrying a rejection `reason_code` fails closed, and agent
+            construction sits inside the handled block so a missing
+            `OPENROUTER_API_KEY` rejects one case instead of aborting the run. A second
+            replay again reproduced all 14 decisions and supporting-URL counts
+            unchanged.
             *Open decision:* whether a named reviewer promotes the four recommended
             identities. The pilot does not make that call.
       - [x] **(f) One public identity predicate for serialization and search.** Keep

@@ -128,6 +128,26 @@ class TestCaseAssembly:
         )
         assert len(case.supporting_source_urls) == 1
 
+    def test_candidate_matching_respects_token_boundaries(self):
+        # ``Sunny House`` must not count as present in ``Sunny Houses``: two such
+        # near-matches would otherwise satisfy both the presence check and the
+        # provenance count for a label that never appears.
+        pages = [
+            _page(1, "https://example-school.com/", "Welcome to Sunny Houses"),
+            _page(2, "https://example-school.com/about", "About Sunny Houses", "about"),
+        ]
+        case = build_case(school=_school(), candidate={"en": "Sunny House"}, pages=pages)
+        assert case.supporting_source_urls == ()
+        assert all(not excerpt.contains_candidate for excerpt in case.excerpts)
+
+    def test_candidate_matching_ignores_punctuation_and_case(self):
+        case = build_case(
+            school=_school(),
+            candidate={"en": "Sunny House"},
+            pages=[_page(1, "https://example-school.com/", "**SUNNY HOUSE** — since 2009")],
+        )
+        assert len(case.supporting_source_urls) == 1
+
     def test_supporting_urls_require_the_exact_official_host(self):
         # The promotion gate rejects any source whose host differs from the
         # configured website host, so a sibling host on the same registrable
@@ -208,6 +228,28 @@ class TestVerdictGuards:
         decision, failures = apply_guards(
             self._case(),
             self._verdict(quoted_evidence=["Sunny House is the best school in Sofia"]),
+        )
+        assert decision == "rejected"
+        assert "unverifiable_quote" in failures
+
+    def test_accept_carrying_a_rejection_reason_fails_closed(self):
+        decision, failures = apply_guards(
+            self._case(), self._verdict(reason_code="network_or_group_label")
+        )
+        assert decision == "rejected"
+        assert "inconsistent_accept_reason" in failures
+
+    def test_quote_verification_respects_token_boundaries(self):
+        case = build_case(
+            school=_school(),
+            candidate={"en": "Sunny House"},
+            pages=[
+                _page(1, "https://example-school.com/", "Sunny House welcomes you"),
+                _page(2, "https://example-school.com/about", "About Sunny House", "about"),
+            ],
+        )
+        decision, failures = apply_guards(
+            case, self._verdict(quoted_evidence=["Sunny House welcomes yous"])
         )
         assert decision == "rejected"
         assert "unverifiable_quote" in failures
@@ -308,6 +350,18 @@ class TestAdjudicationCall:
         # The request was dispatched and may have been billed, so cost reporting
         # must not claim that no call was made.
         assert row["llm_called"] is True
+
+    async def test_agent_construction_failure_rejects_instead_of_aborting(self):
+        # An unset or malformed OPENROUTER_API_KEY must reject this case and let
+        # the run finish, not abort the whole pilot.
+        def _factory():
+            raise RuntimeError("OPENROUTER_API_KEY is not configured")
+
+        row = await adjudicate_case(self._case(), agent_factory=_factory)
+        assert row["decision"] == "rejected"
+        assert row["reason_code"] == "adjudication_failed"
+        # Nothing was dispatched, so nothing could have been billed.
+        assert row["llm_called"] is False
 
     async def test_invalid_model_output_fails_closed(self):
         agent = self._Agent(output={"verdict": "maybe"})

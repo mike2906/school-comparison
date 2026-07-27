@@ -126,9 +126,20 @@ class IdentityAdjudicationCase:
 
 
 def _normalized_text(value: str | None) -> str:
-    """Match the deterministic exact-page comparison used by the resolver."""
+    """Match the deterministic exact-page comparison used by the resolver.
+
+    The result keeps its leading and trailing space. Both sides of a containment
+    check must stay padded: stripping the needle turns the check into an
+    arbitrary substring match, where ``Sunny House`` would be "present" in
+    ``Sunny Houses``.
+    """
     text = re.sub(r"https?://\S+", " ", str(value or ""), flags=re.IGNORECASE)
     return " " + re.sub(r"[^\w]+", " ", text.casefold()).strip() + " "
+
+
+def _contains_label(haystack: str | None, padded_label: str) -> bool:
+    """Token-boundary containment for an already-padded normalized label."""
+    return len(padded_label.strip()) > 0 and padded_label in _normalized_text(haystack)
 
 
 def _registrable_domain(url: str | None) -> str | None:
@@ -206,7 +217,7 @@ def _excerpt_lines(text: str, candidate_key: str, *, limit: int) -> tuple[list[s
         cleaned = _clean_candidate_text(raw_line)
         if not cleaned:
             continue
-        if candidate_key in _normalized_text(raw_line):
+        if _contains_label(raw_line, candidate_key):
             if len(matched) < limit:
                 matched.append(cleaned[:MAX_LINE_CHARS])
         elif len(context) < MAX_CONTEXT_LINES_PER_PAGE:
@@ -270,7 +281,7 @@ def build_case(
         ),
     }
 
-    candidate_key = _normalized_text(candidate_en).strip()
+    candidate_key = _normalized_text(candidate_en)
     scored: list[tuple[tuple[int, int, int], PageExcerpt, str | None]] = []
     for page in pages:
         text = (page.raw_markdown or "")[:MAX_PAGE_SCAN_CHARS]
@@ -471,6 +482,11 @@ def apply_guards(
     if verdict.verdict != "accept":
         return "rejected", failures
 
+    # The schema cannot tie the verdict to its reason, so an accept carrying a
+    # rejection reason is internally inconsistent and must fail closed.
+    if verdict.reason_code != "own_official_identity":
+        failures.append("inconsistent_accept_reason")
+
     reason = deterministic_reject_reason(
         str(case.candidate_en or ""), education_level=case.education_level
     )
@@ -483,11 +499,9 @@ def apply_guards(
     if not quotes:
         failures.append("missing_evidence_quote")
 
-    evidence_haystack = _normalized_text(
-        " ".join(line for excerpt in case.excerpts for line in excerpt.lines)
-    )
+    evidence = " ".join(line for excerpt in case.excerpts for line in excerpt.lines)
     for quote in quotes:
-        if _normalized_text(quote).strip() not in evidence_haystack:
+        if not _contains_label(evidence, _normalized_text(quote)):
             failures.append("unverifiable_quote")
             break
 
@@ -550,11 +564,13 @@ async def adjudicate_case(
         row["guard_failures"] = ["no_cached_evidence"]
         return row
 
-    agent = (agent_factory or _default_agent)()
-    # Mark the call before dispatch: a request that times out or fails may still
-    # have been billed, so a failure must not be reported as "no call made".
-    row["llm_called"] = True
     try:
+        # Agent construction can fail on its own (no or malformed API key), which
+        # must reject this case rather than abort the run. Only after that does a
+        # dispatch happen — and a dispatched request may be billed even when it
+        # times out, so the flag is set before the await, never before.
+        agent = (agent_factory or _default_agent)()
+        row["llm_called"] = True
         raw_result = await asyncio.wait_for(
             execute_billable_request(
                 lambda: agent.run(build_user_prompt(case)),
