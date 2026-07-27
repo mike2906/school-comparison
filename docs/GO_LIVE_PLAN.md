@@ -1344,6 +1344,31 @@ operational safeguards do not reopen the accepted launch boundary.
             some candidate, most are Bulgarian-only and must not be counted as English
             candidate coverage. No LLM, provider, refresh, OCR, geocode, or persistence
             path was used. Full backend tests passed (`930`).
+            **Bounded LLM adjudication pilot complete 2026-07-27; no records changed:**
+            a read-only adjudicator (`uv run python scripts/pilot_identity_adjudication.py
+            --live`) assembles bounded evidence from cached valid official pages plus
+            shared-domain sibling institutions and asks one model question per candidate:
+            does this English label name *this* institution on its own site? On the fixed
+            population (the 4 known-good identities the resolver misses and all 10
+            known-bad traps) it recovered 4/4 missed identities — 393, 506, 624, 635 —
+            and leaked 0/10 traps, for 10 calls and $0.002.
+            **The model alone is not the gate.** It accepted two traps: `Discoverer
+            International School` for kindergarten 589 (quoting text absent from the
+            cached pages) and `Uwekind International School` for kindergarten 634, whose
+            cached pages are literally the same shared-domain pages as its sibling school
+            635. Deterministic guards stopped both; for 634 the education-level guard was
+            the *only* defense, so page evidence and sibling context cannot separate a
+            kindergarten from its sibling school on a shared domain. Guards only ever
+            reject, an accept additionally requires the candidate to appear verbatim in
+            cached pages with verifiable quotes and two same-domain source URLs, and the
+            outcome is a recommendation for manual promotion through the unchanged
+            `identity_curation` gate — nothing publishes automatically. Four
+            contact/Bulgarian-only traps (153, 512, 546, 569) never reach the model.
+            No database write, publication, refresh, provider discovery call, OCR, or
+            geocode attempt was performed. Evidence:
+            `backend/reports/p2-14f/20260727T103912Z/acceptance.md`.
+            *Open decision:* whether a named reviewer promotes the four recommended
+            identities. The pilot does not make that call.
       - [x] **(f) One public identity predicate for serialization and search.** Keep
             display-name matching on the same resolved publication path used by API
             serialization. Add a guard test so a future SQL optimization cannot make
