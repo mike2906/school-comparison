@@ -713,6 +713,7 @@ def _display_name_has_domain_alias_match(
         "center",
         "college",
         "education",
+        "international",
         "kindergarten",
         "nursery",
         "preschool",
@@ -736,12 +737,36 @@ def _display_name_has_domain_alias_match(
         "space",
         "www",
     }
+    # These domains host unrelated institutions. Their provider-owned labels
+    # must not corroborate a display name, while school-owned subdomains still
+    # may (for example ``ou-doganovo.idwebbg.com``).
+    shared_hosting_suffixes = {
+        ("blogspot", "com"),
+        ("github", "io"),
+        ("idwebbg", "com"),
+        ("sites", "google", "com"),
+        ("weebly", "com"),
+        ("webnode", "page"),
+        ("wixsite", "com"),
+        ("wordpress", "com"),
+    }
     # The brand can sit in any host label, not just the leftmost one: it is the
     # registrable domain on ``school.fusion.bg`` and the subdomain on
     # platform-hosted sites like ``ou-doganovo.idwebbg.com``. Checking only
     # ``host.split(".")[0]`` misses the first case entirely.
+    raw_host_labels = [label for label in host.split(".") if label]
+    provider_label_indexes: set[int] = set()
+    for suffix in shared_hosting_suffixes:
+        if tuple(raw_host_labels[-len(suffix) :]) == suffix:
+            provider_label_indexes.update(
+                range(len(raw_host_labels) - len(suffix), len(raw_host_labels))
+            )
+            break
+
     host_compacts: list[str] = []
-    for raw_label in host.split("."):
+    for index, raw_label in enumerate(raw_host_labels):
+        if index in provider_label_indexes:
+            continue
         host_compact = re.sub(r"[^a-z0-9]+", "", raw_label)
         if host_compact in non_brand_host_labels:
             continue

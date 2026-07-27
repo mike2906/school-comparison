@@ -1,6 +1,12 @@
+from unittest.mock import AsyncMock
+
+import pytest
+
+from app.models import School
 from app.services.identity_resolver_benchmark import (
     _english_candidate,
     _identity_key,
+    evaluate_identity_resolver_benchmark,
     load_identity_resolver_benchmark,
 )
 
@@ -28,3 +34,34 @@ def test_identity_key_ignores_display_punctuation():
     assert _identity_key("Montessori Children’s House") == _identity_key(
         "Montessori Children's House"
     )
+
+
+@pytest.mark.asyncio
+async def test_benchmark_queries_only_production_valid_cached_pages():
+    school = School(
+        id=1,
+        name_i18n={"bg": "Тестово училище"},
+        country_code="bg",
+        attributes={},
+    )
+
+    class _ScalarResult:
+        def __init__(self, values):
+            self._values = values
+
+        def scalars(self):
+            return self
+
+        def all(self):
+            return self._values
+
+    db = AsyncMock()
+    db.execute.side_effect = [_ScalarResult([school]), _ScalarResult([])]
+
+    await evaluate_identity_resolver_benchmark(
+        db,
+        benchmark={"known_good": [], "known_bad": [], "deferred_ids": [1]},
+    )
+
+    page_query = db.execute.await_args_list[1].args[0]
+    assert "source_pages.is_valid IS true" in str(page_query)

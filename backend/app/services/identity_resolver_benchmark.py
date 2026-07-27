@@ -99,6 +99,7 @@ async def evaluate_identity_resolver_benchmark(
             select(SourcePage).where(
                 SourcePage.school_id.in_(school_ids),
                 SourcePage.scrape_type == ScrapeType.WEBSITE,
+                SourcePage.is_valid.is_(True),
                 SourcePage.raw_markdown.isnot(None),
             )
         )
