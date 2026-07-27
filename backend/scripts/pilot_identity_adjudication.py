@@ -221,7 +221,11 @@ def _write_acceptance(path: Path, payload: dict[str, Any]) -> None:
 
 async def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
+    # `--live` is the only mode that spends money, so it must never combine with
+    # a mode documented as making no LLM call: a silent precedence rule would
+    # turn an intended replay into fresh paid, nondeterministic requests.
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument(
         "--live",
         action="store_true",
         help="perform one bounded LLM call per case (default: assemble evidence only)",
@@ -232,12 +236,12 @@ async def main() -> None:
         help="skip the LLM call when deterministic guards already reject the candidate",
     )
     parser.add_argument("--limit", type=int, default=0, help="adjudicate at most N cases")
-    parser.add_argument(
+    mode.add_argument(
         "--from-json",
         type=Path,
         help="re-render acceptance.md from a recorded run without any LLM call",
     )
-    parser.add_argument(
+    mode.add_argument(
         "--replay-json",
         type=Path,
         help="re-score a recorded run's model verdicts under the current guards "
