@@ -853,6 +853,8 @@ def test_display_name_domain_alias_matches_brand_in_any_host_label(
         ("https://foo.international", "International School"),
         ("https://child.wordpress.com", "Wordpress School"),
         ("https://ou-doganovo.idwebbg.com", "ID Web BG School"),
+        ("https://child.webflow.io", "Webflow School"),
+        ("https://foo.consulting", "Consulting School"),
     ],
 )
 def test_display_name_domain_alias_rejects_public_suffix_and_hosting_provider_labels(
@@ -867,11 +869,15 @@ def test_display_name_domain_alias_rejects_public_suffix_and_hosting_provider_la
 
 
 def test_display_name_domain_alias_keeps_school_subdomain_on_shared_host():
-    assert extractor_module._display_name_has_domain_alias_match(
-        {"en": "OU Doganovo School"},
-        registry_name=None,
-        website_url="https://ou-doganovo.idwebbg.com",
-    )
+    for website_url, display_name in (
+        ("https://ou-doganovo.idwebbg.com", "OU Doganovo School"),
+        ("https://child.webflow.io", "Child School"),
+    ):
+        assert extractor_module._display_name_has_domain_alias_match(
+            {"en": display_name},
+            registry_name=None,
+            website_url=website_url,
+        )
 
 
 def test_display_name_domain_alias_rejects_non_school_acronym_expansion():

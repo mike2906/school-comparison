@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import urlparse
 
+import tldextract
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent, ModelRetry
 from pydantic_ai.models.openrouter import OpenRouterModel
@@ -43,6 +44,23 @@ from app.services.provider_costs import execute_billable_request
 from . import extractor_helpers as helpers
 
 logger = logging.getLogger(__name__)
+
+# Use tldextract's bundled PSL snapshot only: resolver runs must never refresh
+# network data. Private suffixes separate school-owned subdomains from common
+# hosting platforms; the extras cover platforms used by this corpus that are
+# not currently declared in the PSL private section.
+_HOST_SUFFIX_EXTRACTOR = tldextract.TLDExtract(
+    cache_dir=None,
+    suffix_list_urls=(),
+    include_psl_private_domains=True,
+    extra_suffixes=(
+        "idwebbg.com",
+        "sites.google.com",
+        "weebly.com",
+        "webnode.page",
+        "wordpress.com",
+    ),
+)
 
 GENERAL_INFO_HINT_TOKENS: tuple[str, ...] = (
     "program",
@@ -737,36 +755,18 @@ def _display_name_has_domain_alias_match(
         "space",
         "www",
     }
-    # These domains host unrelated institutions. Their provider-owned labels
-    # must not corroborate a display name, while school-owned subdomains still
-    # may (for example ``ou-doganovo.idwebbg.com``).
-    shared_hosting_suffixes = {
-        ("blogspot", "com"),
-        ("github", "io"),
-        ("idwebbg", "com"),
-        ("sites", "google", "com"),
-        ("weebly", "com"),
-        ("webnode", "page"),
-        ("wixsite", "com"),
-        ("wordpress", "com"),
-    }
     # The brand can sit in any host label, not just the leftmost one: it is the
     # registrable domain on ``school.fusion.bg`` and the subdomain on
     # platform-hosted sites like ``ou-doganovo.idwebbg.com``. Checking only
     # ``host.split(".")[0]`` misses the first case entirely.
-    raw_host_labels = [label for label in host.split(".") if label]
-    provider_label_indexes: set[int] = set()
-    for suffix in shared_hosting_suffixes:
-        if tuple(raw_host_labels[-len(suffix) :]) == suffix:
-            provider_label_indexes.update(
-                range(len(raw_host_labels) - len(suffix), len(raw_host_labels))
-            )
-            break
+    host_parts = _HOST_SUFFIX_EXTRACTOR(host)
+    raw_host_labels = [
+        *[label for label in host_parts.subdomain.split(".") if label],
+        *([host_parts.domain] if host_parts.domain else []),
+    ]
 
     host_compacts: list[str] = []
-    for index, raw_label in enumerate(raw_host_labels):
-        if index in provider_label_indexes:
-            continue
+    for raw_label in raw_host_labels:
         host_compact = re.sub(r"[^a-z0-9]+", "", raw_label)
         if host_compact in non_brand_host_labels:
             continue

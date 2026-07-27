@@ -26,6 +26,7 @@ dependencies = [
     "click>=8.1.0",
     "rich>=13.0.0",
     "cyrtranslit>=1.2.0",
+    "tldextract>=5.3.1",
 ]
 
 [project.optional-dependencies]
