@@ -313,7 +313,7 @@ def test_build_run_config_can_bypass_cache_for_evidence_refresh():
     refresh_config = refresh._build_run_config("https://school.bg/fees")
 
     assert ordinary_config.cache_mode == CacheMode.ENABLED
-    assert refresh_config.cache_mode == CacheMode.BYPASS
+    assert refresh_config.cache_mode == CacheMode.WRITE_ONLY
 
 
 @pytest.mark.asyncio

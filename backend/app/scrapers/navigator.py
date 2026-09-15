@@ -273,7 +273,7 @@ class WebsiteNavigator:
         )
 
         return CrawlerRunConfig(
-            cache_mode=CacheMode.BYPASS if self.bypass_cache else CacheMode.ENABLED,
+            cache_mode=CacheMode.WRITE_ONLY if self.bypass_cache else CacheMode.ENABLED,
             check_cache_freshness=True,
             cache_validation_timeout=8.0,
             page_timeout=int(self.PAGE_TIMEOUT_SECONDS * 1000),
