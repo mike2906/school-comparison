@@ -852,6 +852,7 @@ async def _run_sync(
                     cli_stage=stage,
                     config={
                         "school_id": school_id,
+                        "bypass_cache": bypass_cache,
                         "provider_cost_cap_usd": provider_cost_cap_usd,
                     },
                 )
@@ -963,6 +964,7 @@ async def _run_sync(
                     config={
                         "limit": limit,
                         "include_navigated": include_navigated,
+                        "bypass_cache": bypass_cache,
                         "include_extracted": include_extracted,
                         "force_validate": force_validate,
                         "skip_summarize": skip_summarize,

@@ -69,6 +69,79 @@ def test_cache_bypass_is_navigation_only():
 
 
 @pytest.mark.asyncio
+async def test_navigation_pipeline_snapshots_record_cache_bypass(db_session):
+    school = School(
+        name_i18n={"bg": "Live refresh"},
+        country_code="bg",
+        school_type="private",
+        education_level="primary",
+        city="sofia",
+        website_url="https://school.example",
+    )
+    db_session.add(school)
+    await db_session.commit()
+
+    class SessionContext:
+        async def __aenter__(self):
+            return db_session
+
+        async def __aexit__(self, *_args):
+            return False
+
+    snapshots = []
+
+    async def capture_run(_db, **kwargs):
+        snapshots.append(kwargs["config"])
+        return None
+
+    with (
+        patch("app.database.async_session_maker", return_value=SessionContext()),
+        patch.object(scraper_cli, "start_pipeline_run", new=capture_run),
+        patch.object(
+            scraper_cli,
+            "_run_navigate_school",
+            new=AsyncMock(return_value={"success": True}),
+        ),
+        patch.object(scraper_cli, "_run_navigate_batch", new=AsyncMock(return_value=[])),
+    ):
+        await scraper_cli._run_sync(
+            school_name=None,
+            school_id=school.id,
+            stage="navigate",
+            city="sofia",
+            country="bg",
+            limit=None,
+            year=None,
+            history_years=5,
+            exam_types=[],
+            sample_ratio=0.0,
+            include_navigated=True,
+            include_extracted=False,
+            force_validate=False,
+            bypass_cache=True,
+        )
+        await scraper_cli._run_sync(
+            school_name=None,
+            school_id=None,
+            stage="navigate",
+            city="sofia",
+            country="bg",
+            limit=5,
+            year=None,
+            history_years=5,
+            exam_types=[],
+            sample_ratio=0.0,
+            include_navigated=True,
+            include_extracted=False,
+            force_validate=False,
+            bypass_cache=True,
+        )
+
+    assert snapshots[0]["bypass_cache"] is True
+    assert snapshots[1]["bypass_cache"] is True
+
+
+@pytest.mark.asyncio
 async def test_sync_url_recovery_cannot_bypass_provider_cost_cap_check():
     with pytest.raises(ValueError, match="provider_cost_cap_usd is required"):
         await scraper_cli._run_sync(
