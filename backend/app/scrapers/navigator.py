@@ -221,8 +221,9 @@ class WebsiteNavigator:
         flags=re.IGNORECASE,
     )
 
-    def __init__(self, country_code: str = "bg"):
+    def __init__(self, country_code: str = "bg", *, bypass_cache: bool = False):
         self.country_code = country_code
+        self.bypass_cache = bypass_cache
         self.settings = get_settings()
 
     def _build_browser_config(self, *, enable_stealth: bool = True) -> Any:
@@ -271,7 +272,7 @@ class WebsiteNavigator:
         )
 
         return CrawlerRunConfig(
-            cache_mode=CacheMode.ENABLED,
+            cache_mode=CacheMode.BYPASS if self.bypass_cache else CacheMode.ENABLED,
             check_cache_freshness=True,
             cache_validation_timeout=8.0,
             page_timeout=int(self.PAGE_TIMEOUT_SECONDS * 1000),
@@ -1090,7 +1091,13 @@ async def _persist_navigation_result(
     }
 
 
-async def navigate_school(db: AsyncSession, school_id: int, country_code: str = "bg") -> dict[str, Any]:
+async def navigate_school(
+    db: AsyncSession,
+    school_id: int,
+    country_code: str = "bg",
+    *,
+    bypass_cache: bool = False,
+) -> dict[str, Any]:
     """Run Stage 4 navigation and persist source pages."""
     result = await db.execute(select(School).where(School.id == school_id))
     school = result.scalar_one_or_none()
@@ -1109,7 +1116,7 @@ async def navigate_school(db: AsyncSession, school_id: int, country_code: str = 
         school.website_url = normalized_url
         await db.commit()
 
-    navigator = WebsiteNavigator(country_code=country_code)
+    navigator = WebsiteNavigator(country_code=country_code, bypass_cache=bypass_cache)
     try:
         final_url, pages = await navigator.discover_pages(normalized_url)
     except Exception as exc:
@@ -1133,6 +1140,7 @@ async def navigate_schools_batch(
     *,
     country_code: str = "bg",
     max_concurrency: int = 3,
+    bypass_cache: bool = False,
 ) -> list[dict[str, Any]]:
     """Run Stage 4 navigation for many schools using Crawl4AI arun_many."""
     if not school_ids:
@@ -1143,7 +1151,7 @@ async def navigate_schools_batch(
     by_id = {school.id: school for school in schools}
 
     validator = URLValidator(country_code=country_code)
-    navigator = WebsiteNavigator(country_code=country_code)
+    navigator = WebsiteNavigator(country_code=country_code, bypass_cache=bypass_cache)
 
     normalized_by_school: dict[int, str] = {}
     failures_by_school: dict[int, str] = {}

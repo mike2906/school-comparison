@@ -303,6 +303,19 @@ def test_build_run_config_uses_raw_html_for_about_and_contact_pages():
     assert program_config.markdown_generator.content_source == "cleaned_html"
 
 
+def test_build_run_config_can_bypass_cache_for_evidence_refresh():
+    from crawl4ai import CacheMode
+
+    ordinary = WebsiteNavigator(country_code="bg")
+    refresh = WebsiteNavigator(country_code="bg", bypass_cache=True)
+
+    ordinary_config = ordinary._build_run_config("https://school.bg/fees")
+    refresh_config = refresh._build_run_config("https://school.bg/fees")
+
+    assert ordinary_config.cache_mode == CacheMode.ENABLED
+    assert refresh_config.cache_mode == CacheMode.BYPASS
+
+
 @pytest.mark.asyncio
 async def test_navigate_school_creates_source_pages(db_session):
     school = School(

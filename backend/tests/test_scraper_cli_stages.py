@@ -39,6 +39,35 @@ def test_url_recovery_fails_closed_without_provider_cost_cap():
     assert "recover-failed-urls" in scraper_cli.BILLABLE_STAGES
 
 
+def test_navigation_dry_run_reports_cache_bypass():
+    result = CliRunner().invoke(
+        scraper_cli.cli,
+        [
+            "run",
+            "--stage",
+            "navigate",
+            "--school-id",
+            "171",
+            "--bypass-cache",
+            "--sync",
+            "--dry-run",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Bypass navigation cache: True" in result.output
+
+
+def test_cache_bypass_is_navigation_only():
+    result = CliRunner().invoke(
+        scraper_cli.cli,
+        ["run", "--stage", "extract", "--bypass-cache", "--sync", "--dry-run"],
+    )
+
+    assert result.exit_code == 2
+    assert "--bypass-cache is only valid for --stage navigate" in result.output
+
+
 @pytest.mark.asyncio
 async def test_sync_url_recovery_cannot_bypass_provider_cost_cap_check():
     with pytest.raises(ValueError, match="provider_cost_cap_usd is required"):
