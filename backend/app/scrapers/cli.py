@@ -681,7 +681,7 @@ async def _promote_curated_identities_command(
 @click.option(
     "--bypass-cache",
     is_flag=True,
-    help="For navigate stage, fetch live pages without using the Crawl4AI cache",
+    help="For single-school navigate stage, fetch live pages without the Crawl4AI cache",
 )
 @click.option("--include-extracted", is_flag=True, help="For extract stage, re-extract already extracted schools")
 @click.option(
@@ -731,6 +731,8 @@ def run(
     """Run a pipeline stage."""
     if bypass_cache and stage.lower() != "navigate":
         raise click.UsageError("--bypass-cache is only valid for --stage navigate")
+    if bypass_cache and not (school or school_id):
+        raise click.UsageError("--bypass-cache requires --school or --school-id")
 
     if cohort_file is not None:
         if stage.lower() != "all" or school or school_id:
@@ -826,6 +828,11 @@ async def _run_sync(
     """Run pipeline stage synchronously."""
     from app.config import get_settings
     from app.database import async_session_maker
+
+    if bypass_cache and stage != "navigate":
+        raise ValueError("bypass_cache is only valid for the navigate stage")
+    if bypass_cache and not (school_name or school_id):
+        raise ValueError("bypass_cache requires a single school")
 
     if (
         stage in BILLABLE_STAGES
@@ -964,7 +971,6 @@ async def _run_sync(
                     config={
                         "limit": limit,
                         "include_navigated": include_navigated,
-                        "bypass_cache": bypass_cache,
                         "include_extracted": include_extracted,
                         "force_validate": force_validate,
                         "skip_summarize": skip_summarize,
@@ -1017,7 +1023,6 @@ async def _run_sync(
                                         city,
                                         limit,
                                         include_navigated=include_navigated,
-                                        bypass_cache=bypass_cache,
                                     )
                                 )
                             )
@@ -3248,7 +3253,6 @@ async def _run_navigate_batch(
     city: str,
     limit: Optional[int],
     include_navigated: bool = False,
-    bypass_cache: bool = False,
     school_ids: Optional[list[int]] = None,
     skip_timed_out_chunks: bool = False,
 ):
@@ -3267,10 +3271,7 @@ async def _run_navigate_batch(
     if explicit_selection:
         query = query.where(School.id.in_(explicit_school_ids))
     else:
-        if bypass_cache:
-            statuses = ["validated", "navigated", "extracted", "summarized"]
-        else:
-            statuses = ["validated", "navigated"] if include_navigated else ["validated"]
+        statuses = ["validated", "navigated"] if include_navigated else ["validated"]
         query = query.where(School.scrape_status.in_(statuses))
 
     if city:
@@ -3290,8 +3291,6 @@ async def _run_navigate_batch(
 
     if explicit_selection:
         status_label = "explicit repair selection"
-    elif bypass_cache:
-        status_label = "all completed website stages (live cache-bypass refresh)"
     else:
         status_label = "validated+navigated" if include_navigated else "validated"
     console.print(f"[cyan]Navigating websites for {len(school_ids)} schools...[/cyan]")
@@ -3326,9 +3325,7 @@ async def _run_navigate_batch(
             for isolated_school_id in school_chunk:
                 started = time.monotonic()
                 try:
-                    coro = _run_navigate_school(
-                        db, isolated_school_id, country, bypass_cache=bypass_cache
-                    )
+                    coro = _run_navigate_school(db, isolated_school_id, country)
                     if _nav_timeout > 0:
                         item = await asyncio.wait_for(coro, timeout=_nav_timeout)
                     else:
@@ -3385,7 +3382,6 @@ async def _run_navigate_batch(
                         school_ids=school_chunk,
                         country_code=country,
                         max_concurrency=nav_batch_concurrency,
-                        bypass_cache=bypass_cache,
                     )
                     if _nav_timeout > 0:
                         chunk_timeout = _nav_timeout * max(
@@ -3444,7 +3440,6 @@ async def _run_navigate_batch(
                     school_ids=school_ids,
                     country_code=country,
                     max_concurrency=nav_batch_concurrency,
-                    bypass_cache=bypass_cache,
                 )
             except Exception as exc:
                 logger.warning("Batch navigation failed; falling back to sequential mode: %s", exc)
@@ -3452,9 +3447,7 @@ async def _run_navigate_batch(
                 results = []
                 for school_id in school_ids:
                     try:
-                        coro = _run_navigate_school(
-                            db, school_id, country, bypass_cache=bypass_cache
-                        )
+                        coro = _run_navigate_school(db, school_id, country)
                         if _nav_timeout > 0:
                             result = await asyncio.wait_for(coro, timeout=_nav_timeout)
                         else:

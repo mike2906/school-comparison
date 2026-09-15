@@ -376,6 +376,192 @@ async def test_navigate_school_creates_source_pages(db_session):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("initial_status", "new_hash", "expected_status", "expected_change"),
+    [
+        ("extracted", "same-hash", "extracted", False),
+        ("summarized", "same-hash", "summarized", False),
+        ("extracted", "changed-hash", "navigated", True),
+    ],
+)
+async def test_live_navigation_preserves_completed_status_only_when_unchanged(
+    db_session, initial_status, new_hash, expected_status, expected_change
+):
+    school = School(
+        name_i18n={"bg": "Published school"},
+        country_code="bg",
+        school_type="private",
+        education_level="primary",
+        city="sofia",
+        website_url="https://school.bg",
+        scrape_status=initial_status,
+    )
+    db_session.add(school)
+    await db_session.flush()
+    db_session.add(
+        SourcePage(
+            school_id=school.id,
+            scrape_type=ScrapeType.WEBSITE,
+            source_url="https://school.bg/fees",
+            page_category="pricing",
+            raw_markdown="Current fees",
+            content_hash="same-hash",
+            is_valid=True,
+        )
+    )
+    await db_session.commit()
+
+    pages = [
+        NavigatedPage(
+            url="https://school.bg/fees",
+            category="pricing",
+            markdown="Current fees" if new_hash == "same-hash" else "Changed fees",
+            content_hash=new_hash,
+            cache_status="miss",
+        )
+    ]
+
+    async def fake_discover_pages(self, website_url: str):
+        return website_url, pages
+
+    from unittest.mock import patch
+
+    with patch("app.scrapers.navigator.WebsiteNavigator.discover_pages", new=fake_discover_pages):
+        result = await navigate_school(
+            db=db_session,
+            school_id=school.id,
+            country_code="bg",
+            bypass_cache=True,
+        )
+
+    await db_session.refresh(school)
+    assert school.scrape_status == expected_status
+    assert result["material_change"] is expected_change
+    assert result["status_preserved"] is (not expected_change)
+
+
+@pytest.mark.asyncio
+async def test_live_navigation_redirect_does_not_hide_content_change(db_session):
+    school = School(
+        name_i18n={"bg": "Redirected school"},
+        country_code="bg",
+        school_type="private",
+        education_level="primary",
+        city="sofia",
+        website_url="https://school.bg",
+        scrape_status="extracted",
+    )
+    db_session.add(school)
+    await db_session.flush()
+    db_session.add(
+        SourcePage(
+            school_id=school.id,
+            scrape_type=ScrapeType.WEBSITE,
+            source_url="https://school.bg/fees",
+            page_category="pricing",
+            raw_markdown="Old fees",
+            content_hash="old-hash",
+            is_valid=True,
+        )
+    )
+    await db_session.commit()
+
+    pages = [
+        NavigatedPage(
+            url="https://school.bg/fees",
+            category="pricing",
+            markdown="New fees",
+            content_hash="new-hash",
+            cache_status="miss",
+        )
+    ]
+
+    async def fake_discover_pages(self, website_url: str):
+        return "https://www.school.bg", pages
+
+    from unittest.mock import patch
+
+    with patch("app.scrapers.navigator.WebsiteNavigator.discover_pages", new=fake_discover_pages):
+        result = await navigate_school(
+            db=db_session,
+            school_id=school.id,
+            country_code="bg",
+            bypass_cache=True,
+        )
+
+    await db_session.refresh(school)
+    assert school.scrape_status == "navigated"
+    assert result["material_change"] is True
+    assert result["status_preserved"] is False
+
+
+@pytest.mark.asyncio
+async def test_live_navigation_invalidates_previously_stored_pages_not_recrawled(db_session):
+    school = School(
+        name_i18n={"bg": "School with removed fees"},
+        country_code="bg",
+        school_type="private",
+        education_level="primary",
+        city="sofia",
+        website_url="https://school.bg",
+        scrape_status="extracted",
+    )
+    db_session.add(school)
+    await db_session.flush()
+    home_page = SourcePage(
+        school_id=school.id,
+        scrape_type=ScrapeType.WEBSITE,
+        source_url="https://school.bg",
+        page_category="about",
+        raw_markdown="Current home page",
+        content_hash="home-hash",
+        is_valid=True,
+    )
+    missing_fees_page = SourcePage(
+        school_id=school.id,
+        scrape_type=ScrapeType.WEBSITE,
+        source_url="https://school.bg/fees",
+        page_category="pricing",
+        raw_markdown="Old fees",
+        content_hash="fees-hash",
+        is_valid=True,
+    )
+    db_session.add_all([home_page, missing_fees_page])
+    await db_session.commit()
+
+    pages = [
+        NavigatedPage(
+            url="https://school.bg",
+            category="about",
+            markdown="Current home page",
+            content_hash="home-hash",
+            cache_status="miss",
+        )
+    ]
+
+    async def fake_discover_pages(self, website_url: str):
+        return website_url, pages
+
+    from unittest.mock import patch
+
+    with patch("app.scrapers.navigator.WebsiteNavigator.discover_pages", new=fake_discover_pages):
+        result = await navigate_school(
+            db=db_session,
+            school_id=school.id,
+            country_code="bg",
+            bypass_cache=True,
+        )
+
+    await db_session.refresh(school)
+    await db_session.refresh(missing_fees_page)
+    assert school.scrape_status == "navigated"
+    assert missing_fees_page.is_valid is False
+    assert result["invalidated"] == 1
+    assert result["material_change"] is True
+    assert result["status_preserved"] is False
+
+
+@pytest.mark.asyncio
 async def test_navigate_school_returns_failure_when_no_extractable_content(db_session):
     school = School(
         name_i18n={"bg": "Тестово училище"},

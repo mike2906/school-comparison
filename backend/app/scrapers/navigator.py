@@ -20,6 +20,7 @@ from app.config import get_settings
 from app.models import School, ScrapeType, SourcePage
 from app.scrapers.base import BaseScraper
 from app.scrapers.url_validator import URLValidator
+from app.utils.website_data import WEBSITE_PUBLISHABLE_STATUSES
 
 logger = logging.getLogger(__name__)
 
@@ -978,11 +979,14 @@ async def _persist_navigation_result(
         )
 
     school_id = school.id
+    original_scrape_status = school.scrape_status
+    original_website_url = school.website_url
     now = datetime.now(timezone.utc)
     created = 0
     updated = 0
     contentful_pages = 0
     cache_hits = 0
+    material_change = False
 
     for page in pages:
         has_content = navigator._is_extractable_page_content(page)
@@ -1001,18 +1005,26 @@ async def _persist_navigation_result(
         source_page = existing.scalar_one_or_none()
 
         if source_page:
-            changed = source_page.content_hash != page.content_hash
+            content_changed = source_page.content_hash != page.content_hash
+            category_changed = (
+                page.category is not None and source_page.page_category != page.category
+            )
+            validity_changed = source_page.is_valid != has_content
+            material_change = material_change or any(
+                (content_changed, category_changed, validity_changed)
+            )
             if page.category is not None:
                 source_page.page_category = page.category
             source_page.raw_markdown = page.markdown if has_content else None
             source_page.is_valid = has_content
             source_page.last_scraped_at = now
             source_page.scrape_count = (source_page.scrape_count or 0) + 1
-            if changed:
+            if content_changed:
                 source_page.content_hash = page.content_hash
                 source_page.last_changed_at = now
             updated += 1
         else:
+            material_change = True
             db.add(
                 SourcePage(
                     school_id=school_id,
@@ -1037,29 +1049,51 @@ async def _persist_navigation_result(
     )
     existing_pages = existing_pages_result.scalars().all()
     canonical_site_url = final_url or normalized_url
+    crawled_urls = {page.url for page in pages}
 
     invalidated = 0
     for existing_page in existing_pages:
+        if (
+            navigator.bypass_cache
+            and contentful_pages > 0
+            and existing_page.source_url not in crawled_urls
+        ):
+            if existing_page.is_valid:
+                existing_page.is_valid = False
+                invalidated += 1
+                material_change = True
+            continue
         text = (existing_page.raw_markdown or "").strip()
         if not text:
             if existing_page.is_valid:
                 existing_page.is_valid = False
                 invalidated += 1
+                material_change = True
             continue
         if not navigator._is_same_site_url(existing_page.source_url, canonical_site_url):
             existing_page.is_valid = False
             existing_page.raw_markdown = None
             invalidated += 1
+            material_change = True
             continue
         if navigator._is_bot_challenge_url(existing_page.source_url) or navigator._is_bot_protection_content(text):
             existing_page.is_valid = False
             existing_page.raw_markdown = None
             invalidated += 1
+            material_change = True
 
     if final_url and final_url != school.website_url:
         school.website_url = final_url
+        material_change = material_change or final_url != original_website_url
 
-    if contentful_pages > 0:
+    status_preserved = False
+    if navigator.bypass_cache and original_scrape_status in WEBSITE_PUBLISHABLE_STATUSES:
+        if material_change:
+            school.scrape_status = "navigated"
+        else:
+            school.scrape_status = original_scrape_status
+            status_preserved = True
+    elif contentful_pages > 0:
         school.scrape_status = "navigated"
 
     await db.commit()
@@ -1076,6 +1110,8 @@ async def _persist_navigation_result(
             "cache_hits": cache_hits,
             "invalidated": invalidated,
             "final_url": final_url,
+            "material_change": material_change,
+            "status_preserved": status_preserved,
         }
 
     return {
@@ -1088,6 +1124,8 @@ async def _persist_navigation_result(
         "cache_hits": cache_hits,
         "invalidated": invalidated,
         "final_url": final_url,
+        "material_change": material_change,
+        "status_preserved": status_preserved,
     }
 
 
@@ -1140,7 +1178,6 @@ async def navigate_schools_batch(
     *,
     country_code: str = "bg",
     max_concurrency: int = 3,
-    bypass_cache: bool = False,
 ) -> list[dict[str, Any]]:
     """Run Stage 4 navigation for many schools using Crawl4AI arun_many."""
     if not school_ids:
@@ -1151,7 +1188,7 @@ async def navigate_schools_batch(
     by_id = {school.id: school for school in schools}
 
     validator = URLValidator(country_code=country_code)
-    navigator = WebsiteNavigator(country_code=country_code, bypass_cache=bypass_cache)
+    navigator = WebsiteNavigator(country_code=country_code)
 
     normalized_by_school: dict[int, str] = {}
     failures_by_school: dict[int, str] = {}
