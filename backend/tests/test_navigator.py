@@ -313,7 +313,105 @@ def test_build_run_config_can_bypass_cache_for_evidence_refresh():
     refresh_config = refresh._build_run_config("https://school.bg/fees")
 
     assert ordinary_config.cache_mode == CacheMode.ENABLED
-    assert refresh_config.cache_mode == CacheMode.WRITE_ONLY
+    assert refresh_config.cache_mode == CacheMode.BYPASS
+
+
+def test_live_refresh_collects_only_usable_results_for_cache_replacement():
+    navigator = WebsiteNavigator(country_code="bg", bypass_cache=True)
+    shorter_duplicate = type(
+        "Result",
+        (),
+        {
+            "success": True,
+            "url": "https://school.bg/fees",
+            "redirected_url": None,
+            "markdown": "Fees",
+            "html": "<html>Fees</html>",
+            "metadata": {},
+            "head_fingerprint": "old-head",
+            "cache_status": "miss",
+        },
+    )()
+    usable = type(
+        "Result",
+        (),
+        {
+            "success": True,
+            "url": "https://school.bg/fees",
+            "redirected_url": None,
+            "markdown": "Current fees",
+            "html": "<html>Current fees</html>",
+            "metadata": {},
+            "head_fingerprint": "same-head",
+            "cache_status": "miss",
+        },
+    )()
+    challenge = type(
+        "Result",
+        (),
+        {
+            "success": True,
+            "url": "https://school.bg/admission",
+            "redirected_url": None,
+            "markdown": "Checking the site connection security",
+            "html": "<html>Checking the site connection security</html>",
+            "metadata": {},
+            "head_fingerprint": "challenge-head",
+            "cache_status": "miss",
+        },
+    )()
+    cacheable_results = []
+
+    _, pages = navigator._extract_pages_from_results(
+        normalized_url="https://school.bg",
+        results_obj=[shorter_duplicate, usable, challenge],
+        cacheable_results=cacheable_results,
+    )
+
+    assert len(pages) == 2
+    assert cacheable_results == [usable]
+
+
+@pytest.mark.asyncio
+async def test_live_refresh_replaces_and_verifies_usable_cache_entry():
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock, patch
+
+    from crawl4ai.async_database import async_db_manager
+
+    navigator = WebsiteNavigator(country_code="bg", bypass_cache=True)
+    live_result = SimpleNamespace(url="https://school.bg/fees", html="<html>Fresh fees</html>")
+    cache_write = AsyncMock()
+    cache_read = AsyncMock(
+        return_value=SimpleNamespace(html="<html>Fresh fees</html>")
+    )
+
+    with (
+        patch.object(async_db_manager, "acache_url", new=cache_write),
+        patch.object(async_db_manager, "aget_cached_url", new=cache_read),
+    ):
+        await navigator._replace_cache_with_usable_results([live_result])
+
+    cache_write.assert_awaited_once_with(live_result)
+    cache_read.assert_awaited_once_with("https://school.bg/fees")
+
+
+@pytest.mark.asyncio
+async def test_live_refresh_fails_when_cache_replacement_cannot_be_verified():
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock, patch
+
+    from crawl4ai.async_database import async_db_manager
+
+    navigator = WebsiteNavigator(country_code="bg", bypass_cache=True)
+    live_result = SimpleNamespace(url="https://school.bg/fees", html="<html>Fresh fees</html>")
+
+    with (
+        patch.object(async_db_manager, "acache_url", new=AsyncMock()),
+        patch.object(async_db_manager, "aget_cached_url", new=AsyncMock(return_value=None)),
+        pytest.raises(RuntimeError, match="Failed to refresh Crawl4AI cache"),
+    ):
+        await navigator._replace_cache_with_usable_results([live_result])
 
 
 @pytest.mark.asyncio
@@ -377,12 +475,27 @@ async def test_navigate_school_creates_source_pages(db_session):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    ("initial_status", "new_hash", "new_markdown", "expected_status", "expected_change"),
+    (
+        "initial_status",
+        "new_hash",
+        "new_markdown",
+        "final_url",
+        "expected_status",
+        "expected_change",
+    ),
     [
-        ("extracted", "same-hash", "Current fees", "extracted", False),
-        ("summarized", "same-hash", "Current fees", "summarized", False),
-        ("extracted", "changed-hash", "Changed fees", "navigated", True),
-        ("extracted", "same-hash", "Changed fees", "navigated", True),
+        ("extracted", "same-hash", "Current fees", "https://school.bg", "extracted", False),
+        ("summarized", "same-hash", "Current fees", "https://school.bg", "summarized", False),
+        ("extracted", "changed-hash", "Changed fees", "https://school.bg", "navigated", True),
+        ("extracted", "same-hash", "Changed fees", "https://school.bg", "navigated", True),
+        (
+            "extracted",
+            "same-hash",
+            "Current fees",
+            "https://www.school.bg",
+            "extracted",
+            False,
+        ),
     ],
 )
 async def test_live_navigation_preserves_completed_status_only_when_unchanged(
@@ -390,6 +503,7 @@ async def test_live_navigation_preserves_completed_status_only_when_unchanged(
     initial_status,
     new_hash,
     new_markdown,
+    final_url,
     expected_status,
     expected_change,
 ):
@@ -428,7 +542,7 @@ async def test_live_navigation_preserves_completed_status_only_when_unchanged(
     ]
 
     async def fake_discover_pages(self, website_url: str):
-        return website_url, pages
+        return final_url, pages
 
     from unittest.mock import patch
 
@@ -444,10 +558,11 @@ async def test_live_navigation_preserves_completed_status_only_when_unchanged(
     assert school.scrape_status == expected_status
     assert result["material_change"] is expected_change
     assert result["status_preserved"] is (not expected_change)
+    assert school.website_url == final_url
 
 
 @pytest.mark.asyncio
-async def test_live_navigation_redirect_does_not_hide_content_change(db_session):
+async def test_live_navigation_same_site_redirect_does_not_hide_content_change(db_session):
     school = School(
         name_i18n={"bg": "Redirected school"},
         country_code="bg",
@@ -601,14 +716,7 @@ async def test_live_navigation_does_not_invalidate_pages_omitted_by_limited_craw
             markdown="Current home page",
             content_hash="home-hash",
             cache_status="miss",
-        ),
-        NavigatedPage(
-            url="https://school.bg/.well-known/sgcaptcha/",
-            category=None,
-            markdown="Checking the site connection security",
-            content_hash="captcha-hash",
-            cache_status="miss",
-        ),
+        )
     ]
 
     async def fake_discover_pages(self, website_url: str):
@@ -628,6 +736,86 @@ async def test_live_navigation_does_not_invalidate_pages_omitted_by_limited_craw
     await db_session.refresh(omitted_fees_page)
     assert school.scrape_status == "extracted"
     assert omitted_fees_page.is_valid is True
+    assert result["invalidated"] == 0
+    assert result["material_change"] is False
+    assert result["status_preserved"] is True
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "unusable_markdown",
+    ["Checking the site connection security", None],
+)
+async def test_live_navigation_preserves_existing_page_on_partial_unusable_response(
+    db_session, unusable_markdown
+):
+    school = School(
+        name_i18n={"bg": "School with partial challenge"},
+        country_code="bg",
+        school_type="private",
+        education_level="primary",
+        city="sofia",
+        website_url="https://school.bg",
+        scrape_status="extracted",
+    )
+    db_session.add(school)
+    await db_session.flush()
+    home_page = SourcePage(
+        school_id=school.id,
+        scrape_type=ScrapeType.WEBSITE,
+        source_url="https://school.bg",
+        page_category="about",
+        raw_markdown="Current home page",
+        content_hash="home-hash",
+        is_valid=True,
+    )
+    challenged_fees_page = SourcePage(
+        school_id=school.id,
+        scrape_type=ScrapeType.WEBSITE,
+        source_url="https://school.bg/fees",
+        page_category="pricing",
+        raw_markdown="Stored fees",
+        content_hash="fees-hash",
+        is_valid=True,
+    )
+    db_session.add_all([home_page, challenged_fees_page])
+    await db_session.commit()
+
+    pages = [
+        NavigatedPage(
+            url="https://school.bg",
+            category="about",
+            markdown="Current home page",
+            content_hash="home-hash",
+            cache_status="miss",
+        ),
+        NavigatedPage(
+            url="https://school.bg/fees",
+            category="pricing",
+            markdown=unusable_markdown,
+            content_hash="captcha-hash",
+            cache_status="miss",
+        ),
+    ]
+
+    async def fake_discover_pages(self, website_url: str):
+        return website_url, pages
+
+    from unittest.mock import patch
+
+    with patch("app.scrapers.navigator.WebsiteNavigator.discover_pages", new=fake_discover_pages):
+        result = await navigate_school(
+            db=db_session,
+            school_id=school.id,
+            country_code="bg",
+            bypass_cache=True,
+        )
+
+    await db_session.refresh(school)
+    await db_session.refresh(challenged_fees_page)
+    assert school.scrape_status == "extracted"
+    assert challenged_fees_page.is_valid is True
+    assert challenged_fees_page.raw_markdown == "Stored fees"
     assert result["invalidated"] == 0
     assert result["material_change"] is False
     assert result["status_preserved"] is True

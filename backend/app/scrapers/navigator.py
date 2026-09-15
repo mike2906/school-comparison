@@ -273,7 +273,7 @@ class WebsiteNavigator:
         )
 
         return CrawlerRunConfig(
-            cache_mode=CacheMode.WRITE_ONLY if self.bypass_cache else CacheMode.ENABLED,
+            cache_mode=CacheMode.BYPASS if self.bypass_cache else CacheMode.ENABLED,
             check_cache_freshness=True,
             cache_validation_timeout=8.0,
             page_timeout=int(self.PAGE_TIMEOUT_SECONDS * 1000),
@@ -738,11 +738,15 @@ class WebsiteNavigator:
                 timeout=self.CRAWL_TIMEOUT_SECONDS,
             )
 
+        cacheable_results: list[Any] = []
         final_url, pages = self._extract_pages_from_results(
             normalized_url=normalized_url,
             results_obj=results_obj,
+            cacheable_results=cacheable_results if self.bypass_cache else None,
         )
         if any(self._is_extractable_page_content(page) for page in pages):
+            if self.bypass_cache:
+                await self._replace_cache_with_usable_results(cacheable_results)
             return final_url, pages
 
         failure_messages = self._collect_failure_messages(results_obj)
@@ -759,32 +763,48 @@ class WebsiteNavigator:
                     crawler.arun(url=normalized_url, config=run_config),
                     timeout=self.CRAWL_TIMEOUT_SECONDS,
                 )
+            retry_cacheable_results: list[Any] = []
             retry_final_url, retry_pages = self._extract_pages_from_results(
                 normalized_url=normalized_url,
                 results_obj=retry_results,
+                cacheable_results=retry_cacheable_results if self.bypass_cache else None,
             )
             if retry_pages:
+                if self.bypass_cache and any(
+                    self._is_extractable_page_content(page) for page in retry_pages
+                ):
+                    await self._replace_cache_with_usable_results(
+                        retry_cacheable_results
+                    )
                 return retry_final_url, self._dedupe_pages(pages + retry_pages)
         except Exception as exc:
             logger.warning("Undetected retry failed for %s: %s", normalized_url, exc)
 
         return final_url, pages
 
+    async def _replace_cache_with_usable_results(
+        self, crawl_results: list[Any]
+    ) -> None:
+        """Cache verified usable live results without persisting unusable responses."""
+        from crawl4ai.async_database import async_db_manager  # type: ignore
+
+        for result in crawl_results:
+            await async_db_manager.acache_url(result)
+            cached = await async_db_manager.aget_cached_url(result.url)
+            if cached is None or cached.html != result.html:
+                raise RuntimeError(f"Failed to refresh Crawl4AI cache for {result.url}")
+
     def _extract_pages_from_results(
         self,
         *,
         normalized_url: str,
         results_obj: Any,
+        cacheable_results: list[Any] | None = None,
     ) -> tuple[str, list[NavigatedPage]]:
-        if isinstance(results_obj, (list, tuple)):
-            results = list(results_obj)
-        else:
-            try:
-                results = list(results_obj)
-            except TypeError:
-                results = [results_obj]
+        results = self._iter_results(results_obj)
 
         pages: list[NavigatedPage] = []
+        cache_candidates: dict[str, tuple[NavigatedPage, Any]] = {}
         final_url = normalized_url
 
         for result in results:
@@ -805,18 +825,30 @@ class WebsiteNavigator:
             head_fingerprint = getattr(result, "head_fingerprint", None)
             cache_status = getattr(result, "cache_status", None)
             hash_seed = head_fingerprint or markdown or storage_url
-            pages.append(
-                NavigatedPage(
-                    url=storage_url,
-                    category=self.classify_page(storage_url, title=title),
-                    markdown=markdown if (markdown or "").strip() else None,
-                    content_hash=BaseScraper.compute_hash(str(hash_seed)),
-                    cache_status=str(cache_status) if cache_status is not None else None,
-                    head_fingerprint=str(head_fingerprint) if head_fingerprint else None,
-                )
+            page = NavigatedPage(
+                url=storage_url,
+                category=self.classify_page(storage_url, title=title),
+                markdown=markdown if (markdown or "").strip() else None,
+                content_hash=BaseScraper.compute_hash(str(hash_seed)),
+                cache_status=str(cache_status) if cache_status is not None else None,
+                head_fingerprint=str(head_fingerprint) if head_fingerprint else None,
             )
+            pages.append(page)
+            if cacheable_results is not None and self._is_extractable_page_content(page):
+                current = cache_candidates.get(page.url)
+                if current is None or len(page.markdown or "") > len(
+                    current[0].markdown or ""
+                ):
+                    cache_candidates[page.url] = (page, result)
 
-        return final_url, self._dedupe_pages(pages)
+        deduped_pages = self._dedupe_pages(pages)
+        if cacheable_results is not None:
+            cacheable_results.extend(
+                cache_candidates[page.url][1]
+                for page in deduped_pages
+                if page.url in cache_candidates
+            )
+        return final_url, deduped_pages
 
     async def discover_pages_many(
         self,
@@ -1014,6 +1046,12 @@ async def _persist_navigation_result(
 
     for page in pages:
         has_content = navigator._is_extractable_page_content(page)
+        if (
+            navigator.bypass_cache
+            and original_scrape_status in WEBSITE_PUBLISHABLE_STATUSES
+            and not has_content
+        ):
+            continue
         stored_markdown = page.markdown if has_content else None
 
         existing = await db.execute(
@@ -1095,7 +1133,9 @@ async def _persist_navigation_result(
 
     if final_url and final_url != school.website_url:
         school.website_url = final_url
-        material_change = material_change or final_url != original_website_url
+        material_change = material_change or not navigator._is_same_site_url(
+            original_website_url, final_url
+        )
 
     status_preserved = False
     if navigator.bypass_cache and original_scrape_status in WEBSITE_PUBLISHABLE_STATUSES:
