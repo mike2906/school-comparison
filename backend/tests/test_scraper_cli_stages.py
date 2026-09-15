@@ -853,6 +853,46 @@ async def test_run_navigate_batch_rolls_back_and_continues_after_school_error(db
 
 
 @pytest.mark.asyncio
+async def test_cache_bypass_batch_includes_all_completed_navigation_statuses(db_session):
+    schools = []
+    for status in ("validated", "navigated", "extracted", "summarized", "pending"):
+        school = School(
+            name_i18n={"bg": f"Navigation {status}"},
+            country_code="bg",
+            school_type="private",
+            education_level="primary",
+            city="sofia",
+            website_url=f"https://{status}.school.example",
+            scrape_status=status,
+        )
+        db_session.add(school)
+        schools.append(school)
+    await db_session.commit()
+
+    async def successful_batch(*_args, school_ids, **_kwargs):
+        return [{"school_id": school_id, "success": True} for school_id in school_ids]
+
+    settings = SimpleNamespace(nav_school_timeout_seconds=0, nav_batch_concurrency=3)
+    batch_mock = AsyncMock(side_effect=successful_batch)
+    with (
+        patch("app.config.get_settings", return_value=settings),
+        patch("app.scrapers.navigator.navigate_schools_batch", new=batch_mock),
+    ):
+        await scraper_cli._run_navigate_batch(
+            db=db_session,
+            country="bg",
+            city="sofia",
+            limit=None,
+            include_navigated=False,
+            bypass_cache=True,
+        )
+
+    selected_ids = set(batch_mock.await_args.kwargs["school_ids"])
+    assert selected_ids == {school.id for school in schools[:4]}
+    assert schools[4].id not in selected_ids
+
+
+@pytest.mark.asyncio
 async def test_run_navigate_batch_uses_batch_crawler_results(db_session):
     schools = []
     for idx in range(2):

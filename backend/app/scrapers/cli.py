@@ -3267,7 +3267,10 @@ async def _run_navigate_batch(
     if explicit_selection:
         query = query.where(School.id.in_(explicit_school_ids))
     else:
-        statuses = ["validated", "navigated"] if include_navigated else ["validated"]
+        if bypass_cache:
+            statuses = ["validated", "navigated", "extracted", "summarized"]
+        else:
+            statuses = ["validated", "navigated"] if include_navigated else ["validated"]
         query = query.where(School.scrape_status.in_(statuses))
 
     if city:
@@ -3287,6 +3290,8 @@ async def _run_navigate_batch(
 
     if explicit_selection:
         status_label = "explicit repair selection"
+    elif bypass_cache:
+        status_label = "all completed website stages (live cache-bypass refresh)"
     else:
         status_label = "validated+navigated" if include_navigated else "validated"
     console.print(f"[cyan]Navigating websites for {len(school_ids)} schools...[/cyan]")
