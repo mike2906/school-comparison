@@ -984,16 +984,37 @@ async def _persist_navigation_result(
     now = datetime.now(timezone.utc)
     created = 0
     updated = 0
-    contentful_pages = 0
-    cache_hits = 0
+    contentful_pages = sum(
+        navigator._is_extractable_page_content(page) for page in pages
+    )
+    cache_hits = sum(
+        (page.cache_status or "").startswith("hit") for page in pages
+    )
     material_change = False
+
+    if (
+        navigator.bypass_cache
+        and original_scrape_status in WEBSITE_PUBLISHABLE_STATUSES
+        and contentful_pages == 0
+    ):
+        return {
+            "school_id": school_id,
+            "success": False,
+            "reason": "No extractable page content",
+            "pages_found": len(pages),
+            "pages_with_content": 0,
+            "created": 0,
+            "updated": 0,
+            "cache_hits": cache_hits,
+            "invalidated": 0,
+            "final_url": final_url,
+            "material_change": False,
+            "status_preserved": True,
+        }
 
     for page in pages:
         has_content = navigator._is_extractable_page_content(page)
-        if has_content:
-            contentful_pages += 1
-        if (page.cache_status or "").startswith("hit"):
-            cache_hits += 1
+        stored_markdown = page.markdown if has_content else None
 
         existing = await db.execute(
             select(SourcePage).where(
@@ -1005,7 +1026,8 @@ async def _persist_navigation_result(
         source_page = existing.scalar_one_or_none()
 
         if source_page:
-            content_changed = source_page.content_hash != page.content_hash
+            hash_changed = source_page.content_hash != page.content_hash
+            content_changed = source_page.raw_markdown != stored_markdown
             category_changed = (
                 page.category is not None and source_page.page_category != page.category
             )
@@ -1015,16 +1037,16 @@ async def _persist_navigation_result(
             )
             if page.category is not None:
                 source_page.page_category = page.category
-            source_page.raw_markdown = page.markdown if has_content else None
+            source_page.raw_markdown = stored_markdown
             source_page.is_valid = has_content
             source_page.last_scraped_at = now
             source_page.scrape_count = (source_page.scrape_count or 0) + 1
-            if content_changed:
+            if hash_changed or content_changed:
                 source_page.content_hash = page.content_hash
                 source_page.last_changed_at = now
             updated += 1
         else:
-            material_change = True
+            material_change = material_change or has_content
             db.add(
                 SourcePage(
                     school_id=school_id,
@@ -1032,7 +1054,7 @@ async def _persist_navigation_result(
                     source_url=page.url,
                     content_hash=page.content_hash,
                     page_category=page.category,
-                    raw_markdown=page.markdown if has_content else None,
+                    raw_markdown=stored_markdown,
                     is_valid=has_content,
                     last_scraped_at=now,
                     last_changed_at=now,
@@ -1049,20 +1071,9 @@ async def _persist_navigation_result(
     )
     existing_pages = existing_pages_result.scalars().all()
     canonical_site_url = final_url or normalized_url
-    crawled_urls = {page.url for page in pages}
 
     invalidated = 0
     for existing_page in existing_pages:
-        if (
-            navigator.bypass_cache
-            and contentful_pages > 0
-            and existing_page.source_url not in crawled_urls
-        ):
-            if existing_page.is_valid:
-                existing_page.is_valid = False
-                invalidated += 1
-                material_change = True
-            continue
         text = (existing_page.raw_markdown or "").strip()
         if not text:
             if existing_page.is_valid:
