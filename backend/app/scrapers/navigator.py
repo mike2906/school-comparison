@@ -225,9 +225,16 @@ class WebsiteNavigator:
         flags=re.IGNORECASE,
     )
 
-    def __init__(self, country_code: str = "bg", *, bypass_cache: bool = False):
+    def __init__(
+        self,
+        country_code: str = "bg",
+        *,
+        bypass_cache: bool = False,
+        cache_alias_urls: list[str] | None = None,
+    ):
         self.country_code = country_code
         self.bypass_cache = bypass_cache
+        self.cache_alias_urls = tuple(dict.fromkeys(cache_alias_urls or []))
         self.settings = get_settings()
 
     def _build_browser_config(self, *, enable_stealth: bool = True) -> Any:
@@ -833,7 +840,7 @@ class WebsiteNavigator:
         from crawl4ai.async_database import async_db_manager  # type: ignore
 
         for result in crawl_results:
-            cache_urls = list(
+            result_urls = list(
                 dict.fromkeys(
                     filter(
                         None,
@@ -844,6 +851,7 @@ class WebsiteNavigator:
                     )
                 )
             )
+            cache_urls = self._expand_cache_aliases(result_urls)
             for cache_url in cache_urls:
                 cache_result = copy.copy(result)
                 cache_result.url = cache_url
@@ -858,7 +866,7 @@ class WebsiteNavigator:
         """Remove definitively obsolete URLs from Crawl4AI's cache."""
         from crawl4ai.async_database import async_db_manager  # type: ignore
 
-        unique_urls = list(dict.fromkeys(url for url in urls if url))
+        unique_urls = self._expand_cache_aliases(urls)
         if not unique_urls:
             return
 
@@ -873,6 +881,17 @@ class WebsiteNavigator:
         for url in unique_urls:
             if await async_db_manager.aget_cached_url(url) is not None:
                 raise RuntimeError(f"Failed to remove Crawl4AI cache entry for {url}")
+
+    def _expand_cache_aliases(self, urls: list[str]) -> list[str]:
+        """Include stored canonical aliases for cache replacement or removal."""
+        unique_urls = list(dict.fromkeys(url for url in urls if url))
+        for alias_url in self.cache_alias_urls:
+            if alias_url not in unique_urls and any(
+                self._is_same_page_url(alias_url, candidate_url)
+                for candidate_url in unique_urls
+            ):
+                unique_urls.append(alias_url)
+        return unique_urls
 
     def _extract_pages_from_results(
         self,
@@ -1340,7 +1359,21 @@ async def navigate_school(
         school.website_url = normalized_url
         await db.commit()
 
-    navigator = WebsiteNavigator(country_code=country_code, bypass_cache=bypass_cache)
+    cache_alias_urls: list[str] = []
+    if bypass_cache:
+        source_urls_result = await db.execute(
+            select(SourcePage.source_url).where(
+                SourcePage.school_id == school_id,
+                SourcePage.scrape_type == ScrapeType.WEBSITE,
+            )
+        )
+        cache_alias_urls = list(source_urls_result.scalars().all())
+
+    navigator = WebsiteNavigator(
+        country_code=country_code,
+        bypass_cache=bypass_cache,
+        cache_alias_urls=cache_alias_urls,
+    )
     try:
         final_url, pages = await navigator.discover_pages(normalized_url)
     except Exception as exc:

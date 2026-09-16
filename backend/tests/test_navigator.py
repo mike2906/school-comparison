@@ -402,7 +402,11 @@ async def test_live_refresh_replaces_and_verifies_usable_cache_entry():
 
     from crawl4ai.async_database import async_db_manager
 
-    navigator = WebsiteNavigator(country_code="bg", bypass_cache=True)
+    navigator = WebsiteNavigator(
+        country_code="bg",
+        bypass_cache=True,
+        cache_alias_urls=["https://school.bg/fees/", "https://fees.school.bg/other"],
+    )
     live_result = SimpleNamespace(
         url="https://school.bg/fees",
         redirected_url="https://www.school.bg/fees",
@@ -422,10 +426,12 @@ async def test_live_refresh_replaces_and_verifies_usable_cache_entry():
     assert [call.args[0].url for call in cache_write.await_args_list] == [
         "https://school.bg/fees",
         "https://www.school.bg/fees",
+        "https://school.bg/fees/",
     ]
     assert [call.args[0] for call in cache_read.await_args_list] == [
         "https://school.bg/fees",
         "https://www.school.bg/fees",
+        "https://school.bg/fees/",
     ]
 
 
@@ -514,7 +520,11 @@ async def test_live_refresh_removes_and_verifies_definitive_removal_cache_entrie
 
     from crawl4ai.async_database import async_db_manager
 
-    navigator = WebsiteNavigator(country_code="bg", bypass_cache=True)
+    navigator = WebsiteNavigator(
+        country_code="bg",
+        bypass_cache=True,
+        cache_alias_urls=["https://www.school.bg/old-fees/"],
+    )
     db_execute = AsyncMock()
 
     async def execute_operation(operation):
@@ -536,10 +546,16 @@ async def test_live_refresh_removes_and_verifies_definitive_removal_cache_entrie
 
     execute_with_retry.assert_awaited_once()
     db_execute.assert_awaited_once_with(
-        "DELETE FROM crawled_data WHERE url IN (?)",
-        ("https://school.bg/old-fees",),
+        "DELETE FROM crawled_data WHERE url IN (?, ?)",
+        (
+            "https://school.bg/old-fees",
+            "https://www.school.bg/old-fees/",
+        ),
     )
-    cache_read.assert_awaited_once_with("https://school.bg/old-fees")
+    assert [call.args[0] for call in cache_read.await_args_list] == [
+        "https://school.bg/old-fees",
+        "https://www.school.bg/old-fees/",
+    ]
 
 
 @pytest.mark.asyncio
@@ -1075,6 +1091,10 @@ async def test_live_navigation_updates_all_existing_canonical_aliases(
     ]
 
     async def fake_discover_pages(self, website_url: str):
+        assert set(self.cache_alias_urls) == {
+            "https://school.bg/fees",
+            "https://www.school.bg/fees/",
+        }
         return website_url, pages
 
     from unittest.mock import patch
