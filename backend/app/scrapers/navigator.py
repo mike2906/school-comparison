@@ -839,6 +839,7 @@ class WebsiteNavigator:
         """Cache verified usable live results without persisting unusable responses."""
         from crawl4ai.async_database import async_db_manager  # type: ignore
 
+        failures: list[str] = []
         for result in crawl_results:
             result_urls = list(
                 dict.fromkeys(
@@ -853,14 +854,20 @@ class WebsiteNavigator:
             )
             cache_urls = self._expand_cache_aliases(result_urls)
             for cache_url in cache_urls:
-                cache_result = copy.copy(result)
-                cache_result.url = cache_url
-                await async_db_manager.acache_url(cache_result)
-                cached = await async_db_manager.aget_cached_url(cache_url)
-                if cached is None or cached.html != result.html:
-                    raise RuntimeError(
-                        f"Failed to refresh Crawl4AI cache for {cache_url}"
-                    )
+                try:
+                    cache_result = copy.copy(result)
+                    cache_result.url = cache_url
+                    await async_db_manager.acache_url(cache_result)
+                    cached = await async_db_manager.aget_cached_url(cache_url)
+                    if cached is None or cached.html != result.html:
+                        raise RuntimeError("cache verification failed")
+                except Exception as exc:
+                    failures.append(f"{cache_url}: {exc}")
+
+        if failures:
+            raise RuntimeError(
+                "Failed to refresh Crawl4AI cache for " + "; ".join(failures)
+            )
 
     async def _remove_cache_entries(self, urls: list[str]) -> None:
         """Remove definitively obsolete URLs from Crawl4AI's cache."""

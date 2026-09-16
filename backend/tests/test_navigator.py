@@ -454,6 +454,43 @@ async def test_live_refresh_fails_when_cache_replacement_cannot_be_verified():
 
 
 @pytest.mark.asyncio
+async def test_live_refresh_continues_after_one_cache_entry_fails():
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock, patch
+
+    from crawl4ai.async_database import async_db_manager
+
+    navigator = WebsiteNavigator(country_code="bg", bypass_cache=True)
+    live_results = [
+        SimpleNamespace(url="https://school.bg/fees", html="Fresh fees"),
+        SimpleNamespace(url="https://school.bg/admission", html="Fresh admission"),
+    ]
+    cache_write = AsyncMock()
+    cache_read = AsyncMock(
+        side_effect=[
+            None,
+            SimpleNamespace(html="Fresh admission"),
+        ]
+    )
+
+    with (
+        patch.object(async_db_manager, "acache_url", new=cache_write),
+        patch.object(async_db_manager, "aget_cached_url", new=cache_read),
+        pytest.raises(RuntimeError, match="Failed to refresh Crawl4AI cache"),
+    ):
+        await navigator._replace_cache_with_usable_results(live_results)
+
+    assert [call.args[0].url for call in cache_write.await_args_list] == [
+        "https://school.bg/fees",
+        "https://school.bg/admission",
+    ]
+    assert [call.args[0] for call in cache_read.await_args_list] == [
+        "https://school.bg/fees",
+        "https://school.bg/admission",
+    ]
+
+
+@pytest.mark.asyncio
 async def test_live_refresh_keeps_evidence_when_cache_maintenance_fails(caplog):
     from unittest.mock import AsyncMock, patch
 
