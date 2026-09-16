@@ -762,11 +762,12 @@ class WebsiteNavigator:
             cacheable_results=cacheable_results if self.bypass_cache else None,
             removal_cache_urls=removal_cache_urls if self.bypass_cache else None,
         )
-        if self.bypass_cache and removal_cache_urls:
-            await self._remove_cache_entries(removal_cache_urls)
+        if self.bypass_cache:
+            await self._refresh_live_cache_best_effort(
+                cacheable_results=cacheable_results,
+                removal_cache_urls=removal_cache_urls,
+            )
         if any(self._is_extractable_page_content(page) for page in pages):
-            if self.bypass_cache:
-                await self._replace_cache_with_usable_results(cacheable_results)
             return final_url, pages
 
         failure_messages = self._collect_failure_messages(results_obj)
@@ -793,20 +794,37 @@ class WebsiteNavigator:
                     retry_removal_cache_urls if self.bypass_cache else None
                 ),
             )
-            if self.bypass_cache and retry_removal_cache_urls:
-                await self._remove_cache_entries(retry_removal_cache_urls)
+            if self.bypass_cache:
+                await self._refresh_live_cache_best_effort(
+                    cacheable_results=retry_cacheable_results,
+                    removal_cache_urls=retry_removal_cache_urls,
+                )
             if retry_pages:
-                if self.bypass_cache and any(
-                    self._is_extractable_page_content(page) for page in retry_pages
-                ):
-                    await self._replace_cache_with_usable_results(
-                        retry_cacheable_results
-                    )
                 return retry_final_url, self._dedupe_pages(pages + retry_pages)
         except Exception as exc:
             logger.warning("Undetected retry failed for %s: %s", normalized_url, exc)
 
         return final_url, pages
+
+    async def _refresh_live_cache_best_effort(
+        self,
+        *,
+        cacheable_results: list[Any],
+        removal_cache_urls: list[str],
+    ) -> None:
+        """Maintain Crawl4AI's cache without discarding authoritative live evidence."""
+        if removal_cache_urls:
+            try:
+                await self._remove_cache_entries(removal_cache_urls)
+            except Exception as exc:
+                logger.warning(
+                    "Failed to remove obsolete Crawl4AI cache entries: %s", exc
+                )
+        if cacheable_results:
+            try:
+                await self._replace_cache_with_usable_results(cacheable_results)
+            except Exception as exc:
+                logger.warning("Failed to refresh Crawl4AI cache entries: %s", exc)
 
     async def _replace_cache_with_usable_results(
         self, crawl_results: list[Any]
@@ -1142,6 +1160,14 @@ async def _persist_navigation_result(
             "status_preserved": True,
         }
 
+    candidates_result = await db.execute(
+        select(SourcePage).where(
+            SourcePage.school_id == school_id,
+            SourcePage.scrape_type == ScrapeType.WEBSITE,
+        )
+    )
+    website_source_pages = list(candidates_result.scalars().all())
+
     for page in pages:
         has_content = navigator._is_extractable_page_content(page)
         if (
@@ -1153,72 +1179,56 @@ async def _persist_navigation_result(
             continue
         stored_markdown = page.markdown if has_content else None
 
-        existing = await db.execute(
-            select(SourcePage).where(
-                SourcePage.school_id == school_id,
-                SourcePage.scrape_type == ScrapeType.WEBSITE,
-                SourcePage.source_url == page.url,
-            )
-        )
-        source_page = existing.scalar_one_or_none()
-        if source_page is None:
-            candidates_result = await db.execute(
-                select(SourcePage).where(
-                    SourcePage.school_id == school_id,
-                    SourcePage.scrape_type == ScrapeType.WEBSITE,
-                )
-            )
-            source_page = next(
-                (
-                    candidate
-                    for candidate in candidates_result.scalars().all()
-                    if navigator._is_same_page_url(candidate.source_url, page.url)
-                ),
-                None,
-            )
+        source_pages = [
+            candidate
+            for candidate in website_source_pages
+            if navigator._is_same_page_url(candidate.source_url, page.url)
+        ]
 
-        if source_page:
-            was_valid = bool(source_page.is_valid)
-            hash_changed = source_page.content_hash != page.content_hash
-            content_changed = source_page.raw_markdown != stored_markdown
-            category_changed = (
-                page.category is not None and source_page.page_category != page.category
-            )
-            validity_changed = source_page.is_valid != has_content
-            material_change = material_change or any(
-                (content_changed, category_changed, validity_changed)
-            )
-            if page.category is not None:
-                source_page.page_category = page.category
-            source_page.raw_markdown = stored_markdown
-            source_page.is_valid = has_content
-            source_page.last_scraped_at = now
-            source_page.scrape_count = (source_page.scrape_count or 0) + 1
-            if hash_changed or content_changed:
-                source_page.content_hash = page.content_hash
-                source_page.last_changed_at = now
-            if (
-                page.status_code in navigator.DEFINITIVE_REMOVAL_STATUS_CODES
-                and was_valid
-            ):
-                definitive_invalidated += 1
-            updated += 1
+        if source_pages:
+            for source_page in source_pages:
+                was_valid = bool(source_page.is_valid)
+                hash_changed = source_page.content_hash != page.content_hash
+                content_changed = source_page.raw_markdown != stored_markdown
+                category_changed = (
+                    page.category is not None
+                    and source_page.page_category != page.category
+                )
+                validity_changed = source_page.is_valid != has_content
+                material_change = material_change or any(
+                    (content_changed, category_changed, validity_changed)
+                )
+                if page.category is not None:
+                    source_page.page_category = page.category
+                source_page.raw_markdown = stored_markdown
+                source_page.is_valid = has_content
+                source_page.last_scraped_at = now
+                source_page.scrape_count = (source_page.scrape_count or 0) + 1
+                if hash_changed or content_changed:
+                    source_page.content_hash = page.content_hash
+                    source_page.last_changed_at = now
+                if (
+                    page.status_code in navigator.DEFINITIVE_REMOVAL_STATUS_CODES
+                    and was_valid
+                ):
+                    definitive_invalidated += 1
+                updated += 1
         else:
             material_change = material_change or has_content
-            db.add(
-                SourcePage(
-                    school_id=school_id,
-                    scrape_type=ScrapeType.WEBSITE,
-                    source_url=page.url,
-                    content_hash=page.content_hash,
-                    page_category=page.category,
-                    raw_markdown=stored_markdown,
-                    is_valid=has_content,
-                    last_scraped_at=now,
-                    last_changed_at=now,
-                    scrape_count=1,
-                )
+            source_page = SourcePage(
+                school_id=school_id,
+                scrape_type=ScrapeType.WEBSITE,
+                source_url=page.url,
+                content_hash=page.content_hash,
+                page_category=page.category,
+                raw_markdown=stored_markdown,
+                is_valid=has_content,
+                last_scraped_at=now,
+                last_changed_at=now,
+                scrape_count=1,
             )
+            db.add(source_page)
+            website_source_pages.append(source_page)
             created += 1
 
     existing_pages_result = await db.execute(
