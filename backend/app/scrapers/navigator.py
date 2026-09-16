@@ -1161,10 +1161,7 @@ async def _persist_navigation_result(
             )
         )
         source_page = existing.scalar_one_or_none()
-        if (
-            source_page is None
-            and page.status_code in navigator.DEFINITIVE_REMOVAL_STATUS_CODES
-        ):
+        if source_page is None:
             candidates_result = await db.execute(
                 select(SourcePage).where(
                     SourcePage.school_id == school_id,

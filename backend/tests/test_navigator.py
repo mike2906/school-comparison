@@ -601,7 +601,7 @@ async def test_live_navigation_preserves_completed_status_only_when_unchanged(
 
     pages = [
         NavigatedPage(
-            url="https://school.bg/fees",
+            url=f"{final_url.rstrip('/')}/fees",
             category="pricing",
             markdown=new_markdown,
             content_hash=new_hash,
