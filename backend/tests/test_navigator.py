@@ -403,7 +403,11 @@ async def test_live_refresh_replaces_and_verifies_usable_cache_entry():
     from crawl4ai.async_database import async_db_manager
 
     navigator = WebsiteNavigator(country_code="bg", bypass_cache=True)
-    live_result = SimpleNamespace(url="https://school.bg/fees", html="<html>Fresh fees</html>")
+    live_result = SimpleNamespace(
+        url="https://school.bg/fees",
+        redirected_url="https://www.school.bg/fees",
+        html="<html>Fresh fees</html>",
+    )
     cache_write = AsyncMock()
     cache_read = AsyncMock(
         return_value=SimpleNamespace(html="<html>Fresh fees</html>")
@@ -415,8 +419,14 @@ async def test_live_refresh_replaces_and_verifies_usable_cache_entry():
     ):
         await navigator._replace_cache_with_usable_results([live_result])
 
-    cache_write.assert_awaited_once_with(live_result)
-    cache_read.assert_awaited_once_with("https://school.bg/fees")
+    assert [call.args[0].url for call in cache_write.await_args_list] == [
+        "https://school.bg/fees",
+        "https://www.school.bg/fees",
+    ]
+    assert [call.args[0] for call in cache_read.await_args_list] == [
+        "https://school.bg/fees",
+        "https://www.school.bg/fees",
+    ]
 
 
 @pytest.mark.asyncio

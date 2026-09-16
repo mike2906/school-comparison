@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import json
 import logging
 import re
@@ -814,10 +815,26 @@ class WebsiteNavigator:
         from crawl4ai.async_database import async_db_manager  # type: ignore
 
         for result in crawl_results:
-            await async_db_manager.acache_url(result)
-            cached = await async_db_manager.aget_cached_url(result.url)
-            if cached is None or cached.html != result.html:
-                raise RuntimeError(f"Failed to refresh Crawl4AI cache for {result.url}")
+            cache_urls = list(
+                dict.fromkeys(
+                    filter(
+                        None,
+                        (
+                            str(getattr(result, "url", "") or ""),
+                            str(getattr(result, "redirected_url", "") or ""),
+                        ),
+                    )
+                )
+            )
+            for cache_url in cache_urls:
+                cache_result = copy.copy(result)
+                cache_result.url = cache_url
+                await async_db_manager.acache_url(cache_result)
+                cached = await async_db_manager.aget_cached_url(cache_url)
+                if cached is None or cached.html != result.html:
+                    raise RuntimeError(
+                        f"Failed to refresh Crawl4AI cache for {cache_url}"
+                    )
 
     async def _remove_cache_entries(self, urls: list[str]) -> None:
         """Remove definitively obsolete URLs from Crawl4AI's cache."""
