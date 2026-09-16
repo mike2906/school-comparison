@@ -388,6 +388,7 @@ def test_live_refresh_collects_only_usable_results_for_cache_replacement():
     assert len(pages) == 3
     assert final_url == "https://school.bg/fees"
     assert pages[-1].url == "https://school.bg/old-fees"
+    assert pages[-1].requested_url == "https://school.bg/old-fees"
     assert cacheable_results == [usable]
     assert set(removal_cache_urls) == {
         "https://school.bg/old-fees",
@@ -1163,6 +1164,77 @@ async def test_live_navigation_updates_all_existing_canonical_aliases(
     assert all(row.content_hash == content_hash for row in rows)
     assert result["updated"] == 2
     assert result["created"] == 0
+
+
+@pytest.mark.asyncio
+async def test_live_navigation_invalidates_requested_path_after_redirect(db_session):
+    school = School(
+        name_i18n={"bg": "School with redirected fees"},
+        country_code="bg",
+        school_type="private",
+        education_level="primary",
+        city="sofia",
+        website_url="https://school.bg",
+        scrape_status="extracted",
+    )
+    db_session.add(school)
+    await db_session.flush()
+    old_page = SourcePage(
+        school_id=school.id,
+        scrape_type=ScrapeType.WEBSITE,
+        source_url="https://school.bg/fees",
+        page_category="pricing",
+        raw_markdown="Old fees",
+        content_hash="old-hash",
+        is_valid=True,
+    )
+    db_session.add(old_page)
+    await db_session.commit()
+
+    pages = [
+        NavigatedPage(
+            url="https://school.bg/pricing",
+            requested_url="https://school.bg/fees",
+            category="pricing",
+            markdown="Current pricing",
+            content_hash="current-hash",
+            cache_status="miss",
+        )
+    ]
+
+    async def fake_discover_pages(self, website_url: str):
+        return website_url, pages
+
+    from unittest.mock import patch
+
+    with patch(
+        "app.scrapers.navigator.WebsiteNavigator.discover_pages",
+        new=fake_discover_pages,
+    ):
+        result = await navigate_school(
+            db=db_session,
+            school_id=school.id,
+            country_code="bg",
+            bypass_cache=True,
+        )
+
+    rows_result = await db_session.execute(
+        select(SourcePage)
+        .where(SourcePage.school_id == school.id)
+        .order_by(SourcePage.source_url)
+    )
+    rows = rows_result.scalars().all()
+    assert len(rows) == 2
+    assert rows[0].source_url == "https://school.bg/fees"
+    assert rows[0].is_valid is False
+    assert rows[0].raw_markdown is None
+    assert rows[1].source_url == "https://school.bg/pricing"
+    assert rows[1].is_valid is True
+    assert rows[1].raw_markdown == "Current pricing"
+    assert result["invalidated"] == 1
+    assert result["updated"] == 1
+    assert result["created"] == 1
+    assert result["material_change"] is True
 
 
 @pytest.mark.asyncio

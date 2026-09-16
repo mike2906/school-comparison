@@ -37,6 +37,7 @@ class NavigatedPage:
     cache_status: str | None = None
     head_fingerprint: str | None = None
     status_code: int | None = None
+    requested_url: str | None = None
 
 
 @dataclass
@@ -971,6 +972,7 @@ class WebsiteNavigator:
                 cache_status=str(cache_status) if cache_status is not None else None,
                 head_fingerprint=str(head_fingerprint) if head_fingerprint else None,
                 status_code=status_code,
+                requested_url=self._normalize_url(str(requested_url)),
             )
             pages.append(page)
             if (
@@ -1178,6 +1180,7 @@ async def _persist_navigation_result(
     )
     material_change = False
     definitive_invalidated = 0
+    redirect_invalidated = 0
 
     if (
         navigator.bypass_cache
@@ -1218,6 +1221,35 @@ async def _persist_navigation_result(
         ):
             continue
         stored_markdown = page.markdown if has_content else None
+
+        if has_content and page.requested_url and not navigator._is_same_page_url(
+            page.requested_url, page.url
+        ):
+            redirected_sources = [
+                candidate
+                for candidate in website_source_pages
+                if navigator._is_same_page_url(
+                    candidate.source_url, page.requested_url
+                )
+            ]
+            for redirected_source in redirected_sources:
+                was_valid = bool(redirected_source.is_valid)
+                source_changed = (
+                    redirected_source.raw_markdown is not None or was_valid
+                )
+                material_change = material_change or source_changed
+                redirected_source.raw_markdown = None
+                redirected_source.is_valid = False
+                redirected_source.last_scraped_at = now
+                redirected_source.scrape_count = (
+                    redirected_source.scrape_count or 0
+                ) + 1
+                if source_changed:
+                    redirected_source.content_hash = page.content_hash
+                    redirected_source.last_changed_at = now
+                if was_valid:
+                    redirect_invalidated += 1
+                updated += 1
 
         source_pages = [
             candidate
@@ -1280,7 +1312,7 @@ async def _persist_navigation_result(
     existing_pages = existing_pages_result.scalars().all()
     canonical_site_url = final_url or normalized_url
 
-    invalidated = definitive_invalidated
+    invalidated = definitive_invalidated + redirect_invalidated
     for existing_page in existing_pages:
         text = (existing_page.raw_markdown or "").strip()
         if not text:
