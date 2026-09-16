@@ -852,6 +852,7 @@ class WebsiteNavigator:
         pages: list[NavigatedPage] = []
         cache_candidates: dict[str, tuple[NavigatedPage, Any]] = {}
         final_url = normalized_url
+        final_url_selected = False
 
         for result in results:
             raw_status_code = getattr(result, "status_code", None)
@@ -865,10 +866,18 @@ class WebsiteNavigator:
             ):
                 continue
 
-            raw_url = getattr(result, "redirected_url", None) or getattr(result, "url", None) or normalized_url
+            requested_url = getattr(result, "url", None) or normalized_url
+            if status_code in self.DEFINITIVE_REMOVAL_STATUS_CODES:
+                raw_url = requested_url
+            else:
+                raw_url = getattr(result, "redirected_url", None) or requested_url
             storage_url = self._normalize_url(str(raw_url))
-            if not pages:
+            if (
+                not final_url_selected
+                and status_code not in self.DEFINITIVE_REMOVAL_STATUS_CODES
+            ):
                 final_url = storage_url
+                final_url_selected = True
 
             markdown = self._extract_markdown(result)
             title = ""
@@ -894,7 +903,11 @@ class WebsiteNavigator:
                 and page.status_code in self.DEFINITIVE_REMOVAL_STATUS_CODES
             ):
                 removal_cache_urls.extend(
-                    [str(getattr(result, "url", "") or ""), storage_url]
+                    [
+                        str(requested_url),
+                        str(getattr(result, "redirected_url", "") or ""),
+                        storage_url,
+                    ]
                 )
             if cacheable_results is not None and self._is_extractable_page_content(page):
                 current = cache_candidates.get(page.url)
@@ -1231,7 +1244,12 @@ async def _persist_navigation_result(
         )
 
     status_preserved = False
-    if navigator.bypass_cache and original_scrape_status in WEBSITE_PUBLISHABLE_STATUSES:
+    if (
+        original_scrape_status in WEBSITE_PUBLISHABLE_STATUSES
+        and definitive_invalidated > 0
+    ):
+        school.scrape_status = "navigated"
+    elif navigator.bypass_cache and original_scrape_status in WEBSITE_PUBLISHABLE_STATUSES:
         if material_change:
             school.scrape_status = "navigated"
         else:

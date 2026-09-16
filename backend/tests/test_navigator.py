@@ -366,7 +366,7 @@ def test_live_refresh_collects_only_usable_results_for_cache_replacement():
         {
             "success": False,
             "url": "https://school.bg/old-fees",
-            "redirected_url": None,
+            "redirected_url": "https://school.bg/not-found",
             "markdown": None,
             "html": "",
             "metadata": {},
@@ -378,7 +378,7 @@ def test_live_refresh_collects_only_usable_results_for_cache_replacement():
     cacheable_results = []
     removal_cache_urls = []
 
-    _, pages = navigator._extract_pages_from_results(
+    final_url, pages = navigator._extract_pages_from_results(
         normalized_url="https://school.bg",
         results_obj=[shorter_duplicate, usable, challenge, removed],
         cacheable_results=cacheable_results,
@@ -386,8 +386,13 @@ def test_live_refresh_collects_only_usable_results_for_cache_replacement():
     )
 
     assert len(pages) == 3
+    assert final_url == "https://school.bg/fees"
+    assert pages[-1].url == "https://school.bg/old-fees"
     assert cacheable_results == [usable]
-    assert set(removal_cache_urls) == {"https://school.bg/old-fees"}
+    assert set(removal_cache_urls) == {
+        "https://school.bg/old-fees",
+        "https://school.bg/not-found",
+    }
 
 
 @pytest.mark.asyncio
@@ -876,14 +881,15 @@ async def test_live_navigation_preserves_existing_page_on_partial_unusable_respo
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    ("status_code", "response_url"),
+    ("status_code", "response_url", "bypass_cache"),
     [
-        (404, "https://school.bg/fees"),
-        (410, "https://school.bg/fees/"),
+        (404, "https://school.bg/fees", True),
+        (410, "https://school.bg/fees/", True),
+        (404, "https://school.bg/fees", False),
     ],
 )
 async def test_live_navigation_invalidates_definitively_removed_page(
-    db_session, status_code, response_url
+    db_session, status_code, response_url, bypass_cache
 ):
     school = School(
         name_i18n={"bg": "School with removed fees"},
@@ -929,7 +935,7 @@ async def test_live_navigation_invalidates_definitively_removed_page(
             db=db_session,
             school_id=school.id,
             country_code="bg",
-            bypass_cache=True,
+            bypass_cache=bypass_cache,
         )
 
     await db_session.refresh(school)
