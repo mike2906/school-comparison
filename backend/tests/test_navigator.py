@@ -360,16 +360,34 @@ def test_live_refresh_collects_only_usable_results_for_cache_replacement():
             "cache_status": "miss",
         },
     )()
+    removed = type(
+        "Result",
+        (),
+        {
+            "success": False,
+            "url": "https://school.bg/old-fees",
+            "redirected_url": None,
+            "markdown": None,
+            "html": "",
+            "metadata": {},
+            "head_fingerprint": "removed-head",
+            "cache_status": "miss",
+            "status_code": 404,
+        },
+    )()
     cacheable_results = []
+    removal_cache_urls = []
 
     _, pages = navigator._extract_pages_from_results(
         normalized_url="https://school.bg",
-        results_obj=[shorter_duplicate, usable, challenge],
+        results_obj=[shorter_duplicate, usable, challenge, removed],
         cacheable_results=cacheable_results,
+        removal_cache_urls=removal_cache_urls,
     )
 
-    assert len(pages) == 2
+    assert len(pages) == 3
     assert cacheable_results == [usable]
+    assert set(removal_cache_urls) == {"https://school.bg/old-fees"}
 
 
 @pytest.mark.asyncio
@@ -412,6 +430,41 @@ async def test_live_refresh_fails_when_cache_replacement_cannot_be_verified():
         pytest.raises(RuntimeError, match="Failed to refresh Crawl4AI cache"),
     ):
         await navigator._replace_cache_with_usable_results([live_result])
+
+
+@pytest.mark.asyncio
+async def test_live_refresh_removes_and_verifies_definitive_removal_cache_entries():
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock, patch
+
+    from crawl4ai.async_database import async_db_manager
+
+    navigator = WebsiteNavigator(country_code="bg", bypass_cache=True)
+    db_execute = AsyncMock()
+
+    async def execute_operation(operation):
+        await operation(SimpleNamespace(execute=db_execute))
+
+    execute_with_retry = AsyncMock(side_effect=execute_operation)
+    cache_read = AsyncMock(return_value=None)
+    with (
+        patch.object(
+            async_db_manager,
+            "execute_with_retry",
+            new=execute_with_retry,
+        ),
+        patch.object(async_db_manager, "aget_cached_url", new=cache_read),
+    ):
+        await navigator._remove_cache_entries(
+            ["https://school.bg/old-fees", "https://school.bg/old-fees"]
+        )
+
+    execute_with_retry.assert_awaited_once()
+    db_execute.assert_awaited_once_with(
+        "DELETE FROM crawled_data WHERE url IN (?)",
+        ("https://school.bg/old-fees",),
+    )
+    cache_read.assert_awaited_once_with("https://school.bg/old-fees")
 
 
 @pytest.mark.asyncio
@@ -819,6 +872,75 @@ async def test_live_navigation_preserves_existing_page_on_partial_unusable_respo
     assert result["invalidated"] == 0
     assert result["material_change"] is False
     assert result["status_preserved"] is True
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("status_code", "response_url"),
+    [
+        (404, "https://school.bg/fees"),
+        (410, "https://school.bg/fees/"),
+    ],
+)
+async def test_live_navigation_invalidates_definitively_removed_page(
+    db_session, status_code, response_url
+):
+    school = School(
+        name_i18n={"bg": "School with removed fees"},
+        country_code="bg",
+        school_type="private",
+        education_level="primary",
+        city="sofia",
+        website_url="https://school.bg",
+        scrape_status="extracted",
+    )
+    db_session.add(school)
+    await db_session.flush()
+    removed_page = SourcePage(
+        school_id=school.id,
+        scrape_type=ScrapeType.WEBSITE,
+        source_url="https://school.bg/fees",
+        page_category="pricing",
+        raw_markdown="Stored fees",
+        content_hash="fees-hash",
+        is_valid=True,
+    )
+    db_session.add(removed_page)
+    await db_session.commit()
+
+    pages = [
+        NavigatedPage(
+            url=response_url,
+            category="pricing",
+            markdown="Page not found",
+            content_hash="removed-hash",
+            cache_status="miss",
+            status_code=status_code,
+        )
+    ]
+
+    async def fake_discover_pages(self, website_url: str):
+        return website_url, pages
+
+    from unittest.mock import patch
+
+    with patch("app.scrapers.navigator.WebsiteNavigator.discover_pages", new=fake_discover_pages):
+        result = await navigate_school(
+            db=db_session,
+            school_id=school.id,
+            country_code="bg",
+            bypass_cache=True,
+        )
+
+    await db_session.refresh(school)
+    await db_session.refresh(removed_page)
+    assert result["success"] is False
+    assert school.scrape_status == "navigated"
+    assert removed_page.is_valid is False
+    assert removed_page.raw_markdown is None
+    assert result["invalidated"] == 1
+    assert result["material_change"] is True
+    assert result["status_preserved"] is False
 
 
 @pytest.mark.asyncio

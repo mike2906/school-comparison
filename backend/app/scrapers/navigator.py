@@ -35,6 +35,7 @@ class NavigatedPage:
     content_hash: str
     cache_status: str | None = None
     head_fingerprint: str | None = None
+    status_code: int | None = None
 
 
 @dataclass
@@ -55,6 +56,7 @@ class WebsiteNavigator:
     PAGE_TIMEOUT_SECONDS = 30.0
     CRAWL_TIMEOUT_SECONDS = 120.0
     MAX_CONTENT_CHARS = 15000
+    DEFINITIVE_REMOVAL_STATUS_CODES = frozenset({404, 410})
     RETRYABLE_CRAWL_ERROR_MARKERS = (
         "timeout",
         "timed out",
@@ -651,6 +653,8 @@ class WebsiteNavigator:
         return any(marker in lowered for marker in self.BOT_PROTECTION_TEXT_MARKERS)
 
     def _is_extractable_page_content(self, page: NavigatedPage) -> bool:
+        if page.status_code in self.DEFINITIVE_REMOVAL_STATUS_CODES:
+            return False
         text = (page.markdown or "").strip()
         if not text:
             return False
@@ -675,6 +679,17 @@ class WebsiteNavigator:
         if host == canonical_host:
             return True
         return host.endswith(f".{canonical_host}") or canonical_host.endswith(f".{host}")
+
+    def _is_same_page_url(self, first_url: str, second_url: str) -> bool:
+        first = urlparse(first_url)
+        second = urlparse(second_url)
+        first_path = unquote(first.path or "/").rstrip("/") or "/"
+        second_path = unquote(second.path or "/").rstrip("/") or "/"
+        return (
+            self._host_key(first_url) == self._host_key(second_url)
+            and first_path == second_path
+            and first.query == second.query
+        )
 
     def _dedupe_pages(self, pages: list[NavigatedPage]) -> list[NavigatedPage]:
         by_url: dict[str, NavigatedPage] = {}
@@ -739,11 +754,15 @@ class WebsiteNavigator:
             )
 
         cacheable_results: list[Any] = []
+        removal_cache_urls: list[str] = []
         final_url, pages = self._extract_pages_from_results(
             normalized_url=normalized_url,
             results_obj=results_obj,
             cacheable_results=cacheable_results if self.bypass_cache else None,
+            removal_cache_urls=removal_cache_urls if self.bypass_cache else None,
         )
+        if self.bypass_cache and removal_cache_urls:
+            await self._remove_cache_entries(removal_cache_urls)
         if any(self._is_extractable_page_content(page) for page in pages):
             if self.bypass_cache:
                 await self._replace_cache_with_usable_results(cacheable_results)
@@ -764,11 +783,17 @@ class WebsiteNavigator:
                     timeout=self.CRAWL_TIMEOUT_SECONDS,
                 )
             retry_cacheable_results: list[Any] = []
+            retry_removal_cache_urls: list[str] = []
             retry_final_url, retry_pages = self._extract_pages_from_results(
                 normalized_url=normalized_url,
                 results_obj=retry_results,
                 cacheable_results=retry_cacheable_results if self.bypass_cache else None,
+                removal_cache_urls=(
+                    retry_removal_cache_urls if self.bypass_cache else None
+                ),
             )
+            if self.bypass_cache and retry_removal_cache_urls:
+                await self._remove_cache_entries(retry_removal_cache_urls)
             if retry_pages:
                 if self.bypass_cache and any(
                     self._is_extractable_page_content(page) for page in retry_pages
@@ -794,12 +819,33 @@ class WebsiteNavigator:
             if cached is None or cached.html != result.html:
                 raise RuntimeError(f"Failed to refresh Crawl4AI cache for {result.url}")
 
+    async def _remove_cache_entries(self, urls: list[str]) -> None:
+        """Remove definitively obsolete URLs from Crawl4AI's cache."""
+        from crawl4ai.async_database import async_db_manager  # type: ignore
+
+        unique_urls = list(dict.fromkeys(url for url in urls if url))
+        if not unique_urls:
+            return
+
+        async def delete_urls(db: Any) -> None:
+            placeholders = ", ".join("?" for _ in unique_urls)
+            await db.execute(
+                f"DELETE FROM crawled_data WHERE url IN ({placeholders})",
+                tuple(unique_urls),
+            )
+
+        await async_db_manager.execute_with_retry(delete_urls)
+        for url in unique_urls:
+            if await async_db_manager.aget_cached_url(url) is not None:
+                raise RuntimeError(f"Failed to remove Crawl4AI cache entry for {url}")
+
     def _extract_pages_from_results(
         self,
         *,
         normalized_url: str,
         results_obj: Any,
         cacheable_results: list[Any] | None = None,
+        removal_cache_urls: list[str] | None = None,
     ) -> tuple[str, list[NavigatedPage]]:
         results = self._iter_results(results_obj)
 
@@ -808,7 +854,15 @@ class WebsiteNavigator:
         final_url = normalized_url
 
         for result in results:
-            if not getattr(result, "success", False):
+            raw_status_code = getattr(result, "status_code", None)
+            try:
+                status_code = int(raw_status_code) if raw_status_code is not None else None
+            except (TypeError, ValueError):
+                status_code = None
+            if (
+                not getattr(result, "success", False)
+                and status_code not in self.DEFINITIVE_REMOVAL_STATUS_CODES
+            ):
                 continue
 
             raw_url = getattr(result, "redirected_url", None) or getattr(result, "url", None) or normalized_url
@@ -832,8 +886,16 @@ class WebsiteNavigator:
                 content_hash=BaseScraper.compute_hash(str(hash_seed)),
                 cache_status=str(cache_status) if cache_status is not None else None,
                 head_fingerprint=str(head_fingerprint) if head_fingerprint else None,
+                status_code=status_code,
             )
             pages.append(page)
+            if (
+                removal_cache_urls is not None
+                and page.status_code in self.DEFINITIVE_REMOVAL_STATUS_CODES
+            ):
+                removal_cache_urls.extend(
+                    [str(getattr(result, "url", "") or ""), storage_url]
+                )
             if cacheable_results is not None and self._is_extractable_page_content(page):
                 current = cache_candidates.get(page.url)
                 if current is None or len(page.markdown or "") > len(
@@ -1019,15 +1081,21 @@ async def _persist_navigation_result(
     contentful_pages = sum(
         navigator._is_extractable_page_content(page) for page in pages
     )
+    definitive_removals = sum(
+        page.status_code in navigator.DEFINITIVE_REMOVAL_STATUS_CODES
+        for page in pages
+    )
     cache_hits = sum(
         (page.cache_status or "").startswith("hit") for page in pages
     )
     material_change = False
+    definitive_invalidated = 0
 
     if (
         navigator.bypass_cache
         and original_scrape_status in WEBSITE_PUBLISHABLE_STATUSES
         and contentful_pages == 0
+        and definitive_removals == 0
     ):
         return {
             "school_id": school_id,
@@ -1050,6 +1118,7 @@ async def _persist_navigation_result(
             navigator.bypass_cache
             and original_scrape_status in WEBSITE_PUBLISHABLE_STATUSES
             and not has_content
+            and page.status_code not in navigator.DEFINITIVE_REMOVAL_STATUS_CODES
         ):
             continue
         stored_markdown = page.markdown if has_content else None
@@ -1062,8 +1131,27 @@ async def _persist_navigation_result(
             )
         )
         source_page = existing.scalar_one_or_none()
+        if (
+            source_page is None
+            and page.status_code in navigator.DEFINITIVE_REMOVAL_STATUS_CODES
+        ):
+            candidates_result = await db.execute(
+                select(SourcePage).where(
+                    SourcePage.school_id == school_id,
+                    SourcePage.scrape_type == ScrapeType.WEBSITE,
+                )
+            )
+            source_page = next(
+                (
+                    candidate
+                    for candidate in candidates_result.scalars().all()
+                    if navigator._is_same_page_url(candidate.source_url, page.url)
+                ),
+                None,
+            )
 
         if source_page:
+            was_valid = bool(source_page.is_valid)
             hash_changed = source_page.content_hash != page.content_hash
             content_changed = source_page.raw_markdown != stored_markdown
             category_changed = (
@@ -1082,6 +1170,11 @@ async def _persist_navigation_result(
             if hash_changed or content_changed:
                 source_page.content_hash = page.content_hash
                 source_page.last_changed_at = now
+            if (
+                page.status_code in navigator.DEFINITIVE_REMOVAL_STATUS_CODES
+                and was_valid
+            ):
+                definitive_invalidated += 1
             updated += 1
         else:
             material_change = material_change or has_content
@@ -1110,7 +1203,7 @@ async def _persist_navigation_result(
     existing_pages = existing_pages_result.scalars().all()
     canonical_site_url = final_url or normalized_url
 
-    invalidated = 0
+    invalidated = definitive_invalidated
     for existing_page in existing_pages:
         text = (existing_page.raw_markdown or "").strip()
         if not text:
