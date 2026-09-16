@@ -445,12 +445,16 @@ async def test_live_refresh_fails_when_cache_replacement_cannot_be_verified():
     navigator = WebsiteNavigator(country_code="bg", bypass_cache=True)
     live_result = SimpleNamespace(url="https://school.bg/fees", html="<html>Fresh fees</html>")
 
+    evict_cache = AsyncMock()
     with (
         patch.object(async_db_manager, "acache_url", new=AsyncMock()),
         patch.object(async_db_manager, "aget_cached_url", new=AsyncMock(return_value=None)),
+        patch.object(navigator, "_remove_exact_cache_entries", new=evict_cache),
         pytest.raises(RuntimeError, match="Failed to refresh Crawl4AI cache"),
     ):
         await navigator._replace_cache_with_usable_results([live_result])
+
+    evict_cache.assert_awaited_once_with(["https://school.bg/fees"])
 
 
 @pytest.mark.asyncio
@@ -472,10 +476,12 @@ async def test_live_refresh_continues_after_one_cache_entry_fails():
             SimpleNamespace(html="Fresh admission"),
         ]
     )
+    evict_cache = AsyncMock()
 
     with (
         patch.object(async_db_manager, "acache_url", new=cache_write),
         patch.object(async_db_manager, "aget_cached_url", new=cache_read),
+        patch.object(navigator, "_remove_exact_cache_entries", new=evict_cache),
         pytest.raises(RuntimeError, match="Failed to refresh Crawl4AI cache"),
     ):
         await navigator._replace_cache_with_usable_results(live_results)
@@ -488,6 +494,7 @@ async def test_live_refresh_continues_after_one_cache_entry_fails():
         "https://school.bg/fees",
         "https://school.bg/admission",
     ]
+    evict_cache.assert_awaited_once_with(["https://school.bg/fees"])
 
 
 @pytest.mark.asyncio

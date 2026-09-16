@@ -862,7 +862,12 @@ class WebsiteNavigator:
                     if cached is None or cached.html != result.html:
                         raise RuntimeError("cache verification failed")
                 except Exception as exc:
-                    failures.append(f"{cache_url}: {exc}")
+                    failure = f"{cache_url}: {exc}"
+                    try:
+                        await self._remove_exact_cache_entries([cache_url])
+                    except Exception as eviction_exc:
+                        failure += f"; eviction failed: {eviction_exc}"
+                    failures.append(failure)
 
         if failures:
             raise RuntimeError(
@@ -871,9 +876,13 @@ class WebsiteNavigator:
 
     async def _remove_cache_entries(self, urls: list[str]) -> None:
         """Remove definitively obsolete URLs from Crawl4AI's cache."""
+        await self._remove_exact_cache_entries(self._expand_cache_aliases(urls))
+
+    async def _remove_exact_cache_entries(self, urls: list[str]) -> None:
+        """Remove the specified Crawl4AI cache keys without alias expansion."""
         from crawl4ai.async_database import async_db_manager  # type: ignore
 
-        unique_urls = self._expand_cache_aliases(urls)
+        unique_urls = list(dict.fromkeys(url for url in urls if url))
         if not unique_urls:
             return
 
@@ -885,9 +894,14 @@ class WebsiteNavigator:
             )
 
         await async_db_manager.execute_with_retry(delete_urls)
+        failures: list[str] = []
         for url in unique_urls:
             if await async_db_manager.aget_cached_url(url) is not None:
-                raise RuntimeError(f"Failed to remove Crawl4AI cache entry for {url}")
+                failures.append(url)
+        if failures:
+            raise RuntimeError(
+                "Failed to remove Crawl4AI cache entries for " + "; ".join(failures)
+            )
 
     def _expand_cache_aliases(self, urls: list[str]) -> list[str]:
         """Include stored canonical aliases for cache replacement or removal."""
