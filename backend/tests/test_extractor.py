@@ -3355,3 +3355,192 @@ def test_build_openrouter_model_settings_with_routing(monkeypatch):
         "allow_fallbacks": False,
         "sort": "latency",
     }
+
+
+@pytest.mark.asyncio
+async def test_extracted_pricing_links_to_its_evidence_page(
+    db_session,
+    sample_school_for_extraction,
+):
+    """Each new row records the page it came from, which is what makes it publishable."""
+    school = sample_school_for_extraction
+    priced = PriceExtractionOutput(
+        prices=[
+            ExtractedPrice(
+                category="tuition",
+                amount=1000.0,
+                currency="BGN",
+                period="monthly",
+                confidence=0.9,
+            )
+        ],
+        has_pricing_info=True,
+    )
+    pages = (
+        await db_session.execute(select(SourcePage).where(SourcePage.school_id == school.id))
+    ).scalars().all()
+    pricing_page = next(page for page in pages if page.page_category == "pricing")
+
+    with patch(
+        "app.scrapers.extractor._run_typed_agent",
+        new=AsyncMock(return_value=(priced, 10, 2, 0.001)),
+    ):
+        result = await extractor_module._extract_prices(
+            db_session,
+            school,
+            list(pages),
+            20.0,
+            extractor_module.ExtractionLLMStats(),
+        )
+
+    assert result["success"] is True
+    rows = (
+        await db_session.execute(select(Pricing).where(Pricing.school_id == school.id))
+    ).scalars().all()
+    assert [row.source_page_id for row in rows] == [pricing_page.id]
+
+
+@pytest.mark.asyncio
+async def test_extraction_replaces_only_the_academic_year_it_writes(
+    db_session,
+    sample_school_for_extraction,
+):
+    """Fee history survives a refresh: only the written year is superseded."""
+    school = sample_school_for_extraction
+    db_session.add_all(
+        [
+            Pricing(
+                school_id=school.id,
+                category="tuition",
+                amount=800,
+                currency="BGN",
+                period="monthly",
+                academic_year="2024-2025",
+                source=PriceSource.SCRAPED_WEBSITE,
+                source_url="https://test-school.bg/prices",
+                pricing_context={"confidence": 0.9},
+            ),
+            Pricing(
+                school_id=school.id,
+                category="tuition",
+                amount=900,
+                currency="BGN",
+                period="monthly",
+                # Same logical year as the incoming row, spelled differently.
+                academic_year="2026-2027",
+                source=PriceSource.SCRAPED_WEBSITE,
+                source_url="https://test-school.bg/prices",
+                pricing_context={"confidence": 0.9},
+            ),
+        ]
+    )
+    await db_session.commit()
+
+    priced = PriceExtractionOutput(
+        prices=[
+            ExtractedPrice(
+                category="tuition",
+                amount=1000.0,
+                currency="BGN",
+                period="monthly",
+                academic_year="2026/2027",
+                confidence=0.9,
+            )
+        ],
+        has_pricing_info=True,
+    )
+    pages = (
+        await db_session.execute(select(SourcePage).where(SourcePage.school_id == school.id))
+    ).scalars().all()
+    next(page for page in pages if page.page_category == "pricing").raw_markdown = (
+        "Tuition for 2026/2027 is 1000 BGN monthly."
+    )
+    await db_session.flush()
+
+    with patch(
+        "app.scrapers.extractor._run_typed_agent",
+        new=AsyncMock(return_value=(priced, 10, 2, 0.001)),
+    ):
+        result = await extractor_module._extract_prices(
+            db_session,
+            school,
+            list(pages),
+            20.0,
+            extractor_module.ExtractionLLMStats(),
+        )
+
+    assert result["success"] is True
+    rows = (
+        await db_session.execute(
+            select(Pricing).where(Pricing.school_id == school.id).order_by(Pricing.id)
+        )
+    ).scalars().all()
+
+    # The earlier year is untouched history; the matching year was replaced once,
+    # even though it was stored with a different spelling.
+    assert sorted((row.academic_year, float(row.amount)) for row in rows) == [
+        ("2024-2025", 800.0),
+        ("2026/2027", 1000.0),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_extraction_preserves_rows_whose_year_is_unrecognised(
+    db_session,
+    sample_school_for_extraction,
+):
+    """An unparseable year must not be deleted as if it were an undated row."""
+    school = sample_school_for_extraction
+    db_session.add(
+        Pricing(
+            school_id=school.id,
+            category="tuition",
+            amount=700,
+            currency="BGN",
+            period="monthly",
+            # Normalizes to None, but it is not the undated bucket.
+            academic_year="2022-2027",
+            source=PriceSource.SCRAPED_WEBSITE,
+            source_url="https://test-school.bg/prices",
+            pricing_context={"confidence": 0.9},
+        )
+    )
+    await db_session.commit()
+
+    priced = PriceExtractionOutput(
+        prices=[
+            ExtractedPrice(
+                category="tuition",
+                amount=1000.0,
+                currency="BGN",
+                period="monthly",
+                confidence=0.9,
+            )
+        ],
+        has_pricing_info=True,
+    )
+    pages = (
+        await db_session.execute(select(SourcePage).where(SourcePage.school_id == school.id))
+    ).scalars().all()
+
+    with patch(
+        "app.scrapers.extractor._run_typed_agent",
+        new=AsyncMock(return_value=(priced, 10, 2, 0.001)),
+    ):
+        result = await extractor_module._extract_prices(
+            db_session,
+            school,
+            list(pages),
+            20.0,
+            extractor_module.ExtractionLLMStats(),
+        )
+
+    assert result["success"] is True
+    rows = (
+        await db_session.execute(select(Pricing).where(Pricing.school_id == school.id))
+    ).scalars().all()
+    # The undated incoming row does not supersede the unrecognised-year row.
+    assert sorted((row.academic_year or "", float(row.amount)) for row in rows) == [
+        ("", 1000.0),
+        ("2022-2027", 700.0),
+    ]

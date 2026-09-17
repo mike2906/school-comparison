@@ -270,7 +270,9 @@
     "academicYear": "Academic year",
     "plan": "Plan",
     "priceOnRequest": "Price on request",
-    "currency": "BGN"
+    "currency": "BGN",
+    "yearNotStated": "Academic year not stated by the school",
+    "notCurrentYear": "not for the current academic year"
   },
   "priceSource": {
     "official": "Official",

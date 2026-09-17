@@ -18,6 +18,7 @@ from app.models.school import School
 from app.models.source_page import SourcePage
 from app.scrapers.extraction_rules import get_rules
 from app.scrapers.school_tokens import extract_school_name_tokens
+from app.utils.academic_year import normalize_academic_year
 from app.utils.i18n_resolver import is_generic_numbered_display_label
 from app.utils.transliteration import transliterate_bulgarian
 from app.schemas.extraction import (
@@ -1989,10 +1990,8 @@ def _dedupe_price_rows(prices: list[ExtractedPrice]) -> list[ExtractedPrice]:
 
 
 def _normalize_academic_year(value: str | None) -> str | None:
-    match = re.search(r"(20\d{2})\s*[-/]\s*(20\d{2})", str(value or ""))
-    if not match:
-        return None
-    return f"{match.group(1)}/{match.group(2)}"
+    """Delegate to the shared canonical normalizer (single implementation)."""
+    return normalize_academic_year(value)
 
 
 _PRICE_MATCH_STOPWORDS = {

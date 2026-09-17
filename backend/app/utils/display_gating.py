@@ -6,10 +6,11 @@ error-level issue (or an actionable spot-check discrepancy) in the current
 Stage 6 validation report is withheld from the response, so a parent never sees a
 value the validator has already flagged as wrong.
 
-Pricing rows are gated separately by a hard rule: a row with no ``source_url`` or a
-confidence below :data:`PRICING_CONFIDENCE_FLOOR` is withheld. The floor is shared
-with ``app.services.data_quality`` so the scoreboard metric and this display gate
-can never diverge.
+Pricing rows are gated separately by hard rules: a row is withheld unless it has a
+``source_url``, a confidence at or above :data:`PRICING_CONFIDENCE_FLOOR`, a still-valid
+linked source page, and an academic year that is either absent or normalizes cleanly.
+The floor is shared with ``app.services.data_quality`` so the scoreboard metric and
+this display gate can never diverge.
 """
 
 from __future__ import annotations
@@ -20,6 +21,7 @@ import re
 from typing import Any, Iterator, Mapping
 
 from app.config import get_settings
+from app.utils.academic_year import academic_year_is_resolvable
 
 # Pricing rows below this per-row confidence are withheld from the API. Imported by
 # ``app.services.data_quality`` so the "pricing rows failing gates" metric measures
@@ -280,47 +282,29 @@ def _valid_price_shape(row: Any) -> bool:
     return low is not None and high is not None and low <= high
 
 
-def _aware_verification_time(value: Any) -> datetime.datetime | None:
-    if isinstance(value, datetime.datetime):
-        parsed = value
-    elif isinstance(value, str):
-        try:
-            parsed = datetime.datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
-        except ValueError:
-            return None
-    else:
-        return None
-    return parsed if parsed.tzinfo is not None and parsed.utcoffset() is not None else None
+def _linked_evidence_is_valid(row: Any) -> bool:
+    """True when the row still points at a source page the crawler considers valid.
 
-
-def _has_human_verification(pricing_context: Any, verification_date: Any) -> bool:
-    if not isinstance(pricing_context, Mapping):
+    This replaces same-day human verification as the trust signal. Production navigation
+    upserts source pages in place, so a routine crawl keeps the link intact and pricing
+    stays published; an explicitly invalidated page withholds its prices automatically,
+    and a failed extraction changes nothing.
+    """
+    if _pricing_row_value(row, "source_page_id") is None:
         return False
-    verification = pricing_context.get("human_verification")
-    if not isinstance(verification, Mapping):
+    source_page = _pricing_row_value(row, "source_page")
+    if source_page is None:
         return False
-    verified_by = verification.get("verified_by")
-    if not isinstance(verified_by, str) or not verified_by.strip():
-        return False
-    verified_at = _aware_verification_time(verification.get("verified_at"))
-    if verified_at is None:
-        return False
-    if isinstance(verification_date, datetime.datetime):
-        if verification_date.tzinfo is None:
-            public_date = verification_date.date()
-        else:
-            public_date = verification_date.astimezone(datetime.timezone.utc).date()
-    elif isinstance(verification_date, datetime.date):
-        public_date = verification_date
-    else:
-        return False
-    return public_date == verified_at.astimezone(datetime.timezone.utc).date()
+    return _pricing_row_value(source_page, "is_valid") is True
 
 
 def pricing_row_is_publishable(row: Any) -> bool:
-    """Fail-closed launch gate shared by API serialization and the scoreboard."""
-    source = _pricing_row_value(row, "source")
-    source_value = getattr(source, "value", source)
+    """Fail-closed launch gate shared by API serialization and the scoreboard.
+
+    Trust comes from evidence, not from a human sign-off: the row must still be backed by
+    a valid source page, and any academic year it carries must be a real one. A year that
+    does not normalize is withheld rather than guessed at.
+    """
     source_url = _pricing_row_value(row, "source_url")
     pricing_context = _pricing_row_value(row, "pricing_context")
     currency = _pricing_row_value(row, "currency")
@@ -328,12 +312,9 @@ def pricing_row_is_publishable(row: Any) -> bool:
     period_value = getattr(period, "value", period)
 
     return (
-        source_value == "official"
-        and passes_pricing_gate(source_url, pricing_context)
-        and _has_human_verification(
-            pricing_context,
-            _pricing_row_value(row, "scraped_at"),
-        )
+        passes_pricing_gate(source_url, pricing_context)
+        and _linked_evidence_is_valid(row)
+        and academic_year_is_resolvable(_pricing_row_value(row, "academic_year"))
         and _valid_price_shape(row)
         and isinstance(currency, str)
         and _CURRENCY_RE.fullmatch(currency) is not None

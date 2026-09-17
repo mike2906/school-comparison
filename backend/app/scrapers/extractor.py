@@ -1060,6 +1060,21 @@ def _build_extracted_attributes(
     return extracted
 
 
+def _retention_year_key(value: str | None) -> tuple[bool, str]:
+    """Bucket a stored academic year for replacement.
+
+    Canonical years match across spellings, so a stored "2026-2027" is superseded by an
+    incoming "2026/2027". A blank year forms the undated bucket. A non-blank year that
+    does not normalize keeps its own bucket rather than collapsing into the undated one,
+    so an unrecognised value is never deleted as collateral.
+    """
+    raw = str(value or "").strip()
+    if not raw:
+        return (False, "")
+    canonical = helpers._normalize_academic_year(raw)
+    return (True, canonical) if canonical else (False, raw)
+
+
 async def _extract_prices(
     db: AsyncSession,
     school: School,
@@ -1215,6 +1230,7 @@ async def _extract_prices(
                 age_group=fields["age_group"],
                 source=PriceSource.SCRAPED_WEBSITE,
                 source_url=row_source_url,
+                source_page_id=supporting_page.id if supporting_page else None,
                 pricing_context={
                     "notes": extracted.notes,
                     "confidence": extracted.confidence,
@@ -1268,12 +1284,23 @@ async def _extract_prices(
             "token_cost_usd": token_cost_usd,
         }
 
-    await db.execute(
-        delete(Pricing).where(
+    # Supersede only the academic years this run actually produced, so earlier years
+    # survive as fee history. Rows the school still publishes undated are replaced by
+    # the undated rows of this run.
+    written_years = {_retention_year_key(row.academic_year) for row in pricing_rows}
+    existing_result = await db.execute(
+        select(Pricing).where(
             Pricing.school_id == school.id,
             Pricing.source == PriceSource.SCRAPED_WEBSITE,
         )
     )
+    superseded_ids = [
+        existing.id
+        for existing in existing_result.scalars().all()
+        if _retention_year_key(existing.academic_year) in written_years
+    ]
+    if superseded_ids:
+        await db.execute(delete(Pricing).where(Pricing.id.in_(superseded_ids)))
     await db.execute(
         delete(FieldSource).where(
             FieldSource.school_id == school.id,

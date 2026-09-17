@@ -8,6 +8,7 @@ from app.models.exam_results import ExamResult
 from app.models.field_source import FieldSource, SourceType
 from app.models.pricing import Pricing, PriceSource
 from app.models.school import School, SchoolLocation, SchoolLocationAgeGroupShift
+from app.models.source_page import ScrapeType, SourcePage
 
 PRICING_VERIFIED_AT = datetime(2026, 7, 16, 9, 0)
 
@@ -22,6 +23,21 @@ def _validation_report(issues=None, spot_check=None, status="needs_review"):
         "auto_fixes": [],
         "spot_check": spot_check,
     }
+
+
+async def _pricing_evidence_page(db, school, url):
+    """A valid source page, so a curated row still clears the evidence gate."""
+    page = SourcePage(
+        school_id=school.id,
+        scrape_type=ScrapeType.WEBSITE,
+        source_url=url,
+        content_hash=f"hash-{school.id}-{url}",
+        raw_markdown="Такси",
+        is_valid=True,
+    )
+    db.add(page)
+    await db.flush()
+    return page
 
 
 def _verified_pricing_context(confidence=1.0, **extra):
@@ -192,6 +208,11 @@ class TestSchoolsEndpoint:
                 source=PriceSource.OFFICIAL,
                 scraped_at=PRICING_VERIFIED_AT,
                 source_url="https://public-school.bg/fees",
+                source_page_id=(
+                    await _pricing_evidence_page(
+                        seeded_db, school, "https://public-school.bg/fees"
+                    )
+                ).id,
                 pricing_context=_verified_pricing_context(
                     0.9,
                     includes=["Books"],
@@ -261,6 +282,9 @@ class TestSchoolsEndpoint:
         )
         seeded_db.add(school)
         await seeded_db.flush()
+        registry_page = await _pricing_evidence_page(
+            seeded_db, school, "https://registry.bg/fees"
+        )
         seeded_db.add_all(
             [
                 Pricing(
@@ -282,6 +306,7 @@ class TestSchoolsEndpoint:
                     source=PriceSource.OFFICIAL,
                     scraped_at=PRICING_VERIFIED_AT,
                     source_url="https://registry.bg/fees",
+                    source_page_id=registry_page.id,
                     pricing_context=_verified_pricing_context(),
                 ),
                 FieldSource(
@@ -1433,6 +1458,9 @@ class TestDisplayGating:
                 is_primary=True,
             )
         )
+        verified_page = await _pricing_evidence_page(
+            seeded_db, school, "https://example.com/verified-fees"
+        )
         seeded_db.add_all(
             [
                 Pricing(
@@ -1454,6 +1482,7 @@ class TestDisplayGating:
                     source=PriceSource.OFFICIAL,
                     scraped_at=PRICING_VERIFIED_AT,
                     source_url="https://example.com/verified-fees",
+                    source_page_id=verified_page.id,
                     pricing_context=_verified_pricing_context(),
                 ),
                 # No source_url → withheld.
@@ -1520,6 +1549,7 @@ class TestDisplayGating:
         )
         seeded_db.add(school)
         await seeded_db.flush()
+        fees_page = await _pricing_evidence_page(seeded_db, school, "https://example.com/fees")
         good = Pricing(
             school_id=school.id,
             category="tuition",
@@ -1529,6 +1559,7 @@ class TestDisplayGating:
             source=PriceSource.OFFICIAL,
             scraped_at=PRICING_VERIFIED_AT,
             source_url="https://example.com/fees",
+            source_page_id=fees_page.id,
             pricing_context=_verified_pricing_context(0.9),
         )
         # Clears the source/confidence gate, but Stage 6 flagged it as a bad price.
@@ -1541,6 +1572,7 @@ class TestDisplayGating:
             source=PriceSource.OFFICIAL,
             scraped_at=PRICING_VERIFIED_AT,
             source_url="https://example.com/fees",
+            source_page_id=fees_page.id,
             pricing_context=_verified_pricing_context(0.9),
         )
         seeded_db.add_all([good, flagged])

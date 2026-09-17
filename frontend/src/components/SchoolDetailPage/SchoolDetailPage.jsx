@@ -5,6 +5,7 @@ import Layout from '../Layout/Layout'
 import { fetchSchool, fetchExamAverages } from '../../api/schools'
 import { getSchoolName, getAddress, getSummary } from '../../utils/i18n'
 import { normalizeSchool } from '../../utils/schoolAttributes'
+import { groupPricingByAcademicYear, YEAR_STATUS } from '../../utils/pricing'
 import { useCompare } from '../../context/CompareContext'
 import {
   getStatusInfo,
@@ -696,61 +697,80 @@ function SchoolDetailPage() {
           )
         })()}
 
-        {/* Enhanced Pricing */}
         {hasPricing && (
           <div className="bg-white rounded-2xl shadow-card border border-neutral-200 p-6 md:p-8 mb-6">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold text-neutral-900">{t('pricing.title')}</h2>
-              {pricing[0]?.academic_year && (
-                <span className="text-sm px-3 py-1 bg-teal-50 text-teal-700 border border-teal-200 rounded-lg">
-                  {pricing[0].academic_year}
-                </span>
-              )}
             </div>
 
-            <div className="space-y-6">
-              {Object.entries(groupPricingByCategory(pricing))
-                .filter(([_, items]) => items.length > 0)
-                .map(([category, items]) => (
-                  <div key={category}>
-                    <h3 className="text-sm font-semibold text-neutral-500 uppercase tracking-wide mb-3">
-                      {t(`pricing.${category}`)}
-                    </h3>
-                    <div className="space-y-3">
-                      {items.map((price, idx) => {
-                        const amountText = price.amount_min != null || price.amount_max != null
-                          ? `${price.amount_min != null ? formatAmount(price.amount_min) : ''}${price.amount_min != null && price.amount_max != null ? '–' : ''}${price.amount_max != null ? formatAmount(price.amount_max) : ''} ${price.currency || 'BGN'}`
-                          : price.amount != null
-                          ? `${formatAmount(price.amount)} ${price.currency || 'BGN'}`
-                          : t('pricing.priceOnRequest')
-
-                        return (
-                          <div key={idx} className="flex items-center justify-between p-4 bg-neutral-50 rounded-lg border border-neutral-200">
-                            <div className="flex-1">
-                              <div className="font-medium text-neutral-900">
-                                {price.plan_name || t(`pricing.${price.category}`)}
-                              </div>
-                              {price.age_group && (
-                                <div className="text-sm text-neutral-500">{t(`ageGroups.${price.age_group}`)}</div>
-                              )}
-                            </div>
-                            <div className="text-right flex items-center gap-3">
-                              <div>
-                                <div className="text-lg font-bold text-neutral-900">{amountText}</div>
-                                <div className="text-sm text-neutral-500">{t(`pricing.${price.period}`)}</div>
-                              </div>
-                              {price.source && (
-                                <span className={`px-2 py-1 text-xs font-medium rounded border ${getSourceBadgeColor(price.source)}`}>
-                                  {t(`priceSource.${price.source}`)}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
+            {/* Grouped by academic year: one shared label across mixed years would
+                mis-date every group but one. */}
+            <div className="space-y-8">
+              {groupPricingByAcademicYear(pricing).map(group => (
+                <div key={group.key}>
+                  <div className="flex items-center gap-2 mb-4">
+                    <span
+                      className={`text-sm px-3 py-1 rounded-lg border ${
+                        group.yearStatus === YEAR_STATUS.CURRENT
+                          ? 'bg-teal-50 text-teal-700 border-teal-200'
+                          : 'bg-neutral-100 text-neutral-600 border-neutral-300'
+                      }`}
+                    >
+                      {group.academicYear || t('pricing.yearNotStated')}
+                    </span>
+                    {group.yearStatus === YEAR_STATUS.DATED_OTHER && (
+                      <span className="text-xs text-neutral-500">
+                        {t('pricing.notCurrentYear')}
+                      </span>
+                    )}
                   </div>
-                ))}
+
+                  <div className="space-y-6">
+                    {Object.entries(groupPricingByCategory(group.rows))
+                      .filter(([_, items]) => items.length > 0)
+                      .map(([category, items]) => (
+                        <div key={category}>
+                          <h3 className="text-sm font-semibold text-neutral-500 uppercase tracking-wide mb-3">
+                            {t(`pricing.${category}`)}
+                          </h3>
+                          <div className="space-y-3">
+                            {items.map((price, idx) => {
+                              const amountText = price.amount_min != null || price.amount_max != null
+                                ? `${price.amount_min != null ? formatAmount(price.amount_min) : ''}${price.amount_min != null && price.amount_max != null ? '–' : ''}${price.amount_max != null ? formatAmount(price.amount_max) : ''} ${price.currency || 'BGN'}`
+                                : price.amount != null
+                                ? `${formatAmount(price.amount)} ${price.currency || 'BGN'}`
+                                : t('pricing.priceOnRequest')
+
+                              return (
+                                <div key={idx} className="flex items-center justify-between p-4 bg-neutral-50 rounded-lg border border-neutral-200">
+                                  <div className="flex-1">
+                                    <div className="font-medium text-neutral-900">
+                                      {price.plan_name || t(`pricing.${price.category}`)}
+                                    </div>
+                                    {price.age_group && (
+                                      <div className="text-sm text-neutral-500">{t(`ageGroups.${price.age_group}`)}</div>
+                                    )}
+                                  </div>
+                                  <div className="text-right flex items-center gap-3">
+                                    <div>
+                                      <div className="text-lg font-bold text-neutral-900">{amountText}</div>
+                                      <div className="text-sm text-neutral-500">{t(`pricing.${price.period}`)}</div>
+                                    </div>
+                                    {price.source && (
+                                      <span className={`px-2 py-1 text-xs font-medium rounded border ${getSourceBadgeColor(price.source)}`}>
+                                        {t(`priceSource.${price.source}`)}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}

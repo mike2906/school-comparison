@@ -9,6 +9,7 @@ from app.database import Base
 
 if TYPE_CHECKING:
     from app.models.school import School
+    from app.models.source_page import SourcePage
 
 
 class PriceCategory(str, enum.Enum):
@@ -57,6 +58,17 @@ class Pricing(Base):
     pricing_context: Mapped[Optional[dict]] = mapped_column(JSON)
     source: Mapped[PriceSource] = mapped_column(Enum(PriceSource), nullable=False)
     source_url: Mapped[Optional[str]] = mapped_column(String(1000))
+    # Evidence link: a price is publishable only while the page it came from is still
+    # valid. Production navigation upserts source pages in place, so this survives a
+    # routine crawl; SET NULL is only a backstop for a genuinely deleted page.
+    source_page_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("source_pages.id", ondelete="SET NULL"), nullable=True
+    )
     scraped_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     school: Mapped["School"] = relationship("School", back_populates="pricing")
+    # ``raise_on_sql`` keeps a forgotten eager-load loud instead of silently emitting
+    # a lazy query (which async would fail on anyway) or gating on a stale None.
+    source_page: Mapped[Optional["SourcePage"]] = relationship(
+        "SourcePage", lazy="raise_on_sql"
+    )
