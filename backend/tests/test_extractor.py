@@ -3692,3 +3692,108 @@ async def test_newer_year_extraction_keeps_the_previous_year_alongside_it(
         ("2025/2026", 650.0),
         ("2026/2027", 1000.0),
     ]
+
+
+def _packing_school():
+    return School(
+        name_i18n={"bg": "Тест"},
+        website_url="https://example-school.bg",
+        country_code="bg",
+        city="sofia",
+        school_type="private",
+        education_level="primary",
+    )
+
+
+def _select_pricing_pages(pages):
+    return extractor_module.helpers._select_pages(
+        school=_packing_school(),
+        pages=pages,
+        preferred_categories=["pricing", "admission", "contact"],
+        use_case="pricing",
+        include_tokens=("price", "pricing", "fees", "tuition", "такси", "цени"),
+    )
+
+
+def test_oversized_page_cannot_starve_a_smaller_pricing_page(monkeypatch):
+    """The school 302 shape: a 15k mis-categorised privacy page hid the real fee page.
+
+    Its privacy policy was categorised `pricing` and filled the entire content budget,
+    so the 1.5k page carrying "680 euro" never reached the model.
+    """
+    settings = extractor_module.helpers.get_settings()
+    monkeypatch.setattr(settings, "extraction_max_content_chars", 15000, raising=False)
+
+    fee_text = (
+        "Прием и такса\n"
+        + ("Общи условия за прием и необходими документи. " * 12)
+        + "\nМесечна такса за яслена група за учебната 2025/2026г. е 680 euro\n"
+        + "Месечна такса за детска градина 650 euro\n"
+    )
+    pages = [
+        # Ranked ahead of the fee page and large enough to consume the whole budget.
+        SourcePage(
+            source_url="https://example-school.bg/content/pravila-za-zashtita-danni.php",
+            page_category="pricing",
+            raw_markdown="Правила за защита на личните данни. Такси. " + ("х" * 15000),
+        ),
+        SourcePage(
+            source_url="https://example-school.bg/content/taksa-za-detska-gradina.php",
+            page_category="pricing",
+            raw_markdown=fee_text,
+        ),
+    ]
+
+    selected_text, source_urls = _select_pricing_pages(pages)
+
+    assert "680 euro" in selected_text
+    assert "650 euro" in selected_text
+    assert "https://example-school.bg/content/taksa-za-detska-gradina.php" in source_urls
+    # Budget still respected (the "\n\n" joins between parts are not counted against it).
+    assert len(selected_text) <= 15000 + 4
+
+
+def test_single_long_pricing_page_keeps_effectively_the_whole_budget(monkeypatch):
+    """Guard: the fair-budget rule must not gut a school whose fees really are one long page."""
+    settings = extractor_module.helpers.get_settings()
+    monkeypatch.setattr(settings, "extraction_max_content_chars", 15000, raising=False)
+
+    long_fees = "Такси за обучение\n" + ("Клас и такса за учебната 2026/2027 година. " * 340)
+    pages = [
+        SourcePage(
+            source_url="https://example-school.bg/taksi",
+            page_category="pricing",
+            raw_markdown=long_fees,
+        )
+    ]
+
+    selected_text, source_urls = _select_pricing_pages(pages)
+
+    assert source_urls == ["https://example-school.bg/taksi"]
+    # Nothing is queued behind it, so no room is held back.
+    assert len(selected_text) >= 14000
+
+
+def test_long_pricing_page_keeps_most_of_the_budget_beside_small_pages(monkeypatch):
+    """A long genuine fee page loses only the modest reserve held for the pages behind it."""
+    settings = extractor_module.helpers.get_settings()
+    monkeypatch.setattr(settings, "extraction_max_content_chars", 15000, raising=False)
+
+    pages = [
+        SourcePage(
+            source_url="https://example-school.bg/taksi",
+            page_category="pricing",
+            raw_markdown="Такси за обучение\n" + ("Такса за учебната 2026/2027 година. " * 500),
+        ),
+        SourcePage(
+            source_url="https://example-school.bg/contact",
+            page_category="contact",
+            raw_markdown="Контакти: 0888 123 456",
+        ),
+    ]
+
+    selected_text, source_urls = _select_pricing_pages(pages)
+
+    assert "https://example-school.bg/taksi" in source_urls
+    # Only the small queued page's own size is reserved, not a fixed quarter share.
+    assert len(selected_text) >= 14000

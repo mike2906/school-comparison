@@ -2721,6 +2721,18 @@ def _prepare_summary_source_page_text(text: str) -> str:
         return "\n".join(prepared_lines)
     return text
 
+# A queued page at or under this size has room held back for it in full while packing,
+# because a small page is the one an oversized page can starve completely. Larger queued
+# pages get no reserve: they would be truncated either way, so holding room back for them
+# only costs the higher-ranked page content it would have used.
+_SMALL_QUEUED_PAGE_CHARS = 2000
+# Never hold back more than this share of the budget, so a school whose fees genuinely are
+# one long page keeps the bulk of it even behind several small pages.
+_MAX_RESERVE_FRACTION = 3
+# Below this a page fragment is too small to carry a usable fee, so it is skipped.
+_MIN_USABLE_PAGE_CHARS = 500
+
+
 def _select_pages(
     school: School,
     pages: list[SourcePage],
@@ -2868,17 +2880,16 @@ def _select_pages(
 
     sorted_pages = sorted(candidate_pages, key=score_page, reverse=True)
 
-    content_parts: list[str] = []
-    urls_used: list[str] = []
-    current_chars = 0
     max_pages = 3 if (use_case == "general_info" or use_case.startswith("general_")) else 4
     if use_case == "general_summary_source":
         max_pages = 2
 
+    # Materialize the pages that will actually be packed, so each one can reserve room
+    # for the pages still queued behind it.
+    queued: list[tuple[str, str]] = []
     for page in sorted_pages:
-        if len(urls_used) >= max_pages:
+        if len(queued) >= max_pages:
             break
-
         text = (page.raw_markdown or "").strip()
         if not text:
             continue
@@ -2886,21 +2897,32 @@ def _select_pages(
             text = _prepare_summary_source_page_text(text)
             if not text:
                 continue
+        queued.append((page.source_url or "", f"--- SOURCE: {page.source_url} ---\n" + text))
 
-        header = f"--- SOURCE: {page.source_url} ---\n"
-        candidate = header + text
-        remaining = max_chars - current_chars
-        if remaining <= 0:
-            break
+    content_parts: list[str] = []
+    urls_used: list[str] = []
+    current_chars = 0
 
-        if len(candidate) > remaining:
-            if remaining < 500:
-                break
-            candidate = candidate[:remaining]
+    for index, (source_url, candidate) in enumerate(queued):
+        # One oversized page must not swallow the whole budget and starve a small page
+        # that carries the actual fees.
+        reserved = min(
+            sum(
+                len(later)
+                for _, later in queued[index + 1 :]
+                if len(later) <= _SMALL_QUEUED_PAGE_CHARS
+            ),
+            max_chars // _MAX_RESERVE_FRACTION,
+        )
+        allowance = max_chars - current_chars - reserved
+        if allowance < _MIN_USABLE_PAGE_CHARS:
+            # Too little room for this page to carry evidence; later, smaller pages may
+            # still fit inside what was reserved for them.
+            continue
 
-        content_parts.append(candidate)
-        urls_used.append(page.source_url or "")
-        current_chars += len(candidate)
+        content_parts.append(candidate[:allowance])
+        urls_used.append(source_url)
+        current_chars += min(len(candidate), allowance)
 
     return "\n\n".join(content_parts), [url for url in urls_used if url]
 
