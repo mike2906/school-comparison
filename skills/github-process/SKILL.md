@@ -1,6 +1,6 @@
 ---
 name: github-process
-description: Full PR flow for this repo — branch, checks, PR, manual Codex review trigger, merge. Use when the user says "follow github process" or asks you to open/land a PR.
+description: Full PR flow for this repo — branch, checks, PR, approval-gated Codex review, merge. Use when the user says "follow github process" or asks you to open/land a PR.
 ---
 
 # GitHub Process Skill
@@ -12,32 +12,37 @@ for that.
 ## Steps
 
 1. Create a new `agent/*` branch from `main`.
-2. Make a focused change and avoid unrelated files.
+2. Make the smallest focused change that satisfies the agreed requirement. If the work
+   expands substantially in files, lines, abstractions, or behavioural scope, stop and
+   reassess before continuing. Do not turn an operational or single-use requirement into a
+   reusable production subsystem without explaining the cost and getting approval; treat
+   existing work as sunk cost when a simpler design is available.
 3. Run the relevant local checks (`cd backend && uv run pytest`; frontend lint/build if
    the change touches `frontend/`).
-4. Commit only the files that belong to the change.
+4. Adversarially self-review the complete diff against the requirement, repository
+   invariants, likely edge cases, and existing tests. Fix substantive findings, rerun the
+   appropriate checks, then commit only the files that belong to the change.
 5. Push the branch and open a PR to `main`.
 6. Wait for GitHub Actions.
-7. Mark the PR ready for review, then **trigger the Codex review manually** by posting a
-   `@codex review` comment on the PR. Codex auto-review is intentionally **off** to avoid
-   wasting usage on trivial/docs-only PRs, so the review will NOT appear on its own — you
-   must request it. For a code change, do not merge just because CI is green: after
-   requesting, poll the PR until Codex has either posted findings or clearly completed with
-   no findings. Codex signals completion inconsistently — watch **both** the PR reviews AND
-   the issue comments for author `chatgpt-codex-connector[bot]` (a clean `@codex review`
-   result often comes back as an issue comment like "Didn't find any major issues", not a
-   formal review or a 👍). If it posts findings, address them in the PR or explicitly record
-   why they are accepted before merging.
+7. When the implementation, self-review, tests, PR, and CI are ready, tell Mike that the PR
+   is ready for independent ChatGPT pre-review and provide the PR URL. **Do not post
+   `@codex review` unless Mike explicitly asks.** If Mike requests Codex Review, post one
+   `@codex review` comment and poll until Codex has either posted findings or clearly
+   completed with no findings. Watch **both** PR reviews and issue comments for author
+   `chatgpt-codex-connector[bot]`.
    - **Docs-only / trivial PRs:** skip the `@codex review` request to conserve usage; merge
      on green CI once mergeable.
-   - **One request at a time:** never request a review after every small fix or commit. An
-     idle session does not justify another request, and do not repost while a review is still
-     in flight.
+   - **One consolidated request at a time:** never request a review after every small fix or
+     commit. Batch related fixes, self-review the complete diff again, rerun the appropriate
+     tests, and request another review only when the PR is believed to be merge-ready. An
+     idle session does not justify another request, and do not repost while a review is in
+     flight.
    - **Review stable, consolidated heads:** before the initial request, finish the intended
      implementation, tests, local checks, and supporting evidence. After a review, wait for
-     the complete result, group findings by root cause, and fix all actionable findings
-     together. Audit the affected subsystem for neighboring versions of the same bug, add
-     regression tests for the findings and nearby edge cases, run the relevant focused tests
+     the complete result and group findings by root cause. If a finding would substantially
+     expand the agreed design, pause and reconsider whether the implementation scope is
+     wrong instead of automatically layering on another fix. Otherwise, fix actionable
+     findings together, add proportionate regression tests, run the relevant focused tests
      plus the full applicable suite, and push one consolidated fix batch before re-review.
    - **Converge on evidence, not a fixed review count:** continue the review → batch fixes →
      re-review loop while each round identifies actionable correctness, security, or data-
@@ -50,11 +55,11 @@ for that.
      speculative feedback. Report the review count, the repeating or disputed findings, the
      evidence from tests/audits, and a concrete recommendation. Do not suppress substantive
      findings merely because several reviews have already run.
-8. If CI is green, the Codex review is clear or resolved (or was intentionally skipped for a
-   docs-only PR), and the PR is mergeable, merge it to `main` and delete the branch.
-   Immediately before merging, verify that the latest reviewed commit SHA is still the PR
-   head. After merging, verify that the merge commit contains that exact PR-head tree and
-   that post-merge `main` CI passes.
+8. Follow Mike's direction after independent pre-review. Merge only when CI is green, the
+   PR is mergeable, and every review Mike requested is clear or resolved. If Codex Review
+   was requested, verify immediately before merging that its latest reviewed commit SHA is
+   still the PR head. After merging, verify that the merge commit contains the exact PR-head
+   tree and that post-merge `main` CI passes.
 
 ## Commit / PR conventions
 
