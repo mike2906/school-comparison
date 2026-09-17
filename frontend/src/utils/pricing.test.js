@@ -108,3 +108,35 @@ test('groupPricingByAcademicYear gives each group its own status', () => {
 test('groupPricingByAcademicYear returns an empty list for no pricing', () => {
   assert.deepEqual(groupPricingByAcademicYear([]), [])
 })
+
+test('historical cohort is used only when no current and no undated cohort exists', () => {
+  // With a current cohort present, history is not selected.
+  assert.equal(
+    selectPricingCohort([current({ id: 1 }), dated('2025/2026', { id: 2 })]).yearStatus,
+    YEAR_STATUS.CURRENT,
+  )
+  // With undated prices present, history is still not selected.
+  assert.equal(
+    selectPricingCohort([row({ id: 1 }), dated('2025/2026', { id: 2 })]).yearStatus,
+    YEAR_STATUS.NOT_STATED,
+  )
+  // Only when neither exists does the historical cohort become the fallback.
+  assert.equal(
+    selectPricingCohort([dated('2025/2026', { id: 1 })]).yearStatus,
+    YEAR_STATUS.DATED_OTHER,
+  )
+})
+
+test('historical fallback carries its real academic year for labelling', () => {
+  // The card renders this value, so a fallback price is never shown bare.
+  const cohort = selectPricingCohort([
+    dated('2024/2025', { id: 1, amount: 300 }),
+    dated('2025/2026', { id: 2, amount: 650 }),
+  ])
+
+  assert.equal(cohort.yearStatus, YEAR_STATUS.DATED_OTHER)
+  assert.equal(cohort.academicYear, '2025/2026')
+  assert.notEqual(cohort.academicYear, null)
+  // The headline price comes from that same year, not the older one.
+  assert.deepEqual(cohort.rows.map(r => r.amount), [650])
+})

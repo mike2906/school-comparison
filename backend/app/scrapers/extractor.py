@@ -1159,16 +1159,11 @@ async def _extract_prices(
         parsed = parsed.model_copy(update={"prices": [], "has_pricing_info": False})
 
     if not parsed.has_pricing_info:
-        # A completed model call plus deterministic evidence pass is an
-        # authoritative refresh result. Keeping prior website rows here would
-        # silently republish fees that the current source no longer supports.
-        # Provider failures return above and deliberately preserve old rows.
-        await db.execute(
-            delete(Pricing).where(
-                Pricing.school_id == school.id,
-                Pricing.source == PriceSource.SCRAPED_WEBSITE,
-            )
-        )
+        # Finding no pricing this run supersedes no academic year, so earlier rows and
+        # their evidence links are kept as fee history. They stay year-labelled and can
+        # never be presented as current; the evidence gate withholds them only if their
+        # own source page becomes invalid.
+        # Provider failures return above and likewise preserve old rows.
         await db.execute(
             delete(FieldSource).where(
                 FieldSource.school_id == school.id,
@@ -1179,7 +1174,7 @@ async def _extract_prices(
         return {
             "success": True,
             "count": 0,
-            "detail": "No pricing info detected (cleared existing scraped pricing)",
+            "detail": "No pricing info detected (kept existing pricing as history)",
             "input_tokens": input_tokens,
             "output_tokens": output_tokens,
             "token_cost_usd": token_cost_usd,
@@ -1262,12 +1257,7 @@ async def _extract_prices(
         )
 
     if not pricing_rows:
-        await db.execute(
-            delete(Pricing).where(
-                Pricing.school_id == school.id,
-                Pricing.source == PriceSource.SCRAPED_WEBSITE,
-            )
-        )
+        # Same reasoning as above: nothing was written, so nothing is superseded.
         await db.execute(
             delete(FieldSource).where(
                 FieldSource.school_id == school.id,
@@ -1278,7 +1268,7 @@ async def _extract_prices(
         return {
             "success": True,
             "count": 0,
-            "detail": "Pricing info detected but no valid rows after normalization (cleared existing scraped pricing)",
+            "detail": "Pricing info detected but no valid rows after normalization (kept existing pricing as history)",
             "input_tokens": input_tokens,
             "output_tokens": output_tokens,
             "token_cost_usd": token_cost_usd,

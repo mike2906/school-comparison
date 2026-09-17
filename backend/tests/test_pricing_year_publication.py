@@ -194,3 +194,47 @@ async def test_unresolvable_academic_year_is_withheld(db_session):
     await db_session.commit()
 
     assert (await _publish(db_session, school))["pricing"] == []
+
+
+@pytest.mark.asyncio
+async def test_historical_price_stays_publishable_while_its_evidence_is_valid(db_session):
+    """A 2025-26 fee is withheld only if its own page goes invalid.
+
+    A later crawl that simply finds no newer pricing must not silently unpublish it.
+    """
+    school = await _make_school(db_session, "Surviving History School")
+    page = await _make_page(db_session, school)
+    db_session.add(_price(school, page, academic_year=_previous_year(), amount=650))
+    await db_session.commit()
+
+    rows = (await _publish(db_session, school))["pricing"]
+    assert len(rows) == 1
+    assert rows[0]["year_status"] == "dated_other"
+    # It carries its real year, so the UI can label it rather than imply it is current.
+    assert rows[0]["academic_year_canonical"] == _previous_year()
+
+    # Now the crawler invalidates the page that backs it.
+    page.is_valid = False
+    await db_session.commit()
+
+    assert (await _publish(db_session, school))["pricing"] == []
+
+
+@pytest.mark.asyncio
+async def test_historical_and_current_publish_together_with_distinct_status(db_session):
+    """After a newer year is extracted, both years publish, each labelled correctly."""
+    school = await _make_school(db_session, "Two Year School")
+    page = await _make_page(db_session, school)
+    db_session.add_all(
+        [
+            _price(school, page, academic_year=_previous_year(), amount=650),
+            _price(school, page, academic_year=_current_year(), amount=800),
+        ]
+    )
+    await db_session.commit()
+
+    rows = (await _publish(db_session, school))["pricing"]
+    assert [(row["year_status"], row["academic_year_canonical"]) for row in rows] == [
+        ("current", _current_year()),
+        ("dated_other", _previous_year()),
+    ]
