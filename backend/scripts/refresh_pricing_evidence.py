@@ -17,6 +17,7 @@ import asyncio
 import json
 from math import ceil
 from typing import Any
+from urllib.parse import urlsplit
 
 from sqlalchemy import delete, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -28,6 +29,8 @@ from app.scrapers.url_validator import URLValidator
 
 ISOLATED_DATABASE_NAME = "sofia_schools_pricing_refresh_20260915"
 MIN_PAGE_RETENTION_RATIO = 0.80
+GOOGLE_SITES_HOST = "sites.google.com"
+GOOGLE_SITES_TENANT_PREFIXES = {"site", "view"}
 
 
 class RefreshRejected(RuntimeError):
@@ -39,6 +42,29 @@ def required_live_page_count(existing_count: int) -> int:
     if existing_count <= 1:
         return 1
     return max(2, ceil(existing_count * MIN_PAGE_RETENTION_RATIO))
+
+
+def _site_identity(url: str) -> tuple[str, ...] | None:
+    """Return the conservative site identity used by this operational refresh."""
+    parsed = urlsplit(url)
+    host = (parsed.hostname or "").lower()
+    if host.startswith("www."):
+        host = host[4:]
+    if not host:
+        return None
+
+    if host != GOOGLE_SITES_HOST:
+        return (host,)
+
+    path_parts = [part for part in parsed.path.split("/") if part]
+    if len(path_parts) < 2 or path_parts[0] not in GOOGLE_SITES_TENANT_PREFIXES:
+        return None
+    return (host, path_parts[0], path_parts[1])
+
+
+def _has_same_site_identity(url: str, canonical_site_url: str) -> bool:
+    identity = _site_identity(url)
+    return identity is not None and identity == _site_identity(canonical_site_url)
 
 
 def _stored_page_is_useful(page: SourcePage, navigator: WebsiteNavigator) -> bool:
@@ -105,7 +131,7 @@ async def refresh_school_pricing_evidence(
             f"Live crawl unexpectedly reported {cache_hits} cache hit(s)"
         )
 
-    if not navigator._is_same_site_url(final_url, normalized_url):
+    if not _has_same_site_identity(final_url, normalized_url):
         raise RefreshRejected(
             f"Live crawl redirected off the school site: {final_url}"
         )
@@ -114,7 +140,7 @@ async def refresh_school_pricing_evidence(
         page
         for page in live_pages
         if navigator._is_extractable_page_content(page)
-        and navigator._is_same_site_url(page.url, normalized_url)
+        and _has_same_site_identity(page.url, normalized_url)
     ]
     required_count = required_live_page_count(len(useful_existing))
     if len(useful_live) < required_count:
