@@ -17,12 +17,13 @@ from typing import Any, Iterable
 
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import func, select
+from sqlalchemy.orm import load_only, selectinload
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from app.database import async_session_maker
 from app.main import app
-from app.models import PipelineRun, Pricing, School, SchoolLocation
+from app.models import PipelineRun, Pricing, School, SchoolLocation, SourcePage
 from app.services.data_quality import compute_quality_metrics
 from app.services.geocoding.bounds import SOFIA_MUNICIPALITY_BOUNDS, point_in_bounds
 from app.services.geocoding.service import geocode_failure_is_terminal
@@ -238,6 +239,17 @@ async def sofia_school_ids() -> list[int]:
         )
 
 
+def _pricing_query():
+    """Pricing with the evidence link the publish gate reads.
+
+    ``Pricing.source_page`` is ``lazy="raise_on_sql"``, so a plain ``select(Pricing)``
+    raises here as soon as a row carries a link.
+    """
+    return select(Pricing).options(
+        selectinload(Pricing.source_page).load_only(SourcePage.id, SourcePage.is_valid)
+    )
+
+
 async def api_audit(school_ids: list[int]) -> dict[str, Any]:
     async with async_session_maker() as db:
         raw_attributes = {
@@ -248,7 +260,7 @@ async def api_audit(school_ids: list[int]) -> dict[str, Any]:
         }
         publishable_pricing_ids = {
             row.id
-            for row in (await db.execute(select(Pricing))).scalars()
+            for row in (await db.execute(_pricing_query())).scalars()
             if pricing_row_is_publishable(row)
         }
 
@@ -431,6 +443,9 @@ async def api_audit(school_ids: list[int]) -> dict[str, Any]:
         "internal_key_hits": internal_hits,
         "summary_hits": summary_hits,
         "website_admission_hits": website_admission_hits,
+        # Informational only: school-website pricing may now publish when it is
+        # evidence-backed. `withheld_pricing_hits` enforces that every published row
+        # still satisfies the publish predicate.
         "scraped_pricing_hits": scraped_pricing_hits,
         "provenance_shape_hits": provenance_shape_hits,
         "cached_truth_set_leaks": truth_set_leaks,
@@ -468,7 +483,7 @@ async def database_audit() -> dict[str, Any]:
         )
         pricing_rows = list(
             (
-                await db.execute(select(Pricing).where(Pricing.school_id.in_(scoped_ids)))
+                await db.execute(_pricing_query().where(Pricing.school_id.in_(scoped_ids)))
             ).scalars()
         )
         quality = await compute_quality_metrics(db, country="bg", city="sofia")
@@ -660,7 +675,6 @@ async def main() -> None:
         and not api["internal_key_hits"]
         and not api["summary_hits"]
         and not api["website_admission_hits"]
-        and not api["scraped_pricing_hits"]
         and not api["provenance_shape_hits"]
         and not api["cached_truth_set_leaks"]
         and api["school_367_payloads"] > 0
