@@ -14,7 +14,7 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
-from app.models import Pricing, School, SchoolLocation
+from app.models import Pricing, School, SchoolLocation, ScrapeType, SourcePage
 from app.models.pricing import PriceSource
 from app.schemas.school import SchoolResponse
 from app.schemas.validation import SpotCheckDiscrepancy, SpotCheckOutput
@@ -43,6 +43,10 @@ def _curated_pricing_row(**overrides):
             },
         },
         "scraped_at": datetime(2026, 7, 16, 9, 0, tzinfo=timezone.utc),
+        # Evidence link is the trust signal; the human_verification block above is
+        # tolerated for backward compatibility but no longer authoritative.
+        "source_page_id": 11,
+        "source_page": {"id": 11, "is_valid": True},
         "amount": 500,
         "amount_min": None,
         "amount_max": None,
@@ -211,54 +215,78 @@ def test_pricing_gate_requires_a_source_and_context():
     [
         (PriceSource.OFFICIAL, True),
         ("official", True),
-        (PriceSource.SCRAPED_WEBSITE, False),
-        ("scraped_website", False),
-        (None, False),
+        # School-owned website evidence publishes automatically now that trust comes
+        # from the evidence link rather than a curator's sign-off.
+        (PriceSource.SCRAPED_WEBSITE, True),
+        ("scraped_website", True),
+        (None, True),
     ],
 )
-def test_launch_pricing_gate_publishes_only_curated_rows(source, expected):
+def test_launch_pricing_gate_publishes_evidence_backed_rows_regardless_of_source(source, expected):
     assert pricing_row_is_publishable(_curated_pricing_row(source=source)) is expected
 
 
 def test_launch_pricing_gate_keeps_existing_fail_closed_checks_for_curated_rows():
     assert pricing_row_is_publishable(_curated_pricing_row(source_url=None)) is False
     assert pricing_row_is_publishable(
+        _curated_pricing_row(pricing_context={"confidence": 0.69})
+    ) is False
+
+
+def test_launch_pricing_gate_requires_valid_linked_evidence():
+    """The evidence link, not a human sign-off, is what makes a price publishable."""
+    assert pricing_row_is_publishable(
+        _curated_pricing_row(source_page_id=None, source_page=None)
+    ) is False
+    # Link recorded but the page row is gone (FK backstop fired).
+    assert pricing_row_is_publishable(_curated_pricing_row(source_page=None)) is False
+    # Page still present but the crawler invalidated it.
+    assert pricing_row_is_publishable(
+        _curated_pricing_row(source_page={"id": 11, "is_valid": False})
+    ) is False
+    assert pricing_row_is_publishable(
+        _curated_pricing_row(source_page={"id": 11, "is_valid": None})
+    ) is False
+
+
+def test_launch_pricing_gate_ignores_human_verification():
+    """The block is tolerated in stored JSON but must not decide publication."""
+    # Absent entirely -> still publishable.
+    assert pricing_row_is_publishable(
+        _curated_pricing_row(pricing_context={"confidence": 0.9})
+    ) is True
+    # Present but malformed -> no longer a reason to withhold.
+    assert pricing_row_is_publishable(
         _curated_pricing_row(
             pricing_context={
-                "confidence": 0.69,
-                "human_verification": {
-                    "verified_by": "test-curator",
-                    "verified_at": "2026-07-16T09:00:00Z",
-                },
+                "confidence": 0.9,
+                "human_verification": {"verified_by": "", "verified_at": "nonsense"},
             }
         )
-    ) is False
+    ) is True
+
+
+@pytest.mark.parametrize(
+    "academic_year,expected",
+    [
+        ("2026/2027", True),
+        ("2025-2026", True),
+        (None, True),
+        ("", True),
+        # A development-strategy span is not an academic year; fail closed.
+        ("2022-2027", False),
+        ("sometime next year", False),
+    ],
+)
+def test_launch_pricing_gate_requires_resolvable_academic_year(academic_year, expected):
+    assert pricing_row_is_publishable(
+        _curated_pricing_row(academic_year=academic_year)
+    ) is expected
 
 
 @pytest.mark.parametrize(
     "overrides",
     [
-        {"pricing_context": {"confidence": 1.0}},
-        {
-            "pricing_context": {
-                "confidence": 1.0,
-                "human_verification": {
-                    "verified_by": "",
-                    "verified_at": "2026-07-16T09:00:00Z",
-                },
-            }
-        },
-        {
-            "pricing_context": {
-                "confidence": 1.0,
-                "human_verification": {
-                    "verified_by": "test-curator",
-                    "verified_at": "2026-07-16T09:00:00",
-                },
-            }
-        },
-        {"scraped_at": None},
-        {"scraped_at": datetime(2026, 7, 15, 9, 0, tzinfo=timezone.utc)},
         {"amount": 0},
         {"amount": None, "amount_min": 600, "amount_max": 500},
         {"amount": None, "amount_min": 500, "amount_max": None},
@@ -306,6 +334,16 @@ async def test_real_validator_error_gates_pricing_row_and_summary(db_session):
             is_primary=True,
         )
     )
+    evidence_page = SourcePage(
+        school_id=school.id,
+        scrape_type=ScrapeType.WEBSITE,
+        source_url="https://example.com/fees",
+        content_hash="hash-fees",
+        raw_markdown="Такси 500 лв.",
+        is_valid=True,
+    )
+    db_session.add(evidence_page)
+    await db_session.flush()
     good = Pricing(
         school_id=school.id,
         category="tuition",
@@ -315,13 +353,8 @@ async def test_real_validator_error_gates_pricing_row_and_summary(db_session):
         source=PriceSource.OFFICIAL,
         scraped_at=datetime(2026, 7, 16, 9, 0),
         source_url="https://example.com/fees",
-        pricing_context={
-            "confidence": 0.9,
-            "human_verification": {
-                "verified_by": "test-curator",
-                "verified_at": "2026-07-16T09:00:00Z",
-            },
-        },
+        source_page_id=evidence_page.id,
+        pricing_context={"confidence": 0.9},
     )
     bad = Pricing(
         school_id=school.id,

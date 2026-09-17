@@ -17,8 +17,10 @@ from typing import Any, Optional
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import load_only, selectinload
 
 from app.models.pricing import Pricing
+from app.models.source_page import SourcePage
 from app.models.school import School, SchoolLocation
 from app.services.identity_curation import curated_identity_candidate
 # Re-exported for callers that import it from here; it now lives in
@@ -286,7 +288,13 @@ async def compute_quality_metrics(
         pricing_rows = list(
             (
                 await db.execute(
-                    select(Pricing).where(Pricing.school_id.in_(school_ids))
+                    select(Pricing)
+                    .options(
+                        selectinload(Pricing.source_page).load_only(
+                            SourcePage.id, SourcePage.is_valid
+                        )
+                    )
+                    .where(Pricing.school_id.in_(school_ids))
                 )
             )
             .scalars()

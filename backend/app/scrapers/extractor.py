@@ -1060,6 +1060,21 @@ def _build_extracted_attributes(
     return extracted
 
 
+def _retention_year_key(value: str | None) -> tuple[bool, str]:
+    """Bucket a stored academic year for replacement.
+
+    Canonical years match across spellings, so a stored "2026-2027" is superseded by an
+    incoming "2026/2027". A blank year forms the undated bucket. A non-blank year that
+    does not normalize keeps its own bucket rather than collapsing into the undated one,
+    so an unrecognised value is never deleted as collateral.
+    """
+    raw = str(value or "").strip()
+    if not raw:
+        return (False, "")
+    canonical = helpers._normalize_academic_year(raw)
+    return (True, canonical) if canonical else (False, raw)
+
+
 async def _extract_prices(
     db: AsyncSession,
     school: School,
@@ -1144,16 +1159,11 @@ async def _extract_prices(
         parsed = parsed.model_copy(update={"prices": [], "has_pricing_info": False})
 
     if not parsed.has_pricing_info:
-        # A completed model call plus deterministic evidence pass is an
-        # authoritative refresh result. Keeping prior website rows here would
-        # silently republish fees that the current source no longer supports.
-        # Provider failures return above and deliberately preserve old rows.
-        await db.execute(
-            delete(Pricing).where(
-                Pricing.school_id == school.id,
-                Pricing.source == PriceSource.SCRAPED_WEBSITE,
-            )
-        )
+        # Finding no pricing this run supersedes no academic year, so earlier rows and
+        # their evidence links are kept as fee history. They stay year-labelled and can
+        # never be presented as current; the evidence gate withholds them only if their
+        # own source page becomes invalid.
+        # Provider failures return above and likewise preserve old rows.
         await db.execute(
             delete(FieldSource).where(
                 FieldSource.school_id == school.id,
@@ -1164,7 +1174,7 @@ async def _extract_prices(
         return {
             "success": True,
             "count": 0,
-            "detail": "No pricing info detected (cleared existing scraped pricing)",
+            "detail": "No pricing info detected (kept existing pricing as history)",
             "input_tokens": input_tokens,
             "output_tokens": output_tokens,
             "token_cost_usd": token_cost_usd,
@@ -1215,6 +1225,7 @@ async def _extract_prices(
                 age_group=fields["age_group"],
                 source=PriceSource.SCRAPED_WEBSITE,
                 source_url=row_source_url,
+                source_page_id=supporting_page.id if supporting_page else None,
                 pricing_context={
                     "notes": extracted.notes,
                     "confidence": extracted.confidence,
@@ -1246,12 +1257,7 @@ async def _extract_prices(
         )
 
     if not pricing_rows:
-        await db.execute(
-            delete(Pricing).where(
-                Pricing.school_id == school.id,
-                Pricing.source == PriceSource.SCRAPED_WEBSITE,
-            )
-        )
+        # Same reasoning as above: nothing was written, so nothing is superseded.
         await db.execute(
             delete(FieldSource).where(
                 FieldSource.school_id == school.id,
@@ -1262,18 +1268,29 @@ async def _extract_prices(
         return {
             "success": True,
             "count": 0,
-            "detail": "Pricing info detected but no valid rows after normalization (cleared existing scraped pricing)",
+            "detail": "Pricing info detected but no valid rows after normalization (kept existing pricing as history)",
             "input_tokens": input_tokens,
             "output_tokens": output_tokens,
             "token_cost_usd": token_cost_usd,
         }
 
-    await db.execute(
-        delete(Pricing).where(
+    # Supersede only the academic years this run actually produced, so earlier years
+    # survive as fee history. Rows the school still publishes undated are replaced by
+    # the undated rows of this run.
+    written_years = {_retention_year_key(row.academic_year) for row in pricing_rows}
+    existing_result = await db.execute(
+        select(Pricing).where(
             Pricing.school_id == school.id,
             Pricing.source == PriceSource.SCRAPED_WEBSITE,
         )
     )
+    superseded_ids = [
+        existing.id
+        for existing in existing_result.scalars().all()
+        if _retention_year_key(existing.academic_year) in written_years
+    ]
+    if superseded_ids:
+        await db.execute(delete(Pricing).where(Pricing.id.in_(superseded_ids)))
     await db.execute(
         delete(FieldSource).where(
             FieldSource.school_id == school.id,

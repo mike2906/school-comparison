@@ -270,7 +270,9 @@
     "academicYear": "Учебна година",
     "plan": "План",
     "priceOnRequest": "Цена при запитване",
-    "currency": "лв."
+    "currency": "лв.",
+    "yearNotStated": "Учебната година не е посочена от училището",
+    "notCurrentYear": "не е за текущата учебна година"
   },
   "priceSource": {
     "official": "Официална",

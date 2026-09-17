@@ -8,6 +8,7 @@ import { getFocusEmoji } from '../../utils/locationFocus'
 import { getBenchmarkComparison, getNvoDetail as getSharedNvoDetail } from '../../utils/nvo'
 import { getAdmissionStatusKey, getCanonicalAmenityFlags } from '../../utils/schoolAttributes'
 import { classifyAdmissionRequirement } from '../../utils/admission'
+import { selectPricingCohort, YEAR_STATUS } from '../../utils/pricing'
 
 const typeColors = {
   state: 'bg-teal-500 text-white',
@@ -255,20 +256,6 @@ function getMinTuitionPriceYearly(pricing = []) {
 
   if (minValue == null) return null
   return { amount: minValue, currency }
-}
-
-function getLatestAcademicYear(pricing = []) {
-  const years = pricing
-    .map(item => item.academic_year)
-    .filter(Boolean)
-  if (years.length === 0) return null
-  const parsed = years
-    .map(year => {
-      const match = String(year).match(/(\d{4})/)
-      return match ? { year, start: Number(match[1]) } : { year, start: -1 }
-    })
-  parsed.sort((a, b) => b.start - a.start)
-  return parsed[0]?.year || null
 }
 
 function getAdmissionRequirement(rawRequirement, t) {
@@ -737,7 +724,22 @@ const SchoolCard = forwardRef(function SchoolCard(
     () => getScheduleLine(primaryShiftInfo, attributes, t),
     [primaryShiftInfo, attributes, t]
   )
-  const pricingYear = useMemo(() => getLatestAcademicYear(pricing), [pricing])
+  // Badge and headline price must come from the same cohort, or a current-year label
+  // can end up above a previous year's fee.
+  const pricingCohort = useMemo(() => selectPricingCohort(pricing), [pricing])
+  const pricingYearLabel = useMemo(() => {
+    if (!pricingCohort) return null
+    if (pricingCohort.yearStatus === YEAR_STATUS.NOT_STATED) {
+      return t('pricing.yearNotStated')
+    }
+    return pricingCohort.academicYear
+  }, [pricingCohort, t])
+  // Only a current-year price wears the highlighted badge, so an older fee is never
+  // styled as though it were this year's.
+  const pricingYearBadgeClass =
+    pricingCohort?.yearStatus === YEAR_STATUS.CURRENT
+      ? 'text-teal-700 bg-teal-50 border-teal-200'
+      : 'text-neutral-600 bg-neutral-100 border-neutral-300'
 
   const admissionsInfo = useMemo(() => {
     const locale = i18n.language?.startsWith('bg') ? 'bg-BG' : 'en-US'
@@ -745,7 +747,7 @@ const SchoolCard = forwardRef(function SchoolCard(
     const admissionInfo = school.admission_info || {}
 
     if (isPrivate) {
-      const yearlyPrice = getMinTuitionPriceYearly(pricing)
+      const yearlyPrice = getMinTuitionPriceYearly(pricingCohort?.rows || [])
       const priceLabel = yearlyPrice?.amount != null
         ? t('schoolCard.admissions.fromPrice', {
           price: formatCurrency(yearlyPrice.amount, locale),
@@ -805,7 +807,7 @@ const SchoolCard = forwardRef(function SchoolCard(
     }
 
     return null
-  }, [school, pricing, attributes, i18n.language, t, primaryLocation])
+  }, [school, pricing, pricingCohort, attributes, i18n.language, t, primaryLocation])
 
   const nvoDetail = useMemo(() => {
     return getNvoDetail(school, t)
@@ -990,11 +992,11 @@ const SchoolCard = forwardRef(function SchoolCard(
             {t(`schoolTypes.${displayType}`)}
           </span>
           <span>{t(`educationLevels.${school.education_level}`)}</span>
-          {pricingYear && (
+          {pricingYearLabel && (
             <>
               <span className="text-neutral-300">•</span>
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium text-teal-700 bg-teal-50 border border-teal-200">
-                {pricingYear}
+              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border ${pricingYearBadgeClass}`}>
+                {pricingYearLabel}
               </span>
             </>
           )}
@@ -1008,9 +1010,9 @@ const SchoolCard = forwardRef(function SchoolCard(
         <span className="text-xs text-neutral-600">
           {t(`educationLevels.${school.education_level}`)}
         </span>
-        {pricingYear && (
-          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium text-teal-700 bg-teal-50 border border-teal-200">
-            {pricingYear}
+        {pricingYearLabel && (
+          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border ${pricingYearBadgeClass}`}>
+            {pricingYearLabel}
           </span>
         )}
       </div>

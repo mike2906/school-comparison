@@ -3,9 +3,11 @@ from typing import Optional
 
 from sqlalchemy import and_, exists, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import aliased, selectinload
+from sqlalchemy.orm import aliased, load_only, selectinload
 
+from app.models.pricing import Pricing
 from app.models.school import School, SchoolLocation, SchoolLocationAgeGroupShift
+from app.models.source_page import SourcePage
 from app.services.geocoding.bounds import SOFIA_MUNICIPALITY_BOUNDS, get_city_bounds
 from app.services.geocoding.service import TERMINAL_GEOCODE_FAILURE_REASONS
 from app.utils.i18n_resolver import resolve_address_i18n, resolve_name_i18n
@@ -118,7 +120,11 @@ class SchoolService:
         """Query relationships required by list and search responses."""
         return select(School).options(
             selectinload(School.locations).selectinload(SchoolLocation.age_group_shifts),
-            selectinload(School.pricing),
+            # The publish gate reads the linked page's validity; load only that column
+            # so the response query never pulls page markdown.
+            selectinload(School.pricing)
+            .selectinload(Pricing.source_page)
+            .load_only(SourcePage.id, SourcePage.is_valid),
             selectinload(School.exam_results),
         )
 

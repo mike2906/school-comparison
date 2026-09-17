@@ -1,9 +1,10 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 from app.models.pricing import PriceCategory, PricePeriod, PriceSource
+from app.utils.academic_year import academic_year_status, normalize_academic_year
 
 
 class PricingContextResponse(BaseModel):
@@ -39,5 +40,21 @@ class PricingResponse(PricingBase):
     id: int
     school_id: int
     scraped_at: datetime
+
+    @computed_field(return_type=Optional[str])
+    @property
+    def academic_year_canonical(self) -> Optional[str]:
+        """The year in ``YYYY/YYYY`` form; ``None`` when the school stated none."""
+        return normalize_academic_year(self.academic_year)
+
+    @computed_field(return_type=str)
+    @property
+    def year_status(self) -> str:
+        """``current``, ``dated_other`` or ``not_stated`` for this row.
+
+        Derived per request rather than stored, because which year counts as current
+        changes every September.
+        """
+        return academic_year_status(self.academic_year)
 
     model_config = {"from_attributes": True}

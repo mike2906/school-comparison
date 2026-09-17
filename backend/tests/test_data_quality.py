@@ -8,6 +8,7 @@ import pytest
 from app.models.pipeline_run import PipelineStatus
 from app.models.pricing import PriceCategory, PricePeriod, PriceSource, Pricing
 from app.models.school import School, SchoolLocation
+from app.models.source_page import ScrapeType, SourcePage
 from app.schemas.school import SchoolListResponse
 from app.services.data_quality import _display_name_overrides, compute_quality_metrics
 from app.services.pipeline_runs import (
@@ -32,6 +33,21 @@ def _verified_context(confidence):
             "verified_at": "2026-07-16T09:00:00Z",
         },
     }
+
+
+async def _evidence_page(db, school, url="https://example.com/fees"):
+    """A valid source page: the evidence link the publish gate now requires."""
+    page = SourcePage(
+        school_id=school.id,
+        scrape_type=ScrapeType.WEBSITE,
+        source_url=url,
+        content_hash=f"hash-{school.id}-{url}",
+        raw_markdown="Такси",
+        is_valid=True,
+    )
+    db.add(page)
+    await db.flush()
+    return page
 
 
 async def _make_school(db, **kwargs):
@@ -101,11 +117,12 @@ async def quality_fixture(db_session):
     db_session.add(
         SchoolLocation(school_id=a.id, address_i18n={"bg": "ул. А"}, lat=42.70, lng=23.32, geocode_meta={"precision": "exact"})
     )
+    a_page = await _evidence_page(db_session, a, url="https://a.bg/fees")
     db_session.add(
         Pricing(
             school_id=a.id, category=PriceCategory.TUITION, period=PricePeriod.MONTHLY,
             amount=500, source=PriceSource.OFFICIAL, source_url="https://a.bg/fees",
-            scraped_at=PRICING_VERIFIED_AT,
+            scraped_at=PRICING_VERIFIED_AT, source_page_id=a_page.id,
             pricing_context=_verified_context(0.9),
         )
     )
@@ -285,6 +302,7 @@ async def test_website_validation_coverage_excludes_registry_only_and_withheld_d
 
 async def test_pricing_failure_metric_matches_fail_closed_publication_gate(db_session):
     school = await _make_school(db_session)
+    page = await _evidence_page(db_session, school)
     contexts = [
         _verified_context(0.9),
         {},
@@ -303,6 +321,7 @@ async def test_pricing_failure_metric_matches_fail_closed_publication_gate(db_se
                 source=PriceSource.OFFICIAL,
                 source_url="https://example.com/fees",
                 scraped_at=PRICING_VERIFIED_AT,
+                source_page_id=page.id,
                 pricing_context=context,
             )
             for index, context in enumerate(contexts)
@@ -316,6 +335,7 @@ async def test_pricing_failure_metric_matches_fail_closed_publication_gate(db_se
             amount=100,
             source=PriceSource.SCRAPED_WEBSITE,
             source_url="https://example.com/fees",
+            source_page_id=page.id,
             pricing_context={"confidence": 0.99},
         )
     )
@@ -323,16 +343,20 @@ async def test_pricing_failure_metric_matches_fail_closed_publication_gate(db_se
 
     metrics = await compute_quality_metrics(db_session, country="bg", city="sofia")
 
+    # Two rows clear the gate: the confident curated row and the confident
+    # school-website row, which no longer needs a curator to publish.
     assert metrics["pricing_rows_failing_gates"] == {
-        "publishable": 1,
-        "failing": 6,
+        "publishable": 2,
+        "failing": 5,
         "total": 7,
-        "pct": pytest.approx(85.7),
+        "pct": pytest.approx(71.4),
     }
 
 
 async def test_scoreboard_publishable_pricing_matches_schema_serialization(db_session):
     school = await _make_school(db_session)
+    verified_page = await _evidence_page(db_session, school, url="https://example.com/verified-fees")
+    scraped_page = await _evidence_page(db_session, school, url="https://example.com/scraped-fees")
     rows = [
         Pricing(
             school_id=school.id,
@@ -342,6 +366,7 @@ async def test_scoreboard_publishable_pricing_matches_schema_serialization(db_se
             source=PriceSource.OFFICIAL,
             source_url="https://example.com/verified-fees",
             scraped_at=PRICING_VERIFIED_AT,
+            source_page_id=verified_page.id,
             pricing_context=_verified_context(1.0),
         ),
         Pricing(
@@ -352,6 +377,7 @@ async def test_scoreboard_publishable_pricing_matches_schema_serialization(db_se
             source=PriceSource.OFFICIAL,
             source_url="https://example.com/verified-fees",
             scraped_at=PRICING_VERIFIED_AT,
+            source_page_id=verified_page.id,
             pricing_context=_verified_context(0.5),
         ),
         Pricing(
@@ -361,6 +387,7 @@ async def test_scoreboard_publishable_pricing_matches_schema_serialization(db_se
             amount=900,
             source=PriceSource.SCRAPED_WEBSITE,
             source_url="https://example.com/scraped-fees",
+            source_page_id=scraped_page.id,
             pricing_context={"confidence": 0.99},
         ),
     ]
@@ -380,7 +407,13 @@ async def test_scoreboard_publishable_pricing_matches_schema_serialization(db_se
     )
     metrics = await compute_quality_metrics(db_session, country="bg", city="sofia")
 
-    assert [row.source for row in public.pricing] == [PriceSource.OFFICIAL]
+    # Curated and school-website rows both publish; the low-confidence row does not.
+    # Undated rows tie on year, so the deterministic order falls through to category
+    # ("transport" before "tuition").
+    assert [(row.source, row.category) for row in public.pricing] == [
+        (PriceSource.SCRAPED_WEBSITE, PriceCategory.TRANSPORT),
+        (PriceSource.OFFICIAL, PriceCategory.TUITION),
+    ]
     assert metrics["pricing_rows_failing_gates"]["publishable"] == len(public.pricing)
 
 

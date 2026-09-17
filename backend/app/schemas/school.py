@@ -190,6 +190,18 @@ class SchoolPricingMixin(SchoolAttributesMixin):
             if row.id in blocked_ids:
                 continue
             published.append(row)
+
+        # Deterministic order: newest academic year first, undated rows last, then a
+        # stable tiebreak. Sorted here rather than in SQL because the canonical year is
+        # a Python normalization of the school's own wording.
+        published.sort(
+            key=lambda item: (
+                item.academic_year_canonical is None,
+                -int((item.academic_year_canonical or "0/0").split("/")[0]),
+                item.category.value,
+                item.id,
+            )
+        )
         return published
 
 
