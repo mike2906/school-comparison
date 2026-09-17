@@ -433,3 +433,59 @@ async def test_complete_live_crawl_replaces_only_website_evidence(db_session):
     assert result["baseline_useful_pages"] == 3
     assert result["minimum_required_pages"] == 3
     assert result["fresh_useful_pages"] == 3
+
+
+@pytest.mark.asyncio
+async def test_completeness_baseline_is_capped_at_navigator_max_pages(db_session):
+    school = await _create_school(db_session)
+    old_pages = [
+        _source_page(
+            school.id,
+            index,
+            category="pricing" if index == 0 else "about",
+        )
+        for index in range(19)
+    ]
+    db_session.add_all(old_pages)
+    await db_session.commit()
+
+    live_pages = [
+        NavigatedPage(
+            url=f"https://school.bg/page-{index}",
+            category="pricing" if index == 0 else "about",
+            markdown=f"Current page {index}",
+            content_hash=f"live-{index}",
+            cache_status="miss",
+        )
+        for index in range(10)
+    ]
+
+    async def fake_discover_pages(self, website_url: str):
+        return website_url, live_pages
+
+    with (
+        patch.object(
+            refresh_pricing_evidence,
+            "_current_database_name",
+            new=AsyncMock(
+                return_value=refresh_pricing_evidence.ISOLATED_DATABASE_NAME
+            ),
+        ),
+        patch(
+            "app.scrapers.navigator.WebsiteNavigator.discover_pages",
+            new=fake_discover_pages,
+        ),
+    ):
+        result = await refresh_pricing_evidence.refresh_school_pricing_evidence(
+            db_session,
+            school_id=school.id,
+        )
+
+    assert result["baseline_useful_pages"] == 19
+    assert (
+        result["completeness_baseline_pages"]
+        == refresh_pricing_evidence.WebsiteNavigator.MAX_PAGES
+        == 12
+    )
+    assert result["minimum_required_pages"] == 10
+    assert result["fresh_useful_pages"] == 10

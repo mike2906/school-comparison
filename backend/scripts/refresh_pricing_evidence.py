@@ -142,12 +142,14 @@ async def refresh_school_pricing_evidence(
         if navigator._is_extractable_page_content(page)
         and _has_same_site_identity(page.url, normalized_url)
     ]
-    required_count = required_live_page_count(len(useful_existing))
+    completeness_baseline = min(len(useful_existing), navigator.MAX_PAGES)
+    required_count = required_live_page_count(completeness_baseline)
     if len(useful_live) < required_count:
         raise RefreshRejected(
             "Live crawl appears incomplete: "
             f"{len(useful_live)} useful page(s), requires at least {required_count} "
-            f"from a baseline of {len(useful_existing)}"
+            f"from a capped baseline of {completeness_baseline} "
+            f"({len(useful_existing)} stored)"
         )
 
     baseline_has_pricing = any(
@@ -183,6 +185,7 @@ async def refresh_school_pricing_evidence(
         **result,
         "database": database_name,
         "baseline_useful_pages": len(useful_existing),
+        "completeness_baseline_pages": completeness_baseline,
         "minimum_required_pages": required_count,
         "fresh_useful_pages": len(useful_live),
     }
