@@ -221,8 +221,9 @@ class WebsiteNavigator:
         flags=re.IGNORECASE,
     )
 
-    def __init__(self, country_code: str = "bg"):
+    def __init__(self, country_code: str = "bg", *, bypass_cache: bool = False):
         self.country_code = country_code
+        self.bypass_cache = bypass_cache
         self.settings = get_settings()
 
     def _build_browser_config(self, *, enable_stealth: bool = True) -> Any:
@@ -271,7 +272,7 @@ class WebsiteNavigator:
         )
 
         return CrawlerRunConfig(
-            cache_mode=CacheMode.ENABLED,
+            cache_mode=CacheMode.BYPASS if self.bypass_cache else CacheMode.ENABLED,
             check_cache_freshness=True,
             cache_validation_timeout=8.0,
             page_timeout=int(self.PAGE_TIMEOUT_SECONDS * 1000),

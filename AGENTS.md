@@ -296,15 +296,37 @@ uv run pytest tests/test_api.py -v
 
 ---
 
+## Scope and Review Discipline
+
+- Prefer the smallest change that satisfies the actual requirement.
+- Do not generalize an operational or single-use requirement into a reusable production
+  subsystem without first explaining the additional complexity and getting approval.
+- If a seemingly small task starts expanding substantially in files, lines, abstractions,
+  or behavioural scope, stop and reassess the approach before continuing.
+- Treat existing implementation work as sunk cost when a simpler design is available.
+- Before committing or requesting external/Codex PR review, perform an adversarial
+  self-review of the complete diff against the requirement, repository invariants, likely
+  edge cases, and existing tests. Fix substantive findings before requesting review.
+- Batch related fixes, self-review again, and run the appropriate tests before requesting
+  another review. Do not request a new Codex review after every small fix.
+- If a PR review finding substantially expands the required design, pause and reconsider
+  whether the implementation scope is wrong instead of automatically layering on another
+  fix.
+- Before requesting `@codex review`, tell Mike that the PR is ready for independent
+  ChatGPT pre-review and provide the PR URL. Request Codex Review only when Mike explicitly
+  asks.
+
+---
+
 ## GitHub Process
 
 When the user says **"follow github process"** (or asks you to open/land a PR), follow
 **`skills/github-process/SKILL.md`** — the full branch → checks → PR → **manual**
-`@codex review` → merge flow, including how to detect when Codex has finished.
+review → merge flow, including how to detect when Codex has finished.
 
 Two rules to keep in mind even before reading it: only commit directly to `main` when the
-user explicitly asks, and Codex auto-review is **off** — you must request it with a
-`@codex review` comment (skip that on docs-only/trivial PRs to conserve usage).
+user explicitly asks, and Codex auto-review is **off**. Provide Mike with the PR URL for
+independent ChatGPT pre-review first; post `@codex review` only after Mike explicitly asks.
 
 ---
 
