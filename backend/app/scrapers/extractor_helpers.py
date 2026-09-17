@@ -2729,7 +2729,9 @@ _SMALL_QUEUED_PAGE_CHARS = 2000
 # Never hold back more than this share of the budget, so a school whose fees genuinely are
 # one long page keeps the bulk of it even behind several small pages.
 _MAX_RESERVE_FRACTION = 3
-# Below this a page fragment is too small to carry a usable fee, so it is skipped.
+# A *truncated* fragment below this size cannot carry a usable fee, so it is skipped.
+# A complete page is never measured against this: a short page is whole evidence, not
+# a fragment, and dropping it recreates the starvation this packing rule prevents.
 _MIN_USABLE_PAGE_CHARS = 500
 
 
@@ -2915,14 +2917,17 @@ def _select_pages(
             max_chars // _MAX_RESERVE_FRACTION,
         )
         allowance = max_chars - current_chars - reserved
-        if allowance < _MIN_USABLE_PAGE_CHARS:
-            # Too little room for this page to carry evidence; later, smaller pages may
-            # still fit inside what was reserved for them.
-            continue
 
-        content_parts.append(candidate[:allowance])
+        if len(candidate) > allowance:
+            if allowance < _MIN_USABLE_PAGE_CHARS:
+                # Only a useless fragment would fit; skip it and keep going, so pages
+                # behind it can still use the room reserved for them.
+                continue
+            candidate = candidate[:allowance]
+
+        content_parts.append(candidate)
         urls_used.append(source_url)
-        current_chars += min(len(candidate), allowance)
+        current_chars += len(candidate)
 
     return "\n\n".join(content_parts), [url for url in urls_used if url]
 

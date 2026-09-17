@@ -3797,3 +3797,35 @@ def test_long_pricing_page_keeps_most_of_the_budget_beside_small_pages(monkeypat
     assert "https://example-school.bg/taksi" in source_urls
     # Only the small queued page's own size is reserved, not a fixed quarter share.
     assert len(selected_text) >= 14000
+
+
+def test_complete_short_fee_page_is_not_dropped_as_a_fragment(monkeypatch):
+    """A whole page under the fragment floor is evidence, not a fragment.
+
+    The 500-char minimum exists to reject truncated scraps. Applying it to a complete
+    page drops terse fee pages ("Tuition EUR 680") behind an oversized page, recreating
+    the starvation this packing rule exists to prevent.
+    """
+    settings = extractor_module.helpers.get_settings()
+    monkeypatch.setattr(settings, "extraction_max_content_chars", 15000, raising=False)
+
+    pages = [
+        # Carries the strong pricing slug, so it ranks ahead of the terse fee page.
+        SourcePage(
+            source_url="https://example-school.bg/taksi-i-ceni",
+            page_category="pricing",
+            raw_markdown="Такси и цени. Правила за защита на личните данни. " + ("х" * 15000),
+        ),
+        SourcePage(
+            source_url="https://example-school.bg/info",
+            page_category=None,
+            raw_markdown="Tuition EUR 680",
+        ),
+    ]
+
+    selected_text, source_urls = _select_pricing_pages(pages)
+
+    assert "https://example-school.bg/info" in source_urls
+    assert "Tuition EUR 680" in selected_text
+    # Included whole, not clipped, despite being far below the fragment floor.
+    assert selected_text.rstrip().endswith("Tuition EUR 680")
