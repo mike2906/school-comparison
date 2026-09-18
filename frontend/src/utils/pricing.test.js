@@ -6,6 +6,7 @@ import {
   groupPricingByAcademicYear,
   monthlyEquivalent,
   lowestUnstatedPeriodTuition,
+  isInstallmentPlan,
   YEAR_STATUS,
 } from './pricing.js'
 
@@ -198,4 +199,34 @@ test('lowestUnstatedPeriodTuition picks the lowest unstated-period tuition', () 
     { amount: 500, currency: 'EUR' },
   )
   assert.equal(lowestUnstatedPeriodTuition([]), null)
+})
+
+test('lowestUnstatedPeriodTuition never offers one instalment as the tuition price', () => {
+  // Codex P2 on PR #74: EUR 3490 is one of two instalments, not the tuition fee.
+  assert.equal(
+    lowestUnstatedPeriodTuition([
+      { category: 'tuition', amount: 3490, currency: 'EUR', period: null, plan_name: '2 installments' },
+    ]),
+    null,
+  )
+})
+
+test('lowestUnstatedPeriodTuition skips a cheaper instalment in favour of the full fee', () => {
+  // "Lowest" must not reach past the exclusion: the instalment is cheaper, so picking
+  // it here would be the exact bug.
+  assert.deepEqual(
+    lowestUnstatedPeriodTuition([
+      { category: 'tuition', amount: 3490, currency: 'EUR', period: null, plan_name: '2 installments' },
+      { category: 'tuition', amount: 6600, currency: 'EUR', period: null },
+    ]),
+    { amount: 6600, currency: 'EUR' },
+  )
+})
+
+test('isInstallmentPlan recognises instalment plan names, as it did in SchoolCard', () => {
+  assert.equal(isInstallmentPlan({ plan_name: '2 installments' }), true)
+  assert.equal(isInstallmentPlan({ plan_name: 'на 9 вноски' }), true)
+  assert.equal(isInstallmentPlan({ plan_name: '9 вноски' }), true)
+  assert.equal(isInstallmentPlan({ plan_name: 'Standard' }), false)
+  assert.equal(isInstallmentPlan({}), false)
 })

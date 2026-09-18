@@ -84,6 +84,13 @@ export function groupPricingByAcademicYear(pricing = []) {
   })
 }
 
+const INSTALLMENT_PLAN_NAME_RE = /(\d+\s*(installment|monthly|вноск)|(installment|monthly|вноск)\s*\d+)/i
+
+/** True for a row describing one instalment of a fee rather than the whole fee. */
+export function isInstallmentPlan(item) {
+  return !!(item?.plan_name && INSTALLMENT_PLAN_NAME_RE.test(item.plan_name))
+}
+
 function priceBase(row) {
   if (row?.amount_min != null) return row.amount_min
   if (row?.amount != null) return row.amount
@@ -115,7 +122,7 @@ export function monthlyEquivalent(row) {
  */
 export function lowestUnstatedPeriodTuition(rows = []) {
   const candidates = (Array.isArray(rows) ? rows : [])
-    .filter(row => row.category === 'tuition' && row.period == null)
+    .filter(row => row.category === 'tuition' && row.period == null && !isInstallmentPlan(row))
     .map(row => ({ amount: priceBase(row), currency: row.currency }))
     .filter(entry => entry.amount != null)
   if (candidates.length === 0) return null

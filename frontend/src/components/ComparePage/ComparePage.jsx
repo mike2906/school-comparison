@@ -1075,7 +1075,7 @@ function ComparePage() {
                   </div>
                   <div className="text-sm text-neutral-700">
                     {formatPriceLabel(price, i18n.language, t)}
-                    {price.period ? ` / ${t(`pricing.${price.period}`)}` : ''}
+                    {` / ${price.period ? t(`pricing.${price.period}`) : t('pricing.periodNotStated')}`}
                   </div>
                   <InlineSource
                     badgeKey={price.source}
