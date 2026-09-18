@@ -3829,3 +3829,98 @@ def test_complete_short_fee_page_is_not_dropped_as_a_fragment(monkeypatch):
     assert "Tuition EUR 680" in selected_text
     # Included whole, not clipped, despite being far below the fragment floor.
     assert selected_text.rstrip().endswith("Tuition EUR 680")
+
+
+@pytest.mark.parametrize(
+    "raw,expected",
+    [
+        ("Целодневна – 500евро", "Целодневна – 500 евро"),
+        ("Такса храна - 88евро.", "Такса храна - 88 евро."),
+        ("Месечна такса 1200лева", "Месечна такса 1200 лева"),
+        ("1 200ЕВРО", "1 200 ЕВРО"),
+    ],
+)
+def test_glued_bulgarian_currency_word_is_spaced_for_the_prompt(raw, expected):
+    assert extractor_module.helpers._space_glued_currency_words(raw) == expected
+
+
+@pytest.mark.parametrize(
+    "unchanged",
+    [
+        # Already spaced.
+        "Целодневна – 500 евро",
+        "Месечна такса 1200 лева",
+        # Abbreviations and Latin forms already work glued; deliberately left alone.
+        "Месечно половин ден 888лв",
+        "500eur",
+        "500euro",
+        "500bgn",
+        # The currency word is only the start of a longer word.
+        "5евроклуб",
+        "3левашки",
+        # Not attached to a number at all.
+        "Европа 2026",
+        "",
+    ],
+)
+def test_prompt_normalization_leaves_other_text_alone(unchanged):
+    assert extractor_module.helpers._space_glued_currency_words(unchanged) == unchanged
+
+
+@pytest.mark.asyncio
+async def test_only_the_llm_prompt_sees_spaced_currency_words(
+    db_session,
+    sample_school_for_extraction,
+):
+    """School 615: the model misses "500евро" but reads "500 евро".
+
+    Deterministic parsing and the evidence filter must keep the original text, because
+    they deliberately do not treat full Bulgarian currency words as currencies.
+    """
+    school = sample_school_for_extraction
+    pages = (
+        await db_session.execute(select(SourcePage).where(SourcePage.school_id == school.id))
+    ).scalars().all()
+    next(page for page in pages if page.page_category == "pricing").raw_markdown = (
+        "# ТАКСИ\n#### Целодневна – 500евро\nМесечна такса\n#### Такса храна - 88евро\n"
+    )
+    await db_session.flush()
+
+    # Return a row so the evidence filter actually runs; with no prices it is skipped and
+    # the check below would pass without testing anything.
+    llm = AsyncMock(
+        return_value=(
+            PriceExtractionOutput(
+                prices=[
+                    ExtractedPrice(
+                        category="tuition", amount=500.0, currency="EUR",
+                        period="monthly", confidence=0.9,
+                    )
+                ],
+                has_pricing_info=True,
+            ),
+            1, 1, 0.0,
+        )
+    )
+    helpers = extractor_module.helpers
+    with patch("app.scrapers.extractor._run_typed_agent", new=llm), patch.object(
+        helpers, "_extract_prices_deterministic", wraps=helpers._extract_prices_deterministic
+    ) as deterministic, patch.object(
+        helpers, "_filter_supported_prices", wraps=helpers._filter_supported_prices
+    ) as support:
+        await extractor_module._extract_prices(
+            db_session, school, list(pages), 20.0, extractor_module.ExtractionLLMStats()
+        )
+
+    prompt = llm.call_args.kwargs.get("user_prompt") or llm.call_args.args[1]
+    assert "500 евро" in prompt and "88 евро" in prompt
+    assert "500евро" not in prompt
+
+    deterministic_text = deterministic.call_args.args[0]
+    assert "500евро" in deterministic_text
+    assert "500 евро" not in deterministic_text
+
+    assert support.call_count >= 1
+    for call in support.call_args_list:
+        assert "500евро" in call.args[1]
+        assert "500 евро" not in call.args[1]

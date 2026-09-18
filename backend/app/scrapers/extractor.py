@@ -1112,7 +1112,12 @@ async def _extract_prices(
         "\n"
         "If no concrete pricing exists, return has_pricing_info=false and prices=[]."
     )
-    user_prompt = f"School: {school_name}\n\nContent:\n{selected_text}"
+    # Only the prompt gets glued currency words spaced; deterministic extraction and the
+    # evidence checks below keep the original page text.
+    user_prompt = (
+        f"School: {school_name}\n\nContent:\n"
+        f"{helpers._space_glued_currency_words(selected_text)}"
+    )
     deterministic_pricing = helpers._extract_prices_deterministic(selected_text)
     used_deterministic_pricing = False
 
