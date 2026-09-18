@@ -1254,6 +1254,22 @@ def _parse_price_amount_token(raw: str) -> float | None:
         return None
 
 
+# A full Bulgarian currency word written directly against its amount ("500евро",
+# "1200лева"), and not itself the start of a longer word.
+_GLUED_BG_CURRENCY_WORD_RE = re.compile(r"(\d)(евро|лева)(?![^\W\d_])", re.IGNORECASE)
+
+
+def _space_glued_currency_words(text: str) -> str:
+    """Separate a glued Bulgarian currency word from its amount, for the LLM prompt only.
+
+    The model reliably misses "500евро" yet reliably reads "500 евро". Only the full words
+    are rewritten: abbreviations such as "лв" already work glued, so they are left alone.
+    Callers must keep using the original text for deterministic parsing and evidence
+    checks, which deliberately do not treat these words as currencies.
+    """
+    return _GLUED_BG_CURRENCY_WORD_RE.sub(r"\1 \2", text or "")
+
+
 def _extract_price_amount_currency(
     value: str, *, allow_cyrillic_currency_words: bool = True
 ) -> tuple[float | None, str | None]:
