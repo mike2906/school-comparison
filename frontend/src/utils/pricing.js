@@ -83,3 +83,41 @@ export function groupPricingByAcademicYear(pricing = []) {
     return Number(b.academicYear.split('/')[0]) - Number(a.academicYear.split('/')[0])
   })
 }
+
+function priceBase(row) {
+  if (row?.amount_min != null) return row.amount_min
+  if (row?.amount != null) return row.amount
+  return row?.amount_max ?? null
+}
+
+/**
+ * A fee's per-month equivalent, or null when it cannot honestly be expressed per month.
+ *
+ * Only an explicit monthly, yearly or quarterly period converts. A semester, term or
+ * one-off fee, or one whose period the school did not state, has no defensible monthly
+ * figure; treating it as monthly would present a €4,725 semester fee as €4,725 a month.
+ */
+export function monthlyEquivalent(row) {
+  const base = priceBase(row)
+  if (base == null) return null
+  if (row.period === 'monthly') return base
+  if (row.period === 'yearly') return base / 12
+  if (row.period === 'quarter') return base / 3
+  return null
+}
+
+/**
+ * The lowest tuition amount among rows whose period the school did not state.
+ *
+ * A headline fallback only: such a price is shown as-is and labelled "period not
+ * stated", never converted to a yearly or monthly figure. Returns null when there is
+ * no such row.
+ */
+export function lowestUnstatedPeriodTuition(rows = []) {
+  const candidates = (Array.isArray(rows) ? rows : [])
+    .filter(row => row.category === 'tuition' && row.period == null)
+    .map(row => ({ amount: priceBase(row), currency: row.currency }))
+    .filter(entry => entry.amount != null)
+  if (candidates.length === 0) return null
+  return candidates.reduce((best, entry) => (entry.amount < best.amount ? entry : best))
+}

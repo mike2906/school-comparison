@@ -1246,7 +1246,7 @@ async def _extract_prices(
             FieldSource(
                 school_id=school.id,
                 category="pricing",
-                field_key=f"pricing.{category.value}.{period.value}",
+                field_key=f"pricing.{category.value}.{period.value if period else 'unstated'}",
                 value_text=helpers._format_price_value_text(
                     amount,
                     amount_min,

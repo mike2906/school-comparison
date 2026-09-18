@@ -754,7 +754,9 @@ function SchoolDetailPage() {
                                   <div className="text-right flex items-center gap-3">
                                     <div>
                                       <div className="text-lg font-bold text-neutral-900">{amountText}</div>
-                                      <div className="text-sm text-neutral-500">{t(`pricing.${price.period}`)}</div>
+                                      <div className="text-sm text-neutral-500">
+                                        {price.period ? t(`pricing.${price.period}`) : t('pricing.periodNotStated')}
+                                      </div>
                                     </div>
                                     {price.source && (
                                       <span className={`px-2 py-1 text-xs font-medium rounded border ${getSourceBadgeColor(price.source)}`}>

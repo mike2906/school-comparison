@@ -272,7 +272,8 @@
     "priceOnRequest": "Price on request",
     "currency": "BGN",
     "yearNotStated": "Academic year not stated by the school",
-    "notCurrentYear": "not for the current academic year"
+    "notCurrentYear": "not for the current academic year",
+    "periodNotStated": "Period not stated by school"
   },
   "priceSource": {
     "official": "Official",
@@ -494,7 +495,8 @@
       "lastAdmitted": "Last admitted: {{points}} {{pointsLabel}} ({{year}})",
       "minScore": "Min score: {{score}} ({{year}})",
       "districtEnrollment": "District enrollment",
-      "admissionsUnavailable": "Admissions info unavailable"
+      "admissionsUnavailable": "Admissions info unavailable",
+      "priceUnstatedPeriod": "{{price}} {{currency}} · period not stated"
     },
     "period": {
       "year": "year",

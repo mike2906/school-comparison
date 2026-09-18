@@ -29,7 +29,7 @@ class PricingBase(BaseModel):
     amount_min: Optional[float] = None
     amount_max: Optional[float] = None
     currency: str = "BGN"
-    period: PricePeriod
+    period: Optional[PricePeriod] = None
     plan_name: Optional[str] = None
     pricing_context: Optional[PricingContextResponse] = None
     source: PriceSource
