@@ -272,7 +272,8 @@
     "priceOnRequest": "Цена при запитване",
     "currency": "лв.",
     "yearNotStated": "Учебната година не е посочена от училището",
-    "notCurrentYear": "не е за текущата учебна година"
+    "notCurrentYear": "не е за текущата учебна година",
+    "periodNotStated": "Периодът не е посочен от училището"
   },
   "priceSource": {
     "official": "Официална",
@@ -494,7 +495,8 @@
       "lastAdmitted": "Последно приети: {{points}} {{pointsLabel}} ({{year}})",
       "minScore": "Минимален бал: {{score}} ({{year}})",
       "districtEnrollment": "Прием по район",
-      "admissionsUnavailable": "Няма информация за приема"
+      "admissionsUnavailable": "Няма информация за приема",
+      "priceUnstatedPeriod": "{{price}} {{currency}} · периодът не е посочен"
     },
     "period": {
       "year": "год.",

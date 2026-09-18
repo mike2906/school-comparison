@@ -1,7 +1,14 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { selectPricingCohort, groupPricingByAcademicYear, YEAR_STATUS } from './pricing.js'
+import {
+  selectPricingCohort,
+  groupPricingByAcademicYear,
+  monthlyEquivalent,
+  lowestUnstatedPeriodTuition,
+  isInstallmentPlan,
+  YEAR_STATUS,
+} from './pricing.js'
 
 const row = (overrides = {}) => ({
   id: 1,
@@ -139,4 +146,87 @@ test('historical fallback carries its real academic year for labelling', () => {
   assert.notEqual(cohort.academicYear, null)
   // The headline price comes from that same year, not the older one.
   assert.deepEqual(cohort.rows.map(r => r.amount), [650])
+})
+
+test('monthlyEquivalent converts only an explicit monthly, yearly or quarterly period', () => {
+  assert.equal(monthlyEquivalent({ amount: 500, period: 'monthly' }), 500)
+  assert.equal(monthlyEquivalent({ amount: 6000, period: 'yearly' }), 500)
+  assert.equal(monthlyEquivalent({ amount: 1500, period: 'quarter' }), 500)
+})
+
+test('monthlyEquivalent does not fall through to monthly for other periods', () => {
+  // Regression: SearchPage used to return the raw amount for anything that was not
+  // yearly or quarterly, so a EUR 4,725 semester fee ranked as EUR 4,725 a month.
+  assert.equal(monthlyEquivalent({ amount: 4725, period: 'semester' }), null)
+  assert.equal(monthlyEquivalent({ amount: 6300, period: 'term' }), null)
+  assert.equal(monthlyEquivalent({ amount: 1102, period: 'one_time' }), null)
+})
+
+test('monthlyEquivalent does not invent a period the school did not state', () => {
+  assert.equal(monthlyEquivalent({ amount: 88, period: null }), null)
+  assert.equal(monthlyEquivalent({ amount: 88 }), null)
+})
+
+test('monthlyEquivalent uses amount_min for a range and ignores rows with no amount', () => {
+  assert.equal(monthlyEquivalent({ amount_min: 400, amount_max: 700, period: 'monthly' }), 400)
+  assert.equal(monthlyEquivalent({ period: 'monthly' }), null)
+})
+
+test('lowestUnstatedPeriodTuition returns the raw tuition amount, unconverted', () => {
+  // School 615: EUR 500 tuition whose period the page does not state.
+  assert.deepEqual(
+    lowestUnstatedPeriodTuition([{ category: 'tuition', amount: 500, currency: 'EUR', period: null }]),
+    { amount: 500, currency: 'EUR' },
+  )
+})
+
+test('lowestUnstatedPeriodTuition ignores rows that state a period, and non-tuition fees', () => {
+  assert.equal(
+    lowestUnstatedPeriodTuition([
+      { category: 'tuition', amount: 300, currency: 'EUR', period: 'monthly' },
+      { category: 'food', amount: 88, currency: 'EUR', period: null },
+    ]),
+    null,
+  )
+})
+
+test('lowestUnstatedPeriodTuition picks the lowest unstated-period tuition', () => {
+  assert.deepEqual(
+    lowestUnstatedPeriodTuition([
+      { category: 'tuition', amount: 750, currency: 'EUR', period: null },
+      { category: 'tuition', amount: 500, currency: 'EUR' },
+    ]),
+    { amount: 500, currency: 'EUR' },
+  )
+  assert.equal(lowestUnstatedPeriodTuition([]), null)
+})
+
+test('lowestUnstatedPeriodTuition never offers one instalment as the tuition price', () => {
+  // Codex P2 on PR #74: EUR 3490 is one of two instalments, not the tuition fee.
+  assert.equal(
+    lowestUnstatedPeriodTuition([
+      { category: 'tuition', amount: 3490, currency: 'EUR', period: null, plan_name: '2 installments' },
+    ]),
+    null,
+  )
+})
+
+test('lowestUnstatedPeriodTuition skips a cheaper instalment in favour of the full fee', () => {
+  // "Lowest" must not reach past the exclusion: the instalment is cheaper, so picking
+  // it here would be the exact bug.
+  assert.deepEqual(
+    lowestUnstatedPeriodTuition([
+      { category: 'tuition', amount: 3490, currency: 'EUR', period: null, plan_name: '2 installments' },
+      { category: 'tuition', amount: 6600, currency: 'EUR', period: null },
+    ]),
+    { amount: 6600, currency: 'EUR' },
+  )
+})
+
+test('isInstallmentPlan recognises instalment plan names, as it did in SchoolCard', () => {
+  assert.equal(isInstallmentPlan({ plan_name: '2 installments' }), true)
+  assert.equal(isInstallmentPlan({ plan_name: 'на 9 вноски' }), true)
+  assert.equal(isInstallmentPlan({ plan_name: '9 вноски' }), true)
+  assert.equal(isInstallmentPlan({ plan_name: 'Standard' }), false)
+  assert.equal(isInstallmentPlan({}), false)
 })

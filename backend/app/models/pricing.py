@@ -53,7 +53,9 @@ class Pricing(Base):
     amount_min: Mapped[Optional[float]] = mapped_column(Numeric(10, 2))
     amount_max: Mapped[Optional[float]] = mapped_column(Numeric(10, 2))
     currency: Mapped[str] = mapped_column(String(3), default="BGN")
-    period: Mapped[PricePeriod] = mapped_column(Enum(PricePeriod), nullable=False)
+    # NULL means the school did not state how often the fee is charged. Never fill it
+    # with a guess just to have a value.
+    period: Mapped[Optional[PricePeriod]] = mapped_column(Enum(PricePeriod), nullable=True)
     plan_name: Mapped[Optional[str]] = mapped_column(String(100))
     pricing_context: Mapped[Optional[dict]] = mapped_column(JSON)
     source: Mapped[PriceSource] = mapped_column(Enum(PriceSource), nullable=False)

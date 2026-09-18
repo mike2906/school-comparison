@@ -46,7 +46,7 @@ def deterministic_pricing_rows(school: School, pages: list[SourcePage]) -> list[
             {
                 **fields,
                 "category": fields["category"].value,
-                "period": fields["period"].value,
+                "period": fields["period"].value if fields["period"] else None,
             }
         )
     return rows

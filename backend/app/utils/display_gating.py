@@ -318,5 +318,5 @@ def pricing_row_is_publishable(row: Any) -> bool:
         and _valid_price_shape(row)
         and isinstance(currency, str)
         and _CURRENCY_RE.fullmatch(currency) is not None
-        and period_value in _PRICE_PERIODS
+        and (period_value is None or period_value in _PRICE_PERIODS)
     )

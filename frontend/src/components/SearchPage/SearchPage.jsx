@@ -16,6 +16,7 @@ import { fetchAvailableFilters, fetchExamAverages } from '../../api/schools'
 import { getAgeGroupKeys } from '../../utils/countryConfig'
 import { AGE_GROUP_KEYS } from '../../utils/education'
 import { getLanguageFocusPairs } from '../../utils/schoolAttributes'
+import { monthlyEquivalent } from '../../utils/pricing'
 
 const TYPE_SORT_ORDER = {
   state: 0,
@@ -707,17 +708,7 @@ function SearchPage() {
 
     const tuitionPrices = school.pricing
       .filter(price => price.category === 'tuition')
-      .map(price => {
-        const base = price.amount_min != null ? price.amount_min : (price.amount != null ? price.amount : price.amount_max)
-        if (base == null) return null
-        if (price.period === 'yearly') {
-          return base / 12
-        }
-        if (price.period === 'quarter') {
-          return base / 3
-        }
-        return base
-      })
+      .map(monthlyEquivalent)
       .filter(value => value != null)
 
     if (tuitionPrices.length === 0) return null

@@ -8,7 +8,12 @@ import { getFocusEmoji } from '../../utils/locationFocus'
 import { getBenchmarkComparison, getNvoDetail as getSharedNvoDetail } from '../../utils/nvo'
 import { getAdmissionStatusKey, getCanonicalAmenityFlags } from '../../utils/schoolAttributes'
 import { classifyAdmissionRequirement } from '../../utils/admission'
-import { selectPricingCohort, YEAR_STATUS } from '../../utils/pricing'
+import {
+  isInstallmentPlan,
+  lowestUnstatedPeriodTuition,
+  selectPricingCohort,
+  YEAR_STATUS,
+} from '../../utils/pricing'
 
 const typeColors = {
   state: 'bg-teal-500 text-white',
@@ -228,12 +233,6 @@ function getYearlyEquivalent(item) {
   if (item.period === 'monthly') return base * 12
   if (item.period === 'quarter') return base * 4
   return null
-}
-
-const INSTALLMENT_PLAN_NAME_RE = /(\d+\s*(installment|monthly|вноск)|(installment|monthly|вноск)\s*\d+)/i
-
-function isInstallmentPlan(item) {
-  return !!(item?.plan_name && INSTALLMENT_PLAN_NAME_RE.test(item.plan_name))
 }
 
 function getMinTuitionPriceYearly(pricing = []) {
@@ -580,7 +579,7 @@ function buildExpandedSections({
       const amountMax = item.amount_max != null ? formatCurrency(item.amount_max, locale) : null
       const amount = item.amount != null ? formatCurrency(item.amount, locale) : null
       const category = t(`pricing.${item.category}`)
-      const periodKey = item.period ? t(`pricing.${item.period}`) : ''
+      const periodKey = item.period ? t(`pricing.${item.period}`) : t('pricing.periodNotStated')
       const plan = item.plan_name ? `${t('pricing.plan')}: ${item.plan_name}` : ''
       const year = item.academic_year ? `${t('pricing.academicYear')}: ${item.academic_year}` : ''
       const meta = [plan, year].filter(Boolean).join(' • ')
@@ -748,13 +747,24 @@ const SchoolCard = forwardRef(function SchoolCard(
 
     if (isPrivate) {
       const yearlyPrice = getMinTuitionPriceYearly(pricingCohort?.rows || [])
+      // A tuition fee whose period the school did not state cannot be annualised, but a
+      // well-supported amount should not vanish from the card for that reason alone:
+      // show it as-is, labelled, only when nothing can be annualised.
+      const unstatedPrice = yearlyPrice?.amount == null
+        ? lowestUnstatedPeriodTuition(pricingCohort?.rows || [])
+        : null
       const priceLabel = yearlyPrice?.amount != null
         ? t('schoolCard.admissions.fromPrice', {
           price: formatCurrency(yearlyPrice.amount, locale),
           currency: yearlyPrice.currency || t('pricing.currency'),
           period: t('schoolCard.period.year'),
         })
-        : null
+        : unstatedPrice
+          ? t('schoolCard.admissions.priceUnstatedPeriod', {
+            price: formatCurrency(unstatedPrice.amount, locale),
+            currency: unstatedPrice.currency || t('pricing.currency'),
+          })
+          : null
 
       const requirement = getAdmissionRequirement(
         admissionInfo?.requirements || attributes?.entry_requirements,

@@ -238,3 +238,25 @@ async def test_historical_and_current_publish_together_with_distinct_status(db_s
         ("current", _current_year()),
         ("dated_other", _previous_year()),
     ]
+
+
+@pytest.mark.asyncio
+async def test_unstated_period_publishes_as_null_through_the_api(db_session):
+    """School 615's food fee: a supported amount whose period the page never states.
+
+    It must publish with ``period`` null — not be dropped, and not be given a guessed
+    period to satisfy the schema.
+    """
+    school = await _make_school(db_session, "Unstated Period School")
+    page = await _make_page(db_session, school)
+    db_session.add(_price(school, page, category="food", amount=88, currency="EUR", period=None))
+    db_session.add(_price(school, page, amount=500, currency="EUR", period="monthly"))
+    await db_session.commit()
+
+    rows = (await _publish(db_session, school))["pricing"]
+
+    by_category = {row["category"]: row for row in rows}
+    assert by_category["food"]["period"] is None
+    assert float(by_category["food"]["amount"]) == 88.0
+    # A stated period is unaffected.
+    assert by_category["tuition"]["period"] == "monthly"

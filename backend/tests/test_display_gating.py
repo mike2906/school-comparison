@@ -391,3 +391,14 @@ async def test_real_validator_error_gates_pricing_row_and_summary(db_session):
     assert [row["category"] for row in payload["pricing"]] == ["tuition"]
     # needs_review withholds the stored whole-school summary too.
     assert payload["summary_i18n"] is None
+
+
+def test_launch_pricing_gate_publishes_an_unstated_period():
+    """A school that states a fee but not how often it is charged still publishes it."""
+    assert pricing_row_is_publishable(_curated_pricing_row(period=None)) is True
+
+
+@pytest.mark.parametrize("period", ["weekly", "", "per visit"])
+def test_launch_pricing_gate_still_rejects_an_invalid_stated_period(period):
+    """Allowing NULL must not loosen validation of a period that *is* present."""
+    assert pricing_row_is_publishable(_curated_pricing_row(period=period)) is False
