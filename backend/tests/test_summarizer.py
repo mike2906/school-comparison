@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, patch
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from pydantic import ValidationError
@@ -740,6 +741,101 @@ def test_fallback_summary_uses_summary_source_narrative_in_long_text():
 
     assert "Licensed private school for preschool through grade 7." in result["en"]["long"]
     assert "project-based learning" in result["en"]["long"]
+
+
+def test_fallback_summary_drops_extracted_fragments_that_fail_validation():
+    # School 577: "водеща детска дейност" (a pedagogy term) trips the promotional-word block.
+    summary_input = ai_summariser.SummaryInput(
+        identity=ai_summariser.SummaryIdentity(
+            name_i18n={"bg": "НЕМО - Бояна", "en": "NEMO - Boyana"},
+            school_type="private",
+            education_level="kindergarten",
+            city="sofia",
+        ),
+        offering=ai_summariser.SummaryOffering(
+            teaching_approach=["като водеща детска дейност и като обучителен метод"],
+        ),
+        operations=ai_summariser.SummaryOperations(support_services=["психолог", "Логопед"]),
+    )
+
+    result = ai_summariser._build_fallback_summary(summary_input)
+
+    assert ai_summariser.validate_summary_i18n(result) == result
+    assert "водеща" not in result["bg"]["long"]
+    assert "психолог" in result["bg"]["long"]
+
+
+def test_fallback_summary_short_skips_focus_values_that_fail_validation():
+    summary_input = ai_summariser.SummaryInput(
+        identity=ai_summariser.SummaryIdentity(
+            name_i18n={"bg": "Детска градина Слънце", "en": "Sun Kindergarten"},
+            school_type="private",
+            education_level="kindergarten",
+            city="sofia",
+        ),
+        offering=ai_summariser.SummaryOffering(
+            teaching_approach=["водещ метод на обучение", "игрово обучение"],
+        ),
+    )
+
+    result = ai_summariser._build_fallback_summary(summary_input)
+
+    assert ai_summariser.validate_summary_i18n(result) == result
+    assert "с акцент върху игрово обучение" in result["bg"]["short"]
+
+
+def test_fallback_summary_short_skips_language_labels_that_fail_validation():
+    summary_input = ai_summariser.SummaryInput(
+        identity=ai_summariser.SummaryIdentity(
+            name_i18n={"bg": "Детска градина Слънце", "en": "Sun Kindergarten"},
+            school_type="private",
+            education_level="kindergarten",
+            city="sofia",
+        ),
+        offering=ai_summariser.SummaryOffering(languages=["английски 90%", "немски"]),
+    )
+
+    result = ai_summariser._build_fallback_summary(summary_input)
+
+    assert ai_summariser.validate_summary_i18n(result) == result
+    assert "90%" not in result["bg"]["short"]
+    assert "немски" in result["bg"]["short"]
+
+
+@pytest.mark.asyncio
+async def test_generate_summary_llm_path_selected_fallback_short_passes_validation():
+    summary_input = ai_summariser.SummaryInput(
+        identity=ai_summariser.SummaryIdentity(
+            name_i18n={"bg": "Детска градина Слънце", "en": "Sun Kindergarten"},
+            school_type="private",
+            education_level="kindergarten",
+            city="sofia",
+        ),
+        offering=ai_summariser.SummaryOffering(
+            teaching_approach=["водещ метод на обучение", "игрово обучение"],
+        ),
+    )
+    llm_output = SchoolSummaryStrict.model_validate(
+        {
+            "summary_i18n": {
+                "bg": {"short": "Детска градина с игрови подход.", "long": "Детска градина в София."},
+                "en": {"short": "A kindergarten with a play-based approach.", "long": "A kindergarten in Sofia."},
+            }
+        }
+    )
+    fake_run = SimpleNamespace(output=llm_output, usage=None)
+
+    with (
+        patch("app.ai.summariser.create_agent", return_value=MagicMock()),
+        patch("app.ai.summariser.execute_billable_request", new=AsyncMock(return_value=fake_run)),
+    ):
+        result = await ai_summariser.generate_school_summary(summary_input)
+
+    assert result["generation_mode"] == "llm"
+    bg_short = result["summary_i18n"]["bg"]["short"]
+    assert bg_short.startswith("Детска градина Слънце")
+    assert "игрово обучение" in bg_short
+    assert ai_summariser.validate_summary_i18n(result["summary_i18n"]) == result["summary_i18n"]
 
 
 def test_fallback_summary_derives_shorter_en_name_and_article():
