@@ -1450,6 +1450,8 @@ operational safeguards do not reopen the accepted launch boundary.
       (~500 schools) needs one box: dockerized FastAPI + Postgres + built frontend
       behind Caddy/nginx with HTTPS. Manual task: pick host, domain, DNS, secrets.
       Agents can write the Dockerfile/compose/Caddyfile; a human runs the deploy.
+      The frontend build needs `VITE_CARTO_API_KEY` (map tiles are watermarked
+      without it); restrict that key to the production domain in the CARTO dashboard.
 - [ ] **P3.3 README as shop window.** Screenshots/GIF, 7-stage pipeline architecture
       diagram, decisions-and-trade-offs section (JSONB, calendar-year age logic,
       GeoJSON-first geocoding), test count + CI badge. Move SearXNG troubleshooting

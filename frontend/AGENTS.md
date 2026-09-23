@@ -47,13 +47,11 @@ return <h1>{t('welcome')}</h1>;
 **Distances** — use Leaflet's built-in `distanceTo` (see `src/utils/distance.js`), not a
 custom haversine.
 
-**Map tiles** (CartoDB Positron):
-```jsx
-<TileLayer
-  url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-  attribution='&copy; OpenStreetMap contributors &copy; CARTO'
-/>
-```
+**Map tiles** (CARTO Voyager, `TILE_URL` in `src/components/Map/SchoolMap.jsx`): CARTO
+basemaps need an API key, passed as `?key=` from `VITE_CARTO_API_KEY` (see
+`frontend/.env.example`). Without it every tile carries an "API KEY REQUIRED" watermark.
+The key ships in the browser bundle, so it is not a secret: restrict it to our domains in
+the CARTO dashboard instead.
 
 **Pricing display** — show each price's `source` (official / scraped_website / forum /
 not_found) in the UI.
