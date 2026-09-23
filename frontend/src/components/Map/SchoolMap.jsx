@@ -13,6 +13,12 @@ import { getAgeGroupKeys } from '../../utils/countryConfig'
 import { getFocusEmojis, getFocusLabels } from '../../utils/locationFocus'
 import { AGE_GROUP_KEYS } from '../../utils/education'
 
+// CARTO requires an API key; without one every tile is watermarked
+const CARTO_API_KEY = import.meta.env.VITE_CARTO_API_KEY
+const TILE_URL = `https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png${
+  CARTO_API_KEY ? `?key=${encodeURIComponent(CARTO_API_KEY)}` : ''
+}`
+
 // Fallback values (used when country config hasn't loaded yet)
 const FALLBACK_CENTER = [42.6977, 23.3219]
 const FALLBACK_ZOOM = 12
@@ -1007,7 +1013,7 @@ function SchoolMap({
       >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> | &copy; <a href="https://carto.com/">CARTO</a>'
-          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+          url={TILE_URL}
           subdomains="abcd"
           maxZoom={20}
         />
