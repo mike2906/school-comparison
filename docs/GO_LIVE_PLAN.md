@@ -1514,6 +1514,18 @@ revision. None of this may widen the public boundary without a reviewed pilot.
       coalescing/classification reliable (103/105/153/506 cases as regressions).
 - [ ] **E4 Finish pricing curation** beyond the launch slice: remaining private/
       international schools (178 total), using scraped rows as verification candidates.
+- [ ] **E5 Gymnasium admission thresholds (state schools).** Import the official minimum
+      admission scores after 7th grade into `admission_info.historical_min_scores`. Scores
+      come from the city-wide NVO ranking, so no address logic is needed, but they are per
+      **class profile**, each with its own subject formula: store and display them per
+      profile, never as one school-wide "min score". Comes before E6 (smaller, no address
+      rules).
+- [ ] **E6 Kindergarten points thresholds + admission points calculator.** Import
+      last-admitted points per kindergarten, age group and round from kg.sofia.bg into
+      `admission_info.historical_thresholds`, and ship them together with the parent-facing
+      points calculator (registered-address zone, employment, siblings, etc.). A threshold
+      is meaningless without the parent's own score, so neither ships alone. Calculator
+      rules need tests first (see `backend/AGENTS.md` → Testing).
 
 ## Explicitly deferred (from the reviews' "don't do yet" list)
 
