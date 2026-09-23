@@ -2017,10 +2017,16 @@ def test_explicit_bulgarian_monthly_headings_set_period(heading):
     ]
 
 
-def test_payment_cadence_month_by_month_does_not_set_monthly_period():
-    assert extractor_module.helpers._detect_explicit_price_period(
-        "Таксите се заплащат месец за месец."
-    ) is None
+@pytest.mark.parametrize(
+    "line",
+    [
+        "Таксите се заплащат месец за месец.",
+        "Таксата се заплаща на месец",
+        "Таксите се внасят на месец",
+    ],
+)
+def test_bulgarian_payment_cadence_does_not_set_monthly_period(line):
+    assert extractor_module.helpers._detect_explicit_price_period(line) is None
 
 
 def test_price_period_does_not_carry_into_next_tuition_section():
