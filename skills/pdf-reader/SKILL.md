@@ -1,6 +1,6 @@
 ---
 name: pdf-reader
-description: Extract text and tables from PDFs, including fetching PDFs from URLs, using a small local script.
+description: Extract text and tables from PDFs (local files, PDF URLs, or PDFs linked from a web page) with a small local pdfplumber script. Use when a school website links fee or admissions PDFs and you need structured data from them.
 ---
 
 # PDF Reader Skill
@@ -15,7 +15,8 @@ Use this skill when the user needs to read or extract content from a PDF. It sup
 Example:
 
 ```bash
-uv run python .codex/skills/pdf-reader/scripts/extract_pdf.py --url "https://example.com/file.pdf" --format json --tables
+cd backend  # pdfplumber is a backend dependency
+uv run python ../skills/pdf-reader/scripts/extract_pdf.py --url "https://example.com/file.pdf" --format json --tables
 ```
 
 ## Notes
