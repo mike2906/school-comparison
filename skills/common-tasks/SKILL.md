@@ -13,7 +13,7 @@ Recipes for routine tasks. All backend commands use the `uv run` prefix.
 3. Register router in `app/main.py`
 4. Update `.env.example` if new env vars needed
 
-Note the publish boundary (see AGENTS.md → Known Issues): serialize through the display
+Note the publish boundary (see `backend/AGENTS.md` → Publish Boundary): serialize through the display
 projections/gates, never raw `attributes`/pricing.
 
 ## Add a database column
