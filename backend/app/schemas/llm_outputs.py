@@ -26,8 +26,9 @@ class SchoolSummaryStrict(BaseModel):
 
     summary_i18n: SummaryI18nStrict | Json[SummaryI18nStrict] = Field(
         description=(
-            "Summary in Bulgarian and English with exactly this shape: "
-            "{'summary_i18n': {'bg': {'short': '...', 'long': '...'}, 'en': {'short': '...', 'long': '...'}}}"
+            "Bulgarian (bg) and English (en) summaries, each with a one-sentence `short` "
+            "and a 2-4 sentence `long`, e.g. "
+            "{'bg': {'short': '...', 'long': '...'}, 'en': {'short': '...', 'long': '...'}}"
         )
     )
 

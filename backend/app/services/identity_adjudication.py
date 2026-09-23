@@ -465,7 +465,7 @@ SYSTEM_PROMPT = (
     "A translation you invent is never acceptable: the exact English label must "
     "appear in the supplied evidence.\n"
     "Quote at most four short lines, copied verbatim from the supplied evidence, "
-    "that justify the verdict. Never quote text that is not present above.\n"
+    "that justify the verdict. Never quote text that is not present in the supplied evidence.\n"
     "When uncertain, reject."
 )
 

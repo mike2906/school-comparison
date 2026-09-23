@@ -299,7 +299,6 @@ async def generate_school_summary(summary_input: SummaryInput, *, school_id: int
         "Otherwise avoid exact numbers, counts, years, academic-year ranges, opening hours, room counts, class sizes, library volumes, and similar unstable details. "
         "If pricing, admissions, operations, or exam data exists, refer to its availability or broad category rather than quoting numbers. "
         "Do not mention that information is missing or unavailable; omit absent fact groups entirely. "
-        "Omit any fact group that is absent. "
         "Return Bulgarian and English summaries in exactly this JSON shape: "
         "{\"summary_i18n\":{\"bg\":{\"short\":\"...\",\"long\":\"...\"},\"en\":{\"short\":\"...\",\"long\":\"...\"}}}. "
         "Each language must include a short one-sentence summary and a long summary of 2-4 sentences."
