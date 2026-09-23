@@ -1938,6 +1938,44 @@ def test_price_period_distinguishes_quarterly_fees_from_payments(line, expected_
     assert extractor_module.helpers._detect_price_period(line) == expected_period
 
 
+@pytest.mark.parametrize(
+    ("line", "expected_period"),
+    [
+        ("Еднократна регистрационна такса: 450 EUR", "one_time"),
+        ("Регистрационната такса се заплаща еднократно", "one_time"),
+        ("Годишната такса се заплаща еднократно", "yearly"),
+        ("Таксата се заплаща еднократно в началото на всяка учебна година", None),
+        ("Таксата се заплаща еднократно или на две вноски", None),
+    ],
+)
+def test_bulgarian_one_time_fee_wording_distinguishes_fee_from_payment_plan(
+    line, expected_period
+):
+    assert extractor_module.helpers._detect_explicit_price_period(line) == expected_period
+
+
+def test_price_period_on_following_line_applies_to_preceding_amount():
+    text = "Tuition fee: EUR 8,000\nper year\nRegistration fee: EUR 200"
+
+    parsed = extractor_module.helpers._extract_prices_deterministic(text)
+    signals = extractor_module.helpers._iter_price_line_signals(text)
+    supported = extractor_module.helpers._filter_supported_prices(
+        [ExtractedPrice(category="tuition", amount=8000, currency="EUR", period="yearly", confidence=0.9)],
+        text,
+    )
+
+    assert [(price.amount, price.period) for price in parsed.prices] == [
+        (8000, "yearly"),
+        (200, None),
+    ]
+    assert [(signal["amount"], signal["period"]) for signal in signals] == [
+        (8000, "yearly"),
+        (200, None),
+    ]
+    assert len(supported) == 1
+    assert supported[0].period == "yearly"
+
+
 @pytest.mark.parametrize("line", ["Quarterly instalment: EUR 2,000", "Quarterly payment: EUR 2,000"])
 def test_quarterly_payment_does_not_inherit_fee_period(line):
     assert extractor_module.helpers._detect_price_period(line, default_period="yearly") is None
@@ -2606,7 +2644,8 @@ def test_price_signals_do_not_treat_inclusion_text_as_section_heading():
     ]
 
 
-def test_find_supporting_price_source_url_returns_page_with_matching_amount():
+@pytest.mark.parametrize("amount, period", [(400, "monthly"), (750, None)])
+def test_find_supporting_price_source_url_returns_page_with_matching_amount(amount, period):
     school = School(
         name_i18n={"bg": "Тест"},
         website_url="https://example-school.bg",
@@ -2628,7 +2667,7 @@ def test_find_supporting_price_source_url_returns_page_with_matching_amount():
         ),
     ]
     price = ExtractedPrice(
-        category="tuition", amount=750, currency="EUR", period="monthly", confidence=0.9
+        category="tuition", amount=amount, currency="EUR", period=period, confidence=0.9
     )
 
     source_url = extractor_module.helpers._find_supporting_price_source_url(school, pages, price)

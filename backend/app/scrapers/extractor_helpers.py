@@ -1449,7 +1449,7 @@ def _detect_explicit_price_period(value: str) -> str | None:
     if re.search(
         r"\b(?:one[- ]time|single)\b.{0,30}\b(?:fee|charge|deposit)\b|"
         r"\b(?:fee|charge|deposit)\b.{0,30}\bone[ -]time\b|"
-        r"\bеднократн\w*\s+такс\w*\b",
+        r"\bеднократн\w*(?:\s+\w+){0,2}\s+такс\w*\b",
         lowered,
     ):
         return "one_time"
@@ -1493,6 +1493,12 @@ def _detect_explicit_price_period(value: str) -> str | None:
         or re.search(r"/\s*(?:per\s+)?(?:month|месец)\b", lowered)
     ):
         return "monthly"
+    if (
+        re.search(r"\bсе\s+заплаща\s+еднократно\b", lowered)
+        and not re.search(r"\bили\b.{0,40}\bвноск\w*\b", lowered)
+        and not re.search(r"\bвсяка\s+учебна\s+година\b", lowered)
+    ):
+        return "one_time"
     return None
 
 
@@ -1543,6 +1549,17 @@ def _is_penalty_price_line(value: str) -> bool:
             "неустойк",
         )
     )
+
+
+def _period_on_following_line(lines: list[str], line_index: int) -> str | None:
+    if line_index + 1 >= len(lines):
+        return None
+    following = lines[line_index + 1]
+    if _extract_price_amount_currency(following)[0] is not None:
+        return None
+    if _detect_price_category(following, allow_generic_heading=True) is not None:
+        return None
+    return _detect_explicit_price_period(following)
 
 
 def _iter_price_line_signals(text: str) -> list[dict[str, Any]]:
@@ -1599,8 +1616,13 @@ def _iter_price_line_signals(text: str) -> list[dict[str, Any]]:
 
         explicit_period = _detect_explicit_price_period(line)
         if explicit_period is not None and line_amount is None:
-            current_period = explicit_period
-            current_payment_plan = False
+            previous_amount = (
+                _extract_price_amount_currency(lines[line_index - 1])[0]
+                if line_index > 0 else None
+            )
+            if previous_amount is None or line_category is not None:
+                current_period = explicit_period
+                current_payment_plan = False
         elif (
             line_amount is None
             and line_category is not None
@@ -1645,6 +1667,8 @@ def _iter_price_line_signals(text: str) -> list[dict[str, Any]]:
                 else None
             ),
         )
+        if row_period is None:
+            row_period = _period_on_following_line(lines, line_index)
         evidence_line = " ".join(part for part in (current_heading, semantic_line) if part)
         signals.append(
             {
@@ -1686,7 +1710,7 @@ def _extract_prices_deterministic(text: str) -> PriceExtractionOutput:
     active_price: ExtractedPrice | None = None
     seen: set[tuple[str, float, str, str | None, str | None]] = set()
 
-    for line in lines:
+    for line_index, line in enumerate(lines):
         lowered = line.lower()
         if lowered.startswith("source:"):
             current_category = None
@@ -1733,8 +1757,13 @@ def _extract_prices_deterministic(text: str) -> PriceExtractionOutput:
 
         explicit_period = _detect_explicit_price_period(line)
         if explicit_period is not None and line_amount is None:
-            current_period = explicit_period
-            current_payment_plan = False
+            previous_amount = (
+                _extract_price_amount_currency(lines[line_index - 1])[0]
+                if line_index > 0 else None
+            )
+            if previous_amount is None or line_category is not None:
+                current_period = explicit_period
+                current_payment_plan = False
         elif (
             line_amount is None
             and line_category is not None
@@ -1784,6 +1813,8 @@ def _extract_prices_deterministic(text: str) -> PriceExtractionOutput:
                 else None
             ),
         )
+        if row_period is None:
+            row_period = _period_on_following_line(lines, line_index)
         signature = (row_category, line_amount, line_currency or "BGN", row_age_group, row_year)
         if signature in seen:
             continue

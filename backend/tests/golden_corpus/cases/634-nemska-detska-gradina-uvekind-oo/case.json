@@ -263,7 +263,7 @@
         "amount_min": null,
         "category": "registration",
         "currency": "EUR",
-        "period": null,
+        "period": "one_time",
         "plan_name": null
       },
       {
@@ -274,7 +274,7 @@
         "amount_min": null,
         "category": "registration",
         "currency": "EUR",
-        "period": null,
+        "period": "one_time",
         "plan_name": null
       },
       {
