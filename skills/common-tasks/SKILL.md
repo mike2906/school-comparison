@@ -22,7 +22,9 @@ projections/gates, never raw `attributes`/pricing.
 3. Review the generated migration
 4. Run `uv run alembic upgrade head`
 
-ALWAYS autogenerate migrations — never hand-write them.
+Start from autogenerate. Add hand-written operations only where autogenerate can't express
+the change (data moves, Postgres enum values, renames), and verify upgrade/downgrade locally
+before applying it anywhere shared.
 
 ## Add a translation key
 1. Add to `frontend/src/i18n/bg.json`

@@ -30,7 +30,7 @@ Read this before making changes. Task-specific procedures live in `skills/` (see
 ### Backend (Python)
 - **FastAPI** (async) — REST API
 - **SQLAlchemy 2.0** (async ORM) — database models
-- **Alembic** — migrations (ALWAYS autogenerate, never hand-write)
+- **Alembic** — migrations (start from autogenerate; review before applying)
 - **PostgreSQL** — database (no PostGIS, just lat/lng floats)
 - **Pydantic v2** — validation & LLM structured output
 - **uv** — package manager (NEVER use pip or requirements.txt)
@@ -250,11 +250,15 @@ async def my_route(db: AsyncSession = Depends(get_db)):
 ```
 
 **Migrations:**
-ALWAYS autogenerate:
+Start from autogenerate, then review and adjust the generated file before applying it:
 ```bash
 uv run alembic revision --autogenerate -m "description"
+# review/adjust the generated migration
 uv run alembic upgrade head
 ```
+Autogenerate misses some changes (data moves, Postgres enum values, renames). Add
+hand-written operations (`op.execute`, etc.) for those when necessary, and verify the
+migration — upgrade and downgrade on a local DB — before applying it anywhere shared.
 
 ### Frontend Patterns
 
@@ -351,8 +355,8 @@ See its "Usage discipline" section before waiting on reviews/CI or running the f
 
 Step-by-step recipes for routine tasks (add a route/column/translation, seed, run the app,
 import NVO, print the data-quality scoreboard) live in **`skills/common-tasks/SKILL.md`** —
-read it when performing one. Two rules that hold regardless: **always autogenerate** Alembic
-migrations (never hand-write), and the **NVO import is independent** of the website pipeline
+read it when performing one. Two rules that hold regardless: Alembic migrations **start
+from autogenerate** and are reviewed and verified before applying, and the **NVO import is independent** of the website pipeline
 (not part of `all`).
 
 ---
@@ -425,7 +429,7 @@ URL_RECOVERY_CONCURRENCY=3
 ## Don't Do This
 
 ❌ Use `pip install` → Use `uv add` or edit `pyproject.toml`
-❌ Hand-write Alembic migrations → Use `alembic revision --autogenerate`
+❌ Write a migration from scratch or apply one unreviewed → Start from `alembic revision --autogenerate`, then review and verify
 ❌ Hardcode "Search" in JSX → Use `{t('search')}`
 ❌ Add columns for one-off fields → Use the JSON columns (`attributes`, `admission_info`)
 ❌ Use earth curvature formulas → Use Leaflet's built-in distance
