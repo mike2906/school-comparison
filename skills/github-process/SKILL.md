@@ -64,7 +64,14 @@ when the user explicitly asks for that.
      scope, or when a round contains only duplicate, stylistic, or speculative feedback.
      Report the review count, the repeating or disputed findings, the test evidence, and a
      concrete recommendation.
-8. Follow Mike's direction after independent pre-review. **When Mike says merge, merge** once
+8. **Self-merge lane.** The agent may merge its own PR on green CI, without waiting for
+   Mike, when the change is only docs, tests, config defaults, or a small bug fix with a
+   regression test, and self-review (step 4, including the tool-assisted review for code
+   changes) left nothing outstanding. Everything else waits for Mike: the publish boundary
+   (response fields, gates, allowlists), migrations, writes to the launch DB, deployment
+   or credentials, and new dependencies. When unsure, it waits. Report each self-merge to
+   Mike with the PR URL.
+9. Otherwise follow Mike's direction after independent pre-review. **When Mike says merge, merge** once
    CI is green and the PR is mergeable. Do not request another review first, even if the
    latest commit has not been reviewed. After merging, verify that the merge commit contains
    the exact PR-head tree and that post-merge `main` CI passes.
