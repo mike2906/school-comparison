@@ -1787,7 +1787,7 @@ def test_extract_prices_deterministic_parses_fusion_style_pricing_sections():
     assert parsed.prices[0].category == "tuition"
     assert parsed.prices[0].amount == 6650
     assert parsed.prices[0].currency == "EUR"
-    assert parsed.prices[0].period == "yearly"
+    assert parsed.prices[0].period is None
     assert parsed.prices[0].age_group == "preschool"
     assert parsed.prices[0].academic_year == "2025-2026"
     assert any("2 вноски" in item for item in parsed.prices[0].installments)
@@ -1814,10 +1814,10 @@ def test_extract_prices_deterministic_handles_generic_monthly_fee_page():
 
     assert parsed.has_pricing_info is True
     assert by_amount[530].category == "tuition"
-    assert by_amount[530].period == "monthly"
-    assert by_amount[350].period == "monthly"
+    assert by_amount[530].period is None
+    assert by_amount[350].period is None
     assert by_amount[265].category == "registration"
-    assert by_amount[265].period == "one_time"
+    assert by_amount[265].period is None
     assert by_amount[510].category == "tuition"
     assert by_amount[490].category == "tuition"
     assert by_amount[20].category == "extracurricular"
@@ -1843,7 +1843,7 @@ def test_extract_prices_deterministic_resets_after_optional_services_section():
     assert parsed.has_pricing_info is True
     assert tuition_amounts == [8170]
     assert tuition_by_amount[8170].period == "yearly"
-    assert extracurricular_by_amount[300].period == "yearly"
+    assert extracurricular_by_amount[300].period is None
     assert extracurricular_by_amount[360].period == "term"
 
 
@@ -1866,13 +1866,13 @@ def test_extract_prices_deterministic_keeps_registration_and_optional_services_o
     assert parsed.has_pricing_info is True
     assert tuition_amounts == [8890]
     assert by_amount[200].category == "registration"
-    assert by_amount[200].period == "one_time"
-    assert 2100 not in by_amount
+    assert by_amount[200].period is None
+    assert by_amount[2100].period is None
     assert by_amount[345].category == "food"
     assert by_amount[345].period == "quarter"
 
 
-def test_extract_prices_deterministic_maps_installment_multipliers_to_periods():
+def test_extract_prices_deterministic_does_not_turn_installments_into_periods():
     parsed = extractor_module.helpers._extract_prices_deterministic(
         """
         Годишна такса „Обучение“
@@ -1888,27 +1888,88 @@ def test_extract_prices_deterministic_maps_installment_multipliers_to_periods():
     by_amount = {price.amount: price for price in parsed.prices}
 
     assert by_amount[7950].period == "yearly"
-    assert by_amount[4094].period == "semester"
-    assert by_amount[843].period == "monthly"
+    assert by_amount[4094].period is None
+    assert by_amount[843].period is None
 
 
 @pytest.mark.parametrize(
     ("line", "expected_period"),
     [
-        ("School Transport: €2,100 total, payable in two installments", "yearly"),
-        ("Tuition in two installments: €4,000 each", "semester"),
-        ("Обучение на две вноски: по 4 000 EUR", "semester"),
+        ("School Transport: €2,100 total, payable in two installments", None),
+        ("Tuition in two installments: €4,000 each", None),
+        ("Обучение на две вноски: по 4 000 EUR", None),
     ],
 )
-def test_detect_price_period_distinguishes_total_from_per_installment_amounts(
+def test_detect_price_period_does_not_infer_from_installment_plans(
     line,
     expected_period,
 ):
-    assert extractor_module.helpers._detect_price_period(
-        line,
-        "tuition" if "Tuition" in line or "Обучение" in line else "transport",
-        has_year=True,
-    ) == expected_period
+    assert extractor_module.helpers._detect_price_period(line) == expected_period
+
+
+@pytest.mark.parametrize(
+    ("line", "expected_period"),
+    [
+        ("Annual tuition fee: EUR 8,000", "yearly"),
+        ("Tuition fee: EUR 800 per month", "monthly"),
+        ("Tuition fee: EUR 2,000 per term", "term"),
+        ("Tuition fee: EUR 4,000 per semester", "semester"),
+        ("Meal fee: EUR 1,000 per quarter", "quarter"),
+        ("One-time registration fee: EUR 200", "one_time"),
+    ],
+)
+def test_detect_price_period_normalizes_explicit_supported_periods(line, expected_period):
+    assert extractor_module.helpers._detect_price_period(line) == expected_period
+
+
+def test_price_period_does_not_carry_into_next_tuition_section():
+    text = """
+    Annual tuition fee
+    EUR 8,000
+    Tuition fees for international students
+    EUR 9,000
+    """
+
+    parsed = extractor_module.helpers._extract_prices_deterministic(text)
+    signals = extractor_module.helpers._iter_price_line_signals(text)
+
+    assert {price.amount: price.period for price in parsed.prices} == {
+        8000: "yearly",
+        9000: None,
+    }
+    assert {signal["amount"]: signal["period"] for signal in signals} == {
+        8000: "yearly",
+        9000: None,
+    }
+
+
+def test_normalized_price_fields_preserves_unstated_period():
+    fields = extractor_module._normalized_price_fields(
+        ExtractedPrice(
+            category="tuition",
+            amount=8000,
+            currency="EUR",
+            period=None,
+            confidence=0.9,
+        )
+    )
+
+    assert fields is not None
+    assert fields["period"] is None
+
+
+def test_normalized_price_fields_still_rejects_unknown_stated_period():
+    fields = extractor_module._normalized_price_fields(
+        ExtractedPrice(
+            category="tuition",
+            amount=8000,
+            currency="EUR",
+            period="weekly",
+            confidence=0.9,
+        )
+    )
+
+    assert fields is None
 
 
 def test_dedupe_price_rows_drops_currency_and_installment_duplicates():
@@ -2024,10 +2085,27 @@ def test_filter_supported_prices_uses_source_line_to_fix_period_and_category():
     refined = extractor_module.helpers._filter_supported_prices(prices, text)
     by_amount = {price.amount: price for price in refined}
 
-    assert by_amount[530].period == "monthly"
-    assert by_amount[350].period == "monthly"
+    assert by_amount[530].period is None
+    assert by_amount[350].period is None
     assert by_amount[265].category == "registration"
-    assert by_amount[265].period == "one_time"
+    assert by_amount[265].period is None
+
+
+def test_filter_supported_prices_clears_llm_period_without_source_evidence():
+    text = "Tuition fee for academic year 2026/2027: EUR 8,000"
+    guessed = ExtractedPrice(
+        category="tuition",
+        amount=8000,
+        currency="EUR",
+        period="yearly",
+        academic_year="2026/2027",
+        confidence=0.9,
+    )
+
+    refined = extractor_module.helpers._filter_supported_prices([guessed], text)
+
+    assert len(refined) == 1
+    assert refined[0].period is None
 
 
 def test_filter_supported_prices_uses_plan_context_when_amount_repeats():
@@ -2367,10 +2445,14 @@ def test_supported_prices_keep_only_current_fee_structure_across_categories():
     assert {(row.amount, row.academic_year) for row in supported} == {
         (7820.0, "2026/2027"),
         (680.0, "2026/2027"),
+        (250.0, "2026/2027"),
+        (20.0, "2026/2027"),
         (80.0, "2026/2027"),
     }
     by_amount = {row.amount: row for row in supported}
-    assert by_amount[680].period == "monthly"
+    assert by_amount[680].period is None
+    assert by_amount[250].period is None
+    assert by_amount[20].period is None
     assert by_amount[80].category == "materials"
 
 
@@ -2393,11 +2475,14 @@ def test_supported_prices_keep_only_current_fee_structure_across_categories():
         ),
     ],
 )
-def test_filter_supported_prices_withholds_unlabeled_service_periods(text, price):
-    assert extractor_module.helpers._filter_supported_prices([price], text) == []
+def test_filter_supported_prices_preserves_unlabeled_service_with_null_period(text, price):
+    refined = extractor_module.helpers._filter_supported_prices([price], text)
+
+    assert len(refined) == 1
+    assert refined[0].period is None
 
 
-def test_deterministic_pricing_does_not_inherit_tuition_period_for_bare_transport_amount():
+def test_deterministic_pricing_preserves_bare_transport_with_unstated_period():
     parsed = extractor_module.helpers._extract_prices_deterministic(
         """
         TUITION FEES FOR THE ACADEMIC 2026/2027 YEAR
@@ -2406,8 +2491,9 @@ def test_deterministic_pricing_does_not_inherit_tuition_period_for_bare_transpor
         """
     )
 
-    assert [(row.category, row.amount) for row in parsed.prices] == [
-        ("tuition", 8000.0),
+    assert [(row.category, row.amount, row.period) for row in parsed.prices] == [
+        ("tuition", 8000.0, None),
+        ("transport", 250.0, None),
     ]
 
 
@@ -2526,7 +2612,7 @@ def test_find_supporting_price_source_url_uses_semantics_when_amount_repeats():
         ),
     ]
     price = ExtractedPrice(
-        category="transport", amount=2900, currency="EUR", period="yearly",
+        category="transport", amount=2900, currency="EUR", period=None,
         plan_name="Full School Bus Service Fee", confidence=0.9,
     )
 
@@ -2594,10 +2680,18 @@ async def test_extract_school_uses_deterministic_pricing_fallback_when_llm_repor
     pricing_rows = (
         await db_session.execute(select(Pricing).where(Pricing.school_id == school.id).order_by(Pricing.id))
     ).scalars().all()
-    assert [(row.category.value, float(row.amount), row.currency, row.period.value) for row in pricing_rows] == [
-        ("tuition", 6650.0, "EUR", "yearly"),
-        ("tuition", 7150.0, "EUR", "yearly"),
-        ("materials", 545.0, "EUR", "yearly"),
+    assert [
+        (
+            row.category.value,
+            float(row.amount),
+            row.currency,
+            row.period.value if row.period else None,
+        )
+        for row in pricing_rows
+    ] == [
+        ("tuition", 6650.0, "EUR", None),
+        ("tuition", 7150.0, "EUR", None),
+        ("materials", 545.0, "EUR", None),
     ]
 
 

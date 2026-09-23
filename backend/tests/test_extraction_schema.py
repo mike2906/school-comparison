@@ -33,3 +33,14 @@ def test_extracted_price_accepts_bounded_confidence(confidence):
         confidence=confidence,
     )
     assert price.confidence == confidence
+
+
+def test_extracted_price_allows_unstated_period():
+    price = ExtractedPrice(
+        category="tuition",
+        amount=500,
+        currency="BGN",
+        confidence=0.9,
+    )
+
+    assert price.period is None
