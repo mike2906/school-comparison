@@ -40,6 +40,11 @@ implemented and wired into the CLI/Celery pipeline (discovery, website discovery
 validation, navigation, extraction, validation/spot checks, summarization). Official Bulgaria
 NVO import is an independent stage, with Sofia backfilled for `nvo_4`, `nvo_7`, `nvo_10`
 across 2021-2025. Current work is data quality and go-live (backlog: `docs/GO_LIVE_PLAN.md`).
+
+**Status source of truth:** `docs/GO_LIVE_PLAN.md` checkboxes, plus git history and the DBs.
+Agent memory or notes can be stale; verify an item is still open before starting it, and
+tick the item in the plan in the same PR that finishes it.
+
 Planned, not yet built: admission points calculator, parent-facing NVO calculator, and
 admission-threshold tooling.
 
@@ -188,3 +193,4 @@ reading it:
 - Codex auto-review is **off**. Give Mike the PR URL for independent ChatGPT pre-review;
   post `@codex review` only when Mike explicitly asks, and only one Codex review per PR.
 - When Mike says **merge**, merge on green CI without requesting another review.
+- Agents may merge their own PRs only within the self-merge lane defined in the skill.
