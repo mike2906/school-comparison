@@ -1014,7 +1014,7 @@ def _normalized_price_fields(extracted: ExtractedPrice) -> dict[str, Any] | None
     amount = helpers._to_optional_float(extracted.amount)
     amount_min = helpers._to_optional_float(extracted.amount_min)
     amount_max = helpers._to_optional_float(extracted.amount_max)
-    if category is None or period is None:
+    if category is None or (extracted.period is not None and period is None):
         return None
     if amount is None and amount_min is None and amount_max is None:
         return None
@@ -1106,6 +1106,7 @@ async def _extract_prices(
         "Emit ONE row per distinct fee. Apply these rules:\n"
         "- Dual currencies: when the same fee is quoted in both EUR and BGN (e.g. '€8,100 / 15 842,22 лв'), emit only ONE row in the page's primary currency. Never emit a BGN row for a fee already emitted in EUR (or vice versa).\n"
         "- Payment schedules: when one fee has multiple payment options (full pay / 2 installments / 10 monthly), emit ONE row with the full-payment amount as `amount` and list the other options as strings in `installments` (e.g. '€8,100 – 2 installments'). Do NOT emit separate rows for the installment amounts.\n"
+        "- Set `period` only when the source explicitly states the fee period or represents it unambiguously (for example 'per year', 'monthly fee', or 'per term'). Otherwise set `period` to null. An academic year, fee category, amount, school type, installment count, or payment frequency does NOT by itself establish the fee period.\n"
         "- Distinct tiers: when multiple tiers exist (e.g. 'Bulgarian students' vs 'International students', different grade bands, different meal plans like breakfast vs full-day), emit SEPARATE rows and set `plan_name` to the tier label from the page. `plan_name` must be populated whenever multiple rows share the same category/period/age_group on one page.\n"
         "- Set `age_group` when the page specifies it (grade range, preschool, nursery, etc.).\n"
         "- Set `academic_year` when the page specifies it (e.g. '2025/2026').\n"

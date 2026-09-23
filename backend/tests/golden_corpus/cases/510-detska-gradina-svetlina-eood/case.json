@@ -166,29 +166,7 @@
         "amount_min": null,
         "category": "tuition",
         "currency": "EUR",
-        "period": "semester",
-        "plan_name": null
-      },
-      {
-        "academic_year": null,
-        "age_group": null,
-        "amount": 4094.0,
-        "amount_max": null,
-        "amount_min": null,
-        "category": "tuition",
-        "currency": "EUR",
-        "period": "semester",
-        "plan_name": null
-      },
-      {
-        "academic_year": null,
-        "age_group": null,
-        "amount": 4275.0,
-        "amount_max": null,
-        "amount_min": null,
-        "category": "tuition",
-        "currency": "EUR",
-        "period": "semester",
+        "period": null,
         "plan_name": null
       },
       {
@@ -199,18 +177,18 @@
         "amount_min": null,
         "category": "tuition",
         "currency": "EUR",
-        "period": "monthly",
+        "period": null,
         "plan_name": null
       },
       {
         "academic_year": null,
         "age_group": null,
-        "amount": 8300.0,
+        "amount": 4094.0,
         "amount_max": null,
         "amount_min": null,
         "category": "tuition",
         "currency": "EUR",
-        "period": "monthly",
+        "period": null,
         "plan_name": null
       },
       {
@@ -221,7 +199,18 @@
         "amount_min": null,
         "category": "tuition",
         "currency": "EUR",
-        "period": "monthly",
+        "period": null,
+        "plan_name": null
+      },
+      {
+        "academic_year": null,
+        "age_group": null,
+        "amount": 4275.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "tuition",
+        "currency": "EUR",
+        "period": null,
         "plan_name": null
       },
       {
@@ -232,7 +221,7 @@
         "amount_min": null,
         "category": "tuition",
         "currency": "EUR",
-        "period": "monthly",
+        "period": null,
         "plan_name": null
       },
       {
@@ -243,8 +232,19 @@
         "amount_min": null,
         "category": "tuition",
         "currency": "EUR",
-        "period": "one_time",
+        "period": "yearly",
         "plan_name": "Standard"
+      },
+      {
+        "academic_year": null,
+        "age_group": null,
+        "amount": 8300.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "yearly",
+        "plan_name": null
       }
     ]
   },

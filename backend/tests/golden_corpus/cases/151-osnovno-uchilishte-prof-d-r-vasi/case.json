@@ -152,7 +152,7 @@
         "amount_min": null,
         "category": "tuition",
         "currency": "EUR",
-        "period": "yearly",
+        "period": null,
         "plan_name": null
       },
       {
@@ -163,7 +163,7 @@
         "amount_min": null,
         "category": "tuition",
         "currency": "EUR",
-        "period": "yearly",
+        "period": null,
         "plan_name": null
       },
       {
@@ -174,7 +174,7 @@
         "amount_min": null,
         "category": "tuition",
         "currency": "EUR",
-        "period": "yearly",
+        "period": null,
         "plan_name": null
       },
       {
@@ -185,7 +185,7 @@
         "amount_min": null,
         "category": "tuition",
         "currency": "EUR",
-        "period": "yearly",
+        "period": null,
         "plan_name": null
       },
       {
@@ -196,7 +196,7 @@
         "amount_min": null,
         "category": "transport",
         "currency": "EUR",
-        "period": "yearly",
+        "period": null,
         "plan_name": null
       },
       {

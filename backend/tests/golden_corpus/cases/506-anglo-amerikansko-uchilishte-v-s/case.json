@@ -167,34 +167,12 @@
       {
         "academic_year": "2026-2027",
         "age_group": null,
-        "amount": 10000.0,
-        "amount_max": null,
-        "amount_min": null,
-        "category": "tuition",
-        "currency": "EUR",
-        "period": "yearly",
-        "plan_name": null
-      },
-      {
-        "academic_year": "2026-2027",
-        "age_group": null,
-        "amount": 20000.0,
-        "amount_max": null,
-        "amount_min": null,
-        "category": "tuition",
-        "currency": "EUR",
-        "period": "yearly",
-        "plan_name": null
-      },
-      {
-        "academic_year": "2026-2027",
-        "age_group": null,
         "amount": 3402.0,
         "amount_max": null,
         "amount_min": null,
         "category": "registration",
         "currency": "EUR",
-        "period": "one_time",
+        "period": null,
         "plan_name": null
       },
       {
@@ -205,7 +183,7 @@
         "amount_min": null,
         "category": "registration",
         "currency": "EUR",
-        "period": "one_time",
+        "period": null,
         "plan_name": null
       },
       {
@@ -216,7 +194,7 @@
         "amount_min": null,
         "category": "registration",
         "currency": "EUR",
-        "period": "one_time",
+        "period": null,
         "plan_name": null
       },
       {
@@ -239,6 +217,28 @@
         "category": "transport",
         "currency": "EUR",
         "period": "yearly",
+        "plan_name": null
+      },
+      {
+        "academic_year": "2026-2027",
+        "age_group": null,
+        "amount": 10000.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "tuition",
+        "currency": "EUR",
+        "period": null,
+        "plan_name": null
+      },
+      {
+        "academic_year": "2026-2027",
+        "age_group": null,
+        "amount": 20000.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "tuition",
+        "currency": "EUR",
+        "period": null,
         "plan_name": null
       }
     ]

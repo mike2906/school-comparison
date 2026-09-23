@@ -8,7 +8,10 @@ class ExtractedPrice(BaseModel):
     category: str = Field(description="Price category label from source text")
     amount: Optional[float] = Field(default=None, description="Numeric amount")
     currency: str = Field(default="BGN", description="Currency code (e.g. BGN, EUR, USD)")
-    period: str = Field(description="Period label from source text")
+    period: Optional[str] = Field(
+        default=None,
+        description="Period explicitly established by the source text; null when unstated",
+    )
     amount_min: Optional[float] = Field(default=None, description="Minimum amount if a range is specified")
     amount_max: Optional[float] = Field(default=None, description="Maximum amount if a range is specified")
     plan_name: Optional[str] = Field(default=None, description="Name of the plan (e.g. 'Standard', 'Premium')")

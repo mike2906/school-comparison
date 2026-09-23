@@ -1203,6 +1203,8 @@ _PRICE_LINE_AMOUNT_LATIN_RE = re.compile(
     flags=re.IGNORECASE,
 )
 _OPTIONAL_PRICING_SECTION_TOKENS = (
+    "other charges",
+    "other fees",
     "услуги по желание",
     "по желание на родителите",
     "допълнително заплащане",
@@ -1399,6 +1401,18 @@ def _is_price_category_heading(value: str) -> bool:
     )
 
 
+def _starts_new_price_section(value: str) -> bool:
+    """Identify a new fee section, excluding table labels and explanatory prose."""
+    return value.lstrip().startswith("#") or bool(
+        re.match(
+            r"^(?:tuition|school|food|meal|transport)\s+fees?\s+for\b|"
+            r"^такс\w*\s+за\s+(?:обучение|храна|транспорт)\b",
+            value,
+            flags=re.IGNORECASE,
+        )
+    )
+
+
 def _detect_price_age_group(value: str) -> str | None:
     lowered = value.lower()
     if "предучилищ" in lowered:
@@ -1417,108 +1431,116 @@ def _detect_price_age_group(value: str) -> str | None:
     return None
 
 
-_INSTALLMENT_MULTIPLIER_RE = re.compile(r"\b(\d{1,2})\s*[×xXхХ]\s*[\d.,\s]*\s*(?:€|eur|euro|лв|bgn)", flags=re.IGNORECASE)
-
-
-def _detect_installment_period(value: str) -> str | None:
-    match = _INSTALLMENT_MULTIPLIER_RE.search(value)
-    if match is None:
-        return None
-    if len(_PRICE_LINE_AMOUNT_RE.findall(value)) > 1:
-        return None
-    count = int(match.group(1))
-    if count == 2:
-        return "semester"
-    if count == 3:
-        return "term"
-    if count == 4:
-        return "quarter"
-    if count in (9, 10, 11, 12):
-        return "monthly"
-    return None
+_INSTALLMENT_MULTIPLIER_RE = re.compile(
+    r"\b\d{1,2}\s*[×xXхХ]\s*[\d.,\s]*\s*(?:€|eur|euro|лв|bgn)",
+    flags=re.IGNORECASE,
+)
+_PAYMENT_SCHEDULE_FREQUENCY_RE = re.compile(
+    r"\b(?:monthly|quarterly)\s+(?:paid|payment|instalments?|installments?)|"
+    r"\b(?:paid|payable)\s+(?:monthly|quarterly)\b|"
+    r"\b(?:instalments?|installments?|вноск\w*)\b|"
+    r"\bежемесечн\w*\s+(?:плащ\w*|вноск\w*)\b",
+    flags=re.IGNORECASE,
+)
 
 
 def _detect_explicit_price_period(value: str) -> str | None:
-    lowered = value.lower()
-    if any(token in lowered for token in ("еднократ", "one-time", "one time", "депозит", "deposit")):
+    lowered = value.casefold()
+    if re.search(
+        r"\b(?:one[- ]time|single)\b.{0,30}\b(?:fee|charge|deposit)\b|"
+        r"\b(?:fee|charge|deposit)\b.{0,30}\bone[ -]time\b|"
+        r"\bеднократн\w*(?:\s+\w+){0,2}\s+такс\w*\b",
+        lowered,
+    ):
         return "one_time"
-    if "семест" in lowered or "semester" in lowered:
+    if re.search(
+        r"\b(?:per|each)\s+semester\b|\bsemester(?:ly)?\s+(?:fee|tuition)\b|"
+        r"\b(?:на|за)\s+(?:един\s+)?семестър\b|\bсеместриална\s+такса\b",
+        lowered,
+    ):
         return "semester"
-    if "четвърт" in lowered or "quarter" in lowered:
+    if (
+        re.search(r"\b(?:per|each)\s+quarter\b", lowered)
+        and not re.search(r"\b(?:paid|payable)\s+(?:per|each)\s+quarter\b", lowered)
+    ) or re.search(
+        r"\bquarterly\s+(?:(?:tuition|school|meal|food|transport)\s+)?(?:fee|charge)\b|"
+        r"\b(?:на|за)\s+(?:едно\s+)?тримесечие\b|\bтримесечна\s+такса\b",
+        lowered,
+    ):
         return "quarter"
-    if re.search(r"\b(?:term|срока?|срок)\b", lowered):
+    if re.search(
+        r"\b(?:per|each)\s+term\b|\bterm(?:ly)?\s+(?:fee|tuition)\b|"
+        r"\b(?:на|за)\s+(?:един\s+)?(?:учебен\s+)?срок\b|\bтакса\s+за\s+срок\b",
+        lowered,
+    ):
         return "term"
-    if re.search(r"(?:уч\.?\s*год|учебн(?:а|ата)\s+година|school year)", lowered):
+    if (
+        re.search(r"\b(?:annual|yearly)\s+(?:(?:tuition|school)\s+)?fee\b", lowered)
+        or re.search(r"\bannual\s+tuition\b", lowered)
+        or re.search(r"\bгодишн\w*\s+(?:учебн\w*\s+)?такс\w*\b", lowered)
+        or re.search(r"\bper\s+(?:(?:academic|school)\s+)?year\b", lowered)
+        or re.search(r"\bfor\s+(?:one|the\s+(?:whole|entire))\s+(?:academic|school)\s+year\b", lowered)
+        or re.search(r"\bза\s+(?:една|цялата)\s+уч(?:ебна|\.)?\s*година\b", lowered)
+        or re.search(r"\bна\s+година\b", lowered)
+        or re.search(r"/\s*(?:per\s+)?(?:year|година)\b", lowered)
+    ):
         return "yearly"
-    if any(token in lowered for token in ("годиш", "annual", "yearly", "учебна")):
-        return "yearly"
-    if any(token in lowered for token in ("ежемес", "месеч", "месец", "monthly", "на месец", "per month")):
+    if (
+        re.search(r"\bmonthly\s+(?:tuition|fee)\b", lowered)
+        or re.search(r"\b(?:tuition|fee)\b.{0,30}\bper\s+month\b", lowered)
+        or re.search(r"\bмесечн\w*\s+такс\w*\b", lowered)
+        or re.search(r"\bмесечно(?:половин|целодневно)\b", lowered)
+        or re.search(r"\bтакс\w*\s+(?:за|на)\s+месец\b", lowered)
+        or re.search(r"/\s*(?:per\s+)?(?:month|месец)\b", lowered)
+    ):
         return "monthly"
+    if (
+        re.search(r"\bсе\s+заплаща\s+еднократно\b", lowered)
+        and not re.search(r"\bили\b.{0,40}\bвноск\w*\b", lowered)
+        and not re.search(r"\bвсяка\s+учебна\s+година\b", lowered)
+    ):
+        return "one_time"
     return None
 
 
 def _detect_price_period(
     value: str,
-    category: str | None,
-    has_year: bool,
     default_period: str | None = None,
-    context_value: str | None = None,
 ) -> str | None:
-    installment = _detect_installment_period(value)
-    if installment is not None:
-        return installment
-    if category == "registration":
-        return "one_time"
-    amount_matches = _PRICE_LINE_AMOUNT_RE.findall(value or "")
-    lowered_value = value.casefold()
-    if (
-        category == "tuition"
-        and len(amount_matches) > 2
-        and any(token in lowered_value for token in ("full fee", "пълна такса"))
-    ):
-        return "yearly"
     explicit = _detect_explicit_price_period(value)
     if explicit is not None:
         return explicit
-    if re.search(r"\b(?:in\s+)?two\s+installments\b|\bдве\s+вноски\b", lowered_value):
-        per_installment = bool(
-            re.search(
-                r"\b(?:each|per\s+installment)\b|\btwo\s+installments\s+of\b|"
-                r"\bдве\s+вноски\s+по\b|:\s*по\s+\d",
-                lowered_value,
-            )
-        )
-        return "semester" if per_installment else "yearly"
-    if default_period == "monthly" and category == "tuition" and len(amount_matches) > 2:
-        return "yearly"
-    if default_period is not None:
-        if category not in {"transport", "extracurricular"}:
-            return default_period
-        context = context_value or ""
+    if _PAYMENT_SCHEDULE_FREQUENCY_RE.search(value):
         if (
-            _detect_price_category(context) == category
-            and _detect_explicit_price_period(context) == default_period
+            default_period is not None
+            and re.search(r"\b(?:paid|payable)\s+(?:monthly|quarterly)\b", value, re.IGNORECASE)
+            and not re.search(r"\b(?:instalments?|installments?|payments?|вноск\w*)\b", value, re.IGNORECASE)
         ):
             return default_period
-    if has_year or "вноск" in value.lower():
-        if category in {"transport", "extracurricular"}:
-            # An academic-year heading dates a fee structure; it does not say
-            # whether an optional service is charged once, monthly, or yearly.
-            # A labelled fee/course can still be supported as a whole-year
-            # charge; a bare route, club, or activity amount cannot.
-            context = context_value or ""
-            category_context = (
-                context if _detect_price_category(context) == category else value
-            )
-            lowered = category_context.casefold()
-            if not any(token in lowered for token in ("fee", "такса", "course", "курс")):
-                return None
-        return "yearly"
-    if category in {"food", "materials", "extended_day"}:
-        return "yearly"
-    if category in {"extracurricular", "transport"}:
-        return "monthly"
-    return "monthly" if category == "tuition" else "one_time"
+        return None
+    # Callers only supply a default for an explicit period heading in the current
+    # fee section. Academic years, fee categories, amounts, and installment counts
+    # are deliberately not period evidence.
+    return default_period
+
+
+def _section_period_applies_to_price_line(
+    value: str,
+    section_heading: str | None,
+    payment_plan_heading: bool,
+) -> bool:
+    if not payment_plan_heading:
+        return True
+    # A mixed table can explicitly label its first amount as the full fee while
+    # also showing installment alternatives. The section's stated period applies
+    # to that total, but not to standalone installment amounts.
+    return (
+        len(_PRICE_LINE_AMOUNT_RE.findall(value)) > 1
+        and any(
+            token in (section_heading or "").casefold()
+            for token in ("full fee", "пълна такса")
+        )
+    )
 
 
 def _is_penalty_price_line(value: str) -> bool:
@@ -1536,6 +1558,17 @@ def _is_penalty_price_line(value: str) -> bool:
     )
 
 
+def _period_on_following_line(lines: list[str], line_index: int) -> str | None:
+    if line_index + 1 >= len(lines):
+        return None
+    following = lines[line_index + 1]
+    if _extract_price_amount_currency(following)[0] is not None:
+        return None
+    if _detect_price_category(following, allow_generic_heading=True) is not None:
+        return None
+    return _detect_explicit_price_period(following)
+
+
 def _iter_price_line_signals(text: str) -> list[dict[str, Any]]:
     lines = [_clean_price_line(raw) for raw in re.split(r"[\n\r]+", text) if _clean_price_line(raw)]
     if not lines:
@@ -1546,6 +1579,7 @@ def _iter_price_line_signals(text: str) -> list[dict[str, Any]]:
     current_age_group: str | None = None
     current_academic_year: str | None = None
     current_period: str | None = None
+    current_payment_plan = False
     current_heading: str | None = None
     current_source_url: str | None = None
     source_staleness = _pricing_source_staleness(text)
@@ -1560,6 +1594,7 @@ def _iter_price_line_signals(text: str) -> list[dict[str, Any]]:
             current_age_group = None
             current_academic_year = None
             current_period = None
+            current_payment_plan = False
             current_heading = None
             continue
         line_amount, line_currency = _extract_price_amount_currency(line)
@@ -1571,13 +1606,18 @@ def _iter_price_line_signals(text: str) -> list[dict[str, Any]]:
             current_category = None
             current_age_group = None
             current_period = None
+            current_payment_plan = False
             current_heading = None
             continue
 
+        if line_amount is None and current_period == "monthly" and lowered.startswith("еднократно плащане"):
+            current_period = None
+
         line_category = _detect_price_category(line, allow_generic_heading=True)
         if line_category is not None and line_amount is None and _is_price_category_heading(line):
-            if line_category != current_category:
+            if line_category != current_category or _starts_new_price_section(line):
                 current_period = None
+                current_payment_plan = False
             current_category = line_category
             current_heading = line
             detected_age_group = _detect_price_age_group(line)
@@ -1585,8 +1625,20 @@ def _iter_price_line_signals(text: str) -> list[dict[str, Any]]:
                 current_age_group = detected_age_group
 
         explicit_period = _detect_explicit_price_period(line)
-        if explicit_period is not None:
-            current_period = explicit_period
+        if explicit_period is not None and line_amount is None:
+            previous_amount = (
+                _extract_price_amount_currency(lines[line_index - 1])[0]
+                if line_index > 0 else None
+            )
+            if previous_amount is None or line_category is not None:
+                current_period = explicit_period
+                current_payment_plan = False
+        elif (
+            line_amount is None
+            and line_category is not None
+            and _PAYMENT_SCHEDULE_FREQUENCY_RE.search(line)
+        ):
+            current_payment_plan = True
 
         installment_match = re.search(r"\b(?:на|за)\s*(\d+)\s*вноск", lowered)
         if installment_match and int(installment_match.group(1)) != 1:
@@ -1612,14 +1664,21 @@ def _iter_price_line_signals(text: str) -> list[dict[str, Any]]:
         row_year = academic_year_match.group(1).replace(" ", "") if academic_year_match else current_academic_year
         row_period = _detect_price_period(
             line,
-            row_category,
-            has_year=bool(row_year),
-            default_period=current_period,
-            context_value=semantic_line,
+            default_period=(
+                current_period
+                if row_category == current_category
+                and _section_period_applies_to_price_line(
+                    line, current_heading, current_payment_plan
+                )
+                and not (
+                    _INSTALLMENT_MULTIPLIER_RE.search(line)
+                    and len(_PRICE_LINE_AMOUNT_RE.findall(line)) == 1
+                )
+                else None
+            ),
         )
         if row_period is None:
-            continue
-        current_period = row_period
+            row_period = _period_on_following_line(lines, line_index)
         evidence_line = " ".join(part for part in (current_heading, semantic_line) if part)
         signals.append(
             {
@@ -1654,19 +1713,21 @@ def _extract_prices_deterministic(text: str) -> PriceExtractionOutput:
     current_age_group: str | None = None
     current_academic_year: str | None = None
     current_period: str | None = None
+    current_payment_plan = False
     current_plan_name: str | None = None
     current_heading: str | None = None
     current_includes: list[str] = []
     active_price: ExtractedPrice | None = None
     seen: set[tuple[str, float, str, str | None, str | None]] = set()
 
-    for line in lines:
+    for line_index, line in enumerate(lines):
         lowered = line.lower()
         if lowered.startswith("source:"):
             current_category = None
             current_age_group = None
             current_academic_year = None
             current_period = None
+            current_payment_plan = False
             current_plan_name = None
             current_heading = None
             current_includes = []
@@ -1683,16 +1744,21 @@ def _extract_prices_deterministic(text: str) -> PriceExtractionOutput:
             current_category = None
             current_age_group = None
             current_period = None
+            current_payment_plan = False
             current_plan_name = None
             current_heading = None
             current_includes = []
             active_price = None
             continue
 
+        if line_amount is None and current_period == "monthly" and lowered.startswith("еднократно плащане"):
+            current_period = None
+
         line_category = _detect_price_category(line, allow_generic_heading=True)
         if line_category is not None and line_amount is None:
-            if line_category != current_category:
+            if line_category != current_category or _starts_new_price_section(line):
                 current_period = None
+                current_payment_plan = False
             current_category = line_category
             current_heading = line
             detected_age_group = _detect_price_age_group(line)
@@ -1703,8 +1769,20 @@ def _extract_prices_deterministic(text: str) -> PriceExtractionOutput:
             active_price = None
 
         explicit_period = _detect_explicit_price_period(line)
-        if explicit_period is not None:
-            current_period = explicit_period
+        if explicit_period is not None and line_amount is None:
+            previous_amount = (
+                _extract_price_amount_currency(lines[line_index - 1])[0]
+                if line_index > 0 else None
+            )
+            if previous_amount is None or line_category is not None:
+                current_period = explicit_period
+                current_payment_plan = False
+        elif (
+            line_amount is None
+            and line_category is not None
+            and _PAYMENT_SCHEDULE_FREQUENCY_RE.search(line)
+        ):
+            current_payment_plan = True
 
         if "включва" in lowered and current_category is not None:
             current_includes.append(line)
@@ -1735,14 +1813,21 @@ def _extract_prices_deterministic(text: str) -> PriceExtractionOutput:
         row_plan_name = "Standard" if "стандарт" in lowered or "standard" in lowered else current_plan_name
         row_period = _detect_price_period(
             line,
-            row_category,
-            has_year=bool(row_year),
-            default_period=current_period,
-            context_value=" ".join(part for part in (current_heading, line) if part),
+            default_period=(
+                current_period
+                if row_category == current_category
+                and _section_period_applies_to_price_line(
+                    line, current_heading, current_payment_plan
+                )
+                and not (
+                    _INSTALLMENT_MULTIPLIER_RE.search(line)
+                    and len(_PRICE_LINE_AMOUNT_RE.findall(line)) == 1
+                )
+                else None
+            ),
         )
         if row_period is None:
-            continue
-        current_period = row_period
+            row_period = _period_on_following_line(lines, line_index)
         signature = (row_category, line_amount, line_currency or "BGN", row_age_group, row_year)
         if signature in seen:
             continue
@@ -2031,7 +2116,7 @@ _PRICE_MATCH_STOPWORDS = {
 def _price_signal_match_score(price: ExtractedPrice, signal: dict[str, Any]) -> int:
     context = " ".join(
         str(value or "")
-        for value in (price.plan_name, price.notes, price.category, price.period)
+        for value in (price.plan_name, price.notes, price.category)
     ).casefold()
     line = str(signal.get("line") or "").casefold()
     context_tokens = {
@@ -2041,8 +2126,6 @@ def _price_signal_match_score(price: ExtractedPrice, signal: dict[str, Any]) -> 
     score = 3 * len(context_tokens & line_tokens)
     if price.category == signal.get("category"):
         score += 2
-    if price.period == signal.get("period"):
-        score += 1
     return score
 
 
@@ -2180,8 +2263,11 @@ def _filter_supported_prices(prices: list[ExtractedPrice], text: str) -> list[Ex
                 signal
                 for signal in candidates
                 if signal.get("category") == price.category
-                and signal.get("period") == price.period
             ]
+            if len({(signal.get("category"), signal.get("period"), signal.get("academic_year")) for signal in semantic_matches}) > 1:
+                semantic_matches = [
+                    signal for signal in semantic_matches if signal.get("period") == price.period
+                ]
             matched_semantics = {
                 (signal.get("category"), signal.get("period"), signal.get("academic_year"))
                 for signal in semantic_matches
@@ -2205,8 +2291,9 @@ def _filter_supported_prices(prices: list[ExtractedPrice], text: str) -> list[Ex
         normalized = price.model_copy(deep=True)
         if supporting_signal.get("category"):
             normalized.category = supporting_signal["category"]
-        if supporting_signal.get("period"):
-            normalized.period = supporting_signal["period"]
+        # Evidence is authoritative in both directions: an explicit supported
+        # period corrects the model, and absent period evidence clears a guess.
+        normalized.period = supporting_signal.get("period")
         if supporting_signal.get("academic_year") and not normalized.academic_year:
             normalized.academic_year = supporting_signal["academic_year"]
         if supporting_signal.get("age_group") and not normalized.age_group:

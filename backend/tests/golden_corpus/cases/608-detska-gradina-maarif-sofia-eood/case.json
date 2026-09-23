@@ -134,7 +134,7 @@
         "amount_min": null,
         "category": "registration",
         "currency": "BGN",
-        "period": "one_time",
+        "period": null,
         "plan_name": null
       },
       {
@@ -145,7 +145,7 @@
         "amount_min": null,
         "category": "food",
         "currency": "BGN",
-        "period": "yearly",
+        "period": null,
         "plan_name": null
       }
     ]

@@ -174,7 +174,7 @@
         "amount_min": null,
         "category": "tuition",
         "currency": "EUR",
-        "period": "one_time",
+        "period": null,
         "plan_name": null
       },
       {
@@ -185,7 +185,7 @@
         "amount_min": null,
         "category": "tuition",
         "currency": "EUR",
-        "period": "one_time",
+        "period": null,
         "plan_name": null
       }
     ]

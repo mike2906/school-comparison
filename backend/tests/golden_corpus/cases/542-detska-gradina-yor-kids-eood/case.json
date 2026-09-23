@@ -196,7 +196,7 @@
         "amount_min": null,
         "category": "registration",
         "currency": "BGN",
-        "period": "one_time",
+        "period": null,
         "plan_name": null
       },
       {
