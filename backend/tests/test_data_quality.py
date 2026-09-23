@@ -417,6 +417,44 @@ async def test_scoreboard_publishable_pricing_matches_schema_serialization(db_se
     assert metrics["pricing_rows_failing_gates"]["publishable"] == len(public.pricing)
 
 
+async def test_scoreboard_counts_implausible_tuition_as_failing_like_the_api(db_session):
+    school = await _make_school(db_session)
+    page = await _evidence_page(db_session, school, url="https://example.com/fees")
+
+    def tuition(amount, period):
+        return Pricing(
+            school_id=school.id,
+            category=PriceCategory.TUITION,
+            period=period,
+            amount=amount,
+            source=PriceSource.SCRAPED_WEBSITE,
+            source_url="https://example.com/fees",
+            source_page_id=page.id,
+            pricing_context={"confidence": 1.0},
+        )
+
+    rows = [tuition(800, PricePeriod.MONTHLY), tuition(7, PricePeriod.MONTHLY)]
+    db_session.add_all(rows)
+    await db_session.commit()
+
+    public = SchoolListResponse.model_validate(
+        {
+            "id": school.id,
+            "country_code": school.country_code,
+            "name_i18n": school.name_i18n,
+            "school_type": school.school_type,
+            "education_level": school.education_level,
+            "attributes": school.attributes,
+            "pricing": rows,
+        }
+    )
+    metrics = await compute_quality_metrics(db_session, country="bg", city="sofia")
+
+    assert [row.amount for row in public.pricing] == [800]
+    assert metrics["pricing_rows_failing_gates"]["publishable"] == 1
+    assert metrics["pricing_rows_failing_gates"]["failing"] == 1
+
+
 async def test_scraped_pricing_never_counts_as_publishable_website_data(db_session):
     publishable = await _make_school(db_session, scrape_status="extracted", attributes={})
     withheld = await _make_school(db_session, scrape_status="extracted", attributes={})
