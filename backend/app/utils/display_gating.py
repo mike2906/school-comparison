@@ -10,7 +10,9 @@ Pricing rows are gated separately by hard rules: a row is withheld unless it has
 ``source_url``, a confidence at or above :data:`PRICING_CONFIDENCE_FLOOR`, a still-valid
 linked source page, and an academic year that is either absent or normalizes cleanly.
 The floor is shared with ``app.services.data_quality`` so the scoreboard metric and
-this display gate can never diverge.
+this display gate can never diverge. Tuition rows that pass those rules are then checked
+for plausibility against the school's other tuition rows (see
+:func:`implausible_tuition_row_ids`).
 """
 
 from __future__ import annotations
@@ -18,7 +20,7 @@ from __future__ import annotations
 import datetime
 import decimal
 import re
-from typing import Any, Iterator, Mapping
+from typing import Any, Iterable, Iterator, Mapping
 
 from app.config import get_settings
 from app.utils.academic_year import academic_year_is_resolvable
@@ -30,6 +32,15 @@ PRICING_CONFIDENCE_FLOOR = 0.7
 
 _CURRENCY_RE = re.compile(r"^[A-Z]{3}$")
 _PRICE_PERIODS = {"monthly", "yearly", "one_time", "quarter", "term", "semester"}
+
+# Tuition plausibility. A tuition row whose yearly equivalent is below the floor, or far
+# below the school's typical tuition, is almost always a misfiled add-on (a yoga class, an
+# absence discount, a deposit) or a monthly fee stored as yearly. It would become the
+# card's "from" headline, so it is withheld rather than shown.
+TUITION_YEARLY_FLOOR_EUR = decimal.Decimal("1000")
+TUITION_PEER_RATIO_FLOOR = decimal.Decimal("0.25")
+_BGN_PER_EUR = decimal.Decimal("1.95583")  # fixed euro conversion rate
+_PERIODS_PER_YEAR = {"monthly": 12, "quarter": 4, "yearly": 1}
 
 # Spot-check discrepancy kinds that are actionable enough to withhold a field.
 # Matches the summarizer's `_ACTIONABLE_DISCREPANCY_KINDS` (omissions are only a
@@ -320,3 +331,56 @@ def pricing_row_is_publishable(row: Any) -> bool:
         and _CURRENCY_RE.fullmatch(currency) is not None
         and (period_value is None or period_value in _PRICE_PERIODS)
     )
+
+
+def _yearly_tuition_eur(row: Any) -> decimal.Decimal | None:
+    """Yearly EUR equivalent of a tuition row, or None when it cannot be compared.
+
+    Mirrors the frontend's conversion: only monthly, quarterly and yearly fees annualize,
+    and the lower end of a range is the price. Currencies other than EUR/BGN are skipped.
+    """
+    category = _pricing_row_value(row, "category")
+    if str(getattr(category, "value", category) or "").lower() != "tuition":
+        return None
+    period = _pricing_row_value(row, "period")
+    per_year = _PERIODS_PER_YEAR.get(str(getattr(period, "value", period) or "").lower())
+    if per_year is None:
+        return None
+    base = _positive_price(_pricing_row_value(row, "amount"))
+    if base is None:
+        base = _positive_price(_pricing_row_value(row, "amount_min"))
+    if base is None:
+        return None
+    currency = _pricing_row_value(row, "currency")
+    if currency == "BGN":
+        base = base / _BGN_PER_EUR
+    elif currency != "EUR":
+        return None
+    return base * per_year
+
+
+def implausible_tuition_row_ids(rows: Iterable[Any]) -> set[int]:
+    """Ids of one school's tuition rows too cheap to be its tuition.
+
+    ``rows`` are the school's rows that already pass :func:`pricing_row_is_publishable`.
+    A row is withheld when its yearly equivalent is below
+    :data:`TUITION_YEARLY_FLOOR_EUR`, or below :data:`TUITION_PEER_RATIO_FLOOR` times the
+    median yearly tuition across those rows. Rows that cannot be annualized are left alone.
+    """
+    yearly = {}
+    for row in rows:
+        value = _yearly_tuition_eur(row)
+        row_id = _pricing_row_value(row, "id")
+        if value is not None and row_id is not None:
+            yearly[row_id] = value
+    if not yearly:
+        return set()
+    ordered = sorted(yearly.values())
+    middle = len(ordered) // 2
+    median = ordered[middle] if len(ordered) % 2 else (ordered[middle - 1] + ordered[middle]) / 2
+    peer_floor = median * TUITION_PEER_RATIO_FLOOR
+    return {
+        row_id
+        for row_id, value in yearly.items()
+        if value < TUITION_YEARLY_FLOOR_EUR or value < peer_floor
+    }

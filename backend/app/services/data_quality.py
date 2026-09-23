@@ -28,6 +28,7 @@ from app.services.identity_curation import curated_identity_candidate
 # share one source of truth.
 from app.utils.display_gating import (  # noqa: F401
     PRICING_CONFIDENCE_FLOOR,
+    implausible_tuition_row_ids,
     passes_pricing_gate,
     pricing_row_is_publishable,
     summary_is_publishable,
@@ -222,15 +223,16 @@ def _location_metrics(locations: list[SchoolLocation]) -> tuple[dict[str, Any], 
 
 
 def _pricing_gate_failures(rows: list[Pricing]) -> dict[str, Any]:
-    total = 0
-    failing = 0
-    publishable = 0
+    by_school: dict[int, list[Pricing]] = {}
     for row in rows:
-        total += 1
         if pricing_row_is_publishable(row):
-            publishable += 1
-        else:
-            failing += 1
+            by_school.setdefault(row.school_id, []).append(row)
+    publishable = sum(
+        len(school_rows) - len(implausible_tuition_row_ids(school_rows))
+        for school_rows in by_school.values()
+    )
+    total = len(rows)
+    failing = total - publishable
     return {
         "publishable": publishable,
         "failing": failing,

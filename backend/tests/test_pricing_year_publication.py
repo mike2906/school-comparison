@@ -159,8 +159,8 @@ async def test_undated_rows_sort_after_dated_rows(db_session):
     page = await _make_page(db_session, school)
     db_session.add_all(
         [
-            _price(school, page, academic_year=None, amount=100),
-            _price(school, page, academic_year=_current_year(), amount=200),
+            _price(school, page, academic_year=None, amount=800),
+            _price(school, page, academic_year=_current_year(), amount=900),
         ]
     )
     await db_session.commit()

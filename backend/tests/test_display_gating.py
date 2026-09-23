@@ -23,6 +23,7 @@ from app.scrapers.validator import _spot_check_path_is_core
 from app.utils.display_gating import (
     _FIELD_PATH_DISPLAY_FIELDS,
     blocked_display_fields,
+    implausible_tuition_row_ids,
     iter_blocking_field_paths,
     passes_pricing_gate,
     pricing_row_is_publishable,
@@ -402,3 +403,69 @@ def test_launch_pricing_gate_publishes_an_unstated_period():
 def test_launch_pricing_gate_still_rejects_an_invalid_stated_period(period):
     """Allowing NULL must not loosen validation of a period that *is* present."""
     assert pricing_row_is_publishable(_curated_pricing_row(period=period)) is False
+
+
+def _tuition_row(row_id, amount, period="monthly", currency="EUR", **overrides):
+    return _curated_pricing_row(
+        id=row_id, category="tuition", amount=amount, period=period, currency=currency, **overrides
+    )
+
+
+def test_tuition_far_below_the_schools_other_tuition_is_withheld():
+    # School 525: a €25/month yoga class stored as tuition next to €280-560/month fees.
+    rows = [
+        _tuition_row(1, 560),
+        _tuition_row(2, 280),
+        _tuition_row(3, 350),
+        _tuition_row(4, 25, plan_name="Yoga for children"),
+    ]
+    assert implausible_tuition_row_ids(rows) == {4}
+
+
+def test_tuition_below_the_yearly_floor_is_withheld_even_without_peers():
+    # School 609: a lone €30/year "tuition" row.
+    assert implausible_tuition_row_ids([_tuition_row(1, 30, period="yearly")]) == {1}
+    assert implausible_tuition_row_ids([_tuition_row(1, 1000, period="yearly")]) == set()
+
+
+def test_monthly_fee_stored_as_yearly_is_withheld():
+    # School 199: €450 "yearly" beside the same plan's €4702 yearly fee.
+    rows = [_tuition_row(1, 450, period="yearly"), _tuition_row(2, 4702, period="yearly")]
+    assert implausible_tuition_row_ids(rows) == {1}
+
+
+def test_bgn_tuition_is_converted_before_comparison():
+    # 1500 BGN/year is about €767: below the floor. 1500 BGN/month is not.
+    assert implausible_tuition_row_ids([_tuition_row(1, 1500, "yearly", "BGN")]) == {1}
+    assert implausible_tuition_row_ids([_tuition_row(1, 1500, "monthly", "BGN")]) == set()
+
+
+def test_quarterly_tuition_annualizes_and_ranges_use_the_lower_bound():
+    assert implausible_tuition_row_ids([_tuition_row(1, 200, period="quarter")]) == {1}
+    ranged = _tuition_row(1, None, period="yearly", amount_min=500, amount_max=5000)
+    assert implausible_tuition_row_ids([ranged]) == {1}
+
+
+@pytest.mark.parametrize(
+    "row",
+    [
+        # Periods with no defensible yearly figure are left to the other gates.
+        _tuition_row(1, 30, period="semester"),
+        _tuition_row(1, 30, period="term"),
+        _tuition_row(1, 30, period="one_time"),
+        _tuition_row(1, 30, period=None),
+        # Only tuition is checked; a small registration or food fee is normal.
+        _curated_pricing_row(id=1, category="registration", amount=30, period="one_time"),
+        _curated_pricing_row(id=1, category="food", amount=30, period="monthly"),
+        # No conversion rate for other currencies, so no judgement either.
+        _tuition_row(1, 30, currency="USD"),
+    ],
+)
+def test_rows_that_cannot_be_compared_are_left_alone(row):
+    assert implausible_tuition_row_ids([row, _tuition_row(2, 9000)]) == set()
+
+
+def test_plausible_tuition_spread_publishes_in_full():
+    # School 625: half-day through annual-prepay monthly rates, all genuine.
+    rows = [_tuition_row(i, amount) for i, amount in enumerate([454, 680, 646, 612], start=1)]
+    assert implausible_tuition_row_ids(rows) == set()

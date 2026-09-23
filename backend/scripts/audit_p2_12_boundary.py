@@ -27,7 +27,7 @@ from app.models import PipelineRun, Pricing, School, SchoolLocation, SourcePage
 from app.services.data_quality import compute_quality_metrics
 from app.services.geocoding.bounds import SOFIA_MUNICIPALITY_BOUNDS, point_in_bounds
 from app.services.geocoding.service import geocode_failure_is_terminal
-from app.utils.display_gating import pricing_row_is_publishable
+from app.utils.display_gating import implausible_tuition_row_ids, pricing_row_is_publishable
 from app.utils.school_attributes import publishable_display_text
 from app.utils.website_data import WEBSITE_DATA_WITHHELD_KEY
 
@@ -597,9 +597,16 @@ async def database_audit() -> dict[str, Any]:
                 "matches_expectation": cached_run_matches_expectation(summary),
             }
 
-        predicate_publishable_ids = {
-            row.id for row in pricing_rows if pricing_row_is_publishable(row)
-        }
+        rows_by_school: dict[int, list[Pricing]] = {}
+        for row in pricing_rows:
+            if pricing_row_is_publishable(row):
+                rows_by_school.setdefault(row.school_id, []).append(row)
+        predicate_publishable_ids = set()
+        for school_rows in rows_by_school.values():
+            implausible = implausible_tuition_row_ids(school_rows)
+            predicate_publishable_ids.update(
+                row.id for row in school_rows if row.id not in implausible
+            )
 
     return {
         "schools_in_scope": len(scoped_ids),

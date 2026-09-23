@@ -7,6 +7,7 @@ from app.schemas.pricing import PricingResponse
 from app.schemas.field_source import FieldSourceResponse
 from app.utils.display_gating import (
     blocked_pricing_row_ids,
+    implausible_tuition_row_ids,
     pricing_row_is_publishable,
     summary_is_publishable,
 )
@@ -165,7 +166,9 @@ class SchoolPricingMixin(SchoolAttributesMixin):
     A row is withheld when it has no ``source_url``, a confidence below the shared
     floor, or an error-level validation issue on its ``pricing[{id}]`` path — so the
     API never publishes a price a parent can't trace, that we're unsure of, or that
-    Stage 6 already flagged as wrong. Extends ``SchoolAttributesMixin`` to reach the
+    Stage 6 already flagged as wrong. Tuition rows implausibly cheap next to the school's
+    other tuition are also withheld, so a misfiled add-on never becomes the headline
+    price. Extends ``SchoolAttributesMixin`` to reach the
     validation report via ``raw_attributes``.
     """
 
@@ -179,13 +182,12 @@ class SchoolPricingMixin(SchoolAttributesMixin):
     @property
     def pricing(self) -> list[PricingResponse]:
         blocked_ids = blocked_pricing_row_ids(self.public_attributes_input)
+        # Gate the stored values before Pydantic can coerce malformed input
+        # (for example, a string confidence of "0.9") into a valid public type.
+        publishable = [row for row in self.raw_pricing if pricing_row_is_publishable(row)]
+        blocked_ids |= implausible_tuition_row_ids(publishable)
         published: list[PricingResponse] = []
-        for raw_row in self.raw_pricing:
-            # Gate the stored values before Pydantic can coerce malformed input
-            # (for example, a string confidence of "0.9") into a valid public type.
-            if not pricing_row_is_publishable(raw_row):
-                continue
-
+        for raw_row in publishable:
             row = PricingResponse.model_validate(raw_row)
             if row.id in blocked_ids:
                 continue
