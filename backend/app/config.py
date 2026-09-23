@@ -28,8 +28,7 @@ class Settings(BaseSettings):
     validation_spot_check_max_extracted_chars: int = 8000
 
     # App settings
-    debug: bool = True
-    secret_key: str = "change-this-in-production"
+    debug: bool = False
     allowed_origins: str = "http://localhost:5173"
 
     # Scraping settings

@@ -1439,9 +1439,13 @@ operational safeguards do not reopen the accepted launch boundary.
 
 ## Phase 3 — Go live
 
-- [ ] **P3.1 Prod config hardening.** Flip `debug` default to `False` in
+- [x] **P3.1 Prod config hardening.** Flip `debug` default to `False` in
       `app/config.py`; delete unused `secret_key`; make geocoding raise if
       `nominatim contact email` is still `your-email@example.com`; CORS origins from env.
+      **Done 2026-09-23:** `debug` defaults to `False`; `secret_key` removed (never read);
+      CORS already came from `ALLOWED_ORIGINS`. The placeholder-email check now lives in
+      `nominatim_user_agent()` and also guards the two `cli.py` repair commands that
+      called Nominatim directly; the MoE registry adapter keeps its deliberate skip.
 - [ ] **P3.2 Deployment.** Single small VPS (Hetzner/Fly.io/Railway) — this scale
       (~500 schools) needs one box: dockerized FastAPI + Postgres + built frontend
       behind Caddy/nginx with HTTPS. Manual task: pick host, domain, DNS, secrets.

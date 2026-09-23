@@ -1594,11 +1594,11 @@ async def _repair_oblast_geocodes_command(
     from app.config import get_settings
     from app.database import async_session_maker
     from app.models import School
-    from app.services.geocoding.service import GeocodingService
+    from app.services.geocoding.service import GeocodingService, nominatim_user_agent
     from app.scrapers.sources.bg.moe_registry import MoeRegistryAdapter
 
     settings = get_settings()
-    user_agent = f"SofiaSchoolComparison/1.0 ({settings.geocoding_contact_email})"
+    user_agent = nominatim_user_agent(settings)
 
     async with async_session_maker() as db:
         if school_name and not school_id:
@@ -1879,14 +1879,12 @@ async def _repair_out_of_bounds_geocodes_command(
     from app.models import School
     from app.services.geocoding.bounds import get_city_bounds, point_in_bounds
     from app.services.geocoding.nominatim import NominatimProvider
+    from app.services.geocoding.service import nominatim_user_agent
 
     bounds = get_city_bounds(country, city)
     if bounds is None:
         console.print(f"[yellow]No configured city bounds for {country}/{city}; nothing to repair.[/yellow]")
         return
-
-    settings = get_settings()
-    user_agent = f"SofiaSchoolComparison/1.0 ({settings.geocoding_contact_email})"
 
     async with async_session_maker() as db:
         if school_name and not school_id:
@@ -1963,7 +1961,7 @@ async def _repair_out_of_bounds_geocodes_command(
         if dry_run:
             return
 
-        geocoder = NominatimProvider(user_agent=user_agent)
+        geocoder = NominatimProvider(user_agent=nominatim_user_agent(get_settings()))
         repaired = 0
         failed = 0
 

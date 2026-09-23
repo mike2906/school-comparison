@@ -813,3 +813,58 @@ async def test_repair_locations_command_targets_candidates_and_runs_navigate_and
     assert navigate_batch_mock.await_args.kwargs["school_ids"] == [candidate_school.id]
     assert navigate_batch_mock.await_args.kwargs["skip_timed_out_chunks"] is True
     assert extract_batch_mock.await_args.kwargs["school_ids"] == [candidate_school.id]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("dry_run", [True, False])
+async def test_repair_out_of_bounds_geocodes_checks_contact_email_only_before_geocoding(db_session, dry_run):
+    from app.config import Settings
+
+    school = School(
+        name_i18n={"bg": "Test School"},
+        country_code="bg",
+        school_type="state",
+        education_level="primary",
+        city="sofia",
+    )
+    db_session.add(school)
+    await db_session.flush()
+    db_session.add(
+        SchoolLocation(
+            school_id=school.id,
+            address_i18n={"bg": "ул. Тест 1"},
+            lat=48.0,
+            lng=2.0,
+            is_primary=True,
+        )
+    )
+    await db_session.commit()
+
+    class SessionCtx:
+        async def __aenter__(self):
+            return db_session
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+    placeholder_settings = Settings(geocoding_contact_email="your-email@example.com")
+    with (
+        patch("app.database.async_session_maker", return_value=SessionCtx()),
+        patch("app.config.get_settings", return_value=placeholder_settings),
+        patch("app.services.geocoding.nominatim.NominatimProvider") as provider_cls,
+    ):
+        command = scraper_cli._repair_out_of_bounds_geocodes_command(
+            school_name=None,
+            school_id=school.id,
+            city="sofia",
+            country="bg",
+            limit=None,
+            dry_run=dry_run,
+        )
+        if dry_run:
+            await command
+        else:
+            with pytest.raises(ValueError, match="GEOCODING_CONTACT_EMAIL must be set"):
+                await command
+
+    provider_cls.assert_not_called()
