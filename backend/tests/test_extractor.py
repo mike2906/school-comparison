@@ -1994,7 +1994,16 @@ def test_annual_heading_survives_payment_cadence_on_amount_line():
 
 
 @pytest.mark.parametrize(
-    "heading", ["Месечнополовин ден", "Месечноцелодневно гледане", "Такса за месец"]
+    "heading",
+    [
+        "Месечнополовин ден",
+        "Месечноцелодневно гледане",
+        "Месечно половин ден",
+        "Месечно целодневно гледане",
+        "Такса за месец",
+        "Такса обучение на месец",
+        "Такса за обучение на месец",
+    ],
 )
 def test_explicit_bulgarian_monthly_headings_set_period(heading):
     text = f"## Такси\n## {heading}\nEUR 409"
@@ -2006,6 +2015,12 @@ def test_explicit_bulgarian_monthly_headings_set_period(heading):
     assert [(signal["amount"], signal["period"]) for signal in signals] == [
         (409, "monthly")
     ]
+
+
+def test_payment_cadence_month_by_month_does_not_set_monthly_period():
+    assert extractor_module.helpers._detect_explicit_price_period(
+        "Таксите се заплащат месец за месец."
+    ) is None
 
 
 def test_price_period_does_not_carry_into_next_tuition_section():

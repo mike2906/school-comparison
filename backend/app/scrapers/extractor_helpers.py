@@ -1489,8 +1489,9 @@ def _detect_explicit_price_period(value: str) -> str | None:
         re.search(r"\bmonthly\s+(?:tuition|fee)\b", lowered)
         or re.search(r"\b(?:tuition|fee)\b.{0,30}\bper\s+month\b", lowered)
         or re.search(r"\bмесечн\w*\s+такс\w*\b", lowered)
-        or re.search(r"\bмесечно(?:половин|целодневно)\b", lowered)
-        or re.search(r"\bтакс\w*\s+(?:за|на)\s+месец\b", lowered)
+        or re.search(r"\bмесечно\s*(?:половин|целодневно)", lowered)
+        or re.search(r"\bтакс\w*\b.{0,30}\bна\s+месец\b", lowered)
+        or re.search(r"\bтакс\w*\s+за\s+месец\b", lowered)
         or re.search(r"/\s*(?:per\s+)?(?:month|месец)\b", lowered)
     ):
         return "monthly"
