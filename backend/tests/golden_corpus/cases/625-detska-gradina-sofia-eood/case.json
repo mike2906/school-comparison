@@ -136,23 +136,12 @@
       {
         "academic_year": null,
         "age_group": null,
-        "amount": 550.0,
-        "amount_max": null,
-        "amount_min": null,
-        "category": "tuition",
-        "currency": "BGN",
-        "period": "monthly",
-        "plan_name": null
-      },
-      {
-        "academic_year": null,
-        "age_group": null,
         "amount": 409.0,
         "amount_max": null,
         "amount_min": null,
         "category": "tuition",
         "currency": "EUR",
-        "period": null,
+        "period": "monthly",
         "plan_name": null
       },
       {
@@ -163,7 +152,18 @@
         "amount_min": null,
         "category": "tuition",
         "currency": "EUR",
-        "period": null,
+        "period": "monthly",
+        "plan_name": null
+      },
+      {
+        "academic_year": null,
+        "age_group": null,
+        "amount": 550.0,
+        "amount_max": null,
+        "amount_min": null,
+        "category": "tuition",
+        "currency": "BGN",
+        "period": "monthly",
         "plan_name": null
       },
       {

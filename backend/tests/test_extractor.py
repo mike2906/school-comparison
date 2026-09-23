@@ -1981,6 +1981,33 @@ def test_quarterly_payment_does_not_inherit_fee_period(line):
     assert extractor_module.helpers._detect_price_period(line, default_period="yearly") is None
 
 
+def test_annual_heading_survives_payment_cadence_on_amount_line():
+    text = "Annual tuition fee\nEUR 8,000 payable quarterly"
+
+    parsed = extractor_module.helpers._extract_prices_deterministic(text)
+    signals = extractor_module.helpers._iter_price_line_signals(text)
+
+    assert [(price.amount, price.period) for price in parsed.prices] == [(8000, "yearly")]
+    assert [(signal["amount"], signal["period"]) for signal in signals] == [
+        (8000, "yearly")
+    ]
+
+
+@pytest.mark.parametrize(
+    "heading", ["Месечнополовин ден", "Месечноцелодневно гледане", "Такса за месец"]
+)
+def test_explicit_bulgarian_monthly_headings_set_period(heading):
+    text = f"## Такси\n## {heading}\nEUR 409"
+
+    parsed = extractor_module.helpers._extract_prices_deterministic(text)
+    signals = extractor_module.helpers._iter_price_line_signals(text)
+
+    assert [(price.amount, price.period) for price in parsed.prices] == [(409, "monthly")]
+    assert [(signal["amount"], signal["period"]) for signal in signals] == [
+        (409, "monthly")
+    ]
+
+
 def test_price_period_does_not_carry_into_next_tuition_section():
     text = """
     Annual tuition fee
@@ -2227,6 +2254,19 @@ def test_filter_supported_prices_uses_category_when_amount_repeats():
     refined = extractor_module.helpers._filter_supported_prices(prices, text)
 
     assert {price.category for price in refined} == {"tuition", "transport"}
+
+
+def test_filter_supported_prices_clears_guess_when_category_resolves_repeated_amount():
+    text = "Tuition fee EUR 500\nTransport fee EUR 500"
+    price = ExtractedPrice(
+        category="tuition", amount=500, currency="EUR", period="yearly", confidence=0.9,
+    )
+
+    refined = extractor_module.helpers._filter_supported_prices([price], text)
+
+    assert len(refined) == 1
+    assert refined[0].category == "tuition"
+    assert refined[0].period is None
 
 
 def test_filter_supported_prices_uses_heading_to_fix_high_confidence_category():

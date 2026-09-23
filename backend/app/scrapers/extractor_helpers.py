@@ -1489,7 +1489,8 @@ def _detect_explicit_price_period(value: str) -> str | None:
         re.search(r"\bmonthly\s+(?:tuition|fee)\b", lowered)
         or re.search(r"\b(?:tuition|fee)\b.{0,30}\bper\s+month\b", lowered)
         or re.search(r"\bмесечн\w*\s+такс\w*\b", lowered)
-        or re.search(r"\bтакс\w*\b.{0,30}\bна\s+месец\b", lowered)
+        or re.search(r"\bмесечно(?:половин|целодневно)\b", lowered)
+        or re.search(r"\bтакс\w*\s+(?:за|на)\s+месец\b", lowered)
         or re.search(r"/\s*(?:per\s+)?(?:month|месец)\b", lowered)
     ):
         return "monthly"
@@ -1510,6 +1511,12 @@ def _detect_price_period(
     if explicit is not None:
         return explicit
     if _PAYMENT_SCHEDULE_FREQUENCY_RE.search(value):
+        if (
+            default_period is not None
+            and re.search(r"\b(?:paid|payable)\s+(?:monthly|quarterly)\b", value, re.IGNORECASE)
+            and not re.search(r"\b(?:instalments?|installments?|payments?|вноск\w*)\b", value, re.IGNORECASE)
+        ):
+            return default_period
         return None
     # Callers only supply a default for an explicit period heading in the current
     # fee section. Academic years, fee categories, amounts, and installment counts
@@ -1602,6 +1609,9 @@ def _iter_price_line_signals(text: str) -> list[dict[str, Any]]:
             current_payment_plan = False
             current_heading = None
             continue
+
+        if line_amount is None and current_period == "monthly" and lowered.startswith("еднократно плащане"):
+            current_period = None
 
         line_category = _detect_price_category(line, allow_generic_heading=True)
         if line_category is not None and line_amount is None and _is_price_category_heading(line):
@@ -1740,6 +1750,9 @@ def _extract_prices_deterministic(text: str) -> PriceExtractionOutput:
             current_includes = []
             active_price = None
             continue
+
+        if line_amount is None and current_period == "monthly" and lowered.startswith("еднократно плащане"):
+            current_period = None
 
         line_category = _detect_price_category(line, allow_generic_heading=True)
         if line_category is not None and line_amount is None:
@@ -2250,8 +2263,11 @@ def _filter_supported_prices(prices: list[ExtractedPrice], text: str) -> list[Ex
                 signal
                 for signal in candidates
                 if signal.get("category") == price.category
-                and signal.get("period") == price.period
             ]
+            if len({(signal.get("category"), signal.get("period"), signal.get("academic_year")) for signal in semantic_matches}) > 1:
+                semantic_matches = [
+                    signal for signal in semantic_matches if signal.get("period") == price.period
+                ]
             matched_semantics = {
                 (signal.get("category"), signal.get("period"), signal.get("academic_year"))
                 for signal in semantic_matches
