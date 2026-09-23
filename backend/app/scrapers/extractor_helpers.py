@@ -1203,6 +1203,8 @@ _PRICE_LINE_AMOUNT_LATIN_RE = re.compile(
     flags=re.IGNORECASE,
 )
 _OPTIONAL_PRICING_SECTION_TOKENS = (
+    "other charges",
+    "other fees",
     "услуги по желание",
     "по желание на родителите",
     "допълнително заплащане",
@@ -1434,9 +1436,9 @@ _INSTALLMENT_MULTIPLIER_RE = re.compile(
     flags=re.IGNORECASE,
 )
 _PAYMENT_SCHEDULE_FREQUENCY_RE = re.compile(
-    r"\bmonthly\s+(?:paid|payment|installment)|"
-    r"\b(?:paid|payable)\s+monthly\b|"
-    r"\b(?:installments?|вноск\w*)\b|"
+    r"\b(?:monthly|quarterly)\s+(?:paid|payment|instalments?|installments?)|"
+    r"\b(?:paid|payable)\s+(?:monthly|quarterly)\b|"
+    r"\b(?:instalments?|installments?|вноск\w*)\b|"
     r"\bежемесечн\w*\s+(?:плащ\w*|вноск\w*)\b",
     flags=re.IGNORECASE,
 )
@@ -1457,8 +1459,11 @@ def _detect_explicit_price_period(value: str) -> str | None:
         lowered,
     ):
         return "semester"
-    if re.search(
-        r"\b(?:per|each)\s+quarter\b|\bquarterly\b|"
+    if (
+        re.search(r"\b(?:per|each)\s+quarter\b", lowered)
+        and not re.search(r"\b(?:paid|payable)\s+(?:per|each)\s+quarter\b", lowered)
+    ) or re.search(
+        r"\bquarterly\s+(?:(?:tuition|school|meal|food|transport)\s+)?(?:fee|charge)\b|"
         r"\b(?:на|за)\s+(?:едно\s+)?тримесечие\b|\bтримесечна\s+такса\b",
         lowered,
     ):

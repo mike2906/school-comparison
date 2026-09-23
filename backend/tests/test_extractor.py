@@ -1922,6 +1922,27 @@ def test_detect_price_period_normalizes_explicit_supported_periods(line, expecte
     assert extractor_module.helpers._detect_price_period(line) == expected_period
 
 
+@pytest.mark.parametrize(
+    ("line", "expected_period"),
+    [
+        ("Annual tuition fee: EUR 8,000, payable quarterly", "yearly"),
+        ("Annual tuition fee: EUR 8,000, payable per quarter", "yearly"),
+        ("Tuition fee: EUR 8,000, payable per quarter", None),
+        ("Quarterly instalment: EUR 2,000", None),
+        ("Quarterly installment: EUR 2,000", None),
+        ("Quarterly meal fee: EUR 400", "quarter"),
+        ("Meal fee: EUR 400 per quarter", "quarter"),
+    ],
+)
+def test_price_period_distinguishes_quarterly_fees_from_payments(line, expected_period):
+    assert extractor_module.helpers._detect_price_period(line) == expected_period
+
+
+@pytest.mark.parametrize("line", ["Quarterly instalment: EUR 2,000", "Quarterly payment: EUR 2,000"])
+def test_quarterly_payment_does_not_inherit_fee_period(line):
+    assert extractor_module.helpers._detect_price_period(line, default_period="yearly") is None
+
+
 def test_price_period_does_not_carry_into_next_tuition_section():
     text = """
     Annual tuition fee
@@ -1941,6 +1962,25 @@ def test_price_period_does_not_carry_into_next_tuition_section():
         8000: "yearly",
         9000: None,
     }
+
+
+def test_unrecognised_markdown_heading_ends_price_section():
+    text = """
+    Annual tuition fee
+    EUR 8,000
+    # Other charges
+    EUR 200
+    """
+
+    parsed = extractor_module.helpers._extract_prices_deterministic(text)
+    signals = extractor_module.helpers._iter_price_line_signals(text)
+
+    assert [(price.category, price.amount, price.period) for price in parsed.prices] == [
+        ("tuition", 8000, "yearly"),
+    ]
+    assert [(signal["category"], signal["amount"], signal["period"]) for signal in signals] == [
+        ("tuition", 8000, "yearly"),
+    ]
 
 
 def test_normalized_price_fields_preserves_unstated_period():
