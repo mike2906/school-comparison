@@ -624,6 +624,8 @@ def _language_focus_phrase(summary_input: SummaryInput, lang: str) -> str | None
         key = label.casefold()
         if key in seen or key in {"bulgarian", "български"}:
             continue
+        if _summary_text_issue(label, lang) is not None:
+            continue
         seen.add(key)
         languages.append(label)
     if not languages:
