@@ -315,6 +315,13 @@ uv run pytest tests/test_api.py -v
 - Before requesting `@codex review`, tell Mike that the PR is ready for independent
   ChatGPT pre-review and provide the PR URL. Request Codex Review only when Mike explicitly
   asks.
+- Codex Review shares the agents' usage budget: one review per PR unless Mike asks for
+  another. When Mike says merge, merge on green CI without requesting a re-review.
+- Triage review findings by harm. For extraction heuristics, a finding that only turns a
+  would-be value into null (a recall gap) is non-blocking; null is the safe fallback. Stop
+  and ask when a second round targets the same heuristic or a fix spawns a new finding.
+- Large files (`app/scrapers/extractor_helpers.py`, `extractor.py`, `cli.py` are
+  2,000–4,500 lines): locate code with `grep -n` and read only the needed line ranges.
 
 ---
 
@@ -327,6 +334,7 @@ review → merge flow, including how to detect when Codex has finished.
 Two rules to keep in mind even before reading it: only commit directly to `main` when the
 user explicitly asks, and Codex auto-review is **off**. Provide Mike with the PR URL for
 independent ChatGPT pre-review first; post `@codex review` only after Mike explicitly asks.
+See its "Usage discipline" section before waiting on reviews/CI or running the full suite.
 
 ---
 

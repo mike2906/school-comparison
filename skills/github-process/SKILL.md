@@ -27,8 +27,8 @@ for that.
 7. When the implementation, self-review, tests, PR, and CI are ready, tell Mike that the PR
    is ready for independent ChatGPT pre-review and provide the PR URL. **Do not post
    `@codex review` unless Mike explicitly asks.** If Mike requests Codex Review, post one
-   `@codex review` comment and poll until Codex has either posted findings or clearly
-   completed with no findings. Watch **both** PR reviews and issue comments for author
+   `@codex review` comment and wait (one background command, not per-turn polling) until
+   Codex has either posted findings or clearly completed with no findings. Watch **both** PR reviews and issue comments for author
    `chatgpt-codex-connector[bot]`.
    - **Docs-only / trivial PRs:** skip the `@codex review` request to conserve usage; merge
      on green CI once mergeable.
@@ -44,22 +44,36 @@ for that.
      wrong instead of automatically layering on another fix. Otherwise, fix actionable
      findings together, add proportionate regression tests, run the relevant focused tests
      plus the full applicable suite, and push one consolidated fix batch before re-review.
-   - **Converge on evidence, not a fixed review count:** continue the review → batch fixes →
-     re-review loop while each round identifies actionable correctness, security, or data-
-     integrity issues and the fixes are making measurable progress. Merge only when the
-     latest PR head has been reviewed, all actionable findings are resolved or explicitly
-     accepted, CI is green, and the local audit supports the fixes.
-   - **Pause non-converging loops:** stop and ask the user for direction when the same root-
-     cause issue survives two consecutive fix attempts, findings conflict, a proposed fix
-     materially expands the agreed scope, or a round contains only duplicate, stylistic, or
-     speculative feedback. Report the review count, the repeating or disputed findings, the
-     evidence from tests/audits, and a concrete recommendation. Do not suppress substantive
-     findings merely because several reviews have already run.
-8. Follow Mike's direction after independent pre-review. Merge only when CI is green, the
-   PR is mergeable, and every review Mike requested is clear or resolved. If Codex Review
-   was requested, verify immediately before merging that its latest reviewed commit SHA is
-   still the PR head. After merging, verify that the merge commit contains the exact PR-head
-   tree and that post-merge `main` CI passes.
+   - **One Codex review per PR by default.** Codex Review draws from the same usage budget
+     as the agents. After the first review, fix real findings and push, but do not request
+     another review unless Mike explicitly asks for one.
+   - **Triage findings by harm before fixing.** A finding blocks merge only if the change
+     would publish wrong data or break correctness, security, or data integrity. For
+     extraction heuristics, "returns null where a stated value could have been found" is a
+     recall improvement, not a correctness bug: null is the safe fallback. Record such
+     findings in a follow-up issue or PR description instead of fixing them in the loop.
+   - **Pause non-converging loops:** stop and ask Mike for direction when a second review
+     round targets the same function or heuristic, when a fix for one finding causes a new
+     finding, when findings conflict, when a proposed fix materially expands the agreed
+     scope, or when a round contains only duplicate, stylistic, or speculative feedback.
+     Report the review count, the repeating or disputed findings, the test evidence, and a
+     concrete recommendation.
+8. Follow Mike's direction after independent pre-review. **When Mike says merge, merge** once
+   CI is green and the PR is mergeable. Do not request another review first, even if the
+   latest commit has not been reviewed. After merging, verify that the merge commit contains
+   the exact PR-head tree and that post-merge `main` CI passes.
+
+## Usage discipline
+
+- **Wait for reviews or CI in one background command** that exits when the
+  result arrives (or tell Mike "review requested, ping me when it's back" and stop). Never
+  poll across repeated conversation turns: each turn resends the whole context.
+- **Test in two tiers:** focused tests while iterating; the full suite once before pushing.
+  Always use quiet output (`uv run pytest -q 2>&1 | tail -3`).
+- **Start a fresh session per task** (implement → review fixes → merge are separate tasks
+  when they span hours); long sessions carry their full history into every turn.
+- **No subagents or high reasoning effort for routine edits** (a regex fix plus a test).
+  Subagents start cold and rebuild context.
 
 ## Commit / PR conventions
 
@@ -75,6 +89,6 @@ Codex posts across channels inconsistently:
 - A **clean** `@codex review` result: a plain **issue comment** like "Codex Review: Didn't
   find any major issues." — NOT a new review or a 👍 reaction.
 
-So poll `gh api repos/<owner>/<repo>/issues/<pr>/comments` for `chatgpt-codex-connector[bot]`
-in addition to `gh pr view --json reviews`. A poller that only watches reviews/reactions will
-miss the clean re-review and time out.
+So watch `gh api repos/<owner>/<repo>/issues/<pr>/comments` for `chatgpt-codex-connector[bot]`
+in addition to `gh pr view --json reviews`, inside a single background wait loop (see Usage
+discipline). A watcher that only checks reviews/reactions will miss the clean re-review.
