@@ -22,6 +22,18 @@ TERMINAL_GEOCODE_FAILURE_REASONS = frozenset({
 })
 
 
+def nominatim_user_agent(settings) -> str:
+    """Build the Nominatim User-Agent, refusing a missing or placeholder contact email."""
+    contact_email = settings.geocoding_contact_email
+    if not contact_email or "example.com" in contact_email.lower():
+        raise ValueError(
+            "GEOCODING_CONTACT_EMAIL must be set to a valid email in .env file. "
+            "Nominatim requires a real contact email in the User-Agent header. "
+            f"Current value: {contact_email}"
+        )
+    return f"SofiaSchoolComparison/1.0 ({contact_email})"
+
+
 def _is_deterministic_force_failure(result: GeocodingResult) -> bool:
     """Return whether a failed refresh proves the stored point is unsupported."""
     return result.error in TERMINAL_GEOCODE_FAILURE_REASONS
@@ -91,14 +103,7 @@ class GeocodingService:
             provider_name = self.settings.geocoding_provider.lower()
 
             # Validate contact email is not a placeholder (required for Nominatim and Composite)
-            contact_email = self.settings.geocoding_contact_email
-            if not contact_email or "example.com" in contact_email.lower():
-                raise ValueError(
-                    "GEOCODING_CONTACT_EMAIL must be set to a valid email in .env file. "
-                    "Nominatim requires a real contact email in the User-Agent header. "
-                    f"Current value: {contact_email}"
-                )
-            user_agent = f"SofiaSchoolComparison/1.0 ({contact_email})"
+            user_agent = nominatim_user_agent(self.settings)
 
             if provider_name == "composite":
                 # Composite provider (GeoJSON + Nominatim fallback) - RECOMMENDED
