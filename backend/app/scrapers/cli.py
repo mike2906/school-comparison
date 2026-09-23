@@ -1886,9 +1886,6 @@ async def _repair_out_of_bounds_geocodes_command(
         console.print(f"[yellow]No configured city bounds for {country}/{city}; nothing to repair.[/yellow]")
         return
 
-    settings = get_settings()
-    user_agent = nominatim_user_agent(settings)
-
     async with async_session_maker() as db:
         if school_name and not school_id:
             school_id = await _find_school_by_name(db, school_name, country)
@@ -1964,7 +1961,7 @@ async def _repair_out_of_bounds_geocodes_command(
         if dry_run:
             return
 
-        geocoder = NominatimProvider(user_agent=user_agent)
+        geocoder = NominatimProvider(user_agent=nominatim_user_agent(get_settings()))
         repaired = 0
         failed = 0
 
