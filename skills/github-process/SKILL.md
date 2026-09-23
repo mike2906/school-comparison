@@ -6,8 +6,9 @@ description: Full PR flow for this repo — branch, checks, PR, approval-gated C
 # GitHub Process Skill
 
 Use this when the user says **"follow github process"** or otherwise asks you to open
-and land a pull request. Only commit directly to `main` when the user explicitly asks
-for that.
+and land a pull request. This file is the single source for the review rules; `AGENTS.md`
+only summarizes the three that must hold before it is read. Only commit directly to `main`
+when the user explicitly asks for that.
 
 ## Steps
 

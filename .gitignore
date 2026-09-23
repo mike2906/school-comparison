@@ -29,7 +29,9 @@ dist/
 .idea/
 .vscode/
 .codex/
-.claude/
+# Local Claude Code state is ignored; the skills symlink is shared (see AGENTS.md)
+.claude/*
+!.claude/skills
 *.swp
 *.swo
 *~
