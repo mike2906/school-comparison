@@ -742,6 +742,47 @@ def test_fallback_summary_uses_summary_source_narrative_in_long_text():
     assert "project-based learning" in result["en"]["long"]
 
 
+def test_fallback_summary_drops_extracted_fragments_that_fail_validation():
+    # School 577: "водеща детска дейност" (a pedagogy term) trips the promotional-word block.
+    summary_input = ai_summariser.SummaryInput(
+        identity=ai_summariser.SummaryIdentity(
+            name_i18n={"bg": "НЕМО - Бояна", "en": "NEMO - Boyana"},
+            school_type="private",
+            education_level="kindergarten",
+            city="sofia",
+        ),
+        offering=ai_summariser.SummaryOffering(
+            teaching_approach=["като водеща детска дейност и като обучителен метод"],
+        ),
+        operations=ai_summariser.SummaryOperations(support_services=["психолог", "Логопед"]),
+    )
+
+    result = ai_summariser._build_fallback_summary(summary_input)
+
+    assert ai_summariser.validate_summary_i18n(result) == result
+    assert "водеща" not in result["bg"]["long"]
+    assert "психолог" in result["bg"]["long"]
+
+
+def test_fallback_summary_short_skips_focus_values_that_fail_validation():
+    summary_input = ai_summariser.SummaryInput(
+        identity=ai_summariser.SummaryIdentity(
+            name_i18n={"bg": "Детска градина Слънце", "en": "Sun Kindergarten"},
+            school_type="private",
+            education_level="kindergarten",
+            city="sofia",
+        ),
+        offering=ai_summariser.SummaryOffering(
+            teaching_approach=["водещ метод на обучение", "игрово обучение"],
+        ),
+    )
+
+    result = ai_summariser._build_fallback_summary(summary_input)
+
+    assert ai_summariser.validate_summary_i18n(result) == result
+    assert "с акцент върху игрово обучение" in result["bg"]["short"]
+
+
 def test_fallback_summary_derives_shorter_en_name_and_article():
     summary_input = ai_summariser.SummaryInput(
         identity=ai_summariser.SummaryIdentity(

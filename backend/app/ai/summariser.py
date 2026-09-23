@@ -236,6 +236,27 @@ def _parse_school_summary(result: Any) -> SchoolSummaryStrict:
     raise ValueError("Summarization result missing structured output")
 
 
+def _summary_text_issue(text: str, lang: str, field_name: str = "long") -> str | None:
+    """Return why a summary text fails validation, or None if it passes."""
+    lowered = text.casefold()
+    if "no information available" in lowered or "няма информация" in lowered:
+        return f"{lang} summary must omit missing-data filler"
+    if any(
+        re.search(pattern, lowered, flags=re.IGNORECASE)
+        for pattern in _SEMANTIC_BLOCK_PATTERNS[lang]
+    ):
+        return f"{lang} {field_name} summary contains an unsafe semantic claim"
+    if re.search(r"\b\d{1,2}:\d{2}\b", text):
+        return f"{lang} summary must omit exact time ranges"
+    if re.search(r"\b20\d{2}/20\d{2}\b", text):
+        return f"{lang} summary must omit academic-year ranges"
+    if re.search(r"\b\d+\s+(?:учени(?:ка|ци)|students?|тома|volumes|classrooms?|rooms?)\b", lowered):
+        return f"{lang} summary must omit exact counts"
+    if "%" in text or re.search(r"\b\d+\s*(?:percent|per\s+cent|процента?)\b", lowered):
+        return f"{lang} summary must omit unstable proportions"
+    return None
+
+
 def _validate_summary_payload(summary: SchoolSummaryStrict) -> SchoolSummaryStrict:
     cleaned_i18n: dict[str, dict[str, str]] = {}
     raw_summary_i18n = summary.summary_i18n
@@ -254,22 +275,9 @@ def _validate_summary_payload(summary: SchoolSummaryStrict) -> SchoolSummaryStri
         if not short or not long:
             raise ModelRetry(f"{lang} summary must include non-empty short and long fields")
         for field_name, text in (("short", short), ("long", long)):
-            lowered = text.casefold()
-            if "no information available" in lowered or "няма информация" in lowered:
-                raise ModelRetry(f"{lang} summary must omit missing-data filler")
-            if any(
-                re.search(pattern, lowered, flags=re.IGNORECASE)
-                for pattern in _SEMANTIC_BLOCK_PATTERNS[lang]
-            ):
-                raise ModelRetry(f"{lang} {field_name} summary contains an unsafe semantic claim")
-            if re.search(r"\b\d{1,2}:\d{2}\b", text):
-                raise ModelRetry(f"{lang} summary must omit exact time ranges")
-            if re.search(r"\b20\d{2}/20\d{2}\b", text):
-                raise ModelRetry(f"{lang} summary must omit academic-year ranges")
-            if re.search(r"\b\d+\s+(?:учени(?:ка|ци)|students?|тома|volumes|classrooms?|rooms?)\b", lowered):
-                raise ModelRetry(f"{lang} summary must omit exact counts")
-            if "%" in text or re.search(r"\b\d+\s*(?:percent|per\s+cent|процента?)\b", lowered):
-                raise ModelRetry(f"{lang} summary must omit unstable proportions")
+            issue = _summary_text_issue(text, lang, field_name)
+            if issue:
+                raise ModelRetry(issue)
         cleaned_i18n[lang] = {"short": short, "long": long}
     return SchoolSummaryStrict.model_validate({"summary_i18n": cleaned_i18n})
 
@@ -648,6 +656,8 @@ def _generic_focus_phrase(summary_input: SummaryInput, lang: str) -> str | None:
             continue
         if not _contains_cyrillic(text):
             continue
+        if _summary_text_issue(text, "bg") is not None:
+            continue
         return f"с акцент върху {text}"
     return None
 
@@ -790,6 +800,11 @@ def _build_fallback_summary_for_lang(summary_input: SummaryInput, lang: str) -> 
         else:
             long_parts.append("The site also includes information about day-to-day operations and admissions.")
 
+    # Optional sentences quote extracted fragments verbatim; drop any the validator would
+    # reject so the fallback itself stays publishable.
+    long_parts = long_parts[:1] + [
+        part for part in long_parts[1:] if part and _summary_text_issue(part, lang) is None
+    ]
     long = " ".join(_sentence_case(part) for part in long_parts[:4] if part).strip()
     return {"short": short.strip(), "long": long.strip()}
 
