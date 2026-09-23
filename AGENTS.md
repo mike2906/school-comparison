@@ -1,8 +1,8 @@
 # AGENTS.md — Sofia School Comparison App
 
-**Context file for AI coding assistants (Kilo, Aider, Cursor, etc.)**
+**Project instructions for AI coding agents (Claude Code, Codex, and others).**
 
-This file provides everything you need to work effectively on this project. Read it before making any changes.
+Read this before making changes. Task-specific procedures live in `skills/` (see below).
 
 ---
 
@@ -58,7 +58,7 @@ sofia-school-compare/
 │   ├── app/
 │   │   ├── models/       # SQLAlchemy ORM (school.py, pricing.py, exam_results.py)
 │   │   ├── schemas/      # Pydantic request/response models
-│   │   ├── routers/      # FastAPI routes (schools.py, compare.py)
+│   │   ├── routers/      # FastAPI routes (schools.py, compare.py, countries.py)
 │   │   ├── services/     # Business logic
 │   │   ├── config.py     # Settings (uses get_settings() factory)
 │   │   ├── database.py   # DB engine, session
@@ -99,40 +99,49 @@ into every session — read the `SKILL.md` when its "use when" applies.
 
 ## Database Schema (Core Tables)
 
+`backend/app/models/` is the source of truth; this is the orientation map. Flexible and
+localized columns are SQLAlchemy `JSON` (Postgres `json`, not `jsonb`).
+
 ### schools
-- `id` (PK)
-- `name` (Bulgarian)
-- `name_en` (English/transliterated, nullable)
-- `school_type` (state | private | international)
-- `education_level` (nursery | kindergarten | primary | lower_secondary | upper_secondary)
-- `summary_bg`, `summary_en` (AI-generated)
-- `admission_info` (JSONB) — admission system details
-- `attributes` (JSONB) — flexible school-specific data
-  - **Note (planned scraping model):** Language focus should be modeled as a structured list in `attributes`, e.g. `{ language: string, level: enum }`, with **open language list** (no hardcoded languages). PydanticAI will enforce the schema during scraping.
+- `country_code` (FK → countries.code), `city` (lowercase ASCII, e.g. `sofia`)
+- `name_i18n` (JSON, e.g. `{"bg": "...", "en": "..."}`)
+- `school_type`, `education_level` (plain strings; allowed values come from the country's
+  `education_config`)
+- `summary_i18n` (JSON, AI-generated per language)
+- `admission_info` (JSON) — admission system details
+- `attributes` (JSON) — flexible school-specific data (internal; see publish boundary)
+  - Language focus is an open list of `{language, level}` entries (no hardcoded languages),
+    normalized in `app/utils/school_attributes.py`.
+- `website_url`, `scrape_status`, `institutional_id` (MoE НЕИСПУО code)
 
 ### school_locations (one school can have multiple locations)
-- `id` (PK)
 - `school_id` (FK → schools.id)
-- `age_group` (nursery | first | second | third | preschool | grade_1_4 | grade_5_7 | grade_8_12)
-- `address`, `address_en`, `lat`, `lng`
-- `shift` (morning | afternoon | full_day)
-- `has_organised_groups` (boolean) — after-school care
+- `address_i18n` (JSON), `lat`, `lng` (plain floats, no PostGIS), `district`, `is_primary`
+
+### location_age_group_shifts (per location × age group)
+- `location_id` (FK → school_locations.id) + `age_group` (composite PK)
+- `shift` (e.g. morning | afternoon | full_day), `has_organised_groups` (after-school care)
 
 ### pricing (for private schools)
-- `id` (PK)
-- `school_id` (FK → schools.id)
-- `age_group` (nullable) — prices vary by age
-- `category` (tuition | food | transport | activities)
-- `amount`, `currency`, `period` (monthly | yearly | one_time)
-- `source` (official | scraped_website | forum | not_found) — MUST display in UI
+- `school_id` (FK), `age_group` (nullable) — prices vary by age
+- `category` enum: tuition | food | transport | activities | registration | materials |
+  extended_day | uniforms | extracurricular | camp
+- `amount` or `amount_min`/`amount_max`, `currency`, `academic_year`, `plan_name`
+- `period` enum, **nullable** (null when the school did not state one — never infer it):
+  monthly | yearly | one_time | quarter | term | semester
+- `source` enum: official | scraped_website | forum | not_found — MUST display in UI
+- `source_url`, `pricing_context` (JSON, internal)
 
 ### exam_results (NVO scores for state schools)
-- `school_id` (FK)
-- `year`, `exam_type` (nvo_4 | nvo_7 | nvo_10)
+- `school_id` (FK), `year`, `exam_type` (nvo_4 | nvo_7 | nvo_10)
 - `subject`, `metric`, `value`
 - Current canonical imported metric: `average_score` (official school-level average scores)
 
-**Important:** `admission_info` and `attributes` are JSONB. Don't add new columns for one-off fields — put them in JSONB.
+Pipeline/provenance tables: `field_sources`, `source_pages`, `spot_check_results`,
+`scrape_log`, `pipeline_runs`, `provider_request_ledger`, `countries`.
+
+**Important:** don't add new columns for one-off fields — put them in the `attributes` /
+`admission_info` JSON.
 
 ---
 
@@ -147,7 +156,7 @@ Example: A child born Dec 31, 2022 and one born Jan 1, 2022 both enter the same 
 
 **Never** use exact birth dates or "age on September 1st" logic. This is a common bug.
 
-### Admission Systems (stored in `admission_info` JSONB)
+### Admission Systems (stored in `admission_info` JSON)
 
 **State kindergartens:** Points system (Бал)
 - Parents get points based on: address, employment, siblings, etc.
@@ -165,7 +174,7 @@ Many state schools run two shifts:
 - Morning: 7:30-13:00 (usually younger kids)
 - Afternoon: 13:30-19:00 (usually older kids)
 
-This is stored in `school_locations.shift`.
+This is stored per location and age group in `location_age_group_shifts.shift`.
 
 ---
 
@@ -173,9 +182,10 @@ This is stored in `school_locations.shift`.
 
 1. **All UI strings** go through `t('key')` in React or translation dictionaries. NEVER hardcode English or Bulgarian in components.
 
-2. **School names, addresses** are stored in both Bulgarian and English (`name_en`, `address_en`). The frontend displays the appropriate version based on the user's language preference.
+2. **School names and addresses** are stored per language in `name_i18n` / `address_i18n`
+   (`{"bg": ..., "en": ...}`). The frontend displays the version for the user's language.
 
-3. **AI summaries** are stored in both languages (`summary_bg`, `summary_en`). Frontend picks based on locale.
+3. **AI summaries** are stored per language in `summary_i18n`. Frontend picks based on locale.
 
 4. **Domain-specific terms** have dedicated keys:
    - НВО → NVO
@@ -214,7 +224,7 @@ This is a small project (~500 schools, city-scale). Don't over-engineer.
 **DO:**
 - Use built-in Leaflet distance calculations (not custom haversine formulas)
 - Write simple retry logic (not exponential backoff with jitter)
-- Store data in JSONB when structure varies by school
+- Store data in the JSON columns when structure varies by school
 
 **DON'T:**
 - Build for global scale we don't have
@@ -246,8 +256,6 @@ uv run alembic revision --autogenerate -m "description"
 uv run alembic upgrade head
 ```
 
-Never hand-write migrations except to add `CREATE EXTENSION` (not needed for this project).
-
 ### Frontend Patterns
 
 **API calls:**
@@ -277,7 +285,8 @@ return <h1>{t('welcome')}</h1>;
 
 ## Testing Requirements
 
-**CRITICAL:** These features MUST have tests before implementation:
+Write tests before implementing these — they encode Bulgarian admission and pricing rules
+where a silent off-by-one misleads parents, and the rules are easy to get subtly wrong:
 - Admission points calculator (every criterion, edge cases)
 - NVO score formula
 - Age → group mapping (Target Admission Year logic)
@@ -350,25 +359,15 @@ migrations (never hand-write), and the **NVO import is independent** of the webs
 
 ## Known Issues & Gotchas
 
-1. **Foreign keys must be explicit in SQLAlchemy models:**
-   ```python
-   school_id: Mapped[int] = mapped_column(ForeignKey("schools.id"), nullable=False)
-   ```
-   Not just `Integer`. SQLAlchemy needs the `ForeignKey` declaration.
+1. **Settings uses factory pattern:** Import `get_settings()`, don't import a `settings` instance directly (unless it's defined in config.py).
 
-2. **Settings uses factory pattern:** Import `get_settings()`, don't import a `settings` instance directly (unless it's defined in config.py).
+2. **uv, not pip:** All commands are `uv run X`. Never suggest `pip install`.
 
-3. **uv, not pip:** All commands are `uv run X`. Never suggest `pip install`.
+3. **Age filter:** Uses enrollment year and birth year. Never use exact dates or "age on September 1" logic.
 
-4. **Alembic migrations:** First migration does NOT need `CREATE EXTENSION postgis` — we're using simple lat/lng floats, not geometry types.
+4. **NVO import is independent of the website pipeline:** Use the dedicated `nvo` stage when refreshing official exam results; it is not part of `all`.
 
-5. **Age filter:** Uses enrollment year and birth year. Never use exact dates or "age on September 1" logic.
-
-6. **School names and addresses:** Stored in both Bulgarian and English (`name_en`, `address_en`). The frontend displays the appropriate version based on the user's language preference.
-
-7. **NVO import is independent of the website pipeline:** Use the dedicated `nvo` stage when refreshing official exam results; it is not part of `all`.
-
-8. **Publish boundary — API responses are gated (P1.7/P1.15–P1.16):** `schools.attributes`,
+5. **Publish boundary — API responses are gated (P1.7/P1.15–P1.16):** `schools.attributes`,
    `admission_info`, `pricing_context`, and raw `FieldSource` values are internal storage;
    nothing reaches the wire unless it is declared in the corresponding response allowlist.
    Website-derived fields must additionally pass `app/utils/website_data.py` (publishable
@@ -386,15 +385,10 @@ migrations (never hand-write), and the **NVO import is independent** of the webs
 
 ---
 
-## API Endpoints (Current)
+## API Endpoints
 
-```
-GET  /schools              # List schools (filter by age_group, type)
-GET  /schools/{id}         # Single school detail
-GET  /compare?ids=1,2,3    # Compare multiple schools
-```
-
-Response includes nested `locations`, `pricing`, `exam_results`.
+See `backend/app/routers/` (`schools.py`, `compare.py`, `countries.py`) for the current
+routes. Every response passes through the publish boundary (Known Issues #5).
 
 ---
 
@@ -433,7 +427,7 @@ URL_RECOVERY_CONCURRENCY=3
 ❌ Use `pip install` → Use `uv add` or edit `pyproject.toml`
 ❌ Hand-write Alembic migrations → Use `alembic revision --autogenerate`
 ❌ Hardcode "Search" in JSX → Use `{t('search')}`
-❌ Add columns for one-off fields → Use JSONB (`attributes`, `admission_info`)
+❌ Add columns for one-off fields → Use the JSON columns (`attributes`, `admission_info`)
 ❌ Use earth curvature formulas → Use Leaflet's built-in distance
 ❌ Build complex retry logic → Simple 1-2-3 retries is fine
 
@@ -453,7 +447,7 @@ URL_RECOVERY_CONCURRENCY=3
 
 Before implementing a feature:
 1. Does this need to be in the database, or can it be computed on the fly?
-2. Does this need a new column, or can it go in JSONB?
+2. Does this need a new column, or can it go in the `attributes` / `admission_info` JSON?
 3. Does this need a library, or can I use what's already installed?
 4. Am I building for scale I don't have?
 5. Is there a simpler way?

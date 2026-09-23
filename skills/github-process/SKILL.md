@@ -77,10 +77,9 @@ for that.
 
 ## Commit / PR conventions
 
-- End commit messages with:
-  `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`
-- End PR bodies with:
-  `🤖 Generated with [Claude Code](https://claude.com/claude-code)`
+- End commit messages and PR bodies with the attribution lines your harness supplies for
+  the current session (for Claude Code, the `Co-Authored-By:` trailer naming the model
+  actually in use). Don't copy a model name from an older commit or pin one here.
 
 ## Detecting when Codex has finished
 
