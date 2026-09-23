@@ -21,7 +21,12 @@ when the user explicitly asks for that.
 3. Run the relevant local checks (`cd backend && uv run pytest`; frontend lint/build if
    the change touches `frontend/`).
 4. Adversarially self-review the complete diff against the requirement, repository
-   invariants, likely edge cases, and existing tests. Fix substantive findings, rerun the
+   invariants, likely edge cases, and existing tests. For every check, guard, or
+   validation you add or move, walk each path through the function (early returns,
+   dry-run/preview modes, error branches) and confirm it fires on exactly the paths it
+   should. For code changes (not docs-only), also run one tool-assisted review of the diff
+   at medium effort if the harness provides one (Claude Code: `/code-review medium`); never
+   a higher or multi-agent level unless Mike asks. Fix substantive findings, rerun the
    appropriate checks, then commit only the files that belong to the change.
 5. Push the branch and open a PR to `main`.
 6. Wait for GitHub Actions.
