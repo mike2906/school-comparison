@@ -266,6 +266,9 @@ _BG_TYPE_PHRASES: tuple[tuple[str, str], ...] = (
     ("начално училище", "Primary School"),
     ("обединено училище", "Unified School"),
     ("специализирано спортно училище", "Sports School"),
+    ("спортно училище", "Sports School"),
+    ("иновативно основно училище", "Innovative Primary School"),
+    ("иновативно средно училище", "Innovative Secondary School"),
     ("специално училище", "Special School"),
     ("технологично училище", "Technology School"),
     ("духовно училище", "Theological School"),
@@ -423,6 +426,9 @@ def translate_bg_school_name(name: str | None, *, source: str | None = None) -> 
         text = pattern.sub(lambda _m, en=english: _hold(en), text)
     text = text.replace("№", "No. ")
     text = transliterate_bulgarian(text).replace("І", "I")
+    # A number followed directly by a school type is the school's ordinal ("20. Иновативно
+    # основно училище" → "20th Innovative Primary School"); a number in a brand
+    # ("101 Защо", "101 Защо частна детска градина") stays as written.
     starts_with_type = text.startswith("\x00")
     text = re.sub(r"\x00(\d+)\x00", lambda m: placeholders[int(m.group(1))], text)
     if ordinal_match:
@@ -439,7 +445,7 @@ def translate_bg_school_name(name: str | None, *, source: str | None = None) -> 
 # --- Addresses ------------------------------------------------------------------
 
 _CITY_PREFIX_RE = re.compile(
-    r"^(?:гр\.\s*)?софия(?![а-яa-z])(?:\s+\d{4})?\s*[,;]?\s*(?=\S)", flags=re.IGNORECASE
+    r"^(?:гр\.\s*)?софия(?![а-яa-z])(?:\s+\d{4})?\s*[,;|]?\s*(?=\S)", flags=re.IGNORECASE
 )
 _MUNICIPALITY_SUFFIX_RE = re.compile(
     r"(?:\s*,\s*\d{4}\s+столична|\s*-\s*СО|\s*,\s*СО)\s*$", flags=re.IGNORECASE

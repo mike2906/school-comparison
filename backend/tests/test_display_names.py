@@ -132,6 +132,9 @@ def test_resolve_name_cleans_register_formatting(stored_bg, expected_bg, expecte
 
 def test_number_that_is_part_of_a_brand_is_not_made_ordinal():
     assert translate_bg_school_name("101 ЗАЩО", source="101 ЗАЩО") == "101 Zashto"
+    assert translate_bg_school_name("101 Защо частна детска градина") == (
+        "101 Zashto Private Kindergarten"
+    )
 
 
 def test_tidy_bg_name_keeps_acronyms_and_roman_numerals():
@@ -218,3 +221,16 @@ def test_short_caps_word_in_a_caps_run_is_recased_in_addresses():
 
 def test_city_prefix_needs_a_word_boundary():
     assert tidy_bg_address("Софиянска 5") == "Софиянска 5"
+
+
+def test_city_prefix_consumes_pipe_separator():
+    assert tidy_bg_address("СОФИЯ | КВ ВИТОША | БУЛ НИКОЛА ПЕТКОВ N73").startswith("Кв Витоша")
+
+
+def test_plain_sports_school_and_leading_modifier_get_type_and_ordinal():
+    assert translate_bg_school_name('57 СПОРТНО УЧИЛИЩЕ "СВЕТИ НАУМ ОХРИДСКИ"') == (
+        '57th Sports School "St. Naum Ohridski"'
+    )
+    assert translate_bg_school_name('20.ИНОВАТИВНО ОСНОВНО УЧИЛИЩЕ "ТОДОР МИНКОВ"') == (
+        '20th Innovative Primary School "Todor Minkov"'
+    )
