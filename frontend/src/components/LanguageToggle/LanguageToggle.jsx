@@ -29,7 +29,7 @@ function LanguageToggle({ compact = false }) {
             lang={lang}
             onClick={() => selectLanguage(lang)}
             aria-pressed={isActive}
-            className={`${compact ? 'min-w-[36px] h-9 px-2' : 'min-w-[40px] h-9 px-3'} rounded-md text-xs font-semibold transition-colors ${
+            className={`${compact ? 'min-w-[40px] h-10 px-2' : 'min-w-[40px] h-9 px-3'} rounded-md text-xs font-semibold transition-colors ${
               isActive
                 ? 'bg-white text-neutral-900 shadow-sm'
                 : 'text-neutral-500 hover:text-neutral-900'

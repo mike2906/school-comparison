@@ -4,7 +4,7 @@
  * scroll position and map centre/zoom are kept per history entry in sessionStorage.
  */
 
-export const SORT_VALUES = ['name', 'type', 'price', 'distance']
+export const SORT_VALUES = ['name', 'type', 'price', 'distance', 'nvo']
 export const DISTANCE_VALUES = ['any', '2', '5']
 export const VIEW_MODES = ['list-map', 'map-only', 'list-only']
 export const MOBILE_TABS = ['list', 'map']

@@ -39,7 +39,9 @@
     "noActiveFilters": "Няма активни филтри",
     "mainFilters": "Основни филтри",
     "advancedFilters": "Разширени филтри",
-    "noAdvancedFilters": "Няма разширени филтри"
+    "noAdvancedFilters": "Няма разширени филтри",
+    "allTypes": "Всички",
+    "clearFilters": "Изчисти филтрите"
   },
   "location": {
     "title": "Вашето местоположение",
@@ -72,7 +74,10 @@
     "distanceAny": "Всякакво разстояние",
     "distance2km": "До 2 км",
     "distance5km": "До 5 км",
-    "fromYou": "от вас"
+    "fromYou": "от вас",
+    "nearShort": "До {{address}}",
+    "setShort": "Задайте местоположение",
+    "whyShort": "Вижте разстоянията, подредете по близост и ограничете по разстояние."
   },
   "sorting": {
     "sortBy": "Сортиране по",
@@ -80,7 +85,8 @@
     "name": "Име",
     "type": "Тип",
     "price": "Цена",
-    "pricePrivate": "Цена (само частни)"
+    "pricePrivate": "Цена (само частни)",
+    "nvo": "Резултат НВО (най-висок)"
   },
   "filters": {
     "title": "Филтри",

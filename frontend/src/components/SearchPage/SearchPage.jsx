@@ -11,6 +11,7 @@ import SchoolCardSkeleton from '../SchoolCard/SchoolCardSkeleton'
 import SchoolDetailPanel from './SchoolDetailPanel'
 import AgePicker from './AgePicker'
 import SchoolNameSearch from './SchoolNameSearch'
+import LocationControl from './LocationControl'
 import { useSchools } from '../../hooks/useSchools'
 import { calculateDistance } from '../../utils/distance'
 import { geocodeAddress, reverseGeocode, cancelGeocode } from '../../utils/geocoding'
@@ -21,6 +22,8 @@ import { fetchAvailableFilters, fetchExamAverages } from '../../api/schools'
 import { getAgeGroupKeys } from '../../utils/countryConfig'
 import { AGE_GROUP_KEYS } from '../../utils/education'
 import { getLanguageFocusPairs } from '../../utils/schoolAttributes'
+import { matchesAdvancedFilters } from '../../utils/advancedFilters'
+import { getNvoDetail } from '../../utils/nvo'
 import { monthlyEquivalent, toEur } from '../../utils/pricing'
 import {
   readViewParams,
@@ -82,9 +85,9 @@ function SearchPage() {
   const [viewMode, setViewMode] = useState(initialView.view) // 'list-map', 'map-only', 'list-only'
   const [mobileTab, setMobileTab] = useState(initialView.tab) // 'list' or 'map'
   const [isFiltersOpen, setIsFiltersOpen] = useState(false) // For tablet/mobile drawer
+  const filtersDrawerRef = useRef(null)
   const [userLocation, setUserLocation] = useState(() => readStoredUserLocation(t('location.currentLocation')))
   const [addressInput, setAddressInput] = useState('')
-  const [isManualInput, setIsManualInput] = useState(false)
   const [locationError, setLocationError] = useState(null)
   const [isLocating, setIsLocating] = useState(false)
   const [isGeocoding, setIsGeocoding] = useState(false)
@@ -124,10 +127,8 @@ function SearchPage() {
   locationRef.current = location
   const previousViewModeRef = useRef(null)
   const previousMobileTabRef = useRef(null)
-  const locationSectionRef = useRef(null)
   const errorTimeoutRef = useRef(null)
   const toastTimeoutRef = useRef(null)
-  const latestGeocodeRef = useRef(0)
   const latestMapBoundsRef = useRef(null)
   const scrollOnSelectRef = useRef(false)
 
@@ -185,28 +186,23 @@ function SearchPage() {
       ? filters.educationLevel
       : null
 
-  const { schools, loading, error } = useSchools(
+  // One fetch per age group / type; advanced filters apply on the client (same rules as
+  // the API), so ticking a checkbox does not refetch and flash the list.
+  const { schools: baseSchools, loading, error } = useSchools(
     filters.ageGroup,
     filters.schoolType,
     effectiveEducationLevel,
     filters.includeCrossover,
-    filters.languageFocus,
-    filters.specialPrograms,
-    filters.facilities,
-    filters.teachingApproach,
+    EMPTY_LIST,
+    EMPTY_LIST,
+    EMPTY_LIST,
+    EMPTY_LIST,
     countryCode
   )
 
-  const { schools: baseSchools } = useSchools(
-    filters.ageGroup,
-    filters.schoolType,
-    effectiveEducationLevel,
-    filters.includeCrossover,
-    EMPTY_LIST,
-    EMPTY_LIST,
-    EMPTY_LIST,
-    EMPTY_LIST,
-    countryCode
+  const schools = useMemo(
+    () => baseSchools.filter(school => matchesAdvancedFilters(school, filters)),
+    [baseSchools, filters]
   )
 
   useEffect(() => {
@@ -367,54 +363,6 @@ function SearchPage() {
   }, [userLocation, sortBy])
 
   useEffect(() => {
-    if (userLocation || !isManualInput) {
-      cancelGeocode()
-      return
-    }
-
-    const trimmedAddress = addressInput.trim()
-    if (!trimmedAddress) {
-      cancelGeocode()
-      setIsGeocoding(false)
-      return
-    }
-
-    const requestId = Date.now()
-    latestGeocodeRef.current = requestId
-    setIsGeocoding(true)
-
-    geocodeAddress(trimmedAddress, geocodingConfig)
-      .then((result) => {
-        if (latestGeocodeRef.current !== requestId) return
-        const newLocation = {
-          lat: result.lat,
-          lng: result.lng,
-          address: result.address,
-        }
-        setUserLocation(newLocation)
-        setIsManualInput(false)
-        persistLocation(newLocation)
-      })
-      .catch((err) => {
-        if (latestGeocodeRef.current !== requestId) return
-        if (err?.code === 'CANCELED') return
-        if (err?.code === 'NO_RESULTS') {
-          showLocationError(t('location.errorNotFound'))
-        } else if (err?.code === 'RATE_LIMIT') {
-          showLocationError(t('location.errorRateLimited'))
-        } else if (err?.code === 'TOO_FAST') {
-          showLocationError(t('location.errorPleaseWait'), { temporary: true })
-        } else if (err?.code !== 'EMPTY') {
-          showLocationError(t('location.errorUnableToGeocode'))
-        }
-      })
-      .finally(() => {
-        if (latestGeocodeRef.current !== requestId) return
-        setIsGeocoding(false)
-      })
-  }, [addressInput, userLocation, isManualInput, t, geocodingConfig])
-
-  useEffect(() => {
     return () => {
       if (errorTimeoutRef.current) {
         clearTimeout(errorTimeoutRef.current)
@@ -471,6 +419,16 @@ function SearchPage() {
       navigate(`/schools/${school.id}`)
     }
   })
+
+  // Everything except the age selection, which is the parent's main choice.
+  // One navigation; the URL-to-state syncs pick up the cleared values.
+  const handleClearFilters = () => {
+    setSearchInBounds(false)
+    const params = new URLSearchParams(searchParams)
+    ;['school_type', 'language_focus', 'special_programs', 'facilities', 'teaching_approach', 'q', 'within']
+      .forEach(key => params.delete(key))
+    navigate(`/search?${params.toString()}`, { replace: true, state: location.state })
+  }
 
   const dismissWelcome = () => {
     setWelcomeDismissed(true)
@@ -581,9 +539,19 @@ function SearchPage() {
     localStorage.setItem('userLocation', JSON.stringify(location))
   }
 
+  // Each way of setting a location takes a token; a slower earlier request (GPS or an
+  // address lookup) must not overwrite a location the parent has since set another way.
+  const locationRequestRef = useRef(0)
+  const startLocationRequest = () => {
+    locationRequestRef.current += 1
+    return locationRequestRef.current
+  }
+
   const handleUseMyLocation = () => {
+    const request = startLocationRequest()
     setLocationError(null)
     setIsPickingLocation(false)
+    setIsGeocoding(false)
 
     if (!navigator.geolocation) {
       showLocationError(t('location.errorUnavailable'))
@@ -593,6 +561,7 @@ function SearchPage() {
     setIsLocating(true)
     navigator.geolocation.getCurrentPosition(
       (position) => {
+        if (request !== locationRequestRef.current) return
         const newLocation = {
           lat: position.coords.latitude,
           lng: position.coords.longitude,
@@ -604,6 +573,7 @@ function SearchPage() {
         setIsLocating(false)
       },
       (err) => {
+        if (request !== locationRequestRef.current) return
         if (err.code === 1) {
           showLocationError(t('location.errorDenied'))
         } else {
@@ -623,22 +593,24 @@ function SearchPage() {
     const trimmedAddress = addressInput.trim()
     if (!trimmedAddress) return
 
+    const request = startLocationRequest()
+    setIsLocating(false)
     setIsGeocoding(true)
     setLocationError(null)
     setIsPickingLocation(false)
 
     try {
       const result = await geocodeAddress(trimmedAddress, geocodingConfig)
+      if (request !== locationRequestRef.current) return
       const newLocation = {
         lat: result.lat,
         lng: result.lng,
         address: result.address,
       }
       setUserLocation(newLocation)
-      setIsManualInput(false)
       persistLocation(newLocation)
     } catch (err) {
-      if (err?.code === 'CANCELED') return
+      if (err?.code === 'CANCELED' || request !== locationRequestRef.current) return
       if (err?.code === 'NO_RESULTS') {
         showLocationError(t('location.errorNotFound'))
       } else if (err?.code === 'RATE_LIMIT') {
@@ -649,34 +621,24 @@ function SearchPage() {
         showLocationError(t('location.errorUnableToGeocode'))
       }
     } finally {
-      setIsGeocoding(false)
+      if (request === locationRequestRef.current) setIsGeocoding(false)
     }
-  }
-
-  const handleChangeLocation = () => {
-    if (userLocation?.address) {
-      setAddressInput(userLocation.address)
-    }
-    setIsPickingLocation(false)
-    setUserLocation(null)
-    setLocationError(null)
-    setIsManualInput(false)
-    localStorage.removeItem('userLocation')
   }
 
   const handleClearLocation = () => {
+    startLocationRequest()
+    setIsLocating(false)
+    setIsGeocoding(false)
     setIsPickingLocation(false)
     setUserLocation(null)
     setAddressInput('')
     setLocationError(null)
     setDistanceFilter('any')
-    setIsManualInput(false)
     localStorage.removeItem('userLocation')
   }
 
   const handleStartMapPick = () => {
     setLocationError(null)
-    setIsManualInput(false)
     setIsPickingLocation(prev => {
       const next = !prev
       if (next) {
@@ -703,6 +665,9 @@ function SearchPage() {
 
   const handleMapPickLocation = useStableCallback(({ lat, lng }) => {
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) return
+    startLocationRequest()
+    setIsLocating(false)
+    setIsGeocoding(false)
     const newLocation = {
       lat,
       lng,
@@ -710,7 +675,6 @@ function SearchPage() {
     }
     setUserLocation(newLocation)
     setAddressInput('')
-    setIsManualInput(false)
     setLocationError(null)
     persistLocation(newLocation)
     setIsPickingLocation(false)
@@ -958,6 +922,15 @@ function SearchPage() {
           return valueA - valueB
         })
         break
+      case 'nvo': {
+        // Highest latest combined NVO first; schools without results last.
+        const scores = new Map(list.map(school => [
+          school.id,
+          getNvoDetail(school, null)?.latestCombined ?? Number.NEGATIVE_INFINITY,
+        ]))
+        list.sort((a, b) => scores.get(b.id) - scores.get(a.id))
+        break
+      }
       case 'name':
       default:
         list.sort((a, b) => {
@@ -1019,6 +992,59 @@ function SearchPage() {
     scrollOnSelectRef.current = false
   }, [selectedSchoolId])
 
+  // Reachable by Tab: rendered, and not inside a collapsed <details> (only its own
+  // <summary> is). Chrome still reports boxes for collapsed content, so check directly.
+  const isReachable = (element) => {
+    if (element.getClientRects().length === 0) return false
+    let child = element
+    let parent = element.parentElement
+    while (parent) {
+      if (parent.tagName === 'DETAILS' && !parent.open) {
+        const isOwnSummary = child === element && element.tagName === 'SUMMARY' && element.parentElement === parent
+        if (!isOwnSummary) return false
+      }
+      child = parent
+      parent = parent.parentElement
+    }
+    return true
+  }
+
+  // Modal drawer: focus moves in, Tab stays inside, Escape closes, focus returns after.
+  useEffect(() => {
+    if (!isFiltersOpen) return undefined
+    const drawer = filtersDrawerRef.current
+    const opener = document.activeElement
+    drawer?.focus()
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape' && !event.defaultPrevented) {
+        setIsFiltersOpen(false)
+        return
+      }
+      if (event.key !== 'Tab' || !drawer) return
+      const focusable = [...drawer.querySelectorAll(
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), summary, [tabindex]:not([tabindex="-1"])'
+      )].filter(isReachable)
+      if (focusable.length === 0) return
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (event.shiftKey && (document.activeElement === first || document.activeElement === drawer)) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      } else if (!drawer.contains(document.activeElement)) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+      if (opener instanceof HTMLElement) opener.focus()
+    }
+  }, [isFiltersOpen])
+
   // Close filters drawer on desktop
   useEffect(() => {
     const handleResize = () => {
@@ -1039,216 +1065,16 @@ function SearchPage() {
     ? [
         { value: 'distance', label: t('sorting.distance') },
         { value: 'name', label: t('sorting.name') },
+        { value: 'nvo', label: t('sorting.nvo') },
         { value: 'type', label: t('sorting.type') },
         { value: 'price', label: t('sorting.price') },
       ]
     : [
         { value: 'name', label: t('sorting.name') },
+        { value: 'nvo', label: t('sorting.nvo') },
         { value: 'type', label: t('sorting.type') },
         { value: 'price', label: t('sorting.pricePrivate') },
       ]
-
-  const renderLocationSection = () => {
-    const addressParts = userLocation?.address ? userLocation.address.split(',') : []
-    const addressLine1 = addressParts[0]?.trim()
-    const addressLine2 = addressParts.slice(1, 3).join(', ').trim()
-
-    return (
-      <div
-        ref={locationSectionRef}
-        className="rounded-xl border border-neutral-200 bg-neutral-50 p-4 space-y-4"
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-lg">📍</span>
-            <h3 className="font-semibold text-neutral-900">{t('location.title')}</h3>
-          </div>
-          {!userLocation && (
-            <span className="text-xs text-neutral-500 font-medium">{t('location.optional')}</span>
-          )}
-        </div>
-
-        {!userLocation ? (
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <p className="text-sm text-neutral-600">{t('location.setYourLocation')}</p>
-              <ul className="text-sm text-neutral-600 list-disc ml-5 space-y-1">
-                <li>{t('location.benefitDistances')}</li>
-                <li>{t('location.benefitSort')}</li>
-                <li>{t('location.benefitFilter')}</li>
-              </ul>
-            </div>
-
-            <button
-              onClick={handleUseMyLocation}
-              disabled={isLocating}
-              className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-primary-600 text-white text-sm font-medium hover:bg-primary-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
-            >
-              {isLocating && (
-                <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                </svg>
-              )}
-              {t('location.useMyLocation')}
-            </button>
-
-            <button
-              onClick={handleStartMapPick}
-              className={`w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${
-                isPickingLocation
-                  ? 'bg-primary-50 border-primary-300 text-primary-800'
-                  : 'bg-white border-neutral-300 text-neutral-700 hover:bg-neutral-50'
-              }`}
-            >
-              {isPickingLocation ? t('location.cancelMapPick') : t('location.selectOnMap')}
-            </button>
-
-            {isPickingLocation && (
-              <p className="text-xs text-primary-700 bg-primary-50 border border-primary-200 rounded-lg px-3 py-2">
-                {t('location.mapPickHint')}
-              </p>
-            )}
-
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-neutral-700">
-                {t('location.enterAddress')}
-              </label>
-              <div className="flex gap-2">
-                <input
-                  value={addressInput}
-                  onChange={(e) => {
-                    setAddressInput(e.target.value)
-                    setIsManualInput(true)
-                    setLocationError(null)
-                  }}
-                  placeholder={t('location.addressPlaceholder')}
-                  className="flex-1 min-w-0 border border-neutral-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-shadow"
-                />
-                <button
-                  onClick={handleAddressSearch}
-                  disabled={isGeocoding || !addressInput.trim()}
-                  className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-neutral-900 text-white text-sm font-medium hover:bg-neutral-800 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
-                >
-                  {isGeocoding && (
-                    <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                    </svg>
-                  )}
-                  {t('common.search')}
-                </button>
-              </div>
-              <p className="text-xs text-neutral-500">
-                {t('location.attributionPrefix')}{' '}
-                <a
-                  href="https://www.openstreetmap.org/copyright"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="underline hover:text-neutral-700"
-                >
-                  {t('location.attributionLink')}
-                </a>
-              </p>
-            </div>
-
-            {locationError && (
-              <p className="text-sm text-red-600">{locationError}</p>
-            )}
-          </div>
-        ) : (
-          <div className="space-y-3">
-            <div>
-              <p className="text-sm font-medium text-neutral-700">{t('location.near')}</p>
-              <p className="text-sm text-neutral-900">{addressLine1}</p>
-              {addressLine2 && (
-                <p className="text-sm text-neutral-500">{addressLine2}</p>
-              )}
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={handleChangeLocation}
-                className="flex-1 px-3 py-2 text-sm font-medium rounded-lg bg-white border border-neutral-300 text-neutral-700 hover:bg-neutral-50 transition-colors"
-              >
-                {t('location.change')}
-              </button>
-              <button
-                onClick={handleClearLocation}
-                className="flex-1 px-3 py-2 text-sm font-medium rounded-lg bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition-colors"
-              >
-                {t('location.clear')}
-              </button>
-            </div>
-            <button
-              onClick={handleStartMapPick}
-              className={`w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${
-                isPickingLocation
-                  ? 'bg-primary-50 border-primary-300 text-primary-800'
-                  : 'bg-white border-neutral-300 text-neutral-700 hover:bg-neutral-50'
-              }`}
-            >
-              {isPickingLocation ? t('location.cancelMapPick') : t('location.selectOnMap')}
-            </button>
-            {isPickingLocation && (
-              <p className="text-xs text-primary-700 bg-primary-50 border border-primary-200 rounded-lg px-3 py-2">
-                {t('location.mapPickHint')}
-              </p>
-            )}
-          </div>
-        )}
-
-        {userLocation && (
-          <div className="pt-3 border-t border-neutral-200">
-            {/* TODO: State school catchment areas
-            // State schools have district restrictions. When location is set:
-            // - Add badge "⚠️ Outside your district" for state schools >5km away
-            // - Add filter: "☐ Show only schools in my area" (hides distant state schools)
-            // - Research exact district boundaries (район) for Sofia
-            // See: https://kg.sofia.bg for official district rules
-            */}
-            <fieldset className="space-y-2">
-              <legend className="text-sm font-medium text-neutral-700">
-                {t('location.distanceFilterTitle')}
-              </legend>
-              <label className="flex items-center gap-2 text-sm text-neutral-600">
-                <input
-                  type="radio"
-                  name="distance-filter"
-                  value="any"
-                  checked={distanceFilter === 'any'}
-                  onChange={() => setDistanceFilter('any')}
-                  className="text-primary-600 focus:ring-primary-500"
-                />
-                {t('location.distanceAny')}
-              </label>
-              <label className="flex items-center gap-2 text-sm text-neutral-600">
-                <input
-                  type="radio"
-                  name="distance-filter"
-                  value="2"
-                  checked={distanceFilter === '2'}
-                  onChange={() => setDistanceFilter('2')}
-                  className="text-primary-600 focus:ring-primary-500"
-                />
-                {t('location.distance2km')}
-              </label>
-              <label className="flex items-center gap-2 text-sm text-neutral-600">
-                <input
-                  type="radio"
-                  name="distance-filter"
-                  value="5"
-                  checked={distanceFilter === '5'}
-                  onChange={() => setDistanceFilter('5')}
-                  className="text-primary-600 focus:ring-primary-500"
-                />
-                {t('location.distance5km')}
-              </label>
-            </fieldset>
-          </div>
-        )}
-      </div>
-    )
-  }
 
   const renderMapBoundsFilter = () => (
     <div className="rounded-xl border border-neutral-200 bg-white p-4 space-y-2">
@@ -1274,30 +1100,27 @@ function SearchPage() {
     </div>
   )
 
-  const renderSchoolTypeToggle = () => (
-    <div className="rounded-xl border border-neutral-200 bg-white p-4 space-y-3">
-      <p className="text-sm font-semibold text-neutral-800">{t('filters.schoolType')}</p>
-      <div className="flex items-center gap-2">
-        {['state', 'private'].map(type => {
-          const isActive = filters.schoolType === type
-          return (
-            <button
-              key={type}
-              type="button"
-              onClick={() => handleFilterChange({ schoolType: isActive ? null : type })}
-              className={`
-                flex-1 px-3 py-2 text-sm font-medium rounded-lg border transition-colors
-                ${isActive
-                  ? 'bg-primary-600 text-white border-primary-600'
-                  : 'bg-white text-neutral-700 border-neutral-200 hover:border-neutral-300'}
-              `}
-            >
-              {t(`schoolTypes.${type}`)}
-            </button>
-          )
-        })}
-      </div>
-      <p className="text-xs text-neutral-500">{t('filters.schoolTypeOptional')}</p>
+  // Quick State / Private chips above the list: the most used filter, one tap away.
+  const renderSchoolTypeChips = () => (
+    <div className="flex items-center gap-1.5" role="group" aria-label={t('filters.schoolType')}>
+      {[null, 'state', 'private'].map(type => {
+        const isActive = (filters.schoolType || null) === type
+        return (
+          <button
+            key={type || 'all'}
+            type="button"
+            aria-pressed={isActive}
+            onClick={() => handleFilterChange({ schoolType: type })}
+            className={`h-11 md:h-8 rounded-full border px-4 md:px-3 text-sm font-medium transition-colors ${
+              isActive
+                ? 'border-primary-600 bg-primary-600 text-white'
+                : 'border-neutral-300 bg-white text-neutral-700 hover:border-neutral-400'
+            }`}
+          >
+            {type ? t(`schoolTypes.${type}`) : t('search.allTypes')}
+          </button>
+        )
+      })}
     </div>
   )
 
@@ -1306,30 +1129,15 @@ function SearchPage() {
   const formatLanguageLevelLabel = (key) => t(`advancedFilters.levels.${key}`, { defaultValue: key.replace(/_/g, ' ') })
 
   const advancedCounts = useMemo(() => {
-    const groups = {
-      special_programs: filters.specialPrograms,
-      facilities: filters.facilities,
-      teaching_approach: filters.teachingApproach,
+    const IGNORE_KEY = {
+      language_focus: 'languageFocus',
+      special_programs: 'specialPrograms',
+      facilities: 'facilities',
+      teaching_approach: 'teachingApproach',
     }
-
-    const matchesSelected = (school, groupToIgnore) => {
-      const attributes = school.attributes || {}
-      const focusPairs = getLanguageFocusPairs(school)
-
-      if (groupToIgnore !== 'language_focus' && filters.languageFocus.length > 0) {
-        if (!filters.languageFocus.some(value => focusPairs.has(value))) {
-          return false
-        }
-      }
-
-      return Object.entries(groups).every(([key, selected]) => {
-        if (key === groupToIgnore) return true
-        if (!selected || selected.length === 0) return true
-        // Canonical advanced-filter tags (P1.9), not the free-text display lists.
-        const values = attributes.filter_tags?.[key] || []
-        return selected.some(value => values.includes(value))
-      })
-    }
+    const matchesSelected = (school, groupToIgnore) => (
+      matchesAdvancedFilters(school, filters, IGNORE_KEY[groupToIgnore])
+    )
 
     const counts = {
       language_focus_pairs: {},
@@ -1367,7 +1175,7 @@ function SearchPage() {
       })
 
     return counts
-  }, [baseSchools, availableFilters, filters.languageFocus, filters.specialPrograms, filters.facilities, filters.teachingApproach])
+  }, [baseSchools, availableFilters, filters])
 
   // Scans every school, so compute once per data change rather than on every render
   const languageFilterOptions = useMemo(() => {
@@ -1616,18 +1424,10 @@ function SearchPage() {
     )
   }
 
-  const renderActiveFilters = ({ compact = false } = {}) => {
-    const activeFilters = []
+  // Chips for the selected advanced filters (age and school type have their own controls).
+  const renderActiveFilters = () => {
     const advancedFilters = []
     const advancedByLanguage = new Map()
-
-    if (filters.schoolType) {
-      activeFilters.push({
-        key: 'schoolType',
-        label: t(`schoolTypes.${filters.schoolType}`),
-        onRemove: () => handleFilterChange({ schoolType: null }),
-      })
-    }
 
     const addAdvancedChips = (values, groupKey) => {
       values.forEach(value => {
@@ -1677,184 +1477,74 @@ function SearchPage() {
     addAdvancedChips(filters.facilities, 'facilities')
     addAdvancedChips(filters.teachingApproach, 'teachingApproach')
 
-    if (compact) {
-      if (activeFilters.length === 0 && advancedFilters.length === 0) return null
-      return (
-        <div className="flex items-center gap-3">
-          <span className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
-            {t('search.activeFilters')}
-          </span>
-          <div className="flex-1 overflow-x-auto">
-            <div className="flex items-center gap-2 min-w-max py-1">
-              {activeFilters.map(filter => (
-                <span
-                  key={filter.key}
-                  className={`inline-flex items-center gap-2 text-xs px-2.5 py-1 rounded-full ${
-                    filter.locked
-                      ? 'bg-primary-50 text-primary-700 border border-primary-200'
-                      : 'bg-primary-600 text-white'
-                  }`}
-                >
-                  {filter.label}
-                  {!filter.locked && (
-                    <button
-                      type="button"
-                      onClick={filter.onRemove}
-                      className="w-6 h-6 -my-1 -mr-1 rounded-full flex items-center justify-center text-white hover:bg-primary-700 transition-colors"
-                      aria-label={t('common.close')}
-                    >
-                      ×
-                    </button>
-                  )}
+    if (advancedFilters.length === 0) return null
+    return (
+      <div className="flex items-center gap-3">
+        <span className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+          {t('search.activeFilters')}
+        </span>
+        <div className="flex-1 overflow-x-auto">
+          <div className="flex items-center gap-2 min-w-max py-1">
+            {[...advancedByLanguage.entries()].map(([language, levels]) => (
+              <span
+                key={`lang-${language}`}
+                className="inline-flex items-center gap-2 bg-primary-600 text-white text-xs px-2.5 py-1 rounded-full"
+              >
+                <span>{formatLanguageLabel(language)}:</span>
+                <span className="flex items-center gap-1">
+                  {levels.map(level => (
+                    <span key={`${language}-${level}`} className="inline-flex items-center gap-1 bg-white/15 px-2 py-0.5 rounded-full">
+                      {formatLanguageLevelLabel(level)}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const option = `${language}:${level}`
+                          handleFilterChange({
+                            languageFocus: filters.languageFocus.filter(value => value !== option),
+                          })
+                        }}
+                        className="w-4 h-4 rounded-full flex items-center justify-center text-white hover:bg-white/20"
+                        aria-label={t('common.close')}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
                 </span>
-              ))}
-              {[...advancedByLanguage.entries()].map(([language, levels]) => (
-                <span
-                  key={`lang-${language}`}
-                  className="inline-flex items-center gap-2 bg-primary-600 text-white text-xs px-2.5 py-1 rounded-full"
-                >
-                  <span>{formatLanguageLabel(language)}:</span>
-                  <span className="flex items-center gap-1">
-                    {levels.map(level => (
-                      <span key={`${language}-${level}`} className="inline-flex items-center gap-1 bg-white/15 px-2 py-0.5 rounded-full">
-                        {formatLanguageLevelLabel(level)}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const option = `${language}:${level}`
-                            handleFilterChange({
-                              languageFocus: filters.languageFocus.filter(value => value !== option),
-                            })
-                          }}
-                          className="w-4 h-4 rounded-full flex items-center justify-center text-white hover:bg-white/20"
-                          aria-label={t('common.close')}
-                        >
-                          ×
-                        </button>
-                      </span>
-                    ))}
-                  </span>
-                </span>
-              ))}
-              {advancedFilters.filter(filter => !filter.key.startsWith('languageFocus-')).map(filter => (
-                <span
-                  key={filter.key}
-                  className="inline-flex items-center gap-2 bg-primary-600 text-white text-xs px-2.5 py-1 rounded-full"
-                >
-                  {filter.label}
-                  <button
-                    type="button"
-                    onClick={filter.onRemove}
-                    className="w-6 h-6 -my-1 -mr-1 rounded-full flex items-center justify-center text-white hover:bg-primary-700 transition-colors"
-                    aria-label={t('common.close')}
-                  >
-                    ×
-                  </button>
-                </span>
-              ))}
-              {advancedFilters.length > 0 && (
+              </span>
+            ))}
+            {advancedFilters.filter(filter => !filter.key.startsWith('languageFocus-')).map(filter => (
+              <span
+                key={filter.key}
+                className="inline-flex items-center gap-2 bg-primary-600 text-white text-xs px-2.5 py-1 rounded-full"
+              >
+                {filter.label}
                 <button
                   type="button"
-                  onClick={() => handleFilterChange({
-                    languageFocus: [],
-                    specialPrograms: [],
-                    facilities: [],
-                    teachingApproach: [],
-                  })}
-                  className="text-xs text-neutral-500 hover:text-neutral-700 hover:underline whitespace-nowrap"
+                  onClick={filter.onRemove}
+                  className="w-6 h-6 -my-1 -mr-1 rounded-full flex items-center justify-center text-white hover:bg-primary-700 transition-colors"
+                  aria-label={t('common.close')}
                 >
-                  {t('advancedFilters.clear')}
+                  ×
                 </button>
-              )}
-            </div>
+              </span>
+            ))}
+            {advancedFilters.length > 0 && (
+              <button
+                type="button"
+                onClick={() => handleFilterChange({
+                  languageFocus: [],
+                  specialPrograms: [],
+                  facilities: [],
+                  teachingApproach: [],
+                })}
+                className="text-xs text-neutral-500 hover:text-neutral-700 hover:underline whitespace-nowrap"
+              >
+                {t('advancedFilters.clear')}
+              </button>
+            )}
           </div>
         </div>
-      )
-    }
-
-    return (
-      <div className="rounded-xl border border-neutral-200 bg-white p-4 space-y-3">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-neutral-800">{t('search.activeFilters')}</h3>
-          {advancedFilters.length > 0 && (
-            <button
-              type="button"
-              onClick={() => handleFilterChange({
-                languageFocus: [],
-                specialPrograms: [],
-                facilities: [],
-                teachingApproach: [],
-              })}
-              className="text-xs text-neutral-500 hover:text-neutral-700 hover:underline"
-            >
-              {t('advancedFilters.clear')}
-            </button>
-          )}
-        </div>
-
-        <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
-            {t('search.mainFilters')}
-          </p>
-          {activeFilters.length === 0 ? (
-            <p className="text-xs text-neutral-500">{t('search.noActiveFilters')}</p>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {activeFilters.map(filter => (
-                <span
-                  key={filter.key}
-                  className={`inline-flex items-center gap-2 text-sm px-3 py-1.5 rounded-full ${
-                    filter.locked
-                      ? 'bg-primary-50 text-primary-700 border border-primary-200'
-                      : 'bg-primary-600 text-white'
-                  }`}
-                >
-                  {filter.label}
-                  {!filter.locked && (
-                    <button
-                      type="button"
-                      onClick={filter.onRemove}
-                      className="w-[44px] h-[44px] -my-2 -mr-1 rounded-full flex items-center justify-center text-white hover:bg-primary-700 transition-colors"
-                      aria-label={t('common.close')}
-                    >
-                      ×
-                    </button>
-                  )}
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
-            {t('search.advancedFilters')}
-          </p>
-          {advancedFilters.length === 0 ? (
-            <p className="text-xs text-neutral-500">{t('search.noAdvancedFilters')}</p>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {advancedFilters.map(filter => (
-                <span
-                  key={filter.key}
-                  className="inline-flex items-center gap-2 bg-primary-600 text-white text-sm px-3 py-1.5 rounded-full"
-                >
-                  {filter.label}
-                  <button
-                    type="button"
-                    onClick={filter.onRemove}
-                    className="w-[44px] h-[44px] -my-2 -mr-1 rounded-full flex items-center justify-center text-white hover:bg-primary-700 transition-colors"
-                    aria-label={t('common.close')}
-                  >
-                    ×
-                  </button>
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
-
-        
       </div>
     )
   }
@@ -1868,7 +1558,7 @@ function SearchPage() {
           <div className="flex items-center gap-2 px-3 py-2">
             <Link
               to="/search"
-              className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary-500 to-primary-600 text-white"
+              className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary-500 to-primary-600 text-white"
               aria-label={t('nav.home')}
             >
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
@@ -1885,7 +1575,7 @@ function SearchPage() {
                     role="tab"
                     aria-selected={mobileTab === tab}
                     onClick={() => setMobileTab(tab)}
-                    className={`h-9 px-4 text-sm font-medium rounded-md transition-colors ${
+                    className={`h-10 px-4 text-sm font-medium rounded-md transition-colors ${
                       mobileTab === tab
                         ? 'bg-white text-neutral-900 shadow-sm'
                         : 'text-neutral-600 hover:text-neutral-800'
@@ -1900,7 +1590,7 @@ function SearchPage() {
             <button
               type="button"
               onClick={() => setIsFiltersOpen(true)}
-              className="flex h-9 items-center gap-1.5 px-3 rounded-lg bg-primary-50 text-primary-700 text-sm font-medium"
+              className="flex h-11 min-w-[44px] items-center justify-center gap-1.5 px-3 rounded-lg bg-primary-50 text-primary-700 text-sm font-medium"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
@@ -1946,7 +1636,7 @@ function SearchPage() {
           />
 
           <div className="flex-1">
-            {renderActiveFilters({ compact: true })}
+            {renderActiveFilters()}
           </div>
 
           <div className="flex items-center gap-2 bg-neutral-100 rounded-lg p-1">
@@ -1995,8 +1685,6 @@ function SearchPage() {
           {/* Desktop Filters Sidebar (20%) */}
           <aside className={`hidden ${panelBesideMap ? '' : 'lg:block'} w-80 flex-shrink-0 border-r border-neutral-200 bg-white overflow-y-auto`}>
             <div className="p-5 space-y-6">
-              {renderLocationSection()}
-              {renderSchoolTypeToggle()}
               {renderMapBoundsFilter()}
               {renderAdvancedFilters()}
             </div>
@@ -2012,8 +1700,29 @@ function SearchPage() {
             w-full
           `}>
               <div className="px-4 py-2 bg-white border-b border-neutral-200 space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                <LocationControl
+                  userLocation={userLocation}
+                  addressInput={addressInput}
+                  onAddressInputChange={(value) => {
+                    setAddressInput(value)
+                    setLocationError(null)
+                  }}
+                  onUseMyLocation={handleUseMyLocation}
+                  onAddressSearch={handleAddressSearch}
+                  onStartMapPick={handleStartMapPick}
+                  onClear={handleClearLocation}
+                  isLocating={isLocating}
+                  isGeocoding={isGeocoding}
+                  isPickingLocation={isPickingLocation}
+                  locationError={locationError}
+                  distanceFilter={distanceFilter}
+                  onDistanceFilterChange={setDistanceFilter}
+                />
+                {renderSchoolTypeChips()}
+                </div>
                 <div className="lg:hidden">
-                  {renderActiveFilters({ compact: true })}
+                  {renderActiveFilters()}
                 </div>
                 <div className="flex items-center justify-between gap-3">
                   {loading ? (
@@ -2025,13 +1734,14 @@ function SearchPage() {
                     </p>
                   )}
                   <div className="flex items-center gap-2">
-                    <label className="text-sm font-medium text-neutral-700">
+                    <label htmlFor="results-sort" className="text-sm font-medium text-neutral-700 max-sm:sr-only">
                       {t('sorting.sortBy')}
                     </label>
                     <select
+                      id="results-sort"
                       value={sortBy}
                       onChange={(e) => setSortBy(e.target.value)}
-                      className="border border-neutral-300 rounded-lg px-3 py-1.5 text-sm bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-shadow"
+                      className="h-11 md:h-auto border border-neutral-300 rounded-lg px-3 md:py-1.5 text-sm bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-shadow"
                     >
                       {sortOptions.map(option => (
                         <option key={option.value} value={option.value}>{option.label}</option>
@@ -2113,6 +1823,13 @@ function SearchPage() {
                     </div>
                     <p className="text-neutral-600">{t('schools.noResults')}</p>
                     <p className="text-sm text-neutral-400 mt-1">{t('schools.tryDifferentFilters')}</p>
+                    <button
+                      type="button"
+                      onClick={handleClearFilters}
+                      className="mt-4 h-10 rounded-lg border border-neutral-300 bg-white px-4 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+                    >
+                      {t('search.clearFilters')}
+                    </button>
                   </div>
                 )}
 
@@ -2147,6 +1864,18 @@ function SearchPage() {
             ${showMap ? 'lg:block' : 'lg:hidden'}
             md:w-2/5
           `}>
+                {isPickingLocation && (
+                  <div className="absolute inset-x-3 top-16 z-[1000] flex items-center justify-between gap-3 rounded-lg bg-neutral-900/90 px-4 py-2 text-sm text-white shadow-lg" role="status">
+                    <span>{t('location.mapPickHint')}</span>
+                    <button
+                      type="button"
+                      onClick={handleStartMapPick}
+                      className="h-9 flex-shrink-0 rounded-md bg-white/15 px-3 font-medium hover:bg-white/25"
+                    >
+                      {t('location.cancelMapPick')}
+                    </button>
+                  </div>
+                )}
                 <SchoolMap
                   schools={filteredSchools}
                   activeAgeGroup={filters.ageGroup}
@@ -2184,17 +1913,25 @@ function SearchPage() {
             />
 
             {/* Bottom Sheet (Mobile) / Side Drawer (Tablet) */}
-            <div className={`
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="filters-drawer-title"
+              tabIndex={-1}
+              ref={filtersDrawerRef}
+              className={`
               fixed z-[2100] bg-white lg:hidden
               md:top-0 md:right-0 md:bottom-0 md:w-96 md:shadow-2xl
               max-md:bottom-0 max-md:left-0 max-md:right-0 max-md:rounded-t-2xl max-md:shadow-up max-md:max-h-[85vh]
               overflow-y-auto
             `}>
               <div className="sticky top-0 bg-white border-b border-neutral-200 px-5 py-4 flex items-center justify-between">
-                <h2 className="font-semibold text-neutral-900">{t('search.filters')}</h2>
+                <h2 id="filters-drawer-title" className="font-semibold text-neutral-900">{t('search.filters')}</h2>
                 <button
+                  type="button"
                   onClick={() => setIsFiltersOpen(false)}
-                  className="p-1 hover:bg-neutral-100 rounded-lg transition-colors"
+                  aria-label={t('common.close')}
+                  className="flex h-10 w-10 items-center justify-center hover:bg-neutral-100 rounded-lg transition-colors"
                 >
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -2203,8 +1940,6 @@ function SearchPage() {
               </div>
               <div className="p-5">
                 <div className="space-y-6">
-                  {renderLocationSection()}
-                  {renderSchoolTypeToggle()}
                   {renderMapBoundsFilter()}
                   {renderAdvancedFilters()}
                 </div>

@@ -751,7 +751,7 @@ function ComparePage() {
           const metrics = metricsById.get(school.id)
           const value = metrics?.overallLatest ?? metrics?.overallAvg
           if (value == null) return renderPlaceholder()
-          const year = metrics?.nvoDetail?.latestYear
+          const year = metrics?.overallLatest != null ? metrics?.nvoDetail?.latestCombinedYear : metrics?.nvoDetail?.latestYear
           return (
             <div>
               <div className={`text-sm font-semibold ${getPerformanceStyle(value).text}`}>{formatPercent(value, 1)}%</div>

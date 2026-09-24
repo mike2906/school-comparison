@@ -116,3 +116,18 @@ test('getNvoDetail labels the upper-secondary exam as the 10th-grade NVO', () =>
   assert.equal(detail.examType, 'nvo_10')
   assert.equal(detail.gradeLabel, 'schoolCard.nvo.grade10')
 })
+
+test('getNvoDetail combines subjects from the same year only', () => {
+  const school = {
+    education_level: 'lower_secondary',
+    exam_results: [
+      { exam_type: 'nvo_7', subject: 'math', metric: 'average_score', year: 2025, value: 80 },
+      { exam_type: 'nvo_7', subject: 'math', metric: 'average_score', year: 2024, value: 60 },
+      { exam_type: 'nvo_7', subject: 'bulgarian', metric: 'average_score', year: 2024, value: 70 },
+    ],
+  }
+  const detail = getNvoDetail(school, (key) => key)
+  assert.equal(detail.latestCombined, 65)
+  assert.equal(detail.latestCombinedYear, 2024)
+  assert.equal(detail.latestMath, 80)
+})

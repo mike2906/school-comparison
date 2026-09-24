@@ -173,11 +173,16 @@ export function getNvoDetail(
       ? (mathData.average + bgData.average) / 2
       : null
   )
-  const latestCombined = (
-    latestMath != null && latestBg != null
-      ? (latestMath + latestBg) / 2
-      : null
-  )
+  // Combine the two subjects from the same year only: the newest year can be missing a
+  // subject, and averaging 2025 maths with 2024 Bulgarian gives a result that never existed.
+  const bgByYear = new Map(subjects.bulgarian.map(item => [item.year, Number(item.value)]))
+  const latestCommon = [...subjects.math]
+    .sort((a, b) => b.year - a.year)
+    .find(item => bgByYear.has(item.year))
+  const latestCombinedYear = latestCommon?.year ?? null
+  const latestCombined = latestCommon
+    ? (Number(latestCommon.value) + bgByYear.get(latestCommon.year)) / 2
+    : null
   const colorClass = schoolAverageCombined == null
     ? 'text-neutral-600'
     : schoolAverageCombined >= 75
@@ -200,6 +205,7 @@ export function getNvoDetail(
     latestMath,
     latestBg,
     latestCombined,
+    latestCombinedYear,
     latestYear,
     colorClass,
     minYear: yearsUsed.length > 0 ? Math.min(...yearsUsed) : null,

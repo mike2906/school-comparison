@@ -776,7 +776,7 @@ const SchoolCard = memo(function SchoolCard({
       }
       if (priceLabel) return { icon: '💰', text: priceLabel }
       if (requirement) return { icon: requirement.icon, text: requirement.text }
-      return { icon: '💰', text: t('schoolCard.admissions.admissionsUnavailable') }
+      return null
     }
 
     if (school.school_type === 'state' && school.education_level === 'kindergarten') {
@@ -791,7 +791,7 @@ const SchoolCard = memo(function SchoolCard({
           }),
         }
       }
-      return { icon: '🎯', text: t('schoolCard.admissions.admissionsUnavailable') }
+      return null
     }
 
     if (school.school_type === 'state' && school.education_level === 'upper_secondary') {
@@ -805,7 +805,7 @@ const SchoolCard = memo(function SchoolCard({
         }),
         }
       }
-      return { icon: '🎯', text: t('schoolCard.admissions.admissionsUnavailable') }
+      return null
     }
 
     if (school.school_type === 'state' && school.education_level === 'lower_secondary') {
@@ -895,7 +895,8 @@ const SchoolCard = memo(function SchoolCard({
   const expandedId = `school-details-${school.id}`
   const showScheduleOnMobile = !admissionsInfo
   const distanceValue = typeof school.distance === 'number' ? school.distance : null
-  const distanceLabel = distanceValue != null ? formatDistance(distanceValue) : t('schoolCard.distanceUnknown')
+  // Only a known distance is shown; the list header prompts for a location once instead.
+  const distanceLabel = distanceValue != null ? formatDistance(distanceValue) : null
   const distanceStyle = distanceValue == null
     ? { backgroundColor: '#f3f4f6', color: '#6b7280' }
     : distanceValue < 2
@@ -959,16 +960,25 @@ const SchoolCard = memo(function SchoolCard({
     <article
       data-school-id={school.id}
       onClick={() => onClick?.(school)}
+      onKeyDown={(event) => {
+        if (event.target !== event.currentTarget) return
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault()
+          onClick?.(school)
+        }
+      }}
+      tabIndex={0}
+      aria-current={isSelected ? 'true' : undefined}
       onMouseEnter={() => onHover?.(school)}
       onMouseLeave={onHoverEnd}
       className={
-        `school-card p-5 max-md:p-4 mx-3 my-3 rounded-[12px] cursor-pointer bg-white border transition-all duration-200 shadow-sm hover:-translate-y-0.5 hover:border-teal-500 hover:shadow-[0_4px_12px_rgba(20,184,166,0.15)] ` +
+        `school-card p-4 mx-3 my-2 rounded-[12px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500 cursor-pointer bg-white border transition-all duration-200 shadow-sm hover:-translate-y-0.5 hover:border-teal-500 hover:shadow-[0_4px_12px_rgba(20,184,166,0.15)] ` +
         (isSelected
           ? 'border-primary-200 border-l-4 border-l-primary-600 bg-primary-50/60 shadow-card-hover'
           : 'border-neutral-200')
       }
     >
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex items-start justify-between gap-2">
         <div className="flex items-start gap-2">
           {statusInfo && (
             <span
@@ -978,47 +988,22 @@ const SchoolCard = memo(function SchoolCard({
               role="img"
             />
           )}
-          <h3 className="text-[18px] font-semibold text-neutral-900 leading-snug max-md:text-[16px]" data-testid="school-name">
+          <h3 className="text-[17px] font-semibold text-neutral-900 leading-snug max-md:text-[16px]" data-testid="school-name">
             {schoolName}
           </h3>
         </div>
         {distanceLabel && (
           <span
-            className="hidden sm:inline-flex flex-shrink-0 items-center gap-1 text-[13px] font-medium px-2.5 py-1 rounded-full"
+            className="inline-flex flex-shrink-0 items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full"
             style={distanceStyle}
             aria-label={t('schoolCard.aria.distance', { distance: distanceLabel })}
-            title={distanceValue == null ? t('schoolCard.distancePrompt') : ''}
           >
             📍 {distanceLabel}
           </span>
         )}
       </div>
 
-      {distanceLabel && (
-        <div className="sm:hidden mt-1 text-xs text-neutral-600 flex flex-wrap items-center gap-2">
-          <span
-            aria-label={t('schoolCard.aria.distance', { distance: distanceLabel })}
-            title={distanceValue == null ? t('schoolCard.distancePrompt') : ''}
-          >
-            📍 {distanceLabel}
-          </span>
-          <span className="text-neutral-300">•</span>
-          <span className={`inline-flex items-center px-2.5 py-1 rounded text-[11px] font-semibold uppercase tracking-[0.08em] ${colors}`}>
-            {t(`schoolTypes.${displayType}`)}
-          </span>
-          <span>{t(`educationLevels.${school.education_level}`)}</span>
-          {pricingYearLabel && (
-            <>
-              <span className="text-neutral-300">•</span>
-              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border ${pricingYearBadgeClass}`}>
-                {pricingYearLabel}
-              </span>
-            </>
-          )}
-        </div>
-      )}
-
-      <div className="mt-2 hidden sm:flex flex-wrap items-center gap-2">
+      <div className="mt-1.5 flex flex-wrap items-center gap-2">
         <span className={`inline-flex items-center px-2.5 py-1 rounded text-[11px] font-semibold uppercase tracking-[0.08em] ${colors}`}>
           {t(`schoolTypes.${displayType}`)}
         </span>
@@ -1032,9 +1017,7 @@ const SchoolCard = memo(function SchoolCard({
         )}
       </div>
 
-      <div className="mt-3 border-t border-neutral-200" />
-
-      <div className="mt-4 grid grid-cols-1 md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] gap-4 md:gap-4 lg:gap-6">
+      <div className="mt-3 grid grid-cols-1 md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] gap-2 md:gap-4">
         <div className="space-y-2">
           {address && (
             <div className="flex items-start gap-2 text-sm text-neutral-600">
@@ -1173,7 +1156,7 @@ const SchoolCard = memo(function SchoolCard({
         const hasMultipleLocations = (school.locations?.length || 0) > 1
         return hasExpandedContent || hasMultipleLocations || hasMultipleAgeGroupShifts
       })() && (
-        <div className="mt-4 flex items-center justify-between text-sm text-neutral-500">
+        <div className="mt-3 flex items-center justify-between text-sm text-neutral-500">
           {(school.locations?.length || 0) > 1 ? (
             <button
               type="button"
@@ -1515,12 +1498,12 @@ const SchoolCard = memo(function SchoolCard({
         </div>
       )}
 
-      <div className="flex items-center gap-3 pt-4 mt-4 border-t border-neutral-100">
+      <div className="flex items-center gap-3 pt-3 mt-3 border-t border-neutral-100">
         <button
           onClick={handleCompareClick}
           disabled={!inCompare && !canAddMore}
           className={
-            `flex-1 px-3 py-2 text-sm font-medium rounded-lg transition-colors transition-transform hover:scale-[1.02] ` +
+            `flex-1 min-h-[44px] md:min-h-0 px-3 py-2 text-sm font-medium rounded-lg transition-colors transition-transform hover:scale-[1.02] ` +
             (inCompare
               ? 'bg-primary-100 text-primary-700 border-2 border-primary-500 hover:bg-primary-200'
               : !canAddMore
@@ -1542,7 +1525,7 @@ const SchoolCard = memo(function SchoolCard({
         <Link
           to={`/schools/${school.id}`}
           onClick={handleDetailsClick}
-          className="flex-1 px-3 py-2 text-center text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors transition-transform hover:scale-[1.02]"
+          className="flex-1 min-h-[44px] md:min-h-0 inline-flex items-center justify-center px-3 py-2 text-center text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors transition-transform hover:scale-[1.02]"
         >
           {t('schools.details')}
         </Link>
