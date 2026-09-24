@@ -855,6 +855,32 @@ class TestKgSofiaImportCompleteness:
             ["source_record_id=500"],
         ]
 
+    async def test_building_school_owns_its_kg_id_over_family_list(self, db_session: AsyncSession):
+        from app.models import School
+
+        family = School(
+            country_code="bg", name_i18n={"bg": "A"}, school_type="state",
+            education_level="kindergarten", city="sofia",
+            attributes={"kg_sofia_id": 106, "kg_sofia_ids": ["106", "299"]},
+        )
+        building = School(
+            country_code="bg", name_i18n={"bg": "B"}, school_type="state",
+            education_level="kindergarten", city="sofia",
+            attributes={"kg_sofia_id": 299},
+        )
+        # Insert the building first so row order alone would let the family win.
+        db_session.add(building)
+        await db_session.flush()
+        db_session.add(family)
+        await db_session.commit()
+
+        adapter = KgSofiaBgAdapter(db=db_session)
+        with patch("httpx.AsyncClient", return_value=_kg_mock_client([], [])):
+            await adapter.discover()
+
+        assert adapter._school_id_by_kg_id["299"] == building.id
+        assert adapter._school_id_by_kg_id["106"] == family.id
+
     async def test_school_records_never_create_schools(self, db_session: AsyncSession):
         from sqlalchemy import func, select
         from app.models import School

@@ -127,7 +127,10 @@ class BaseSourceAdapter(ABC):
                     source_match_id = self._existing_school_id_for(disc)
                     if source_match_id is not None:
                         existing_school = await self.db.get(School, source_match_id)
-                        matched_by_source_id = existing_school is not None
+                        # Only a school this source created (no registry id) is "owned" by it.
+                        matched_by_source_id = (
+                            existing_school is not None and not existing_school.institutional_id
+                        )
 
                 if not existing_school:
                     # Fallback match: name + city + district

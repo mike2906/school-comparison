@@ -166,14 +166,16 @@ class KgSofiaBgAdapter(BaseSourceAdapter):
             )
         )
         school_id_by_kg_id: dict[str, int] = {}
-        for school_id, attrs in schools_result.all():
-            if not attrs:
-                continue
+        school_rows = [(school_id, attrs) for school_id, attrs in schools_result.all() if attrs]
+        # Grouped ids first, then each school's own kg_sofia_id, so a building that is its
+        # own school maps to that school even when a merged family also lists it.
+        for school_id, attrs in sorted(school_rows):
             kg_ids = attrs.get("kg_sofia_ids")
             if isinstance(kg_ids, list):
                 for grouped_kg_id in kg_ids:
                     if grouped_kg_id is not None:
-                        school_id_by_kg_id[str(grouped_kg_id)] = school_id
+                        school_id_by_kg_id.setdefault(str(grouped_kg_id), school_id)
+        for school_id, attrs in school_rows:
             kg_id = attrs.get("kg_sofia_id")
             if kg_id is not None:
                 school_id_by_kg_id[str(kg_id)] = school_id
@@ -336,8 +338,7 @@ class KgSofiaBgAdapter(BaseSourceAdapter):
             if owners and target not in owners:
                 continue
             kept.append(location)
-        if kept:
-            school.locations = kept
+        school.locations = kept
 
     def _may_create_school(self, disc: DiscoveredSchool) -> bool:
         """Only kindergartens and nurseries are created from kg.sofia.bg.
