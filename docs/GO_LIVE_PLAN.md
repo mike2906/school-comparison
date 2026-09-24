@@ -1661,7 +1661,8 @@ the session scratchpad only.
 - [x] **UF29 Small copy issues:** "Tuition / Admission" row shows only tuition; birth-year
       list includes the enrolment year itself; unexplained tab percentages.
       **Done 2026-09-24:** NVO tab percentages removed (UF10). The birth-year list including the enrolment year is correct (a baby born that year can join a nursery group). "Tuition / Admission" stays: state rows fill in once E5/E6 import thresholds.
-- [ ] **UF30 (P2) Map markers don't distinguish kindergartens from schools** in All ages.
+- [x] **UF30 (P2) Map markers don't distinguish kindergartens from schools** in All ages.
+      **Done 2026-09-24:** inner mark on the pin: dot = school, square = kindergarten (colour still state/private); legend explains both.
 - [ ] **UF31 (P2) Emoji and SVG icons mixed;** flags stand in for languages.
 
 **Backend / data (wait for Mike):**
@@ -1673,16 +1674,18 @@ the session scratchpad only.
       they show as ~0.2 km from the centre. Re-geocode them and treat centroid hits as
       "no coordinates" (no distance) in a guard.
       **Done 2026-09-24:** PR #103: area-level Nominatim results and city-only GeoJSON streets are rejected in the pipeline; the three centroid locations (ids 149, 708, 1173) corrected with evidence and a pg_dump backup.
-- [ ] **UF34 English names are transliterations** ("Amerikanski Kolezh V Sofia",
+- [x] **UF34 English names are transliterations** ("Amerikanski Kolezh V Sofia",
       "Chastna Ezikova Gimnaziya…") next to translated ones; "American" does not find the
       American College. Curated EN names for well-known schools + type-word translation.
+      **Done 2026-09-24:** PR #107: generated English names translate the school type ("94th Secondary School …", "Kindergarten No. 31 …") and 8 well-known schools have curated English names with evidence (American College of Sofia, First English Language School, Lycée Français de Sofia Victor Hugo, German School Sofia, …; pg_dump backup taken).
 - [ ] **UF35 Only 54 state kindergartens listed** with no coverage statement; check
       against kg.sofia.bg and state coverage on /about and in counts.
 - [x] **UF36 `/schools` is 2.1 MB uncompressed** (~200 KB gzipped); add `GZipMiddleware`
       or proxy compression, later a slimmer list schema.
       **Done 2026-09-24:** PR #102: `GZipMiddleware` (≥1 KB); the all-ages list goes from 2.1 MB to ~190 KB.
-- [ ] **UF37 Raw register formatting:** ALL-CAPS names, "ЕООД" suffixes, stray quotes,
+- [x] **UF37 Raw register formatting:** ALL-CAPS names, "ЕООД" suffixes, stray quotes,
       machine-transliterated addresses in the EN UI. A display-name / address cleanup.
+      **Done 2026-09-24:** PR #107: display-only cleanup in `app/utils/display_names.py` (recased ALL-CAPS, legal-form suffixes and stray quotes removed, BG „…“ quotes, clean addresses without "гр. София" / "1799 СТОЛИЧНА"); stored data unchanged.
 
 ## Phase 3 — Go live
 

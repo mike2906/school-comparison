@@ -55,17 +55,23 @@ const parseCoordinate = (value) => {
 }
 
 // Custom marker icons
-const createMarkerIcon = (type, { isSelected, isHovered, isDimmed }) => {
+// Colour = state / private; inner mark = school (dot) or kindergarten (square), so the
+// two can be told apart in "All ages".
+const createMarkerIcon = (type, { isSelected, isHovered, isDimmed, isKindergarten = false }) => {
   const color = isSelected ? HIGHLIGHT_COLOR : getTypeColor(type)
 
   const svgIcon = isSelected
     ? `<svg width="42" height="52" viewBox="0 0 42 52" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path d="M21 0C9.402 0 0 9.402 0 21c0 14.7 21 31 21 31s21-16.3 21-31C42 9.402 32.598 0 21 0z" fill="${color}"/>
-        <circle cx="21" cy="19" r="8.5" fill="white"/>
+        ${isKindergarten
+          ? '<rect x="13" y="11" width="16" height="16" rx="3" fill="white"/>'
+          : '<circle cx="21" cy="19" r="8.5" fill="white"/>'}
       </svg>`
     : `<svg width="32" height="40" viewBox="-1 -1 34 42" fill="none" overflow="visible" xmlns="http://www.w3.org/2000/svg">
         <path d="M16 0C7.163 0 0 7.163 0 16c0 11.2 16 24 16 24s16-12.8 16-24C32 7.163 24.837 0 16 0z" fill="white" stroke="${color}" stroke-width="2"/>
-        <circle cx="16" cy="14" r="5" fill="${color}"/>
+        ${isKindergarten
+          ? `<rect x="11" y="9" width="10" height="10" rx="2" fill="${color}"/>`
+          : `<circle cx="16" cy="14" r="5" fill="${color}"/>`}
       </svg>`
 
   return L.divIcon({
@@ -624,10 +630,11 @@ const SchoolMarker = memo(function SchoolMarker({
 }) {
   const markerRef = useRef(null)
   const schoolType = marker.school.school_type
+  const isKindergarten = marker.school.education_level === 'kindergarten'
   // A new icon object makes react-leaflet rebuild the marker DOM, so only create one when its look changes
   const icon = useMemo(
-    () => createMarkerIcon(schoolType, { isSelected, isHovered, isDimmed }),
-    [schoolType, isSelected, isHovered, isDimmed]
+    () => createMarkerIcon(schoolType, { isSelected, isHovered, isDimmed, isKindergarten }),
+    [schoolType, isSelected, isHovered, isDimmed, isKindergarten]
   )
 
   useEffect(() => {
@@ -1299,6 +1306,14 @@ function SchoolMap({
           <div className="flex items-center gap-2">
             <span className="w-3 h-3 rounded-full bg-violet-500" />
             <span className="text-xs text-neutral-600">{t('schoolTypes.private')}</span>
+          </div>
+          <div className="flex items-center gap-2 pt-1">
+            <span className="w-3 h-3 rounded-full border-2 border-neutral-500" />
+            <span className="text-xs text-neutral-600">{t('map.legendSchool')}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="w-3 h-3 rounded-sm border-2 border-neutral-500" />
+            <span className="text-xs text-neutral-600">{t('map.legendKindergarten')}</span>
           </div>
         </div>
       </div>

@@ -218,7 +218,9 @@
     "searchInBounds": "Search in visible map area",
     "searchInBoundsHint": "Limit results to schools visible on the map.",
     "showingInArea": "Showing {{shown}} of {{total}} schools in this area",
-    "locationsFor": "Locations for {{name}}"
+    "locationsFor": "Locations for {{name}}",
+    "legendSchool": "School",
+    "legendKindergarten": "Kindergarten"
   },
   "pricing": {
     "title": "Pricing",
