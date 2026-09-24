@@ -42,6 +42,8 @@ export function writeViewParams(searchParams, view) {
     view: view.view === VIEW_DEFAULTS.view ? null : view.view,
     tab: view.tab === VIEW_DEFAULTS.tab ? null : view.tab,
     school: view.school ? String(view.school) : null,
+    // One-shot entry param, consumed on load; never kept in the URL.
+    selected_school_id: null,
   }
   Object.entries(entries).forEach(([key, value]) => {
     if (value == null) next.delete(key)
@@ -61,12 +63,15 @@ function safeSession() {
   }
 }
 
-/** Saved scroll/map state, only if it belongs to this history entry. */
-export function readSavedViewState(locationKey, storage = safeSession()) {
+/**
+ * Saved scroll/map state, only if it belongs to this history entry. The key alone is not
+ * enough: the first entry of every page load is keyed 'default'.
+ */
+export function readSavedViewState(locationKey, search, storage = safeSession()) {
   if (!storage || !locationKey) return null
   try {
     const saved = JSON.parse(storage.getItem(SCROLL_STATE_KEY) || 'null')
-    if (!saved || saved.key !== locationKey) return null
+    if (!saved || saved.key !== locationKey || saved.search !== search) return null
     return {
       scrollTop: Number.isFinite(saved.scrollTop) ? saved.scrollTop : 0,
       map: saved.map && Array.isArray(saved.map.center) && Number.isFinite(saved.map.zoom) ? saved.map : null,
@@ -76,10 +81,10 @@ export function readSavedViewState(locationKey, storage = safeSession()) {
   }
 }
 
-export function saveViewState(locationKey, { scrollTop, map }, storage = safeSession()) {
+export function saveViewState(locationKey, { search, scrollTop, map }, storage = safeSession()) {
   if (!storage || !locationKey) return
   try {
-    storage.setItem(SCROLL_STATE_KEY, JSON.stringify({ key: locationKey, scrollTop, map }))
+    storage.setItem(SCROLL_STATE_KEY, JSON.stringify({ key: locationKey, search, scrollTop, map }))
   } catch {
     // Storage full or blocked: losing the scroll position is acceptable.
   }

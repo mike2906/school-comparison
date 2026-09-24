@@ -31,21 +31,25 @@ test('writeViewParams omits defaults, keeps other params, and reports no-ops', (
   const next = writeViewParams(base, { sort: 'name', within: 'any', view: 'list-map', tab: 'list', school: 7 })
   assert.equal(next.toString(), 'age_group=first&school=7')
   assert.equal(writeViewParams(next, readViewParams(next)), null)
+  const entry = writeViewParams(new URLSearchParams('selected_school_id=5'), readViewParams(new URLSearchParams('')))
+  assert.equal(entry.toString(), '')
 })
 
 test('saved view state is only restored for the same history entry', () => {
   const storage = memoryStorage()
-  saveViewState('abc', { scrollTop: 1500, map: { center: [42.7, 23.3], zoom: 13 } }, storage)
-  assert.deepEqual(readSavedViewState('abc', storage), { scrollTop: 1500, map: { center: [42.7, 23.3], zoom: 13 } })
-  assert.equal(readSavedViewState('other', storage), null)
+  saveViewState('abc', { search: '?age_group=first', scrollTop: 1500, map: { center: [42.7, 23.3], zoom: 13 } }, storage)
+  assert.deepEqual(readSavedViewState('abc', '?age_group=first', storage), { scrollTop: 1500, map: { center: [42.7, 23.3], zoom: 13 } })
+  assert.equal(readSavedViewState('other', '?age_group=first', storage), null)
+  // Every page load's first entry is keyed 'default': a different URL must not restore.
+  assert.equal(readSavedViewState('abc', '?age_group=grade_8_12', storage), null)
 })
 
 test('readSavedViewState tolerates corrupt storage and a missing map view', () => {
   const storage = memoryStorage()
   storage.setItem('searchViewState', '{not json')
-  assert.equal(readSavedViewState('abc', storage), null)
-  saveViewState('abc', { scrollTop: 10, map: null }, storage)
-  assert.deepEqual(readSavedViewState('abc', storage), { scrollTop: 10, map: null })
+  assert.equal(readSavedViewState('abc', '', storage), null)
+  saveViewState('abc', { search: '', scrollTop: 10, map: null }, storage)
+  assert.deepEqual(readSavedViewState('abc', '', storage), { scrollTop: 10, map: null })
 })
 
 test('getLastSearchUrl only returns search URLs', () => {

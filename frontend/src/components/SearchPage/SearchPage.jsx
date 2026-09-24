@@ -61,7 +61,7 @@ function SearchPage() {
   const location = useLocation()
   // View state lives in the URL so it survives opening a school and coming back.
   const [initialView] = useState(() => readViewParams(searchParams))
-  const [savedViewState] = useState(() => readSavedViewState(location.key))
+  const [savedViewState] = useState(() => readSavedViewState(location.key, location.search))
   const { compareList } = useCompare()
   const { config, countryCode } = useCountry()
 
@@ -99,8 +99,8 @@ function SearchPage() {
   // Tracked on scroll: the list node is already detached when the unmount cleanup runs.
   const listScrollTopRef = useRef(0)
   const mapViewRef = useRef(savedViewState?.map || null)
-  const locationKeyRef = useRef(location.key)
-  locationKeyRef.current = location.key
+  const locationRef = useRef(location)
+  locationRef.current = location
   const previousViewModeRef = useRef(null)
   const previousMobileTabRef = useRef(null)
   const locationSectionRef = useRef(null)
@@ -117,7 +117,9 @@ function SearchPage() {
   const educationLevel = searchParams.get('education_level')
   const includeCrossover = searchParams.get('include_crossover') === 'true'
   const targetYearParam = searchParams.get('target_year')
-  const selectedSchoolIdParam = searchParams.get('selected_school_id')
+  // One-shot "focus this school" entry param; consumed once the list has loaded and
+  // dropped from the URL by the view-state sync below.
+  const entrySchoolIdRef = useRef(searchParams.get('selected_school_id'))
   const promptLocation = searchParams.get('prompt_location') === '1'
   const getParamList = (key) => {
     const values = searchParams.getAll(key)
@@ -139,12 +141,6 @@ function SearchPage() {
     teachingApproach: getParamList('teaching_approach'),
   })
 
-  const clearSelectedSchoolParam = () => {
-    if (!searchParams.has('selected_school_id')) return
-    const params = new URLSearchParams(searchParams)
-    params.delete('selected_school_id')
-    navigate(`/search?${params.toString()}`, { replace: true })
-  }
 
 
   const [availableFilters, setAvailableFilters] = useState({
@@ -236,14 +232,15 @@ function SearchPage() {
 
   // Keep sort, distance, view and selection in the URL (replace, so Back is not polluted).
   useEffect(() => {
-    setSearchParams(prev => writeViewParams(prev, {
+    const next = writeViewParams(searchParams, {
       sort: sortBy,
       within: distanceFilter,
       view: viewMode,
       tab: mobileTab,
       school: selectedSchoolId,
-    }) || prev, { replace: true })
-  }, [sortBy, distanceFilter, viewMode, mobileTab, selectedSchoolId, setSearchParams])
+    })
+    if (next) setSearchParams(next, { replace: true })
+  }, [sortBy, distanceFilter, viewMode, mobileTab, selectedSchoolId, searchParams, setSearchParams])
 
   useEffect(() => {
     rememberLastSearchUrl(`/search${location.search}`)
@@ -252,7 +249,8 @@ function SearchPage() {
   // Remember list scroll and map view for this history entry when leaving the page.
   useEffect(() => {
     return () => {
-      saveViewState(locationKeyRef.current, {
+      saveViewState(locationRef.current.key, {
+        search: locationRef.current.search,
         scrollTop: listScrollTopRef.current,
         map: mapViewRef.current,
       })
@@ -390,7 +388,6 @@ function SearchPage() {
 
   const handleSchoolSelect = (school, { source = 'list' } = {}) => {
     if (!school) return
-    clearSelectedSchoolParam()
     if (locationOverlay.schoolId && locationOverlay.schoolId !== school.id) {
       clearLocationOverlay()
     }
@@ -415,7 +412,6 @@ function SearchPage() {
   })
 
   const handleClearSelection = useStableCallback(() => {
-    clearSelectedSchoolParam()
     setSelectedSchoolId(null)
   })
 
@@ -802,12 +798,16 @@ function SearchPage() {
   }, [filteredSchools, searchInBounds, mapBounds])
 
   useEffect(() => {
-    if (!selectedSchoolIdParam) return
-    const schoolId = Number.parseInt(selectedSchoolIdParam, 10)
-    if (!Number.isFinite(schoolId)) return
+    if (!entrySchoolIdRef.current) return
+    const schoolId = Number.parseInt(entrySchoolIdRef.current, 10)
+    if (!Number.isFinite(schoolId)) {
+      entrySchoolIdRef.current = null
+      return
+    }
 
     const school = schools.find(item => item.id === schoolId)
     if (!school) return
+    entrySchoolIdRef.current = null
 
     if (searchInBounds) {
       setSearchInBounds(false)
@@ -823,7 +823,7 @@ function SearchPage() {
     if (window.innerWidth < 768) {
       setMobileTab('map')
     }
-  }, [schools, searchInBounds, selectedSchoolIdParam])
+  }, [schools, searchInBounds])
 
   useEffect(() => {
     if (!selectedSchoolId || loading) return
