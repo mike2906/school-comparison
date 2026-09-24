@@ -218,7 +218,9 @@
     "searchInBounds": "Търсене в видимата област на картата",
     "searchInBoundsHint": "Ограничава резултатите до училищата, които са видими на картата.",
     "showingInArea": "Показване на {{shown}} от {{total}} училища в тази област",
-    "locationsFor": "Локации за {{name}}"
+    "locationsFor": "Локации за {{name}}",
+    "legendSchool": "Училище",
+    "legendKindergarten": "Детска градина"
   },
   "pricing": {
     "title": "Цени",
