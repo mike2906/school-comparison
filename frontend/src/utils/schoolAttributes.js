@@ -1,3 +1,4 @@
+import { canonicalLanguagePair } from './languages.js'
 /**
  * Resolves the locale-specific view of a school's display attributes.
  *
@@ -160,21 +161,23 @@ export function hasDisplayEvidence(value) {
   return true
 }
 
+// Canonical pairs ("english:intensive"), so "English", "английски" and "английски език"
+// are one filter option and scraped non-languages never become one.
 function addLanguageFocusPairs(values, pairs) {
   if (!Array.isArray(values)) return
 
   values.forEach((value) => {
+    let raw = null
     if (isObject(value)) {
       const language = value.language
       const level = value.level
-      if (language && level) {
-        pairs.add(`${language}:${level}`)
-      } else if (language) {
-        pairs.add(language)
-      }
+      if (language && level) raw = `${language}:${level}`
+      else if (language) raw = language
     } else if (typeof value === 'string') {
-      pairs.add(value)
+      raw = value
     }
+    const pair = raw ? canonicalLanguagePair(raw) : null
+    if (pair) pairs.add(pair)
   })
 }
 

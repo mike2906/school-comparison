@@ -40,3 +40,15 @@ export function languageLabel(value, t) {
   const text = String(value).trim()
   return text.charAt(0).toUpperCase() + text.slice(1)
 }
+
+/**
+ * A language-focus filter value ("english", "английски:intensive") in canonical form
+ * ("english", "english:intensive"), or null when the language part is not a language
+ * (scraped noise such as "Information Technology").
+ */
+export function canonicalLanguagePair(value) {
+  const [language, level] = String(value || '').split(':')
+  const key = languageKey(language)
+  if (!key) return null
+  return level ? `${key}:${level}` : key
+}

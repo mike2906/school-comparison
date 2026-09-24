@@ -187,11 +187,6 @@
       "improving": "Students improve as they progress: {{highGrade}} scores {{diff}}% higher than {{lowGrade}}",
       "declining": "Performance varies by grade: {{highGrade}} scores {{diff}}% higher than {{lowGrade}}"
     },
-    "compareAllGrades": "Compare All Grades",
-    "showByGrade": "Show by Grade",
-    "byGrade": "By Grade",
-    "compareAllGradesInfo": "Comparing performance across all grade levels",
-    "compareAllGradesHelp": "Different line styles distinguish grades: Solid = 4th grade, Dashed = 7th grade, Dotted = 10th grade.",
     "showSubjects": "Show subjects",
     "moreLocations": "more location",
     "moreLocations_one": "more location",

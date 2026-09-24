@@ -27,7 +27,6 @@ import {
   getExamTypeLabel,
 } from './helpers'
 import NvoTimelineChart from './NvoTimelineChart'
-import MultiGradeComparisonChart from './MultiGradeComparisonChart'
 import KeyFacts from './KeyFacts'
 import LocationMap, { directionsUrl } from './LocationMap'
 import PricingSection from './PricingSection'
@@ -72,7 +71,6 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [activeExamType, setActiveExamType] = useState(null)
-  const [showAllGrades, setShowAllGrades] = useState(false)
   const [selectedSubjects, setSelectedSubjects] = useState(['math', 'bulgarian'])
   const [examAverages, setExamAverages] = useState(null)
 
@@ -590,69 +588,40 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
                   </div>
                 </div>
 
-                {/* Compare All Grades Toggle */}
-                {hasMultipleGrades && (
-                  <button
-                    onClick={() => setShowAllGrades(!showAllGrades)}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                      showAllGrades
-                        ? 'bg-primary-700 text-white shadow-md'
-                        : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
-                    }`}
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                    </svg>
-                    <span className="hidden md:inline">{showAllGrades ? t('schools.showByGrade') : t('schools.compareAllGrades')}</span>
-                    <span className="md:hidden">{showAllGrades ? t('schools.byGrade') : t('schools.compare')}</span>
-                  </button>
-                )}
               </div>
 
-              {/* Conditional Rendering: Tabs OR Combined Chart */}
-              {showAllGrades ? (
-                /* Show All Grades Combined */
-                <MultiGradeComparisonChart
+              {/* One exam at a time: 4th/7th/10th-grade NVO are different exams, so they
+                  are not plotted together; each is compared with its own national average. */}
+                {/* Tabs for Multiple Grade Levels */}
+                {hasMultipleGrades && (
+                  <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
+                    {availableExamTypes.map(examType => {
+                      const isActive = activeExamType === examType
+
+                      return (
+                        <button
+                          key={examType}
+                          onClick={() => setActiveExamType(examType)}
+                          className={`px-4 py-2.5 rounded-lg font-medium whitespace-nowrap transition-all ${
+                            isActive
+                              ? 'bg-primary-700 text-white shadow-md'
+                              : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
+                          }`}
+                        >
+                          {getExamTypeLabel(examType, t)}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+
+                {/* Single Grade Chart */}
+                <NvoTimelineChart
                   examResults={school.exam_results}
-                  availableExamTypes={availableExamTypes}
+                  examType={activeExamType || getExamTypeForEducationLevel(school.education_level)}
                   selectedSubjects={selectedSubjects}
                   examAverages={examAverages}
                 />
-              ) : (
-                /* Show Tabs + Single Grade Chart */
-                <>
-                  {/* Tabs for Multiple Grade Levels */}
-                  {hasMultipleGrades && (
-                    <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
-                      {availableExamTypes.map(examType => {
-                        const isActive = activeExamType === examType
-
-                        return (
-                          <button
-                            key={examType}
-                            onClick={() => setActiveExamType(examType)}
-                            className={`px-4 py-2.5 rounded-lg font-medium whitespace-nowrap transition-all ${
-                              isActive
-                                ? 'bg-primary-700 text-white shadow-md'
-                                : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
-                            }`}
-                          >
-                            {getExamTypeLabel(examType, t)}
-                          </button>
-                        )
-                      })}
-                    </div>
-                  )}
-
-                  {/* Single Grade Chart */}
-                  <NvoTimelineChart
-                    examResults={school.exam_results}
-                    examType={activeExamType || getExamTypeForEducationLevel(school.education_level)}
-                    selectedSubjects={selectedSubjects}
-                    examAverages={examAverages}
-                  />
-                </>
-              )}
 
               {/* Subject Filter Toggles (below chart) */}
               <div className="flex items-center justify-center gap-3 mt-6 pt-6 border-t border-neutral-200">

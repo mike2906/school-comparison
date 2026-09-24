@@ -243,8 +243,13 @@ test('getLanguageFocusPairs includes every attributes_i18n locale for filter cou
     },
   })
 
-  assert.deepEqual(
-    [...pairs].sort(),
-    ['English:mother_tongue', 'German:early_foreign', 'Английски:mother_tongue'].sort()
-  )
+  // Every locale is read, and the same language in either spelling is one canonical pair.
+  assert.deepEqual([...pairs].sort(), ['english:mother_tongue', 'german:early_foreign'])
+})
+
+test('getLanguageFocusPairs drops scraped values that are not languages', () => {
+  const pairs = getLanguageFocusPairs({
+    attributes: { language_focus: [{ language: 'Information Technology', level: 'enrichment' }, 'bg'] },
+  })
+  assert.deepEqual([...pairs], ['bulgarian'])
 })
