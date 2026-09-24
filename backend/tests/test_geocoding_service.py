@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, patch
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.services.geocoding.base import GeocodingResult
-from app.services.geocoding.nominatim import NominatimProvider
+from app.services.geocoding.nominatim import AREA_LEVEL_MATCH_ERROR, NominatimProvider
 from app.services.geocoding.service import GeocodingService, geocode_failure_is_terminal
 from app.scrapers.cli import _oblast_fallback_query_specs
 from app.models import School, SchoolLocation
@@ -1705,3 +1705,188 @@ class TestCompositeProvider:
                 # Should return Nominatim result
                 assert result.success
                 assert result.provider == 'nominatim'
+
+
+class TestCityCentroidGuards:
+    """UF33: a settlement-centroid hit must be treated as "no coordinates"."""
+
+    @staticmethod
+    def _mock_client(responses_by_query: dict[str, list[dict]]):
+        class MockResponse:
+            status_code = 200
+
+            def __init__(self, json_data):
+                self._json_data = json_data
+
+            def raise_for_status(self):
+                pass
+
+            def json(self):
+                return self._json_data
+
+        async def mock_get(*args, **kwargs):
+            return MockResponse(responses_by_query.get(kwargs["params"]["q"], []))
+
+        mock_client = AsyncMock()
+        mock_client.__aenter__.return_value = mock_client
+        mock_client.__aexit__.return_value = None
+        mock_client.get = mock_get
+        return mock_client
+
+    # Shape of the real Nominatim answer that put ДГ №31 Люлин on the Sofia centroid.
+    SOFIA_CITY_NODE = {
+        "lat": "42.6977028",
+        "lon": "23.3217359",
+        "class": "boundary",
+        "type": "administrative",
+        "addresstype": "city",
+        "display_name": "София, Средец, Столична, София-град, България",
+        "address": {"city": "София", "municipality": "Столична"},
+    }
+
+    async def test_nominatim_rejects_city_level_result(self):
+        provider = NominatimProvider(user_agent="Test/1.0")
+        provider.MIN_REQUEST_INTERVAL = 0
+        client = self._mock_client({"208 17 - II м. р., София": [self.SOFIA_CITY_NODE]})
+
+        with patch("httpx.AsyncClient", return_value=client):
+            result = await provider.geocode(
+                "гр. София, ул. 208 № 17 - II м. р.",
+                country_code="bg",
+                city="sofia",
+            )
+
+        assert result.success is False
+        assert result.lat is None and result.lng is None
+        assert result.error == AREA_LEVEL_MATCH_ERROR
+
+    async def test_nominatim_skips_area_level_result_and_uses_next_candidate(self):
+        provider = NominatimProvider(user_agent="Test/1.0")
+        provider.MIN_REQUEST_INTERVAL = 0
+        client = self._mock_client({
+            "ж.к. Дружба 1, 5016, 3, София": [{**self.SOFIA_CITY_NODE, "addresstype": "city_district"}],
+            "ж.к. Дружба 1, бл. 3, София": [{
+                "lat": "42.6690",
+                "lon": "23.4032",
+                "class": "building",
+                "type": "yes",
+                "addresstype": "building",
+                "display_name": "бл. 3, ж.к. Дружба 1, София",
+                "address": {"city": "София"},
+            }],
+        })
+
+        with patch("httpx.AsyncClient", return_value=client):
+            result = await provider.geocode(
+                'гр. София, ж.к. "Дружба 1", ул."5016", №3',
+                country_code="bg",
+                city="sofia",
+            )
+
+        assert result.success is True
+        assert (result.lat, result.lng) == (42.6690, 23.4032)
+
+    async def test_nominatim_keeps_neighbourhood_result(self):
+        """Only whole settlements/administrative areas are rejected, not a named quarter."""
+        provider = NominatimProvider(user_agent="Test/1.0")
+        provider.MIN_REQUEST_INTERVAL = 0
+        quarter = {
+            "lat": "42.7256471",
+            "lon": "23.2501109",
+            "class": "place",
+            "type": "quarter",
+            "addresstype": "quarter",
+            "display_name": "ж.к. Люлин 2, София",
+            "address": {"city": "София"},
+        }
+        client = self._mock_client({"ж.к. Люлин 2, София": [quarter]})
+
+        with patch("httpx.AsyncClient", return_value=client):
+            result = await provider.geocode("ж.к. Люлин 2", country_code="bg", city="sofia")
+
+        assert result.success is True
+
+    def test_city_only_street_detection(self):
+        from app.services.geocoding.bg.geojson import is_city_only_street
+
+        assert is_city_only_street("ГРАД СОФИЯ")
+        assert is_city_only_street("ГР. СОФИЯ")
+        assert is_city_only_street("гр.Дългопол")
+        assert not is_city_only_street("ГР. СОФИЯ ПЛ. СВ. НЕДЕЛЯ 4 ЕТ 5")
+        assert not is_city_only_street("ГР. СОФИЯ УЛ ИВАН ВАЗОВ")
+        assert not is_city_only_street("ГРИГОРИЙ ЦАМБЛАК")
+        assert not is_city_only_street("С. РАВНЕЦ")
+        assert not is_city_only_street("")
+        assert not is_city_only_street(None)
+
+    async def test_geojson_rejects_feature_with_city_only_street(self):
+        from app.services.geocoding.bg.geojson import CITY_ONLY_STREET_ERROR, GeoJSONProvider
+
+        # Real EU dataset row: the school is in Княжево, but the row sits on the centroid.
+        mock_geojson = {
+            "features": [
+                {
+                    "type": "Feature",
+                    "geometry": {"coordinates": [23.32218, 42.69786]},
+                    "properties": {
+                        "name": "ЧАСТНО СРЕДНО УЧИЛИЩЕ ЕВЛОГИ И ХРИСТО ГЕОРГИЕВИ ЕООД",
+                        "city": "СТОЛИЧНА",
+                        "street": "ГРАД СОФИЯ",
+                        "postcode": "1619",
+                    },
+                }
+            ]
+        }
+
+        with patch("pathlib.Path.exists", return_value=True):
+            with patch("builtins.open", create=True):
+                with patch("json.load", return_value=mock_geojson):
+                    provider = GeoJSONProvider()
+                    provider._load_index()
+                    result = await provider.geocode(
+                        address='бул. "Цар Борис III" № 224',
+                        country_code="bg",
+                        school_name="Частно средно училище Евлоги и Христо Георгиеви ЕООД",
+                        city="sofia",
+                    )
+
+        assert result.success is False
+        assert result.lat is None
+        assert result.error == CITY_ONLY_STREET_ERROR
+
+    async def test_force_refresh_clears_centroid_coordinates(self, db_session: AsyncSession):
+        mock_provider = AsyncMock()
+        mock_provider.provider_name = "mock"
+        mock_provider.geocode.return_value = GeocodingResult(
+            success=False,
+            error=AREA_LEVEL_MATCH_ERROR,
+            provider="nominatim",
+        )
+        service = GeocodingService(db=db_session, provider=mock_provider)
+        school = School(
+            name_i18n={"bg": "ДГ №31 Люлин"},
+            country_code="bg",
+            city="sofia",
+            school_type="state",
+            education_level="kindergarten",
+        )
+        db_session.add(school)
+        await db_session.flush()
+        location = SchoolLocation(
+            school_id=school.id,
+            address_i18n={"bg": "гр. София, ул. 208 № 17 - II м. р."},
+            lat=42.6977028,
+            lng=23.3217359,
+            is_primary=True,
+        )
+        db_session.add(location)
+        await db_session.commit()
+
+        result = await service.geocode_location(location, force=True)
+
+        assert result.success is False
+        await db_session.refresh(location)
+        assert location.lat is None
+        assert location.lng is None
+        assert location.geocode_meta["rejection_reason"] == AREA_LEVEL_MATCH_ERROR
+        assert geocode_failure_is_terminal(location.geocode_meta)
