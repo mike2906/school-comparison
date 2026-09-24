@@ -605,7 +605,8 @@
       },
       "kindergartens": {
         "title": "Municipal kindergartens",
-        "body": "Sofia Municipality’s kindergarten enrolment system: kindergartens, their groups and locations."
+        "body": "Sofia Municipality’s kindergarten enrolment system: kindergartens, their groups and locations.",
+        "coverage": "Coverage is still partial: we list 35 of Sofia’s roughly 200 municipal kindergartens and 6 of its 25 municipal nurseries, plus 3 state kindergartens run by the Ministry of Defence. The full list, and applications, are on Sofia Municipality’s system at kg.sofia.bg."
       },
       "nvo": {
         "title": "NVO exam results",

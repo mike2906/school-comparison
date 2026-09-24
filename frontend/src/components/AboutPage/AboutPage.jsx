@@ -5,7 +5,7 @@ import Layout from '../Layout/Layout'
 
 const SOURCES = [
   { key: 'schools', href: null },
-  { key: 'kindergartens', href: 'https://kg.sofia.bg' },
+  { key: 'kindergartens', href: 'https://kg.sofia.bg', coverage: true },
   { key: 'nvo', href: 'https://data.egov.bg' },
   { key: 'prices', href: null },
   { key: 'maps', href: 'https://www.openstreetmap.org/copyright' },
@@ -35,6 +35,9 @@ function AboutPage() {
             <li key={source.key} className="rounded-xl border border-neutral-200 bg-white p-4">
               <h3 className="font-semibold text-neutral-900">{t(`about.sources.${source.key}.title`)}</h3>
               <p className="mt-1 text-sm text-neutral-700">{t(`about.sources.${source.key}.body`)}</p>
+              {source.coverage && (
+                <p className="mt-2 text-sm text-neutral-700">{t(`about.sources.${source.key}.coverage`)}</p>
+              )}
               {source.href && (
                 <a
                   href={source.href}
