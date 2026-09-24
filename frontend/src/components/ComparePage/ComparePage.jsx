@@ -348,22 +348,6 @@ function getNvoDetail(school, t) {
   return getSharedNvoDetail(school, t)
 }
 
-function getMonthlyEquivalent(pricing = []) {
-  const monthlyValues = pricing
-    .map(item => {
-      const base = item.amount_min != null ? Number(item.amount_min) : (item.amount != null ? Number(item.amount) : null)
-      if (base == null) return null
-      if (item.period === 'monthly') return base
-      if (item.period === 'yearly') return base / 12
-      if (item.period === 'quarter') return base / 3
-      return null
-    })
-    .filter(value => value != null)
-
-  if (monthlyValues.length === 0) return null
-  return monthlyValues.reduce((sum, value) => sum + value, 0)
-}
-
 function normalizeCompareValue(value) {
   if (value == null) return '__null__'
   if (Array.isArray(value)) return JSON.stringify(value.slice().sort())
@@ -1037,8 +1021,13 @@ function ComparePage() {
             return renderPlaceholder(school.school_type === 'state' ? 'compare.notApplicable' : 'compare.notAvailable')
           }
 
-          const monthlyEquivalent = getMonthlyEquivalent(school.pricing)
-          const pricingCurrency = school.pricing?.find(item => item.currency)?.currency || 'EUR'
+          // Per-month view of the same EUR tuition range as the quick overview; never a sum of rows.
+          const yearlyRange = metricsById.get(school.id)?.pricingRange
+          const monthlyEquivalent = yearlyRange
+            ? (yearlyRange.min === yearlyRange.max
+              ? formatCurrency(yearlyRange.min / 12, i18n.language, yearlyRange.currency)
+              : `${formatCurrency(yearlyRange.min / 12, i18n.language, yearlyRange.currency)} - ${formatCurrency(yearlyRange.max / 12, i18n.language, yearlyRange.currency)}`)
+            : null
 
           return (
             <div className="space-y-3">
@@ -1068,7 +1057,7 @@ function ComparePage() {
                   <div className="font-medium text-neutral-800">
                     {t('compare.labels.monthlyEquivalent')}
                   </div>
-                  <div>{formatCurrency(monthlyEquivalent, i18n.language, pricingCurrency)} / {t('pricing.monthly')}</div>
+                  <div>{monthlyEquivalent} / {t('pricing.monthly')}</div>
                 </div>
               )}
             </div>
