@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { searchSchools } from '../../api/schools'
 import { getAddress, getSchoolName } from '../../utils/i18n'
@@ -13,6 +13,10 @@ const MAX_SUGGESTIONS = 6
 function SchoolNameSearch({ value, onChange, onOpenSchool, className = '' }) {
   const { t, i18n } = useTranslation()
   const containerRef = useRef(null)
+  // Rendered twice (mobile and desktop toolbars), so ids must be unique per instance.
+  const idBase = useId()
+  const inputId = `${idBase}-input`
+  const listId = `${idBase}-suggestions`
   const [results, setResults] = useState([])
   const [open, setOpen] = useState(false)
   const [activeIndex, setActiveIndex] = useState(-1)
@@ -82,12 +86,12 @@ function SchoolNameSearch({ value, onChange, onOpenSchool, className = '' }) {
 
   return (
     <div ref={containerRef} className={`relative ${className}`}>
-      <label className="sr-only" htmlFor="school-name-search">{t('landing.searchPlaceholder')}</label>
+      <label className="sr-only" htmlFor={inputId}>{t('landing.searchPlaceholder')}</label>
       <svg className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
       </svg>
       <input
-        id="school-name-search"
+        id={inputId}
         type="search"
         value={value}
         onChange={(event) => {
@@ -101,13 +105,13 @@ function SchoolNameSearch({ value, onChange, onOpenSchool, className = '' }) {
         autoComplete="off"
         role="combobox"
         aria-expanded={showDropdown}
-        aria-controls="school-name-suggestions"
-        aria-activedescendant={activeIndex >= 0 ? `school-suggestion-${suggestions[activeIndex]?.id}` : undefined}
+        aria-controls={listId}
+        aria-activedescendant={activeIndex >= 0 ? `${idBase}-option-${suggestions[activeIndex]?.id}` : undefined}
         className="h-11 lg:h-10 w-full rounded-lg border border-neutral-300 bg-white pl-9 pr-3 text-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
       />
       {showDropdown && (
         <ul
-          id="school-name-suggestions"
+          id={listId}
           role="listbox"
           className="absolute left-0 right-0 top-full z-[1200] mt-1 max-h-80 overflow-y-auto rounded-lg border border-neutral-200 bg-white py-1 shadow-xl"
         >
@@ -117,7 +121,7 @@ function SchoolNameSearch({ value, onChange, onOpenSchool, className = '' }) {
           {suggestions.map((school, index) => (
             <li
               key={school.id}
-              id={`school-suggestion-${school.id}`}
+              id={`${idBase}-option-${school.id}`}
               role="option"
               aria-selected={index === activeIndex}
               onMouseDown={(event) => event.preventDefault()}

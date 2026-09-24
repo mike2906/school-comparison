@@ -2,6 +2,8 @@ import { memo, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { isDesktopViewport, isPlainLeftClick } from '../../utils/searchViewState'
+import { schoolLevelLabel } from '../../utils/levelLabel'
+import { languageLabel } from '../../utils/languages'
 import { useCompare } from '../../context/CompareContext'
 import { getSchoolName, getAddress } from '../../utils/i18n'
 import { formatDistance } from '../../utils/distance'
@@ -79,12 +81,7 @@ const AMENITY_PRIORITY = [
 ]
 
 function getLanguageLabel(language, t) {
-  if (!language) return ''
-  const lower = language.toLowerCase()
-  const key = `advancedFilters.languages.${lower}`
-  const translated = t(key)
-  if (translated !== key) return translated
-  return lower.charAt(0).toUpperCase() + lower.slice(1)
+  return languageLabel(language, t)
 }
 
 function getLanguageCode(language) {
@@ -791,7 +788,8 @@ const SchoolCard = memo(function SchoolCard({
           }),
         }
       }
-      return null
+      // No published thresholds yet: say how admission works rather than nothing.
+      return { icon: '🎯', text: t('schoolCard.admissions.kgByPoints') }
     }
 
     if (school.school_type === 'state' && school.education_level === 'upper_secondary') {
@@ -806,14 +804,6 @@ const SchoolCard = memo(function SchoolCard({
         }
       }
       return null
-    }
-
-    if (school.school_type === 'state' && school.education_level === 'lower_secondary') {
-      return { icon: '📝', text: t('schoolCard.admissions.districtEnrollment') }
-    }
-
-    if (school.school_type === 'state' && school.education_level === 'primary') {
-      return { icon: '📝', text: t('schoolCard.admissions.districtEnrollment') }
     }
 
     return null
@@ -1008,7 +998,7 @@ const SchoolCard = memo(function SchoolCard({
           {t(`schoolTypes.${displayType}`)}
         </span>
         <span className="text-xs text-neutral-600">
-          {t(`educationLevels.${school.education_level}`)}
+          {schoolLevelLabel(school, t)}
         </span>
         {pricingYearLabel && (
           <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border ${pricingYearBadgeClass}`}>

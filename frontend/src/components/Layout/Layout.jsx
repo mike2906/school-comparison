@@ -11,7 +11,7 @@ function Layout({ children, hideNavOnMobile = false, compactNavOnMobile = false 
     <div className="min-h-screen bg-neutral-100">
       {/* Navigation */}
       <nav className={`bg-white border-b border-neutral-200 sticky top-0 z-50 ${
-        hideNavOnMobile ? 'hidden md:block' : ''
+        hideNavOnMobile ? 'hidden lg:block' : ''
       }`}>
         <div className={`${compactNavOnMobile ? 'px-4 md:px-6' : 'px-6'}`}>
           <div className={`flex justify-between items-center ${compactNavOnMobile ? 'h-12 md:h-16' : 'h-16'}`}>

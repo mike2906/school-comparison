@@ -6,6 +6,7 @@ import SearchPage from './components/SearchPage/SearchPage'
 import SchoolDetailPage from './components/SchoolDetailPage/SchoolDetailPage'
 import ComparePage from './components/ComparePage/ComparePage'
 import AboutPage from './components/AboutPage/AboutPage'
+import NotFoundPage from './components/NotFoundPage/NotFoundPage'
 import CompareBar from './components/CompareBar/CompareBar'
 
 // The results page is the home page; old `/?age_group=...` links keep their filters.
@@ -28,6 +29,7 @@ const router = createBrowserRouter([
   {
     path: '/',
     element: <RootLayout />,
+    errorElement: <NotFoundPage variant="error" />,
     children: [
       {
         index: true,
@@ -48,6 +50,10 @@ const router = createBrowserRouter([
       {
         path: 'about',
         element: <AboutPage />,
+      },
+      {
+        path: '*',
+        element: <NotFoundPage />,
       },
     ],
   },

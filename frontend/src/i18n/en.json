@@ -126,8 +126,8 @@
     "upper_secondary": "High School"
   },
   "schools": {
-    "ageGroupsShifts": "Age groups & shifts",
-    "showAgeGroupsShifts": "Show age groups & shifts",
+    "ageGroupsShifts": "Age groups",
+    "showAgeGroupsShifts": "Age groups",
     "showLocations": "Show locations",
     "results": "schools",
     "results_one": "school",
@@ -205,7 +205,11 @@
     "mapLocationMissing": "Missing map coordinates",
     "clearLocations": "Clear locations",
     "locationsShownOnMap": "Locations are shown on the map.",
-    "locationFlowHint": "Flow is ordered by age group."
+    "locationFlowHint": "Flow is ordered by age group.",
+    "resultsKindergarten_one": "kindergarten",
+    "resultsKindergarten_other": "kindergartens",
+    "resultsMixed_one": "result",
+    "resultsMixed_other": "results"
   },
   "shifts": {
     "morning": "Morning",
@@ -266,25 +270,25 @@
     "noData": "No exam results available",
     "scorePercent": "Score (%)",
     "average": "Average",
-    "nationalAverage": "National benchmark",
+    "nationalAverage": "National average",
     "nationalMath": "National Math avg",
     "nationalBulgarian": "National Bulgarian avg",
     "seriesLegend": "Lines",
     "seriesSchool": "{{subject}} school result",
-    "seriesNational": "{{subject}} national benchmark",
+    "seriesNational": "{{subject}} national average",
     "latestStatus": "Latest-year status",
-    "aboveBenchmark": "Above benchmark",
-    "nearBenchmark": "Near benchmark",
-    "belowBenchmark": "Below benchmark",
-    "nationalBenchmarkValue": "National benchmark {{value}}%",
+    "aboveBenchmark": "Above national average",
+    "nearBenchmark": "Near national average",
+    "belowBenchmark": "Below national average",
+    "nationalBenchmarkValue": "National average {{value}}%",
     "pointsShort": "pp",
-    "tooltipBenchmarkAbove": "{{value}}% is {{diff}} percentage points above the national benchmark ({{benchmark}}%).",
-    "tooltipBenchmarkNear": "{{value}}% is close to the national benchmark ({{benchmark}}%), within {{diff}} percentage points.",
-    "tooltipBenchmarkBelow": "{{value}}% is {{diff}} percentage points below the national benchmark ({{benchmark}}%).",
+    "tooltipBenchmarkAbove": "{{value}}% is {{diff}} percentage points above the national average ({{benchmark}}%).",
+    "tooltipBenchmarkNear": "{{value}}% is close to the national average ({{benchmark}}%), within {{diff}} percentage points.",
+    "tooltipBenchmarkBelow": "{{value}}% is {{diff}} percentage points below the national average ({{benchmark}}%).",
     "tooltipTrendUp": "Latest result {{latest}}% is {{diff}} percentage points above the school's recent average ({{average}}%).",
     "tooltipTrendDown": "Latest result {{latest}}% is {{diff}} percentage points below the school's recent average ({{average}}%).",
     "tooltipTrendFlat": "Latest result {{latest}}% is close to the school's recent average ({{average}}%), within {{diff}} percentage points.",
-    "vsLastYear": "vs last year",
+    "vsLastYear": "Last year",
     "excellent": "Excellent",
     "good": "Good",
     "needsImprovement": "Needs Improvement"
@@ -335,12 +339,12 @@
     },
     "labels": {
       "type": "Type",
-      "educationLevel": "Education level",
+      "educationLevel": "Offers",
       "tuitionOrAdmission": "Tuition / Admission",
       "tuitionYearly": "Yearly tuition",
       "pointsLastYear": "Last admitted ({{year}})",
       "minScoreYear": "Min. score ({{year}})",
-      "nvoAverage": "Combined NVO result",
+      "nvoAverage": "NVO, Bulgarian + maths",
       "latestYear": "Latest year: {{year}}",
       "schedule": "Schedule",
       "distance": "Distance",
@@ -348,7 +352,7 @@
       "enrollmentStatus": "Enrollment status",
       "nvoMath": "NVO Math",
       "nvoBulgarian": "NVO Bulgarian",
-      "avgValue": "School avg {{value}}%",
+      "avgValue": "5-year school avg {{value}}%",
       "classSize": "Class size",
       "teachingApproach": "Teaching approach",
       "specialPrograms": "Special programs",
@@ -364,8 +368,8 @@
       "spotsAvailable": "Spots available",
       "eligibleAgeGroups": "Eligible age groups",
       "pricingOverview": "Pricing overview",
-      "monthlyEquivalent": "Tuition per month (approx.)",
-      "sources": "Sources"
+      "sources": "Sources",
+      "fiveYearAverage": "5-year average"
     },
     "sourceTypes": {
       "official_website": "Official",
@@ -475,8 +479,8 @@
       "noEntranceExam": "No entrance exam",
       "lastAdmitted": "Last admitted: {{points}} {{pointsLabel}} ({{year}})",
       "minScore": "Min score: {{score}} ({{year}})",
-      "districtEnrollment": "District enrollment",
-      "priceUnstatedPeriod": "{{price}} {{currency}} · period not stated"
+      "priceUnstatedPeriod": "{{price}} {{currency}} · period not stated",
+      "kgByPoints": "Admission by points through kg.sofia.bg"
     },
     "period": {
       "year": "year",
@@ -496,7 +500,7 @@
       "latest": "Latest",
       "subjectHeader": "Subject",
       "avgHeader": "5-Yr Avg",
-      "trendHeader": "Trend"
+      "trendHeader": "vs 5-yr avg"
     },
     "amenities": {
       "meals": "Meals provided",
@@ -541,11 +545,10 @@
   "schoolDetail": {
     "keyFacts": "Key facts",
     "tuitionPerYear": "{{price}} {{currency}} / year",
-    "tuitionPerMonth": "≈ {{price}} {{currency}} / month",
     "tuitionUnstated": "{{price}} {{currency}}",
     "groupsAndGrades": "Groups & grades",
     "nvoLatest": "{{exam}}, {{year}}",
-    "nvoVsNational": "National average {{value}}%",
+    "nvoVsNational": "National average, both subjects: {{value}}%",
     "minScore": "Min. admission score",
     "lastAdmitted": "Last admitted",
     "pointsValue": "{{points}} points",
@@ -555,7 +558,10 @@
     "directions": "Directions",
     "inBulgarian": "In Bulgarian",
     "officialAdmission": "Admission to Sofia municipal kindergartens runs through the official system:",
-    "mapLabel": "Map of school locations"
+    "mapLabel": "Map of school locations",
+    "admission": "Admission",
+    "kgByPointsShort": "By points (kg.sofia.bg)",
+    "kgThresholdsLater": "Last-admitted points are not published here yet"
   },
   "detailPanel": {
     "label": "School details",
@@ -625,5 +631,36 @@
     "limitsTitle": "What is not here yet",
     "limitsBody": "Admission thresholds (kindergarten points and gymnasium minimum scores) are not published yet. Where we have no reliable data we leave the field out rather than guess.",
     "cta": "Browse schools"
+  },
+  "levels": {
+    "grades": "Grades {{range}}"
+  },
+  "languages": {
+    "english": "English",
+    "bulgarian": "Bulgarian",
+    "german": "German",
+    "french": "French",
+    "spanish": "Spanish",
+    "russian": "Russian",
+    "italian": "Italian",
+    "chinese": "Chinese",
+    "japanese": "Japanese",
+    "turkish": "Turkish",
+    "greek": "Greek",
+    "arabic": "Arabic",
+    "korean": "Korean",
+    "romanian": "Romanian",
+    "hebrew": "Hebrew",
+    "danish": "Danish",
+    "norwegian": "Norwegian"
+  },
+  "notFound": {
+    "title": "Page not found",
+    "body": "This page does not exist or has moved. You can find every school from the search page.",
+    "cta": "Go to the school search"
+  },
+  "routeError": {
+    "title": "Something went wrong",
+    "body": "This page could not be shown. Please try again from the school search."
   }
 }

@@ -4,6 +4,10 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import Layout from '../Layout/Layout'
 import { useCompare } from '../../context/CompareContext'
 import { getLastSearchUrl } from '../../utils/searchViewState'
+import { schoolLevelLabel } from '../../utils/levelLabel'
+import { languageLabel } from '../../utils/languages'
+import TagList from '../SchoolDetailPage/TagList'
+import PhoneLinks from '../SchoolDetailPage/PhoneLinks'
 import { fetchCompare, fetchExamAverages } from '../../api/schools'
 import { calculateDistance, formatDistance } from '../../utils/distance'
 import { compareSchoolNames, getSchoolName, getAddress, getSummary } from '../../utils/i18n'
@@ -17,7 +21,7 @@ import {
   hasDisplayEvidence,
   normalizeSchoolList,
 } from '../../utils/schoolAttributes'
-import { getBenchmarkComparison, getNvoDetail as getSharedNvoDetail } from '../../utils/nvo'
+import { getBenchmarkComparison, getBenchmarkToneClasses, getNvoDetail as getSharedNvoDetail } from '../../utils/nvo'
 import { classifyAdmissionRequirement } from '../../utils/admission'
 import { yearlyTuitionRangeEur } from '../../utils/pricing'
 
@@ -126,12 +130,7 @@ function normalizeLanguageFocus(languageFocus = []) {
 }
 
 function getLanguageLabel(language, t) {
-  if (!language) return ''
-  const lower = language.toLowerCase()
-  const key = `advancedFilters.languages.${lower}`
-  const translated = t(key)
-  if (translated !== key) return translated
-  return lower.charAt(0).toUpperCase() + lower.slice(1)
+  return languageLabel(language, t)
 }
 
 function getOptionLabel(option, t) {
@@ -261,6 +260,17 @@ function getPerformanceStyle(value) {
   if (value >= 75) return { text: 'text-emerald-500' }
   if (value >= 60) return { text: 'text-amber-500' }
   return { text: 'text-red-500' }
+}
+
+// Combined (Bulgarian + maths) result against the national average for the same exam and
+// year, with the same ±5 pp tolerance as the detail page, so the colours agree.
+function getCombinedBenchmark(nvoDetail, year, value, examAverages) {
+  const national = examAverages?.by_year?.[nvoDetail?.examType]?.[String(year)]
+  if (value == null || national?.math == null || national?.bulgarian == null) return null
+  const nationalValue = (Number(national.math) + Number(national.bulgarian)) / 2
+  const diff = value - nationalValue
+  const tone = diff >= 5 ? 'above' : diff <= -5 ? 'below' : 'near'
+  return { nationalValue, ...getBenchmarkToneClasses(tone) }
 }
 
 function getNvoValueStyle({ value, examType, year, subjectKey, examAverages }) {
@@ -625,17 +635,10 @@ function ComparePage() {
     setTimeout(() => setShareStatus(''), 2000)
   }
 
+  // Same tag handling as the school page: no Title Case, Bulgarian tags grouped in EN.
   const makeTags = (items = []) => {
     if (!items.length) return null
-    return (
-      <div className="flex flex-wrap gap-1">
-        {items.map((item, idx) => (
-          <span key={`${item}-${idx}`} className="rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-700">
-            {item}
-          </span>
-        ))}
-      </div>
-    )
+    return <TagList tags={items} chipClassName="rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-700" />
   }
 
   const renderPlaceholder = (labelKey = 'compare.notAvailable') => (
@@ -688,9 +691,9 @@ function ComparePage() {
       {
         label: t('compare.labels.educationLevel'),
         getValue: (school) => (
-          <span className="text-sm text-neutral-700">{t(`educationLevels.${school.education_level}`)}</span>
+          <span className="text-sm text-neutral-700">{schoolLevelLabel(school, t)}</span>
         ),
-        getCompare: (school) => school.education_level,
+        getCompare: (school) => schoolLevelLabel(school, t),
       },
       {
         label: t('compare.labels.tuitionOrAdmission'),
@@ -749,13 +752,26 @@ function ComparePage() {
             return renderPlaceholder('compare.notApplicable')
           }
           const metrics = metricsById.get(school.id)
+          const detail = metrics?.nvoDetail
+          const isLatest = metrics?.overallLatest != null
           const value = metrics?.overallLatest ?? metrics?.overallAvg
           if (value == null) return renderPlaceholder()
-          const year = metrics?.overallLatest != null ? metrics?.nvoDetail?.latestCombinedYear : metrics?.nvoDetail?.latestYear
+          const year = isLatest ? detail?.latestCombinedYear : null
+          const benchmark = isLatest ? getCombinedBenchmark(detail, year, value, examAverages) : null
           return (
             <div>
-              <div className={`text-sm font-semibold ${getPerformanceStyle(value).text}`}>{formatPercent(value, 1)}%</div>
-              {year ? <div className="text-xs text-neutral-500">{t('compare.labels.latestYear', { year })}</div> : null}
+              <div className={`text-sm font-semibold ${benchmark?.textClass || 'text-neutral-900'}`}>{formatPercent(value, 1)}%</div>
+              <div className="text-xs text-neutral-500">
+                {[
+                  detail?.gradeLabel,
+                  isLatest ? year : t('compare.labels.fiveYearAverage'),
+                ].filter(Boolean).join(' · ')}
+              </div>
+              {benchmark && (
+                <div className="text-xs text-neutral-500">
+                  {t('academicPerformance.nationalBenchmarkValue', { value: formatPercent(benchmark.nationalValue, 1) })}
+                </div>
+              )}
             </div>
           )
         },
@@ -1096,13 +1112,6 @@ function ComparePage() {
             return renderPlaceholder(school.school_type === 'state' ? 'compare.notApplicable' : 'compare.notAvailable')
           }
 
-          // Per-month view of the same EUR tuition range as the quick overview; never a sum of rows.
-          const yearlyRange = metricsById.get(school.id)?.pricingRange
-          const monthlyEquivalent = yearlyRange
-            ? (yearlyRange.min === yearlyRange.max
-              ? formatCurrency(yearlyRange.min / 12, i18n.language, yearlyRange.currency)
-              : `${formatCurrency(yearlyRange.min / 12, i18n.language, yearlyRange.currency)} - ${formatCurrency(yearlyRange.max / 12, i18n.language, yearlyRange.currency)}`)
-            : null
 
           return (
             <div className="space-y-3">
@@ -1127,14 +1136,6 @@ function ComparePage() {
                   />
                 </div>
               ))}
-              {monthlyEquivalent != null && (
-                <div className="rounded bg-neutral-50 p-2 text-xs text-neutral-600">
-                  <div className="font-medium text-neutral-800">
-                    {t('compare.labels.monthlyEquivalent')}
-                  </div>
-                  <div>{monthlyEquivalent} / {t('pricing.monthly')}</div>
-                </div>
-              )}
             </div>
           )
         },
@@ -1209,7 +1210,9 @@ function ComparePage() {
           return (
             <div className="space-y-1">
               {phones.map((phone) => (
-                <div key={phone} className="text-sm text-neutral-700">{phone}</div>
+                <div key={phone} className="flex flex-col gap-1 text-sm">
+                  <PhoneLinks phone={phone} className="inline-flex items-center gap-1.5 text-primary-700 hover:underline" />
+                </div>
               ))}
             </div>
           )
@@ -1227,7 +1230,7 @@ function ComparePage() {
       { key: 'locations', title: t('compare.sections.locations'), rows: locationRows },
       { key: 'contact', title: t('compare.sections.contact'), rows: contactRows },
     ]
-  }, [t, i18n.language, metricsById, userLocation, schools, selectedAgeGroup])
+  }, [t, i18n.language, metricsById, userLocation, schools, selectedAgeGroup, examAverages])
 
   const visibleSections = useMemo(() => sections
     .map(section => ({
@@ -1653,7 +1656,7 @@ function SchoolHeader({ school, onRemove, t, language, compact = false }) {
         </span>
         {!compact && school.education_level && (
           <span className="px-2 py-0.5 rounded text-xs bg-neutral-100 text-neutral-700">
-            {t(`educationLevels.${school.education_level}`)}
+            {schoolLevelLabel(school, t)}
           </span>
         )}
       </div>

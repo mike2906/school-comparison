@@ -279,7 +279,7 @@ const serializeBounds = (bounds) => ({
   },
 })
 
-function MapUpdater({ schools, userLocation, autoFit, lastValidBoundsRef, defaultZoom, countryBounds, keepInitialView }) {
+function MapUpdater({ schools, userLocation, autoFit, lastValidBoundsRef, defaultZoom, countryBounds, keepInitialView, fittedWhileHiddenRef }) {
   const map = useMap()
   const lastAutoFitKeyRef = useRef(null)
   // A restored view (returning from a school page) wins over the first auto-fit.
@@ -303,6 +303,8 @@ function MapUpdater({ schools, userLocation, autoFit, lastValidBoundsRef, defaul
     }
 
     lastAutoFitKeyRef.current = autoFitKey
+    const size = map.getSize()
+    fittedWhileHiddenRef.current = size.x === 0 || size.y === 0
 
     if (schoolPoints.length > 0) {
       const bounds = fitMapToPoints(map, points)
@@ -324,7 +326,7 @@ function MapUpdater({ schools, userLocation, autoFit, lastValidBoundsRef, defaul
     }
 
     map.fitBounds(countryBounds, { padding: FIT_PADDING, maxZoom: defaultZoom, animate: true, duration: 0.4 })
-  }, [schools, userLocation, autoFit, map, lastValidBoundsRef, defaultZoom, countryBounds])
+  }, [schools, userLocation, autoFit, map, lastValidBoundsRef, defaultZoom, countryBounds, fittedWhileHiddenRef])
 
   return null
 }
@@ -356,15 +358,23 @@ function MapBoundsWatcher({ onBoundsChange, onViewChange }) {
   return null
 }
 
-function MapResizer({ resizeKey }) {
+function MapResizer({ resizeKey, lastValidBoundsRef, fittedWhileHiddenRef }) {
   const map = useMap()
 
   useEffect(() => {
     const timer = setTimeout(() => {
       map.invalidateSize({ animate: false })
+      const size = map.getSize()
+      // An auto-fit that ran while the map was hidden (mobile/tablet List tab) used a zero
+      // size and zoomed out to the whole province: redo it once the map is visible. Only
+      // then, so a view the parent zoomed to themselves is kept across tab switches.
+      if (fittedWhileHiddenRef.current && size.x > 0 && size.y > 0 && lastValidBoundsRef.current) {
+        map.fitBounds(lastValidBoundsRef.current, { padding: FIT_PADDING, maxZoom: MAX_FIT_ZOOM, animate: false })
+        fittedWhileHiddenRef.current = false
+      }
     }, 0)
     return () => clearTimeout(timer)
-  }, [map, resizeKey])
+  }, [map, resizeKey, lastValidBoundsRef, fittedWhileHiddenRef])
 
   return null
 }
@@ -527,17 +537,12 @@ function PopupContent({
           </div>
         )}
 
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-neutral-500">{locationLabel}</span>
-          {shiftLabel && <span className="text-neutral-400">•</span>}
-          {shiftLabel && <span className="text-neutral-500">{shiftLabel}</span>}
-          {hasOrganisedGroups && (
-            <>
-              <span className="text-neutral-400">•</span>
-              <span className="text-neutral-500">{t('schools.organisedGroups')}</span>
-            </>
-          )}
-        </div>
+        {/* The groups are already in the badge row; only add shift / care details here. */}
+        {(shiftLabel || hasOrganisedGroups) && (
+          <div className="flex flex-wrap items-center gap-2 text-neutral-500">
+            {[shiftLabel, hasOrganisedGroups ? t('schools.organisedGroups') : null].filter(Boolean).join(' • ')}
+          </div>
+        )}
 
         {additionalLocations > 0 && (
           <div className="flex items-center gap-2 text-xs text-neutral-400">
@@ -808,12 +813,13 @@ function ResetViewControl({ schools, userLocation, lastValidBoundsRef, label, de
   }, [map, schools, userLocation, lastValidBoundsRef, defaultZoom, countryBounds])
 
   return (
-    <div className="leaflet-top leaflet-right">
+    // Bottom-right, so a school's popup (opened near the top) never covers it.
+    <div className="leaflet-bottom leaflet-right">
       <div className="leaflet-control">
         <button
           type="button"
           onClick={handleResetView}
-          className="mt-3 mr-3 inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg bg-primary-600 text-white shadow-panel hover:bg-primary-700 transition-colors"
+          className="mb-8 mr-3 inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg border border-neutral-200 bg-white text-neutral-800 shadow-panel hover:bg-neutral-50 transition-colors"
         >
           {label}
         </button>
@@ -851,6 +857,7 @@ function SchoolMap({
   const { addToCompare, removeFromCompare, isInCompare, canAddMore } = useCompare()
   const { config } = useCountry()
   const lastValidBoundsRef = useRef(null)
+  const fittedWhileHiddenRef = useRef(false)
   const markerInteractionRef = useRef(0)
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768)
   const [sheetOffset, setSheetOffset] = useState(120)
@@ -1098,10 +1105,11 @@ function SchoolMap({
           defaultZoom={defaultZoom}
           countryBounds={countryBounds}
           keepInitialView={Boolean(initialView)}
+          fittedWhileHiddenRef={fittedWhileHiddenRef}
         />
 
         <MapBoundsWatcher onBoundsChange={onBoundsChange} onViewChange={onViewChange} />
-        <MapResizer resizeKey={resizeKey} />
+        <MapResizer resizeKey={resizeKey} lastValidBoundsRef={lastValidBoundsRef} fittedWhileHiddenRef={fittedWhileHiddenRef} />
         <MapClickHandler
           onClearSelection={onClearSelection}
           markerInteractionRef={markerInteractionRef}
@@ -1210,8 +1218,9 @@ function SchoolMap({
           className="map-bottom-sheet absolute inset-x-0 bottom-0 z-[1200] transition-transform duration-300"
           style={{ transform: `translateY(${sheetOffset}px)` }}
         >
+          {/* Clear the fixed compare bar so its buttons do not cover the sheet's actions. */}
           <div
-            className="mx-3 mb-3 rounded-2xl bg-white shadow-2xl border border-neutral-200"
+            className={`mx-3 ${hasCompare ? 'mb-24' : 'mb-3'} rounded-2xl bg-white shadow-2xl border border-neutral-200`}
           >
             <div
               className="flex items-center justify-center py-2 cursor-grab active:cursor-grabbing"
