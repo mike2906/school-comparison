@@ -21,6 +21,20 @@ logger = logging.getLogger(__name__)
 
 SOFIA_MAP_BOUNDS = SOFIA_MUNICIPALITY_BOUNDS
 
+# A "street" that is only a city/town name (e.g. "ГРАД СОФИЯ") means the dataset
+# placed the school on the settlement centroid, not at its building.
+CITY_ONLY_STREET_ERROR = "geojson_city_only_address"
+_CITY_ONLY_STREET_RE = re.compile(r"^(?:ГР\.|ГР\s|ГРАД\s)\s*[А-Я\s\-]+$")
+_STREET_MARKER_RE = re.compile(r"\b(?:УЛ|БУЛ|ПЛ|ЖК|Ж\.К|КВ|БЛ|М)\b")
+
+
+def is_city_only_street(street: Optional[str]) -> bool:
+    """Return whether a GeoJSON street field names only a city or town."""
+    value = re.sub(r"\s+", " ", street or "").strip().upper()
+    if not value or not _CITY_ONLY_STREET_RE.fullmatch(value):
+        return False
+    return not _STREET_MARKER_RE.search(value)
+
 
 @dataclass(frozen=True)
 class AdminMunicipalityResolution:
@@ -370,6 +384,16 @@ class GeoJSONProvider(BaseGeocodingProvider):
 
         props = feature['properties']
         street = props.get('street', '')
+        if is_city_only_street(street):
+            logger.warning(
+                "GeoJSON match has only a city-level address (%r); treating as no coordinates",
+                street,
+            )
+            return GeocodingResult(
+                success=False,
+                error=CITY_ONLY_STREET_ERROR,
+                provider=self.provider_name,
+            )
         matched_city = props.get('city', '')
         postcode = props.get('postcode', '')
         formatted_address = f"{street}, {postcode} {matched_city}".strip(', ')

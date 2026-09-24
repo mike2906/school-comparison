@@ -9,6 +9,22 @@ from app.services.geocoding.base import BaseGeocodingProvider, GeocodingResult
 
 logger = logging.getLogger(__name__)
 
+# A result of one of these types is a settlement or administrative area, returned at its
+# centroid (e.g. the Sofia city node when no street matched). It carries no information
+# about where the school is, so it must be treated as "no coordinates".
+AREA_LEVEL_RESULT_TYPES = frozenset({
+    "city",
+    "town",
+    "municipality",
+    "city_district",
+    "county",
+    "state_district",
+    "state",
+    "region",
+    "country",
+})
+AREA_LEVEL_MATCH_ERROR = "area_level_match_only"
+
 
 class NominatimProvider(BaseGeocodingProvider):
     """
@@ -308,6 +324,12 @@ class NominatimProvider(BaseGeocodingProvider):
 
         return bool(expected_tokens.intersection(result_tokens))
 
+    @staticmethod
+    def _is_area_level_result(result: dict) -> bool:
+        """Return whether a Nominatim result is a whole settlement/area, not a place in it."""
+        result_type = result.get("addresstype") or result.get("type")
+        return result_type in AREA_LEVEL_RESULT_TYPES
+
     async def geocode(self, address: str, country_code: str = "bg", school_name: Optional[str] = None, city: Optional[str] = None) -> GeocodingResult:
         """
         Geocode an address using Nominatim.
@@ -329,6 +351,7 @@ class NominatimProvider(BaseGeocodingProvider):
         else:
             search_queries = [address]
 
+        rejected_area_level = False
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 for query in search_queries:
@@ -362,6 +385,15 @@ class NominatimProvider(BaseGeocodingProvider):
                             f"Expected '{city}', got city tokens {sorted(self._result_city_tokens(result))}"
                         )
                         continue
+                    if self._is_area_level_result(result):
+                        logger.warning(
+                            "Nominatim: Rejected area-level result (%s) for query '%s': %s",
+                            result.get("addresstype") or result.get("type"),
+                            query,
+                            result.get("display_name"),
+                        )
+                        rejected_area_level = True
+                        continue
 
                     lat = float(result["lat"])
                     lng = float(result["lon"])
@@ -387,7 +419,7 @@ class NominatimProvider(BaseGeocodingProvider):
                 )
                 return GeocodingResult(
                     success=False,
-                    error="No results found",
+                    error=AREA_LEVEL_MATCH_ERROR if rejected_area_level else "No results found",
                     provider=self.provider_name,
                 )
 
