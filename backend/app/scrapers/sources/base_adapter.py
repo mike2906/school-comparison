@@ -12,6 +12,12 @@ from app.models.scrape_log import ScrapeLog, ScrapeType, ScrapeStatus
 logger = logging.getLogger(__name__)
 
 
+def _address_key(address_i18n: Optional[dict]) -> str:
+    """Normalized address used to recognise a location that already exists."""
+    address = (address_i18n or {}).get("bg") or (address_i18n or {}).get("en") or ""
+    return " ".join(address.casefold().split())
+
+
 class BaseSourceAdapter(ABC):
     """
     Abstract base class for discovery source adapters.
@@ -115,11 +121,13 @@ class BaseSourceAdapter(ABC):
                     )
                     existing_school = result.scalar_one_or_none()
 
+                matched_by_source_id = False
                 if not existing_school:
                     # Adapter-specific match (e.g. a source record id stored in attributes)
                     source_match_id = self._existing_school_id_for(disc)
                     if source_match_id is not None:
                         existing_school = await self.db.get(School, source_match_id)
+                        matched_by_source_id = existing_school is not None
 
                 if not existing_school:
                     # Fallback match: name + city + district
@@ -236,21 +244,34 @@ class BaseSourceAdapter(ABC):
 
                 # Step 3: Create/update locations
                 # If no locations were discovered, keep existing locations intact to avoid wiping data.
+                locations_to_add = list(disc.locations or [])
                 keep_existing_locations = False
                 if existing_school and self.ENRICHMENT_ONLY:
-                    # Enrichment adapters never replace an existing school's locations:
-                    # those may carry corrected coordinates (geocode_meta.manual_fix) or
-                    # come from the authoritative registry.
-                    existing_location_count = await self.db.scalar(
-                        select(func.count(SchoolLocation.id)).where(
-                            SchoolLocation.school_id == school_id
+                    # Enrichment adapters never delete or recreate an existing school's
+                    # locations: they may carry corrected coordinates
+                    # (geocode_meta.manual_fix) or come from the authoritative registry.
+                    existing_locations = (
+                        await self.db.execute(
+                            select(SchoolLocation).where(SchoolLocation.school_id == school_id)
                         )
-                    )
-                    keep_existing_locations = bool(existing_location_count)
-                if disc.locations and not keep_existing_locations:
+                    ).scalars().all()
+                    if existing_locations:
+                        keep_existing_locations = True
+                        if matched_by_source_id:
+                            # A school this source already owns may gain a location (e.g. a
+                            # new kindergarten building); add only unseen addresses.
+                            known = {_address_key(loc.address_i18n) for loc in existing_locations}
+                            locations_to_add = [
+                                loc.model_copy(update={"is_primary": False})
+                                for loc in locations_to_add
+                                if _address_key(loc.address_i18n) not in known
+                            ]
+                        else:
+                            locations_to_add = []
+                if locations_to_add:
                     # For simplicity, delete old locations and recreate
                     # (In production, might want smarter diffing, but locations rarely change)
-                    if existing_school:
+                    if existing_school and not keep_existing_locations:
                         # Remove child shift rows first because raw deletes bypass ORM cascades.
                         location_ids_result = await self.db.execute(
                             select(SchoolLocation.id).where(SchoolLocation.school_id == school_id)
@@ -266,7 +287,7 @@ class BaseSourceAdapter(ABC):
                             delete(SchoolLocation).where(SchoolLocation.school_id == school_id)
                         )
 
-                    for loc in disc.locations:
+                    for loc in locations_to_add:
                         new_location = SchoolLocation(
                             school_id=school_id,
                             address_i18n=loc.address_i18n,

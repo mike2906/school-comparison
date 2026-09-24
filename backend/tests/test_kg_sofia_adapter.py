@@ -755,6 +755,106 @@ class TestKgSofiaImportCompleteness:
         location = (await db_session.execute(select(SchoolLocation))).scalar_one()
         assert (location.lat, location.lng) == (42.69, 23.32)
 
+    async def test_linked_school_gains_new_building_without_losing_existing_location(
+        self, db_session: AsyncSession
+    ):
+        from sqlalchemy import select
+        from app.models import School, SchoolLocation
+        from app.schemas.scraping import DiscoveredLocation, DiscoveredSchool
+
+        existing = School(
+            country_code="bg",
+            name_i18n={"bg": "ДГ №7 Тест"},
+            school_type="state",
+            education_level="kindergarten",
+            city="sofia",
+            attributes={"kg_sofia_id": 7},
+        )
+        db_session.add(existing)
+        await db_session.flush()
+        db_session.add(
+            SchoolLocation(
+                school_id=existing.id,
+                address_i18n={"bg": "ул. Тестова 7, София"},
+                district="Средец",
+                lat=42.69,
+                lng=23.32,
+                is_primary=True,
+            )
+        )
+        await db_session.commit()
+
+        def location(address: str) -> DiscoveredLocation:
+            return DiscoveredLocation(
+                address_i18n={"bg": address},
+                district="Средец",
+                is_primary=True,
+                age_groups=["first"],
+                shifts={},
+                has_organised_groups={},
+            )
+
+        adapter = KgSofiaBgAdapter(db=db_session)
+        adapter._school_id_by_kg_id = {"7": existing.id}
+        result = await adapter.upsert_schools([
+            DiscoveredSchool(
+                name_i18n={"bg": "ДГ №7 Тест"},
+                country_code="bg",
+                city="sofia",
+                school_type="state",
+                education_level="kindergarten",
+                locations=[location("ул.  Тестова 7, София"), location("ул. Нова 1, София")],
+                attributes={"kg_sofia_id": 7, "kg_sofia_ids": ["7", "8"]},
+            )
+        ])
+
+        assert result["updated"] == 1
+        locations = (
+            await db_session.execute(
+                select(SchoolLocation).order_by(SchoolLocation.id)
+            )
+        ).scalars().all()
+        assert [loc.address_i18n["bg"] for loc in locations] == [
+            "ул. Тестова 7, София",
+            "ул. Нова 1, София",
+        ]
+        assert (locations[0].lat, locations[0].lng, locations[0].is_primary) == (42.69, 23.32, True)
+        assert locations[1].is_primary is False
+
+    def test_merged_family_keeps_building_that_is_already_its_own_school(self):
+        from app.schemas.scraping import DiscoveredLocation, DiscoveredSchool
+
+        def location(record_id: int) -> DiscoveredLocation:
+            return DiscoveredLocation(
+                address_i18n={"bg": f"ул. Тестова {record_id}"},
+                district="Средец",
+                is_primary=record_id == 106,
+                location_tags=[f"source_record_id={record_id}"],
+                age_groups=[],
+                shifts={},
+                has_organised_groups={},
+            )
+
+        adapter = KgSofiaBgAdapter(db=None)
+        # 106 is the family's school; 299 ('- сграда 2') was imported as school 120.
+        adapter._school_id_by_kg_id = {"106": 119, "299": 120}
+        family = DiscoveredSchool(
+            name_i18n={"bg": "ДГ №16 Приказен свят"},
+            country_code="bg",
+            city="sofia",
+            school_type="state",
+            education_level="kindergarten",
+            locations=[location(106), location(299), location(500)],
+            attributes={"kg_sofia_id": 106, "kg_sofia_ids": ["106", "299", "500"]},
+        )
+
+        adapter._drop_locations_owned_by_other_schools(family)
+
+        assert [loc.location_tags for loc in family.locations] == [
+            ["source_record_id=106"],
+            ["source_record_id=500"],
+        ]
+
     async def test_school_records_never_create_schools(self, db_session: AsyncSession):
         from sqlalchemy import func, select
         from app.models import School

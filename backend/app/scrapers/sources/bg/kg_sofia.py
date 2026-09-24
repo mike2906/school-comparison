@@ -244,6 +244,8 @@ class KgSofiaBgAdapter(BaseSourceAdapter):
 
             merged_records = self._merge_building_branch_records(parsed_records)
             discovered_schools = [school for school, changed in merged_records if changed]
+            for school in discovered_schools:
+                self._drop_locations_owned_by_other_schools(school)
 
             # Apply limit if specified
             if limit:
@@ -282,21 +284,18 @@ class KgSofiaBgAdapter(BaseSourceAdapter):
         page_hash = self._hash_record({"_source": record_type, "data": data})
         source_page = existing_pages.get(source_url)
         school_id = school_id_by_kg_id.get(kg_id_str)
-        # A record with no linked school is always processed: an earlier limited run may
-        # have stored its fingerprint without ever creating the school.
-        changed = (
-            source_page is None
-            or source_page.content_hash != page_hash
-            or school_id is None
-        )
+        content_changed = source_page is None or source_page.content_hash != page_hash
         self._upsert_registry_page(
             source_page=source_page,
             source_url=source_url,
             page_hash=page_hash,
             school_id=school_id,
-            changed=changed,
+            changed=content_changed,
             seen_at=seen_at,
         )
+        # A record with no linked school is always processed: an earlier limited run may
+        # have stored its fingerprint without ever creating the school.
+        changed = content_changed or school_id is None
 
         school = self._parse_institution(data, default_type)
         if school:
@@ -314,6 +313,31 @@ class KgSofiaBgAdapter(BaseSourceAdapter):
             if kg_id is not None and str(kg_id) in mapping:
                 return mapping[str(kg_id)]
         return None
+
+    def _drop_locations_owned_by_other_schools(self, school: DiscoveredSchool) -> None:
+        """Drop merged building locations whose kg record is already its own school.
+
+        Older imports stored some '- сграда' buildings as separate schools. When such a
+        building is merged into its family, keep it on the school that already has it
+        instead of adding a second pin for the same building.
+        """
+        target = self._existing_school_id_for(school)
+        if target is None:
+            return
+        mapping = getattr(self, "_school_id_by_kg_id", {}) or {}
+        kept = []
+        for location in school.locations:
+            record_ids = [
+                tag.split("=", 1)[1]
+                for tag in location.location_tags or []
+                if tag.startswith("source_record_id=")
+            ]
+            owners = {mapping.get(record_id) for record_id in record_ids} - {None}
+            if owners and target not in owners:
+                continue
+            kept.append(location)
+        if kept:
+            school.locations = kept
 
     def _may_create_school(self, disc: DiscoveredSchool) -> bool:
         """Only kindergartens and nurseries are created from kg.sofia.bg.
