@@ -3,6 +3,7 @@
 // backend/tests/test_school_search.py fails when the two tables below drift apart.
 
 // Official Bulgarian transliteration, lowercase only.
+// No regex lookbehind or Object.hasOwn here: Safari < 16.4 cannot parse/run them.
 const TRANSLIT = {
   а: 'a', б: 'b', в: 'v', г: 'g', д: 'd', е: 'e', ж: 'zh', з: 'z',
   и: 'i', й: 'y', к: 'k', л: 'l', м: 'm', н: 'n', о: 'o', п: 'p',
@@ -57,7 +58,7 @@ export function normalizeSearchText(text) {
   return String(text || '')
     .toLowerCase()
     .replace(/№/g, ' ')
-    .replace(/(?<![a-z])no\.(?=\s*\d)/g, ' ')
+    .replace(/(^|[^a-z])no\.(?=\s*\d)/g, '$1 ')
     .replace(/[^\p{L}\p{N}]+/gu, ' ')
     .replace(/(\d)(?=\p{L})/gu, '$1 ')
     .replace(/(\p{L})(?=\d)/gu, '$1 ')
@@ -67,7 +68,7 @@ export function normalizeSearchText(text) {
 }
 
 export function transliterate(text) {
-  return Array.from(text, ch => (Object.hasOwn(TRANSLIT, ch) ? TRANSLIT[ch] : ch)).join('')
+  return Array.from(text, ch => (Object.prototype.hasOwnProperty.call(TRANSLIT, ch) ? TRANSLIT[ch] : ch)).join('')
 }
 
 const TYPE_LATIN = new Map(
@@ -85,7 +86,7 @@ function prepareName(value) {
 
 function tokenIn(token, name) {
   const latin = transliterate(token)
-  if (/^\d+$/.test(token)) return new RegExp(`(?<!\\d)${token}(?!\\d)`).test(name.norm)
+  if (/^\d+$/.test(token)) return new RegExp(`(^|\\D)${token}(?!\\d)`).test(name.norm)
   const stems = TYPE_LATIN.get(latin)
   if (stems) {
     return name.words.includes(latin) || stems.every(stem => name.latin.includes(stem))
