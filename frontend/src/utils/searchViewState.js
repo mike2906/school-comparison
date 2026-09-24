@@ -125,3 +125,13 @@ export function getLastSearchUrl(storage = safeSession()) {
     return '/search'
   }
 }
+
+/** True when the search page shows the detail as a side panel (Tailwind `lg`). */
+export function isDesktopViewport() {
+  return typeof window !== 'undefined' && window.matchMedia?.('(min-width: 1024px)').matches === true
+}
+
+/** A plain left click, i.e. not one the browser should turn into "open in new tab". */
+export function isPlainLeftClick(event) {
+  return event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey
+}

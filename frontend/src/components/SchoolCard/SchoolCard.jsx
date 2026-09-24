@@ -1,6 +1,7 @@
 import { memo, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
+import { isDesktopViewport, isPlainLeftClick } from '../../utils/searchViewState'
 import { useCompare } from '../../context/CompareContext'
 import { getSchoolName, getAddress } from '../../utils/i18n'
 import { formatDistance } from '../../utils/distance'
@@ -639,10 +640,10 @@ const SchoolCard = memo(function SchoolCard({
   onShowAllLocations,
   onFocusLocation,
   onClearLocations,
+  onOpenDetails,
   examAverages = null,
 }) {
   const { t, i18n } = useTranslation()
-  const navigate = useNavigate()
   const { addToCompare, removeFromCompare, isInCompare, canAddMore } = useCompare()
   const [isExpanded, setIsExpanded] = useState(false)
 
@@ -923,9 +924,14 @@ const SchoolCard = memo(function SchoolCard({
     }
   }
 
+  // A real link, so middle-click / ctrl-click open the full page in a new tab. A plain
+  // click on desktop opens the side panel instead of leaving the results.
   const handleDetailsClick = (e) => {
     e.stopPropagation()
-    navigate(`/schools/${school.id}`)
+    if (onOpenDetails && isPlainLeftClick(e) && isDesktopViewport()) {
+      e.preventDefault()
+      onOpenDetails(school)
+    }
   }
 
   const handleToggleLocations = (event) => {
@@ -1533,12 +1539,13 @@ const SchoolCard = memo(function SchoolCard({
             t('schools.compare')
           )}
         </button>
-        <button
+        <Link
+          to={`/schools/${school.id}`}
           onClick={handleDetailsClick}
-          className="flex-1 px-3 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors transition-transform hover:scale-[1.02]"
+          className="flex-1 px-3 py-2 text-center text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors transition-transform hover:scale-[1.02]"
         >
           {t('schools.details')}
-        </button>
+        </Link>
       </div>
 
     </article>

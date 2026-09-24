@@ -8,6 +8,7 @@ import LanguageToggle from '../LanguageToggle/LanguageToggle'
 import SchoolMap from '../Map/SchoolMap'
 import SchoolCard from '../SchoolCard/SchoolCard'
 import SchoolCardSkeleton from '../SchoolCard/SchoolCardSkeleton'
+import SchoolDetailPanel from './SchoolDetailPanel'
 import { useSchools } from '../../hooks/useSchools'
 import { calculateDistance } from '../../utils/distance'
 import { geocodeAddress, reverseGeocode, cancelGeocode } from '../../utils/geocoding'
@@ -62,6 +63,12 @@ function SearchPage() {
   // View state lives in the URL so it survives opening a school and coming back.
   const [initialView] = useState(() => readViewParams(searchParams))
   const [savedViewState] = useState(() => readSavedViewState(location.key, location.search))
+  // The school shown in the side panel (`?detail=<id>`); opening it pushes a history entry
+  // so browser Back closes the panel instead of leaving the results.
+  const detailSchoolId = (() => {
+    const value = Number.parseInt(searchParams.get('detail') || '', 10)
+    return Number.isFinite(value) && value > 0 ? value : null
+  })()
   const { compareList } = useCompare()
   const { config, countryCode } = useCountry()
 
@@ -239,8 +246,9 @@ function SearchPage() {
       tab: mobileTab,
       school: selectedSchoolId,
     })
-    if (next) setSearchParams(next, { replace: true })
-  }, [sortBy, distanceFilter, viewMode, mobileTab, selectedSchoolId, searchParams, setSearchParams])
+    // Keep the history state (it records whether the detail panel pushed this entry).
+    if (next) setSearchParams(next, { replace: true, state: location.state })
+  }, [sortBy, distanceFilter, viewMode, mobileTab, selectedSchoolId, searchParams, setSearchParams, location.state])
 
   useEffect(() => {
     rememberLastSearchUrl(`/search${location.search}`)
@@ -400,8 +408,37 @@ function SearchPage() {
     })
   }
 
+  const handleOpenDetails = useStableCallback((school) => {
+    if (!school) return
+    const params = new URLSearchParams(searchParams)
+    params.set('detail', String(school.id))
+    if (detailSchoolId) {
+      navigate(`/search?${params.toString()}`, { replace: true, state: location.state })
+    } else {
+      navigate(`/search?${params.toString()}`, { state: { detailPushed: true } })
+    }
+  })
+
+  const handleCloseDetails = useStableCallback(() => {
+    // Opened from these results: step back to them. Opened from a link: just drop the param.
+    if (location.state?.detailPushed) {
+      navigate(-1)
+      return
+    }
+    const params = new URLSearchParams(searchParams)
+    params.delete('detail')
+    navigate(`/search?${params.toString()}`, { replace: true })
+  })
+
   const handleListSchoolSelect = useStableCallback((school) => handleSchoolSelect(school, { source: 'list' }))
-  const handleMapSchoolSelect = useStableCallback((school) => handleSchoolSelect(school, { source: 'map' }))
+  const handleMapSchoolSelect = useStableCallback((school) => {
+    // With the panel open, a marker click shows that school in the panel.
+    if (detailSchoolId && school) {
+      handleOpenDetails(school)
+      return
+    }
+    handleSchoolSelect(school, { source: 'map' })
+  })
 
   const handleSchoolHover = useStableCallback((school) => {
     setHoveredSchoolId(school?.id ?? null)
@@ -1881,7 +1918,10 @@ function SearchPage() {
         </div>
 
         {/* Main Content Area */}
-        <div className="flex-1 flex overflow-hidden">
+        <div className="relative flex-1 flex overflow-hidden">
+          {detailSchoolId && (
+            <SchoolDetailPanel schoolId={detailSchoolId} onClose={handleCloseDetails} />
+          )}
           {/* Desktop Filters Sidebar (20%) */}
           <aside className="hidden lg:block w-80 flex-shrink-0 border-r border-neutral-200 bg-white overflow-y-auto">
             <div className="p-5 space-y-6">
@@ -1982,8 +2022,9 @@ function SearchPage() {
                     key={school.id}
                     school={school}
                     location={getLocationForAgeGroup(school, filters.ageGroup)}
-                    isSelected={selectedSchoolId === school.id}
+                    isSelected={(detailSchoolId || selectedSchoolId) === school.id}
                     onClick={handleListSchoolSelect}
+                    onOpenDetails={handleOpenDetails}
                     onHover={handleSchoolHover}
                     onHoverEnd={handleSchoolHoverEnd}
                     ageGroupOrder={ageGroupOrder}
@@ -2010,8 +2051,9 @@ function SearchPage() {
                 <SchoolMap
                   schools={filteredSchools}
                   activeAgeGroup={filters.ageGroup}
-                  selectedSchoolId={selectedSchoolId}
+                  selectedSchoolId={detailSchoolId || selectedSchoolId}
                   hoveredSchoolId={hoveredSchoolId}
+                  onOpenDetails={handleOpenDetails}
                   onSchoolSelect={handleMapSchoolSelect}
                   onClearSelection={handleClearSelection}
                   loading={loading}
