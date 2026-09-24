@@ -821,7 +821,7 @@ function SearchPage() {
   }
 
   const getStartingPrice = (school) => {
-    if (school.school_type !== 'private' || !school.pricing || school.pricing.length === 0) {
+    if (school.school_type === 'state' || !school.pricing || school.pricing.length === 0) {
       return null
     }
 
