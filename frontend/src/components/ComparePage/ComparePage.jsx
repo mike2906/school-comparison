@@ -5,7 +5,7 @@ import Layout from '../Layout/Layout'
 import { useCompare } from '../../context/CompareContext'
 import { fetchCompare, fetchExamAverages } from '../../api/schools'
 import { calculateDistance, formatDistance } from '../../utils/distance'
-import { getSchoolName, getAddress, getSummary } from '../../utils/i18n'
+import { compareSchoolNames, getSchoolName, getAddress, getSummary } from '../../utils/i18n'
 import { hasAnySchoolSummary } from './summaryVisibility'
 import { getProvenanceSourceKey } from './sourceMetadata'
 import {
@@ -18,6 +18,7 @@ import {
 } from '../../utils/schoolAttributes'
 import { getBenchmarkComparison, getNvoDetail as getSharedNvoDetail } from '../../utils/nvo'
 import { classifyAdmissionRequirement } from '../../utils/admission'
+import { yearlyTuitionRangeEur } from '../../utils/pricing'
 
 const SOURCE_BADGE_STYLES = {
   official: 'bg-emerald-50 text-emerald-700',
@@ -65,7 +66,7 @@ function formatDate(value, locale) {
   }).format(date)
 }
 
-function formatCurrency(amount, locale, currency = 'BGN') {
+function formatCurrency(amount, locale, currency = 'EUR') {
   if (amount == null || Number.isNaN(amount)) return null
   return new Intl.NumberFormat(locale, {
     style: 'currency',
@@ -75,7 +76,7 @@ function formatCurrency(amount, locale, currency = 'BGN') {
 }
 
 function formatPriceLabel(price, locale, t) {
-  const currency = price.currency || 'BGN'
+  const currency = price.currency || 'EUR'
   const min = price.amount_min != null ? formatCurrency(Number(price.amount_min), locale, currency) : null
   const max = price.amount_max != null ? formatCurrency(Number(price.amount_max), locale, currency) : null
   const exact = price.amount != null ? formatCurrency(Number(price.amount), locale, currency) : null
@@ -347,30 +348,6 @@ function getNvoDetail(school, t) {
   return getSharedNvoDetail(school, t)
 }
 
-function getPricingYearlyRange(pricing = []) {
-  const values = pricing
-    .filter(item => item.category === 'tuition')
-    .flatMap(item => {
-      const baseMin = item.amount_min != null ? Number(item.amount_min) : (item.amount != null ? Number(item.amount) : null)
-      const baseMax = item.amount_max != null ? Number(item.amount_max) : (item.amount != null ? Number(item.amount) : null)
-      const toYearly = (value) => {
-        if (value == null) return null
-        if (item.period === 'yearly') return value
-        if (item.period === 'monthly') return value * 12
-        if (item.period === 'quarter') return value * 4
-        return null
-      }
-      return [toYearly(baseMin), toYearly(baseMax)]
-    })
-    .filter(value => value != null)
-
-  if (values.length === 0) return null
-  return {
-    min: Math.min(...values),
-    max: Math.max(...values),
-  }
-}
-
 function getMonthlyEquivalent(pricing = []) {
   const monthlyValues = pricing
     .map(item => {
@@ -508,7 +485,7 @@ function ComparePage() {
       const distance = userLocation && primaryLocation?.lat && primaryLocation?.lng
         ? calculateDistance(userLocation.lat, userLocation.lng, primaryLocation.lat, primaryLocation.lng)
         : null
-      const pricingRange = getPricingYearlyRange(school.pricing)
+      const pricingRange = yearlyTuitionRangeEur(school.pricing)
       const nvoDetail = school.school_type === 'international' ? null : getNvoDetail(school, t)
       const overallLatest = nvoDetail?.latestCombined ?? null
       const overallAvg = nvoDetail?.schoolAverageCombined ?? null
@@ -531,7 +508,7 @@ function ComparePage() {
       if (sortBy === 'name') {
         const nameA = getSchoolName(a, i18n.language)
         const nameB = getSchoolName(b, i18n.language)
-        return nameA.localeCompare(nameB, i18n.language)
+        return compareSchoolNames(nameA, nameB, i18n.language)
       }
 
       if (sortBy === 'distance') {
@@ -682,8 +659,8 @@ function ComparePage() {
 
           if (school.school_type !== 'state' && pricingRange) {
             const formatted = pricingRange.min === pricingRange.max
-              ? formatCurrency(pricingRange.min, i18n.language)
-              : `${formatCurrency(pricingRange.min, i18n.language)} - ${formatCurrency(pricingRange.max, i18n.language)}`
+              ? formatCurrency(pricingRange.min, i18n.language, pricingRange.currency)
+              : `${formatCurrency(pricingRange.min, i18n.language, pricingRange.currency)} - ${formatCurrency(pricingRange.max, i18n.language, pricingRange.currency)}`
             return (
               <div>
                 <div className="text-sm font-semibold text-neutral-900">{formatted}</div>
@@ -1061,7 +1038,7 @@ function ComparePage() {
           }
 
           const monthlyEquivalent = getMonthlyEquivalent(school.pricing)
-          const pricingCurrency = school.pricing?.find(item => item.currency)?.currency || 'BGN'
+          const pricingCurrency = school.pricing?.find(item => item.currency)?.currency || 'EUR'
 
           return (
             <div className="space-y-3">

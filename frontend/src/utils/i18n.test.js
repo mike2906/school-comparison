@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { getAddress, getSchoolName } from './i18n.js'
+import { compareSchoolNames, getAddress, getSchoolName } from './i18n.js'
 
 test('getSchoolName prefers resolved_name_i18n over legal name', () => {
   const school = {
@@ -65,4 +65,14 @@ test('getAddress prefers resolved_address_i18n transliteration fallback', () => 
   }
 
   assert.equal(getAddress(location, 'en'), 'bul. "Dzheims Baucher" № 116')
+})
+
+test('compareSchoolNames sorts numbered schools numerically', () => {
+  const names = ['101 SU', '10 SU', '2 SU', '1 SU', '119 SU']
+  assert.deepEqual([...names].sort((a, b) => compareSchoolNames(a, b, 'en')), ['1 SU', '2 SU', '10 SU', '101 SU', '119 SU'])
+})
+
+test('compareSchoolNames ignores leading quote noise', () => {
+  const names = ["''Yagodina", 'Aurora', 'Zora']
+  assert.deepEqual([...names].sort((a, b) => compareSchoolNames(a, b, 'en')), ['Aurora', "''Yagodina", 'Zora'])
 })

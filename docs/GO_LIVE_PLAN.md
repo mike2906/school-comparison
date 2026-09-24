@@ -1447,7 +1447,7 @@ view lost, skeleton re-shown, ~10 API calls on return). Frontend-only; no respon
 gate changes. Mike approved (2026-09-24) agent self-merge for these PRs on green CI after
 self-review, with at most one Codex review on the larger ones.
 
-- [ ] **U1 Correctness fixes.** (a) Compare quick-overview formats EUR prices as BGN
+- [x] **U1 Correctness fixes.** (a) Compare quick-overview formats EUR prices as BGN
       (`formatCurrency` called without the row currency); all display fallbacks default
       to `'BGN'` although Bulgaria uses EUR since 2026-01-01. (b) Desktop search has no
       result count or sort control (the bar is `lg:hidden`). (c) No language toggle on the
@@ -1456,6 +1456,12 @@ self-review, with at most one Codex review on the larger ones.
       is `w-1/5` (288 px at 1440) and clips the address Search button. (f) Mobile search
       uses `h-screen` (100vh) — use `100dvh`. (g) "12th grade" NVO labels while the exam
       tabs are 4/7/10 — verify and fix.
+      **Done 2026-09-24:** compare range uses the headline cohort in EUR
+      (`yearlyTuitionRangeEur`, BGN converted at the fixed 1.95583 rate, other currencies
+      skipped) and price sort converts too; fallbacks are EUR; count/sort bar on all
+      widths; EN | BG switch in the mobile search header; numeric name collation ignoring
+      leading quotes; 320 px sidebar; `100dvh`. (g) was a real bug: `nvo_10` used the
+      "12th grade" label.
 - [ ] **U2 Keep search state across detail navigation.** In-memory cache of the school
       list per query; selected school, sort, distance, and list/map view in the URL
       (`replace`); restore the list's scroll position and the map centre/zoom on return

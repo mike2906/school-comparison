@@ -736,9 +736,9 @@ function SchoolDetailPage() {
                           <div className="space-y-3">
                             {items.map((price, idx) => {
                               const amountText = price.amount_min != null || price.amount_max != null
-                                ? `${price.amount_min != null ? formatAmount(price.amount_min) : ''}${price.amount_min != null && price.amount_max != null ? '–' : ''}${price.amount_max != null ? formatAmount(price.amount_max) : ''} ${price.currency || 'BGN'}`
+                                ? `${price.amount_min != null ? formatAmount(price.amount_min) : ''}${price.amount_min != null && price.amount_max != null ? '–' : ''}${price.amount_max != null ? formatAmount(price.amount_max) : ''} ${price.currency || 'EUR'}`
                                 : price.amount != null
-                                ? `${formatAmount(price.amount)} ${price.currency || 'BGN'}`
+                                ? `${formatAmount(price.amount)} ${price.currency || 'EUR'}`
                                 : t('pricing.priceOnRequest')
 
                               return (

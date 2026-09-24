@@ -8,6 +8,8 @@ import {
   lowestUnstatedPeriodTuition,
   isInstallmentPlan,
   YEAR_STATUS,
+  toEur,
+  yearlyTuitionRangeEur,
 } from './pricing.js'
 
 const row = (overrides = {}) => ({
@@ -229,4 +231,38 @@ test('isInstallmentPlan recognises instalment plan names, as it did in SchoolCar
   assert.equal(isInstallmentPlan({ plan_name: '9 вноски' }), true)
   assert.equal(isInstallmentPlan({ plan_name: 'Standard' }), false)
   assert.equal(isInstallmentPlan({}), false)
+})
+
+test('toEur converts BGN at the fixed euro rate and rejects other currencies', () => {
+  assert.equal(toEur(100, 'EUR'), 100)
+  assert.equal(toEur(195.583, 'BGN'), 100)
+  assert.equal(toEur(100, 'USD'), null)
+  assert.equal(toEur(null, 'EUR'), null)
+})
+
+test('yearlyTuitionRangeEur reports euro and never mislabels EUR amounts', () => {
+  const range = yearlyTuitionRangeEur([
+    row({ id: 1, amount: 8965, currency: 'EUR', period: 'yearly', year_status: 'current' }),
+    row({ id: 2, amount: 75, currency: 'EUR', category: 'registration', period: 'one_time', year_status: 'current' }),
+  ])
+  assert.deepEqual(range, { min: 8965, max: 8965, currency: 'EUR' })
+})
+
+test('yearlyTuitionRangeEur converts BGN, annualises monthly fees, skips instalments and USD', () => {
+  const range = yearlyTuitionRangeEur([
+    row({ id: 1, amount: 1955.83, currency: 'BGN', period: 'yearly', year_status: 'current' }),
+    row({ id: 2, amount: 100, currency: 'EUR', period: 'monthly', year_status: 'current' }),
+    row({ id: 3, amount: 50, currency: 'EUR', period: 'monthly', plan_name: '10 installments', year_status: 'current' }),
+    row({ id: 4, amount: 10, currency: 'USD', period: 'yearly', year_status: 'current' }),
+  ])
+  assert.equal(Math.round(range.min), 1000)
+  assert.equal(range.max, 1200)
+})
+
+test('yearlyTuitionRangeEur ignores rows outside the headline cohort', () => {
+  const range = yearlyTuitionRangeEur([
+    row({ id: 1, amount: 9000, period: 'yearly', year_status: 'current' }),
+    row({ id: 2, amount: 3000, period: 'yearly', year_status: 'dated_other', academic_year_canonical: '2023/2024' }),
+  ])
+  assert.equal(range.min, 9000)
 })

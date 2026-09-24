@@ -4,20 +4,21 @@ import { useSearchParams, useNavigate } from 'react-router-dom'
 import debounce from 'lodash.debounce'
 import { useStableCallback } from '../../hooks/useStableCallback'
 import Layout from '../Layout/Layout'
+import LanguageToggle from '../LanguageToggle/LanguageToggle'
 import SchoolMap from '../Map/SchoolMap'
 import SchoolCard from '../SchoolCard/SchoolCard'
 import SchoolCardSkeleton from '../SchoolCard/SchoolCardSkeleton'
 import { useSchools } from '../../hooks/useSchools'
 import { calculateDistance } from '../../utils/distance'
 import { geocodeAddress, reverseGeocode, cancelGeocode } from '../../utils/geocoding'
-import { getSchoolName } from '../../utils/i18n'
+import { compareSchoolNames, getSchoolName } from '../../utils/i18n'
 import { useCompare } from '../../context/CompareContext'
 import { useCountry } from '../../context/CountryContext'
 import { fetchAvailableFilters, fetchExamAverages } from '../../api/schools'
 import { getAgeGroupKeys } from '../../utils/countryConfig'
 import { AGE_GROUP_KEYS } from '../../utils/education'
 import { getLanguageFocusPairs } from '../../utils/schoolAttributes'
-import { monthlyEquivalent } from '../../utils/pricing'
+import { monthlyEquivalent, toEur } from '../../utils/pricing'
 
 const TYPE_SORT_ORDER = {
   state: 0,
@@ -712,7 +713,7 @@ function SearchPage() {
 
     const tuitionPrices = school.pricing
       .filter(price => price.category === 'tuition')
-      .map(monthlyEquivalent)
+      .map(price => toEur(monthlyEquivalent(price), price.currency))
       .filter(value => value != null)
 
     if (tuitionPrices.length === 0) return null
@@ -822,7 +823,7 @@ function SearchPage() {
         list.sort((a, b) => {
           const nameA = getSchoolName(a, i18n.language)
           const nameB = getSchoolName(b, i18n.language)
-          return nameA.localeCompare(nameB, i18n.language, { sensitivity: 'base' })
+          return compareSchoolNames(nameA, nameB, i18n.language)
         })
         break
     }
@@ -978,7 +979,7 @@ function SearchPage() {
                     setLocationError(null)
                   }}
                   placeholder={t('location.addressPlaceholder')}
-                  className="flex-1 border border-neutral-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-shadow"
+                  className="flex-1 min-w-0 border border-neutral-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-shadow"
                 />
                 <button
                   onClick={handleAddressSearch}
@@ -1723,7 +1724,7 @@ function SearchPage() {
 
   return (
     <Layout hideNavOnMobile>
-      <div className="h-screen md:h-[calc(100vh-64px)] flex flex-col">
+      <div className="h-[100dvh] md:h-[calc(100dvh-64px)] flex flex-col">
         {/* Mobile/Tablet Header with Filters Button and Tabs */}
         <div className="lg:hidden border-b border-neutral-200 bg-white">
           <div className="flex items-center gap-2 px-3 py-2">
@@ -1771,6 +1772,7 @@ function SearchPage() {
               </svg>
               {t('search.filters')}
             </button>
+            <LanguageToggle compact />
           </div>
         </div>
 
@@ -1827,7 +1829,7 @@ function SearchPage() {
         {/* Main Content Area */}
         <div className="flex-1 flex overflow-hidden">
           {/* Desktop Filters Sidebar (20%) */}
-          <aside className="hidden lg:block w-1/5 border-r border-neutral-200 bg-white overflow-y-auto">
+          <aside className="hidden lg:block w-80 flex-shrink-0 border-r border-neutral-200 bg-white overflow-y-auto">
             <div className="p-5 space-y-6">
               {renderLocationSection()}
               {renderSchoolTypeToggle()}
@@ -1840,13 +1842,15 @@ function SearchPage() {
           <div className={`
             flex flex-col bg-neutral-50
             ${mobileTab === 'list' ? '' : 'hidden md:flex'}
-            ${viewMode === 'list-only' ? 'lg:w-4/5' : 'lg:w-1/2'}
+            ${viewMode === 'list-only' ? 'lg:flex-1' : 'lg:w-2/5'}
             ${showList ? 'lg:flex' : 'lg:hidden'}
             md:w-3/5
             w-full
           `}>
-              <div className="px-4 py-2 bg-white border-b border-neutral-200 space-y-2 lg:hidden">
-                {renderActiveFilters({ compact: true })}
+              <div className="px-4 py-2 bg-white border-b border-neutral-200 space-y-2">
+                <div className="lg:hidden">
+                  {renderActiveFilters({ compact: true })}
+                </div>
                 <div className="flex items-center justify-between gap-3">
                   {loading ? (
                     <div className="h-4 w-32 bg-neutral-200 animate-pulse rounded" />
@@ -1943,7 +1947,6 @@ function SearchPage() {
             flex-1 relative
             ${mobileTab === 'map' ? '' : 'hidden md:block'}
             ${showMap ? 'lg:block' : 'lg:hidden'}
-            ${viewMode === 'map-only' ? 'lg:w-full' : 'lg:w-3/10'}
             md:w-2/5
           `}>
                 <SchoolMap

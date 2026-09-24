@@ -249,7 +249,7 @@ function getMinTuitionPriceYearly(pricing = []) {
     if (yearlyValue == null) return
     if (minValue == null || yearlyValue < minValue) {
       minValue = yearlyValue
-      currency = item.currency || 'BGN'
+      currency = item.currency || 'EUR'
     }
   })
 
@@ -585,9 +585,9 @@ function buildExpandedSections({
       const meta = [plan, year].filter(Boolean).join(' • ')
       const source = item.source ? t(`priceSource.${item.source}`) : ''
       const priceLabel = amountMin && amountMax
-        ? `${amountMin}–${amountMax} ${item.currency || 'BGN'}`
+        ? `${amountMin}–${amountMax} ${item.currency || 'EUR'}`
         : amount
-          ? `${amount} ${item.currency || 'BGN'}`
+          ? `${amount} ${item.currency || 'EUR'}`
           : t('pricing.priceOnRequest')
       const periodLabel = periodKey ? ` (${periodKey})` : ''
       const metaLabel = meta ? ` • ${meta}` : ''

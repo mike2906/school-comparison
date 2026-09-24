@@ -101,3 +101,18 @@ test('getBenchmarkComparison classifies against the same exam, year, and subject
   assert.equal(comparison.benchmarkValue, 59.4)
   assert.equal(comparison.textClass, 'text-amber-700')
 })
+
+test('getNvoDetail labels the upper-secondary exam as the 10th-grade NVO', () => {
+  const school = {
+    education_level: 'upper_secondary',
+    exam_results: [
+      { exam_type: 'nvo_10', subject: 'math', metric: 'average_score', year: 2025, value: 40.0 },
+      { exam_type: 'nvo_10', subject: 'bulgarian', metric: 'average_score', year: 2025, value: 50.0 },
+    ],
+  }
+
+  const detail = getNvoDetail(school, (key) => key)
+
+  assert.equal(detail.examType, 'nvo_10')
+  assert.equal(detail.gradeLabel, 'schoolCard.nvo.grade10')
+})

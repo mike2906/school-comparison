@@ -128,3 +128,45 @@ export function lowestUnstatedPeriodTuition(rows = []) {
   if (candidates.length === 0) return null
   return candidates.reduce((best, entry) => (entry.amount < best.amount ? entry : best))
 }
+
+// Bulgaria adopted the euro on 2026-01-01 at this irrevocably fixed rate.
+export const BGN_PER_EUR = 1.95583
+
+/** An amount in euro, or null when the currency has no fixed conversion to euro. */
+export function toEur(amount, currency) {
+  if (amount == null) return null
+  const value = Number(amount)
+  if (!Number.isFinite(value)) return null
+  if (!currency || currency === 'EUR') return value
+  if (currency === 'BGN') return value / BGN_PER_EUR
+  return null
+}
+
+/**
+ * The yearly tuition range of a school's headline pricing cohort, in euro.
+ *
+ * Uses the same cohort as the headline price, skips instalment rows, and only converts
+ * explicit monthly / quarterly / yearly periods. BGN rows are converted at the fixed
+ * rate; rows in other currencies are left out. Returns `{ min, max, currency: 'EUR' }`
+ * or null.
+ */
+export function yearlyTuitionRangeEur(pricing = []) {
+  const cohort = selectPricingCohort(pricing)
+  if (!cohort) return null
+  const perYear = { yearly: 1, quarter: 4, monthly: 12 }
+
+  const values = cohort.rows
+    .filter(row => row.category === 'tuition' && !isInstallmentPlan(row) && perYear[row.period])
+    .flatMap(row => {
+      const low = row.amount_min ?? row.amount ?? row.amount_max
+      const high = row.amount_max ?? row.amount ?? row.amount_min
+      return [low, high].map(value => {
+        const eur = toEur(value, row.currency)
+        return eur == null ? null : eur * perYear[row.period]
+      })
+    })
+    .filter(value => value != null)
+
+  if (values.length === 0) return null
+  return { min: Math.min(...values), max: Math.max(...values), currency: 'EUR' }
+}
