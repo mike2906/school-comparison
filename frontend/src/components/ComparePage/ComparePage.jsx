@@ -638,7 +638,9 @@ function ComparePage() {
   // Same tag handling as the school page: no Title Case, Bulgarian tags grouped in EN.
   const makeTags = (items = []) => {
     if (!items.length) return null
-    return <TagList tags={items} chipClassName="rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-700" />
+    // TagList handles text only; numbers (e.g. spots) are shown as text, not dropped.
+    const tags = items.filter(item => item != null && item !== '').map(item => String(item))
+    return <TagList tags={tags} chipClassName="rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-700" />
   }
 
   const renderPlaceholder = (labelKey = 'compare.notAvailable') => (
