@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 
 from app.config import get_settings
 from app.routers import schools, compare, countries
@@ -19,6 +20,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# The school list is ~2 MB of JSON; gzip cuts it to ~10 % for parents on mobile data.
+app.add_middleware(GZipMiddleware, minimum_size=1024)
 
 app.include_router(countries.router, prefix="/countries", tags=["countries"])
 app.include_router(schools.router, prefix="/schools", tags=["schools"])
