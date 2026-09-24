@@ -22,7 +22,7 @@ import { fetchAvailableFilters, fetchExamAverages } from '../../api/schools'
 import { getAgeGroupKeys } from '../../utils/countryConfig'
 import { AGE_GROUP_KEYS } from '../../utils/education'
 import { getLanguageFocusPairs } from '../../utils/schoolAttributes'
-import { matchesAdvancedFilters } from '../../utils/advancedFilters'
+import { matchesAdvancedFilters, matchesSchoolType } from '../../utils/advancedFilters'
 import { getNvoDetail } from '../../utils/nvo'
 import { monthlyEquivalent, toEur } from '../../utils/pricing'
 import {
@@ -53,6 +53,8 @@ const TYPE_SORT_ORDER = {
 }
 
 const EMPTY_LIST = []
+// Cards are rendered in pages as the list scrolls: all ~440 at once took ~0.6 s per render.
+const LIST_PAGE_SIZE = 30
 
 const DEFAULT_ADVANCED_OPTIONS = {
   language_focus_levels: ['immersion', 'bilingual', 'enrichment'],
@@ -69,6 +71,11 @@ function SearchPage() {
   // View state lives in the URL so it survives opening a school and coming back.
   const [initialView] = useState(() => readViewParams(searchParams))
   const [savedViewState] = useState(() => readSavedViewState(location.key, location.search))
+  // Enough cards to reach a restored scroll position (cards are at least ~100 px tall).
+  const [visibleCount, setVisibleCount] = useState(() => (
+    Math.ceil((savedViewState?.scrollTop || 0) / 100) + LIST_PAGE_SIZE
+  ))
+  const listSentinelRef = useRef(null)
   // The school shown in the side panel (`?detail=<id>`); opening it pushes a history entry
   // so browser Back closes the panel instead of leaving the results.
   const detailSchoolId = (() => {
@@ -186,11 +193,11 @@ function SearchPage() {
       ? filters.educationLevel
       : null
 
-  // One fetch per age group / type; advanced filters apply on the client (same rules as
-  // the API), so ticking a checkbox does not refetch and flash the list.
-  const { schools: baseSchools, loading, error } = useSchools(
+  // One fetch per age group; type and advanced filters apply on the client (same rules as
+  // the API, except that Private also covers international schools).
+  const { schools: ageSchools, loading, error } = useSchools(
     filters.ageGroup,
-    filters.schoolType,
+    null,
     effectiveEducationLevel,
     filters.includeCrossover,
     EMPTY_LIST,
@@ -198,6 +205,15 @@ function SearchPage() {
     EMPTY_LIST,
     EMPTY_LIST,
     countryCode
+  )
+
+  // Skeletons only before anything is loaded; later loads keep the old results visible.
+  const isFirstLoad = loading && ageSchools.length === 0
+
+  // School type is a client-side filter too, so the State / Private chips are instant.
+  const baseSchools = useMemo(
+    () => ageSchools.filter(school => matchesSchoolType(school, filters.schoolType)),
+    [ageSchools, filters.schoolType]
   )
 
   const schools = useMemo(
@@ -805,7 +821,7 @@ function SearchPage() {
   }
 
   const getStartingPrice = (school) => {
-    if (school.school_type !== 'private' || !school.pricing || school.pricing.length === 0) {
+    if (school.school_type === 'state' || !school.pricing || school.pricing.length === 0) {
       return null
     }
 
@@ -985,12 +1001,41 @@ function SearchPage() {
 
   useEffect(() => {
     if (!selectedSchoolId || !scrollOnSelectRef.current) return
+    // A school picked on the map may be below the rendered page: render up to it first.
+    const index = sortedSchools.findIndex(school => school.id === selectedSchoolId)
+    if (index >= visibleCount) {
+      setVisibleCount(index + 20)
+      return
+    }
     const node = document.querySelector(`[data-school-id="${selectedSchoolId}"]`)
     if (node) {
       node.scrollIntoView({ behavior: 'smooth', block: 'center' })
     }
     scrollOnSelectRef.current = false
-  }, [selectedSchoolId])
+  }, [selectedSchoolId, sortedSchools, visibleCount])
+
+  // New results start at the top with the first page (not on map panning).
+  const listKey = JSON.stringify([filters, sortBy, nameQuery, distanceFilter])
+  const lastListKeyRef = useRef(listKey)
+  useEffect(() => {
+    if (lastListKeyRef.current === listKey) return
+    lastListKeyRef.current = listKey
+    setVisibleCount(LIST_PAGE_SIZE)
+    if (listScrollRef.current) listScrollRef.current.scrollTop = 0
+  }, [listKey])
+
+  // Render the next page as the end of the list comes near.
+  useEffect(() => {
+    const sentinel = listSentinelRef.current
+    if (!sentinel || typeof IntersectionObserver === 'undefined') return undefined
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some(entry => entry.isIntersecting)) {
+        setVisibleCount(count => count + LIST_PAGE_SIZE)
+      }
+    }, { root: listScrollRef.current, rootMargin: '800px 0px' })
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [visibleCount, sortedSchools.length])
 
   // Reachable by Tab: rendered, and not inside a collapsed <details> (only its own
   // <summary> is). Chrome still reports boxes for collapsed content, so check directly.
@@ -1725,7 +1770,7 @@ function SearchPage() {
                   {renderActiveFilters()}
                 </div>
                 <div className="flex items-center justify-between gap-3">
-                  {loading ? (
+                  {isFirstLoad ? (
                     <div className="h-4 w-32 bg-neutral-200 animate-pulse rounded" />
                   ) : (
                     <p className="text-sm text-neutral-600">
@@ -1795,7 +1840,7 @@ function SearchPage() {
                   </div>
                 )}
 
-                {loading && (
+                {isFirstLoad && (
                   <div className="p-4 space-y-4">
                     {[...Array(5)].map((_, i) => (
                       <SchoolCardSkeleton key={i} />
@@ -1833,7 +1878,9 @@ function SearchPage() {
                   </div>
                 )}
 
-                {!loading && !error && sortedSchools.map(school => (
+                {!isFirstLoad && !error && (
+                <div className={loading ? 'opacity-60 transition-opacity' : 'transition-opacity'} aria-busy={loading}>
+                {sortedSchools.slice(0, visibleCount).map(school => (
                   <SchoolCard
                     key={school.id}
                     school={school}
@@ -1854,6 +1901,11 @@ function SearchPage() {
                     examAverages={examAverages}
                   />
                 ))}
+                {visibleCount < sortedSchools.length && (
+                  <div ref={listSentinelRef} className="h-16" aria-hidden="true" />
+                )}
+                </div>
+                )}
               </div>
             </div>
 

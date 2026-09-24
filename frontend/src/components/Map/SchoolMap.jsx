@@ -1252,8 +1252,20 @@ function SchoolMap({
         </div>
       )}
 
-      {/* Loading overlay */}
-      {loading && (
+      {/* Loading: a full overlay only for the first load; afterwards the old markers stay
+          usable and a small pill says the results are updating. */}
+      {loading && schools.length > 0 && (
+        <div className="pointer-events-none absolute left-1/2 top-4 z-[1000] -translate-x-1/2" role="status">
+          <div className="flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-sm font-medium text-neutral-700 shadow-lg">
+            <svg className="h-4 w-4 animate-spin text-primary-500" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            {t('common.updating')}
+          </div>
+        </div>
+      )}
+      {loading && schools.length === 0 && (
         <div className="absolute inset-0 bg-white/60 backdrop-blur-sm flex items-center justify-center z-[1000]">
           <div className="flex items-center gap-3 bg-white px-5 py-3 rounded-full shadow-lg">
             <svg className="animate-spin h-5 w-5 text-primary-500" fill="none" viewBox="0 0 24 24">
@@ -1314,4 +1326,6 @@ function SchoolMap({
   )
 }
 
-export default SchoolMap
+// Memoised: the search page re-renders on every keystroke, sort and hover, and
+// re-rendering ~440 markers each time made those interactions sluggish.
+export default memo(SchoolMap)

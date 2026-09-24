@@ -30,3 +30,16 @@ export function matchesAdvancedFilters(school, selected, ignore = null) {
     return values.some(value => tags.includes(value))
   })
 }
+
+/**
+ * School type chip. "Private" includes international schools: they are private schools
+ * to a parent (the cards already show them as private), and filtering on the exact type
+ * hid e.g. the Anglo-American and French schools.
+ */
+export function matchesSchoolType(school, schoolType) {
+  if (!schoolType) return true
+  if (schoolType === 'private') {
+    return school.school_type === 'private' || school.school_type === 'international'
+  }
+  return school.school_type === schoolType
+}

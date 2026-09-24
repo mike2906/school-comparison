@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { matchesAdvancedFilters } from './advancedFilters.js'
+import { matchesAdvancedFilters, matchesSchoolType } from './advancedFilters.js'
 
 const school = {
   attributes: {
@@ -24,4 +24,12 @@ test('matchesAdvancedFilters can ignore one group for per-option counts', () => 
   assert.equal(matchesAdvancedFilters(school, selected, 'facilities'), false)
   assert.equal(matchesAdvancedFilters(school, { facilities: ['pool'] }, 'facilities'), true)
   assert.equal(matchesAdvancedFilters(school, { languageFocus: ['german:intensive'] }, 'languageFocus'), true)
+})
+
+test('matchesSchoolType: private includes international schools', () => {
+  assert.equal(matchesSchoolType({ school_type: 'international' }, 'private'), true)
+  assert.equal(matchesSchoolType({ school_type: 'private' }, 'private'), true)
+  assert.equal(matchesSchoolType({ school_type: 'state' }, 'private'), false)
+  assert.equal(matchesSchoolType({ school_type: 'international' }, 'state'), false)
+  assert.equal(matchesSchoolType({ school_type: 'state' }, null), true)
 })

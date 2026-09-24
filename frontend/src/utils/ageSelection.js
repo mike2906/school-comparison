@@ -13,25 +13,36 @@ export function categoryForGroup(ageGroup, kindergartenGroups = FALLBACK_KINDERG
   return kindergartenGroups.includes(ageGroup) ? 'kindergarten' : 'school'
 }
 
+/** Where the preschool year is offered. It exists both in kindergartens and in schools. */
+export const PRESCHOOL_WHERE = ['both', 'school', 'kindergarten']
+
+/** The current preschool "where" from the URL-backed filters; old links default to both. */
+export function preschoolWhere({ educationLevel, includeCrossover }) {
+  if (includeCrossover) return 'both'
+  if (educationLevel === 'primary') return 'school'
+  if (educationLevel === 'kindergarten') return 'kindergarten'
+  return 'both'
+}
+
 /**
- * The search params for a picked group. The preschool year exists both in kindergartens
- * and in primary schools, so it is scoped by category unless crossover is requested.
+ * The search params for a picked group. For preschool, `where` scopes it to schools
+ * (education_level=primary), kindergartens, or both (include_crossover), the default:
+ * a parent entering a birth year should see every option rather than half of them.
  */
-export function toSearchSelection({ ageGroup, category, includeCrossover = false }) {
+export function toSearchSelection({ ageGroup, where = 'both' }) {
   if (!ageGroup) {
     return { ageGroup: null, educationLevel: null, includeCrossover: false }
   }
   if (ageGroup !== 'preschool') {
     return { ageGroup, educationLevel: null, includeCrossover: false }
   }
-  if (includeCrossover) {
-    return { ageGroup, educationLevel: null, includeCrossover: true }
+  if (where === 'school') {
+    return { ageGroup, educationLevel: 'primary', includeCrossover: false }
   }
-  return {
-    ageGroup,
-    educationLevel: category === 'school' ? 'primary' : 'kindergarten',
-    includeCrossover: false,
+  if (where === 'kindergarten') {
+    return { ageGroup, educationLevel: 'kindergarten', includeCrossover: false }
   }
+  return { ageGroup, educationLevel: null, includeCrossover: true }
 }
 
 /** Enrolment years offered: this year's September intake and the next few. */
