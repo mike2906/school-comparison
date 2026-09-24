@@ -53,6 +53,17 @@ export function writeViewParams(searchParams, view) {
 }
 
 const SCROLL_STATE_KEY = 'searchViewState'
+const MAX_SAVED_ENTRIES = 20
+
+function readAll(storage) {
+  try {
+    const saved = JSON.parse(storage.getItem(SCROLL_STATE_KEY) || '[]')
+    return Array.isArray(saved) ? saved : []
+  } catch {
+    // Corrupt value: start over rather than blocking future saves.
+    return []
+  }
+}
 export const LAST_SEARCH_URL_KEY = 'lastSearchUrl'
 
 function safeSession() {
@@ -70,8 +81,8 @@ function safeSession() {
 export function readSavedViewState(locationKey, search, storage = safeSession()) {
   if (!storage || !locationKey) return null
   try {
-    const saved = JSON.parse(storage.getItem(SCROLL_STATE_KEY) || 'null')
-    if (!saved || saved.key !== locationKey || saved.search !== search) return null
+    const saved = readAll(storage).find(entry => entry?.key === locationKey && entry.search === search)
+    if (!saved) return null
     return {
       scrollTop: Number.isFinite(saved.scrollTop) ? saved.scrollTop : 0,
       map: saved.map && Array.isArray(saved.map.center) && Number.isFinite(saved.map.zoom) ? saved.map : null,
@@ -84,7 +95,10 @@ export function readSavedViewState(locationKey, search, storage = safeSession())
 export function saveViewState(locationKey, { search, scrollTop, map }, storage = safeSession()) {
   if (!storage || !locationKey) return
   try {
-    storage.setItem(SCROLL_STATE_KEY, JSON.stringify({ key: locationKey, search, scrollTop, map }))
+    // One record per history entry (newest last), so going back several searches still restores each.
+    const others = readAll(storage).filter(entry => !(entry?.key === locationKey && entry.search === search))
+    const next = [...others, { key: locationKey, search, scrollTop, map }].slice(-MAX_SAVED_ENTRIES)
+    storage.setItem(SCROLL_STATE_KEY, JSON.stringify(next))
   } catch {
     // Storage full or blocked: losing the scroll position is acceptable.
   }

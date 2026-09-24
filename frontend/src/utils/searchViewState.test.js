@@ -61,3 +61,16 @@ test('getLastSearchUrl only returns search URLs', () => {
   assert.equal(getLastSearchUrl(storage), '/search')
   assert.equal(getLastSearchUrl(null), '/search')
 })
+
+test('view state is kept per history entry, capped to recent entries', () => {
+  const storage = memoryStorage()
+  saveViewState('first', { search: '?a=1', scrollTop: 100, map: null }, storage)
+  saveViewState('second', { search: '?a=2', scrollTop: 200, map: null }, storage)
+  assert.equal(readSavedViewState('first', '?a=1', storage).scrollTop, 100)
+  assert.equal(readSavedViewState('second', '?a=2', storage).scrollTop, 200)
+  saveViewState('first', { search: '?a=1', scrollTop: 150, map: null }, storage)
+  assert.equal(readSavedViewState('first', '?a=1', storage).scrollTop, 150)
+  for (let i = 0; i < 25; i += 1) saveViewState(`k${i}`, { search: '', scrollTop: i, map: null }, storage)
+  assert.equal(readSavedViewState('first', '?a=1', storage), null)
+  assert.equal(readSavedViewState('k24', '', storage).scrollTop, 24)
+})
