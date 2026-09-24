@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import debounce from 'lodash.debounce'
+import { useStableCallback } from '../../hooks/useStableCallback'
 import Layout from '../Layout/Layout'
 import SchoolMap from '../Map/SchoolMap'
 import SchoolCard from '../SchoolCard/SchoolCard'
@@ -73,7 +74,7 @@ function SearchPage() {
   const errorTimeoutRef = useRef(null)
   const toastTimeoutRef = useRef(null)
   const latestGeocodeRef = useRef(0)
-  const cardRefs = useRef(new Map())
+  const latestMapBoundsRef = useRef(null)
   const scrollOnSelectRef = useRef(false)
 
   // Read filters from URL
@@ -271,10 +272,10 @@ function SearchPage() {
     })
   }
 
-  const clearLocationOverlay = () => {
+  const clearLocationOverlay = useStableCallback(() => {
     setLocationOverlay({ schoolId: null, focusLocationId: null, hideOthers: false })
     setOpenLocationsId(null)
-  }
+  })
 
   useEffect(() => {
     if (userLocation && !previousLocationRef.current) {
@@ -358,20 +359,23 @@ function SearchPage() {
     })
   }
 
-  const handleSchoolHover = (school) => {
+  const handleListSchoolSelect = useStableCallback((school) => handleSchoolSelect(school, { source: 'list' }))
+  const handleMapSchoolSelect = useStableCallback((school) => handleSchoolSelect(school, { source: 'map' }))
+
+  const handleSchoolHover = useStableCallback((school) => {
     setHoveredSchoolId(school?.id ?? null)
-  }
+  })
 
-  const handleSchoolHoverEnd = () => {
+  const handleSchoolHoverEnd = useStableCallback(() => {
     setHoveredSchoolId(null)
-  }
+  })
 
-  const handleClearSelection = () => {
+  const handleClearSelection = useStableCallback(() => {
     clearSelectedSchoolParam()
     setSelectedSchoolId(null)
-  }
+  })
 
-  const handleToggleLocationsPanel = (school) => {
+  const handleToggleLocationsPanel = useStableCallback((school) => {
     if (!school) return
     const hasMultipleLocations = (school.locations?.length || 0) > 1
     setOpenLocationsId(prev => {
@@ -388,29 +392,29 @@ function SearchPage() {
       return nextId
     })
     setSelectedSchoolId(school.id)
-  }
+  })
 
-  const handleShowLocationsForSchool = (school) => {
+  const handleShowLocationsForSchool = useStableCallback((school) => {
     if (!school) return
     setOpenLocationsId(school.id)
     setOverlayForSchool(school.id)
     setSelectedSchoolId(school.id)
-  }
+  })
 
-  const handleShowAllLocations = (schoolId) => {
+  const handleShowAllLocations = useStableCallback((schoolId) => {
     if (!schoolId) return
     setOpenLocationsId(schoolId)
     setOverlayForSchool(schoolId)
     setSelectedSchoolId(schoolId)
-  }
+  })
 
-  const handleFocusLocation = (schoolId, locationId) => {
+  const handleFocusLocation = useStableCallback((schoolId, locationId) => {
     if (!schoolId || !locationId) return
     setOverlayForSchool(schoolId, { focusLocationId: locationId })
     setSelectedSchoolId(schoolId)
-  }
+  })
 
-  const handleToggleHideOthers = (schoolId) => {
+  const handleToggleHideOthers = useStableCallback((schoolId) => {
     if (!schoolId) return
     setLocationOverlay(prev => {
       const sameSchool = prev.schoolId === schoolId
@@ -421,7 +425,7 @@ function SearchPage() {
       }
     })
     setSelectedSchoolId(schoolId)
-  }
+  })
 
   const showLocationError = (message, { temporary = false } = {}) => {
     if (errorTimeoutRef.current) {
@@ -569,7 +573,7 @@ function SearchPage() {
     })
   }
 
-  const handleMapPickLocation = ({ lat, lng }) => {
+  const handleMapPickLocation = useStableCallback(({ lat, lng }) => {
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) return
     const newLocation = {
       lat,
@@ -610,7 +614,7 @@ function SearchPage() {
       .catch(() => {
         // Silent fallback to "Selected on map" when reverse geocoding fails.
       })
-  }
+  })
 
   const handleFilterChange = (newFilters) => {
     const nextFilters = { ...filters, ...newFilters }
@@ -840,13 +844,23 @@ function SearchPage() {
     }
   }, [debouncedBoundsHandler])
 
-  const handleBoundsChange = (bounds) => {
-    debouncedBoundsHandler(bounds)
-  }
+  // Moving the map only re-renders the page when the list is filtered by map area
+  const handleBoundsChange = useStableCallback((bounds) => {
+    latestMapBoundsRef.current = bounds
+    if (searchInBounds) {
+      debouncedBoundsHandler(bounds)
+    }
+  })
+
+  useEffect(() => {
+    if (searchInBounds) {
+      setMapBounds(latestMapBoundsRef.current)
+    }
+  }, [searchInBounds])
 
   useEffect(() => {
     if (!selectedSchoolId || !scrollOnSelectRef.current) return
-    const node = cardRefs.current.get(selectedSchoolId)
+    const node = document.querySelector(`[data-school-id="${selectedSchoolId}"]`)
     if (node) {
       node.scrollIntoView({ behavior: 'smooth', block: 'center' })
     }
@@ -1210,6 +1224,58 @@ function SearchPage() {
     return counts
   }, [baseSchools, availableFilters, filters.languageFocus, filters.specialPrograms, filters.facilities, filters.teachingApproach])
 
+  // Scans every school, so compute once per data change rather than on every render
+  const languageFilterOptions = useMemo(() => {
+    const derivedLanguages = new Set()
+    const derivedLevels = new Set()
+    const derivedPairs = new Set()
+
+    baseSchools.forEach(school => {
+      getLanguageFocusPairs(school).forEach(pair => {
+        derivedPairs.add(pair)
+        if (pair.includes(':')) {
+          const [language, level] = pair.split(':')
+          if (language) derivedLanguages.add(language)
+          if (level) derivedLevels.add(level)
+        }
+      })
+    })
+
+    const languages = Array.from(new Set([
+      ...(availableFilters.language_focus_languages || []),
+      ...derivedLanguages,
+    ]))
+
+    const levels = Array.from(new Set([
+      ...(DEFAULT_ADVANCED_OPTIONS.language_focus_levels || []),
+      ...(availableFilters.language_focus_levels || []),
+      ...derivedLevels,
+    ]))
+
+    const pairs = [
+      ...(availableFilters.language_focus_pairs || []),
+      ...derivedPairs,
+    ]
+    const byLanguage = new Map()
+
+    pairs.forEach(pair => {
+      const [language, level] = pair.split(':')
+      if (!language || !level) return
+      if (!byLanguage.has(language)) {
+        byLanguage.set(language, new Set())
+      }
+      byLanguage.get(language).add(level)
+    })
+
+    languages.forEach(language => {
+      const existingLevels = byLanguage.get(language) || new Set()
+      const combined = new Set([...levels, ...existingLevels])
+      byLanguage.set(language, combined)
+    })
+
+    return { languages, levels, byLanguage }
+  }, [baseSchools, availableFilters])
+
   const renderAdvancedFilters = () => {
     const buildOptions = (key) => {
       const serverOptions = availableFilters[key] || []
@@ -1217,59 +1283,8 @@ function SearchPage() {
       return Array.from(new Set([...defaults, ...serverOptions]))
     }
 
-    const buildLanguageOptions = () => {
-      const derivedLanguages = new Set()
-      const derivedLevels = new Set()
-      const derivedPairs = new Set()
-
-      baseSchools.forEach(school => {
-        getLanguageFocusPairs(school).forEach(pair => {
-          derivedPairs.add(pair)
-          if (pair.includes(':')) {
-            const [language, level] = pair.split(':')
-            if (language) derivedLanguages.add(language)
-            if (level) derivedLevels.add(level)
-          }
-        })
-      })
-
-      const languages = Array.from(new Set([
-        ...(availableFilters.language_focus_languages || []),
-        ...derivedLanguages,
-      ]))
-
-      const levels = Array.from(new Set([
-        ...(DEFAULT_ADVANCED_OPTIONS.language_focus_levels || []),
-        ...(availableFilters.language_focus_levels || []),
-        ...derivedLevels,
-      ]))
-
-      const pairs = [
-        ...(availableFilters.language_focus_pairs || []),
-        ...derivedPairs,
-      ]
-      const byLanguage = new Map()
-
-      pairs.forEach(pair => {
-        const [language, level] = pair.split(':')
-        if (!language || !level) return
-        if (!byLanguage.has(language)) {
-          byLanguage.set(language, new Set())
-        }
-        byLanguage.get(language).add(level)
-      })
-
-      languages.forEach(language => {
-        const existingLevels = byLanguage.get(language) || new Set()
-        const combined = new Set([...levels, ...existingLevels])
-        byLanguage.set(language, combined)
-      })
-
-      return { languages, levels, byLanguage }
-    }
-
     const renderLanguageFocusGroup = () => {
-      const { languages, levels, byLanguage } = buildLanguageOptions()
+      const { languages, levels, byLanguage } = languageFilterOptions
       if (languages.length === 0) return null
 
       return (
@@ -1903,26 +1918,19 @@ function SearchPage() {
                 {!loading && !error && sortedSchools.map(school => (
                   <SchoolCard
                     key={school.id}
-                    ref={(node) => {
-                      if (node) {
-                        cardRefs.current.set(school.id, node)
-                      } else {
-                        cardRefs.current.delete(school.id)
-                      }
-                    }}
                     school={school}
                     location={getLocationForAgeGroup(school, filters.ageGroup)}
                     isSelected={selectedSchoolId === school.id}
-                    onClick={() => handleSchoolSelect(school, { source: 'list' })}
-                    onHover={() => handleSchoolHover(school)}
+                    onClick={handleListSchoolSelect}
+                    onHover={handleSchoolHover}
                     onHoverEnd={handleSchoolHoverEnd}
                     ageGroupOrder={ageGroupOrder}
                     activeAgeGroup={filters.ageGroup}
                     isLocationsOpen={openLocationsId === school.id}
                     locationOverlay={locationOverlay}
-                    onToggleLocations={() => handleToggleLocationsPanel(school)}
-                    onShowAllLocations={() => handleShowAllLocations(school.id)}
-                    onFocusLocation={(locationId) => handleFocusLocation(school.id, locationId)}
+                    onToggleLocations={handleToggleLocationsPanel}
+                    onShowAllLocations={handleShowAllLocations}
+                    onFocusLocation={handleFocusLocation}
                     onClearLocations={clearLocationOverlay}
                     examAverages={examAverages}
                   />
@@ -1943,7 +1951,7 @@ function SearchPage() {
                   activeAgeGroup={filters.ageGroup}
                   selectedSchoolId={selectedSchoolId}
                   hoveredSchoolId={hoveredSchoolId}
-                  onSchoolSelect={(school) => handleSchoolSelect(school, { source: 'map' })}
+                  onSchoolSelect={handleMapSchoolSelect}
                   onClearSelection={handleClearSelection}
                   loading={loading}
                   userLocation={userLocation}

@@ -1,4 +1,4 @@
-import { forwardRef, useMemo, useState } from 'react'
+import { memo, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { useCompare } from '../../context/CompareContext'
@@ -622,26 +622,25 @@ function buildExpandedSections({
   return sections
 }
 
-const SchoolCard = forwardRef(function SchoolCard(
-  {
-    school,
-    isSelected,
-    onClick,
-    onHover,
-    onHoverEnd,
-    location,
-    activeAgeGroup = null,
-    ageGroupOrder = [],
-    isLocationsOpen = false,
-    locationOverlay = null,
-    onToggleLocations,
-    onShowAllLocations,
-    onFocusLocation,
-    onClearLocations,
-    examAverages = null,
-  },
-  ref
-) {
+// Memoized: the search page renders hundreds of cards, and callbacks receive the
+// school so the parent can pass stable handlers instead of per-card closures.
+const SchoolCard = memo(function SchoolCard({
+  school,
+  isSelected,
+  onClick,
+  onHover,
+  onHoverEnd,
+  location,
+  activeAgeGroup = null,
+  ageGroupOrder = [],
+  isLocationsOpen = false,
+  locationOverlay = null,
+  onToggleLocations,
+  onShowAllLocations,
+  onFocusLocation,
+  onClearLocations,
+  examAverages = null,
+}) {
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
   const { addToCompare, removeFromCompare, isInCompare, canAddMore } = useCompare()
@@ -931,18 +930,18 @@ const SchoolCard = forwardRef(function SchoolCard(
 
   const handleToggleLocations = (event) => {
     event.stopPropagation()
-    onToggleLocations?.()
+    onToggleLocations?.(school)
   }
 
   const handleShowAllLocations = (event) => {
     event.stopPropagation()
-    onShowAllLocations?.()
+    onShowAllLocations?.(school.id)
   }
 
 
   const handleFocusLocation = (event, locationId) => {
     event.stopPropagation()
-    onFocusLocation?.(locationId)
+    onFocusLocation?.(school.id, locationId)
   }
 
   const handleClearLocations = (event) => {
@@ -952,9 +951,9 @@ const SchoolCard = forwardRef(function SchoolCard(
 
   return (
     <article
-      ref={ref}
-      onClick={onClick}
-      onMouseEnter={onHover}
+      data-school-id={school.id}
+      onClick={() => onClick?.(school)}
+      onMouseEnter={() => onHover?.(school)}
       onMouseLeave={onHoverEnd}
       className={
         `school-card p-5 max-md:p-4 mx-3 my-3 rounded-[12px] cursor-pointer bg-white border transition-all duration-200 shadow-sm hover:-translate-y-0.5 hover:border-teal-500 hover:shadow-[0_4px_12px_rgba(20,184,166,0.15)] ` +

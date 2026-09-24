@@ -12,6 +12,7 @@ import { useCountry } from '../../context/CountryContext'
 import { getAgeGroupKeys } from '../../utils/countryConfig'
 import { getFocusEmojis, getFocusLabels } from '../../utils/locationFocus'
 import { AGE_GROUP_KEYS } from '../../utils/education'
+import { useStableCallback } from '../../hooks/useStableCallback'
 
 // CARTO requires an API key; without one every tile is watermarked
 const CARTO_API_KEY = import.meta.env.VITE_CARTO_API_KEY
@@ -545,7 +546,7 @@ function PopupContent({
           type="button"
           onClick={(event) => {
             event.stopPropagation()
-            onCompareToggle?.()
+            onCompareToggle?.(marker.school)
           }}
           disabled={compareDisabled}
           className={`
@@ -563,7 +564,7 @@ function PopupContent({
           type="button"
           onClick={(event) => {
             event.stopPropagation()
-            onViewDetails?.()
+            onViewDetails?.(marker.school)
           }}
           className="flex-1 px-3 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors"
         >
@@ -596,6 +597,12 @@ const SchoolMarker = memo(function SchoolMarker({
   onMarkerInteraction,
 }) {
   const markerRef = useRef(null)
+  const schoolType = marker.school.school_type
+  // A new icon object makes react-leaflet rebuild the marker DOM, so only create one when its look changes
+  const icon = useMemo(
+    () => createMarkerIcon(schoolType, { isSelected, isHovered, isDimmed }),
+    [schoolType, isSelected, isHovered, isDimmed]
+  )
 
   useEffect(() => {
     if (!markerRef.current || !showPopup) return
@@ -610,7 +617,7 @@ const SchoolMarker = memo(function SchoolMarker({
     <Marker
       ref={markerRef}
       position={marker.position}
-      icon={createMarkerIcon(marker.school.school_type, { isSelected, isHovered, isDimmed })}
+      icon={icon}
       zIndexOffset={isSelected ? 1200 : 0}
       eventHandlers={{
         mousedown: (event) => {
@@ -683,10 +690,11 @@ const OverlayLocationMarker = memo(function OverlayLocationMarker({
     : labelMode === 'number'
     ? marker.label
     : getLocationShortLabel(t, marker.location, ageGroupOrder, activeAgeGroup)
-  const icon = createLocationMarkerIcon(marker.school.school_type, {
-    label,
-    isSelected,
-  })
+  const schoolType = marker.school.school_type
+  const icon = useMemo(
+    () => createLocationMarkerIcon(schoolType, { label, isSelected }),
+    [schoolType, label, isSelected]
+  )
   const fullLabel = labelMode === 'focus' && focusLabels.length
     ? focusLabels.join(', ')
     : labelMode === 'number'
@@ -990,14 +998,18 @@ function SchoolMap({
     return () => cancelAnimationFrame(frame)
   }, [selectedSchoolId])
 
-  const handleCompareToggle = (school) => {
+  const handleCompareToggle = useStableCallback((school) => {
     if (!school) return
     if (isInCompare(school.id)) {
       removeFromCompare(school.id)
     } else {
       addToCompare(school)
     }
-  }
+  })
+
+  const handleViewDetails = useCallback((school) => {
+    navigate(`/schools/${school.id}`)
+  }, [navigate])
 
   return (
     <div
@@ -1037,8 +1049,8 @@ function SchoolMap({
                   userLocation={userLocation}
                   onSelect={onSchoolSelect}
                   onFocusLocation={onFocusLocation}
-                  onCompareToggle={() => handleCompareToggle(marker.school)}
-                  onViewDetails={() => navigate(`/schools/${marker.school.id}`)}
+                  onCompareToggle={handleCompareToggle}
+                  onViewDetails={handleViewDetails}
                   onClosePopup={onClearSelection}
                   inCompare={isInCompare(marker.school.id)}
                   canAddMore={canAddMore}
@@ -1126,8 +1138,8 @@ function SchoolMap({
               t={t}
               language={i18n.language}
               userLocation={userLocation}
-              onCompareToggle={() => handleCompareToggle(marker.school)}
-              onViewDetails={() => navigate(`/schools/${marker.school.id}`)}
+              onCompareToggle={handleCompareToggle}
+              onViewDetails={handleViewDetails}
               onClosePopup={onClearSelection}
               inCompare={isInCompare(marker.school.id)}
               canAddMore={canAddMore}
@@ -1148,12 +1160,12 @@ function SchoolMap({
               isDimmed={false}
               onSelect={onSchoolSelect}
               onDeselect={onClearSelection}
-            showPopup={!isMobile && !overlayFocusActive}
+              showPopup={!isMobile && !overlayFocusActive}
               t={t}
               language={i18n.language}
               userLocation={userLocation}
-              onCompareToggle={() => handleCompareToggle(marker.school)}
-              onViewDetails={() => navigate(`/schools/${marker.school.id}`)}
+              onCompareToggle={handleCompareToggle}
+              onViewDetails={handleViewDetails}
               onClosePopup={onClearSelection}
             inCompare={isInCompare(marker.school.id)}
             canAddMore={canAddMore}
@@ -1199,8 +1211,8 @@ function SchoolMap({
               t={t}
               language={i18n.language}
               userLocation={userLocation}
-              onCompareToggle={() => handleCompareToggle(selectedMarker.school)}
-              onViewDetails={() => navigate(`/schools/${selectedMarker.school.id}`)}
+              onCompareToggle={handleCompareToggle}
+              onViewDetails={handleViewDetails}
               onClose={onClearSelection}
               isMobile
               inCompare={isInCompare(selectedMarker.school.id)}
