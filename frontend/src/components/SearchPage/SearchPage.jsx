@@ -2019,7 +2019,8 @@ function SearchPage() {
               </div>
               <div className="p-5">
                 <div className="space-y-6">
-                  {mobileTab === 'map' && renderMapBoundsFilter()}
+                  {/* Map-area filter where the map is visible, or while it is on so it can be turned off. */}
+                  {(mobileTab === 'map' || searchInBounds) && renderMapBoundsFilter()}
                   {renderAdvancedFilters()}
                   <Link to="/about" className="inline-block text-sm text-primary-700 underline">
                     {t('nav.about')}
