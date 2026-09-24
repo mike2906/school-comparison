@@ -1585,6 +1585,78 @@ the publish boundary wait for Mike.
 - [ ] **UF6 Kindergarten "last admitted points" ignores the age group** (detail key facts).
       Latent until E6 imports thresholds; handle there.
 
+#### UX review pass 2 (2026-09-24)
+
+A fresh-eyes review of `main` after U1–U8 (Playwright at 390/820/1440, BG and EN, five
+parent personas); findings spot-checked against the API and DB. Screenshots were kept in
+the session scratchpad only.
+
+**Frontend-only (agent may do):**
+- [ ] **UF7 Tablet (768–1023 px) shows two headers** and the Map/List tabs do nothing: the
+      nav hides below `md`, the mobile header only from `lg`. One breakpoint for both.
+- [ ] **UF8 Mobile compare bar covers the map popup's Compare / View details buttons.**
+- [ ] **UF9 "Show age groups & shifts" everywhere, but no shift data exists** (0 of 1,663
+      `shift` values). Say "Age groups" and drop the clock icons until there is data.
+- [ ] **UF10 NVO wording/units disagree:** "national average" vs "national benchmark",
+      "+1.5%" deltas next to "+19.7 pp", an unexplained "Trend" column, "(33%)" on tabs,
+      "Под ориентира" jargon. One term (national average), deltas in pp everywhere.
+- [ ] **UF11 Compare colours NVO on fixed 60/75 % cut-offs,** contradicting the detail
+      page's "above national average" green; the row doesn't name the grade and "School
+      avg" doesn't say "5-year". Colour relative to the national average; label both.
+- [ ] **UF12 СУ (grades 1–12) badged "Гимназия / High School"; ОУ translated "Primary
+      School".** Derive the badge from the grades offered / school type in the name.
+- [ ] **UF13 Hard-coded "District enrollment / Прием по район"** on every state primary /
+      lower-secondary card (`SchoolCard.jsx`), not from data and misleading for Sofia's
+      central 1st-grade points system. Remove it.
+- [ ] **UF14 Kindergarten parents get no admission signal:** add "Admission by points via
+      kg.sofia.bg; thresholds coming later" to state kindergartens; hide NVO and price
+      sorts for kindergarten groups.
+- [ ] **UF15 Mixed-language data:** "Езици на обучение: Bulgarian", "Фокус Bulgarian",
+      English tags in the BG UI and Bulgarian / Title-Case tags in EN compare and cards.
+      Translate language names via i18n; reuse `utils/tags.js` in cards and compare.
+- [ ] **UF16 Counts say "149 училища" for kindergarten groups;** use a neutral or
+      kindergarten noun.
+- [ ] **UF17 Location chip "До 1, бул. Витоша"** is ambiguous and truncates on phones:
+      "Близо до …", and move the distance select into the popover on mobile.
+- [ ] **UF18 Compare page phones** are not normalised or tappable; reuse `PhoneLinks`.
+- [ ] **UF19 Mobile first screen fits ~1 card;** age picker and search placeholder truncate.
+      One scrollable chip row for location/type/sort, one-line welcome tip, shorter
+      placeholder.
+- [ ] **UF20 Filters buried three levels deep; desktop sidebar mostly empty.** Open
+      advanced filters by default; put type/distance/sort in the desktop sidebar.
+- [ ] **UF21 Card footer toggles wrap onto two lines each on phones.**
+- [ ] **UF22 Map popup repeats the grades line;** desktop popup overlaps "Reset view".
+- [ ] **UF23 "Search in visible map area" offered on the mobile List tab** (map hidden).
+- [ ] **UF24 Contrast:** white on primary-500 badges (~2.5:1) and primary-600 buttons
+      (~3.7:1) fail WCAG AA; use primary-700.
+- [ ] **UF25 Duplicate `#school-name-search` id** (mobile + desktop copies).
+- [ ] **UF26 Unknown URLs show React Router's developer error page;** add a translated 404.
+- [ ] **UF27 Footer with About and a "report a data error" link** (needs a contact channel
+      from Mike).
+- [ ] **UF28 Monthly tuition is yearly ÷ 12** though most schools bill over 9–10 months;
+      drop it or label it.
+- [ ] **UF29 Small copy issues:** "Tuition / Admission" row shows only tuition; birth-year
+      list includes the enrolment year itself; unexplained tab percentages.
+- [ ] **UF30 (P2) Map markers don't distinguish kindergartens from schools** in All ages.
+- [ ] **UF31 (P2) Emoji and SVG icons mixed;** flags stand in for languages.
+
+**Backend / data (wait for Mike):**
+- [ ] **UF32 Name search misses how parents write names:** "СМГ", "НПМГ", "1 АЕГ",
+      "119 СУ", "СУ 119" return nothing (only "119" or a full word works). Strip type
+      words and "№", match number + rest, small curated alias table.
+- [ ] **UF33 Three locations sit on the Sofia centroid** (e.g. ДГ №31 Люлин, id 143), so
+      they show as ~0.2 km from the centre. Re-geocode them and treat centroid hits as
+      "no coordinates" (no distance) in a guard.
+- [ ] **UF34 English names are transliterations** ("Amerikanski Kolezh V Sofia",
+      "Chastna Ezikova Gimnaziya…") next to translated ones; "American" does not find the
+      American College. Curated EN names for well-known schools + type-word translation.
+- [ ] **UF35 Only 54 state kindergartens listed** with no coverage statement; check
+      against kg.sofia.bg and state coverage on /about and in counts.
+- [ ] **UF36 `/schools` is 2.1 MB uncompressed** (~200 KB gzipped); add `GZipMiddleware`
+      or proxy compression, later a slimmer list schema.
+- [ ] **UF37 Raw register formatting:** ALL-CAPS names, "ЕООД" suffixes, stray quotes,
+      machine-transliterated addresses in the EN UI. A display-name / address cleanup.
+
 ## Phase 3 — Go live
 
 - [x] **P3.1 Prod config hardening.** Flip `debug` default to `False` in
