@@ -1437,6 +1437,60 @@ operational safeguards do not reopen the accepted launch boundary.
       `main` workflows passed. P2.14(e) remains deliberately open with its recorded
       evidence requirements and unchanged curation queues.
 
+## Phase UX — UI/UX review (2026-09-24)
+
+Source: a UX review done as a UX expert and as four parent personas (kindergarten parent
+who thinks in birth years; 7th-grade parent choosing a gymnasium; expat parent comparing
+private schools; parent who already knows the school name), with screenshots at 390 / 820 /
+1440 px and a scripted back-navigation measurement (list scroll 1500 → 0, selection and map
+view lost, skeleton re-shown, ~10 API calls on return). Frontend-only; no response-field or
+gate changes. Mike approved (2026-09-24) agent self-merge for these PRs on green CI after
+self-review, with at most one Codex review on the larger ones.
+
+- [ ] **U1 Correctness fixes.** (a) Compare quick-overview formats EUR prices as BGN
+      (`formatCurrency` called without the row currency); all display fallbacks default
+      to `'BGN'` although Bulgaria uses EUR since 2026-01-01. (b) Desktop search has no
+      result count or sort control (the bar is `lg:hidden`). (c) No language toggle on the
+      mobile search page (nav hidden). (d) Name sort is lexicographic ("1, 10, 101") and
+      puts stray leading quotes first — use numeric collation. (e) Desktop filter sidebar
+      is `w-1/5` (288 px at 1440) and clips the address Search button. (f) Mobile search
+      uses `h-screen` (100vh) — use `100dvh`. (g) "12th grade" NVO labels while the exam
+      tabs are 4/7/10 — verify and fix.
+- [ ] **U2 Keep search state across detail navigation.** In-memory cache of the school
+      list per query; selected school, sort, distance, and list/map view in the URL
+      (`replace`); restore the list's scroll position and the map centre/zoom on return
+      (skip auto-fit); detail "Back" falls back to `/search` when there is no in-app
+      history; drop the duplicate `useSchools` fetch.
+- [ ] **U3 Desktop detail side panel.** On `lg+`, opening a school shows its detail in a
+      panel over the list/map instead of leaving the page; `/schools/:id` stays a
+      deep-linkable full page (and is what mobile uses). "Details" becomes a real link.
+- [ ] **U4 Search is the home page.** `/` shows the map + list immediately; the
+      category / age group / birth-year choice becomes a compact bar on the search page
+      (birth year first, per the calendar-year rule), editable at any time instead of a
+      locked chip. School-name search on the search page (instant, Latin/Cyrillic/numbers)
+      and school-name results open the school's page. Old `/?age_group=...` links keep
+      working.
+- [ ] **U5 Results list and filters.** Compact location control ("Near: address", use my
+      location, pick on map) with explicit submit instead of auto-commit on a typing
+      pause; hide per-card "Distance unknown" / "Admissions info unavailable" noise;
+      smaller cards; filter client-side instead of refetching on every advanced-filter
+      click; frequently used filters as chips above the list; sorts by NVO result;
+      Sofia-bounded initial map view; 44 px touch targets; drawer Escape/focus/labels;
+      softer mobile location prompt; "clear filters" on empty results.
+- [ ] **U6 School detail content.** Key-facts strip at the top ordered by school type
+      (price first for private, NVO/admission for state); small map + directions link;
+      remove the misleading cross-grade NVO insight; linear (not smoothed) NVO chart
+      lines; tappable, normalised phone numbers; official-source link instead of
+      "contact school" filler; actions in the header; per-school document title;
+      untranslated Bulgarian tags and Title Case scraped labels handled in the EN UI.
+- [ ] **U7 Compare page.** Usable mobile layout (stacked rows, two schools per view);
+      sticky school header while scrolling; compare list stores ids, not stale school
+      objects; compare bar fits mobile and explains the 4-school limit; "Add school" keeps
+      the search context.
+- [ ] **U8 Cross-cutting.** Clickable logo and nav link to Compare; "EN | BG" language
+      switch; keyboard-reachable cards and non-colour-only status; "About the data" page
+      (sources, last updated). Split the largest components as they are touched (P4.1).
+
 ## Phase 3 — Go live
 
 - [x] **P3.1 Prod config hardening.** Flip `debug` default to `False` in
