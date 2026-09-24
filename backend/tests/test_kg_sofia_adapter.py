@@ -838,6 +838,7 @@ class TestKgSofiaImportCompleteness:
         adapter = KgSofiaBgAdapter(db=None)
         # 106 is the family's school; 299 ('- сграда 2') was imported as school 120.
         adapter._school_id_by_kg_id = {"106": 119, "299": 120}
+        adapter._school_id_by_own_kg_id = {"106": 119, "299": 120}
         family = DiscoveredSchool(
             name_i18n={"bg": "ДГ №16 Приказен свят"},
             country_code="bg",
@@ -854,6 +855,90 @@ class TestKgSofiaImportCompleteness:
             ["source_record_id=106"],
             ["source_record_id=500"],
         ]
+
+    def test_new_family_does_not_match_standalone_building_school(self):
+        from app.schemas.scraping import DiscoveredLocation, DiscoveredSchool
+
+        def location(record_id: int) -> DiscoveredLocation:
+            return DiscoveredLocation(
+                address_i18n={"bg": f"ул. Тестова {record_id}"},
+                district="Средец",
+                is_primary=record_id == 40,
+                location_tags=[f"source_record_id={record_id}"],
+                age_groups=[],
+                shifts={},
+                has_organised_groups={},
+            )
+
+        adapter = KgSofiaBgAdapter(db=None)
+        # Canonical 40 was never imported; its building 41 is standalone school 500.
+        adapter._school_id_by_kg_id = {"41": 500}
+        adapter._school_id_by_own_kg_id = {"41": 500}
+        family = DiscoveredSchool(
+            name_i18n={"bg": "ДГ №40 Тест"},
+            country_code="bg",
+            city="sofia",
+            school_type="state",
+            education_level="kindergarten",
+            locations=[location(40), location(41)],
+            attributes={"kg_sofia_id": 40, "kg_sofia_ids": ["40", "41"]},
+        )
+
+        assert adapter._existing_school_id_for(family) is None
+        adapter._drop_locations_owned_by_other_schools(family)
+        assert [loc.location_tags for loc in family.locations] == [["source_record_id=40"]]
+
+    async def test_linked_school_location_takes_new_age_groups_keeps_coordinates(
+        self, db_session: AsyncSession
+    ):
+        from sqlalchemy import select
+        from app.models import School, SchoolLocation, SchoolLocationAgeGroupShift
+        from app.schemas.scraping import DiscoveredLocation, DiscoveredSchool
+
+        school = School(
+            country_code="bg", name_i18n={"bg": "ДГ №9 Тест"}, school_type="state",
+            education_level="kindergarten", city="sofia", attributes={"kg_sofia_id": 9},
+        )
+        db_session.add(school)
+        await db_session.flush()
+        row = SchoolLocation(
+            school_id=school.id, address_i18n={"bg": "ул. Тестова 9"}, district="Средец",
+            phone="02/000", lat=42.7, lng=23.3, is_primary=True,
+            location_tags=["address_source=website_contact", "source_record_id=1"],
+        )
+        db_session.add(row)
+        await db_session.flush()
+        db_session.add(SchoolLocationAgeGroupShift(location_id=row.id, age_group="first"))
+        await db_session.commit()
+
+        adapter = KgSofiaBgAdapter(db=db_session)
+        adapter._school_id_by_kg_id = {"9": school.id}
+        await adapter.upsert_schools([
+            DiscoveredSchool(
+                name_i18n={"bg": "ДГ №9 Тест"}, country_code="bg", city="sofia",
+                school_type="state", education_level="kindergarten",
+                locations=[DiscoveredLocation(
+                    address_i18n={"bg": "ул. Тестова 9"}, district="Средец", phone="02/111",
+                    is_primary=True, age_groups=["nursery", "first"], shifts={},
+                    location_tags=["source=kg_sofia_bg", "source_record_id=9"],
+                    has_organised_groups={},
+                )],
+                attributes={"kg_sofia_id": 9, "kg_sofia_public_type": "ДГ (с яслени групи)"},
+            )
+        ])
+
+        location = (await db_session.execute(select(SchoolLocation))).scalar_one()
+        assert location.id == row.id
+        assert (location.lat, location.lng, location.phone) == (42.7, 23.3, "02/111")
+        assert location.location_tags == [
+            "address_source=website_contact",
+            "source=kg_sofia_bg",
+            "source_record_id=9",
+        ]
+        age_groups = (
+            await db_session.execute(select(SchoolLocationAgeGroupShift.age_group))
+        ).scalars().all()
+        assert sorted(age_groups) == ["first", "nursery"]
 
     async def test_building_school_owns_its_kg_id_over_family_list(self, db_session: AsyncSession):
         from app.models import School

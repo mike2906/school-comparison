@@ -261,9 +261,14 @@ class BaseSourceAdapter(ABC):
                     if existing_locations:
                         keep_existing_locations = True
                         if matched_by_source_id:
-                            # A school this source already owns may gain a location (e.g. a
-                            # new kindergarten building); add only unseen addresses.
-                            known = {_address_key(loc.address_i18n) for loc in existing_locations}
+                            # A school this source already owns keeps its rows (and their
+                            # coordinates) but takes the source's contact and age-group data,
+                            # and may gain a location (e.g. a new kindergarten building).
+                            known = {_address_key(loc.address_i18n): loc for loc in existing_locations}
+                            for incoming in locations_to_add:
+                                row = known.get(_address_key(incoming.address_i18n))
+                                if row is not None:
+                                    await self._sync_source_location(row, incoming)
                             locations_to_add = [
                                 loc.model_copy(update={"is_primary": False})
                                 for loc in locations_to_add
@@ -368,6 +373,53 @@ class BaseSourceAdapter(ABC):
     def _ensure_i18n_fallbacks(self, disc: DiscoveredSchool) -> None:
         """Keep discovery data source-backed; synthetic EN fallbacks are added at display time only."""
         return None
+
+    async def _sync_source_location(self, row, incoming) -> None:
+        """Update a source-owned location's source fields; never its coordinates."""
+        from sqlalchemy import select
+        from app.models import SchoolLocationAgeGroupShift
+
+        row.district = incoming.district or row.district
+        row.phone = incoming.phone or row.phone
+        if incoming.location_tags:
+            # Replace only this source's own tags; other stages keep markers here
+            # (e.g. address_source=website_contact, coords_cleared=...).
+            source_prefixes = tuple(
+                {tag.split("=", 1)[0] + "=" for tag in incoming.location_tags if "=" in tag}
+            )
+            kept_tags = [
+                tag for tag in row.location_tags or [] if not tag.startswith(source_prefixes)
+            ]
+            row.location_tags = sorted(set(kept_tags) | set(incoming.location_tags))
+        shifts = (
+            await self.db.execute(
+                select(SchoolLocationAgeGroupShift).where(
+                    SchoolLocationAgeGroupShift.location_id == row.id
+                )
+            )
+        ).scalars().all()
+        wanted = set(incoming.age_groups or [])
+        if not wanted:
+            return
+        existing = {shift.age_group: shift for shift in shifts}
+        for age_group, shift in existing.items():
+            if age_group not in wanted:
+                await self.db.delete(shift)
+                continue
+            # Take values the source states; keep stored ones it does not provide.
+            if age_group in incoming.shifts:
+                shift.shift = incoming.shifts[age_group]
+            if age_group in incoming.has_organised_groups:
+                shift.has_organised_groups = incoming.has_organised_groups[age_group]
+        for age_group in sorted(wanted - set(existing)):
+            self.db.add(
+                SchoolLocationAgeGroupShift(
+                    location_id=row.id,
+                    age_group=age_group,
+                    shift=incoming.shifts.get(age_group),
+                    has_organised_groups=incoming.has_organised_groups.get(age_group),
+                )
+            )
 
     def _existing_school_id_for(self, disc: DiscoveredSchool) -> Optional[int]:
         """School id this record is already linked to by source id (override per adapter)."""

@@ -175,11 +175,14 @@ class KgSofiaBgAdapter(BaseSourceAdapter):
                 for grouped_kg_id in kg_ids:
                     if grouped_kg_id is not None:
                         school_id_by_kg_id.setdefault(str(grouped_kg_id), school_id)
+        school_id_by_own_kg_id: dict[str, int] = {}
         for school_id, attrs in school_rows:
             kg_id = attrs.get("kg_sofia_id")
             if kg_id is not None:
                 school_id_by_kg_id[str(kg_id)] = school_id
+                school_id_by_own_kg_id[str(kg_id)] = school_id
         self._school_id_by_kg_id = school_id_by_kg_id
+        self._school_id_by_own_kg_id = school_id_by_own_kg_id
 
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             # Fetch kindergartens
@@ -307,13 +310,22 @@ class KgSofiaBgAdapter(BaseSourceAdapter):
         return None
 
     def _existing_school_id_for(self, disc: DiscoveredSchool) -> Optional[int]:
-        """Match by kg.sofia record id: the adapter's names carry no MoE id and may drift."""
+        """Match by kg.sofia record id: the adapter's names carry no MoE id and may drift.
+
+        The record's own (canonical) id wins. A secondary id of a merged family only
+        matches a school that lists it as part of its family, never a building that an
+        older import stored as its own school.
+        """
         attrs = disc.attributes or {}
-        kg_ids = [attrs.get("kg_sofia_id"), *(attrs.get("kg_sofia_ids") or [])]
         mapping = getattr(self, "_school_id_by_kg_id", {}) or {}
-        for kg_id in kg_ids:
-            if kg_id is not None and str(kg_id) in mapping:
-                return mapping[str(kg_id)]
+        own = getattr(self, "_school_id_by_own_kg_id", {}) or {}
+        canonical = attrs.get("kg_sofia_id")
+        if canonical is not None and str(canonical) in mapping:
+            return mapping[str(canonical)]
+        for kg_id in attrs.get("kg_sofia_ids") or []:
+            key = str(kg_id)
+            if key in mapping and key not in own:
+                return mapping[key]
         return None
 
     def _drop_locations_owned_by_other_schools(self, school: DiscoveredSchool) -> None:
@@ -324,9 +336,7 @@ class KgSofiaBgAdapter(BaseSourceAdapter):
         instead of adding a second pin for the same building.
         """
         target = self._existing_school_id_for(school)
-        if target is None:
-            return
-        mapping = getattr(self, "_school_id_by_kg_id", {}) or {}
+        own = getattr(self, "_school_id_by_own_kg_id", {}) or {}
         kept = []
         for location in school.locations:
             record_ids = [
@@ -334,7 +344,7 @@ class KgSofiaBgAdapter(BaseSourceAdapter):
                 for tag in location.location_tags or []
                 if tag.startswith("source_record_id=")
             ]
-            owners = {mapping.get(record_id) for record_id in record_ids} - {None}
+            owners = {own.get(record_id) for record_id in record_ids} - {None}
             if owners and target not in owners:
                 continue
             kept.append(location)
