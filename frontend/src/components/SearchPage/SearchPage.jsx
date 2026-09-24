@@ -1794,6 +1794,18 @@ function SearchPage() {
             ${showMap ? 'lg:block' : 'lg:hidden'}
             md:w-2/5
           `}>
+                {isPickingLocation && (
+                  <div className="absolute inset-x-3 top-16 z-[1000] flex items-center justify-between gap-3 rounded-lg bg-neutral-900/90 px-4 py-2 text-sm text-white shadow-lg" role="status">
+                    <span>{t('location.mapPickHint')}</span>
+                    <button
+                      type="button"
+                      onClick={handleStartMapPick}
+                      className="h-9 flex-shrink-0 rounded-md bg-white/15 px-3 font-medium hover:bg-white/25"
+                    >
+                      {t('location.cancelMapPick')}
+                    </button>
+                  </div>
+                )}
                 <SchoolMap
                   schools={filteredSchools}
                   activeAgeGroup={filters.ageGroup}
