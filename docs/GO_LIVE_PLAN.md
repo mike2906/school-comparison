@@ -1474,9 +1474,16 @@ self-review, with at most one Codex review on the larger ones.
       entry in sessionStorage. Measured: back from a detail page restores scroll 1500 →
       1500, selection, sort and map view with no skeleton and no list refetch. The detail
       "Back" fallback moves to U3 (the detail page is being edited under U6).
-- [ ] **U3 Desktop detail side panel.** On `lg+`, opening a school shows its detail in a
+- [x] **U3 Desktop detail side panel.** On `lg+`, opening a school shows its detail in a
       panel over the list/map instead of leaving the page; `/schools/:id` stays a
       deep-linkable full page (and is what mobile uses). "Details" becomes a real link.
+      **Done 2026-09-24:** `?detail=<id>` on `/search` opens `SchoolDetailPanel` over the
+      filters + list (map stays visible and highlights the school); opening pushes a
+      history entry (flagged in history state) so browser Back / Escape / "Back to
+      results" close it, and a marker click swaps the school. "Details" is a `<Link>`:
+      plain click on `lg+` opens the panel, modified clicks and mobile go to the full
+      page. `SchoolDetailPage` gained an `embedded` mode, and its Back falls back to the
+      last search URL when there is no in-app history (U2 leftover).
 - [ ] **U4 Search is the home page.** `/` shows the map + list immediately; the
       category / age group / birth-year choice becomes a compact bar on the search page
       (birth year first, per the calendar-year rule), editable at any time instead of a

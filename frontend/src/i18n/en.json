@@ -589,5 +589,10 @@
     "inBulgarian": "In Bulgarian",
     "officialAdmission": "Admission to Sofia municipal kindergartens runs through the official system:",
     "mapLabel": "Map of school locations"
+  },
+  "detailPanel": {
+    "label": "School details",
+    "backToResults": "Back to results",
+    "openFullPage": "Open full page"
   }
 }

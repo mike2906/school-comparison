@@ -13,6 +13,7 @@ import { getAgeGroupKeys } from '../../utils/countryConfig'
 import { getFocusEmojis, getFocusLabels } from '../../utils/locationFocus'
 import { AGE_GROUP_KEYS } from '../../utils/education'
 import { useStableCallback } from '../../hooks/useStableCallback'
+import { isDesktopViewport } from '../../utils/searchViewState'
 
 // CARTO requires an API key; without one every tile is watermarked
 const CARTO_API_KEY = import.meta.env.VITE_CARTO_API_KEY
@@ -831,6 +832,7 @@ function SchoolMap({
   onPickLocation,
   onBoundsChange,
   onViewChange,
+  onOpenDetails,
   initialView = null,
   autoFit = true,
   hasCompare = false,
@@ -1025,8 +1027,12 @@ function SchoolMap({
   })
 
   const handleViewDetails = useCallback((school) => {
+    if (onOpenDetails && isDesktopViewport()) {
+      onOpenDetails(school)
+      return
+    }
     navigate(`/schools/${school.id}`)
-  }, [navigate])
+  }, [navigate, onOpenDetails])
 
   return (
     <div

@@ -5,6 +5,7 @@ import Layout from '../Layout/Layout'
 import { fetchSchool, fetchExamAverages } from '../../api/schools'
 import { getSchoolName, getAddress, getSummary } from '../../utils/i18n'
 import { normalizeSchool } from '../../utils/schoolAttributes'
+import { getLastSearchUrl } from '../../utils/searchViewState'
 import { useCompare } from '../../context/CompareContext'
 import {
   getStatusInfo,
@@ -37,9 +38,32 @@ import PhoneLinks from './PhoneLinks'
 // kindergarten admission thresholds; see AGENTS.md).
 const SOFIA_KINDERGARTEN_ADMISSION_URL = 'https://kg.sofia.bg'
 
-function SchoolDetailPage() {
-  const { id } = useParams()
+// In the desktop search side panel there is no page chrome around the detail.
+function EmbeddedShell({ children }) {
+  return <div className="bg-neutral-100 min-h-full">{children}</div>
+}
+
+/**
+ * A school's detail. Rendered as the `/schools/:id` page, or `embedded` inside the search
+ * page's side panel, where "Back" closes the panel instead of leaving the page.
+ */
+function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null }) {
+  const params = useParams()
+  const id = schoolId ?? params.id
   const navigate = useNavigate()
+  const Shell = embedded ? EmbeddedShell : Layout
+  const handleBack = () => {
+    if (embedded && onClose) {
+      onClose()
+      return
+    }
+    // Opened from a shared link: there is no in-app page to go back to.
+    if (window.history.state?.idx === 0) {
+      navigate(getLastSearchUrl())
+      return
+    }
+    navigate(-1)
+  }
   const { t, i18n } = useTranslation()
   const { addToCompare, removeFromCompare, isInCompare, canAddMore, compareList } = useCompare()
   const [rawSchool, setRawSchool] = useState(null)
@@ -108,7 +132,7 @@ function SchoolDetailPage() {
 
   if (loading) {
     return (
-      <Layout>
+      <Shell>
         <div className="flex items-center justify-center min-h-[60vh]">
           <div className="flex items-center gap-3">
             <svg className="animate-spin h-8 w-8 text-primary-500" fill="none" viewBox="0 0 24 24">
@@ -118,13 +142,13 @@ function SchoolDetailPage() {
             <span className="text-lg text-neutral-600">{t('common.loading')}</span>
           </div>
         </div>
-      </Layout>
+      </Shell>
     )
   }
 
   if (error || !school) {
     return (
-      <Layout>
+      <Shell>
         <div className="max-w-4xl mx-auto px-6 py-12">
           <div className="text-center">
             <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-100 flex items-center justify-center">
@@ -135,14 +159,14 @@ function SchoolDetailPage() {
             <h2 className="text-2xl font-bold text-neutral-900 mb-2">{t('schools.notFound')}</h2>
             <p className="text-neutral-600 mb-6">{error || t('schools.notFoundDesc')}</p>
             <button
-              onClick={() => navigate(-1)}
+              onClick={handleBack}
               className="px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
             >
               {t('common.goBack')}
             </button>
           </div>
         </div>
-      </Layout>
+      </Shell>
     )
   }
 
@@ -229,12 +253,12 @@ function SchoolDetailPage() {
   }
 
   return (
-    <Layout>
+    <Shell>
       <div className={`max-w-5xl mx-auto px-4 md:px-6 py-6 md:py-8 ${compareBarVisible ? 'pb-40' : 'pb-24 md:pb-8'}`}>
-        {/* Back Button */}
+        {/* Back Button (the side panel has its own close control) */}
         <button
-          onClick={() => navigate(-1)}
-          className="flex items-center gap-2 text-sm text-neutral-600 hover:text-neutral-900 mb-6 transition-colors"
+          onClick={handleBack}
+          className={`${embedded ? 'hidden' : 'flex'} items-center gap-2 text-sm text-neutral-600 hover:text-neutral-900 mb-6 transition-colors`}
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -839,7 +863,7 @@ function SchoolDetailPage() {
           </div>
         )}
       </div>
-    </Layout>
+    </Shell>
   )
 }
 
