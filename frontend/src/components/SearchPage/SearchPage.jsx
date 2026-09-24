@@ -977,6 +977,7 @@ function SearchPage() {
   }, [])
 
   const showList = viewMode === 'list-map' || viewMode === 'list-only'
+  const panelBesideMap = Boolean(detailSchoolId) && viewMode === 'map-only'
   const showMap = viewMode === 'list-map' || viewMode === 'map-only'
   const hasCompare = compareList.length > 0
 
@@ -1920,10 +1921,14 @@ function SearchPage() {
         {/* Main Content Area */}
         <div className="relative flex-1 flex overflow-hidden">
           {detailSchoolId && (
-            <SchoolDetailPanel schoolId={detailSchoolId} onClose={handleCloseDetails} />
+            <SchoolDetailPanel
+              schoolId={detailSchoolId}
+              onClose={handleCloseDetails}
+              beside={panelBesideMap}
+            />
           )}
           {/* Desktop Filters Sidebar (20%) */}
-          <aside className="hidden lg:block w-80 flex-shrink-0 border-r border-neutral-200 bg-white overflow-y-auto">
+          <aside className={`hidden ${panelBesideMap ? '' : 'lg:block'} w-80 flex-shrink-0 border-r border-neutral-200 bg-white overflow-y-auto`}>
             <div className="p-5 space-y-6">
               {renderLocationSection()}
               {renderSchoolTypeToggle()}
@@ -2065,7 +2070,7 @@ function SearchPage() {
                   initialView={savedViewState?.map || null}
                   autoFit={!searchInBounds && !selectedSchoolId && !locationOverlay.schoolId}
                   hasCompare={hasCompare}
-                  resizeKey={`${viewMode}-${mobileTab}-${showMap}`}
+                  resizeKey={`${viewMode}-${mobileTab}-${showMap}-${panelBesideMap}`}
                   locationOverlay={locationOverlay}
                   onShowLocations={handleShowLocationsForSchool}
                   onClearLocationOverlay={clearLocationOverlay}

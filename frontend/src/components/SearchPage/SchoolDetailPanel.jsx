@@ -7,8 +7,9 @@ import SchoolDetailPage from '../SchoolDetailPage/SchoolDetailPage'
  * A school's detail over the search page, so the map, list, filters and scroll position
  * stay put. Desktop: a panel over the filters + list with the map still visible. Below
  * `lg` it only appears for a shared `?detail=` link, as a full-screen sheet.
+ * In map-only view it sits beside the map (`beside`) rather than over it.
  */
-function SchoolDetailPanel({ schoolId, onClose }) {
+function SchoolDetailPanel({ schoolId, onClose, beside = false }) {
   const { t } = useTranslation()
   const panelRef = useRef(null)
   const scrollRef = useRef(null)
@@ -33,7 +34,13 @@ function SchoolDetailPanel({ schoolId, onClose }) {
       role="dialog"
       aria-modal="false"
       aria-label={t('detailPanel.label')}
-      className="fixed inset-0 z-[2100] flex flex-col bg-neutral-100 outline-none lg:absolute lg:inset-y-0 lg:left-0 lg:right-auto lg:z-[1100] lg:w-[calc(20rem+40%)] lg:border-r lg:border-neutral-200 lg:shadow-2xl"
+      // Over the filters + list in the list views; `beside` the map in map-only view, so the
+      // map shrinks instead of hiding the highlighted school under the panel.
+      className={`fixed inset-0 z-[2100] flex flex-col bg-neutral-100 outline-none lg:z-[1100] lg:border-r lg:border-neutral-200 ${
+        beside
+          ? 'lg:static lg:w-[min(760px,50%)] lg:flex-shrink-0'
+          : 'lg:absolute lg:inset-y-0 lg:left-0 lg:right-auto lg:w-[calc(20rem+40%)] lg:shadow-2xl'
+      }`}
     >
       <div className="flex items-center justify-between gap-3 border-b border-neutral-200 bg-white px-4 py-2">
         <button
