@@ -166,17 +166,23 @@ class KgSofiaBgAdapter(BaseSourceAdapter):
             )
         )
         school_id_by_kg_id: dict[str, int] = {}
-        for school_id, attrs in schools_result.all():
-            if not attrs:
-                continue
+        school_rows = [(school_id, attrs) for school_id, attrs in schools_result.all() if attrs]
+        # Grouped ids first, then each school's own kg_sofia_id, so a building that is its
+        # own school maps to that school even when a merged family also lists it.
+        for school_id, attrs in sorted(school_rows):
             kg_ids = attrs.get("kg_sofia_ids")
             if isinstance(kg_ids, list):
                 for grouped_kg_id in kg_ids:
                     if grouped_kg_id is not None:
-                        school_id_by_kg_id[str(grouped_kg_id)] = school_id
+                        school_id_by_kg_id.setdefault(str(grouped_kg_id), school_id)
+        school_id_by_own_kg_id: dict[str, int] = {}
+        for school_id, attrs in school_rows:
             kg_id = attrs.get("kg_sofia_id")
             if kg_id is not None:
                 school_id_by_kg_id[str(kg_id)] = school_id
+                school_id_by_own_kg_id[str(kg_id)] = school_id
+        self._school_id_by_kg_id = school_id_by_kg_id
+        self._school_id_by_own_kg_id = school_id_by_own_kg_id
 
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             # Fetch kindergartens
@@ -243,6 +249,8 @@ class KgSofiaBgAdapter(BaseSourceAdapter):
 
             merged_records = self._merge_building_branch_records(parsed_records)
             discovered_schools = [school for school, changed in merged_records if changed]
+            for school in discovered_schools:
+                self._drop_locations_owned_by_other_schools(school)
 
             # Apply limit if specified
             if limit:
@@ -280,17 +288,19 @@ class KgSofiaBgAdapter(BaseSourceAdapter):
         source_url = self._registry_source_url(record_type, kg_id_str)
         page_hash = self._hash_record({"_source": record_type, "data": data})
         source_page = existing_pages.get(source_url)
-        changed = source_page is None or source_page.content_hash != page_hash
-
         school_id = school_id_by_kg_id.get(kg_id_str)
+        content_changed = source_page is None or source_page.content_hash != page_hash
         self._upsert_registry_page(
             source_page=source_page,
             source_url=source_url,
             page_hash=page_hash,
             school_id=school_id,
-            changed=changed,
+            changed=content_changed,
             seen_at=seen_at,
         )
+        # A record with no linked school is always processed: an earlier limited run may
+        # have stored its fingerprint without ever creating the school.
+        changed = content_changed or school_id is None
 
         school = self._parse_institution(data, default_type)
         if school:
@@ -298,6 +308,56 @@ class KgSofiaBgAdapter(BaseSourceAdapter):
             school.attributes["kg_sofia_last_seen_at"] = seen_at.isoformat()
             return school, changed
         return None
+
+    def _existing_school_id_for(self, disc: DiscoveredSchool) -> Optional[int]:
+        """Match by kg.sofia record id: the adapter's names carry no MoE id and may drift.
+
+        The record's own (canonical) id wins. A secondary id of a merged family only
+        matches a school that lists it as part of its family, never a building that an
+        older import stored as its own school.
+        """
+        attrs = disc.attributes or {}
+        mapping = getattr(self, "_school_id_by_kg_id", {}) or {}
+        own = getattr(self, "_school_id_by_own_kg_id", {}) or {}
+        canonical = attrs.get("kg_sofia_id")
+        if canonical is not None and str(canonical) in mapping:
+            return mapping[str(canonical)]
+        for kg_id in attrs.get("kg_sofia_ids") or []:
+            key = str(kg_id)
+            if key in mapping and key not in own:
+                return mapping[key]
+        return None
+
+    def _drop_locations_owned_by_other_schools(self, school: DiscoveredSchool) -> None:
+        """Drop merged building locations whose kg record is already its own school.
+
+        Older imports stored some '- сграда' buildings as separate schools. When such a
+        building is merged into its family, keep it on the school that already has it
+        instead of adding a second pin for the same building.
+        """
+        target = self._existing_school_id_for(school)
+        own = getattr(self, "_school_id_by_own_kg_id", {}) or {}
+        kept = []
+        for location in school.locations:
+            record_ids = [
+                tag.split("=", 1)[1]
+                for tag in location.location_tags or []
+                if tag.startswith("source_record_id=")
+            ]
+            owners = {own.get(record_id) for record_id in record_ids} - {None}
+            if owners and target not in owners:
+                continue
+            kept.append(location)
+        school.locations = kept
+
+    def _may_create_school(self, disc: DiscoveredSchool) -> bool:
+        """Only kindergartens and nurseries are created from kg.sofia.bg.
+
+        kg.sofia school records (state schools with preparatory groups) carry no MoE
+        institutional id and use different names than the MoE register, so creating
+        them would duplicate MoE schools. They may only enrich a matched school.
+        """
+        return disc.education_level == "kindergarten"
 
     def _registry_source_url(self, record_type: str, kg_id: str) -> str:
         return f"{self.REGISTRY_SOURCE_PREFIX}{record_type}/{kg_id}"

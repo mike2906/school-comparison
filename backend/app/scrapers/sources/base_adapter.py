@@ -12,6 +12,12 @@ from app.models.scrape_log import ScrapeLog, ScrapeType, ScrapeStatus
 logger = logging.getLogger(__name__)
 
 
+def _address_key(address_i18n: Optional[dict]) -> str:
+    """Normalized address used to recognise a location that already exists."""
+    address = (address_i18n or {}).get("bg") or (address_i18n or {}).get("en") or ""
+    return " ".join(address.casefold().split())
+
+
 class BaseSourceAdapter(ABC):
     """
     Abstract base class for discovery source adapters.
@@ -115,6 +121,17 @@ class BaseSourceAdapter(ABC):
                     )
                     existing_school = result.scalar_one_or_none()
 
+                matched_by_source_id = False
+                if not existing_school:
+                    # Adapter-specific match (e.g. a source record id stored in attributes)
+                    source_match_id = self._existing_school_id_for(disc)
+                    if source_match_id is not None:
+                        existing_school = await self.db.get(School, source_match_id)
+                        # Only a school this source created (no registry id) is "owned" by it.
+                        matched_by_source_id = (
+                            existing_school is not None and not existing_school.institutional_id
+                        )
+
                 if not existing_school:
                     # Fallback match: name + city + district
                     # Get default language name for matching
@@ -132,15 +149,16 @@ class BaseSourceAdapter(ABC):
 
                     # Try to find by name, city, and district
                     # Use JSON operations to match name in name_i18n
-                    from sqlalchemy import cast, String
-
                     result = await self.db.execute(
                         select(School)
                         .join(SchoolLocation, School.id == SchoolLocation.school_id)
                         .where(
                             and_(
                                 School.country_code == disc.country_code,
-                                cast(School.name_i18n[default_lang], String) == name_to_match,
+                                # as_string() yields the unquoted text on Postgres and
+                                # SQLite; cast(..., String) kept the JSON quotes/escapes
+                                # and never matched.
+                                School.name_i18n[default_lang].as_string() == name_to_match,
                                 School.city == disc.city,
                                 SchoolLocation.district == district,
                                 SchoolLocation.is_primary == True,
@@ -188,12 +206,24 @@ class BaseSourceAdapter(ABC):
 
                     existing_school.attributes = {**existing_attributes, **incoming_attributes}
                     existing_school.admission_info = {**existing_admission_info, **(disc.admission_info or {})}
-                    existing_school.scrape_status = "pending"  # Reset to pending for re-scraping
+                    if not self.ENRICHMENT_ONLY:
+                        # Reset to pending for re-scraping. Enrichment adapters only add
+                        # their own attributes, which never need a website re-scrape (and a
+                        # pending status would withhold the school's published website data).
+                        existing_school.scrape_status = "pending"
 
                     school_id = existing_school.id
                     school_for_gate = existing_school
                     updated += 1
                 else:
+                    if not self._may_create_school(disc):
+                        logger.info(
+                            "%s: no existing school for %s; this record type only enriches",
+                            self.ADAPTER_NAME,
+                            disc.name_i18n,
+                        )
+                        skipped += 1
+                        continue
                     # Create new
                     new_school = School(
                         country_code=disc.country_code,
@@ -217,10 +247,39 @@ class BaseSourceAdapter(ABC):
 
                 # Step 3: Create/update locations
                 # If no locations were discovered, keep existing locations intact to avoid wiping data.
-                if disc.locations:
+                locations_to_add = list(disc.locations or [])
+                keep_existing_locations = False
+                if existing_school and self.ENRICHMENT_ONLY:
+                    # Enrichment adapters never delete or recreate an existing school's
+                    # locations: they may carry corrected coordinates
+                    # (geocode_meta.manual_fix) or come from the authoritative registry.
+                    existing_locations = (
+                        await self.db.execute(
+                            select(SchoolLocation).where(SchoolLocation.school_id == school_id)
+                        )
+                    ).scalars().all()
+                    if existing_locations:
+                        keep_existing_locations = True
+                        if matched_by_source_id:
+                            # A school this source already owns keeps its rows (and their
+                            # coordinates) but takes the source's contact and age-group data,
+                            # and may gain a location (e.g. a new kindergarten building).
+                            known = {_address_key(loc.address_i18n): loc for loc in existing_locations}
+                            for incoming in locations_to_add:
+                                row = known.get(_address_key(incoming.address_i18n))
+                                if row is not None:
+                                    await self._sync_source_location(row, incoming)
+                            locations_to_add = [
+                                loc.model_copy(update={"is_primary": False})
+                                for loc in locations_to_add
+                                if _address_key(loc.address_i18n) not in known
+                            ]
+                        else:
+                            locations_to_add = []
+                if locations_to_add:
                     # For simplicity, delete old locations and recreate
                     # (In production, might want smarter diffing, but locations rarely change)
-                    if existing_school:
+                    if existing_school and not keep_existing_locations:
                         # Remove child shift rows first because raw deletes bypass ORM cascades.
                         location_ids_result = await self.db.execute(
                             select(SchoolLocation.id).where(SchoolLocation.school_id == school_id)
@@ -236,7 +295,7 @@ class BaseSourceAdapter(ABC):
                             delete(SchoolLocation).where(SchoolLocation.school_id == school_id)
                         )
 
-                    for loc in disc.locations:
+                    for loc in locations_to_add:
                         new_location = SchoolLocation(
                             school_id=school_id,
                             address_i18n=loc.address_i18n,
@@ -314,6 +373,61 @@ class BaseSourceAdapter(ABC):
     def _ensure_i18n_fallbacks(self, disc: DiscoveredSchool) -> None:
         """Keep discovery data source-backed; synthetic EN fallbacks are added at display time only."""
         return None
+
+    async def _sync_source_location(self, row, incoming) -> None:
+        """Update a source-owned location's source fields; never its coordinates."""
+        from sqlalchemy import select
+        from app.models import SchoolLocationAgeGroupShift
+
+        row.district = incoming.district or row.district
+        row.phone = incoming.phone or row.phone
+        if incoming.location_tags:
+            # Replace only this source's own tags; other stages keep markers here
+            # (e.g. address_source=website_contact, coords_cleared=...).
+            source_prefixes = tuple(
+                {tag.split("=", 1)[0] + "=" for tag in incoming.location_tags if "=" in tag}
+            )
+            kept_tags = [
+                tag for tag in row.location_tags or [] if not tag.startswith(source_prefixes)
+            ]
+            row.location_tags = sorted(set(kept_tags) | set(incoming.location_tags))
+        shifts = (
+            await self.db.execute(
+                select(SchoolLocationAgeGroupShift).where(
+                    SchoolLocationAgeGroupShift.location_id == row.id
+                )
+            )
+        ).scalars().all()
+        wanted = set(incoming.age_groups or [])
+        if not wanted:
+            return
+        existing = {shift.age_group: shift for shift in shifts}
+        for age_group, shift in existing.items():
+            if age_group not in wanted:
+                await self.db.delete(shift)
+                continue
+            # Take values the source states; keep stored ones it does not provide.
+            if age_group in incoming.shifts:
+                shift.shift = incoming.shifts[age_group]
+            if age_group in incoming.has_organised_groups:
+                shift.has_organised_groups = incoming.has_organised_groups[age_group]
+        for age_group in sorted(wanted - set(existing)):
+            self.db.add(
+                SchoolLocationAgeGroupShift(
+                    location_id=row.id,
+                    age_group=age_group,
+                    shift=incoming.shifts.get(age_group),
+                    has_organised_groups=incoming.has_organised_groups.get(age_group),
+                )
+            )
+
+    def _existing_school_id_for(self, disc: DiscoveredSchool) -> Optional[int]:
+        """School id this record is already linked to by source id (override per adapter)."""
+        return None
+
+    def _may_create_school(self, disc: DiscoveredSchool) -> bool:
+        """Whether an unmatched discovered record may create a new school (override to restrict)."""
+        return True
 
     def _filter_incoming_attributes(self, incoming: dict) -> dict:
         """Filter incoming attributes according to adapter merge policy."""

@@ -649,3 +649,404 @@ class TestKgSofiaAgeGroupExtraction:
         # ПГ (Профилирана гимназия) = grades 8-12 only
         result = adapter._extract_age_groups('ПГ', 'upper_secondary')
         assert result == ['grade_8_12']
+
+
+def _kg_mock_client(kindergartens: list[dict], schools: list[dict]):
+    class MockResponse:
+        status_code = 200
+
+        def __init__(self, json_data):
+            self._json_data = json_data
+
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return self._json_data
+
+    async def mock_get(url, **kwargs):
+        if "kinderGarden" in url:
+            return MockResponse({"items": {"kinderGardens": kindergartens}})
+        return MockResponse({"items": {"kinderGardens": schools}})
+
+    mock_client = AsyncMock()
+    mock_client.__aenter__.return_value = mock_client
+    mock_client.__aexit__.return_value = None
+    mock_client.get = mock_get
+    return mock_client
+
+
+def _kg_record(kg_id: int, name: str, public_type: str = "ДГ", region: str = "средец") -> dict:
+    return {
+        "id": kg_id,
+        "nameStr": name,
+        "name": {"publicType": public_type},
+        "address": f"ул. Тестова {kg_id}, София",
+        "region": region,
+        "contacts": [],
+    }
+
+
+class TestKgSofiaImportCompleteness:
+    """UF35: a limited first run must not hide the remaining records forever."""
+
+    async def test_full_run_after_limited_run_creates_remaining_kindergartens(
+        self, db_session: AsyncSession
+    ):
+        from sqlalchemy import func, select
+        from app.models import School
+
+        kindergartens = [_kg_record(i, f"ДГ №{i} Тест") for i in range(1, 7)]
+
+        with patch("httpx.AsyncClient", return_value=_kg_mock_client(kindergartens, [])):
+            first = await KgSofiaBgAdapter(db=db_session).run(limit=2)
+        assert first["created"] == 2
+
+        # The limited run stored fingerprints for all six records. Records whose school
+        # was never created must still count as changed on the next run.
+        with patch("httpx.AsyncClient", return_value=_kg_mock_client(kindergartens, [])):
+            second = await KgSofiaBgAdapter(db=db_session).run()
+        assert second["created"] == 4
+        assert second["updated"] == 0
+
+        total = await db_session.scalar(select(func.count(School.id)))
+        assert total == 6
+
+        # A third run with unchanged data does nothing.
+        with patch("httpx.AsyncClient", return_value=_kg_mock_client(kindergartens, [])):
+            third = await KgSofiaBgAdapter(db=db_session).run()
+        assert third == {"created": 0, "updated": 0, "skipped": 0}
+
+    async def test_record_with_known_kg_id_updates_existing_school(self, db_session: AsyncSession):
+        """A linked school is matched by kg id, even when its name no longer matches."""
+        from sqlalchemy import func, select
+        from app.models import School, SchoolLocation
+
+        existing = School(
+            country_code="bg",
+            name_i18n={"bg": "ДГ №7 Старо име"},
+            school_type="state",
+            education_level="kindergarten",
+            city="sofia",
+            scrape_status="summarized",
+            attributes={"kg_sofia_id": 7},
+        )
+        db_session.add(existing)
+        await db_session.flush()
+        db_session.add(
+            SchoolLocation(
+                school_id=existing.id,
+                address_i18n={"bg": "ул. Тестова 7, София"},
+                district="Средец",
+                lat=42.69,
+                lng=23.32,
+                is_primary=True,
+            )
+        )
+        await db_session.commit()
+
+        # No registry page yet, so the record counts as changed and is upserted.
+        records = [_kg_record(7, "ДГ №7 Ново име")]
+        with patch("httpx.AsyncClient", return_value=_kg_mock_client(records, [])):
+            result = await KgSofiaBgAdapter(db=db_session).run()
+
+        assert result == {"created": 0, "updated": 1, "skipped": 0}
+        assert await db_session.scalar(select(func.count(School.id))) == 1
+        location = (await db_session.execute(select(SchoolLocation))).scalar_one()
+        assert (location.lat, location.lng) == (42.69, 23.32)
+
+    async def test_linked_school_gains_new_building_without_losing_existing_location(
+        self, db_session: AsyncSession
+    ):
+        from sqlalchemy import select
+        from app.models import School, SchoolLocation
+        from app.schemas.scraping import DiscoveredLocation, DiscoveredSchool
+
+        existing = School(
+            country_code="bg",
+            name_i18n={"bg": "ДГ №7 Тест"},
+            school_type="state",
+            education_level="kindergarten",
+            city="sofia",
+            attributes={"kg_sofia_id": 7},
+        )
+        db_session.add(existing)
+        await db_session.flush()
+        db_session.add(
+            SchoolLocation(
+                school_id=existing.id,
+                address_i18n={"bg": "ул. Тестова 7, София"},
+                district="Средец",
+                lat=42.69,
+                lng=23.32,
+                is_primary=True,
+            )
+        )
+        await db_session.commit()
+
+        def location(address: str) -> DiscoveredLocation:
+            return DiscoveredLocation(
+                address_i18n={"bg": address},
+                district="Средец",
+                is_primary=True,
+                age_groups=["first"],
+                shifts={},
+                has_organised_groups={},
+            )
+
+        adapter = KgSofiaBgAdapter(db=db_session)
+        adapter._school_id_by_kg_id = {"7": existing.id}
+        result = await adapter.upsert_schools([
+            DiscoveredSchool(
+                name_i18n={"bg": "ДГ №7 Тест"},
+                country_code="bg",
+                city="sofia",
+                school_type="state",
+                education_level="kindergarten",
+                locations=[location("ул.  Тестова 7, София"), location("ул. Нова 1, София")],
+                attributes={"kg_sofia_id": 7, "kg_sofia_ids": ["7", "8"]},
+            )
+        ])
+
+        assert result["updated"] == 1
+        locations = (
+            await db_session.execute(
+                select(SchoolLocation).order_by(SchoolLocation.id)
+            )
+        ).scalars().all()
+        assert [loc.address_i18n["bg"] for loc in locations] == [
+            "ул. Тестова 7, София",
+            "ул. Нова 1, София",
+        ]
+        assert (locations[0].lat, locations[0].lng, locations[0].is_primary) == (42.69, 23.32, True)
+        assert locations[1].is_primary is False
+
+    def test_merged_family_keeps_building_that_is_already_its_own_school(self):
+        from app.schemas.scraping import DiscoveredLocation, DiscoveredSchool
+
+        def location(record_id: int) -> DiscoveredLocation:
+            return DiscoveredLocation(
+                address_i18n={"bg": f"ул. Тестова {record_id}"},
+                district="Средец",
+                is_primary=record_id == 106,
+                location_tags=[f"source_record_id={record_id}"],
+                age_groups=[],
+                shifts={},
+                has_organised_groups={},
+            )
+
+        adapter = KgSofiaBgAdapter(db=None)
+        # 106 is the family's school; 299 ('- сграда 2') was imported as school 120.
+        adapter._school_id_by_kg_id = {"106": 119, "299": 120}
+        adapter._school_id_by_own_kg_id = {"106": 119, "299": 120}
+        family = DiscoveredSchool(
+            name_i18n={"bg": "ДГ №16 Приказен свят"},
+            country_code="bg",
+            city="sofia",
+            school_type="state",
+            education_level="kindergarten",
+            locations=[location(106), location(299), location(500)],
+            attributes={"kg_sofia_id": 106, "kg_sofia_ids": ["106", "299", "500"]},
+        )
+
+        adapter._drop_locations_owned_by_other_schools(family)
+
+        assert [loc.location_tags for loc in family.locations] == [
+            ["source_record_id=106"],
+            ["source_record_id=500"],
+        ]
+
+    def test_new_family_does_not_match_standalone_building_school(self):
+        from app.schemas.scraping import DiscoveredLocation, DiscoveredSchool
+
+        def location(record_id: int) -> DiscoveredLocation:
+            return DiscoveredLocation(
+                address_i18n={"bg": f"ул. Тестова {record_id}"},
+                district="Средец",
+                is_primary=record_id == 40,
+                location_tags=[f"source_record_id={record_id}"],
+                age_groups=[],
+                shifts={},
+                has_organised_groups={},
+            )
+
+        adapter = KgSofiaBgAdapter(db=None)
+        # Canonical 40 was never imported; its building 41 is standalone school 500.
+        adapter._school_id_by_kg_id = {"41": 500}
+        adapter._school_id_by_own_kg_id = {"41": 500}
+        family = DiscoveredSchool(
+            name_i18n={"bg": "ДГ №40 Тест"},
+            country_code="bg",
+            city="sofia",
+            school_type="state",
+            education_level="kindergarten",
+            locations=[location(40), location(41)],
+            attributes={"kg_sofia_id": 40, "kg_sofia_ids": ["40", "41"]},
+        )
+
+        assert adapter._existing_school_id_for(family) is None
+        adapter._drop_locations_owned_by_other_schools(family)
+        assert [loc.location_tags for loc in family.locations] == [["source_record_id=40"]]
+
+    async def test_linked_school_location_takes_new_age_groups_keeps_coordinates(
+        self, db_session: AsyncSession
+    ):
+        from sqlalchemy import select
+        from app.models import School, SchoolLocation, SchoolLocationAgeGroupShift
+        from app.schemas.scraping import DiscoveredLocation, DiscoveredSchool
+
+        school = School(
+            country_code="bg", name_i18n={"bg": "ДГ №9 Тест"}, school_type="state",
+            education_level="kindergarten", city="sofia", attributes={"kg_sofia_id": 9},
+        )
+        db_session.add(school)
+        await db_session.flush()
+        row = SchoolLocation(
+            school_id=school.id, address_i18n={"bg": "ул. Тестова 9"}, district="Средец",
+            phone="02/000", lat=42.7, lng=23.3, is_primary=True,
+            location_tags=["address_source=website_contact", "source_record_id=1"],
+        )
+        db_session.add(row)
+        await db_session.flush()
+        db_session.add(SchoolLocationAgeGroupShift(location_id=row.id, age_group="first"))
+        await db_session.commit()
+
+        adapter = KgSofiaBgAdapter(db=db_session)
+        adapter._school_id_by_kg_id = {"9": school.id}
+        await adapter.upsert_schools([
+            DiscoveredSchool(
+                name_i18n={"bg": "ДГ №9 Тест"}, country_code="bg", city="sofia",
+                school_type="state", education_level="kindergarten",
+                locations=[DiscoveredLocation(
+                    address_i18n={"bg": "ул. Тестова 9"}, district="Средец", phone="02/111",
+                    is_primary=True, age_groups=["nursery", "first"], shifts={},
+                    location_tags=["source=kg_sofia_bg", "source_record_id=9"],
+                    has_organised_groups={},
+                )],
+                attributes={"kg_sofia_id": 9, "kg_sofia_public_type": "ДГ (с яслени групи)"},
+            )
+        ])
+
+        location = (await db_session.execute(select(SchoolLocation))).scalar_one()
+        assert location.id == row.id
+        assert (location.lat, location.lng, location.phone) == (42.7, 23.3, "02/111")
+        assert location.location_tags == [
+            "address_source=website_contact",
+            "source=kg_sofia_bg",
+            "source_record_id=9",
+        ]
+        age_groups = (
+            await db_session.execute(select(SchoolLocationAgeGroupShift.age_group))
+        ).scalars().all()
+        assert sorted(age_groups) == ["first", "nursery"]
+
+    async def test_building_school_owns_its_kg_id_over_family_list(self, db_session: AsyncSession):
+        from app.models import School
+
+        family = School(
+            country_code="bg", name_i18n={"bg": "A"}, school_type="state",
+            education_level="kindergarten", city="sofia",
+            attributes={"kg_sofia_id": 106, "kg_sofia_ids": ["106", "299"]},
+        )
+        building = School(
+            country_code="bg", name_i18n={"bg": "B"}, school_type="state",
+            education_level="kindergarten", city="sofia",
+            attributes={"kg_sofia_id": 299},
+        )
+        # Insert the building first so row order alone would let the family win.
+        db_session.add(building)
+        await db_session.flush()
+        db_session.add(family)
+        await db_session.commit()
+
+        adapter = KgSofiaBgAdapter(db=db_session)
+        with patch("httpx.AsyncClient", return_value=_kg_mock_client([], [])):
+            await adapter.discover()
+
+        assert adapter._school_id_by_kg_id["299"] == building.id
+        assert adapter._school_id_by_kg_id["106"] == family.id
+
+    async def test_school_records_never_create_schools(self, db_session: AsyncSession):
+        from sqlalchemy import func, select
+        from app.models import School
+
+        schools = [_kg_record(100, "33 СУ Тест", public_type="СУ")]
+        with patch("httpx.AsyncClient", return_value=_kg_mock_client([], schools)):
+            result = await KgSofiaBgAdapter(db=db_session).run()
+
+        assert result["created"] == 0
+        assert result["skipped"] == 1
+        assert await db_session.scalar(select(func.count(School.id))) == 0
+
+    async def test_nursery_records_create_schools(self, db_session: AsyncSession):
+        kindergartens = [_kg_record(5, "СДЯ №5 Тест", public_type="СДЯ")]
+        with patch("httpx.AsyncClient", return_value=_kg_mock_client(kindergartens, [])):
+            result = await KgSofiaBgAdapter(db=db_session).run()
+        assert result["created"] == 1
+
+    async def test_enrichment_keeps_existing_locations_and_scrape_status(
+        self, db_session: AsyncSession
+    ):
+        from sqlalchemy import select
+        from app.models import School, SchoolLocation
+        from app.schemas.scraping import DiscoveredLocation, DiscoveredSchool
+
+        # ASCII name: SQLite stores Cyrillic JSON as escapes, which breaks name matching in tests.
+
+        existing = School(
+            country_code="bg",
+            name_i18n={"bg": "DG 31 Lyulin"},
+            school_type="state",
+            education_level="kindergarten",
+            city="sofia",
+            scrape_status="summarized",
+            attributes={},
+        )
+        db_session.add(existing)
+        await db_session.flush()
+        corrected = SchoolLocation(
+            school_id=existing.id,
+            address_i18n={"bg": "гр. София, ул. 208 № 17 - II м. р."},
+            district="Люлин",
+            lat=42.7239608,
+            lng=23.2546818,
+            geocode_meta={"status": "accepted", "manual_fix": "UF33"},
+            is_primary=True,
+        )
+        db_session.add(corrected)
+        await db_session.commit()
+        corrected_id = corrected.id
+
+        result = await KgSofiaBgAdapter(db=db_session).upsert_schools([
+            DiscoveredSchool(
+                name_i18n={"bg": "DG 31 Lyulin"},
+                country_code="bg",
+                city="sofia",
+                school_type="state",
+                education_level="kindergarten",
+                locations=[
+                    DiscoveredLocation(
+                        address_i18n={"bg": "гр. София, ул. 208 № 17"},
+                        district="Люлин",
+                        is_primary=True,
+                        age_groups=["first"],
+                        shifts={},
+                        has_organised_groups={},
+                    )
+                ],
+                attributes={"kg_sofia_id": 83},
+            )
+        ])
+
+        assert result["updated"] == 1
+        await db_session.refresh(existing)
+        assert existing.scrape_status == "summarized"
+        assert existing.attributes["kg_sofia_id"] == 83
+        locations = (
+            await db_session.execute(
+                select(SchoolLocation).where(SchoolLocation.school_id == existing.id)
+            )
+        ).scalars().all()
+        assert [location.id for location in locations] == [corrected_id]
+        assert (locations[0].lat, locations[0].lng) == (42.7239608, 23.2546818)
+        assert locations[0].geocode_meta["manual_fix"] == "UF33"
