@@ -17,7 +17,7 @@
     "subtitle": "Find the perfect school for your child",
     "home": "Home",
     "compare": "Compare",
-    "about": "About",
+    "about": "About the data",
     "language": "Language"
   },
   "landing": {
@@ -36,20 +36,10 @@
     "mapOnly": "Map only",
     "listOnly": "List only",
     "activeFilters": "Active Filters",
-    "noActiveFilters": "No active filters",
-    "mainFilters": "Main Filters",
-    "advancedFilters": "Advanced Filters",
-    "noAdvancedFilters": "No advanced filters",
     "allTypes": "All",
     "clearFilters": "Clear filters"
   },
   "location": {
-    "title": "Your Location",
-    "optional": "Optional",
-    "setYourLocation": "Set your location to:",
-    "benefitDistances": "See distances to schools",
-    "benefitSort": "Sort by proximity",
-    "benefitFilter": "Filter by distance",
     "useMyLocation": "Use my location",
     "selectOnMap": "Choose on map",
     "cancelMapPick": "Cancel map selection",
@@ -57,8 +47,6 @@
     "setOnMapToast": "Location set",
     "enterAddress": "Or enter address:",
     "addressPlaceholder": "Enter address",
-    "near": "Near:",
-    "change": "Change location",
     "clear": "Clear",
     "currentLocation": "Your current location",
     "selectedOnMap": "Selected on map",
@@ -95,10 +83,8 @@
     "selectBirthYear": "Select year",
     "ageGroup": "Age group",
     "schoolType": "School type",
-    "schoolTypeOptional": "Optional",
     "clear": "Clear",
-    "orCalculate": "or calculate from birth year",
-    "calculatedGroup": "Calculated group"
+    "orCalculate": "or calculate from birth year"
   },
   "ageGroups": {
     "nursery": "Nursery",
@@ -491,7 +477,6 @@
       "lastAdmitted": "Last admitted: {{points}} {{pointsLabel}} ({{year}})",
       "minScore": "Min score: {{score}} ({{year}})",
       "districtEnrollment": "District enrollment",
-      "admissionsUnavailable": "Admissions info unavailable",
       "priceUnstatedPeriod": "{{price}} {{currency}} · period not stated"
     },
     "period": {
@@ -552,9 +537,7 @@
     },
     "aria": {
       "distance": "{{distance}} from your location"
-    },
-    "distanceUnknown": "Distance unknown",
-    "distancePrompt": "Set your location to see distance"
+    }
   },
   "schoolDetail": {
     "keyFacts": "Key facts",
@@ -600,5 +583,37 @@
     "body": "Tell us your child’s birth year to see only the groups they can join, or search a school by name.",
     "cta": "Choose birth year",
     "dismiss": "Dismiss"
+  },
+  "about": {
+    "title": "About the data",
+    "intro": "This site brings together public information about kindergartens and schools in Sofia so you can compare them in one place.",
+    "sourcesTitle": "Where the data comes from",
+    "sources": {
+      "schools": {
+        "title": "Schools and their addresses",
+        "body": "The Ministry of Education and Science register of schools and kindergartens: names, types, grades and addresses."
+      },
+      "kindergartens": {
+        "title": "Municipal kindergartens",
+        "body": "Sofia Municipality’s kindergarten enrolment system: kindergartens, their groups and locations."
+      },
+      "nvo": {
+        "title": "NVO exam results",
+        "body": "Official results of the national external assessments (NVO) for 4th, 7th and 10th grade, published by the Ministry of Education and Science as open data. We show each school’s average in Bulgarian and maths and the national average for the same year."
+      },
+      "prices": {
+        "title": "Private school fees",
+        "body": "Taken from each school’s own website and shown only where the page states the price. Every price is marked with its source, and the comparison page links to the page it came from and shows when we checked it. Fees change, so confirm with the school before deciding."
+      },
+      "maps": {
+        "title": "Maps and distances",
+        "body": "School locations are placed on the map with OpenStreetMap data; map tiles by CARTO. Distances are straight-line, not travel distance."
+      }
+    },
+    "ageTitle": "How age groups are worked out",
+    "ageBody": "In Bulgaria the group depends on the calendar year of birth, not the exact birthday: group = enrolment year − birth year. Children born on 1 January and 31 December of the same year join the same group.",
+    "limitsTitle": "What is not here yet",
+    "limitsBody": "Admission thresholds (kindergarten points and gymnasium minimum scores) are not published yet. Where we have no reliable data we leave the field out rather than guess.",
+    "cta": "Browse schools"
   }
 }
