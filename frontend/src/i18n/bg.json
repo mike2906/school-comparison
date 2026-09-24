@@ -560,5 +560,24 @@
     },
     "distanceUnknown": "Разстоянието е неизвестно",
     "distancePrompt": "Задайте местоположение, за да видите разстояние"
+  },
+  "schoolDetail": {
+    "keyFacts": "Основни факти",
+    "tuitionPerYear": "{{price}} {{currency}} / година",
+    "tuitionPerMonth": "≈ {{price}} {{currency}} на месец",
+    "tuitionUnstated": "{{price}} {{currency}}",
+    "groupsAndGrades": "Групи и класове",
+    "nvoLatest": "{{exam}}, {{year}} г.",
+    "nvoVsNational": "Средно за страната {{value}}%",
+    "minScore": "Минимален бал за прием",
+    "lastAdmitted": "Последно приет",
+    "pointsValue": "{{points}} точки",
+    "yearValue": "през {{year}} г.",
+    "distance": "Разстояние от вас",
+    "distanceValue": "{{km}} км",
+    "directions": "Упътване",
+    "inBulgarian": "На български",
+    "officialAdmission": "Приемът в общинските детски градини в София се извършва чрез официалната система:",
+    "mapLabel": "Карта на локациите на училището"
   }
 }

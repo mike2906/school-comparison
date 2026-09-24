@@ -7,6 +7,7 @@ import {
 } from '../../utils/nvo'
 import { getAdmissionStatusKey, getCanonicalAmenityFlags } from '../../utils/schoolAttributes'
 import { classifyAdmissionRequirement } from '../../utils/admission'
+import { humanizeTag } from '../../utils/tags'
 
 /**
  * SchoolDetailPage Helper Functions
@@ -233,7 +234,8 @@ export function getOptionLabel(option, t) {
   const key = `advancedFilters.options.${option}`
   const translated = t(key)
   if (translated !== key) return translated
-  return option.replace(/_/g, ' ').replace(/\b\w/g, char => char.toUpperCase())
+  // Free text scraped from a website: tidy it, but never Title-Case a sentence.
+  return humanizeTag(option)
 }
 
 /**
@@ -322,70 +324,4 @@ export function getLineStyleForGrade(examType) {
     },
   }
   return styles[examType] || styles.nvo_7
-}
-
-/**
- * Calculate cross-grade comparison insight
- */
-export function getCrossGradeInsight(examResults = [], availableExamTypes = [], t) {
-  if (availableExamTypes.length < 2) return null
-
-  const scores = {}
-  availableExamTypes.forEach(examType => {
-    scores[examType] = getLatestScoreForExamType(examResults, examType)
-  })
-
-  // Find highest and lowest
-  const entries = Object.entries(scores).filter(([_, score]) => score != null)
-  if (entries.length < 2) return null
-
-  entries.sort((a, b) => b[1] - a[1]) // Sort by score descending
-  const [highestType, highestScore] = entries[0]
-  const [lowestType, lowestScore] = entries[entries.length - 1]
-
-  const diff = highestScore - lowestScore
-
-  if (diff < 2) {
-    return {
-      type: 'consistent',
-      message: t ? t('schools.crossGrade.consistent') : 'Scores remain consistent across grade levels',
-      icon: '📊'
-    }
-  }
-
-  // Check if progression is natural (higher grades = higher scores)
-  const gradeOrder = { nvo_4: 1, nvo_7: 2, nvo_10: 3 }
-  const isProgressive = gradeOrder[highestType] > gradeOrder[lowestType]
-
-  if (isProgressive) {
-    return {
-      type: 'improving',
-      message: t
-        ? t('schools.crossGrade.improving', {
-            highGrade: getExamTypeLabel(highestType, t),
-            lowGrade: getExamTypeLabel(lowestType, t),
-            diff: formatPercent(diff, 1)
-          })
-        : `Students improve as they progress: ${getExamTypeLabel(highestType)} scores ${formatPercent(diff, 1)}% higher than ${getExamTypeLabel(lowestType)}`,
-      icon: '📈',
-      highestType,
-      lowestType,
-      diff
-    }
-  } else {
-    return {
-      type: 'declining',
-      message: t
-        ? t('schools.crossGrade.declining', {
-            highGrade: getExamTypeLabel(highestType, t),
-            lowGrade: getExamTypeLabel(lowestType, t),
-            diff: formatPercent(diff, 1)
-          })
-        : `Performance varies by grade: ${getExamTypeLabel(highestType)} scores ${formatPercent(diff, 1)}% higher than ${getExamTypeLabel(lowestType)}`,
-      icon: '📉',
-      highestType,
-      lowestType,
-      diff
-    }
-  }
 }

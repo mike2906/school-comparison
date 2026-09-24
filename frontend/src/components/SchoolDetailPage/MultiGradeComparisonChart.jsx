@@ -152,7 +152,7 @@ function MultiGradeComparisonChart({ examResults, availableExamTypes, selectedSu
                 {/* Math line */}
                 {showMath && (
                   <Line
-                    type="monotone"
+                    type="linear"
                     dataKey={`${examType}_math`}
                     stroke={colors.math[examType]}
                     strokeWidth={lineStyle.strokeWidth}
@@ -169,7 +169,7 @@ function MultiGradeComparisonChart({ examResults, availableExamTypes, selectedSu
                 {/* Bulgarian line */}
                 {showBulgarian && (
                   <Line
-                    type="monotone"
+                    type="linear"
                     dataKey={`${examType}_bulgarian`}
                     stroke={colors.bulgarian[examType]}
                     strokeWidth={lineStyle.strokeWidth}
@@ -189,7 +189,7 @@ function MultiGradeComparisonChart({ examResults, availableExamTypes, selectedSu
           {/* Average (dashed reference line) */}
           {average != null && (
             <Line
-              type="monotone"
+              type="linear"
               dataKey="avg"
               stroke="#9ca3af"
               strokeWidth={1}

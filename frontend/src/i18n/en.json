@@ -560,5 +560,24 @@
     },
     "distanceUnknown": "Distance unknown",
     "distancePrompt": "Set your location to see distance"
+  },
+  "schoolDetail": {
+    "keyFacts": "Key facts",
+    "tuitionPerYear": "{{price}} {{currency}} / year",
+    "tuitionPerMonth": "≈ {{price}} {{currency}} / month",
+    "tuitionUnstated": "{{price}} {{currency}}",
+    "groupsAndGrades": "Groups & grades",
+    "nvoLatest": "{{exam}}, {{year}}",
+    "nvoVsNational": "National average {{value}}%",
+    "minScore": "Min. admission score",
+    "lastAdmitted": "Last admitted",
+    "pointsValue": "{{points}} points",
+    "yearValue": "in {{year}}",
+    "distance": "Distance from you",
+    "distanceValue": "{{km}} km",
+    "directions": "Directions",
+    "inBulgarian": "In Bulgarian",
+    "officialAdmission": "Admission to Sofia municipal kindergartens runs through the official system:",
+    "mapLabel": "Map of school locations"
   }
 }

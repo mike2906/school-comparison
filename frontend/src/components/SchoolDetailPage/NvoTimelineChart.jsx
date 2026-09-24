@@ -103,7 +103,7 @@ function NvoTimelineChart({ examResults = [], examType, examAverages = null, sel
 
             {showNationalBulgarian && (
               <Line
-                type="monotone"
+                type="linear"
                 dataKey="nationalBulgarian"
                 name={t('academicPerformance.seriesNational', { subject: t('schoolCard.nvo.subjectBulgarian') })}
                 stroke="#c084fc"
@@ -116,7 +116,7 @@ function NvoTimelineChart({ examResults = [], examType, examAverages = null, sel
 
             {showNationalMath && (
               <Line
-                type="monotone"
+                type="linear"
                 dataKey="nationalMath"
                 name={t('academicPerformance.seriesNational', { subject: t('schoolCard.nvo.subjectMath') })}
                 stroke="#60a5fa"
@@ -130,7 +130,7 @@ function NvoTimelineChart({ examResults = [], examType, examAverages = null, sel
             {/* Bulgarian Language line */}
             {showBulgarian && (
               <Line
-                type="monotone"
+                type="linear"
                 dataKey="bulgarian"
                 name={t('academicPerformance.seriesSchool', { subject: t('schoolCard.nvo.subjectBulgarian') })}
                 stroke="#8b5cf6"
@@ -152,7 +152,7 @@ function NvoTimelineChart({ examResults = [], examType, examAverages = null, sel
             {/* Mathematics line */}
             {showMath && (
               <Line
-                type="monotone"
+                type="linear"
                 dataKey="math"
                 name={t('academicPerformance.seriesSchool', { subject: t('schoolCard.nvo.subjectMath') })}
                 stroke="#3b82f6"
@@ -179,9 +179,19 @@ function NvoTimelineChart({ examResults = [], examType, examAverages = null, sel
 }
 
 function ChartLegend({ t, showMath, showBulgarian, showNationalMath, showNationalBulgarian }) {
+  const showNational = showNationalMath || showNationalBulgarian
   return (
-    <div className="rounded-lg border border-neutral-200 bg-white/80 p-4">
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-neutral-700">
+    <div className="rounded-lg border border-neutral-200 bg-white/80 px-3 py-2 sm:p-4">
+      {/* Phones: subject colours plus one dashed "national benchmark" key, so the legend
+          fits in one or two short lines instead of four long ones. */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-neutral-700 sm:hidden">
+        {showBulgarian && <LegendLine color="#8b5cf6" label={t('schoolCard.nvo.subjectBulgarian')} />}
+        {showMath && <LegendLine color="#3b82f6" label={t('schoolCard.nvo.subjectMath')} />}
+        {showNational && (
+          <LegendLine color="#9ca3af" dashed label={t('academicPerformance.nationalAverage')} />
+        )}
+      </div>
+      <div className="hidden sm:flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-neutral-700">
         <span className="font-medium text-neutral-900">{t('academicPerformance.seriesLegend')}</span>
         {showBulgarian && (
           <LegendLine
@@ -216,8 +226,8 @@ function ChartLegend({ t, showMath, showBulgarian, showNationalMath, showNationa
 
 function LegendLine({ color, label, dashed = false }) {
   return (
-    <div className="inline-flex items-center gap-2">
-      <svg width="28" height="10" aria-hidden="true" className="shrink-0">
+    <div className="inline-flex items-center gap-1.5 sm:gap-2 min-w-0">
+      <svg width="20" height="10" viewBox="0 0 28 10" aria-hidden="true" className="shrink-0 sm:w-7">
         <line
           x1="1"
           y1="5"

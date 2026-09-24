@@ -1483,12 +1483,23 @@ self-review, with at most one Codex review on the larger ones.
       click; frequently used filters as chips above the list; sorts by NVO result;
       Sofia-bounded initial map view; 44 px touch targets; drawer Escape/focus/labels;
       softer mobile location prompt; "clear filters" on empty results.
-- [ ] **U6 School detail content.** Key-facts strip at the top ordered by school type
+- [x] **U6 School detail content.** Key-facts strip at the top ordered by school type
       (price first for private, NVO/admission for state); small map + directions link;
       remove the misleading cross-grade NVO insight; linear (not smoothed) NVO chart
       lines; tappable, normalised phone numbers; official-source link instead of
       "contact school" filler; actions in the header; per-school document title;
       untranslated Bulgarian tags and Title Case scraped labels handled in the EN UI.
+      **Done 2026-09-24:** key-facts strip (private: yearly tuition with monthly
+      equivalent and currency, languages, grades; state: latest combined NVO vs the
+      national average, min. score and shift when present; kindergarten: last-admitted
+      points; distance from a saved location); pricing moves right under it; small
+      locations map with a Google Maps directions link per location; cross-grade insight
+      removed; linear NVO lines and a short mobile legend; `utils/phone.js` normalises
+      and dials numbers (`+359`); "contact school" filler hidden, kg.sofia.bg linked for
+      state kindergartens; Share/Compare in the hero (the mobile bar yields to the
+      CompareBar); `<name> · Sofia Schools` tab title; free-text tags are no longer
+      Title-Cased and Bulgarian tags sit under "In Bulgarian" in the EN UI
+      (`utils/tags.js`).
 - [ ] **U7 Compare page.** Usable mobile layout (stacked rows, two schools per view);
       sticky school header while scrolling; compare list stores ids, not stale school
       objects; compare bar fits mobile and explains the 4-school limit; "Add school" keeps
