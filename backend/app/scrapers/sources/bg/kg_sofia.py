@@ -177,6 +177,7 @@ class KgSofiaBgAdapter(BaseSourceAdapter):
             kg_id = attrs.get("kg_sofia_id")
             if kg_id is not None:
                 school_id_by_kg_id[str(kg_id)] = school_id
+        self._school_id_by_kg_id = school_id_by_kg_id
 
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             # Fetch kindergartens
@@ -280,9 +281,14 @@ class KgSofiaBgAdapter(BaseSourceAdapter):
         source_url = self._registry_source_url(record_type, kg_id_str)
         page_hash = self._hash_record({"_source": record_type, "data": data})
         source_page = existing_pages.get(source_url)
-        changed = source_page is None or source_page.content_hash != page_hash
-
         school_id = school_id_by_kg_id.get(kg_id_str)
+        # A record with no linked school is always processed: an earlier limited run may
+        # have stored its fingerprint without ever creating the school.
+        changed = (
+            source_page is None
+            or source_page.content_hash != page_hash
+            or school_id is None
+        )
         self._upsert_registry_page(
             source_page=source_page,
             source_url=source_url,
@@ -298,6 +304,25 @@ class KgSofiaBgAdapter(BaseSourceAdapter):
             school.attributes["kg_sofia_last_seen_at"] = seen_at.isoformat()
             return school, changed
         return None
+
+    def _existing_school_id_for(self, disc: DiscoveredSchool) -> Optional[int]:
+        """Match by kg.sofia record id: the adapter's names carry no MoE id and may drift."""
+        attrs = disc.attributes or {}
+        kg_ids = [attrs.get("kg_sofia_id"), *(attrs.get("kg_sofia_ids") or [])]
+        mapping = getattr(self, "_school_id_by_kg_id", {}) or {}
+        for kg_id in kg_ids:
+            if kg_id is not None and str(kg_id) in mapping:
+                return mapping[str(kg_id)]
+        return None
+
+    def _may_create_school(self, disc: DiscoveredSchool) -> bool:
+        """Only kindergartens and nurseries are created from kg.sofia.bg.
+
+        kg.sofia school records (state schools with preparatory groups) carry no MoE
+        institutional id and use different names than the MoE register, so creating
+        them would duplicate MoE schools. They may only enrich a matched school.
+        """
+        return disc.education_level == "kindergarten"
 
     def _registry_source_url(self, record_type: str, kg_id: str) -> str:
         return f"{self.REGISTRY_SOURCE_PREFIX}{record_type}/{kg_id}"

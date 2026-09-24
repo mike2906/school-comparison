@@ -116,6 +116,12 @@ class BaseSourceAdapter(ABC):
                     existing_school = result.scalar_one_or_none()
 
                 if not existing_school:
+                    # Adapter-specific match (e.g. a source record id stored in attributes)
+                    source_match_id = self._existing_school_id_for(disc)
+                    if source_match_id is not None:
+                        existing_school = await self.db.get(School, source_match_id)
+
+                if not existing_school:
                     # Fallback match: name + city + district
                     # Get default language name for matching
                     default_lang = disc.country_code  # Assume country code is default language
@@ -132,15 +138,16 @@ class BaseSourceAdapter(ABC):
 
                     # Try to find by name, city, and district
                     # Use JSON operations to match name in name_i18n
-                    from sqlalchemy import cast, String
-
                     result = await self.db.execute(
                         select(School)
                         .join(SchoolLocation, School.id == SchoolLocation.school_id)
                         .where(
                             and_(
                                 School.country_code == disc.country_code,
-                                cast(School.name_i18n[default_lang], String) == name_to_match,
+                                # as_string() yields the unquoted text on Postgres and
+                                # SQLite; cast(..., String) kept the JSON quotes/escapes
+                                # and never matched.
+                                School.name_i18n[default_lang].as_string() == name_to_match,
                                 School.city == disc.city,
                                 SchoolLocation.district == district,
                                 SchoolLocation.is_primary == True,
@@ -188,12 +195,24 @@ class BaseSourceAdapter(ABC):
 
                     existing_school.attributes = {**existing_attributes, **incoming_attributes}
                     existing_school.admission_info = {**existing_admission_info, **(disc.admission_info or {})}
-                    existing_school.scrape_status = "pending"  # Reset to pending for re-scraping
+                    if not self.ENRICHMENT_ONLY:
+                        # Reset to pending for re-scraping. Enrichment adapters only add
+                        # their own attributes, which never need a website re-scrape (and a
+                        # pending status would withhold the school's published website data).
+                        existing_school.scrape_status = "pending"
 
                     school_id = existing_school.id
                     school_for_gate = existing_school
                     updated += 1
                 else:
+                    if not self._may_create_school(disc):
+                        logger.info(
+                            "%s: no existing school for %s; this record type only enriches",
+                            self.ADAPTER_NAME,
+                            disc.name_i18n,
+                        )
+                        skipped += 1
+                        continue
                     # Create new
                     new_school = School(
                         country_code=disc.country_code,
@@ -217,7 +236,18 @@ class BaseSourceAdapter(ABC):
 
                 # Step 3: Create/update locations
                 # If no locations were discovered, keep existing locations intact to avoid wiping data.
-                if disc.locations:
+                keep_existing_locations = False
+                if existing_school and self.ENRICHMENT_ONLY:
+                    # Enrichment adapters never replace an existing school's locations:
+                    # those may carry corrected coordinates (geocode_meta.manual_fix) or
+                    # come from the authoritative registry.
+                    existing_location_count = await self.db.scalar(
+                        select(func.count(SchoolLocation.id)).where(
+                            SchoolLocation.school_id == school_id
+                        )
+                    )
+                    keep_existing_locations = bool(existing_location_count)
+                if disc.locations and not keep_existing_locations:
                     # For simplicity, delete old locations and recreate
                     # (In production, might want smarter diffing, but locations rarely change)
                     if existing_school:
@@ -314,6 +344,14 @@ class BaseSourceAdapter(ABC):
     def _ensure_i18n_fallbacks(self, disc: DiscoveredSchool) -> None:
         """Keep discovery data source-backed; synthetic EN fallbacks are added at display time only."""
         return None
+
+    def _existing_school_id_for(self, disc: DiscoveredSchool) -> Optional[int]:
+        """School id this record is already linked to by source id (override per adapter)."""
+        return None
+
+    def _may_create_school(self, disc: DiscoveredSchool) -> bool:
+        """Whether an unmatched discovered record may create a new school (override to restrict)."""
+        return True
 
     def _filter_incoming_attributes(self, incoming: dict) -> dict:
         """Filter incoming attributes according to adapter merge policy."""
