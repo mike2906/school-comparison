@@ -20,10 +20,10 @@ const memoryStorage = () => {
 
 test('readViewParams validates values and falls back to defaults', () => {
   const view = readViewParams(new URLSearchParams('sort=price&within=5&view=map-only&tab=map&school=42'))
-  assert.deepEqual(view, { sort: 'price', within: '5', view: 'map-only', tab: 'map', school: 42 })
+  assert.deepEqual(view, { sort: 'price', within: '5', view: 'map-only', tab: 'map', school: 42, q: '' })
 
   const bad = readViewParams(new URLSearchParams('sort=evil&within=3&view=x&tab=y&school=abc'))
-  assert.deepEqual(bad, { sort: 'name', within: 'any', view: 'list-map', tab: 'list', school: null })
+  assert.deepEqual(bad, { sort: 'name', within: 'any', view: 'list-map', tab: 'list', school: null, q: '' })
 })
 
 test('writeViewParams omits defaults, keeps other params, and reports no-ops', () => {
@@ -85,4 +85,11 @@ test('getLastSearchUrl rejects look-alike and off-site paths', () => {
   assert.equal(getLastSearchUrl(storage), '/search')
   const throwing = { getItem: () => { throw new Error('SecurityError') } }
   assert.equal(getLastSearchUrl(throwing), '/search')
+})
+
+test('the name query round-trips through the URL', () => {
+  const next = writeViewParams(new URLSearchParams('age_group=first'), { ...readViewParams(new URLSearchParams('')), q: 'пенчо' })
+  assert.equal(readViewParams(next).q, 'пенчо')
+  const cleared = writeViewParams(next, { ...readViewParams(next), q: '' })
+  assert.equal(cleared.has('q'), false)
 })

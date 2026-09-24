@@ -88,3 +88,24 @@ export function compareSchoolNames(nameA, nameB, language) {
     numeric: true,
   })
 }
+
+function normalizeForSearch(text) {
+  return String(text || '')
+    .toLocaleLowerCase()
+    .replace(/[\s"'“”„«»‘’`.,()№-]+/g, ' ')
+    .trim()
+}
+
+/**
+ * True when every word of `query` appears in one of the school's names, in any language
+ * ("119", "пенчо", "slaveykov"). An empty query matches everything.
+ */
+export function schoolMatchesQuery(school, query) {
+  const tokens = normalizeForSearch(query).split(' ').filter(Boolean)
+  if (tokens.length === 0) return true
+  const names = [
+    ...Object.values(school?.resolved_name_i18n || {}),
+    ...Object.values(school?.name_i18n || {}),
+  ].map(normalizeForSearch)
+  return names.some(name => tokens.every(token => name.includes(token)))
+}

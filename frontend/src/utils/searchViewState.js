@@ -14,7 +14,10 @@ export const VIEW_DEFAULTS = {
   within: 'any',
   view: 'list-map',
   tab: 'list',
+  q: '',
 }
+
+const MAX_QUERY_LENGTH = 100
 
 const oneOf = (value, allowed, fallback) => (allowed.includes(value) ? value : fallback)
 
@@ -27,6 +30,7 @@ export function readViewParams(searchParams) {
     view: oneOf(searchParams.get('view'), VIEW_MODES, VIEW_DEFAULTS.view),
     tab: oneOf(searchParams.get('tab'), MOBILE_TABS, VIEW_DEFAULTS.tab),
     school: Number.isFinite(selected) && selected > 0 ? selected : null,
+    q: (searchParams.get('q') || '').slice(0, MAX_QUERY_LENGTH),
   }
 }
 
@@ -42,6 +46,7 @@ export function writeViewParams(searchParams, view) {
     view: view.view === VIEW_DEFAULTS.view ? null : view.view,
     tab: view.tab === VIEW_DEFAULTS.tab ? null : view.tab,
     school: view.school ? String(view.school) : null,
+    q: view.q ? String(view.q).slice(0, MAX_QUERY_LENGTH) : null,
     // One-shot entry param, consumed on load; never kept in the URL.
     selected_school_id: null,
   }

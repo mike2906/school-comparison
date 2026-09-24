@@ -21,34 +21,13 @@
     "language": "Language"
   },
   "landing": {
-    "title": "Find the perfect school for your child",
-    "subtitle": "Explore Sofia schools on the map and compare available admission and pricing data",
-    "selectCategory": "Select category",
     "categoryKindergarten": "Kindergarten",
-    "categoryKindergartenSubtitle": "Ages 0-6",
     "categorySchool": "School",
-    "categorySchoolSubtitle": "Grades 1-12",
-    "selectAgeGroup": "Select age group",
-    "selectSchoolType": "School type (optional)",
-    "orCalculate": "or calculate from birth year",
-    "calculatorToggle": "Don't know which group? Calculate from birth year",
-    "searchButton": "Search schools",
-    "selectFiltersHint": "Please select at least an age group or school type",
     "searchPlaceholder": "Search for a specific school...",
-    "noSearchResults": "No schools found",
-    "orBrowseByCategory": "— or browse by category —",
-    "useThisSelection": "Use this selection",
     "crossoverCheckboxKindergarten": "Also show pre-school programs at primary schools",
-    "crossoverCheckboxSchool": "Also show kindergarten pre-school programs",
-    "featureMapTitle": "Interactive Map",
-    "featureMapDesc": "See schools with confirmed locations using map-based filters",
-    "featureCompareTitle": "Comparison",
-    "featureCompareDesc": "Compare available verified prices and services",
-    "featureResultsTitle": "NVO Results",
-    "featureResultsDesc": "View historical exam results for state schools"
+    "crossoverCheckboxSchool": "Also show kindergarten pre-school programs"
   },
   "search": {
-    "backToFilters": "Back to age groups",
     "back": "Back",
     "filters": "Filters",
     "listView": "List",
@@ -594,5 +573,26 @@
     "label": "School details",
     "backToResults": "Back to results",
     "openFullPage": "Open full page"
+  },
+  "nameSearch": {
+    "openSchool": "Open a school",
+    "filteringBy": "Names matching “{{query}}”",
+    "clear": "Clear"
+  },
+  "agePicker": {
+    "title": "Who are you looking for?",
+    "allAges": "All ages",
+    "bornSummary": "Born {{year}} · {{group}}",
+    "calculated": "In {{year}} your child joins: {{group}}",
+    "noGroup": "No kindergarten or school group for that year yet.",
+    "orPickGroup": "or pick a group",
+    "showAll": "Show all ages",
+    "done": "Done"
+  },
+  "welcome": {
+    "title": "Find a kindergarten or school in Sofia",
+    "body": "Tell us your child’s birth year to see only the groups they can join, or search a school by name.",
+    "cta": "Choose birth year",
+    "dismiss": "Dismiss"
   }
 }
