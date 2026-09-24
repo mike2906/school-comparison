@@ -1512,8 +1512,21 @@ revision. None of this may widen the public boundary without a reviewed pilot.
 - [ ] **E3 Website-derived admission fields.** Re-enable behind the P2.7 flag after
       E1's entity-scoped extraction and sentence-completeness validation make fragment
       coalescing/classification reliable (103/105/153/506 cases as regressions).
-- [ ] **E4 Finish pricing curation** beyond the launch slice: remaining private/
-      international schools (178 total), using scraped rows as verification candidates.
+- [ ] **E4 Extend pricing coverage** beyond the launch slice (20 of 175 Sofia private/
+      international schools publish evidence-linked prices as of 2026-09-24). Pricing
+      publishes on the evidence-link gate plus the tuition plausibility check (PR #86); no
+      human curation. Blocked on E1: no re-extraction before it passes. Backlog:
+      - **Step 0 (read-only, can run before E1):** survey the 18 extracted schools that
+        have a valid `pricing` source page but no pricing rows; record which show a clear
+        single tuition fee. That becomes E1's pricing regression set and sizes the gain.
+      - Re-extract those 18, plus the 4 refreshed schools with no linked rows.
+      - 7 refresh-rejected schools (154, 300, 350, 351, 541, 542, 608): decide
+        re-baselining after the pipeline works.
+      - 17 deferred: 12 shared-host and 2 path-tenant (574/628) need per-entity page
+        scoping; 3 have no website (176, 551, 593).
+      - Known gap: the plausibility check only catches implausibly *cheap* tuition. An
+        overstated or wrong-programme price (e.g. 606's legacy €7,550 total) still needs
+        E1's heading/plan association.
 - [ ] **E5 Gymnasium admission thresholds (state schools).** Import the official minimum
       admission scores after 7th grade into `admission_info.historical_min_scores`. Scores
       come from the city-wide NVO ranking, so no address logic is needed, but they are per
