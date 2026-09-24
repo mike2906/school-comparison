@@ -1484,12 +1484,19 @@ self-review, with at most one Codex review on the larger ones.
       plain click on `lg+` opens the panel, modified clicks and mobile go to the full
       page. `SchoolDetailPage` gained an `embedded` mode, and its Back falls back to the
       last search URL when there is no in-app history (U2 leftover).
-- [ ] **U4 Search is the home page.** `/` shows the map + list immediately; the
+- [x] **U4 Search is the home page.** `/` shows the map + list immediately; the
       category / age group / birth-year choice becomes a compact bar on the search page
       (birth year first, per the calendar-year rule), editable at any time instead of a
       locked chip. School-name search on the search page (instant, Latin/Cyrillic/numbers)
       and school-name results open the school's page. Old `/?age_group=...` links keep
       working.
+      **Done 2026-09-24:** `/` redirects to `/search` keeping its query; `LandingPage` is
+      gone. The search toolbar has an `AgePicker` (birth year + enrolment year first, then
+      kindergarten/school group chips with counts, preschool crossover, "show all ages";
+      bottom sheet on mobile) and `SchoolNameSearch` (instant list + map filter via `q`,
+      dropdown of API matches that opens the school: panel on desktop, page on mobile).
+      All ages are shown until a group is picked; a dismissible welcome tip points to the
+      birth-year picker. Logo links home; 36 px mobile header controls.
 - [ ] **U5 Results list and filters.** Compact location control ("Near: address", use my
       location, pick on map) with explicit submit instead of auto-commit on a typing
       pause; hide per-card "Distance unknown" / "Admissions info unavailable" noise;

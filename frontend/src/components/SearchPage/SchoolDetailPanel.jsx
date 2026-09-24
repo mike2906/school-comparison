@@ -21,7 +21,8 @@ function SchoolDetailPanel({ schoolId, onClose, beside = false }) {
 
   useEffect(() => {
     const handleKeyDown = (event) => {
-      if (event.key === 'Escape') onClose()
+      // A popover or input that used Escape itself marks it handled.
+      if (event.key === 'Escape' && !event.defaultPrevented) onClose()
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)

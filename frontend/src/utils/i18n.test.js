@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { compareSchoolNames, getAddress, getSchoolName } from './i18n.js'
+import { compareSchoolNames, getAddress, getSchoolName, schoolMatchesQuery } from './i18n.js'
 
 test('getSchoolName prefers resolved_name_i18n over legal name', () => {
   const school = {
@@ -75,4 +75,17 @@ test('compareSchoolNames sorts numbered schools numerically', () => {
 test('compareSchoolNames ignores leading quote noise', () => {
   const names = ["''Yagodina", 'Aurora', 'Zora']
   assert.deepEqual([...names].sort((a, b) => compareSchoolNames(a, b, 'en')), ['Aurora', "''Yagodina", 'Zora'])
+})
+
+test('schoolMatchesQuery matches names in any language, numbers and partial words', () => {
+  const school = {
+    name_i18n: { bg: '1 Средно училище „Пенчо П. Славейков“' },
+    resolved_name_i18n: { en: '1 Sredno uchilishte "Pencho P. Slaveykov"' },
+  }
+  assert.equal(schoolMatchesQuery(school, ''), true)
+  assert.equal(schoolMatchesQuery(school, 'пенчо'), true)
+  assert.equal(schoolMatchesQuery(school, 'Slaveykov 1'), true)
+  assert.equal(schoolMatchesQuery(school, '"Pencho'), true)
+  assert.equal(schoolMatchesQuery(school, 'Vazov'), false)
+  assert.equal(schoolMatchesQuery({}, 'x'), false)
 })

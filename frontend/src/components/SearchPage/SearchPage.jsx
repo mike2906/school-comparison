@@ -1,6 +1,6 @@
 import { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useSearchParams, useNavigate, useLocation } from 'react-router-dom'
+import { Link, useSearchParams, useNavigate, useLocation } from 'react-router-dom'
 import debounce from 'lodash.debounce'
 import { useStableCallback } from '../../hooks/useStableCallback'
 import Layout from '../Layout/Layout'
@@ -9,10 +9,12 @@ import SchoolMap from '../Map/SchoolMap'
 import SchoolCard from '../SchoolCard/SchoolCard'
 import SchoolCardSkeleton from '../SchoolCard/SchoolCardSkeleton'
 import SchoolDetailPanel from './SchoolDetailPanel'
+import AgePicker from './AgePicker'
+import SchoolNameSearch from './SchoolNameSearch'
 import { useSchools } from '../../hooks/useSchools'
 import { calculateDistance } from '../../utils/distance'
 import { geocodeAddress, reverseGeocode, cancelGeocode } from '../../utils/geocoding'
-import { compareSchoolNames, getSchoolName } from '../../utils/i18n'
+import { compareSchoolNames, getSchoolName, schoolMatchesQuery } from '../../utils/i18n'
 import { useCompare } from '../../context/CompareContext'
 import { useCountry } from '../../context/CountryContext'
 import { fetchAvailableFilters, fetchExamAverages } from '../../api/schools'
@@ -26,6 +28,7 @@ import {
   readSavedViewState,
   saveViewState,
   rememberLastSearchUrl,
+  isDesktopViewport,
 } from '../../utils/searchViewState'
 
 function readStoredUserLocation(fallbackAddress) {
@@ -88,6 +91,18 @@ function SearchPage() {
   const [isPickingLocation, setIsPickingLocation] = useState(false)
   const [distanceFilter, setDistanceFilter] = useState(initialView.within)
   // With a saved location, nearest-first is the default, as it was before sort lived in the URL.
+  const [nameQuery, setNameQuery] = useState(initialView.q)
+  // URLs this page has written but that have not landed yet, oldest first.
+  const pendingWritesRef = useRef([])
+  const adoptingUrlRef = useRef(false)
+  const [agePickerOpen, setAgePickerOpen] = useState(false)
+  const [welcomeDismissed, setWelcomeDismissed] = useState(() => {
+    try {
+      return localStorage.getItem('welcomeDismissed') === 'true'
+    } catch {
+      return false
+    }
+  })
   const [sortBy, setSortBy] = useState(() => (
     searchParams.has('sort') || !userLocation ? initialView.sort : 'distance'
   ))
@@ -99,7 +114,6 @@ function SearchPage() {
     focusLocationId: null,
     hideOthers: false,
   })
-  const [highlightLocation, setHighlightLocation] = useState(false)
   const [locationToast, setLocationToast] = useState(null)
   const previousLocationRef = useRef(userLocation)
   const listScrollRef = useRef(null)
@@ -117,36 +131,42 @@ function SearchPage() {
   const latestMapBoundsRef = useRef(null)
   const scrollOnSelectRef = useRef(false)
 
-  // Read filters from URL
-  const ageGroup = searchParams.get('age_group')
-  const rawSchoolType = searchParams.get('school_type')
-  const schoolType = rawSchoolType === 'international' ? 'private' : rawSchoolType
-  const educationLevel = searchParams.get('education_level')
-  const includeCrossover = searchParams.get('include_crossover') === 'true'
-  const targetYearParam = searchParams.get('target_year')
   // One-shot "focus this school" entry param; consumed once the list has loaded and
   // dropped from the URL by the view-state sync below.
   const entrySchoolIdRef = useRef(searchParams.get('selected_school_id'))
-  const promptLocation = searchParams.get('prompt_location') === '1'
-  const getParamList = (key) => {
-    const values = searchParams.getAll(key)
-    if (values.length > 0) return values
-    const csv = searchParams.get(key)
-    return csv ? csv.split(',').map(value => value.trim()).filter(Boolean) : []
+  const rawSchoolType = searchParams.get('school_type')
+
+  // Filters are read from the URL, and re-read whenever it changes: the page has its own
+  // history entries (the detail panel), so Back can bring back an older filter set.
+  const readFiltersFromUrl = (params) => {
+    const getParamList = (key) => {
+      const values = params.getAll(key)
+      if (values.length > 0) return values
+      const csv = params.get(key)
+      return csv ? csv.split(',').map(value => value.trim()).filter(Boolean) : []
+    }
+    const type = params.get('school_type')
+    const targetYearParam = params.get('target_year')
+    return {
+      ageGroup: params.get('age_group'),
+      targetYear: targetYearParam ? parseInt(targetYearParam) : new Date().getFullYear() + 1,
+      birthYear: Number.parseInt(params.get('birth_year') || '', 10) || null,
+      schoolType: type === 'international' ? 'private' : type,
+      educationLevel: params.get('education_level'),
+      includeCrossover: params.get('include_crossover') === 'true',
+      languageFocus: getParamList('language_focus'),
+      specialPrograms: getParamList('special_programs'),
+      facilities: getParamList('facilities'),
+      teachingApproach: getParamList('teaching_approach'),
+    }
   }
 
-  const [filters, setFilters] = useState({
-    ageGroup: ageGroup,
-    targetYear: targetYearParam ? parseInt(targetYearParam) : new Date().getFullYear() + 1,
-    birthYear: null,
-    schoolType: schoolType,
-    educationLevel: educationLevel,
-    includeCrossover: includeCrossover,
-    languageFocus: getParamList('language_focus'),
-    specialPrograms: getParamList('special_programs'),
-    facilities: getParamList('facilities'),
-    teachingApproach: getParamList('teaching_approach'),
-  })
+  const [filters, setFilters] = useState(() => readFiltersFromUrl(searchParams))
+
+  useEffect(() => {
+    const fromUrl = readFiltersFromUrl(new URLSearchParams(location.search))
+    setFilters(prev => (JSON.stringify(prev) === JSON.stringify(fromUrl) ? prev : fromUrl))
+  }, [location.search])
 
 
 
@@ -237,18 +257,49 @@ function SearchPage() {
     }
   }, [countryCode])
 
+  // A URL change we did not write (logo link, Back/Forward) carries its own view state.
+  // Runs before the state-to-URL sync below, which then skips this commit: it would
+  // otherwise write the old state over the URL we are adopting.
+  useEffect(() => {
+    const pendingIndex = pendingWritesRef.current.indexOf(location.search)
+    if (pendingIndex >= 0) {
+      // Our own write landing (earlier ones may have been skipped): nothing to adopt.
+      pendingWritesRef.current = pendingWritesRef.current.slice(pendingIndex + 1)
+      return
+    }
+    adoptingUrlRef.current = true
+    const params = new URLSearchParams(location.search)
+    const view = readViewParams(params)
+    setSortBy(params.has('sort') || !userLocation ? view.sort : 'distance')
+    setDistanceFilter(view.within)
+    setViewMode(view.view)
+    setMobileTab(view.tab)
+    setSelectedSchoolId(view.school)
+    setNameQuery(view.q)
+  }, [location.search])
+
   // Keep sort, distance, view and selection in the URL (replace, so Back is not polluted).
   useEffect(() => {
+    if (adoptingUrlRef.current) {
+      adoptingUrlRef.current = false
+      return
+    }
     const next = writeViewParams(searchParams, {
       sort: sortBy,
       within: distanceFilter,
       view: viewMode,
       tab: mobileTab,
       school: selectedSchoolId,
+      q: nameQuery,
     })
+    if (!next) return
+    // Remember the write until it lands, so the URL-to-state sync above does not echo it
+    // back (an earlier write landing mid-typing would otherwise undo keystrokes).
+    pendingWritesRef.current = [...pendingWritesRef.current, `?${next.toString()}`]
     // Keep the history state (it records whether the detail panel pushed this entry).
-    if (next) setSearchParams(next, { replace: true, state: location.state })
-  }, [sortBy, distanceFilter, viewMode, mobileTab, selectedSchoolId, searchParams, setSearchParams, location.state])
+    setSearchParams(next, { replace: true, state: location.state })
+  }, [sortBy, distanceFilter, viewMode, mobileTab, selectedSchoolId, nameQuery, searchParams, setSearchParams, location.state])
+
 
   useEffect(() => {
     rememberLastSearchUrl(`/search${location.search}`)
@@ -281,28 +332,6 @@ function SearchPage() {
   useEffect(() => {
     localStorage.setItem('searchInMapBounds', searchInBounds ? 'true' : 'false')
   }, [searchInBounds])
-
-  useEffect(() => {
-    if (!promptLocation) return
-    if (userLocation) return
-    if (window.innerWidth >= 768) return
-
-    setIsFiltersOpen(true)
-    setHighlightLocation(true)
-
-    const timer = setTimeout(() => {
-      locationSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }, 200)
-
-    const highlightTimer = setTimeout(() => {
-      setHighlightLocation(false)
-    }, 2500)
-
-    return () => {
-      clearTimeout(timer)
-      clearTimeout(highlightTimer)
-    }
-  }, [promptLocation, userLocation])
 
   const ageGroupOrder = useMemo(() => {
     const keys = getAgeGroupKeys(config)
@@ -429,6 +458,28 @@ function SearchPage() {
     params.delete('detail')
     navigate(`/search?${params.toString()}`, { replace: true })
   })
+
+  const handleAgeChange = useStableCallback((selection) => {
+    handleFilterChange(selection)
+  })
+
+  // A school picked by name opens directly (panel on desktop, full page on mobile).
+  const handleOpenSchoolByName = useStableCallback((school) => {
+    if (isDesktopViewport()) {
+      handleOpenDetails(school)
+    } else {
+      navigate(`/schools/${school.id}`)
+    }
+  })
+
+  const dismissWelcome = () => {
+    setWelcomeDismissed(true)
+    try {
+      localStorage.setItem('welcomeDismissed', 'true')
+    } catch {
+      // A blocked storage just means the tip shows again next visit.
+    }
+  }
 
   const handleListSchoolSelect = useStableCallback((school) => handleSchoolSelect(school, { source: 'list' }))
   const handleMapSchoolSelect = useStableCallback((school) => {
@@ -732,6 +783,13 @@ function SearchPage() {
         params.delete('target_year')
       }
     }
+    if (newFilters.birthYear !== undefined) {
+      if (newFilters.birthYear) {
+        params.set('birth_year', String(newFilters.birthYear))
+      } else {
+        params.delete('birth_year')
+      }
+    }
     if (newFilters.includeCrossover !== undefined) {
       if (newFilters.includeCrossover) {
         params.set('include_crossover', 'true')
@@ -812,9 +870,11 @@ function SearchPage() {
   const distanceLimit = userLocation && distanceFilter !== 'any' ? parseFloat(distanceFilter) : null
 
   const filteredSchools = useMemo(() => {
-    if (!distanceLimit) return schoolsWithDistance
-    return schoolsWithDistance.filter(school => typeof school.distance === 'number' && school.distance <= distanceLimit)
-  }, [schoolsWithDistance, distanceLimit])
+    return schoolsWithDistance.filter(school => (
+      (!distanceLimit || (typeof school.distance === 'number' && school.distance <= distanceLimit)) &&
+      schoolMatchesQuery(school, nameQuery)
+    ))
+  }, [schoolsWithDistance, distanceLimit, nameQuery])
 
   const isSchoolInBounds = (school, bounds) => {
     if (!bounds?.southWest || !bounds?.northEast) return true
@@ -959,12 +1019,6 @@ function SearchPage() {
     scrollOnSelectRef.current = false
   }, [selectedSchoolId])
 
-  const handleBackToLanding = () => {
-    // Preserve current filters when going back to landing page
-    const params = new URLSearchParams(searchParams)
-    navigate(`/?${params.toString()}`)
-  }
-
   // Close filters drawer on desktop
   useEffect(() => {
     const handleResize = () => {
@@ -1002,9 +1056,7 @@ function SearchPage() {
     return (
       <div
         ref={locationSectionRef}
-        className={`rounded-xl border border-neutral-200 bg-neutral-50 p-4 space-y-4 ${
-          highlightLocation ? 'location-highlight' : ''
-        }`}
+        className="rounded-xl border border-neutral-200 bg-neutral-50 p-4 space-y-4"
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -1569,14 +1621,6 @@ function SearchPage() {
     const advancedFilters = []
     const advancedByLanguage = new Map()
 
-    if (filters.ageGroup) {
-      activeFilters.push({
-        key: 'ageGroup',
-        label: t(`ageGroups.${filters.ageGroup}`),
-        locked: true,
-      })
-    }
-
     if (filters.schoolType) {
       activeFilters.push({
         key: 'schoolType',
@@ -1634,6 +1678,7 @@ function SearchPage() {
     addAdvancedChips(filters.teachingApproach, 'teachingApproach')
 
     if (compact) {
+      if (activeFilters.length === 0 && advancedFilters.length === 0) return null
       return (
         <div className="flex items-center gap-3">
           <span className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
@@ -1817,68 +1862,88 @@ function SearchPage() {
   return (
     <Layout hideNavOnMobile>
       <div className="h-[100dvh] md:h-[calc(100dvh-64px)] flex flex-col">
-        {/* Mobile/Tablet Header with Filters Button and Tabs */}
+        <h1 className="sr-only">{t('welcome.title')}</h1>
+        {/* Mobile/Tablet Header */}
         <div className="lg:hidden border-b border-neutral-200 bg-white">
           <div className="flex items-center gap-2 px-3 py-2">
-            <button
-              onClick={handleBackToLanding}
-              className="p-2 -ml-2 text-neutral-600 hover:text-neutral-900"
-              aria-label={t('search.backToFilters')}
+            <Link
+              to="/search"
+              className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary-500 to-primary-600 text-white"
+              aria-label={t('nav.home')}
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
               </svg>
-            </button>
+            </Link>
 
             <div className="flex-1 flex items-center justify-center">
-              <div className="inline-flex items-center bg-neutral-100 rounded-lg p-0.5">
-                <button
-                  onClick={() => setMobileTab('list')}
-                  className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
-                    mobileTab === 'list'
-                      ? 'bg-white text-neutral-900 shadow-sm'
-                      : 'text-neutral-600 hover:text-neutral-800'
-                  }`}
-                >
-                  {t('search.listView')}
-                </button>
-                <button
-                  onClick={() => setMobileTab('map')}
-                  className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
-                    mobileTab === 'map'
-                      ? 'bg-white text-neutral-900 shadow-sm'
-                      : 'text-neutral-600 hover:text-neutral-800'
-                  }`}
-                >
-                  {t('search.mapView')}
-                </button>
+              <div className="inline-flex items-center bg-neutral-100 rounded-lg p-0.5" role="tablist">
+                {['list', 'map'].map(tab => (
+                  <button
+                    key={tab}
+                    type="button"
+                    role="tab"
+                    aria-selected={mobileTab === tab}
+                    onClick={() => setMobileTab(tab)}
+                    className={`h-9 px-4 text-sm font-medium rounded-md transition-colors ${
+                      mobileTab === tab
+                        ? 'bg-white text-neutral-900 shadow-sm'
+                        : 'text-neutral-600 hover:text-neutral-800'
+                    }`}
+                  >
+                    {tab === 'list' ? t('search.listView') : t('search.mapView')}
+                  </button>
+                ))}
               </div>
             </div>
 
             <button
+              type="button"
               onClick={() => setIsFiltersOpen(true)}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-primary-50 text-primary-700 text-xs font-medium"
+              className="flex h-9 items-center gap-1.5 px-3 rounded-lg bg-primary-50 text-primary-700 text-sm font-medium"
             >
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
               </svg>
-              {t('search.filters')}
+              <span className="sr-only sm:not-sr-only">{t('search.filters')}</span>
             </button>
             <LanguageToggle compact />
           </div>
+          <div className="grid grid-cols-2 gap-2 px-3 pb-2">
+            <AgePicker
+              ageGroup={filters.ageGroup}
+              educationLevel={filters.educationLevel}
+              includeCrossover={filters.includeCrossover}
+              targetYear={filters.targetYear}
+              birthYear={filters.birthYear}
+              compact
+              open={agePickerOpen && !isDesktopViewport()}
+              onOpenChange={setAgePickerOpen}
+              onChange={handleAgeChange}
+            />
+            <SchoolNameSearch value={nameQuery} onChange={setNameQuery} onOpenSchool={handleOpenSchoolByName} />
+          </div>
         </div>
 
-        {/* Desktop View Toggle */}
-        <div className="hidden lg:flex items-center gap-6 px-6 py-3 border-b border-neutral-200 bg-white">
-          <button
-            onClick={handleBackToLanding}
-            className="flex items-center gap-2 text-sm text-neutral-600 hover:text-neutral-900"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
-            {t('search.backToFilters')}
-          </button>
+        {/* Desktop toolbar */}
+        <div className="hidden lg:flex items-center gap-4 px-6 py-3 border-b border-neutral-200 bg-white">
+          <AgePicker
+            className="w-72 flex-shrink-0"
+            ageGroup={filters.ageGroup}
+            educationLevel={filters.educationLevel}
+            includeCrossover={filters.includeCrossover}
+            targetYear={filters.targetYear}
+            birthYear={filters.birthYear}
+            open={agePickerOpen && isDesktopViewport()}
+            onOpenChange={setAgePickerOpen}
+            onChange={handleAgeChange}
+          />
+          <SchoolNameSearch
+            className="w-80 flex-shrink-0"
+            value={nameQuery}
+            onChange={setNameQuery}
+            onOpenSchool={handleOpenSchoolByName}
+          />
 
           <div className="flex-1">
             {renderActiveFilters({ compact: true })}
@@ -1991,6 +2056,35 @@ function SearchPage() {
                 onScroll={(event) => { listScrollTopRef.current = event.currentTarget.scrollTop }}
                 className={`flex-1 overflow-y-auto ${hasCompare ? 'pb-24' : ''}`}
               >
+                {!filters.ageGroup && !nameQuery && !welcomeDismissed && (
+                  <div className="mx-3 mt-3 rounded-xl border border-primary-200 bg-primary-50 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <h2 className="text-base font-semibold text-primary-900">{t('welcome.title')}</h2>
+                        <p className="mt-1 text-sm text-primary-900/80">{t('welcome.body')}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={dismissWelcome}
+                        className="-mr-1 -mt-1 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg text-primary-800 hover:bg-primary-100"
+                        aria-label={t('welcome.dismiss')}
+                      >
+                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      onMouseDown={(event) => event.stopPropagation()}
+                      onClick={() => setAgePickerOpen(true)}
+                      className="mt-3 h-10 rounded-lg bg-primary-600 px-4 text-sm font-medium text-white hover:bg-primary-700"
+                    >
+                      {t('welcome.cta')}
+                    </button>
+                  </div>
+                )}
+
                 {loading && (
                   <div className="p-4 space-y-4">
                     {[...Array(5)].map((_, i) => (
