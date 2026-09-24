@@ -1,0 +1,76 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+
+import {
+  readViewParams,
+  writeViewParams,
+  readSavedViewState,
+  saveViewState,
+  getLastSearchUrl,
+  rememberLastSearchUrl,
+} from './searchViewState.js'
+
+const memoryStorage = () => {
+  const data = new Map()
+  return {
+    getItem: key => (data.has(key) ? data.get(key) : null),
+    setItem: (key, value) => data.set(key, String(value)),
+  }
+}
+
+test('readViewParams validates values and falls back to defaults', () => {
+  const view = readViewParams(new URLSearchParams('sort=price&within=5&view=map-only&tab=map&school=42'))
+  assert.deepEqual(view, { sort: 'price', within: '5', view: 'map-only', tab: 'map', school: 42 })
+
+  const bad = readViewParams(new URLSearchParams('sort=evil&within=3&view=x&tab=y&school=abc'))
+  assert.deepEqual(bad, { sort: 'name', within: 'any', view: 'list-map', tab: 'list', school: null })
+})
+
+test('writeViewParams omits defaults, keeps other params, and reports no-ops', () => {
+  const base = new URLSearchParams('age_group=first&sort=price')
+  const next = writeViewParams(base, { sort: 'name', within: 'any', view: 'list-map', tab: 'list', school: 7 })
+  assert.equal(next.toString(), 'age_group=first&school=7')
+  assert.equal(writeViewParams(next, readViewParams(next)), null)
+  const entry = writeViewParams(new URLSearchParams('selected_school_id=5'), readViewParams(new URLSearchParams('')))
+  assert.equal(entry.toString(), '')
+})
+
+test('saved view state is only restored for the same history entry', () => {
+  const storage = memoryStorage()
+  saveViewState('abc', { search: '?age_group=first', scrollTop: 1500, map: { center: [42.7, 23.3], zoom: 13 } }, storage)
+  assert.deepEqual(readSavedViewState('abc', '?age_group=first', storage), { scrollTop: 1500, map: { center: [42.7, 23.3], zoom: 13 } })
+  assert.equal(readSavedViewState('other', '?age_group=first', storage), null)
+  // Every page load's first entry is keyed 'default': a different URL must not restore.
+  assert.equal(readSavedViewState('abc', '?age_group=grade_8_12', storage), null)
+})
+
+test('readSavedViewState tolerates corrupt storage and a missing map view', () => {
+  const storage = memoryStorage()
+  storage.setItem('searchViewState', '{not json')
+  assert.equal(readSavedViewState('abc', '', storage), null)
+  saveViewState('abc', { search: '', scrollTop: 10, map: null }, storage)
+  assert.deepEqual(readSavedViewState('abc', '', storage), { scrollTop: 10, map: null })
+})
+
+test('getLastSearchUrl only returns search URLs', () => {
+  const storage = memoryStorage()
+  assert.equal(getLastSearchUrl(storage), '/search')
+  rememberLastSearchUrl('/search?age_group=first', storage)
+  assert.equal(getLastSearchUrl(storage), '/search?age_group=first')
+  rememberLastSearchUrl('https://evil.example', storage)
+  assert.equal(getLastSearchUrl(storage), '/search')
+  assert.equal(getLastSearchUrl(null), '/search')
+})
+
+test('view state is kept per history entry, capped to recent entries', () => {
+  const storage = memoryStorage()
+  saveViewState('first', { search: '?a=1', scrollTop: 100, map: null }, storage)
+  saveViewState('second', { search: '?a=2', scrollTop: 200, map: null }, storage)
+  assert.equal(readSavedViewState('first', '?a=1', storage).scrollTop, 100)
+  assert.equal(readSavedViewState('second', '?a=2', storage).scrollTop, 200)
+  saveViewState('first', { search: '?a=1', scrollTop: 150, map: null }, storage)
+  assert.equal(readSavedViewState('first', '?a=1', storage).scrollTop, 150)
+  for (let i = 0; i < 25; i += 1) saveViewState(`k${i}`, { search: '', scrollTop: i, map: null }, storage)
+  assert.equal(readSavedViewState('first', '?a=1', storage), null)
+  assert.equal(readSavedViewState('k24', '', storage).scrollTop, 24)
+})

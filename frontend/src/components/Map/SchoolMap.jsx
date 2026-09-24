@@ -275,9 +275,11 @@ const serializeBounds = (bounds) => ({
   },
 })
 
-function MapUpdater({ schools, userLocation, autoFit, lastValidBoundsRef, defaultZoom, countryBounds }) {
+function MapUpdater({ schools, userLocation, autoFit, lastValidBoundsRef, defaultZoom, countryBounds, keepInitialView }) {
   const map = useMap()
   const lastAutoFitKeyRef = useRef(null)
+  // A restored view (returning from a school page) wins over the first auto-fit.
+  const keepInitialViewRef = useRef(keepInitialView)
 
   useEffect(() => {
     if (!autoFit) return
@@ -287,6 +289,15 @@ function MapUpdater({ schools, userLocation, autoFit, lastValidBoundsRef, defaul
 
     const schoolPoints = collectSchoolPoints(schools, countryBounds)
     const points = collectPoints(schools, userLocation, countryBounds)
+
+    if (keepInitialViewRef.current) {
+      if (schoolPoints.length === 0) return
+      keepInitialViewRef.current = false
+      lastAutoFitKeyRef.current = autoFitKey
+      lastValidBoundsRef.current = L.latLngBounds(points)
+      return
+    }
+
     lastAutoFitKeyRef.current = autoFitKey
 
     if (schoolPoints.length > 0) {
@@ -314,11 +325,15 @@ function MapUpdater({ schools, userLocation, autoFit, lastValidBoundsRef, defaul
   return null
 }
 
-function MapBoundsWatcher({ onBoundsChange }) {
+function MapBoundsWatcher({ onBoundsChange, onViewChange }) {
   const map = useMapEvents({
     moveend: () => {
       if (onBoundsChange) {
         onBoundsChange(serializeBounds(map.getBounds()))
+      }
+      if (onViewChange) {
+        const center = map.getCenter()
+        onViewChange({ center: [center.lat, center.lng], zoom: map.getZoom() })
       }
     },
     zoomend: () => {
@@ -815,6 +830,8 @@ function SchoolMap({
   isPickingLocation,
   onPickLocation,
   onBoundsChange,
+  onViewChange,
+  initialView = null,
   autoFit = true,
   hasCompare = false,
   resizeKey,
@@ -1018,8 +1035,8 @@ function SchoolMap({
       } ${isPickingLocation ? 'map-picking-location' : ''}`}
     >
       <MapContainer
-        center={mapCenter}
-        zoom={defaultZoom}
+        center={initialView?.center || mapCenter}
+        zoom={initialView?.zoom || defaultZoom}
         className="h-full w-full"
         zoomControl={false}
       >
@@ -1071,9 +1088,10 @@ function SchoolMap({
           lastValidBoundsRef={lastValidBoundsRef}
           defaultZoom={defaultZoom}
           countryBounds={countryBounds}
+          keepInitialView={Boolean(initialView)}
         />
 
-        <MapBoundsWatcher onBoundsChange={onBoundsChange} />
+        <MapBoundsWatcher onBoundsChange={onBoundsChange} onViewChange={onViewChange} />
         <MapResizer resizeKey={resizeKey} />
         <MapClickHandler
           onClearSelection={onClearSelection}
