@@ -60,7 +60,7 @@ function AboutPage() {
 
         <Link
           to="/search"
-          className="mt-10 inline-flex h-11 items-center rounded-lg bg-primary-600 px-5 text-sm font-medium text-white hover:bg-primary-700"
+          className="mt-10 inline-flex h-11 items-center rounded-lg bg-primary-700 px-5 text-sm font-medium text-white hover:bg-primary-800"
         >
           {t('about.cta')}
         </Link>

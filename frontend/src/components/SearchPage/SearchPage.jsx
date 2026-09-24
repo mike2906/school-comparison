@@ -1182,9 +1182,9 @@ function SearchPage() {
             type="button"
             aria-pressed={isActive}
             onClick={() => handleFilterChange({ schoolType: type })}
-            className={`h-11 md:h-8 rounded-full border px-4 md:px-3 text-sm font-medium transition-colors ${
+            className={`h-11 md:h-8 rounded-full border px-3 text-sm font-medium transition-colors ${
               isActive
-                ? 'border-primary-600 bg-primary-600 text-white'
+                ? 'border-primary-600 bg-primary-700 text-white'
                 : 'border-neutral-300 bg-white text-neutral-700 hover:border-neutral-400'
             }`}
           >
@@ -1467,7 +1467,7 @@ function SearchPage() {
     }
 
     return (
-      <details className="rounded-xl border border-neutral-200 bg-white p-4">
+      <details open className="rounded-xl border border-neutral-200 bg-white p-4">
         <summary className="cursor-pointer text-sm font-semibold text-neutral-800">
           {t('advancedFilters.title')}
         </summary>
@@ -1559,7 +1559,7 @@ function SearchPage() {
             {[...advancedByLanguage.entries()].map(([language, levels]) => (
               <span
                 key={`lang-${language}`}
-                className="inline-flex items-center gap-2 bg-primary-600 text-white text-xs px-2.5 py-1 rounded-full"
+                className="inline-flex items-center gap-2 bg-primary-700 text-white text-xs px-2.5 py-1 rounded-full"
               >
                 <span>{formatLanguageLabel(language)}:</span>
                 <span className="flex items-center gap-1">
@@ -1587,13 +1587,13 @@ function SearchPage() {
             {advancedFilters.filter(filter => !filter.key.startsWith('languageFocus-')).map(filter => (
               <span
                 key={filter.key}
-                className="inline-flex items-center gap-2 bg-primary-600 text-white text-xs px-2.5 py-1 rounded-full"
+                className="inline-flex items-center gap-2 bg-primary-700 text-white text-xs px-2.5 py-1 rounded-full"
               >
                 {filter.label}
                 <button
                   type="button"
                   onClick={filter.onRemove}
-                  className="w-6 h-6 -my-1 -mr-1 rounded-full flex items-center justify-center text-white hover:bg-primary-700 transition-colors"
+                  className="w-6 h-6 -my-1 -mr-1 rounded-full flex items-center justify-center text-white hover:bg-primary-800 transition-colors"
                   aria-label={t('common.close')}
                 >
                   ×
@@ -1682,7 +1682,7 @@ function SearchPage() {
               onOpenChange={setAgePickerOpen}
               onChange={handleAgeChange}
             />
-            <SchoolNameSearch value={nameQuery} onChange={setNameQuery} onOpenSchool={handleOpenSchoolByName} />
+            <SchoolNameSearch compact value={nameQuery} onChange={setNameQuery} onOpenSchool={handleOpenSchoolByName} />
           </div>
         </div>
 
@@ -1770,7 +1770,8 @@ function SearchPage() {
             w-full
           `}>
               <div className="px-4 py-2 bg-white border-b border-neutral-200 space-y-2">
-                <div className="flex flex-wrap items-center justify-between gap-2">
+                {/* Row 1: where (location) and order (sort). Row 2: which (type) and how many. */}
+                <div className="flex items-center justify-between gap-2">
                 <LocationControl
                   userLocation={userLocation}
                   addressInput={addressInput}
@@ -1789,21 +1790,7 @@ function SearchPage() {
                   distanceFilter={distanceFilter}
                   onDistanceFilterChange={setDistanceFilter}
                 />
-                {renderSchoolTypeChips()}
-                </div>
-                <div className="lg:hidden">
-                  {renderActiveFilters()}
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  {isFirstLoad ? (
-                    <div className="h-4 w-32 bg-neutral-200 animate-pulse rounded" />
-                  ) : (
-                    <p className="text-sm text-neutral-600">
-                      <span className="font-semibold text-neutral-900">{sortedSchools.length}</span>
-                      {' '}{t(resultNounKey, { count: sortedSchools.length })}
-                    </p>
-                  )}
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-shrink-0 items-center gap-2">
                     <label htmlFor="results-sort" className="text-sm font-medium text-neutral-700 max-sm:sr-only">
                       {t('sorting.sortBy')}
                     </label>
@@ -1811,13 +1798,28 @@ function SearchPage() {
                       id="results-sort"
                       value={sortBy}
                       onChange={(e) => setSortBy(e.target.value)}
-                      className="h-11 md:h-auto border border-neutral-300 rounded-lg px-3 md:py-1.5 text-sm bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-shadow"
+                      className="h-11 md:h-auto max-w-[44vw] md:max-w-none border border-neutral-300 rounded-lg px-2 md:px-3 md:py-1.5 text-sm bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-shadow"
                     >
                       {sortOptions.map(option => (
                         <option key={option.value} value={option.value}>{option.label}</option>
                       ))}
                     </select>
                   </div>
+                </div>
+                <div className="lg:hidden">
+                  {renderActiveFilters()}
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  {renderSchoolTypeChips()}
+                  {isFirstLoad ? (
+                    <div className="h-4 w-32 bg-neutral-200 animate-pulse rounded" />
+                  ) : (
+                    <p className="whitespace-nowrap text-sm text-neutral-600">
+                      <span className="font-semibold text-neutral-900">{sortedSchools.length}</span>
+                      {/* Phones show just the number beside the type chips; the noun stays for screen readers. */}
+                      <span className="max-sm:sr-only">{' '}{t(resultNounKey, { count: sortedSchools.length })}</span>
+                    </p>
+                  )}
                 </div>
 
                 {searchInBounds && !loading && (
@@ -1837,11 +1839,12 @@ function SearchPage() {
                 className={`flex-1 overflow-y-auto ${hasCompare ? 'pb-24' : ''}`}
               >
                 {!filters.ageGroup && !nameQuery && !welcomeDismissed && (
-                  <div className="mx-3 mt-3 rounded-xl border border-primary-200 bg-primary-50 p-4">
+                  <div className="mx-3 mt-3 rounded-xl border border-primary-200 bg-primary-50 p-3 sm:p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <h2 className="text-base font-semibold text-primary-900">{t('welcome.title')}</h2>
-                        <p className="mt-1 text-sm text-primary-900/80">{t('welcome.body')}</p>
+                        <h2 className="text-sm sm:text-base font-semibold text-primary-900">{t('welcome.title')}</h2>
+                        {/* The explanation is for wider screens; phones keep just the title and action. */}
+                        <p className="mt-1 hidden text-sm text-primary-900/80 sm:block">{t('welcome.body')}</p>
                       </div>
                       <button
                         type="button"
@@ -1858,7 +1861,7 @@ function SearchPage() {
                       type="button"
                       onMouseDown={(event) => event.stopPropagation()}
                       onClick={() => setAgePickerOpen(true)}
-                      className="mt-3 h-10 rounded-lg bg-primary-600 px-4 text-sm font-medium text-white hover:bg-primary-700"
+                      className="mt-2 sm:mt-3 h-10 rounded-lg bg-primary-700 px-4 text-sm font-medium text-white hover:bg-primary-800"
                     >
                       {t('welcome.cta')}
                     </button>
@@ -2016,7 +2019,7 @@ function SearchPage() {
               </div>
               <div className="p-5">
                 <div className="space-y-6">
-                  {renderMapBoundsFilter()}
+                  {mobileTab === 'map' && renderMapBoundsFilter()}
                   {renderAdvancedFilters()}
                   <Link to="/about" className="inline-block text-sm text-primary-700 underline">
                     {t('nav.about')}

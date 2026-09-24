@@ -20,9 +20,9 @@ import {
 } from '../../utils/pricing'
 
 const typeColors = {
-  state: 'bg-teal-500 text-white',
-  private: 'bg-violet-500 text-white',
-  international: 'bg-blue-500 text-white',
+  state: 'bg-teal-700 text-white',
+  private: 'bg-violet-600 text-white',
+  international: 'bg-blue-700 text-white',
 }
 
 const STATUS_COLORS = {
@@ -1519,7 +1519,7 @@ const SchoolCard = memo(function SchoolCard({
         <Link
           to={`/schools/${school.id}`}
           onClick={handleDetailsClick}
-          className="flex-1 min-h-[44px] md:min-h-0 inline-flex items-center justify-center px-3 py-2 text-center text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors transition-transform hover:scale-[1.02]"
+          className="flex-1 min-h-[44px] md:min-h-0 inline-flex items-center justify-center px-3 py-2 text-center text-sm font-medium text-white bg-primary-700 hover:bg-primary-800 rounded-lg transition-colors transition-transform hover:scale-[1.02]"
         >
           {t('schools.details')}
         </Link>

@@ -8,6 +8,7 @@ import {
   saveViewState,
   getLastSearchUrl,
   rememberLastSearchUrl,
+  shortAddress,
 } from './searchViewState.js'
 
 const memoryStorage = () => {
@@ -92,4 +93,11 @@ test('the name query round-trips through the URL', () => {
   assert.equal(readViewParams(next).q, 'пенчо')
   const cleared = writeViewParams(next, { ...readViewParams(next), q: '' })
   assert.equal(cleared.has('q'), false)
+})
+
+test('shortAddress puts a leading house number after the street', () => {
+  assert.equal(shortAddress('1, бул. Витоша, Център, София'), 'бул. Витоша 1')
+  assert.equal(shortAddress('ул. Раковски 12, София'), 'ул. Раковски 12')
+  assert.equal(shortAddress('Current location'), 'Current location')
+  assert.equal(shortAddress(''), '')
 })

@@ -87,7 +87,7 @@ function CompareBar() {
         className={`
           px-4 md:px-6 py-2.5 md:py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap
           ${canCompare
-            ? 'bg-primary-600 text-white hover:bg-primary-700 shadow-lg hover:shadow-xl'
+            ? 'bg-primary-700 text-white hover:bg-primary-800 shadow-lg hover:shadow-xl'
             : 'bg-neutral-300 text-neutral-500 cursor-not-allowed pointer-events-none'
           }
         `}

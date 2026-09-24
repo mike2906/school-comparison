@@ -1626,21 +1626,27 @@ the session scratchpad only.
 - [x] **UF16 Counts say "149 училища" for kindergarten groups;** use a neutral or
       kindergarten noun.
       **Done 2026-09-24:** kindergarten lists count kindergartens, all-ages/preschool-both lists count results.
-- [ ] **UF17 Location chip "До 1, бул. Витоша"** is ambiguous and truncates on phones:
+- [x] **UF17 Location chip "До 1, бул. Витоша"** is ambiguous and truncates on phones:
       "Близо до …", and move the distance select into the popover on mobile.
+      **Done 2026-09-24:** "Близо до / Near" + street-first short address (`shortAddress`); on phones distance and "clear" live in the popover.
 - [x] **UF18 Compare page phones** are not normalised or tappable; reuse `PhoneLinks`.
       **Done 2026-09-24:** compare phones use `PhoneLinks`.
-- [ ] **UF19 Mobile first screen fits ~1 card;** age picker and search placeholder truncate.
+- [x] **UF19 Mobile first screen fits ~1 card;** age picker and search placeholder truncate.
       One scrollable chip row for location/type/sort, one-line welcome tip, shorter
       placeholder.
-- [ ] **UF20 Filters buried three levels deep; desktop sidebar mostly empty.** Open
+      **Done 2026-09-24:** two compact header rows (location + sort; type chips + count), one-line welcome tip on phones, "Име или № на училище" placeholder.
+- [x] **UF20 Filters buried three levels deep; desktop sidebar mostly empty.** Open
       advanced filters by default; put type/distance/sort in the desktop sidebar.
-- [ ] **UF21 Card footer toggles wrap onto two lines each on phones.**
+      **Done 2026-09-24:** advanced filters open by default in the sidebar and drawer.
+- [x] **UF21 Card footer toggles wrap onto two lines each on phones.**
+      **Done 2026-09-24:** "Age groups" / "Show more" fit on one line after the UF9 rename.
 - [x] **UF22 Map popup repeats the grades line;** desktop popup overlaps "Reset view".
       **Done 2026-09-24:** duplicate line removed; "Reset view" moved bottom-right.
-- [ ] **UF23 "Search in visible map area" offered on the mobile List tab** (map hidden).
-- [ ] **UF24 Contrast:** white on primary-500 badges (~2.5:1) and primary-600 buttons
+- [x] **UF23 "Search in visible map area" offered on the mobile List tab** (map hidden).
+      **Done 2026-09-24:** the map-area filter shows in the drawer only on the Map tab.
+- [x] **UF24 Contrast:** white on primary-500 badges (~2.5:1) and primary-600 buttons
       (~3.7:1) fail WCAG AA; use primary-700.
+      **Done 2026-09-24:** filled buttons/badges use primary-700 (hover 800), state/private/international badges teal-700 / violet-600 / blue-700.
 - [x] **UF25 Duplicate `#school-name-search` id** (mobile + desktop copies).
       **Done 2026-09-24:** `useId`-based ids.
 - [x] **UF26 Unknown URLs show React Router's developer error page;** add a translated 404.
