@@ -1942,6 +1942,9 @@ function SearchPage() {
                 <div className="space-y-6">
                   {renderMapBoundsFilter()}
                   {renderAdvancedFilters()}
+                  <Link to="/about" className="inline-block text-sm text-primary-700 underline">
+                    {t('nav.about')}
+                  </Link>
                 </div>
               </div>
             </div>

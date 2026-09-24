@@ -1,9 +1,11 @@
 import { useTranslation } from 'react-i18next'
-import { Link } from 'react-router-dom'
+import { Link, NavLink } from 'react-router-dom'
+import { useCompare } from '../../context/CompareContext'
 import LanguageToggle from '../LanguageToggle/LanguageToggle'
 
 function Layout({ children, hideNavOnMobile = false, compactNavOnMobile = false }) {
   const { t } = useTranslation()
+  const { compareList } = useCompare()
 
   return (
     <div className="min-h-screen bg-neutral-100">
@@ -28,14 +30,33 @@ function Layout({ children, hideNavOnMobile = false, compactNavOnMobile = false 
                 <div className="text-lg font-semibold text-neutral-900 leading-tight">
                   {t('nav.title')}
                 </div>
-                <p className="text-xs text-neutral-500 leading-tight">
+                <p className="hidden sm:block text-xs text-neutral-500 leading-tight">
                   {t('nav.subtitle')}
                 </p>
               </div>
             </Link>
 
             {/* Right side */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 md:gap-2">
+              {compareList.length >= 2 && (
+                <NavLink
+                  to="/compare"
+                  className={({ isActive }) => `hidden sm:inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-sm font-medium ${
+                    isActive ? 'bg-primary-50 text-primary-800' : 'text-neutral-700 hover:bg-neutral-100'
+                  }`}
+                >
+                  {t('nav.compare')}
+                  <span className="rounded-full bg-primary-100 px-1.5 text-xs text-primary-700">{compareList.length}</span>
+                </NavLink>
+              )}
+              <NavLink
+                to="/about"
+                className={({ isActive }) => `inline-flex h-9 items-center whitespace-nowrap rounded-lg px-2 sm:px-3 text-sm font-medium ${
+                  isActive ? 'bg-primary-50 text-primary-800' : 'text-neutral-700 hover:bg-neutral-100'
+                }`}
+              >
+                {t('nav.about')}
+              </NavLink>
               <LanguageToggle />
             </div>
           </div>

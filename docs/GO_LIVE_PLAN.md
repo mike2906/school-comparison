@@ -1545,9 +1545,18 @@ self-review, with at most one Codex review on the larger ones.
       page). The bar is one row on mobile, hidden on `/compare`, and says
       "Maximum 4 schools" when full. "Add school" and a history-less "Back" go to
       `sessionStorage.lastSearchUrl` (a `/search` path) or `/search`.
-- [ ] **U8 Cross-cutting.** Clickable logo and nav link to Compare; "EN | BG" language
+- [x] **U8 Cross-cutting.** Clickable logo and nav link to Compare; "EN | BG" language
       switch; keyboard-reachable cards and non-colour-only status; "About the data" page
       (sources, last updated). Split the largest components as they are touched (P4.1).
+      **Done 2026-09-24:** logo links home (U4); nav has "Compare (n)" (2+ schools) and
+      "About the data"; EN | BG switch (U1); cards are focusable with Enter/Space (U5) and
+      the status dot keeps its text badge. `/about` lists the sources the code actually
+      uses (MoE register, kg.sofia.bg, MoE NVO open data, school websites for fees,
+      OpenStreetMap/CARTO), the calendar-year rule and what is not published yet. There
+      is no per-dataset "last updated" date in the API, so the page does not claim one.
+      Removed six unused components/hooks and the strings U1–U5 orphaned. `SearchPage.jsx`
+      is ~1,900 lines (from 2,024) with the panel, picker, name search and location
+      control extracted; the rest of P4.1 stays open.
 
 ## Phase 3 — Go live
 

@@ -5,6 +5,7 @@ import ErrorBoundary from './components/ErrorBoundary/ErrorBoundary'
 import SearchPage from './components/SearchPage/SearchPage'
 import SchoolDetailPage from './components/SchoolDetailPage/SchoolDetailPage'
 import ComparePage from './components/ComparePage/ComparePage'
+import AboutPage from './components/AboutPage/AboutPage'
 import CompareBar from './components/CompareBar/CompareBar'
 
 // The results page is the home page; old `/?age_group=...` links keep their filters.
@@ -43,6 +44,10 @@ const router = createBrowserRouter([
       {
         path: 'compare',
         element: <ComparePage />,
+      },
+      {
+        path: 'about',
+        element: <AboutPage />,
       },
     ],
   },
