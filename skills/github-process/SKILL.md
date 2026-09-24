@@ -71,6 +71,13 @@ when the user explicitly asks for that.
    (response fields, gates, allowlists), migrations, writes to the launch DB, deployment
    or credentials, and new dependencies. When unsure, it waits. Report each self-merge to
    Mike with the PR URL.
+   **Exception, one-off launch-DB data fixes:** the agent may apply a small data
+   correction (INSERT/UPDATE/DELETE, no schema change) to the local launch DB without
+   waiting when it has evidence for the fix (e.g. the source page states the value),
+   has taken a `pg_dump` backup in the same session, and has checked the effect with a
+   dry run or a `WHERE`-guarded statement that returns the changed rows. Report each fix
+   to Mike (what changed, why, backup path). Bulk promotions and anything that changes
+   what the publish gates allow still wait for Mike.
 9. Otherwise follow Mike's direction after independent pre-review. **When Mike says merge, merge** once
    CI is green and the PR is mergeable. Do not request another review first, even if the
    latest commit has not been reviewed. After merging, verify that the merge commit contains
