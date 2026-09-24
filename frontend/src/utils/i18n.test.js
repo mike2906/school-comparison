@@ -89,3 +89,39 @@ test('schoolMatchesQuery matches names in any language, numbers and partial word
   assert.equal(schoolMatchesQuery(school, 'Vazov'), false)
   assert.equal(schoolMatchesQuery({}, 'x'), false)
 })
+
+test('schoolMatchesQuery handles how parents write school names', () => {
+  const su119 = { name_i18n: { bg: '119 Средно училище "Академик Михаил Арнаудов"' } }
+  const su1190 = { name_i18n: { bg: '1190 Средно училище "Тест"' } }
+  const smg = { name_i18n: { bg: 'Софийска математическа гимназия  "Паисий Хилендарски"' } }
+  const npmg = { name_i18n: { bg: 'Национална природо-математическа  гимназия "Академик Любомир Чакалов"' } }
+  const aeg1 = { name_i18n: { bg: 'Първа английска езикова гимназия' } }
+  const ieg164 = { name_i18n: { bg: '164. гимназия с преподаване  на испански език "Мигел де Сервантес"' } }
+  const ou150 = { name_i18n: { bg: '150-то ОСНОВНО УЧИЛИЩЕ  "ЦАР СИМЕОН ПЪРВИ"' } }
+  const dg5 = { name_i18n: { bg: 'ДГ №5 Надежда (с яслени групи)' } }
+
+  for (const q of ['119', '119 СУ', 'СУ 119', '119-то', '№119', '119th', 'No. 119', '119 su', '119-то СОУ']) {
+    assert.equal(schoolMatchesQuery(su119, q), true, q)
+  }
+  assert.equal(schoolMatchesQuery(su1190, '119'), false)
+  assert.equal(schoolMatchesQuery(su119, '119 ОУ'), false)
+  assert.equal(schoolMatchesQuery(su119, 'xqzv'), false)
+
+  for (const q of ['СМГ', 'smg', 'sofiyska matematicheska', 'смг паисий']) {
+    assert.equal(schoolMatchesQuery(smg, q), true, q)
+  }
+  assert.equal(schoolMatchesQuery(smg, 'смг вазов'), false)
+  assert.equal(schoolMatchesQuery(npmg, 'СМГ'), false)
+  assert.equal(schoolMatchesQuery(npmg, 'НПМГ'), true)
+  assert.equal(schoolMatchesQuery(npmg, 'npmg'), true)
+  for (const q of ['1 АЕГ', '1-ва АЕГ', 'I АЕГ', 'Първа АЕГ', '1 aeg']) {
+    assert.equal(schoolMatchesQuery(aeg1, q), true, q)
+  }
+  assert.equal(schoolMatchesQuery(aeg1, '2 АЕГ'), false)
+  assert.equal(schoolMatchesQuery(ieg164, '164 ИЕГ'), true)
+  assert.equal(schoolMatchesQuery(ou150, '150 ОУ'), true)
+  assert.equal(schoolMatchesQuery(ou150, 'ОУ 150'), true)
+  assert.equal(schoolMatchesQuery(dg5, 'ДГ 5'), true)
+  assert.equal(schoolMatchesQuery(dg5, 'дг 55'), false)
+  assert.equal(schoolMatchesQuery(dg5, 'constructor'), false)
+})

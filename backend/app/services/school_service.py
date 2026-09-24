@@ -1,4 +1,3 @@
-import re
 from typing import Optional
 
 from sqlalchemy import and_, exists, func, or_, select
@@ -10,6 +9,7 @@ from app.models.school import School, SchoolLocation, SchoolLocationAgeGroupShif
 from app.models.source_page import SourcePage
 from app.services.geocoding.bounds import SOFIA_MUNICIPALITY_BOUNDS, get_city_bounds
 from app.services.geocoding.service import TERMINAL_GEOCODE_FAILURE_REASONS
+from app.utils import school_search
 from app.utils.i18n_resolver import resolve_address_i18n, resolve_name_i18n
 from app.utils.school_attributes import build_filterable_attributes
 from app.utils.website_data import (
@@ -335,96 +335,16 @@ class SchoolService:
         limit: int = 10,
     ) -> list[School]:
         """
-        Search schools by name or location.
+        Search schools by name (registry and public display names) or address.
 
-        Args:
-            search_query: Search term (already sanitized)
-            country_code: Country to filter by
-            limit: Maximum number of results to return
-
-        Returns:
-            List of schools matching the search query
+        Matching and ranking rules (type abbreviations, "№"/ordinals, curated acronyms,
+        transliteration) live in app/utils/school_search.py. Display names go through
+        the same publication predicate as response serialization.
         """
-        # Escape special SQL ILIKE wildcards to prevent unintended pattern matching.
-        # Parents often type school numbers without the Bulgarian "№" marker
-        # (for example "ДГ 5" instead of stored "ДГ №5"), so search both forms.
-        variants = self._school_search_variants(search_query)
-        if not variants:
+        tokens = school_search.query_tokens(search_query)
+        if not tokens:
             return []
 
-        escaped_variants = [
-            variant.replace("%", r"\%").replace("_", r"\_")
-            for variant in variants
-        ]
-        patterns = [f"%{variant}%" for variant in escaped_variants]
-        registry_and_address_fields = (
-            School.name_i18n["bg"].as_string(),
-            School.name_i18n["en"].as_string(),
-            SchoolLocation.address_i18n["bg"].as_string(),
-            SchoolLocation.address_i18n["en"].as_string(),
-        )
-        registry_and_address_clauses = [
-            field.ilike(pattern, escape="\\")
-            for pattern in patterns
-            for field in registry_and_address_fields
-        ]
-
-        # Match IDs first so multiple matching locations do not duplicate schools
-        # or consume the result limit. Display names are deliberately handled by
-        # _search_resolved_fallback_ids so search uses the exact same publication
-        # predicate as response serialization instead of approximating it in SQL.
-        city_clause = self._city_clause(city)
-        matching_school_ids = (
-            select(School.id)
-            .outerjoin(SchoolLocation, SchoolLocation.school_id == School.id)
-            .where(School.country_code == country_code)
-            .where(self._has_listable_location(city))
-            .where(or_(*registry_and_address_clauses))
-            .distinct()
-            .limit(limit)
-        )
-        if city_clause is not None:
-            matching_school_ids = matching_school_ids.where(city_clause)
-        matching_school_ids = matching_school_ids.subquery()
-
-        matched_ids = (
-            await self.db.execute(select(matching_school_ids.c.id))
-        ).scalars().all()
-        if len(matched_ids) < limit:
-            matched_ids.extend(
-                await self._search_resolved_fallback_ids(
-                    variants=variants,
-                    country_code=country_code,
-                    city=city,
-                    exclude_ids=set(matched_ids),
-                    limit=limit - len(matched_ids),
-                )
-            )
-        if not matched_ids:
-            return []
-
-        query = (
-            self._list_query()
-            .where(School.id.in_(matched_ids))
-        )
-        result = await self.db.execute(query)
-        schools_by_id = {school.id: school for school in result.scalars().unique().all()}
-        return [schools_by_id[school_id] for school_id in matched_ids if school_id in schools_by_id]
-
-    async def _search_resolved_fallback_ids(
-        self,
-        *,
-        variants: list[str],
-        country_code: str,
-        city: Optional[str],
-        exclude_ids: set[int],
-        limit: int,
-    ) -> list[int]:
-        """Search derived display fallbacks without hydrating the full response graph."""
-        if limit <= 0:
-            return []
-
-        folded_variants = [variant.casefold() for variant in variants]
         city_clause = self._city_clause(city)
         query = (
             select(
@@ -440,62 +360,41 @@ class SchoolService:
         )
         if city_clause is not None:
             query = query.where(city_clause)
-        if exclude_ids:
-            query = query.where(School.id.not_in(exclude_ids))
 
-        result = await self.db.execute(query)
-        matched_ids: list[int] = []
-        seen_ids: set[int] = set()
-        for school_id, name_i18n, attributes, scrape_status, address_i18n in result.all():
-            if school_id in seen_ids:
-                continue
-            searchable_values = list((name_i18n or {}).values())
-            searchable_values.extend(
-                resolve_name_i18n(
-                    name_i18n,
-                    attributes_for_publication(attributes, scrape_status),
-                ).values()
-            )
-            searchable_values.extend((address_i18n or {}).values())
-            searchable_values.extend(resolve_address_i18n(address_i18n).values())
+        schools: dict[int, dict] = {}
+        for school_id, name_i18n, attributes, scrape_status, address_i18n in (
+            await self.db.execute(query)
+        ).all():
+            entry = schools.get(school_id)
+            if entry is None:
+                name_i18n = name_i18n or {}
+                names = list(name_i18n.values())
+                names.extend(
+                    resolve_name_i18n(
+                        name_i18n,
+                        attributes_for_publication(attributes, scrape_status),
+                    ).values()
+                )
+                entry = schools[school_id] = {
+                    "registry_name": name_i18n.get("bg", ""),
+                    "names": names,
+                    "addresses": [],
+                }
+            entry["addresses"].extend((address_i18n or {}).values())
+            entry["addresses"].extend(resolve_address_i18n(address_i18n).values())
 
-            if not any(
-                variant in str(value).casefold()
-                for variant in folded_variants
-                for value in searchable_values
-            ):
-                continue
+        ranked: list[tuple[int, int, int]] = []
+        for school_id, entry in schools.items():
+            rank = school_search.rank_school(tokens, **entry)
+            if rank is not None:
+                ranked.append((rank, len(school_search.normalize(entry["registry_name"])), school_id))
+        matched_ids = [school_id for _, _, school_id in sorted(ranked)[:limit]]
+        if not matched_ids:
+            return []
 
-            seen_ids.add(school_id)
-            matched_ids.append(school_id)
-            if len(matched_ids) >= limit:
-                break
-
-        return matched_ids
-
-    @staticmethod
-    def _school_search_variants(search_query: str) -> list[str]:
-        query = re.sub(r"\s+", " ", search_query.strip())
-        variants = [query]
-
-        if "№" in query:
-            variants.append(re.sub(r"\s*№\s*", " ", query))
-        else:
-            variants.append(re.sub(r"\b(\D+?)\s+(\d+)\b", r"\1 №\2", query, count=1))
-            variants.append(re.sub(r"\b(\D+?)\s+(\d+)\b", r"\1 № \2", query, count=1))
-
-        out: list[str] = []
-        seen: set[str] = set()
-        for variant in variants:
-            normalized = re.sub(r"\s+", " ", variant).strip()
-            if not normalized:
-                continue
-            key = normalized.casefold()
-            if key in seen:
-                continue
-            seen.add(key)
-            out.append(normalized)
-        return out
+        result = await self.db.execute(self._list_query().where(School.id.in_(matched_ids)))
+        schools_by_id = {school.id: school for school in result.scalars().unique().all()}
+        return [schools_by_id[school_id] for school_id in matched_ids if school_id in schools_by_id]
 
     async def get_schools_by_ids(self, school_ids: list[int]) -> list[School]:
         """
