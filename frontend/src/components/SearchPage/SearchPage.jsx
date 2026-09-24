@@ -169,7 +169,8 @@ function SearchPage() {
       schoolType: type === 'international' ? 'private' : type,
       educationLevel: params.get('education_level'),
       includeCrossover: params.get('include_crossover') === 'true',
-      languageFocus: getParamList('language_focus'),
+      // Canonical, so links saved with older spellings ('English:intensive') still match.
+      languageFocus: uniqueCanonical(getParamList('language_focus'), canonicalLanguagePair),
       specialPrograms: getParamList('special_programs'),
       facilities: getParamList('facilities'),
       teachingApproach: getParamList('teaching_approach'),
