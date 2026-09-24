@@ -52,6 +52,20 @@ def _verified_pricing_context(confidence=1.0, **extra):
 
 
 class TestHealthEndpoint:
+    def test_app_gzips_large_responses(self):
+        from fastapi.middleware.gzip import GZipMiddleware
+
+        from app.main import app
+
+        gzip = [m for m in app.user_middleware if m.cls is GZipMiddleware]
+        assert len(gzip) == 1
+        assert gzip[0].kwargs["minimum_size"] <= 1024
+
+    @pytest.mark.asyncio
+    async def test_small_responses_are_not_gzipped(self, client):
+        response = await client.get("/health", headers={"Accept-Encoding": "gzip"})
+        assert "content-encoding" not in response.headers
+
     @pytest.mark.asyncio
     async def test_health_check(self, client):
         response = await client.get("/health")
