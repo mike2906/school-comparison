@@ -92,6 +92,9 @@ function SearchPage() {
   const [distanceFilter, setDistanceFilter] = useState(initialView.within)
   // With a saved location, nearest-first is the default, as it was before sort lived in the URL.
   const [nameQuery, setNameQuery] = useState(initialView.q)
+  // URLs this page has written but that have not landed yet, oldest first.
+  const pendingWritesRef = useRef([])
+  const adoptingUrlRef = useRef(false)
   const [agePickerOpen, setAgePickerOpen] = useState(false)
   const [welcomeDismissed, setWelcomeDismissed] = useState(() => {
     try {
@@ -254,8 +257,33 @@ function SearchPage() {
     }
   }, [countryCode])
 
+  // A URL change we did not write (logo link, Back/Forward) carries its own view state.
+  // Runs before the state-to-URL sync below, which then skips this commit: it would
+  // otherwise write the old state over the URL we are adopting.
+  useEffect(() => {
+    const pendingIndex = pendingWritesRef.current.indexOf(location.search)
+    if (pendingIndex >= 0) {
+      // Our own write landing (earlier ones may have been skipped): nothing to adopt.
+      pendingWritesRef.current = pendingWritesRef.current.slice(pendingIndex + 1)
+      return
+    }
+    adoptingUrlRef.current = true
+    const params = new URLSearchParams(location.search)
+    const view = readViewParams(params)
+    setSortBy(params.has('sort') || !userLocation ? view.sort : 'distance')
+    setDistanceFilter(view.within)
+    setViewMode(view.view)
+    setMobileTab(view.tab)
+    setSelectedSchoolId(view.school)
+    setNameQuery(view.q)
+  }, [location.search])
+
   // Keep sort, distance, view and selection in the URL (replace, so Back is not polluted).
   useEffect(() => {
+    if (adoptingUrlRef.current) {
+      adoptingUrlRef.current = false
+      return
+    }
     const next = writeViewParams(searchParams, {
       sort: sortBy,
       within: distanceFilter,
@@ -264,9 +292,14 @@ function SearchPage() {
       school: selectedSchoolId,
       q: nameQuery,
     })
+    if (!next) return
+    // Remember the write until it lands, so the URL-to-state sync above does not echo it
+    // back (an earlier write landing mid-typing would otherwise undo keystrokes).
+    pendingWritesRef.current = [...pendingWritesRef.current, `?${next.toString()}`]
     // Keep the history state (it records whether the detail panel pushed this entry).
-    if (next) setSearchParams(next, { replace: true, state: location.state })
+    setSearchParams(next, { replace: true, state: location.state })
   }, [sortBy, distanceFilter, viewMode, mobileTab, selectedSchoolId, nameQuery, searchParams, setSearchParams, location.state])
+
 
   useEffect(() => {
     rememberLastSearchUrl(`/search${location.search}`)
