@@ -39,7 +39,9 @@
     "noActiveFilters": "No active filters",
     "mainFilters": "Main Filters",
     "advancedFilters": "Advanced Filters",
-    "noAdvancedFilters": "No advanced filters"
+    "noAdvancedFilters": "No advanced filters",
+    "allTypes": "All",
+    "clearFilters": "Clear filters"
   },
   "location": {
     "title": "Your Location",
@@ -72,7 +74,10 @@
     "distanceAny": "Any distance",
     "distance2km": "Within 2km",
     "distance5km": "Within 5km",
-    "fromYou": "from you"
+    "fromYou": "from you",
+    "nearShort": "Near {{address}}",
+    "setShort": "Set your location",
+    "whyShort": "See distances, sort by the nearest and limit by distance."
   },
   "sorting": {
     "sortBy": "Sort by",
@@ -80,7 +85,8 @@
     "name": "Name",
     "type": "Type",
     "price": "Price",
-    "pricePrivate": "Price (Private only)"
+    "pricePrivate": "Price (Private only)",
+    "nvo": "NVO result (highest)"
   },
   "filters": {
     "title": "Filters",

@@ -1497,13 +1497,23 @@ self-review, with at most one Codex review on the larger ones.
       dropdown of API matches that opens the school: panel on desktop, page on mobile).
       All ages are shown until a group is picked; a dismissible welcome tip points to the
       birth-year picker. Logo links home; 36 px mobile header controls.
-- [ ] **U5 Results list and filters.** Compact location control ("Near: address", use my
+- [x] **U5 Results list and filters.** Compact location control ("Near: address", use my
       location, pick on map) with explicit submit instead of auto-commit on a typing
       pause; hide per-card "Distance unknown" / "Admissions info unavailable" noise;
       smaller cards; filter client-side instead of refetching on every advanced-filter
       click; frequently used filters as chips above the list; sorts by NVO result;
       Sofia-bounded initial map view; 44 px touch targets; drawer Escape/focus/labels;
       softer mobile location prompt; "clear filters" on empty results.
+      **Done 2026-09-24:** `LocationControl` ("Near …" chip with my-location / address
+      submitted with Enter / pick-on-map, clear, distance select) replaces the sidebar
+      block and the auto-geocode-while-typing effect; State/Private chips above the list;
+      cards drop "Distance unknown" / "Admissions info unavailable", merge the two meta
+      rows and tighten spacing, and are keyboard-focusable; advanced filters run on the
+      client (`utils/advancedFilters.js`, verified identical to the API for all 55
+      options), so one fetch per age group; "NVO result" sort; the initial map fit skips
+      the farthest 5 % of points (`utils/mapFit.js`); filter drawer is a labelled dialog
+      with Escape; empty results offer "Clear filters". The landing-driven mobile
+      location prompt went away with U4.
 - [x] **U6 School detail content.** Key-facts strip at the top ordered by school type
       (price first for private, NVO/admission for state); small map + directions link;
       remove the misleading cross-grade NVO insight; linear (not smoothed) NVO chart
