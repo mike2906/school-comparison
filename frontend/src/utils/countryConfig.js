@@ -107,3 +107,25 @@ export function gradeToPoints(config, grade) {
 export function getExamSubjects(config) {
   return config?.education_config?.exam_subjects || []
 }
+
+/**
+ * Age-group keys that belong only to `category` (e.g. kindergarten groups without the
+ * preschool year, which is both kindergarten and school).
+ */
+export function getExclusiveAgeGroups(config, category) {
+  if (!config?.education_config?.age_groups) return []
+  return config.education_config.age_groups
+    .filter(ag => ag.category === category)
+    .map(ag => ag.key)
+}
+
+/**
+ * Grade numbers for each school-only age group, counting the first school group's first
+ * year as grade 1 (Bulgaria: grade_1_4 → [1, 4], grade_8_12 → [8, 12]).
+ */
+export function getGradeBands(config) {
+  const groups = (config?.education_config?.age_groups || []).filter(ag => ag.category === 'school')
+  if (groups.length === 0) return {}
+  const base = Math.min(...groups.map(ag => ag.min_diff)) - 1
+  return Object.fromEntries(groups.map(ag => [ag.key, [ag.min_diff - base, ag.max_diff - base]]))
+}

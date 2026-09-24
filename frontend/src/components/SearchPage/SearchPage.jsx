@@ -19,11 +19,12 @@ import { compareSchoolNames, getSchoolName, schoolMatchesQuery } from '../../uti
 import { useCompare } from '../../context/CompareContext'
 import { useCountry } from '../../context/CountryContext'
 import { fetchAvailableFilters, fetchExamAverages } from '../../api/schools'
-import { getAgeGroupKeys } from '../../utils/countryConfig'
+import { getAgeGroupKeys, getExclusiveAgeGroups } from '../../utils/countryConfig'
 import { AGE_GROUP_KEYS } from '../../utils/education'
 import { getLanguageFocusPairs } from '../../utils/schoolAttributes'
 import { matchesAdvancedFilters, matchesSchoolType } from '../../utils/advancedFilters'
 import { getNvoDetail } from '../../utils/nvo'
+import { languageLabel } from '../../utils/languages'
 import { monthlyEquivalent, toEur } from '../../utils/pricing'
 import {
   readViewParams,
@@ -55,6 +56,8 @@ const TYPE_SORT_ORDER = {
 const EMPTY_LIST = []
 // Cards are rendered in pages as the list scrolls: all ~440 at once took ~0.6 s per render.
 const LIST_PAGE_SIZE = 30
+// Bulgaria, until the country config has loaded.
+const FALLBACK_KINDERGARTEN_ONLY_GROUPS = ['nursery', 'first', 'second', 'third']
 
 const DEFAULT_ADVANCED_OPTIONS = {
   language_focus_levels: ['immersion', 'bilingual', 'enrichment'],
@@ -1106,7 +1109,23 @@ function SearchPage() {
   const showMap = viewMode === 'list-map' || viewMode === 'map-only'
   const hasCompare = compareList.length > 0
 
-  const sortOptions = userLocation
+  const kindergartenOnlyGroups = config
+    ? getExclusiveAgeGroups(config, 'kindergarten')
+    : FALLBACK_KINDERGARTEN_ONLY_GROUPS
+
+  // Kindergarten-only lists are counted as kindergartens, all-ages / preschool lists
+  // neutrally, school grades as schools.
+  const resultNounKey = !filters.ageGroup || (filters.ageGroup === 'preschool' && filters.includeCrossover)
+    ? 'schools.resultsMixed'
+    : kindergartenOnlyGroups.includes(filters.ageGroup) ||
+      (filters.ageGroup === 'preschool' && filters.educationLevel === 'kindergarten')
+      ? 'schools.resultsKindergarten'
+      : 'schools.results'
+
+  // Kindergartens have no NVO results, so that sort only applies when schools are listed.
+  const kindergartensOnly = kindergartenOnlyGroups.includes(filters.ageGroup) ||
+    (filters.ageGroup === 'preschool' && filters.educationLevel === 'kindergarten')
+  const allSortOptions = userLocation
     ? [
         { value: 'distance', label: t('sorting.distance') },
         { value: 'name', label: t('sorting.name') },
@@ -1120,6 +1139,13 @@ function SearchPage() {
         { value: 'type', label: t('sorting.type') },
         { value: 'price', label: t('sorting.pricePrivate') },
       ]
+  const sortOptions = kindergartensOnly
+    ? allSortOptions.filter(option => option.value !== 'nvo')
+    : allSortOptions
+
+  useEffect(() => {
+    if (kindergartensOnly && sortBy === 'nvo') setSortBy('name')
+  }, [kindergartensOnly, sortBy])
 
   const renderMapBoundsFilter = () => (
     <div className="rounded-xl border border-neutral-200 bg-white p-4 space-y-2">
@@ -1170,7 +1196,7 @@ function SearchPage() {
   )
 
   const formatAdvancedLabel = (key) => t(`advancedFilters.options.${key}`, { defaultValue: key.replace(/_/g, ' ') })
-  const formatLanguageLabel = (key) => t(`advancedFilters.languages.${key}`, { defaultValue: key })
+  const formatLanguageLabel = (key) => languageLabel(key, t)
   const formatLanguageLevelLabel = (key) => t(`advancedFilters.levels.${key}`, { defaultValue: key.replace(/_/g, ' ') })
 
   const advancedCounts = useMemo(() => {
@@ -1596,7 +1622,7 @@ function SearchPage() {
 
   return (
     <Layout hideNavOnMobile>
-      <div className="h-[100dvh] md:h-[calc(100dvh-64px)] flex flex-col">
+      <div className="h-[100dvh] lg:h-[calc(100dvh-64px)] flex flex-col">
         <h1 className="sr-only">{t('welcome.title')}</h1>
         {/* Mobile/Tablet Header */}
         <div className="lg:hidden border-b border-neutral-200 bg-white">
@@ -1738,10 +1764,9 @@ function SearchPage() {
           {/* School List (Desktop: 50%, Tablet: 60%, Mobile: full on List tab) */}
           <div className={`
             flex flex-col bg-neutral-50
-            ${mobileTab === 'list' ? '' : 'hidden md:flex'}
+            ${mobileTab === 'list' ? '' : 'hidden lg:flex'}
             ${viewMode === 'list-only' ? 'lg:flex-1' : 'lg:w-2/5'}
             ${showList ? 'lg:flex' : 'lg:hidden'}
-            md:w-3/5
             w-full
           `}>
               <div className="px-4 py-2 bg-white border-b border-neutral-200 space-y-2">
@@ -1775,7 +1800,7 @@ function SearchPage() {
                   ) : (
                     <p className="text-sm text-neutral-600">
                       <span className="font-semibold text-neutral-900">{sortedSchools.length}</span>
-                      {' '}{t('schools.results', { count: sortedSchools.length })}
+                      {' '}{t(resultNounKey, { count: sortedSchools.length })}
                     </p>
                   )}
                   <div className="flex items-center gap-2">
@@ -1912,9 +1937,8 @@ function SearchPage() {
           {/* Map (Desktop: 30%, Tablet: 40%, Mobile: full on Map tab) */}
           <div className={`
             flex-1 relative
-            ${mobileTab === 'map' ? '' : 'hidden md:block'}
+            ${mobileTab === 'map' ? '' : 'hidden lg:block'}
             ${showMap ? 'lg:block' : 'lg:hidden'}
-            md:w-2/5
           `}>
                 {isPickingLocation && (
                   <div className="absolute inset-x-3 top-16 z-[1000] flex items-center justify-between gap-3 rounded-lg bg-neutral-900/90 px-4 py-2 text-sm text-white shadow-lg" role="status">

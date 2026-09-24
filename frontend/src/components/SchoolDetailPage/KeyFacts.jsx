@@ -17,6 +17,7 @@ import {
   getExamTypeLabel,
 } from './helpers'
 import { getMappableLocations } from './LocationMap'
+import { usesSofiaKindergartenSystem } from '../../utils/admission'
 
 function readSavedLocation() {
   try {
@@ -73,13 +74,8 @@ function KeyFacts({ school, examAverages, nvoExamType }) {
             price: formatRange(tuition.min, tuition.max),
             currency: tuition.currency,
           })}
-          detail={[
-            t('schoolDetail.tuitionPerMonth', {
-              price: formatRange(tuition.min / 12, tuition.max / 12),
-              currency: tuition.currency,
-            }),
-            yearDetail,
-          ].filter(Boolean).join(' · ')}
+          // No "per month" figure: yearly ÷ 12 misleads when schools bill over 9–10 months.
+          detail={yearDetail}
         />
       )
     } else {
@@ -152,6 +148,16 @@ function KeyFacts({ school, examAverages, nvoExamType }) {
         label={t('schoolDetail.lastAdmitted')}
         value={t('schoolDetail.pointsValue', { points: formatNumber(lastAdmitted.points, 2) })}
         detail={lastAdmitted.year ? t('schoolDetail.yearValue', { year: lastAdmitted.year }) : null}
+      />
+    )
+  } else if (usesSofiaKindergartenSystem(school)) {
+    // No published thresholds yet: say how admission works instead of leaving a gap.
+    facts.lastAdmitted = (
+      <Fact
+        key="lastAdmitted"
+        label={t('schoolDetail.admission')}
+        value={t('schoolDetail.kgByPointsShort')}
+        detail={t('schoolDetail.kgThresholdsLater')}
       />
     )
   }

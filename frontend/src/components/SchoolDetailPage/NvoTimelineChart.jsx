@@ -350,7 +350,7 @@ function YearOverYearBadge({ subject, data, dataKey, color }) {
           {currentValue.toFixed(1)}%
         </span>
         <span className={`text-sm font-semibold ${changeColorClass}`}>
-          {change > 0 ? '+' : ''}{change.toFixed(1)}% {arrow}
+          {change > 0 ? '+' : ''}{change.toFixed(1)} {t('academicPerformance.pointsShort')} {arrow}
         </span>
       </div>
       <p className="text-xs text-neutral-500 mt-1">

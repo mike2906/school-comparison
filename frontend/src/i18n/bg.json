@@ -126,8 +126,8 @@
     "upper_secondary": "Гимназия"
   },
   "schools": {
-    "ageGroupsShifts": "Възрастови групи и смени",
-    "showAgeGroupsShifts": "Покажи възрастови групи и смени",
+    "ageGroupsShifts": "Възрастови групи",
+    "showAgeGroupsShifts": "Възрастови групи",
     "showLocations": "Покажи локации",
     "results": "училища",
     "results_one": "училище",
@@ -205,7 +205,11 @@
     "mapLocationMissing": "Липсват координати",
     "clearLocations": "Изчисти локациите",
     "locationsShownOnMap": "Локациите са показани на картата.",
-    "locationFlowHint": "Маршрутът е подреден по възрастови групи."
+    "locationFlowHint": "Маршрутът е подреден по възрастови групи.",
+    "resultsKindergarten_one": "детска градина",
+    "resultsKindergarten_other": "детски градини",
+    "resultsMixed_one": "резултат",
+    "resultsMixed_other": "резултата"
   },
   "shifts": {
     "morning": "Сутрин",
@@ -266,25 +270,25 @@
     "noData": "Няма налични резултати от изпити",
     "scorePercent": "Резултат (%)",
     "average": "Средна",
-    "nationalAverage": "Национален ориентир",
+    "nationalAverage": "Средно за страната",
     "nationalMath": "Нац. средно Математика",
     "nationalBulgarian": "Нац. средно БЕЛ",
     "seriesLegend": "Линии",
     "seriesSchool": "{{subject}} резултат на училището",
-    "seriesNational": "{{subject}} национален ориентир",
+    "seriesNational": "{{subject}} средно за страната",
     "latestStatus": "Статус за последната година",
-    "aboveBenchmark": "Над ориентира",
-    "nearBenchmark": "Близо до ориентира",
-    "belowBenchmark": "Под ориентира",
-    "nationalBenchmarkValue": "Национален ориентир {{value}}%",
-    "pointsShort": "пт.",
-    "tooltipBenchmarkAbove": "{{value}}% е с {{diff}} процентни пункта над националния ориентир ({{benchmark}}%).",
-    "tooltipBenchmarkNear": "{{value}}% е близо до националния ориентир ({{benchmark}}%), в рамките на {{diff}} процентни пункта.",
-    "tooltipBenchmarkBelow": "{{value}}% е с {{diff}} процентни пункта под националния ориентир ({{benchmark}}%).",
+    "aboveBenchmark": "Над средното за страната",
+    "nearBenchmark": "Близо до средното за страната",
+    "belowBenchmark": "Под средното за страната",
+    "nationalBenchmarkValue": "Средно за страната {{value}}%",
+    "pointsShort": "пр. п.",
+    "tooltipBenchmarkAbove": "{{value}}% е с {{diff}} процентни пункта над средното за страната ({{benchmark}}%).",
+    "tooltipBenchmarkNear": "{{value}}% е близо до средното за страната ({{benchmark}}%), в рамките на {{diff}} процентни пункта.",
+    "tooltipBenchmarkBelow": "{{value}}% е с {{diff}} процентни пункта под средното за страната ({{benchmark}}%).",
     "tooltipTrendUp": "Последният резултат {{latest}}% е с {{diff}} процентни пункта над скорошната средна стойност за училището ({{average}}%).",
     "tooltipTrendDown": "Последният резултат {{latest}}% е с {{diff}} процентни пункта под скорошната средна стойност за училището ({{average}}%).",
     "tooltipTrendFlat": "Последният резултат {{latest}}% е близо до скорошната средна стойност за училището ({{average}}%), в рамките на {{diff}} процентни пункта.",
-    "vsLastYear": "спрямо миналата година",
+    "vsLastYear": "Миналата година",
     "excellent": "Отличен",
     "good": "Добър",
     "needsImprovement": "Нужда от подобрение"
@@ -335,12 +339,12 @@
     },
     "labels": {
       "type": "Тип",
-      "educationLevel": "Ниво",
+      "educationLevel": "Предлага",
       "tuitionOrAdmission": "Такса / Прием",
       "tuitionYearly": "Годишна такса",
       "pointsLastYear": "Последно приети ({{year}})",
       "minScoreYear": "Минимален бал ({{year}})",
-      "nvoAverage": "Общ НВО резултат",
+      "nvoAverage": "НВО, БЕЛ + математика",
       "latestYear": "Последна година: {{year}}",
       "schedule": "Смяна",
       "distance": "Разстояние",
@@ -348,7 +352,7 @@
       "enrollmentStatus": "Статус на приема",
       "nvoMath": "НВО Математика",
       "nvoBulgarian": "НВО БЕЛ",
-      "avgValue": "Средно за училището {{value}}%",
+      "avgValue": "5-год. средно за училището {{value}}%",
       "classSize": "Брой ученици в клас",
       "teachingApproach": "Педагогически подход",
       "specialPrograms": "Специални програми",
@@ -364,8 +368,8 @@
       "spotsAvailable": "Свободни места",
       "eligibleAgeGroups": "Възрастови групи",
       "pricingOverview": "Такси",
-      "monthlyEquivalent": "Обучение на месец (прибл.)",
-      "sources": "Източници"
+      "sources": "Източници",
+      "fiveYearAverage": "5-годишна средна"
     },
     "sourceTypes": {
       "official_website": "Официален",
@@ -475,8 +479,8 @@
       "noEntranceExam": "Без входен изпит",
       "lastAdmitted": "Последно приети: {{points}} {{pointsLabel}} ({{year}})",
       "minScore": "Минимален бал: {{score}} ({{year}})",
-      "districtEnrollment": "Прием по район",
-      "priceUnstatedPeriod": "{{price}} {{currency}} · периодът не е посочен"
+      "priceUnstatedPeriod": "{{price}} {{currency}} · периодът не е посочен",
+      "kgByPoints": "Прием по точки чрез kg.sofia.bg"
     },
     "period": {
       "year": "год.",
@@ -496,7 +500,7 @@
       "latest": "Последна",
       "subjectHeader": "Предмет",
       "avgHeader": "5-год. средно",
-      "trendHeader": "Тренд"
+      "trendHeader": "спрямо 5-год."
     },
     "amenities": {
       "meals": "Осигурена храна",
@@ -541,11 +545,10 @@
   "schoolDetail": {
     "keyFacts": "Основни факти",
     "tuitionPerYear": "{{price}} {{currency}} / година",
-    "tuitionPerMonth": "≈ {{price}} {{currency}} на месец",
     "tuitionUnstated": "{{price}} {{currency}}",
     "groupsAndGrades": "Групи и класове",
     "nvoLatest": "{{exam}}, {{year}} г.",
-    "nvoVsNational": "Средно за страната {{value}}%",
+    "nvoVsNational": "Средно за страната, двата предмета: {{value}}%",
     "minScore": "Минимален бал за прием",
     "lastAdmitted": "Последно приет",
     "pointsValue": "{{points}} точки",
@@ -555,7 +558,10 @@
     "directions": "Упътване",
     "inBulgarian": "На български",
     "officialAdmission": "Приемът в общинските детски градини в София се извършва чрез официалната система:",
-    "mapLabel": "Карта на локациите на училището"
+    "mapLabel": "Карта на локациите на училището",
+    "admission": "Прием",
+    "kgByPointsShort": "По точки (kg.sofia.bg)",
+    "kgThresholdsLater": "Точките на последно приетите още не са публикувани тук"
   },
   "detailPanel": {
     "label": "Подробности за училището",
@@ -626,5 +632,36 @@
     "limitsTitle": "Какво още липсва",
     "limitsBody": "Праговете за прием (точки за детска градина и минимален бал за гимназия) все още не са публикувани. Когато нямаме надеждни данни, оставяме полето празно, вместо да гадаем.",
     "cta": "Разгледайте училищата"
+  },
+  "levels": {
+    "grades": "{{range}} клас"
+  },
+  "languages": {
+    "english": "Английски",
+    "bulgarian": "Български",
+    "german": "Немски",
+    "french": "Френски",
+    "spanish": "Испански",
+    "russian": "Руски",
+    "italian": "Италиански",
+    "chinese": "Китайски",
+    "japanese": "Японски",
+    "turkish": "Турски",
+    "greek": "Гръцки",
+    "arabic": "Арабски",
+    "korean": "Корейски",
+    "romanian": "Румънски",
+    "hebrew": "Иврит",
+    "danish": "Датски",
+    "norwegian": "Норвежки"
+  },
+  "notFound": {
+    "title": "Страницата не е намерена",
+    "body": "Тази страница не съществува или е преместена. Всички училища можете да намерите от търсенето.",
+    "cta": "Към търсенето на училища"
+  },
+  "routeError": {
+    "title": "Нещо се обърка",
+    "body": "Страницата не можа да се покаже. Опитайте отново от търсенето на училища."
   }
 }

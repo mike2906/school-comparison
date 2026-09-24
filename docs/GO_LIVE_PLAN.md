@@ -1592,49 +1592,64 @@ parent personas); findings spot-checked against the API and DB. Screenshots were
 the session scratchpad only.
 
 **Frontend-only (agent may do):**
-- [ ] **UF7 Tablet (768–1023 px) shows two headers** and the Map/List tabs do nothing: the
+- [x] **UF7 Tablet (768–1023 px) shows two headers** and the Map/List tabs do nothing: the
       nav hides below `md`, the mobile header only from `lg`. One breakpoint for both.
-- [ ] **UF8 Mobile compare bar covers the map popup's Compare / View details buttons.**
-- [ ] **UF9 "Show age groups & shifts" everywhere, but no shift data exists** (0 of 1,663
+      **Done 2026-09-24:** one `lg` breakpoint for the search header and nav; List/Map tabs work below `lg`; a map auto-fitted while hidden is refitted once shown.
+- [x] **UF8 Mobile compare bar covers the map popup's Compare / View details buttons.**
+      **Done 2026-09-24:** the mobile marker sheet sits above the compare bar.
+- [x] **UF9 "Show age groups & shifts" everywhere, but no shift data exists** (0 of 1,663
       `shift` values). Say "Age groups" and drop the clock icons until there is data.
-- [ ] **UF10 NVO wording/units disagree:** "national average" vs "national benchmark",
+      **Done 2026-09-24:** "Age groups" wording; bullets instead of clock icons.
+- [x] **UF10 NVO wording/units disagree:** "national average" vs "national benchmark",
       "+1.5%" deltas next to "+19.7 pp", an unexplained "Trend" column, "(33%)" on tabs,
       "Под ориентира" jargon. One term (national average), deltas in pp everywhere.
-- [ ] **UF11 Compare colours NVO on fixed 60/75 % cut-offs,** contradicting the detail
+      **Done 2026-09-24:** "national average" everywhere (EN/BG), year-on-year change in pp, "vs 5-yr avg" column, tab percentages removed.
+- [x] **UF11 Compare colours NVO on fixed 60/75 % cut-offs,** contradicting the detail
       page's "above national average" green; the row doesn't name the grade and "School
       avg" doesn't say "5-year". Colour relative to the national average; label both.
-- [ ] **UF12 СУ (grades 1–12) badged "Гимназия / High School"; ОУ translated "Primary
+      **Done 2026-09-24:** colour relative to the national average for the same exam and year (±5 pp, as on the detail page); grade, year or "5-year average" and the national figure shown.
+- [x] **UF12 СУ (grades 1–12) badged "Гимназия / High School"; ОУ translated "Primary
       School".** Derive the badge from the grades offered / school type in the name.
-- [ ] **UF13 Hard-coded "District enrollment / Прием по район"** on every state primary /
+      **Done 2026-09-24:** `utils/levelLabel.js` derives "Grades 1–12" / "Kindergarten" from the groups offered (cards, detail hero, compare "Offers" row).
+- [x] **UF13 Hard-coded "District enrollment / Прием по район"** on every state primary /
       lower-secondary card (`SchoolCard.jsx`), not from data and misleading for Sofia's
       central 1st-grade points system. Remove it.
-- [ ] **UF14 Kindergarten parents get no admission signal:** add "Admission by points via
+      **Done 2026-09-24:** removed from cards and the detail page.
+- [x] **UF14 Kindergarten parents get no admission signal:** add "Admission by points via
       kg.sofia.bg; thresholds coming later" to state kindergartens; hide NVO and price
       sorts for kindergarten groups.
-- [ ] **UF15 Mixed-language data:** "Езици на обучение: Bulgarian", "Фокус Bulgarian",
+      **Done 2026-09-24:** state kindergartens show "Admission by points through kg.sofia.bg" (card) and an Admission key fact; NVO sort hidden for kindergarten-only lists.
+- [x] **UF15 Mixed-language data:** "Езици на обучение: Bulgarian", "Фокус Bulgarian",
       English tags in the BG UI and Bulgarian / Title-Case tags in EN compare and cards.
       Translate language names via i18n; reuse `utils/tags.js` in cards and compare.
-- [ ] **UF16 Counts say "149 училища" for kindergarten groups;** use a neutral or
+      **Done 2026-09-24:** `utils/languages.js` maps English/Bulgarian/code spellings to translated names everywhere; compare tags use `TagList`.
+- [x] **UF16 Counts say "149 училища" for kindergarten groups;** use a neutral or
       kindergarten noun.
+      **Done 2026-09-24:** kindergarten lists count kindergartens, all-ages/preschool-both lists count results.
 - [ ] **UF17 Location chip "До 1, бул. Витоша"** is ambiguous and truncates on phones:
       "Близо до …", and move the distance select into the popover on mobile.
-- [ ] **UF18 Compare page phones** are not normalised or tappable; reuse `PhoneLinks`.
+- [x] **UF18 Compare page phones** are not normalised or tappable; reuse `PhoneLinks`.
+      **Done 2026-09-24:** compare phones use `PhoneLinks`.
 - [ ] **UF19 Mobile first screen fits ~1 card;** age picker and search placeholder truncate.
       One scrollable chip row for location/type/sort, one-line welcome tip, shorter
       placeholder.
 - [ ] **UF20 Filters buried three levels deep; desktop sidebar mostly empty.** Open
       advanced filters by default; put type/distance/sort in the desktop sidebar.
 - [ ] **UF21 Card footer toggles wrap onto two lines each on phones.**
-- [ ] **UF22 Map popup repeats the grades line;** desktop popup overlaps "Reset view".
+- [x] **UF22 Map popup repeats the grades line;** desktop popup overlaps "Reset view".
+      **Done 2026-09-24:** duplicate line removed; "Reset view" moved bottom-right.
 - [ ] **UF23 "Search in visible map area" offered on the mobile List tab** (map hidden).
 - [ ] **UF24 Contrast:** white on primary-500 badges (~2.5:1) and primary-600 buttons
       (~3.7:1) fail WCAG AA; use primary-700.
-- [ ] **UF25 Duplicate `#school-name-search` id** (mobile + desktop copies).
-- [ ] **UF26 Unknown URLs show React Router's developer error page;** add a translated 404.
-- [ ] **UF27 Footer with About and a "report a data error" link** (needs a contact channel
-      from Mike).
-- [ ] **UF28 Monthly tuition is yearly ÷ 12** though most schools bill over 9–10 months;
+- [x] **UF25 Duplicate `#school-name-search` id** (mobile + desktop copies).
+      **Done 2026-09-24:** `useId`-based ids.
+- [x] **UF26 Unknown URLs show React Router's developer error page;** add a translated 404.
+      **Done 2026-09-24:** translated 404 for unknown URLs and a separate route-error screen.
+- [ ] **UF27 Footer with About and a "report a data error" link** — waiting for a contact
+      email once Mike has a domain (Mike, 2026-09-24).
+- [x] **UF28 Monthly tuition is yearly ÷ 12** though most schools bill over 9–10 months;
       drop it or label it.
+      **Done 2026-09-24:** the ÷12 monthly figure is gone from key facts and compare.
 - [ ] **UF29 Small copy issues:** "Tuition / Admission" row shows only tuition; birth-year
       list includes the enrolment year itself; unexplained tab percentages.
 - [ ] **UF30 (P2) Map markers don't distinguish kindergartens from schools** in All ages.

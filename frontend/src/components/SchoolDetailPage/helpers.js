@@ -1,3 +1,4 @@
+import { languageLabel } from '../../utils/languages.js'
 import {
   getNvoDetail as getSharedNvoDetail,
   getExamTypeForEducationLevel as getSharedExamTypeForEducationLevel,
@@ -218,12 +219,7 @@ export function getAmenityFlags(attributes, hasAfterSchool) {
  * Get language label from code
  */
 export function getLanguageLabel(language, t) {
-  if (!language) return ''
-  const lower = language.toLowerCase()
-  const key = `advancedFilters.languages.${lower}`
-  const translated = t(key)
-  if (translated !== key) return translated
-  return lower.charAt(0).toUpperCase() + lower.slice(1)
+  return languageLabel(language, t)
 }
 
 /**

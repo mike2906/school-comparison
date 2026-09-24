@@ -6,6 +6,9 @@ import { fetchSchool, fetchExamAverages } from '../../api/schools'
 import { getSchoolName, getAddress, getSummary } from '../../utils/i18n'
 import { normalizeSchool } from '../../utils/schoolAttributes'
 import { getLastSearchUrl } from '../../utils/searchViewState'
+import { usesSofiaKindergartenSystem } from '../../utils/admission'
+import { schoolLevelLabel } from '../../utils/levelLabel'
+import { useCountry } from '../../context/CountryContext'
 import { useCompare } from '../../context/CompareContext'
 import {
   getStatusInfo,
@@ -13,7 +16,6 @@ import {
   getLastAdmittedPoints,
   getMinNvoScore,
   getAdmissionRequirement,
-  formatPercent,
   getNvoDetail,
   getAmenityFlags,
   getLanguageLabel,
@@ -23,7 +25,6 @@ import {
   getExamTypeForEducationLevel,
   getAvailableExamTypes,
   getExamTypeLabel,
-  getLatestScoreForExamType,
 } from './helpers'
 import NvoTimelineChart from './NvoTimelineChart'
 import MultiGradeComparisonChart from './MultiGradeComparisonChart'
@@ -65,6 +66,7 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
     navigate(-1)
   }
   const { t, i18n } = useTranslation()
+  const { config: countryConfig } = useCountry()
   const { addToCompare, removeFromCompare, isInCompare, canAddMore, compareList } = useCompare()
   const [rawSchool, setRawSchool] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -181,7 +183,6 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
   const nvoDetail = getNvoDetail(school, t)
   const availableExamTypes = getAvailableExamTypes(school.exam_results)
   const keyFactsExamType = nvoDetail?.examType || availableExamTypes[availableExamTypes.length - 1] || null
-  const isStateKindergarten = school.school_type === 'state' && school.education_level === 'kindergarten'
   // The global CompareBar is fixed to the bottom while the compare list is non-empty.
   const compareBarVisible = compareList.length > 0
 
@@ -295,7 +296,7 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
               {t(`schoolTypes.${school.school_type}`)}
             </span>
             <span className="px-4 py-2 rounded-lg text-sm font-semibold bg-neutral-100 text-neutral-700 border border-neutral-200">
-              {t(`educationLevels.${school.education_level}`)}
+              {schoolLevelLabel(school, t, countryConfig)}
             </span>
             {statusInfo && (
               <span
@@ -433,7 +434,7 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
           <div className="bg-white rounded-2xl shadow-card border border-neutral-200 p-6 md:p-8 mb-6">
             <h2 className="text-2xl font-bold text-neutral-900 mb-6">{t('schools.locationsAndEnrollment')}</h2>
             <LocationMap locations={locations} />
-            {isStateKindergarten && school.country_code === 'bg' && (
+            {usesSofiaKindergartenSystem(school) && (
               <p className="text-sm text-neutral-600 mb-6">
                 {t('schoolDetail.officialAdmission')}{' '}
                 <a
@@ -482,8 +483,6 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
                   if (requirement) {
                     admissionText = `${requirement.icon} ${requirement.text}`
                   }
-                } else if (school.school_type === 'state' && (school.education_level === 'primary' || school.education_level === 'lower_secondary')) {
-                  admissionText = t('schoolCard.admissions.districtEnrollment')
                 }
 
                 return (
@@ -537,9 +536,7 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
                         <div className="mt-3 space-y-2">
                           {location.age_group_shifts.map((shift, shiftIdx) => (
                             <div key={shiftIdx} className="flex items-center gap-2 text-neutral-600">
-                              <svg className="w-4 h-4 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                              </svg>
+                              <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-primary-500" aria-hidden="true" />
                               <span>
                                 {t(`ageGroups.${shift.age_group}`)}
                                 {shift.shift ? ` • ${t(`shifts.${shift.shift}`)}` : ''}
@@ -628,7 +625,6 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
                   {hasMultipleGrades && (
                     <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
                       {availableExamTypes.map(examType => {
-                        const latestScore = getLatestScoreForExamType(school.exam_results, examType)
                         const isActive = activeExamType === examType
 
                         return (
@@ -642,11 +638,6 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
                             }`}
                           >
                             {getExamTypeLabel(examType, t)}
-                            {latestScore != null && (
-                              <span className={`ml-2 text-sm ${isActive ? 'text-primary-100' : 'text-neutral-500'}`}>
-                                ({formatPercent(latestScore, 0)}%)
-                              </span>
-                            )}
                           </button>
                         )
                       })}
