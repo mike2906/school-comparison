@@ -69,7 +69,7 @@ function LocationControl({
         type="button"
         onClick={() => setOpen(value => !value)}
         aria-expanded={open}
-        className={`inline-flex h-9 min-w-0 items-center gap-1.5 rounded-lg border px-3 text-sm ${
+        className={`inline-flex h-11 md:h-9 min-w-0 items-center gap-1.5 rounded-lg border px-3 text-sm ${
           userLocation
             ? 'border-primary-200 bg-primary-50 text-primary-800'
             : 'border-dashed border-neutral-300 text-neutral-700 hover:bg-neutral-50'
@@ -85,7 +85,7 @@ function LocationControl({
           <button
             type="button"
             onClick={onClear}
-            className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg text-neutral-500 hover:bg-neutral-100"
+            className="flex h-11 w-11 md:h-9 md:w-9 flex-shrink-0 items-center justify-center rounded-lg text-neutral-500 hover:bg-neutral-100"
             aria-label={t('location.clear')}
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
@@ -97,7 +97,7 @@ function LocationControl({
             id="distance-filter"
             value={distanceFilter}
             onChange={(event) => onDistanceFilterChange(event.target.value)}
-            className="h-9 flex-shrink-0 rounded-lg border border-neutral-300 bg-white px-2 text-sm"
+            className="h-11 md:h-9 flex-shrink-0 rounded-lg border border-neutral-300 bg-white px-2 text-sm"
           >
             {DISTANCE_OPTIONS.map(option => (
               <option key={option} value={option}>
@@ -115,7 +115,7 @@ function LocationControl({
             type="button"
             onClick={onUseMyLocation}
             disabled={isLocating}
-            className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-primary-600 px-3 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-60"
+            className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-primary-600 px-3 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-60"
           >
             {isLocating && <Spinner />}
             {t('location.useMyLocation')}
@@ -134,12 +134,12 @@ function LocationControl({
               value={addressInput}
               onChange={(event) => onAddressInputChange(event.target.value)}
               placeholder={t('location.addressPlaceholder')}
-              className="h-10 min-w-0 flex-1 rounded-lg border border-neutral-300 px-3 text-sm"
+              className="h-11 min-w-0 flex-1 rounded-lg border border-neutral-300 px-3 text-sm"
             />
             <button
               type="submit"
               disabled={isGeocoding || !addressInput.trim()}
-              className="inline-flex h-10 items-center gap-2 rounded-lg bg-neutral-900 px-3 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-60"
+              className="inline-flex h-11 items-center gap-2 rounded-lg bg-neutral-900 px-3 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-60"
             >
               {isGeocoding && <Spinner />}
               {t('common.search')}
@@ -151,7 +151,7 @@ function LocationControl({
               setOpen(false)
               onStartMapPick()
             }}
-            className="h-10 w-full rounded-lg border border-neutral-300 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+            className="h-11 w-full rounded-lg border border-neutral-300 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
           >
             {isPickingLocation ? t('location.cancelMapPick') : t('location.selectOnMap')}
           </button>

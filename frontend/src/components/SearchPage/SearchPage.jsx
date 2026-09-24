@@ -539,9 +539,19 @@ function SearchPage() {
     localStorage.setItem('userLocation', JSON.stringify(location))
   }
 
+  // Each way of setting a location takes a token; a slower earlier request (GPS or an
+  // address lookup) must not overwrite a location the parent has since set another way.
+  const locationRequestRef = useRef(0)
+  const startLocationRequest = () => {
+    locationRequestRef.current += 1
+    return locationRequestRef.current
+  }
+
   const handleUseMyLocation = () => {
+    const request = startLocationRequest()
     setLocationError(null)
     setIsPickingLocation(false)
+    setIsGeocoding(false)
 
     if (!navigator.geolocation) {
       showLocationError(t('location.errorUnavailable'))
@@ -551,6 +561,7 @@ function SearchPage() {
     setIsLocating(true)
     navigator.geolocation.getCurrentPosition(
       (position) => {
+        if (request !== locationRequestRef.current) return
         const newLocation = {
           lat: position.coords.latitude,
           lng: position.coords.longitude,
@@ -562,6 +573,7 @@ function SearchPage() {
         setIsLocating(false)
       },
       (err) => {
+        if (request !== locationRequestRef.current) return
         if (err.code === 1) {
           showLocationError(t('location.errorDenied'))
         } else {
@@ -581,12 +593,15 @@ function SearchPage() {
     const trimmedAddress = addressInput.trim()
     if (!trimmedAddress) return
 
+    const request = startLocationRequest()
+    setIsLocating(false)
     setIsGeocoding(true)
     setLocationError(null)
     setIsPickingLocation(false)
 
     try {
       const result = await geocodeAddress(trimmedAddress, geocodingConfig)
+      if (request !== locationRequestRef.current) return
       const newLocation = {
         lat: result.lat,
         lng: result.lng,
@@ -595,7 +610,7 @@ function SearchPage() {
       setUserLocation(newLocation)
       persistLocation(newLocation)
     } catch (err) {
-      if (err?.code === 'CANCELED') return
+      if (err?.code === 'CANCELED' || request !== locationRequestRef.current) return
       if (err?.code === 'NO_RESULTS') {
         showLocationError(t('location.errorNotFound'))
       } else if (err?.code === 'RATE_LIMIT') {
@@ -606,11 +621,14 @@ function SearchPage() {
         showLocationError(t('location.errorUnableToGeocode'))
       }
     } finally {
-      setIsGeocoding(false)
+      if (request === locationRequestRef.current) setIsGeocoding(false)
     }
   }
 
   const handleClearLocation = () => {
+    startLocationRequest()
+    setIsLocating(false)
+    setIsGeocoding(false)
     setIsPickingLocation(false)
     setUserLocation(null)
     setAddressInput('')
@@ -647,6 +665,9 @@ function SearchPage() {
 
   const handleMapPickLocation = useStableCallback(({ lat, lng }) => {
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) return
+    startLocationRequest()
+    setIsLocating(false)
+    setIsGeocoding(false)
     const newLocation = {
       lat,
       lng,
@@ -971,8 +992,57 @@ function SearchPage() {
     scrollOnSelectRef.current = false
   }, [selectedSchoolId])
 
+  // Reachable by Tab: rendered, and not inside a collapsed <details> (only its own
+  // <summary> is). Chrome still reports boxes for collapsed content, so check directly.
+  const isReachable = (element) => {
+    if (element.getClientRects().length === 0) return false
+    let child = element
+    let parent = element.parentElement
+    while (parent) {
+      if (parent.tagName === 'DETAILS' && !parent.open) {
+        const isOwnSummary = child === element && element.tagName === 'SUMMARY' && element.parentElement === parent
+        if (!isOwnSummary) return false
+      }
+      child = parent
+      parent = parent.parentElement
+    }
+    return true
+  }
+
+  // Modal drawer: focus moves in, Tab stays inside, Escape closes, focus returns after.
   useEffect(() => {
-    if (isFiltersOpen) filtersDrawerRef.current?.focus()
+    if (!isFiltersOpen) return undefined
+    const drawer = filtersDrawerRef.current
+    const opener = document.activeElement
+    drawer?.focus()
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape' && !event.defaultPrevented) {
+        setIsFiltersOpen(false)
+        return
+      }
+      if (event.key !== 'Tab' || !drawer) return
+      const focusable = [...drawer.querySelectorAll(
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), summary, [tabindex]:not([tabindex="-1"])'
+      )].filter(isReachable)
+      if (focusable.length === 0) return
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (event.shiftKey && (document.activeElement === first || document.activeElement === drawer)) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      } else if (!drawer.contains(document.activeElement)) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+      if (opener instanceof HTMLElement) opener.focus()
+    }
   }, [isFiltersOpen])
 
   // Close filters drawer on desktop
@@ -1041,7 +1111,7 @@ function SearchPage() {
             type="button"
             aria-pressed={isActive}
             onClick={() => handleFilterChange({ schoolType: type })}
-            className={`h-8 rounded-full border px-3 text-sm font-medium transition-colors ${
+            className={`h-11 md:h-8 rounded-full border px-4 md:px-3 text-sm font-medium transition-colors ${
               isActive
                 ? 'border-primary-600 bg-primary-600 text-white'
                 : 'border-neutral-300 bg-white text-neutral-700 hover:border-neutral-400'
@@ -1488,7 +1558,7 @@ function SearchPage() {
           <div className="flex items-center gap-2 px-3 py-2">
             <Link
               to="/search"
-              className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary-500 to-primary-600 text-white"
+              className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary-500 to-primary-600 text-white"
               aria-label={t('nav.home')}
             >
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
@@ -1505,7 +1575,7 @@ function SearchPage() {
                     role="tab"
                     aria-selected={mobileTab === tab}
                     onClick={() => setMobileTab(tab)}
-                    className={`h-9 px-4 text-sm font-medium rounded-md transition-colors ${
+                    className={`h-10 px-4 text-sm font-medium rounded-md transition-colors ${
                       mobileTab === tab
                         ? 'bg-white text-neutral-900 shadow-sm'
                         : 'text-neutral-600 hover:text-neutral-800'
@@ -1520,7 +1590,7 @@ function SearchPage() {
             <button
               type="button"
               onClick={() => setIsFiltersOpen(true)}
-              className="flex h-9 items-center gap-1.5 px-3 rounded-lg bg-primary-50 text-primary-700 text-sm font-medium"
+              className="flex h-11 min-w-[44px] items-center justify-center gap-1.5 px-3 rounded-lg bg-primary-50 text-primary-700 text-sm font-medium"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
@@ -1671,7 +1741,7 @@ function SearchPage() {
                       id="results-sort"
                       value={sortBy}
                       onChange={(e) => setSortBy(e.target.value)}
-                      className="border border-neutral-300 rounded-lg px-3 py-1.5 text-sm bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-shadow"
+                      className="h-11 md:h-auto border border-neutral-300 rounded-lg px-3 md:py-1.5 text-sm bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-shadow"
                     >
                       {sortOptions.map(option => (
                         <option key={option.value} value={option.value}>{option.label}</option>
@@ -1849,9 +1919,6 @@ function SearchPage() {
               aria-labelledby="filters-drawer-title"
               tabIndex={-1}
               ref={filtersDrawerRef}
-              onKeyDown={(event) => {
-                if (event.key === 'Escape') setIsFiltersOpen(false)
-              }}
               className={`
               fixed z-[2100] bg-white lg:hidden
               md:top-0 md:right-0 md:bottom-0 md:w-96 md:shadow-2xl

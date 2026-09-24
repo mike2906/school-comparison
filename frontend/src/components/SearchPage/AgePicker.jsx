@@ -134,7 +134,7 @@ function AgePicker({
         onClick={() => onOpenChange(!open)}
         aria-expanded={open}
         aria-haspopup="dialog"
-        className={`inline-flex h-10 w-full items-center gap-2 rounded-lg border px-3 text-sm font-medium transition-colors ${
+        className={`inline-flex h-11 lg:h-10 w-full items-center gap-2 rounded-lg border px-3 text-sm font-medium transition-colors ${
           ageGroup
             ? 'border-primary-300 bg-primary-50 text-primary-800'
             : 'border-neutral-300 bg-white text-neutral-800 hover:bg-neutral-50'

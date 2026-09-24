@@ -103,7 +103,7 @@ function SchoolNameSearch({ value, onChange, onOpenSchool, className = '' }) {
         aria-expanded={showDropdown}
         aria-controls="school-name-suggestions"
         aria-activedescendant={activeIndex >= 0 ? `school-suggestion-${suggestions[activeIndex]?.id}` : undefined}
-        className="h-10 w-full rounded-lg border border-neutral-300 bg-white pl-9 pr-3 text-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
+        className="h-11 lg:h-10 w-full rounded-lg border border-neutral-300 bg-white pl-9 pr-3 text-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
       />
       {showDropdown && (
         <ul

@@ -235,8 +235,10 @@ const collectSchoolPoints = (schools, countryBounds) => {
   return points
 }
 
+const leafletDistance = (a, b) => L.latLng(a).distanceTo(b)
+
 const collectPoints = (schools, userLocation, countryBounds) => {
-  const points = pointsForFit(collectSchoolPoints(schools, countryBounds))
+  const points = pointsForFit(collectSchoolPoints(schools, countryBounds), { distance: leafletDistance })
 
   if (userLocation?.lat && userLocation?.lng) {
     points.push([userLocation.lat, userLocation.lng])

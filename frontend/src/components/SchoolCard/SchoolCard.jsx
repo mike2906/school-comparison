@@ -1503,7 +1503,7 @@ const SchoolCard = memo(function SchoolCard({
           onClick={handleCompareClick}
           disabled={!inCompare && !canAddMore}
           className={
-            `flex-1 px-3 py-2 text-sm font-medium rounded-lg transition-colors transition-transform hover:scale-[1.02] ` +
+            `flex-1 min-h-[44px] md:min-h-0 px-3 py-2 text-sm font-medium rounded-lg transition-colors transition-transform hover:scale-[1.02] ` +
             (inCompare
               ? 'bg-primary-100 text-primary-700 border-2 border-primary-500 hover:bg-primary-200'
               : !canAddMore
@@ -1525,7 +1525,7 @@ const SchoolCard = memo(function SchoolCard({
         <Link
           to={`/schools/${school.id}`}
           onClick={handleDetailsClick}
-          className="flex-1 px-3 py-2 text-center text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors transition-transform hover:scale-[1.02]"
+          className="flex-1 min-h-[44px] md:min-h-0 inline-flex items-center justify-center px-3 py-2 text-center text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors transition-transform hover:scale-[1.02]"
         >
           {t('schools.details')}
         </Link>
