@@ -394,7 +394,7 @@
       "spotsAvailable": "Свободни места",
       "eligibleAgeGroups": "Възрастови групи",
       "pricingOverview": "Такси",
-      "monthlyEquivalent": "Ориентировъчно месечно",
+      "monthlyEquivalent": "Обучение на месец (прибл.)",
       "sources": "Източници"
     },
     "sourceTypes": {
@@ -406,7 +406,17 @@
       "scraped_website": "Уебсайт",
       "unknown": "Неизвестен",
       "website": "Уебсайт"
-    }
+    },
+    "compareCount": "Сравни ({{count}})",
+    "maxReached": "Максимум {{max}} училища",
+    "selectedCount": "Избрани: {{count}}",
+    "showSelected": "Покажи избраните училища",
+    "hideSelected": "Скрий избраните училища",
+    "previousSchools": "Предишни училища",
+    "nextSchools": "Следващи училища",
+    "visibleRange": "{{from}}–{{to}} от {{total}}",
+    "someNotFound": "Някои училища вече не са налични и бяха премахнати от сравнението.",
+    "comparingCount_one": "Сравнявате {{count}} училище"
   },
   "advancedFilters": {
     "title": "Разширени филтри",

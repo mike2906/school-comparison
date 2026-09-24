@@ -113,11 +113,14 @@ export function rememberLastSearchUrl(url, storage = safeSession()) {
   }
 }
 
-/** The last search URL, or '/search' when missing or not a search URL. */
+// An in-app /search path only: not '/searching', not '//other.host/search'.
+const SEARCH_PATH_RE = /^\/search(?:[/?#]|$)/
+
+/** The last search URL, or '/search' when missing or not an in-app search path. */
 export function getLastSearchUrl(storage = safeSession()) {
   try {
     const url = storage?.getItem(LAST_SEARCH_URL_KEY)
-    return url && url.startsWith('/search') ? url : '/search'
+    return typeof url === 'string' && SEARCH_PATH_RE.test(url) ? url : '/search'
   } catch {
     return '/search'
   }

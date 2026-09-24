@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import Layout from '../Layout/Layout'
 import { useCompare } from '../../context/CompareContext'
+import { getLastSearchUrl } from '../../utils/searchViewState'
 import { fetchCompare, fetchExamAverages } from '../../api/schools'
 import { calculateDistance, formatDistance } from '../../utils/distance'
 import { compareSchoolNames, getSchoolName, getAddress, getSummary } from '../../utils/i18n'
@@ -387,10 +388,17 @@ function ComparePage() {
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
-  const { compareList, removeFromCompare, clearCompare } = useCompare()
+  const { compareList, removeFromCompare, clearCompare, syncCompareList, maxCompare } = useCompare()
   const [schools, setSchools] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [missingCount, setMissingCount] = useState(0)
+  const [mobileStart, setMobileStart] = useState(0)
+  const loadedRef = useRef({ requested: new Set(), byId: new Map() })
+  const desktopBodyRef = useRef(null)
+  const desktopHeaderRef = useRef(null)
+  const mobileBodyRef = useRef(null)
+  const mobileHeaderRef = useRef(null)
   const [highlightDiffs, setHighlightDiffs] = useState(false)
   const [sortBy, setSortBy] = useState('name')
   const [shareStatus, setShareStatus] = useState('')
@@ -416,28 +424,47 @@ function ComparePage() {
   }, [])
 
   useEffect(() => {
-    if (ids.length < 2) {
-      navigate('/search')
+    // One school left because the others no longer exist: stay and explain (missingCount).
+    if (ids.length === 0 || (ids.length === 1 && missingCount === 0)) {
+      // Replace, so Back does not land on a compare page that redirects again.
+      navigate(getLastSearchUrl(), { replace: true })
       return
     }
 
+    // Removing a school only narrows the set: reuse the data already loaded.
+    const { requested, byId } = loadedRef.current
+    if (ids.every(id => requested.has(id))) {
+      setSchools(ids.map(id => byId.get(id)).filter(Boolean))
+      setLoading(false)
+      return
+    }
+
+    let cancelled = false
     const loadSchools = async () => {
       setLoading(true)
       setError(null)
       try {
         const data = await fetchCompare(ids)
-        const byId = new Map(data.map(item => [item.id, item]))
-        const ordered = ids.map(id => byId.get(id)).filter(Boolean)
+        if (cancelled) return
+        const loadedById = new Map(data.map(item => [item.id, item]))
+        loadedRef.current = { requested: new Set(ids), byId: loadedById }
+        const ordered = ids.map(id => loadedById.get(id)).filter(Boolean)
         setSchools(ordered)
+        setMissingCount(ids.length - ordered.length)
+        // Refresh the compare bar's stored names and drop ids that no longer exist.
+        syncCompareList(ids, data)
       } catch (err) {
-        setError(err.message)
+        if (!cancelled) setError(err.message)
       } finally {
-        setLoading(false)
+        if (!cancelled) setLoading(false)
       }
     }
 
     loadSchools()
-  }, [ids, navigate])
+    return () => {
+      cancelled = true
+    }
+  }, [ids, navigate, syncCompareList, missingCount])
 
   useEffect(() => {
     let isMounted = true
@@ -529,6 +556,7 @@ function ComparePage() {
   }, [localizedSchools, sortBy, i18n.language, metricsById])
 
   const handleRemove = (schoolId) => {
+    setMissingCount(0)
     removeFromCompare(schoolId)
     const next = ids.filter(id => id !== schoolId)
     if (queryKey) {
@@ -549,6 +577,37 @@ function ComparePage() {
       params.delete(queryKey)
       setSearchParams(params, { replace: true })
     }
+  }
+
+  const searchReturnPath = () => getLastSearchUrl()
+
+  // With no in-app history (a shared link), navigate(-1) would leave the site.
+  const handleBack = () => {
+    if ((window.history.state?.idx ?? 0) > 0) {
+      navigate(-1)
+    } else {
+      navigate(searchReturnPath())
+    }
+  }
+
+  const syncHeaderScroll = (body, header) => {
+    if (body && header && header.scrollLeft !== body.scrollLeft) {
+      header.scrollLeft = body.scrollLeft
+    }
+  }
+
+  const handleMobileScroll = () => {
+    const body = mobileBodyRef.current
+    if (!body) return
+    syncHeaderScroll(body, mobileHeaderRef.current)
+    const columnWidth = body.clientWidth / 2
+    if (columnWidth > 0) setMobileStart(Math.round(body.scrollLeft / columnWidth))
+  }
+
+  const scrollMobileBy = (direction) => {
+    const body = mobileBodyRef.current
+    if (!body) return
+    body.scrollBy({ left: direction * (body.clientWidth / 2), behavior: 'smooth' })
   }
 
   const handleShare = async () => {
@@ -1001,11 +1060,27 @@ function ComparePage() {
       {
         label: t('compare.labels.eligibleAgeGroups'),
         getValue: (school) => {
-          const ageGroups = (school.locations || [])
+          const ageGroups = [...new Set((school.locations || [])
             .flatMap(location => (Array.isArray(location.age_groups) ? location.age_groups : [location.age_group]))
-            .filter(Boolean)
-            .map(group => t(`ageGroups.${group}`))
-          return ageGroups.length > 0 ? makeTags(ageGroups) : renderPlaceholder()
+            .filter(Boolean))]
+          if (ageGroups.length === 0) return renderPlaceholder()
+          // The age group the parent searched for is highlighted.
+          return (
+            <div className="flex flex-wrap gap-1">
+              {ageGroups.map(group => (
+                <span
+                  key={group}
+                  className={`rounded px-2 py-0.5 text-xs ${
+                    selectedAgeGroup && group === selectedAgeGroup
+                      ? 'bg-primary-600 text-white'
+                      : 'bg-neutral-100 text-neutral-700'
+                  }`}
+                >
+                  {t(`ageGroups.${group}`)}
+                </span>
+              ))}
+            </div>
+          )
         },
         getCompare: (school) => (school.locations || [])
           .flatMap(location => (Array.isArray(location.age_groups) ? location.age_groups : [location.age_group]))
@@ -1152,7 +1227,7 @@ function ComparePage() {
       { key: 'locations', title: t('compare.sections.locations'), rows: locationRows },
       { key: 'contact', title: t('compare.sections.contact'), rows: contactRows },
     ]
-  }, [t, i18n.language, metricsById, userLocation, schools])
+  }, [t, i18n.language, metricsById, userLocation, schools, selectedAgeGroup])
 
   const visibleSections = useMemo(() => sections
     .map(section => ({
@@ -1219,6 +1294,12 @@ function ComparePage() {
     return map
   }, [schools, t])
 
+  // Keep the sticky headers aligned when columns change (removal, sort) and the body clamps.
+  useLayoutEffect(() => {
+    syncHeaderScroll(desktopBodyRef.current, desktopHeaderRef.current)
+    handleMobileScroll()
+  })
+
   if (loading) {
     return (
       <Layout>
@@ -1247,40 +1328,71 @@ function ComparePage() {
             </div>
             <h2 className="text-2xl font-bold text-neutral-900 mb-2">{t('common.error')}</h2>
             <p className="text-neutral-600 mb-6">{error}</p>
-            <button
-              onClick={() => navigate(-1)}
-              className="px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
-            >
-              {t('common.goBack')}
-            </button>
+            <div className="flex flex-wrap justify-center gap-3">
+              <button
+                type="button"
+                onClick={handleBack}
+                className="px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+              >
+                {t('common.goBack')}
+              </button>
+              {/* Recovery when every stored school is gone (the API answers 404). */}
+              <button
+                type="button"
+                onClick={handleClear}
+                className="px-6 py-3 text-red-600 border border-red-100 rounded-lg hover:bg-red-50 transition-colors"
+              >
+                {t('compare.clearAll')}
+              </button>
+            </div>
           </div>
         </div>
       </Layout>
     )
   }
 
+  const columnCount = sortedSchools.length
+  const isFull = ids.length >= maxCompare
+  // Desktop: header and body are separate tables with the same fixed column widths, so the
+  // header can stick to the viewport while the body scrolls sideways.
+  const desktopTableStyle = { minWidth: `calc(14rem + ${columnCount} * 240px)` }
+  const desktopColgroup = (
+    <colgroup>
+      <col style={{ width: '14rem' }} />
+      {sortedSchools.map(school => <col key={school.id} />)}
+    </colgroup>
+  )
+  // Mobile: two schools per screen width; labels span the visible width as row headings.
+  const mobileColumns = Math.max(columnCount, 2)
+  const mobileInnerStyle = { width: `${mobileColumns * 50}%` }
+  const mobileGridStyle = { gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))` }
+  const mobileLabelStyle = { width: `${200 / mobileColumns}%` }
+  const mobileLastStart = Math.max(columnCount - 2, 0)
+  const mobileFirstVisible = Math.min(mobileStart, mobileLastStart)
+
   return (
     <Layout>
       <div className="min-h-screen bg-neutral-50 pb-8">
-        <div className="bg-white border-b border-neutral-200 sticky top-16 z-10">
-          <div className="max-w-7xl mx-auto px-6 py-4">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              <div className="flex flex-wrap items-center gap-4">
+        <div className="bg-white border-b border-neutral-200">
+          <div className="max-w-7xl mx-auto px-4 py-3 md:px-6 md:py-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex items-center gap-4">
                 <button
-                  onClick={() => navigate(-1)}
+                  type="button"
+                  onClick={handleBack}
                   className="flex items-center gap-2 text-sm text-neutral-600 hover:text-neutral-900 transition-colors"
                 >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                   </svg>
                   {t('common.back')}
                 </button>
-                <div>
-                  <h1 className="text-2xl font-bold text-neutral-900">{t('compare.title')}</h1>
-                  <p className="text-sm text-neutral-500">{t('compare.comparingCount', { count: sortedSchools.length })}</p>
+                <div className="min-w-0">
+                  <h1 className="text-xl md:text-2xl font-bold text-neutral-900">{t('compare.title')}</h1>
+                  <p className="text-sm text-neutral-500">{t('compare.comparingCount', { count: columnCount })}</p>
                 </div>
               </div>
-              <div className="flex flex-wrap items-center gap-3">
+              <div className="flex flex-wrap items-center gap-2 md:gap-3">
                 <label className="flex items-center gap-2 text-sm text-neutral-700">
                   <input
                     type="checkbox"
@@ -1293,6 +1405,7 @@ function ComparePage() {
                 <select
                   value={sortBy}
                   onChange={(event) => setSortBy(event.target.value)}
+                  aria-label={t('sorting.sortBy')}
                   className="text-sm border border-neutral-200 rounded-md px-3 py-2 bg-white"
                 >
                   <option value="name">{t('compare.sort.name')}</option>
@@ -1301,98 +1414,166 @@ function ComparePage() {
                   <option value="nvo">{t('compare.sort.nvo')}</option>
                 </select>
                 <button
-                  onClick={() => navigate('/search')}
-                  className="px-3 py-2 text-sm font-medium text-primary-600 border border-primary-600 rounded-md hover:bg-primary-50 transition-colors"
+                  type="button"
+                  onClick={() => navigate(searchReturnPath())}
+                  disabled={isFull}
+                  title={isFull ? t('compare.maxReached', { max: maxCompare }) : undefined}
+                  className="px-3 py-2 text-sm font-medium text-primary-600 border border-primary-600 rounded-md hover:bg-primary-50 transition-colors disabled:cursor-not-allowed disabled:border-neutral-200 disabled:text-neutral-400 disabled:hover:bg-transparent"
                 >
                   {t('compare.addSchool')}
                 </button>
                 <button
+                  type="button"
                   onClick={handleShare}
                   className="px-3 py-2 text-sm font-medium text-neutral-700 border border-neutral-200 rounded-md hover:bg-neutral-50 transition-colors"
                 >
                   {t('compare.share')}
                 </button>
                 <button
+                  type="button"
                   onClick={handleClear}
                   className="px-3 py-2 text-sm font-medium text-red-600 border border-red-100 rounded-md hover:bg-red-50 transition-colors"
                 >
                   {t('compare.clearAll')}
                 </button>
-                {shareStatus && <span className="text-xs text-neutral-500">{shareStatus}</span>}
+                {isFull && <span className="text-xs text-neutral-500">{t('compare.maxReached', { max: maxCompare })}</span>}
+                {shareStatus && <span className="text-xs text-neutral-500" aria-live="polite">{shareStatus}</span>}
               </div>
             </div>
           </div>
         </div>
 
-        <div className="max-w-7xl mx-auto px-6 py-8">
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
+        {missingCount > 0 && (
+          <div className="max-w-7xl mx-auto px-4 pt-3 md:px-6">
+            <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">{t('compare.someNotFound')}</p>
+          </div>
+        )}
+
+        {/* Mobile (< md): stacked rows, two schools per view, header scrolls with the values. */}
+        <div className="md:hidden pt-3">
+          <div className="sticky top-16 z-20 border-y border-neutral-200 bg-white shadow-sm">
+            {columnCount > 2 && (
+              <div className="flex items-center justify-between px-3 pt-2 text-xs text-neutral-500">
+                <button
+                  type="button"
+                  onClick={() => scrollMobileBy(-1)}
+                  disabled={mobileFirstVisible === 0}
+                  aria-label={t('compare.previousSchools')}
+                  className="rounded-md border border-neutral-200 px-3 py-1 text-base leading-none text-neutral-700 disabled:opacity-30"
+                >
+                  <span aria-hidden="true">‹</span>
+                </button>
+                <span aria-live="polite">
+                  {t('compare.visibleRange', {
+                    from: mobileFirstVisible + 1,
+                    to: Math.min(mobileFirstVisible + 2, columnCount),
+                    total: columnCount,
+                  })}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => scrollMobileBy(1)}
+                  disabled={mobileFirstVisible >= mobileLastStart}
+                  aria-label={t('compare.nextSchools')}
+                  className="rounded-md border border-neutral-200 px-3 py-1 text-base leading-none text-neutral-700 disabled:opacity-30"
+                >
+                  <span aria-hidden="true">›</span>
+                </button>
+              </div>
+            )}
+            <div ref={mobileHeaderRef} className="overflow-hidden">
+              <div className="grid" style={{ ...mobileInnerStyle, ...mobileGridStyle }}>
+                {sortedSchools.map((school, idx) => (
+                  <div key={school.id} className={`min-w-0 p-3 ${idx > 0 ? 'border-l border-neutral-200' : ''}`}>
+                    <SchoolHeader school={school} onRemove={handleRemove} t={t} language={i18n.language} compact />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div
+            ref={mobileBodyRef}
+            onScroll={handleMobileScroll}
+            className="overflow-x-auto overscroll-x-contain snap-x snap-mandatory bg-white"
+          >
+            <div style={mobileInnerStyle}>
+              {visibleSections.map(section => (
+                <section key={section.key}>
+                  <h2
+                    className="sticky left-0 bg-primary-600 px-3 py-2 text-sm font-semibold text-white"
+                    style={mobileLabelStyle}
+                  >
+                    {section.title}
+                  </h2>
+                  {section.rows.map(row => (
+                    <MobileCompareRow
+                      key={`${section.key}-${row.label}`}
+                      label={row.label}
+                      highlightDiffs={highlightDiffs}
+                      labelStyle={mobileLabelStyle}
+                      gridStyle={mobileGridStyle}
+                      cells={sortedSchools.map(school => ({
+                        content: row.getValue(school),
+                        compareValue: row.getCompare ? row.getCompare(school) : row.getValue(school),
+                      }))}
+                    />
+                  ))}
+                </section>
+              ))}
+              <div
+                className="sticky left-0 flex items-center justify-between gap-3 bg-neutral-100 px-3 py-2 text-sm font-semibold text-neutral-700"
+                style={mobileLabelStyle}
+              >
+                <span>{t('compare.sections.sources')}</span>
+                <SourcesToggle open={sourcesOpen} onToggle={() => setSourcesOpen(prev => !prev)} t={t} />
+              </div>
+              {sourcesOpen && (
+                <div className="grid border-b border-neutral-200" style={mobileGridStyle}>
+                  {sortedSchools.map((school, idx) => (
+                    <div key={school.id} className={`min-w-0 break-words p-3 ${idx > 0 ? 'border-l border-neutral-200' : ''}`}>
+                      <SourcesPanel
+                        school={school}
+                        t={t}
+                        locale={i18n.language}
+                        completeness={completenessById.get(school.id)}
+                        open={sourcesOpen}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Desktop (md+): table with a sticky school header. */}
+        <div className="hidden md:block max-w-7xl mx-auto px-6 py-6">
+          <div
+            ref={desktopHeaderRef}
+            className="sticky top-16 z-20 overflow-hidden bg-neutral-50 shadow-[0_6px_8px_-6px_rgba(0,0,0,0.2)]"
+          >
+            <table className="w-full table-fixed border-collapse" style={desktopTableStyle}>
+              {desktopColgroup}
               <thead>
                 <tr>
-                  <th className="sticky left-0 z-20 bg-neutral-50 p-4 text-left w-56"></th>
-                  {sortedSchools.map(school => {
-                    return (
-                      <th key={school.id} className="bg-white p-4 border border-neutral-200 min-w-[300px] align-top">
-                        <div className="space-y-3">
-                          <div className="flex items-start justify-between gap-2">
-                            <h3 className="font-bold text-neutral-900 text-left">
-                              {getSchoolName(school, i18n.language)}
-                            </h3>
-                            <button
-                              onClick={() => handleRemove(school.id)}
-                              className="flex-shrink-0 p-1 hover:bg-neutral-100 rounded transition-colors"
-                              aria-label={t('compare.remove')}
-                            >
-                              <svg className="w-4 h-4 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                              </svg>
-                            </button>
-                          </div>
-                          <div className="flex flex-wrap gap-2">
-                            <span className={`
-                              px-2 py-0.5 rounded text-xs font-medium
-                              ${school.school_type === 'state'
-                                ? 'bg-primary-50 text-primary-700'
-                                : 'bg-violet-50 text-violet-700'
-                              }
-                            `}>
-                              {t(`schoolTypes.${school.school_type}`)}
-                            </span>
-                            <span className="px-2 py-0.5 rounded text-xs bg-neutral-100 text-neutral-700">
-                              {t(`educationLevels.${school.education_level}`)}
-                            </span>
-                          </div>
-                          <div className="flex flex-wrap gap-1">
-                            {[...new Set((school.locations || [])
-                              .flatMap(location => (Array.isArray(location.age_groups) ? location.age_groups : [location.age_group]))
-                              .filter(Boolean))].map((group) => {
-                              const isSelected = selectedAgeGroup && group === selectedAgeGroup
-                              return (
-                                <span
-                                  key={group}
-                                  className={`rounded px-2 py-0.5 text-[11px] ${
-                                    isSelected
-                                      ? 'bg-primary-600 text-white'
-                                      : 'bg-neutral-100 text-neutral-600'
-                                  }`}
-                                >
-                                  {t(`ageGroups.${group}`)}
-                                </span>
-                              )
-                            })}
-                          </div>
-                          <button
-                            onClick={() => navigate(`/schools/${school.id}`)}
-                            className="w-full px-3 py-1.5 text-xs font-medium text-primary-600 border border-primary-600 rounded hover:bg-primary-50 transition-colors"
-                          >
-                            {t('schools.viewDetails')}
-                          </button>
-                        </div>
-                      </th>
-                    )
-                  })}
+                  <th className="sticky left-0 z-10 bg-neutral-50 p-3" aria-hidden="true"></th>
+                  {sortedSchools.map(school => (
+                    <th key={school.id} className="bg-white p-3 border border-neutral-200 align-top text-left font-normal">
+                      <SchoolHeader school={school} onRemove={handleRemove} t={t} language={i18n.language} />
+                    </th>
+                  ))}
                 </tr>
               </thead>
+            </table>
+          </div>
+          <div
+            ref={desktopBodyRef}
+            onScroll={() => syncHeaderScroll(desktopBodyRef.current, desktopHeaderRef.current)}
+            className="overflow-x-auto"
+          >
+            <table className="w-full table-fixed border-collapse" style={desktopTableStyle}>
+              {desktopColgroup}
               <tbody>
                 {visibleSections.map((section) => (
                   <FragmentSection
@@ -1405,7 +1586,7 @@ function ComparePage() {
 
                 <SourcesSectionRow
                   label={t('compare.sections.sources')}
-                  colSpan={sortedSchools.length + 1}
+                  colSpan={columnCount + 1}
                   open={sourcesOpen}
                   onToggle={() => setSourcesOpen(prev => !prev)}
                   t={t}
@@ -1416,7 +1597,7 @@ function ComparePage() {
                       {t('compare.labels.sources')}
                     </td>
                     {sortedSchools.map((school) => (
-                      <td key={school.id} className="bg-white p-4 border border-neutral-200 align-top">
+                      <td key={school.id} className="bg-white p-4 border border-neutral-200 align-top break-words">
                         <SourcesPanel
                           school={school}
                           t={t}
@@ -1428,13 +1609,100 @@ function ComparePage() {
                     ))}
                   </tr>
                 )}
-
               </tbody>
             </table>
           </div>
         </div>
       </div>
     </Layout>
+  )
+}
+
+function SchoolHeader({ school, onRemove, t, language, compact = false }) {
+  const name = getSchoolName(school, language)
+  return (
+    <div className={compact ? 'space-y-1.5' : 'space-y-2'}>
+      <div className="flex items-start justify-between gap-1">
+        <Link
+          to={`/schools/${school.id}`}
+          title={name}
+          className={`min-w-0 font-bold text-neutral-900 hover:text-primary-700 hover:underline line-clamp-2 ${
+            compact ? 'text-sm leading-snug' : 'text-base leading-snug'
+          }`}
+        >
+          {name}
+        </Link>
+        <button
+          type="button"
+          onClick={() => onRemove(school.id)}
+          className="flex-shrink-0 -mr-1 -mt-1 p-1.5 hover:bg-neutral-100 rounded transition-colors"
+          aria-label={`${t('compare.remove')}: ${name}`}
+        >
+          <svg className="w-4 h-4 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+          school.school_type === 'state'
+            ? 'bg-primary-50 text-primary-700'
+            : 'bg-violet-50 text-violet-700'
+        }`}>
+          {t(`schoolTypes.${school.school_type}`)}
+        </span>
+        {!compact && school.education_level && (
+          <span className="px-2 py-0.5 rounded text-xs bg-neutral-100 text-neutral-700">
+            {t(`educationLevels.${school.education_level}`)}
+          </span>
+        )}
+      </div>
+      {!compact && (
+        <Link
+          to={`/schools/${school.id}`}
+          className="inline-block text-xs font-medium text-primary-600 hover:text-primary-700 hover:underline"
+        >
+          {t('schools.viewDetails')}
+        </Link>
+      )}
+    </div>
+  )
+}
+
+function getDiffClasses(cells, highlightDiffs) {
+  if (!highlightDiffs) return cells.map(() => 'bg-white')
+  const normalized = cells.map(cell => normalizeCompareValue(cell.compareValue))
+  const allSame = normalized.every(value => value === normalized[0])
+  return cells.map(() => (allSame ? 'bg-white opacity-50' : 'bg-primary-50'))
+}
+
+function renderCellContent(content) {
+  return typeof content === 'string'
+    ? <p className="text-sm text-neutral-700">{content || '—'}</p>
+    : content
+}
+
+function MobileCompareRow({ label, cells, highlightDiffs, labelStyle, gridStyle }) {
+  const diffClasses = getDiffClasses(cells, highlightDiffs)
+  return (
+    <div className="border-b border-neutral-200">
+      <h3
+        className="sticky left-0 bg-neutral-100 px-3 py-1.5 text-xs font-semibold text-neutral-700"
+        style={labelStyle}
+      >
+        {label}
+      </h3>
+      <div className="grid" style={gridStyle}>
+        {cells.map((cell, idx) => (
+          <div
+            key={idx}
+            className={`min-w-0 snap-start break-words px-3 py-2.5 ${idx > 0 ? 'border-l border-neutral-200' : ''} ${diffClasses[idx]}`}
+          >
+            {renderCellContent(cell.content)}
+          </div>
+        ))}
+      </div>
+    </div>
   )
 }
 
@@ -1483,30 +1751,36 @@ function SourcesSectionRow({ label, colSpan, open, onToggle, t }) {
       >
         <div className="flex items-center justify-between gap-3">
           <span>{label}</span>
-          <button
-            type="button"
-            onClick={onToggle}
-            className="inline-flex items-center gap-2 text-xs font-medium text-neutral-600 hover:text-neutral-800"
-          >
-            <span>{open ? t('compare.hideSources') : t('compare.showSources')}</span>
-            <svg
-              className={`h-3 w-3 transition-transform ${open ? 'rotate-180' : ''}`}
-              viewBox="0 0 20 20"
-              fill="currentColor"
-              aria-hidden="true"
-            >
-              <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.94a.75.75 0 111.08 1.04l-4.24 4.5a.75.75 0 01-1.08 0l-4.24-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
-            </svg>
-          </button>
+          <SourcesToggle open={open} onToggle={onToggle} t={t} />
         </div>
       </th>
     </tr>
   )
 }
 
+function SourcesToggle({ open, onToggle, t }) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={open}
+      className="inline-flex items-center gap-2 text-xs font-medium text-neutral-600 hover:text-neutral-800"
+    >
+      <span>{open ? t('compare.hideSources') : t('compare.showSources')}</span>
+      <svg
+        className={`h-3 w-3 transition-transform ${open ? 'rotate-180' : ''}`}
+        viewBox="0 0 20 20"
+        fill="currentColor"
+        aria-hidden="true"
+      >
+        <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.94a.75.75 0 111.08 1.04l-4.24 4.5a.75.75 0 01-1.08 0l-4.24-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+      </svg>
+    </button>
+  )
+}
+
 function CompareRow({ label, cells, highlightDiffs }) {
-  const normalized = cells.map(cell => normalizeCompareValue(cell.compareValue))
-  const allSame = normalized.every(value => value === normalized[0])
+  const diffClasses = getDiffClasses(cells, highlightDiffs)
 
   return (
     <tr>
@@ -1514,19 +1788,8 @@ function CompareRow({ label, cells, highlightDiffs }) {
         {label}
       </td>
       {cells.map((cell, idx) => (
-        <td
-          key={idx}
-          className={`bg-white p-4 border border-neutral-200 align-top ${
-            highlightDiffs
-              ? allSame
-                ? 'opacity-50'
-                : 'bg-primary-50/40'
-              : ''
-          }`}
-        >
-          {typeof cell.content === 'string'
-            ? <p className="text-sm text-neutral-700">{cell.content || '—'}</p>
-            : cell.content}
+        <td key={idx} className={`p-4 border border-neutral-200 align-top break-words ${diffClasses[idx]}`}>
+          {renderCellContent(cell.content)}
         </td>
       ))}
     </tr>
