@@ -1462,11 +1462,18 @@ self-review, with at most one Codex review on the larger ones.
       widths; EN | BG switch in the mobile search header; numeric name collation ignoring
       leading quotes; 320 px sidebar; `100dvh`. (g) was a real bug: `nvo_10` used the
       "12th grade" label.
-- [ ] **U2 Keep search state across detail navigation.** In-memory cache of the school
+- [x] **U2 Keep search state across detail navigation.** In-memory cache of the school
       list per query; selected school, sort, distance, and list/map view in the URL
       (`replace`); restore the list's scroll position and the map centre/zoom on return
       (skip auto-fit); detail "Back" falls back to `/search` when there is no in-app
       history; drop the duplicate `useSchools` fetch.
+      **Done 2026-09-24:** `api/cache.js` (10-min in-memory GET cache, shared in-flight
+      requests, failures not cached; also dedupes the second `useSchools` call);
+      `useSchools` renders from cache and ignores stale responses; `sort`, `within`,
+      `view`, `tab`, `school` in the URL; list scroll + map centre/zoom saved per history
+      entry in sessionStorage. Measured: back from a detail page restores scroll 1500 →
+      1500, selection, sort and map view with no skeleton and no list refetch. The detail
+      "Back" fallback moves to U3 (the detail page is being edited under U6).
 - [ ] **U3 Desktop detail side panel.** On `lg+`, opening a school shows its detail in a
       panel over the list/map instead of leaving the page; `/schools/:id` stays a
       deep-linkable full page (and is what mobile uses). "Details" becomes a real link.

@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useSearchParams, useNavigate } from 'react-router-dom'
+import { useSearchParams, useNavigate, useLocation } from 'react-router-dom'
 import debounce from 'lodash.debounce'
 import { useStableCallback } from '../../hooks/useStableCallback'
 import Layout from '../Layout/Layout'
@@ -19,6 +19,25 @@ import { getAgeGroupKeys } from '../../utils/countryConfig'
 import { AGE_GROUP_KEYS } from '../../utils/education'
 import { getLanguageFocusPairs } from '../../utils/schoolAttributes'
 import { monthlyEquivalent, toEur } from '../../utils/pricing'
+import {
+  readViewParams,
+  writeViewParams,
+  readSavedViewState,
+  saveViewState,
+  rememberLastSearchUrl,
+} from '../../utils/searchViewState'
+
+function readStoredUserLocation(fallbackAddress) {
+  try {
+    const parsed = JSON.parse(localStorage.getItem('userLocation') || 'null')
+    if (typeof parsed?.lat === 'number' && typeof parsed?.lng === 'number') {
+      return { lat: parsed.lat, lng: parsed.lng, address: parsed.address || fallbackAddress }
+    }
+  } catch {
+    // Corrupt or blocked storage: start without a location.
+  }
+  return null
+}
 
 const TYPE_SORT_ORDER = {
   state: 0,
@@ -37,27 +56,34 @@ const DEFAULT_ADVANCED_OPTIONS = {
 
 function SearchPage() {
   const { t, i18n } = useTranslation()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
+  const location = useLocation()
+  // View state lives in the URL so it survives opening a school and coming back.
+  const [initialView] = useState(() => readViewParams(searchParams))
+  const [savedViewState] = useState(() => readSavedViewState(location.key))
   const { compareList } = useCompare()
   const { config, countryCode } = useCountry()
 
   const geocodingConfig = config?.map_config?.geocoding || {}
 
-  const [selectedSchoolId, setSelectedSchoolId] = useState(null)
+  const [selectedSchoolId, setSelectedSchoolId] = useState(initialView.school)
   const [hoveredSchoolId, setHoveredSchoolId] = useState(null)
-  const [viewMode, setViewMode] = useState('list-map') // 'list-map', 'map-only', 'list-only'
-  const [mobileTab, setMobileTab] = useState('list') // 'list' or 'map'
+  const [viewMode, setViewMode] = useState(initialView.view) // 'list-map', 'map-only', 'list-only'
+  const [mobileTab, setMobileTab] = useState(initialView.tab) // 'list' or 'map'
   const [isFiltersOpen, setIsFiltersOpen] = useState(false) // For tablet/mobile drawer
-  const [userLocation, setUserLocation] = useState(null)
+  const [userLocation, setUserLocation] = useState(() => readStoredUserLocation(t('location.currentLocation')))
   const [addressInput, setAddressInput] = useState('')
   const [isManualInput, setIsManualInput] = useState(false)
   const [locationError, setLocationError] = useState(null)
   const [isLocating, setIsLocating] = useState(false)
   const [isGeocoding, setIsGeocoding] = useState(false)
   const [isPickingLocation, setIsPickingLocation] = useState(false)
-  const [distanceFilter, setDistanceFilter] = useState('any')
-  const [sortBy, setSortBy] = useState('name')
+  const [distanceFilter, setDistanceFilter] = useState(initialView.within)
+  // With a saved location, nearest-first is the default, as it was before sort lived in the URL.
+  const [sortBy, setSortBy] = useState(() => (
+    searchParams.has('sort') || !userLocation ? initialView.sort : 'distance'
+  ))
   const [searchInBounds, setSearchInBounds] = useState(false)
   const [mapBounds, setMapBounds] = useState(null)
   const [openLocationsId, setOpenLocationsId] = useState(null)
@@ -68,7 +94,13 @@ function SearchPage() {
   })
   const [highlightLocation, setHighlightLocation] = useState(false)
   const [locationToast, setLocationToast] = useState(null)
-  const previousLocationRef = useRef(null)
+  const previousLocationRef = useRef(userLocation)
+  const listScrollRef = useRef(null)
+  // Tracked on scroll: the list node is already detached when the unmount cleanup runs.
+  const listScrollTopRef = useRef(0)
+  const mapViewRef = useRef(savedViewState?.map || null)
+  const locationKeyRef = useRef(location.key)
+  locationKeyRef.current = location.key
   const previousViewModeRef = useRef(null)
   const previousMobileTabRef = useRef(null)
   const locationSectionRef = useRef(null)
@@ -202,23 +234,34 @@ function SearchPage() {
     }
   }, [countryCode])
 
+  // Keep sort, distance, view and selection in the URL (replace, so Back is not polluted).
   useEffect(() => {
-    const storedLocation = localStorage.getItem('userLocation')
-    if (storedLocation) {
-      try {
-        const parsed = JSON.parse(storedLocation)
-        if (typeof parsed?.lat === 'number' && typeof parsed?.lng === 'number') {
-          setUserLocation({
-            lat: parsed.lat,
-            lng: parsed.lng,
-            address: parsed.address || t('location.currentLocation'),
-          })
-        }
-      } catch {
-        localStorage.removeItem('userLocation')
-      }
+    setSearchParams(prev => writeViewParams(prev, {
+      sort: sortBy,
+      within: distanceFilter,
+      view: viewMode,
+      tab: mobileTab,
+      school: selectedSchoolId,
+    }) || prev, { replace: true })
+  }, [sortBy, distanceFilter, viewMode, mobileTab, selectedSchoolId, setSearchParams])
+
+  useEffect(() => {
+    rememberLastSearchUrl(`/search${location.search}`)
+  }, [location.search])
+
+  // Remember list scroll and map view for this history entry when leaving the page.
+  useEffect(() => {
+    return () => {
+      saveViewState(locationKeyRef.current, {
+        scrollTop: listScrollTopRef.current,
+        map: mapViewRef.current,
+      })
     }
-  }, [t])
+  }, [])
+
+  const handleMapViewChange = useStableCallback((view) => {
+    mapViewRef.current = view
+  })
 
   useEffect(() => {
     const storedPreference = localStorage.getItem('searchInMapBounds')
@@ -783,12 +826,12 @@ function SearchPage() {
   }, [schools, searchInBounds, selectedSchoolIdParam])
 
   useEffect(() => {
-    if (!selectedSchoolId) return
+    if (!selectedSchoolId || loading) return
     const visibleIds = new Set(filteredSchools.map(school => school.id))
     if (!visibleIds.has(selectedSchoolId)) {
       setSelectedSchoolId(null)
     }
-  }, [filteredSchools, selectedSchoolId])
+  }, [filteredSchools, selectedSchoolId, loading])
 
   useEffect(() => {
     if (!locationOverlay.schoolId) return
@@ -830,6 +873,17 @@ function SearchPage() {
 
     return list
   }, [boundedSchools, sortBy, i18n.language])
+
+  // Restore the list position once the restored list has rendered.
+  const pendingScrollRestoreRef = useRef(savedViewState?.scrollTop || 0)
+  useLayoutEffect(() => {
+    if (!pendingScrollRestoreRef.current || loading || sortedSchools.length === 0) return
+    if (listScrollRef.current) {
+      listScrollRef.current.scrollTop = pendingScrollRestoreRef.current
+      listScrollTopRef.current = listScrollRef.current.scrollTop
+    }
+    pendingScrollRestoreRef.current = 0
+  }, [loading, sortedSchools.length])
 
   const totalFilteredCount = filteredSchools.length
   const visibleFilteredCount = boundedSchools.length
@@ -1887,7 +1941,11 @@ function SearchPage() {
               </div>
 
               {/* School list */}
-              <div className={`flex-1 overflow-y-auto ${hasCompare ? 'pb-24' : ''}`}>
+              <div
+                ref={listScrollRef}
+                onScroll={(event) => { listScrollTopRef.current = event.currentTarget.scrollTop }}
+                className={`flex-1 overflow-y-auto ${hasCompare ? 'pb-24' : ''}`}
+              >
                 {loading && (
                   <div className="p-4 space-y-4">
                     {[...Array(5)].map((_, i) => (
@@ -1961,6 +2019,8 @@ function SearchPage() {
                   isPickingLocation={isPickingLocation}
                   onPickLocation={handleMapPickLocation}
                   onBoundsChange={handleBoundsChange}
+                  onViewChange={handleMapViewChange}
+                  initialView={savedViewState?.map || null}
                   autoFit={!searchInBounds && !selectedSchoolId && !locationOverlay.schoolId}
                   hasCompare={hasCompare}
                   resizeKey={`${viewMode}-${mobileTab}-${showMap}`}

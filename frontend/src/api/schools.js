@@ -1,6 +1,8 @@
+import { cachedJson, peekCachedJson } from './cache'
+
 const API_BASE = '/api'
 
-export async function fetchSchools({
+function buildSchoolsUrl({
   countryCode = 'bg',
   city = 'sofia',
   ageGroup = null,
@@ -34,64 +36,46 @@ export async function fetchSchools({
   facilities.forEach(value => params.append('facilities', value))
   teachingApproach.forEach(value => params.append('teaching_approach', value))
 
-  const url = `${API_BASE}/schools?${params.toString()}`
-
-  const response = await fetch(url)
-  if (!response.ok) {
-    throw new Error(`Failed to fetch schools: ${response.statusText}`)
-  }
-
-  return response.json()
+  return `${API_BASE}/schools?${params.toString()}`
 }
 
-export async function fetchAvailableFilters({ countryCode = 'bg', city = 'sofia' } = {}) {
+export function fetchSchools(options = {}) {
+  return cachedJson(buildSchoolsUrl(options), 'Failed to fetch schools')
+}
+
+/** Already-loaded schools for these options, so a revisit can render without a skeleton. */
+export function peekSchools(options = {}) {
+  return peekCachedJson(buildSchoolsUrl(options))
+}
+
+export function fetchAvailableFilters({ countryCode = 'bg', city = 'sofia' } = {}) {
   const params = new URLSearchParams()
   params.set('country_code', countryCode)
   if (city) {
     params.set('city', city)
   }
-  const response = await fetch(`${API_BASE}/schools/filters?${params.toString()}`)
-  if (!response.ok) {
-    throw new Error(`Failed to fetch available filters: ${response.statusText}`)
-  }
-
-  return response.json()
+  return cachedJson(`${API_BASE}/schools/filters?${params.toString()}`, 'Failed to fetch available filters')
 }
 
-export async function fetchSchool(id) {
-  const response = await fetch(`${API_BASE}/schools/${id}`)
-  if (!response.ok) {
-    throw new Error(`Failed to fetch school: ${response.statusText}`)
-  }
-
-  return response.json()
+export function fetchSchool(id) {
+  return cachedJson(`${API_BASE}/schools/${id}`, 'Failed to fetch school')
 }
 
-export async function fetchCompare(ids) {
+export function fetchCompare(ids) {
   const idsParam = ids.join(',')
-  const response = await fetch(`${API_BASE}/compare?ids=${idsParam}`)
-  if (!response.ok) {
-    throw new Error(`Failed to fetch comparison: ${response.statusText}`)
-  }
-
-  return response.json()
+  return cachedJson(`${API_BASE}/compare?ids=${idsParam}`, 'Failed to fetch comparison')
 }
 
-export async function fetchSchoolCounts({ countryCode = 'bg', city = 'sofia' } = {}) {
+export function fetchSchoolCounts({ countryCode = 'bg', city = 'sofia' } = {}) {
   const params = new URLSearchParams()
   params.set('country_code', countryCode)
   if (city) {
     params.set('city', city)
   }
-  const response = await fetch(`${API_BASE}/schools/counts?${params.toString()}`)
-  if (!response.ok) {
-    throw new Error(`Failed to fetch school counts: ${response.statusText}`)
-  }
-
-  return response.json()
+  return cachedJson(`${API_BASE}/schools/counts?${params.toString()}`, 'Failed to fetch school counts')
 }
 
-export async function searchSchools(query, { countryCode = 'bg', city = 'sofia' } = {}) {
+export function searchSchools(query, { countryCode = 'bg', city = 'sofia' } = {}) {
   const params = new URLSearchParams()
   params.set('q', query)
   params.set('country_code', countryCode)
@@ -99,30 +83,19 @@ export async function searchSchools(query, { countryCode = 'bg', city = 'sofia' 
     params.set('city', city)
   }
 
-  const response = await fetch(`${API_BASE}/schools/search?${params.toString()}`)
-  if (!response.ok) {
-    throw new Error(`Failed to search schools: ${response.statusText}`)
-  }
-
-  return response.json()
+  return cachedJson(`${API_BASE}/schools/search?${params.toString()}`, 'Failed to search schools')
 }
 
-export async function fetchCountryConfig(code) {
-  const response = await fetch(`${API_BASE}/countries/${code}`)
-  if (!response.ok) {
-    throw new Error(`Failed to fetch country config: ${response.statusText}`)
-  }
-
-  return response.json()
+export function fetchCountryConfig(code) {
+  return cachedJson(`${API_BASE}/countries/${code}`, 'Failed to fetch country config')
 }
 
-export async function fetchExamAverages({ countryCode = 'bg' } = {}) {
+export function fetchExamAverages({ countryCode = 'bg' } = {}) {
   const params = new URLSearchParams()
   params.set('country_code', countryCode)
-  const response = await fetch(`${API_BASE}/schools/exam-averages?${params.toString()}`)
-  if (!response.ok) {
-    throw new Error(`Failed to fetch exam averages: ${response.statusText}`)
-  }
+  return cachedJson(`${API_BASE}/schools/exam-averages?${params.toString()}`, 'Failed to fetch exam averages')
+}
 
-  return response.json()
+export function peekSchool(id) {
+  return peekCachedJson(`${API_BASE}/schools/${id}`)
 }
