@@ -34,7 +34,7 @@ function SchoolActions({ onShare, onCompare, inCompare, canAddMore, compact = fa
             ? 'bg-primary-100 text-primary-700 border-2 border-primary-500 hover:bg-primary-200'
             : compareDisabled
             ? 'bg-neutral-100 text-neutral-400 cursor-not-allowed border border-neutral-300'
-            : 'bg-primary-600 text-white hover:bg-primary-700 border border-primary-600'
+            : 'bg-primary-700 text-white hover:bg-primary-800 border border-primary-600'
         }`}
       >
         {inCompare && (

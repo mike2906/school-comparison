@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { shortAddress as formatShortAddress } from '../../utils/searchViewState'
 
 const DISTANCE_OPTIONS = ['any', '2', '5']
 
@@ -61,15 +62,15 @@ function LocationControl({
     if (userLocation) setOpen(false)
   }, [userLocation])
 
-  const shortAddress = userLocation?.address?.split(',').slice(0, 2).join(',').trim()
+  const shortAddress = formatShortAddress(userLocation?.address)
 
   return (
-    <div ref={containerRef} className="relative flex min-w-0 items-center gap-2">
+    <div ref={containerRef} className="relative flex min-w-0 flex-1 items-center gap-2 md:flex-none">
       <button
         type="button"
         onClick={() => setOpen(value => !value)}
         aria-expanded={open}
-        className={`inline-flex h-11 md:h-9 min-w-0 items-center gap-1.5 rounded-lg border px-3 text-sm ${
+        className={`inline-flex h-11 md:h-9 min-w-0 max-w-full items-center gap-1.5 rounded-lg border px-3 text-sm ${
           userLocation
             ? 'border-primary-200 bg-primary-50 text-primary-800'
             : 'border-dashed border-neutral-300 text-neutral-700 hover:bg-neutral-50'
@@ -85,7 +86,7 @@ function LocationControl({
           <button
             type="button"
             onClick={onClear}
-            className="flex h-11 w-11 md:h-9 md:w-9 flex-shrink-0 items-center justify-center rounded-lg text-neutral-500 hover:bg-neutral-100"
+            className="hidden md:flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg text-neutral-500 hover:bg-neutral-100"
             aria-label={t('location.clear')}
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
@@ -97,7 +98,7 @@ function LocationControl({
             id="distance-filter"
             value={distanceFilter}
             onChange={(event) => onDistanceFilterChange(event.target.value)}
-            className="h-11 md:h-9 flex-shrink-0 rounded-lg border border-neutral-300 bg-white px-2 text-sm"
+            className="hidden md:block h-9 flex-shrink-0 rounded-lg border border-neutral-300 bg-white px-2 text-sm"
           >
             {DISTANCE_OPTIONS.map(option => (
               <option key={option} value={option}>
@@ -110,12 +111,44 @@ function LocationControl({
 
       {open && (
         <div className="absolute left-0 top-full z-[1200] mt-2 w-[min(360px,calc(100vw-2rem))] space-y-3 rounded-xl border border-neutral-200 bg-white p-4 shadow-xl">
-          <p className="text-sm text-neutral-600">{t('location.whyShort')}</p>
+          {userLocation ? (
+            // On phones the distance filter and "clear" live here to keep the chip row short.
+            <div className="space-y-3 md:hidden">
+              <p className="text-sm font-medium text-neutral-800">{t('location.nearShort', { address: shortAddress })}</p>
+              <label className="block text-sm text-neutral-700">
+                <span className="mb-1 block">{t('location.distanceFilterTitle')}</span>
+                <select
+                  value={distanceFilter}
+                  onChange={(event) => onDistanceFilterChange(event.target.value)}
+                  className="h-11 w-full rounded-lg border border-neutral-300 bg-white px-2 text-sm"
+                >
+                  {DISTANCE_OPTIONS.map(option => (
+                    <option key={option} value={option}>
+                      {option === 'any' ? t('location.distanceAny') : t(`location.distance${option}km`)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false)
+                  onClear()
+                }}
+                className="h-11 w-full rounded-lg border border-neutral-300 text-sm font-medium text-neutral-700"
+              >
+                {t('location.clear')}
+              </button>
+              <p className="border-t border-neutral-100 pt-3 text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('location.changeShort')}</p>
+            </div>
+          ) : (
+            <p className="text-sm text-neutral-600">{t('location.whyShort')}</p>
+          )}
           <button
             type="button"
             onClick={onUseMyLocation}
             disabled={isLocating}
-            className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-primary-600 px-3 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-60"
+            className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-primary-700 px-3 text-sm font-medium text-white hover:bg-primary-800 disabled:opacity-60"
           >
             {isLocating && <Spinner />}
             {t('location.useMyLocation')}

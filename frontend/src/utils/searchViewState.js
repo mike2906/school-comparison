@@ -140,3 +140,14 @@ export function isDesktopViewport() {
 export function isPlainLeftClick(event) {
   return event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey
 }
+
+/**
+ * A short address for the "Near …" chip. Geocoders return "1, бул. Витоша, …", so a
+ * leading house number is moved after the street: "бул. Витоша 1".
+ */
+export function shortAddress(address) {
+  const parts = String(address || '').split(',').map(part => part.trim()).filter(Boolean)
+  if (parts.length === 0) return ''
+  if (/^\d+[a-zа-я]?$/iu.test(parts[0]) && parts[1]) return `${parts[1]} ${parts[0]}`
+  return parts[0]
+}

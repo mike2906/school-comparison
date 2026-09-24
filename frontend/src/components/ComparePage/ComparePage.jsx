@@ -1092,7 +1092,7 @@ function ComparePage() {
                   key={group}
                   className={`rounded px-2 py-0.5 text-xs ${
                     selectedAgeGroup && group === selectedAgeGroup
-                      ? 'bg-primary-600 text-white'
+                      ? 'bg-primary-700 text-white'
                       : 'bg-neutral-100 text-neutral-700'
                   }`}
                 >
@@ -1339,7 +1339,7 @@ function ComparePage() {
               <button
                 type="button"
                 onClick={handleBack}
-                className="px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+                className="px-6 py-3 bg-primary-700 text-white rounded-lg hover:bg-primary-800 transition-colors"
               >
                 {t('common.goBack')}
               </button>
@@ -1508,7 +1508,7 @@ function ComparePage() {
               {visibleSections.map(section => (
                 <section key={section.key}>
                   <h2
-                    className="sticky left-0 bg-primary-600 px-3 py-2 text-sm font-semibold text-white"
+                    className="sticky left-0 bg-primary-700 px-3 py-2 text-sm font-semibold text-white"
                     style={mobileLabelStyle}
                   >
                     {section.title}
@@ -1736,7 +1736,7 @@ function FragmentSection({ section, schools, highlightDiffs }) {
 function SectionRow({ label, colSpan, tone = 'primary' }) {
   const classes = tone === 'muted'
     ? 'bg-neutral-100 text-neutral-700 border-neutral-200'
-    : 'bg-primary-600 text-white border-primary-600'
+    : 'bg-primary-700 text-white border-primary-700'
 
   return (
     <tr>

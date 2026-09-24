@@ -10,7 +10,7 @@ const MAX_SUGGESTIONS = 6
  * Name search on the results page. Typing filters the list instantly (the parent applies
  * `value`); the dropdown also finds schools outside the current filters and opens them.
  */
-function SchoolNameSearch({ value, onChange, onOpenSchool, className = '' }) {
+function SchoolNameSearch({ value, onChange, onOpenSchool, className = '', compact = false }) {
   const { t, i18n } = useTranslation()
   const containerRef = useRef(null)
   // Rendered twice (mobile and desktop toolbars), so ids must be unique per instance.
@@ -101,7 +101,7 @@ function SchoolNameSearch({ value, onChange, onOpenSchool, className = '' }) {
         }}
         onFocus={() => setOpen(true)}
         onKeyDown={handleKeyDown}
-        placeholder={t('landing.searchPlaceholder')}
+        placeholder={compact ? t('nameSearch.placeholderShort') : t('landing.searchPlaceholder')}
         autoComplete="off"
         role="combobox"
         aria-expanded={showDropdown}

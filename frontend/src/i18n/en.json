@@ -64,7 +64,8 @@
     "fromYou": "from you",
     "nearShort": "Near {{address}}",
     "setShort": "Set your location",
-    "whyShort": "See distances, sort by the nearest and limit by distance."
+    "whyShort": "See distances, sort by the nearest and limit by distance.",
+    "changeShort": "Change location"
   },
   "sorting": {
     "sortBy": "Sort by",
@@ -571,7 +572,8 @@
   "nameSearch": {
     "openSchool": "Open a school",
     "filteringBy": "Names matching “{{query}}”",
-    "clear": "Clear"
+    "clear": "Clear",
+    "placeholderShort": "School name or №"
   },
   "agePicker": {
     "title": "Who are you looking for?",

@@ -300,7 +300,7 @@ function AgePicker({
               <button
                 type="button"
                 onClick={() => onOpenChange(false)}
-                className="h-10 rounded-lg bg-primary-600 px-5 text-sm font-medium text-white hover:bg-primary-700"
+                className="h-10 rounded-lg bg-primary-700 px-5 text-sm font-medium text-white hover:bg-primary-800"
               >
                 {t('agePicker.done')}
               </button>

@@ -162,7 +162,7 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
             <p className="text-neutral-600 mb-6">{error || t('schools.notFoundDesc')}</p>
             <button
               onClick={handleBack}
-              className="px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+              className="px-6 py-3 bg-primary-700 text-white rounded-lg hover:bg-primary-800 transition-colors"
             >
               {t('common.goBack')}
             </button>
@@ -596,7 +596,7 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
                     onClick={() => setShowAllGrades(!showAllGrades)}
                     className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                       showAllGrades
-                        ? 'bg-primary-600 text-white shadow-md'
+                        ? 'bg-primary-700 text-white shadow-md'
                         : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
                     }`}
                   >
@@ -633,7 +633,7 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
                             onClick={() => setActiveExamType(examType)}
                             className={`px-4 py-2.5 rounded-lg font-medium whitespace-nowrap transition-all ${
                               isActive
-                                ? 'bg-primary-600 text-white shadow-md'
+                                ? 'bg-primary-700 text-white shadow-md'
                                 : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
                             }`}
                           >
