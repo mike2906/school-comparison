@@ -74,3 +74,15 @@ test('view state is kept per history entry, capped to recent entries', () => {
   assert.equal(readSavedViewState('first', '?a=1', storage), null)
   assert.equal(readSavedViewState('k24', '', storage).scrollTop, 24)
 })
+
+test('getLastSearchUrl rejects look-alike and off-site paths', () => {
+  const storage = memoryStorage()
+  for (const bad of ['//evil.example/search', '/searching', 'https://evil.example/search']) {
+    rememberLastSearchUrl(bad, storage)
+    assert.equal(getLastSearchUrl(storage), '/search')
+  }
+  rememberLastSearchUrl('/search', storage)
+  assert.equal(getLastSearchUrl(storage), '/search')
+  const throwing = { getItem: () => { throw new Error('SecurityError') } }
+  assert.equal(getLastSearchUrl(throwing), '/search')
+})

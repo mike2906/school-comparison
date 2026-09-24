@@ -1,42 +1,47 @@
-import { createContext, useContext, useState, useEffect } from 'react'
+import { createContext, useCallback, useContext, useEffect, useState } from 'react'
+import {
+  MAX_COMPARE,
+  loadCompareList,
+  safeLocalStorage,
+  saveCompareList,
+  syncCompareList as syncEntries,
+  toCompareEntry,
+} from '../utils/compareList'
 
 const CompareContext = createContext()
 
-const MAX_COMPARE = 4 // Maximum number of schools to compare
-
 export function CompareProvider({ children }) {
-  const [compareList, setCompareList] = useState(() => {
-    // Load from localStorage on mount
-    const saved = localStorage.getItem('compareList')
-    return saved ? JSON.parse(saved) : []
-  })
+  // Entries are {id, name_i18n, resolved_name_i18n, school_type}; old full-object lists are
+  // trimmed on load. The compare page fetches fresh data by id.
+  const [compareList, setCompareList] = useState(() => loadCompareList(safeLocalStorage()))
 
-  // Save to localStorage whenever compareList changes
   useEffect(() => {
-    localStorage.setItem('compareList', JSON.stringify(compareList))
+    saveCompareList(safeLocalStorage(), compareList)
   }, [compareList])
 
-  const addToCompare = (school) => {
+  const addToCompare = useCallback((school) => {
+    const entry = toCompareEntry(school)
+    if (!entry) return
     setCompareList(prev => {
-      // Don't add if already in list
-      if (prev.find(s => s.id === school.id)) {
+      if (prev.some(s => s.id === entry.id) || prev.length >= MAX_COMPARE) {
         return prev
       }
-      // Don't add if list is full
-      if (prev.length >= MAX_COMPARE) {
-        return prev
-      }
-      return [...prev, school]
+      return [...prev, entry]
     })
-  }
+  }, [])
 
-  const removeFromCompare = (schoolId) => {
+  const removeFromCompare = useCallback((schoolId) => {
     setCompareList(prev => prev.filter(s => s.id !== schoolId))
-  }
+  }, [])
 
-  const clearCompare = () => {
+  const clearCompare = useCallback(() => {
     setCompareList([])
-  }
+  }, [])
+
+  // Refresh stored names from a compare response and drop ids the API no longer returns.
+  const syncCompareList = useCallback((requestedIds, freshSchools) => {
+    setCompareList(prev => syncEntries(prev, requestedIds, freshSchools))
+  }, [])
 
   const isInCompare = (schoolId) => {
     return compareList.some(s => s.id === schoolId)
@@ -51,6 +56,7 @@ export function CompareProvider({ children }) {
         addToCompare,
         removeFromCompare,
         clearCompare,
+        syncCompareList,
         isInCompare,
         canAddMore,
         maxCompare: MAX_COMPARE,

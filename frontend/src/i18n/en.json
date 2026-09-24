@@ -406,7 +406,17 @@
       "scraped_website": "Website",
       "unknown": "Unknown",
       "website": "Website"
-    }
+    },
+    "compareCount": "Compare ({{count}})",
+    "maxReached": "Maximum {{max}} schools",
+    "selectedCount": "{{count}} selected",
+    "showSelected": "Show selected schools",
+    "hideSelected": "Hide selected schools",
+    "previousSchools": "Previous schools",
+    "nextSchools": "Next schools",
+    "visibleRange": "{{from}}–{{to}} of {{total}}",
+    "someNotFound": "Some schools are no longer available and were removed from the comparison.",
+    "comparingCount_one": "Comparing {{count}} school"
   },
   "advancedFilters": {
     "title": "Advanced Filters",

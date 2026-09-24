@@ -1507,10 +1507,20 @@ self-review, with at most one Codex review on the larger ones.
       CompareBar); `<name> · Sofia Schools` tab title; free-text tags are no longer
       Title-Cased and Bulgarian tags sit under "In Bulgarian" in the EN UI
       (`utils/tags.js`).
-- [ ] **U7 Compare page.** Usable mobile layout (stacked rows, two schools per view);
+- [x] **U7 Compare page.** Usable mobile layout (stacked rows, two schools per view);
       sticky school header while scrolling; compare list stores ids, not stale school
       objects; compare bar fits mobile and explains the 4-school limit; "Add school" keeps
       the search context.
+      **Done 2026-09-24:** below `md` each row label is a full-width heading over two
+      value columns; 3–4 schools scroll sideways with scroll-snap and ‹ › paging, and the
+      sticky school header follows the scroll. Desktop keeps the table, with the header as
+      a separate sticky table synced to the body. `localStorage.compareList` keeps only
+      `{id, name_i18n, resolved_name_i18n, school_type}` (old arrays trimmed, storage and
+      JSON errors guarded); a compare response refreshes names and drops ids that no
+      longer exist, with a notice (an all-missing list gets "Clear all" on the error
+      page). The bar is one row on mobile, hidden on `/compare`, and says
+      "Maximum 4 schools" when full. "Add school" and a history-less "Back" go to
+      `sessionStorage.lastSearchUrl` (a `/search` path) or `/search`.
 - [ ] **U8 Cross-cutting.** Clickable logo and nav link to Compare; "EN | BG" language
       switch; keyboard-reachable cards and non-colour-only status; "About the data" page
       (sources, last updated). Split the largest components as they are touched (P4.1).
