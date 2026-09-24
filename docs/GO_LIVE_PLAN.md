@@ -1678,14 +1678,31 @@ the session scratchpad only.
       "Chastna Ezikova Gimnaziya…") next to translated ones; "American" does not find the
       American College. Curated EN names for well-known schools + type-word translation.
       **Done 2026-09-24:** PR #107: generated English names translate the school type ("94th Secondary School …", "Kindergarten No. 31 …") and 8 well-known schools have curated English names with evidence (American College of Sofia, First English Language School, Lycée Français de Sofia Victor Hugo, German School Sofia, …; pg_dump backup taken).
-- [ ] **UF35 Only 54 state kindergartens listed** with no coverage statement; check
+- [x] **UF35 Only 54 state kindergartens listed** with no coverage statement; check
       against kg.sofia.bg and state coverage on /about and in counts.
+      **Done 2026-09-24:** root cause was the kg.sofia adapter fingerprinting all 501 records on a
+      limited first run, so later runs skipped the rest. PR #109 fixes it (unlinked records count as
+      changed; only kindergarten/nursery records create schools; re-import never recreates existing
+      locations). Import (kg.sofia adapter only, dry runs first, pg_dump backups): state
+      kindergartens listed 54 → 299 (200 numbered ДГ, 25 СДЯ); no duplicates; none of the 579
+      existing locations moved. Geocoding: 233 of 285 new locations have coordinates (8 wrong-district
+      matches cleared). /about states the coverage without exact counts (PR #112).
 - [x] **UF36 `/schools` is 2.1 MB uncompressed** (~200 KB gzipped); add `GZipMiddleware`
       or proxy compression, later a slimmer list schema.
       **Done 2026-09-24:** PR #102: `GZipMiddleware` (≥1 KB); the all-ages list goes from 2.1 MB to ~190 KB.
 - [x] **UF37 Raw register formatting:** ALL-CAPS names, "ЕООД" suffixes, stray quotes,
       machine-transliterated addresses in the EN UI. A display-name / address cleanup.
       **Done 2026-09-24:** PR #107: display-only cleanup in `app/utils/display_names.py` (recased ALL-CAPS, legal-form suffixes and stray quotes removed, BG „…“ quotes, clean addresses without "гр. София" / "1799 СТОЛИЧНА"); stored data unchanged.
+- [ ] **UF38 Nominatim district check.** 8 kindergarten points were cleared because Nominatim
+      matched a same-named street in another district (e.g. ул. Вършец in Подуяне placed in
+      Войнеговци); a future geocoding run will return them unless the provider checks the
+      district/neighbourhood against the address.
+- [ ] **UF39 kg.sofia duplicate address spellings.** Location 2916 (school 104, same building,
+      different spelling) was removed but will be re-added on the next kg.sofia run; normalise
+      addresses before comparing. Some "- сграда N" buildings are still separate school rows.
+- [ ] **UF40 Geocoding contact address** (`GEOCODING_CONTACT_EMAIL`) is Mike's personal email and
+      is sent with every Nominatim request; switch to a project address once the domain exists
+      (with UF27).
 
 ## Phase 3 — Go live
 
