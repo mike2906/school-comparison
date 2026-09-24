@@ -5,6 +5,7 @@ import Layout from '../Layout/Layout'
 import { useCompare } from '../../context/CompareContext'
 import { getLastSearchUrl } from '../../utils/searchViewState'
 import { schoolLevelLabel } from '../../utils/levelLabel'
+import { useCountry } from '../../context/CountryContext'
 import { languageLabel } from '../../utils/languages'
 import TagList from '../SchoolDetailPage/TagList'
 import PhoneLinks from '../SchoolDetailPage/PhoneLinks'
@@ -396,6 +397,7 @@ function InlineSource({ badgeKey, badgeLabel, url, displayUrl, dateLabel, t }) {
 
 function ComparePage() {
   const { t, i18n } = useTranslation()
+  const { config: countryConfig } = useCountry()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const { compareList, removeFromCompare, clearCompare, syncCompareList, maxCompare } = useCompare()
@@ -693,9 +695,9 @@ function ComparePage() {
       {
         label: t('compare.labels.educationLevel'),
         getValue: (school) => (
-          <span className="text-sm text-neutral-700">{schoolLevelLabel(school, t)}</span>
+          <span className="text-sm text-neutral-700">{schoolLevelLabel(school, t, countryConfig)}</span>
         ),
-        getCompare: (school) => schoolLevelLabel(school, t),
+        getCompare: (school) => schoolLevelLabel(school, t, countryConfig),
       },
       {
         label: t('compare.labels.tuitionOrAdmission'),
@@ -1624,6 +1626,7 @@ function ComparePage() {
 }
 
 function SchoolHeader({ school, onRemove, t, language, compact = false }) {
+  const { config: countryConfig } = useCountry()
   const name = getSchoolName(school, language)
   return (
     <div className={compact ? 'space-y-1.5' : 'space-y-2'}>
@@ -1658,7 +1661,7 @@ function SchoolHeader({ school, onRemove, t, language, compact = false }) {
         </span>
         {!compact && school.education_level && (
           <span className="px-2 py-0.5 rounded text-xs bg-neutral-100 text-neutral-700">
-            {schoolLevelLabel(school, t)}
+            {schoolLevelLabel(school, t, countryConfig)}
           </span>
         )}
       </div>

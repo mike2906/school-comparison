@@ -19,7 +19,7 @@ import { compareSchoolNames, getSchoolName, schoolMatchesQuery } from '../../uti
 import { useCompare } from '../../context/CompareContext'
 import { useCountry } from '../../context/CountryContext'
 import { fetchAvailableFilters, fetchExamAverages } from '../../api/schools'
-import { getAgeGroupKeys } from '../../utils/countryConfig'
+import { getAgeGroupKeys, getExclusiveAgeGroups } from '../../utils/countryConfig'
 import { AGE_GROUP_KEYS } from '../../utils/education'
 import { getLanguageFocusPairs } from '../../utils/schoolAttributes'
 import { matchesAdvancedFilters, matchesSchoolType } from '../../utils/advancedFilters'
@@ -56,7 +56,8 @@ const TYPE_SORT_ORDER = {
 const EMPTY_LIST = []
 // Cards are rendered in pages as the list scrolls: all ~440 at once took ~0.6 s per render.
 const LIST_PAGE_SIZE = 30
-const KINDERGARTEN_ONLY_GROUPS = ['nursery', 'first', 'second', 'third']
+// Bulgaria, until the country config has loaded.
+const FALLBACK_KINDERGARTEN_ONLY_GROUPS = ['nursery', 'first', 'second', 'third']
 
 const DEFAULT_ADVANCED_OPTIONS = {
   language_focus_levels: ['immersion', 'bilingual', 'enrichment'],
@@ -1108,17 +1109,21 @@ function SearchPage() {
   const showMap = viewMode === 'list-map' || viewMode === 'map-only'
   const hasCompare = compareList.length > 0
 
+  const kindergartenOnlyGroups = config
+    ? getExclusiveAgeGroups(config, 'kindergarten')
+    : FALLBACK_KINDERGARTEN_ONLY_GROUPS
+
   // Kindergarten-only lists are counted as kindergartens, all-ages / preschool lists
   // neutrally, school grades as schools.
   const resultNounKey = !filters.ageGroup || (filters.ageGroup === 'preschool' && filters.includeCrossover)
     ? 'schools.resultsMixed'
-    : KINDERGARTEN_ONLY_GROUPS.includes(filters.ageGroup) ||
+    : kindergartenOnlyGroups.includes(filters.ageGroup) ||
       (filters.ageGroup === 'preschool' && filters.educationLevel === 'kindergarten')
       ? 'schools.resultsKindergarten'
       : 'schools.results'
 
   // Kindergartens have no NVO results, so that sort only applies when schools are listed.
-  const kindergartensOnly = KINDERGARTEN_ONLY_GROUPS.includes(filters.ageGroup) ||
+  const kindergartensOnly = kindergartenOnlyGroups.includes(filters.ageGroup) ||
     (filters.ageGroup === 'preschool' && filters.educationLevel === 'kindergarten')
   const allSortOptions = userLocation
     ? [

@@ -3,12 +3,15 @@
  * "Kindergarten · Grades 1–4". The stored education_level is a single category, so an
  * СУ teaching grades 1–12 was labelled "High School" and an ОУ "Primary School".
  */
-const GRADE_BANDS = {
+import { getExclusiveAgeGroups, getGradeBands } from './countryConfig.js'
+
+// Bulgaria, used until the country config has loaded.
+const FALLBACK_GRADE_BANDS = {
   grade_1_4: [1, 4],
   grade_5_7: [5, 7],
   grade_8_12: [8, 12],
 }
-const KINDERGARTEN_GROUPS = ['nursery', 'first', 'second', 'third']
+const FALLBACK_KINDERGARTEN_GROUPS = ['nursery', 'first', 'second', 'third']
 
 function offeredGroups(school) {
   const groups = new Set()
@@ -20,8 +23,8 @@ function offeredGroups(school) {
 }
 
 /** Contiguous grade ranges, e.g. [[1, 12]] or [[1, 4], [8, 12]]. */
-export function gradeRanges(groups) {
-  const bands = Object.entries(GRADE_BANDS)
+export function gradeRanges(groups, gradeBands = FALLBACK_GRADE_BANDS) {
+  const bands = Object.entries(gradeBands)
     .filter(([key]) => groups.has(key))
     .map(([, band]) => band)
     .sort((a, b) => a[0] - b[0])
@@ -34,14 +37,19 @@ export function gradeRanges(groups) {
   return ranges
 }
 
-/** A short label for what the school offers; falls back to the stored level. */
-export function schoolLevelLabel(school, t) {
+/**
+ * A short label for what the school offers; falls back to the stored level. Groups and
+ * grade numbers come from the country config when it is loaded.
+ */
+export function schoolLevelLabel(school, t, config = null) {
   const groups = offeredGroups(school)
+  const kindergartenGroups = config ? getExclusiveAgeGroups(config, 'kindergarten') : FALLBACK_KINDERGARTEN_GROUPS
+  const gradeBands = config ? getGradeBands(config) : FALLBACK_GRADE_BANDS
   const parts = []
-  if (KINDERGARTEN_GROUPS.some(group => groups.has(group))) {
+  if (kindergartenGroups.some(group => groups.has(group))) {
     parts.push(t('educationLevels.kindergarten'))
   }
-  const ranges = gradeRanges(groups)
+  const ranges = gradeRanges(groups, gradeBands)
   if (ranges.length > 0) {
     parts.push(t('levels.grades', {
       range: ranges.map(([start, end]) => (start === end ? `${start}` : `${start}–${end}`)).join(', '),

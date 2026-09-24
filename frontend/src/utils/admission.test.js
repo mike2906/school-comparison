@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { classifyAdmissionRequirement } from './admission.js'
+import { classifyAdmissionRequirement, usesSofiaKindergartenSystem } from './admission.js'
 
 test('classifies English and Bulgarian interview requirements', () => {
   assert.equal(classifyAdmissionRequirement('Interview with the family').kind, 'interview')
@@ -58,4 +58,11 @@ test('returns null for missing or unusable requirements', () => {
   assert.equal(classifyAdmissionRequirement(null), null)
   assert.equal(classifyAdmissionRequirement([]), null)
   assert.equal(classifyAdmissionRequirement({}), null)
+})
+
+test('usesSofiaKindergartenSystem only for Bulgarian state kindergartens', () => {
+  assert.equal(usesSofiaKindergartenSystem({ school_type: 'state', education_level: 'kindergarten', country_code: 'bg' }), true)
+  assert.equal(usesSofiaKindergartenSystem({ school_type: 'private', education_level: 'kindergarten', country_code: 'bg' }), false)
+  assert.equal(usesSofiaKindergartenSystem({ school_type: 'state', education_level: 'kindergarten', country_code: 'ro' }), false)
+  assert.equal(usesSofiaKindergartenSystem({ school_type: 'state', education_level: 'primary', country_code: 'bg' }), false)
 })

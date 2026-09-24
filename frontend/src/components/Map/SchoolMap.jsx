@@ -325,6 +325,8 @@ function MapUpdater({ schools, userLocation, autoFit, lastValidBoundsRef, defaul
       return
     }
 
+    // Remember the country view too, so a map revealed after an empty result refits to it.
+    lastValidBoundsRef.current = countryBounds
     map.fitBounds(countryBounds, { padding: FIT_PADDING, maxZoom: defaultZoom, animate: true, duration: 0.4 })
   }, [schools, userLocation, autoFit, map, lastValidBoundsRef, defaultZoom, countryBounds, fittedWhileHiddenRef])
 

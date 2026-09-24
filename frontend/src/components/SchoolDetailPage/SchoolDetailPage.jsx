@@ -6,7 +6,9 @@ import { fetchSchool, fetchExamAverages } from '../../api/schools'
 import { getSchoolName, getAddress, getSummary } from '../../utils/i18n'
 import { normalizeSchool } from '../../utils/schoolAttributes'
 import { getLastSearchUrl } from '../../utils/searchViewState'
+import { usesSofiaKindergartenSystem } from '../../utils/admission'
 import { schoolLevelLabel } from '../../utils/levelLabel'
+import { useCountry } from '../../context/CountryContext'
 import { useCompare } from '../../context/CompareContext'
 import {
   getStatusInfo,
@@ -64,6 +66,7 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
     navigate(-1)
   }
   const { t, i18n } = useTranslation()
+  const { config: countryConfig } = useCountry()
   const { addToCompare, removeFromCompare, isInCompare, canAddMore, compareList } = useCompare()
   const [rawSchool, setRawSchool] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -180,7 +183,6 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
   const nvoDetail = getNvoDetail(school, t)
   const availableExamTypes = getAvailableExamTypes(school.exam_results)
   const keyFactsExamType = nvoDetail?.examType || availableExamTypes[availableExamTypes.length - 1] || null
-  const isStateKindergarten = school.school_type === 'state' && school.education_level === 'kindergarten'
   // The global CompareBar is fixed to the bottom while the compare list is non-empty.
   const compareBarVisible = compareList.length > 0
 
@@ -294,7 +296,7 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
               {t(`schoolTypes.${school.school_type}`)}
             </span>
             <span className="px-4 py-2 rounded-lg text-sm font-semibold bg-neutral-100 text-neutral-700 border border-neutral-200">
-              {schoolLevelLabel(school, t)}
+              {schoolLevelLabel(school, t, countryConfig)}
             </span>
             {statusInfo && (
               <span
@@ -432,7 +434,7 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
           <div className="bg-white rounded-2xl shadow-card border border-neutral-200 p-6 md:p-8 mb-6">
             <h2 className="text-2xl font-bold text-neutral-900 mb-6">{t('schools.locationsAndEnrollment')}</h2>
             <LocationMap locations={locations} />
-            {isStateKindergarten && school.country_code === 'bg' && (
+            {usesSofiaKindergartenSystem(school) && (
               <p className="text-sm text-neutral-600 mb-6">
                 {t('schoolDetail.officialAdmission')}{' '}
                 <a

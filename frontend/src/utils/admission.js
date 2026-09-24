@@ -56,3 +56,14 @@ export function classifyAdmissionRequirement(rawRequirement) {
   if (kinds.size === 1 && kinds.has('none')) return { kind: 'none', text }
   return { kind: 'other', text }
 }
+
+/**
+ * True when a school's admission runs through Sofia's municipal kindergarten system
+ * (kg.sofia.bg). Responses carry no city yet and the app only lists Sofia, so this checks
+ * the country; add the city when other Bulgarian cities are published.
+ */
+export function usesSofiaKindergartenSystem(school) {
+  return school?.school_type === 'state' &&
+    school?.education_level === 'kindergarten' &&
+    school?.country_code === 'bg'
+}

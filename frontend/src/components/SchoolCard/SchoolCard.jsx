@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { isDesktopViewport, isPlainLeftClick } from '../../utils/searchViewState'
 import { schoolLevelLabel } from '../../utils/levelLabel'
+import { useCountry } from '../../context/CountryContext'
 import { languageLabel } from '../../utils/languages'
 import { useCompare } from '../../context/CompareContext'
 import { getSchoolName, getAddress } from '../../utils/i18n'
@@ -10,7 +11,7 @@ import { formatDistance } from '../../utils/distance'
 import { getFocusEmoji } from '../../utils/locationFocus'
 import { getBenchmarkComparison, getNvoDetail as getSharedNvoDetail } from '../../utils/nvo'
 import { getAdmissionStatusKey, getCanonicalAmenityFlags } from '../../utils/schoolAttributes'
-import { classifyAdmissionRequirement } from '../../utils/admission'
+import { classifyAdmissionRequirement, usesSofiaKindergartenSystem } from '../../utils/admission'
 import {
   isInstallmentPlan,
   lowestUnstatedPeriodTuition,
@@ -641,6 +642,7 @@ const SchoolCard = memo(function SchoolCard({
   examAverages = null,
 }) {
   const { t, i18n } = useTranslation()
+  const { config: countryConfig } = useCountry()
   const { addToCompare, removeFromCompare, isInCompare, canAddMore } = useCompare()
   const [isExpanded, setIsExpanded] = useState(false)
 
@@ -789,7 +791,9 @@ const SchoolCard = memo(function SchoolCard({
         }
       }
       // No published thresholds yet: say how admission works rather than nothing.
-      return { icon: '🎯', text: t('schoolCard.admissions.kgByPoints') }
+      return usesSofiaKindergartenSystem(school)
+        ? { icon: '🎯', text: t('schoolCard.admissions.kgByPoints') }
+        : null
     }
 
     if (school.school_type === 'state' && school.education_level === 'upper_secondary') {
@@ -998,7 +1002,7 @@ const SchoolCard = memo(function SchoolCard({
           {t(`schoolTypes.${displayType}`)}
         </span>
         <span className="text-xs text-neutral-600">
-          {schoolLevelLabel(school, t)}
+          {schoolLevelLabel(school, t, countryConfig)}
         </span>
         {pricingYearLabel && (
           <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border ${pricingYearBadgeClass}`}>

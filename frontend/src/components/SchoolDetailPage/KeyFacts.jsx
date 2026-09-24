@@ -17,6 +17,7 @@ import {
   getExamTypeLabel,
 } from './helpers'
 import { getMappableLocations } from './LocationMap'
+import { usesSofiaKindergartenSystem } from '../../utils/admission'
 
 function readSavedLocation() {
   try {
@@ -149,7 +150,7 @@ function KeyFacts({ school, examAverages, nvoExamType }) {
         detail={lastAdmitted.year ? t('schoolDetail.yearValue', { year: lastAdmitted.year }) : null}
       />
     )
-  } else if (!isPrivate && isKindergarten) {
+  } else if (usesSofiaKindergartenSystem(school)) {
     // No published thresholds yet: say how admission works instead of leaving a gap.
     facts.lastAdmitted = (
       <Fact
