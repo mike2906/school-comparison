@@ -191,3 +191,30 @@ def test_resolved_address_keeps_stored_english_address():
 
 def test_tidy_bg_address_leaves_short_caps_acronyms():
     assert tidy_bg_address('ул. "Георги Георгиев - ГЕЦ" № 48') == "ул. „Георги Георгиев - ГЕЦ“ № 48"
+
+
+def test_hyphenated_ordinal_suffix_stays_lower_case():
+    assert resolve_name_i18n({"bg": '150-то ОСНОВНО УЧИЛИЩЕ  "ЦАР СИМЕОН ПЪРВИ"'}) == {
+        "bg": "150-то Основно училище „Цар Симеон Първи“",
+        "en": '150th Primary School "Tsar Simeon Parvi"',
+    }
+    assert resolve_name_i18n({"bg": '1-во СУ "Пенчо П. Славейков"'})["en"] == (
+        '1st Secondary School "Pencho P. Slaveykov"'
+    )
+
+
+def test_nested_registry_quotes_are_not_paired_inside_out():
+    assert translate_bg_school_name('"ЧАСТНО СРЕДНО УЧИЛИЩЕ "ДРУЖБА" - СОФИЯ" ЕООД') == (
+        'Private Secondary School "Druzhba" - Sofia'
+    )
+
+
+def test_short_caps_word_in_a_caps_run_is_recased_in_addresses():
+    assert resolve_address_i18n({"bg": 'ул. "ГЕО МИЛЕВ" №5'}) == {
+        "bg": "ул. „Гео Милев“ № 5",
+        "en": 'ul. "Geo Milev" No. 5',
+    }
+
+
+def test_city_prefix_needs_a_word_boundary():
+    assert tidy_bg_address("Софиянска 5") == "Софиянска 5"

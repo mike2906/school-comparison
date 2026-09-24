@@ -98,9 +98,11 @@ def _normalise_quotes(text: str, *, open_q: str, close_q: str) -> str:
             text = text + "\""
         text = text.strip()
     positions = [i for i, ch in enumerate(text) if ch in _QUOTE_CHARS]
-    # A single pair wrapping the whole value adds nothing.
-    if len(positions) == 2 and positions[0] == 0 and positions[1] == len(text) - 1:
-        return _collapse(text[1:-1])
+    # A pair wrapping the whole value adds nothing. With more quotes inside, the outer
+    # pair is the registry's wrapper around a nested name ('"ЧСУ "Дружба" - София"'),
+    # so left-to-right pairing would turn it inside out.
+    if len(positions) >= 2 and positions[0] == 0 and positions[-1] == len(text) - 1:
+        return _normalise_quotes(text[1:-1].strip(), open_q=open_q, close_q=close_q)
 
     out: list[str] = []
     opening = True
@@ -186,6 +188,11 @@ def _recase(text: str, *, register_caps: bool) -> str:
         out.append(between)
         word = match.group(0)
         followed_by_dot = text[match.end():match.end() + 1] == "."
+        if re.search(r"\d-$", between) and len(word) <= 2:
+            # Ordinal suffix of a number ("150-ТО", "49-то"): lower case, not a word.
+            out.append(word.lower())
+            last = match.end()
+            continue
         if len(word) == 1:
             # Single capitals: conjunctions/prepositions go lower, initials stay.
             if register_caps and word in "ИВСК" and not followed_by_dot and not first:
@@ -234,7 +241,7 @@ def tidy_bg_name(name: str | None, *, source: str | None = None) -> str | None:
 
 # --- English --------------------------------------------------------------------
 
-_ORDINAL_PREFIX_RE = re.compile(r"^(\d+)\s*(?:\.|-(?:то|о|ро|ви|ми))?\s+(?=\S)", flags=re.IGNORECASE)
+_ORDINAL_PREFIX_RE = re.compile(r"^(\d+)\s*(?:\.|-[а-я]{1,2})?\s+(?=\S)", flags=re.IGNORECASE)
 _BG_TYPE_PHRASES: tuple[tuple[str, str], ...] = (
     # Longest phrases first; matched case-insensitively on the tidied Bulgarian name.
     ("частна детска градина", "Private Kindergarten"),
@@ -432,7 +439,7 @@ def translate_bg_school_name(name: str | None, *, source: str | None = None) -> 
 # --- Addresses ------------------------------------------------------------------
 
 _CITY_PREFIX_RE = re.compile(
-    r"^(?:гр\.\s*)?софия(?:\s+\d{4})?\s*[,;]?\s*(?=\S)", flags=re.IGNORECASE
+    r"^(?:гр\.\s*)?софия(?![а-яa-z])(?:\s+\d{4})?\s*[,;]?\s*(?=\S)", flags=re.IGNORECASE
 )
 _MUNICIPALITY_SUFFIX_RE = re.compile(
     r"(?:\s*,\s*\d{4}\s+столична|\s*-\s*СО|\s*,\s*СО)\s*$", flags=re.IGNORECASE
@@ -446,11 +453,19 @@ def tidy_bg_address(address: str | None) -> str | None:
         return None
     # Caps words are register formatting: all of them in a caps address, otherwise
     # words of 4+ letters (short caps tokens like "ВТУ" may be acronyms).
+    # A short caps word next to another caps word ("ГЕО МИЛЕВ") is part of a caps run.
     min_len = 2 if is_register_caps(text) else 4
+    caps_run_re = re.compile(r"[А-Я]{2,}(?:[\s.-]+[А-Я]{2,})+")
+    run_spans = [m.span() for m in caps_run_re.finditer(text)]
     text = re.sub(
         r"[А-Я]+",
         lambda m: m.group(0)
-        if _ROMAN_RE.fullmatch(m.group(0)) or len(m.group(0)) < min_len
+        if _ROMAN_RE.fullmatch(m.group(0))
+        or len(m.group(0)) < 2
+        or (
+            len(m.group(0)) < min_len
+            and not any(start <= m.start() < end for start, end in run_spans)
+        )
         else m.group(0).capitalize(),
         text,
     )
