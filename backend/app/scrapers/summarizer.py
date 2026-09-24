@@ -372,14 +372,22 @@ def _build_identity(
 
     primary_location = _select_primary_location(school)
     primary_address_i18n: dict[str, str] = {}
+    locality_source_i18n: dict[str, str] = {}
     district: str | None = None
     if not identity_optional_blocked and primary_location is not None:
         primary_address_i18n = resolve_address_i18n(primary_location.address_i18n)
+        # The display address drops the redundant "гр. София" prefix; the locality is
+        # read from the stored address, which still carries it.
+        locality_source_i18n = {
+            str(lang): str(value)
+            for lang, value in dict(primary_location.address_i18n or {}).items()
+            if value
+        }
         district = primary_location.district
     locality_i18n = _primary_location_locality_i18n(
         school,
         primary_location,
-        primary_address_i18n,
+        locality_source_i18n,
     )
 
     return SummaryIdentity(
