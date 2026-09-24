@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { languageKey, languageLabel } from './languages.js'
+import { canonicalLanguagePair, languageKey, languageLabel } from './languages.js'
 
 test('languageKey recognises English, Bulgarian and code spellings', () => {
   assert.equal(languageKey('English'), 'english')
@@ -17,4 +17,11 @@ test('languageLabel translates known languages and keeps unknown values', () => 
   assert.equal(languageLabel('немски', t), 'T:languages.german')
   assert.equal(languageLabel('latin', t), 'Latin')
   assert.equal(languageLabel('', t), '')
+})
+
+test('canonicalLanguagePair merges spellings and drops non-languages', () => {
+  assert.equal(canonicalLanguagePair('английски език:intensive'), 'english:intensive')
+  assert.equal(canonicalLanguagePair('English'), 'english')
+  assert.equal(canonicalLanguagePair('Information Technology:enrichment'), null)
+  assert.equal(canonicalLanguagePair(''), null)
 })

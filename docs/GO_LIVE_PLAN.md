@@ -1576,12 +1576,14 @@ the publish boundary wait for Mike.
 - [x] **UF3 "Private" includes international schools.** The API filters the exact type,
       so the Private chip hid the Anglo-American, French and German schools. School type
       is now a client-side filter where Private covers `international` too.
-- [ ] **UF4 Language-focus filter options are not canonical.** `/schools/filters` returns
+- [x] **UF4 Language-focus filter options are not canonical.** `/schools/filters` returns
       values like "Английски език", "английски", "bg", "Information Technology" beside
       "English". Needs a backend projection/normalisation fix (Mike).
-- [ ] **UF5 "Compare all grades" chart mixes exams.** It plots 4th/7th/10th-grade NVO on
+      **Done 2026-09-24:** fixed on the frontend: language-focus values map to canonical keys (`canonicalLanguagePair`, `utils/languages.js`) both per school and for `/schools/filters` options, so spellings merge into one option with a combined count and non-languages ("Information Technology") are dropped; languages with no listed school are hidden. The backend projection still returns raw values.
+- [x] **UF5 "Compare all grades" chart mixes exams.** It plots 4th/7th/10th-grade NVO on
       one axis, the same apples-to-oranges issue as the insight removed in U6. Remove it
       or restate it per exam against the national average.
+      **Done 2026-09-24:** removed; the per-exam tabs, each against its own national average, remain.
 - [ ] **UF6 Kindergarten "last admitted points" ignores the age group** (detail key facts).
       Latent until E6 imports thresholds; handle there.
 
@@ -1656,25 +1658,29 @@ the session scratchpad only.
 - [x] **UF28 Monthly tuition is yearly ÷ 12** though most schools bill over 9–10 months;
       drop it or label it.
       **Done 2026-09-24:** the ÷12 monthly figure is gone from key facts and compare.
-- [ ] **UF29 Small copy issues:** "Tuition / Admission" row shows only tuition; birth-year
+- [x] **UF29 Small copy issues:** "Tuition / Admission" row shows only tuition; birth-year
       list includes the enrolment year itself; unexplained tab percentages.
+      **Done 2026-09-24:** NVO tab percentages removed (UF10). The birth-year list including the enrolment year is correct (a baby born that year can join a nursery group). "Tuition / Admission" stays: state rows fill in once E5/E6 import thresholds.
 - [ ] **UF30 (P2) Map markers don't distinguish kindergartens from schools** in All ages.
 - [ ] **UF31 (P2) Emoji and SVG icons mixed;** flags stand in for languages.
 
 **Backend / data (wait for Mike):**
-- [ ] **UF32 Name search misses how parents write names:** "СМГ", "НПМГ", "1 АЕГ",
+- [x] **UF32 Name search misses how parents write names:** "СМГ", "НПМГ", "1 АЕГ",
       "119 СУ", "СУ 119" return nothing (only "119" or a full word works). Strip type
       words and "№", match number + rest, small curated alias table.
-- [ ] **UF33 Three locations sit on the Sofia centroid** (e.g. ДГ №31 Люлин, id 143), so
+      **Done 2026-09-24:** PR #104: query normalisation (№, ordinals, type abbreviations, Latin↔Cyrillic), verified acronym table (СМГ, НПМГ, 1/2 АЕГ, НГДЕК, …), ranking; `schoolMatchesQuery` mirrors it.
+- [x] **UF33 Three locations sit on the Sofia centroid** (e.g. ДГ №31 Люлин, id 143), so
       they show as ~0.2 km from the centre. Re-geocode them and treat centroid hits as
       "no coordinates" (no distance) in a guard.
+      **Done 2026-09-24:** PR #103: area-level Nominatim results and city-only GeoJSON streets are rejected in the pipeline; the three centroid locations (ids 149, 708, 1173) corrected with evidence and a pg_dump backup.
 - [ ] **UF34 English names are transliterations** ("Amerikanski Kolezh V Sofia",
       "Chastna Ezikova Gimnaziya…") next to translated ones; "American" does not find the
       American College. Curated EN names for well-known schools + type-word translation.
 - [ ] **UF35 Only 54 state kindergartens listed** with no coverage statement; check
       against kg.sofia.bg and state coverage on /about and in counts.
-- [ ] **UF36 `/schools` is 2.1 MB uncompressed** (~200 KB gzipped); add `GZipMiddleware`
+- [x] **UF36 `/schools` is 2.1 MB uncompressed** (~200 KB gzipped); add `GZipMiddleware`
       or proxy compression, later a slimmer list schema.
+      **Done 2026-09-24:** PR #102: `GZipMiddleware` (≥1 KB); the all-ages list goes from 2.1 MB to ~190 KB.
 - [ ] **UF37 Raw register formatting:** ALL-CAPS names, "ЕООД" suffixes, stray quotes,
       machine-transliterated addresses in the EN UI. A display-name / address cleanup.
 

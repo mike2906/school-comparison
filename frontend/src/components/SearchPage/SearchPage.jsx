@@ -24,7 +24,11 @@ import { AGE_GROUP_KEYS } from '../../utils/education'
 import { getLanguageFocusPairs } from '../../utils/schoolAttributes'
 import { matchesAdvancedFilters, matchesSchoolType } from '../../utils/advancedFilters'
 import { getNvoDetail } from '../../utils/nvo'
-import { languageLabel } from '../../utils/languages'
+import { canonicalLanguagePair, languageKey, languageLabel } from '../../utils/languages'
+
+const uniqueCanonical = (values, canonical) => (
+  [...new Set((values || []).map(canonical).filter(Boolean))]
+)
 import { monthlyEquivalent, toEur } from '../../utils/pricing'
 import {
   readViewParams,
@@ -165,7 +169,8 @@ function SearchPage() {
       schoolType: type === 'international' ? 'private' : type,
       educationLevel: params.get('education_level'),
       includeCrossover: params.get('include_crossover') === 'true',
-      languageFocus: getParamList('language_focus'),
+      // Canonical, so links saved with older spellings ('English:intensive') still match.
+      languageFocus: uniqueCanonical(getParamList('language_focus'), canonicalLanguagePair),
       specialPrograms: getParamList('special_programs'),
       facilities: getParamList('facilities'),
       teachingApproach: getParamList('teaching_approach'),
@@ -230,8 +235,9 @@ function SearchPage() {
       .then((data) => {
         if (!isMounted) return
         setAvailableFilters({
-          language_focus_pairs: data.language_focus_pairs || [],
-          language_focus_languages: data.language_focus_languages || [],
+          // Canonical keys, so "English" / "английски" / "Английски език" are one option.
+          language_focus_pairs: uniqueCanonical(data.language_focus_pairs, canonicalLanguagePair),
+          language_focus_languages: uniqueCanonical(data.language_focus_languages, languageKey),
           language_focus_levels: data.language_focus_levels || [],
           special_programs: data.special_programs || [],
           facilities: data.facilities || [],
@@ -1335,6 +1341,8 @@ function SearchPage() {
               const languageCount = allLevelKeys.reduce((sum, key) => {
                 return sum + (advancedCounts.language_focus_pairs?.[key] ?? 0)
               }, 0)
+              // Languages no listed school offers are noise; keep one if it is selected.
+              if (languageCount === 0 && selectedForLanguage.length === 0) return null
 
               return (
                 <details key={language} className="rounded-md border border-neutral-200 bg-neutral-50 px-3 py-2">
