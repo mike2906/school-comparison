@@ -128,35 +128,42 @@ function SearchPage() {
   const latestMapBoundsRef = useRef(null)
   const scrollOnSelectRef = useRef(false)
 
-  // Read filters from URL
-  const ageGroup = searchParams.get('age_group')
-  const rawSchoolType = searchParams.get('school_type')
-  const schoolType = rawSchoolType === 'international' ? 'private' : rawSchoolType
-  const educationLevel = searchParams.get('education_level')
-  const includeCrossover = searchParams.get('include_crossover') === 'true'
-  const targetYearParam = searchParams.get('target_year')
   // One-shot "focus this school" entry param; consumed once the list has loaded and
   // dropped from the URL by the view-state sync below.
   const entrySchoolIdRef = useRef(searchParams.get('selected_school_id'))
-  const getParamList = (key) => {
-    const values = searchParams.getAll(key)
-    if (values.length > 0) return values
-    const csv = searchParams.get(key)
-    return csv ? csv.split(',').map(value => value.trim()).filter(Boolean) : []
+  const rawSchoolType = searchParams.get('school_type')
+
+  // Filters are read from the URL, and re-read whenever it changes: the page has its own
+  // history entries (the detail panel), so Back can bring back an older filter set.
+  const readFiltersFromUrl = (params) => {
+    const getParamList = (key) => {
+      const values = params.getAll(key)
+      if (values.length > 0) return values
+      const csv = params.get(key)
+      return csv ? csv.split(',').map(value => value.trim()).filter(Boolean) : []
+    }
+    const type = params.get('school_type')
+    const targetYearParam = params.get('target_year')
+    return {
+      ageGroup: params.get('age_group'),
+      targetYear: targetYearParam ? parseInt(targetYearParam) : new Date().getFullYear() + 1,
+      birthYear: Number.parseInt(params.get('birth_year') || '', 10) || null,
+      schoolType: type === 'international' ? 'private' : type,
+      educationLevel: params.get('education_level'),
+      includeCrossover: params.get('include_crossover') === 'true',
+      languageFocus: getParamList('language_focus'),
+      specialPrograms: getParamList('special_programs'),
+      facilities: getParamList('facilities'),
+      teachingApproach: getParamList('teaching_approach'),
+    }
   }
 
-  const [filters, setFilters] = useState({
-    ageGroup: ageGroup,
-    targetYear: targetYearParam ? parseInt(targetYearParam) : new Date().getFullYear() + 1,
-    birthYear: Number.parseInt(searchParams.get('birth_year') || '', 10) || null,
-    schoolType: schoolType,
-    educationLevel: educationLevel,
-    includeCrossover: includeCrossover,
-    languageFocus: getParamList('language_focus'),
-    specialPrograms: getParamList('special_programs'),
-    facilities: getParamList('facilities'),
-    teachingApproach: getParamList('teaching_approach'),
-  })
+  const [filters, setFilters] = useState(() => readFiltersFromUrl(searchParams))
+
+  useEffect(() => {
+    const fromUrl = readFiltersFromUrl(new URLSearchParams(location.search))
+    setFilters(prev => (JSON.stringify(prev) === JSON.stringify(fromUrl) ? prev : fromUrl))
+  }, [location.search])
 
 
 

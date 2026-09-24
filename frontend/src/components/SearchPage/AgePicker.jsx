@@ -63,7 +63,10 @@ function AgePicker({
       if (containerRef.current && !containerRef.current.contains(event.target)) onOpenChange(false)
     }
     const handleKey = (event) => {
-      if (event.key === 'Escape') onOpenChange(false)
+      if (event.key !== 'Escape') return
+      // Handled here: the detail panel underneath must not also close.
+      event.preventDefault()
+      onOpenChange(false)
     }
     document.addEventListener('mousedown', handlePointer)
     document.addEventListener('keydown', handleKey)

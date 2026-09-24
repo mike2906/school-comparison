@@ -57,6 +57,7 @@ function SchoolNameSearch({ value, onChange, onOpenSchool, className = '' }) {
 
   const handleKeyDown = (event) => {
     if (event.key === 'Escape') {
+      if (showDropdown || value) event.preventDefault()
       if (showDropdown) setOpen(false)
       else if (value) onChange('')
       return
