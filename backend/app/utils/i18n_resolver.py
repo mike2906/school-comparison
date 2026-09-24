@@ -3,24 +3,9 @@ from __future__ import annotations
 import re
 from typing import Any, Mapping
 
-from app.utils.transliteration import transliterate_address, transliterate_bulgarian
+from app.utils.display_names import english_address, tidy_bg_address, tidy_bg_name, translate_bg_school_name
 
 
-_NAME_EN_REPLACEMENTS = (
-    (re.compile(r"\bD-r\b", flags=re.IGNORECASE), "Dr."),
-    (re.compile(r"\bSv\.(?=\s|$)", flags=re.IGNORECASE), "St."),
-)
-_INSTITUTION_EN_REPLACEMENTS = (
-    (re.compile(r"\bChastna Detska Gradina\b", flags=re.IGNORECASE), "Private Kindergarten"),
-    (re.compile(r"\bDetska Gradina\b", flags=re.IGNORECASE), "Kindergarten"),
-    (re.compile(r"\bChastno Nachalno Uchilishte\b", flags=re.IGNORECASE), "Private Primary School"),
-    (re.compile(r"\bNachalno Uchilishte\b", flags=re.IGNORECASE), "Primary School"),
-    (re.compile(r"\bChastno Osnovno Uchilishte\b", flags=re.IGNORECASE), "Private Primary School"),
-    (re.compile(r"\bOsnovno Uchilishte\b", flags=re.IGNORECASE), "Primary School"),
-    (re.compile(r"\bObedineno Uchilishte\b", flags=re.IGNORECASE), "Unified School"),
-    (re.compile(r"\bChastno Sredno Uchilishte\b", flags=re.IGNORECASE), "Private Secondary School"),
-    (re.compile(r"\bSredno Uchilishte\b", flags=re.IGNORECASE), "Secondary School"),
-)
 _SCHOOL_ABBREVIATION_PREFIX = re.compile(r"^(?:ЧОУ|ЧДГ|ЧСУ|ЦДГ|ДГ|НУ|ОУ|СУ|ПГ)\s+", flags=re.IGNORECASE)
 _GENERIC_BG_NAME_MARKERS = {
     "частно",
@@ -37,7 +22,9 @@ _GENERIC_BG_NAME_MARKERS = {
     "оод",
 }
 _GENERIC_BG_PREFIX_RE = re.compile(
-    r"^(?:частн(?:а|о)?|основно|начално|средно|езиково|профилирано|училище|детска|градина|учебен|комплекс)\b",
+    # A leading preposition ("по икономика …", "с изучаване на …") is a type phrase
+    # left over from prefix stripping, not a school's own name.
+    r"^(?:по\s|с\s|със\s|за\s|частн(?:а|о)?|основно|начално|средно|езиково|профилирано|училище|детска|градина|учебен|комплекс)\b",
     flags=re.IGNORECASE,
 )
 _GENERIC_BG_NAME_STRIP_PREFIX = re.compile(
@@ -54,7 +41,7 @@ _GENERIC_BG_NAME_STRIP_PREFIX = re.compile(
     flags=re.IGNORECASE | re.VERBOSE,
 )
 _LEGAL_ENTITY_SUFFIX_RE = re.compile(
-    r"""[\s,"'„“”-]*(?:
+    r"""(?:^|[\s,"'„“”-]+)(?:
         еоод|оод|ад|ет|еад|кд|сд|сдружение|
         eood|ood|ad|ead|ltd|llc|inc|association
     )\.?$""",
@@ -86,27 +73,14 @@ _GENERIC_NUMBERED_EN_DISPLAY_RE = re.compile(
 )
 
 
-def derive_english_name(bg_name: str | None) -> str | None:
-    """Derive an English display fallback from Bulgarian without persisting it."""
-    if not bg_name:
-        return None
+def derive_english_name(bg_name: str | None, *, source: str | None = None) -> str | None:
+    """Derive an English display fallback from Bulgarian without persisting it.
 
-    resolved = transliterate_bulgarian(bg_name).strip()
-    if not resolved:
-        return None
-    preserve_uppercase_acronym = bool(
-        re.fullmatch(r"[А-Я]{3,6}", re.sub(r"\s+", "", bg_name or ""))
-    )
-    if not preserve_uppercase_acronym and resolved.isupper() and any(char.isalpha() for char in resolved):
-        resolved = resolved.title()
-
-    for pattern, replacement in _NAME_EN_REPLACEMENTS:
-        resolved = pattern.sub(replacement, resolved)
-    for pattern, replacement in _INSTITUTION_EN_REPLACEMENTS:
-        resolved = pattern.sub(replacement, resolved)
-
-    resolved = re.sub(r"\s+", " ", resolved).strip()
-    return resolved or None
+    School-type words are translated and the proper-name part transliterated
+    (UF34); ``source`` is the full stored name, used to tell register ALL-CAPS from a
+    deliberate caps brand (UF37).
+    """
+    return translate_bg_school_name(bg_name, source=source)
 
 
 def _contains_cyrillic(text: str | None) -> bool:
@@ -330,7 +304,9 @@ def resolve_name_i18n(
 
     bg_name = display.get("bg") or display.get("en") or cleaned_raw_fallback or raw_primary_name
     if bg_name:
-        resolved["bg"] = bg_name
+        # Display-only cleanup of register formatting (UF37); stored names are untouched.
+        caps_source = raw_primary_name if bg_name != display.get("bg") else None
+        resolved["bg"] = tidy_bg_name(bg_name, source=caps_source) or bg_name
 
     en_name = _prefer_display_english(display)
     if not en_name and not display:
@@ -359,7 +335,10 @@ def resolve_name_i18n(
             )
         elif cleaned_raw_fallback:
             derived_source = cleaned_raw_fallback
-        en_name = derive_english_name(derived_source)
+        en_name = derive_english_name(
+            derived_source,
+            source=None if display.get("bg") else raw_primary_name,
+        )
     if en_name:
         resolved["en"] = en_name
 
@@ -373,13 +352,15 @@ def resolve_address_i18n(address_i18n: Mapping[str, Any] | None) -> dict[str, st
         return {}
 
     resolved: dict[str, str] = {}
-    bg_address = raw_address.get("bg") or raw_address.get("en")
+    raw_bg = raw_address.get("bg")
+    bg_address = raw_bg or raw_address.get("en")
     if bg_address:
-        resolved["bg"] = bg_address
+        # Display-only cleanup (UF37): caps, quote spacing, "гр. София"/municipality noise.
+        resolved["bg"] = (tidy_bg_address(raw_bg) if raw_bg else None) or bg_address
 
     en_address = raw_address.get("en")
-    if not en_address and raw_address.get("bg"):
-        en_address = transliterate_address(raw_address["bg"]).strip() or None
+    if not en_address and raw_bg:
+        en_address = english_address(raw_bg)
     if en_address:
         resolved["en"] = en_address
 

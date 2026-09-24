@@ -30,13 +30,18 @@ def test_derive_english_name_normalizes_common_honorifics():
     assert derive_english_name("Св. Климент Охридски") == "St. Kliment Ohridski"
 
 
-def test_derive_english_name_preserves_short_uppercase_acronyms():
-    assert derive_english_name("ЕСПА") == "ESPA"
+def test_derive_english_name_keeps_caps_brand_only_in_mixed_case_source():
+    # A lone caps token in a mixed-case registry name is a deliberate brand ...
+    assert derive_english_name(
+        "ЕСПА", source='"Частно средно училище с ранно чуждоезиково обучение ЕСПА" ЕООД'
+    ) == "ESPA"
+    # ... but in an all-caps registry name it is register formatting.
+    assert derive_english_name("ЛИДИ", source='"ЧАСТНА ДЕТСКА ГРАДИНА ЛИДИ" ООД') == "Lidi"
 
 
 def test_derive_english_name_translates_common_institution_types():
-    assert derive_english_name('21 СРЕДНО УЧИЛИЩЕ "ХРИСТО БОТЕВ"') == '21 Secondary School "Hristo Botev"'
-    assert derive_english_name('145 Основно училище "Симеон Радев"') == '145 Primary School "Simeon Radev"'
+    assert derive_english_name('21 СРЕДНО УЧИЛИЩЕ "ХРИСТО БОТЕВ"') == '21st Secondary School "Hristo Botev"'
+    assert derive_english_name('145 Основно училище "Симеон Радев"') == '145th Primary School "Simeon Radev"'
     assert derive_english_name('Детска градина "Звездичка"') == 'Kindergarten "Zvezdichka"'
 
 
@@ -50,7 +55,7 @@ def test_resolve_name_i18n_keeps_bg_display_name_but_derives_english_from_legal_
     )
 
     assert resolved == {
-        "bg": "ЧОУ ПЕТЪР БЕРОН",
+        "bg": "ЧОУ Петър Берон",
         "en": "Dr. Petar Beron",
     }
 
@@ -65,7 +70,7 @@ def test_resolve_name_i18n_handles_malformed_nested_quotes_in_legal_name():
     )
 
     assert resolved == {
-        "bg": "ЧОУ ПЕТЪР БЕРОН",
+        "bg": "ЧОУ Петър Берон",
         "en": "Dr. Petar Beron",
     }
 
@@ -77,7 +82,7 @@ def test_resolve_name_i18n_prefers_non_generic_bg_display_name_for_english_fallb
     )
 
     assert resolved == {
-        "bg": "НИКАТОР",
+        "bg": "Никатор",
         "en": "Nikator",
     }
 
@@ -101,8 +106,8 @@ def test_resolve_name_i18n_prefers_clean_display_brand_for_english_alignment():
     )
 
     assert resolved == {
-        "bg": "СофтУни БУДИТЕЛ",
-        "en": "SoftUni BUDITEL",
+        "bg": "СофтУни Будител",
+        "en": "SoftUni Buditel",
     }
 
 
@@ -113,7 +118,7 @@ def test_resolve_name_i18n_strips_generic_german_school_prefix_for_english():
     )
 
     assert resolved == {
-        "bg": "немска гимназия Ерих Кестнер",
+        "bg": "Немска гимназия Ерих Кестнер",
         "en": "Erih Kestner",
     }
 
@@ -135,8 +140,8 @@ def test_resolve_name_i18n_strips_association_suffix_when_no_display_name_exists
     )
 
     assert resolved == {
-        "bg": "МИЛЕА",
-        "en": "MILEA",
+        "bg": "Милеа",
+        "en": "Milea",
     }
 
 
@@ -158,8 +163,8 @@ def test_resolve_name_i18n_ignores_generic_numbered_school_display_label():
     )
 
     assert resolved == {
-        "bg": '21 СРЕДНО УЧИЛИЩЕ "ХРИСТО БОТЕВ"',
-        "en": '21 Secondary School "Hristo Botev"',
+        "bg": "21 Средно училище „Христо Ботев“",
+        "en": '21st Secondary School "Hristo Botev"',
     }
 
 
@@ -170,8 +175,8 @@ def test_resolve_name_i18n_ignores_uncorroborated_display_name():
     )
 
     assert resolved == {
-        "bg": '21 СРЕДНО УЧИЛИЩЕ "ХРИСТО БОТЕВ"',
-        "en": '21 Secondary School "Hristo Botev"',
+        "bg": "21 Средно училище „Христо Ботев“",
+        "en": '21st Secondary School "Hristo Botev"',
     }
 
 
@@ -221,6 +226,6 @@ def test_resolve_address_i18n_derives_english_without_persisting_it():
     )
 
     assert resolved == {
-        "bg": 'бул. "Джеймс Баучер" № 116, ет. 1, ап. 4',
-        "en": 'bul. "Dzheyms Baucher" № 116, et. 1, ap. 4',
+        "bg": "бул. „Джеймс Баучер“ № 116, ет. 1, ап. 4",
+        "en": 'bul. "Dzheyms Baucher" No. 116, et. 1, ap. 4',
     }

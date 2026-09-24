@@ -160,7 +160,7 @@ async def test_prepare_summary_candidate_ignores_low_quality_display_name(db_ses
 
     assert prepared.summary_input is not None
     assert prepared.summary_input.identity.display_name_i18n == {}
-    assert prepared.summary_input.identity.name_i18n["bg"] == '145 Основно училище "Симеон Радев"'
+    assert prepared.summary_input.identity.name_i18n["bg"] == "145 Основно училище „Симеон Радев“"
 
 
 @pytest.mark.asyncio
@@ -194,7 +194,7 @@ async def test_prepare_summary_candidate_only_exposes_corroborated_display_name(
 
     assert prepared.summary_input is not None
     assert prepared.summary_input.identity.display_name_i18n == {}
-    assert prepared.summary_input.identity.name_i18n["bg"] == 'Частно училище "Истинско име"'
+    assert prepared.summary_input.identity.name_i18n["bg"] == "Частно училище „Истинско име“"
 
 
 @pytest.mark.asyncio
@@ -271,8 +271,8 @@ async def test_prepare_summary_candidate_ignores_generic_numbered_display_name(d
     assert prepared.summary_input is not None
     assert prepared.summary_input.identity.display_name_i18n == {}
     assert prepared.summary_input.identity.name_i18n == {
-        "bg": '21 СРЕДНО УЧИЛИЩЕ "ХРИСТО БОТЕВ"',
-        "en": '21 Secondary School "Hristo Botev"',
+        "bg": "21 Средно училище „Христо Ботев“",
+        "en": '21st Secondary School "Hristo Botev"',
     }
 
 

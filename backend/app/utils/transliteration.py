@@ -51,6 +51,8 @@ def transliterate_bulgarian(text: str) -> str:
     if not text:
         return text
 
+    # Streamlined System: "ьо" is "yo" (Пастьор → Pastyor, дьо → dyo), not cyrtranslit's "jo".
+    text = text.replace("ьо", "йо").replace("ЬО", "ЙО").replace("Ьо", "Йо")
     result = cyrtranslit.to_latin(text, "bg")
     # Project convention: ASCII-only Latin output for EN fallback fields.
     result = result.replace("Ă", "A").replace("ă", "a")
