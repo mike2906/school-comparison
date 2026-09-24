@@ -1558,6 +1558,33 @@ self-review, with at most one Codex review on the larger ones.
       is ~1,900 lines (from 2,024) with the panel, picker, name search and location
       control extracted; the rest of P4.1 stays open.
 
+### Phase UX follow-ups (2026-09-24)
+
+Found while landing U1–U8 and from Mike's testing. Open items that touch the backend or
+the publish boundary wait for Mike.
+
+- [x] **UF1 Preschool "where" defaults to both.** Birth-year selection used to scope the
+      preschool year to kindergartens only (149 of 218), hiding the 69 schools until a
+      checkbox was ticked. The picker now shows a "Where? Both / At a school / At a
+      kindergarten" choice, defaulting to both; picking preschool from the School tab
+      starts on "At a school". Same URL params as before.
+- [x] **UF2 Changing filters no longer blanks the map.** "Show all ages" blurred the map
+      behind a "Loading" overlay for ~4 s. Later loads keep the old markers and list
+      (dimmed) with an "Updating…" pill; the list renders 30 cards at a time as it
+      scrolls (was all ~440, ~0.6 s per render in dev); `SchoolMap` is memoised; the
+      name collator is cached.
+- [x] **UF3 "Private" includes international schools.** The API filters the exact type,
+      so the Private chip hid the Anglo-American, French and German schools. School type
+      is now a client-side filter where Private covers `international` too.
+- [ ] **UF4 Language-focus filter options are not canonical.** `/schools/filters` returns
+      values like "Английски език", "английски", "bg", "Information Technology" beside
+      "English". Needs a backend projection/normalisation fix (Mike).
+- [ ] **UF5 "Compare all grades" chart mixes exams.** It plots 4th/7th/10th-grade NVO on
+      one axis, the same apples-to-oranges issue as the insight removed in U6. Remove it
+      or restate it per exam against the national average.
+- [ ] **UF6 Kindergarten "last admitted points" ignores the age group** (detail key facts).
+      Latent until E6 imports thresholds; handle there.
+
 ## Phase 3 — Go live
 
 - [x] **P3.1 Prod config hardening.** Flip `debug` default to `False` in

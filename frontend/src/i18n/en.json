@@ -10,7 +10,8 @@
     "goBack": "Go Back",
     "active": "Active",
     "yes": "Yes",
-    "no": "No"
+    "no": "No",
+    "updating": "Updating…"
   },
   "nav": {
     "title": "Sofia Schools",
@@ -23,9 +24,7 @@
   "landing": {
     "categoryKindergarten": "Kindergarten",
     "categorySchool": "School",
-    "searchPlaceholder": "Search for a specific school...",
-    "crossoverCheckboxKindergarten": "Also show pre-school programs at primary schools",
-    "crossoverCheckboxSchool": "Also show kindergarten pre-school programs"
+    "searchPlaceholder": "Search for a specific school..."
   },
   "search": {
     "back": "Back",
@@ -576,7 +575,18 @@
     "noGroup": "No kindergarten or school group for that year yet.",
     "orPickGroup": "or pick a group",
     "showAll": "Show all ages",
-    "done": "Done"
+    "done": "Done",
+    "preschoolWhere": "Where?",
+    "preschoolWhereHint": "Kindergartens and schools both offer the preschool year; at a school, children can often continue into 1st grade there.",
+    "where": {
+      "both": "Both",
+      "school": "At a school",
+      "kindergarten": "At a kindergarten"
+    },
+    "whereShort": {
+      "school": "schools",
+      "kindergarten": "kindergartens"
+    }
   },
   "welcome": {
     "title": "Find a kindergarten or school in Sofia",

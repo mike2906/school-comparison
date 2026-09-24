@@ -81,12 +81,18 @@ export function schoolNameSortKey(name) {
   return String(name || '').replace(LEADING_NOISE_RE, '')
 }
 
+// localeCompare with options builds a collator per call; sorting ~440 names did ~4,000.
+const collators = new Map()
+function nameCollator(language) {
+  if (!collators.has(language)) {
+    collators.set(language, new Intl.Collator(language, { sensitivity: 'base', numeric: true }))
+  }
+  return collators.get(language)
+}
+
 /** Compare two display names so numbered schools sort 1, 2, 10, 101 rather than 1, 10, 101, 2. */
 export function compareSchoolNames(nameA, nameB, language) {
-  return schoolNameSortKey(nameA).localeCompare(schoolNameSortKey(nameB), language, {
-    sensitivity: 'base',
-    numeric: true,
-  })
+  return nameCollator(language).compare(schoolNameSortKey(nameA), schoolNameSortKey(nameB))
 }
 
 function normalizeForSearch(text) {

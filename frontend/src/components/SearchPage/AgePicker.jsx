@@ -10,6 +10,8 @@ import {
   birthYearsFor,
   categoryForGroup,
   enrolmentYears,
+  preschoolWhere,
+  PRESCHOOL_WHERE,
   toSearchSelection,
 } from '../../utils/ageSelection'
 
@@ -43,9 +45,9 @@ function AgePicker({
     return groups.length > 0 ? groups : FALLBACK_SCHOOL_GROUPS
   }, [config])
 
-  const selectedCategory = ageGroup === 'preschool' && educationLevel === 'primary'
-    ? 'school'
-    : categoryForGroup(ageGroup, kindergartenGroups)
+  const where = ageGroup === 'preschool' ? preschoolWhere({ educationLevel, includeCrossover }) : null
+  // Preschool at schools opens on the School tab; everything else follows its group.
+  const selectedCategory = where === 'school' ? 'school' : categoryForGroup(ageGroup, kindergartenGroups)
   const [category, setCategory] = useState(selectedCategory || 'kindergarten')
 
   useEffect(() => {
@@ -81,11 +83,7 @@ function AgePicker({
   const effectiveTarget = targetYear || years[1]
 
   const apply = (next) => {
-    const selection = toSearchSelection({
-      ageGroup: next.ageGroup,
-      category: next.category,
-      includeCrossover: next.includeCrossover,
-    })
+    const selection = toSearchSelection({ ageGroup: next.ageGroup, where: next.where })
     onChange({
       ...selection,
       targetYear: next.targetYear ?? effectiveTarget,
@@ -100,29 +98,38 @@ function AgePicker({
       return
     }
     const group = calculateAgeGroup(effectiveTarget, year, config)
-    apply({ ageGroup: group, category: categoryForGroup(group, kindergartenGroups), targetYear: effectiveTarget, birthYear: year })
+    // From a birth year, preschool shows kindergartens and schools alike.
+    apply({ ageGroup: group, where: 'both', targetYear: effectiveTarget, birthYear: year })
   }
 
   const handleTargetYear = (value) => {
     const year = Number.parseInt(value, 10)
     if (birthYear) {
       const group = calculateAgeGroup(year, birthYear, config)
-      apply({ ageGroup: group, category: categoryForGroup(group, kindergartenGroups), targetYear: year, birthYear })
+      apply({ ageGroup: group, where: where || 'both', targetYear: year, birthYear })
     } else {
-      apply({ ageGroup, category: selectedCategory, includeCrossover, targetYear: year })
+      apply({ ageGroup, where: where || 'both', targetYear: year })
     }
   }
 
+  // Preschool is in both tabs: picked from a tab, it starts scoped to that tab.
+  const isGroupActive = (group) => (
+    ageGroup === group && (group !== 'preschool' || where === 'both' || where === category)
+  )
+
   const handleGroup = (group) => {
-    const next = ageGroup === group && selectedCategory === category ? null : group
-    apply({ ageGroup: next, category, targetYear: effectiveTarget })
+    const next = isGroupActive(group) ? null : group
+    apply({ ageGroup: next, where: category, targetYear: effectiveTarget })
   }
 
   // Narrow screens show just the group; the birth year is visible when the picker opens.
+  const scopedGroupLabel = (group) => (
+    where && where !== 'both' ? `${groupLabel(group)} · ${t(`agePicker.whereShort.${where}`)}` : groupLabel(group)
+  )
   const buttonLabel = ageGroup
     ? (birthYear && !compact
-      ? t('agePicker.bornSummary', { year: birthYear, group: groupLabel(ageGroup) })
-      : groupLabel(ageGroup))
+      ? t('agePicker.bornSummary', { year: birthYear, group: scopedGroupLabel(ageGroup) })
+      : scopedGroupLabel(ageGroup))
     : t('agePicker.allAges')
 
   const groups = category === 'kindergarten' ? kindergartenGroups : schoolGroups
@@ -231,7 +238,7 @@ function AgePicker({
 
             <div className="grid grid-cols-2 gap-2">
               {groups.map(group => {
-                const isActive = ageGroup === group && selectedCategory === category
+                const isActive = isGroupActive(group)
                 return (
                   <button
                     key={group}
@@ -254,22 +261,31 @@ function AgePicker({
             </div>
 
             {ageGroup === 'preschool' && (
-              <label className="mt-3 flex items-start gap-3 rounded-lg bg-neutral-50 p-3 text-sm text-neutral-700">
-                <input
-                  type="checkbox"
-                  checked={includeCrossover}
-                  onChange={() => apply({
-                    ageGroup,
-                    category: selectedCategory,
-                    includeCrossover: !includeCrossover,
-                    birthYear,
-                  })}
-                  className="mt-0.5 h-4 w-4 rounded border-neutral-300 text-primary-600"
-                />
-                {selectedCategory === 'school'
-                  ? t('landing.crossoverCheckboxSchool')
-                  : t('landing.crossoverCheckboxKindergarten')}
-              </label>
+              <div className="mt-4 rounded-lg bg-neutral-50 p-3">
+                <p id="preschool-where-label" className="text-sm font-medium text-neutral-800">
+                  {t('agePicker.preschoolWhere')}
+                </p>
+                <p className="mt-0.5 text-xs text-neutral-500">{t('agePicker.preschoolWhereHint')}</p>
+                <div className="mt-2 grid grid-cols-3 gap-1 rounded-lg bg-neutral-200/70 p-0.5" role="radiogroup" aria-labelledby="preschool-where-label">
+                  {PRESCHOOL_WHERE.map(option => (
+                    <button
+                      key={option}
+                      type="button"
+                      role="radio"
+                      aria-checked={where === option}
+                      onClick={() => {
+                        if (option !== 'both') setCategory(option)
+                        apply({ ageGroup, where: option, targetYear: effectiveTarget, birthYear })
+                      }}
+                      className={`min-h-[40px] rounded-md px-2 text-sm font-medium ${
+                        where === option ? 'bg-white text-neutral-900 shadow-sm' : 'text-neutral-600'
+                      }`}
+                    >
+                      {t(`agePicker.where.${option}`)}
+                    </button>
+                  ))}
+                </div>
+              </div>
             )}
 
             <div className="mt-4 flex items-center justify-between gap-3 border-t border-neutral-100 pt-4">
