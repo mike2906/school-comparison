@@ -17,7 +17,8 @@
     "subtitle": "Find the perfect school for your child",
     "home": "Home",
     "compare": "Compare",
-    "about": "About"
+    "about": "About",
+    "language": "Language"
   },
   "landing": {
     "title": "Find the perfect school for your child",
@@ -270,7 +271,7 @@
     "academicYear": "Academic year",
     "plan": "Plan",
     "priceOnRequest": "Price on request",
-    "currency": "BGN",
+    "currency": "EUR",
     "yearNotStated": "Academic year not stated by the school",
     "notCurrentYear": "not for the current academic year",
     "periodNotStated": "Period not stated by school"
@@ -506,7 +507,7 @@
       "avg": "5-yr avg NVO ({{grade}}): Math {{math}}%, Bulgarian {{bulgarian}}%",
       "grade4": "4th grade",
       "grade7": "7th grade",
-      "grade12": "12th grade",
+      "grade10": "10th grade",
       "avgShort": "5-yr avg: Math {{math}}%, Bulgarian {{bulgarian}}%",
       "fiveYearTitle": "5-Year Average NVO ({{grade}})",
       "basedOnYears": "Based on {{start}}-{{end}} results",

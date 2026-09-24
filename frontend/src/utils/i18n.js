@@ -72,3 +72,19 @@ export function getSummary(school, language, variant = 'long') {
   const preferred = localized?.[variant] || localized?.long || localized?.short
   return typeof preferred === 'string' ? preferred : ''
 }
+
+// Leading quotes and punctuation are data noise ("''Yagodina") and must not decide order.
+const LEADING_NOISE_RE = /^[\s"'“”„«»‘’`.,-]+/
+
+/** Sort key for a school name: leading noise removed so "''Yagodina" sorts under Y. */
+export function schoolNameSortKey(name) {
+  return String(name || '').replace(LEADING_NOISE_RE, '')
+}
+
+/** Compare two display names so numbered schools sort 1, 2, 10, 101 rather than 1, 10, 101, 2. */
+export function compareSchoolNames(nameA, nameB, language) {
+  return schoolNameSortKey(nameA).localeCompare(schoolNameSortKey(nameB), language, {
+    sensitivity: 'base',
+    numeric: true,
+  })
+}

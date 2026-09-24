@@ -1,7 +1,7 @@
 const EXAM_TYPE_CONFIG = {
   primary: { examType: 'nvo_4', gradeKey: 'schoolCard.nvo.grade4' },
   lower_secondary: { examType: 'nvo_7', gradeKey: 'schoolCard.nvo.grade7' },
-  upper_secondary: { examType: 'nvo_10', gradeKey: 'schoolCard.nvo.grade12' },
+  upper_secondary: { examType: 'nvo_10', gradeKey: 'schoolCard.nvo.grade10' },
 }
 
 const GRADE_ORDER = { nvo_4: 1, nvo_7: 2, nvo_10: 3 }
