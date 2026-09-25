@@ -147,8 +147,8 @@ export function getTrendInfo(latest, average) {
 /**
  * Get detailed NVO data for a school
  */
-export function getNvoDetail(school, t) {
-  return getSharedNvoDetail(school, t)
+export function getNvoDetail(school, t, ageGroup = null) {
+  return getSharedNvoDetail(school, t, { ageGroup })
 }
 
 /**

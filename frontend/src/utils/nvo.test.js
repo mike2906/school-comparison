@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { getBenchmarkComparison, getNvoDetail, prepareNvoTimelineData } from './nvo.js'
+import { examTypeForAgeGroup, getBenchmarkComparison, getNvoDetail, prepareNvoTimelineData } from './nvo.js'
 
 test('getNvoDetail only exposes school averages when both subjects have enough history', () => {
   const school = {
@@ -130,4 +130,37 @@ test('getNvoDetail combines subjects from the same year only', () => {
   assert.equal(detail.latestCombined, 65)
   assert.equal(detail.latestCombinedYear, 2024)
   assert.equal(detail.latestMath, 80)
+})
+
+test('getNvoDetail shows the exam for the searched age group when the school has it', () => {
+  const school = {
+    education_level: 'upper_secondary',
+    exam_results: [
+      { exam_type: 'nvo_7', subject: 'math', metric: 'average_score', year: 2025, value: 60 },
+      { exam_type: 'nvo_7', subject: 'bulgarian', metric: 'average_score', year: 2025, value: 70 },
+      { exam_type: 'nvo_10', subject: 'math', metric: 'average_score', year: 2025, value: 40 },
+      { exam_type: 'nvo_10', subject: 'bulgarian', metric: 'average_score', year: 2025, value: 50 },
+    ],
+  }
+  assert.equal(getNvoDetail(school, null).examType, 'nvo_10')
+  assert.equal(getNvoDetail(school, null, { ageGroup: 'grade_5_7' }).examType, 'nvo_7')
+  assert.equal(getNvoDetail(school, null, { ageGroup: 'grade_8_12' }).examType, 'nvo_10')
+  // Nothing for 4th grade: fall back to the school's own stage.
+  assert.equal(getNvoDetail(school, null, { ageGroup: 'grade_1_4' }).examType, 'nvo_10')
+  assert.equal(getNvoDetail(school, null, { ageGroup: 'first' }).examType, 'nvo_10')
+})
+
+test('getNvoDetail falls back when the searched exam lacks a subject the card needs', () => {
+  const school = {
+    education_level: 'upper_secondary',
+    exam_results: [
+      { exam_type: 'nvo_7', subject: 'math', metric: 'average_score', year: 2025, value: 60 },
+      { exam_type: 'nvo_10', subject: 'math', metric: 'average_score', year: 2025, value: 40 },
+      { exam_type: 'nvo_10', subject: 'bulgarian', metric: 'average_score', year: 2025, value: 50 },
+    ],
+  }
+  const detail = getNvoDetail(school, null, { ageGroup: 'grade_5_7', requireCompleteSubjects: true })
+  assert.equal(detail.examType, 'nvo_10')
+  assert.equal(examTypeForAgeGroup('grade_5_7'), 'nvo_7')
+  assert.equal(examTypeForAgeGroup(null), null)
 })

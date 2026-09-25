@@ -405,8 +405,8 @@ function hexToRgba(hex, alpha) {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`
 }
 
-function getNvoDetail(school, t) {
-  return getSharedNvoDetail(school, t, { requireCompleteSubjects: true })
+function getNvoDetail(school, t, ageGroup = null) {
+  return getSharedNvoDetail(school, t, { requireCompleteSubjects: true, ageGroup })
 }
 
 function getAmenityFlags(attributes, hasAfterSchool) {
@@ -814,8 +814,9 @@ const SchoolCard = memo(function SchoolCard({
   }, [school, pricing, pricingCohort, attributes, i18n.language, t, primaryLocation])
 
   const nvoDetail = useMemo(() => {
-    return getNvoDetail(school, t)
-  }, [school, t])
+    // The searched stage's exam (e.g. 7th grade for grades 5–7), else the school's own.
+    return getNvoDetail(school, t, activeAgeGroup)
+  }, [school, t, activeAgeGroup])
 
   const nvoSummary = useMemo(() => {
     if (!nvoDetail) return null
@@ -1517,7 +1518,7 @@ const SchoolCard = memo(function SchoolCard({
           )}
         </button>
         <Link
-          to={`/schools/${school.id}`}
+          to={activeAgeGroup ? `/schools/${school.id}?group=${encodeURIComponent(activeAgeGroup)}` : `/schools/${school.id}`}
           onClick={handleDetailsClick}
           className="flex-1 min-h-[44px] md:min-h-0 inline-flex items-center justify-center px-3 py-2 text-center text-sm font-medium text-white bg-primary-700 hover:bg-primary-800 rounded-lg transition-colors transition-transform hover:scale-[1.02]"
         >

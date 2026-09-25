@@ -356,8 +356,8 @@ function getTrendInfo(latest, average) {
   return { arrow: '→', className: 'text-neutral-400', diff }
 }
 
-function getNvoDetail(school, t) {
-  return getSharedNvoDetail(school, t)
+function getNvoDetail(school, t, ageGroup = null) {
+  return getSharedNvoDetail(school, t, { ageGroup })
 }
 
 function normalizeCompareValue(value) {
@@ -509,7 +509,7 @@ function ComparePage() {
         ? calculateDistance(userLocation.lat, userLocation.lng, primaryLocation.lat, primaryLocation.lng)
         : null
       const pricingRange = yearlyTuitionRangeEur(school.pricing)
-      const nvoDetail = school.school_type === 'international' ? null : getNvoDetail(school, t)
+      const nvoDetail = school.school_type === 'international' ? null : getNvoDetail(school, t, selectedAgeGroup)
       const overallLatest = nvoDetail?.latestCombined ?? null
       const overallAvg = nvoDetail?.schoolAverageCombined ?? null
 
@@ -522,7 +522,7 @@ function ComparePage() {
       })
     })
     return map
-  }, [localizedSchools, t, userLocation])
+  }, [localizedSchools, t, userLocation, selectedAgeGroup])
 
   const sortedSchools = useMemo(() => {
     const list = [...localizedSchools]
