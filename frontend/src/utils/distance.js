@@ -10,7 +10,8 @@ export function calculateDistance(lat1, lng1, lat2, lng2) {
   return from.distanceTo(to) / 1000
 }
 
-export function formatDistance(distanceKm) {
+/** "1.2km"; "~1.2km" when measured from an approximate (street-level) pin. */
+export function formatDistance(distanceKm, { approximate = false } = {}) {
   if (typeof distanceKm !== 'number') return null
-  return `${distanceKm.toFixed(1)}km`
+  return `${approximate ? '~' : ''}${distanceKm.toFixed(1)}km`
 }

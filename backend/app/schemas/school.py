@@ -227,9 +227,23 @@ class SchoolLocationBase(BaseModel):
         validation_alias="location_tags",
         exclude=True,
     )
+    # Any, not dict: a malformed JSON value must not fail the whole response.
+    raw_geocode_meta: Any = Field(
+        default=None,
+        validation_alias="geocode_meta",
+        exclude=True,
+    )
     is_primary: bool = True
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    @computed_field(return_type=bool)
+    @property
+    def coordinates_approximate(self) -> bool:
+        """The pin is street/area level, not the building (only this flag is published)."""
+        meta = self.raw_geocode_meta if isinstance(self.raw_geocode_meta, dict) else {}
+        has_pin = self.lat is not None and self.lng is not None
+        return has_pin and meta.get("precision") == "approximate"
 
     @field_validator("address_i18n", mode="before")
     @classmethod

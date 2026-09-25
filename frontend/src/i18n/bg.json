@@ -220,7 +220,8 @@
     "showingInArea": "Показване на {{shown}} от {{total}} училища в тази област",
     "locationsFor": "Локации за {{name}}",
     "legendSchool": "Училище",
-    "legendKindergarten": "Детска градина"
+    "legendKindergarten": "Детска градина",
+    "approximatePin": "Приблизително местоположение (по улица)"
   },
   "pricing": {
     "title": "Цени",
@@ -537,7 +538,8 @@
       "specialPrograms": "Специални програми"
     },
     "aria": {
-      "distance": "{{distance}} от вашето местоположение"
+      "distance": "{{distance}} от вашето местоположение",
+      "distanceApprox": "Около {{distance}} от вашето местоположение"
     }
   },
   "schoolDetail": {
@@ -559,7 +561,9 @@
     "mapLabel": "Карта на локациите на училището",
     "admission": "Прием",
     "kgByPointsShort": "По точки (kg.sofia.bg)",
-    "kgThresholdsLater": "Точките на последно приетите още не са публикувани тук"
+    "kgThresholdsLater": "Точките на последно приетите още не са публикувани тук",
+    "distanceValueApprox": "~{{km}} км",
+    "approximateLocation": "Точката на картата е приблизителна (по улица), затова и разстоянията са приблизителни."
   },
   "detailPanel": {
     "label": "Подробности за училището",

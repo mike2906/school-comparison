@@ -891,7 +891,9 @@ const SchoolCard = memo(function SchoolCard({
   const showScheduleOnMobile = !admissionsInfo
   const distanceValue = typeof school.distance === 'number' ? school.distance : null
   // Only a known distance is shown; the list header prompts for a location once instead.
-  const distanceLabel = distanceValue != null ? formatDistance(distanceValue) : null
+  const distanceLabel = distanceValue != null
+    ? formatDistance(distanceValue, { approximate: school.distanceApproximate })
+    : null
   const distanceStyle = distanceValue == null
     ? { backgroundColor: '#f3f4f6', color: '#6b7280' }
     : distanceValue < 2
@@ -991,7 +993,10 @@ const SchoolCard = memo(function SchoolCard({
           <span
             className="inline-flex flex-shrink-0 items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full"
             style={distanceStyle}
-            aria-label={t('schoolCard.aria.distance', { distance: distanceLabel })}
+            aria-label={t(
+              school.distanceApproximate ? 'schoolCard.aria.distanceApprox' : 'schoolCard.aria.distance',
+              { distance: formatDistance(distanceValue) },
+            )}
           >
             📍 {distanceLabel}
           </span>

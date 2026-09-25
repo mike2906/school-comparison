@@ -541,8 +541,15 @@ function PopupContent({
         {typeof distanceKm === 'number' && (
           <div className="flex items-start gap-2">
             <span className="text-neutral-400">📏</span>
-            <span>{formatDistance(distanceKm)} {t('location.fromYou')}</span>
+            <span>
+              {formatDistance(distanceKm, { approximate: marker.location.coordinates_approximate })}{' '}
+              {t('location.fromYou')}
+            </span>
           </div>
+        )}
+
+        {marker.location.coordinates_approximate && (
+          <p className="text-xs text-neutral-500">{t('map.approximatePin')}</p>
         )}
 
         {/* The groups are already in the badge row; only add shift / care details here. */}

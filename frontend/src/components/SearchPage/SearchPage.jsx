@@ -852,7 +852,7 @@ function SearchPage() {
       const distance = distanceLocation?.lat && distanceLocation?.lng
         ? calculateDistance(userLocation.lat, userLocation.lng, distanceLocation.lat, distanceLocation.lng)
         : null
-      return { ...school, distance }
+      return { ...school, distance, distanceApproximate: Boolean(distanceLocation?.coordinates_approximate) }
     })
   }, [schools, userLocation, filters.ageGroup])
 

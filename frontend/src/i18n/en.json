@@ -220,7 +220,8 @@
     "showingInArea": "Showing {{shown}} of {{total}} schools in this area",
     "locationsFor": "Locations for {{name}}",
     "legendSchool": "School",
-    "legendKindergarten": "Kindergarten"
+    "legendKindergarten": "Kindergarten",
+    "approximatePin": "Approximate location (street level)"
   },
   "pricing": {
     "title": "Pricing",
@@ -537,7 +538,8 @@
       "specialPrograms": "Special programs"
     },
     "aria": {
-      "distance": "{{distance}} from your location"
+      "distance": "{{distance}} from your location",
+      "distanceApprox": "About {{distance}} from your location"
     }
   },
   "schoolDetail": {
@@ -559,7 +561,9 @@
     "mapLabel": "Map of school locations",
     "admission": "Admission",
     "kgByPointsShort": "By points (kg.sofia.bg)",
-    "kgThresholdsLater": "Last-admitted points are not published here yet"
+    "kgThresholdsLater": "Last-admitted points are not published here yet",
+    "distanceValueApprox": "~{{km}} km",
+    "approximateLocation": "The map pin is approximate (street level), so distances are too."
   },
   "detailPanel": {
     "label": "School details",
