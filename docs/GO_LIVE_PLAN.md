@@ -1721,6 +1721,18 @@ the session scratchpad only.
       (ДГ №149, second building) was cleared again: the GeoJSON name fallback returned the main
       building's point. Known recall loss: a street-level match in a neighbouring quarter
       without a known district stays unpinned (кв. Бояна → м. Гърдова глава).
+- [x] **UF43 Official municipal points for state schools and kindergartens.** Sofia
+      Municipality publishes a point, address and район for each of its schools, kindergartens
+      and nurseries (`arcgis.sofia.bg/arcgis/rest/services/School_AllPublic`).
+      **Done 2026-09-25:** `scripts/import_sofia_municipal_points.py` (dry-run report first;
+      match needs type + number or name words, and agreeing addresses). Applied with pg_dump
+      backups: 492 of 560 state locations now use the official point (7 had been >5 km off on
+      same-named streets, e.g. 152 ОУ in Илинден instead of Мърчаево); state locations without
+      a pin 43 → 8; 191 districts filled. `--fill-districts` set the район of 59 more exact
+      pins (incl. private schools) from the municipal boundaries. Tagged
+      `coords_source=sofia_municipal`; forced re-geocodes and website map links keep them.
+      The 68 unmatched rows (second buildings not in the layer, non-municipal state schools)
+      are in the report for review.
 - [ ] **UF42 Related institutions (kindergarten → school) are separate and sometimes
       mis-linked.** Parents weighing a kindergarten want to know the school it leads to.
       Example: Maple Bear is kindergarten 556 (reg. 2200052, кв. Витоша) and school 596

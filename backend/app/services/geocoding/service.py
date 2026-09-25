@@ -8,7 +8,7 @@ from app.models import SchoolLocation, School
 from app.services.geocoding.base import BaseGeocodingProvider, GeocodingResult
 from app.services.geocoding.nominatim import AREA_LEVEL_MATCH_ERROR, AREA_MISMATCH_ERROR, NominatimProvider
 from app.services.geocoding.composite import CompositeGeocodingProvider
-from app.services.geocoding.write_gate import apply_geocode_result_to_location
+from app.services.geocoding.write_gate import OFFICIAL_COORDS_TAG, apply_geocode_result_to_location
 from app.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -145,8 +145,14 @@ class GeocodingService:
         Returns:
             GeocodingResult with status and coordinates
         """
+        # Official points (Sofia Municipality) are never replaced by a geocoder guess.
+        has_official_point = OFFICIAL_COORDS_TAG in (location.location_tags or [])
         # Check if already geocoded (unless force=True)
-        if not force and location.lat is not None and location.lng is not None:
+        if (
+            (not force or has_official_point)
+            and location.lat is not None
+            and location.lng is not None
+        ):
             logger.debug(
                 f"Location {location.id} already has coordinates ({location.lat}, {location.lng}), skipping"
             )

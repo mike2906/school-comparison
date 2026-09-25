@@ -21,6 +21,7 @@ from app.schemas.extraction import (
     SummarySourceExtractionOutput,
 )
 from app.scrapers import extractor as extractor_module
+from app.services.geocoding.write_gate import OFFICIAL_COORDS_TAG
 
 
 @pytest.fixture
@@ -1360,6 +1361,41 @@ async def test_website_map_coordinates_use_write_gate_and_reject_out_of_bounds(d
     assert location.geocode_meta["method"] == "website_map_link"
     assert location.geocode_meta["rejection_reason"] == "outside_sofia_write_bounds"
     assert "coords_source=website_map_link" not in (location.location_tags or [])
+
+
+@pytest.mark.asyncio
+async def test_website_map_coordinates_do_not_replace_official_point(db_session):
+    school = School(
+        name_i18n={"bg": "ДГ №4 Слънчо"},
+        country_code="bg",
+        city="sofia",
+        school_type="state",
+        education_level="kindergarten",
+    )
+    db_session.add(school)
+    await db_session.flush()
+    location = SchoolLocation(
+        school_id=school.id,
+        address_i18n={"bg": 'ул. "Ела" № 6'},
+        lat=42.6812,
+        lng=23.2012,
+        location_tags=["source=kg_sofia_bg", OFFICIAL_COORDS_TAG],
+        is_primary=True,
+    )
+    db_session.add(location)
+    await db_session.commit()
+
+    await extractor_module._sync_primary_location_from_contact_address(
+        db_session,
+        school,
+        {"address": 'ул. "Ела" № 6', "coordinates": {"lat": 42.70, "lng": 23.28}},
+    )
+    await db_session.commit()
+
+    await db_session.refresh(location)
+    assert (location.lat, location.lng) == (42.6812, 23.2012)
+    assert OFFICIAL_COORDS_TAG in location.location_tags
+    assert "coords_source=website_map_link" not in location.location_tags
 
 
 @pytest.mark.asyncio
