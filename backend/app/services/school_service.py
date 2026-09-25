@@ -8,7 +8,7 @@ from app.models.pricing import Pricing
 from app.models.school import School, SchoolLocation, SchoolLocationAgeGroupShift
 from app.models.source_page import SourcePage
 from app.services.geocoding.bounds import SOFIA_MUNICIPALITY_BOUNDS, get_city_bounds
-from app.services.geocoding.service import TERMINAL_GEOCODE_FAILURE_REASONS
+from app.services.geocoding.service import LISTABLE_UNPINNED_REASONS
 from app.utils import school_search
 from app.utils.i18n_resolver import resolve_address_i18n, resolve_name_i18n
 from app.utils.school_attributes import build_filterable_attributes
@@ -55,7 +55,7 @@ class SchoolService:
             func.length(func.trim(provider)) > 0,
             reason.is_not(None),
             func.length(func.trim(reason)) > 0,
-            func.trim(reason).in_(tuple(sorted(TERMINAL_GEOCODE_FAILURE_REASONS))),
+            func.trim(reason).in_(tuple(sorted(LISTABLE_UNPINNED_REASONS))),
         )
 
     @staticmethod

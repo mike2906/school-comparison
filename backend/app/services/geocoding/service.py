@@ -42,6 +42,14 @@ TERMINAL_GEOCODE_FAILURE_REASONS = frozenset({
 })
 
 
+# Unpinned locations that still list (without a map pin): terminal failures plus a name
+# match that was set aside, which a later run may still resolve.
+LISTABLE_UNPINNED_REASONS = TERMINAL_GEOCODE_FAILURE_REASONS | {
+    NAME_MATCH_POINT_TAKEN,
+    NAME_MATCH_ADDRESS_MISMATCH,
+}
+
+
 def nominatim_user_agent(settings) -> str:
     """Build the Nominatim User-Agent, refusing a missing or placeholder contact email."""
     contact_email = settings.geocoding_contact_email

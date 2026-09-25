@@ -72,6 +72,9 @@ async def _school(db: AsyncSession, name: str, school_type: str = "state") -> Sc
         ('бул. "Симеоновско шосе" № 59', "УЛ. ЙОЗЕФ ВАЛДХАРД 3, 1700 СТОЛИЧНА", False),
         ('ж. к. Редута, ул. "Детелин войвода" № 10', "Ж.К. РЕДУТА | УЛ. КАЛИМАНЦИ 43, 1505 СТОЛИЧНА", False),
         ("ул. Христо Ботев № 5", "ул. Христо Смирненски № 5", False),
+        # A block without a comma before it is still the house number.
+        ("ж.к. Младост 1 бл. 15", "ж.к. Младост 1, бл. 15", True),
+        ("ж.к. Младост 1 бл. 15", "ж.к. Младост 11 бл. 5", False),
         ("ул. Бигла 56", "УЛ. БИГЛА 52, 1164 СТОЛИЧНА", False),
         # Nothing to compare: no house number, or a street on one side only.
         ('ж.к. Гоце Делчев, бл. 257Аа', "УЛ. МАЙОР ПАВЕЛ ПАВЛОВ №6, 1404 СТОЛИЧНА", False),

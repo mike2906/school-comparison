@@ -16,7 +16,7 @@ _AREA_MARKER = r"(?:кв|ж\.?\s*к|жк|в\.?\s*з|район|р-н|местн�
 _STREET_MARKER = r"(?:ул|бул|пл|алея)"
 # A neighbourhood/district name runs from its marker to the next separator or street marker.
 _AREA_RE = re.compile(
-    rf"(?<![а-яa-z]){_AREA_MARKER}(?:\.\s*|\s+)(.*?)(?=[,|№(]|(?<![а-яa-z]){_STREET_MARKER}[.\s]|$)"
+    rf"(?<![а-яa-z]){_AREA_MARKER}(?:\.\s*|\s+)(.*?)(?=[,|№(]|(?<![а-яa-z])(?:{_STREET_MARKER}|бл)[.\s]|$)"
 )
 # A leading/trailing segment that is only a locality and/or a postcode ("1700 СТОЛИЧНА").
 _LOCALITY_SEGMENT_RE = re.compile(r"(?:(?:гр|с)\.\s*)?(?:\d{4}\s+)?[^\d]*?(?:\s+\d{4})?")

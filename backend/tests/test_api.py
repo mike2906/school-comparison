@@ -1308,8 +1308,8 @@ class TestSchoolsCountsEndpoint:
             lng=None,
             geocode_meta={
                 "status": "rejected",
-                "provider": "nominatim",
-                "rejection_reason": "duplicate_approximate_match_different_address",
+                "provider": "geojson_bg",
+                "rejection_reason": "duplicate_geojson_name_match_different_address",
             },
             is_primary=False,
         )
