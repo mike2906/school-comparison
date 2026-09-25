@@ -18,6 +18,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import flag_modified
 
 from app.ai.client import calculate_cost, create_agent, extract_provider_cost_usd, get_model
+from app.scrapers.campus_sync import (
+    apply_campus_sync,
+    geocode_campus_locations,
+    remove_website_campus_data,
+)
 from app.utils.website_data import promote_validation_report, record_validation_failure
 from app.services.provider_costs import execute_billable_request
 from app.config import get_settings
@@ -712,6 +717,7 @@ async def validate_school_data(
         status="ok",
         issue_counts={"error": 0, "warning": 0},
     )
+    new_campus_location_ids: list[int] = []
 
     try:
         async with _tx_context(db):
@@ -1216,6 +1222,10 @@ async def validate_school_data(
 
             school.attributes = attrs
             school.admission_info = admission_info
+            # UF42(b): campuses and stated age groups are created only as the marker
+            # clears, in this transaction (apply_campus_sync re-checks the site).
+            campus_result = await apply_campus_sync(db, school)
+            new_campus_location_ids = campus_result.get("new_location_ids") or []
             if report.auto_fixes:
                 clear_summary_state(school, downgrade_status=True)
             school.updated_at = datetime.datetime.now(datetime.timezone.utc)
@@ -1241,6 +1251,8 @@ async def validate_school_data(
                     failed_school.attributes,
                     error=str(exc),
                 )
+                # The marker is set again: website-derived campuses stop publishing.
+                await remove_website_campus_data(db, school_id)
                 failed_school.updated_at = datetime.datetime.now(datetime.timezone.utc)
                 flag_modified(failed_school, "attributes")
                 db.add(failed_school)
@@ -1254,6 +1266,10 @@ async def validate_school_data(
             "status": "validation_failed",
             "error": str(exc),
         }
+
+    if new_campus_location_ids and not db.in_transaction():
+        # After the commit: the geocoding service commits each pin itself.
+        await geocode_campus_locations(db, new_campus_location_ids, country_code=country_code)
 
     if run_spot_check:
         spot_result = await run_spot_check_for_school(db, school_id, country_code=country_code)

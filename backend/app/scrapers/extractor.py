@@ -1508,6 +1508,11 @@ async def _extract_general_info(
     location_address_update = await _sync_primary_location_from_contact_address(db, school, contact_info)
 
     attrs = prepare_validation_rollover(school.attributes)
+    # UF42(b): extra campuses and stated age groups are only candidates here; validation
+    # creates them when it clears the withholding marker set just above.
+    from app.scrapers.campus_sync import record_candidates_at_extraction
+
+    await record_candidates_at_extraction(db, school, pages, attrs)
     admission_info = dict(school.admission_info) if isinstance(school.admission_info, dict) else {}
 
     admission_payload = normalized.admission.model_dump()

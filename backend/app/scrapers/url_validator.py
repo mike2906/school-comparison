@@ -1107,8 +1107,14 @@ async def clear_website_derived_locations(
     from sqlalchemy import select
 
     from app.models import SchoolLocation
+    from app.scrapers.campus_sync import CAMPUS_TAG, remove_website_campus_data
     from app.services.geocoding.write_gate import OFFICIAL_COORDS_TAG
 
+    # Campus locations and age groups added from the site go entirely (UF42b).
+    campus_changes = [
+        {**change, "school_id": school_id}
+        for change in await remove_website_campus_data(db, school_id, preview=preview)
+    ]
     locations = list(
         (
             await db.execute(
@@ -1121,6 +1127,8 @@ async def clear_website_derived_locations(
     changed: list[dict] = []
     for location in locations:
         tags = [str(tag) for tag in (location.location_tags or [])]
+        if CAMPUS_TAG in tags:
+            continue
         website_address = "address_source=website_contact" in tags
         if website_address and keep_officially_confirmed_addresses and OFFICIAL_COORDS_TAG in tags:
             website_address = False
@@ -1159,7 +1167,7 @@ async def clear_website_derived_locations(
             or (tag == "address_source=website_contact" and not website_address)
         ]
         db.add(location)
-    return changed
+    return changed + campus_changes
 
 
 async def _clear_website_derived_school_data(db, school) -> None:
@@ -1346,6 +1354,7 @@ async def _update_validation_result(
     from app.database import async_session_maker
     from app.models import School, SourcePage, ScrapeType
     from sqlalchemy import select
+    from app.scrapers.campus_sync import remove_website_campus_data
 
     async with async_session_maker() as db:
         settings = get_settings()
@@ -1441,6 +1450,8 @@ async def _update_validation_result(
                 school.attributes[WEBSITE_DATA_WITHHELD_KEY] = True
                 if _should_clear_website_derived_data(result, reason):
                     await _clear_website_derived_school_data(db, school)
+                else:
+                    await remove_website_campus_data(db, school_id)
                 school.attributes.pop("validated_website_url", None)
                 if timeout_terminal:
                     school.scrape_status = "no_official_website"
@@ -1455,6 +1466,7 @@ async def _update_validation_result(
                     school.website_url = None
             elif result == ValidationResult.AMBIGUOUS:
                 school.attributes[WEBSITE_DATA_WITHHELD_KEY] = True
+                await remove_website_campus_data(db, school_id)
                 school.attributes.pop("validated_website_url", None)
                 school.scrape_status = "failed_validate"
                 school.website_url = None
