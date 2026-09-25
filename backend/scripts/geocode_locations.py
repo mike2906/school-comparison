@@ -20,6 +20,9 @@ Usage:
 
     # Geocode specific school
     uv run python scripts/geocode_locations.py --school-id 123
+
+    # Read-only: list a school's locations that share a point at different addresses
+    uv run python scripts/geocode_locations.py --check-shared-points
 """
 import asyncio
 import sys
@@ -30,7 +33,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from app.database import async_session_maker
-from app.services.geocoding.service import GeocodingService
+from app.services.geocoding.service import GeocodingService, same_school_shared_points
 
 
 async def main():
@@ -72,7 +75,28 @@ async def main():
         help="Confirm a force run non-interactively",
     )
 
+    parser.add_argument(
+        "--check-shared-points",
+        action="store_true",
+        help="Read-only: report one school's locations on one point at different addresses",
+    )
+
     args = parser.parse_args()
+
+    if args.check_shared_points:
+        async with async_session_maker() as db:
+            pairs = await same_school_shared_points(
+                db,
+                country_code=None if args.all_locations else args.country,
+                city=None if args.all_locations else args.city,
+            )
+        for first, second, distance in pairs:
+            print(
+                f"school {first.school_id}: location {first.id} {first.address_i18n} and "
+                f"{second.id} {second.address_i18n} are {distance:.0f} m apart"
+            )
+        print(f"{len(pairs)} same-school pairs share a point at different addresses")
+        return
 
     print("=" * 60)
     print("Sofia School Comparison - Geocoding Script")

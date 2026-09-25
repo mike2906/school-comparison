@@ -1,24 +1,39 @@
 """Main geocoding service that coordinates geocoding operations."""
 import logging
+import math
 from typing import Optional
-from sqlalchemy import func, select
+from sqlalchemy import String, cast, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import SchoolLocation, School
 from app.services.geocoding.base import BaseGeocodingProvider, GeocodingResult
+from app.services.geocoding.bg.address_match import same_building
 from app.services.geocoding.nominatim import AREA_LEVEL_MATCH_ERROR, AREA_MISMATCH_ERROR, NominatimProvider
 from app.services.geocoding.composite import CompositeGeocodingProvider
-from app.services.geocoding.write_gate import OFFICIAL_COORDS_TAG, apply_geocode_result_to_location
+from app.services.geocoding.write_gate import (
+    OFFICIAL_COORDS_TAG,
+    apply_geocode_result_to_location,
+    location_holding_point,
+)
 from app.config import get_settings
 
 logger = logging.getLogger(__name__)
 
+# A GeoJSON name match for a school with several locations whose register address is not
+# this location's. Not terminal: the address tiers may still find the location.
+NAME_MATCH_ADDRESS_MISMATCH = "geojson_name_match_address_mismatch"
+NAME_MATCH_POINT_TAKEN = "duplicate_geojson_name_match_different_address"
+# A sibling location this close to a name-match point is taken to sit on it.
+SIBLING_POINT_RADIUS_M = 50.0
+
+# Failures that routine runs do not retry. Deliberately absent: NAME_MATCH_POINT_TAKEN, which
+# only says the GeoJSON tier's point belongs to another location, not that the address
+# tiers cannot find this one (UF44).
 TERMINAL_GEOCODE_FAILURE_REASONS = frozenset({
     "No address available",
     "No results found",
     "outside_sofia_write_bounds",
     "duplicate_approximate_match_different_address",
-    "duplicate_geojson_name_match_different_address",
     AREA_LEVEL_MATCH_ERROR,
     AREA_MISMATCH_ERROR,
 })
@@ -57,6 +72,17 @@ def geocode_failure_is_terminal(meta: object) -> bool:
         and isinstance(reason, str)
         and reason.strip() in TERMINAL_GEOCODE_FAILURE_REASONS
     )
+
+
+def _distance_m(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
+    dy = (lat2 - lat1) * 111_320
+    dx = (lng2 - lng1) * 111_320 * math.cos(math.radians((lat1 + lat2) / 2))
+    return math.hypot(dx, dy)
+
+
+def _location_address(location: SchoolLocation) -> str:
+    address_i18n = location.address_i18n or {}
+    return address_i18n.get("bg") or address_i18n.get("en") or ""
 
 
 def _preferred_geocoding_city(school: School | None) -> Optional[str]:
@@ -226,7 +252,7 @@ class GeocodingService:
 
         # Geocode using provider
         logger.info(f"Geocoding location {location.id}: {address} (school: {school_name}, city: {city})")
-        result = None
+        result = await self._official_point_at_same_address(location, school, address, country_code)
 
         # Special handling for merged kg.sofia branch families and Sofia-oblast
         # schools: use address-first geocoding before name-based GeoJSON lookup.
@@ -241,9 +267,7 @@ class GeocodingService:
             and hasattr(self.provider, "nominatim_provider")
             and hasattr(self.provider, "geojson_provider")
         )
-        if (
-            prefer_address_first
-        ):
+        if result is None and prefer_address_first:
             result = await self.provider.nominatim_provider.geocode(
                 address=address,
                 country_code=country_code,
@@ -257,7 +281,9 @@ class GeocodingService:
                     school_name=fallback_school_name,
                     city=city,
                 )
-                if geojson_result.success:
+                if geojson_result.success and not await self._name_match_conflict(
+                    location, address, geojson_result
+                ):
                     result = geojson_result
 
         if result is None:
@@ -268,6 +294,28 @@ class GeocodingService:
                 city=city,
                 district=location.district,
             )
+            conflict = await self._name_match_conflict(location, address, result)
+            if conflict:
+                nominatim = getattr(self.provider, "nominatim_provider", None)
+                if nominatim is not None:
+                    # The name match is another building's point; try the address itself.
+                    result = await nominatim.geocode(
+                        address=address,
+                        country_code=country_code,
+                        city=city,
+                        district=location.district,
+                    )
+                    if result.success:
+                        result.method = "nominatim_fallback"
+                else:
+                    result = GeocodingResult(
+                        success=False,
+                        error=conflict,
+                        provider=result.provider,
+                        formatted_address=result.formatted_address,
+                        method=result.method,
+                        precision=result.precision,
+                    )
 
         # Update database if successful
         if result.success and result.lat is not None and result.lng is not None:
@@ -304,6 +352,97 @@ class GeocodingService:
             logger.warning(f"Failed to geocode location {location.id}: {result.error}")
 
         return result
+
+    async def _official_point_at_same_address(
+        self,
+        location: SchoolLocation,
+        school: School | None,
+        address: str,
+        country_code: str,
+    ) -> Optional[GeocodingResult]:
+        """The official point of a building this location shares, if exactly one.
+
+        Schools often rent space in another institution's building ("… на ПГЕХ"). Its
+        official point is reused only when the addresses give the same street and house
+        number (not on name similarity), and every such official point is the same one.
+        """
+        if school is None or country_code != "bg":
+            return None
+        rows = await self.db.execute(
+            select(SchoolLocation)
+            .join(School, School.id == SchoolLocation.school_id)
+            .where(
+                SchoolLocation.id != location.id,
+                SchoolLocation.lat.is_not(None),
+                SchoolLocation.lng.is_not(None),
+                School.country_code == school.country_code,
+                School.city == school.city,
+                cast(SchoolLocation.location_tags, String).like(f"%{OFFICIAL_COORDS_TAG}%"),
+            )
+        )
+        hosts = [
+            host for host in rows.scalars()
+            if OFFICIAL_COORDS_TAG in (host.location_tags or [])
+            and same_building(address, _location_address(host))
+        ]
+        if len({(host.lat, host.lng) for host in hosts}) != 1:
+            return None
+        host = hosts[0]
+        logger.info("Location %s shares the building of official point %s", location.id, host.id)
+        return GeocodingResult(
+            lat=host.lat,
+            lng=host.lng,
+            success=True,
+            provider="official_point",
+            formatted_address=_location_address(host),
+            method="official_point_same_address",
+            precision="exact",
+        )
+
+    async def _name_match_conflict(
+        self,
+        location: SchoolLocation,
+        address: str,
+        result: GeocodingResult,
+    ) -> Optional[str]:
+        """Why a GeoJSON name match's point is not this location's, or None if it may be.
+
+        A name identifies the institution, not the building: every location of a school
+        with several would get the register's one point (ДГ №149's second building, UF41).
+        So for such a school the register address must be this location's address, and no
+        sibling may already sit near the point. For a school with one location the register
+        point stands (its address is often the newer one: the municipality agrees with it
+        for several state schools whose stored address is out of date). Nobody else may
+        already hold the exact point at a different address.
+        """
+        if not result.success or result.method != "geojson_name_match":
+            return None
+        if result.lat is None or result.lng is None:
+            return None
+        if await location_holding_point(self.db, location, result.lat, result.lng):
+            return NAME_MATCH_POINT_TAKEN
+        siblings = [
+            sibling for sibling in (await self.db.execute(
+                select(SchoolLocation).where(
+                    SchoolLocation.school_id == location.school_id,
+                    SchoolLocation.id != location.id,
+                )
+            )).scalars()
+            # Duplicate rows of this address are the same building, not a sibling.
+            if not same_building(address, _location_address(sibling), allow_unnumbered=True)
+        ]
+        if not siblings:
+            return None
+        if not same_building(address, result.formatted_address or "", allow_unnumbered=True):
+            return NAME_MATCH_ADDRESS_MISMATCH
+        for sibling in siblings:
+            if (
+                sibling.lat is not None
+                and sibling.lng is not None
+                and _distance_m(sibling.lat, sibling.lng, result.lat, result.lng) <= SIBLING_POINT_RADIUS_M
+            ):
+                return NAME_MATCH_POINT_TAKEN
+        return None
 
     async def geocode_school_locations(
         self,
@@ -436,3 +575,43 @@ class GeocodingService:
             Summary dict with counts
         """
         return await self.geocode_all_locations(force=False, limit=limit)
+
+
+async def same_school_shared_points(
+    db: AsyncSession,
+    *,
+    country_code: Optional[str] = None,
+    city: Optional[str] = None,
+    radius_m: float = SIBLING_POINT_RADIUS_M,
+) -> list[tuple[SchoolLocation, SchoolLocation, float]]:
+    """Pairs of one school's pinned locations on (nearly) one point at different addresses.
+
+    One of each pair almost certainly has the other building's point (the failure the
+    name-match guard prevents). Duplicate rows of one address and pairs of official
+    building points are not reported.
+    """
+    query = (
+        select(SchoolLocation)
+        .join(School, School.id == SchoolLocation.school_id)
+        .where(SchoolLocation.lat.is_not(None), SchoolLocation.lng.is_not(None))
+        .order_by(SchoolLocation.school_id, SchoolLocation.id)
+    )
+    if country_code is not None:
+        query = query.where(func.lower(School.country_code) == country_code.strip().lower())
+    if city is not None:
+        query = query.where(func.lower(School.city) == city.strip().lower())
+    by_school: dict[int, list[SchoolLocation]] = {}
+    for location in (await db.execute(query)).scalars():
+        by_school.setdefault(location.school_id, []).append(location)
+    pairs = []
+    for locations in by_school.values():
+        for i, first in enumerate(locations):
+            for second in locations[i + 1:]:
+                if all(OFFICIAL_COORDS_TAG in (loc.location_tags or []) for loc in (first, second)):
+                    continue  # two official building points (across a street) are both right
+                distance = _distance_m(first.lat, first.lng, second.lat, second.lng)
+                if distance <= radius_m and not same_building(
+                    _location_address(first), _location_address(second), allow_unnumbered=True
+                ):
+                    pairs.append((first, second, distance))
+    return pairs

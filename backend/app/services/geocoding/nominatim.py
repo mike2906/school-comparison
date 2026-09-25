@@ -457,6 +457,20 @@ class NominatimProvider(BaseGeocodingProvider):
         return bool(expected_tokens.intersection(result_tokens))
 
     @staticmethod
+    def _house_number_was_asked(house_number: object, query: str) -> bool:
+        """Whether a result's house number is one the query asked for.
+
+        Nominatim can answer "Седмочисленици 23" with a shop at № 9 on the same street, or
+        a street-only query with some house on it: right street, not the building.
+        """
+        if not isinstance(house_number, str):
+            return False
+        number = re.search(r"\d+", house_number)
+        return bool(number) and number.group().lstrip("0") in {
+            n.lstrip("0") for n in re.findall(r"\d+", query)
+        }
+
+    @staticmethod
     def _is_area_level_result(result: dict) -> bool:
         """Return whether a Nominatim result is a whole settlement/area, not a place in it."""
         result_type = result.get("addresstype") or result.get("type")
@@ -565,7 +579,11 @@ class NominatimProvider(BaseGeocodingProvider):
                     lng = float(result["lon"])
                     formatted_address = result.get("display_name")
                     address_details = result.get("address") or {}
-                    precision = "exact" if address_details.get("house_number") else "approximate"
+                    precision = (
+                        "exact"
+                        if self._house_number_was_asked(address_details.get("house_number"), query)
+                        else "approximate"
+                    )
 
                     logger.info(f"Nominatim: Successfully geocoded '{address}' using query '{query}' → ({lat}, {lng})")
 

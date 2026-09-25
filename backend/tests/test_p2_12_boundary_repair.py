@@ -178,8 +178,8 @@ async def test_guarded_repair_corrects_only_location_119_and_accepts_terminal_nu
                 address_i18n={"bg": "ж. к. Младост 4, бл. 460А"},
                 geocode_meta={
                     "status": "rejected",
-                    "provider": "geojson_bg",
-                    "rejection_reason": "duplicate_geojson_name_match_different_address",
+                    "provider": "nominatim",
+                    "rejection_reason": "duplicate_approximate_match_different_address",
                 },
             ),
         ]

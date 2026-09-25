@@ -244,6 +244,15 @@ class TestNominatimProvider:
         assert result.success is True
         assert result.precision == "approximate"
 
+    def test_exact_only_for_the_house_number_asked_for(self):
+        asked = NominatimProvider._house_number_was_asked
+        assert asked("23", "Свети Седмочисленици 23, кв. Лозенец, София")
+        assert asked("257А", "ж.к. Гоце Делчев, бл. 257Аа, София")
+        assert asked("бл. 460А", "ж.к. Младост 4, бл. 460А, София")
+        assert not asked("9", "Свети Седмочисленици 23, кв. Лозенец, София")
+        assert not asked("16", "Йордан Стубел, кв. Витоша, София")  # street-only query
+        assert not asked(None, "Букара 15, София")
+
     def test_normalize_drops_floor_apartment_and_building_notes(self):
         provider = NominatimProvider()
         normalized = provider._normalize_bulgarian_address(
@@ -941,8 +950,11 @@ class TestGeocodingService:
         self,
         db_session: AsyncSession,
     ):
-        """Approximate GeoJSON name matches must not collapse distinct addresses to one point."""
-        mock_provider = AsyncMock()
+        """Approximate GeoJSON name matches must not collapse distinct addresses to one point.
+
+        With no address tier to fall back to, the rejection is recorded but not terminal.
+        """
+        mock_provider = type("GeoJSONOnly", (), {"geocode": AsyncMock()})()
         mock_provider.provider_name = "mock"
         mock_provider.geocode.return_value = GeocodingResult(
             lat=42.6977,
@@ -951,6 +963,7 @@ class TestGeocodingService:
             provider="geojson_bg",
             method="geojson_name_match",
             precision="approximate",
+            formatted_address="УЛ. ВТОРА 2, 1000 СТОЛИЧНА",
         )
 
         service = GeocodingService(db=db_session, provider=mock_provider)
@@ -987,8 +1000,8 @@ class TestGeocodingService:
         await db_session.refresh(candidate_location)
         assert candidate_location.lat is None
         assert candidate_location.lng is None
-        assert candidate_location.geocode_meta["status"] == "rejected"
         assert candidate_location.geocode_meta["rejection_reason"] == result.error
+        assert not geocode_failure_is_terminal(candidate_location.geocode_meta)
 
     async def test_geocode_location_rejects_duplicate_approximate_nominatim_match(
         self,

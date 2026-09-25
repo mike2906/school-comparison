@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import School, SchoolLocation
 from app.services.geocoding.base import GeocodingResult
+from app.services.geocoding.bg.address_match import same_building
 from app.services.geocoding.bounds import SOFIA_MUNICIPALITY_BOUNDS, point_in_bounds
 
 logger = logging.getLogger(__name__)
@@ -50,6 +51,36 @@ def _point_in_sofia_write_bounds(lat: float, lng: float) -> bool:
     return point_in_bounds(lat, lng, SOFIA_WRITE_BOUNDS)
 
 
+async def location_holding_point(
+    db: AsyncSession,
+    location: SchoolLocation,
+    lat: float,
+    lng: float,
+) -> Optional[SchoolLocation]:
+    """Another location already at exactly this point with a different address, if any.
+
+    Two spellings of one building ("№ 43" and "№ 43, партер") are the same address.
+    """
+    raw_address = _location_address(location)
+    current_address = _normalize_address(raw_address)
+    candidates = await db.execute(
+        select(SchoolLocation)
+        .where(
+            SchoolLocation.id != location.id,
+            SchoolLocation.lat == lat,
+            SchoolLocation.lng == lng,
+        )
+        .limit(20)
+    )
+    for other in candidates.scalars():
+        other_address = _location_address(other)
+        if _normalize_address(other_address) != current_address and not same_building(
+            raw_address, other_address, allow_unnumbered=True
+        ):
+            return other
+    return None
+
+
 async def apply_geocode_result_to_location(
     db: AsyncSession,
     location: SchoolLocation,
@@ -87,40 +118,30 @@ async def apply_geocode_result_to_location(
         )
 
     if result.precision == "approximate":
-        current_address = _normalize_address(_location_address(location))
-        duplicate_result = await db.execute(
-            select(SchoolLocation)
-            .where(
-                SchoolLocation.id != location.id,
-                SchoolLocation.lat == result.lat,
-                SchoolLocation.lng == result.lng,
+        duplicate = await location_holding_point(db, location, result.lat, result.lng)
+        if duplicate is not None:
+            reason = (
+                "duplicate_geojson_name_match_different_address"
+                if result.method == "geojson_name_match"
+                else "duplicate_approximate_match_different_address"
             )
-            .limit(20)
-        )
-        for duplicate in duplicate_result.scalars():
-            if _normalize_address(_location_address(duplicate)) != current_address:
-                reason = (
-                    "duplicate_geojson_name_match_different_address"
-                    if result.method == "geojson_name_match"
-                    else "duplicate_approximate_match_different_address"
-                )
-                logger.warning(
-                    "Rejected approximate geocode duplicate for location %s; "
-                    "candidate point is already held by location %s with a different address",
-                    location.id,
-                    duplicate.id,
-                )
-                location.lat = None
-                location.lng = None
-                location.geocode_meta = _result_meta(result, status="rejected", reason=reason)
-                return GeocodingResult(
-                    success=False,
-                    error=reason,
-                    provider=result.provider,
-                    formatted_address=result.formatted_address,
-                    method=result.method,
-                    precision=result.precision,
-                )
+            logger.warning(
+                "Rejected approximate geocode duplicate for location %s; "
+                "candidate point is already held by location %s with a different address",
+                location.id,
+                duplicate.id,
+            )
+            location.lat = None
+            location.lng = None
+            location.geocode_meta = _result_meta(result, status="rejected", reason=reason)
+            return GeocodingResult(
+                success=False,
+                error=reason,
+                provider=result.provider,
+                formatted_address=result.formatted_address,
+                method=result.method,
+                precision=result.precision,
+            )
 
     location.lat = result.lat
     location.lng = result.lng

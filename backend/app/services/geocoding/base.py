@@ -9,6 +9,8 @@ GeocodingMethod = Literal[
     "nominatim_address",
     "nominatim_fallback",
     "website_map_link",
+    "municipal_point",
+    "official_point_same_address",
 ]
 GeocodingPrecision = Literal["exact", "approximate"]
 
