@@ -227,9 +227,21 @@ class SchoolLocationBase(BaseModel):
         validation_alias="location_tags",
         exclude=True,
     )
+    raw_geocode_meta: Optional[dict] = Field(
+        default=None,
+        validation_alias="geocode_meta",
+        exclude=True,
+    )
     is_primary: bool = True
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    @computed_field(return_type=bool)
+    @property
+    def coordinates_approximate(self) -> bool:
+        """The pin is street/area level, not the building (only this flag is published)."""
+        meta = self.raw_geocode_meta if isinstance(self.raw_geocode_meta, dict) else {}
+        return self.lat is not None and meta.get("precision") == "approximate"
 
     @field_validator("address_i18n", mode="before")
     @classmethod

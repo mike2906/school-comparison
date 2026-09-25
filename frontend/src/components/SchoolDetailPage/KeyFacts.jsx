@@ -170,15 +170,22 @@ function KeyFacts({ school, examAverages, nvoExamType }) {
   }
 
   if (savedLocation) {
-    const distances = getMappableLocations(locations)
-      .map(point => calculateDistance(savedLocation.lat, savedLocation.lng, point.lat, point.lng))
-      .filter(value => value != null)
-    if (distances.length > 0) {
+    const nearest = getMappableLocations(locations)
+      .map(point => ({
+        km: calculateDistance(savedLocation.lat, savedLocation.lng, point.lat, point.lng),
+        approximate: Boolean(point.location.coordinates_approximate),
+      }))
+      .filter(item => item.km != null)
+      .sort((a, b) => a.km - b.km)[0]
+    if (nearest) {
       facts.distance = (
         <Fact
           key="distance"
           label={t('schoolDetail.distance')}
-          value={t('schoolDetail.distanceValue', { km: formatNumber(Math.min(...distances), 1) })}
+          value={t(
+            nearest.approximate ? 'schoolDetail.distanceValueApprox' : 'schoolDetail.distanceValue',
+            { km: formatNumber(nearest.km, 1) },
+          )}
         />
       )
     }
