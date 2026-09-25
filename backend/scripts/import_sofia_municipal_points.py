@@ -12,6 +12,7 @@ coordinates (exact precision, through the geocoding write gate), a missing distr
 
     uv run python scripts/import_sofia_municipal_points.py
     uv run python scripts/import_sofia_municipal_points.py --apply
+    uv run python scripts/import_sofia_municipal_points.py --fill-districts [--apply]
 """
 
 from __future__ import annotations
@@ -42,6 +43,7 @@ LAYERS_URL = (
 )
 # Layer id -> kind of institution.
 LAYERS = {0: "school", 1: "kindergarten", 2: "nursery"}
+DISTRICTS_LAYER = 3
 PROVIDER = "sofia_municipal_arcgis"
 DEFAULT_REPORT_ROOT = Path(__file__).parent.parent / "reports" / "municipal-points"
 
@@ -291,11 +293,74 @@ async def apply_match(db, row: Row) -> bool:
     return True
 
 
+async def district_at(client: httpx.AsyncClient, lat: float, lng: float) -> Optional[str]:
+    """The район containing a point, from the municipality's district boundaries."""
+    response = await client.get(
+        f"{LAYERS_URL}/{DISTRICTS_LAYER}/query",
+        params={
+            "geometry": f"{lng},{lat}",
+            "geometryType": "esriGeometryPoint",
+            "inSR": 4326,
+            "spatialRel": "esriSpatialRelIntersects",
+            "outFields": "name_rajon",
+            "returnGeometry": "false",
+            "f": "json",
+        },
+    )
+    response.raise_for_status()
+    features = response.json().get("features") or []
+    return _canonical_district(features[0]["attributes"].get("name_rajon")) if len(features) == 1 else None
+
+
+async def fill_districts(db, apply: bool) -> None:
+    """Set the район of Sofia locations with an exact pin and no district.
+
+    Approximate pins are skipped: the district is evidence for later geocoding checks, and
+    a street-level guess near a boundary would feed itself.
+    """
+    locations = (await db.execute(
+        select(SchoolLocation)
+        .join(School, School.id == SchoolLocation.school_id)
+        .where(
+            School.city == "sofia",
+            SchoolLocation.district.is_(None),
+            SchoolLocation.lat.is_not(None),
+            SchoolLocation.lng.is_not(None),
+        )
+        .order_by(SchoolLocation.id)
+    )).scalars().all()
+    exact = [loc for loc in locations if (loc.geocode_meta or {}).get("precision") == "exact"]
+    print(f"{len(exact)} exact pins without a district ({len(locations) - len(exact)} approximate skipped)")
+    filled = 0
+    async with httpx.AsyncClient(timeout=30.0, headers={"User-Agent": "Mozilla/5.0"}) as client:
+        for loc in exact:
+            district = await district_at(client, loc.lat, loc.lng)
+            print(f"  {loc.id}: {district}")
+            if district and apply:
+                loc.district = district
+                filled += 1
+    if apply:
+        await db.commit()
+        print(f"Filled {filled} districts")
+    else:
+        print("Dry run; nothing written.")
+
+
 async def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--apply", action="store_true", help="write the 'match' rows")
     parser.add_argument("--report-root", type=Path, default=DEFAULT_REPORT_ROOT)
+    parser.add_argument(
+        "--fill-districts",
+        action="store_true",
+        help="instead of matching, set the район of exact pins that have none",
+    )
     args = parser.parse_args()
+
+    if args.fill_districts:
+        async with async_session_maker() as db:
+            await fill_districts(db, args.apply)
+        return
 
     points = await fetch_points()
     print(f"Fetched {len(points)} municipal points")

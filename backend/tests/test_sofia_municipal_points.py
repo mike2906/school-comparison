@@ -163,3 +163,22 @@ async def test_forced_geocode_keeps_official_point(db_session):
     assert (result.success, result.provider) == (True, "cached")
     provider.geocode.assert_not_awaited()
     assert (location.lat, location.lng) == (42.6812, 23.2012)
+
+
+@pytest.mark.asyncio
+async def test_fill_districts_uses_exact_pins_only(db_session, monkeypatch):
+    from scripts import import_sofia_municipal_points as script
+
+    _, exact = await _location(
+        db_session, lat=42.6509, lng=23.3315, geocode_meta={"precision": "exact"}
+    )
+    _, approximate = await _location(
+        db_session, lat=42.66, lng=23.34, geocode_meta={"precision": "approximate"}
+    )
+    monkeypatch.setattr(script, "district_at", AsyncMock(return_value="Лозенец"))
+
+    await script.fill_districts(db_session, apply=True)
+
+    assert exact.district == "Лозенец"
+    assert approximate.district is None
+    script.district_at.assert_awaited_once()
