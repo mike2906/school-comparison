@@ -1975,6 +1975,7 @@ async def _repair_out_of_bounds_geocodes_command(
                     address=str(address),
                     country_code=country,
                     city=city,
+                    institution_name=(row["school"].name_i18n or {}).get("bg"),
                 )
                 if not result.success or result.lat is None or result.lng is None:
                     continue
