@@ -83,9 +83,9 @@ def school_pages():
     ]
 
 
-def extract(pages, url, level, shared=True):
+def extract(pages, url, level):
     return extract_campus_candidates(
-        pages, website_url=url, city="sofia", education_level=level, education_config=BG_CONFIG, shared_site=shared
+        pages, website_url=url, city="sofia", education_level=level, education_config=BG_CONFIG
     )
 
 
@@ -187,22 +187,43 @@ def test_sibling_institution_address_is_never_a_new_campus():
 def test_range_without_campus_name_is_ignored_when_there_are_several_campuses():
     pages = school_pages()
     pages[1] = SitePage(SCHOOL_SITE + "en/admissions", "We teach students from Preschool to Grade 8.", "admission")
-    payload = extract(pages, SCHOOL_SITE, "lower_secondary", shared=False)
+    payload = extract(pages, SCHOOL_SITE, "lower_secondary")
     assert all("diff_range" not in c for c in payload["campuses"])
-    assert payload["school_level"] is None
 
 
-def test_single_campus_school_level_range_goes_to_primary_only_when_site_not_shared():
+def test_school_wide_ranges_are_not_tied_to_a_building():
     pages = [SitePage("https://solo.bg/kontakti", "Контакти\nул. Липа 5, София", "contact"),
-             SitePage("https://solo.bg/priem", "Приемаме ученици от 1 до 7 клас.", "admission")]
-    payload = extract(pages, "https://solo.bg/", "lower_secondary", shared=False)
-    assert payload["school_level"]["diff_range"] == [7, 13]
+             SitePage("https://solo.bg/priem", "Ваканция за 1 – 11 клас. Приемаме ученици от 1 до 7 клас.", "admission")]
     plan = plan_campus_sync(
-        payload, education_level="lower_secondary", education_config=BG_CONFIG,
-        existing=[ExistingLocation(1, 'ул. "Липа" № 5', {"grade_1_4"}, True)], other_institution_addresses=[],
+        extract(pages, "https://solo.bg/", "lower_secondary"), education_level="lower_secondary",
+        education_config=BG_CONFIG, existing=[ExistingLocation(1, 'ул. "Липа" № 5', {"grade_1_4"}, True)],
+        other_institution_addresses=[],
     )
-    assert plan["age_groups"][0]["add"] == ["grade_5_7"]
-    assert extract(pages, "https://solo.bg/", "lower_secondary", shared=True)["school_level"] is None
+    assert plan == {"new_locations": [], "age_groups": [],
+                    "skipped": [{"address": "ул. Липа 5, София", "reason": "single_address_not_a_new_campus"}]} or (
+        plan["new_locations"] == [] and plan["age_groups"] == []
+    )
+
+
+def test_bulgarian_campus_sentences_state_the_ranges():
+    pages = school_pages()
+    pages[1] = SitePage(
+        SCHOOL_SITE + "priem/",
+        "5. клас ( не се предлага в Maple Bear Бояна)\n"
+        "Сградата ни в Бояна приема деца от подготвителен клас(ПУК) до 4. клас и осигурява уютна среда. "
+        "Сградата ни в Камбаните помещава ученици от подготвителен до 7. клас и разполага с по-обширна база.",
+        "admission",
+    )
+    by_street = {c["address"]: c.get("diff_range") for c in extract(pages, SCHOOL_SITE, "lower_secondary")["campuses"]}
+    assert by_street == {"ул. Витошки Камбани 9": [6, 13], "ул. Панорамен Път 38": [6, 10]}
+
+
+def test_school_heading_on_a_kindergarten_site_is_not_its_campus():
+    contact = "## Детска градина\nАдрес:\nул. Липа 5\n1113 София\n## Училище\nАдрес:\nул. Бреза 7\n1113 София"
+    payload = extract([SitePage("https://waldorf-x.bg/kontakti", contact, "contact")], "https://waldorf-x.bg/",
+                      "kindergarten")
+    assert [c["address"] for c in payload["campuses"]] == ["ул. Липа 5"]
+    assert {s["address"]: s["reason"] for s in payload["skipped"]} == {"ул. Бреза 7": "describes_other_level"}
 
 
 # ---------------------------------------------------------------------------
@@ -370,5 +391,5 @@ def test_module_has_no_hardcoded_age_group_keys():
     import inspect
 
     source = inspect.getsource(cs)
-    for key in ("grade_1_4", "grade_5_7", "preschool\"", "nursery\""):
+    for key in ('"grade_1_4"', '"grade_5_7"', '"preschool"', '"nursery"'):
         assert key not in source

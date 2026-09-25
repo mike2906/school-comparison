@@ -35,7 +35,6 @@ from app.scrapers.shared_site_check import (
     _tokens,
     address_key,
     address_matches,
-    describes_level,
     level_family,
     site_id,
 )
@@ -69,9 +68,18 @@ _GRADE_RE = re.compile(
     r"\bgrade\s*(?P<a>\d{1,2})\b|\b(?P<b>\d{1,2})\s*(?:-?(?:ви|ри|ти|ми))?\.?\s*клас",
     re.IGNORECASE,
 )
-_SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+|\n+")
+# Not after "4." in "до 4. клас": a number followed by a dot is an ordinal.
+_SENTENCE_SPLIT_RE = re.compile(r"(?<=[^\d\s][.!?])\s+|\n+")
+# Bare level words that make a heading/label name a level (for the label only;
+# page-wide text mentions school readiness everywhere).
+_LABEL_LEVEL_RE = {
+    "school": re.compile(r"училищ|гимназ|(?<!pre)(?<!pre-)school|lyceum|лицей", re.IGNORECASE),
+    "kindergarten": re.compile(r"градин|ясл|kindergarten|nursery", re.IGNORECASE),
+}
 CONTEXT_BEFORE = 2
 CONTEXT_AFTER = 2
+# A campus needs a full street address (street + number, or quarter + block).
+PRECISE_ADDRESS_KINDS = frozenset({"street_number", "quarter_block"})
 
 
 # ---------------------------------------------------------------------------
@@ -117,18 +125,26 @@ def _end_diffs(text: str, defs: Sequence[AgeGroupDef], offset: Optional[int]) ->
         value = offset + int(grade.group("a") or grade.group("b"))
         return value, value
     lowered = text.casefold()
-    matches = [
-        g for g in defs
-        if any(re.search(rf"(?<![\w]){re.escape(label.casefold())}(?![\w])", lowered) for label in g.labels)
-    ]
+    matches = [g for g in defs if any(_label_in(label, lowered) for label in g.labels)]
     if len(matches) == 1:
         return matches[0].min_diff, matches[0].max_diff
     return None
 
 
+def _label_in(label: str, lowered_text: str) -> bool:
+    """A config label in text; a long one-word label also matches its inflections
+    ("Подготвителна" ~ "подготвителен", "Preschool" ~ "Preschool")."""
+    label = label.casefold().strip()
+    if " " not in label and len(label) >= 7:
+        return re.search(rf"(?<!\w){re.escape(label[:-2])}\w*", lowered_text) is not None
+    return re.search(rf"(?<!\w){re.escape(label)}(?!\w)", lowered_text) is not None
+
+
 def stated_range(sentence: str, defs: Sequence[AgeGroupDef], offset: Optional[int]) -> Optional[tuple[int, int]]:
     """The age-difference range a sentence states explicitly, if exactly one."""
     found: set[tuple[int, int]] = set()
+    # "до 4. клас" -> "до 4 клас": the ordinal dot is not the end of the range.
+    sentence = re.sub(r"(\d)\.\s*(?=клас|grade)", r"\1 ", sentence, flags=re.IGNORECASE)
     for match in _RANGE_RE.finditer(sentence):
         start, end = match.group("a"), match.group("b")
         hi = _end_diffs(end, defs, offset)
@@ -211,15 +227,19 @@ def _campus_candidates(pages: Sequence[SitePage], *, city: str, family: str) -> 
             after = lines[index + 1 : index + 1 + CONTEXT_AFTER]
             context = " | ".join([*before, line, *after])
             candidate = {"address": address, "label": _label(before), "context": context, "source_url": page.url}
-            if any(addresses_equivalent(address, existing["address"]) for existing in kept):
+            if any(addresses_equivalent(address, seen["address"]) for seen in [*kept, *skipped]):
                 continue
-            if not _names_city(" ".join([line, *after]), city):
+            key = address_key(address)
+            nearby = " ".join([*before[-1:], line, *after])
+            if key is None or key.kind not in PRECISE_ADDRESS_KINDS:
+                skipped.append({**candidate, "reason": "not_a_street_address"})
+            elif not _names_city(nearby, city):
                 skipped.append({**candidate, "reason": "city_not_stated"})
-            elif _NOT_CAMPUS_RE.search(" ".join([*before, line])):
+            elif _NOT_CAMPUS_RE.search(" ".join([*before, line, *after[:1]])):
                 skipped.append({**candidate, "reason": "office_or_partner_address"})
-            elif describes_level(" ".join([*before, line]), other_family) and not describes_level(
-                " ".join([*before, line]), family
-            ):
+            elif _LABEL_LEVEL_RE[other_family].search(" ".join([*before, line])) and not _LABEL_LEVEL_RE[
+                family
+            ].search(" ".join([*before, line])):
                 skipped.append({**candidate, "reason": "describes_other_level"})
             else:
                 kept.append(candidate)
@@ -252,12 +272,18 @@ def extract_campus_candidates(
     city: str,
     education_level: str,
     education_config: Mapping[str, Any] | None,
-    shared_site: bool = False,
 ) -> Optional[dict[str, Any]]:
-    """Campus addresses and stated level ranges from the verified site's pages."""
+    """Campus addresses and each campus's stated level range from the verified site.
+
+    A level range counts only in a sentence that names the campus; a range stated
+    for the school as a whole (history, holiday calendars, "from 1 to 8 grade" in
+    an old article) is not tied to any building and is not used.
+    """
+    from app.scrapers.shared_site_check import is_directory_url
+
     site = site_id(website_url)
     site_pages = [p for p in pages if site_id(p.url) == site]
-    if not site_pages:
+    if not site_pages or is_directory_url(website_url):
         return None
     family = level_family(education_level)
     defs = age_group_defs(education_config)
@@ -279,25 +305,13 @@ def extract_campus_candidates(
                 campus["range_evidence"] = evidence[:300]
                 campus["range_source_url"] = url
 
-    school_level = None
-    if len(campuses) <= 1 and not shared_site:
-        ranges = {}
-        for url, sentence in sentences:
-            found = stated_range(sentence, defs, offset)
-            if found:
-                ranges.setdefault(found, (url, sentence))
-        if len(ranges) == 1:
-            (diff_range, (url, evidence)), = ranges.items()
-            school_level = {"diff_range": list(diff_range), "evidence": evidence[:300], "source_url": url}
-
-    if not campuses and not school_level:
+    if not campuses:
         return None
     return {
         "site": site,
         "extracted_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         "campuses": campuses,
         "skipped": skipped,
-        "school_level": school_level,
     }
 
 
@@ -353,12 +367,6 @@ def plan_campus_sync(
         plan["new_locations"].append({"address": address, "label": campus.get("label"), "age_groups": groups,
                                       "evidence": campus.get("context"), "range_evidence": campus.get("range_evidence"),
                                       "source_url": campus.get("source_url")})
-
-    school_level = payload.get("school_level")
-    if school_level and len(campuses) <= 1:
-        primary = next((loc for loc in existing if loc.is_primary), existing[0] if existing else None)
-        if primary is not None:
-            add_groups(primary, school_level["diff_range"], school_level.get("evidence"))
     return plan
 
 
@@ -471,27 +479,6 @@ async def apply_campus_sync(db, school) -> dict[str, Any]:
     return {**plan, "new_location_ids": [loc.id for loc in new_locations]}
 
 
-async def _site_is_shared(db, school) -> bool:
-    from sqlalchemy import select
-
-    from app.models import School
-    from app.scrapers.shared_site_check import site_group_key
-
-    key = site_group_key(school.website_url)
-    if not key:
-        return False
-    rows = (
-        await db.execute(
-            select(School.website_url).where(
-                School.country_code == school.country_code,
-                School.website_url.isnot(None),
-                School.id != school.id,
-            )
-        )
-    ).scalars().all()
-    return any(site_group_key(url) == key for url in rows)
-
-
 async def record_candidates_at_extraction(db, school, pages: Sequence[Any], attrs: dict) -> None:
     """Store campus candidates for the new extraction and drop what the old one created.
 
@@ -507,7 +494,6 @@ async def record_candidates_at_extraction(db, school, pages: Sequence[Any], attr
         city=school.city or "",
         education_level=school.education_level or "",
         education_config=country.education_config if country else None,
-        shared_site=await _site_is_shared(db, school),
     )
     if payload:
         attrs[CAMPUSES_KEY] = payload
