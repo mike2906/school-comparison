@@ -4,7 +4,12 @@ from unittest.mock import AsyncMock, patch
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.services.geocoding.base import GeocodingResult
-from app.services.geocoding.nominatim import AREA_LEVEL_MATCH_ERROR, AREA_MISMATCH_ERROR, NominatimProvider
+from app.services.geocoding.nominatim import (
+    AREA_LEVEL_MATCH_ERROR,
+    AREA_MISMATCH_ERROR,
+    OTHER_INSTITUTION_ERROR,
+    NominatimProvider,
+)
 from app.services.geocoding.service import GeocodingService, geocode_failure_is_terminal
 from app.scrapers.cli import _oblast_fallback_query_specs
 from app.models import School, SchoolLocation
@@ -243,6 +248,32 @@ class TestNominatimProvider:
 
         assert result.success is True
         assert result.precision == "approximate"
+
+    @pytest.mark.parametrize(
+        ("result_number", "address", "query", "exact"),
+        [
+            ("23", 'кв. Лозенец, ул. "Св. Седмочисленици" № 23', "Свети Седмочисленици 23, кв. Лозенец, София", True),
+            ("9", 'кв. Лозенец, ул. "Св. Седмочисленици" № 23', "Свети Седмочисленици 23, кв. Лозенец, София", False),
+            ("15", 'ул. "Кадемлия" 15, в сградата на ПГ', "Кадемлия 15, София", True),
+            ("9А", 'ж. к. Горна баня, ул. "Синьо езеро" № 9а', "Синьо езеро 9а, София", True),
+            ("5", "кв. Лозенец, No 5", "кв. Лозенец, 5, София", True),
+            ("5", 'ул. "Етър" 5', "Етър 5, София", True),
+            ("12", "ул. Благоевград № 12", "Благоевград 12, София", True),
+            # Letters must agree: 15А is not 15Б, and 15 is not 15А.
+            ("15Б", "ул. Тест № 15А", "Тест 15А, София", False),
+            ("15", "ул. Тест № 15А", "Тест 15А, София", False),
+            ("15А", "ул. Тест № 15", "Тест 15, София", False),
+            # No house number asked for: a quarter number, a block, a postcode.
+            ("4", 'ж.к. Младост 4, ул. "Тест"', "ж.к. Младост 4, Тест, София", False),
+            ("460А", "ж. к. Младост 4, бл. 460А, вх. 2, ет. 5, ап. 18", "ж.к. Младост 4, бл. 460А, София", False),
+            ("1616", 'гр. София, кв. Бояна, ул. "Деян Гьоргов", 1616', "Деян Гьоргов, кв. Бояна, София 1616", False),
+            # The street-only fallback query does not ask for the number.
+            ("16", 'кв. Витоша, ул. "Йордан Стубел" № 16', "Йордан Стубел, кв. Витоша, София", False),
+            (None, 'ул. "Букара" № 15', "Букара 15, София", False),
+        ],
+    )
+    def test_exact_only_for_the_house_number_asked_for(self, result_number, address, query, exact):
+        assert NominatimProvider._house_number_was_asked(result_number, address, query) is exact
 
     def test_normalize_drops_floor_apartment_and_building_notes(self):
         provider = NominatimProvider()
@@ -941,8 +972,11 @@ class TestGeocodingService:
         self,
         db_session: AsyncSession,
     ):
-        """Approximate GeoJSON name matches must not collapse distinct addresses to one point."""
-        mock_provider = AsyncMock()
+        """Approximate GeoJSON name matches must not collapse distinct addresses to one point.
+
+        With no address tier to fall back to, the rejection is recorded but not terminal.
+        """
+        mock_provider = type("GeoJSONOnly", (), {"geocode": AsyncMock()})()
         mock_provider.provider_name = "mock"
         mock_provider.geocode.return_value = GeocodingResult(
             lat=42.6977,
@@ -951,6 +985,7 @@ class TestGeocodingService:
             provider="geojson_bg",
             method="geojson_name_match",
             precision="approximate",
+            formatted_address="УЛ. ВТОРА 2, 1000 СТОЛИЧНА",
         )
 
         service = GeocodingService(db=db_session, provider=mock_provider)
@@ -987,8 +1022,8 @@ class TestGeocodingService:
         await db_session.refresh(candidate_location)
         assert candidate_location.lat is None
         assert candidate_location.lng is None
-        assert candidate_location.geocode_meta["status"] == "rejected"
         assert candidate_location.geocode_meta["rejection_reason"] == result.error
+        assert not geocode_failure_is_terminal(candidate_location.geocode_meta)
 
     async def test_geocode_location_rejects_duplicate_approximate_nominatim_match(
         self,
@@ -1949,16 +1984,17 @@ class TestCityCentroidGuards:
         assert result.success is True
         assert (result.lat, result.lng) == (42.6690, 23.4032)
 
-    async def test_nominatim_keeps_neighbourhood_result(self):
-        """Only whole settlements/administrative areas are rejected, not a named quarter."""
+    @pytest.mark.parametrize("area_type", ["quarter", "suburb", "neighbourhood", "residential"])
+    async def test_nominatim_rejects_neighbourhood_centre(self, area_type):
+        """UF44: the middle of a ж.к. says nothing about where the school is (783, 1147)."""
         provider = NominatimProvider(user_agent="Test/1.0")
         provider.MIN_REQUEST_INTERVAL = 0
         quarter = {
             "lat": "42.7256471",
             "lon": "23.2501109",
             "class": "place",
-            "type": "quarter",
-            "addresstype": "quarter",
+            "type": area_type,
+            "addresstype": area_type,
             "display_name": "ж.к. Люлин 2, София",
             "address": {"city": "София"},
         }
@@ -1967,7 +2003,53 @@ class TestCityCentroidGuards:
         with patch("httpx.AsyncClient", return_value=client):
             result = await provider.geocode("ж.к. Люлин 2", country_code="bg", city="sofia")
 
-        assert result.success is True
+        assert result.success is False
+        assert result.error == AREA_LEVEL_MATCH_ERROR
+
+    # Shape of the OSM answer for ДГ №128's second building (location 3086).
+    OTHER_KINDERGARTEN = {
+        "lat": "42.7034056",
+        "lon": "23.2824907",
+        "class": "amenity",
+        "type": "kindergarten",
+        "addresstype": "amenity",
+        "name": "ДГ №130 „Приказка“",
+        "display_name": "ДГ №130 „Приказка“, 2, Суходолска, ж.к. Западен парк, София",
+        "address": {"amenity": "ДГ №130 „Приказка“", "house_number": "2", "road": "Суходолска",
+                    "city": "София"},
+    }
+
+    async def test_nominatim_rejects_another_numbered_institution(self):
+        provider = NominatimProvider(user_agent="Test/1.0")
+        provider.MIN_REQUEST_INTERVAL = 0
+        client = self._mock_client({"Суходолска 2, София": [self.OTHER_KINDERGARTEN]})
+
+        with patch("httpx.AsyncClient", return_value=client):
+            result = await provider.geocode(
+                'гр. София, ж.к. Западен парк, ул. "Суходолска", №2',
+                country_code="bg",
+                city="sofia",
+                institution_name="ДГ №128 Феникс - сграда 2 (с яслени групи)",
+            )
+
+        assert result.success is False
+        assert result.error == OTHER_INSTITUTION_ERROR
+        assert geocode_failure_is_terminal(
+            {"status": "failed", "provider": "nominatim", "rejection_reason": result.error}
+        )
+
+    @pytest.mark.parametrize(
+        ("result", "institution", "other"),
+        [
+            (OTHER_KINDERGARTEN, "ДГ №130 Приказка", False),  # the same institution
+            (OTHER_KINDERGARTEN, "Частна детска градина Слънце", False),  # no number: no clear conflict
+            ({**OTHER_KINDERGARTEN, "name": "Детска градина", "address": {}}, "ДГ №128", False),
+            ({**OTHER_KINDERGARTEN, "class": "building", "type": "yes"}, "ДГ №128", False),
+            ({**OTHER_KINDERGARTEN, "type": "school", "name": "17 СУ Дамян Груев"}, "128 СУ", True),
+        ],
+    )
+    def test_other_institution_is_a_clear_number_conflict_only(self, result, institution, other):
+        assert NominatimProvider._names_other_institution(result, institution) is other
 
     def test_city_only_street_detection(self):
         from app.services.geocoding.bg.geojson import is_city_only_street

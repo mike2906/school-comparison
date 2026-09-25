@@ -514,6 +514,7 @@ class MoeRegistryAdapter(BaseSourceAdapter):
                 address=address,
                 country_code=school.country_code,
                 city=geocoding_city,
+                institution_name=school_name,
             )
             if result.success and result.lat is not None and result.lng is not None:
                 return result, "coords_source=nominatim"

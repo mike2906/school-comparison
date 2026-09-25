@@ -34,3 +34,21 @@ The composite provider uses a two-tier approach:
 - Exact match preferred: `("ДГ 5 НАДЕЖДА", "СТОЛИЧНА")`
 - Fallback if unique: `("ДГ 5 НАДЕЖДА", any city)` - only if school name is unique across Bulgaria
 - Ambiguous match rejected: If multiple cities have same school name, returns error with warning
+
+## Reusing a point for another record (UF44)
+
+- **Official building point first:** a location whose address gives the same street and house
+  number as a location tagged `coords_source=sofia_municipal` reuses that point (method
+  `official_point_same_address`), e.g. a private school renting floors in a state school.
+  Address agreement only (`bg/address_match.same_building`), never name similarity.
+- **GeoJSON name match, several locations:** a name identifies the institution, not the
+  building. For a school with several locations the register address must be this
+  location's and no sibling may sit within 50 m; otherwise the address tiers (Nominatim)
+  are tried. A single-location school keeps the register point.
+- `duplicate_geojson_name_match_different_address` is not terminal, so routine runs retry it.
+- Nominatim never pins a neighbourhood/settlement centre or another numbered school or
+  kindergarten (OSM amenity). Results are `exact` only when their house number (letter included) is the
+  address's own № or street number, and the query carried it; never a block, a quarter
+  number (Младост 4) or a postcode.
+- `scripts/geocode_locations.py --check-shared-points` lists one school's locations on one
+  point at different addresses (read-only).
