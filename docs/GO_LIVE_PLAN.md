@@ -1762,6 +1762,29 @@ the session scratchpad only.
       `app/services/identity_adjudication.py`. Re-run discovery/extraction for affected
       groups with dry runs and backups. No merge: registry IDs, addresses and exam results
       stay separate.
+      **(a) done 2026-09-25:** `app/scrapers/shared_site_check.py` runs after website
+      discovery, failed-URL recovery and `repair-websites`, and on its own as
+      `cli shared-site-check [--dry-run] [--report]`. It keeps a shared site only when
+      the site states the registry address, describes the level, and its subdomain/path
+      doesn't name the other level. A brand hub is replaced by the one campus subdomain
+      (named after the city or a level) that states the address and level. Otherwise the
+      site is withheld through the URL-validation state. The site's copied contact
+      address and map-link pin are cleared using the validator's strong-path helper; an
+      address confirmed by an official point is kept. Applied from the dry run taken after
+      UF44 (backup `~/backups/sofia_schools_pre_uf42a_20260925_1525.dump`). 27 shared
+      domains: `sites.google.com` is 4 separate sites; the other 26 groups (56
+      institutions) → 38 kept, 2 replaced (Maple Bear 556 → `sofia-kindergarten.maplebear.bg`,
+      596 → `sofia-school.maplebear.bg`, both `pending` until re-validated), 16 withheld
+      (framar directory 121/123/146, softuni 150, uwekind 153/634/635, weda 372/534,
+      pberon 537/546, montessori 589, state kindergarten buildings 104/105/108/134).
+      Schools with a website 440 → 424; publishable website data 347 → 329. Cleared
+      locations: 1079 (534, address only; the GeoJSON pin stays), 1082 (537) and 1091 (546)
+      (address and map-link pin; no registry address is stored, so these two have no pin
+      now). Known recall losses / follow-ups: 3-letter street names ("Ела") can't
+      be matched; campuses on a path of the same domain (`novigradini.com/pbk/`) are not
+      followed; stale registry addresses withhold real sites (uwekind moved); withheld
+      schools are `failed_validate`, so discovery may find and withhold them again each
+      run; 537/546/534 need their registry address recovered.
 - [ ] **UF44 Remaining pin gaps (after UF41/UF43).** 38 Sofia private locations have no pin:
       17 are blocked by a terminal `duplicate_geojson_name_match_different_address` and were
       never tried with the UF41 street/district logic (many ordinary addresses, e.g. ж.к.
