@@ -68,16 +68,18 @@ _KINDERGARTEN_TERMS = (
 _SCHOOL_TERM_RE = re.compile(
     r"основно училище|средно училище|начално училище|частно училище|езиково училище"
     r"|гимнази|прогимназ|начален етап"
-    r"|\b(?:[1-9]|1[0-2])\s*(?:-?(?:ви|ри|ти|ми))?\.?\s*клас"
+    # A single grade is kindergarten wording too ("подготовка за 1 клас"); a span of
+    # grades ("1 - 7 клас", "Grades 1-12") is what a school says about itself.
+    r"|\b(?:[1-9]|1[0-2])\.?\s*(?:-|–|до)\s*(?:[1-9]|1[0-2])\.?\s*клас"
     r"|high school|middle school|primary school|elementary school|secondary school"
-    r"|\bgrades?\s*(?:[1-9]|1[0-2])\b|\b(?:[1-9]|1[0-2])(?:st|nd|rd|th)\s+grade",
+    r"|\bgrades?\s*(?:[1-9]|1[0-2])\s*(?:-|–|to)\s*(?:grade\s*)?(?:[1-9]|1[0-2])\b",
     re.IGNORECASE,
 )
 
 # Level words in a URL's subdomain labels or path (not in the registrable domain,
 # which combined sites such as ``britanica-parkschool.bg`` share).
-_URL_SCHOOL_RE = re.compile(r"school|uchilishte|uchilishhe|gimnazi|училищ|гимназ")
-_URL_KINDERGARTEN_RE = re.compile(r"kindergarten|gradina|nursery|detska|градин|ясла")
+_URL_SCHOOL_RE = re.compile(r"(?<!pre)(?<!pre-)(?<!pre_)school|uchilishte|uchilishhe|gimnazi|училищ|гимназ")
+_URL_KINDERGARTEN_RE = re.compile(r"kindergarten|gradina|nursery|detska|pre-?school|градин|ясла")
 
 _CONTACT_LINK_RE = re.compile(r"contact|kontakt|контакт|за-нас|za-nas|about", re.IGNORECASE)
 
@@ -508,11 +510,14 @@ async def campus_links(reader: SiteReader, domain: str, city: str) -> list[str]:
         root = _site_root(link)
         if root not in subdomains:
             subdomains.append(root)
+    if len(subdomains) < 2:
+        return []
+    # The member's city may have a single campus among several cities' campuses.
     campuses = [
         root for root in subdomains
         if _is_campus_label(_host(root)[: -len(domain) - 1], city)
     ]
-    return campuses[:MAX_CAMPUS_CANDIDATES] if len(campuses) >= 2 else []
+    return campuses[:MAX_CAMPUS_CANDIDATES]
 
 
 async def decide_member(

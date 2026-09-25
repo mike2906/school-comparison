@@ -143,6 +143,19 @@ async def test_maple_bear_kindergarten_withheld_when_no_campus_states_its_addres
 
 
 @pytest.mark.asyncio
+async def test_hub_with_one_campus_in_the_members_city_is_still_a_hub():
+    hub, sofia, plovdiv = "https://brand.bg/", "https://sofia.brand.bg/", "https://plovdiv.brand.bg/"
+    pages = {
+        hub: page(hub, "Brand. Основно училище. Sofia: ул. Липа 5. Plovdiv: ул. Бреза 7", [sofia, plovdiv]),
+        sofia: page(sofia, "Brand Sofia. Основно училище, 1-7 клас. ул. Липа № 5"),
+        plovdiv: page(plovdiv, "Brand Plovdiv. Основно училище. ул. Бреза 7"),
+    }
+    member = Member(1, "Brand", "private", "lower_secondary", hub, ['ул. "Липа" № 5'], city="sofia")
+    decision = await decide_member(member, domain="brand.bg", reader=SiteReader(fake_fetcher(pages)))
+    assert (decision.action, decision.new_url) == (REPLACE, sofia)
+
+
+@pytest.mark.asyncio
 async def test_hub_member_without_matching_campus_is_withheld_not_kept_on_hub():
     _, school = maple_members()
     pages = maple_bear_pages()
@@ -293,7 +306,9 @@ def test_vague_addresses_have_no_key(address):
 def test_level_terms():
     assert describes_level("Частна детска градина", "kindergarten")
     assert not describes_level("Подготовка за училище, preschool", "school")
-    assert describes_level("Прием в 5. клас", "school")
+    assert describes_level("Прием в 1 - 7 клас", "school")
+    assert not describes_level("Детска градина. Подготовка за 1 клас, готови за 1-ви клас", "school")
+    assert describes_level("Grades 1-12", "school")
     assert describes_level("Elementary School, Grade 1", "school")
     assert not describes_level("Maple Bear School, Preschool program", "kindergarten")
 
@@ -303,6 +318,8 @@ def test_url_level_words_only_count_outside_the_registrable_domain():
     assert not url_names_other_level("https://sofia-kindergarten.maplebear.bg/", "kindergarten", "maplebear.bg")
     assert not url_names_other_level("https://britanica-parkschool.bg/", "kindergarten", "britanica-parkschool.bg")
     assert url_names_other_level("https://example.bg/detska-gradina/", "school", "example.bg")
+    assert not url_names_other_level("https://brand.bg/preschool/", "kindergarten", "brand.bg")
+    assert url_names_other_level("https://brand.bg/pre-school/", "school", "brand.bg")
 
 
 def test_path_hosted_platform_sites_are_not_one_shared_site():
