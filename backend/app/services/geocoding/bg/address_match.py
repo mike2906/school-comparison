@@ -107,7 +107,7 @@ def same_building(first: str, second: str, *, allow_unnumbered: bool = False) ->
 # "№ 9а", "No. 14 Е", "№47-47б" -> the number and an optional building letter. A letter
 # after a space counts only when nothing but a separator follows ("№ 2 в сградата" is 2).
 _HOUSE = r"(\d+)(?:([а-я])(?![а-я])|\s+([а-я])(?=\s*(?:[,(|]|$)))?"
-_MARKED_HOUSE_RE = re.compile(rf"(?:№|(?<![а-яa-z])no\.?)\s*{_HOUSE}")
+_MARKED_HOUSE_RE = re.compile(rf"(?:№|(?<![а-яa-z])n[оo](?![а-яa-z])\.?)\s*{_HOUSE}")
 # The number right after a street name: ул. "Кадемлия" 15, бул. Никола Вапцаров 47.
 _STREET_HOUSE_RE = re.compile(
     rf"(?<![а-яa-z]){_STREET_MARKER}\.?\s*[^\d,|№]*?[а-яa-z][^\d,|№]*?,?\s*{_HOUSE}"
@@ -122,7 +122,7 @@ def house_number(address: str) -> str | None:
     """
     text = re.sub(r"[\"'„“”«»]", " ", (address or "").translate(_LATIN_TO_CYRILLIC).casefold())
     text = re.sub(r"\([^)]*\)?", " ", text)
-    text = re.sub(r"(?<![а-яa-z])(?:бл|ет|ап|вх|офис)\.?\s*[0-9а-яa-z]+", " ", text)
+    text = re.sub(r"(?<![а-яa-z])(?:бл|ет|ап|вх|офис)(?![а-яa-z])\.?\s*[0-9а-яa-z]+", " ", text)
     text = re.sub(r"(?<![№\d])(?<!№\s)\b\d{4}\b", " ", text)  # postcodes, numbered streets
     match = _MARKED_HOUSE_RE.search(text) or _STREET_HOUSE_RE.search(text)
     if not match:
