@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, patch
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.services.geocoding.base import GeocodingResult
-from app.services.geocoding.nominatim import AREA_LEVEL_MATCH_ERROR, NominatimProvider
+from app.services.geocoding.nominatim import AREA_LEVEL_MATCH_ERROR, AREA_MISMATCH_ERROR, NominatimProvider
 from app.services.geocoding.service import GeocodingService, geocode_failure_is_terminal
 from app.scrapers.cli import _oblast_fallback_query_specs
 from app.models import School, SchoolLocation
@@ -243,6 +243,169 @@ class TestNominatimProvider:
 
         assert result.success is True
         assert result.precision == "approximate"
+
+    def test_normalize_drops_floor_apartment_and_building_notes(self):
+        provider = NominatimProvider()
+        normalized = provider._normalize_bulgarian_address(
+            'кв. Иван Вазов, ул. "Димитър Манов" № 18, ет. 3 (сграда на 47 СУ "Христо Г. Данов")'
+        )
+        assert normalized == "кв. Иван Вазов, Димитър Манов 18"
+        assert provider._normalize_bulgarian_address('ул. „Арх. Миланов” № 2, ап. 11') == "Арх. Миланов 2"
+        # Abbreviations inside street names are not floors or apartments.
+        assert provider._normalize_bulgarian_address(
+            'бул. "Кап. Петко войвода" № 12'
+        ) == "Кап. Петко войвода 12"
+
+    def test_build_candidates_street_fallback_needs_an_area(self):
+        """OSM often lacks the house number; fall back to the street, but only with its area."""
+        provider = NominatimProvider()
+        normalized = provider._normalize_bulgarian_address('кв. Витоша, ул. "Йордан Стубел" № 16')
+        candidates = provider._build_bulgarian_query_candidates(
+            normalized, city="sofia", street_fallback_area="Витоша"
+        )
+        assert candidates[-1] == "Йордан Стубел, Витоша, София"
+
+        normalized = provider._normalize_bulgarian_address('гр. София, ул. "Вършец", №11')
+        assert provider._build_bulgarian_query_candidates(
+            normalized, city="sofia", street_fallback_area="Подуяне"
+        )[-1] == "Вършец, Подуяне, София"
+        # A leading "София <postcode>" is not the street.
+        normalized = provider._normalize_bulgarian_address(
+            'София 1618, район Витоша, ул. Ралевица № 80А'
+        )
+        assert provider._build_bulgarian_query_candidates(
+            normalized, city="sofia", street_fallback_area="Витоша"
+        )[-1] == "Ралевица, Витоша, София"
+        # Without an area there is no way to tell same-named streets apart.
+        normalized = provider._normalize_bulgarian_address('гр. София, ул. "Вършец", №11')
+        assert provider._build_bulgarian_query_candidates(normalized, city="sofia") == [
+            "Вършец, 11, София"
+        ]
+
+    def test_area_check_requires_district_and_neighbourhood(self):
+        provider = NominatimProvider()
+        keywords = provider._address_area_keywords('гр. София, кв. Кремиковци, ул. "X", №2')
+        assert keywords == ["кремиковци"]
+        right = {"address": {"suburb": "кв. Кремиковци", "county": "Кремиковци"}}
+        other_village = {"address": {"village": "Горни Богров", "county": "Кремиковци"}}
+        assert provider._result_matches_expected_area(right, keywords, "Кремиковци")
+        # Right district, different village: rejected.
+        assert not provider._result_matches_expected_area(other_village, keywords, "Кремиковци")
+        # An exact house number in the right district may sit in a neighbouring quarter.
+        exact_house = {"address": {"house_number": "41", "suburb": "кв. Карпузица", "county": "Витоша"}}
+        knyazhevo = provider._address_area_keywords('кв. Княжево, ул. "Княжевска", №41')
+        assert provider._result_matches_expected_area(exact_house, knyazhevo, "Витоша")
+        assert not provider._result_matches_expected_area(exact_house, knyazhevo, None)
+        # Villages have no county; the display name still lists the район.
+        kazichene = {
+            "display_name": "Цар Борис III, Казичене, Панчарево, Столична",
+            "address": {"road": "Цар Борис III", "village": "Казичене"},
+        }
+        assert not provider._result_matches_expected_area(kazichene, [], "Красно село")
+        assert provider._result_matches_expected_area(kazichene, [], "Панчарево")
+        # The road's own name does not count as the district.
+        village_road = {
+            "display_name": "Оборище, Кокаляне, Панчарево, Столична",
+            "address": {"road": "Оборище", "village": "Кокаляне"},
+        }
+        assert not provider._result_matches_expected_area(village_road, [], "Оборище")
+        # Latin look-alike letters in source data still match.
+        assert provider._address_area_keywords("кв. Kремиковци, ул. X № 2") == ["кремиковци"]
+        # Markers without a space, and floor/micro-district markers that name no place.
+        assert provider._address_area_keywords("кв.Горна баня, ул.Вечерница 21") == ["горна"]
+        assert provider._address_area_keywords('ул. "Гургулят" № 1 - VIII м. р.') == []
+        # район is the district, not a neighbourhood.
+        assert provider._address_areas('район Витоша, ж. к. Драгалевци, ул. "Ваклинец" № 36') == (
+            ["Драгалевци"], "Витоша"
+        )
+
+    @pytest.mark.asyncio
+    async def test_geocode_rejects_same_named_street_elsewhere_and_uses_street_fallback(self):
+        """ул. Йордан Стубел 16 (кв. Витоша) must not land on Бакалов-Стубел 16 in Триадица."""
+        provider = NominatimProvider(user_agent="Test/1.0")
+        provider.MIN_REQUEST_INTERVAL = 0
+        queries = []
+
+        class MockResponse:
+            status_code = 200
+
+            def __init__(self, json_data):
+                self._json_data = json_data
+
+            def raise_for_status(self):
+                pass
+
+            def json(self):
+                return self._json_data
+
+        async def mock_get(*args, **kwargs):
+            query = kwargs["params"]["q"]
+            queries.append(query)
+            if query == "кв. Витоша, Йордан Стубел 16, София":
+                return MockResponse([{
+                    "lat": "42.6494", "lon": "23.2958",
+                    "display_name": "16, Йордан Бакалов-Стубел, кв. Манастирски ливади, София",
+                    "address": {"house_number": "16", "road": "Йордан Бакалов-Стубел",
+                                "suburb": "кв. Манастирски ливади", "city": "София",
+                                "county": "Триадица"},
+                }])
+            if query == "Йордан Стубел, Витоша, София":
+                return MockResponse([{
+                    "lat": "42.6513", "lon": "23.3306",
+                    "display_name": "Йордан Стубел, кв. Витоша, София, Лозенец",
+                    "addresstype": "road",
+                    "address": {"road": "Йордан Стубел", "suburb": "кв. Витоша",
+                                "city": "София", "county": "Лозенец"},
+                }])
+            return MockResponse([])
+
+        mock_client = AsyncMock()
+        mock_client.__aenter__.return_value = mock_client
+        mock_client.__aexit__.return_value = None
+        mock_client.get = mock_get
+
+        with patch("httpx.AsyncClient", return_value=mock_client):
+            result = await provider.geocode(
+                'кв. Витоша, ул. "Йордан Стубел" № 16', country_code="bg", city="sofia"
+            )
+
+        assert result.success is True
+        assert (result.lat, result.lng) == (42.6513, 23.3306)
+        assert result.precision == "approximate"
+        assert queries[-1] == "Йордан Стубел, Витоша, София"
+
+    @pytest.mark.asyncio
+    async def test_geocode_rejects_result_outside_known_district(self):
+        """UF38: ул. Вършец (Подуяне) must not be placed on ул. Вършец in Нови Искър."""
+        provider = NominatimProvider(user_agent="Test/1.0")
+        provider.MIN_REQUEST_INTERVAL = 0
+
+        class MockResponse:
+            status_code = 200
+
+            def raise_for_status(self):
+                pass
+
+            def json(self):
+                return [{
+                    "lat": "42.8030", "lon": "23.4211",
+                    "display_name": "Вършец, Войнеговци, Нови Искър, Столична",
+                    "address": {"road": "Вършец", "village": "Войнеговци",
+                                "county": "Нови Искър", "state_district": "Столична"},
+                }]
+
+        mock_client = AsyncMock()
+        mock_client.__aenter__.return_value = mock_client
+        mock_client.__aexit__.return_value = None
+        mock_client.get = AsyncMock(return_value=MockResponse())
+
+        with patch("httpx.AsyncClient", return_value=mock_client):
+            result = await provider.geocode(
+                'гр. София, ул. "Вършец", №11', country_code="bg", city="sofia", district="Подуяне"
+            )
+
+        assert result.success is False
+        assert result.error == AREA_MISMATCH_ERROR
 
     @pytest.mark.asyncio
     async def test_geocode_no_results(self):

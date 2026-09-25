@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import SchoolLocation, School
 from app.services.geocoding.base import BaseGeocodingProvider, GeocodingResult
-from app.services.geocoding.nominatim import AREA_LEVEL_MATCH_ERROR, NominatimProvider
+from app.services.geocoding.nominatim import AREA_LEVEL_MATCH_ERROR, AREA_MISMATCH_ERROR, NominatimProvider
 from app.services.geocoding.composite import CompositeGeocodingProvider
 from app.services.geocoding.write_gate import apply_geocode_result_to_location
 from app.config import get_settings
@@ -20,6 +20,7 @@ TERMINAL_GEOCODE_FAILURE_REASONS = frozenset({
     "duplicate_approximate_match_different_address",
     "duplicate_geojson_name_match_different_address",
     AREA_LEVEL_MATCH_ERROR,
+    AREA_MISMATCH_ERROR,
 })
 
 
@@ -241,6 +242,7 @@ class GeocodingService:
                 address=address,
                 country_code=country_code,
                 city=city,
+                district=location.district,
             )
             if not result.success and fallback_school_name:
                 geojson_result = await self.provider.geojson_provider.geocode(
@@ -258,6 +260,7 @@ class GeocodingService:
                 country_code=country_code,
                 school_name=school_name,
                 city=city,
+                district=location.district,
             )
 
         # Update database if successful
