@@ -1089,11 +1089,84 @@ def _should_clear_website_derived_data(result: ValidationResult, reason: Optiona
     return any(marker in lowered for marker in strong_markers)
 
 
+async def clear_website_derived_locations(
+    db,
+    school_id: int,
+    *,
+    keep_officially_confirmed_addresses: bool = False,
+    preview: bool = False,
+) -> list[dict]:
+    """Clear location addresses/pins copied from a website the pipeline no longer trusts.
+
+    The previous registry address is not retained when contact extraction replaces it,
+    so the address fails closed. With ``keep_officially_confirmed_addresses`` an address
+    an official register point has confirmed is kept (it is registry evidence, not only
+    the website's claim). Returns one row per changed location; ``preview`` only
+    reports them.
+    """
+    from sqlalchemy import select
+
+    from app.models import SchoolLocation
+    from app.services.geocoding.write_gate import OFFICIAL_COORDS_TAG
+
+    locations = list(
+        (
+            await db.execute(
+                select(SchoolLocation).where(SchoolLocation.school_id == school_id)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    changed: list[dict] = []
+    for location in locations:
+        tags = [str(tag) for tag in (location.location_tags or [])]
+        website_address = "address_source=website_contact" in tags
+        if website_address and keep_officially_confirmed_addresses and OFFICIAL_COORDS_TAG in tags:
+            website_address = False
+        website_coords = (
+            "coords_source=website_map_link" in tags
+            or (location.geocode_meta or {}).get("method") == "website_map_link"
+        )
+        if not (website_address or website_coords):
+            continue
+        changed.append(
+            {
+                "location_id": location.id,
+                "school_id": school_id,
+                "address_before": dict(location.address_i18n or {}),
+                "lat_before": location.lat,
+                "lng_before": location.lng,
+                "clears_address": website_address,
+                "clears_coords": website_coords,
+            }
+        )
+        if preview:
+            continue
+        if website_address:
+            location.address_i18n = {}
+        if website_coords:
+            location.lat = None
+            location.lng = None
+            location.geocode_meta = {}
+        location.location_tags = [
+            tag
+            for tag in tags
+            if tag not in {
+                "address_source=website_contact",
+                "coords_source=website_map_link",
+            }
+            or (tag == "address_source=website_contact" and not website_address)
+        ]
+        db.add(location)
+    return changed
+
+
 async def _clear_website_derived_school_data(db, school) -> None:
     """Remove fields derived from a confirmed wrong website in the same transaction."""
-    from sqlalchemy import delete, select
+    from sqlalchemy import delete
 
-    from app.models import FieldSource, Pricing, SchoolLocation
+    from app.models import FieldSource, Pricing
     from app.models.field_source import SourceType
     from app.models.pricing import PriceSource
 
@@ -1111,40 +1184,7 @@ async def _clear_website_derived_school_data(db, school) -> None:
     admission_info.pop("website_extracted", None)
     school.admission_info = admission_info
 
-    locations = list(
-        (
-            await db.execute(
-                select(SchoolLocation).where(SchoolLocation.school_id == school.id)
-            )
-        )
-        .scalars()
-        .all()
-    )
-    for location in locations:
-        tags = [str(tag) for tag in (location.location_tags or [])]
-        website_address = "address_source=website_contact" in tags
-        website_coords = (
-            "coords_source=website_map_link" in tags
-            or (location.geocode_meta or {}).get("method") == "website_map_link"
-        )
-        if website_address:
-            # The previous registry address is not retained when contact extraction
-            # replaces it, so fail closed instead of publishing the wrong address.
-            location.address_i18n = {}
-        if website_coords:
-            location.lat = None
-            location.lng = None
-            location.geocode_meta = {}
-        if website_address or website_coords:
-            location.location_tags = [
-                tag
-                for tag in tags
-                if tag not in {
-                    "address_source=website_contact",
-                    "coords_source=website_map_link",
-                }
-            ]
-            db.add(location)
+    await clear_website_derived_locations(db, school.id)
 
     await db.execute(
         delete(Pricing).where(

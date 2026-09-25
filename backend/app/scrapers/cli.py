@@ -549,6 +549,84 @@ def repair_out_of_bounds_geocodes(school, school_id, city, country, limit, dry_r
     )
 
 
+@cli.command("shared-site-check")
+@click.option("--school-id", "school_ids", type=int, multiple=True, help="Only groups containing this school (repeatable)")
+@click.option("--city", default=None, help="Only groups with a member in this city (default: whole country)")
+@click.option("--country", default="bg", show_default=True, help="Country code")
+@click.option("--dry-run", is_flag=True, help="Report decisions without writing data")
+@click.option(
+    "--report",
+    "report_path",
+    type=click.Path(dir_okay=False, path_type=Path),
+    help="Write the full per-institution report as JSON",
+)
+def shared_site_check_command(school_ids, city, country, dry_run, report_path):
+    """Keep, replace (brand hub -> campus) or withhold websites shared by 2+ institutions."""
+    asyncio.run(
+        _shared_site_check_command(
+            school_ids=builtins.list(school_ids) or None,
+            city=city,
+            country=country,
+            dry_run=dry_run,
+            report_path=report_path,
+        )
+    )
+
+
+async def _shared_site_check_command(*, school_ids, city, country, dry_run, report_path):
+    import json
+
+    from app.database import async_session_maker
+
+    async with async_session_maker() as db:
+        report = await _run_shared_site_check(
+            db, country=country, city=city, school_ids=school_ids, dry_run=dry_run
+        )
+    if report_path is not None:
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(json.dumps(report, ensure_ascii=False, indent=1), encoding="utf-8")
+        console.print(f"Report: {report_path}")
+
+
+async def _run_shared_site_check(
+    db,
+    *,
+    country: str,
+    city: Optional[str] = None,
+    school_ids: Optional[list[int]] = None,
+    dry_run: bool = False,
+) -> dict:
+    """UF42(a): check websites shared by 2+ institutions; runs after website discovery."""
+    from app.scrapers.shared_site_check import run_shared_site_check
+
+    report = await run_shared_site_check(
+        db, country=country, city=city, school_ids=school_ids, dry_run=dry_run
+    )
+    mode = "dry-run" if dry_run else "applied"
+    console.print(f"[cyan]Shared-site check ({mode})[/cyan]")
+    table = Table(show_header=True, header_style="bold cyan")
+    for column in ("Group", "ID", "Level", "Decision", "Reason", "URL"):
+        table.add_column(column)
+    for group in report["groups"]:
+        for row in group["members"]:
+            table.add_row(
+                group["group"],
+                str(row["school_id"]),
+                row["education_level"],
+                row["action"],
+                row["reason"],
+                row["new_url"] or row["current_url"],
+            )
+    if report["groups"]:
+        console.print(table)
+    counts = report["counts"]
+    console.print(
+        f"groups={counts['groups']} institutions={counts['institutions']} "
+        f"kept={counts['kept']} replaced={counts['replaced']} withheld={counts['withheld']}"
+    )
+    return report
+
+
 @cli.command("promote-curated-identities")
 @click.option(
     "--school-id",
@@ -876,8 +954,10 @@ async def _run_sync(
                                 console.print("[yellow]Discover stage runs in batch mode only[/yellow]")
                             elif stage == "discover-websites":
                                 await _run_discover_website(db, school_id, country)
+                                await _run_shared_site_check(db, country=country, school_ids=[school_id])
                             elif stage == "recover-failed-urls":
                                 await _run_recover_failed_school(db, school_id, country)
+                                await _run_shared_site_check(db, country=country, school_ids=[school_id])
                             elif stage == "validate-urls":
                                 await _run_validate_url(db, school_id, country)
                             elif stage == "navigate":
@@ -2641,6 +2721,8 @@ async def _repair_websites_command(
                     await _run_recover_failed_school(db, target_school_id, country)
                 except Exception as exc:
                     logger.error("Failed website recovery for school %s: %s", target_school_id, exc)
+            # Recovery sets new URLs; they go through the shared-site check like discovery.
+            await _run_shared_site_check(db, country=country, school_ids=failed_validate_ids)
 
             schools = (await db.execute(query)).scalars().all()
 
@@ -3075,6 +3157,9 @@ async def _run_recover_failed_urls_batch(db, country: str, city: str, limit: Opt
     console.print(f"  No official website: {terminal_count}")
     console.print(f"  Skipped: {skipped_count}")
 
+    # Recovery rediscovers websites too, so it gets the same shared-site check.
+    await _run_shared_site_check(db, country=country, school_ids=school_ids)
+
     return _stage_summary(
         processed=len(school_ids),
         succeeded=validated_count,
@@ -3155,6 +3240,8 @@ async def _run_discover_websites_batch(db, country: str, city: str, limit: Optio
     console.print(f"  Found: {found_count}")
     console.print(f"  Updated: {updated_count}")
     console.print(f"  Unchanged: {len(schools) - updated_count}")
+
+    await _run_shared_site_check(db, country=country, school_ids=[school.id for school in schools])
 
     return _stage_summary(
         processed=len(schools),
@@ -3452,6 +3539,7 @@ async def _run_all_stages(db, school_id: int, country: str):
 
         if stage == "discover-websites":
             await _run_discover_website(db, school_id, country)
+            await _run_shared_site_check(db, country=country, school_ids=[school_id])
         elif stage == "validate-urls":
             await _run_validate_url(db, school_id, country)
         elif stage == "navigate":
