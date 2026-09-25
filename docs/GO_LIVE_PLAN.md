@@ -1742,11 +1742,36 @@ the session scratchpad only.
       (`sofia-school.maplebear.bg`; maplebear.bg links the kindergarten to
       `sofia-vitosha.maplebear.bg`), so its scraped pages describe the school; 596 points at
       the national `maplebear.bg`. 25 website domains are shared by 2+ institutions.
-      Proposed: (a) audit shared-domain groups by registrable domain for wrong website
-      assignments and missing campuses/age groups, fixing with evidence; (b) a curated
-      `attributes.related` link (`{"school_id", "relation": "continues_to"}`) published
-      through the allowlist and shown as one line on the detail page. No merge: registry
-      IDs, addresses, and exam results stay separate. Wait for Mike on (b) (publish boundary).
+      **Approach (Mike, 2026-09-25): fix the process, not the records; nothing Sofia-specific
+      (the aim is country-wide and beyond).**
+      (a) *Shared-site check after website discovery:* group institutions by registrable
+      domain; for a group of 2+, accept a site for an institution only with evidence tying it
+      to that institution (site contact address ≈ registry address, education level fits;
+      for a brand hub like maplebear.bg that lists campus sites, follow the link whose
+      address/city matches). Otherwise withhold the website and its extracted data. The
+      identity pilot showed page text alone cannot separate a kindergarten from its sibling
+      school on one domain: the education-level guard is the defence.
+      (b) *Campuses and age groups from the verified site:* several addresses on the
+      contact page become extra locations; stated levels (Grade 0) become age groups.
+      Extends the existing primary-address sync in `extractor.py`.
+      (c) *Relationship computed, not curated:* within a verified group, same brand,
+      kindergarten → school gives `continues_to`; published through the allowlist as one line
+      on the detail page (publish boundary: Mike approved the idea, 2026-09-25).
+      Start from `scripts/derive_school_groups.py` (read-only group derivation, already
+      handles "Maple Bear" vs "Канадско мече") and `_registrable_domain` in
+      `app/services/identity_adjudication.py`. Re-run discovery/extraction for affected
+      groups with dry runs and backups. No merge: registry IDs, addresses and exam results
+      stay separate.
+- [ ] **UF44 Remaining pin gaps (after UF41/UF43).** 38 Sofia private locations have no pin:
+      17 are blocked by a terminal `duplicate_geojson_name_match_different_address` and were
+      never tried with the UF41 street/district logic (many ordinary addresses, e.g. ж.к.
+      Редута); several sit in a state school's or university's building ("… на ПГЕХ", УАСГ,
+      ВТУ) that now has an official point. Retry through Nominatim with dry runs; reuse the
+      host building's official point when the address matches. Also guard the GeoJSON
+      name-match fallback for schools with several locations (it gave ДГ №149's second
+      building the main building's point, UF41); no same-school pins currently share a point
+      at different addresses. 8 state locations still have no pin: fix individually with
+      evidence (report `backend/reports/municipal-points/`).
 
 ## Phase 3 — Go live
 
