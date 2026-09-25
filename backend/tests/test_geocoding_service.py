@@ -244,14 +244,28 @@ class TestNominatimProvider:
         assert result.success is True
         assert result.precision == "approximate"
 
-    def test_exact_only_for_the_house_number_asked_for(self):
-        asked = NominatimProvider._house_number_was_asked
-        assert asked("23", "Свети Седмочисленици 23, кв. Лозенец, София")
-        assert asked("257А", "ж.к. Гоце Делчев, бл. 257Аа, София")
-        assert asked("бл. 460А", "ж.к. Младост 4, бл. 460А, София")
-        assert not asked("9", "Свети Седмочисленици 23, кв. Лозенец, София")
-        assert not asked("16", "Йордан Стубел, кв. Витоша, София")  # street-only query
-        assert not asked(None, "Букара 15, София")
+    @pytest.mark.parametrize(
+        ("result_number", "address", "query", "exact"),
+        [
+            ("23", 'кв. Лозенец, ул. "Св. Седмочисленици" № 23', "Свети Седмочисленици 23, кв. Лозенец, София", True),
+            ("9", 'кв. Лозенец, ул. "Св. Седмочисленици" № 23', "Свети Седмочисленици 23, кв. Лозенец, София", False),
+            ("15", 'ул. "Кадемлия" 15, в сградата на ПГ', "Кадемлия 15, София", True),
+            ("9А", 'ж. к. Горна баня, ул. "Синьо езеро" № 9а', "Синьо езеро 9а, София", True),
+            # Letters must agree: 15А is not 15Б, and 15 is not 15А.
+            ("15Б", "ул. Тест № 15А", "Тест 15А, София", False),
+            ("15", "ул. Тест № 15А", "Тест 15А, София", False),
+            ("15А", "ул. Тест № 15", "Тест 15, София", False),
+            # No house number asked for: a quarter number, a block, a postcode.
+            ("4", 'ж.к. Младост 4, ул. "Тест"', "ж.к. Младост 4, Тест, София", False),
+            ("460А", "ж. к. Младост 4, бл. 460А, вх. 2, ет. 5, ап. 18", "ж.к. Младост 4, бл. 460А, София", False),
+            ("1616", 'гр. София, кв. Бояна, ул. "Деян Гьоргов", 1616', "Деян Гьоргов, кв. Бояна, София 1616", False),
+            # The street-only fallback query does not ask for the number.
+            ("16", 'кв. Витоша, ул. "Йордан Стубел" № 16', "Йордан Стубел, кв. Витоша, София", False),
+            (None, 'ул. "Букара" № 15', "Букара 15, София", False),
+        ],
+    )
+    def test_exact_only_for_the_house_number_asked_for(self, result_number, address, query, exact):
+        assert NominatimProvider._house_number_was_asked(result_number, address, query) is exact
 
     def test_normalize_drops_floor_apartment_and_building_notes(self):
         provider = NominatimProvider()

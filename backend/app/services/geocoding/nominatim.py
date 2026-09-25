@@ -6,6 +6,7 @@ import re
 import httpx
 
 from app.services.geocoding.base import BaseGeocodingProvider, GeocodingResult
+from app.services.geocoding.bg.address_match import house_number, same_house_number
 
 logger = logging.getLogger(__name__)
 
@@ -457,18 +458,20 @@ class NominatimProvider(BaseGeocodingProvider):
         return bool(expected_tokens.intersection(result_tokens))
 
     @staticmethod
-    def _house_number_was_asked(house_number: object, query: str) -> bool:
-        """Whether a result's house number is one the query asked for.
+    def _house_number_was_asked(result_house_number: object, address: str, query: str) -> bool:
+        """Whether a result's house number is exactly the one the address asks for.
 
-        Nominatim can answer "Седмочисленици 23" with a shop at № 9 on the same street, or
-        a street-only query with some house on it: right street, not the building.
+        Nominatim can answer "Седмочисленици 23" with a shop at № 9 on the same street, or a
+        street-only query with some house on it: right street, not the building. Only the
+        address's own house number counts (not blocks, "Младост 4" or postcodes), letters
+        included (15А is not 15Б or 15), and the query must still carry it (the street-only
+        fallback does not).
         """
-        if not isinstance(house_number, str):
+        wanted = house_number(address)
+        if not wanted or not same_house_number(result_house_number, address):
             return False
-        number = re.search(r"\d+", house_number)
-        return bool(number) and number.group().lstrip("0") in {
-            n.lstrip("0") for n in re.findall(r"\d+", query)
-        }
+        digits = re.match(r"\d+", wanted).group()
+        return re.search(rf"(?<!\d)0*{digits}(?!\d)", query) is not None
 
     @staticmethod
     def _is_area_level_result(result: dict) -> bool:
@@ -581,7 +584,7 @@ class NominatimProvider(BaseGeocodingProvider):
                     address_details = result.get("address") or {}
                     precision = (
                         "exact"
-                        if self._house_number_was_asked(address_details.get("house_number"), query)
+                        if self._house_number_was_asked(address_details.get("house_number"), address, query)
                         else "approximate"
                     )
 

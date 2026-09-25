@@ -102,3 +102,41 @@ def same_building(first: str, second: str, *, allow_unnumbered: bool = False) ->
     if not a.street and not b.street:
         return bool(a.areas & b.areas)
     return False
+
+
+# "№ 9а", "No. 14 Е", "№47-47б" -> the number and an optional building letter. A letter
+# after a space counts only when nothing but a separator follows ("№ 2 в сградата" is 2).
+_HOUSE = r"(\d+)(?:([а-я])(?![а-я])|\s+([а-я])(?=\s*(?:[,(|]|$)))?"
+_MARKED_HOUSE_RE = re.compile(rf"(?:№|(?<![а-яa-z])no\.?)\s*{_HOUSE}")
+# The number right after a street name: ул. "Кадемлия" 15, бул. Никола Вапцаров 47.
+_STREET_HOUSE_RE = re.compile(
+    rf"(?<![а-яa-z]){_STREET_MARKER}\.?\s*[^\d,|№]*?[а-яa-z][^\d,|№]*?,?\s*{_HOUSE}"
+)
+
+
+def house_number(address: str) -> str | None:
+    """The house number an address asks for ("15а"), or None.
+
+    Only a marked number (№, No) or the one right after the street name. Block numbers,
+    neighbourhood numbers (Младост 4), floors and postcodes are not house numbers.
+    """
+    text = re.sub(r"[\"'„“”«»]", " ", (address or "").translate(_LATIN_TO_CYRILLIC).casefold())
+    text = re.sub(r"\([^)]*\)?", " ", text)
+    text = re.sub(r"(?<![а-яa-z])(?:бл|ет|ап|вх|офис)\.?\s*[0-9а-яa-z]+", " ", text)
+    text = re.sub(r"(?<![№\d])(?<!№\s)\b\d{4}\b", " ", text)  # postcodes, numbered streets
+    match = _MARKED_HOUSE_RE.search(text) or _STREET_HOUSE_RE.search(text)
+    if not match:
+        return None
+    return match.group(1).lstrip("0") + (match.group(2) or match.group(3) or "")
+
+
+def same_house_number(result_house_number: object, address: str) -> bool:
+    """Whether a geocoder's house number is exactly the one the address asks for."""
+    wanted = house_number(address)
+    if not wanted or not isinstance(result_house_number, str):
+        return False
+    found = re.match(
+        r"\s*(\d+)\s*([а-я])?(?![а-я\d])",
+        result_house_number.translate(_LATIN_TO_CYRILLIC).casefold(),
+    )
+    return bool(found) and found.group(1).lstrip("0") + (found.group(2) or "") == wanted
