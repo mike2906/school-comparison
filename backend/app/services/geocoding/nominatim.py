@@ -10,20 +10,33 @@ from app.services.geocoding.bg.address_match import house_number, same_house_num
 
 logger = logging.getLogger(__name__)
 
-# A result of one of these types is a settlement or administrative area, returned at its
-# centroid (e.g. the Sofia city node when no street matched). It carries no information
-# about where the school is, so it must be treated as "no coordinates".
+# A result of one of these types is a settlement, neighbourhood or administrative area,
+# returned at its centroid (the Sofia city node, the middle of ж.к. Борово) when no street
+# matched. It carries no information about where the school is: "no coordinates".
 AREA_LEVEL_RESULT_TYPES = frozenset({
     "city",
     "town",
+    "village",
+    "hamlet",
+    "isolated_dwelling",
+    "locality",
     "municipality",
     "city_district",
+    "borough",
+    "suburb",
+    "quarter",
+    "neighbourhood",
+    "residential",
+    "allotments",
     "county",
     "state_district",
     "state",
     "region",
     "country",
 })
+# The result is a school/kindergarten/nursery numbered differently from the location's own.
+OTHER_INSTITUTION_ERROR = "other_institution_match"
+_INSTITUTION_RESULT_TYPES = frozenset({"school", "kindergarten", "childcare", "college"})
 AREA_LEVEL_MATCH_ERROR = "area_level_match_only"
 # Every result named a street in a different neighbourhood/district than the address.
 AREA_MISMATCH_ERROR = "area_mismatch"
@@ -474,6 +487,23 @@ class NominatimProvider(BaseGeocodingProvider):
         return re.search(rf"(?<!\d)0*{digits}(?!\d)", query) is not None
 
     @staticmethod
+    def _names_other_institution(result: dict, institution_name: Optional[str]) -> bool:
+        """Whether the result is another numbered institution ("ДГ №130" for ДГ №128).
+
+        Conservative: only a school/kindergarten/nursery amenity whose name and the
+        location's institution name both carry a number, and the numbers differ.
+        """
+        if not institution_name or result.get("class", result.get("category")) != "amenity":
+            return False
+        if result.get("type") not in _INSTITUTION_RESULT_TYPES:
+            return False
+        address = result.get("address") if isinstance(result.get("address"), dict) else {}
+        name = result.get("name") or address.get("amenity")
+        ours = re.search(r"\d+", institution_name)
+        theirs = re.search(r"\d+", name) if isinstance(name, str) else None
+        return bool(ours and theirs) and ours.group().lstrip("0") != theirs.group().lstrip("0")
+
+    @staticmethod
     def _is_area_level_result(result: dict) -> bool:
         """Return whether a Nominatim result is a whole settlement/area, not a place in it."""
         result_type = result.get("addresstype") or result.get("type")
@@ -486,6 +516,7 @@ class NominatimProvider(BaseGeocodingProvider):
         school_name: Optional[str] = None,
         city: Optional[str] = None,
         district: Optional[str] = None,
+        institution_name: Optional[str] = None,
     ) -> GeocodingResult:
         """
         Geocode an address using Nominatim.
@@ -496,6 +527,8 @@ class NominatimProvider(BaseGeocodingProvider):
             school_name: Optional school name (not used by Nominatim)
             city: Optional city name (not used by Nominatim - address should be complete)
             district: Optional known district (район), checked against the result
+            institution_name: The location's institution; a result that is another numbered
+                school/kindergarten is rejected
 
         Returns:
             GeocodingResult with coordinates or error
@@ -522,6 +555,7 @@ class NominatimProvider(BaseGeocodingProvider):
 
         rejected_area_level = False
         rejected_area_mismatch = False
+        rejected_other_institution = False
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 for query in search_queries:
@@ -568,6 +602,15 @@ class NominatimProvider(BaseGeocodingProvider):
                         )
                         rejected_area_mismatch = True
                         continue
+                    if self._names_other_institution(result, institution_name or school_name):
+                        logger.warning(
+                            "Nominatim: Rejected another institution for query '%s' (%s): %s",
+                            query,
+                            institution_name or school_name,
+                            result.get("display_name"),
+                        )
+                        rejected_other_institution = True
+                        continue
                     if self._is_area_level_result(result):
                         logger.warning(
                             "Nominatim: Rejected area-level result (%s) for query '%s': %s",
@@ -607,7 +650,8 @@ class NominatimProvider(BaseGeocodingProvider):
                 return GeocodingResult(
                     success=False,
                     error=(
-                        AREA_LEVEL_MATCH_ERROR if rejected_area_level
+                        OTHER_INSTITUTION_ERROR if rejected_other_institution
+                        else AREA_LEVEL_MATCH_ERROR if rejected_area_level
                         else AREA_MISMATCH_ERROR if rejected_area_mismatch
                         else "No results found"
                     ),

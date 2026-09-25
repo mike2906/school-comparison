@@ -8,7 +8,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import SchoolLocation, School
 from app.services.geocoding.base import BaseGeocodingProvider, GeocodingResult
 from app.services.geocoding.bg.address_match import same_building
-from app.services.geocoding.nominatim import AREA_LEVEL_MATCH_ERROR, AREA_MISMATCH_ERROR, NominatimProvider
+from app.services.geocoding.nominatim import (
+    AREA_LEVEL_MATCH_ERROR,
+    AREA_MISMATCH_ERROR,
+    OTHER_INSTITUTION_ERROR,
+    NominatimProvider,
+)
 from app.services.geocoding.composite import CompositeGeocodingProvider
 from app.services.geocoding.write_gate import (
     OFFICIAL_COORDS_TAG,
@@ -39,6 +44,7 @@ TERMINAL_GEOCODE_FAILURE_REASONS = frozenset({
     "duplicate_approximate_match_different_address",
     AREA_LEVEL_MATCH_ERROR,
     AREA_MISMATCH_ERROR,
+    OTHER_INSTITUTION_ERROR,
 })
 
 
@@ -298,6 +304,7 @@ class GeocodingService:
                 country_code=country_code,
                 city=city,
                 district=location.district,
+                institution_name=fallback_school_name,
             )
             if not result.success and fallback_school_name:
                 geojson_result = await self.provider.geojson_provider.geocode(
@@ -318,6 +325,7 @@ class GeocodingService:
                 school_name=school_name,
                 city=city,
                 district=location.district,
+                institution_name=fallback_school_name,
             )
             conflict = await self._name_match_conflict(location, address, result)
             if conflict:
@@ -329,6 +337,7 @@ class GeocodingService:
                         country_code=country_code,
                         city=city,
                         district=location.district,
+                        institution_name=fallback_school_name,
                     )
                     if result.success:
                         result.method = "nominatim_fallback"

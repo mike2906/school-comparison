@@ -51,6 +51,7 @@ class CompositeGeocodingProvider(BaseGeocodingProvider):
         school_name: Optional[str] = None,
         city: Optional[str] = None,
         district: Optional[str] = None,
+        institution_name: Optional[str] = None,
     ) -> GeocodingResult:
         """
         Geocode with fallback strategy.
@@ -91,6 +92,7 @@ class CompositeGeocodingProvider(BaseGeocodingProvider):
             country_code=country_code,
             city=city,
             district=district,
+            institution_name=institution_name or school_name,
         )
         if result.success:
             result.method = "nominatim_fallback"

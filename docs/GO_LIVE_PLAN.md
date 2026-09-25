@@ -1790,6 +1790,18 @@ the session scratchpad only.
       3120 (ДГ №150): not in the municipal layer, and OSM has none or a point on another
       street; 22 private locations with no or out-of-area Nominatim result (incl. the УАСГ and
       ВТУ tenants 1078, 1117, 836, which have no official point).
+      **Correction (same PR, after Codex P1):** a Nominatim pin is exact only for the address's
+      own № / street house number, letter included (not a block, "Младост 4" or a postcode);
+      a neighbourhood/settlement centre (suburb, quarter, residential, village…) is not a pin;
+      a school/kindergarten amenity with a different number ("ДГ №130" for ДГ №128) is
+      rejected. Every stored exact Nominatim pin was re-checked through the pipeline, plus the
+      3 stored area-centre pins (37 locations; dry run `backend/reports/uf44/20260925T124813Z/`,
+      backup `~/backups/sofia_schools_pre_uf44b_20260925_1548.dump`): 17 relabelled
+      approximate, 12 moved, 8 withheld (1107/1108/1123 area mismatch; 783, 1137 area centre;
+      3035, 3036, 3109 no street-level result). 3086 is now an approximate street pin, no longer
+      the other kindergarten's point. Sofia locations without a pin: private 27 → 32 (the
+      baseline includes UF42a's cleared 1082/1091), state 4 → 7. Follow-up: 3024, 3112, 3115 keep
+      pins the current pipeline does not reproduce (no result / area mismatch).
 
 ## Phase 3 — Go live
 

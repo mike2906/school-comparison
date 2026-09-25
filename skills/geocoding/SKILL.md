@@ -46,7 +46,8 @@ The composite provider uses a two-tier approach:
   location's and no sibling may sit within 50 m; otherwise the address tiers (Nominatim)
   are tried. A single-location school keeps the register point.
 - `duplicate_geojson_name_match_different_address` is not terminal, so routine runs retry it.
-- Nominatim results are `exact` only when their house number (letter included) is the
+- Nominatim never pins a neighbourhood/settlement centre or another numbered school or
+  kindergarten (OSM amenity). Results are `exact` only when their house number (letter included) is the
   address's own № or street number, and the query carried it; never a block, a quarter
   number (Младост 4) or a postcode.
 - `scripts/geocode_locations.py --check-shared-points` lists one school's locations on one

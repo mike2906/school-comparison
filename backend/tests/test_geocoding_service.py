@@ -4,7 +4,12 @@ from unittest.mock import AsyncMock, patch
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.services.geocoding.base import GeocodingResult
-from app.services.geocoding.nominatim import AREA_LEVEL_MATCH_ERROR, AREA_MISMATCH_ERROR, NominatimProvider
+from app.services.geocoding.nominatim import (
+    AREA_LEVEL_MATCH_ERROR,
+    AREA_MISMATCH_ERROR,
+    OTHER_INSTITUTION_ERROR,
+    NominatimProvider,
+)
 from app.services.geocoding.service import GeocodingService, geocode_failure_is_terminal
 from app.scrapers.cli import _oblast_fallback_query_specs
 from app.models import School, SchoolLocation
@@ -1979,16 +1984,17 @@ class TestCityCentroidGuards:
         assert result.success is True
         assert (result.lat, result.lng) == (42.6690, 23.4032)
 
-    async def test_nominatim_keeps_neighbourhood_result(self):
-        """Only whole settlements/administrative areas are rejected, not a named quarter."""
+    @pytest.mark.parametrize("area_type", ["quarter", "suburb", "neighbourhood", "residential"])
+    async def test_nominatim_rejects_neighbourhood_centre(self, area_type):
+        """UF44: the middle of a ж.к. says nothing about where the school is (783, 1147)."""
         provider = NominatimProvider(user_agent="Test/1.0")
         provider.MIN_REQUEST_INTERVAL = 0
         quarter = {
             "lat": "42.7256471",
             "lon": "23.2501109",
             "class": "place",
-            "type": "quarter",
-            "addresstype": "quarter",
+            "type": area_type,
+            "addresstype": area_type,
             "display_name": "ж.к. Люлин 2, София",
             "address": {"city": "София"},
         }
@@ -1997,7 +2003,53 @@ class TestCityCentroidGuards:
         with patch("httpx.AsyncClient", return_value=client):
             result = await provider.geocode("ж.к. Люлин 2", country_code="bg", city="sofia")
 
-        assert result.success is True
+        assert result.success is False
+        assert result.error == AREA_LEVEL_MATCH_ERROR
+
+    # Shape of the OSM answer for ДГ №128's second building (location 3086).
+    OTHER_KINDERGARTEN = {
+        "lat": "42.7034056",
+        "lon": "23.2824907",
+        "class": "amenity",
+        "type": "kindergarten",
+        "addresstype": "amenity",
+        "name": "ДГ №130 „Приказка“",
+        "display_name": "ДГ №130 „Приказка“, 2, Суходолска, ж.к. Западен парк, София",
+        "address": {"amenity": "ДГ №130 „Приказка“", "house_number": "2", "road": "Суходолска",
+                    "city": "София"},
+    }
+
+    async def test_nominatim_rejects_another_numbered_institution(self):
+        provider = NominatimProvider(user_agent="Test/1.0")
+        provider.MIN_REQUEST_INTERVAL = 0
+        client = self._mock_client({"Суходолска 2, София": [self.OTHER_KINDERGARTEN]})
+
+        with patch("httpx.AsyncClient", return_value=client):
+            result = await provider.geocode(
+                'гр. София, ж.к. Западен парк, ул. "Суходолска", №2',
+                country_code="bg",
+                city="sofia",
+                institution_name="ДГ №128 Феникс - сграда 2 (с яслени групи)",
+            )
+
+        assert result.success is False
+        assert result.error == OTHER_INSTITUTION_ERROR
+        assert geocode_failure_is_terminal(
+            {"status": "failed", "provider": "nominatim", "rejection_reason": result.error}
+        )
+
+    @pytest.mark.parametrize(
+        ("result", "institution", "other"),
+        [
+            (OTHER_KINDERGARTEN, "ДГ №130 Приказка", False),  # the same institution
+            (OTHER_KINDERGARTEN, "Частна детска градина Слънце", False),  # no number: no clear conflict
+            ({**OTHER_KINDERGARTEN, "name": "Детска градина", "address": {}}, "ДГ №128", False),
+            ({**OTHER_KINDERGARTEN, "class": "building", "type": "yes"}, "ДГ №128", False),
+            ({**OTHER_KINDERGARTEN, "type": "school", "name": "17 СУ Дамян Груев"}, "128 СУ", True),
+        ],
+    )
+    def test_other_institution_is_a_clear_number_conflict_only(self, result, institution, other):
+        assert NominatimProvider._names_other_institution(result, institution) is other
 
     def test_city_only_street_detection(self):
         from app.services.geocoding.bg.geojson import is_city_only_street
