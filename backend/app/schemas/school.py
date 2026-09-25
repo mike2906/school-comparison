@@ -227,7 +227,8 @@ class SchoolLocationBase(BaseModel):
         validation_alias="location_tags",
         exclude=True,
     )
-    raw_geocode_meta: Optional[dict] = Field(
+    # Any, not dict: a malformed JSON value must not fail the whole response.
+    raw_geocode_meta: Any = Field(
         default=None,
         validation_alias="geocode_meta",
         exclude=True,
