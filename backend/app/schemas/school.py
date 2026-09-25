@@ -242,7 +242,8 @@ class SchoolLocationBase(BaseModel):
     def coordinates_approximate(self) -> bool:
         """The pin is street/area level, not the building (only this flag is published)."""
         meta = self.raw_geocode_meta if isinstance(self.raw_geocode_meta, dict) else {}
-        return self.lat is not None and meta.get("precision") == "approximate"
+        has_pin = self.lat is not None and self.lng is not None
+        return has_pin and meta.get("precision") == "approximate"
 
     @field_validator("address_i18n", mode="before")
     @classmethod

@@ -515,6 +515,7 @@ function ComparePage() {
 
       map.set(school.id, {
         distance,
+        distanceApproximate: Boolean(primaryLocation?.coordinates_approximate),
         pricingRange,
         nvoDetail,
         overallLatest,
@@ -801,12 +802,17 @@ function ComparePage() {
       {
         label: t('compare.labels.distance'),
         getValue: (school) => {
-          const distance = metricsById.get(school.id)?.distance
+          const metrics = metricsById.get(school.id)
+          const distance = metrics?.distance
           if (!userLocation) {
             return renderPlaceholder('compare.distanceNotSet')
           }
           return distance != null
-            ? <span className="text-sm text-neutral-700">{formatDistance(distance)}</span>
+            ? (
+              <span className="text-sm text-neutral-700">
+                {formatDistance(distance, { approximate: metrics.distanceApproximate })}
+              </span>
+            )
             : renderPlaceholder()
         },
         getCompare: (school) => metricsById.get(school.id)?.distance ?? null,
@@ -1170,7 +1176,9 @@ function ComparePage() {
                     <div>{getAddress(location, i18n.language)}</div>
                     <div className="text-xs text-neutral-500">
                       {shiftInfo?.shift ? t(`schoolCard.shift.${shiftInfo.shift}`) : null}
-                      {distance != null ? ` • ${formatDistance(distance)}` : ''}
+                      {distance != null
+                        ? ` • ${formatDistance(distance, { approximate: location.coordinates_approximate })}`
+                        : ''}
                     </div>
                   </div>
                 )

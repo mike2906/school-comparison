@@ -548,6 +548,10 @@ function PopupContent({
           </div>
         )}
 
+        {marker.location.coordinates_approximate && (
+          <p className="text-xs text-neutral-500">{t('map.approximatePin')}</p>
+        )}
+
         {/* The groups are already in the badge row; only add shift / care details here. */}
         {(shiftLabel || hasOrganisedGroups) && (
           <div className="flex flex-wrap items-center gap-2 text-neutral-500">

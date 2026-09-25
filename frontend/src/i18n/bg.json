@@ -220,7 +220,8 @@
     "showingInArea": "Показване на {{shown}} от {{total}} училища в тази област",
     "locationsFor": "Локации за {{name}}",
     "legendSchool": "Училище",
-    "legendKindergarten": "Детска градина"
+    "legendKindergarten": "Детска градина",
+    "approximatePin": "Приблизително местоположение (по улица)"
   },
   "pricing": {
     "title": "Цени",

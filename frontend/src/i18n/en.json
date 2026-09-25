@@ -220,7 +220,8 @@
     "showingInArea": "Showing {{shown}} of {{total}} schools in this area",
     "locationsFor": "Locations for {{name}}",
     "legendSchool": "School",
-    "legendKindergarten": "Kindergarten"
+    "legendKindergarten": "Kindergarten",
+    "approximatePin": "Approximate location (street level)"
   },
   "pricing": {
     "title": "Pricing",
