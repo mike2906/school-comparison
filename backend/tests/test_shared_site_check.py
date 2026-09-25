@@ -322,6 +322,35 @@ def test_url_level_words_only_count_outside_the_registrable_domain():
     assert url_names_other_level("https://brand.bg/pre-school/", "school", "brand.bg")
 
 
+def test_platform_tenant_pages_group_with_their_site_root():
+    assert site_group_key("https://sites.google.com/view/foo") == site_group_key(
+        "https://sites.google.com/view/foo/contact"
+    )
+    assert site_group_key("https://sites.google.com/view/foo") != site_group_key("https://sites.google.com/view/bar")
+    assert ssc.site_id("https://sites.google.com/126ou.net/new/kontakti") == "sites.google.com/126ou.net/new"
+
+
+def test_platform_with_unknown_tenant_prefix_groups_conservatively(monkeypatch):
+    monkeypatch.setattr(ssc, "_PATH_TENANT_SEGMENTS", {})
+    assert site_group_key("https://sites.google.com/view/foo") == site_group_key("https://sites.google.com/view/bar")
+
+
+@pytest.mark.asyncio
+async def test_platform_tenants_do_not_share_evidence():
+    stored = {
+        ssc.site_id("https://sites.google.com/view/tenant-a/kontakti"): [
+            "Основно училище А, 1 - 7 клас. ул. Липа № 5"
+        ]
+    }
+    reader = SiteReader(fake_fetcher({}), stored)
+    tenant_b = sibling(2, "lower_secondary", 'ул. "Липа" № 5', "https://sites.google.com/view/tenant-b")
+    decision = await decide_member(tenant_b, domain="", reader=reader)
+    assert decision.action == WITHHOLD
+    assert await reader.site_texts("https://sites.google.com/view/tenant-a") == stored[
+        "sites.google.com/view/tenant-a"
+    ]
+
+
 def test_path_hosted_platform_sites_are_not_one_shared_site():
     first = site_group_key("https://sites.google.com/view/89ousofia")
     second = site_group_key("https://sites.google.com/view/school-vakarel")

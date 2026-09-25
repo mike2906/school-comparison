@@ -294,23 +294,41 @@ def _host(url: str | None) -> str:
     return host[4:] if host.startswith("www.") else host
 
 
-def site_group_key(url: str | None) -> Optional[str]:
-    """Registrable domain; on a path-hosted platform (sites.google.com) the site path.
+# Path-hosted platforms: how many leading path segments name one tenant's site.
+# Google Sites: /view/<site>, /site/<site>, /<workspace-domain>/<site>.
+_PATH_TENANT_SEGMENTS = {"sites.google.com": 2}
 
-    A platform host is itself a (private) public suffix, so each tenant's site is
-    its path, not the shared host.
+
+def _is_platform_host(host: str) -> bool:
+    """A host that is itself a (private) public suffix hosts other people's sites."""
+    from app.scrapers import extractor
+
+    return bool(host) and extractor._HOST_SUFFIX_EXTRACTOR(host).suffix == host
+
+
+def site_id(url: str | None) -> str:
+    """One website's identity: its host, or the tenant root on a path-hosted platform.
+
+    On a platform whose tenant prefix is unknown the whole host counts as one site,
+    so its tenants are grouped and checked rather than silently split.
     """
+    host = _host(url)
+    segments = _PATH_TENANT_SEGMENTS.get(host)
+    if segments and _is_platform_host(host):
+        parts = [p for p in (urlparse(str(url or "")).path or "").split("/") if p][:segments]
+        if len(parts) == segments:
+            return f"{host}/{'/'.join(parts).casefold()}"
+    return host
+
+
+def site_group_key(url: str | None) -> Optional[str]:
+    """Registrable domain; on a path-hosted platform, the tenant's site (``site_id``)."""
     domain = registrable_domain(url)
     if not domain:
         return None
     host = _host(url)
-    if domain == host:
-        from app.scrapers import extractor
-
-        parts = extractor._HOST_SUFFIX_EXTRACTOR(host)
-        if parts.suffix == host:
-            path = (urlparse(str(url)).path or "").rstrip("/")
-            return f"{host}{path}"
+    if domain == host and _is_platform_host(host):
+        return site_id(url)
     return domain
 
 
@@ -452,14 +470,14 @@ class SiteReader:
         """Text of the site at ``url``: stored pages for its host, the page, its contact pages."""
         if url in self._site_texts:
             return self._site_texts[url]
-        host = _host(url)
-        texts = list(self._stored.get(host, []))
+        site = site_id(url)
+        texts = list(self._stored.get(site, []))
         home = await self.page(url)
         if home is not None:
             texts.append(home.text)
             contact_urls = []
             for link, anchor in home.links:
-                if _host(link) != host or link in contact_urls:
+                if site_id(link) != site or link in contact_urls:
                     continue
                 if _CONTACT_LINK_RE.search(unquote(urlparse(link).path)) or _CONTACT_LINK_RE.search(anchor or ""):
                     contact_urls.append(link)
@@ -554,7 +572,7 @@ async def decide_member(
     matches: list[str] = []
     checked: dict[str, Any] = {}
     for campus in campuses:
-        if _host(campus) == _host(url):
+        if site_id(campus) == site_id(url):
             continue
         campus_evidence = evaluate_site(member, campus, await reader.site_texts(campus), domain)
         checked[campus] = campus_evidence.as_dict()
@@ -634,12 +652,12 @@ async def _stored_texts_by_host(db, school_ids: Sequence[int]) -> dict[str, list
     by_host: dict[str, list[str]] = defaultdict(list)
     seen: set[tuple[str, str]] = set()
     for source_url, markdown in rows:
-        host = _host(source_url)
-        marker = (host, (markdown or "")[:500])
+        site = site_id(source_url)
+        marker = (site, (markdown or "")[:500])
         if marker in seen:
             continue
         seen.add(marker)
-        by_host[host].append(markdown or "")
+        by_host[site].append(markdown or "")
     return dict(by_host)
 
 
@@ -660,7 +678,7 @@ async def _invalidate_host_pages(db, school_id: int, url: str) -> int:
     from app.models import SourcePage
     from app.models.scrape_log import ScrapeType
 
-    host = _host(url)
+    site = site_id(url)
     count = 0
     pages = (
         await db.execute(
@@ -671,7 +689,7 @@ async def _invalidate_host_pages(db, school_id: int, url: str) -> int:
         )
     ).scalars()
     for page in pages:
-        if _host(page.source_url) == host and page.is_valid is not False:
+        if site_id(page.source_url) == site and page.is_valid is not False:
             page.is_valid = False
             count += 1
     return count
