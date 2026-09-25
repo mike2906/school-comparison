@@ -672,9 +672,25 @@ async def _invalidate_host_pages(db, school_id: int, url: str) -> int:
     return count
 
 
+async def _site_derived_locations(db, school_id: int, *, preview: bool) -> list[dict[str, Any]]:
+    """The validator's strong-path location clearing: addresses/pins copied from the site.
+
+    An address an official register point confirmed is kept; no other registry
+    address is stored, so a site-copied address fails closed.
+    """
+    from app.scrapers.url_validator import clear_website_derived_locations
+
+    return await clear_website_derived_locations(
+        db, school_id, keep_officially_confirmed_addresses=True, preview=preview
+    )
+
+
 async def apply_decision(db, school, decision: Decision, *, country_code: str = "bg") -> dict[str, Any]:
     if decision.action == KEEP:
-        return {"pages_invalidated": 0}
+        return {"pages_invalidated": 0, "locations_cleared": []}
+    # The old site is no longer trusted for either outcome, so neither is what it put
+    # on the map.
+    locations_cleared = await _site_derived_locations(db, school.id, preview=False)
     pages_invalidated = await _invalidate_host_pages(db, school.id, decision.current_url)
     attrs = dict(school.attributes or {})
     attrs["website_candidate_method"] = "shared_site_check"
@@ -705,7 +721,7 @@ async def apply_decision(db, school, decision: Decision, *, country_code: str = 
             db, school.id, decision.new_url, "shared_site_check"
         )
     db.add(school)
-    return {"pages_invalidated": pages_invalidated}
+    return {"pages_invalidated": pages_invalidated, "locations_cleared": locations_cleared}
 
 
 async def run_shared_site_check(
@@ -747,6 +763,9 @@ async def run_shared_site_check(
     }
 
     stored = await _stored_texts_by_host(db, [m.school_id for ms in in_scope.values() for m in ms])
+    if dry_run:
+        # Nothing to write: release the read transaction before minutes of fetching.
+        await db.rollback()
     reader = SiteReader(fetcher or http_fetch, stored)
 
     report_groups = []
@@ -760,17 +779,22 @@ async def run_shared_site_check(
         for member in members:
             decision = await decide_member(member, domain=hub_domain, reader=reader, country_code=country)
             counts[decision.action] += 1
-            applied = None
-            if not dry_run:
+            if dry_run:
+                locations = []
+                if decision.action != KEEP:
+                    locations = await _site_derived_locations(db, member.school_id, preview=True)
+                    # Read-only: end the short read transaction before the next fetch.
+                    await db.rollback()
+                applied = {"would_clear_locations": locations}
+            else:
                 applied = await apply_decision(db, by_id[member.school_id], decision, country_code=country)
-            school = by_id[member.school_id]
             rows.append(
                 {
                     "school_id": member.school_id,
                     "name": member.name,
                     "school_type": member.school_type,
                     "education_level": member.education_level,
-                    "city": school.city,
+                    "city": member.city,
                     "registry_addresses": member.registry_addresses,
                     "website_derived_addresses": member.website_derived_addresses,
                     "current_url": decision.current_url,

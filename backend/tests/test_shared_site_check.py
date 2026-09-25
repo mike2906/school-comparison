@@ -438,6 +438,81 @@ async def test_school_ids_limit_the_check_to_their_groups(db_session):
 
 
 @pytest.mark.asyncio
+async def test_withhold_clears_site_derived_locations_but_keeps_officially_confirmed_address(db_session):
+    rows = await _seed(db_session)
+    pair_kg = rows["pair_kg"]
+    await db_session.refresh(pair_kg, ["locations"])
+    copied = pair_kg.locations[0]
+    copied.address_i18n = {"bg": "ул. Липа 5"}
+    copied.lat, copied.lng = 42.6, 23.3
+    copied.geocode_meta = {"method": "website_map_link"}
+    copied.location_tags = ["address_source=website_contact", "coords_source=website_map_link"]
+    confirmed = SchoolLocation(
+        school_id=pair_kg.id,
+        address_i18n={"bg": 'ул. "Бреза" № 7'},
+        is_primary=False,
+        lat=42.7,
+        lng=23.4,
+        location_tags=["address_source=website_contact", "coords_source=sofia_municipal"],
+    )
+    db_session.add(confirmed)
+    await db_session.commit()
+    copied_id, confirmed_id, pair_kg_id = copied.id, confirmed.id, pair_kg.id
+
+    report = await run_shared_site_check(db_session, dry_run=True, fetcher=fake_fetcher(_pages_with_pair()))
+    row = next(m for g in report["groups"] for m in g["members"] if m["school_id"] == pair_kg_id)
+    assert row["action"] == WITHHOLD
+    assert [loc["location_id"] for loc in row["applied"]["would_clear_locations"]] == [copied_id]
+    await db_session.refresh(copied)
+    assert copied.address_i18n == {"bg": "ул. Липа 5"}  # dry run changed nothing
+
+    await run_shared_site_check(db_session, dry_run=False, fetcher=fake_fetcher(_pages_with_pair()))
+    await db_session.refresh(copied)
+    await db_session.refresh(confirmed)
+    assert copied.address_i18n == {}
+    assert (copied.lat, copied.lng) == (None, None)
+    assert copied.location_tags == []
+    assert confirmed.address_i18n == {"bg": 'ул. "Бреза" № 7'}
+    assert (confirmed.lat, confirmed.lng) == (42.7, 23.4)
+    assert "address_source=website_contact" in confirmed.location_tags
+    assert confirmed_id != copied_id
+
+
+@pytest.mark.asyncio
+async def test_repair_websites_runs_recovered_urls_through_the_check(db_session):
+    from unittest.mock import AsyncMock, patch
+
+    from app.scrapers import cli as scraper_cli
+
+    school = School(
+        name_i18n={"bg": "Възстановен"}, country_code="bg", school_type="private", education_level="kindergarten",
+        city="sofia", scrape_status="failed_validate",
+    )
+    db_session.add(school)
+    await db_session.commit()
+
+    class SessionContext:
+        async def __aenter__(self):
+            return db_session
+
+        async def __aexit__(self, *_args):
+            return False
+
+    with (
+        patch("app.database.async_session_maker", side_effect=lambda: SessionContext()),
+        patch.object(scraper_cli, "_run_recover_failed_school", new=AsyncMock()),
+        patch.object(scraper_cli, "_run_shared_site_check", new=AsyncMock()) as check_mock,
+    ):
+        await scraper_cli._repair_websites_command(
+            school_name=None, school_id=school.id, city="sofia", country="bg", limit=None,
+            include_state=False, dry_run=False, recover_failed=True, run_extract=False,
+        )
+
+    check_mock.assert_awaited_once()
+    assert check_mock.await_args.kwargs["school_ids"] == [school.id]
+
+
+@pytest.mark.asyncio
 async def test_website_discovery_batch_runs_the_check_for_its_schools(db_session):
     from unittest.mock import AsyncMock, patch
 

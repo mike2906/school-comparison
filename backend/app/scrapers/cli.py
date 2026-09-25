@@ -2721,6 +2721,8 @@ async def _repair_websites_command(
                     await _run_recover_failed_school(db, target_school_id, country)
                 except Exception as exc:
                     logger.error("Failed website recovery for school %s: %s", target_school_id, exc)
+            # Recovery sets new URLs; they go through the shared-site check like discovery.
+            await _run_shared_site_check(db, country=country, school_ids=failed_validate_ids)
 
             schools = (await db.execute(query)).scalars().all()
 
