@@ -315,7 +315,10 @@ def site_id(url: str | None) -> str:
     host = _host(url)
     segments = _PATH_TENANT_SEGMENTS.get(host)
     if segments and _is_platform_host(host):
-        parts = [p for p in (urlparse(str(url or "")).path or "").split("/") if p][:segments]
+        path_parts = [p for p in (urlparse(str(url or "")).path or "").split("/") if p]
+        if path_parts[:1] == ["a"]:  # classic Google Sites: /a/<workspace-domain>/<site>
+            segments += 1
+        parts = path_parts[:segments]
         if len(parts) == segments:
             return f"{host}/{'/'.join(parts).casefold()}"
     return host
@@ -797,7 +800,7 @@ async def run_shared_site_check(
         members = in_scope[key]
         domain = registrable_domain(members[0].website_url) or key
         # Platform-hosted sites have no brand hub to follow.
-        hub_domain = domain if key == domain else ""
+        hub_domain = "" if key != domain or _is_platform_host(domain) else domain
         rows = []
         for member in members:
             decision = await decide_member(member, domain=hub_domain, reader=reader, country_code=country)

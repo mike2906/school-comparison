@@ -328,6 +328,34 @@ def test_platform_tenant_pages_group_with_their_site_root():
     )
     assert site_group_key("https://sites.google.com/view/foo") != site_group_key("https://sites.google.com/view/bar")
     assert ssc.site_id("https://sites.google.com/126ou.net/new/kontakti") == "sites.google.com/126ou.net/new"
+    assert ssc.site_id("https://sites.google.com/a/school.bg/one/home") == "sites.google.com/a/school.bg/one"
+    assert ssc.site_id("https://sites.google.com/a/school.bg/two") == "sites.google.com/a/school.bg/two"
+
+
+@pytest.mark.asyncio
+async def test_platform_front_page_is_never_treated_as_a_brand_hub(db_session):
+    for idx in (1, 2):
+        school = School(
+            name_i18n={"bg": f"P{idx}"}, country_code="bg", city="sofia", school_type="state",
+            education_level="lower_secondary", website_url="https://sites.google.com/", scrape_status="extracted",
+        )
+        school.locations = [SchoolLocation(address_i18n={"bg": 'ул. "Липа" № 5'}, is_primary=True, location_tags=[])]
+        db_session.add(school)
+    await db_session.commit()
+    hub = page(
+        "https://sites.google.com/",
+        "Google Sites",
+        ["https://sofia-school.sites.google.com/", "https://other-school.sites.google.com/"],
+    )
+    fetched: list[str] = []
+
+    async def fetch(url):
+        fetched.append(url)
+        return hub if url.rstrip("/") == "https://sites.google.com" else None
+
+    report = await run_shared_site_check(db_session, dry_run=True, fetcher=fetch)
+    assert [m["action"] for g in report["groups"] for m in g["members"]] == [WITHHOLD, WITHHOLD]
+    assert not any("sofia-school" in url for url in fetched)
 
 
 def test_platform_with_unknown_tenant_prefix_groups_conservatively(monkeypatch):
