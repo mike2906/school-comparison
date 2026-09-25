@@ -170,6 +170,21 @@ def test_partner_office_other_city_and_sibling_kindergarten_addresses_are_not_ca
     assert skipped["ул. Роза 9, София"] == "office_or_partner_address"
 
 
+def test_same_street_with_a_different_number_is_ambiguous_and_skipped():
+    payload = {"site": "x", "campuses": [
+        {"address": "ул. „Академик Сандерс“ 37", "label": "", "context": ""},
+        {"address": "ул. „Дъбова гора“ 7", "label": "", "context": ""},
+    ]}
+    plan = plan_campus_sync(
+        payload, education_level="kindergarten", education_config=BG_CONFIG,
+        existing=[ExistingLocation(1, 'район Витоша, ул. "Акад. Сандерс" № 14 Е', set(), True),
+                  ExistingLocation(2, 'ул. "Дъбова гора" № 7', set(), False)],
+        other_institution_addresses=[],
+    )
+    assert plan["new_locations"] == []
+    assert plan["skipped"] == [{"address": "ул. „Академик Сандерс“ 37", "reason": "same_street_different_number"}]
+
+
 def test_sibling_institution_address_is_never_a_new_campus():
     payload = {"site": "x", "campuses": [
         {"address": "ул. Липа 5", "label": "", "context": ""},

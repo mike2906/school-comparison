@@ -327,6 +327,16 @@ class ExistingLocation:
     is_primary: bool
 
 
+def _same_street_different_number(first: str, second: str) -> bool:
+    left, right = address_key(first), address_key(second)
+    return bool(
+        left and right
+        and left.kind == right.kind == "street_number"
+        and set(left.words) == set(right.words)
+        and left.number != right.number
+    )
+
+
 def plan_campus_sync(
     payload: Mapping[str, Any] | None,
     *,
@@ -354,6 +364,10 @@ def plan_campus_sync(
         if match is not None:
             if campus.get("diff_range"):
                 add_groups(match, campus["diff_range"], campus.get("range_evidence"))
+            continue
+        if any(_same_street_different_number(loc.address, address) for loc in existing):
+            # A second building or a move: the site alone can't tell which.
+            plan["skipped"].append({"address": address, "reason": "same_street_different_number"})
             continue
         sibling = next((sid for sid, other in other_institution_addresses if addresses_equivalent(other, address)), None)
         if sibling is not None:
