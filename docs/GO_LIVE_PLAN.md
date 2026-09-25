@@ -1762,7 +1762,7 @@ the session scratchpad only.
       `app/services/identity_adjudication.py`. Re-run discovery/extraction for affected
       groups with dry runs and backups. No merge: registry IDs, addresses and exam results
       stay separate.
-- [ ] **UF44 Remaining pin gaps (after UF41/UF43).** 38 Sofia private locations have no pin:
+- [x] **UF44 Remaining pin gaps (after UF41/UF43).** 38 Sofia private locations have no pin:
       17 are blocked by a terminal `duplicate_geojson_name_match_different_address` and were
       never tried with the UF41 street/district logic (many ordinary addresses, e.g. ж.к.
       Редута); several sit in a state school's or university's building ("… на ПГЕХ", УАСГ,
@@ -1772,6 +1772,24 @@ the session scratchpad only.
       building the main building's point, UF41); no same-school pins currently share a point
       at different addresses. 8 state locations still have no pin: fix individually with
       evidence (report `backend/reports/municipal-points/`).
+      **Done 2026-09-25:** a GeoJSON name match that loses its point is no longer terminal and
+      falls through to Nominatim (UF41/UF38 checks) in the same run; for a school with several
+      locations a name match needs the register address to be this location's and no sibling
+      within 50 m (ДГ №149 / 3119 regression test); a location at an official building's
+      street and house number reuses that point (`official_point_same_address`), unless the
+      register gives the institution an address none of its locations has (then unchanged:
+      1174, 1080); Nominatim pins are exact only for the house number asked for;
+      `geocode_locations.py --check-shared-points` (0 pairs after apply). Applied
+      `scripts/geocode_pin_gaps_uf44.py` (dry run `backend/reports/uf44/20260925T104215Z/`,
+      backup `~/backups/sofia_schools_pre_uf44_20260925_1342.dump`): 42 locations changed.
+      Sofia locations without a pin: private 38 → 25, state 8 → 4. 8 wrong name-match pins
+      moved to their own address and 2 cleared (1072, 1095); 11 host-building tenants on the
+      official point (e.g. 816 in ПГЕХ, 815, 679); 4 state locations from the municipal
+      layer with kg.sofia/website evidence (762, 2974, 2979, 3029). Withheld: 1147 (only the
+      ж.к. Дружба centroid); state 835 (МО kindergarten), 3070 (ДГ №122), 2922 (СДЯ №37) and
+      3120 (ДГ №150): not in the municipal layer, and OSM has none or a point on another
+      street; 22 private locations with no or out-of-area Nominatim result (incl. the УАСГ and
+      ВТУ tenants 1078, 1117, 836, which have no official point).
 
 ## Phase 3 — Go live
 

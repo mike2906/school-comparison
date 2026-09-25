@@ -9,6 +9,7 @@ from app.services.geocoding.base import GeocodingResult
 from app.services.geocoding.bg.address_match import same_building
 from app.services.geocoding.service import (
     NAME_MATCH_ADDRESS_MISMATCH,
+    REGISTER_ADDRESS_CONFLICT,
     GeocodingService,
     geocode_failure_is_terminal,
     same_school_shared_points,
@@ -341,6 +342,59 @@ class TestOfficialPointOfHostBuilding:
         assert tenant.geocode_meta["method"] == "official_point_same_address"
         assert tenant.geocode_meta["precision"] == "exact"
         assert OFFICIAL_COORDS_TAG not in (tenant.location_tags or [])
+
+    async def _stale_address_school(self, db: AsyncSession) -> SchoolLocation:
+        """1174 shape: stored address is another school's building; register says elsewhere."""
+        await self._host(db, 'ул. "Стара планина" № 13', 42.69966, 23.33225)
+        school = await _school(db, "Профилирана гимназия Михай Еминеску")
+        location = SchoolLocation(
+            school_id=school.id,
+            address_i18n={"bg": 'ул. "Стара планина" №13'},
+            lat=42.6981,
+            lng=23.3237,
+            geocode_meta={"status": "accepted", "method": "geojson_name_match", "precision": "approximate"},
+            is_primary=True,
+        )
+        db.add(location)
+        await db.commit()
+        return location
+
+    async def test_register_address_conflict_leaves_the_location_unchanged(
+        self, db_session: AsyncSession
+    ):
+        location = await self._stale_address_school(db_session)
+        before = dict(location.geocode_meta)
+        provider = _CompositeLike(_name_match(0, 0, ""), NO_RESULTS)
+        provider.geojson_provider.geocode.return_value = _name_match(
+            42.6981, 23.3237, "УЛ.Г.С.РАКОВСКИ № 20, 1202 СТОЛИЧНА"
+        )
+
+        result = await GeocodingService(db=db_session, provider=provider).geocode_location(
+            location, force=True
+        )
+
+        assert result.error == REGISTER_ADDRESS_CONFLICT
+        provider.geocode.assert_not_awaited()
+        provider.nominatim_provider.geocode.assert_not_awaited()
+        await db_session.refresh(location)
+        assert (location.lat, location.lng) == (42.6981, 23.3237)
+        assert location.geocode_meta == before
+
+    async def test_register_agreeing_with_the_address_allows_the_host_point(
+        self, db_session: AsyncSession
+    ):
+        location = await self._stale_address_school(db_session)
+        provider = _CompositeLike(_name_match(0, 0, ""), NO_RESULTS)
+        provider.geojson_provider.geocode.return_value = _name_match(
+            42.6981, 23.3237, "УЛ. СТАРА ПЛАНИНА № 13, 1000 СТОЛИЧНА"
+        )
+
+        result = await GeocodingService(db=db_session, provider=provider).geocode_location(
+            location, force=True
+        )
+
+        assert result.method == "official_point_same_address"
+        assert (location.lat, location.lng) == (42.69966, 23.33225)
 
     async def test_other_house_number_is_not_the_host(self, db_session: AsyncSession):
         await self._host(db_session, 'ул."Средорек" № 5', 42.66628, 23.25357)

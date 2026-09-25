@@ -23,6 +23,9 @@ logger = logging.getLogger(__name__)
 # this location's. Not terminal: the address tiers may still find the location.
 NAME_MATCH_ADDRESS_MISMATCH = "geojson_name_match_address_mismatch"
 NAME_MATCH_POINT_TAKEN = "duplicate_geojson_name_match_different_address"
+# The location's stored address and the institution's register address name different
+# buildings: a point found from the stored address is not written (the location is unchanged).
+REGISTER_ADDRESS_CONFLICT = "register_address_conflict"
 # A sibling location this close to a name-match point is taken to sit on it.
 SIBLING_POINT_RADIUS_M = 50.0
 
@@ -253,6 +256,20 @@ class GeocodingService:
         # Geocode using provider
         logger.info(f"Geocoding location {location.id}: {address} (school: {school_name}, city: {city})")
         result = await self._official_point_at_same_address(location, school, address, country_code)
+        if result is not None and await self._register_address_conflict(
+            location, address, fallback_school_name, city, country_code
+        ):
+            # The stored address may be out of date; neither move nor create a pin from it.
+            logger.warning(
+                "Location %s: stored address disagrees with the register; pin left as is",
+                location.id,
+            )
+            return GeocodingResult(
+                success=False,
+                error=REGISTER_ADDRESS_CONFLICT,
+                provider=result.provider,
+                method=result.method,
+            )
 
         # Special handling for merged kg.sofia branch families and Sofia-oblast
         # schools: use address-first geocoding before name-based GeoJSON lookup.
@@ -397,6 +414,37 @@ class GeocodingService:
             formatted_address=_location_address(host),
             method="official_point_same_address",
             precision="exact",
+        )
+
+    async def _register_address_conflict(
+        self,
+        location: SchoolLocation,
+        address: str,
+        school_name: Optional[str],
+        city: Optional[str],
+        country_code: str,
+    ) -> bool:
+        """Whether the register gives the institution an address none of its locations has.
+
+        Then the stored address may be out of date (location 1174: stored Стара планина 13,
+        register Раковски 20), and a point found from it is not trusted. No register record,
+        or a register address matching this or a sibling location, is no conflict.
+        """
+        geojson = getattr(self.provider, "geojson_provider", None)
+        if geojson is None or not school_name:
+            return False
+        record = await geojson.geocode(
+            address=address, country_code=country_code, school_name=school_name, city=city
+        )
+        register_address = record.formatted_address if record.success else None
+        if not isinstance(register_address, str) or not register_address:
+            return False
+        siblings = (await self.db.execute(
+            select(SchoolLocation).where(SchoolLocation.school_id == location.school_id)
+        )).scalars()
+        addresses = {address} | {_location_address(sibling) for sibling in siblings}
+        return not any(
+            same_building(known, register_address, allow_unnumbered=True) for known in addresses
         )
 
     async def _name_match_conflict(
