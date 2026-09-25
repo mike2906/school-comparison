@@ -50,6 +50,7 @@ class CompositeGeocodingProvider(BaseGeocodingProvider):
         country_code: str = "bg",
         school_name: Optional[str] = None,
         city: Optional[str] = None,
+        district: Optional[str] = None,
     ) -> GeocodingResult:
         """
         Geocode with fallback strategy.
@@ -63,6 +64,7 @@ class CompositeGeocodingProvider(BaseGeocodingProvider):
             country_code: ISO country code (default: "bg")
             school_name: School name for GeoJSON matching (optional)
             city: City name for GeoJSON matching (optional)
+            district: Known district, checked against Nominatim results (optional)
 
         Returns:
             GeocodingResult from first successful provider
@@ -88,6 +90,7 @@ class CompositeGeocodingProvider(BaseGeocodingProvider):
             address=address,
             country_code=country_code,
             city=city,
+            district=district,
         )
         if result.success:
             result.method = "nominatim_fallback"

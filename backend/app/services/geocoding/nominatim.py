@@ -24,6 +24,23 @@ AREA_LEVEL_RESULT_TYPES = frozenset({
     "country",
 })
 AREA_LEVEL_MATCH_ERROR = "area_level_match_only"
+# Every result named a street in a different neighbourhood/district than the address.
+AREA_MISMATCH_ERROR = "area_mismatch"
+
+# Neighbourhood (кв., ж.к., в.з., м.) and district (район, р-н) markers in Bulgarian addresses.
+_AREA_MARKER_RE = re.compile(
+    r'(?:^|[\s,])(кв|ж\.?\s*к|жк|в\.?\s*з|м|район|р-н)(?:\.\s*|\s+)"?([^,"„“”]+)',
+    flags=re.IGNORECASE,
+)
+_DISTRICT_MARKERS = ("район", "р-н")
+# Result address keys that name a neighbourhood or settlement. Not `county`: in Sofia that
+# is the район, which is checked separately.
+_RESULT_AREA_KEYS = (
+    "suburb", "quarter", "neighbourhood", "residential", "city_district", "borough",
+    "village", "hamlet", "town", "isolated_dwelling", "allotments",
+)
+# Latin letters that source data uses in place of look-alike Cyrillic ones.
+_LATIN_TO_CYRILLIC = str.maketrans("AaBEeKkMHOoPpCcTXxy", "АаВЕеКкМНОоРрСсТХху")
 
 
 class NominatimProvider(BaseGeocodingProvider):
@@ -92,6 +109,7 @@ class NominatimProvider(BaseGeocodingProvider):
         # Remove quotes first (before removing abbreviations)
         logger.debug(f"Before quote removal: {address!r}")
         address = address.replace('"', '').replace('"', '').replace('"', '')
+        address = re.sub(r'[„“”]', '', address)
         logger.debug(f"After quote removal: {address!r}")
 
         # Expand common abbreviated street names from source datasets.
@@ -149,6 +167,16 @@ class NominatimProvider(BaseGeocodingProvider):
             address,
             flags=re.IGNORECASE,
         )
+
+        # Drop notes that only confuse the lookup: "(сграда на ...)", floors, apartments.
+        address = re.sub(r'\([^)]*\)?', '', address)
+        address = re.sub(
+            r',?\s*(?<![A-Za-zА-Яа-я])(?:ет\.|ап\.)\s*[0-9A-Za-zА-Яа-я]+(?:\s*и\s*(?:ет\.\s*)?[0-9]+)*',
+            '',
+            address,
+            flags=re.IGNORECASE,
+        )
+        address = re.sub(r',?\s*партер\b', '', address, flags=re.IGNORECASE)
 
         # Remove street abbreviations (бул. BEFORE ул. to avoid partial match)
         logger.debug(f"Before abbreviation removal: {address!r}")
@@ -216,7 +244,12 @@ class NominatimProvider(BaseGeocodingProvider):
             return address
         return f"{address}, {normalized_city}"
 
-    def _build_bulgarian_query_candidates(self, normalized_address: str, city: Optional[str]) -> list[str]:
+    def _build_bulgarian_query_candidates(
+        self,
+        normalized_address: str,
+        city: Optional[str],
+        street_fallback_area: Optional[str] = None,
+    ) -> list[str]:
         """
         Build fallback query variants for Bulgarian addresses.
 
@@ -273,7 +306,106 @@ class NominatimProvider(BaseGeocodingProvider):
                 city_token = "София" if city and city.lower() == "sofia" else (city or (tokens[-1] if tokens else ""))
                 add(f"{area_token}, {block_token}, {city_token}")
 
+        # Variant: street without the house number, which OSM often lacks. Only when the
+        # neighbourhood or district is known, so geocode() can check the street is the right
+        # one (Sofia has many same-named streets).
+        if street_fallback_area:
+            street = None
+            for i, token in enumerate(tokens):
+                if re.match(r'(?:ж\.к\.|кв\.|бл\.)', token, flags=re.IGNORECASE):
+                    continue
+                numbered = re.fullmatch(r'(.*[А-Яа-я].*?)\s+\d+[A-Za-zА-Яа-я]?', token)
+                if numbered and numbered.group(1).strip().lower() == "софия":
+                    continue  # "София 1618": city plus postcode, not a street
+                if numbered:
+                    street = numbered.group(1)
+                elif (
+                    re.search(r'[А-Яа-я]', token)
+                    and i + 1 < len(tokens)
+                    and re.fullmatch(r'\d+[A-Za-zА-Яа-я]?', tokens[i + 1])
+                ):
+                    street = token
+                if street:
+                    break
+            if street:
+                add(self._append_city_if_missing(f"{street}, {street_fallback_area}", city))
+
         return queries
+
+    @staticmethod
+    def _area_keyword(name: str) -> Optional[str]:
+        """Return the first word of 4+ letters in a place name, lowercased, or None."""
+        name = name.translate(_LATIN_TO_CYRILLIC).lower()
+        return next((w for w in re.findall(r'[а-я]{4,}', name)), None)
+
+    @staticmethod
+    def _address_areas(address: str) -> tuple[list[str], Optional[str]]:
+        """Neighbourhood names and the район named in a raw address (e.g. кв. Витоша)."""
+        neighbourhoods: list[str] = []
+        district = None
+        for match in _AREA_MARKER_RE.finditer(address):
+            name = match.group(2).strip()
+            if match.group(1).lower() in _DISTRICT_MARKERS:
+                district = district or name
+            else:
+                neighbourhoods.append(name)
+        return neighbourhoods, district
+
+    def _address_area_keywords(self, address: str) -> list[str]:
+        """Keywords of the neighbourhoods named in a raw address."""
+        keywords = []
+        for name in self._address_areas(address)[0]:
+            keyword = self._area_keyword(name)
+            if keyword and keyword not in keywords:
+                keywords.append(keyword)
+        return keywords
+
+    def _result_matches_expected_area(
+        self,
+        result: dict,
+        area_keywords: list[str],
+        district: Optional[str],
+    ) -> bool:
+        """
+        Check that a result lies in the neighbourhood/district the address names.
+
+        Sofia has many same-named streets (ул. Вършец, ул. Мургаш, ул. Йордан Стубел), so a
+        street match alone can land in another part of the city. A result passes when it is
+        in the known district and names at least one of the address's neighbourhoods. A
+        street-level match in a neighbouring quarter is rejected even in the right district
+        (кв. Кремиковци vs Горни Богров): no pin is safer than a wrong one. An exact house
+        number in the right district passes. Missing result hierarchy is not a mismatch.
+        """
+        address = result.get("address") or {}
+        if not isinstance(address, dict):
+            return True
+        area_text = " ".join(
+            v.translate(_LATIN_TO_CYRILLIC).lower()
+            for key in _RESULT_AREA_KEYS
+            if isinstance((v := address.get(key)), str)
+        )
+        district_keyword = self._area_keyword(district) if district else None
+        if district_keyword:
+            # Sofia results carry the район as `county`; villages in the municipality have
+            # no county, but their display name still lists the район (Казичене, Панчарево).
+            county = address.get("county")
+            if isinstance(county, str) and county.strip():
+                district_text = county
+            else:
+                # Without the road itself, which may share the district's name (ул. Оборище).
+                district_text = ", ".join(
+                    part for part in (result.get("display_name") or "").split(",")
+                    if part.strip() != address.get("road")
+                )
+            if district_text and district_keyword not in district_text.translate(_LATIN_TO_CYRILLIC).lower():
+                return False
+            if district_text and address.get("house_number"):
+                # The exact house in the right district; OSM often files it under a
+                # neighbouring quarter (кв. Княжево → Карпузица).
+                return True
+        if area_keywords and area_text:
+            return any(k in area_text for k in area_keywords)
+        return True
 
     @staticmethod
     def _expected_city_tokens(expected_city: Optional[str]) -> set[str]:
@@ -330,7 +462,14 @@ class NominatimProvider(BaseGeocodingProvider):
         result_type = result.get("addresstype") or result.get("type")
         return result_type in AREA_LEVEL_RESULT_TYPES
 
-    async def geocode(self, address: str, country_code: str = "bg", school_name: Optional[str] = None, city: Optional[str] = None) -> GeocodingResult:
+    async def geocode(
+        self,
+        address: str,
+        country_code: str = "bg",
+        school_name: Optional[str] = None,
+        city: Optional[str] = None,
+        district: Optional[str] = None,
+    ) -> GeocodingResult:
         """
         Geocode an address using Nominatim.
 
@@ -339,6 +478,7 @@ class NominatimProvider(BaseGeocodingProvider):
             country_code: ISO country code (default: "bg")
             school_name: Optional school name (not used by Nominatim)
             city: Optional city name (not used by Nominatim - address should be complete)
+            district: Optional known district (район), checked against the result
 
         Returns:
             GeocodingResult with coordinates or error
@@ -346,12 +486,25 @@ class NominatimProvider(BaseGeocodingProvider):
         # Build query candidates (normalization + optional fallback variants).
         if country_code == "bg":
             normalized_address = self._normalize_bulgarian_address(address)
-            search_queries = self._build_bulgarian_query_candidates(normalized_address, city)
+            neighbourhoods, address_district = self._address_areas(address)
+            area_keywords = self._address_area_keywords(address)
+            # OSM `county` is the район only inside Sofia; elsewhere it is the municipality.
+            is_sofia = (city or "").strip().lower() == "sofia"
+            district = (district or address_district) if is_sofia else None
+            # Most specific named neighbourhood (the last one), else the district.
+            street_fallback_area = next(
+                (a for a in reversed(neighbourhoods) if self._area_keyword(a)), None
+            ) or (district if district and self._area_keyword(district) else None)
+            search_queries = self._build_bulgarian_query_candidates(
+                normalized_address, city, street_fallback_area=street_fallback_area
+            )
             logger.debug(f"Normalized address: '{address}' -> '{normalized_address}'")
         else:
             search_queries = [address]
+            area_keywords = []
 
         rejected_area_level = False
+        rejected_area_mismatch = False
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 for query in search_queries:
@@ -384,6 +537,19 @@ class NominatimProvider(BaseGeocodingProvider):
                             f"Nominatim: Rejected result for query '{query}' due to city mismatch. "
                             f"Expected '{city}', got city tokens {sorted(self._result_city_tokens(result))}"
                         )
+                        continue
+                    if country_code == "bg" and not self._result_matches_expected_area(
+                        result, area_keywords, district
+                    ):
+                        logger.warning(
+                            "Nominatim: Rejected result for query '%s' outside the address's "
+                            "neighbourhood/district (%s, %s): %s",
+                            query,
+                            area_keywords,
+                            district,
+                            result.get("display_name"),
+                        )
+                        rejected_area_mismatch = True
                         continue
                     if self._is_area_level_result(result):
                         logger.warning(
@@ -419,7 +585,11 @@ class NominatimProvider(BaseGeocodingProvider):
                 )
                 return GeocodingResult(
                     success=False,
-                    error=AREA_LEVEL_MATCH_ERROR if rejected_area_level else "No results found",
+                    error=(
+                        AREA_LEVEL_MATCH_ERROR if rejected_area_level
+                        else AREA_MISMATCH_ERROR if rejected_area_mismatch
+                        else "No results found"
+                    ),
                     provider=self.provider_name,
                 )
 

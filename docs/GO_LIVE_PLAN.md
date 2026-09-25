@@ -1693,16 +1693,48 @@ the session scratchpad only.
 - [x] **UF37 Raw register formatting:** ALL-CAPS names, "ЕООД" suffixes, stray quotes,
       machine-transliterated addresses in the EN UI. A display-name / address cleanup.
       **Done 2026-09-24:** PR #107: display-only cleanup in `app/utils/display_names.py` (recased ALL-CAPS, legal-form suffixes and stray quotes removed, BG „…“ quotes, clean addresses without "гр. София" / "1799 СТОЛИЧНА"); stored data unchanged.
-- [ ] **UF38 Nominatim district check.** 8 kindergarten points were cleared because Nominatim
+- [x] **UF38 Nominatim district check.** 8 kindergarten points were cleared because Nominatim
       matched a same-named street in another district (e.g. ул. Вършец in Подуяне placed in
       Войнеговци); a future geocoding run will return them unless the provider checks the
       district/neighbourhood against the address.
+      **Done 2026-09-25 (with UF41):** Sofia results must lie in the location's known district
+      (or the address's район) and name the address's кв./ж.к. (an exact house number in the
+      right district may sit in a neighbouring quarter); otherwise `area_mismatch`. 6 of the 8
+      now have correct pins (e.g. ул. Вършец → Сухата река, Подуяне).
 - [ ] **UF39 kg.sofia duplicate address spellings.** Location 2916 (school 104, same building,
       different spelling) was removed but will be re-added on the next kg.sofia run; normalise
       addresses before comparing. Some "- сграда N" buildings are still separate school rows.
 - [ ] **UF40 Geocoding contact address** (`GEOCODING_CONTACT_EMAIL`) is Mike's personal email and
       is sent with every Nominatim request; switch to a project address once the domain exists
       (with UF27).
+- [x] **UF41 108 Sofia locations have no pin ("No results found").** Many are a
+      neighbourhood plus a house number OSM lacks (Maple Bear kindergarten 556: кв. Витоша,
+      ул. "Йордан Стубел" № 16). Dropping the neighbourhood is wrong: `Йордан Стубел 16,
+      София` matches Бакалов-Стубел 16 in Триадица. Add a street-only fallback that keeps the
+      neighbourhood/district, check every result against them (with UF38), and strip
+      floor/apartment/parenthetical notes. Re-run the failed locations.
+      **Done 2026-09-25:** street-only fallback (only with a neighbourhood or district to check
+      against), UF38 check, address cleanup. Forced re-geocode of the 108 + 8 UF38 locations +
+      location 150 (dry runs first, pg_dump backup): 59 new pins (55 approximate), incl. Maple
+      Bear kindergarten 1102; location 150 (бул. Цар Борис III 41, Красно село) moved from a
+      same-named street in Казичене. Sofia locations without a pin 140 → 81. Location 3119
+      (ДГ №149, second building) was cleared again: the GeoJSON name fallback returned the main
+      building's point. Known recall loss: a street-level match in a neighbouring quarter
+      without a known district stays unpinned (кв. Бояна → м. Гърдова глава).
+- [ ] **UF42 Related institutions (kindergarten → school) are separate and sometimes
+      mis-linked.** Parents weighing a kindergarten want to know the school it leads to.
+      Example: Maple Bear is kindergarten 556 (reg. 2200052, кв. Витоша) and school 596
+      (reg. 2200031). The school has two campuses (Boyana, 38 Panoramen Pat, Preschool–Grade
+      4; Kambanite, 9 Vitoshki Kambani, Preschool–Grade 7); we only have Boyana, and list
+      grades 1–7 with no preschool. 556's website is the school's site
+      (`sofia-school.maplebear.bg`; maplebear.bg links the kindergarten to
+      `sofia-vitosha.maplebear.bg`), so its scraped pages describe the school; 596 points at
+      the national `maplebear.bg`. 25 website domains are shared by 2+ institutions.
+      Proposed: (a) audit shared-domain groups by registrable domain for wrong website
+      assignments and missing campuses/age groups, fixing with evidence; (b) a curated
+      `attributes.related` link (`{"school_id", "relation": "continues_to"}`) published
+      through the allowlist and shown as one line on the detail page. No merge: registry
+      IDs, addresses, and exam results stay separate. Wait for Mike on (b) (publish boundary).
 
 ## Phase 3 — Go live
 
