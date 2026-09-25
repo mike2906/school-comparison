@@ -2,6 +2,7 @@
 """UF44 one-off: re-geocode Sofia pin gaps through GeocodingService, dry run first.
 
     uv run python scripts/geocode_pin_gaps_uf44.py dry-run
+    uv run python scripts/geocode_pin_gaps_uf44.py dry-run 105,133   # re-check these only
     uv run python scripts/geocode_pin_gaps_uf44.py apply reports/uf44/<stamp>/proposed.json
 
 Dry run: each location is geocoded in its own short transaction that is rolled back (the
@@ -145,19 +146,23 @@ async def _select(provider) -> tuple[list, dict]:
         return work, schools
 
 
-async def dry_run() -> None:
+async def dry_run(location_ids: list[int] | None = None) -> None:
     provider = CompositeGeocodingProvider(user_agent=nominatim_user_agent(get_settings()))
     points = {p.name: p for p in await fetch_points()}
     async with _RolledBack() as db:
         before_counts = await _counts(db)
-    work, schools = await _select(provider)
+    if location_ids:
+        # Re-check given locations only (group R): forced re-geocode, every gate on.
+        work, schools = [("R", loc_id, "") for loc_id in location_ids], {}
+    else:
+        work, schools = await _select(provider)
     proposed: dict = {}
     rows = []
     for group, loc_id, why in work:
         async with _RolledBack() as db:
             await _replay(db, proposed)
             loc = await db.get(SchoolLocation, loc_id)
-            school = schools[loc_id]
+            school = schools.get(loc_id) or await db.get(School, loc.school_id)
             before = _state(loc)
             if group == "D":
                 point = points[OFFICIAL_BY_EVIDENCE[loc_id]]
@@ -172,7 +177,9 @@ async def dry_run() -> None:
             expected = loc.district or NominatimProvider._address_areas(address)[1]
         meta = after["geocode_meta"] or {}
         moved = (after["lat"], after["lng"]) != (before["lat"], before["lng"])
-        centroid = moved and after["lat"] is not None and _is_neighbourhood_centroid(meta)
+        is_centroid = after["lat"] is not None and _is_neighbourhood_centroid(meta)
+        # UF44 withheld new centroid pins; a re-check (R) takes the pipeline's result as is.
+        centroid = moved and is_centroid and group != "R"
         if error == REGISTER_ADDRESS_CONFLICT:
             outcome = "address conflict, not changed"
         elif not moved:
@@ -191,6 +198,7 @@ async def dry_run() -> None:
             "old_status": (before["geocode_meta"] or {}).get("rejection_reason")
             or (before["geocode_meta"] or {}).get("status"),
             "old_method": (before["geocode_meta"] or {}).get("method"),
+            "old_precision": (before["geocode_meta"] or {}).get("precision"),
             "old_lat": before["lat"], "old_lng": before["lng"], "guard_reason": why,
             "outcome": outcome, "new_lat": after["lat"], "new_lng": after["lng"],
             "provider": meta.get("provider"), "method": meta.get("method"),
@@ -199,6 +207,7 @@ async def dry_run() -> None:
             "new_status": error or meta.get("rejection_reason") or meta.get("status"),
             "formatted_address": meta.get("formatted_address"),
             "expected_district": expected,
+            "note": "neighbourhood centroid" if is_centroid else "",
             "apply": "yes" if apply else ("WITHHELD: neighbourhood centroid" if centroid else "no change"),
         })
         print(group, loc_id, outcome, after["lat"], after["lng"], meta.get("method"), flush=True)
@@ -259,7 +268,7 @@ async def apply(path: str) -> None:
 
 if __name__ == "__main__":
     if sys.argv[1:2] == ["dry-run"]:
-        asyncio.run(dry_run())
+        asyncio.run(dry_run([int(i) for i in sys.argv[2].split(",")] if len(sys.argv) > 2 else None))
     elif sys.argv[1:2] == ["apply"] and len(sys.argv) == 3:
         asyncio.run(apply(sys.argv[2]))
     else:
