@@ -13,6 +13,9 @@ from app.config import get_settings
 
 logger = logging.getLogger(__name__)
 
+# Set by scripts/import_sofia_municipal_points.py.
+OFFICIAL_COORDS_TAG = "coords_source=sofia_municipal"
+
 TERMINAL_GEOCODE_FAILURE_REASONS = frozenset({
     "No address available",
     "No results found",
@@ -145,8 +148,14 @@ class GeocodingService:
         Returns:
             GeocodingResult with status and coordinates
         """
+        # Official points (Sofia Municipality) are never replaced by a geocoder guess.
+        has_official_point = OFFICIAL_COORDS_TAG in (location.location_tags or [])
         # Check if already geocoded (unless force=True)
-        if not force and location.lat is not None and location.lng is not None:
+        if (
+            (not force or has_official_point)
+            and location.lat is not None
+            and location.lng is not None
+        ):
             logger.debug(
                 f"Location {location.id} already has coordinates ({location.lat}, {location.lng}), skipping"
             )
