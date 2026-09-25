@@ -951,7 +951,7 @@ function SearchPage() {
         // Highest latest combined NVO first; schools without results last.
         const scores = new Map(list.map(school => [
           school.id,
-          getNvoDetail(school, null)?.latestCombined ?? Number.NEGATIVE_INFINITY,
+          getNvoDetail(school, null, { ageGroup: filters.ageGroup })?.latestCombined ?? Number.NEGATIVE_INFINITY,
         ]))
         list.sort((a, b) => scores.get(b.id) - scores.get(a.id))
         break
@@ -967,7 +967,7 @@ function SearchPage() {
     }
 
     return list
-  }, [boundedSchools, sortBy, i18n.language])
+  }, [boundedSchools, sortBy, i18n.language, filters.ageGroup])
 
   // Restore the list position once the restored list has rendered.
   const pendingScrollRestoreRef = useRef(savedViewState?.scrollTop || 0)

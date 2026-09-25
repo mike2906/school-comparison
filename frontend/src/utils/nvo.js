@@ -6,6 +6,28 @@ const EXAM_TYPE_CONFIG = {
 
 const GRADE_ORDER = { nvo_4: 1, nvo_7: 2, nvo_10: 3 }
 
+// The exam that tells a parent about the stage they are choosing for: grades 5–7 end with
+// the 7th-grade NVO (the one that decides 8th-grade admission), 8–12 with the 10th-grade one.
+const AGE_GROUP_EXAM_TYPE = { grade_1_4: 'nvo_4', grade_5_7: 'nvo_7', grade_8_12: 'nvo_10' }
+const EXAM_CONFIG_BY_TYPE = Object.fromEntries(
+  Object.values(EXAM_TYPE_CONFIG).map(config => [config.examType, config])
+)
+
+/** The NVO exam type for an age group, or null (kindergarten groups, all ages). */
+export function examTypeForAgeGroup(ageGroup) {
+  return AGE_GROUP_EXAM_TYPE[ageGroup] || null
+}
+
+function hasExamResults(examResults, examType, requireBothSubjects) {
+  const subjects = new Set(
+    examResults
+      .filter(result => result.exam_type === examType && isAverageMetric(result.metric))
+      .map(result => getNvoSubjectKey(result.subject))
+      .filter(Boolean)
+  )
+  return requireBothSubjects ? subjects.has('math') && subjects.has('bulgarian') : subjects.size > 0
+}
+
 export function isAverageMetric(metric) {
   return String(metric || '').toLowerCase().includes('average')
 }
@@ -117,14 +139,18 @@ function getLatestResult(items) {
 export function getNvoDetail(
   school,
   t,
-  { minimumYearsForAverage = 3, maxAverageYears = 5, requireCompleteSubjects = false } = {}
+  { minimumYearsForAverage = 3, maxAverageYears = 5, requireCompleteSubjects = false, ageGroup = null } = {}
 ) {
   const examResults = school.exam_results || []
   if (examResults.length === 0) {
     return null
   }
 
-  const examConfig = EXAM_TYPE_CONFIG[school.education_level]
+  // The searched age group's exam when the school has it; otherwise its highest stage's.
+  const preferredType = examTypeForAgeGroup(ageGroup)
+  const examConfig = preferredType && hasExamResults(examResults, preferredType, requireCompleteSubjects)
+    ? EXAM_CONFIG_BY_TYPE[preferredType]
+    : EXAM_TYPE_CONFIG[school.education_level]
   if (!examConfig) {
     return null
   }

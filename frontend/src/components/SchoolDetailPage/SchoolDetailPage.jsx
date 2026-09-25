@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import Layout from '../Layout/Layout'
 import { fetchSchool, fetchExamAverages } from '../../api/schools'
 import { getSchoolName, getAddress, getSummary } from '../../utils/i18n'
 import { normalizeSchool } from '../../utils/schoolAttributes'
 import { getLastSearchUrl } from '../../utils/searchViewState'
+import { examTypeForAgeGroup } from '../../utils/nvo'
 import { usesSofiaKindergartenSystem } from '../../utils/admission'
 import { schoolLevelLabel } from '../../utils/levelLabel'
 import { useCountry } from '../../context/CountryContext'
@@ -49,6 +50,10 @@ function EmbeddedShell({ children }) {
  */
 function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null }) {
   const params = useParams()
+  const [searchParams] = useSearchParams()
+  // The age group the parent searched for: the search URL's own (side panel) or the
+  // ?group= the card's link passes to the full page. It picks which NVO exam leads.
+  const preferredAgeGroup = searchParams.get('age_group') || searchParams.get('group')
   const id = schoolId ?? params.id
   const navigate = useNavigate()
   const Shell = embedded ? EmbeddedShell : Layout
@@ -99,8 +104,11 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
         // Set default active exam type
         const availableTypes = getAvailableExamTypes(data.exam_results)
         if (availableTypes.length > 0) {
-          // Default to school's primary education level, or first available
-          const defaultType = getExamTypeForEducationLevel(data.education_level)
+          // The searched stage's exam, else the school's own level, else the first available
+          const preferredType = examTypeForAgeGroup(preferredAgeGroup)
+          const defaultType = preferredType && availableTypes.includes(preferredType)
+            ? preferredType
+            : getExamTypeForEducationLevel(data.education_level)
           setActiveExamType(
             availableTypes.includes(defaultType) ? defaultType : availableTypes[0]
           )
@@ -178,7 +186,7 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
   const pricing = school.pricing || []
   const locations = school.locations || []
   const primaryLocation = locations.find(l => l.is_primary) || locations[0]
-  const nvoDetail = getNvoDetail(school, t)
+  const nvoDetail = getNvoDetail(school, t, preferredAgeGroup)
   const availableExamTypes = getAvailableExamTypes(school.exam_results)
   const keyFactsExamType = nvoDetail?.examType || availableExamTypes[availableExamTypes.length - 1] || null
   // The global CompareBar is fixed to the bottom while the compare list is non-empty.
