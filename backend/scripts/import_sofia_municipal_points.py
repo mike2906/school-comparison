@@ -35,8 +35,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from app.database import async_session_maker
 from app.models import School, SchoolLocation
 from app.services.geocoding.base import GeocodingResult
-from app.services.geocoding.service import OFFICIAL_COORDS_TAG
-from app.services.geocoding.write_gate import apply_geocode_result_to_location
+from app.services.geocoding.write_gate import OFFICIAL_COORDS_TAG, apply_geocode_result_to_location
 
 LAYERS_URL = (
     "https://arcgis.sofia.bg/arcgis/rest/services/School_AllPublic/Schools_AllPublic/MapServer"

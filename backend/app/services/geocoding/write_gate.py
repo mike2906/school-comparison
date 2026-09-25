@@ -13,6 +13,9 @@ from app.services.geocoding.bounds import SOFIA_MUNICIPALITY_BOUNDS, point_in_bo
 logger = logging.getLogger(__name__)
 
 SOFIA_WRITE_BOUNDS = SOFIA_MUNICIPALITY_BOUNDS
+# Official building points (scripts/import_sofia_municipal_points.py); geocoders and website
+# map links never replace them.
+OFFICIAL_COORDS_TAG = "coords_source=sofia_municipal"
 
 
 def _normalize_address(value: Optional[str]) -> str:

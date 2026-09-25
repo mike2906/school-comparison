@@ -38,7 +38,7 @@ from app.schemas.extraction import (
 from app.scrapers.summarizer import clear_summary_state
 from app.scrapers.validator import validate_school_data
 from app.services.geocoding.base import GeocodingResult
-from app.services.geocoding.write_gate import apply_geocode_result_to_location
+from app.services.geocoding.write_gate import OFFICIAL_COORDS_TAG, apply_geocode_result_to_location
 from app.utils.website_data import WEBSITE_DATA_WITHHELD_KEY, prepare_validation_rollover
 from app.services.provider_costs import execute_billable_request
 from . import extractor_helpers as helpers
@@ -354,12 +354,17 @@ async def _sync_primary_location_from_contact_address(
     address_i18n = dict(primary_location.address_i18n or {})
     current_bg = helpers._normalize_contact_address_candidate(address_i18n.get("bg") or "")
     existing_tags = list(primary_location.location_tags or [])
+    has_official_point = OFFICIAL_COORDS_TAG in existing_tags
     coord_tags = [tag for tag in existing_tags if str(tag).startswith("coords_source=")]
-    tags = [tag for tag in existing_tags if not str(tag).startswith("coords_source=")]
+    tags = [
+        tag for tag in existing_tags
+        if not str(tag).startswith("coords_source=") or tag == OFFICIAL_COORDS_TAG
+    ]
     same_address = _normalize_address_for_compare(current_bg) == _normalize_address_for_compare(website_address)
 
     async def apply_website_coordinates() -> bool:
-        if coord_lat is None or coord_lng is None:
+        # An official municipal point is better evidence than a website map link.
+        if has_official_point or coord_lat is None or coord_lng is None:
             return False
         applied = await apply_geocode_result_to_location(
             db,

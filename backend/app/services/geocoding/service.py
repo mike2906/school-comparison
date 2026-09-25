@@ -8,13 +8,10 @@ from app.models import SchoolLocation, School
 from app.services.geocoding.base import BaseGeocodingProvider, GeocodingResult
 from app.services.geocoding.nominatim import AREA_LEVEL_MATCH_ERROR, AREA_MISMATCH_ERROR, NominatimProvider
 from app.services.geocoding.composite import CompositeGeocodingProvider
-from app.services.geocoding.write_gate import apply_geocode_result_to_location
+from app.services.geocoding.write_gate import OFFICIAL_COORDS_TAG, apply_geocode_result_to_location
 from app.config import get_settings
 
 logger = logging.getLogger(__name__)
-
-# Set by scripts/import_sofia_municipal_points.py.
-OFFICIAL_COORDS_TAG = "coords_source=sofia_municipal"
 
 TERMINAL_GEOCODE_FAILURE_REASONS = frozenset({
     "No address available",

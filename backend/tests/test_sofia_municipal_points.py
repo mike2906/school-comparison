@@ -5,7 +5,8 @@ from unittest.mock import AsyncMock
 import pytest
 
 from app.models import School, SchoolLocation
-from app.services.geocoding.service import OFFICIAL_COORDS_TAG, GeocodingService
+from app.services.geocoding.service import GeocodingService
+from app.services.geocoding.write_gate import OFFICIAL_COORDS_TAG
 from scripts.import_sofia_municipal_points import (
     Point,
     Row,
