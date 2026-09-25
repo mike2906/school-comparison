@@ -555,21 +555,36 @@ async def remove_website_campus_data(db, school_id: int, *, preview: bool = Fals
     return changes
 
 
-async def geocode_campus_locations(db, location_ids: Sequence[int], *, country_code: str = "bg") -> None:
-    """Pin new campus locations through the normal geocoding service and its gates."""
-    if not location_ids:
-        return
+async def geocode_campus_locations(db, school_id: int, *, country_code: str = "bg") -> list[int]:
+    """Pin this school's campus locations that have no pin yet (normal service and gates).
+
+    Call only on a session with no open transaction: the geocoding service commits
+    each pin. Campus rows are created inside validation, which may run nested in
+    extraction's transaction, so this looks the rows up instead of taking the ids
+    from that transaction; the next committed validation pins anything left.
+    """
     from sqlalchemy import select
 
     from app.models.school import SchoolLocation
+    from app.services.geocoding.service import geocode_failure_is_terminal
+
+    candidates = (
+        await db.execute(
+            select(SchoolLocation).where(SchoolLocation.school_id == school_id, SchoolLocation.lat.is_(None))
+        )
+    ).scalars().all()
+    locations = [
+        loc for loc in candidates
+        if CAMPUS_TAG in (loc.location_tags or []) and not geocode_failure_is_terminal(loc.geocode_meta)
+    ]
+    if not locations:
+        return []
     from app.services.geocoding.service import GeocodingService
 
     geocoder = GeocodingService(db)
-    locations = (
-        await db.execute(select(SchoolLocation).where(SchoolLocation.id.in_(list(location_ids))))
-    ).scalars().all()
     for location in locations:
         try:
             await geocoder.geocode_location(location, country_code=country_code)
         except Exception as exc:  # a missing pin must not undo the validated data
             logger.warning("Campus location %s geocoding failed: %s", location.id, exc)
+    return [loc.id for loc in locations]

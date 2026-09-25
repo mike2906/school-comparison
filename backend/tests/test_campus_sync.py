@@ -399,7 +399,49 @@ async def test_validation_creates_campuses_when_it_clears_the_marker(db_session)
     locations = await _locations(db_session, school_id)
     assert [loc.address_i18n["bg"] for loc in locations] == ['ул. "Панорамен път" № 38', "ул. Витошки Камбани 9"]
     geocode.assert_awaited_once()
-    assert geocode.await_args.args[1] == [locations[1].id]
+    assert geocode.await_args.args[1] == school_id
+
+
+@pytest.mark.asyncio
+async def test_validation_nested_in_extraction_leaves_geocoding_to_the_committed_run(db_session):
+    from unittest.mock import AsyncMock
+
+    from app.scrapers.validator import validate_school_data
+
+    school = await _school_with_candidates(db_session, withheld=True)
+    attrs = dict(school.attributes)
+    attrs["data_validation_attempt"] = {"status": "pending", "started_at": "2026-09-25T00:00:00+00:00"}
+    school.attributes = attrs
+    await db_session.commit()
+    school_id = school.id
+
+    with patch("app.scrapers.validator.geocode_campus_locations", new=AsyncMock()) as geocode:
+        await db_session.execute(select(School.id))  # extraction's open transaction
+        assert db_session.in_transaction()
+        await validate_school_data(db_session, school_id)
+        geocode.assert_not_awaited()
+        await db_session.commit()
+        await validate_school_data(db_session, school_id)  # the validate-data stage
+        geocode.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_geocoding_pins_only_campus_locations_without_a_pin(db_session):
+    from unittest.mock import AsyncMock, MagicMock
+
+    school = await _school_with_candidates(db_session)
+    await apply_campus_sync(db_session, school)
+    await db_session.commit()
+    school_id = school.id
+
+    geocoder = MagicMock()
+    geocoder.geocode_location = AsyncMock()
+    with patch("app.services.geocoding.service.GeocodingService", return_value=geocoder):
+        pinned = await cs.geocode_campus_locations(db_session, school_id)
+
+    campus = [loc for loc in await _locations(db_session, school_id) if CAMPUS_TAG in loc.location_tags]
+    assert pinned == [campus[0].id]
+    assert geocoder.geocode_location.await_args.args[0].id == campus[0].id
 
 
 def test_module_has_no_hardcoded_age_group_keys():

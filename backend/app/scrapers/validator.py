@@ -717,7 +717,6 @@ async def validate_school_data(
         status="ok",
         issue_counts={"error": 0, "warning": 0},
     )
-    new_campus_location_ids: list[int] = []
 
     try:
         async with _tx_context(db):
@@ -1224,8 +1223,7 @@ async def validate_school_data(
             school.admission_info = admission_info
             # UF42(b): campuses and stated age groups are created only as the marker
             # clears, in this transaction (apply_campus_sync re-checks the site).
-            campus_result = await apply_campus_sync(db, school)
-            new_campus_location_ids = campus_result.get("new_location_ids") or []
+            await apply_campus_sync(db, school)
             if report.auto_fixes:
                 clear_summary_state(school, downgrade_status=True)
             school.updated_at = datetime.datetime.now(datetime.timezone.utc)
@@ -1267,9 +1265,10 @@ async def validate_school_data(
             "error": str(exc),
         }
 
-    if new_campus_location_ids and not db.in_transaction():
-        # After the commit: the geocoding service commits each pin itself.
-        await geocode_campus_locations(db, new_campus_location_ids, country_code=country_code)
+    if not db.in_transaction():
+        # Committed: pin campus locations (the geocoding service commits each pin).
+        # Nested inside extraction, the later validate-data run does this instead.
+        await geocode_campus_locations(db, school_id, country_code=country_code)
 
     if run_spot_check:
         spot_result = await run_spot_check_for_school(db, school_id, country_code=country_code)
