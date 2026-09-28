@@ -4393,6 +4393,7 @@ async def _run_extract_batch(
 
         from app.config import get_settings as _get_settings
         from app.database import async_session_maker
+        from app.scrapers.extractor import keep_previous_website_data
 
         settings = _get_settings()
         _ext_timeout = settings.extraction_school_timeout_seconds
@@ -4428,6 +4429,7 @@ async def _run_extract_batch(
                         "Extraction timed out after %.0fs for school %s", _ext_timeout, school_id
                     )
                     await db.rollback()
+                    await keep_previous_website_data(db, school_id)
                     fail_count += 1
                 except Exception as e:
                     logger.error(f"Error extracting school {school_id}: {e}")
@@ -4453,6 +4455,8 @@ async def _run_extract_batch(
                         logger.error(
                             "Extraction timed out after %.0fs for school %s", _ext_timeout, school_id
                         )
+                        async with async_session_maker() as school_db:
+                            await keep_previous_website_data(school_db, school_id)
                         return school_id, {
                             "school_id": school_id,
                             "status": "extraction_failed",

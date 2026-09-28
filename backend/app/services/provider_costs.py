@@ -91,7 +91,7 @@ async def reserve_provider_request(
     request_reserve_usd: Decimal | float,
     client_request_id: Optional[str] = None,
 ) -> ProviderRequestLedger:
-    """Persist a pre-dispatch reservation after checking exact attributed spend."""
+    """Persist a pre-dispatch reservation after checking spend against the cap."""
     cap = _usd(cap_usd, field="provider cost cap")
     reserve = _usd(request_reserve_usd, field="provider request reserve")
     run = (
@@ -111,18 +111,24 @@ async def reserve_provider_request(
             )
         ).scalars()
     )
-    uncertain = [row for row in existing if row.status != ProviderRequestStatus.ATTRIBUTED]
-    if uncertain:
-        raise ProviderAttributionUncertain(
-            "prior provider attribution is pending or uncertain; refusing another dispatch"
-        )
-    spend = sum(
-        (_usd(row.provider_cost_usd, field="provider cost") for row in existing),
-        Decimal("0"),
+    # A pending or uncertain request (e.g. a timeout; the provider may have billed it)
+    # counts at the request reserve, its assumed maximum cost, so it does not block the
+    # rest of the run but still counts toward the cap.
+    uncertain_count = sum(
+        row.status != ProviderRequestStatus.ATTRIBUTED for row in existing
     )
+    spend = sum(
+        (
+            _usd(row.provider_cost_usd, field="provider cost")
+            for row in existing
+            if row.status == ProviderRequestStatus.ATTRIBUTED
+        ),
+        Decimal("0"),
+    ) + reserve * uncertain_count
     if spend + reserve > cap:
         raise ProviderCostCapExceeded(
-            f"provider cost cap would be exceeded: spent={spend} reserve={reserve} cap={cap}"
+            f"provider cost cap would be exceeded: spent={spend} "
+            f"(incl. {uncertain_count} uncertain at {reserve}) reserve={reserve} cap={cap}"
         )
 
     row = ProviderRequestLedger(
