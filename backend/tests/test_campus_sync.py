@@ -197,6 +197,49 @@ def test_fully_qualified_copy_beats_an_earlier_weak_rejection_but_not_a_firm_one
     assert [c["address"] for c in payload["campuses"]] == ["ул. Бреза 7"]
 
 
+def test_entrance_street_of_the_registry_building_is_not_a_campus():
+    contact = SitePage(
+        "https://school1.example.bg/contacts",
+        "Свържете се с нас\nСофия, кв. Стрелбище\nул. “Нишава” 107 /вход от ул. \"Твърдишки проход\"/\n+359 877\n"
+        "#### Училище 1 - Стрелбище\nСофия, ул. \"Твърдишки проход\" 18\n"
+        "#### Училище 1 - Лозенец\nСофия, ул. Бреза 7\n",
+        "contact",
+    )
+    payload = extract([contact], "https://school1.example.bg/", "lower_secondary")
+    assert [c["address"] for c in payload["campuses"]] == ["ул. Бреза 7"]
+    assert ("ул. \"Твърдишки проход\" 18", "entrance_of_existing_location") in [
+        (s["address"], s["reason"]) for s in payload["skipped"]
+    ]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("offset,kept", [(0.0003, False), (0.02, True)])  # ~33 m vs ~2 km north
+async def test_geocoded_campus_next_to_an_existing_location_is_the_same_building(db_session, offset, kept):
+    from unittest.mock import AsyncMock, MagicMock
+
+    school = await _school_with_candidates(db_session)
+    primary = (await _locations(db_session, school.id))[0]
+    primary.lat, primary.lng = 42.6566, 23.2464
+    await db_session.commit()
+    await apply_campus_sync(db_session, school)
+    await db_session.commit()
+    school_id = school.id
+
+    async def pin(location, country_code="bg"):
+        location.lat, location.lng = 42.6566 + offset, 23.2464
+        await db_session.commit()
+
+    geocoder = MagicMock()
+    geocoder.geocode_location = AsyncMock(side_effect=pin)
+    with patch("app.services.geocoding.service.GeocodingService", return_value=geocoder):
+        await cs.geocode_campus_locations(db_session, school_id)
+
+    campuses = [loc for loc in await _locations(db_session, school_id) if CAMPUS_TAG in loc.location_tags]
+    assert bool(campuses) is kept
+    primary = (await _locations(db_session, school_id))[0]
+    assert "grade_5_7" in primary.age_groups and len(primary.age_groups) == 3  # untouched
+
+
 def test_main_building_label_is_not_an_office():
     page = SitePage("https://primer.bg/kontakti", "Централна сграда\nул. Липа 5\nСофия\nСграда 2\nул. Бреза 7\nСофия", "contact")
     payload = extract([page], "https://primer.bg/", "lower_secondary")

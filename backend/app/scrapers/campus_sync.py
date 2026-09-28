@@ -31,6 +31,7 @@ from typing import Any, Optional
 from urllib.parse import unquote, urlparse
 
 from app.scrapers.shared_site_check import (
+    _distinctive_words,
     _skeleton,
     _tokens,
     address_key,
@@ -79,7 +80,17 @@ _LABEL_LEVEL_RE = {
 }
 CONTEXT_BEFORE = 2
 CONTEXT_AFTER = 2
-_FIRM_REJECTIONS = frozenset({"office_or_partner_address", "describes_other_level"})
+_FIRM_REJECTIONS = frozenset(
+    {"office_or_partner_address", "describes_other_level", "entrance_of_existing_location"}
+)
+# "ул. Нишава 107 /вход от ул. Твърдишки проход/": the second street is a door, not a campus.
+_ENTRANCE_RE = re.compile(
+    r"(?:вход\s+от|entrance\s+(?:from|on))\s+(?:ул\.?|бул\.?|улица|street|st\.?)?\s*"
+    r"[\"'„“”]*(?P<street>[^\"'„“”/()\n,]+)",
+    re.IGNORECASE,
+)
+# A geocoded campus this close to one of the school's other locations is the same building.
+CAMPUS_SAME_BUILDING_RADIUS_M = 75.0
 # A campus needs a full street address (street + number, or quarter + block).
 PRECISE_ADDRESS_KINDS = frozenset({"street_number", "quarter_block"})
 
@@ -215,6 +226,12 @@ def _campus_candidates(pages: Sequence[SitePage], *, city: str, family: str) -> 
     from app.scrapers import extractor_helpers as helpers
 
     other_family = "school" if family == "kindergarten" else "kindergarten"
+    entrance_streets = [
+        set(_distinctive_words(match.group("street")))
+        for page in pages
+        if _is_contact_page(page)
+        for match in _ENTRANCE_RE.finditer(page.text or "")
+    ]
     occurrences: list[dict] = []
     for page in pages:
         if not _is_contact_page(page):
@@ -232,6 +249,8 @@ def _campus_candidates(pages: Sequence[SitePage], *, city: str, family: str) -> 
             nearby = " ".join([*before[-1:], line, *after])
             if key is None or key.kind not in PRECISE_ADDRESS_KINDS:
                 reason = "not_a_street_address"
+            elif any(words and words <= set(key.words) for words in entrance_streets):
+                reason = "entrance_of_existing_location"
             elif not _names_city(nearby, city):
                 reason = "city_not_stated"
             elif _NOT_CAMPUS_RE.search(" ".join([*before, line, *after[:1]])):
@@ -611,4 +630,41 @@ async def geocode_campus_locations(db, school_id: int, *, country_code: str = "b
             await geocoder.geocode_location(location, country_code=country_code)
         except Exception as exc:  # a missing pin must not undo the validated data
             logger.warning("Campus location %s geocoding failed: %s", location.id, exc)
+            continue
+        await _drop_if_same_building(db, location)
     return [loc.id for loc in locations]
+
+
+async def _drop_if_same_building(db, campus) -> bool:
+    """A pinned campus next to another location of the school is that building (an
+    entrance or a second spelling): delete it with its age groups."""
+    from sqlalchemy import select
+
+    from app.models.school import SchoolLocation
+    from app.services.geocoding.service import _distance_m
+
+    if campus.lat is None or campus.lng is None:
+        return False
+    others = (
+        await db.execute(
+            select(SchoolLocation).where(
+                SchoolLocation.school_id == campus.school_id,
+                SchoolLocation.id != campus.id,
+                SchoolLocation.lat.isnot(None),
+                SchoolLocation.lng.isnot(None),
+            )
+        )
+    ).scalars().all()
+    near = next(
+        (o for o in others if _distance_m(campus.lat, campus.lng, o.lat, o.lng) <= CAMPUS_SAME_BUILDING_RADIUS_M),
+        None,
+    )
+    if near is None:
+        return False
+    logger.info(
+        "same_building_as_existing_location: campus %s (%s) is within %.0f m of location %s; deleted",
+        campus.id, (campus.address_i18n or {}).get("bg"), CAMPUS_SAME_BUILDING_RADIUS_M, near.id,
+    )
+    await db.delete(campus)
+    await db.commit()
+    return True
