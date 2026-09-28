@@ -4429,7 +4429,15 @@ async def _run_extract_batch(
                         "Extraction timed out after %.0fs for school %s", _ext_timeout, school_id
                     )
                     await db.rollback()
-                    await keep_previous_website_data(db, school_id)
+                    try:
+                        await keep_previous_website_data(db, school_id)
+                    except Exception as exc:
+                        logger.error(
+                            "Could not restore status after timeout for school %s: %s",
+                            school_id,
+                            exc,
+                        )
+                        await db.rollback()
                     fail_count += 1
                 except Exception as e:
                     logger.error(f"Error extracting school {school_id}: {e}")
@@ -4455,8 +4463,15 @@ async def _run_extract_batch(
                         logger.error(
                             "Extraction timed out after %.0fs for school %s", _ext_timeout, school_id
                         )
-                        async with async_session_maker() as school_db:
-                            await keep_previous_website_data(school_db, school_id)
+                        try:
+                            async with async_session_maker() as school_db:
+                                await keep_previous_website_data(school_db, school_id)
+                        except Exception as exc:
+                            logger.error(
+                                "Could not restore status after timeout for school %s: %s",
+                                school_id,
+                                exc,
+                            )
                         return school_id, {
                             "school_id": school_id,
                             "status": "extraction_failed",

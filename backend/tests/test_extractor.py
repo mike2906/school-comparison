@@ -194,6 +194,44 @@ async def test_extract_school_does_not_promote_fallback_when_llm_call_fails(
     assert pricing_rows == []
 
 
+def _website_field_source(school_id: int, url: str) -> FieldSource:
+    from app.models.field_source import SourceConfidence, SourceType
+
+    return FieldSource(
+        school_id=school_id,
+        category="attributes",
+        field_key="attributes.facilities",
+        value_text="pool",
+        source_type=SourceType.SCRAPED_WEBSITE,
+        source_url=url,
+        scraped_at=datetime.datetime(2026, 9, 1),
+        confidence=SourceConfidence.HIGH,
+    )
+
+
+@pytest.mark.asyncio
+async def test_extract_school_does_not_republish_data_from_a_previous_site(
+    db_session,
+    sample_school_for_extraction,
+):
+    school = sample_school_for_extraction
+    school.attributes = {
+        "extracted": {"facilities": ["pool"]},
+        "data_validation": {"_schema_version": 1, "status": "ok"},
+    }
+    # Website discovery moved the school to test-school.bg; the stored data came
+    # from another site and nothing withheld it.
+    db_session.add(_website_field_source(school.id, "https://old-site.bg/about"))
+    await db_session.commit()
+
+    with patch("app.scrapers.extractor._run_typed_agent", new=_failed_llm_call):
+        result = await extractor_module.extract_school(db_session, school.id, "bg")
+
+    assert result["status"] == "extraction_failed"
+    await db_session.refresh(school)
+    assert school.scrape_status == "extraction_failed"
+
+
 @pytest.mark.asyncio
 async def test_extract_school_keeps_previously_published_data_when_llm_retries_fail(
     db_session,
@@ -221,6 +259,7 @@ async def test_extract_school_keeps_previously_published_data_when_llm_retries_f
             source_url="https://test-school.bg/prices",
         )
     )
+    db_session.add(_website_field_source(school.id, "https://www.test-school.bg/about"))
     await db_session.commit()
 
     with patch("app.scrapers.extractor._run_typed_agent", new=_failed_llm_call):

@@ -1917,13 +1917,39 @@ def _build_deterministic_general_info_output(
     )
 
 
+def _site_host(url: str | None) -> str:
+    host = (urlparse(str(url or "")).hostname or "").casefold()
+    return host[4:] if host.startswith("www.") else host
+
+
+async def _stored_website_data_matches_current_site(db: AsyncSession, school: School) -> bool:
+    """Whether the stored website extraction came from the school's current host.
+
+    Website discovery can move a school to another site without withholding the old
+    data, so the old data must not be republished under the new URL.
+    """
+    current = _site_host(school.website_url)
+    if not current:
+        return False
+    source_urls = (
+        await db.execute(
+            select(FieldSource.source_url).where(
+                FieldSource.school_id == school.id,
+                FieldSource.source_type == SourceType.SCRAPED_WEBSITE,
+            )
+        )
+    ).scalars().all()
+    return current in {_site_host(url) for url in source_urls}
+
+
 async def keep_previous_website_data(db: AsyncSession, school_id: int) -> str | None:
     """Undo a failed extraction without promoting a fallback (call after a rollback).
 
     Earlier stages of the run set a non-publishable status (e.g. ``navigated``). A
     school whose last validated website data is still intact (current validation
-    report, no withholding marker) gets a publishable status back, so that data stays
-    published; otherwise it is ``extraction_failed`` and stays withheld.
+    report, no withholding marker) and came from its current website host gets a
+    publishable status back, so that data stays published; otherwise it is
+    ``extraction_failed`` and stays withheld.
     """
     school = (
         await db.execute(
@@ -1934,7 +1960,9 @@ async def keep_previous_website_data(db: AsyncSession, school_id: int) -> str | 
     ).scalar_one_or_none()
     if school is None:
         return None
-    if website_data_is_publishable(school.attributes, "extracted"):
+    if website_data_is_publishable(
+        school.attributes, "extracted"
+    ) and await _stored_website_data_matches_current_site(db, school):
         school.scrape_status = "summarized" if school.summary_i18n else "extracted"
     else:
         school.scrape_status = "extraction_failed"
