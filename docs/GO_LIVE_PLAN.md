@@ -1829,10 +1829,11 @@ the session scratchpad only.
       listed. It needs a site that passed the checks, not publishable extracted data: the
       link uses only the URL, registry name/level/city and the target's published name.
       Published: only the target's id, resolved name, school type and level. Launch DB
-      (report `backend/reports/uf42c/`): 1 link now (556→596 Maple Bear, both replaced by
-      the check). 5 more (515→575 Британика, 587→522 Дружба, 591→592 Никатор, 510→214
-      Светлина, 514→630 Waldorf) wait only for a keep record, i.e. an applied
-      `cli shared-site-check` run (keeps were not recorded before this change). 9
+      (report `backend/reports/uf42c/`): after an applied `cli shared-site-check` run
+      (2026-09-28, 17 groups / 36 institutions, all kept, identical to the dry run; backup
+      `~/backups/sofia_schools_pre_uf42c_keep_20260928_1030.dump`) 6 links publish:
+      556→596 Maple Bear, 515→575 Британика, 587→522 Дружба, 591→592 Никатор, 510→214
+      Светлина, 514→630 Waldorf (checked through `GET /schools/{id}`). 9
       near-misses have a withheld kindergarten site (560, 589, 546, 555, 528, 634, 372);
       verifying it would link 589→610, 546→537, 555→594, 634→635 and 372→534, the rest
       have no shared brand. The school side shows no inverse link.
