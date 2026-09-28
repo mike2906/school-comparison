@@ -197,6 +197,77 @@ def test_fully_qualified_copy_beats_an_earlier_weak_rejection_but_not_a_firm_one
     assert [c["address"] for c in payload["campuses"]] == ["ул. Бреза 7"]
 
 
+def test_main_building_label_is_not_an_office():
+    page = SitePage("https://primer.bg/kontakti", "Централна сграда\nул. Липа 5\nСофия\nСграда 2\nул. Бреза 7\nСофия", "contact")
+    payload = extract([page], "https://primer.bg/", "lower_secondary")
+    assert [c["address"] for c in payload["campuses"]] == ["ул. Липа 5", "ул. Бреза 7"]
+
+
+def test_a_later_firm_rejection_overrides_an_earlier_accepted_copy():
+    listing = SitePage("https://primer.bg/kontakti", "Сграда 1\nул. Липа 5\nСофия\nСграда 2\nул. Бреза 7\nСофия", "contact")
+    office = SitePage("https://primer.bg/kontakti-office", "Административен офис\nул. Липа 5\nСофия", "contact")
+    kindergarten = SitePage("https://primer.bg/kontakti-dg", "Детска градина\nул. Бреза 7\nСофия", "contact")
+    payload = extract([listing, office, kindergarten], "https://primer.bg/", "lower_secondary")
+    assert payload is None or payload["campuses"] == []
+    payload = extract_campus_candidates(
+        [listing, office], website_url="https://primer.bg/", city="sofia",
+        education_level="lower_secondary", education_config=BG_CONFIG,
+    )
+    assert [c["address"] for c in payload["campuses"]] == ["ул. Бреза 7"]
+    assert [(s["address"], s["reason"]) for s in payload["skipped"]] == [("ул. Липа 5", "office_or_partner_address")]
+
+
+@pytest.mark.asyncio
+async def test_registry_sync_confirming_a_website_age_group_keeps_it_on_withhold(db_session):
+    from app.schemas.scraping import DiscoveredLocation
+    from app.scrapers.sources.base_adapter import BaseSourceAdapter
+
+    class RegistryAdapter(BaseSourceAdapter):
+        async def discover(self, limit=None, sample_ratio=0.0):
+            return []
+
+    school = await _school_with_candidates(db_session)
+    await apply_campus_sync(db_session, school)
+    await db_session.commit()
+    school_id = school.id
+    primary = (await _locations(db_session, school_id))[0]
+    assert AGE_GROUP_TAG_PREFIX + "preschool" in primary.location_tags
+
+    incoming = DiscoveredLocation(address_i18n={"bg": 'ул. "Панорамен път" № 38'},
+                                  age_groups=["grade_1_4", "grade_5_7", "preschool"])
+    await RegistryAdapter(db=db_session)._sync_source_location(primary, incoming)
+    await db_session.commit()
+
+    await remove_website_campus_data(db_session, school_id)
+    await db_session.commit()
+    (primary,) = await _locations(db_session, school_id)
+    assert sorted(primary.age_groups) == ["grade_1_4", "grade_5_7", "preschool"]
+    assert not any(t.startswith(AGE_GROUP_TAG_PREFIX) for t in primary.location_tags)
+
+
+@pytest.mark.asyncio
+async def test_registry_dropping_a_website_age_group_also_drops_its_tag(db_session):
+    from app.schemas.scraping import DiscoveredLocation
+    from app.scrapers.sources.base_adapter import BaseSourceAdapter
+
+    class RegistryAdapter(BaseSourceAdapter):
+        async def discover(self, limit=None, sample_ratio=0.0):
+            return []
+
+    school = await _school_with_candidates(db_session)
+    await apply_campus_sync(db_session, school)
+    await db_session.commit()
+    school_id = school.id
+    primary = (await _locations(db_session, school_id))[0]
+    incoming = DiscoveredLocation(address_i18n={"bg": 'ул. "Панорамен път" № 38'}, age_groups=["grade_1_4"])
+    await RegistryAdapter(db=db_session)._sync_source_location(primary, incoming)
+    await db_session.commit()
+
+    (primary, _campus) = await _locations(db_session, school_id)
+    assert primary.age_groups == ["grade_1_4"]
+    assert not any(t.startswith(AGE_GROUP_TAG_PREFIX) for t in primary.location_tags)
+
+
 def test_sibling_institution_address_is_never_a_new_campus():
     payload = {"site": "x", "campuses": [
         {"address": "ул. Липа 5", "label": "", "context": ""},

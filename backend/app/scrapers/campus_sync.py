@@ -50,7 +50,8 @@ AGE_GROUP_TAG_PREFIX = "age_group_source=website:"
 _CONTACT_PATH_RE = re.compile(r"contact|kontakt|контакт", re.IGNORECASE)
 # Addresses that belong to someone else or to administration, not a campus.
 _NOT_CAMPUS_RE = re.compile(
-    r"офис|office|headquarter|\bhq\b|централ|управлени|седалище|администрац|"
+    # "централа"/"централен офис" (HQ), not "Централна сграда" (a main campus).
+    r"офис|office|headquarter|\bhq\b|централа\b|управлени|седалище|администрац|"
     r"partner|партньор|франчайз|franchise|счетоводств|accounting",
     re.IGNORECASE,
 )
@@ -214,8 +215,7 @@ def _campus_candidates(pages: Sequence[SitePage], *, city: str, family: str) -> 
     from app.scrapers import extractor_helpers as helpers
 
     other_family = "school" if family == "kindergarten" else "kindergarten"
-    kept: list[dict] = []
-    skipped: list[dict] = []
+    occurrences: list[dict] = []
     for page in pages:
         if not _is_contact_page(page):
             continue
@@ -228,12 +228,6 @@ def _campus_candidates(pages: Sequence[SitePage], *, city: str, family: str) -> 
             after = lines[index + 1 : index + 1 + CONTEXT_AFTER]
             context = " | ".join([*before, line, *after])
             candidate = {"address": address, "label": _label(before), "context": context, "source_url": page.url}
-            if any(addresses_equivalent(address, seen["address"]) for seen in kept):
-                continue
-            earlier = [s for s in skipped if addresses_equivalent(address, s["address"])]
-            # An office/partner/other-level address stays rejected wherever it appears.
-            if any(s["reason"] in _FIRM_REJECTIONS for s in earlier):
-                continue
             key = address_key(address)
             nearby = " ".join([*before[-1:], line, *after])
             if key is None or key.kind not in PRECISE_ADDRESS_KINDS:
@@ -248,15 +242,29 @@ def _campus_candidates(pages: Sequence[SitePage], *, city: str, family: str) -> 
                 reason = "describes_other_level"
             else:
                 reason = None
-            if reason is None or reason in _FIRM_REJECTIONS:
-                # A fully qualified copy beats an earlier weak one (e.g. a header without the city).
-                skipped[:] = [s for s in skipped if s not in earlier]
-            elif earlier:
-                continue
-            if reason is None:
-                kept.append(candidate)
-            else:
-                skipped.append({**candidate, "reason": reason})
+            occurrences.append({**candidate, "reason": reason})
+
+    # Decide per address over all its occurrences: an office/partner/other-level
+    # context anywhere rejects it; otherwise one fully qualified copy accepts it
+    # (a header or footer copy without the city does not block it).
+    groups: list[list[dict]] = []
+    for occurrence in occurrences:
+        group = next((g for g in groups if addresses_equivalent(g[0]["address"], occurrence["address"])), None)
+        if group is None:
+            groups.append([occurrence])
+        else:
+            group.append(occurrence)
+    kept: list[dict] = []
+    skipped: list[dict] = []
+    for group in groups:
+        firm = next((o for o in group if o["reason"] in _FIRM_REJECTIONS), None)
+        accepted = next((o for o in group if o["reason"] is None), None)
+        if firm is not None:
+            skipped.append(firm)
+        elif accepted is not None:
+            kept.append({k: v for k, v in accepted.items() if k != "reason"})
+        else:
+            skipped.append(group[0])
     return kept, skipped
 
 
@@ -488,7 +496,8 @@ async def apply_campus_sync(db, school) -> dict[str, Any]:
         tags = list(location.location_tags or [])
         for key in change["add"]:
             location.age_group_shifts.append(SchoolLocationAgeGroupShift(age_group=key))
-            tags.append(AGE_GROUP_TAG_PREFIX + key)
+            if AGE_GROUP_TAG_PREFIX + key not in tags:
+                tags.append(AGE_GROUP_TAG_PREFIX + key)
         location.location_tags = tags
         db.add(location)
     new_locations = []
