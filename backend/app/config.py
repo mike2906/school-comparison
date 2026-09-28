@@ -48,6 +48,10 @@ class Settings(BaseSettings):
 
     # Extraction settings
     extraction_llm_timeout_seconds: float = 45.0
+    # A timed-out extraction call is retried (EXTRACTION_LLM_TIMEOUT_RETRIES times) with
+    # this longer timeout; the timeouts bound run length, not cost.
+    extraction_llm_retry_timeout_seconds: float = 90.0
+    extraction_llm_timeout_retries: int = 2
     extraction_max_content_chars: int = 15000
     extraction_general_info_min_quality_score: int = 4
     extraction_output_retries: int = 2
@@ -69,7 +73,7 @@ class Settings(BaseSettings):
     # from stalling the entire batch. Set to 0 to disable (not recommended with crawl4ai).
     nav_school_timeout_seconds: float = 120.0
     # Per-school hard timeout for CLI batch extraction (covers all LLM calls + retries).
-    extraction_school_timeout_seconds: float = 180.0
+    extraction_school_timeout_seconds: float = 600.0
     summarization_llm_timeout_seconds: float = 20.0
     summarization_batch_concurrency: int = 2
     pipeline_heartbeat_interval_seconds: float = 30.0

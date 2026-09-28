@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
@@ -141,12 +142,21 @@ async def test_extract_school_persists_pricing_and_general_info(db_session, samp
     assert any(row.field_key == "attributes.display_name_i18n" for row in field_sources)
 
 
+async def _failed_llm_call(**kwargs):
+    """Mimic _run_typed_agent after its retries are exhausted (or the call is refused)."""
+    kwargs["llm_stats"].total_calls += 1
+    kwargs["llm_stats"].hard_failures += 1
+    return None, 0, 0, 0.0
+
+
 @pytest.mark.asyncio
-async def test_extract_school_uses_deterministic_fallback_when_general_llm_fails(
+async def test_extract_school_does_not_promote_fallback_when_llm_call_fails(
     db_session,
     sample_school_for_extraction,
 ):
-    school = sample_school_for_extraction
+    school = sample_school_for_extraction  # never published: no validation report
+    school.attributes = {"website_data_withheld": True}
+    await db_session.commit()
 
     mock_price = PriceExtractionOutput(
         prices=[
@@ -160,20 +170,114 @@ async def test_extract_school_uses_deterministic_fallback_when_general_llm_fails
         ],
         has_pricing_info=True,
     )
+    calls = iter([(mock_price, 100, 10, 0.001)])
 
-    with patch(
-        "app.scrapers.extractor._run_typed_agent",
-        new=AsyncMock(side_effect=[(mock_price, 100, 10, 0.001), (None, 0, 0, 0.0)]),
-    ):
+    async def _price_ok_general_fails(**kwargs):
+        if kwargs["result_type"] is PriceExtractionOutput:
+            return next(calls)
+        return await _failed_llm_call(**kwargs)
+
+    with patch("app.scrapers.extractor._run_typed_agent", new=_price_ok_general_fails):
         result = await extractor_module.extract_school(db_session, school.id, "bg")
 
-    assert result["status"] == "extracted"
-    assert result["general_info_success"] is True
-    assert any("deterministic fallback" in detail for detail in result["details"])
+    assert result["status"] == "extraction_failed"
+    assert "fallback output not promoted" in result["error"]
+    assert result["llm_stats"]["hard_failures"] == 1
+    assert any("stays withheld" in detail for detail in result["details"])
 
     await db_session.refresh(school)
-    extracted = (school.attributes or {}).get("extracted", {})
-    assert extracted.get("languages"), "deterministic fallback should preserve at least detected languages"
+    assert school.scrape_status == "extraction_failed"
+    assert school.attributes == {"website_data_withheld": True}
+    pricing_rows = (
+        await db_session.execute(select(Pricing).where(Pricing.school_id == school.id))
+    ).scalars().all()
+    assert pricing_rows == []
+
+
+def _website_field_source(school_id: int, url: str) -> FieldSource:
+    from app.models.field_source import SourceConfidence, SourceType
+
+    return FieldSource(
+        school_id=school_id,
+        category="attributes",
+        field_key="attributes.facilities",
+        value_text="pool",
+        source_type=SourceType.SCRAPED_WEBSITE,
+        source_url=url,
+        scraped_at=datetime.datetime(2026, 9, 1),
+        confidence=SourceConfidence.HIGH,
+    )
+
+
+@pytest.mark.asyncio
+async def test_extract_school_does_not_republish_data_from_a_previous_site(
+    db_session,
+    sample_school_for_extraction,
+):
+    school = sample_school_for_extraction
+    school.attributes = {
+        "extracted": {"facilities": ["pool"]},
+        "data_validation": {"_schema_version": 1, "status": "ok"},
+    }
+    # Website discovery moved the school to test-school.bg; the stored data came
+    # from another site and nothing withheld it.
+    db_session.add(_website_field_source(school.id, "https://old-site.bg/about"))
+    await db_session.commit()
+
+    with patch("app.scrapers.extractor._run_typed_agent", new=_failed_llm_call):
+        result = await extractor_module.extract_school(db_session, school.id, "bg")
+
+    assert result["status"] == "extraction_failed"
+    await db_session.refresh(school)
+    assert school.scrape_status == "extraction_failed"
+
+
+@pytest.mark.asyncio
+async def test_extract_school_keeps_previously_published_data_when_llm_retries_fail(
+    db_session,
+    sample_school_for_extraction,
+):
+    from app.utils.website_data import website_data_is_publishable
+
+    school = sample_school_for_extraction
+    previous_attributes = {
+        "extracted": {"facilities": ["pool"]},
+        "data_validation": {"_schema_version": 1, "status": "ok"},
+    }
+    school.attributes = previous_attributes
+    school.summary_i18n = {"bg": "Резюме", "en": "Summary"}
+    # Earlier stages of this run moved the status off the published one.
+    school.scrape_status = "navigated"
+    db_session.add(
+        Pricing(
+            school_id=school.id,
+            category="tuition",
+            amount=900.0,
+            currency="EUR",
+            period="yearly",
+            source=PriceSource.SCRAPED_WEBSITE,
+            source_url="https://test-school.bg/prices",
+        )
+    )
+    db_session.add(_website_field_source(school.id, "https://www.test-school.bg/about"))
+    await db_session.commit()
+
+    with patch("app.scrapers.extractor._run_typed_agent", new=_failed_llm_call):
+        result = await extractor_module.extract_school(db_session, school.id, "bg")
+
+    assert result["status"] == "extraction_failed"
+    assert any("Kept previously published" in detail for detail in result["details"])
+
+    await db_session.refresh(school)
+    assert school.scrape_status == "summarized"
+    assert school.attributes == previous_attributes
+    assert school.summary_i18n == {"bg": "Резюме", "en": "Summary"}
+    assert website_data_is_publishable(school.attributes, school.scrape_status)
+    # The deterministic fallback would have written 1000 BGN monthly from the page.
+    pricing_rows = (
+        await db_session.execute(select(Pricing).where(Pricing.school_id == school.id))
+    ).scalars().all()
+    assert [(row.amount, row.currency) for row in pricing_rows] == [(900.0, "EUR")]
 
 
 @pytest.mark.asyncio
@@ -1614,6 +1718,111 @@ async def test_run_typed_agent_falls_back_from_cheap_to_capable_for_general_info
     assert input_tokens == 11
     assert output_tokens == 5
     assert token_cost_usd == 0.0
+
+
+@pytest.mark.asyncio
+async def test_run_typed_agent_retries_timed_out_call_with_longer_timeout(monkeypatch):
+    from app.config import get_settings
+
+    llm_stats = extractor_module.ExtractionLLMStats()
+    monkeypatch.setattr(get_settings(), "extraction_llm_retry_timeout_seconds", 5.0)
+    monkeypatch.setattr(get_settings(), "extraction_llm_timeout_retries", 2)
+    delays = iter([1.0, 0.2])  # the retry is slower than the first timeout allows
+
+    class FakeAgentResult:
+        output = PriceExtractionOutput(prices=[], has_pricing_info=False)
+
+        def usage(self):
+            return SimpleNamespace(input_tokens=4, output_tokens=2)
+
+    class FakeAgent:
+        def __init__(self, **kwargs):
+            pass
+
+        def output_validator(self, fn):
+            return fn
+
+        async def run(self, _prompt):
+            await asyncio.sleep(next(delays))
+            return FakeAgentResult()
+
+    monkeypatch.setattr(extractor_module, "Agent", FakeAgent)
+    monkeypatch.setattr(extractor_module, "_build_openrouter_model", lambda *_args, **_kwargs: object())
+
+    parsed, input_tokens, _output_tokens, _cost = await extractor_module._run_typed_agent(
+        system_prompt="x",
+        user_prompt="y",
+        result_type=PriceExtractionOutput,
+        timeout_seconds=0.05,
+        llm_stats=llm_stats,
+    )
+
+    assert parsed is not None
+    assert input_tokens == 4
+    assert llm_stats.timeout_retries == 1
+    assert llm_stats.hard_failures == 0
+
+
+@pytest.mark.asyncio
+async def test_run_typed_agent_gives_up_after_timeout_retries(monkeypatch):
+    from app.config import get_settings
+
+    llm_stats = extractor_module.ExtractionLLMStats()
+    monkeypatch.setattr(get_settings(), "extraction_llm_retry_timeout_seconds", 0.05)
+    monkeypatch.setattr(get_settings(), "extraction_llm_timeout_retries", 2)
+    runs = 0
+
+    class FakeAgent:
+        def __init__(self, **kwargs):
+            pass
+
+        def output_validator(self, fn):
+            return fn
+
+        async def run(self, _prompt):
+            nonlocal runs
+            runs += 1
+            await asyncio.sleep(1.0)
+
+    monkeypatch.setattr(extractor_module, "Agent", FakeAgent)
+    monkeypatch.setattr(extractor_module, "_build_openrouter_model", lambda *_args, **_kwargs: object())
+
+    parsed, *_ = await extractor_module._run_typed_agent(
+        system_prompt="x",
+        user_prompt="y",
+        result_type=PriceExtractionOutput,
+        timeout_seconds=0.05,
+        llm_stats=llm_stats,
+    )
+
+    assert parsed is None
+    assert runs == 3
+    assert llm_stats.timeout_retries == 2
+    assert llm_stats.hard_failures == 1
+
+
+@pytest.mark.asyncio
+async def test_run_typed_agent_makes_no_call_after_a_hard_failure(monkeypatch):
+    llm_stats = extractor_module.ExtractionLLMStats(hard_failures=1)
+
+    class FakeAgent:
+        def __init__(self, **kwargs):
+            raise AssertionError("no LLM call after a hard failure")
+
+    monkeypatch.setattr(extractor_module, "Agent", FakeAgent)
+    monkeypatch.setattr(extractor_module, "_build_openrouter_model", lambda *_args, **_kwargs: object())
+
+    parsed, *_ = await extractor_module._run_typed_agent(
+        system_prompt="x",
+        user_prompt="y",
+        result_type=GeneralInfoExtractionOutput,
+        timeout_seconds=5.0,
+        llm_stats=llm_stats,
+    )
+
+    assert parsed is None
+    assert llm_stats.total_calls == 0
+    assert llm_stats.hard_failures == 1
 
 
 def test_extract_openrouter_cost_usd_from_provider_details():

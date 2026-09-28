@@ -39,7 +39,11 @@ from app.scrapers.summarizer import clear_summary_state
 from app.scrapers.validator import validate_school_data
 from app.services.geocoding.base import GeocodingResult
 from app.services.geocoding.write_gate import OFFICIAL_COORDS_TAG, apply_geocode_result_to_location
-from app.utils.website_data import WEBSITE_DATA_WITHHELD_KEY, prepare_validation_rollover
+from app.utils.website_data import (
+    WEBSITE_DATA_WITHHELD_KEY,
+    prepare_validation_rollover,
+    website_data_is_publishable,
+)
 from app.services.provider_costs import execute_billable_request
 from . import extractor_helpers as helpers
 
@@ -129,6 +133,7 @@ class ExtractionLLMStats:
     relaxed_parse_successes: int = 0
     provider_failures: int = 0
     model_retries: int = 0
+    timeout_retries: int = 0
     hard_failures: int = 0
     capable_fallback_attempts: int = 0
     capable_fallback_successes: int = 0
@@ -156,6 +161,7 @@ class ExtractionLLMStats:
             "relaxed_parse_successes": self.relaxed_parse_successes,
             "provider_failures": self.provider_failures,
             "model_retries": self.model_retries,
+            "timeout_retries": self.timeout_retries,
             "hard_failures": self.hard_failures,
             "capable_fallback_attempts": self.capable_fallback_attempts,
             "capable_fallback_successes": self.capable_fallback_successes,
@@ -434,6 +440,10 @@ async def _run_typed_agent(
     school_id: int | None = None,
 ) -> tuple[Any | None, int, int, float]:
     settings = get_settings()
+    if llm_stats.hard_failures:
+        # The school's extraction is rolled back after any hard failure, so later
+        # calls would only spend money and the per-school timeout.
+        return None, 0, 0, 0.0
 
     async def _run_for_tier(tier: str) -> tuple[Any | None, int, int, float]:
         retries_state = {"count": 0}
@@ -477,15 +487,37 @@ async def _run_typed_agent(
             return data
 
         llm_stats.total_calls += 1
-        result = await asyncio.wait_for(
-            execute_billable_request(
-                lambda: agent.run(user_prompt),
-                model=get_model(tier),
-                school_id=school_id,
-                stage="extract",
-            ),
-            timeout=timeout_seconds,
-        )
+        # A timed-out call is retried with a longer timeout; each attempt is its own
+        # billable request. Other errors are not retried here.
+        retries = max(0, int(settings.extraction_llm_timeout_retries))
+        attempt = 0
+        while True:
+            attempt_timeout = (
+                timeout_seconds
+                if attempt == 0
+                else max(timeout_seconds, float(settings.extraction_llm_retry_timeout_seconds))
+            )
+            try:
+                result = await execute_billable_request(
+                    lambda: agent.run(user_prompt),
+                    model=get_model(tier),
+                    school_id=school_id,
+                    stage="extract",
+                    timeout_seconds=attempt_timeout,
+                )
+                break
+            except asyncio.TimeoutError:
+                if attempt >= retries:
+                    raise
+                attempt += 1
+                llm_stats.timeout_retries += 1
+                logger.warning(
+                    "Extraction call timed out after %.0fs (%s); retry %s/%s",
+                    attempt_timeout,
+                    result_type.__name__,
+                    attempt,
+                    retries,
+                )
         llm_stats.model_retries += retries_state["count"]
         parsed = _parse_agent_output(result, result_type)
         input_tokens, output_tokens = helpers._get_usage(result)
@@ -516,7 +548,6 @@ async def _run_typed_agent(
                 return None, 0, 0, 0.0
             llm_stats.capable_fallback_successes += 1
             return out
-        _record_failure(exc, final=True)
         return None, 0, 0, 0.0
 
 
@@ -1888,6 +1919,60 @@ def _build_deterministic_general_info_output(
     )
 
 
+def _site_host(url: str | None) -> str:
+    host = (urlparse(str(url or "")).hostname or "").casefold()
+    return host[4:] if host.startswith("www.") else host
+
+
+async def _stored_website_data_matches_current_site(db: AsyncSession, school: School) -> bool:
+    """Whether the stored website extraction came from the school's current host.
+
+    Website discovery can move a school to another site without withholding the old
+    data, so the old data must not be republished under the new URL.
+    """
+    current = _site_host(school.website_url)
+    if not current:
+        return False
+    source_urls = (
+        await db.execute(
+            select(FieldSource.source_url).where(
+                FieldSource.school_id == school.id,
+                FieldSource.source_type == SourceType.SCRAPED_WEBSITE,
+            )
+        )
+    ).scalars().all()
+    return current in {_site_host(url) for url in source_urls}
+
+
+async def keep_previous_website_data(db: AsyncSession, school_id: int) -> str | None:
+    """Undo a failed extraction without promoting a fallback (call after a rollback).
+
+    Earlier stages of the run set a non-publishable status (e.g. ``navigated``). A
+    school whose last validated website data is still intact (current validation
+    report, no withholding marker) and came from its current website host gets a
+    publishable status back, so that data stays published; otherwise it is
+    ``extraction_failed`` and stays withheld.
+    """
+    school = (
+        await db.execute(
+            select(School)
+            .where(School.id == school_id)
+            .execution_options(populate_existing=True)
+        )
+    ).scalar_one_or_none()
+    if school is None:
+        return None
+    if website_data_is_publishable(
+        school.attributes, "extracted"
+    ) and await _stored_website_data_matches_current_site(db, school):
+        school.scrape_status = "summarized" if school.summary_i18n else "extracted"
+    else:
+        school.scrape_status = "extraction_failed"
+    school.updated_at = datetime.datetime.now(datetime.timezone.utc)
+    await db.commit()
+    return school.scrape_status
+
+
 async def extract_school(
     db: AsyncSession,
     school_id: int,
@@ -1974,6 +2059,22 @@ async def extract_school(
     stats["token_cost_usd"] += float(general_result.get("token_cost_usd", 0.0) or 0.0)
     if general_result.get("detail"):
         stats["details"].append(general_result["detail"])
+
+    if llm_stats.hard_failures:
+        # An extraction LLM call failed or was refused after its retries: the
+        # deterministic fallback output is not promoted.
+        await db.rollback()
+        kept_status = await keep_previous_website_data(db, school_id)
+        stats["status"] = "extraction_failed"
+        stats["error"] = "Extraction LLM call failed after retries; fallback output not promoted"
+        stats["details"].append(
+            "Kept previously published website data"
+            if kept_status in {"extracted", "summarized"}
+            else "No previously published website data; website data stays withheld"
+        )
+        stats["token_cost_usd"] = round(float(stats["token_cost_usd"] or 0.0), 6)
+        stats["llm_stats"] = llm_stats.as_dict()
+        return stats
 
     if stats["pricing_success"] or stats["general_info_success"]:
         clear_summary_state(school)

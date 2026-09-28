@@ -20,6 +20,7 @@ from app.services.provider_costs import (
     attribute_provider_responses,
     execute_billable_request,
     extract_exact_provider_attributions,
+    mark_provider_request_uncertain,
     provider_cost_scope,
     reconcile_provider_cost,
     reserve_provider_request,
@@ -201,7 +202,7 @@ async def test_billable_batch_concurrency_is_serialized_until_exact_attribution(
     assert max_active == 1
 
 
-async def test_missing_or_delayed_attribution_blocks_following_dispatch(db_session):
+async def test_uncertain_request_counts_at_reserve_and_later_dispatch_runs(db_session):
     run = await _run(db_session)
     row = await _reserve(db_session, run)
 
@@ -215,8 +216,61 @@ async def test_missing_or_delayed_attribution_blocks_following_dispatch(db_sessi
             provider_cost_usd=None,
         )
     assert row.status == ProviderRequestStatus.UNCERTAIN
-    with pytest.raises(ProviderAttributionUncertain):
-        await _reserve(db_session, run)
+
+    # The uncertain call no longer blocks the run: the next dispatch is reserved.
+    later = await _reserve(db_session, run)
+    await _attribute(db_session, later, request_id="req-later", cost="0.01000000")
+    assert later.status == ProviderRequestStatus.ATTRIBUTED
+
+
+async def test_uncertain_requests_still_count_toward_the_cap(db_session):
+    run = await _run(db_session)  # cap 1.0
+    for _ in range(9):
+        row = await _reserve(db_session, run, reserve=0.1)
+        await mark_provider_request_uncertain(
+            db_session, client_request_id=row.client_request_id, reason="timeout"
+        )
+
+    # 9 uncertain requests at the 0.1 reserve leave room for exactly one more.
+    last = await _reserve(db_session, run, reserve=0.1)
+    await mark_provider_request_uncertain(
+        db_session, client_request_id=last.client_request_id, reason="timeout"
+    )
+    with pytest.raises(ProviderCostCapExceeded, match="10 uncertain"):
+        await _reserve(db_session, run, reserve=0.1)
+
+
+async def test_uncertain_and_exact_spend_are_combined_against_the_cap(db_session):
+    run = await _run(db_session)
+    exact = await _reserve(db_session, run, reserve=0.1)
+    await _attribute(db_session, exact, cost="0.85000000")
+    timed_out = await _reserve(db_session, run, reserve=0.1)
+    await mark_provider_request_uncertain(
+        db_session, client_request_id=timed_out.client_request_id, reason="timeout"
+    )
+
+    # 0.85 exact + 0.1 uncertain + 0.1 reserve > 1.0
+    with pytest.raises(ProviderCostCapExceeded):
+        await _reserve(db_session, run, reserve=0.1)
+
+
+async def test_reconciliation_counts_only_exact_spend_with_uncertain_rows(db_session):
+    run = await _run(db_session)
+    timed_out = await _reserve(db_session, run)
+    await mark_provider_request_uncertain(
+        db_session, client_request_id=timed_out.client_request_id, reason="timeout"
+    )
+    exact = await _reserve(db_session, run)
+    await _attribute(db_session, exact, cost="0.02000000")
+
+    payload = await reconcile_provider_cost(
+        db_session, pipeline_run_id=run.id, provider_total_cost_usd="0.03000000"
+    )
+
+    assert payload["ledger_total_cost_usd"] == 0.02
+    assert payload["discrepancy_usd"] == 0.01
+    assert payload["attributed_requests"] == 1
+    assert payload["uncertain_requests"] == 1
 
 
 async def test_provider_attribution_is_idempotent_and_rejects_disagreement(db_session):
@@ -386,3 +440,123 @@ async def test_invalid_later_response_does_not_persist_partial_attribution(db_se
     assert len(persisted) == 1
     assert persisted[0].provider_request_id is None
     assert persisted[0].status == ProviderRequestStatus.UNCERTAIN
+
+
+async def test_timed_out_dispatch_is_uncertain_and_later_dispatches_still_run(
+    monkeypatch, async_engine, db_session
+):
+    import app.database as database
+    import app.services.provider_costs as provider_costs
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+    monkeypatch.setattr(
+        database,
+        "async_session_maker",
+        async_sessionmaker(async_engine, class_=AsyncSession, expire_on_commit=False),
+    )
+    request_ids = iter(["req-a", "req-b"])
+    monkeypatch.setattr(
+        provider_costs,
+        "extract_exact_provider_attributions",
+        lambda _result: [
+            {
+                "provider_request_id": next(request_ids),
+                "input_tokens": 10,
+                "output_tokens": 2,
+                "provider_cost_usd": Decimal("0.01"),
+            }
+        ],
+    )
+    run = await start_pipeline_run(
+        db_session,
+        country="bg",
+        city="sofia",
+        cli_stage="extract",
+        config={"provider_cost_cap_usd": 0.3},
+    )
+
+    async def _slow():
+        await asyncio.sleep(1.0)
+
+    async def _fast():
+        return object()
+
+    with provider_cost_scope(
+        pipeline_run_id=run.id, stage="extract", cap_usd=0.3, request_reserve_usd=0.1
+    ):
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(
+                execute_billable_request(_slow, model="mock", school_id=None), timeout=0.05
+            )
+        # The timed-out request no longer blocks the run.
+        await execute_billable_request(_fast, model="mock", school_id=None)
+        await execute_billable_request(_fast, model="mock", school_id=None)
+        # A second timeout still dispatches (0.12 + 0.1 reserve), but then the
+        # counted spend is 0.1 + 0.1 uncertain + 0.02 exact and 0.32 > the 0.3 cap.
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(
+                execute_billable_request(_slow, model="mock", school_id=None), timeout=0.05
+            )
+        with pytest.raises(ProviderCostCapExceeded):
+            await execute_billable_request(_fast, model="mock", school_id=None)
+
+    rows = list(
+        (
+            await db_session.execute(
+                select(ProviderRequestLedger)
+                .where(ProviderRequestLedger.pipeline_run_id == run.id)
+                .execution_options(populate_existing=True)
+            )
+        ).scalars()
+    )
+    assert sorted(row.status.value for row in rows) == [
+        "attributed",
+        "attributed",
+        "uncertain",
+        "uncertain",
+    ]
+
+
+async def test_dispatch_timeout_excludes_time_queued_for_the_dispatch_lock(monkeypatch):
+    import app.database as database
+    import app.services.provider_costs as provider_costs
+
+    class _Session:
+        async def __aenter__(self):
+            return object()
+
+        async def __aexit__(self, *_args):
+            return None
+
+    async def _noop(*_args, **_kwargs):
+        return None
+
+    async def _reserve(*_args, **_kwargs):
+        return SimpleNamespace(client_request_id="client")
+
+    monkeypatch.setattr(database, "async_session_maker", lambda: _Session())
+    monkeypatch.setattr(provider_costs, "reserve_provider_request", _reserve)
+    monkeypatch.setattr(
+        provider_costs,
+        "extract_exact_provider_attributions",
+        lambda _result: [{"provider_request_id": "mock"}],
+    )
+    monkeypatch.setattr(provider_costs, "attribute_provider_responses", _noop)
+
+    async def _slow():
+        await asyncio.sleep(0.2)
+        return "slow"
+
+    async def _fast():
+        return "fast"
+
+    with provider_cost_scope(
+        pipeline_run_id="run-1", stage="extract", cap_usd=1.0, request_reserve_usd=0.1
+    ):
+        results = await asyncio.gather(
+            execute_billable_request(_slow, model="mock", school_id=1, timeout_seconds=1.0),
+            # Queued behind the slow call for longer than its own timeout.
+            execute_billable_request(_fast, model="mock", school_id=2, timeout_seconds=0.05),
+        )
+
+    assert results == ["slow", "fast"]
