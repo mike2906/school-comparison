@@ -1817,6 +1817,28 @@ the session scratchpad only.
       and becomes "Maple Bear Sofia"); 630's waldorf.bg prices mix kindergarten and
       school fees; extraction falls back to deterministic output and still promotes when
       LLM calls time out or are refused (decision pending with Mike).
+      **Follow-up done 2026-09-28 (#124):** a timed-out extraction call is retried twice
+      with a 90 s timeout, and the timeout covers only the provider call, not the wait for the dispatch lock. An
+      uncertain call counts at the $0.10 request reserve against the run cap instead of
+      refusing the rest of the run. If an extraction call still fails or is refused, the
+      school makes no further calls, is rolled back, and the fallback is not promoted.
+      Previously published data from the same host keeps its publishable status; anything
+      else stays withheld. Re-runs on the launch DB, one school per run, no timeouts or
+      uncertain calls: **556** applied (first published prices: €9,200 tuition, meals
+      €181.44/month, materials €400/€550, all from the kindergarten site; the name came back
+      as 596's "Maple Bear Sofia" and was set to the site's "Maple Bear Kindergarten Sofia"
+      by hand). **525** applied (current €530/€350 fees replace stale €560/€350; the
+      prepay rates are now installments, not registration rows; Каравелов 54 campus added;
+      by hand: monthly on €530 and €20, the €265 deposit refiled as one-time
+      registration, the €25 yoga row refiled from tuition to extracurricular). **630**
+      applied (Хумболт 7 is the school's address per the contacts page, pinned; €6,150 and
+      €6,640 tuition, €800 deposit; by hand: deleted the kindergarten €6,200 tuition, an
+      invented €6,200 "catering" tuition row and the €135 weekly guest fee filed as
+      registration; the €800 deposit set to one-time). Its registry location 1187 (Горски
+      пътник 44) is the kindergarten's building (514) and still lists grades 1–12.
+      Backups: `~/backups/sofia_schools_pre_rerun_{556_20260928_1130,525_20260928_1450,630_20260928_1520}.dump`
+      (the time in the name is wrong: written 14:43, 14:46, 16:38). Still open:
+      extraction quality (UF45); `language_focus` duplicates did not recur.
       **(c) done 2026-09-28:** `app/services/school_relations.py` computes `continues_to` on
       request for the detail endpoint only (`SchoolDetailResponse`; nothing stored, no
       migration); the detail page shows one line linking to the school. Evidence rule: same
@@ -1877,6 +1899,28 @@ the session scratchpad only.
       the other kindergarten's point. Sofia locations without a pin: private 27 → 32 (the
       baseline includes UF42a's cleared 1082/1091), state 4 → 7. Follow-up: 3024, 3112, 3115 keep
       pins the current pipeline does not reproduce (no result / area mismatch).
+- [ ] **UF45 Price-row and name sanity checks (proposed 2026-09-28, needs Mike's go).**
+      Every wrong row fixed by hand in the UF42 re-runs breaks a rule that can be checked
+      against the source page text, without a model:
+      (1) *Amount near its label:* the amount must appear within a short window of the
+      row's own label or plan name (630's "catering" row copied €6,200 from the line above).
+      (2) *Level fits the school:* a label naming the other level ("детска градина",
+      kindergarten, nursery on a school; grades on a kindergarten) drops the row (630's
+      kindergarten tuition). Reuse the shared-site level vocabulary.
+      (3) *Period from the text:* a period keyword next to the amount ("месечна",
+      "ежемесечно", "/ month", "годишна") sets the period when the model left it null
+      (525 €530, €20); an unrepresentable one ("седмична", "/ден") drops the row (630
+      €135 weekly).
+      (4) *Category words:* "депозит"/deposit is never tuition (525 €265).
+      (5) *Name is not a sibling's:* a display name equal to another institution's name in
+      the same site group is rejected (556 → "Maple Bear Sofia").
+      (6) *Re-extraction regression guard:* when a re-extraction would replace published
+      rows and loses stated periods or rows the page still shows, hold the school for
+      review instead of publishing.
+      Rules (1)–(5) fix or drop single rows (a publish-gate change); (6) is the backstop.
+      An LLM judge is not needed for these: the Stage 6 capable-model spot-check already
+      runs, but it is monitoring-only. Make it actionable for pricing only if residual
+      errors remain after the rules.
 
 ## Phase 3 — Go live
 
