@@ -238,6 +238,23 @@ async def test_geocoded_campus_next_to_an_existing_location_is_the_same_building
     assert bool(campuses) is kept
     primary = (await _locations(db_session, school_id))[0]
     assert "grade_5_7" in primary.age_groups and len(primary.age_groups) == 3  # untouched
+    if not kept:
+        # The next validation does not recreate it.
+        school = await db_session.get(School, school_id)
+        await db_session.refresh(school)
+        result = await apply_campus_sync(db_session, school)
+        assert result["new_location_ids"] == []
+        assert {"address": "ул. Витошки Камбани 9", "reason": "same_building_as_existing_location"} in result["skipped"]
+
+
+def test_entrance_wording_without_another_address_on_the_line_is_ignored():
+    contact = SitePage(
+        "https://school1.example.bg/contacts",
+        "Сграда 2 (вход от ул. Бреза)\nСофия, ул. Бреза 7\nСграда 1\nСофия, ул. Липа 5\n",
+        "contact",
+    )
+    payload = extract([contact], "https://school1.example.bg/", "lower_secondary")
+    assert [c["address"] for c in payload["campuses"]] == ["ул. Бреза 7", "ул. Липа 5"]
 
 
 def test_main_building_label_is_not_an_office():

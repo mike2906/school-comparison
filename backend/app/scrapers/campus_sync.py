@@ -89,6 +89,13 @@ _ENTRANCE_RE = re.compile(
     r"[\"'„“”]*(?P<street>[^\"'„“”/()\n,]+)",
     re.IGNORECASE,
 )
+
+
+def _numbered_street(text: str) -> bool:
+    key = address_key(text.rstrip(" /(-–,[:"))
+    return key is not None and key.kind == "street_number"
+
+
 # A geocoded campus this close to one of the school's other locations is the same building.
 CAMPUS_SAME_BUILDING_RADIUS_M = 75.0
 # A campus needs a full street address (street + number, or quarter + block).
@@ -226,11 +233,15 @@ def _campus_candidates(pages: Sequence[SitePage], *, city: str, family: str) -> 
     from app.scrapers import extractor_helpers as helpers
 
     other_family = "school" if family == "kindergarten" else "kindergarten"
+    # Only an entrance attached to another numbered street address on the same line
+    # ("ул. Нишава 107 /вход от ул. X/") names a door of that building.
     entrance_streets = [
         set(_distinctive_words(match.group("street")))
         for page in pages
         if _is_contact_page(page)
-        for match in _ENTRANCE_RE.finditer(page.text or "")
+        for line in (page.text or "").splitlines()
+        for match in _ENTRANCE_RE.finditer(line)
+        if _numbered_street(line[: match.start()])
     ]
     occurrences: list[dict] = []
     for page in pages:
@@ -409,6 +420,9 @@ def plan_campus_sync(
         if any(_same_street_different_number(loc.address, address) for loc in existing):
             # A second building or a move: the site alone can't tell which.
             plan["skipped"].append({"address": address, "reason": "same_street_different_number"})
+            continue
+        if any(addresses_equivalent(done, address) for done in payload.get("same_building") or []):
+            plan["skipped"].append({"address": address, "reason": "same_building_as_existing_location"})
             continue
         sibling = next((sid for sid, other in other_institution_addresses if addresses_equivalent(other, address)), None)
         if sibling is not None:
@@ -665,6 +679,17 @@ async def _drop_if_same_building(db, campus) -> bool:
         "same_building_as_existing_location: campus %s (%s) is within %.0f m of location %s; deleted",
         campus.id, (campus.address_i18n or {}).get("bg"), CAMPUS_SAME_BUILDING_RADIUS_M, near.id,
     )
+    # Remember it until the next extraction so validation doesn't recreate the row.
+    from app.models import School
+
+    school = await db.get(School, campus.school_id)
+    attrs = dict(school.attributes or {})
+    payload = dict(attrs.get(CAMPUSES_KEY) or {})
+    address = (campus.address_i18n or {}).get("bg") or ""
+    payload["same_building"] = [*(payload.get("same_building") or []), address]
+    attrs[CAMPUSES_KEY] = payload
+    school.attributes = attrs
+    db.add(school)
     await db.delete(campus)
     await db.commit()
     return True
