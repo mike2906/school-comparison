@@ -1733,7 +1733,7 @@ the session scratchpad only.
       `coords_source=sofia_municipal`; forced re-geocodes and website map links keep them.
       The 68 unmatched rows (second buildings not in the layer, non-municipal state schools)
       are in the report for review.
-- [ ] **UF42 Related institutions (kindergarten → school) are separate and sometimes
+- [x] **UF42 Related institutions (kindergarten → school) are separate and sometimes
       mis-linked.** Parents weighing a kindergarten want to know the school it leads to.
       Example: Maple Bear is kindergarten 556 (reg. 2200052, кв. Витоша) and school 596
       (reg. 2200031). The school has two campuses (Boyana, 38 Panoramen Pat, Preschool–Grade
@@ -1817,6 +1817,21 @@ the session scratchpad only.
       and becomes "Maple Bear Sofia"); 630's waldorf.bg prices mix kindergarten and
       school fees; extraction falls back to deterministic output and still promotes when
       LLM calls time out or are refused (decision pending with Mike).
+      **(c) done 2026-09-28:** `app/services/school_relations.py` computes `continues_to` on
+      request for the detail endpoint only (`SchoolDetailResponse`; nothing stored, no
+      migration); the detail page shows one line linking to the school. Evidence rule: same
+      site group (`site_group_key`), neither website withheld by URL validation or the
+      shared-site check, registry names share a brand (`brand`/`shared_brand_key`, moved
+      out of `scripts/derive_school_groups.py`; at least 4 characters), kindergarten-level →
+      school-level, same city, exactly one candidate school, and the school is itself
+      listed. It needs a site that passed the checks, not publishable extracted data: the
+      link uses only the URL, registry name/level/city and the target's published name.
+      Published: only the target's id, resolved name, school type and level. Launch DB
+      (report `backend/reports/uf42c/`): 6 links (515→575 Британика, 587→522 Дружба,
+      556→596 Maple Bear, 591→592 Никатор, 510→214 Светлина, 514→630 Waldorf); 9
+      near-misses, all because the kindergarten's site is withheld (560, 589, 546, 555,
+      528, 634, 372); restoring the site would link 589→610, 546→537, 555→594, 634→635 and
+      372→534, the rest have no shared brand. The school side shows no inverse link.
 - [x] **UF44 Remaining pin gaps (after UF41/UF43).** 38 Sofia private locations have no pin:
       17 are blocked by a terminal `duplicate_geojson_name_match_different_address` and were
       never tried with the UF41 street/district logic (many ordinary addresses, e.g. ж.к.

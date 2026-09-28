@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import Layout from '../Layout/Layout'
 import { fetchSchool, fetchExamAverages } from '../../api/schools'
@@ -317,6 +317,20 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
               </span>
             )}
           </div>
+
+          {/* Computed server-side: the one school this kindergarten leads to. */}
+          {school.continues_to && (
+            <p className="text-neutral-700 mb-6">
+              {t('schools.continuesTo')}{' '}
+              <Link
+                to={`/schools/${school.continues_to.id}`}
+                className="font-semibold text-primary-700 hover:text-primary-800 underline underline-offset-2"
+              >
+                {getSchoolName(school.continues_to, i18n.language)}
+              </Link>{' '}
+              {t('schools.continuesToSchool')}
+            </p>
+          )}
 
           {summary && (
             <div className="prose max-w-none mb-6">
