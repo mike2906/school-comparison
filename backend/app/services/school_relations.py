@@ -5,7 +5,9 @@ this holds:
 
 * both websites are on the same site group (registrable domain, or the tenant site
   on a path-hosted platform; ``shared_site_check.site_group_key``);
-* neither website was withheld by URL validation or the shared-site check;
+* each side's current website has positive evidence: a shared-site check keep or
+  replace decision recorded for that same site; and neither was withheld by URL
+  validation;
 * the registry names share a brand (``brand`` / ``shared_brand_key``, the logic of
   ``scripts/derive_school_groups.py``);
 * one is kindergarten-level and the other school-level, in the same city;
@@ -26,7 +28,8 @@ from typing import Any, Optional
 
 from app.scrapers.shared_site_check import (
     SHARED_SITE_CHECK_KEY,
-    WITHHOLD,
+    KEEP,
+    REPLACE,
     level_family,
     registrable_domain,
     site_group_key,
@@ -101,22 +104,27 @@ class Institution:
         )
 
 
-def website_passed_site_checks(inst: Institution) -> bool:
-    """The website was not withheld by URL validation or the shared-site check."""
-    if not inst.website_url:
-        return False
-    if str(inst.scrape_status or "").strip().casefold() in WITHHELD_WEBSITE_STATUSES:
-        return False
-    # A withhold decision already clears the URL; if the same site came back without
-    # a newer decision, the old withhold still stands for this purpose.
+def website_evidence_gap(inst: Institution) -> Optional[str]:
+    """Why the current website is not verified for a link (None when it is).
+
+    The shared-site check must have kept or chosen (replaced to) a URL on the same
+    site as the current one: that decision verified the institution's address and
+    level on the site itself. A URL imported, rediscovered or moved to another site
+    after the decision has no evidence yet. URL-validation withholding still excludes.
+    """
+    if not inst.website_url or str(inst.scrape_status or "").strip().casefold() in WITHHELD_WEBSITE_STATUSES:
+        return "withheld"
     check = inst.attributes.get(SHARED_SITE_CHECK_KEY)
-    if (
-        isinstance(check, Mapping)
-        and check.get("action") == WITHHOLD
-        and site_id(check.get("previous_url")) == site_id(inst.website_url)
-    ):
-        return False
-    return True
+    if not isinstance(check, Mapping) or check.get("action") not in (KEEP, REPLACE):
+        return "no shared-site check decision"
+    decided_url = check.get("new_url") or (check.get("previous_url") if check.get("action") == KEEP else None)
+    if not decided_url or site_id(decided_url) != site_id(inst.website_url):
+        return "shared-site check decision is for another site"
+    return None
+
+
+def website_passed_site_checks(inst: Institution) -> bool:
+    return website_evidence_gap(inst) is None
 
 
 def link_rejection(kindergarten: Institution, school: Institution) -> Optional[str]:
@@ -125,10 +133,10 @@ def link_rejection(kindergarten: Institution, school: Institution) -> Optional[s
         return "source is not kindergarten-level"
     if level_family(school.education_level) != "school":
         return "target is not school-level"
-    if not website_passed_site_checks(kindergarten):
-        return "kindergarten website withheld"
-    if not website_passed_site_checks(school):
-        return "school website withheld"
+    for side, inst in (("kindergarten", kindergarten), ("school", school)):
+        gap = website_evidence_gap(inst)
+        if gap:
+            return f"{side} website: {gap}"
     group = site_group_key(kindergarten.website_url)
     if not group or group != site_group_key(school.website_url):
         return "different site"

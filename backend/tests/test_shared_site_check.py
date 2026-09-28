@@ -500,6 +500,10 @@ async def test_apply_withholds_and_replaces_through_existing_state(db_session):
     assert kept.website_url == "https://example-school.bg/"
     assert kept.scrape_status == "extracted"
     assert website_data_is_publishable(kept.attributes, kept.scrape_status)
+    # A keep is recorded as positive evidence for exactly this site.
+    assert kept.attributes["shared_site_check"]["action"] == "keep"
+    assert kept.attributes["shared_site_check"]["new_url"] == "https://example-school.bg/"
+    assert replaced.attributes["shared_site_check"]["action"] == "replace"
 
 
 @pytest.mark.asyncio

@@ -21,6 +21,19 @@ VALIDATED = {
 }
 
 
+def check(action, url, previous_url=None):
+    """A shared-site check record as `apply_decision` stores it."""
+    return {
+        "shared_site_check": {
+            "checked_at": "2026-09-25T12:00:00+00:00",
+            "action": action,
+            "reason": "test",
+            "previous_url": previous_url or url,
+            "new_url": url,
+        }
+    }
+
+
 def inst(id, name, level, url, status="extracted", city="sofia", attributes=None):
     return Institution(
         id=id,
@@ -29,11 +42,16 @@ def inst(id, name, level, url, status="extracted", city="sofia", attributes=None
         city=city,
         website_url=url,
         scrape_status=status,
-        attributes=attributes or {},
+        # Default: the shared-site check kept this URL.
+        attributes=check("keep", url) if attributes is None else attributes,
     )
 
 
-KG = inst(1, KG_NAME, "kindergarten", "https://sofia-kindergarten.maplebear.bg/", status="pending")
+# 556's shape: the check replaced the school site with the kindergarten campus; pending.
+KG = inst(
+    1, KG_NAME, "kindergarten", "https://sofia-kindergarten.maplebear.bg/", status="pending",
+    attributes=check("replace", "https://sofia-kindergarten.maplebear.bg/", "https://sofia-school.maplebear.bg/en/"),
+)
 SCHOOL = inst(2, SCHOOL_NAME, "lower_secondary", "https://sofia-school.maplebear.bg/")
 
 
@@ -57,17 +75,38 @@ class TestRule:
     @pytest.mark.parametrize("status", ["failed_validate", "no_official_website"])
     def test_withheld_school_site_blocks(self, status):
         withheld = inst(2, SCHOOL_NAME, "lower_secondary", "https://sofia-school.maplebear.bg/", status=status)
-        assert link_rejection(KG, withheld) == "school website withheld"
+        assert link_rejection(KG, withheld) == "school website: withheld"
 
     def test_withheld_kindergarten_site_blocks(self):
         withheld = inst(1, KG_NAME, "kindergarten", None, status="failed_validate")
-        assert link_rejection(withheld, SCHOOL) == "kindergarten website withheld"
+        assert link_rejection(withheld, SCHOOL) == "kindergarten website: withheld"
         assert continues_to_target(withheld, [SCHOOL]) is None
 
     def test_shared_site_withhold_record_for_the_same_site_blocks(self):
-        attrs = {"shared_site_check": {"action": "withhold", "previous_url": "https://sofia-school.maplebear.bg/"}}
+        attrs = check("withhold", None, "https://sofia-school.maplebear.bg/")
         school = inst(2, SCHOOL_NAME, "lower_secondary", "https://sofia-school.maplebear.bg/", attributes=attrs)
-        assert link_rejection(KG, school) == "school website withheld"
+        assert link_rejection(KG, school) == "school website: no shared-site check decision"
+
+    def test_pending_url_without_a_check_record_blocks(self):
+        unchecked = inst(1, KG_NAME, "kindergarten", "https://sofia-kindergarten.maplebear.bg/",
+                         status="pending", attributes={})
+        assert link_rejection(unchecked, SCHOOL) == "kindergarten website: no shared-site check decision"
+        assert link_rejection(KG, inst(2, SCHOOL_NAME, "primary", "https://sofia-school.maplebear.bg/",
+                                       attributes={})) == "school website: no shared-site check decision"
+
+    def test_check_record_for_an_old_url_blocks(self):
+        # Decision taken on another site; the URL moved afterwards.
+        moved = inst(2, SCHOOL_NAME, "lower_secondary", "https://new-school.maplebear.bg/",
+                     attributes=check("keep", "https://sofia-school.maplebear.bg/"))
+        assert link_rejection(KG, moved) == "school website: shared-site check decision is for another site"
+        replaced_elsewhere = inst(1, KG_NAME, "kindergarten", "https://sofia-school.maplebear.bg/",
+                                  attributes=check("replace", "https://sofia-kindergarten.maplebear.bg/",
+                                                   "https://sofia-school.maplebear.bg/"))
+        assert link_rejection(replaced_elsewhere, SCHOOL) == "kindergarten website: shared-site check decision is for another site"
+
+    def test_keep_record_for_the_current_url_links(self):
+        kept_kg = inst(1, KG_NAME, "kindergarten", "https://sofia-kindergarten.maplebear.bg/about")
+        assert link_rejection(kept_kg, SCHOOL) is None
 
     def test_different_domain_city_or_brand_blocks(self):
         assert link_rejection(KG, inst(2, SCHOOL_NAME, "primary", "https://maplebear.com/")) == "different site"
@@ -110,7 +149,7 @@ async def _add(db, *, name, level, url, status="extracted", attributes=None, cit
     return school
 
 
-async def _maple_bear(db, *, kg_status="pending", school_status="extracted", school_pinned=True):
+async def _maple_bear(db, *, kg_status="pending", school_status="extracted", school_pinned=True, kg_checked=True):
     kg = await _add(
         db,
         name=KG_NAME,
@@ -118,7 +157,12 @@ async def _maple_bear(db, *, kg_status="pending", school_status="extracted", sch
         url=None if kg_status == "failed_validate" else "https://sofia-kindergarten.maplebear.bg/",
         status=kg_status,
         # 556's current shape: re-extraction pending, website data withheld.
-        attributes={WEBSITE_DATA_WITHHELD_KEY: True, "extracted": {"secret": "must not ship"}},
+        attributes={
+            WEBSITE_DATA_WITHHELD_KEY: True,
+            "extracted": {"secret": "must not ship"},
+            **(check("replace", "https://sofia-kindergarten.maplebear.bg/", "https://sofia-school.maplebear.bg/en/")
+               if kg_checked else {}),
+        },
     )
     school = await _add(
         db,
@@ -126,7 +170,11 @@ async def _maple_bear(db, *, kg_status="pending", school_status="extracted", sch
         level="lower_secondary",
         url=None if school_status == "failed_validate" else "https://sofia-school.maplebear.bg/",
         status=school_status,
-        attributes=dict(VALIDATED, extracted={"secret": "must not ship"}),
+        attributes=dict(
+            VALIDATED,
+            extracted={"secret": "must not ship"},
+            **check("replace", "https://sofia-school.maplebear.bg/", "https://maplebear.bg/"),
+        ),
         pinned=school_pinned,
     )
     return kg, school
@@ -169,6 +217,12 @@ class TestDetailEndpoint:
         assert response.json()["continues_to"] is None
 
     @pytest.mark.asyncio
+    async def test_unchecked_pending_kindergarten_has_no_link(self, seeded_db, seeded_client):
+        kg, _ = await _maple_bear(seeded_db, kg_checked=False)
+        response = await seeded_client.get(f"/schools/{kg.id}")
+        assert response.json()["continues_to"] is None
+
+    @pytest.mark.asyncio
     async def test_unlisted_target_removes_link(self, seeded_db, seeded_client):
         kg, _ = await _maple_bear(seeded_db, school_pinned=False)
         response = await seeded_client.get(f"/schools/{kg.id}")
@@ -182,7 +236,7 @@ class TestDetailEndpoint:
             name='"Частно средно училище Канадско мече"',
             level="upper_secondary",
             url="https://sofia-highschool.maplebear.bg/",
-            attributes=VALIDATED,
+            attributes=dict(VALIDATED, **check("keep", "https://sofia-highschool.maplebear.bg/")),
         )
         response = await seeded_client.get(f"/schools/{kg.id}")
         assert response.json()["continues_to"] is None

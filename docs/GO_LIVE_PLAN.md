@@ -1820,18 +1820,22 @@ the session scratchpad only.
       **(c) done 2026-09-28:** `app/services/school_relations.py` computes `continues_to` on
       request for the detail endpoint only (`SchoolDetailResponse`; nothing stored, no
       migration); the detail page shows one line linking to the school. Evidence rule: same
-      site group (`site_group_key`), neither website withheld by URL validation or the
-      shared-site check, registry names share a brand (`brand`/`shared_brand_key`, moved
+      site group (`site_group_key`), each current website has a shared-site check keep or
+      replace decision recorded for that same site (a keep is now recorded too; a URL that
+      changed site after the decision has no evidence) and is not withheld by URL
+      validation, registry names share a brand (`brand`/`shared_brand_key`, moved
       out of `scripts/derive_school_groups.py`; at least 4 characters), kindergarten-level →
       school-level, same city, exactly one candidate school, and the school is itself
       listed. It needs a site that passed the checks, not publishable extracted data: the
       link uses only the URL, registry name/level/city and the target's published name.
       Published: only the target's id, resolved name, school type and level. Launch DB
-      (report `backend/reports/uf42c/`): 6 links (515→575 Британика, 587→522 Дружба,
-      556→596 Maple Bear, 591→592 Никатор, 510→214 Светлина, 514→630 Waldorf); 9
-      near-misses, all because the kindergarten's site is withheld (560, 589, 546, 555,
-      528, 634, 372); restoring the site would link 589→610, 546→537, 555→594, 634→635 and
-      372→534, the rest have no shared brand. The school side shows no inverse link.
+      (report `backend/reports/uf42c/`): 1 link now (556→596 Maple Bear, both replaced by
+      the check). 5 more (515→575 Британика, 587→522 Дружба, 591→592 Никатор, 510→214
+      Светлина, 514→630 Waldorf) wait only for a keep record, i.e. an applied
+      `cli shared-site-check` run (keeps were not recorded before this change). 9
+      near-misses have a withheld kindergarten site (560, 589, 546, 555, 528, 634, 372);
+      verifying it would link 589→610, 546→537, 555→594, 634→635 and 372→534, the rest
+      have no shared brand. The school side shows no inverse link.
 - [x] **UF44 Remaining pin gaps (after UF41/UF43).** 38 Sofia private locations have no pin:
       17 are blocked by a terminal `duplicate_geojson_name_match_different_address` and were
       never tried with the UF41 street/district logic (many ordinary addresses, e.g. ж.к.
