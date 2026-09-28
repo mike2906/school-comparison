@@ -1785,6 +1785,38 @@ the session scratchpad only.
       followed; stale registry addresses withhold real sites (uwekind moved); withheld
       schools are `failed_validate`, so discovery may find and withhold them again each
       run; 537/546/534 need their registry address recovered.
+      **(b) done 2026-09-25/28:** `app/scrapers/campus_sync.py`. Extraction stores campus
+      candidates (contact-page street addresses with the city stated; not office/partner,
+      other-level or another institution's address; same street with a different number
+      is skipped as ambiguous) and each campus's stated level range, only in internal
+      `attributes.website_campuses`. Validation creates the locations and age groups
+      (mapped through `education_config`) in the transaction that clears the withholding
+      marker, then geocodes them through the normal service after the commit. Everything
+      is tagged website-derived and deleted by every withhold path (URL invalid/ambiguous,
+      shared-site check, strong clear, validation failure); registry rows are never removed.
+      Applied through the normal pipeline, one run per school, with
+      `EXTRACTION_LLM_TIMEOUT_SECONDS=90` set for those runs only. **596** applied: new Kambanite
+      location (ул. Витошки Камбани 9: preschool, 1-4, 5-7; the site says "Preschool
+      through Grade 7"; Nominatim pin), preschool added at Boyana (location 1149).
+      **556** skipped: nothing to add; its re-extraction was rejected. **525** restored: its
+      Каравелов 54 campus is unapplied because re-extracting its prices degraded them.
+      **630** excluded: its campus (Хумболт 7) is unapplied. Backups:
+      `~/backups/sofia_schools_pre_uf42b_20260925_1613.dump` (first four-school run: an LLM
+      timeout made the cost guard refuse every later call, the run fell back to deterministic
+      output, so the whole DB was restored; bad state in `..._post_uf42b_failed_20260925_1618.dump`),
+      `..._pre_uf42b_rerun_20260925_1622.dump` (same failure, restored),
+      `..._pre_uf42b_596_20260925_1627.dump` (restored after the rejected 556 run; that state is in
+      `..._pre_restore_uf42b_20260928_0921.dump`), `..._pre_uf42b_596_rerun_20260928.dump`,
+      `..._pre_uf42b_596_retry_20260928.dump`, `..._pre_uf42b_525_20260928.dump` (restored;
+      pre-restore state in `..._pre_restore525_20260928_0934.dump`).
+      Recall losses: no school-wide level ranges (a range counts only in a sentence naming
+      the campus); English-only addresses ("16 Jordan Stubel Street") are not parsed.
+      Follow-ups: 525 price re-extraction loses periods and registration rows, and files a
+      deposit as tuition; 556/596 extraction quality (junk `facilities: ["facilities"]`,
+      English listed twice in `language_focus`, the kindergarten loses its distinct name
+      and becomes "Maple Bear Sofia"); 630's waldorf.bg prices mix kindergarten and
+      school fees; extraction falls back to deterministic output and still promotes when
+      LLM calls time out or are refused (decision pending with Mike).
 - [x] **UF44 Remaining pin gaps (after UF41/UF43).** 38 Sofia private locations have no pin:
       17 are blocked by a terminal `duplicate_geojson_name_match_different_address` and were
       never tried with the UF41 street/district logic (many ordinary addresses, e.g. ж.к.

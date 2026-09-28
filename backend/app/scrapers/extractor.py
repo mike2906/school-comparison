@@ -1508,6 +1508,11 @@ async def _extract_general_info(
     location_address_update = await _sync_primary_location_from_contact_address(db, school, contact_info)
 
     attrs = prepare_validation_rollover(school.attributes)
+    # UF42(b): extra campuses and stated age groups are only candidates here; validation
+    # creates them when it clears the withholding marker set just above.
+    from app.scrapers.campus_sync import record_candidates_at_extraction
+
+    await record_candidates_at_extraction(db, school, pages, attrs)
     admission_info = dict(school.admission_info) if isinstance(school.admission_info, dict) else {}
 
     admission_payload = normalized.admission.model_dump()
@@ -2014,6 +2019,15 @@ async def extract_school(
         stats["details"].append(f"Validation completed before commit ({validation_status})")
 
     await db.commit()
+    if stats["status"] == "extracted":
+        # UF42(b): campus rows created by the validation above are pinned now that
+        # they are committed (the geocoding service commits each pin).
+        from app.scrapers.campus_sync import geocode_campus_locations
+
+        try:
+            await geocode_campus_locations(db, school_id, country_code=country_code)
+        except Exception as exc:  # a missing pin must not fail the extraction
+            logger.warning("Campus geocoding failed for school %s: %s", school_id, exc)
 
     stats["token_cost_usd"] = round(float(stats["token_cost_usd"] or 0.0), 6)
     stats["llm_stats"] = llm_stats.as_dict()

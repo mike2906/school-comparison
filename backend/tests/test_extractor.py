@@ -4194,3 +4194,30 @@ async def test_only_the_llm_prompt_sees_spaced_currency_words(
     for call in support.call_args_list:
         assert "500евро" in call.args[1]
         assert "500 евро" not in call.args[1]
+
+
+@pytest.mark.asyncio
+async def test_extract_school_pins_campus_locations_after_its_commit(db_session, sample_school_for_extraction):
+    """UF42(b): validation inside extraction creates campus rows; they are geocoded once committed."""
+    school = sample_school_for_extraction
+    school_id = school.id
+    mock_price = PriceExtractionOutput(prices=[], has_pricing_info=False)
+    mock_general = GeneralInfoExtractionOutput(
+        languages=[ExtractedLanguageFocus(language="English")], has_useful_info=True
+    )
+    async def fake_agent(**kwargs):
+        if kwargs["result_type"] is PriceExtractionOutput:
+            return mock_price, 1, 1, 0.0
+        if kwargs["result_type"] is GeneralInfoExtractionOutput:
+            return mock_general, 1, 1, 0.0
+        return None, 0, 0, 0.0
+
+    with (
+        patch("app.scrapers.extractor._run_typed_agent", new=AsyncMock(side_effect=fake_agent)),
+        patch("app.scrapers.campus_sync.geocode_campus_locations", new=AsyncMock()) as geocode,
+    ):
+        result = await extractor_module.extract_school(db_session, school_id, "bg")
+
+    assert result["status"] == "extracted"
+    geocode.assert_awaited_once()
+    assert geocode.await_args.args[1] == school_id

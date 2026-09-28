@@ -401,10 +401,20 @@ class BaseSourceAdapter(ABC):
         wanted = set(incoming.age_groups or [])
         if not wanted:
             return
+        # The registry now states these age groups itself: they are no longer only the
+        # website's claim, so a later website withhold must not delete them (UF42b).
+        from app.scrapers.campus_sync import AGE_GROUP_TAG_PREFIX
+
+        confirmed = {AGE_GROUP_TAG_PREFIX + age_group for age_group in wanted}
+        if confirmed & set(row.location_tags or []):
+            row.location_tags = [tag for tag in row.location_tags if tag not in confirmed]
         existing = {shift.age_group: shift for shift in shifts}
         for age_group, shift in existing.items():
             if age_group not in wanted:
                 await self.db.delete(shift)
+                dropped = AGE_GROUP_TAG_PREFIX + age_group
+                if dropped in (row.location_tags or []):
+                    row.location_tags = [tag for tag in row.location_tags if tag != dropped]
                 continue
             # Take values the source states; keep stored ones it does not provide.
             if age_group in incoming.shifts:
