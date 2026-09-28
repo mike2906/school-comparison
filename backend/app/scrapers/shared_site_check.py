@@ -713,6 +713,17 @@ async def _site_derived_locations(db, school_id: int, *, preview: bool) -> list[
 
 async def apply_decision(db, school, decision: Decision, *, country_code: str = "bg") -> dict[str, Any]:
     if decision.action == KEEP:
+        # Positive evidence for this exact site (read by the kindergarten → school link).
+        attrs = dict(school.attributes or {})
+        attrs[SHARED_SITE_CHECK_KEY] = {
+            "checked_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "action": KEEP,
+            "reason": decision.reason,
+            "previous_url": decision.current_url,
+            "new_url": decision.current_url,
+        }
+        school.attributes = attrs
+        db.add(school)
         return {"pages_invalidated": 0, "locations_cleared": []}
     # The old site is no longer trusted for either outcome, so neither is what it put
     # on the map.

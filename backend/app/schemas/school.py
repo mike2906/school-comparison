@@ -342,6 +342,23 @@ class SchoolResponse(SchoolBase, SchoolPricingMixin):
         ]
 
 
+class RelatedSchoolResponse(BaseModel):
+    """Public projection of a related school: only fields its own response publishes."""
+
+    id: int
+    resolved_name_i18n: dict[str, str]
+    school_type: str
+    education_level: str
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class SchoolDetailResponse(SchoolResponse):
+    """Detail endpoint only: adds the computed kindergarten → school link (UF42c)."""
+
+    continues_to: Optional[RelatedSchoolResponse] = None
+
+
 class SchoolListResponse(SchoolPricingMixin):
     id: int
     country_code: str = "bg"

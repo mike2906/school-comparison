@@ -8,23 +8,8 @@ from app.models import School, SourcePage
 from app.models.scrape_log import ScrapeType
 from app.scrapers.extractor_helpers import transliterate_bulgarian
 from app.services.identity_adjudication import _registrable_domain
+from app.services.school_relations import brand, brand_key as key, shared_brand_key
 from app.utils.i18n_resolver import resolve_display_name_i18n
-
-LEGAL = r'(?i)\b(ЕООД|ООД|АД|ЕАД|СДРУЖЕНИЕ)\b'
-TYPE_WORDS = (r'(?i)\b(ЧАСТНА|ЧАСТНО|ЧАСТНИ|ДЕТСКА ГРАДИНА|ДЕТСКА ЯСЛА|ЯСЛА|ГРАДИНА|'
-              r'ОСНОВНО УЧИЛИЩЕ|СРЕДНО УЧИЛИЩЕ|НАЧАЛНО УЧИЛИЩЕ|УЧИЛИЩЕ|'
-              r'ПРОФЕСИОНАЛНА ГИМНАЗИЯ|ПРОФИЛИРАНА ГИМНАЗИЯ|ГИМНАЗИЯ|'
-              r'МЕЖДУНАРОДНО|С ЧУЖДОЕЗИКОВО ОБУЧЕНИЕ|ЕЗИКОВА|ЕЗИКОВО)\b')
-
-def brand(name):
-    text = re.sub(r'^[\s"„“]+|[\s"„“]+$', '', str(name or ''))
-    text = re.sub(LEGAL, ' ', text)
-    text = re.sub(TYPE_WORDS, ' ', text)
-    text = re.sub(r'[\s"„“\-]+', ' ', text).strip(' -"')
-    return text
-
-def key(value):
-    return re.sub(r'[^а-яa-z0-9]+', '', str(value or '').casefold())
 
 def addr_key(value):
     text = re.sub(r'(?i)\b(гр|с|ж\.?к|кв|бул|ул|район|№)\b\.?', ' ', str(value or ''))
@@ -106,12 +91,7 @@ async def main():
                 'url': s.website_url,
                 'presented_as': presentation_hit(brand((s.name_i18n or {}).get('bg')), corpus),
             })
-        brands = {key(r['brand']) for r in rows}
-        shared_brand = None
-        for candidate in sorted(brands, key=len):
-            if all(candidate and candidate in key(r['brand']) for r in rows):
-                shared_brand = candidate
-                break
+        shared_brand = shared_brand_key(key(r['brand']) for r in rows)
         addrs = {addr_key(r['address']) for r in rows if r['address']}
         levels = [r['level'] for r in rows]
         if shared_brand and len(set(levels)) == len(levels):

@@ -139,6 +139,8 @@
     "address": "Address",
     "phone": "Phone",
     "website": "Website",
+    "continuesTo": "Continues to:",
+    "continuesToSchool": "(school)",
     "pupils": "Pupils",
     "shift": "Shift",
     "organisedGroups": "After-school care",

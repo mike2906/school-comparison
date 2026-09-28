@@ -9,7 +9,8 @@ from app.config import get_settings
 from app.database import get_db
 from app.models.school import School, SchoolLocation, SchoolLocationAgeGroupShift
 from app.models.exam_results import ExamResult
-from app.schemas.school import SchoolResponse, SchoolListResponse
+from app.schemas.school import RelatedSchoolResponse, SchoolDetailResponse, SchoolListResponse
+from app.services.school_relations import continues_to
 from app.services.school_service import SchoolService
 
 logger = logging.getLogger(__name__)
@@ -199,7 +200,7 @@ async def get_exam_averages(
         )
 
 
-@router.get("/{school_id}", response_model=SchoolResponse)
+@router.get("/{school_id}", response_model=SchoolDetailResponse)
 async def get_school(
     school_id: Annotated[int, Path(gt=0, description="School ID (must be positive)")],
     db: AsyncSession = Depends(get_db),
@@ -212,7 +213,16 @@ async def get_school(
         if not school:
             raise HTTPException(status_code=404, detail="School not found")
 
-        return school
+        response = SchoolDetailResponse.model_validate(school)
+        try:
+            link = await continues_to(db, school)
+        except Exception:
+            # The link is optional; fail closed without failing the detail page.
+            logger.warning("continues_to failed for school %s", school_id, exc_info=True)
+            link = None
+        if link is not None:
+            response.continues_to = RelatedSchoolResponse.model_validate(link)
+        return response
     except HTTPException:
         # Re-raise HTTP exceptions (like 404)
         raise
