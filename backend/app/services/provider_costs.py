@@ -421,11 +421,16 @@ async def execute_billable_request(
     model: str,
     school_id: Optional[int],
     stage: Optional[str] = None,
+    timeout_seconds: Optional[float] = None,
 ) -> Any:
-    """Run a provider call with durable reservation and exact post-response attribution."""
+    """Run a provider call with durable reservation and exact post-response attribution.
+
+    ``timeout_seconds`` bounds only the provider call, not the wait for the dispatch
+    lock, so queued calls in a batch don't use up their timeout before dispatch.
+    """
     scope = _SCOPE.get()
     if scope is None:
-        return await call()
+        return await _bounded(call, timeout_seconds)
 
     # A scope is shared by all tasks spawned inside the batch. Serializing the
     # dispatch-through-attribution interval makes every next cap decision use
@@ -438,7 +443,14 @@ async def execute_billable_request(
             model=model,
             school_id=school_id,
             stage=stage,
+            timeout_seconds=timeout_seconds,
         )
+
+
+async def _bounded(call: Callable[[], Awaitable[Any]], timeout_seconds: Optional[float]) -> Any:
+    if timeout_seconds is None:
+        return await call()
+    return await asyncio.wait_for(call(), timeout=timeout_seconds)
 
 
 async def _execute_tracked_billable_request(
@@ -448,6 +460,7 @@ async def _execute_tracked_billable_request(
     model: str,
     school_id: Optional[int],
     stage: Optional[str],
+    timeout_seconds: Optional[float] = None,
 ) -> Any:
     """Execute one serialized request within an active provider-cost scope."""
 
@@ -464,7 +477,7 @@ async def _execute_tracked_billable_request(
             request_reserve_usd=scope.request_reserve_usd,
         )
     try:
-        result = await call()
+        result = await _bounded(call, timeout_seconds)
     except BaseException as exc:
         async with async_session_maker() as ledger_db:
             await mark_provider_request_uncertain(

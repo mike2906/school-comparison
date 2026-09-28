@@ -1801,6 +1801,30 @@ async def test_run_typed_agent_gives_up_after_timeout_retries(monkeypatch):
     assert llm_stats.hard_failures == 1
 
 
+@pytest.mark.asyncio
+async def test_run_typed_agent_makes_no_call_after_a_hard_failure(monkeypatch):
+    llm_stats = extractor_module.ExtractionLLMStats(hard_failures=1)
+
+    class FakeAgent:
+        def __init__(self, **kwargs):
+            raise AssertionError("no LLM call after a hard failure")
+
+    monkeypatch.setattr(extractor_module, "Agent", FakeAgent)
+    monkeypatch.setattr(extractor_module, "_build_openrouter_model", lambda *_args, **_kwargs: object())
+
+    parsed, *_ = await extractor_module._run_typed_agent(
+        system_prompt="x",
+        user_prompt="y",
+        result_type=GeneralInfoExtractionOutput,
+        timeout_seconds=5.0,
+        llm_stats=llm_stats,
+    )
+
+    assert parsed is None
+    assert llm_stats.total_calls == 0
+    assert llm_stats.hard_failures == 1
+
+
 def test_extract_openrouter_cost_usd_from_provider_details():
     message_a = SimpleNamespace(provider_details={"cost": 0.001})
     message_b = SimpleNamespace(provider_details={"cost": 0.0025})

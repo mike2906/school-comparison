@@ -440,6 +440,10 @@ async def _run_typed_agent(
     school_id: int | None = None,
 ) -> tuple[Any | None, int, int, float]:
     settings = get_settings()
+    if llm_stats.hard_failures:
+        # The school's extraction is rolled back after any hard failure, so later
+        # calls would only spend money and the per-school timeout.
+        return None, 0, 0, 0.0
 
     async def _run_for_tier(tier: str) -> tuple[Any | None, int, int, float]:
         retries_state = {"count": 0}
@@ -494,14 +498,12 @@ async def _run_typed_agent(
                 else max(timeout_seconds, float(settings.extraction_llm_retry_timeout_seconds))
             )
             try:
-                result = await asyncio.wait_for(
-                    execute_billable_request(
-                        lambda: agent.run(user_prompt),
-                        model=get_model(tier),
-                        school_id=school_id,
-                        stage="extract",
-                    ),
-                    timeout=attempt_timeout,
+                result = await execute_billable_request(
+                    lambda: agent.run(user_prompt),
+                    model=get_model(tier),
+                    school_id=school_id,
+                    stage="extract",
+                    timeout_seconds=attempt_timeout,
                 )
                 break
             except asyncio.TimeoutError:

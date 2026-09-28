@@ -515,3 +515,48 @@ async def test_timed_out_dispatch_is_uncertain_and_later_dispatches_still_run(
         "uncertain",
         "uncertain",
     ]
+
+
+async def test_dispatch_timeout_excludes_time_queued_for_the_dispatch_lock(monkeypatch):
+    import app.database as database
+    import app.services.provider_costs as provider_costs
+
+    class _Session:
+        async def __aenter__(self):
+            return object()
+
+        async def __aexit__(self, *_args):
+            return None
+
+    async def _noop(*_args, **_kwargs):
+        return None
+
+    async def _reserve(*_args, **_kwargs):
+        return SimpleNamespace(client_request_id="client")
+
+    monkeypatch.setattr(database, "async_session_maker", lambda: _Session())
+    monkeypatch.setattr(provider_costs, "reserve_provider_request", _reserve)
+    monkeypatch.setattr(
+        provider_costs,
+        "extract_exact_provider_attributions",
+        lambda _result: [{"provider_request_id": "mock"}],
+    )
+    monkeypatch.setattr(provider_costs, "attribute_provider_responses", _noop)
+
+    async def _slow():
+        await asyncio.sleep(0.2)
+        return "slow"
+
+    async def _fast():
+        return "fast"
+
+    with provider_cost_scope(
+        pipeline_run_id="run-1", stage="extract", cap_usd=1.0, request_reserve_usd=0.1
+    ):
+        results = await asyncio.gather(
+            execute_billable_request(_slow, model="mock", school_id=1, timeout_seconds=1.0),
+            # Queued behind the slow call for longer than its own timeout.
+            execute_billable_request(_fast, model="mock", school_id=2, timeout_seconds=0.05),
+        )
+
+    assert results == ["slow", "fast"]
