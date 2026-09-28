@@ -78,6 +78,7 @@ _LABEL_LEVEL_RE = {
 }
 CONTEXT_BEFORE = 2
 CONTEXT_AFTER = 2
+_FIRM_REJECTIONS = frozenset({"office_or_partner_address", "describes_other_level"})
 # A campus needs a full street address (street + number, or quarter + block).
 PRECISE_ADDRESS_KINDS = frozenset({"street_number", "quarter_block"})
 
@@ -227,22 +228,35 @@ def _campus_candidates(pages: Sequence[SitePage], *, city: str, family: str) -> 
             after = lines[index + 1 : index + 1 + CONTEXT_AFTER]
             context = " | ".join([*before, line, *after])
             candidate = {"address": address, "label": _label(before), "context": context, "source_url": page.url}
-            if any(addresses_equivalent(address, seen["address"]) for seen in [*kept, *skipped]):
+            if any(addresses_equivalent(address, seen["address"]) for seen in kept):
+                continue
+            earlier = [s for s in skipped if addresses_equivalent(address, s["address"])]
+            # An office/partner/other-level address stays rejected wherever it appears.
+            if any(s["reason"] in _FIRM_REJECTIONS for s in earlier):
                 continue
             key = address_key(address)
             nearby = " ".join([*before[-1:], line, *after])
             if key is None or key.kind not in PRECISE_ADDRESS_KINDS:
-                skipped.append({**candidate, "reason": "not_a_street_address"})
+                reason = "not_a_street_address"
             elif not _names_city(nearby, city):
-                skipped.append({**candidate, "reason": "city_not_stated"})
+                reason = "city_not_stated"
             elif _NOT_CAMPUS_RE.search(" ".join([*before, line, *after[:1]])):
-                skipped.append({**candidate, "reason": "office_or_partner_address"})
+                reason = "office_or_partner_address"
             elif _LABEL_LEVEL_RE[other_family].search(" ".join([*before, line])) and not _LABEL_LEVEL_RE[
                 family
             ].search(" ".join([*before, line])):
-                skipped.append({**candidate, "reason": "describes_other_level"})
+                reason = "describes_other_level"
             else:
+                reason = None
+            if reason is None or reason in _FIRM_REJECTIONS:
+                # A fully qualified copy beats an earlier weak one (e.g. a header without the city).
+                skipped[:] = [s for s in skipped if s not in earlier]
+            elif earlier:
+                continue
+            if reason is None:
                 kept.append(candidate)
+            else:
+                skipped.append({**candidate, "reason": reason})
     return kept, skipped
 
 
@@ -497,7 +511,8 @@ async def record_candidates_at_extraction(db, school, pages: Sequence[Any], attr
     """Store campus candidates for the new extraction and drop what the old one created.
 
     Extraction sets the withholding marker, so website-derived campus rows stop
-    publishing now; validation recreates them when it clears the marker.
+    publishing now; validation recreates them when it clears the marker (as new rows:
+    their pins are redone by the normal geocoder after the commit).
     """
     from app.models.country import Country
 

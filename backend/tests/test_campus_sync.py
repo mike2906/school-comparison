@@ -185,6 +185,18 @@ def test_same_street_with_a_different_number_is_ambiguous_and_skipped():
     assert plan["skipped"] == [{"address": "ул. „Академик Сандерс“ 37", "reason": "same_street_different_number"}]
 
 
+def test_fully_qualified_copy_beats_an_earlier_weak_rejection_but_not_a_firm_one():
+    header = SitePage("https://primer.bg/kontakti-header", "Меню\nул. Липа 5\nНачало", "contact")
+    footer = SitePage("https://primer.bg/kontakti", "Сграда 1\nул. Липа 5\nСофия\nСграда 2\nул. Бреза 7\nСофия", "contact")
+    payload = extract([header, footer], "https://primer.bg/", "lower_secondary")
+    assert [c["address"] for c in payload["campuses"]] == ["ул. Липа 5", "ул. Бреза 7"]
+    assert payload["skipped"] == []
+
+    office = SitePage("https://primer.bg/kontakti-office", "Административен офис\nул. Липа 5\nСофия", "contact")
+    payload = extract([office, footer], "https://primer.bg/", "lower_secondary")
+    assert [c["address"] for c in payload["campuses"]] == ["ул. Бреза 7"]
+
+
 def test_sibling_institution_address_is_never_a_new_campus():
     payload = {"site": "x", "campuses": [
         {"address": "ул. Липа 5", "label": "", "context": ""},

@@ -1267,7 +1267,7 @@ async def validate_school_data(
 
     if not db.in_transaction():
         # Committed: pin campus locations (the geocoding service commits each pin).
-        # Nested inside extraction, the later validate-data run does this instead.
+        # Nested inside extraction, extract_school does this after its own commit.
         await geocode_campus_locations(db, school_id, country_code=country_code)
 
     if run_spot_check:
