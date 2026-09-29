@@ -410,3 +410,28 @@ def test_rule_6_allows_a_fee_refiled_under_another_category():
     published = [(row(Decimal("265"), period="ONE_TIME"), SLAVEICHE)]
     proposed = [(row(Decimal("265"), category="REGISTRATION", period="ONE_TIME"), SLAVEICHE)]
     assert replacement_regressions(published, proposed, "kindergarten") == []
+
+
+# School 183 (sianie-bg.com/?pg=ceni): the deposit's label is split from its colon.
+SIANIE = """Целодневно пребиваване:
+Детска градина - 675 EUR
+Депозит
+: 450 EUR
+Таксите се внасят месец за месец
+"""
+
+
+@pytest.mark.parametrize("plan_name", ["Целодневно пребиваване", None])
+def test_183_tuition_is_not_the_next_lines_deposit(plan_name):
+    tuition = row(Decimal("675"), period="MONTHLY", plan_name=plan_name)
+    assert rules(tuition, SIANIE, "kindergarten") == set()
+
+
+def test_183_deposit_filed_as_tuition_still_trips_rule_4():
+    assert "4_deposit_not_tuition" in rules(row(Decimal("450"), plan_name="Депозит"), SIANIE, "kindergarten")
+    assert "4_deposit_not_tuition" in rules(row(Decimal("450")), SIANIE, "kindergarten")
+
+
+def test_deposit_context_trips_rule_4_even_when_the_label_omits_the_word():
+    wrong = row(Decimal("265"), notes="за запазване на място")
+    assert "4_deposit_not_tuition" in rules(wrong, SLAVEICHE, "kindergarten")
