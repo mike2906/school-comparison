@@ -1930,7 +1930,22 @@ the session scratchpad only.
       are sibling institutions that both show the bare brand). Wrong live rows listed, not fixed: 564
       installments as tuition (2950/2952/2954), 329/2915 label, 531/2946 and 530/2944
       miscategorized as food, 606/2962 programme fee as 9th-grade tuition, 171 invented
-      TERM/SEMESTER periods, 515's name. Step 2 (gates) waits for Mike.
+      TERM/SEMESTER periods, 515's name.
+      **Step 2 (2026-09-29, PR pending Mike):** Stage 6 validation runs rules 1–4 and 4b from
+      `app/scrapers/price_evidence.py` on every scraped row with a valid linked page:
+      findings become errors on `pricing[{id}]` (the existing display gate withholds
+      them), a stated null period is an auto-fix, a period conflict is a warning. Rule 5
+      is narrowed to a kindergarten whose display name is a same-site school's: the
+      kindergarten falls back to its registry name. The dry run showed that falling back
+      on both sides would take 575's correct "BRITANICA Park School" and give 151/392 the
+      same "Проф. д-р Васил Златарски". Rule 6: `_extract_prices` keeps the published rows
+      and records `attributes.pricing_hold` when the replacement drops a fee the page
+      still shows or loses a period the page does not restate. The scoreboard now also
+      counts validation-blocked rows. Dry run (re-validation of 122 schools in a
+      rolled-back transaction): withholds 329/2915, 531/2946, 564/2950/2952/2954; 515
+      shows "Британика"; nothing else changes. Apply after merge:
+      `cli run --stage validate-data --school-id N` for 329, 531, 564, 515 (backup first).
+      Not caught by any rule (from the step 1 list): 530/2944, 606/2962, 171's periods, 564/2949.
 
 ## Phase 3 — Go live
 

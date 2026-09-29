@@ -1,4 +1,4 @@
-"""UF45 step 1: the audit's rule matchers, on the real pages from the UF42 re-runs.
+"""UF45 evidence rules (app.scrapers.price_evidence), on the real UF42 re-run pages.
 
 The six wrong rows fixed by hand on 2026-09-28 (525, 630, 556) are rebuilt from the
 plan notes against the stored page text: each must trip its rule, and the rows as fixed
@@ -9,16 +9,16 @@ from decimal import Decimal
 
 import pytest
 
-from scripts.audit_price_rows_uf45 import (
+from app.scrapers.price_evidence import (
     PriceRow,
-    PublishedName,
     amount_spans,
-    audit_names,
-    audit_price_row,
+    check_price_row,
     normalize_text,
     period_families,
+    replacement_regressions,
     stated_period,
 )
+from scripts.audit_price_rows_uf45 import PublishedName, audit_names
 
 # slaveiche.com/taksi (school 525, kindergarten), source page 25916.
 SLAVEICHE = """ТАКСИ
@@ -91,14 +91,10 @@ def row(
     period=None,
     plan_name=None,
     notes=None,
-    school_id=1,
-    row_id=1,
     amount_min=None,
     amount_max=None,
 ):
     return PriceRow(
-        id=row_id,
-        school_id=school_id,
         category=category,
         amount=amount,
         amount_min=amount_min,
@@ -110,7 +106,7 @@ def row(
 
 
 def rules(price_row, page, family):
-    return {hit.rule for hit in audit_price_row(price_row, page, family)}
+    return {finding.rule for finding in check_price_row(price_row, page, family)}
 
 
 # ---------------------------------------------------------------------------
@@ -155,10 +151,8 @@ def test_525_deposit_filed_as_tuition_trips_rule_4():
 )
 def test_525_null_period_with_monthly_wording_trips_rule_3(amount, category, notes):
     wrong = row(amount, category=category, notes=notes)
-    hits = audit_price_row(wrong, SLAVEICHE, "kindergarten")
-    assert [(h.rule, h.detail) for h in hits] == [
-        ("3_period_missing", "null period, text says MONTHLY")
-    ]
+    findings = check_price_row(wrong, SLAVEICHE, "kindergarten")
+    assert [(f.rule, f.period) for f in findings] == [("3_period_missing", "MONTHLY")]
 
 
 def test_556_name_taken_from_sibling_trips_rule_5():

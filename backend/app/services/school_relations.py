@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Optional
 
 from app.scrapers.shared_site_check import (
@@ -89,6 +89,7 @@ class Institution:
     website_url: Optional[str]
     scrape_status: Optional[str]
     attributes: Mapping[str, Any]
+    name_i18n: Mapping[str, Any] = field(default_factory=dict)
 
     @classmethod
     def from_row(cls, row: Any) -> "Institution":
@@ -101,6 +102,7 @@ class Institution:
             website_url=row.website_url,
             scrape_status=row.scrape_status,
             attributes=row.attributes if isinstance(row.attributes, Mapping) else {},
+            name_i18n=names,
         )
 
 

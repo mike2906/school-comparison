@@ -65,6 +65,15 @@ error-level issues / actionable spot-check discrepancies, plus pricing rows with
 through those projections/gates — never serialize raw JSON or ORM rows directly, or you
 silently bypass the boundary.
 
+Stage 6 also checks each price row against its linked page text
+(`app/scrapers/price_evidence.py`, UF45): a row whose amount is not in its label's run of
+prices, whose label names the other level, whose period is per day/week, or that is a
+deposit or one installment filed as tuition gets an error on `pricing[{id}]`; a null
+period the page states is filled in. A kindergarten showing a same-site school's name
+gets an error on `attributes.display_name_i18n` and falls back to its registry name.
+A re-extraction that would drop a fee the page still shows, or a stated period, is held
+(`attributes.pricing_hold`) and the published rows stay.
+
 URL validation failures set a persistent website-data withholding marker; only extraction plus
 deterministic validation may clear it. Gate coverage is coupled to the validator's spot-check
 scope (`SPOT_CHECK_CORE_FIELD_PREFIXES`) by a guard test.

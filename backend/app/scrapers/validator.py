@@ -23,11 +23,15 @@ from app.scrapers.campus_sync import (
     geocode_campus_locations,
     remove_website_campus_data,
 )
-from app.utils.website_data import promote_validation_report, record_validation_failure
+from app.utils.website_data import (
+    attributes_for_publication,
+    promote_validation_report,
+    record_validation_failure,
+)
 from app.services.provider_costs import execute_billable_request
 from app.config import get_settings
 from app.models.field_source import FieldSource, SourceType
-from app.models.pricing import PriceSource, Pricing
+from app.models.pricing import PricePeriod, PriceSource, Pricing
 from app.models.school import School
 from app.models.scrape_log import ScrapeType
 from app.models.source_page import SourcePage
@@ -40,7 +44,22 @@ from app.schemas.validation import (
 )
 from app.scrapers import extractor_helpers as extraction_helpers
 from app.scrapers.summarizer import clear_summary_state
-from app.utils.display_gating import admission_value_is_semantically_valid
+from app.scrapers.price_evidence import (
+    RULE_AMOUNT_NEAR_LABEL,
+    RULE_DEPOSIT,
+    RULE_INSTALLMENT,
+    RULE_LEVEL,
+    RULE_PERIOD_CONFLICT,
+    RULE_PERIOD_MISSING,
+    RULE_PERIOD_UNREPRESENTABLE,
+    PriceRow,
+    check_price_row,
+    shared_names,
+)
+from app.scrapers.shared_site_check import level_family, site_group_key
+from app.utils.academic_year import normalize_academic_year
+from app.utils.display_gating import DISPLAY_NAME_FIELD_PATH, admission_value_is_semantically_valid
+from app.utils.i18n_resolver import resolve_display_name_i18n, resolve_name_i18n
 
 logger = logging.getLogger(__name__)
 
@@ -701,6 +720,128 @@ def _parse_spot_check_output(result: Any) -> SpotCheckOutput | None:
     return None
 
 
+# UF45: price rows that break an evidence rule are withheld (error on ``pricing[{id}]``).
+_PRICE_EVIDENCE_ERROR_CODES = {
+    RULE_AMOUNT_NEAR_LABEL: "pricing_amount_not_near_label",
+    RULE_LEVEL: "pricing_label_names_other_level",
+    RULE_PERIOD_UNREPRESENTABLE: "pricing_period_unrepresentable",
+    RULE_DEPOSIT: "pricing_deposit_as_tuition",
+    RULE_INSTALLMENT: "pricing_installment_as_tuition",
+}
+
+
+async def _check_price_evidence(
+    db: AsyncSession, report: ValidationReport, school: School, rows: list[Pricing]
+) -> None:
+    """UF45 rules 1-4: check each row against the text of its linked, valid page.
+
+    A null period the page states next to the amount is filled in (an auto-fix); a
+    stated period that disagrees is a warning; every other finding withholds the row.
+    Rows without a valid linked page are left alone: the evidence gate withholds them.
+    So are rows of an earlier academic year than the school's newest: extraction keeps
+    them as fee history, and the page now shows the new year's fees.
+    """
+    years = {row.id: normalize_academic_year(row.academic_year) for row in rows}
+    newest = max((year for year in years.values() if year), default=None)
+    rows = [row for row in rows if not years[row.id] or years[row.id] == newest]
+    page_ids = {row.source_page_id for row in rows if row.source_page_id is not None}
+    if not page_ids:
+        return
+    pages = dict(
+        (
+            await db.execute(
+                select(SourcePage.id, SourcePage.raw_markdown).where(
+                    SourcePage.id.in_(page_ids), SourcePage.is_valid.is_(True)
+                )
+            )
+        ).all()
+    )
+    family = level_family(school.education_level)
+    for row in rows:
+        text = pages.get(row.source_page_id)
+        if not text:
+            continue
+        row_prefix = f"pricing[{row.id}]"
+        for finding in check_price_row(PriceRow.from_pricing(row), text, family):
+            if finding.rule == RULE_PERIOD_MISSING:
+                period = PricePeriod(finding.period.lower())
+                _add_fix(
+                    report,
+                    code="pricing_period_from_text",
+                    field_path=f"{row_prefix}.period",
+                    original_value=None,
+                    fixed_value=period.value,
+                    reason=f"The page states the period next to the amount: {finding.snippet[:160]}",
+                )
+                row.period = period
+            elif finding.rule == RULE_PERIOD_CONFLICT:
+                _add_issue(
+                    report,
+                    code="pricing_period_conflicts_with_text",
+                    severity="warning",
+                    field_path=f"{row_prefix}.period",
+                    message=f"{finding.detail}: {finding.snippet[:160]}",
+                )
+            else:
+                _add_issue(
+                    report,
+                    code=_PRICE_EVIDENCE_ERROR_CODES[finding.rule],
+                    severity="error",
+                    field_path=row_prefix,
+                    message=f"{finding.detail}: {finding.snippet[:160]}",
+                )
+
+
+async def _check_display_name(
+    db: AsyncSession, report: ValidationReport, school: School, attrs: dict[str, Any]
+) -> None:
+    """UF45 rule 5: a kindergarten showing the name of a school on the same site.
+
+    A combined site carries the school's brand, and a kindergarten extracted from it
+    picks that brand up (556 took 596's "Maple Bear Sofia"; 515 shows "BRITANICA Park
+    School"). The kindergarten's display name is withheld, so it falls back to its
+    registry name; the school keeps its own. Two school-level institutions of one brand
+    (a basic school and a gymnasium) may share a name. Compared against the sibling's
+    website candidate as well as its published name, so the result does not depend on
+    which is validated first.
+    """
+    # Local import: school_relations imports app.scrapers, whose package imports us.
+    from app.services.school_relations import same_site_institutions
+
+    if level_family(school.education_level) != "kindergarten":
+        return
+    candidate = resolve_display_name_i18n(attrs)
+    group = site_group_key(school.website_url)
+    if not candidate or not group:
+        return
+    for other in await same_site_institutions(db, school):
+        if (
+            other.id == school.id
+            or level_family(other.education_level) != "school"
+            or site_group_key(other.website_url) != group
+        ):
+            continue
+        other_names = [
+            *resolve_display_name_i18n(other.attributes).values(),
+            *resolve_name_i18n(
+                other.name_i18n, attributes_for_publication(other.attributes, other.scrape_status)
+            ).values(),
+        ]
+        shared = shared_names(candidate.values(), other_names)
+        if shared:
+            _add_issue(
+                report,
+                code="display_name_matches_sibling",
+                severity="error",
+                field_path=DISPLAY_NAME_FIELD_PATH,
+                message=(
+                    f"Display name {sorted(shared)[0]!r} is school {other.id}'s name on the "
+                    "same site; the kindergarten's registry name is published instead."
+                ),
+            )
+            return
+
+
 def _tx_context(db: AsyncSession):
     return db.begin_nested() if db.in_transaction() else db.begin()
 
@@ -868,6 +1009,11 @@ async def validate_school_data(
                         fixed_value=None,
                         reason="Removed exact duplicate scraped pricing row.",
                     )
+
+            duplicate_row_ids = {dup_id for dup_id, _ in duplicate_ids}
+            await _check_price_evidence(
+                db, report, school, [row for row in pricing_rows if row.id not in duplicate_row_ids]
+            )
 
             extracted = attrs.get("extracted")
             extracted_dict = dict(extracted) if isinstance(extracted, dict) else None
@@ -1206,6 +1352,8 @@ async def validate_school_data(
                             "Extracted payload has no scraped-website FieldSource provenance rows."
                         ),
                     )
+
+            await _check_display_name(db, report, school, attrs)
 
             report.status = "needs_review" if report.issue_counts.get("error", 0) > 0 else "ok"
             report.validated_at = _now_iso()

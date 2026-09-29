@@ -17,6 +17,8 @@ from pydantic_ai.models.openrouter import OpenRouterModel
 from pydantic_ai.providers.openrouter import OpenRouterProvider
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+from sqlalchemy.orm.attributes import flag_modified
 
 from app.ai.client import get_model
 from app.config import get_settings
@@ -35,7 +37,10 @@ from app.schemas.extraction import (
     ServicesExtractionOutput,
     SummarySourceExtractionOutput,
 )
+from app.scrapers.price_evidence import PriceRow, replacement_regressions
+from app.scrapers.shared_site_check import level_family
 from app.scrapers.summarizer import clear_summary_state
+from app.utils.display_gating import blocked_pricing_row_ids, pricing_row_is_publishable
 from app.scrapers.validator import validate_school_data
 from app.services.geocoding.base import GeocodingResult
 from app.services.geocoding.write_gate import OFFICIAL_COORDS_TAG, apply_geocode_result_to_location
@@ -1111,6 +1116,31 @@ def _retention_year_key(value: str | None) -> tuple[bool, str]:
     return (True, canonical) if canonical else (False, raw)
 
 
+# UF45 rule 6: why the last re-extraction's pricing was not written (internal only).
+PRICING_HOLD_KEY = "pricing_hold"
+
+
+def _pricing_replacement_regressions(
+    school: School,
+    pages: list[SourcePage],
+    superseded: list[Pricing],
+    proposed: list[Pricing],
+) -> list[str]:
+    """Rule 6 over the rows a re-extraction would replace: only rows the API publishes."""
+    blocked = blocked_pricing_row_ids(school.attributes if isinstance(school.attributes, dict) else None)
+    published = [
+        row for row in superseded if row.id not in blocked and pricing_row_is_publishable(row)
+    ]
+    if not published:
+        return []
+    texts = {page.id: page.raw_markdown for page in pages}
+    return replacement_regressions(
+        [(PriceRow.from_pricing(row), texts.get(row.source_page_id)) for row in published],
+        [(PriceRow.from_pricing(row), texts.get(row.source_page_id)) for row in proposed],
+        level_family(school.education_level),
+    )
+
+
 async def _extract_prices(
     db: AsyncSession,
     school: School,
@@ -1321,16 +1351,46 @@ async def _extract_prices(
     # the undated rows of this run.
     written_years = {_retention_year_key(row.academic_year) for row in pricing_rows}
     existing_result = await db.execute(
-        select(Pricing).where(
+        select(Pricing)
+        .where(
             Pricing.school_id == school.id,
             Pricing.source == PriceSource.SCRAPED_WEBSITE,
         )
+        .options(selectinload(Pricing.source_page).load_only(SourcePage.id, SourcePage.is_valid))
     )
-    superseded_ids = [
-        existing.id
+    superseded = [
+        existing
         for existing in existing_result.scalars().all()
         if _retention_year_key(existing.academic_year) in written_years
     ]
+    superseded_ids = [existing.id for existing in superseded]
+
+    # UF45 rule 6: a re-extraction that would lose what the published rows show is held
+    # for review; the published rows stay and the proposal is not written.
+    regressions = _pricing_replacement_regressions(school, pages, superseded, pricing_rows)
+    attrs = dict(school.attributes) if isinstance(school.attributes, dict) else {}
+    if regressions:
+        attrs[PRICING_HOLD_KEY] = {
+            "held_at": helpers._utcnow_naive().isoformat(),
+            "reasons": regressions,
+            "proposed_rows": len(pricing_rows),
+        }
+        school.attributes = attrs
+        flag_modified(school, "attributes")
+        return {
+            "success": True,
+            "count": 0,
+            "held": True,
+            "detail": "Re-extracted pricing held for review (kept published rows): " + "; ".join(regressions),
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+            "token_cost_usd": token_cost_usd,
+        }
+    if PRICING_HOLD_KEY in attrs:
+        attrs.pop(PRICING_HOLD_KEY)
+        school.attributes = attrs
+        flag_modified(school, "attributes")
+
     if superseded_ids:
         await db.execute(delete(Pricing).where(Pricing.id.in_(superseded_ids)))
     await db.execute(
