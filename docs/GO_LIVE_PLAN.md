@@ -1954,6 +1954,14 @@ the session scratchpad only.
       no price (its €6,600 tuition was never extracted); 515 shows "Британика". Post-apply
       audit `backend/reports/uf45/20260929T093812Z/`: no price-rule hits; 5 name pairs
       remain by design (two schools of one brand, or bare-brand registry names).
+      **Hand fixes 2026-09-29** for the rows no rule catches (page evidence; backup
+      `~/backups/sofia_schools_pre_uf45_rowfixes_20260929_1454.dump`): 564/2949 one-time →
+      yearly ("Годишна такса обучение"); 171/2896, 2897, 2899, 2900 term/semester → yearly
+      ("за учебната 2026 - 2027 г."), and 2897/2899/2900's "installments" plan names
+      corrected to one-payment wording with the grade band; 530/2944 food → tuition,
+      period cleared, "Полудневен престой с обяд"; 606/2962 deleted (the 9th-grade
+      "допълнителни програми метаумения" fee filed as tuition; 9th-grade tuition is 2961).
+      Published rows 72 → 71; audit clean. 329 publishes no price until re-extraction.
 
 ## Phase 3 — Go live
 
