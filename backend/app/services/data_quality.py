@@ -28,6 +28,7 @@ from app.services.identity_curation import curated_identity_candidate
 # share one source of truth.
 from app.utils.display_gating import (  # noqa: F401
     PRICING_CONFIDENCE_FLOOR,
+    blocked_pricing_row_ids,
     implausible_tuition_row_ids,
     passes_pricing_gate,
     pricing_row_is_publishable,
@@ -222,13 +223,20 @@ def _location_metrics(locations: list[SchoolLocation]) -> tuple[dict[str, Any], 
     return precision_metric, duplicate_groups
 
 
-def _pricing_gate_failures(rows: list[Pricing]) -> dict[str, Any]:
+def _pricing_gate_failures(
+    rows: list[Pricing], blocked_ids: set[int] | frozenset[int] = frozenset()
+) -> dict[str, Any]:
+    """``blocked_ids``: rows withheld by the schools' validation reports (e.g. UF45)."""
     by_school: dict[int, list[Pricing]] = {}
     for row in rows:
         if pricing_row_is_publishable(row):
             by_school.setdefault(row.school_id, []).append(row)
     publishable = sum(
-        len(school_rows) - len(implausible_tuition_row_ids(school_rows))
+        len(
+            {row.id for row in school_rows}
+            - implausible_tuition_row_ids(school_rows)
+            - set(blocked_ids)
+        )
         for school_rows in by_school.values()
     )
     total = len(rows)
@@ -315,5 +323,14 @@ async def compute_quality_metrics(
         "display_name_overrides": _display_name_overrides(schools),
         "curated_identity_promotions": _curated_identity_promotions(schools),
         "spot_check_discrepancy_rate": _spot_check_rate(schools),
-        "pricing_rows_failing_gates": _pricing_gate_failures(pricing_rows),
+        "pricing_rows_failing_gates": _pricing_gate_failures(
+            pricing_rows,
+            {
+                row_id
+                for school in schools
+                for row_id in blocked_pricing_row_ids(
+                    attributes_for_publication(school.attributes, school.scrape_status)
+                )
+            },
+        ),
     }

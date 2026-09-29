@@ -1,4 +1,4 @@
-"""UF45 step 1: the audit's rule matchers, on the real pages from the UF42 re-runs.
+"""UF45 evidence rules (app.scrapers.price_evidence), on the real UF42 re-run pages.
 
 The six wrong rows fixed by hand on 2026-09-28 (525, 630, 556) are rebuilt from the
 plan notes against the stored page text: each must trip its rule, and the rows as fixed
@@ -9,16 +9,16 @@ from decimal import Decimal
 
 import pytest
 
-from scripts.audit_price_rows_uf45 import (
+from app.scrapers.price_evidence import (
     PriceRow,
-    PublishedName,
     amount_spans,
-    audit_names,
-    audit_price_row,
+    check_price_row,
     normalize_text,
     period_families,
+    replacement_regressions,
     stated_period,
 )
+from scripts.audit_price_rows_uf45 import PublishedName, audit_names
 
 # slaveiche.com/taksi (school 525, kindergarten), source page 25916.
 SLAVEICHE = """ТАКСИ
@@ -91,14 +91,10 @@ def row(
     period=None,
     plan_name=None,
     notes=None,
-    school_id=1,
-    row_id=1,
     amount_min=None,
     amount_max=None,
 ):
     return PriceRow(
-        id=row_id,
-        school_id=school_id,
         category=category,
         amount=amount,
         amount_min=amount_min,
@@ -110,7 +106,7 @@ def row(
 
 
 def rules(price_row, page, family):
-    return {hit.rule for hit in audit_price_row(price_row, page, family)}
+    return {finding.rule for finding in check_price_row(price_row, page, family)}
 
 
 # ---------------------------------------------------------------------------
@@ -155,10 +151,8 @@ def test_525_deposit_filed_as_tuition_trips_rule_4():
 )
 def test_525_null_period_with_monthly_wording_trips_rule_3(amount, category, notes):
     wrong = row(amount, category=category, notes=notes)
-    hits = audit_price_row(wrong, SLAVEICHE, "kindergarten")
-    assert [(h.rule, h.detail) for h in hits] == [
-        ("3_period_missing", "null period, text says MONTHLY")
-    ]
+    findings = check_price_row(wrong, SLAVEICHE, "kindergarten")
+    assert [(f.rule, f.period) for f in findings] == [("3_period_missing", "MONTHLY")]
 
 
 def test_556_name_taken_from_sibling_trips_rule_5():
@@ -362,3 +356,57 @@ def test_installment_filed_as_tuition(line, period, trips):
 
 def test_missing_page_text_is_reported():
     assert rules(row(Decimal("100")), None, "school") == {"1_amount_near_label"}
+
+
+# ---------------------------------------------------------------------------
+# Codex review of #127
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize(
+    "amount,currency,trips",
+    [
+        (Decimal("530"), "EUR", False),
+        (Decimal("530"), "BGN", True),  # the page shows €530; 530 лв. would be wrong
+        (Decimal("1037"), "BGN", False),  # the BGN companion
+        (Decimal("1037"), "EUR", True),
+    ],
+)
+def test_amount_must_be_shown_in_the_rows_currency(amount, currency, trips):
+    price_row = PriceRow(
+        category="TUITION", amount=amount, amount_min=None, amount_max=None,
+        period="MONTHLY", plan_name=None, notes="целодневно гледане", currency=currency,
+    )
+    assert ("1_amount_near_label" in rules(price_row, SLAVEICHE, "kindergarten")) is trips
+
+
+def test_a_bare_amount_is_not_judged_on_currency():
+    price_row = PriceRow(
+        category="TUITION", amount=Decimal("6150"), amount_min=None, amount_max=None,
+        period="YEARLY", plan_name="Гимназия", notes=None, currency="BGN",
+    )
+    assert "1_amount_near_label" not in rules(price_row, "Гимназия:\n6150\nВсички суми са в евро!", "school")
+
+
+@pytest.mark.parametrize(
+    "page,trips",
+    [("Такса: от 500 до 900 евро", False), ("Такса: от 500 до 700 евро", True)],
+)
+def test_both_ends_of_a_range_must_be_on_the_page(page, trips):
+    price_row = row(None, period="MONTHLY", amount_min=Decimal("500"), amount_max=Decimal("900"))
+    assert ("1_amount_near_label" in rules(price_row, page, "school")) is trips
+
+
+def test_rule_6_counts_fees_that_share_an_amount():
+    page = "Такса записване: 500 евро\nМесечна такса: 500 евро"
+    published = [(row(Decimal("500"), category="REGISTRATION"), page), (row(Decimal("500"), period="MONTHLY"), page)]
+    proposed = [(row(Decimal("500"), period="MONTHLY"), page)]
+    assert replacement_regressions(published, proposed, "school") == [
+        "drops 1 of 2 rows at 500.00 (REGISTRATION 500.00, TUITION 500.00), which the page still shows"
+    ]
+
+
+def test_rule_6_allows_a_fee_refiled_under_another_category():
+    """525's €265 deposit moved from tuition to registration: same fee, not a loss."""
+    published = [(row(Decimal("265"), period="ONE_TIME"), SLAVEICHE)]
+    proposed = [(row(Decimal("265"), category="REGISTRATION", period="ONE_TIME"), SLAVEICHE)]
+    assert replacement_regressions(published, proposed, "kindergarten") == []

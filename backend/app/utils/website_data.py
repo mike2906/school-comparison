@@ -6,6 +6,7 @@ from collections.abc import Mapping
 import datetime
 from typing import Any
 
+from app.utils.display_gating import display_name_blocked
 
 WEBSITE_DATA_WITHHELD_KEY = "website_data_withheld"
 VALIDATION_HISTORY_KEY = "data_validation_history"
@@ -122,6 +123,10 @@ def attributes_for_publication(attributes: Any, scrape_status: Any) -> dict[str,
     """Return raw attributes with private website-derived branches removed when withheld."""
     attrs = dict(attributes) if isinstance(attributes, Mapping) else {}
     if website_data_is_publishable(attrs, scrape_status):
+        # UF45 rule 5: a display name validation flagged (a sibling's name) falls back
+        # to the registry name.
+        if display_name_blocked(attrs):
+            attrs.pop("display_name_i18n", None)
         return attrs
     for key in _PRIVATE_WEBSITE_ATTRIBUTE_KEYS:
         attrs.pop(key, None)

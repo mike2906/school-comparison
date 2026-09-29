@@ -234,6 +234,15 @@ def blocked_pricing_row_ids(attributes: Mapping[str, Any] | None) -> set[int]:
     return blocked
 
 
+# Validation flags a website display name here (UF45 rule 5: it is a sibling's name).
+DISPLAY_NAME_FIELD_PATH = "attributes.display_name_i18n"
+
+
+def display_name_blocked(attributes: Mapping[str, Any] | None) -> bool:
+    """True when the current validation report withholds the website display name."""
+    return any(path.strip() == DISPLAY_NAME_FIELD_PATH for path in _blocking_field_paths(attributes))
+
+
 def summary_is_publishable(attributes: Mapping[str, Any] | None) -> bool:
     """True only when the current validation report is explicitly ``ok`` (P1.7).
 

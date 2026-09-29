@@ -4430,3 +4430,124 @@ async def test_extract_school_pins_campus_locations_after_its_commit(db_session,
     assert result["status"] == "extracted"
     geocode.assert_awaited_once()
     assert geocode.await_args.args[1] == school_id
+
+
+# UF45 rule 6: a re-extraction that loses what the published rows show is held.
+
+_HOLD_PAGE = (
+    "ТАКСИ\n€ 530 | 1037 лв.\n- целодневно гледане, ежемесечно заплащане\n"
+    "€ 350 | 685 лв.\n- половин ден с включен обяд\n"
+    "€ 265 | 518 лв.\n– депозит за запазване на място\n"
+)
+
+
+async def _published_rows_and_page(db_session, school, rows):
+    pages = (
+        await db_session.execute(select(SourcePage).where(SourcePage.school_id == school.id))
+    ).scalars().all()
+    pricing_page = next(page for page in pages if page.page_category == "pricing")
+    pricing_page.raw_markdown = _HOLD_PAGE
+    for category, amount, period in rows:
+        db_session.add(
+            Pricing(
+                school_id=school.id,
+                category=category,
+                amount=amount,
+                currency="EUR",
+                period=period,
+                source=PriceSource.SCRAPED_WEBSITE,
+                source_url=pricing_page.source_url,
+                source_page_id=pricing_page.id,
+                pricing_context={"confidence": 1.0},
+            )
+        )
+    await db_session.commit()
+    return list(pages)
+
+
+async def _run_prices(db_session, school, pages, prices):
+    output = PriceExtractionOutput(
+        prices=[
+            ExtractedPrice(category=category, amount=amount, currency="EUR", period=period, confidence=1.0)
+            for category, amount, period in prices
+        ],
+        has_pricing_info=True,
+    )
+    with patch(
+        "app.scrapers.extractor._run_typed_agent",
+        new=AsyncMock(return_value=(output, 10, 2, 0.001)),
+    ):
+        return await extractor_module._extract_prices(
+            db_session, school, pages, 20.0, extractor_module.ExtractionLLMStats()
+        )
+
+
+async def _stored(db_session, school):
+    rows = (
+        await db_session.execute(select(Pricing).where(Pricing.school_id == school.id))
+    ).scalars().all()
+    return sorted(
+        (row.category.value, float(row.amount), row.period.value if row.period else None) for row in rows
+    )
+
+
+@pytest.mark.asyncio
+async def test_reextraction_dropping_a_fee_the_page_still_shows_is_held(
+    db_session, sample_school_for_extraction
+):
+    school = sample_school_for_extraction
+    published = [("tuition", 530, "monthly"), ("registration", 265, "one_time")]
+    pages = await _published_rows_and_page(db_session, school, published)
+
+    result = await _run_prices(db_session, school, pages, [("tuition", 530.0, "monthly")])
+
+    assert result["held"] is True
+    assert await _stored(db_session, school) == sorted(
+        [("tuition", 530.0, "monthly"), ("registration", 265.0, "one_time")]
+    )
+    hold = school.attributes[extractor_module.PRICING_HOLD_KEY]
+    assert hold["reasons"] == ["drops REGISTRATION 265.00, which the page still shows"]
+
+
+@pytest.mark.asyncio
+async def test_reextraction_losing_a_period_the_page_does_not_state_is_held(
+    db_session, sample_school_for_extraction
+):
+    school = sample_school_for_extraction
+    pages = await _published_rows_and_page(db_session, school, [("tuition", 350, "monthly")])
+
+    result = await _run_prices(db_session, school, pages, [("tuition", 350.0, None)])
+
+    assert result["held"] is True
+    assert await _stored(db_session, school) == [("tuition", 350.0, "monthly")]
+
+
+@pytest.mark.asyncio
+async def test_reextraction_losing_a_period_the_page_states_is_written(
+    db_session, sample_school_for_extraction
+):
+    """Validation fills "ежемесечно" back in, so this is not a regression."""
+    school = sample_school_for_extraction
+    school.attributes = {extractor_module.PRICING_HOLD_KEY: {"reasons": ["earlier"]}}
+    pages = await _published_rows_and_page(db_session, school, [("tuition", 530, "monthly")])
+
+    result = await _run_prices(db_session, school, pages, [("tuition", 530.0, None)])
+
+    assert result.get("held") is None
+    assert await _stored(db_session, school) == [("tuition", 530.0, None)]
+    # A replacement that goes through clears the earlier hold.
+    assert extractor_module.PRICING_HOLD_KEY not in school.attributes
+
+
+@pytest.mark.asyncio
+async def test_reextraction_is_not_held_for_a_fee_the_page_no_longer_shows(
+    db_session, sample_school_for_extraction
+):
+    """525's €560 became €530: the old amount is gone from the page."""
+    school = sample_school_for_extraction
+    pages = await _published_rows_and_page(db_session, school, [("tuition", 560, "monthly")])
+
+    result = await _run_prices(db_session, school, pages, [("tuition", 530.0, "monthly")])
+
+    assert result.get("held") is None
+    assert [row[:2] for row in await _stored(db_session, school)] == [("tuition", 530.0)]
