@@ -1961,7 +1961,15 @@ the session scratchpad only.
       corrected to one-payment wording with the grade band; 530/2944 food → tuition,
       period cleared, "Полудневен престой с обяд"; 606/2962 deleted (the 9th-grade
       "допълнителни програми метаумения" fee filed as tuition; 9th-grade tuition is 2961).
-      Published rows 72 → 71; audit clean. 329 publishes no price until re-extraction.
+      Published rows 72 → 71; audit clean.
+      **329 re-extracted 2026-09-29** (one school, $0.50 cap, 90 s timeout; backup
+      `~/backups/sofia_schools_pre_rerun_329_20260929_1458.dump`): clean run, €70
+      registration now without the wrong label, €123 theatre course as extracurricular
+      (was legacy tuition), but the model again missed the €6,600 tuition. Added by hand
+      from the page ("Такси учебна 2026-2027 г. / СТАНДАРТНА ТАКСА / EUR 6600", 6900 in 2 and
+      7200 in 4 installments) as row 2999, yearly; backup
+      `..._pre_329_tuition_20260929_1459.dump`; deterministic validation ok. Rule 6 now holds
+      a re-extraction that drops it.
 
 ## Phase 3 — Go live
 
