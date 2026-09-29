@@ -202,6 +202,33 @@ def amount_context(text: str, span: tuple[int, int]) -> str:
     return "\n".join(parts)
 
 
+_CURRENCY_CODES = {
+    "€": "EUR", "eur": "EUR", "euro": "EUR", "евро": "EUR",
+    "лв": "BGN", "лв.": "BGN", "лева": "BGN", "bgn": "BGN",
+    "$": "USD", "usd": "USD", "£": "GBP", "gbp": "GBP",
+}
+_CURRENCY_TOKEN = r"(€|\$|£|eur\b|euro\b|евро|лв\.?|лева|bgn|usd|gbp)"
+# Right before the amount on its line ("€ 530"), or alone on the line above ("EUR\n6600").
+_CURRENCY_BEFORE_RE = re.compile(rf"(?:{_CURRENCY_TOKEN}[ \t]*|\n[ \t]*{_CURRENCY_TOKEN}[ \t]*\n[ \t]*)\Z")
+# Right after it ("530 лв."), or alone on the line below ("7050\nевро").
+_CURRENCY_AFTER_RE = re.compile(rf"^(?:[ \t]*{_CURRENCY_TOKEN}|[ \t]*\n[ \t]*{_CURRENCY_TOKEN}[ \t]*(?:\n|\Z))")
+
+
+def occurrence_currency(text: str, span: tuple[int, int]) -> Optional[str]:
+    """The currency written next to one amount occurrence (None when none is)."""
+    after = _CURRENCY_AFTER_RE.match(text[span[1]: span[1] + 16])
+    if after:
+        return _CURRENCY_CODES[next(group for group in after.groups() if group)]
+    start = max(0, span[0] - 16)
+    window = text[start: span[0]]
+    if start == 0 or text[start - 1] == "\n":
+        window = "\n" + window  # the window starts a line
+    before = _CURRENCY_BEFORE_RE.search(window)
+    if before:
+        return _CURRENCY_CODES[next(group for group in before.groups() if group)]
+    return None
+
+
 def _snippet(text: str, span: tuple[int, int], width: int = 90) -> str:
     return re.sub(r"\s+", " ", text[max(0, span[0] - width): span[1] + width]).strip()
 
@@ -307,6 +334,7 @@ class PriceRow:
     period: Optional[str]
     plan_name: Optional[str]
     notes: Optional[str]
+    currency: Optional[str] = None
 
     @property
     def label(self) -> Optional[str]:
@@ -325,6 +353,7 @@ class PriceRow:
             period=_enum(row.period),
             plan_name=row.plan_name,
             notes=notes if isinstance(notes, str) else None,
+            currency=str(row.currency or "").strip().upper() or None,
         )
 
     @property
@@ -354,11 +383,27 @@ def check_price_row(row: PriceRow, page_text: str | None, school_family: str) ->
         hit(RULE_AMOUNT_NEAR_LABEL, "no stored page text", "")
         return hits
 
-    spans = [span for value in row.amounts for span in amount_spans(text, value)]
+    # Every amount (both ends of a range) must be on the page, in the row's currency
+    # where the page writes one next to it ("€ 530 | 1037 лв." holds 530 EUR, not BGN).
+    spans = []
+    for value in row.amounts:
+        found = amount_spans(text, value)
+        if not found:
+            hit(RULE_AMOUNT_NEAR_LABEL, f"amount {value} not on the page", text[:160])
+            return hits
+        in_currency = [
+            span for span in found if occurrence_currency(text, span) in (None, row.currency)
+        ]
+        if row.currency and not in_currency:
+            shown = sorted({occurrence_currency(text, span) for span in found})
+            hit(
+                RULE_AMOUNT_NEAR_LABEL,
+                f"amount {value} {row.currency} is shown only in {', '.join(shown)}",
+                _snippet(text, found[0]),
+            )
+            return hits
+        spans.extend(in_currency or found)
     labels = label_spans(text, row.label)
-    if not spans:
-        hit(RULE_AMOUNT_NEAR_LABEL, f"amount {row.amounts} not on the page", text[:160])
-        return hits
 
     # The amount occurrence this row is about: the one nearest its label, when found.
     # In a markdown table the label is a column header, so the check says nothing there.
@@ -467,22 +512,38 @@ def replacement_regressions(
     by_amount: dict[tuple[str, ...], list[tuple[PriceRow, Optional[str]]]] = {}
     for row, text in proposed:
         by_amount.setdefault(_amount_key(row), []).append((row, text))
+    published_by_amount: dict[tuple[str, ...], list[tuple[PriceRow, Optional[str]]]] = {}
+    for row, text in published:
+        published_by_amount.setdefault(_amount_key(row), []).append((row, text))
 
     reasons = []
-    for old, text in published:
-        label = f"{old.category} {', '.join(_amount_key(old))}"
-        matches = by_amount.get(_amount_key(old))
-        if not matches:
+    for key, olds in published_by_amount.items():
+        matches = by_amount.get(key, [])
+        # Counted, not just matched: a €500 registration and a €500 tuition tier are two
+        # fees, and one proposed €500 row keeps only one of them. A category change on
+        # the same amount (a deposit refiled from tuition to registration) is not a loss.
+        if len(matches) < len(olds):
+            old, text = olds[0]
             normalized = normalize_text(text)
-            if normalized and any(amount_spans(normalized, value) for value in old.amounts):
-                reasons.append(f"drops {label}, which the page still shows")
+            shown = min(len(amount_spans(normalized, value)) for value in old.amounts) if normalized else 0
+            if shown >= len(olds):
+                dropped = len(olds) - len(matches)
+                label = ", ".join(f"{row.category} {', '.join(key)}" for row, _ in olds)
+                reasons.append(
+                    f"drops {dropped} of {len(olds)} rows at {', '.join(key)} ({label}), "
+                    "which the page still shows"
+                    if len(olds) > 1
+                    else f"drops {label}, which the page still shows"
+                )
             continue
-        if old.period and all(new.period is None for new, _ in matches):
-            filled = any(
-                finding.rule == RULE_PERIOD_MISSING
-                for new, new_text in matches
-                for finding in check_price_row(new, new_text, school_family)
-            )
-            if not filled:
-                reasons.append(f"loses the {old.period} period of {label}")
+        for old, _ in olds:
+            if old.period and all(new.period is None for new, _ in matches):
+                filled = any(
+                    finding.rule == RULE_PERIOD_MISSING
+                    for new, new_text in matches
+                    for finding in check_price_row(new, new_text, school_family)
+                )
+                if not filled:
+                    reasons.append(f"loses the {old.period} period of {old.category} {', '.join(key)}")
+                    break
     return reasons

@@ -980,6 +980,10 @@ async def validate_school_data(
                         message="Scraped pricing row is missing source_url.",
                     )
 
+            # Before the duplicate pass: a period filled from the page can make two rows
+            # identical, and the copy must go in this run, not the next one.
+            await _check_price_evidence(db, report, school, pricing_rows)
+
             seen_signatures: dict[tuple[Any, ...], int] = {}
             duplicate_ids: list[tuple[int, int]] = []
             for row in pricing_rows:
@@ -997,6 +1001,13 @@ async def validate_school_data(
                 report.auto_fixes = [
                     fix for fix in report.auto_fixes if not fix.field_path.startswith(duplicate_prefixes)
                 ]
+                report.issues = [
+                    issue for issue in report.issues if not issue.field_path.startswith(duplicate_prefixes)
+                ]
+                report.issue_counts = {
+                    severity: sum(1 for issue in report.issues if issue.severity == severity)
+                    for severity in ("error", "warning")
+                }
                 await db.execute(
                     delete(Pricing).where(Pricing.id.in_([dup_id for dup_id, _ in duplicate_ids]))
                 )
@@ -1009,11 +1020,6 @@ async def validate_school_data(
                         fixed_value=None,
                         reason="Removed exact duplicate scraped pricing row.",
                     )
-
-            duplicate_row_ids = {dup_id for dup_id, _ in duplicate_ids}
-            await _check_price_evidence(
-                db, report, school, [row for row in pricing_rows if row.id not in duplicate_row_ids]
-            )
 
             extracted = attrs.get("extracted")
             extracted_dict = dict(extracted) if isinstance(extracted, dict) else None

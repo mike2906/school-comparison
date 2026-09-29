@@ -270,3 +270,24 @@ async def test_earlier_year_fee_history_is_not_checked_against_the_new_page(db_s
     assert _issue_codes(school, invented) == {"pricing_amount_not_near_label"}
     response = await client.get(f"/schools/{school.id}")
     assert sorted(row["id"] for row in response.json()["pricing"]) == sorted([history.id, current.id])
+
+
+@pytest.mark.asyncio
+async def test_a_row_made_identical_by_the_period_fill_is_removed_in_the_same_run(db_session):
+    school, page = await _school_with_page(
+        db_session, level="kindergarten", website_url="https://dup.bg", page_text=SLAVEICHE
+    )
+    stated = _row(school, page, "tuition", 530, "monthly", notes="целодневно гледане")
+    unstated = _row(school, page, "tuition", 530, notes="целодневно гледане")
+    db_session.add_all([stated, unstated])
+    await db_session.commit()
+
+    await validator_module.validate_school_data(db_session, school.id, "bg")
+
+    remaining = (
+        await db_session.execute(select(Pricing.id).where(Pricing.school_id == school.id))
+    ).scalars().all()
+    assert remaining == [stated.id]
+    await db_session.refresh(school)
+    report = school.attributes["data_validation"]
+    assert not any(fix["field_path"].startswith(f"pricing[{unstated.id}]") and fix["code"] != "duplicate_pricing_row_removed" for fix in report["auto_fixes"])
