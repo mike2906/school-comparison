@@ -1921,6 +1921,16 @@ the session scratchpad only.
       An LLM judge is not needed for these: the Stage 6 capable-model spot-check already
       runs, but it is monitoring-only. Make it actionable for pricing only if residual
       errors remain after the rules.
+      **Step 1 done 2026-09-29 (audit only, no gate or data change):**
+      `scripts/audit_price_rows_uf45.py` checks every row and name `GET /schools/{id}`
+      publishes against the linked page text (rules 1–5, plus 4b: a tuition row whose
+      line says "I вноска"). Launch DB, 77 published rows / 22 schools
+      (`backend/reports/uf45/20260929T081716Z/`, with `hand_check.md`): rule 1: 2 hits
+      (1 true), rules 2–4: 0, 4b: 3 (all true), rule 5: 6 pairs (1 wrong name, 515; 5 pairs
+      are sibling institutions that both show the bare brand). Wrong live rows listed, not fixed: 564
+      installments as tuition (2950/2952/2954), 329/2915 label, 531/2946 and 530/2944
+      miscategorized as food, 606/2962 programme fee as 9th-grade tuition, 171 invented
+      TERM/SEMESTER periods, 515's name. Step 2 (gates) waits for Mike.
 
 ## Phase 3 — Go live
 
