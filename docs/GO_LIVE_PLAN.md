@@ -1899,7 +1899,7 @@ the session scratchpad only.
       the other kindergarten's point. Sofia locations without a pin: private 27 → 32 (the
       baseline includes UF42a's cleared 1082/1091), state 4 → 7. Follow-up: 3024, 3112, 3115 keep
       pins the current pipeline does not reproduce (no result / area mismatch).
-- [ ] **UF45 Price-row and name sanity checks (proposed 2026-09-28, needs Mike's go).**
+- [x] **UF45 Price-row and name sanity checks (proposed 2026-09-28, needs Mike's go).**
       Every wrong row fixed by hand in the UF42 re-runs breaks a rule that can be checked
       against the source page text, without a model:
       (1) *Amount near its label:* the amount must appear within a short window of the
@@ -1931,7 +1931,7 @@ the session scratchpad only.
       installments as tuition (2950/2952/2954), 329/2915 label, 531/2946 and 530/2944
       miscategorized as food, 606/2962 programme fee as 9th-grade tuition, 171 invented
       TERM/SEMESTER periods, 515's name.
-      **Step 2 (2026-09-29, PR pending Mike):** Stage 6 validation runs rules 1–4 and 4b from
+      **Step 2 (2026-09-29, #127):** Stage 6 validation runs rules 1–4 and 4b from
       `app/scrapers/price_evidence.py` on every scraped row with a valid linked page:
       findings become errors on `pricing[{id}]` (the existing display gate withholds
       them), a stated null period is an auto-fix, a period conflict is a warning. Rule 5
@@ -1946,6 +1946,14 @@ the session scratchpad only.
       shows "Британика"; nothing else changes. Apply after merge:
       `cli run --stage validate-data --school-id N` for 329, 531, 564, 515 (backup first).
       Not caught by any rule (from the step 1 list): 530/2944, 606/2962, 171's periods, 564/2949.
+      Codex review fixes (same PR): rule 1 checks the currency written next to the amount
+      and both ends of a range; rule 6 counts rows per amount; the period fill runs before
+      the duplicate pass. **Applied 2026-09-29** (deterministic validation only, no
+      spot-check calls; backup `~/backups/sofia_schools_pre_uf45_apply_20260929_1236.dump`)
+      to 329, 531, 564, 515: published rows 77 → 72, as in the dry run; 329 now publishes
+      no price (its €6,600 tuition was never extracted); 515 shows "Британика". Post-apply
+      audit `backend/reports/uf45/20260929T093812Z/`: no price-rule hits; 5 name pairs
+      remain by design (two schools of one brand, or bare-brand registry names).
 
 ## Phase 3 — Go live
 
