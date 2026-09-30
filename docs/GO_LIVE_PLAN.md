@@ -1653,8 +1653,11 @@ the session scratchpad only.
       **Done 2026-09-24:** `useId`-based ids.
 - [x] **UF26 Unknown URLs show React Router's developer error page;** add a translated 404.
       **Done 2026-09-24:** translated 404 for unknown URLs and a separate route-error screen.
-- [ ] **UF27 Footer with About and a "report a data error" link** — use
+- [x] **UF27 Footer with About and a "report a data error" link** — use
       `contact@schooldecider.com` (Cloudflare Email Routing to Mike's inbox, live 2026-09-30).
+      **Done 2026-09-30:** footer on About, compare, school and 404 pages (not the full-screen
+      search map, whose nav already links About): About link and a `mailto:` report link with a
+      translated subject.
 - [x] **UF28 Monthly tuition is yearly ÷ 12** though most schools bill over 9–10 months;
       drop it or label it.
       **Done 2026-09-24:** the ÷12 monthly figure is gone from key facts and compare.
@@ -1704,9 +1707,11 @@ the session scratchpad only.
 - [ ] **UF39 kg.sofia duplicate address spellings.** Location 2916 (school 104, same building,
       different spelling) was removed but will be re-added on the next kg.sofia run; normalise
       addresses before comparing. Some "- сграда N" buildings are still separate school rows.
-- [ ] **UF40 Geocoding contact address** (`GEOCODING_CONTACT_EMAIL`) is Mike's personal email and
+- [x] **UF40 Geocoding contact address** (`GEOCODING_CONTACT_EMAIL`) is Mike's personal email and
       is sent with every Nominatim request; switch it to `contact@schooldecider.com` (live
       2026-09-30; with UF27).
+      **Done 2026-09-30:** local `backend/.env` set to `contact@schooldecider.com` (no code
+      change; production sets it when the API is deployed in P3.2).
 - [x] **UF41 108 Sofia locations have no pin ("No results found").** Many are a
       neighbourhood plus a house number OSM lacks (Maple Bear kindergarten 556: кв. Витоша,
       ул. "Йордан Стубел" № 16). Dropping the neighbourhood is wrong: `Йордан Стубел 16,
