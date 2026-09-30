@@ -1629,7 +1629,7 @@ function SearchPage() {
   }
 
   return (
-    <Layout hideNavOnMobile>
+    <Layout hideNavOnMobile hideFooter>
       <div className="h-[100dvh] lg:h-[calc(100dvh-64px)] flex flex-col">
         <h1 className="sr-only">{t('welcome.title')}</h1>
         {/* Mobile/Tablet Header */}

@@ -1,14 +1,41 @@
 import { useTranslation } from 'react-i18next'
-import { Link, NavLink } from 'react-router-dom'
+import { Link, NavLink, useLocation } from 'react-router-dom'
 import { useCompare } from '../../context/CompareContext'
 import LanguageToggle from '../LanguageToggle/LanguageToggle'
 
-function Layout({ children, hideNavOnMobile = false, compactNavOnMobile = false }) {
+const CONTACT_EMAIL = 'contact@schooldecider.com'
+
+function Footer({ clearCompareBar }) {
   const { t } = useTranslation()
-  const { compareList } = useCompare()
+  const reportHref = `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(t('footer.reportSubject'))}`
 
   return (
-    <div className="min-h-screen bg-neutral-100">
+    // The fixed CompareBar would otherwise cover the footer links.
+    <footer className={`border-t border-neutral-200 bg-white ${clearCompareBar ? 'pb-40' : ''}`}>
+      <div className="mx-auto flex max-w-5xl flex-col gap-2 px-6 py-6 text-sm text-neutral-600 sm:flex-row sm:items-center sm:justify-between">
+        <p>{t('footer.dataNote')}</p>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <Link to="/about" className="text-primary-700 underline">
+            {t('nav.about')}
+          </Link>
+          <a href={reportHref} className="text-primary-700 underline">
+            {t('footer.reportError')}
+          </a>
+        </div>
+      </div>
+    </footer>
+  )
+}
+
+function Layout({ children, hideNavOnMobile = false, compactNavOnMobile = false, hideFooter = false }) {
+  const { t } = useTranslation()
+  const { compareList } = useCompare()
+  const { pathname } = useLocation()
+  // Same condition CompareBar uses to show itself.
+  const compareBarVisible = compareList.length > 0 && !pathname.startsWith('/compare')
+
+  return (
+    <div className="flex min-h-screen flex-col bg-neutral-100">
       {/* Navigation */}
       <nav className={`bg-white border-b border-neutral-200 sticky top-0 z-50 ${
         hideNavOnMobile ? 'hidden lg:block' : ''
@@ -64,7 +91,8 @@ function Layout({ children, hideNavOnMobile = false, compactNavOnMobile = false 
       </nav>
 
       {/* Main content */}
-      <main>{children}</main>
+      <main className="flex-1">{children}</main>
+      {!hideFooter && <Footer clearCompareBar={compareBarVisible} />}
     </div>
   )
 }

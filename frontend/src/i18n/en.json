@@ -668,5 +668,10 @@
   "routeError": {
     "title": "Something went wrong",
     "body": "This page could not be shown. Please try again from the school search."
+  },
+  "footer": {
+    "dataNote": "Found a mistake in a school’s details? Tell us and we’ll check it.",
+    "reportError": "Report a data error",
+    "reportSubject": "Data error report"
   }
 }
