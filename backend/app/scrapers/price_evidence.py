@@ -190,13 +190,24 @@ def amount_context(text: str, span: tuple[int, int]) -> str:
     parts = [amount_segment(text, span)]
 
     before_lines = text[:start].split("\n")[:-1] if start else []
-    for previous in reversed(before_lines[-ATTACHED_LINES:]):
-        if _is_price_line(previous) or not previous.rstrip().endswith(":"):
+    # "label" with its colon starting this line ("Депозит\n: 450 EUR") is this amount's label.
+    split_label = text[start:end].lstrip().startswith(":")
+    for index, previous in enumerate(reversed(before_lines[-ATTACHED_LINES:])):
+        if _is_price_line(previous) or not (
+            previous.rstrip().endswith(":") or (index == 0 and split_label)
+        ):
             break
         parts.insert(0, previous)
     after_lines = text[end + 1:].split("\n") if end < len(text) else []
-    for following in after_lines[:ATTACHED_LINES]:
-        if _is_price_line(following) or following.rstrip().endswith(":"):
+    for index, following in enumerate(after_lines[:ATTACHED_LINES]):
+        # The next fee's label: "label:", or "label" with its colon starting the next
+        # line ("Депозит\n: 450 EUR", school 183).
+        next_line = after_lines[index + 1] if index + 1 < len(after_lines) else ""
+        if (
+            _is_price_line(following)
+            or following.rstrip().endswith(":")
+            or next_line.lstrip().startswith(":")
+        ):
             break
         parts.append(following)
     return "\n".join(parts)
