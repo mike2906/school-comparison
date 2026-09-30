@@ -1653,8 +1653,8 @@ the session scratchpad only.
       **Done 2026-09-24:** `useId`-based ids.
 - [x] **UF26 Unknown URLs show React Router's developer error page;** add a translated 404.
       **Done 2026-09-24:** translated 404 for unknown URLs and a separate route-error screen.
-- [ ] **UF27 Footer with About and a "report a data error" link** — waiting for a contact
-      email once Mike has a domain (Mike, 2026-09-24).
+- [ ] **UF27 Footer with About and a "report a data error" link** — use
+      `contact@schooldecider.com` (Cloudflare Email Routing to Mike's inbox, live 2026-09-30).
 - [x] **UF28 Monthly tuition is yearly ÷ 12** though most schools bill over 9–10 months;
       drop it or label it.
       **Done 2026-09-24:** the ÷12 monthly figure is gone from key facts and compare.
@@ -1705,8 +1705,8 @@ the session scratchpad only.
       different spelling) was removed but will be re-added on the next kg.sofia run; normalise
       addresses before comparing. Some "- сграда N" buildings are still separate school rows.
 - [ ] **UF40 Geocoding contact address** (`GEOCODING_CONTACT_EMAIL`) is Mike's personal email and
-      is sent with every Nominatim request; switch to a project address once the domain exists
-      (with UF27).
+      is sent with every Nominatim request; switch it to `contact@schooldecider.com` (live
+      2026-09-30; with UF27).
 - [x] **UF41 108 Sofia locations have no pin ("No results found").** Many are a
       neighbourhood plus a house number OSM lacks (Maple Bear kindergarten 556: кв. Витоша,
       ул. "Йордан Стубел" № 16). Dropping the neighbourhood is wrong: `Йордан Стубел 16,
@@ -2007,7 +2007,12 @@ the session scratchpad only.
         self-hosted analytics, dashboards-as-code.
 
       **Stage A — Launch.**
-      - [ ] Buy the domain (human); Cloudflare account and zone. Unblocks UF27 and UF40.
+      - [x] Buy the domain (human); Cloudflare account and zone. Unblocks UF27 and UF40.
+            **Done 2026-09-30:** `schooldecider.com` bought at Cloudflare Registrar (zone on
+            Cloudflare; account has a password and 2FA). Email Routing forwards
+            `contact@schooldecider.com` to Mike's inbox (catch-all off). `schooldecider.bg`
+            is the planned primary site (Bulgarian at `/`, English under `/en/`), with the
+            .com redirecting to it; the .bg is still to be registered via SuperHosting.BG.
       - [ ] Language URLs: Bulgarian at `/`, English under `/en/`; reciprocal `hreflang`.
             Today the language comes only from browser detection, so English is never
             indexed.
@@ -2053,6 +2058,9 @@ the session scratchpad only.
             code never needs a schema rollback.
       - [ ] Agents deploy only through CI; they get read-only access to logs and metrics
             and no production credentials.
+            Note (2026-09-30): during manual setup, agents have broad Cloudflare account
+            access through the Cloudflare plugin's OAuth connection. Replace it with scoped
+            API tokens (per task, least privilege) in this stage.
 
       **Stage C — Data releases and backups.**
       - [ ] Versioned published snapshots stored in Cloudflare R2 together with the inputs
