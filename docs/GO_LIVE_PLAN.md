@@ -1980,12 +1980,121 @@ the session scratchpad only.
       CORS already came from `ALLOWED_ORIGINS`. The placeholder-email check now lives in
       `nominatim_user_agent()` and also guards the two `cli.py` repair commands that
       called Nominatim directly; the MoE registry adapter keeps its deliberate skip.
-- [ ] **P3.2 Deployment.** Single small VPS (Hetzner/Fly.io/Railway) — this scale
-      (~500 schools) needs one box: dockerized FastAPI + Postgres + built frontend
-      behind Caddy/nginx with HTTPS. Manual task: pick host, domain, DNS, secrets.
-      Agents can write the Dockerfile/compose/Caddyfile; a human runs the deploy.
-      The frontend build needs `VITE_CARTO_API_KEY` (map tiles are watermarked
-      without it); restrict that key to the production domain in the CARTO dashboard.
+- [ ] **P3.2 Deployment and autonomous operation (revised 2026-09-30).** Replaces the
+      earlier "single small VPS" item. Work through stages A–E in order; each stage is a
+      set of agent-sized PRs. Stage A alone meets the "live" definition above.
+
+      **Goal.** Hands-off operation, built as a showcase: (1) school data refreshes on a
+      schedule with an LLM verifier in place of human review; (2) features go from a
+      prompt to production through agent build, test, review and UI checks, with no
+      human checks. Mike is looped in only for the big changes listed in
+      `skills/github-process/SKILL.md` ("Big changes") and when a circuit breaker trips.
+      No automation may depend on a human approving routine output. What makes this safe:
+      automated gates, circuit breakers, rollback and alerting.
+
+      **Decisions (2026-09-30).** A Codex launch/hosting report was reviewed against the repo:
+      - The public app is read-only; data changes only through the pipeline. The school
+        data is therefore a *published snapshot*, separate from future user data
+        (sign-in, comments), which is the only data needing real production backups.
+      - Hybrid hosting: Cloudflare Pages serves the frontend and prerendered school pages;
+        one Hetzner VPS runs FastAPI, Postgres and Caddy in Docker. A fully static build
+        (no API) was considered and rejected because writes and a scheduled pipeline are
+        planned, and it would mean porting the server-side filters to JS.
+      - Not OCI Always Free for production: idle always-on instances can be reclaimed, A1
+        capacity is not guaranteed, and it means running on Arm64. OCI stays an option
+        for the stateless pipeline worker (stage D) if multi-cloud practice is wanted.
+      - Out of scope until a real need appears: Kubernetes, a separate staging VM,
+        self-hosted analytics, dashboards-as-code.
+
+      **Stage A — Launch.**
+      - [ ] Buy the domain (human); Cloudflare account and zone. Unblocks UF27 and UF40.
+      - [ ] Language URLs: Bulgarian at `/`, English under `/en/`; reciprocal `hreflang`.
+            Today the language comes only from browser detection, so English is never
+            indexed.
+      - [ ] Prerender school pages at build time with a per-page title, meta description,
+            canonical URL and Open Graph tags; `sitemap.xml`, `robots.txt`, real 404s.
+            Descriptive slugs are welcome but not a launch blocker; keep numeric IDs
+            stable. State-school pages lead with official NVO results. Pages whose
+            content is thin get `noindex` rather than being padded.
+      - [ ] Dockerfile for the API, a production compose file with Caddy (HTTPS), a
+            readiness endpoint that checks the DB, container log rotation.
+      - [ ] Terraform (or OpenTofu): the Hetzner server and firewall, the Cloudflare DNS
+            zone, the Pages project, and crawler settings (check that Cloudflare's AI-crawler
+            blocking matches the intended `robots.txt`).
+      - [ ] GitHub Actions CD: build images to GHCR, deploy the API to the VPS and the
+            frontend to Pages on merge; post-deploy smoke tests; automatic rollback to
+            the previous image tag if they fail.
+      - [ ] CARTO key restricted to the domain, with visible attribution
+            (`VITE_CARTO_API_KEY` is needed in the frontend build). Official NVO source
+            credited on the About page.
+      - [ ] External uptime check (free tier) that alerts Mike; Cloudflare Web Analytics
+            (cookieless, no custom events yet); a short privacy notice.
+      - [ ] Google Search Console and Bing Webmaster Tools: verify, submit the sitemap,
+            inspect representative pages.
+
+      **Stage B — Agent delivery loop.**
+      - [ ] Protect the checks from the agents they check: CODEOWNERS plus branch protection
+            on `.github/workflows/`, gate and threshold configs, `AGENTS.md` and `skills/`.
+            Changes there are big changes.
+      - [ ] Staging stack on the same VPS (a second compose project with its own DB loaded
+            from the published snapshot); PR preview deploys point at it.
+      - [ ] Playwright journeys for the core user stories (search and filter, school
+            detail, compare, language switch), run in CI against staging.
+      - [ ] Reviewer agent on a different model family from the coding agent, run in CI on
+            every PR.
+      - [ ] UI agent: walks the PR's acceptance criteria on the preview deploy and attaches
+            screenshots and a pass/fail result to the PR.
+      - [ ] Eyes before autonomy: structured JSON logs with request IDs, frontend error
+            tracking (e.g. Sentry free tier) and alerts on 5xx rate and failed deploys.
+            These replace a human watching, so they land before auto-merge.
+      - [ ] Auto-merge on green CI, reviewer pass and UI pass, unless the PR touches a big
+            change, which instead pings Mike with the PR URL.
+      - [ ] Migrations: backup before migrate; expand-then-contract only, so rolling back
+            code never needs a schema rollback.
+      - [ ] Agents deploy only through CI; they get read-only access to logs and metrics
+            and no production credentials.
+
+      **Stage C — Data releases and backups.**
+      - [ ] Versioned published snapshots stored in Cloudflare R2 together with the inputs
+            needed to rebuild them. Production loads a named version; rollback loads the
+            previous one. Loading must never touch user tables.
+      - [ ] Move the internal (pipeline) DB to the VPS as a separate database from the
+            public one; local development works from a copy.
+      - [ ] Nightly `pg_dump` of the internal DB (and later user data) to R2 or B2, plus a
+            scheduled CI job that restores the latest dump and checks row counts.
+      - [ ] Automate the official NVO import: poll for the annual release and auto-release
+            when the boundary audit passes.
+
+      **Stage D — Autonomous data refresh.** Cadence: weekly change detection, monthly
+      full refresh; NVO annually; kindergarten thresholds per admission round.
+      - [ ] Temporary pipeline worker: a scheduled workflow creates a larger server with
+            Terraform, runs the pipeline against the internal DB, uploads the candidate
+            snapshot and its diff to R2, then destroys the server.
+      - [ ] Change detection: fingerprint each school's pages and re-extract only the
+            changed ones.
+      - [ ] Reference set: the reviewed 18-school cohort with hand-verified values. Every
+            run must reproduce them before anything releases.
+      - [ ] Verifier agent: a stronger model from a different family than the extractor
+            checks every changed field against the stored source text or PDF. A rejected
+            change is withheld, and the school keeps its last verified value. Choose the
+            model by scoring candidates on the reference set, for accuracy and cost per run.
+      - [ ] Circuit breakers that block a release and alert Mike: changes above X% of
+            schools, a coverage drop above Y, a failed boundary audit, or a reference-set
+            regression.
+      - [ ] Enable auto-publish one field family at a time, each only after it meets a
+            recorded accuracy bar on the reference set: NVO first, then pricing, then
+            website-derived fields after E1.
+
+      **Stage E — Full observability and user features.**
+      - [ ] OpenTelemetry on FastAPI and the DB; Grafana Alloy sending VPS, container and
+            app telemetry to Grafana Cloud (free tier); p95 latency and resource alerts.
+            Data-freshness alerts (last release, failed or overdue runs).
+      - [ ] Writes, in increasing order of risk: "report a data error" (UF27); sign-in via
+            a hosted provider or email magic links (no home-built passwords) with saved
+            schools; questions to a school; public comments last, with LLM moderation and
+            a legal (defamation, GDPR) review before launch. Every new user table is
+            backed up and covered by the restore test.
+
 - [ ] **P3.3 README as shop window.** Screenshots/GIF, 7-stage pipeline architecture
       diagram, decisions-and-trade-offs section (JSONB, calendar-year age logic,
       GeoJSON-first geocoding), test count + CI badge. Move SearXNG troubleshooting
