@@ -83,6 +83,25 @@ when the user explicitly asks for that.
    latest commit has not been reviewed. After merging, verify that the merge commit contains
    the exact PR-head tree and that post-merge `main` CI passes.
 
+## Big changes (always loop Mike in)
+
+The target is hands-off delivery (`docs/GO_LIVE_PLAN.md` P3.2): once stage B's protections
+are in place, a PR that passes CI, the reviewer agent and the UI agent auto-merges and
+deploys. Until then, step 8's self-merge lane applies. In both regimes, these changes
+**always** go to Mike with the PR URL and, where it helps, a short manual test to try:
+
+- Destructive or non-expand/contract migrations.
+- The publish boundary: new or changed response fields, gates, allowlists, and turning on
+  auto-publish for a field family.
+- Auth, security, credentials and secrets.
+- Infrastructure that is destroyed or replaced (a Terraform plan with deletions).
+- Anything that raises the monthly running cost.
+- Privacy: new data collected about users, analytics, or third-party scripts.
+- The checks themselves: CI workflows, gate or circuit-breaker thresholds, the reference
+  set, `AGENTS.md` and `skills/`. An agent must never loosen a check to get its PR through.
+
+A data-refresh run that trips a circuit breaker also goes to Mike; normal runs do not.
+
 ## Usage discipline
 
 - **Wait for reviews or CI in one background command** that exits when the
