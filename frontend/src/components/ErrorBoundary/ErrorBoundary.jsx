@@ -1,4 +1,5 @@
 import React from 'react'
+import { languageFromPath, languagePath } from '../../utils/languageUrl'
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -55,7 +56,7 @@ class ErrorBoundary extends React.Component {
               {/* Action Buttons */}
               <div className="flex gap-3 w-full">
                 <button
-                  onClick={() => window.location.href = '/'}
+                  onClick={() => window.location.href = languagePath('/', languageFromPath(window.location.pathname))}
                   className="flex-1 px-6 py-3 bg-primary-700 text-white rounded-lg hover:bg-primary-800 transition-colors font-medium"
                 >
                   Go to Home

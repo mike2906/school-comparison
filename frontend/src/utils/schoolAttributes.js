@@ -13,12 +13,7 @@ function isObject(value) {
 }
 
 function getPreferredLocale(locale) {
-  if (locale) {
-    return String(locale).toLowerCase().startsWith('en') ? 'en' : 'bg'
-  }
-  if (typeof localStorage === 'undefined') return 'bg'
-  const raw = localStorage.getItem('language') || 'bg'
-  return raw.toLowerCase().startsWith('en') ? 'en' : 'bg'
+  return String(locale || '').toLowerCase().startsWith('en') ? 'en' : 'bg'
 }
 
 export function normalizeSchoolAttributes(rawAttributes, attributesI18n, locale) {

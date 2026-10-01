@@ -14,8 +14,11 @@ Read the root `AGENTS.md` first. This file adds what you need before changing an
    `{"bg": ..., "en": ...}`). Display the version for the user's language.
 3. **AI summaries** arrive per language in `summary_i18n`; pick by locale.
 4. **Domain terms** have dedicated keys (see root `AGENTS.md` → Domain terms).
-5. Language preference is stored in `localStorage` under `language`
-   (`src/i18n/index.js`). Default: Bulgarian.
+5. The URL decides the language: Bulgarian at `/`, English under `/en/`
+   (`src/utils/languageUrl.js`). There is no browser detection and no saved preference.
+   The router runs under the language's basename, so write links and `navigate()` calls
+   without a prefix (`/schools/12`); they stay in the current language. Switching language
+   is a full navigation to the other prefix (`LanguageToggle`).
 
 ```jsx
 <button>Search Schools</button>          // bad
