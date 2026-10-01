@@ -1,0 +1,5 @@
+# Copy to terraform.tfvars (gitignored). None of these is a secret; the API token comes
+# from the environment (see README.md).
+account_id = ""
+zone_id    = ""
+api_ipv4   = ""

@@ -63,6 +63,7 @@ services:
       - "${HTTPS_PORT:-443}:443"
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./deploy/cloudflare-proxies.caddy:/etc/caddy/cloudflare-proxies.caddy:ro
       - ${ORIGIN_CERT_DIR:-./deploy/certs}:/certs:ro
       - caddy_data:/data
       - caddy_config:/config

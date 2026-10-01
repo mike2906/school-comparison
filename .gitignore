@@ -73,3 +73,10 @@ build/
 # Celery
 celerybeat-schedule
 celerybeat.pid
+
+# Terraform (state is in HCP Terraform; tfvars hold account IDs and the server IP)
+infra/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfplan

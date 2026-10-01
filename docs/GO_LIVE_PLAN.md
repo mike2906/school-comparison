@@ -2002,12 +2002,15 @@ the session scratchpad only.
         data is therefore a *published snapshot*, separate from future user data
         (sign-in, comments), which is the only data needing real production backups.
       - Hybrid hosting: Cloudflare Pages serves the frontend and prerendered school pages;
-        one Hetzner VPS runs FastAPI, Postgres and Caddy in Docker. A fully static build
+        one OVHcloud VPS runs FastAPI, Postgres and Caddy in Docker (OVH instead of
+        Hetzner since 2026-10-01: Hetzner's cheap tier is unorderable and the next is
+        about EUR 12/month; OVH VPS-1 is EUR 4.49 ex VAT, monthly). A fully static build
         (no API) was considered and rejected because writes and a scheduled pipeline are
         planned, and it would mean porting the server-side filters to JS.
       - Not OCI Always Free for production: idle always-on instances can be reclaimed, A1
         capacity is not guaranteed, and it means running on Arm64. OCI stays an option
         for the stateless pipeline worker (stage D) if multi-cloud practice is wanted.
+        Reconsidered on 2026-10-01 when the host moved to OVH, and passed over again.
       - Out of scope until a real need appears: Kubernetes, a separate staging VM,
         self-hosted analytics, dashboards-as-code.
 
@@ -2062,9 +2065,27 @@ the session scratchpad only.
             through Caddy (Terraform); the image is 1.7 GB because it carries the
             scraping dependencies (playwright, scipy, litellm), so move those to a
             dependency group when image pulls start to matter.
-      - [ ] Terraform (or OpenTofu): the Hetzner server and firewall, the Cloudflare DNS
-            zone, the Pages project, and crawler settings (check that Cloudflare's AI-crawler
-            blocking matches the intended `robots.txt`).
+      - [ ] Terraform: the Cloudflare DNS records, TLS mode, Origin CA certificate, the
+            Pages project, and crawler settings; the server and its firewall by script.
+            **Config merged 2026-10-01, not applied yet** (tick when Mike has ordered the
+            VPS and applied; steps in `infra/README.md`). Terraform 1.16 with state in
+            HCP Terraform (local execution) manages Cloudflare only (`infra/`). The OVH
+            VPS is ordered by hand: the OVH provider can order one, but a changed image
+            reinstalls it and the SSH key needs an image ID that exists only after the
+            order. `deploy/bootstrap.sh` sets the host up (Docker, key-only SSH,
+            unattended upgrades) and `deploy/firewall.sh`, reapplied by a systemd unit at
+            boot, limits 443 to Cloudflare's IPv4 ranges and closes 80; OVH's edge
+            firewall was rejected (IPv4 only, 20 rules, blind to traffic from inside
+            OVH). Caddy's ports bind IPv4 only. Caddy takes the client address from
+            `CF-Connecting-IP` on connections from Cloudflare and passes it to the API.
+            The Origin CA key is made locally and only its signing request reaches
+            Terraform. Pages is a Direct Upload project (CD builds and uploads; it cannot
+            later become Git-connected). Crawlers: training is `disallow` (robots.txt
+            only) through Bot Preference Sync, which replaced managed robots.txt in
+            September 2026; nothing is blocked at the edge. The provider cannot yet set
+            the sync switch itself (cloudflare/terraform-provider-cloudflare#7385), so it
+            is checked in the dashboard. The site launches on `schooldecider.com`; the
+            switch to `.bg` is one variable plus the list in `infra/README.md`.
       - [ ] GitHub Actions CD: build images to GHCR, deploy the API to the VPS and the
             frontend to Pages on merge; post-deploy smoke tests; automatic rollback to
             the previous image tag if they fail.
