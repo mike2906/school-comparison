@@ -58,11 +58,13 @@ Type=oneshot
 RemainAfterExit=yes
 ExecStart=/usr/local/sbin/schooldecider-firewall
 
+# RequiredBy: if the rules cannot be applied, Docker does not start (closed, not open).
 [Install]
-WantedBy=multi-user.target docker.service
+WantedBy=multi-user.target
+RequiredBy=docker.service
 UNIT
 systemctl daemon-reload
-systemctl enable schooldecider-firewall.service
+systemctl reenable schooldecider-firewall.service
 systemctl restart schooldecider-firewall.service
 
 echo "bootstrap done; log in again for the docker group to apply to $login_user"

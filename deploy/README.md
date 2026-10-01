@@ -29,7 +29,9 @@ build the image on the host: `dc build api`.
 whenever Docker restarts: port 443 accepts only Cloudflare's IPv4 ranges
 (`cloudflare-proxies.caddy`), port 80 is closed, SSH stays open (keys only). Keep
 `HTTP_PORT=0.0.0.0:80` and `HTTPS_PORT=0.0.0.0:443` in `deploy/.env` so nothing is
-published over IPv6, which the firewall does not cover. When Cloudflare's ranges change
+published over IPv6, which the firewall does not cover. Docker requires the firewall
+service: if the rules cannot be applied, Docker does not start and the API is down
+rather than exposed (`systemctl status schooldecider-firewall`). When Cloudflare's ranges change
 (`terraform plan` in `infra/` fails), update the file, then:
 
 ```bash
