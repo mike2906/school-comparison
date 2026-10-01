@@ -1,11 +1,22 @@
-from fastapi import FastAPI
+import asyncio
+import logging
+
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.responses import JSONResponse
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
+from app.database import get_db
+from app.models.school import School
 from app.routers import schools, compare, countries
 
+logger = logging.getLogger(__name__)
 settings = get_settings()
+
+READINESS_TIMEOUT_SECONDS = 3.0
 
 app = FastAPI(
     title="School Comparison API",
@@ -32,3 +43,22 @@ app.include_router(compare.router, prefix="/compare", tags=["compare"])
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
+
+
+@app.get("/ready")
+async def readiness_check(db: AsyncSession = Depends(get_db)):
+    """Ready only when the DB answers and a school snapshot is loaded.
+
+    `/health` is liveness (no dependencies). An unreachable DB, a missing schema and an
+    empty `schools` table all return 503, without error detail.
+    """
+    try:
+        school_id = await asyncio.wait_for(
+            db.scalar(select(School.id).limit(1)), timeout=READINESS_TIMEOUT_SECONDS
+        )
+    except Exception:
+        logger.exception("Readiness check failed")
+        school_id = None
+    if school_id is None:
+        return JSONResponse(status_code=503, content={"status": "not_ready"})
+    return {"status": "ready"}

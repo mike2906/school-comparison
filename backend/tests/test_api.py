@@ -72,6 +72,30 @@ class TestHealthEndpoint:
         assert response.status_code == 200
         assert response.json() == {"status": "healthy"}
 
+    @pytest.mark.asyncio
+    async def test_ready_with_schools(self, client, sample_schools):
+        response = await client.get("/ready")
+        assert response.status_code == 200
+        assert response.json() == {"status": "ready"}
+
+    @pytest.mark.asyncio
+    async def test_not_ready_without_schools(self, client):
+        response = await client.get("/ready")
+        assert response.status_code == 503
+        assert response.json() == {"status": "not_ready"}
+
+    @pytest.mark.asyncio
+    async def test_not_ready_when_db_fails(self, client, db_session, sample_schools, monkeypatch):
+        async def fail(*args, **kwargs):
+            raise OSError("connection refused: secret-host")
+
+        monkeypatch.setattr(db_session, "scalar", fail)
+        response = await client.get("/ready")
+        assert response.status_code == 503
+        assert response.json() == {"status": "not_ready"}
+        # Liveness has no dependencies.
+        assert (await client.get("/health")).status_code == 200
+
 
 class TestSchoolsEndpoint:
     @pytest.mark.asyncio

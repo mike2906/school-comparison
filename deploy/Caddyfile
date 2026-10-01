@@ -1,0 +1,13 @@
+# Reverse proxy for the API. Hostname and certificate source come from deploy/.env:
+#   production: CADDY_TLS="/certs/origin.pem /certs/origin.key" (Cloudflare Origin CA)
+#   local:      CADDY_TLS=internal (Caddy's own local CA)
+{$API_HOST} {
+	tls {$CADDY_TLS}
+
+	log {
+		output stdout
+		format json
+	}
+
+	reverse_proxy api:8000
+}

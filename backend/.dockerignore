@@ -1,0 +1,8 @@
+# Allowlist: only what the API image needs. Keeps .env, tests and local data out.
+*
+!pyproject.toml
+!uv.lock
+!alembic.ini
+!alembic
+!app
+**/__pycache__

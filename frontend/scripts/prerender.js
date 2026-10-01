@@ -89,6 +89,10 @@ async function main() {
   const origin = siteOrigin(env.VITE_SITE_ORIGIN)
   const apiUrl = env.PRERENDER_API_URL
   if (!apiUrl && strict) throw new Error('PRERENDER_API_URL must be set for a production build')
+  // The production host does not proxy `/api`, so the browser needs an absolute API URL.
+  if (strict && !/^https:\/\//.test(env.VITE_API_BASE || '')) {
+    throw new Error('VITE_API_BASE must be set to an https URL for a production build')
+  }
 
   const { schools, listedIds } = apiUrl ? await fetchSchools(apiUrl) : { schools: [], listedIds: new Set() }
   const template = await readFile(path.join(DIST, 'index.html'), 'utf8')
