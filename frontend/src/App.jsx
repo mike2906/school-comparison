@@ -9,23 +9,39 @@ import ComparePage from './components/ComparePage/ComparePage'
 import AboutPage from './components/AboutPage/AboutPage'
 import NotFoundPage from './components/NotFoundPage/NotFoundPage'
 import CompareBar from './components/CompareBar/CompareBar'
-import { alternateLinks, languageBasename, languageFromPath } from './utils/languageUrl'
+import {
+  DEFAULT_SITE_ORIGIN,
+  alternateLinks,
+  canonicalUrl,
+  hasCanonical,
+  languageBasename,
+  languageFromPath,
+} from './utils/languageUrl'
 
 // The language is fixed for the lifetime of the document: switching it is a full
 // navigation to the other prefix (see LanguageToggle), which is why links and
 // navigate() calls can stay unprefixed under the basename.
 const LANGUAGE = languageFromPath(window.location.pathname)
 
-// hreflang needs absolute URLs. schooldecider.bg is the planned primary domain.
-const SITE_ORIGIN = import.meta.env.VITE_SITE_ORIGIN || 'https://schooldecider.bg'
+// Canonical and hreflang need absolute URLs.
+const SITE_ORIGIN = import.meta.env.VITE_SITE_ORIGIN || DEFAULT_SITE_ORIGIN
 
+// The prerendered HTML already carries the canonical and hreflang links of the page that
+// was loaded (scripts/prerender.js); this keeps them in step with client-side navigation.
 // `pathname` here is the route path: the router has already stripped the basename.
 function useLanguageHead() {
   const { pathname } = useLocation()
 
   useEffect(() => {
     document.documentElement.lang = LANGUAGE
-    document.head.querySelectorAll('link[rel="alternate"][hreflang]').forEach((link) => link.remove())
+    document.head
+      .querySelectorAll('link[rel="canonical"], link[rel="alternate"][hreflang]')
+      .forEach((link) => link.remove())
+    if (!hasCanonical(pathname)) return
+    const canonical = document.createElement('link')
+    canonical.rel = 'canonical'
+    canonical.href = canonicalUrl(pathname, LANGUAGE, SITE_ORIGIN)
+    document.head.appendChild(canonical)
     for (const { hreflang, href } of alternateLinks(pathname, SITE_ORIGIN)) {
       const link = document.createElement('link')
       link.rel = 'alternate'

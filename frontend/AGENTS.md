@@ -56,5 +56,13 @@ basemaps need an API key, passed as `?key=` from `VITE_CARTO_API_KEY` (see
 The key ships in the browser bundle, so it is not a secret: restrict it to our domains in
 the CARTO dashboard instead.
 
+**Prerendering** — `npm run build` runs `scripts/prerender.js` after Vite: it writes a real
+HTML file per valid URL and language (title, description, canonical, hreflang, Open Graph,
+a small static content block), plus `sitemap.xml`, `robots.txt` and the 404 pages. The
+builders are in `src/prerender/pages.js`; school data comes from the public API
+(`PRERENDER_API_URL`). Because a top-level `404.html` ends the host's SPA fallback, **a new
+route needs an entry in `fixedPages`** or it will return 404 in production. Deploys use
+`npm run build:production`, which fails rather than ship without school pages.
+
 **Pricing display** — show each price's `source` (official / scraped_website / forum /
 not_found) in the UI.

@@ -1,0 +1,8 @@
+# `/` is an alias of the results page; the query string is carried over.
+/ /search 301
+/en/ /en/search 301
+
+# The school whose id is 404 cannot live at schools/404.html (that name is the directory's
+# not-found page), so its URL is rewritten to the file the prerender writes instead.
+/schools/404 /schools/school-404 200
+/en/schools/404 /en/schools/school-404 200

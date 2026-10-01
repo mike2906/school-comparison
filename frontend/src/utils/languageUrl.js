@@ -10,6 +10,10 @@
 
 export const DEFAULT_LANGUAGE = 'bg'
 
+// schooldecider.bg is the planned primary domain; a production build must set
+// VITE_SITE_ORIGIN explicitly (see scripts/prerender.js).
+export const DEFAULT_SITE_ORIGIN = 'https://schooldecider.bg'
+
 const LANGUAGE_PREFIXES = { bg: '', en: '/en' }
 
 export const URL_LANGUAGES = Object.keys(LANGUAGE_PREFIXES)
@@ -28,6 +32,19 @@ export function languageBasename(language) {
 export function languagePath(routePath, language) {
   const path = routePath && routePath.startsWith('/') ? routePath : `/${routePath || ''}`
   return `${LANGUAGE_PREFIXES[language] ?? ''}${path}`
+}
+
+/**
+ * Route paths that carry a canonical URL and hreflang alternates. Unknown URLs and the
+ * per-visitor compare page are `noindex` and carry neither.
+ */
+export function hasCanonical(routePath) {
+  return /^\/(search|about|schools\/\d+)$/.test(routePath || '')
+}
+
+/** Absolute canonical URL of a route path in the given language. */
+export function canonicalUrl(routePath, language, origin) {
+  return `${String(origin || '').replace(/\/+$/, '')}${languagePath(routePath, language)}`
 }
 
 /** Reciprocal hreflang alternates (absolute URLs) for a route path; x-default is Bulgarian. */

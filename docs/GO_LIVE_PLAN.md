@@ -2027,11 +2027,24 @@ the session scratchpad only.
             runtime from `VITE_SITE_ORIGIN`; the prerender item moves them into the
             static HTML, adds canonical URLs, and must route `/en/*` explicitly once a
             top-level 404 page ends the host's SPA fallback.
-      - [ ] Prerender school pages at build time with a per-page title, meta description,
+      - [x] Prerender school pages at build time with a per-page title, meta description,
             canonical URL and Open Graph tags; `sitemap.xml`, `robots.txt`, real 404s.
             Descriptive slugs are welcome but not a launch blocker; keep numeric IDs
             stable. State-school pages lead with official NVO results. Pages whose
             content is thin get `noindex` rather than being padded.
+            **Done 2026-10-01:** `frontend/scripts/prerender.js` stamps the built
+            `index.html` per URL and language (no SSR), reading schools from the public
+            API (`PRERENDER_API_URL`). A school page is indexable with NVO results, a
+            published price, or a Bulgarian summary of 300+ characters; otherwise
+            `noindex, follow` and left out of the sitemap (launch DB: 261 indexable, 424
+            thin, no summaries published yet; the 77 published schools outside Sofia keep
+            a working page but are `noindex`). `/` and `/en/` 301 to the results page
+            (`public/_redirects`, query string kept); unknown URLs get a real 404 in the
+            right language. `robots.txt` carries `search=yes, ai-input=yes, ai-train=no,
+            use=reference`. Left for later items: CD must run `npm run build:production`
+            (fails without the API URL, an https origin, or schools) and rebuild after
+            each data publish; Cloudflare's managed robots.txt adds per-crawler training
+            opt-outs and "block AI bots" stays off (Terraform); no `og:image` yet.
       - [ ] Dockerfile for the API, a production compose file with Caddy (HTTPS), a
             readiness endpoint that checks the DB, container log rotation.
       - [ ] Terraform (or OpenTofu): the Hetzner server and firewall, the Cloudflare DNS
