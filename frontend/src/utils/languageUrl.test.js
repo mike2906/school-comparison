@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { alternateLinks, languageBasename, languageFromPath, languagePath } from './languageUrl.js'
+import { alternateLinks, canonicalUrl, hasCanonical, languageBasename, languageFromPath, languagePath } from './languageUrl.js'
 
 test('languageFromPath reads english only from a whole /en segment', () => {
   assert.equal(languageFromPath('/en'), 'en')
@@ -59,4 +59,14 @@ test('alternateLinks tolerate a trailing slash on the origin', () => {
     alternateLinks('/', 'https://example.bg/').map((link) => link.href),
     ['https://example.bg/', 'https://example.bg/en/', 'https://example.bg/']
   )
+})
+
+test('canonicalUrl is the absolute URL in the page language', () => {
+  assert.equal(canonicalUrl('/schools/12', 'en', 'https://example.test/'), 'https://example.test/en/schools/12')
+  assert.equal(canonicalUrl('/search', 'bg', 'https://example.test'), 'https://example.test/search')
+})
+
+test('hasCanonical covers indexable routes only', () => {
+  for (const path of ['/search', '/about', '/schools/12']) assert.equal(hasCanonical(path), true)
+  for (const path of ['/', '/compare', '/nope', '/schools/abc', '/schools/12/x']) assert.equal(hasCanonical(path), false)
 })

@@ -673,5 +673,16 @@
     "dataNote": "Found a mistake in a school’s details? Tell us and we’ll check it.",
     "reportError": "Report a data error",
     "reportSubject": "Data error report"
+  },
+  "seo": {
+    "searchTitle": "Schools and kindergartens in Sofia: map and comparison",
+    "searchDescription": "Find and compare kindergartens and schools in Sofia: map, official NVO exam results, private school fees and admissions.",
+    "schoolFacts": "{{type}} · {{level}}",
+    "nvoHeading": "Official NVO results",
+    "nvoLine": "{{exam}} {{year}}: {{scores}}",
+    "nvoBulgarian": "Bulgarian {{value}}",
+    "nvoMath": "maths {{value}}",
+    "tuitionOne": "Tuition: about €{{min}} a year",
+    "tuitionRange": "Tuition: €{{min}}–€{{max}} a year"
   }
 }
