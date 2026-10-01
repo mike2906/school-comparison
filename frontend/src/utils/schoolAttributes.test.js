@@ -43,13 +43,13 @@ test('treats en-US as english', () => {
   assert.deepEqual(normalized.facilities, ['Library'])
 })
 
-test('falls back to localStorage when no locale is passed', () => {
+test('defaults to bulgarian when no locale is passed, ignoring any saved preference', () => {
   const previousStorage = global.localStorage
   global.localStorage = { getItem: () => 'en' }
 
   const normalized = normalizeSchoolAttributes(ATTRIBUTES, ATTRIBUTES_I18N)
 
-  assert.deepEqual(normalized.facilities, ['Library'])
+  assert.deepEqual(normalized.facilities, ATTRIBUTES_I18N.bg.facilities)
   global.localStorage = previousStorage
 })
 

@@ -2018,9 +2018,15 @@ the session scratchpad only.
             `contact@schooldecider.com` to Mike's inbox (catch-all off). `schooldecider.bg`
             is the planned primary site (Bulgarian at `/`, English under `/en/`), with the
             .com redirecting to it; the .bg is still to be registered via SuperHosting.BG.
-      - [ ] Language URLs: Bulgarian at `/`, English under `/en/`; reciprocal `hreflang`.
-            Today the language comes only from browser detection, so English is never
-            indexed.
+      - [x] Language URLs: Bulgarian at `/`, English under `/en/`; reciprocal `hreflang`.
+            **Done 2026-10-01:** the URL is the only source of the language
+            (`frontend/src/utils/languageUrl.js`): the router runs under a `/en` basename
+            for English, the toggle is a plain link to the same page under the other
+            prefix, and browser detection and the saved preference are gone (no automatic
+            redirect). `html lang` and the `bg`/`en`/`x-default` alternates are set at
+            runtime from `VITE_SITE_ORIGIN`; the prerender item moves them into the
+            static HTML, adds canonical URLs, and must route `/en/*` explicitly once a
+            top-level 404 page ends the host's SPA fallback.
       - [ ] Prerender school pages at build time with a per-page title, meta description,
             canonical URL and Open Graph tags; `sitemap.xml`, `robots.txt`, real 404s.
             Descriptive slugs are welcome but not a launch blocker; keep numeric IDs
