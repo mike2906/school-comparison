@@ -13,7 +13,7 @@ alias dc='docker compose --env-file deploy/.env -f docker-compose.prod.yml'
 
 ## Host setup (once)
 
-The host is an OVH VPS (Ubuntu 24.04) reached as `ubuntu@<ip>` with your SSH key.
+The host is an OVH VPS (Ubuntu 26.04) reached as `ubuntu@<ip>` with your SSH key.
 `bootstrap.sh` installs Docker, turns off SSH password logins, enables unattended
 security updates and installs the firewall service. It is safe to run again.
 
