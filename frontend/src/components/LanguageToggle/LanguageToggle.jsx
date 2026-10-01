@@ -30,6 +30,8 @@ function LanguageToggle({ compact = false }) {
             lang={lang}
             hrefLang={lang}
             aria-current={isActive ? 'true' : undefined}
+            // The current language is already showing: don't reload the page for it.
+            onClick={isActive ? (event) => event.preventDefault() : undefined}
             className={`${compact ? 'min-w-[40px] h-10 px-2' : 'min-w-[40px] h-9 px-3'} inline-flex items-center justify-center rounded-md text-xs font-semibold transition-colors ${
               isActive
                 ? 'bg-white text-neutral-900 shadow-sm'
