@@ -1,6 +1,16 @@
 # Reverse proxy for the API. Hostname and certificate source come from deploy/.env:
 #   production: CADDY_TLS="/certs/origin.pem /certs/origin.key" (Cloudflare Origin CA)
 #   local:      CADDY_TLS=internal (Caddy's own local CA)
+{
+	# Cloudflare is the only proxy in front: take the client address from its
+	# CF-Connecting-IP header, and only when the connection comes from a Cloudflare range.
+	servers {
+		import cloudflare-proxies.caddy
+		trusted_proxies_strict
+		client_ip_headers CF-Connecting-IP
+	}
+}
+
 {$API_HOST} {
 	tls {$CADDY_TLS}
 
@@ -9,5 +19,8 @@
 		format json
 	}
 
-	reverse_proxy api:8000
+	reverse_proxy api:8000 {
+		# One address, not the client-supplied chain: uvicorn logs the leftmost entry.
+		header_up X-Forwarded-For {client_ip}
+	}
 }

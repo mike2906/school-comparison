@@ -11,6 +11,37 @@ cp deploy/.env.example deploy/.env    # then fill it in; POSTGRES_PASSWORD: open
 alias dc='docker compose --env-file deploy/.env -f docker-compose.prod.yml'
 ```
 
+## Host setup (once)
+
+The host is an OVH VPS (Ubuntu 24.04) reached as `ubuntu@<ip>` with your SSH key.
+`bootstrap.sh` installs Docker, turns off SSH password logins, enables unattended
+security updates and installs the firewall service. It is safe to run again.
+
+```bash
+scp deploy/bootstrap.sh deploy/firewall.sh deploy/cloudflare-proxies.caddy ubuntu@<ip>:
+ssh ubuntu@<ip> sudo bash bootstrap.sh
+```
+
+Then log in again, clone the repo to `~/schooldecider` and continue below. Until CD exists,
+build the image on the host: `dc build api`.
+
+**Firewall.** `schooldecider-firewall.service` runs `firewall.sh` at boot (before Docker starts) and
+whenever Docker restarts: port 443 accepts only Cloudflare's IPv4 ranges
+(`cloudflare-proxies.caddy`), port 80 is closed, SSH stays open (keys only). The compose
+file publishes Caddy's ports on IPv4 only, so nothing is reachable over IPv6, which the
+firewall does not cover. Docker requires the firewall
+service: if the rules cannot be applied, Docker does not start and the API is down
+rather than exposed (`systemctl status schooldecider-firewall`). When Cloudflare's ranges change
+(`terraform plan` in `infra/` fails), update the file, then:
+
+```bash
+scp deploy/cloudflare-proxies.caddy ubuntu@<ip>:
+ssh ubuntu@<ip> 'sudo install -m 0644 cloudflare-proxies.caddy /etc/schooldecider/ && sudo systemctl restart schooldecider-firewall'
+# and, after pulling the repo on the host: dc restart caddy
+```
+
+Check from any machine that is not Cloudflare: `curl -m 5 -k https://<ip>/` must time out.
+
 ## First start (order matters)
 
 1. **Start Postgres:** `dc up -d postgres`
@@ -36,7 +67,8 @@ step 3, then step 4.
 Production: the `api` DNS record is proxied by Cloudflare with SSL mode Full (strict), and
 Caddy serves a Cloudflare Origin CA certificate. Put `origin.pem` and `origin.key` in
 `deploy/certs/` (gitignored, mounted read-only) and keep
-`CADDY_TLS=/certs/origin.pem /certs/origin.key`.
+`CADDY_TLS=/certs/origin.pem /certs/origin.key`. The certificate comes from Terraform and
+the key never leaves your machine and the server: `infra/README.md`.
 
 Local: `API_HOST=api.localhost`, `CADDY_TLS=internal`, and optionally `HTTP_PORT=8081`,
 `HTTPS_PORT=8443`. Caddy signs with its own CA, so use `curl -k`:
@@ -49,4 +81,7 @@ curl -k --resolve api.localhost:8443:127.0.0.1 https://api.localhost:8443/ready
 
 Each container's stdout/stderr is kept by Docker's `json-file` driver, rotated at 10 MB
 with 5 compressed files per container. Caddy writes JSON access logs to stdout:
-`dc logs -f caddy`.
+`dc logs -f caddy`. Caddy takes the visitor's address from Cloudflare's `CF-Connecting-IP`
+header (only on connections from a Cloudflare range) and passes it to the API, so
+`client_ip` in Caddy's log and the address in the API's log are the visitor's;
+`remote_ip` is Cloudflare's.
