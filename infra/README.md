@@ -58,9 +58,10 @@ scp ~/.config/schooldecider/origin.pem ~/.config/schooldecider/origin.key ubuntu
 ```
 
 After the first apply, check in the dashboard:
-- AI Crawl Control: **Bot Preference Sync is on** (the provider cannot set
-  `bot_preference_sync_enabled` yet, cloudflare/terraform-provider-cloudflare#7385) and
-  shows Search allow, Agent allow, Training disallow.
+- AI Crawl Control: Search allow, Agent allow, Training disallow, and **Bot Preference
+  Sync on. If it is off, turn it on there**: the provider cannot set
+  `bot_preference_sync_enabled` yet (cloudflare/terraform-provider-cloudflare#7385), and
+  without it the preferences are not written into the served `robots.txt`.
 - `https://schooldecider.com/robots.txt` (once the site is deployed) starts with
   Cloudflare's block of training-crawler `Disallow` lines, followed by ours.
 
@@ -79,7 +80,7 @@ restart the firewall and Caddy (`deploy/README.md`).
 | builds and uptime checks reach the API | `fight_mode = false` |
 
 `is_robots_txt_managed` is the older managed-robots.txt switch, replaced by Bot Preference
-Sync in September 2026; it is left unset.
+Sync in September 2026; it is set to `false`, which is also the provider's default.
 
 ## Switching to schooldecider.bg
 
@@ -90,8 +91,8 @@ Sync in September 2026; it is left unset.
 2. Server `deploy/.env`: `API_HOST`, `ALLOWED_ORIGINS`.
 3. Frontend build (CD): `VITE_SITE_ORIGIN`, `VITE_API_BASE`, `PRERENDER_API_URL`, then
    rebuild: canonical, `hreflang` and sitemap URLs all come from `VITE_SITE_ORIGIN`.
-   `frontend/.env.example` and `DEFAULT_SITE_ORIGIN` in `frontend/src/utils/languageUrl.js`
-   name the domain too.
+   Also change `frontend/.env.example` and `DEFAULT_SITE_ORIGIN` in
+   `frontend/src/utils/languageUrl.js`.
 4. Keep the `.com` zone (Email Routing) and add a `.com` → `.bg` redirect rule there. This
    config manages one zone, so that needs a second small set of resources.
 5. The API token must cover the new zone. Re-verify Search Console and Bing, resubmit the

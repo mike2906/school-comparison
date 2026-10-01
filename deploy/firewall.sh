@@ -3,7 +3,7 @@
 # Docker publishes ports through its own iptables rules, ahead of ufw, so the rules go
 # in Docker's DOCKER-USER chain. Idempotent; schooldecider-firewall.service (installed by
 # deploy/bootstrap.sh) runs it at boot, before Docker starts, and whenever Docker restarts. IPv4 only: Caddy's
-# ports are bound to 0.0.0.0 in deploy/.env, so nothing is published over IPv6.
+# ports are bound to 0.0.0.0 in docker-compose.prod.yml, so nothing is published over IPv6.
 set -euo pipefail
 
 RANGES_FILE="${1:-/etc/schooldecider/cloudflare-proxies.caddy}"

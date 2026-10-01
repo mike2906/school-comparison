@@ -121,8 +121,8 @@ resource "cloudflare_ruleset" "redirects" {
 # blocked at the edge. `ai_training = "disallow"` is the robots.txt-only choice; Bot
 # Preference Sync publishes it as per-crawler Disallow lines ahead of our robots.txt.
 # Not set here: `bot_preference_sync_enabled` (the provider cannot manage it yet,
-# cloudflare/terraform-provider-cloudflare#7385; check it is on in the dashboard) and
-# `is_robots_txt_managed` (the older switch it replaced).
+# cloudflare/terraform-provider-cloudflare#7385; turn it on in the dashboard).
+# `is_robots_txt_managed` is the older switch it replaced; the provider defaults it to false.
 resource "cloudflare_bot_management" "crawlers" {
   zone_id = var.zone_id
 
@@ -130,8 +130,9 @@ resource "cloudflare_bot_management" "crawlers" {
   aisearch    = "disabled"
   ai_user     = "disabled"
 
-  ai_bots_protection = "disabled"
-  crawler_protection = "disabled"
+  is_robots_txt_managed = false
+  ai_bots_protection    = "disabled"
+  crawler_protection    = "disabled"
   # Off so the Pages build and uptime checks can call the API unchallenged.
   fight_mode = false
 }

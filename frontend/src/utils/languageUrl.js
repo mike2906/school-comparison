@@ -10,9 +10,9 @@
 
 export const DEFAULT_LANGUAGE = 'bg'
 
-// schooldecider.bg is the planned primary domain; a production build must set
+// The launch domain (schooldecider.bg is the planned primary); a production build must set
 // VITE_SITE_ORIGIN explicitly (see scripts/prerender.js).
-export const DEFAULT_SITE_ORIGIN = 'https://schooldecider.bg'
+export const DEFAULT_SITE_ORIGIN = 'https://schooldecider.com'
 
 const LANGUAGE_PREFIXES = { bg: '', en: '/en' }
 
