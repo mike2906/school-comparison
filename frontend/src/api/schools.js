@@ -1,6 +1,5 @@
+import { API_BASE } from './base'
 import { cachedJson, peekCachedJson } from './cache'
-
-const API_BASE = '/api'
 
 function buildSchoolsUrl({
   countryCode = 'bg',

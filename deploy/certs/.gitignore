@@ -1,0 +1,3 @@
+# Cloudflare Origin CA certificate and key live here on the server only.
+*
+!.gitignore

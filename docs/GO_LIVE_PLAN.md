@@ -2045,8 +2045,23 @@ the session scratchpad only.
             (fails without the API URL, an https origin, or schools) and rebuild after
             each data publish; Cloudflare's managed robots.txt adds per-crawler training
             opt-outs and "block AI bots" stays off (Terraform); no `og:image` yet.
-      - [ ] Dockerfile for the API, a production compose file with Caddy (HTTPS), a
+      - [x] Dockerfile for the API, a production compose file with Caddy (HTTPS), a
             readiness endpoint that checks the DB, container log rotation.
+            **Done 2026-10-01:** `backend/Dockerfile` (uv from the lockfile, non-root),
+            `docker-compose.prod.yml` (Caddy → API → Postgres; only Caddy publishes
+            ports; no Redis/Celery) and the runbook `deploy/README.md`. The browser calls
+            the API on its own host, `https://api.<site>` (`VITE_API_BASE`, CORS via
+            `ALLOWED_ORIGINS`); the Pages build reads the same URL (`PRERENDER_API_URL`).
+            Caddy serves a Cloudflare Origin CA certificate behind the proxied record
+            (Full strict); hostname and certificate come from `deploy/.env`. `/ready`
+            returns 503 unless the DB answers and `schools` has rows; `/health` stays
+            dependency-free. Migrations are an explicit step after the snapshot restore,
+            never on API start. Logs: `json-file`, 10 MB × 5 per container. Verified on a
+            local run only; nothing is live. Left for later items: the Origin CA
+            certificate, limiting 443 to Cloudflare IPs and passing the real client IP
+            through Caddy (Terraform); the image is 1.7 GB because it carries the
+            scraping dependencies (playwright, scipy, litellm), so move those to a
+            dependency group when image pulls start to matter.
       - [ ] Terraform (or OpenTofu): the Hetzner server and firewall, the Cloudflare DNS
             zone, the Pages project, and crawler settings (check that Cloudflare's AI-crawler
             blocking matches the intended `robots.txt`).

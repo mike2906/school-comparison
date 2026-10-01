@@ -1,8 +1,8 @@
 import { createContext, useContext, useState, useEffect } from 'react'
 
-const CountryContext = createContext(null)
+import { API_BASE } from '../api/base'
 
-const API_BASE = '/api'
+const CountryContext = createContext(null)
 
 export function CountryProvider({ children, defaultCountry = 'bg' }) {
   const [config, setConfig] = useState(null)
