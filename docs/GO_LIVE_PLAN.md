@@ -2086,6 +2086,9 @@ the session scratchpad only.
             the sync switch itself (cloudflare/terraform-provider-cloudflare#7385), so it
             is checked in the dashboard. The site launches on `schooldecider.com`; the
             switch to `.bg` is one variable plus the list in `infra/README.md`.
+            **2026-10-01:** VPS-1 ordered (Warsaw, Ubuntu 26.04) and `bootstrap.sh` run
+            on it: Docker 29.8, firewall service active (443 limited to 15 Cloudflare
+            ranges, 80 closed). Cloudflare apply still to do.
       - [ ] GitHub Actions CD: build images to GHCR, deploy the API to the VPS and the
             frontend to Pages on merge; post-deploy smoke tests; automatic rollback to
             the previous image tag if they fail.

@@ -13,7 +13,7 @@ Monthly cost: everything here is on Cloudflare's free plan. The only paid item i
 
 ## One-time setup (human)
 
-1. **API host.** Order an OVH VPS-1 (monthly, Ubuntu 24.04, your SSH public key). Note its
+1. **API host.** Order an OVH VPS-1 (monthly, Ubuntu 26.04, your SSH public key). Note its
    IPv4 address. Then set it up and deploy the stack: `deploy/README.md`.
 2. **Terraform 1.16** on your machine.
 3. **HCP Terraform** (free plan): create an organization and a workspace named

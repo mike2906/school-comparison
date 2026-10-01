@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# One-time setup of the API host (Ubuntu 24.04), safe to run again. From your machine:
+# One-time setup of the API host (Ubuntu 26.04), safe to run again. From your machine:
 #   scp deploy/bootstrap.sh deploy/firewall.sh deploy/cloudflare-proxies.caddy ubuntu@<ip>:
 #   ssh ubuntu@<ip> sudo bash bootstrap.sh
 # Installs Docker, turns off SSH password logins, enables unattended security updates and
