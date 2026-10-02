@@ -82,7 +82,8 @@ smoke_site() {
 	[ "$urls" -ge 200 ] || fail "sitemap.xml lists $urls URLs, expected at least 200"
 	ok "sitemap.xml lists $urls URLs"
 
-	school="$(grep -o "<loc>$site/schools/[0-9]*</loc>" <<< "$sitemap" | head -n 1 | sed 's/<[^>]*>//g')"
+	# -m 1, not `| head`: with pipefail, head closing the pipe early fails the script.
+	school="$(grep -m 1 -o "<loc>$site/schools/[0-9]*</loc>" <<< "$sitemap" | sed 's/<[^>]*>//g')"
 	[ -n "$school" ] || fail "sitemap.xml lists no school page"
 	page="$(body "$school")"
 	grep -q 'rel="canonical"' <<< "$page" || fail "$school has no canonical link"
@@ -100,7 +101,19 @@ smoke_site() {
 
 case "${1:-}" in
 	api) smoke_api "${2:?API origin}" "${3:?site origin}" ;;
-	site) smoke_site "${2:?site origin}" "${3:-}" ;;
+	site)
+		# A new deployment can answer 522 on some URLs for a few seconds; a real fault stays.
+		for attempt in 1 2 3; do
+			# Not `if (...)`: that would switch off `set -e` inside the checks.
+			set +e
+			(set -e; smoke_site "${2:?site origin}" "${3:-}")
+			result=$?
+			set -e
+			[ "$result" != 0 ] || exit 0
+			[ "$attempt" = 3 ] || { echo "retrying in 15 seconds"; sleep 15; }
+		done
+		exit 1
+		;;
 	*)
 		echo "usage: deploy/smoke.sh api <API origin> <site origin> | site <site origin> [commit sha]" >&2
 		exit 1
