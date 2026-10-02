@@ -111,6 +111,11 @@ uv run alembic upgrade head
 Autogenerate misses some changes (data moves, Postgres enum values, renames). Add
 hand-written operations (`op.execute`, etc.) for those when necessary, and verify the
 migration (upgrade and downgrade on a local DB) before applying it anywhere shared.
+CD runs `alembic upgrade head` before it starts the new image, and its rollback restores
+the previous image without downgrading. A migration must therefore leave the schema usable
+by the previous image: add in one release, remove in a later one (expand, then contract).
+One that cannot is a big change: it goes to Mike and is deployed by hand
+(`deploy/README.md`).
 
 **Geocoding** — GeoJSON keys schools by **province/municipality**: Sofia is `СТОЛИЧНА`, not
 `СОФИЯ` (DB stores `city="sofia"`; the provider normalizes). Read `skills/geocoding/SKILL.md`
