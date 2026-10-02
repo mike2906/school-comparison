@@ -10,6 +10,7 @@ set -euo pipefail
 IMAGE_REPO=ghcr.io/mike2906/school-comparison-api
 APP_DIR="${SCHOOLDECIDER_DIR:-$HOME/schooldecider}"
 RELEASE_FILE=deploy/release.env
+SELF="$(readlink -f "${BASH_SOURCE[0]}")"
 # Files CD does not change. A commit that changes one is refused until the host is synced.
 CONFIG_FILES=(docker-compose.prod.yml deploy/Caddyfile deploy/cloudflare-proxies.caddy)
 
@@ -60,7 +61,7 @@ deploy() {
 	local sha="${1:-}" hash="${2:-}" new current previous token=""
 	[[ "$sha" =~ ^[0-9a-f]{40}$ ]] || die "expected a full commit sha"
 	[[ "$hash" =~ ^[0-9a-f]{64}$ ]] || die "expected a config hash"
-	if [ "$hash" != "$(cat "${CONFIG_FILES[@]}" "$0" | sha256sum | cut -d' ' -f1)" ]; then
+	if [ "$hash" != "$(cat "${CONFIG_FILES[@]}" "$SELF" | sha256sum | cut -d' ' -f1)" ]; then
 		die "the compose file, Caddy files or this script differ from the commit; sync the host first (deploy/README.md)"
 	fi
 
@@ -125,7 +126,8 @@ fi
 
 cd "$APP_DIR"
 exec 9> deploy/.deploy.lock
-flock -n 9 || die "another deploy is running"
+# Runs are serialized by the workflow; wait for one that was cancelled mid-way to finish.
+flock -w 300 9 || die "another deploy is still running"
 # First run: the image built on the host by hand is both the running one and the fallback.
 [ -f "$RELEASE_FILE" ] || write_release schooldecider-api:local schooldecider-api:local
 

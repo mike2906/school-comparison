@@ -71,8 +71,9 @@ and step 4 with the new image.
 
 ## Continuous deployment
 
-`.github/workflows/deploy.yml` runs on every push to `main`: tests first, then, unless the
-push changed only docs, skills or Terraform, a release.
+`.github/workflows/deploy.yml` runs on every push to `main`: tests first, then a release, unless
+the changes since the commit the live site was built from (`version.txt`) are only docs,
+skills or Terraform.
 
 1. **API** (only when `backend/`, `deploy/`, the compose file or the workflow changed): the
    image is built on the runner and pushed to `ghcr.io/mike2906/school-comparison-api:<commit>`

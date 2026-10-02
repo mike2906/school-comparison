@@ -49,7 +49,6 @@ jobs:
       - name: Decide
         id: decide
         env:
-          BEFORE: ${{ github.event.before }}
           FRONTEND_ONLY: ${{ inputs.frontend_only }}
         run: |
           if [ "$GITHUB_REF" != refs/heads/main ]; then
@@ -58,18 +57,22 @@ jobs:
           fi
           release=true
           api=true
+          # Compare with the commit the live site was built from, not with the previous
+          # push: a run that was superseded in the queue or rolled back is then included.
+          live="$(curl -fsS -m 20 -H 'Cache-Control: no-cache' "$SITE_ORIGIN/version.txt?cb=$GITHUB_SHA" 2>/dev/null || true)"
           if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
             if [ "$FRONTEND_ONLY" = true ]; then api=false; fi
-          elif git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+          elif [[ "$live" =~ ^[0-9a-f]{40}$ ]] && git cat-file -e "$live^{commit}" 2>/dev/null; then
             # Docs, skills and Terraform do not reach production through this workflow.
-            if git diff --quiet "$BEFORE" "$GITHUB_SHA" -- . ':(exclude)docs' ':(exclude)skills' ':(exclude)infra' ':(exclude,glob)**/*.md'; then
+            if git diff --quiet "$live" "$GITHUB_SHA" -- . ':(exclude)docs' ':(exclude)skills' ':(exclude)infra' ':(exclude,glob)**/*.md'; then
               release=false
             fi
             # The API restarts only when something that reaches the host changed.
-            if git diff --quiet "$BEFORE" "$GITHUB_SHA" -- backend docker-compose.prod.yml deploy .github/workflows/deploy.yml ':(exclude,glob)**/*.md'; then
+            if git diff --quiet "$live" "$GITHUB_SHA" -- backend docker-compose.prod.yml deploy .github/workflows/deploy.yml ':(exclude,glob)**/*.md'; then
               api=false
             fi
           fi
+          echo "Live site: ${live:-unknown}; release=$release api=$api"
           echo "release=$release" >> "$GITHUB_OUTPUT"
           echo "api=$api" >> "$GITHUB_OUTPUT"
 
