@@ -2065,10 +2065,9 @@ the session scratchpad only.
             through Caddy (Terraform); the image is 1.7 GB because it carries the
             scraping dependencies (playwright, scipy, litellm), so move those to a
             dependency group when image pulls start to matter.
-      - [ ] Terraform: the Cloudflare DNS records, TLS mode, Origin CA certificate, the
+      - [x] Terraform: the Cloudflare DNS records, TLS mode, Origin CA certificate, the
             Pages project, and crawler settings; the server and its firewall by script.
-            **Config merged 2026-10-01, not applied yet** (tick when Mike has ordered the
-            VPS and applied; steps in `infra/README.md`). Terraform 1.16 with state in
+            **Done 2026-10-02** (config merged 2026-10-01; steps in `infra/README.md`). Terraform 1.16 with state in
             HCP Terraform (local execution) manages Cloudflare only (`infra/`). The OVH
             VPS is ordered by hand: the OVH provider can order one, but a changed image
             reinstalls it and the SSH key needs an image ID that exists only after the
@@ -2088,7 +2087,13 @@ the session scratchpad only.
             switch to `.bg` is one variable plus the list in `infra/README.md`.
             **2026-10-01:** VPS-1 ordered (Warsaw, Ubuntu 26.04) and `bootstrap.sh` run
             on it: Docker 29.8, firewall service active (443 limited to 15 Cloudflare
-            ranges, 80 closed). Cloudflare apply still to do.
+            ranges, 80 closed).
+            **2026-10-02:** applied to Cloudflare, 10 resources, and a second plan
+            reports no changes. `www` redirects to the apex; Email Routing's MX records
+            are intact; the origin does not answer on 443 from outside Cloudflare. The
+            apex and `api.` answer 522/521 until the frontend and the API stack are
+            deployed (next: the certificate onto the host and `deploy/README.md`, then
+            the CD item). Still to check in the dashboard: Bot Preference Sync is on.
       - [ ] GitHub Actions CD: build images to GHCR, deploy the API to the VPS and the
             frontend to Pages on merge; post-deploy smoke tests; automatic rollback to
             the previous image tag if they fail.
