@@ -2101,11 +2101,10 @@ the session scratchpad only.
             ready; CORS allows only `https://schooldecider.com`; ports 80 and 443 do
             not answer from outside Cloudflare; Caddy logs the visitor's address as
             `client_ip`. The apex stays 522 until CD uploads the frontend.
-      - [ ] GitHub Actions CD: build images to GHCR, deploy the API to the VPS and the
+      - [x] GitHub Actions CD: build images to GHCR, deploy the API to the VPS and the
             frontend to Pages on merge; post-deploy smoke tests; automatic rollback to
             the previous image tag if they fail.
-            **Workflow written 2026-10-02, not yet run** (tick after the first green
-            release): `.github/workflows/deploy.yml` tests every push to `main` and,
+            **Done 2026-10-02:** `.github/workflows/deploy.yml` tests every push to `main` and,
             unless only docs, skills or Terraform changed, releases. The API image is
             built on the runner and pushed to GHCR; a deploy SSH key that can run only
             `deploy/deploy.sh` on the host pulls it with the job's token, migrates,
@@ -2119,6 +2118,13 @@ the session scratchpad only.
             (a `production` environment limited to `main` needs GitHub Pro for a
             private repo); the 1.7 GB image is unchanged (dependency split is a
             separate PR). Human setup: `deploy/README.md`, Continuous deployment.
+            **First releases 2026-10-02:** the first run (#142) deployed the API and
+            uploaded the site, then failed the site smoke test on a single 522 seconds
+            after the first Pages deployment went live, and rolled the API back as
+            designed. #143 made the site checks retry and fixed a SIGPIPE in
+            `smoke.sh`; its release (8c8cc36) was green end to end.
+            `https://schooldecider.com` is live and the API runs the GHCR image. The
+            hand-built `schooldecider-api:local` image is still on the host.
       - [ ] CARTO key restricted to the domain, with visible attribution
             (`VITE_CARTO_API_KEY` is needed in the frontend build). Official NVO source
             credited on the About page.
