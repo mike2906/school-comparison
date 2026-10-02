@@ -3,7 +3,8 @@
 # CD's SSH key may run (forced command in authorized_keys). Runbook: deploy/README.md
 #   deploy <commit sha> <config hash>   pull the commit's image (GHCR token on stdin),
 #                                       migrate, restart the API, check /ready
-#   rollback <commit sha>               back to the previous image, if <commit sha> is running
+#   rollback <commit sha>               back to the previous image, if the last deploy
+#                                       moved the host to <commit sha>
 # The running and previous images are recorded in deploy/release.env, which compose reads.
 set -euo pipefail
 
@@ -85,6 +86,9 @@ deploy() {
 
 	if [ "$new" != "$current" ]; then
 		write_release "$new" "$current"
+	else
+		# Already running: this run changes nothing, so it leaves nothing to roll back.
+		write_release "$new" "$new"
 	fi
 	dc up -d
 	if ! wait_ready "$new"; then
@@ -111,7 +115,10 @@ rollback() {
 		echo "deploy: running $current, not $sha; nothing to roll back"
 		return 0
 	fi
-	[ "$previous" != "$current" ] || die "no previous image recorded"
+	if [ "$previous" = "$current" ]; then
+		echo "deploy: $sha was already running before this release; nothing to roll back"
+		return 0
+	fi
 	write_release "$previous" "$previous"
 	dc up -d
 	wait_ready "$previous" || die "rolled back to $previous, but it is not ready"

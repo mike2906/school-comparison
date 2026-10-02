@@ -60,16 +60,30 @@ jobs:
           # Compare with the commit the live site was built from, not with the previous
           # push: a run that was superseded in the queue or rolled back is then included.
           live="$(curl -fsS -m 20 -H 'Cache-Control: no-cache' "$SITE_ORIGIN/version.txt?cb=$GITHUB_SHA" 2>/dev/null || true)"
+          known=false
+          api_changed=true
+          if [[ "$live" =~ ^[0-9a-f]{40}$ ]] && git cat-file -e "$live^{commit}" 2>/dev/null; then
+            known=true
+            # The API restarts only when something that reaches the host changed.
+            if git diff --quiet "$live" "$GITHUB_SHA" -- backend docker-compose.prod.yml deploy .github/workflows/deploy.yml ':(exclude,glob)**/*.md'; then
+              api_changed=false
+            fi
+          fi
           if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
-            if [ "$FRONTEND_ONLY" = true ]; then api=false; fi
-          elif [[ "$live" =~ ^[0-9a-f]{40}$ ]] && git cat-file -e "$live^{commit}" 2>/dev/null; then
+            if [ "$FRONTEND_ONLY" = true ]; then
+              # The site's version.txt also stands for the API. Uploading a site built from
+              # this commit without its API changes would mark them as live.
+              if [ "$api_changed" = true ]; then
+                echo "::error::The API is behind this commit (or the live commit is unknown); run a full release"
+                exit 1
+              fi
+              api=false
+            fi
+          elif [ "$known" = true ]; then
+            api=$api_changed
             # Docs, skills and Terraform do not reach production through this workflow.
             if git diff --quiet "$live" "$GITHUB_SHA" -- . ':(exclude)docs' ':(exclude)skills' ':(exclude)infra' ':(exclude,glob)**/*.md'; then
               release=false
-            fi
-            # The API restarts only when something that reaches the host changed.
-            if git diff --quiet "$live" "$GITHUB_SHA" -- backend docker-compose.prod.yml deploy .github/workflows/deploy.yml ':(exclude,glob)**/*.md'; then
-              api=false
             fi
           fi
           echo "Live site: ${live:-unknown}; release=$release api=$api"

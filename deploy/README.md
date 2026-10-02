@@ -99,6 +99,8 @@ this is deployed by hand, with a `pg_dump` first, and its PR says so.
 
 **After a data publish** (a new snapshot restored on the host), rebuild the site: Actions →
 Deploy → Run workflow → `frontend_only`. Or `gh workflow run deploy.yml -f frontend_only=true`.
+It refuses to run when the API is behind the commit (a failed or rolled-back release): run
+a full release instead (the same, without `frontend_only`).
 
 **What CD does not change.** `docker-compose.prod.yml`, `deploy/Caddyfile`,
 `deploy/cloudflare-proxies.caddy` and `deploy/deploy.sh` itself. A commit that changes one
@@ -111,7 +113,7 @@ ssh ubuntu@<ip> 'sudo install -m 0755 ~/schooldecider/deploy/deploy.sh /usr/loca
 ```
 
 Then rerun the failed workflow. By hand on the host, `schooldecider-deploy rollback <commit>`
-goes back to the previous image if `<commit>` is the one running.
+goes back to the previous image if the last deploy moved the host to `<commit>`.
 
 ### One-time setup (human)
 
