@@ -22,8 +22,12 @@ scp deploy/bootstrap.sh deploy/firewall.sh deploy/cloudflare-proxies.caddy ubunt
 ssh ubuntu@<ip> sudo bash bootstrap.sh
 ```
 
-Then log in again, clone the repo to `~/schooldecider` and continue below. Until CD exists,
-build the image on the host: `dc build api`.
+Then put the code in `~/schooldecider` and continue below. The repo is private, so until
+CD exists send a copy instead of cloning, and build the image on the host (`dc build api`):
+
+```bash
+git archive --format=tar main | ssh ubuntu@<ip> 'mkdir -p ~/schooldecider && tar -x -C ~/schooldecider'
+```
 
 **Firewall.** `schooldecider-firewall.service` runs `firewall.sh` at boot (before Docker starts) and
 whenever Docker restarts: port 443 accepts only Cloudflare's IPv4 ranges

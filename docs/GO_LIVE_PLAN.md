@@ -2093,7 +2093,14 @@ the session scratchpad only.
             are intact; the origin does not answer on 443 from outside Cloudflare. The
             apex and `api.` answer 522/521 until the frontend and the API stack are
             deployed (next: the certificate onto the host and `deploy/README.md`, then
-            the CD item). Still to check in the dashboard: Bot Preference Sync is on.
+            the CD item). Bot Preference Sync turned on in the dashboard by Mike.
+            **API live 2026-10-02:** code sent to the host as `git archive main`
+            (65a91de; the repo is private, so no GitHub credentials on the host), image
+            built there, launch-DB snapshot restored (785 schools), all three
+            `PUBLISH_*` flags false. `https://api.schooldecider.com/ready` returns
+            ready; CORS allows only `https://schooldecider.com`; ports 80 and 443 do
+            not answer from outside Cloudflare; Caddy logs the visitor's address as
+            `client_ip`. The apex stays 522 until CD uploads the frontend.
       - [ ] GitHub Actions CD: build images to GHCR, deploy the API to the VPS and the
             frontend to Pages on merge; post-deploy smoke tests; automatic rollback to
             the previous image tag if they fail.
