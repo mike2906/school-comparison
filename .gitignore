@@ -74,6 +74,10 @@ build/
 celerybeat-schedule
 celerybeat.pid
 
+# Written on the API host by deploy/deploy.sh
+deploy/release.env
+deploy/.deploy.lock
+
 # Terraform (state is in HCP Terraform; tfvars hold account IDs and the server IP)
 infra/.terraform/
 *.tfstate

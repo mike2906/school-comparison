@@ -1,0 +1,219 @@
+name: Deploy
+
+# Every push to main is tested; a push that changes more than docs is then released: the
+# API image to the host, the site to Cloudflare Pages. The API and the site are one
+# release: if any later step fails, both go back to what was live. Runbook: deploy/README.md
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      frontend_only:
+        description: Rebuild and upload the site only (after a data publish)
+        type: boolean
+        default: false
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions: {}
+
+env:
+  IMAGE: ghcr.io/mike2906/school-comparison-api
+  SITE_ORIGIN: https://schooldecider.com
+  API_ORIGIN: https://api.schooldecider.com
+  PAGES_PROJECT: schooldecider
+
+jobs:
+  ci:
+    name: CI
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+
+  changes:
+    name: What to release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      release: ${{ steps.decide.outputs.release }}
+      api: ${{ steps.decide.outputs.api }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Decide
+        id: decide
+        env:
+          BEFORE: ${{ github.event.before }}
+          FRONTEND_ONLY: ${{ inputs.frontend_only }}
+        run: |
+          if [ "$GITHUB_REF" != refs/heads/main ]; then
+            echo "::error::Only main is deployed"
+            exit 1
+          fi
+          release=true
+          api=true
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
+            if [ "$FRONTEND_ONLY" = true ]; then api=false; fi
+          elif git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            # Docs, skills and Terraform do not reach production through this workflow.
+            if git diff --quiet "$BEFORE" "$GITHUB_SHA" -- . ':(exclude)docs' ':(exclude)skills' ':(exclude)infra' ':(exclude,glob)**/*.md'; then
+              release=false
+            fi
+            # The API restarts only when something that reaches the host changed.
+            if git diff --quiet "$BEFORE" "$GITHUB_SHA" -- backend docker-compose.prod.yml deploy .github/workflows/deploy.yml ':(exclude,glob)**/*.md'; then
+              api=false
+            fi
+          fi
+          echo "release=$release" >> "$GITHUB_OUTPUT"
+          echo "api=$api" >> "$GITHUB_OUTPUT"
+
+  build-api:
+    name: Build API image
+    needs: [ci, changes]
+    if: needs.changes.outputs.release == 'true' && needs.changes.outputs.api == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Log in to GHCR
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+
+      - name: Build and push
+        run: |
+          docker buildx create --use
+          docker buildx build backend \
+            --tag "$IMAGE:$GITHUB_SHA" \
+            --cache-from "type=registry,ref=$IMAGE:buildcache" \
+            --cache-to "type=registry,ref=$IMAGE:buildcache,mode=max" \
+            --push
+
+  deploy-api:
+    name: Deploy API
+    needs: build-api
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    env:
+      DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+      DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Deploy to the host
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: deploy/remote.sh deploy
+
+      - name: Smoke test
+        run: deploy/smoke.sh api "$API_ORIGIN" "$SITE_ORIGIN"
+
+      - name: Roll back
+        if: failure() || cancelled()
+        run: |
+          deploy/remote.sh rollback
+          echo "API deploy failed; the host runs the previous image. Migrations stay applied." >> "$GITHUB_STEP_SUMMARY"
+
+  frontend:
+    name: Build and deploy site
+    needs: [ci, changes, deploy-api]
+    # Runs after a successful API deploy, or without one when the API did not change.
+    if: >-
+      ${{ !cancelled() && needs.ci.result == 'success' && needs.changes.outputs.release == 'true'
+      && (needs.changes.outputs.api != 'true' || needs.deploy-api.result == 'success') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: frontend
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_PAGES_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        env:
+          VITE_SITE_ORIGIN: ${{ env.SITE_ORIGIN }}
+          VITE_API_BASE: ${{ env.API_ORIGIN }}
+          PRERENDER_API_URL: ${{ env.API_ORIGIN }}
+          # Public (it ships in the bundle); restricted to our domains at CARTO.
+          VITE_CARTO_API_KEY: ${{ vars.VITE_CARTO_API_KEY }}
+        run: |
+          npm run build:production
+          grep -rqF "$API_ORIGIN" dist/assets || { echo "::error::The bundle does not call $API_ORIGIN"; exit 1; }
+          echo "$GITHUB_SHA" > dist/version.txt
+
+      - name: Note the live deployment
+        id: live
+        run: |
+          id="$(curl -fsS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/$PAGES_PROJECT" \
+            | jq -r '.result.canonical_deployment.id // empty')"
+          echo "id=$id" >> "$GITHUB_OUTPUT"
+
+      - name: Upload to Pages
+        id: upload
+        run: >-
+          npx --yes wrangler@4.147.0 pages deploy dist
+          --project-name "$PAGES_PROJECT" --branch main
+          --commit-hash "$GITHUB_SHA" --commit-dirty=true
+
+      - name: Smoke test
+        working-directory: .
+        run: deploy/smoke.sh site "$SITE_ORIGIN" "$GITHUB_SHA"
+
+      - name: Roll back Pages
+        if: (failure() || cancelled()) && steps.upload.conclusion != 'skipped' && steps.live.outputs.id != ''
+        env:
+          LIVE_ID: ${{ steps.live.outputs.id }}
+        run: |
+          curl -fsS -X POST -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/$PAGES_PROJECT/deployments/$LIVE_ID/rollback" \
+            | jq '{success, errors}'
+          echo "Site deploy failed; Pages serves the previous deployment again." >> "$GITHUB_STEP_SUMMARY"
+
+  rollback-api:
+    name: Roll back API
+    needs: [deploy-api, frontend]
+    # One release: the API this run deployed does not stay without its site.
+    if: ${{ always() && needs.deploy-api.result == 'success' && needs.frontend.result != 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+      DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Roll back
+        run: |
+          deploy/remote.sh rollback
+          echo "The site was not deployed, so the API went back to the previous image. Migrations stay applied." >> "$GITHUB_STEP_SUMMARY"

@@ -11,6 +11,14 @@ cp deploy/.env.example deploy/.env    # then fill it in; POSTGRES_PASSWORD: open
 alias dc='docker compose --env-file deploy/.env -f docker-compose.prod.yml'
 ```
 
+Once CD has deployed, the running image is recorded in `deploy/release.env` (written by
+`deploy/deploy.sh`) and the alias on the host must read it too, or `dc up` goes back to the
+hand-built image:
+
+```bash
+alias dc='docker compose --env-file deploy/.env --env-file deploy/release.env -f docker-compose.prod.yml'
+```
+
 ## Host setup (once)
 
 The host is an OVH VPS (Ubuntu 26.04) reached as `ubuntu@<ip>` with your SSH key.
@@ -22,8 +30,9 @@ scp deploy/bootstrap.sh deploy/firewall.sh deploy/cloudflare-proxies.caddy ubunt
 ssh ubuntu@<ip> sudo bash bootstrap.sh
 ```
 
-Then put the code in `~/schooldecider` and continue below. The repo is private, so until
-CD exists send a copy instead of cloning, and build the image on the host (`dc build api`):
+Then put the code in `~/schooldecider` and continue below. The repo is private, so send a
+copy instead of cloning. For the first start, build the image on the host (`dc build api`);
+after that CD delivers images (see Continuous deployment):
 
 ```bash
 git archive --format=tar main | ssh ubuntu@<ip> 'mkdir -p ~/schooldecider && tar -x -C ~/schooldecider'
@@ -57,8 +66,88 @@ Check from any machine that is not Cloudflare: `curl -m 5 -k https://<ip>/` must
 4. **Start the rest:** `dc up -d`
 5. **Check:** `curl https://<API_HOST>/ready` returns `{"status":"ready"}`.
 
-Migrations never run on API start. For a later release: `dc pull` (or `dc build`), then
-step 3, then step 4.
+Migrations never run on API start. Later releases are deployed by CD, which runs step 3
+and step 4 with the new image.
+
+## Continuous deployment
+
+`.github/workflows/deploy.yml` runs on every push to `main`: tests first, then, unless the
+push changed only docs, skills or Terraform, a release.
+
+1. **API** (only when `backend/`, `deploy/`, the compose file or the workflow changed): the
+   image is built on the runner and pushed to `ghcr.io/mike2906/school-comparison-api:<commit>`
+   (private). The runner then calls the host over SSH. Its key can run one command there,
+   `deploy/deploy.sh`, which pulls the image with the job's own short-lived token (never
+   stored on the host), runs `alembic upgrade head`, restarts the API and waits for
+   `/ready`. If the new container is not ready within a minute it restarts the previous
+   image. `deploy/smoke.sh api` then checks the API from outside.
+2. **Site**: `npm run build:production` against the live API, upload to the Pages project
+   with wrangler, then `deploy/smoke.sh site`. If that fails, Pages is rolled back to the
+   deployment that was live before.
+3. **One release.** If the site step fails after this run deployed the API, the API also
+   goes back to the previous image.
+
+The host keeps two release images, the running one and the rollback target
+(`deploy/release.env`), and removes older ones after each successful deploy.
+
+**Migrations and rollback.** A rollback changes the image only; migrations stay applied
+and there is no automatic downgrade or backup. So every migration must leave the schema
+usable by the previous image (expand first, contract in a later release): add columns and
+tables, do not drop or rename what the running code reads. A migration that cannot meet
+this is deployed by hand, with a `pg_dump` first, and its PR says so.
+
+**After a data publish** (a new snapshot restored on the host), rebuild the site: Actions →
+Deploy → Run workflow → `frontend_only`. Or `gh workflow run deploy.yml -f frontend_only=true`.
+
+**What CD does not change.** `docker-compose.prod.yml`, `deploy/Caddyfile`,
+`deploy/cloudflare-proxies.caddy` and `deploy/deploy.sh` itself. A commit that changes one
+of them is refused by the host until you sync it:
+
+```bash
+git archive --format=tar main | ssh ubuntu@<ip> 'tar -x -C ~/schooldecider'
+ssh ubuntu@<ip> 'sudo install -m 0755 ~/schooldecider/deploy/deploy.sh /usr/local/sbin/schooldecider-deploy'
+# then, if the compose file or a Caddy file changed: dc up -d
+```
+
+Then rerun the failed workflow. By hand on the host, `schooldecider-deploy rollback <commit>`
+goes back to the previous image if `<commit>` is the one running.
+
+### One-time setup (human)
+
+No command below prints a secret.
+
+1. **Deploy key**, without a passphrase, used by nothing else:
+   ```bash
+   ssh-keygen -t ed25519 -N '' -C schooldecider-cd -f ~/.config/schooldecider/cd_deploy_key
+   ```
+2. **Host:** sync the code and install the script (the two commands above), then allow the
+   key to run only that script (no shell, no forwarding, no file copy):
+   ```bash
+   printf 'restrict,command="/usr/local/sbin/schooldecider-deploy" %s\n' "$(cat ~/.config/schooldecider/cd_deploy_key.pub)" | ssh ubuntu@<ip> 'cat >> ~/.ssh/authorized_keys'
+   ssh -i ~/.config/schooldecider/cd_deploy_key -o IdentitiesOnly=yes ubuntu@<ip> id   # prints the script's usage line, not your uid
+   ```
+3. **Cloudflare token** for Pages only (My Profile → API Tokens → Create Custom Token):
+   Account → Cloudflare Pages → Edit, account resources limited to this account, no zone
+   permissions. This is a different token from Terraform's.
+4. **GitHub** (repository → Settings → Secrets and variables → Actions, or `gh`):
+   ```bash
+   gh secret set DEPLOY_SSH_KEY < ~/.config/schooldecider/cd_deploy_key
+   gh secret set CLOUDFLARE_PAGES_TOKEN        # paste the token at the prompt
+   gh variable set DEPLOY_HOST --body <ip>
+   gh variable set CLOUDFLARE_ACCOUNT_ID --body <account id>
+   gh variable set VITE_CARTO_API_KEY --body <key>   # optional; public, restricted at CARTO
+   ```
+   GHCR needs nothing: the workflow uses its own `GITHUB_TOKEN` (`packages: write` to
+   build, `packages: read` to deploy).
+
+The host's SSH public key is pinned in `deploy/ssh_host_key.pub`; the runner refuses any
+other. If the host is reinstalled, replace it (`ssh-keyscan -t ed25519 <ip>`, key type and
+key only, checked against the host's console).
+
+The two secrets are repository secrets, so a workflow on any branch pushed to this
+repository can read them. On a GitHub plan with environments for private repositories
+(Pro or higher), move them to a `production` environment limited to `main` and add
+`environment: production` to the `deploy-api`, `frontend` and `rollback-api` jobs.
 
 ## Endpoints
 

@@ -89,7 +89,8 @@ Sync in September 2026; it is set to `false`, which is also the provider's defau
    with that name first; if the plan does not replace the certificate, add
    `-replace=cloudflare_origin_ca_certificate.api`) and must be copied to the server again.
 2. Server `deploy/.env`: `API_HOST`, `ALLOWED_ORIGINS`.
-3. Frontend build (CD): `VITE_SITE_ORIGIN`, `VITE_API_BASE`, `PRERENDER_API_URL`, then
+3. Frontend build (CD): `SITE_ORIGIN` and `API_ORIGIN` in `.github/workflows/deploy.yml`
+   (they set `VITE_SITE_ORIGIN`, `VITE_API_BASE`, `PRERENDER_API_URL`), then
    rebuild: canonical, `hreflang` and sitemap URLs all come from `VITE_SITE_ORIGIN`.
    Also change `frontend/.env.example` and `DEFAULT_SITE_ORIGIN` in
    `frontend/src/utils/languageUrl.js`.

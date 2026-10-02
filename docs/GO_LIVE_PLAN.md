@@ -2104,6 +2104,21 @@ the session scratchpad only.
       - [ ] GitHub Actions CD: build images to GHCR, deploy the API to the VPS and the
             frontend to Pages on merge; post-deploy smoke tests; automatic rollback to
             the previous image tag if they fail.
+            **Workflow written 2026-10-02, not yet run** (tick after the first green
+            release): `.github/workflows/deploy.yml` tests every push to `main` and,
+            unless only docs, skills or Terraform changed, releases. The API image is
+            built on the runner and pushed to GHCR; a deploy SSH key that can run only
+            `deploy/deploy.sh` on the host pulls it with the job's token, migrates,
+            restarts the API and falls back to the previous image if `/ready` fails.
+            The site is built with `build:production` and uploaded with wrangler.
+            `deploy/smoke.sh` checks both; a failed site step rolls back Pages and the
+            API this run deployed (one release). Rollback is image-only, so migrations
+            must stay usable by the previous image (`backend/AGENTS.md`); stage B's
+            backup-before-migrate is still open. `frontend_only` rebuilds the site
+            after a data publish. Left open: the secrets are repository secrets
+            (a `production` environment limited to `main` needs GitHub Pro for a
+            private repo); the 1.7 GB image is unchanged (dependency split is a
+            separate PR). Human setup: `deploy/README.md`, Continuous deployment.
       - [ ] CARTO key restricted to the domain, with visible attribution
             (`VITE_CARTO_API_KEY` is needed in the frontend build). Official NVO source
             credited on the About page.
