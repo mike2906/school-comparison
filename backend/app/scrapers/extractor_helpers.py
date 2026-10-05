@@ -35,7 +35,7 @@ from app.utils.transliteration import transliterate_bulgarian
 
 _ACTIVE_RULES: contextvars.ContextVar[Any] = contextvars.ContextVar(
     "extraction_rules_module",
-    default=get_rules(None),
+    default=get_rules(None),  # noqa: B039  (a module, not a mutable container)
 )
 
 _DISPLAY_NAME_LOCATION_TOKENS = {"софия", "sofia", "град", "grad", "city"}

@@ -425,7 +425,7 @@ def check_price_row(row: PriceRow, page_text: str | None, school_family: str) ->
             (
                 ("|" not in _line_of(text, s) and not label_is_near(text, prices, s, l), _gap(s, l), s, l)
                 for s in spans
-                for l in labels
+                for l in labels  # noqa: E741
             ),
             key=lambda t: (t[0], t[1]),
         )

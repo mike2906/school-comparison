@@ -164,7 +164,7 @@ class BaseSourceAdapter(ABC):
                                 School.name_i18n[default_lang].as_string() == name_to_match,
                                 School.city == disc.city,
                                 SchoolLocation.district == district,
-                                SchoolLocation.is_primary == True,
+                                SchoolLocation.is_primary == True,  # noqa: E712  (SQL expression)
                             )
                         )
                     )
