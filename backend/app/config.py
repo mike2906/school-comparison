@@ -3,6 +3,13 @@ from pydantic import field_validator
 from pydantic_settings import BaseSettings
 
 
+# Sent by the crawler and by search requests. It names the site that runs the crawler so a
+# school's webmaster can tell who is fetching pages and how to reach us. The bot name comes
+# first because robots.txt matching uses the text before the first "/": with a "Mozilla/5.0"
+# prefix, a rule addressed to SchoolDeciderBot would not apply.
+CRAWLER_USER_AGENT = "SchoolDeciderBot/1.0 (+https://schooldecider.com)"
+
+
 class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/sofia_schools"

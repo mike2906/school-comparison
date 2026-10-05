@@ -16,7 +16,7 @@ from bs4 import BeautifulSoup
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import get_settings
+from app.config import CRAWLER_USER_AGENT, get_settings
 from app.models import School, ScrapeType, SourcePage
 from app.scrapers.base import BaseScraper
 from app.scrapers.url_validator import URLValidator
@@ -54,18 +54,6 @@ class WebsiteNavigator:
     PAGE_TIMEOUT_SECONDS = 30.0
     CRAWL_TIMEOUT_SECONDS = 120.0
     MAX_CONTENT_CHARS = 15000
-    RETRYABLE_CRAWL_ERROR_MARKERS = (
-        "timeout",
-        "timed out",
-        "net::err",
-        "captcha",
-        "cloudflare",
-        "blocked",
-        "access denied",
-        "too many requests",
-        "429",
-        "403",
-    )
 
     BOT_CHALLENGE_PATH_PREFIXES = (
         "/.well-known/sgcaptcha",
@@ -226,15 +214,15 @@ class WebsiteNavigator:
         self.bypass_cache = bypass_cache
         self.settings = get_settings()
 
-    def _build_browser_config(self, *, enable_stealth: bool = True) -> Any:
+    def _build_browser_config(self) -> Any:
         from crawl4ai import BrowserConfig  # type: ignore
 
+        # No stealth mode: the crawler identifies itself and does not hide that it is automated.
         return BrowserConfig(
             headless=True,
             verbose=False,
             ignore_https_errors=True,
-            enable_stealth=enable_stealth,
-            user_agent="Mozilla/5.0 (compatible; SchoolScraper/1.0; +https://kg.sofia.bg)",
+            user_agent=CRAWLER_USER_AGENT,
         )
 
     def _build_run_config(self, website_url: str) -> Any:
@@ -274,6 +262,7 @@ class WebsiteNavigator:
         return CrawlerRunConfig(
             cache_mode=CacheMode.BYPASS if self.bypass_cache else CacheMode.ENABLED,
             check_cache_freshness=True,
+            check_robots_txt=True,
             cache_validation_timeout=8.0,
             page_timeout=int(self.PAGE_TIMEOUT_SECONDS * 1000),
             wait_until="domcontentloaded",
@@ -697,38 +686,11 @@ class WebsiteNavigator:
         except TypeError:
             return [results_obj]
 
-    def _collect_failure_messages(self, results_obj: Any) -> list[str]:
-        messages: list[str] = []
-        for result in self._iter_results(results_obj):
-            if getattr(result, "success", False):
-                continue
-            error_message = getattr(result, "error_message", None)
-            if error_message:
-                messages.append(str(error_message))
-        return messages
-
-    def _should_retry_with_undetected(self, failure_messages: list[str]) -> bool:
-        for message in failure_messages:
-            lowered = message.lower()
-            if any(marker in lowered for marker in self.RETRYABLE_CRAWL_ERROR_MARKERS):
-                return True
-        return False
-
-    def _build_undetected_crawler(self, browser_config: Any) -> Any | None:
-        from crawl4ai import AsyncWebCrawler, UndetectedAdapter  # type: ignore
-        from crawl4ai.async_crawler_strategy import AsyncPlaywrightCrawlerStrategy  # type: ignore
-
-        strategy = AsyncPlaywrightCrawlerStrategy(
-            browser_config=browser_config,
-            browser_adapter=UndetectedAdapter(),
-        )
-        return AsyncWebCrawler(config=browser_config, crawler_strategy=strategy)
-
     async def discover_pages(self, website_url: str) -> tuple[str, list[NavigatedPage]]:
         from crawl4ai import AsyncWebCrawler  # type: ignore
 
         normalized_url = self._normalize_url(website_url)
-        browser_config = self._build_browser_config(enable_stealth=True)
+        browser_config = self._build_browser_config()
         run_config = self._build_run_config(normalized_url)
 
         async with AsyncWebCrawler(config=browser_config) as crawler:
@@ -741,32 +703,6 @@ class WebsiteNavigator:
             normalized_url=normalized_url,
             results_obj=results_obj,
         )
-        if any(self._is_extractable_page_content(page) for page in pages):
-            return final_url, pages
-
-        failure_messages = self._collect_failure_messages(results_obj)
-        if not self._should_retry_with_undetected(failure_messages):
-            return final_url, pages
-
-        try:
-            undetected_config = self._build_browser_config(enable_stealth=False)
-            undetected_crawler = self._build_undetected_crawler(undetected_config)
-            if undetected_crawler is None:
-                return final_url, pages
-            async with undetected_crawler as crawler:
-                retry_results = await asyncio.wait_for(
-                    crawler.arun(url=normalized_url, config=run_config),
-                    timeout=self.CRAWL_TIMEOUT_SECONDS,
-                )
-            retry_final_url, retry_pages = self._extract_pages_from_results(
-                normalized_url=normalized_url,
-                results_obj=retry_results,
-            )
-            if retry_pages:
-                return retry_final_url, self._dedupe_pages(pages + retry_pages)
-        except Exception as exc:
-            logger.warning("Undetected retry failed for %s: %s", normalized_url, exc)
-
         return final_url, pages
 
     def _extract_pages_from_results(
@@ -894,7 +830,7 @@ class WebsiteNavigator:
         if not website_urls:
             return {}
 
-        browser_config = self._build_browser_config(enable_stealth=True)
+        browser_config = self._build_browser_config()
         run_configs = [self._build_run_config(url) for url in website_urls]
         concurrency = max(1, int(max_concurrency))
         timeout_budget = max(

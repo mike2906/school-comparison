@@ -21,7 +21,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.config import get_settings
+from app.config import CRAWLER_USER_AGENT, get_settings
 from app.models import School, SourcePage, ScrapeType
 from app.scrapers.base import BaseScraper
 from app.scrapers.school_tokens import extract_school_name_tokens
@@ -292,7 +292,7 @@ class WebsiteDiscoverer:
     SEARCH_HEADERS = {
         # Brave can return unsupported brotli variants; identity is safest for parser mode.
         "Accept-Encoding": "identity",
-        "User-Agent": "Mozilla/5.0 (compatible; SchoolScraper/1.0; +https://kg.sofia.bg)",
+        "User-Agent": CRAWLER_USER_AGENT,
     }
 
     def __init__(self, country_code: str = "bg"):
