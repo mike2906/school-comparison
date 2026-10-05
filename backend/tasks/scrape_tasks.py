@@ -22,8 +22,8 @@ import asyncio
 import logging
 import random
 from typing import Optional
-from celery import group, chain
-from celery.exceptions import Retry
+
+from celery import chain, group
 
 from tasks import celery_app
 
@@ -180,9 +180,10 @@ def discover_websites_batch(
 
 async def _get_schools_for_website_discovery(country_code, city, limit):
     """Get school IDs that are eligible for website discovery."""
+    from sqlalchemy import select
+
     from app.database import async_session_maker
     from app.models import School
-    from sqlalchemy import select
 
     async with async_session_maker() as db:
         query = select(School.id).where(
@@ -286,9 +287,10 @@ def validate_urls_batch(
 
 async def _get_schools_for_url_validation(country_code, city, limit):
     """Get school IDs that need URL validation."""
+    from sqlalchemy import select
+
     from app.database import async_session_maker
     from app.models import School
-    from sqlalchemy import select
 
     async with async_session_maker() as db:
         query = select(School.id).where(
@@ -334,10 +336,12 @@ def validate_school_url(self, school_id: int, country_code: str = "bg"):
 
 async def _validate_school_url_async(school_id, country_code):
     """Async implementation of validate_school_url."""
+    from sqlalchemy import select
+
     from app.database import async_session_maker
     from app.models import School
-    from app.scrapers.url_validator import extract_validation_aliases, validate_school_url as validate_url
-    from sqlalchemy import select
+    from app.scrapers.url_validator import extract_validation_aliases
+    from app.scrapers.url_validator import validate_school_url as validate_url
 
     async with async_session_maker() as db:
         result = await db.execute(select(School).where(School.id == school_id))
@@ -412,9 +416,10 @@ def navigate_batch(
 
 async def _get_schools_for_navigation(country_code, city, limit, include_navigated: bool = False):
     """Get validated school IDs eligible for website navigation."""
+    from sqlalchemy import select
+
     from app.database import async_session_maker
     from app.models import School
-    from sqlalchemy import select
 
     async with async_session_maker() as db:
         statuses = ["validated", "navigated"] if include_navigated else ["validated"]
@@ -512,9 +517,10 @@ def extract_batch(
 
 async def _get_schools_for_extraction(country_code, city, limit):
     """Get school IDs eligible for extraction."""
+    from sqlalchemy import select
+
     from app.database import async_session_maker
     from app.models import School
-    from sqlalchemy import select
 
     async with async_session_maker() as db:
         # Retry failed extractions by default in next batch run
@@ -623,10 +629,11 @@ async def _get_schools_for_validation(
     force_validate: bool = False,
 ) -> list[int]:
     """Get school IDs eligible for Stage 6 deterministic validation."""
+    from sqlalchemy import select
+
     from app.database import async_session_maker
     from app.models import School
     from app.scrapers.validator import has_current_validation_report
-    from sqlalchemy import select
 
     async with async_session_maker() as db:
         query = select(School.id, School.attributes).where(
@@ -764,11 +771,12 @@ async def _sample_school_ids_for_spot_checks(
     sample_size: Optional[int],
 ) -> list[int]:
     """Choose already-validated school IDs for sampled spot-checks."""
+    from sqlalchemy import select
+
     from app.config import get_settings
     from app.database import async_session_maker
     from app.models import School
     from app.scrapers.validator import has_current_validation_report
-    from sqlalchemy import select
 
     configured_sample_size = int(get_settings().spot_check_sample_size)
     effective_sample_size = configured_sample_size if sample_size is None else int(sample_size)

@@ -22,7 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.config import CRAWLER_USER_AGENT, get_settings
-from app.models import School, SourcePage, ScrapeType
+from app.models import School, ScrapeType, SourcePage
 from app.scrapers.base import BaseScraper
 from app.scrapers.school_tokens import extract_school_name_tokens
 from app.scrapers.url_validator import URLValidator, extract_validation_aliases
@@ -1085,7 +1085,6 @@ class WebsiteDiscoverer:
             host = host[4:]
         path = (parsed.path or "").lower()
         query = (parsed.query or "").lower()
-        haystack = f"{host}{path}{query}"
 
         score = 0
         if source == "existing":

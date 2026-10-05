@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import String, Text, Integer, Boolean, DateTime, JSON, Float, ForeignKey
+from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -88,7 +88,7 @@ class SchoolLocationAgeGroupShift(Base):
 
 # Import for relationship type hints
 from app.models.country import Country
-from app.models.pricing import Pricing
 from app.models.exam_results import ExamResult
 from app.models.field_source import FieldSource
+from app.models.pricing import Pricing
 from app.models.source_page import SourcePage

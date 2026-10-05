@@ -1,7 +1,7 @@
 from functools import lru_cache
+
 from pydantic import field_validator
 from pydantic_settings import BaseSettings
-
 
 # Sent by the crawler and by search requests. It names the site that runs the crawler so a
 # school's webmaster can tell who is fetching pages and how to reach us. The bot name comes

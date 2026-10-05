@@ -10,7 +10,6 @@ A child born Dec 31, 2022 and one born Jan 1, 2022 both enter the same group in 
 """
 from typing import Optional
 
-
 # Default Bulgaria config for backwards compatibility
 _BG_AGE_GROUPS = [
     {"key": "nursery", "min_diff": 0, "max_diff": 2},

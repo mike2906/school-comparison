@@ -15,7 +15,6 @@ from app.services.identity_adjudication import (
     MAX_MATCHED_LINES_PER_PAGE,
     MAX_PAGES_PER_CASE,
     IdentityAdjudicationVerdict,
-    PageExcerpt,
     SiblingContext,
     adjudicate_case,
     apply_guards,

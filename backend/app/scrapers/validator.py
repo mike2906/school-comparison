@@ -18,17 +18,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import flag_modified
 
 from app.ai.client import calculate_cost, create_agent, extract_provider_cost_usd, get_model
-from app.scrapers.campus_sync import (
-    apply_campus_sync,
-    geocode_campus_locations,
-    remove_website_campus_data,
-)
-from app.utils.website_data import (
-    attributes_for_publication,
-    promote_validation_report,
-    record_validation_failure,
-)
-from app.services.provider_costs import execute_billable_request
 from app.config import get_settings
 from app.models.field_source import FieldSource, SourceType
 from app.models.pricing import PricePeriod, PriceSource, Pricing
@@ -43,7 +32,11 @@ from app.schemas.validation import (
     ValidationReport,
 )
 from app.scrapers import extractor_helpers as extraction_helpers
-from app.scrapers.summarizer import clear_summary_state
+from app.scrapers.campus_sync import (
+    apply_campus_sync,
+    geocode_campus_locations,
+    remove_website_campus_data,
+)
 from app.scrapers.price_evidence import (
     RULE_AMOUNT_NEAR_LABEL,
     RULE_DEPOSIT,
@@ -57,9 +50,16 @@ from app.scrapers.price_evidence import (
     shared_names,
 )
 from app.scrapers.shared_site_check import level_family, site_group_key
+from app.scrapers.summarizer import clear_summary_state
+from app.services.provider_costs import execute_billable_request
 from app.utils.academic_year import normalize_academic_year
 from app.utils.display_gating import DISPLAY_NAME_FIELD_PATH, admission_value_is_semantically_valid
 from app.utils.i18n_resolver import resolve_display_name_i18n, resolve_name_i18n
+from app.utils.website_data import (
+    attributes_for_publication,
+    promote_validation_report,
+    record_validation_failure,
+)
 
 logger = logging.getLogger(__name__)
 

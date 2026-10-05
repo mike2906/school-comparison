@@ -286,7 +286,7 @@ def _looks_like_secondary_header(row: list[str]) -> bool:
 def _expand_secondary_header(row: list[str], top_row: list[str]) -> list[str]:
     expanded: list[str] = []
     carry = ""
-    for idx, (top_cell, bottom_cell) in enumerate(zip(top_row, row)):
+    for _idx, (top_cell, bottom_cell) in enumerate(zip(top_row, row)):
         normalized_top = _normalize_header(top_cell)
         if normalized_top in {"бел", "мат"}:
             carry = normalized_top

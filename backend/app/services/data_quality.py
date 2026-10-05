@@ -17,12 +17,13 @@ from typing import Any, Optional
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import load_only, selectinload
+from sqlalchemy.orm import selectinload
 
 from app.models.pricing import Pricing
-from app.models.source_page import SourcePage
 from app.models.school import School, SchoolLocation
+from app.models.source_page import SourcePage
 from app.services.identity_curation import curated_identity_candidate
+
 # Re-exported for callers that import it from here; it now lives in
 # `app.utils.display_gating` so the scoreboard metric and the P1.7 display gate
 # share one source of truth.

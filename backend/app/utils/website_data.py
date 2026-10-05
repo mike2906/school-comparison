@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
 import datetime
+from collections.abc import Mapping
 from typing import Any
 
 from app.utils.display_gating import display_name_blocked

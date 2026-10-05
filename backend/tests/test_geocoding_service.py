@@ -1,8 +1,11 @@
 """Tests for geocoding service."""
-import pytest
 from unittest.mock import AsyncMock, patch
+
+import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models import School, SchoolLocation
+from app.scrapers.cli import _oblast_fallback_query_specs
 from app.services.geocoding.base import GeocodingResult
 from app.services.geocoding.nominatim import (
     AREA_LEVEL_MATCH_ERROR,
@@ -11,8 +14,6 @@ from app.services.geocoding.nominatim import (
     NominatimProvider,
 )
 from app.services.geocoding.service import GeocodingService, geocode_failure_is_terminal
-from app.scrapers.cli import _oblast_fallback_query_specs
-from app.models import School, SchoolLocation
 
 
 class TestNominatimProvider:
@@ -523,6 +524,7 @@ class TestGeocodingService:
     async def test_service_respects_provider_setting(self, db_session: AsyncSession):
         """Test that service uses provider from settings."""
         from unittest.mock import patch
+
         from app.config import Settings
 
         # Mock settings with nominatim provider
@@ -538,8 +540,10 @@ class TestGeocodingService:
     async def test_service_raises_on_unknown_provider(self, db_session: AsyncSession):
         """Test that service raises error for unknown provider."""
         from unittest.mock import patch
-        from app.config import Settings
+
         import pytest
+
+        from app.config import Settings
 
         # Mock settings with invalid provider
         mock_settings = Settings(
@@ -554,8 +558,10 @@ class TestGeocodingService:
     async def test_service_raises_on_placeholder_email(self, db_session: AsyncSession):
         """Test that service raises error if contact email is a placeholder."""
         from unittest.mock import patch
-        from app.config import Settings
+
         import pytest
+
+        from app.config import Settings
 
         # Mock settings with placeholder email
         mock_settings = Settings(
@@ -1708,8 +1714,9 @@ class TestGeoJSONMatching:
     @pytest.mark.asyncio
     async def test_exact_name_city_match(self):
         """Test exact (school_name, city) matching."""
-        from app.services.geocoding.bg.geojson import GeoJSONProvider
         from unittest.mock import patch
+
+        from app.services.geocoding.bg.geojson import GeoJSONProvider
         
         # Mock GeoJSON data with specific school in СТОЛИЧНА
         mock_geojson = {
@@ -1747,8 +1754,9 @@ class TestGeoJSONMatching:
     @pytest.mark.asyncio
     async def test_sofia_match_outside_city_bounds_is_rejected(self):
         """GeoJSON sometimes labels a row as Stolichna but stores bad coordinates."""
-        from app.services.geocoding.bg.geojson import GeoJSONProvider
         from unittest.mock import patch
+
+        from app.services.geocoding.bg.geojson import GeoJSONProvider
 
         mock_geojson = {
             'features': [
@@ -1783,8 +1791,9 @@ class TestGeoJSONMatching:
     @pytest.mark.asyncio
     async def test_ambiguous_name_rejection(self):
         """Test that ambiguous names (multiple cities) are rejected."""
-        from app.services.geocoding.bg.geojson import GeoJSONProvider
         from unittest.mock import patch
+
+        from app.services.geocoding.bg.geojson import GeoJSONProvider
         
         # Mock GeoJSON with same school name in different cities
         mock_geojson = {
@@ -1830,8 +1839,9 @@ class TestGeoJSONMatching:
     @pytest.mark.asyncio
     async def test_match_by_website_host(self):
         """GeoJSON provider can recover coordinates by website host."""
-        from app.services.geocoding.bg.geojson import GeoJSONProvider
         from unittest.mock import patch
+
+        from app.services.geocoding.bg.geojson import GeoJSONProvider
 
         mock_geojson = {
             'features': [
@@ -1866,8 +1876,9 @@ class TestCompositeProvider:
     @pytest.mark.asyncio
     async def test_fallback_to_nominatim(self):
         """Test that composite falls back to Nominatim when GeoJSON fails."""
-        from app.services.geocoding.composite import CompositeGeocodingProvider
         from unittest.mock import AsyncMock, patch
+
+        from app.services.geocoding.composite import CompositeGeocodingProvider
         
         # Mock failed GeoJSON result
         mock_geojson_result = AsyncMock(return_value=type('Result', (), {

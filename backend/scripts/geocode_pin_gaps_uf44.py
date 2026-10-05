@@ -31,6 +31,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 sys.path.insert(0, str(Path(__file__).parent.parent))
 sys.path.insert(0, str(Path(__file__).parent))
 
+from import_sofia_municipal_points import Row, _canonical_district, apply_match, district_at, fetch_points
+
 from app.config import get_settings
 from app.database import engine
 from app.models import School, SchoolLocation
@@ -44,7 +46,6 @@ from app.services.geocoding.service import (
     same_school_shared_points,
 )
 from app.services.geocoding.write_gate import OFFICIAL_COORDS_TAG
-from import_sofia_municipal_points import Row, _canonical_district, apply_match, district_at, fetch_points
 
 REPORT_ROOT = Path(os.environ.get("UF44_REPORT_ROOT") or Path(__file__).parent.parent / "reports" / "uf44")
 # Evidence-backed individual fixes: location id -> exact municipal point name.

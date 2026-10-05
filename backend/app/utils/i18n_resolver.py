@@ -5,7 +5,6 @@ from typing import Any, Mapping
 
 from app.utils.display_names import english_address, tidy_bg_address, tidy_bg_name, translate_bg_school_name
 
-
 _SCHOOL_ABBREVIATION_PREFIX = re.compile(r"^(?:ЧОУ|ЧДГ|ЧСУ|ЦДГ|ДГ|НУ|ОУ|СУ|ПГ)\s+", flags=re.IGNORECASE)
 _GENERIC_BG_NAME_MARKERS = {
     "частно",

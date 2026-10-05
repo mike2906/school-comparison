@@ -6,7 +6,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.database import get_db
-from app.models.school import School
 from app.schemas.school import SchoolResponse
 from app.services.school_service import SchoolService
 

@@ -6,7 +6,7 @@ from sqlalchemy import select
 
 from app.models.exam_results import ExamResult
 from app.models.field_source import FieldSource, SourceType
-from app.models.pricing import Pricing, PriceSource
+from app.models.pricing import PriceSource, Pricing
 from app.models.school import School, SchoolLocation, SchoolLocationAgeGroupShift
 from app.models.source_page import ScrapeType, SourcePage
 

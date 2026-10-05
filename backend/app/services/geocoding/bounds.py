@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import Optional
 
-
 SOFIA_MUNICIPALITY_BOUNDS = {
     "south": 42.50,
     "west": 23.10,

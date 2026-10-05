@@ -2,7 +2,7 @@ from typing import Optional
 
 from sqlalchemy import and_, exists, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import aliased, load_only, selectinload
+from sqlalchemy.orm import aliased, selectinload
 
 from app.models.pricing import Pricing
 from app.models.school import School, SchoolLocation, SchoolLocationAgeGroupShift

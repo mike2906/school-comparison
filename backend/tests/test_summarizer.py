@@ -11,8 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.ai import summariser as ai_summariser
-from app.models import Pricing, School, SchoolLocation
-from app.models.pricing import PriceSource
+from app.models import School, SchoolLocation
 from app.schemas.llm_outputs import SchoolSummaryStrict
 from app.scrapers import summarizer as summarizer_module
 from tasks import scrape_tasks

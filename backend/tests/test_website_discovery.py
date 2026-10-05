@@ -6,7 +6,7 @@ import httpx
 import pytest
 from sqlalchemy import select
 
-from app.models import School, SchoolLocation, SourcePage, ScrapeType
+from app.models import School, SchoolLocation, ScrapeType, SourcePage
 from app.scrapers.website_discovery import WebsiteDiscoverer, discover_school_website
 
 

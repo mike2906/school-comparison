@@ -445,9 +445,10 @@ async def test_invalid_later_response_does_not_persist_partial_attribution(db_se
 async def test_timed_out_dispatch_is_uncertain_and_later_dispatches_still_run(
     monkeypatch, async_engine, db_session
 ):
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
     import app.database as database
     import app.services.provider_costs as provider_costs
-    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
     monkeypatch.setattr(
         database,

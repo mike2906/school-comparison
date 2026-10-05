@@ -4,7 +4,8 @@ Source adapter registry.
 This module provides a registry of all discovery adapters.
 New country adapters are registered here.
 """
-from typing import Type, Optional
+from typing import Optional, Type
+
 from app.scrapers.sources.base_adapter import BaseSourceAdapter
 
 # Adapter registry: {adapter_name: adapter_class}

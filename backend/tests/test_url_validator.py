@@ -1,27 +1,28 @@
 """Tests for URL validator (Stage 2)."""
 import asyncio
 from types import SimpleNamespace
-import pytest
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import httpx
-from unittest.mock import AsyncMock, patch, MagicMock
+import pytest
 from sqlalchemy import select
 
-from app.scrapers.url_validator import (
-    URLValidator,
-    ValidationResult,
-    URLValidationOutput,
-    _should_clear_website_derived_data,
-    _update_validation_result,
-    extract_validation_aliases,
-    validate_school_url,
-    _is_timeout_reason,
-    _update_timeout_failure_state,
-    TIMEOUT_FAILURE_ATTR_KEY,
-)
-from app.models import School, SchoolLocation, SourcePage, ScrapeType
+from app.models import School, SchoolLocation, ScrapeType, SourcePage
 from app.models.field_source import FieldSource, SourceType
 from app.models.pricing import PriceSource, Pricing
 from app.scrapers.base import BaseScraper
+from app.scrapers.url_validator import (
+    TIMEOUT_FAILURE_ATTR_KEY,
+    URLValidationOutput,
+    URLValidator,
+    ValidationResult,
+    _is_timeout_reason,
+    _should_clear_website_derived_data,
+    _update_timeout_failure_state,
+    _update_validation_result,
+    extract_validation_aliases,
+    validate_school_url,
+)
 
 
 class TestURLValidator:

@@ -1,13 +1,14 @@
 """Base adapter for discovery sources (government registries, search engines, etc.)."""
-from abc import ABC, abstractmethod
-from typing import Optional
-from datetime import datetime
-import uuid
 import logging
+import uuid
+from abc import ABC, abstractmethod
+from datetime import datetime
+from typing import Optional
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.scrape_log import ScrapeLog, ScrapeStatus, ScrapeType
 from app.schemas.scraping import DiscoveredSchool
-from app.models.scrape_log import ScrapeLog, ScrapeType, ScrapeStatus
 
 logger = logging.getLogger(__name__)
 
@@ -89,11 +90,13 @@ class BaseSourceAdapter(ABC):
         Returns:
             Dict with counts: {"created": N, "updated": M, "skipped": K}
         """
+        import logging
+
+        from sqlalchemy import and_, delete, func, select
+
         from app.models import School, SchoolLocation, SchoolLocationAgeGroupShift
         from app.services.geocoding.base import GeocodingResult
         from app.services.geocoding.write_gate import apply_geocode_result_to_location
-        from sqlalchemy import select, and_, func, delete
-        import logging
 
         logger = logging.getLogger(__name__)
 
@@ -377,6 +380,7 @@ class BaseSourceAdapter(ABC):
     async def _sync_source_location(self, row, incoming) -> None:
         """Update a source-owned location's source fields; never its coordinates."""
         from sqlalchemy import select
+
         from app.models import SchoolLocationAgeGroupShift
 
         row.district = incoming.district or row.district

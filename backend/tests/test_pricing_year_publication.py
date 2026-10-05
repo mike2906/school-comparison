@@ -8,7 +8,6 @@ silently withholding every price.
 from datetime import date, datetime
 
 import pytest
-from sqlalchemy import select
 
 from app.models import Pricing, School, SchoolLocation, ScrapeType, SourcePage
 from app.models.pricing import PriceSource

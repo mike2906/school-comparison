@@ -13,7 +13,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import FieldSource, School, SourceConfidence, SourceType
 from app.utils.i18n_resolver import resolve_display_name_i18n
 
-
 CURATED_IDENTITY_METHOD = "offline_cached_source_review"
 CANONICAL_IDENTITY_CURATION_KEY = "canonical_identity_curation"
 

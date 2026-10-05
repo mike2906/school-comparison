@@ -12,19 +12,17 @@ Creates 100 realistic schools in Sofia with comprehensive coverage:
 
 import asyncio
 import re
-from datetime import datetime
 
 from sqlalchemy import delete
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
-from app.models.school import School, SchoolLocation, SchoolLocationAgeGroupShift
-from app.models.country import Country
-from app.models.pricing import Pricing, PriceCategory, PricePeriod, PriceSource
-from app.models.exam_results import ExamResult
-from app.models.field_source import FieldSource, SourceType, SourceConfidence
 from app.config import get_settings
-
+from app.models.country import Country
+from app.models.exam_results import ExamResult
+from app.models.field_source import FieldSource, SourceConfidence, SourceType
+from app.models.pricing import PriceCategory, PricePeriod, PriceSource, Pricing
+from app.models.school import School, SchoolLocation, SchoolLocationAgeGroupShift
 
 # Bulgarian to Latin transliteration mapping
 BULGARIAN_TO_LATIN = {
@@ -1592,26 +1590,26 @@ async def seed_database():
         await session.commit()
         
         print(f"✅ Successfully seeded {len(schools)} schools:")
-        print(f"   Private kindergartens: 20")
-        print(f"   State kindergartens: 18")
-        print(f"   Private primary schools: 14")
-        print(f"   State primary schools: 14")
-        print(f"   State lower secondary schools: 6")
-        print(f"   Private lower secondary schools: 6")
-        print(f"   International schools: 5")
-        print(f"   Private gymnasiums: 7")
-        print(f"   State gymnasiums: 10")
-        print(f"   🧪 TEST: Multi-grade school: 1")
+        print("   Private kindergartens: 20")
+        print("   State kindergartens: 18")
+        print("   Private primary schools: 14")
+        print("   State primary schools: 14")
+        print("   State lower secondary schools: 6")
+        print("   Private lower secondary schools: 6")
+        print("   International schools: 5")
+        print("   Private gymnasiums: 7")
+        print("   State gymnasiums: 10")
+        print("   🧪 TEST: Multi-grade school: 1")
         print(f"   Total locations: ~{len(schools) * 2}")
-        print(f"\n🎯 Comprehensive coverage for filter testing!")
-        print(f"   - Every age group has multiple options")
-        print(f"   - State and private all represented")
-        print(f"   - Prices range from 480 BGN/mo to 24,000 BGN/yr")
-        print(f"   - Multiple neighborhoods covered")
-        print(f"\n🧪 TEST SCHOOL FOR MULTI-GRADE TABS:")
-        print(f"   School: TEST: 155 СУ 'Акад. Методи Попов'")
-        print(f"   Has NVO results for: 4th grade (75%), 7th grade (82%), 10th grade (88%)")
-        print(f"   Expected insight: 📈 'Students improve as they progress'")
+        print("\n🎯 Comprehensive coverage for filter testing!")
+        print("   - Every age group has multiple options")
+        print("   - State and private all represented")
+        print("   - Prices range from 480 BGN/mo to 24,000 BGN/yr")
+        print("   - Multiple neighborhoods covered")
+        print("\n🧪 TEST SCHOOL FOR MULTI-GRADE TABS:")
+        print("   School: TEST: 155 СУ 'Акад. Методи Попов'")
+        print("   Has NVO results for: 4th grade (75%), 7th grade (82%), 10th grade (88%)")
+        print("   Expected insight: 📈 'Students improve as they progress'")
 
 
 if __name__ == "__main__":

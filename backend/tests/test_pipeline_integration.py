@@ -3,10 +3,11 @@
 These tests focus on the integration points between pipeline stages,
 not the full end-to-end execution (which requires Celery workers).
 """
-import pytest
-from unittest.mock import AsyncMock, patch, MagicMock, Mock
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
-from app.models import School, SourcePage, ScrapeType
+import pytest
+
+from app.models import School
 from app.scrapers.url_validator import ValidationResult
 
 
@@ -102,8 +103,8 @@ class TestDiscoveryIntegration:
 
     async def test_kg_sofia_adapter_upsert_flow(self, db_session):
         """KgSofiaBg adapter can upsert schools."""
+        from app.schemas.scraping import DiscoveredLocation, DiscoveredSchool
         from app.scrapers.sources.base_adapter import BaseSourceAdapter
-        from app.schemas.scraping import DiscoveredSchool, DiscoveredLocation
 
         # Create a simple test adapter
         class TestAdapter(BaseSourceAdapter):
@@ -155,8 +156,8 @@ class TestDiscoveryIntegration:
 
     async def test_upsert_duplicate_prevents_duplicates(self, db_session):
         """Upserting the same school twice updates instead of creating."""
-        from app.scrapers.sources.base_adapter import BaseSourceAdapter
         from app.schemas.scraping import DiscoveredSchool
+        from app.scrapers.sources.base_adapter import BaseSourceAdapter
 
         class TestAdapter(BaseSourceAdapter):
             ADAPTER_NAME = "test"
@@ -189,8 +190,8 @@ class TestDiscoveryIntegration:
 
     async def test_authoritative_upsert_preserves_existing_curated_locale(self, db_session):
         """A BG-only registry refresh must not erase a curated canonical EN name."""
-        from app.scrapers.sources.base_adapter import BaseSourceAdapter
         from app.schemas.scraping import DiscoveredSchool
+        from app.scrapers.sources.base_adapter import BaseSourceAdapter
 
         class TestAdapter(BaseSourceAdapter):
             ADAPTER_NAME = "test"

@@ -2,25 +2,26 @@
 import logging
 import math
 from typing import Optional
+
 from sqlalchemy import String, cast, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import SchoolLocation, School
+from app.config import get_settings
+from app.models import School, SchoolLocation
 from app.services.geocoding.base import BaseGeocodingProvider, GeocodingResult
 from app.services.geocoding.bg.address_match import same_building
+from app.services.geocoding.composite import CompositeGeocodingProvider
 from app.services.geocoding.nominatim import (
     AREA_LEVEL_MATCH_ERROR,
     AREA_MISMATCH_ERROR,
     OTHER_INSTITUTION_ERROR,
     NominatimProvider,
 )
-from app.services.geocoding.composite import CompositeGeocodingProvider
 from app.services.geocoding.write_gate import (
     OFFICIAL_COORDS_TAG,
     apply_geocode_result_to_location,
     location_holding_point,
 )
-from app.config import get_settings
 
 logger = logging.getLogger(__name__)
 
