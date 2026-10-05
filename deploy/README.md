@@ -136,7 +136,7 @@ No command below prints a secret.
    ```bash
    gh secret set DEPLOY_SSH_KEY < ~/.config/schooldecider/cd_deploy_key
    gh secret set CLOUDFLARE_PAGES_TOKEN        # paste the token at the prompt
-   gh variable set DEPLOY_HOST --body <ip>
+   gh secret set DEPLOY_HOST --body <ip>       # a secret so the address is masked in run logs
    gh variable set CLOUDFLARE_ACCOUNT_ID --body <account id>
    gh variable set VITE_CARTO_API_KEY --body <key>   # optional; public, restricted at CARTO
    ```

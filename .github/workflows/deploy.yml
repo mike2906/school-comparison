@@ -125,7 +125,7 @@ jobs:
       packages: read
     env:
       DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
-      DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -225,7 +225,7 @@ jobs:
       contents: read
     env:
       DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
-      DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
