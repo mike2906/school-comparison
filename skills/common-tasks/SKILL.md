@@ -33,9 +33,16 @@ before applying it anywhere shared.
 
 ## Seed the database
 ```bash
-cd backend/scripts/
-uv run python seed_data.py
+# Create this disposable database once, from the repository root:
+docker compose exec -T postgres createdb -U postgres sofia_schools_demo
+cd backend
+export DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/sofia_schools_demo
+uv run alembic upgrade head
+uv run python -m scripts.seed_data --reset-demo-data
 ```
+
+Seeding replaces existing demo data. The script refuses other database names, remote
+hosts and connection query overrides. Never point this recipe at the launch database.
 
 ## Run the app
 ```bash

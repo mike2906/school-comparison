@@ -81,6 +81,23 @@ deploy() {
 		rm -rf "$docker_config"
 	fi
 
+	# Keep a recoverable snapshot before any schema change. A failed/invalid dump stops
+	# the release before Alembic runs; code rollback never downgrades the database.
+	local backup
+	umask 077
+	mkdir -p deploy/backups
+	backup="$(mktemp "$APP_DIR/deploy/backups/pre-migrate-${sha:0:12}-XXXXXXXX.dump")"
+	if ! dc exec -T postgres pg_dump -U schools -d schools --format=custom > "$backup"; then
+		rm -f "$backup"
+		die "database backup failed; migration not started"
+	fi
+	if [ ! -s "$backup" ] || ! dc exec -T postgres pg_restore --list < "$backup" >/dev/null; then
+		rm -f "$backup"
+		die "database backup is empty or unreadable; migration not started"
+	fi
+	sha256sum "$backup" > "$backup.sha256"
+	echo "deploy: verified pre-migration backup at $backup"
+
 	echo "deploy: migrating with $new"
 	API_IMAGE="$new" dc run --rm -T api alembic upgrade head </dev/null
 

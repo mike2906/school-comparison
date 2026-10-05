@@ -92,7 +92,8 @@ The host keeps two release images, the running one and the rollback target
 (`deploy/release.env`), and removes older ones after each successful deploy.
 
 **Migrations and rollback.** A rollback changes the image only; migrations stay applied
-and there is no automatic downgrade or backup. So every migration must leave the schema
+and there is no automatic downgrade. A validated backup is taken before migration
+(see below). Every migration must leave the schema
 usable by the previous image (expand first, contract in a later release): add columns and
 tables, do not drop or rename what the running code reads. A migration that cannot meet
 this is deployed by hand, with a `pg_dump` first, and its PR says so.
@@ -147,7 +148,7 @@ The host's SSH public key is pinned in `deploy/ssh_host_key.pub`; the runner ref
 other. If the host is reinstalled, replace it (`ssh-keyscan -t ed25519 <ip>`, key type and
 key only, checked against the host's console).
 
-The two secrets are repository secrets, so a workflow on any branch pushed to this
+The three deployment secrets are repository secrets, so a workflow on any branch pushed to this
 repository can read them. On a GitHub plan with environments for private repositories
 (Pro or higher), move them to a `production` environment limited to `main` and add
 `environment: production` to the `deploy-api`, `frontend` and `rollback-api` jobs.
@@ -181,3 +182,17 @@ with 5 compressed files per container. Caddy writes JSON access logs to stdout:
 header (only on connections from a Cloudflare range) and passes it to the API, so
 `client_ip` in Caddy's log and the address in the API's log are the visitor's;
 `remote_ip` is Cloudflare's.
+
+## Pre-migration backups
+
+The deployment script creates a mode-600 custom-format PostgreSQL archive under
+`$APP_DIR/deploy/backups/` before each migration, validates its archive listing and records
+a SHA-256 checksum. A failed or empty backup stops deployment before migration. These files
+contain private data and must stay outside Git. Install the updated script before relying
+on this behavior; changing the repository does not update the host automatically.
+
+Backups are retained until deliberately removed. Monitor disk space and arrange off-host
+copies with a retention policy. To practice recovery, copy an archive to an isolated
+PostgreSQL instance, create an empty database, and run `pg_restore --no-owner
+--exit-on-error -d <isolated_database> <archive>`. Verify the schema revision and data before
+using a backup for recovery. Never restore over the live database as a routine check.

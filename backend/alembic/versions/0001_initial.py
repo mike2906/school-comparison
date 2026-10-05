@@ -18,6 +18,27 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    # Bootstrap the pipeline table historically created outside Alembic.
+    op.create_table('pipeline_runs',
+    sa.Column('id', sa.String(length=36), nullable=False),
+    sa.Column('country_code', sa.String(length=2), nullable=False),
+    sa.Column('city', sa.String(length=100), nullable=True),
+    sa.Column('stage', sa.Enum('DISCOVER', 'VALIDATE_URLS', 'NAVIGATE', 'EXTRACT', 'VALIDATE_DATA', 'SUMMARIZE', 'FULL', name='pipelinestage'), nullable=False),
+    sa.Column('status', sa.Enum('RUNNING', 'COMPLETED', 'FAILED', 'PARTIAL', name='pipelinestatus'), nullable=False),
+    sa.Column('started_at', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('completed_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('schools_processed', sa.Integer(), nullable=False),
+    sa.Column('schools_succeeded', sa.Integer(), nullable=False),
+    sa.Column('schools_failed', sa.Integer(), nullable=False),
+    sa.Column('schools_skipped', sa.Integer(), nullable=False),
+    sa.Column('total_llm_cost_usd', sa.Float(), nullable=False),
+    sa.Column('error_summary', sa.Text(), nullable=True),
+    sa.Column('config', sa.JSON(), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
+    sa.PrimaryKeyConstraint('id')
+    )
+
     # Schools table
     op.create_table(
         'schools',
@@ -106,6 +127,9 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    op.drop_table('pipeline_runs')
+    sa.Enum(name='pipelinestatus').drop(op.get_bind(), checkfirst=True)
+    sa.Enum(name='pipelinestage').drop(op.get_bind(), checkfirst=True)
     op.drop_table('scrape_log')
     op.drop_table('exam_results')
     op.drop_table('pricing')

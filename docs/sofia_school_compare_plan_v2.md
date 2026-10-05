@@ -1,5 +1,10 @@
 # Sofia School Comparison App — Project Plan v2
 
+> Historical design proposal. This document includes ideas and schema choices that were
+> not implemented. Use `GO_LIVE_PLAN.md`, `AGENTS.md`, the current models and README for
+> current behavior. In particular, JSON storage and publication gates supersede earlier
+> JSONB and unrestricted summary proposals.
+
 ## Project Overview
 
 A bilingual (Bulgarian / English) web app that helps parents in Sofia discover, filter, and compare kindergartens and schools based on location, age group, pricing, exam results, and more. Data is scraped and periodically refreshed. AI is used strategically (and cheaply) for summaries and sentiment analysis.
