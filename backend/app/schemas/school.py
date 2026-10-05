@@ -3,8 +3,8 @@ from typing import Any, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, computed_field, field_validator
 
-from app.schemas.pricing import PricingResponse
 from app.schemas.field_source import FieldSourceResponse
+from app.schemas.pricing import PricingResponse
 from app.utils.display_gating import (
     blocked_pricing_row_ids,
     implausible_tuition_row_ids,

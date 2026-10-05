@@ -35,7 +35,6 @@ from app.services.identity_resolver_benchmark import (
     load_identity_resolver_benchmark,
 )
 
-
 REPORT_ROOT = Path(__file__).resolve().parents[1] / "reports" / "p2-14f"
 
 

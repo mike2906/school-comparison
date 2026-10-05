@@ -7,8 +7,8 @@ import contextvars
 import datetime
 import json
 import re
-from urllib.parse import urlparse
 from typing import Any, Optional
+from urllib.parse import urlparse
 
 from pydantic_ai.exceptions import ModelAPIError, ModelHTTPError, UnexpectedModelBehavior
 
@@ -16,15 +16,10 @@ from app.config import get_settings
 from app.models.pricing import PriceCategory, PricePeriod
 from app.models.school import School
 from app.models.source_page import SourcePage
-from app.scrapers.extraction_rules import get_rules
-from app.scrapers.school_tokens import extract_school_name_tokens
-from app.utils.academic_year import normalize_academic_year
-from app.utils.i18n_resolver import is_generic_numbered_display_label
-from app.utils.transliteration import transliterate_bulgarian
 from app.schemas.extraction import (
     AdmissionExtractionOutput,
-    ExtractedPrice,
     ExtractedLanguageFocus,
+    ExtractedPrice,
     GeneralInfoExtractionOutput,
     OperationsExtractionOutput,
     PriceExtractionOutput,
@@ -32,6 +27,11 @@ from app.schemas.extraction import (
     ServicesExtractionOutput,
     SummarySourceExtractionOutput,
 )
+from app.scrapers.extraction_rules import get_rules
+from app.scrapers.school_tokens import extract_school_name_tokens
+from app.utils.academic_year import normalize_academic_year
+from app.utils.i18n_resolver import is_generic_numbered_display_label
+from app.utils.transliteration import transliterate_bulgarian
 
 _ACTIVE_RULES: contextvars.ContextVar[Any] = contextvars.ContextVar(
     "extraction_rules_module",

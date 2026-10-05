@@ -1,11 +1,12 @@
 """Seed the Bulgaria country configuration."""
 import asyncio
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from sqlalchemy import select
+
 from app.database import async_session_maker
 from app.models.country import Country
 

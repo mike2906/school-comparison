@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+import re
 from collections import defaultdict
 from dataclasses import dataclass
-import re
 from typing import Any, Iterable, Mapping
 
 from app.scrapers.school_tokens import extract_school_name_tokens

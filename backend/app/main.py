@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import get_settings
 from app.database import get_db
 from app.models.school import School
-from app.routers import schools, compare, countries
+from app.routers import compare, countries, schools
 
 logger = logging.getLogger(__name__)
 settings = get_settings()

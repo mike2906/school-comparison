@@ -29,7 +29,6 @@ from app.models import School
 from app.services.geocoding.bg import GeoJSONProvider, city_storage_value
 from app.services.geocoding.bounds import SOFIA_MUNICIPALITY_BOUNDS, point_in_bounds
 
-
 DEFAULT_REPORT_ROOT = Path(__file__).parent.parent / "reports" / "scope-repair"
 
 

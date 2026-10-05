@@ -35,7 +35,6 @@ from app.scrapers.display_name_audit import _clean_candidate_text, _page_bonus
 from app.services.identity_curation import _normalized_host, _source_page_key
 from app.services.provider_costs import execute_billable_request
 
-
 # Bounded evidence budget. These caps exist so a pilot over many schools cannot
 # silently turn into a large-context job; they are deliberately small.
 MAX_PAGES_PER_CASE = 6
@@ -348,7 +347,7 @@ def build_case(
     # that promotion then refuses with `source_domain_mismatch`.
     official_host = _normalized_host(website_url)
     supporting: dict[tuple[str, str], str] = {}
-    for _rank, excerpt, url in scored:
+    for _rank, _excerpt, url in scored:
         if not url or not official_host or _normalized_host(url) != official_host:
             continue
         key = _source_page_key(url)

@@ -12,16 +12,16 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
+from app.config import get_settings
 from app.models.school import School, SchoolLocation
 from app.schemas.school import (
     SchoolDisplayAttributes,
     SchoolListResponse,
-    SchoolLocationResponse,
     SchoolLocalizedAttributes,
+    SchoolLocationResponse,
     SchoolResponse,
 )
 from app.services.school_service import SchoolService
-from app.config import get_settings
 from app.utils.school_attributes import (
     build_base_attributes,
     build_display_attributes,

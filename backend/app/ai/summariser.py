@@ -11,9 +11,9 @@ from pydantic import BaseModel, Field
 from pydantic_ai import ModelRetry
 
 from app.ai.client import calculate_cost, create_agent, get_model
-from app.services.provider_costs import execute_billable_request
 from app.config import get_settings
 from app.schemas.llm_outputs import SchoolSummaryStrict
+from app.services.provider_costs import execute_billable_request
 from app.utils.i18n_resolver import derive_english_name
 from app.utils.transliteration import transliterate_bulgarian
 

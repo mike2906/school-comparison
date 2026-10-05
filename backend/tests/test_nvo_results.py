@@ -38,7 +38,6 @@ async def _seed_country(db_session):
 
 
 def _resource(exam_type: str = "nvo_7", year: int = 2025) -> NvoResource:
-    rid = f"{year:04d}{exam_type[-1]}"[:8].ljust(8, "0")
     resource_id = {
         "nvo_4": "af1c2e60-3f7e-4ad1-b393-979f8e56735c",
         "nvo_7": "1bd20af9-df82-4908-aae4-d2d2a0eaef81",

@@ -1,6 +1,5 @@
-from app.utils.transliteration import transliterate_address, transliterate_bulgarian
 from app.utils.i18n_resolver import derive_english_name, resolve_address_i18n, resolve_name_i18n
-
+from app.utils.transliteration import transliterate_address, transliterate_bulgarian
 
 CORROBORATED_DISPLAY = {
     "display_name_evidence": {

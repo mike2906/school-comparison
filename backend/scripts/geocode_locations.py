@@ -24,9 +24,9 @@ Usage:
     # Read-only: list a school's locations that share a point at different addresses
     uv run python scripts/geocode_locations.py --check-shared-points
 """
+import argparse
 import asyncio
 import sys
-import argparse
 from pathlib import Path
 
 # Add parent directory to path to allow imports

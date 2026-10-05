@@ -24,7 +24,6 @@ from app.models import School, SchoolLocation
 from app.services.geocoding.service import geocode_failure_is_terminal
 from app.utils.website_data import WEBSITE_DATA_WITHHELD_KEY
 
-
 COLLISION_LOCATION_ID = 119
 COLLISION_OTHER_LOCATION_ID = 1147
 COLLISION_OLD_COORDS = (42.6548862, 23.4008491)

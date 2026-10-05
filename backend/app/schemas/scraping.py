@@ -1,6 +1,7 @@
 """Schemas for scraping/discovery pipeline."""
 from typing import Optional
-from pydantic import BaseModel, Field, ConfigDict
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class DiscoveredLocation(BaseModel):

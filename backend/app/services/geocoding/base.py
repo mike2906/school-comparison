@@ -1,8 +1,7 @@
 """Base geocoding provider interface."""
 from abc import ABC, abstractmethod
-from typing import Literal, Optional
 from dataclasses import dataclass
-
+from typing import Literal, Optional
 
 GeocodingMethod = Literal[
     "geojson_name_match",

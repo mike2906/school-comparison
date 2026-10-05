@@ -3,12 +3,11 @@ Tests for Bulgarian education system utilities.
 
 These tests are CRITICAL - the age group calculation is the core of the application.
 """
-import pytest
 from app.utils.education import (
-    calculate_age_group,
-    grade_to_points,
-    calculate_gymnasium_score,
     AGE_GROUP_KEYS,
+    calculate_age_group,
+    calculate_gymnasium_score,
+    grade_to_points,
 )
 
 

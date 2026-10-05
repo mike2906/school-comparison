@@ -5,25 +5,25 @@ Validates school website URLs before proceeding to navigation/extraction stages.
 Uses heuristic keyword matching (~90% of cases) with optional LLM validation
 for ambiguous cases.
 """
-import logging
-import inspect
-from collections.abc import Mapping
-from typing import Optional
-from enum import Enum
 import asyncio
+import inspect
+import logging
 import re
+from collections.abc import Mapping
+from enum import Enum
+from typing import Optional
 from urllib.parse import unquote, urlparse
+
 import httpx
 from bs4 import BeautifulSoup
+from pydantic import BaseModel
 
-from app.ai.client import calculate_cost, create_agent, extract_provider_cost_usd
-from app.ai.client import get_model
-from app.services.provider_costs import execute_billable_request
+from app.ai.client import calculate_cost, create_agent, extract_provider_cost_usd, get_model
 from app.config import get_settings
 from app.scrapers.school_tokens import extract_school_name_tokens
+from app.services.provider_costs import execute_billable_request
 from app.utils.transliteration import transliterate_bulgarian
 from app.utils.website_data import WEBSITE_DATA_WITHHELD_KEY
-from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
@@ -471,7 +471,6 @@ class URLValidator:
     ) -> tuple[ValidationResult, Optional[str], Optional[str]]:
         text_content = (text_content or "").lower()
         page_identity_labels = page_identity_labels or []
-        page_context = f"{title_text} {h1_text} {text_content[:4000]}".lower()
         # keyword_context intentionally includes identity labels in addition to
         # the broader page text so short school markers in nav/hero/title copy
         # still contribute to keyword scoring.
@@ -1351,9 +1350,10 @@ async def _update_validation_result(
         final_url: Final URL after redirects
         reason: Validation reason
     """
-    from app.database import async_session_maker
-    from app.models import School, SourcePage, ScrapeType
     from sqlalchemy import select
+
+    from app.database import async_session_maker
+    from app.models import School, ScrapeType, SourcePage
     from app.scrapers.campus_sync import remove_website_campus_data
 
     async with async_session_maker() as db:

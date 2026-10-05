@@ -9,8 +9,8 @@ from __future__ import annotations
 import asyncio
 import datetime
 import math
-from decimal import Decimal
 from contextlib import asynccontextmanager
+from decimal import Decimal
 from typing import Any, Iterable, Optional
 from uuid import uuid4
 

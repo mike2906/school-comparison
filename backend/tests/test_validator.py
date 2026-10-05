@@ -13,9 +13,9 @@ from app.models.field_source import SourceType
 from app.models.pricing import PriceSource
 from app.models.scrape_log import ScrapeType
 from app.models.source_page import SourcePage
-from app.utils.website_data import prepare_validation_rollover, website_data_is_publishable
 from app.schemas.validation import SpotCheckDiscrepancy, SpotCheckOutput
 from app.scrapers import validator as validator_module
+from app.utils.website_data import prepare_validation_rollover, website_data_is_publishable
 
 
 def test_normalize_summary_source_clears_narrative_fields_without_source_text():

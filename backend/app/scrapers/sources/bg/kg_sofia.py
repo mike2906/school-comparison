@@ -11,14 +11,18 @@ import json
 import logging
 import re
 from datetime import datetime, timezone
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
+
 import httpx
 
-from app.scrapers.sources.base_adapter import BaseSourceAdapter
-from app.schemas.scraping import DiscoveredSchool, DiscoveredLocation
-from app.scrapers.sources import register_adapter
-from app.scrapers.base import BaseScraper
 from app.models.scrape_log import ScrapeType
+from app.schemas.scraping import DiscoveredLocation, DiscoveredSchool
+from app.scrapers.base import BaseScraper
+from app.scrapers.sources import register_adapter
+from app.scrapers.sources.base_adapter import BaseSourceAdapter
+
+if TYPE_CHECKING:
+    from app.models.source_page import SourcePage
 
 logger = logging.getLogger(__name__)
 
@@ -143,7 +147,8 @@ class KgSofiaBgAdapter(BaseSourceAdapter):
             ValueError: If the response format is unexpected
         """
         from sqlalchemy import select
-        from app.models import School, SourcePage, ScrapeType
+
+        from app.models import School, ScrapeType, SourcePage
 
         parsed_records: list[tuple[DiscoveredSchool, bool]] = []
         seen_kg_ids: set[str] = set()
@@ -275,7 +280,6 @@ class KgSofiaBgAdapter(BaseSourceAdapter):
         seen_kg_ids: set[str],
         seen_at: datetime,
     ) -> Optional[tuple[DiscoveredSchool, bool]]:
-        from app.models import SourcePage, ScrapeType
 
         kg_id = data.get("id")
         if kg_id is None:
@@ -376,7 +380,7 @@ class KgSofiaBgAdapter(BaseSourceAdapter):
         changed: bool,
         seen_at: datetime,
     ) -> None:
-        from app.models import SourcePage, ScrapeType
+        from app.models import ScrapeType, SourcePage
 
         if source_page:
             source_page.last_scraped_at = seen_at
@@ -400,6 +404,7 @@ class KgSofiaBgAdapter(BaseSourceAdapter):
 
     async def _update_active_flags(self, seen_kg_ids: set[str], seen_at: datetime) -> None:
         from sqlalchemy import select
+
         from app.models import School
 
         now_iso = seen_at.isoformat()

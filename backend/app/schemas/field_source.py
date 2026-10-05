@@ -3,7 +3,7 @@ from typing import Optional
 
 from pydantic import BaseModel, ConfigDict
 
-from app.models.field_source import SourceType, SourceConfidence
+from app.models.field_source import SourceConfidence, SourceType
 
 
 class FieldSourceBase(BaseModel):

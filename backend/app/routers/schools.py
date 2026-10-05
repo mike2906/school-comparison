@@ -1,14 +1,14 @@
-from typing import Optional, Annotated
 import logging
+from typing import Annotated, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Path
-from sqlalchemy import select, func
+from fastapi import APIRouter, Depends, HTTPException, Path, Query
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.database import get_db
-from app.models.school import School, SchoolLocation, SchoolLocationAgeGroupShift
 from app.models.exam_results import ExamResult
+from app.models.school import School, SchoolLocation, SchoolLocationAgeGroupShift
 from app.schemas.school import RelatedSchoolResponse, SchoolDetailResponse, SchoolListResponse
 from app.services.school_relations import continues_to
 from app.services.school_service import SchoolService

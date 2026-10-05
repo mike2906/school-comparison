@@ -13,18 +13,22 @@ import json
 import logging
 import re
 from datetime import datetime, timezone
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
+
 import httpx
 
 from app.config import get_settings
-from app.scrapers.sources.base_adapter import BaseSourceAdapter
-from app.schemas.scraping import DiscoveredSchool, DiscoveredLocation
-from app.scrapers.sources import register_adapter
-from app.scrapers.base import BaseScraper
 from app.models.scrape_log import ScrapeType
+from app.schemas.scraping import DiscoveredLocation, DiscoveredSchool
+from app.scrapers.base import BaseScraper
+from app.scrapers.sources import register_adapter
+from app.scrapers.sources.base_adapter import BaseSourceAdapter
 from app.services.geocoding.base import GeocodingResult
 from app.services.geocoding.bg import GeoJSONProvider, city_storage_value
 from app.services.geocoding.nominatim import NominatimProvider
+
+if TYPE_CHECKING:
+    from app.models.source_page import SourcePage
 
 logger = logging.getLogger(__name__)
 _LOCALITY_MARKER_RE = re.compile(r"\b(?:гр\.?|с\.?|село|район|кв\.|ж\.к\.)\b", flags=re.IGNORECASE)
@@ -315,7 +319,8 @@ class MoeRegistryAdapter(BaseSourceAdapter):
             ValueError: If the response format is unexpected
         """
         from sqlalchemy import select
-        from app.models import School, SourcePage, ScrapeType
+
+        from app.models import School, ScrapeType, SourcePage
 
         discovered_schools = []
         seen_instids: set[str] = set()
@@ -627,7 +632,7 @@ class MoeRegistryAdapter(BaseSourceAdapter):
         changed: bool,
         seen_at: datetime,
     ) -> None:
-        from app.models import SourcePage, ScrapeType
+        from app.models import ScrapeType, SourcePage
 
         if source_page:
             source_page.last_scraped_at = seen_at
@@ -651,6 +656,7 @@ class MoeRegistryAdapter(BaseSourceAdapter):
 
     async def _update_active_flags(self, seen_instids: set[str], seen_at: datetime) -> None:
         from sqlalchemy import select
+
         from app.models import School
 
         now_iso = seen_at.isoformat()
@@ -832,7 +838,6 @@ class MoeRegistryAdapter(BaseSourceAdapter):
                     town_name,
                 )
                 phone_number = (detail_data.get("phoneNumber") or "").strip() or None
-                email = (detail_data.get("email") or "").strip() or None
 
                 if primary_address:
                     primary_location = DiscoveredLocation(
@@ -908,9 +913,7 @@ class MoeRegistryAdapter(BaseSourceAdapter):
     async def _delay(self):
         """Small delay between requests to be respectful to the API."""
         import asyncio
-        from app.config import get_settings
 
-        settings = get_settings()
         # Rate limit: 10/min = 6 seconds between requests
         # Use 1 second delay to be respectful but not too slow
         await asyncio.sleep(1.0)  # 1 second between detail requests (~60 schools/min)

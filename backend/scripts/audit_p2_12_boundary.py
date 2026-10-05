@@ -17,7 +17,7 @@ from typing import Any, Iterable
 
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import func, select
-from sqlalchemy.orm import load_only, selectinload
+from sqlalchemy.orm import selectinload
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -30,7 +30,6 @@ from app.services.geocoding.service import geocode_failure_is_terminal
 from app.utils.display_gating import implausible_tuition_row_ids, pricing_row_is_publishable
 from app.utils.school_attributes import publishable_display_text
 from app.utils.website_data import WEBSITE_DATA_WITHHELD_KEY
-
 
 DEFAULT_COHORT_IDS = (
     506,

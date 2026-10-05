@@ -1,12 +1,12 @@
 """Tests for MoeRegistryAdapter."""
 from datetime import datetime, timezone
+from unittest.mock import AsyncMock, patch
 
 import pytest
-from unittest.mock import AsyncMock, patch
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.scrapers.sources.bg.moe_registry import MoeRegistryAdapter
 from app.scrapers.sources import get_adapter, list_adapters
+from app.scrapers.sources.bg.moe_registry import MoeRegistryAdapter
 from app.services.geocoding.base import GeocodingResult
 
 
@@ -566,7 +566,7 @@ class TestMoeRegistryAdapterUpsert:
 
     async def test_upsert_with_institutional_id(self, db_session: AsyncSession):
         """Test that upsert matches by institutional_id (primary key)."""
-        from app.schemas.scraping import DiscoveredSchool, DiscoveredLocation
+        from app.schemas.scraping import DiscoveredLocation, DiscoveredSchool
 
         adapter = MoeRegistryAdapter(db=db_session)
 
@@ -602,8 +602,9 @@ class TestMoeRegistryAdapterUpsert:
         assert result["updated"] == 1
 
         # Verify school in DB
-        from app.models import School
         from sqlalchemy import select
+
+        from app.models import School
 
         db_result = await db_session.execute(
             select(School).where(School.institutional_id == "TEST-123")

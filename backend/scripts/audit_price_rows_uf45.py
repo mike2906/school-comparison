@@ -94,13 +94,13 @@ def audit_names(schools: Iterable[PublishedName]) -> list[Hit]:
 
 async def _collect() -> tuple[list[Hit], dict[str, Any]]:
     from sqlalchemy import or_, select
+    from sqlalchemy.ext.asyncio import AsyncSession
 
     from app.database import engine
     from app.models import School, SourcePage
     from app.models.pricing import Pricing
     from app.schemas.school import SchoolDetailResponse
     from app.services.school_service import SchoolService
-    from sqlalchemy.ext.asyncio import AsyncSession
 
     hits: list[Hit] = []
     stats: Counter = Counter()

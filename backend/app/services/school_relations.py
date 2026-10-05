@@ -27,9 +27,9 @@ from dataclasses import dataclass, field
 from typing import Any, Optional
 
 from app.scrapers.shared_site_check import (
-    SHARED_SITE_CHECK_KEY,
     KEEP,
     REPLACE,
+    SHARED_SITE_CHECK_KEY,
     level_family,
     registrable_domain,
     site_group_key,

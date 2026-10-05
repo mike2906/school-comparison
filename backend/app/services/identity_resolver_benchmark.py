@@ -16,7 +16,6 @@ from app.models.scrape_log import ScrapeType
 from app.scrapers import extractor
 from app.scrapers import extractor_helpers as helpers
 
-
 DEFAULT_BENCHMARK_PATH = (
     Path(__file__).resolve().parents[2]
     / "tests"

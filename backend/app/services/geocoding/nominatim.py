@@ -1,8 +1,9 @@
 """OpenStreetMap Nominatim geocoding provider."""
-import logging
 import asyncio
-from typing import Optional
+import logging
 import re
+from typing import Optional
+
 import httpx
 
 from app.services.geocoding.base import BaseGeocodingProvider, GeocodingResult

@@ -40,16 +40,17 @@ from app.schemas.extraction import (
 from app.scrapers.price_evidence import PriceRow, replacement_regressions
 from app.scrapers.shared_site_check import level_family
 from app.scrapers.summarizer import clear_summary_state
-from app.utils.display_gating import blocked_pricing_row_ids, pricing_row_is_publishable
 from app.scrapers.validator import validate_school_data
 from app.services.geocoding.base import GeocodingResult
 from app.services.geocoding.write_gate import OFFICIAL_COORDS_TAG, apply_geocode_result_to_location
+from app.services.provider_costs import execute_billable_request
+from app.utils.display_gating import blocked_pricing_row_ids, pricing_row_is_publishable
 from app.utils.website_data import (
     WEBSITE_DATA_WITHHELD_KEY,
     prepare_validation_rollover,
     website_data_is_publishable,
 )
-from app.services.provider_costs import execute_billable_request
+
 from . import extractor_helpers as helpers
 
 logger = logging.getLogger(__name__)

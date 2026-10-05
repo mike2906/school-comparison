@@ -49,21 +49,22 @@ Usage:
 import asyncio
 import builtins
 import datetime
-from contextlib import nullcontext
-from collections import defaultdict
-from math import ceil, isfinite
-import sys
 import logging
 import random
 import re
+import sys
 import time
+from collections import defaultdict
+from contextlib import nullcontext
+from math import ceil, isfinite
 from pathlib import Path
-from urllib.parse import unquote, urlparse
 from typing import Optional
+from urllib.parse import unquote, urlparse
+
 import click
 from rich.console import Console
-from rich.table import Table
 from rich.progress import Progress, SpinnerColumn, TextColumn
+from rich.table import Table
 
 from app.services.pipeline_runs import (
     checkpoint_pipeline_run,
@@ -73,8 +74,7 @@ from app.services.pipeline_runs import (
     start_pipeline_run,
     terminalize_stale_pipeline_runs,
 )
-from app.services.provider_costs import provider_cost_scope
-from app.services.provider_costs import reconcile_provider_cost
+from app.services.provider_costs import provider_cost_scope, reconcile_provider_cost
 
 # Setup logging
 logging.basicConfig(
@@ -824,7 +824,7 @@ def run(
         )
 
     if dry_run:
-        console.print(f"[yellow]DRY RUN - would execute:[/yellow]")
+        console.print("[yellow]DRY RUN - would execute:[/yellow]")
         console.print(f"  Stage: {stage}")
         console.print(f"  School: {school or school_id or 'batch'}")
         console.print(f"  City: {city}")
@@ -1192,8 +1192,9 @@ async def _run_nvo_import(
 
 async def _find_school_by_name(db, name: str, country: str) -> Optional[int]:
     """Find school by fuzzy name match."""
+    from sqlalchemy import String, cast, or_, select
+
     from app.models import School
-    from sqlalchemy import select, cast, String, or_, func
 
     # Try exact match first
     result = await db.execute(
@@ -1674,8 +1675,8 @@ async def _repair_oblast_geocodes_command(
     from app.config import get_settings
     from app.database import async_session_maker
     from app.models import School
-    from app.services.geocoding.service import GeocodingService, nominatim_user_agent
     from app.scrapers.sources.bg.moe_registry import MoeRegistryAdapter
+    from app.services.geocoding.service import GeocodingService, nominatim_user_agent
 
     settings = get_settings()
     user_agent = nominatim_user_agent(settings)
@@ -2881,7 +2882,7 @@ async def _run_discover_batch(db, country: str, city: str, limit: Optional[int],
             TextColumn("[progress.description]{task.description}"),
             console=console,
         ) as progress:
-            task = progress.add_task(f"Discovering schools...", total=None)
+            task = progress.add_task("Discovering schools...", total=None)
 
             try:
                 result = await adapter.run(limit=limit, sample_ratio=sample_ratio)
@@ -2890,7 +2891,7 @@ async def _run_discover_batch(db, country: str, city: str, limit: Optional[int],
                 created_total += int(result["created"])
                 updated_total += int(result["updated"])
                 skipped_total += int(result["skipped"])
-                console.print(f"[green]✓ Discovery complete:[/green]")
+                console.print("[green]✓ Discovery complete:[/green]")
                 console.print(f"  Created: {result['created']}")
                 console.print(f"  Updated: {result['updated']}")
                 console.print(f"  Skipped: {result['skipped']}")
@@ -2920,9 +2921,10 @@ async def _run_validate_urls_batch(
     school_ids: Optional[list[int]] = None,
 ):
     """Run URL validation stage in batch mode."""
+    from sqlalchemy import select
+
     from app.config import get_settings
     from app.models import School
-    from sqlalchemy import select
     from app.scrapers.url_validator import extract_validation_aliases, validate_school_url
 
     query = select(School.id, School.website_url, School.name_i18n, School.attributes).where(
@@ -3027,7 +3029,7 @@ async def _run_validate_urls_batch(
                 error_count += 1
             progress.update(task, advance=1)
 
-    console.print(f"[green]✓ URL validation complete:[/green]")
+    console.print("[green]✓ URL validation complete:[/green]")
     console.print(f"  Valid: {valid_count}")
     console.print(f"  Invalid: {invalid_count}")
     console.print(f"  Ambiguous: {ambiguous_count}")
@@ -3047,9 +3049,10 @@ async def _run_validate_urls_batch(
 
 async def _run_recover_failed_school(db, school_id: int, country: str) -> dict:
     """Rediscover + revalidate URL for one failed school, trying multiple candidates."""
+    from sqlalchemy import select
+
     from app.config import get_settings
     from app.models import School
-    from sqlalchemy import select
     from app.scrapers.website_discovery import WebsiteDiscoverer
 
     result = await db.execute(select(School).where(School.id == school_id))
@@ -3083,9 +3086,10 @@ async def _recover_failed_school_with_new_session(school_id: int, country: str) 
 
 async def _run_recover_failed_urls_batch(db, country: str, city: str, limit: Optional[int]):
     """Retry website discovery for failed URLs with multi-candidate validation fallback."""
+    from sqlalchemy import select
+
     from app.config import get_settings
     from app.models import School
-    from sqlalchemy import select
 
     query = select(School.id).where(
         School.country_code == country,
@@ -3188,8 +3192,9 @@ async def _run_discover_website(db, school_id: int, country: str):
 
 async def _run_discover_websites_batch(db, country: str, city: str, limit: Optional[int]):
     """Run website discovery stage in batch mode."""
-    from app.models import School
     from sqlalchemy import and_, or_, select
+
+    from app.models import School
 
     query = select(School).where(
         School.country_code == country,
@@ -3237,7 +3242,7 @@ async def _run_discover_websites_batch(db, country: str, city: str, limit: Optio
                 logger.error(f"Error discovering website for school {school.id}: {e}")
             progress.update(task, advance=1)
 
-    console.print(f"[green]✓ Website discovery complete:[/green]")
+    console.print("[green]✓ Website discovery complete:[/green]")
     console.print(f"  Found: {found_count}")
     console.print(f"  Updated: {updated_count}")
     console.print(f"  Unchanged: {len(schools) - updated_count}")
@@ -3254,8 +3259,9 @@ async def _run_discover_websites_batch(db, country: str, city: str, limit: Optio
 
 async def _run_validate_url(db, school_id: int, country: str):
     """Run URL validation for a single school."""
-    from app.models import School
     from sqlalchemy import select
+
+    from app.models import School
     from app.scrapers.url_validator import extract_validation_aliases, validate_school_url
 
     result = await db.execute(select(School).where(School.id == school_id))
@@ -3310,9 +3316,10 @@ async def _run_navigate_batch(
     skip_timed_out_chunks: bool = False,
 ):
     """Run navigation stage in batch mode."""
+    from sqlalchemy import select
+
     from app.models import School
     from app.scrapers.navigator import navigate_schools_batch
-    from sqlalchemy import select
 
     query = select(School).where(
         School.country_code == country,
@@ -3524,7 +3531,7 @@ async def _run_navigate_batch(
                     fail_count += 1
                 progress.update(task, advance=1)
 
-    console.print(f"[green]✓ Navigation complete:[/green]")
+    console.print("[green]✓ Navigation complete:[/green]")
     console.print(f"  Successful: {success_count}")
     console.print(f"  Failed: {fail_count}")
     await _persist_navigation_terminal_telemetry(db, results, school_urls)
@@ -3567,8 +3574,9 @@ async def _select_all_stage_cohort(
     requested_school_ids: Optional[list[int]] = None,
 ) -> list[int]:
     """Select one deterministic cohort for every stage in a batch ``all`` run."""
-    from app.models import School
     from sqlalchemy import select
+
+    from app.models import School
 
     query = (
         select(School.id)
@@ -3767,9 +3775,10 @@ def reset(school, school_id, status, to_status, country):
 
 async def _reset_status(school_name, school_id, from_status, to_status, country):
     """Reset school scrape status."""
+    from sqlalchemy import update
+
     from app.database import async_session_maker
     from app.models import School
-    from sqlalchemy import select, update
 
     async with async_session_maker() as db:
         if school_name or school_id:
@@ -3811,9 +3820,10 @@ def list(city, country, status, limit):
 
 async def _list_schools(city, country, status, limit):
     """List schools with filters."""
+    from sqlalchemy import select
+
     from app.database import async_session_maker
     from app.models import School
-    from sqlalchemy import select
 
     async with async_session_maker() as db:
         query = select(School).where(School.country_code == country)
@@ -3864,10 +3874,11 @@ def data_quality(city, country, runs):
 
 
 async def _show_data_quality(city, country, runs):
+    from sqlalchemy import select
+
     from app.database import async_session_maker
     from app.models import PipelineRun
     from app.services.data_quality import compute_quality_metrics
-    from sqlalchemy import select
 
     async with async_session_maker() as db:
         metrics = await compute_quality_metrics(db, country=country, city=city)
@@ -3972,9 +3983,10 @@ def stats(city, country):
 
 async def _show_stats(city, country):
     """Show pipeline statistics."""
+    from sqlalchemy import func, select
+
     from app.database import async_session_maker
     from app.models import School
-    from sqlalchemy import select, func
 
     async with async_session_maker() as db:
         # Total schools
@@ -4010,7 +4022,7 @@ async def _show_stats(city, country):
         type_counts = dict(result.all())
 
         # Display
-        console.print(f"\n[bold cyan]Pipeline Statistics[/bold cyan]")
+        console.print("\n[bold cyan]Pipeline Statistics[/bold cyan]")
         console.print(f"Country: {country}")
         if city:
             console.print(f"City: {city}")
@@ -4022,7 +4034,7 @@ async def _show_stats(city, country):
             console.print(f"  {status}: {count}")
 
         # Type breakdown
-        console.print(f"\n[bold]By Type:[/bold]")
+        console.print("\n[bold]By Type:[/bold]")
         for school_type, count in sorted(type_counts.items()):
             console.print(f"  {school_type}: {count}")
 
@@ -4090,6 +4102,8 @@ async def _run_validate_data_batch(
     school_ids: Optional[list[int]] = None,
 ):
     """Run Stage 6 validation in batch mode, then sampled monitoring spot-checks."""
+    from sqlalchemy import select
+
     from app.config import get_settings as _get_settings
     from app.database import async_session_maker
     from app.models import School
@@ -4098,7 +4112,6 @@ async def _run_validate_data_batch(
         run_spot_check_for_school,
         validate_school_data,
     )
-    from sqlalchemy import select
 
     settings = _get_settings()
     query = select(School.id, School.attributes).where(School.country_code == country)
@@ -4303,7 +4316,7 @@ async def _run_extract_school(db, school_id: int, country: str):
     llm_stats = result.get("llm_stats") or {}
 
     if result.get("skipped"):
-        console.print(f"[yellow]  Skipped: content unchanged[/yellow]")
+        console.print("[yellow]  Skipped: content unchanged[/yellow]")
     elif result.get("status") == "extracted":
         console.print(
             f"[green]  Success: pricing={result.get('pricing_count')} items, "
@@ -4339,8 +4352,9 @@ async def _run_extract_batch(
     school_ids: Optional[list[int]] = None,
 ):
     """Run extraction stage in batch mode."""
-    from app.models import School
     from sqlalchemy import select
+
+    from app.models import School
 
     explicit_selection = school_ids is not None
     explicit_school_ids = builtins.list(school_ids or [])
@@ -4499,7 +4513,7 @@ async def _run_extract_batch(
                     fail_count += 1
                 progress.update(task, advance=1)
 
-    console.print(f"[green]✓ Extraction complete:[/green]")
+    console.print("[green]✓ Extraction complete:[/green]")
     console.print(f"  Successful: {success_count}")
     console.print(f"  Skipped: {skipped_count}")
     console.print(f"  Failed: {fail_count}")

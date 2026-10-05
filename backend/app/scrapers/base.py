@@ -5,7 +5,7 @@ from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.scrape_log import ScrapeLog, ScrapeType, ScrapeStatus, ErrorType
+from app.models.scrape_log import ErrorType, ScrapeLog, ScrapeStatus, ScrapeType
 
 
 class BaseScraper(ABC):

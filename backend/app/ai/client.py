@@ -9,6 +9,7 @@ This module provides:
 import inspect
 from math import isfinite
 from typing import Any, Literal
+
 from pydantic_ai import Agent
 from pydantic_ai.models.openai import OpenAIModel
 from pydantic_ai.models.openrouter import OpenRouterModel

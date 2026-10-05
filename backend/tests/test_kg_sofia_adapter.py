@@ -1,10 +1,11 @@
 """Tests for KgSofiaBgAdapter."""
-import pytest
 from unittest.mock import AsyncMock, patch
+
+import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.scrapers.sources.bg.kg_sofia import KgSofiaBgAdapter
 from app.scrapers.sources import get_adapter, list_adapters
+from app.scrapers.sources.bg.kg_sofia import KgSofiaBgAdapter
 
 
 class TestKgSofiaBgAdapterRegistry:
@@ -317,7 +318,7 @@ class TestKgSofiaBgAdapterUpsert:
 
     async def test_upsert_creates_new_school(self, db_session: AsyncSession):
         """Test that upsert creates a new school in the database."""
-        from app.schemas.scraping import DiscoveredSchool, DiscoveredLocation
+        from app.schemas.scraping import DiscoveredLocation, DiscoveredSchool
 
         adapter = KgSofiaBgAdapter(db=db_session)
 
@@ -358,9 +359,10 @@ class TestKgSofiaBgAdapterUpsert:
         assert result["skipped"] == 0
 
         # Verify school was created in DB
-        from app.models import School, SchoolLocation
-        from sqlalchemy import select, cast, String
+        from sqlalchemy import String, cast, select
         from sqlalchemy.orm import selectinload
+
+        from app.models import School
 
         # Query by kg_sofia_id in attributes (unique identifier)
         # Use cast(JSON, String) for cross-DB compatibility (SQLite vs PostgreSQL)
@@ -382,8 +384,9 @@ class TestKgSofiaBgAdapterUpsert:
     async def test_upsert_preserves_moe_core_fields_on_existing_school(self, db_session: AsyncSession):
         """kg.sofia enrichment must not overwrite core fields sourced from MoE."""
         from sqlalchemy import select
+
         from app.models import School, SchoolLocation
-        from app.schemas.scraping import DiscoveredSchool, DiscoveredLocation
+        from app.schemas.scraping import DiscoveredLocation, DiscoveredSchool
 
         existing = School(
             country_code="bg",
@@ -470,7 +473,7 @@ class TestKgSofiaBuildingMerges:
 
     def test_merge_building_variants_into_single_school(self):
         """Explicit '- сграда ...' records should merge into one school with multiple locations."""
-        from app.schemas.scraping import DiscoveredSchool, DiscoveredLocation
+        from app.schemas.scraping import DiscoveredLocation, DiscoveredSchool
 
         adapter = KgSofiaBgAdapter(db=None)
 
@@ -529,7 +532,7 @@ class TestKgSofiaBuildingMerges:
 
     def test_does_not_merge_without_building_suffix(self):
         """Records without '- сграда' suffix must remain independent."""
-        from app.schemas.scraping import DiscoveredSchool, DiscoveredLocation
+        from app.schemas.scraping import DiscoveredLocation, DiscoveredSchool
 
         adapter = KgSofiaBgAdapter(db=None)
 
@@ -694,6 +697,7 @@ class TestKgSofiaImportCompleteness:
         self, db_session: AsyncSession
     ):
         from sqlalchemy import func, select
+
         from app.models import School
 
         kindergartens = [_kg_record(i, f"ДГ №{i} Тест") for i in range(1, 7)]
@@ -720,6 +724,7 @@ class TestKgSofiaImportCompleteness:
     async def test_record_with_known_kg_id_updates_existing_school(self, db_session: AsyncSession):
         """A linked school is matched by kg id, even when its name no longer matches."""
         from sqlalchemy import func, select
+
         from app.models import School, SchoolLocation
 
         existing = School(
@@ -759,6 +764,7 @@ class TestKgSofiaImportCompleteness:
         self, db_session: AsyncSession
     ):
         from sqlalchemy import select
+
         from app.models import School, SchoolLocation
         from app.schemas.scraping import DiscoveredLocation, DiscoveredSchool
 
@@ -892,6 +898,7 @@ class TestKgSofiaImportCompleteness:
         self, db_session: AsyncSession
     ):
         from sqlalchemy import select
+
         from app.models import School, SchoolLocation, SchoolLocationAgeGroupShift
         from app.schemas.scraping import DiscoveredLocation, DiscoveredSchool
 
@@ -968,6 +975,7 @@ class TestKgSofiaImportCompleteness:
 
     async def test_school_records_never_create_schools(self, db_session: AsyncSession):
         from sqlalchemy import func, select
+
         from app.models import School
 
         schools = [_kg_record(100, "33 СУ Тест", public_type="СУ")]
@@ -988,6 +996,7 @@ class TestKgSofiaImportCompleteness:
         self, db_session: AsyncSession
     ):
         from sqlalchemy import select
+
         from app.models import School, SchoolLocation
         from app.schemas.scraping import DiscoveredLocation, DiscoveredSchool
 
