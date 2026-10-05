@@ -37,11 +37,11 @@ async def compare_schools(
         # Convert to integers and validate
         try:
             school_ids = [int(id_str) for id_str in id_strings]
-        except ValueError:
+        except ValueError as exc:
             raise HTTPException(
                 status_code=400,
                 detail="Invalid school IDs. All IDs must be positive integers."
-            )
+            ) from exc
 
         # Validate all IDs are positive
         if any(id_val <= 0 for id_val in school_ids):
@@ -82,4 +82,4 @@ async def compare_schools(
         raise HTTPException(
             status_code=500,
             detail="An error occurred while fetching schools for comparison. Please try again later."
-        )
+        ) from e

@@ -24,7 +24,7 @@ async def list_countries(db: AsyncSession = Depends(get_db)):
         raise HTTPException(
             status_code=500,
             detail="An error occurred while fetching countries.",
-        )
+        ) from e
 
 
 @router.get("/{code}", response_model=CountryConfigResponse)
@@ -43,4 +43,4 @@ async def get_country(code: str, db: AsyncSession = Depends(get_db)):
         raise HTTPException(
             status_code=500,
             detail="An error occurred while fetching country configuration.",
-        )
+        ) from e
