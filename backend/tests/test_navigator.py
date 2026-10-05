@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from urllib.robotparser import RobotFileParser
 
 import pytest
 from sqlalchemy import select
@@ -287,6 +288,21 @@ def test_extract_map_link_coordinates_supports_center_param():
     )
 
     assert coords == (42.65034, 23.319464)
+
+
+def test_crawler_identifies_itself_and_checks_robots_txt():
+    navigator = WebsiteNavigator(country_code="bg")
+
+    browser_config = navigator._build_browser_config()
+    run_config = navigator._build_run_config("https://school.bg/")
+
+    assert "schooldecider.com" in browser_config.user_agent
+    # A robots.txt rule addressed to the bot by name must apply to it.
+    robots = RobotFileParser()
+    robots.parse(["User-agent: SchoolDeciderBot", "Disallow: /"])
+    assert robots.can_fetch(browser_config.user_agent, "https://school.bg/fees") is False
+    assert browser_config.enable_stealth is False
+    assert run_config.check_robots_txt is True
 
 
 def test_build_run_config_uses_raw_html_for_about_and_contact_pages():
