@@ -4,6 +4,9 @@ Sources: full project review + data-quality architecture review (2026-07-06), re
 assessment (2026-07-07). This file is the single backlog. Each task is written so a
 coding agent (Claude Code or Codex) can execute it in one session with no extra context.
 
+Evidence paths under `backend/reports/` point to local run reports. They are gitignored
+and not in the repository.
+
 **Core diagnosis (why we're in circles):** quality signals are recorded *after*
 publication instead of enforced *before* it. Extraction writes straight into the rows
 the API serves; validation status, confidence scores, and FieldSource provenance are

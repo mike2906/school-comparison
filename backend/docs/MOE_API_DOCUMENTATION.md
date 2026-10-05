@@ -139,8 +139,6 @@ https://ri-api.mon.bg
 - Exam results
 
 ### Detail Endpoint (Enhanced Data)
-**See [MOE_API_ENHANCED_SUMMARY.md](MOE_API_ENHANCED_SUMMARY.md) for the two-phase approach.**
-
 The `/data/get/institution` endpoint (requires `instid` + `procID`) provides:
 - ✅ Full physical addresses
 - ✅ Phone numbers

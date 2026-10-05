@@ -5,8 +5,7 @@ const MIN_REQUEST_INTERVAL_MS = 1000
 const DEBOUNCE_MS = 500
 const NOMINATIM_BASE_URL = 'https://nominatim.openstreetmap.org/search'
 const NOMINATIM_REVERSE_URL = 'https://nominatim.openstreetmap.org/reverse'
-// TODO: Update the contact email to a role-based address before production release.
-const NOMINATIM_USER_AGENT = 'SchoolFinder/1.0 (contact: mike.ruse90@gmail.com)'
+const NOMINATIM_USER_AGENT = 'SchoolFinder/1.0 (contact: contact@schooldecider.com)'
 
 let lastRequestAt = 0
 let pendingReject = null
