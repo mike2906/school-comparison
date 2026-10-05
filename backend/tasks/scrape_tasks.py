@@ -82,7 +82,7 @@ def discover_schools(
         return run_async(_discover_schools_async(country_code, adapter_name, city, limit))
     except Exception as exc:
         logger.exception(f"Discovery failed: {exc}")
-        raise self.retry(exc=exc) from exc
+        raise self.retry(exc=exc)  # noqa: B904 - Celery retry raises internally
 
 
 async def _discover_schools_async(country_code, adapter_name, city, limit):
@@ -175,7 +175,7 @@ def discover_websites_batch(
         }
     except Exception as exc:
         logger.exception(f"Website discovery batch failed: {exc}")
-        raise self.retry(exc=exc) from exc
+        raise self.retry(exc=exc)  # noqa: B904 - Celery retry raises internally
 
 
 async def _get_schools_for_website_discovery(country_code, city, limit):
@@ -214,7 +214,7 @@ def discover_school_website_task(self, school_id: int, country_code: str = "bg")
         return run_async(_discover_school_website_async(school_id, country_code))
     except Exception as exc:
         logger.exception(f"Website discovery failed for school {school_id}: {exc}")
-        raise self.retry(exc=exc) from exc
+        raise self.retry(exc=exc)  # noqa: B904 - Celery retry raises internally
 
 
 async def _discover_school_website_async(school_id, country_code):
@@ -282,7 +282,7 @@ def validate_urls_batch(
 
     except Exception as exc:
         logger.exception(f"URL validation batch failed: {exc}")
-        raise self.retry(exc=exc) from exc
+        raise self.retry(exc=exc)  # noqa: B904 - Celery retry raises internally
 
 
 async def _get_schools_for_url_validation(country_code, city, limit):
@@ -331,7 +331,7 @@ def validate_school_url(self, school_id: int, country_code: str = "bg"):
         return run_async(_validate_school_url_async(school_id, country_code))
     except Exception as exc:
         logger.exception(f"URL validation failed for school {school_id}: {exc}")
-        raise self.retry(exc=exc) from exc
+        raise self.retry(exc=exc)  # noqa: B904 - Celery retry raises internally
 
 
 async def _validate_school_url_async(school_id, country_code):
@@ -411,7 +411,7 @@ def navigate_batch(
         }
     except Exception as exc:
         logger.exception(f"Navigation batch failed: {exc}")
-        raise self.retry(exc=exc) from exc
+        raise self.retry(exc=exc)  # noqa: B904 - Celery retry raises internally
 
 
 async def _get_schools_for_navigation(country_code, city, limit, include_navigated: bool = False):
@@ -452,7 +452,7 @@ def navigate_school_website(self, school_id: int, country_code: str = "bg"):
         return run_async(_navigate_school_website_async(school_id, country_code))
     except Exception as exc:
         logger.exception(f"Navigation failed for school {school_id}: {exc}")
-        raise self.retry(exc=exc) from exc
+        raise self.retry(exc=exc)  # noqa: B904 - Celery retry raises internally
 
 
 async def _navigate_school_website_async(school_id: int, country_code: str = "bg"):
@@ -512,7 +512,7 @@ def extract_batch(
         }
     except Exception as exc:
         logger.exception(f"Extraction batch failed: {exc}")
-        raise self.retry(exc=exc) from exc
+        raise self.retry(exc=exc)  # noqa: B904 - Celery retry raises internally
 
 
 async def _get_schools_for_extraction(country_code, city, limit):
@@ -553,7 +553,7 @@ def extract_school_data(self, school_id: int, country_code: str = "bg"):
         return run_async(_extract_school_async(school_id, country_code))
     except Exception as exc:
         logger.exception(f"Extraction failed for school {school_id}: {exc}")
-        raise self.retry(exc=exc) from exc
+        raise self.retry(exc=exc)  # noqa: B904 - Celery retry raises internally
 
 
 async def _extract_school_async(school_id, country_code):
@@ -619,7 +619,7 @@ def validate_batch(
         }
     except Exception as exc:
         logger.exception("Validation batch failed: %s", exc)
-        raise self.retry(exc=exc) from exc
+        raise self.retry(exc=exc)  # noqa: B904 - Celery retry raises internally
 
 
 async def _get_schools_for_validation(
@@ -667,7 +667,7 @@ def validate_school_data_task(self, school_id: int, country_code: str = "bg"):
         return run_async(_validate_school_data_async(school_id, country_code))
     except Exception as exc:
         logger.exception("Validation failed for school %s: %s", school_id, exc)
-        raise self.retry(exc=exc) from exc
+        raise self.retry(exc=exc)  # noqa: B904 - Celery retry raises internally
 
 
 async def _validate_school_data_async(school_id: int, country_code: str = "bg"):
@@ -761,7 +761,7 @@ def run_spot_checks(
         }
     except Exception as exc:
         logger.exception("Spot-check batch failed: %s", exc)
-        raise self.retry(exc=exc) from exc
+        raise self.retry(exc=exc)  # noqa: B904 - Celery retry raises internally
 
 
 async def _sample_school_ids_for_spot_checks(
@@ -822,7 +822,7 @@ def run_spot_check_task(self, school_id: int, country_code: str = "bg"):
         return run_async(_run_spot_check_async(school_id, country_code))
     except Exception as exc:
         logger.exception("Spot-check failed for school %s: %s", school_id, exc)
-        raise self.retry(exc=exc) from exc
+        raise self.retry(exc=exc)  # noqa: B904 - Celery retry raises internally
 
 
 async def _run_spot_check_async(school_id: int, country_code: str = "bg"):
@@ -896,7 +896,7 @@ def summarize_batch(
         }
     except Exception as exc:
         logger.exception("Summarization batch failed: %s", exc)
-        raise self.retry(exc=exc) from exc
+        raise self.retry(exc=exc)  # noqa: B904 - Celery retry raises internally
 
 
 @celery_app.task(
@@ -912,7 +912,7 @@ def summarize_school(self, school_id: int, country_code: str = "bg"):
         return run_async(_summarize_school_async(school_id, country_code))
     except Exception as exc:
         logger.exception("Summarization failed for school %s: %s", school_id, exc)
-        raise self.retry(exc=exc) from exc
+        raise self.retry(exc=exc)  # noqa: B904 - Celery retry raises internally
 
 
 async def _get_schools_for_summarization(
