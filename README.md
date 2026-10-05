@@ -2,111 +2,147 @@
 
 [![CI](https://github.com/mike2906/school-comparison/actions/workflows/ci.yml/badge.svg)](https://github.com/mike2906/school-comparison/actions/workflows/ci.yml)
 
-Bilingual (Bulgarian/English) web app for parents in Sofia to discover, filter, and compare kindergartens and schools.
+A bilingual (Bulgarian/English) web app that helps parents in Sofia find and compare
+kindergartens and schools. Live at [schooldecider.com](https://schooldecider.com).
 
-## Features
-- Interactive map of school locations
-- Filter by enrollment year (age group)
-- Compare private schools side-by-side (pricing, facilities)
-- View NVO exam results for state schools
-- Admission thresholds and points history
-- Bilingual UI (Bulgarian primary, English secondary)
+This repository holds the code, infrastructure and agent instructions. The school dataset
+is not in it.
 
-## Tech Stack
-- Backend: FastAPI, SQLAlchemy 2.0 (async), PostgreSQL
-- Frontend: React 18 + Vite, Leaflet, Tailwind, i18next
+## What it does
 
-## Scraping Pipeline Status
-Implemented:
-- Stage 1: School discovery adapters
-- Stage 2: Website discovery + normalization
-- Stage 3: URL validation (heuristics + optional LLM fallback)
-- Stage 4: Website navigation + page caching
-- Stage 5: Extraction (pricing + general info, hash-based skip, quality gate)
-- Stage 6: Data validation + monitoring spot-checks
-- Stage 7: summarization
-- Independent official BG NVO import (`nvo` stage, 2021-2025 Sofia backfill loaded)
+- Map and list of schools, filtered by enrollment year, city and school type.
+- Side-by-side comparison of private schools: fees, facilities, languages.
+- Official NVO exam results for state schools (grades 4, 7 and 10, 2021–2025).
+- Every published price links to the page it was read from.
+- One prerendered, indexable page per school, in both languages.
 
-## Local Development
+## Architecture
+
+```
+Browser ──> Cloudflare Pages   static site: React 18 + Vite, prerendered per school
+        └─> Cloudflare proxy ──> OVH VPS: Caddy ──> FastAPI ──> PostgreSQL
+```
+
+| Part | Stack | Where |
+|---|---|---|
+| API | FastAPI (async), SQLAlchemy 2.0, Alembic, Pydantic v2 | `backend/app/` |
+| Frontend | React 18, Vite, Leaflet, i18next, Tailwind | `frontend/` |
+| Scraping pipeline | Click CLI, Celery, Crawl4AI, pydantic-ai | `backend/app/scrapers/` |
+| Production stack | Docker Compose: Caddy, API, Postgres on one VPS | `docker-compose.prod.yml`, `deploy/` |
+| Cloud config | Terraform for Cloudflare: DNS, TLS, Origin CA certificate, Pages | `infra/` |
+| CI and CD | GitHub Actions | `.github/workflows/` |
+
+Production serves a published snapshot of the data. The scraping pipeline, Redis and
+Celery run offline and are not part of the production stack. The host firewall accepts
+HTTPS only from Cloudflare's address ranges.
+
+### Continuous deployment
+
+Every push to `main` runs the tests and then a release
+([`deploy.yml`](.github/workflows/deploy.yml), runbook in [`deploy/README.md`](deploy/README.md)):
+
+1. The API image is built and pushed to GHCR. The runner's SSH key can run one command on
+   the host, `deploy/deploy.sh`, which pulls the image, runs `alembic upgrade head`,
+   restarts the API and waits for `/ready`. If the new container is not ready within a
+   minute, the previous image is restarted.
+2. The site is built against the live API and uploaded to Cloudflare Pages, then smoke
+   tested. If that fails, Pages goes back to the previous deployment, and so does the API
+   if this run deployed it.
+
+A rollback changes the image only, so migrations are written expand-then-contract: each
+one must leave the schema usable by the previous image.
+
+## Publish boundary
+
+Scraped data is wrong often enough that storing a value and publishing it are separate
+steps. Extracted values, provenance and validation reports live in internal JSON columns,
+and no API response serializes them directly:
+
+- Each response is built from an explicit allowlist of fields.
+- Website-derived fields are published only when the school's scrape status is
+  publishable, no withholding marker is set, and a current validation report exists.
+- `backend/app/utils/display_gating.py` drops fields, price rows and summaries that carry
+  an error-level validation issue or an actionable spot-check discrepancy.
+- A price row needs a source URL and a minimum confidence. Its amount is checked against
+  the text of the linked page; a deposit or a single installment filed as tuition is
+  rejected.
+
+The gates fail closed: a value that cannot be verified is withheld, not shown with a
+caveat. The prerendered site is built from the public API, so it cannot show anything the
+boundary withholds.
+
+## Scraping and validation pipeline
+
+Stages run from one CLI (`uv run python -m app.scrapers.cli run --stage <stage>`):
+
+1. **Discovery**: schools from the Ministry of Education registry and Sofia's
+   kindergarten admission system.
+2. **Website discovery**: find each school's official site and filter out directory sites.
+3. **URL validation**: heuristics, with an optional LLM fallback.
+4. **Navigation**: crawl and cache the relevant pages.
+5. **Extraction**: fees and general information as structured LLM output (Pydantic
+   schemas), skipped when the page hash is unchanged.
+6. **Validation**: deterministic checks plus LLM spot checks on a sample. The results
+   feed the publish boundary.
+7. **Summaries**: short bilingual descriptions.
+
+NVO exam results are imported separately from the official open-data sets. Each billable
+LLM request is recorded in a ledger, and a run stops at its cost cap.
+
+## Built with AI agents
+
+Most of the code was written by coding agents (Claude Code and Codex) working under rules
+kept in the repository:
+
+- [`AGENTS.md`](AGENTS.md), [`backend/AGENTS.md`](backend/AGENTS.md) and
+  [`frontend/AGENTS.md`](frontend/AGENTS.md) hold the domain rules and invariants an agent
+  reads before changing code. [`skills/`](skills/) holds task procedures.
+- [`skills/github-process/SKILL.md`](skills/github-process/SKILL.md) defines the review
+  rules. Work happens on an `agent/*` branch and goes through a pull request and CI. The
+  agent reviews its own complete diff, and code changes get a second, tool-assisted review.
+- An agent may merge its own pull request only when the change is docs, tests, config
+  defaults or a small bug fix with a regression test. Changes to the publish boundary,
+  migrations, credentials, infrastructure, running cost or the checks themselves go to a
+  human.
+- An agent must never loosen a check to get its pull request through.
+
+[`docs/GO_LIVE_PLAN.md`](docs/GO_LIVE_PLAN.md) is the working backlog, including what
+went wrong along the way and how it was fixed.
+
+## Known limitations
+
+- A few modules are much too large: `backend/app/scrapers/cli.py` and
+  `extractor_helpers.py` are over 4,000 lines each, and the main search page component is
+  about 2,000.
+- The backend has no linter or type checker in CI yet; the frontend runs ESLint.
+- Coverage is Sofia only, and a fee is published only where the gates can verify it, so
+  many private schools show no prices.
+
+## Local development
+
 ```bash
-# Optional but recommended (gitignored root .env):
-# SEARXNG_SECRET=your-long-random-secret
+docker compose up -d                              # PostgreSQL, Redis, SearXNG
 
-# Databases
-docker-compose up -d
-
-# Backend
 cd backend
+cp .env.example .env
+uv run alembic upgrade head
+uv run python scripts/seed_data.py                # 100 made-up schools
 uv run uvicorn app.main:app --reload
 
-# Frontend
-cd frontend
+cd ../frontend
+npm ci
 npm run dev
 ```
 
-If `searxng` crash-loops with `server.secret_key is not changed`, set `SEARXNG_SECRET` in a root `.env` file (project root, not `backend/.env`) and restart:
+Tests: `cd backend && uv run pytest -q` (about 1,500 tests, on SQLite) and
+`cd frontend && npm test`.
 
-```bash
-docker compose up -d --force-recreate searxng
-```
+More recipes are in [`skills/common-tasks/SKILL.md`](skills/common-tasks/SKILL.md).
 
-Backend env note: `DEBUG=true` no longer enables SQL logging by itself. Use `DATABASE_ECHO=true` when you explicitly want SQL query logs.
-
-## Scraper CLI Quick Commands
-```bash
-cd backend
-
-# Batch website discovery (Stage 2)
-uv run python -m app.scrapers.cli run --stage discover-websites --city sofia --sync --limit 100
-
-# Recover failed URL candidates
-uv run python -m app.scrapers.cli run --stage recover-failed-urls --city sofia --sync --limit 50
-
-# Validate URLs (Stage 3)
-uv run python -m app.scrapers.cli run --stage validate-urls --city sofia --sync --limit 100
-
-# Navigate validated websites (Stage 4)
-uv run python -m app.scrapers.cli run --stage navigate --city sofia --sync --limit 100
-
-# Extract structured data from navigated pages (Stage 5)
-uv run python -m app.scrapers.cli run --stage extract --city sofia --sync --limit 100
-
-# Validate extracted data and run monitoring spot-checks (Stage 6)
-uv run python -m app.scrapers.cli run --stage validate-data --city sofia --sync --limit 100
-
-# Generate bilingual summaries for eligible schools (Stage 7)
-uv run python -m app.scrapers.cli run --stage summarize --city sofia --sync --limit 100
-
-# Import official NVO results (independent of website pipeline)
-uv run python -m app.scrapers.cli run --stage nvo --city sofia --country bg --sync
-```
-
-## Recommended Single-School Workflow
-For problematic domains (like bot-protected sites), use the standard per-school flow:
-1. `validate-urls`
-2. `navigate` (now includes challenge-aware retry and undetected+stealth second fallback)
-3. `extract`
-
-```bash
-cd backend
-scripts/run_school_workflow.sh --school-id 182
-```
-
-## Extraction Tuning
-Set these in `backend/.env` when tuning quality/cost:
-
-```bash
-EXTRACTION_GENERAL_INFO_MIN_QUALITY_SCORE=4
-EXTRACTION_OUTPUT_RETRIES=2
-EXTRACTION_OPENROUTER_MODELS=openai/gpt-4o-mini
-EXTRACTION_OPENROUTER_PROVIDER_ALLOW_FALLBACKS=true
-```
-
-Use the single-school workflow for fast validation:
-```bash
-cd backend
-scripts/run_school_workflow.sh --school-id 182
-```
+`backend/tests/golden_corpus/` holds excerpts of public school web pages, used as
+regression fixtures for extraction. To have one removed, write to
+contact@schooldecider.com.
 
 ## License
-TBD
+
+[MIT](LICENSE)
