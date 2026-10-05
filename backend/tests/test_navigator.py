@@ -428,6 +428,59 @@ async def test_navigate_school_returns_failure_when_no_extractable_content(db_se
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("robots_blocked", [True, False])
+async def test_navigate_school_withholds_cached_data_only_when_robots_txt_blocks(db_session, robots_blocked):
+    from unittest.mock import patch
+
+    from app.utils.website_data import WEBSITE_DATA_WITHHELD_KEY
+
+    school = School(
+        name_i18n={"bg": "Тестово училище"},
+        country_code="bg",
+        school_type="state",
+        education_level="primary",
+        city="sofia",
+        website_url="https://school.bg",
+        scrape_status="extracted",
+        attributes={"extracted": {"class_size": "20"}},
+    )
+    db_session.add(school)
+    await db_session.commit()
+    db_session.add(
+        SourcePage(
+            school_id=school.id,
+            scrape_type=ScrapeType.WEBSITE,
+            source_url="https://school.bg/fees",
+            content_hash="hash-fees",
+            raw_markdown="Tuition 5000 EUR per year",
+            is_valid=True,
+        )
+    )
+    await db_session.commit()
+
+    async def fake_discover_pages(self, website_url: str):
+        return website_url, []
+
+    async def fake_robots_disallows(self, url: str):
+        return robots_blocked
+
+    with (
+        patch("app.scrapers.navigator.WebsiteNavigator.discover_pages", new=fake_discover_pages),
+        patch("app.scrapers.navigator.WebsiteNavigator.robots_disallows", new=fake_robots_disallows),
+    ):
+        result = await navigate_school(db=db_session, school_id=school.id, country_code="bg")
+
+    page = (await db_session.execute(select(SourcePage).where(SourcePage.school_id == school.id))).scalar_one()
+    await db_session.refresh(school)
+
+    assert result["success"] is False
+    assert page.is_valid is (not robots_blocked)
+    assert bool(school.attributes.get(WEBSITE_DATA_WITHHELD_KEY)) is robots_blocked
+    assert school.attributes["extracted"] == {"class_size": "20"}
+    assert (result["reason"] == "Disallowed by robots.txt") is robots_blocked
+
+
+@pytest.mark.asyncio
 async def test_navigate_schools_batch_uses_discover_many_and_persists(db_session):
     schools = []
     for idx in range(2):

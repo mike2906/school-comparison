@@ -20,6 +20,7 @@ from app.config import CRAWLER_USER_AGENT, get_settings
 from app.models import School, ScrapeType, SourcePage
 from app.scrapers.base import BaseScraper
 from app.scrapers.url_validator import URLValidator
+from app.utils.website_data import WEBSITE_DATA_WITHHELD_KEY
 
 logger = logging.getLogger(__name__)
 
@@ -686,6 +687,18 @@ class WebsiteNavigator:
         except TypeError:
             return [results_obj]
 
+    async def robots_disallows(self, url: str) -> bool:
+        """Return True when the site's robots.txt forbids the crawler from fetching ``url``."""
+        from crawl4ai.utils import RobotsParser  # type: ignore
+
+        try:
+            return not await RobotsParser().can_fetch(url, CRAWLER_USER_AGENT)
+        except Exception as exc:
+            # The crawl itself already honoured robots.txt; an unreadable rules cache must
+            # not stop the navigation result from being saved.
+            logger.warning("robots.txt check failed for %s: %s", url, exc)
+            return False
+
     async def discover_pages(self, website_url: str) -> tuple[str, list[NavigatedPage]]:
         from crawl4ai import AsyncWebCrawler  # type: ignore
 
@@ -992,6 +1005,16 @@ async def _persist_navigation_result(
             existing_page.raw_markdown = None
             invalidated += 1
 
+    # The site asks not to be crawled: stop using the pages fetched before and withhold the
+    # data extracted from them. Only a later extraction plus validation clears the marker.
+    robots_blocked = not pages and await navigator.robots_disallows(normalized_url)
+    if robots_blocked:
+        for existing_page in existing_pages:
+            if existing_page.is_valid:
+                existing_page.is_valid = False
+                invalidated += 1
+        school.attributes = {**(school.attributes or {}), WEBSITE_DATA_WITHHELD_KEY: True}
+
     if final_url and final_url != school.website_url:
         school.website_url = final_url
 
@@ -1004,7 +1027,7 @@ async def _persist_navigation_result(
         return {
             "school_id": school_id,
             "success": False,
-            "reason": "No extractable page content",
+            "reason": "Disallowed by robots.txt" if robots_blocked else "No extractable page content",
             "pages_found": len(pages),
             "pages_with_content": 0,
             "created": created,
