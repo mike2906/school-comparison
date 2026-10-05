@@ -2132,11 +2132,29 @@ the session scratchpad only.
             (cookieless, no custom events yet); a short privacy notice.
       - [ ] Google Search Console and Bing Webmaster Tools: verify, submit the sitemap,
             inspect representative pages.
+      - [ ] CD follow-ups (from the CD item, 2026-10-05):
+            - [ ] Slim the API image (1.7 GB): move the scraping dependencies out of the
+                  runtime set. Not a pure dependency move, because API-path modules
+                  (`app/services/school_relations.py`, `app/utils/transliteration.py`, ...)
+                  import scraper code or its dependencies; untangle and test first.
+            - [ ] After the next API release, remove the hand-built
+                  `schooldecider-api:local` image from the host (Mike; the agent has no
+                  host shell): `docker image rm schooldecider-api:local`.
+            - [ ] Deploy secrets are exposed to every branch. The account is on GitHub
+                  Free, where a private repo has no environments (so no `production`
+                  environment limited to `main`) and no branch protection. Any workflow
+                  pushed on any branch can read `DEPLOY_SSH_KEY` and
+                  `CLOUDFLARE_PAGES_TOKEN`. Accepted for now: only Mike and his agents
+                  push, and the key can only run `deploy/deploy.sh`. Decide before stage
+                  B's auto-merge: GitHub Pro (USD 4/month) or a public repo (both features
+                  are free there).
 
       **Stage B — Agent delivery loop.**
       - [ ] Protect the checks from the agents they check: CODEOWNERS plus branch protection
             on `.github/workflows/`, gate and threshold configs, `AGENTS.md` and `skills/`.
             Changes there are big changes.
+            Note (2026-10-05): branch protection and rulesets are not available for a
+            private repo on GitHub Free; see the CD follow-up on deploy secrets.
       - [ ] Staging stack on the same VPS (a second compose project with its own DB loaded
             from the published snapshot); PR preview deploys point at it.
       - [ ] Playwright journeys for the core user stories (search and filter, school
