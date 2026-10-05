@@ -58,7 +58,6 @@ line-length = 120
 select = ["E", "F", "I", "B"]
 ignore = [
     "E501",  # no formatter; prompt strings and seed data run long, reflowing them risks changing prompts
-    "B904",  # `raise ... from err` in 25 except blocks; only changes tracebacks, left for a follow-up
     "B905",  # zip(strict=True) would raise on length mismatch, a behaviour change
 ]
 

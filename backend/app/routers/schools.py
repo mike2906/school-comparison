@@ -57,7 +57,7 @@ async def list_schools(
         raise HTTPException(
             status_code=500,
             detail="An error occurred while fetching schools. Please try again later."
-        )
+        ) from e
 
 # TODO: Rename endpoint to something more clear
 @router.get("/counts", response_model=dict[str, int])
@@ -90,7 +90,7 @@ async def get_school_counts(
         raise HTTPException(
             status_code=500,
             detail="An error occurred while fetching school counts. Please try again later."
-        )
+        ) from e
 
 
 @router.get("/filters", response_model=dict[str, list[str]])
@@ -108,7 +108,7 @@ async def get_available_filters(
         raise HTTPException(
             status_code=500,
             detail="An error occurred while fetching available filters. Please try again later."
-        )
+        ) from e
 
 
 @router.get("/search", response_model=list[SchoolListResponse])
@@ -133,7 +133,7 @@ async def search_schools(
         raise HTTPException(
             status_code=500,
             detail="An error occurred while searching schools. Please try again later."
-        )
+        ) from e
 
 
 @router.get("/exam-averages")
@@ -197,7 +197,7 @@ async def get_exam_averages(
         raise HTTPException(
             status_code=500,
             detail="An error occurred while calculating exam averages. Please try again later."
-        )
+        ) from e
 
 
 @router.get("/{school_id}", response_model=SchoolDetailResponse)
@@ -231,4 +231,4 @@ async def get_school(
         raise HTTPException(
             status_code=500,
             detail="An error occurred while fetching school details. Please try again later."
-        )
+        ) from e
