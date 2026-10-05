@@ -42,7 +42,7 @@ def _normalize_preferred_english_tokens(text: str) -> str:
     result = text
     for source, target in PREFERRED_EN_TOKENS.items():
         pattern = re.compile(rf"\b{re.escape(source)}\b", flags=re.IGNORECASE)
-        result = pattern.sub(lambda m: _match_case(m.group(0), target), result)
+        result = pattern.sub(lambda m: _match_case(m.group(0), target), result)  # noqa: B023  (called within this iteration)
     return result
 
 

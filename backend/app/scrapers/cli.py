@@ -2740,7 +2740,7 @@ async def _repair_websites_command(
                 .where(
                     SourcePage.school_id.in_(website_school_ids),
                     SourcePage.scrape_type == ScrapeType.WEBSITE,
-                    SourcePage.is_valid != False,
+                    SourcePage.is_valid != False,  # noqa: E712  (SQL expression)
                     SourcePage.raw_markdown.isnot(None),
                 )
                 .order_by(SourcePage.school_id, SourcePage.id)

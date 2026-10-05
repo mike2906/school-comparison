@@ -85,7 +85,7 @@ async def main():
         ).casefold()
         rows = []
         for s in sorted(members, key=lambda x: x.id):
-            addr = next(((l.address_i18n or {}).get('bg') for l in s.locations
+            addr = next(((l.address_i18n or {}).get('bg') for l in s.locations  # noqa: E741
                          if (l.address_i18n or {}).get('bg')), '')
             rows.append({
                 'id': s.id,

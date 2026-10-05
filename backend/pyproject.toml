@@ -58,12 +58,8 @@ line-length = 120
 select = ["E", "F", "I", "B"]
 ignore = [
     "E501",  # no formatter; prompt strings and seed data run long, reflowing them risks changing prompts
-    "B904",  # `raise ... from err` in 30 except blocks; only changes tracebacks, left for a follow-up
+    "B904",  # `raise ... from err` in 25 except blocks; only changes tracebacks, left for a follow-up
     "B905",  # zip(strict=True) would raise on length mismatch, a behaviour change
-    "B039",  # ContextVar default is evaluated once on purpose (extractor_helpers)
-    "E741",  # short names like `l` in comprehensions
-    "E712",  # `== True` / `!= False` on SQLAlchemy columns is a SQL expression
-    "B023",  # lambda is called inside the loop iteration (transliteration)
 ]
 
 [tool.ruff.lint.flake8-bugbear]
@@ -71,7 +67,10 @@ ignore = [
 extend-immutable-calls = ["fastapi.Depends", "fastapi.Query"]
 
 [tool.ruff.lint.per-file-ignores]
-# Imports after code are deliberate: circular-import ordering, adapter registration, dotenv.
-"app/models/*.py" = ["E402"]
+# Imports after code are deliberate: circular-import ordering and adapter registration.
+"app/models/field_source.py" = ["E402"]
+"app/models/school.py" = ["E402"]
+"app/models/source_page.py" = ["E402"]
+"app/models/spot_check.py" = ["E402"]
 "app/scrapers/cli.py" = ["E402"]
 "app/scrapers/sources/__init__.py" = ["E402"]
