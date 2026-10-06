@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link } from 'react-router-dom'
-import Layout from '../Layout/Layout'
+import { Link, useLocation } from 'react-router-dom'
+import Layout, { CONTACT_EMAIL } from '../Layout/Layout'
 
 const SOURCES = [
   { key: 'schools', href: null },
@@ -11,9 +11,18 @@ const SOURCES = [
   { key: 'maps', href: 'https://www.openstreetmap.org/copyright' },
 ]
 
+const PRIVACY = ['account', 'browser', 'lookups', 'hosting', 'contact']
+
 /** Where the data comes from and how to read it: the main trust signal for parents. */
 function AboutPage() {
   const { t } = useTranslation()
+  const { hash, key } = useLocation()
+
+  // The page renders after the browser's own jump to the fragment, so repeat it. `key`
+  // changes on every navigation, so following the same link again scrolls again.
+  useEffect(() => {
+    if (hash) document.getElementById(hash.slice(1))?.scrollIntoView()
+  }, [hash, key])
 
   useEffect(() => {
     const previous = document.title
@@ -57,6 +66,15 @@ function AboutPage() {
 
         <h2 className="mt-10 text-xl font-semibold text-neutral-900">{t('about.limitsTitle')}</h2>
         <p className="mt-3 text-neutral-700">{t('about.limitsBody')}</p>
+
+        <h2 id="privacy" className="mt-10 scroll-mt-20 text-xl font-semibold text-neutral-900">
+          {t('about.privacyTitle')}
+        </h2>
+        {PRIVACY.map(key => (
+          <p key={key} className="mt-3 text-neutral-700">
+            {t(`about.privacy.${key}`, { email: CONTACT_EMAIL })}
+          </p>
+        ))}
 
         <Link
           to="/search"

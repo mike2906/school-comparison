@@ -1,0 +1,35 @@
+name: Uptime
+
+# Runs the post-deploy smoke tests against production every 15 minutes. GitHub emails the
+# repository owner when a scheduled run fails. One retry, so a single slow answer does not.
+on:
+  schedule:
+    - cron: "7,22,37,52 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: uptime
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  SITE_ORIGIN: https://schooldecider.com
+  API_ORIGIN: https://api.schooldecider.com
+
+jobs:
+  check:
+    name: Site and API
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Smoke tests
+        run: |
+          check() {
+            deploy/smoke.sh api "$API_ORIGIN" "$SITE_ORIGIN" && deploy/smoke.sh site "$SITE_ORIGIN"
+          }
+          check || { echo "First attempt failed; retrying in 60 seconds."; sleep 60; check; }
