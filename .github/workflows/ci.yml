@@ -54,6 +54,7 @@ jobs:
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/schooldecider_migrations
         run: |
+          uv run alembic upgrade head --sql > "$RUNNER_TEMP/migrations.sql"
           uv run alembic upgrade head
           uv run alembic check
           uv run alembic downgrade -1
