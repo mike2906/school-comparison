@@ -1,4 +1,5 @@
 """Test fixtures with SQLite."""
+import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -7,8 +8,17 @@ from app.database import Base, get_db
 from app.main import app
 from app.models.country import Country
 from app.models.school import School, SchoolLocation, SchoolLocationAgeGroupShift
+from app.routers import schools as schools_router
 
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
+
+
+@pytest.fixture(autouse=True)
+def clear_school_list_cache():
+    """Each test has its own database, so a cached list body must not outlive the test."""
+    schools_router._list_cache.clear()
+    yield
+    schools_router._list_cache.clear()
 
 
 @pytest_asyncio.fixture

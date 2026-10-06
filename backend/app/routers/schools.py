@@ -1,7 +1,10 @@
+import asyncio
 import logging
+import time
 from typing import Annotated, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Query
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Response
+from pydantic import TypeAdapter
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,6 +20,22 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 router = APIRouter()
+
+# Serializing the whole city (projection and gates for ~700 schools) takes seconds of CPU,
+# while the data only changes when a refresh is published. Keep the serialized body of the
+# requests the site makes for a few minutes; a restart (every deploy) clears it.
+LIST_CACHE_TTL_SECONDS = 600
+LIST_CACHE_MAX_ENTRIES = 32
+_list_cache: dict[tuple, tuple[float, bytes]] = {}
+_list_cache_lock = asyncio.Lock()
+_list_response_adapter = TypeAdapter(list[SchoolListResponse])
+
+
+def _cached_list_body(key: tuple) -> bytes | None:
+    entry = _list_cache.get(key)
+    if entry is None or time.monotonic() - entry[0] >= LIST_CACHE_TTL_SECONDS:
+        return None
+    return entry[1]
 
 
 @router.get("", response_model=list[SchoolListResponse])
@@ -35,23 +54,56 @@ async def list_schools(
 ):
     """List all schools, optionally filtered by age group and/or school type."""
     try:
-        service = SchoolService(db)
         # Map international to private (international is a subtype of private)
         if school_type == "international":
             school_type = "private"
-        schools = await service.list_schools_filtered(
-            country_code=country_code,
-            city=city,
-            age_group=age_group,
-            school_type=school_type,
-            education_level=education_level,
-            include_crossover=include_crossover,
-            language_focus=language_focus,
-            special_programs=special_programs,
-            facilities=facilities,
-            teaching_approach=teaching_approach,
+        # The advanced filters are free-form lists (the site applies them client-side),
+        # so those requests are not cached.
+        cacheable = not any([language_focus, special_programs, facilities, teaching_approach])
+        key = (
+            country_code,
+            SchoolService._normalize_city_filter(city),
+            age_group,
+            school_type,
+            education_level,
+            include_crossover,
         )
-        return schools
+        if cacheable:
+            body = _cached_list_body(key)
+            if body is not None:
+                return Response(content=body, media_type="application/json")
+
+        # One build at a time, so a burst of visitors on a cold cache waits for a single
+        # serialization instead of each running its own.
+        async with _list_cache_lock:
+            if cacheable:
+                body = _cached_list_body(key)
+                if body is not None:
+                    return Response(content=body, media_type="application/json")
+            service = SchoolService(db)
+            schools = await service.list_schools_filtered(
+                country_code=country_code,
+                city=city,
+                age_group=age_group,
+                school_type=school_type,
+                education_level=education_level,
+                include_crossover=include_crossover,
+                language_focus=language_focus,
+                special_programs=special_programs,
+                facilities=facilities,
+                teaching_approach=teaching_approach,
+            )
+            # Returning a Response skips FastAPI's own response_model pass, so serialize
+            # through the same allowlisted model here: this is the publish boundary.
+            body = _list_response_adapter.dump_json(
+                _list_response_adapter.validate_python(schools, from_attributes=True),
+                by_alias=True,
+            )
+            if cacheable:
+                if len(_list_cache) >= LIST_CACHE_MAX_ENTRIES:
+                    _list_cache.clear()
+                _list_cache[key] = (time.monotonic(), body)
+        return Response(content=body, media_type="application/json")
     except Exception as e:
         logger.error(f"Error listing schools: {e}", exc_info=True)
         raise HTTPException(

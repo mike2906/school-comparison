@@ -1,4 +1,5 @@
 from datetime import datetime
+from functools import cached_property
 from typing import Any, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, computed_field, field_validator
@@ -135,16 +136,22 @@ class SchoolAttributesMixin(BaseModel):
     def public_attributes_input(self) -> dict[str, Any]:
         return attributes_for_publication(self.raw_attributes, self.raw_scrape_status)
 
+    @cached_property
+    def display_projection(self) -> tuple[dict[str, Any], dict[str, dict[str, Any]]]:
+        # Shared by `attributes` and `attributes_i18n`: the projection is the most
+        # expensive part of serializing a school, so build it once per response object.
+        return build_display_attributes(self.public_attributes_input)
+
     @computed_field(return_type=SchoolDisplayAttributes)
     @property
     def attributes(self) -> SchoolDisplayAttributes:
-        base, _ = build_display_attributes(self.public_attributes_input)
+        base, _ = self.display_projection
         return SchoolDisplayAttributes.model_validate(base)
 
     @computed_field(return_type=dict[str, SchoolLocalizedAttributes])
     @property
     def attributes_i18n(self) -> dict[str, SchoolLocalizedAttributes]:
-        _, localized = build_display_attributes(self.public_attributes_input)
+        _, localized = self.display_projection
         return {
             locale: SchoolLocalizedAttributes.model_validate(values)
             for locale, values in localized.items()
