@@ -81,6 +81,11 @@ deploy() {
 		rm -rf "$docker_config"
 	fi
 
+	# exec requires a healthy database even after compose down or host recovery.
+	if ! dc up -d --wait --wait-timeout 60 postgres; then
+		die "database startup failed; migration not started"
+	fi
+
 	# Keep a recoverable snapshot before any schema change. A failed/invalid dump stops
 	# the release before Alembic runs; code rollback never downgrades the database.
 	local backup
@@ -97,6 +102,18 @@ deploy() {
 	fi
 	sha256sum "$backup" > "$backup.sha256"
 	echo "deploy: verified pre-migration backup at $backup"
+
+	# Keep this verified dump and the six most recent previous script-created dumps.
+	# Never prune on backup failure, and leave manually named archives untouched.
+	local -a older_backups
+	local old_backup
+	mapfile -d '' -t older_backups < <(
+		find "$APP_DIR/deploy/backups" -maxdepth 1 -type f -name 'pre-migrate-*.dump' \
+			! -path "$backup" -printf '%T@ %p\0' | sort -z -nr | cut -z -d' ' -f2-
+	)
+	for old_backup in "${older_backups[@]:6}"; do
+		rm -f -- "$old_backup" "$old_backup.sha256"
+	done
 
 	echo "deploy: migrating with $new"
 	API_IMAGE="$new" dc run --rm -T api alembic upgrade head </dev/null

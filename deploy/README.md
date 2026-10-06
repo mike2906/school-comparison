@@ -185,14 +185,17 @@ header (only on connections from a Cloudflare range) and passes it to the API, s
 
 ## Pre-migration backups
 
-The deployment script creates a mode-600 custom-format PostgreSQL archive under
+The deployment script starts PostgreSQL and waits for its healthcheck before creating a mode-600 custom-format PostgreSQL archive under
 `$APP_DIR/deploy/backups/` before each migration, validates its archive listing and records
 a SHA-256 checksum. A failed or empty backup stops deployment before migration. These files
 contain private data and must stay outside Git. Install the updated script before relying
 on this behavior; changing the repository does not update the host automatically.
 
-Backups are retained until deliberately removed. Monitor disk space and arrange off-host
-copies with a retention policy. To practice recovery, copy an archive to an isolated
+After a successful backup validation, the script keeps the new archive and the six most
+recent previous `pre-migrate-*.dump` archives, removing older archives and their checksum
+files. Backup failure leaves previous archives untouched. Other filenames are not pruned.
+This bounds archive count, not total bytes: monitor disk space as the database grows and
+arrange off-host copies with an independent retention policy. To practice recovery, copy an archive to an isolated
 PostgreSQL instance, create an empty database, and run `pg_restore --no-owner
 --exit-on-error -d <isolated_database> <archive>`. Verify the schema revision and data before
 using a backup for recovery. Never restore over the live database as a routine check.

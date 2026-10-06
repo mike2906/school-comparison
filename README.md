@@ -131,7 +131,7 @@ docker compose exec -T postgres createdb -U postgres sofia_schools_demo
 
 cd backend
 cp .env.example .env
-export DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/sofia_schools_demo
+sed -i 's|^DATABASE_URL=.*|DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/sofia_schools_demo|' .env
 uv sync --locked --extra dev
 uv run alembic upgrade head
 uv run python -m scripts.seed_data --reset-demo-data  # replaces demo data only
@@ -142,7 +142,9 @@ npm ci
 npm run dev
 ```
 
-The demo database is disposable. Reseeding replaces its school data; the script refuses
+The demo database URL is saved in `backend/.env`, so a new backend terminal uses the same
+database. Shell-level `DATABASE_URL` overrides still take precedence. The demo database is
+disposable. Reseeding replaces its school data; the script refuses
 the launch database and remote targets. Development service ports bind to loopback.
 Create the demo database once; on later starts, skip `createdb` and seeding unless you
 want to replace its data. Production setup is separate in [`deploy/README.md`](deploy/README.md).

@@ -50,15 +50,28 @@ jobs:
       - name: Run tests
         run: uv run pytest
 
-      - name: PostgreSQL clean install and latest revision rollback
+      - name: PostgreSQL clean install and populated alignment reapplication
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/schooldecider_migrations
+          POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
         run: |
           uv run alembic upgrade head --sql > "$RUNNER_TEMP/migrations.sql"
           uv run alembic upgrade head
           uv run alembic check
+          docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -d schooldecider_migrations -v ON_ERROR_STOP=1 <<'SQL'
+          INSERT INTO countries (code, name_i18n, education_config, map_config, supported_languages, default_language, default_currency, created_at, updated_at)
+          VALUES ('bg', '{}', '{}', '{}', '["bg"]', 'bg', 'BGN', now(), now());
+          INSERT INTO schools (country_code, name_i18n, school_type, education_level, city)
+          VALUES ('bg', '{"bg":"Migration preservation test"}', 'state', 'primary', 'sofia');
+          SQL
+          before="$(docker exec "$POSTGRES_CONTAINER" psql -U postgres -d schooldecider_migrations -Atc 'SELECT row_to_json(s)::text FROM schools s ORDER BY id')"
+          # The latest downgrade deliberately retains schema; rewind its revision marker
+          # so upgrade exercises conditional DDL against existing, populated tables.
           uv run alembic downgrade -1
           uv run alembic upgrade head
+          after="$(docker exec "$POSTGRES_CONTAINER" psql -U postgres -d schooldecider_migrations -Atc 'SELECT row_to_json(s)::text FROM schools s ORDER BY id')"
+          test -n "$before" && test "$before" = "$after"
+          uv run alembic check
 
       - name: Verify PostgreSQL backup restore
         env:
@@ -71,6 +84,9 @@ jobs:
           original="$(docker exec "$POSTGRES_CONTAINER" psql -U postgres -d schooldecider_migrations -Atc 'SELECT version_num FROM alembic_version')"
           restored="$(docker exec "$POSTGRES_CONTAINER" psql -U postgres -d schooldecider_restore -Atc 'SELECT version_num FROM alembic_version')"
           test -n "$original" && test "$original" = "$restored"
+          original_rows="$(docker exec "$POSTGRES_CONTAINER" psql -U postgres -d schooldecider_migrations -Atc 'SELECT row_to_json(s)::text FROM schools s ORDER BY id')"
+          restored_rows="$(docker exec "$POSTGRES_CONTAINER" psql -U postgres -d schooldecider_restore -Atc 'SELECT row_to_json(s)::text FROM schools s ORDER BY id')"
+          test -n "$original_rows" && test "$original_rows" = "$restored_rows"
 
   frontend:
     name: Frontend

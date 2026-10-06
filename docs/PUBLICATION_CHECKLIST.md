@@ -9,10 +9,12 @@ repository public, deploy a release or modify the existing school database.
 - Demo seeding requires an explicit reset flag and a local database named
   `sofia_schools_demo`; query-string connection overrides are refused.
 - Locked dependency updates remove known fixable advisories and unused AI provider SDKs.
-- CI tests a fresh PostgreSQL migration chain, model/schema alignment, the latest additive
-  revision rollback and a separate backup restoration.
+- CI tests a fresh PostgreSQL migration chain, model/schema alignment, populated-schema
+  reapplication and a separate backup restoration.
 - Deployment takes and validates a private custom-format PostgreSQL backup before migration.
-  A backup failure stops deployment. Backup files are excluded from Git.
+  PostgreSQL is started and awaited first. A backup failure stops deployment and preserves
+  previous archives; successful backup validation keeps the newest seven script-created
+  archives. Backup files are excluded from Git.
 - The initial migration now creates the pipeline table before later revisions alter it.
   The schema-alignment revision adds missing fields only where absent, preserving databases
   previously initialized with ORM `create_all`. Its downgrade intentionally retains fields
