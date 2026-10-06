@@ -133,11 +133,11 @@ No command below prints a secret.
 3. **Cloudflare token** for Pages only (My Profile → API Tokens → Create Custom Token):
    Account → Cloudflare Pages → Edit, account resources limited to this account, no zone
    permissions. This is a different token from Terraform's.
-4. **GitHub** (repository → Settings → Secrets and variables → Actions, or `gh`):
+4. **GitHub** (repository → Settings → Environments → production, or `gh`):
    ```bash
-   gh secret set DEPLOY_SSH_KEY < ~/.config/schooldecider/cd_deploy_key
-   gh secret set CLOUDFLARE_PAGES_TOKEN        # paste the token at the prompt
-   gh secret set DEPLOY_HOST --body <ip>       # a secret so the address is masked in run logs
+   gh secret set DEPLOY_SSH_KEY --env production < ~/.config/schooldecider/cd_deploy_key
+   gh secret set CLOUDFLARE_PAGES_TOKEN --env production   # paste the token at the prompt
+   gh secret set DEPLOY_HOST --env production --body <ip>  # a secret so the address is masked in run logs
    gh variable set CLOUDFLARE_ACCOUNT_ID --body <account id>
    gh variable set VITE_CARTO_API_KEY --body <key>   # optional; public, restricted at CARTO
    ```
@@ -148,10 +148,10 @@ The host's SSH public key is pinned in `deploy/ssh_host_key.pub`; the runner ref
 other. If the host is reinstalled, replace it (`ssh-keyscan -t ed25519 <ip>`, key type and
 key only, checked against the host's console).
 
-The three deployment secrets are repository secrets, so a workflow on any branch pushed to this
-repository can read them. On a GitHub plan with environments for private repositories
-(Pro or higher), move them to a `production` environment limited to `main` and add
-`environment: production` to the `deploy-api`, `frontend` and `rollback-api` jobs.
+The three deployment secrets belong in the `production` environment, which is limited to
+`main`; the `deploy-api`, `frontend` and `rollback-api` jobs name that environment. A
+repository secret of the same name is readable by a workflow on any branch, so delete it
+once the environment secret is set (`gh secret delete <NAME>`).
 
 ## Endpoints
 

@@ -120,6 +120,7 @@ jobs:
     name: Deploy API
     needs: build-api
     runs-on: ubuntu-latest
+    environment: production
     permissions:
       contents: read
       packages: read
@@ -152,6 +153,7 @@ jobs:
       ${{ !cancelled() && needs.ci.result == 'success' && needs.changes.outputs.release == 'true'
       && (needs.changes.outputs.api != 'true' || needs.deploy-api.result == 'success') }}
     runs-on: ubuntu-latest
+    environment: production
     permissions:
       contents: read
     defaults:
@@ -221,6 +223,7 @@ jobs:
     # One release: the API this run deployed does not stay without its site.
     if: ${{ always() && needs.deploy-api.result == 'success' && needs.frontend.result != 'success' }}
     runs-on: ubuntu-latest
+    environment: production
     permissions:
       contents: read
     env:
