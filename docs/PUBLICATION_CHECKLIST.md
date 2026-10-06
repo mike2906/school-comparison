@@ -35,8 +35,10 @@ repository public, deploy a release or modify the existing school database.
   outside contributors' forks need approval, and secret scanning with push protection is on.
 - Done 2026-10-06: the three deployment secrets live only in the `production` environment,
   which is restricted to `main`; no repository-level secrets remain.
-- Set an off-host backup and retention policy; the deployment backup alone is not disaster
-  recovery. Test restoration before deleting old archives.
+- Off-host backup: `backend/scripts/backup_offsite.sh` copies the launch database and
+  `backend/reports/` to a private R2 bucket ([runbook](../deploy/README.md), Off-host
+  backup). First run and a restore from the bucket checked 2026-10-06; run it after
+  each data publish.
 - Confirm the intended license and rights to any published data/assets. Add actual product
   screenshots when useful; never present mockups as implementation evidence.
 
