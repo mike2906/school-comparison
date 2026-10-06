@@ -127,6 +127,50 @@ class TestSchoolsEndpoint:
         assert "field_sources" not in school
 
     @pytest.mark.asyncio
+    async def test_list_schools_reuses_cached_body_until_ttl(self, seeded_client, monkeypatch):
+        """A repeat request is served from the cache; it is rebuilt after the TTL."""
+        from app.routers import schools as schools_router
+        from app.services.school_service import SchoolService
+
+        calls = 0
+        original = SchoolService.list_schools_filtered
+
+        async def counting(self, **kwargs):
+            nonlocal calls
+            calls += 1
+            return await original(self, **kwargs)
+
+        monkeypatch.setattr(SchoolService, "list_schools_filtered", counting)
+
+        first = await seeded_client.get("/schools")
+        second = await seeded_client.get("/schools")
+        assert first.status_code == second.status_code == 200
+        assert second.content == first.content
+        assert len(first.json()) == 3
+        assert calls == 1
+
+        # Different parameters are a different entry, not the cached full list.
+        filtered = await seeded_client.get("/schools?age_group=first")
+        assert calls == 2
+        assert len(filtered.json()) < 3
+
+        # Spelling the default city differently is the same entry.
+        await seeded_client.get("/schools?city=Sofia")
+        assert calls == 2
+
+        monkeypatch.setattr(schools_router, "LIST_CACHE_TTL_SECONDS", 0)
+        await seeded_client.get("/schools")
+        assert calls == 3
+
+    @pytest.mark.asyncio
+    async def test_list_schools_advanced_filters_are_not_cached(self, seeded_client):
+        from app.routers import schools as schools_router
+
+        response = await seeded_client.get("/schools?facilities=pool")
+        assert response.status_code == 200
+        assert schools_router._list_cache == {}
+
+    @pytest.mark.asyncio
     async def test_list_schools_serializes_exam_results_used_by_school_cards(
         self,
         seeded_db,
