@@ -199,3 +199,44 @@ arrange off-host copies with an independent retention policy. To practice recove
 PostgreSQL instance, create an empty database, and run `pg_restore --no-owner
 --exit-on-error -d <isolated_database> <archive>`. Verify the schema revision and data before
 using a backup for recovery. Never restore over the live database as a routine check.
+
+## Off-host backup
+
+Production holds only a published snapshot. The launch database and `backend/reports/`
+(pipeline state that is not in Git) exist on the machine that runs the pipeline, so that is
+what is copied off it, to a private Cloudflare R2 bucket.
+
+One-time setup (human), in the Cloudflare dashboard under R2:
+
+1. Enable R2 (the free tier covers 10 GB; Cloudflare asks for a payment method).
+2. Create a bucket named `schooldecider-backups`. Leave public access off.
+3. Manage R2 API Tokens → Create API token: **Object Read & Write**, limited to that
+   bucket. Save the values in `~/.config/schooldecider/backup.env`, mode 600:
+   ```
+   export R2_ACCOUNT_ID=...
+   export R2_ACCESS_KEY_ID=...
+   export R2_SECRET_ACCESS_KEY=...
+   ```
+   For a bucket created in the EU jurisdiction, also set
+   `export R2_ENDPOINT=https://<account id>.eu.r2.cloudflarestorage.com`.
+
+After each data publish, from the repository root:
+
+```bash
+backend/scripts/backup_offsite.sh
+```
+
+It dumps the database, checks the dump is readable, archives `backend/reports/` without
+the older dumps kept there, uploads both and compares the stored sizes. Nothing is pruned.
+
+To check a backup restores, download it into a scratch database, never the launch one:
+
+```bash
+. ~/.config/schooldecider/backup.env
+curl --fail --aws-sigv4 "aws:amz:auto:s3" --user "$R2_ACCESS_KEY_ID:$R2_SECRET_ACCESS_KEY" \
+  -o /tmp/restore.dump "${R2_ENDPOINT:-https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com}/schooldecider-backups/<name>.dump"
+docker exec sofia_schools_db createdb -U postgres restore_check
+docker exec -i sofia_schools_db pg_restore -U postgres --no-owner --exit-on-error -d restore_check < /tmp/restore.dump
+docker exec sofia_schools_db psql -U postgres -d restore_check -c 'select count(*) from schools'
+docker exec sofia_schools_db dropdb -U postgres restore_check
+```
