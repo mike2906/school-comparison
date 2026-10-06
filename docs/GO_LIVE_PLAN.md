@@ -2221,12 +2221,14 @@ the session scratchpad only.
             backed up and covered by the restore test.
 
 - [ ] **P3.3 README as shop window.** Screenshots/GIF, 7-stage pipeline architecture
-      diagram, decisions-and-trade-offs section (JSONB, calendar-year age logic,
+      diagram, decisions-and-trade-offs section (JSON, calendar-year age logic,
       GeoJSON-first geocoding), test count + CI badge. Move SearXNG troubleshooting
       to `docs/`.
-- [ ] **P3.4 ARCHITECTURE.md** on the LLM pipeline: structured extraction with
+- [x] **P3.4 ARCHITECTURE.md** on the LLM pipeline: structured extraction with
       PydanticAI, validation gates, evidence checks, spot-checking, per-field
       provenance, cost/timeout tuning. This is the portfolio differentiator.
+      **2026-10-05:** architecture guide covers the pipeline, publication boundary,
+      tradeoffs and limitations; see the publication checklist for operational follow-ups.
 - [ ] **P3.5 Prompt-injection guard for summaries**: flag summaries containing URLs,
       phone numbers not in source, or promotional anomalies. *No longer pre-launch*
       (summaries are out of launch scope per the 2026-07-15 revision) — required before
@@ -2238,6 +2240,7 @@ the session scratchpad only.
       (`useUserLocation`, `useSchoolFilters`, `useMapSync`) + subcomponents. Then
       `ComparePage.jsx` (1,783) and `SchoolCard.jsx` (1,546) if appetite remains.
 - [ ] **P4.2 ruff + mypy** for backend; fix `datetime.utcnow()` deprecations; add to CI.
+      Ruff is already enforced in CI; mypy and timestamp cleanup remain open.
 - [ ] **P4.3 vitest + testing-library** for frontend filter/age-group logic.
 - [ ] **P4.4 Extract repair commands** from `cli.py` (3,453 lines) into
       `app/scrapers/repairs/` modules with unit tests; thin Click wrappers. Delete
@@ -2313,3 +2316,11 @@ revision. None of this may widen the public boundary without a reviewed pilot.
 Human review queue/admin CMS; FieldSource provenance graph rework; switching geocoding
 providers; multi-country generalization of gates (hardcode Sofia); rewriting
 `extractor_helpers.py` before the golden corpus exists; real-time dashboards.
+
+## Repository publication preparation (2026-10-05)
+
+Code protections and remaining maintainer controls are tracked in
+[PUBLICATION_CHECKLIST.md](PUBLICATION_CHECKLIST.md). Local service ports, demo seeding,
+locked dependencies, clean-install migrations and deployment backup handling are prepared
+for review. Host installation, branch protection and secret scoping remain open; visibility
+and the launch database are unchanged.

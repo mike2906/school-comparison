@@ -1,6 +1,6 @@
 """
 Seed script for Sofia School Comparison App - EXPANDED VERSION
-Run with: uv run python seed_data.py
+Run with: DATABASE_URL=<local sofia_schools_demo URL> uv run python -m scripts.seed_data --reset-demo-data
 
 Creates 100 realistic schools in Sofia with comprehensive coverage:
 - Multiple schools per type (state/private/international)
@@ -10,10 +10,13 @@ Creates 100 realistic schools in Sofia with comprehensive coverage:
 - Pricing data, NVO results, admission thresholds
 """
 
+import argparse
 import asyncio
 import re
 
 from sqlalchemy import delete
+from sqlalchemy.engine import make_url
+from sqlalchemy.exc import ArgumentError
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -355,10 +358,31 @@ NVO_THREE_YEAR_DELTAS = [
 ]
 
 
-async def seed_database():
+def validate_seed_target(database_url: str, *, reset_demo_data: bool) -> None:
+    """Allow destructive seeding only on the explicitly named local demo database."""
+    if not reset_demo_data:
+        raise ValueError("Seeding replaces demo data; pass --reset-demo-data explicitly.")
+    try:
+        url = make_url(database_url)
+    except ArgumentError:
+        raise ValueError("Invalid DATABASE_URL; use the local sofia_schools_demo database.") from None
+    if (
+        url.drivername != "postgresql+asyncpg"
+        or url.host not in {"localhost", "127.0.0.1", "::1"}
+        or url.database != "sofia_schools_demo"
+        or url.query
+    ):
+        raise ValueError(
+            "Refusing to seed: DATABASE_URL must point to sofia_schools_demo on loopback, "
+            "without connection query overrides. See README.md."
+        )
+
+
+async def seed_database(*, reset_demo_data: bool = False):
     """Create and populate test data with comprehensive coverage"""
     
     settings = get_settings()
+    validate_seed_target(settings.DATABASE_URL, reset_demo_data=reset_demo_data)
     engine = create_async_engine(settings.DATABASE_URL)
     async_session = sessionmaker(
         engine, class_=AsyncSession, expire_on_commit=False
@@ -1613,4 +1637,10 @@ async def seed_database():
 
 
 if __name__ == "__main__":
-    asyncio.run(seed_database())
+    parser = argparse.ArgumentParser(description="Replace disposable local demo school data.")
+    parser.add_argument("--reset-demo-data", action="store_true", help="Confirm replacement of demo data.")
+    args = parser.parse_args()
+    try:
+        asyncio.run(seed_database(reset_demo_data=args.reset_demo_data))
+    except ValueError as exc:
+        parser.error(str(exc))

@@ -7,6 +7,9 @@ on:
     branches-ignore: [main]
   workflow_call:
 
+permissions:
+  contents: read
+
 jobs:
   backend:
     name: Backend
@@ -14,6 +17,18 @@ jobs:
     defaults:
       run:
         working-directory: backend
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: schooldecider_migrations
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -27,13 +42,51 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: uv sync --extra dev
+        run: uv sync --locked --extra dev
 
       - name: Run lint
         run: uv run ruff check .
 
       - name: Run tests
         run: uv run pytest
+
+      - name: PostgreSQL clean install and populated alignment reapplication
+        env:
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/schooldecider_migrations
+          POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+        run: |
+          uv run alembic upgrade head --sql > "$RUNNER_TEMP/migrations.sql"
+          uv run alembic upgrade head
+          uv run alembic check
+          docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -d schooldecider_migrations -v ON_ERROR_STOP=1 <<'SQL'
+          INSERT INTO countries (code, name_i18n, education_config, map_config, supported_languages, default_language, default_currency, created_at, updated_at)
+          VALUES ('bg', '{}', '{}', '{}', '["bg"]', 'bg', 'BGN', now(), now());
+          INSERT INTO schools (country_code, name_i18n, school_type, education_level, city)
+          VALUES ('bg', '{"bg":"Migration preservation test"}', 'state', 'primary', 'sofia');
+          SQL
+          before="$(docker exec "$POSTGRES_CONTAINER" psql -U postgres -d schooldecider_migrations -Atc 'SELECT row_to_json(s)::text FROM schools s ORDER BY id')"
+          # The latest downgrade deliberately retains schema; rewind its revision marker
+          # so upgrade exercises conditional DDL against existing, populated tables.
+          uv run alembic downgrade -1
+          uv run alembic upgrade head
+          after="$(docker exec "$POSTGRES_CONTAINER" psql -U postgres -d schooldecider_migrations -Atc 'SELECT row_to_json(s)::text FROM schools s ORDER BY id')"
+          test -n "$before" && test "$before" = "$after"
+          uv run alembic check
+
+      - name: Verify PostgreSQL backup restore
+        env:
+          POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+        run: |
+          docker exec "$POSTGRES_CONTAINER" pg_dump -U postgres -d schooldecider_migrations -Fc > "$RUNNER_TEMP/migrations.dump"
+          docker exec -i "$POSTGRES_CONTAINER" pg_restore --list < "$RUNNER_TEMP/migrations.dump" > /dev/null
+          docker exec "$POSTGRES_CONTAINER" createdb -U postgres schooldecider_restore
+          docker exec -i "$POSTGRES_CONTAINER" pg_restore -U postgres -d schooldecider_restore --no-owner --exit-on-error < "$RUNNER_TEMP/migrations.dump"
+          original="$(docker exec "$POSTGRES_CONTAINER" psql -U postgres -d schooldecider_migrations -Atc 'SELECT version_num FROM alembic_version')"
+          restored="$(docker exec "$POSTGRES_CONTAINER" psql -U postgres -d schooldecider_restore -Atc 'SELECT version_num FROM alembic_version')"
+          test -n "$original" && test "$original" = "$restored"
+          original_rows="$(docker exec "$POSTGRES_CONTAINER" psql -U postgres -d schooldecider_migrations -Atc 'SELECT row_to_json(s)::text FROM schools s ORDER BY id')"
+          restored_rows="$(docker exec "$POSTGRES_CONTAINER" psql -U postgres -d schooldecider_restore -Atc 'SELECT row_to_json(s)::text FROM schools s ORDER BY id')"
+          test -n "$original_rows" && test "$original_rows" = "$restored_rows"
 
   frontend:
     name: Frontend
@@ -56,10 +109,10 @@ jobs:
         run: npm ci
 
       - name: Run lint
-        run: npm run lint --if-present
+        run: npm run lint
 
       - name: Build
         run: npm run build
 
       - name: Run tests
-        run: npm test --if-present
+        run: npm test

@@ -8,6 +8,9 @@ kindergartens and schools. Live at [schooldecider.com](https://schooldecider.com
 This repository holds the code, infrastructure and agent instructions. The school dataset
 is not in it.
 
+See [contributing](CONTRIBUTING.md), [security reporting](SECURITY.md) and the
+[publication checklist](docs/PUBLICATION_CHECKLIST.md) for verification and operational limits.
+
 ## What it does
 
 - Map and list of schools, filtered by enrollment year, city and school type.
@@ -17,6 +20,8 @@ is not in it.
 - One prerendered, indexable page per school, in both languages.
 
 ## Architecture
+
+The [architecture guide](ARCHITECTURE.md) explains extraction, evidence gates and tradeoffs.
 
 ```
 Browser ──> Cloudflare Pages   static site: React 18 + Vite, prerendered per school
@@ -122,17 +127,27 @@ went wrong along the way and how it was fixed.
 
 ```bash
 docker compose up -d                              # PostgreSQL, Redis, SearXNG
+docker compose exec -T postgres createdb -U postgres sofia_schools_demo
 
 cd backend
 cp .env.example .env
+sed -i 's|^DATABASE_URL=.*|DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/sofia_schools_demo|' .env
+uv sync --locked --extra dev
 uv run alembic upgrade head
-uv run python scripts/seed_data.py                # 100 made-up schools
+uv run python -m scripts.seed_data --reset-demo-data  # replaces demo data only
 uv run uvicorn app.main:app --reload
 
 cd ../frontend
 npm ci
 npm run dev
 ```
+
+The demo database URL is saved in `backend/.env`, so a new backend terminal uses the same
+database. Shell-level `DATABASE_URL` overrides still take precedence. The demo database is
+disposable. Reseeding replaces its school data; the script refuses
+the launch database and remote targets. Development service ports bind to loopback.
+Create the demo database once; on later starts, skip `createdb` and seeding unless you
+want to replace its data. Production setup is separate in [`deploy/README.md`](deploy/README.md).
 
 Tests: `cd backend && uv run pytest -q` (about 1,500 tests, on SQLite) and
 `cd frontend && npm test`.
