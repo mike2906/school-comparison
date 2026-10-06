@@ -1303,7 +1303,7 @@ class TestBotProtectionValidation:
         captcha_html = (
             "<html><head>"
             '<link rel="icon" href="data:;">'
-            '<meta http-equiv="refresh" content="0;/.well-known/sgcaptcha/?r=%2F&y=ipc:78.83.254.41:123">'
+            '<meta http-equiv="refresh" content="0;/.well-known/sgcaptcha/?r=%2F&y=ipc:203.0.113.1:123">'
             "</head></html>"
         )
         mock_response = MagicMock()
@@ -1333,12 +1333,12 @@ class TestBotProtectionValidation:
 
         captcha_html = (
             "<html><head>"
-            '<meta http-equiv="refresh" content="0;/.well-known/sgcaptcha/?r=%2F&y=ipc:78.83.254.41:123">'
+            '<meta http-equiv="refresh" content="0;/.well-known/sgcaptcha/?r=%2F&y=ipc:203.0.113.1:123">'
             "</head></html>"
         )
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_response.url = "https://dg185.bg/.well-known/sgcaptcha/?r=%2F&y=ipc:78.83.254.41:123"
+        mock_response.url = "https://dg185.bg/.well-known/sgcaptcha/?r=%2F&y=ipc:203.0.113.1:123"
         mock_response.text = captcha_html
 
         with patch("httpx.AsyncClient") as mock_client_class:
