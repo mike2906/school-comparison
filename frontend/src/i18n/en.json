@@ -636,6 +636,14 @@
     "ageBody": "In Bulgaria the group depends on the calendar year of birth, not the exact birthday: group = enrolment year − birth year. Children born on 1 January and 31 December of the same year join the same group.",
     "limitsTitle": "What is not here yet",
     "limitsBody": "Admission thresholds (kindergarten points and gymnasium minimum scores) are not published yet. Where we have no reliable data we leave the field out rather than guess.",
+    "privacyTitle": "Privacy",
+    "privacy": {
+      "account": "You do not need an account, and the site sets no cookies.",
+      "browser": "If you set a starting location, it is saved in your browser together with a few display choices, so they are still there on your next visit. They are not sent to us.",
+      "lookups": "When you type an address or pick a point on the map, the address or coordinates are sent to OpenStreetMap’s Nominatim service to look them up. Map images are loaded from CARTO. Both see your IP address, as any website you visit does.",
+      "hosting": "The site is served through Cloudflare, and our server keeps standard request logs that include IP addresses, for security and troubleshooting. We count visits with Cloudflare Web Analytics, which uses no cookies and does not follow you across sites.",
+      "contact": "If you email us, we use your address only to reply. Questions about privacy: {{email}}."
+    },
     "cta": "Browse schools"
   },
   "levels": {
@@ -670,6 +678,7 @@
     "body": "This page could not be shown. Please try again from the school search."
   },
   "footer": {
+    "privacy": "Privacy",
     "dataNote": "Found a mistake in a school’s details? Tell us and we’ll check it.",
     "reportError": "Report a data error",
     "reportSubject": "Data error report"

@@ -3,7 +3,7 @@ import { Link, NavLink, useLocation } from 'react-router-dom'
 import { useCompare } from '../../context/CompareContext'
 import LanguageToggle from '../LanguageToggle/LanguageToggle'
 
-const CONTACT_EMAIL = 'contact@schooldecider.com'
+export const CONTACT_EMAIL = 'contact@schooldecider.com'
 
 function Footer({ clearCompareBar }) {
   const { t } = useTranslation()
@@ -12,11 +12,14 @@ function Footer({ clearCompareBar }) {
   return (
     // The fixed CompareBar would otherwise cover the footer links.
     <footer className={`border-t border-neutral-200 bg-white ${clearCompareBar ? 'pb-40' : ''}`}>
-      <div className="mx-auto flex max-w-5xl flex-col gap-2 px-6 py-6 text-sm text-neutral-600 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mx-auto flex max-w-5xl flex-col gap-2 px-6 py-6 text-sm text-neutral-600 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
         <p>{t('footer.dataNote')}</p>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <Link to="/about" className="text-primary-700 underline">
             {t('nav.about')}
+          </Link>
+          <Link to="/about#privacy" className="text-primary-700 underline">
+            {t('footer.privacy')}
           </Link>
           <a href={reportHref} className="text-primary-700 underline">
             {t('footer.reportError')}

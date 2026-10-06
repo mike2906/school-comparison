@@ -2133,6 +2133,11 @@ the session scratchpad only.
             credited on the About page.
       - [ ] External uptime check (free tier) that alerts Mike; Cloudflare Web Analytics
             (cookieless, no custom events yet); a short privacy notice.
+            **2026-10-06:** the `Uptime` workflow runs `deploy/smoke.sh` against
+            production every 15 minutes and GitHub emails the owner on failure; the About
+            page has a Privacy section, linked from the footer. Left open: turn on Web
+            Analytics for `schooldecider.com` in the Cloudflare dashboard (automatic
+            setup; the notice already names it).
       - [ ] Google Search Console and Bing Webmaster Tools: verify, submit the sitemap,
             inspect representative pages.
       - [ ] CD follow-ups (from the CD item, 2026-10-05):
