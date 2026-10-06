@@ -18,5 +18,5 @@
 Съобщение
 
 ## HTML contact signals
-Phone: 0897 958561
+Phone: 0890 000004
 Email: office@sianie-bg.com

@@ -15,6 +15,8 @@ repository public, deploy a release or modify the existing school database.
   PostgreSQL is started and awaited first. A backup failure stops deployment and preserves
   previous archives; successful backup validation keeps the newest seven script-created
   archives. Backup files are excluded from Git.
+- Golden-corpus fixtures have people's names, personal email addresses and mobile numbers
+  replaced with made-up ones (current tree only; earlier commits keep the originals).
 - The initial migration now creates the pipeline table before later revisions alter it.
   The schema-alignment revision adds missing fields only where absent, preserving databases
   previously initialized with ORM `create_all`. Its downgrade intentionally retains fields

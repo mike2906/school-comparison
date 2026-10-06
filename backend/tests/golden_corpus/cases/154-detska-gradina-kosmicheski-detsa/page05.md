@@ -1,4 +1,4 @@
-+359 884 788 274
++359 880 000 001
 [ ![Cosmos Kids](https://cosmos-kids.org/wp-content/uploads/2018/12/logoCosmosKids2019.jpg) ](https://cosmos-kids.org/)
 * [Home](https://cosmos-kids.org/home/)
 * [About us](https://cosmos-kids.org/)

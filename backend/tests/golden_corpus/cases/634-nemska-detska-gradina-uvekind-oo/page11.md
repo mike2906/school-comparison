@@ -12,35 +12,35 @@ Privacy Policy
 Ключът към успеха на едно училище според нас е в персоналния подход, в стремежа към развитие на цялостната личност и разкриване на талантите на всеки ученик.
 Поздрави,
 Нашите лидери
-Аглика Дамаскова
+Ралица Савова
 Заместник-директор по учебната дейност
-aglika.damaskova@uwekind.bg
-Десислава Илиева
+elena.petrova@uwekind.bg
+Ралица Здравкова
 Заместник-директор по административната дейност
-desislava.ilieva@uwekind.bg
-Славина Райнова
+ivana.nikolova@uwekind.bg
+Елена Велчева
 Заместник-директор на детската градина
-slavina.rainova@uwekind.bg
-Борислава Анастасова
+nevena.stoyanova@uwekind.bg
+Ивана Пенчева
 DP координатор
-borislava.anastasova@uwekind.bg
-Ива Досева
+silvana.todorova@uwekind.bg
+Невена Борисова
 CAS координатор
-iva.doseva@uwekind.bg
-Надежда Неделчева
-nadezhda.nedelcheva@uwekind.bg
-София Варадинова
+bilyana.koleva@uwekind.bg
+Силвана Генчева
+denitsa.angelova@uwekind.bg
+Биляна Дончева
 Заместник-директор по учебната дейност в начален етап.
-sofia.varadinova@uwekind.bg
-Иван Илиев
+radostina.kostova@uwekind.bg
+Росен Здравков
 Primary Years Programme координатор
-ivan.iliev@uwekind.bg
-Антон Чолаков
+petar.atanasov@uwekind.bg
+Петър Манолов
 MYP Координатор
-anton.cholakov@uwekind.bg
-Костадин Соколов
+nikolay.krastev@uwekind.bg
+Николай Недялков
 Service as Action координатор
-kostadin.sokolov@uwekind.bg
+stefan.naydenov@uwekind.bg
 Нашият екип
 В Увекинд работят повече от 120 висококвалифицирани преподаватели, които осигуряват толерантна и подкрепяща учебна среда за своите ученици.
 Inquirers
@@ -58,19 +58,19 @@ Communicators
 Нашите учители за Увекинд
 Станете част от нашето Увекинд семейство и споделете с нас едно вълнуващо училищно приключение!
 Преди години чух от един невероятен човек и учител, че „и Пипи има нужда от училище“. Вероятно от нашето училище, където има място за всеки. Защото се грижим за всеки един Uwekind, опитвайки се да му дадем необходимото за неговото лично израстване. Защото се стараем да запазим любопитството му и да му дадем шанс да развива способности и умения, които ще са му по-потреби от точни факти и наизустени правила. Защото никога не скучаем, а опитваме нови, интересни неща – в класната стая и извън нея.
-Евелина Евлогиева
+Теодора Радева
 Преподавател по немски език
 Когато бях дете, родителите ми ме учеха да бъда най-добра във всичко. Успявах във всяка дейност – учене, спорт, изкуства.
 Тогава не разбирах защо ми е нужно всичко това, защото колкото повече постигах, толкова по-трудно ми беше да избера своя път. Всичко ми изглеждаше интересно, но в никоя професия не откривах истински себе си. Един ден разбрах. Учила съм за това – да бъда учител в Uwekind. Тук чрез опита, знанията и уменията си всеки ден помагам на децата да открият силата в себе си. Да бъдат уверени и готови да се изправят пред предизвикателствата на света. Uwekind не е работно място, а второ семейство. Дом, в който имаш възможността да докосваш бъдещето и да надскачаш собствените си граници всеки ден.
-Даниела Кисьова
+Венета Вълчева
 Учител начален етап
 
 ## HTML contact signals
 Email: info@uwekind.bg
-Email: aglika.damaskova@uwekind.bg
-Email: desislava.ilieva@uwekind.bg
-Email: slavina.rainova@uwekind.bg
-Email: borislava.anastasova@uwekind.bg
-Email: iva.doseva@uwekind.bg
-Email: nadezhda.nedelcheva@uwekind.bg
-Email: sofia.varadinova@uwekind.bg
+Email: elena.petrova@uwekind.bg
+Email: ivana.nikolova@uwekind.bg
+Email: nevena.stoyanova@uwekind.bg
+Email: silvana.todorova@uwekind.bg
+Email: bilyana.koleva@uwekind.bg
+Email: denitsa.angelova@uwekind.bg
+Email: radostina.kostova@uwekind.bg

@@ -97,18 +97,18 @@ The AAS counselors are keenly aware of the fact that transitions are an integral
 Our counselors work to establish trust and rapport with each student; they respect students’ privacy so that students feel safe to explore issues, feelings, and behaviours. The counselors follow the ethical guidelines of the American School Counselor Association.
 Each division of the school has a dedicated and experienced counselor to support students through any struggles they may have. The AAS counselors also help students to develop academic, career, and social/emotional skills to become active and successful global citizens.
 ## School Counselors
-![Ms. Kelly Anderson photo](https://resources.finalsite.net/images/f_auto,q_auto,t_image_size_2/v1731999640/aassofiaorg/syhvfmlmeoeezse0g6jq/KelliAnderson_thumb.jpg)
-Ms. Kelli Anderson
-Ms. Kelli Anderson -- Elementary School Counselor
-![Mr. James Villers photo](https://resources.finalsite.net/images/f_auto,q_auto,t_image_size_2/v1731999738/aassofiaorg/bude7ybzmprjmp3b0ixz/JamesVillers_thumb.jpg)
-Mr. James Villers
-Mr. James Villers -- Middle School Counselor
+![Ms. Susan Brooks photo](https://resources.finalsite.net/images/f_auto,q_auto,t_image_size_2/v1731999640/aassofiaorg/syhvfmlmeoeezse0g6jq/SusanBrooks_thumb.jpg)
+Ms. Susan Brooks
+Ms. Susan Brooks -- Elementary School Counselor
+![Mr. Paul Bennett photo](https://resources.finalsite.net/images/f_auto,q_auto,t_image_size_2/v1731999738/aassofiaorg/bude7ybzmprjmp3b0ixz/PaulBennett_thumb.jpg)
+Mr. Paul Bennett
+Mr. Paul Bennett -- Middle School Counselor
 ![aas logo ](https://resources.finalsite.net/images/f_auto,q_auto,t_image_size_2/v1755849802/aassofiaorg/fheau10hctcftimogu64/Celia494X477.jpg)
-Ms. Celia Fakhoury
-Ms. Celia Fakhoury - High School Councelor
+Ms. Alice Hughes
+Ms. Alice Hughes - High School Councelor
 ![aas logo ](https://resources.finalsite.net/images/f_auto,q_auto,t_image_size_2/v1755849802/aassofiaorg/fiss2pqt6lhf3vkog9ok/Kelley494x477.jpg)
-Ms. Kelley Christman
-Ms. Kelley Christman - College and Career Counselor
+Ms. Alice Shaw
+Ms. Alice Shaw - College and Career Counselor
 ![decorative-image](https://resources.finalsite.net/images/v1728490678/aassofiaorg/q6oij3rglo3nnojnlflz/Vector1.svg)
 [![The Anglo-American School of Sofia](https://resources.finalsite.net/images/f_auto,q_auto/v1728207063/aassofiaorg/cuioeodi4satxzib63jc/TheAnglo-AmericanSchoolofSofia-FooterLogo.png)](https://www.aas-sofia.org)
 ## Contact Us

@@ -140,7 +140,7 @@ Looking for Something?
 Search
 
 ## HTML contact signals
-Phone: +359 878 208 975
-Phone: +359 889 108 519
-Phone: +359 884 256 736
+Phone: +359 870 000 014
+Phone: +359 880 000 015
+Phone: +359 880 000 016
 Phone: 2025-05-19 14

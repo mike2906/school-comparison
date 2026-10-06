@@ -67,13 +67,13 @@ Divider Copy
 Divider
 If you are a human seeing this field, please leave it empty.
 ##### УЧИЛИЩЕ
-+359 878 208 975
++359 870 000 014
 shkolo@bgshkolo.com
 ##### ДЕТСКА ГРАДИНА
-+359 889 108519
++359 880 000015
 detska_gradina@bgshkolo.com
 ##### СПОРТЕН КОМПЛЕКС
-+359 884 904785
++359 880 000017
 overgasarena@gmail.com
 ##### АДРЕС
 София, ж.к. „Младост 2“
@@ -102,11 +102,11 @@ Looking for Something?
 Search
 
 ## HTML contact signals
-Phone: +359 878 208 975
-Phone: +359 889 108 519
-Phone: +359 884 256 736
-Address: Полетата, маркирани със *, са задължителни! Divider Copy Име * Имейл * До * Детска градина Училище Спортен комплекс Относно * Потвърждавам, че съм запознат и съгласен с общите условия на сайта! * Divider If you are a human seeing this field, please leave it empty. УЧИЛИЩЕ +359 878 208 975 shkolo@bgshkolo.com ДЕТСКА ГРАДИНА +359 889 108519 detska_gradina@bgshkolo.com СПОРТЕН КОМПЛЕКС +359 884 904785 overgasarena@gmail.com АДРЕС София, ж.к. „Младост 2“ ул. „Генерал-Майор Васил Делов“ 10
+Phone: +359 870 000 014
+Phone: +359 880 000 015
+Phone: +359 880 000 016
+Address: Полетата, маркирани със *, са задължителни! Divider Copy Име * Имейл * До * Детска градина Училище Спортен комплекс Относно * Потвърждавам, че съм запознат и съгласен с общите условия на сайта! * Divider If you are a human seeing this field, please leave it empty. УЧИЛИЩЕ +359 870 000 014 shkolo@bgshkolo.com ДЕТСКА ГРАДИНА +359 880 000015 detska_gradina@bgshkolo.com СПОРТЕН КОМПЛЕКС +359 880 000017 overgasarena@gmail.com АДРЕС София, ж.к. „Младост 2“ ул. „Генерал-Майор Васил Делов“ 10
 Email: shkolo@bgshkolo.com
 Email: detska_gradina@bgshkolo.com
 Email: overgasarena@gmail.com
-Phone: +359 889 108519
+Phone: +359 880 000015

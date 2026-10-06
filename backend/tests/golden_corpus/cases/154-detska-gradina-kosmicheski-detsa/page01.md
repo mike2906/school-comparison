@@ -1,4 +1,4 @@
-+359 884 788 274
++359 880 000 001
 [ ![Cosmos Kids](https://cosmos-kids.org/wp-content/uploads/2018/12/logoCosmosKids2019.jpg) ](https://cosmos-kids.org/)
 * [Home](https://cosmos-kids.org/home/)
 * [About us](https://cosmos-kids.org/)
@@ -38,21 +38,21 @@ If you’re interested in becoming a part of our team, we encourage you to share
 In the multilingual environment in Cosmos Kids, kids learn that there is no difference between nationalities and languages. They feel comfortable speaking both in English and in Bulgarian (or German, or Spanish) no matter which part of the world they are.
 During the years in Cosmos Kids, our children created some of their best friendships that continue even when they are no longer in the kindergarten. We, the parents, also became friends and continue to spend vacations together. We feel like a family ![🙂](https://s.w.org/images/core/emoji/17.0.2/svg/1f642.svg)
 Cosmos kids has been the best experience for Mia and Nikola, and we strongly recommend it to every child and parent looking for a special place where kids can grow happy, learn while playing, and establish life-long friendships!
-We wish Cosmos kids’ team all the best so that they can bring such wonderful experience to more and more kids and their families!” **Bistra Kirova**
+We wish Cosmos kids’ team all the best so that they can bring such wonderful experience to more and more kids and their families!” **Ivana Nikolova**
 Director, Muzeiko
 “At Cosmos Kids Dara and Hannah grew up as free and positive thinking children and made a lots of friends. This is the place where they take care of children like their own, learn hard and play a lot.
-Thank you for all these wonderful years spent together!” **Adriana Panayotova, Founder, CoderDojo Bulgaria**
-Teodor Panayotov, CEO, Coursedot
+Thank you for all these wonderful years spent together!” **Nevena Dobreva, Founder, CoderDojo Bulgaria**
+Krasimir Petrov, CEO, Coursedot
 “Alena’s time at Cosmos Kids was the best experience a child could have in kindergarden. At Cosmos our child learned to love and respect nature, play sports, make friends and be part of a family of inspired children and people. It is with bitter sweetness to see this chapter reach its natural end but we know she has made many friends who will continue to be part of her life, and she has received the most valuable lessons both in life and in preparation for school.
 We highly recommend Cosmos Kids if you want your child to learn to focus and pay attention, but also to have freedom and individuality, learn English and Bulgarian, prepare for school, but also get to play and enjoy nature.
-Thanks Tatiana Zaharieva, Vili Simeonova, Marieta Vincent for being great children’s mentors, and Bistra Kirova for the recommendation.”
-**Vessela Valtcheva-McGee, LEED AP, BREEAM Assessor, EDGE Auditor Managing Partner International Projects, Triple Green Building Group - Bulgaria**
-Richard McGee, Owner, Anonymous Tattoo
+Thanks Denitsa Angelova, Denitsa Angelova, Claire Ward for being great children’s mentors, and Ivana Nikolova for the recommendation.”
+**Alice Shaw, LEED AP, BREEAM Assessor, EDGE Auditor Managing Partner International Projects, Triple Green Building Group - Bulgaria**
+Andrew Palmer, Owner, Anonymous Tattoo
 ### years experience in education
 ### years english nursery and kindergarten
 ## Get In Touch
 **Location:** 48, Georgi Georgiev-Gets str., Dragalevtsi, Sofia, Bulgaria
-**Telephone:** +359 884 788 274
+**Telephone:** +359 880 000 001
 **Email:**
 **School Hours:** M-F: 8:00 am – 5:30 pm
 [ Български](https://bg.cosmos-kids.org/)[ English](https://cosmos-kids.org/)

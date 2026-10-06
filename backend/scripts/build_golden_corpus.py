@@ -10,6 +10,10 @@ instead of gambling.
     uv run python -m scripts.build_golden_corpus
 
 This script needs the database; the resulting tests do not.
+
+The script writes pages as cached. Before committing regenerated cases, replace the names
+of staff, parents and pupils, personal email addresses and mobile numbers with made-up
+ones, in the pages and in ``case.json`` alike (the repository is public).
 """
 
 from __future__ import annotations
