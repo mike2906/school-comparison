@@ -97,55 +97,55 @@ If arriving by taxi be sure to tell the operator that you want to go to **the An
 * Phone- Inquire: +359 2 923 8810, +359 2 923 8822 E:
 #### All other inquiries or to contact a member of staff:
 * Phone- Reception Desk: +359 2 923 8810, +359 2 923 8811
-* Transportation: +359 88 990 1916
-* After-School Activities: +359 88 433 6418
-* Emergency After Hours Telephone (18:00-7:00): +359 88 785 5480
+* Transportation: +359 88 000 0006
+* After-School Activities: +359 88 000 0005
+* Emergency After Hours Telephone (18:00-7:00): +359 88 000 0007
 * Police: 112
-![AAS director Dr. Tim Fries](https://resources.finalsite.net/images/f_auto,q_auto,t_image_size_2/v1736851213/aassofiaorg/kjp7avxj08q9lbyrdhsi/TimothyFries494x477.jpg)
-Dr. Tim Fries
+![AAS director Dr. Alan Morgan](https://resources.finalsite.net/images/f_auto,q_auto,t_image_size_2/v1736851213/aassofiaorg/kjp7avxj08q9lbyrdhsi/AlanMorgan494x477.jpg)
+Dr. Alan Morgan
 #### Director
 E:
-![elementary principal Julie Villers](https://resources.finalsite.net/images/f_auto,q_auto,t_image_size_2/v1736852142/aassofiaorg/seb1kmrcyspcktxrd3mf/JulieVillers494X477.jpg)
-Julie Villers
+![elementary principal Claire Ward](https://resources.finalsite.net/images/f_auto,q_auto,t_image_size_2/v1736852142/aassofiaorg/seb1kmrcyspcktxrd3mf/ClaireWard494X477.jpg)
+Claire Ward
 #### Elementary School Principal
 School: +359 2 923 8837
-![secondary principal Eric Burnett](https://resources.finalsite.net/images/f_auto,q_auto,t_image_size_2/v1757656704/aassofiaorg/unwxlrqnrrrrhlmanmig/EricBurnett494X477.png)
-Eric Burnett
+![secondary principal Philip Hughes](https://resources.finalsite.net/images/f_auto,q_auto,t_image_size_2/v1757656704/aassofiaorg/unwxlrqnrrrrhlmanmig/PhilipHughes494X477.png)
+Philip Hughes
 #### Secondary Principal
 School: + 359 2 923 8842
-![Es principal assistant Violeta Kostova](https://resources.finalsite.net/images/f_auto,q_auto,t_image_size_2/v1731402326/aassofiaorg/oaxpy0c3nruijsifm4e1/VioletaKostova494X477.jpg)
-Violeta Kostova
+![Es principal assistant Silvana Tsvetkova](https://resources.finalsite.net/images/f_auto,q_auto,t_image_size_2/v1731402326/aassofiaorg/oaxpy0c3nruijsifm4e1/SilvanaTsvetkova494X477.jpg)
+Silvana Tsvetkova
 #### Elementary Principal Assistant
-Mobile: +359 88 890 1787
-![ms hs secretary ivana petrova](https://resources.finalsite.net/images/f_auto,q_auto/v1758006542/aassofiaorg/d3zrvkctq1o4ibcw5nfv/IvanaPetrova494.jpg)
-Ivana Petrova
+Mobile: +359 88 000 0008
+![ms hs secretary elena petrova](https://resources.finalsite.net/images/f_auto,q_auto/v1758006542/aassofiaorg/d3zrvkctq1o4ibcw5nfv/ElenaPetrova494.jpg)
+Elena Petrova
 #### Secondary Principal Assistant
 ![aas logo ](https://resources.finalsite.net/images/f_auto,q_auto/v1730971621/aassofiaorg/lds4sblmzvcqjxiwmwmf/placeholder494X477.png)
 Athletics & Activities Department
-##### Dimitar Nassapov
-##### Aliki Stavrou
-##### Martin Koupenov
+##### Rosen Todorov
+##### Rachel Palmer
+##### Stefan Kolev
 EASA:
 MS/HS :
-![IB coordinator Kalina Belivanova](https://resources.finalsite.net/images/f_auto,q_auto,t_image_size_2/v1731406572/aassofiaorg/osqfqfke2rzfskyswr8f/KalinaBelivanova494X477.jpg)
-Kalina Belivanova
+![IB coordinator Albena Savova](https://resources.finalsite.net/images/f_auto,q_auto,t_image_size_2/v1731406572/aassofiaorg/osqfqfke2rzfskyswr8f/AlbenaSavova494X477.jpg)
+Albena Savova
 #### IB Diploma Coordinator & Math Teacher
-![Admissions officer Maria Mihailova](https://resources.finalsite.net/images/f_auto,q_auto,t_image_size_2/v1736852142/aassofiaorg/kfb6jpbmabuyjngiu7d6/MMihailova494X477.jpg)
-Maria Mihailova
+![Admissions officer Bilyana Radeva](https://resources.finalsite.net/images/f_auto,q_auto,t_image_size_2/v1736852142/aassofiaorg/kfb6jpbmabuyjngiu7d6/BRadeva494X477.jpg)
+Bilyana Radeva
 #### Admissions Officer
 School: + 359 2 923 8822
-![Registrar Dola Kay](https://resources.finalsite.net/images/f_auto,q_auto,t_image_size_2/v1731406900/aassofiaorg/lgvklcakqarbpagq34qu/Dola-Kay_web.jpg)
-Dola Kay
+![Registrar Emma Reed](https://resources.finalsite.net/images/f_auto,q_auto,t_image_size_2/v1731406900/aassofiaorg/lgvklcakqarbpagq34qu/Emma-Reed_web.jpg)
+Emma Reed
 #### Registrar/PowerSchool Coordinator
 School: + 359 2 923 8813
-![Director's assistant Zhulieta Nikolova](https://resources.finalsite.net/images/f_auto,q_auto,t_image_size_2/v1731406984/aassofiaorg/zdm17ntrhzu7bktrueel/ZhulietaNikolova494X477.jpg)
-Zhulieta Nikolova
+![Director's assistant Ivana Atanasova](https://resources.finalsite.net/images/f_auto,q_auto,t_image_size_2/v1731406984/aassofiaorg/zdm17ntrhzu7bktrueel/IvanaAtanasova494X477.jpg)
+Ivana Atanasova
 #### Director’s Executive Administrator
-![aas logo ](https://resources.finalsite.net/images/f_auto,q_auto/v1755773991/aassofiaorg/rflhqe8ptxal996ngggr/KristinaMecelicaite494X477.jpg)
-Kristina Mecelicaite
+![aas logo ](https://resources.finalsite.net/images/f_auto,q_auto/v1755773991/aassofiaorg/rflhqe8ptxal996ngggr/ClaireWard494X477.jpg)
+Claire Ward
 #### Student Support Services Coordinator
 ![A middle-aged man with short brown hair and a friendly smile, set against a plain gray background.](https://resources.finalsite.net/images/f_auto,q_auto,t_image_size_2/v1765202002/aassofiaorg/aassofiaorg/fe8p7wbe5fwgnzjbx60q/Brian494X477.jpg)
-Brian Sullivan
+David Ward
 #### ICT Manager
 ![decorative-image](https://resources.finalsite.net/images/v1728490678/aassofiaorg/q6oij3rglo3nnojnlflz/Vector1.svg)
 [![The Anglo-American School of Sofia](https://resources.finalsite.net/images/f_auto,q_auto/v1728207063/aassofiaorg/cuioeodi4satxzib63jc/TheAnglo-AmericanSchoolofSofia-FooterLogo.png)](https://www.aas-sofia.org)
@@ -173,10 +173,10 @@ Bulgaria
 
 ## HTML contact signals
 Email: admissions@aas-sofia.org
-Email: tfries@aas-sofia.org
-Email: jvillers@aas-sofia.org
-Email: eburnett@aas-sofia.org
+Email: mcarter@aas-sofia.org
+Email: lbennett@aas-sofia.org
+Email: pharris@aas-sofia.org
 Email: es_office@aas-sofia.org
-Email: ipetrova@aas-sofia.org
+Email: enikolova@aas-sofia.org
 Email: easa@aas-sofia.org
-Email: dnassapov@aas-sofia.org
+Email: pstoyanov@aas-sofia.org

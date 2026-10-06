@@ -29,8 +29,8 @@
           "address": "St. Pancharevo, Sofia 1137 Bulgaria +359 2 9238810 frontdesk@aas-sofia.org",
           "emails": [
             "admissions@aas-sofia.org",
-            "tfries@aas-sofia.org",
-            "jvillers@aas-sofia.org"
+            "mcarter@aas-sofia.org",
+            "lbennett@aas-sofia.org"
           ],
           "phones": [
             "+359 2 9238810",
@@ -54,7 +54,7 @@
         "operations": {
           "daily_schedule": [],
           "day_options": [
-            "* After-School Activities: +359 88 433 6418"
+            "* After-School Activities: +359 88 000 0005"
           ],
           "has_useful_info": true,
           "meals": [],
@@ -89,9 +89,9 @@
           "has_useful_info": true,
           "safety_features": [],
           "support_services": [
-            "Ms. Kelli Anderson -- Elementary School Counselor",
-            "Mr. James Villers -- Middle School Counselor",
-            "Ms. Kelley Christman - College and Career Counselor"
+            "Ms. Susan Brooks -- Elementary School Counselor",
+            "Mr. Paul Bennett -- Middle School Counselor",
+            "Ms. Alice Shaw - College and Career Counselor"
           ]
         },
         "summary_source": {

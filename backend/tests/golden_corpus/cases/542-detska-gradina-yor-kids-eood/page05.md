@@ -123,11 +123,11 @@ Please note that our website may not work properly if all cookies are disabled. 
 България
 Уебсайт: <https://yourkidsbg.com>
 Email: OFFICE@ex.comYOURKIDSBG.COM
-Phone number: 0887 116 834
+Phone number: 0880 000 013
 This Cookie Policy was synchronized with
 [Copyright yourkidsbg.com](https://www.yourkidsbg.com/)
 [Политика за поверителност](https://www.yourkidsbg.com/privacy-policy/)
 
 ## HTML contact signals
 Address: ул. „подполк. Калитин“ 216, 1233 ж.к. Захарна фабрика, София
-Phone: 0887 116 834
+Phone: 0880 000 013

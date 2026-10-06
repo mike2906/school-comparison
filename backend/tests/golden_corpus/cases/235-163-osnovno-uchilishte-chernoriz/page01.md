@@ -47,10 +47,10 @@
 ![](https://163ou.bg/wp-content/uploads/2022/10/c-pink-min.png)
 # _Гордеем се!_ **163. ОУ „Черноризец Храбър“**
 ![](https://163ou.bg/wp-content/uploads/2022/10/circle.png)
-[![Кристиян Любенов донесе бронзов медал от Международния турнир по хокей на лед за деца](https://163ou.bg/wp-content/uploads/2026/02/img_5328-400x284-37209_400x250.jpeg)](https://163ou.bg/kristiyan-lyubenov-donese-bronzov-medal-ot-mezhdunarodniya-turnir-po-hokej-na-led-za-detza/)
-## [Кристиян Любенов донесе бронзов медал от Международния турнир по хокей на лед за деца](https://163ou.bg/kristiyan-lyubenov-donese-bronzov-medal-ot-mezhdunarodniya-turnir-po-hokej-na-led-za-detza/)
+[![Стефан Здравков донесе бронзов медал от Международния турнир по хокей на лед за деца](https://163ou.bg/wp-content/uploads/2026/02/img_5328-400x284-37209_400x250.jpeg)](https://163ou.bg/hristo-velchev-donese-bronzov-medal-ot-mezhdunarodniya-turnir-po-hokej-na-led-za-detza/)
+## [Стефан Здравков донесе бронзов медал от Международния турнир по хокей на лед за деца](https://163ou.bg/hristo-velchev-donese-bronzov-medal-ot-mezhdunarodniya-turnir-po-hokej-na-led-za-detza/)
 На Международен турнир по хокей на лед за деца - възрастова гупа 10-12 г. в град Галац - Румъния,...
-[повече информация](https://163ou.bg/kristiyan-lyubenov-donese-bronzov-medal-ot-mezhdunarodniya-turnir-po-hokej-na-led-za-detza/)
+[повече информация](https://163ou.bg/hristo-velchev-donese-bronzov-medal-ot-mezhdunarodniya-turnir-po-hokej-na-led-za-detza/)
 [3](https://163ou.bg/#down)
 ## **Новини**
 [![Училище за родители](https://163ou.bg/wp-content/uploads/2026/02/neozaglaven-dizajn-1-338690_400x250.png)](https://163ou.bg/uchilishte-za-roditeli/)

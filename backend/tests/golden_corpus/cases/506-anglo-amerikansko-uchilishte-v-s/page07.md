@@ -114,10 +114,10 @@ During such challenging times, Tuition Insurance offers both emotional and finan
 This exclusive offering reflects our school’s forward-thinking approach and commitment to student and family well-being.
 ##### For Further Information:
 Please, contact
-Mr. Iliya Stanoev
+Mr. Petar Krastev
 Managing Director
 Total Ins - Insurance Broker EOOD
-istanoev@totalins.eu
+pdobrev@totalins.eu
 _*Please, note, that the insurance option is offered through Total Ins Insurance Broker and AAS does not receive any commission or other form of benefit from the insurance provider._
 ##### Additional Documents:
 In English | In Bulgarian

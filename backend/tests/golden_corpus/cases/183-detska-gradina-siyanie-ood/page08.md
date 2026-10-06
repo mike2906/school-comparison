@@ -5,10 +5,10 @@ Google Maps
 Понеделник – Петък
 7:30 – 18:30
 Телефон:
-0897 958561
+0890 000004
 E-mail:
 office@sianie-bg.com
 
 ## HTML contact signals
-Phone: 0897 958561
+Phone: 0890 000004
 Email: office@sianie-bg.com

@@ -155,7 +155,9 @@ Tests: `cd backend && uv run pytest -q` (about 1,500 tests, on SQLite) and
 More recipes are in [`skills/common-tasks/SKILL.md`](skills/common-tasks/SKILL.md).
 
 `backend/tests/golden_corpus/` holds excerpts of public school web pages, used as
-regression fixtures for extraction. To have one removed, write to
+regression fixtures for extraction. The text belongs to the schools and is not covered by
+the licence below. Names of staff, parents and pupils, personal email addresses and mobile
+numbers in it are replaced with made-up ones. To have an excerpt removed, write to
 contact@schooldecider.com.
 
 ## License

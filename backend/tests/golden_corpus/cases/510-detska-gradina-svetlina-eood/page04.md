@@ -59,7 +59,7 @@ At Svetlina Private School, students learn through experience, connect knowledge
 At Svetlina Private High School, we view education as a conscious process in which students do not just acquire knowledge, but also build skills for the future. The training includes intensive English language study, professional competence modules, and practical projects. We introduce innovative approaches, including the use of artificial intelligence in the learning process. We work with attention to the individual – with mentors who support the individual path of development, and with a program that prepares young people for life outside the classroom.
 [ To High School ](https://svetlina.net/en/home-high-school/)
 ## Over 25 years of caring for the holistic development of every child
-Svetlina Educational Group was founded in 1999 by Vesselina Radkova, a visionary who first introduced the holistic approach to education in Bulgaria. Every child is unique, and that is precisely why our team is trained to develop their potential – not only intellectually, but also physically, emotionally and spiritually.
+Svetlina Educational Group was founded in 1999 by Nevena Radeva, a visionary who first introduced the holistic approach to education in Bulgaria. Every child is unique, and that is precisely why our team is trained to develop their potential – not only intellectually, but also physically, emotionally and spiritually.
 Today, the Svetlina Educational Group is part of the Education 3000 global school chain, an international network that brings together the most successful innovative practices in the world. We are also an active member of the Association of Cambridge Schools in Bulgaria and the Bulgarian Association of Private Schools, sharing and applying high educational standards in our daily work.
 At Svetlina, we don’t just teach – we inspire, build, and prepare children for a world that is changing every second. Because we believe that the future starts today.
 ## Advantages
@@ -99,15 +99,15 @@ is the first video platform for early childhood development (0–6 years) create
 inspiring seminar for teenagers that brings together young people from all over the country. Speakers from various fields share their personal stories to show young people that every dream is possible and that the future depends on them.
 ## Parent testimonials
 As parents, we are extremely satisfied with Svetlina Kindergarten, especially the Lyulin campus. Everything—from the teaching team to the facilities—is wonderful! But most importantly for us, our child has always gone to kindergarten with great enthusiasm and has come back happy and joyful.
-Viktoria Ivailova Panayotova
+Radostina Petrova Nikolova
 We are extremely grateful and appreciative of the entire team at the Lyulin campus. We saw and felt the care, attention, and dedication invested in working with our child. The effort, energy, and time devoted to Matia’s development and the individual approach taken are truly valued! The progress is the result of all this. Thank you!
-Vanesa Yordanova
+Ivana Savova
 We would like to express our deep gratitude for the heartfelt care, professionalism, and endless dedication of the entire teaching team at Svetlina, especially Miss Sneji, Miss Nina, and Mr. Peter. We have always felt at ease knowing that our child was in good and caring hands. Tea’s teachers will certainly be missed.
-Vera Krumova
+Silvana Angelova
 A huge thank you for the care and patience that the team at the campus has shown to my child. You are a source of strength and support for every parent. In less than a year, I can see tremendous progress in Nikola, for which I am once again deeply grateful. Keep growing and reaching your high professional goals.
-Kristina Vasileva
+Elena Radeva
 Thank you for the care and attention shown to our child. We felt warmth, understanding, and support, and most importantly, our child feels happy attending the kindergarten.
-Maria Aleksandrova Baleva
+Elena Petrova Nikolova
 ## Apply
 [ Kindergarten ](https://svetlina.net/en/garden/kak-da-kandidatstvate/)
 [ School ](https://svetlina.net/en/school/kak-da-kandidatstvate/)
@@ -117,7 +117,7 @@ Maria Aleksandrova Baleva
 Frequently Asked Questions
 **Kindergarten**
 ### Do you have any vacancies?
-Please contact our communication manager on 0895 560 647 or email kinder.communication.manager@svetlina.net to check for your desired location and group. If we do not have any spaces, we will put you on a waiting list and contact you as soon as possible.
+Please contact our communication manager on 0890 000 009 or email kinder.communication.manager@svetlina.net to check for your desired location and group. If we do not have any spaces, we will put you on a waiting list and contact you as soon as possible.
 ### How big are the groups?
 The groups are optimally 12 children. We have found that this is the optimal option, in which children have the opportunity to socialize, while at the same time receiving the necessary attention and individual approach.
 ### Do we get a point with you for applying to a state kindergarten?
@@ -147,6 +147,6 @@ Our focus is on ensuring that the three equal parties to this process – parent
 Our team consists of qualified educators, philologists, psychologists, sports instructors, music and art specialists who support and guide the student throughout his or her entire period of development and learning.
 We believe that we cannot prepare the future for students, but we are ready to prepare students for their future!
 ### How do I apply to Svetlina Secondary School?
-You can apply for admission to Svetlina Primary School through the application platform or by contacting a communications manager at the following number: +359 897 820 996 or by email: communication.manager@svetlina.net
+You can apply for admission to Svetlina Primary School through the application platform or by contacting a communications manager at the following number: +359 890 000 010 or by email: communication.manager@svetlina.net
 Application form: https://svetlina.net/priem-za-chastno-inovativno-uchilishte/
 ### What is the daily routine of the stu

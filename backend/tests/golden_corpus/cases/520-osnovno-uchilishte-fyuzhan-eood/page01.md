@@ -55,7 +55,7 @@
 ### [Новини](https://school.fusion.bg/category/novini/)
 * [ ![Ден на Розовата фанелка в ЧОУ Фюжън \(3\)](https://school.fusion.bg/wp-content/uploads/sites/6/2026/02/Den-na-Rozovata-fanelka-v-CHOU-Fyuzhan-3-1434x1920-600x460.jpg) ](https://school.fusion.bg/novini/rozovo-edinstvo-kak-posadihme-dobrota-v-uchilishte-fyuzhan/)
 ### [ Розово единство: Как „посадихме“ доброта в училище Фюжън ](https://school.fusion.bg/novini/rozovo-edinstvo-kak-posadihme-dobrota-v-uchilishte-fyuzhan/)
-* [ ![kodovo ime zhivot fusion school katya chonova \(2\)](https://school.fusion.bg/wp-content/uploads/sites/6/2026/02/kodovo-ime-zhivot-fusion-school-katya-chonova-2-1-1920x1137-600x460.jpg) ](https://school.fusion.bg/novini/kodovo-ime-zhivot-tri-godini-po-patya-na-preventsiyata/)
+* [ ![kodovo ime zhivot fusion school elena kostova \(2\)](https://school.fusion.bg/wp-content/uploads/sites/6/2026/02/kodovo-ime-zhivot-fusion-school-elena-kostova-2-1-1920x1137-600x460.jpg) ](https://school.fusion.bg/novini/kodovo-ime-zhivot-tri-godini-po-patya-na-preventsiyata/)
 ### [ „Кодово име: Живот“: три години по пътя на превенцията ](https://school.fusion.bg/novini/kodovo-ime-zhivot-tri-godini-po-patya-na-preventsiyata/)
 * [ ![1199-675](https://school.fusion.bg/wp-content/uploads/sites/6/2026/02/1199-675-600x460.jpg) ](https://school.fusion.bg/novini/informatsionna-sreshta-progimnaziya/)
 ### [ Информационна среща – Прогимназия ](https://school.fusion.bg/novini/informatsionna-sreshta-progimnaziya/)
@@ -83,6 +83,6 @@ _В близост до кръговото на Околовръстен път,
 [ ![745-420_2](https://school.fusion.bg/wp-content/uploads/sites/6/2026/02/745-420_2.png) ](https://school.fusion.bg/informatsionna-sreshta-2026-2027)
 
 ## HTML contact signals
-Phone: +359 883 363 777
+Phone: +359 880 000 012
 Email: school@fusion.bg
-Address: ул. Витошка Зорница 2, кв. Драгалевци, гр. София. В близост до кръговото на Околовръстен път, улицата срещу магазин Фантастико +359 883 363 777 school@fusion.bg
+Address: ул. Витошка Зорница 2, кв. Драгалевци, гр. София. В близост до кръговото на Околовръстен път, улицата срещу магазин Фантастико +359 880 000 012 school@fusion.bg

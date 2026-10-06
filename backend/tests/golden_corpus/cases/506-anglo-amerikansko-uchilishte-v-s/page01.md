@@ -133,23 +133,23 @@ Previous
 ![Picture of teacher with her child](https://resources.finalsite.net/images/f_auto,q_auto,t_image_size_4/v1763034084/aassofiaorg/ydhad9ewic5wrhqt0gxx/IMG-20231220-WA0004.jpg)
 Faculty
 I really enjoy the teenage sense of humour and I find the international dynamic to the classroom especially interesting when teaching languages. There are never any two days that are the same in teaching and it is never boring. Even after 18 years it is still not boring!
-**Ms. Jennifer Banister** Gr. 1 MS/HS Spanish & German Teacher
-![headshot John Danaher](https://resources.finalsite.net/images/f_auto,q_auto/v1734506188/aassofiaorg/h3egzusu6ccjhuetk7e3/JohnDanaher.jpg)
+**Ms. Helen Bailey** Gr. 1 MS/HS Spanish & German Teacher
+![headshot David Harris](https://resources.finalsite.net/images/f_auto,q_auto/v1734506188/aassofiaorg/h3egzusu6ccjhuetk7e3/DavidHarris.jpg)
 What brings me the most joy in my job is witnessing my students realize their potential and achieve their goals. Engaging in deep conversations across a wide range of topics and subjects with my students enriches both their learning experience and my own professional fulfillment.
-**Dr. John Danaher** HS Science Teacher
+**Dr. David Harris** HS Science Teacher
 ![Picture of a teacher](https://resources.finalsite.net/images/f_auto,q_auto,t_image_size_4/v1763034332/aassofiaorg/c8dgeyap0zy8916djwfw/Louisephoto.jpg)
 I experience moments of JOY every day, from our Circle Time "aha" moments to watching a child connect a concept or recall an idea we had discussed in a previous lesson.
-**Ms. Louise McGivern** Pre-K Teacher
-![headshot Blessy Monica](https://resources.finalsite.net/images/f_auto,q_auto/v1734506403/aassofiaorg/q6n3y2qfiugbghsiowzu/BlessyMonica.jpg)
+**Ms. Karen Ellis** Pre-K Teacher
+![headshot Helen Bailey](https://resources.finalsite.net/images/f_auto,q_auto/v1734506403/aassofiaorg/q6n3y2qfiugbghsiowzu/HelenBailey.jpg)
 Instructional Coach
 Always Maslow before Bloom. Children are impressionable and we are in the job of moulding the generation of tomorrow. Establishing strong relationships and knowing each student's unique personality, are key to fostering a conducive learning environment.
-**Ms. Blessy Monica** PreK-12 Instructional Coach
-![headshot Mitra Dimova](https://resources.finalsite.net/images/f_auto,q_auto/v1734506630/aassofiaorg/nvgvioehduqvuxzyjae8/MitraDimova.jpg)
+**Ms. Helen Bailey** PreK-12 Instructional Coach
+![headshot Denitsa Tsvetkova](https://resources.finalsite.net/images/f_auto,q_auto/v1734506630/aassofiaorg/nvgvioehduqvuxzyjae8/DenitsaTsvetkova.jpg)
 AAS Sofia is a place where dedication to teaching meets a community of lifelong learners, where the positivism and creativity of the teachers are like nowhere else, and where students are supported in their journey.
-**Ms. Mitra Dimova** BFL K-5 Teacher
-![headshot Ian Harrington](https://resources.finalsite.net/images/f_auto,q_auto/v1734506933/aassofiaorg/tbffbohi11o3migns2c6/IanHarrington.jpg)
+**Ms. Denitsa Tsvetkova** BFL K-5 Teacher
+![headshot Simon Parker](https://resources.finalsite.net/images/f_auto,q_auto/v1734506933/aassofiaorg/tbffbohi11o3migns2c6/SimonParker.jpg)
 I came for the job and stayed for my family. The AAS Community provides me with a great working environment and has given my family many opportunities and support that we would otherwise not have.
-**Mr. Ian Harrington** MS Science Teacher
+**Mr. Simon Parker** MS Science Teacher
 ![Picture of a happy smiling student](https://resources.finalsite.net/images/f_auto,q_auto/v1763034814/aassofiaorg/ueeusd6h8ctn5pagg9ed/IMG_3862.jpg)
 Student
 What makes my experience within this school so unique is having the ability to integrate my creative abilities. I thrive in an environment that fosters creativity and growth, much like my favorite subject - Visual Arts- which excites me to go to school each day.
@@ -176,28 +176,28 @@ Next
 ## Latest News
 ![A middle-aged man with short brown hair and a friendly smile, set against a plain gray background.](https://resources.finalsite.net/images/f_auto,q_auto,t_image_size_2/v1765202002/aassofiaorg/aassofiaorg/fe8p7wbe5fwgnzjbx60q/Brian494X477.jpg)
 Beyond Chatbots: Exciting Developments in Technology
-AAS Director of Technology Brian Sullivan looks beyond the chatbot debate to highlight the profound gains being made in science and engineering.
+AAS Director of Technology David Ward looks beyond the chatbot debate to highlight the profound gains being made in science and engineering.
 [ Read More about Beyond Chatbots: Exciting Developments in Technology ](https://www.aas-sofia.org/p/~board/weekly-read/post/beyond-chatbots-exciting-developments-in-technology)
 ![A smiling woman with dark hair wearing a beige sweater against a plain background.](https://resources.finalsite.net/images/f_auto,q_auto,t_image_size_2/v1772201753/aassofiaorg/rubin8sn0rnv9ezwyp8v/AmandaFrank494X477.jpg)
 Embracing Neurodiversity and Student Strengths
 To wrap up our Inclusion Week, we asked our Behaviour Specialist Amanda Frank about neurodiversity, learning support and her recent visit to Bishkek International School.
 [ Read More about Embracing Neurodiversity and Student Strengths ](https://www.aas-sofia.org/p/~board/weekly-read/post/embracing-neurodiversity-and-student-strengths)
-![MS Counselor James Villers ](https://resources.finalsite.net/images/f_auto,q_auto,t_image_size_2/v1731999738/aassofiaorg/bude7ybzmprjmp3b0ixz/JamesVillers_thumb.jpg)
+![MS Counselor Paul Bennett ](https://resources.finalsite.net/images/f_auto,q_auto,t_image_size_2/v1731999738/aassofiaorg/bude7ybzmprjmp3b0ixz/PaulBennett_thumb.jpg)
 Prioritizing Our Children's Well-Being
 A 2024 study from
 [ Read More about Prioritizing Our Children's Well-Being ](https://www.aas-sofia.org/p/~board/weekly-read/post/prioritizing-our-childrens-well-being)
-![tiya kavrakova former student](https://resources.finalsite.net/images/f_auto,q_auto,t_image_size_2/v1770376490/aassofiaorg/eawiq6gioo9cvczdnq3j/TiyaPortrait.jpg)
-Tiya Kavrakova: AAS Taught Me From An Early Age That My Voice Matters
-This week we meet with a former student Tiya Kavrakova, who was at AAS 20 years ago. She reflects on the essential skills that helped her in her life and career path after leaving the school.
-[ Read More about Tiya Kavrakova: AAS Taught Me From An Early Age That My Voice Matters ](https://www.aas-sofia.org/p/~board/weekly-read/post/tiya-kavrakova-aas-taught-me-that-my-voice-matters-from-an-early-age)
-![curriculum director Angela Assed](https://resources.finalsite.net/images/f_auto,q_auto/v1730981432/aassofiaorg/za6mgdsagwx0vxvzpvw5/assed494X477.jpg)
+![denitsa tsvetkova former student](https://resources.finalsite.net/images/f_auto,q_auto,t_image_size_2/v1770376490/aassofiaorg/eawiq6gioo9cvczdnq3j/TiyaPortrait.jpg)
+Denitsa Tsvetkova: AAS Taught Me From An Early Age That My Voice Matters
+This week we meet with a former student Denitsa Tsvetkova, who was at AAS 20 years ago. She reflects on the essential skills that helped her in her life and career path after leaving the school.
+[ Read More about Denitsa Tsvetkova: AAS Taught Me From An Early Age That My Voice Matters ](https://www.aas-sofia.org/p/~board/weekly-read/post/denitsa-tsvetkova-aas-taught-me-that-my-voice-matters-from-an-early-age)
+![curriculum director Laura Foster](https://resources.finalsite.net/images/f_auto,q_auto/v1730981432/aassofiaorg/za6mgdsagwx0vxvzpvw5/foster494X477.jpg)
 Inquiry Based Learning
 Inquiry-based learning is a student-centered approach that cultivates curiosity, critical thinking, problem solving, and deep understanding.
 [ Read More about Inquiry Based Learning ](https://www.aas-sofia.org/p/~board/weekly-read/post/inquiry-based-learning)
-![headshot eric burnett ms/hs principal](https://resources.finalsite.net/images/f_auto,q_auto,t_image_size_2/v1757656704/aassofiaorg/unwxlrqnrrrrhlmanmig/EricBurnett494X477.png)
+![headshot philip hughes ms/hs principal](https://resources.finalsite.net/images/f_auto,q_auto,t_image_size_2/v1757656704/aassofiaorg/unwxlrqnrrrrhlmanmig/PhilipHughes494X477.png)
 The Distortions
 Talking to children is tough. Listening to children is sometimes tougher. What sometimes makes these conversations even more challenging is that what we hear oft times doesn’t match reality, but is instead the result of meddling minds crafting cognitive distortions.
 [ Read More about The Distortions ](https://www.aas-sofia.org/p/~board/weekly-read/post/the-distortions)
-![headshot Julie Villers Es principal](https://resources.finalsite.net/images/f_auto,q_auto,t_image_size_2/v1736852142/aassofiaorg/seb1kmrcyspcktxrd3mf/JulieVillers494X477.jpg)
+![headshot Claire Ward Es principal](https://resources.finalsite.net/images/f_auto,q_auto,t_image_size_2/v1736852142/aassofiaorg/seb1kmrcyspcktxrd3mf/ClaireWard494X477.jpg)
 Safeguarding Children: Our Shared Responsibility
 Raising children is such a wonderful experience for a parent. Being witness to another human being learning about the world and knowing you play a crucial part in it is truly rewarding. Every age and st

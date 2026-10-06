@@ -44,5 +44,5 @@
 ## HTML contact signals
 Email: office@yourkidsbg.com
 Address: гр. София, ул. „Подполковник Калитин“ № 216
-Phone: 0887116834
-Phone: 0887 116 834
+Phone: 0880000013
+Phone: 0880 000 013

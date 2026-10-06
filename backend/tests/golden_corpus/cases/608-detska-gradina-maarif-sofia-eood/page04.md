@@ -66,5 +66,5 @@ Web sitesi deneyiminizi iyileştirmek amacıyla analitik çerezler kullanılır.
 Tercihlerimi Kaydet
 
 ## HTML contact signals
-Phone: +359 88 4465600
+Phone: +359 88 0000020
 Email: bulgaria@turkiyemaarif.org

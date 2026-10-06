@@ -80,7 +80,7 @@ Maarif iki dillilere yönelik Türkçe Öğretimi Modeliyle Yeni Dönem Türkçe
 * [ ![Türkiye Cumhuriyeti Filibe Başkonsolosu Emre Manav’a Nezaket Ziyareti](https://bg.maarifschools.org/uploads/news/detail/169d5189024517.webp) ](https://bg.maarifschools.org/news/turkiye-cumhuriyeti-filibe-baskonsolosu-emre-manava-nezaket-ziyareti-202604071745)
 07.04.2026
 Türkiye Cumhuriyeti Filibe Başkonsolosu Emre Manav’a Nezaket Ziyareti
-Ülke Temsilcisimiz Onur Yıldız, Türkiye Cumhuriyeti Filibe Başkonsolosu Emre Manav’a nezaket ziyaretinde bulunmuştur. Nazik kabulleri ve misafirperverlikleri dolayısıyla Sayın Başkonsolosumuza teşekkürlerimizi sunarız. Ziyaret programı kapsamında ayrıca, Başkonsolosluk sorumluluk bölgesinde yer alan Kırcaali Bölge Müftüsü Basri Eminefendi ile Mestanlı İmam Hatip Lisesi Müdürü Ahmed Bozov’a da ziyaret gerçekleştirilmiştir.
+Ülke Temsilcisimiz Onur Yıldız, Türkiye Cumhuriyeti Filibe Başkonsolosu Emre Manav’a nezaket ziyaretinde bulunmuştur. Nazik kabulleri ve misafirperverlikleri dolayısıyla Sayın Başkonsolosumuza teşekkürlerimizi sunarız. Ziyaret programı kapsamında ayrıca, Başkonsolosluk sorumluluk bölgesinde yer alan Kırcaali Bölge Müftüsü Basri Eminefendi ile Mestanlı İmam Hatip Lisesi Müdürü Vladimir Savov’a da ziyaret gerçekleştirilmiştir.
 [ Devamını Oku ](https://bg.maarifschools.org/news/turkiye-cumhuriyeti-filibe-baskonsolosu-emre-manava-nezaket-ziyareti-202604071745)
 * [ ![Hafta Sonu Türkçe Kursları Devam Ediyor](https://bg.maarifschools.org/uploads/news/detail/169cb7f48983fe.webp) ](https://bg.maarifschools.org/news/hafta-sonu-turkce-kurslari-devam-ediyor)
 31.03.2026

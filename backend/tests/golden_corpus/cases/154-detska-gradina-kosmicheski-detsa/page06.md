@@ -1,4 +1,4 @@
-+359 884 788 274
++359 880 000 001
 [ ![Cosmos Kids](https://cosmos-kids.org/wp-content/uploads/2018/12/logoCosmosKids2019.jpg) ](https://cosmos-kids.org/)
 * [Home](https://cosmos-kids.org/home/)
 * [About us](https://cosmos-kids.org/)
@@ -47,7 +47,7 @@ For this period, the fee is reduced by 200 leva for a full-day subscription and 
 ## How To Enrol Your Child for Cosmos Kids
 &#xe090;
 #### Call For Inquiry
-00359 884 788 274
+00359 880 000 001
 &#xe076;
 #### Mail For Inquiry
 cosmoskids@gmail.com
@@ -115,7 +115,7 @@ The kindergarten creative arts curriculum encourages discovery, inquiry and wond
 ### years english nursery and kindergarten
 ## Get In Touch
 **Location:** 48, Georgi Georgiev-Gets str., Dragalevtsi, Sofia, Bulgaria
-**Telephone:** +359 884 788 274
+**Telephone:** +359 880 000 001
 **Email:**
 **School Hours:** Monday-Friday: 8:00 am – 5:30 pm
 [ Български](https://bg.cosmos-kids.org/prices/)[ English](https://cosmos-kids.org/prices/)
