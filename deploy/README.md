@@ -209,7 +209,7 @@ what is copied off it, to a private Cloudflare R2 bucket.
 One-time setup (human), in the Cloudflare dashboard under R2:
 
 1. Enable R2 (the free tier covers 10 GB; Cloudflare asks for a payment method).
-2. Create a bucket named `schooldecider-backups`. Leave public access off.
+2. Create a bucket named `schooldecider-backups-eu`. Leave public access off.
 3. Manage R2 API Tokens → Create API token: **Object Read & Write**, limited to that
    bucket. Save the values in `~/.config/schooldecider/backup.env`, mode 600:
    ```
@@ -234,7 +234,7 @@ To check a backup restores, download it into a scratch database, never the launc
 ```bash
 . ~/.config/schooldecider/backup.env
 curl --fail --aws-sigv4 "aws:amz:auto:s3" --user "$R2_ACCESS_KEY_ID:$R2_SECRET_ACCESS_KEY" \
-  -o /tmp/restore.dump "${R2_ENDPOINT:-https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com}/schooldecider-backups/<name>.dump"
+  -o /tmp/restore.dump "${R2_ENDPOINT:-https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com}/schooldecider-backups-eu/<name>.dump"
 docker exec sofia_schools_db createdb -U postgres restore_check
 docker exec -i sofia_schools_db pg_restore -U postgres --no-owner --exit-on-error -d restore_check < /tmp/restore.dump
 docker exec sofia_schools_db psql -U postgres -d restore_check -c 'select count(*) from schools'

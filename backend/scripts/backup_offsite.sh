@@ -13,7 +13,7 @@
 #     export R2_ACCESS_KEY_ID=...
 #     export R2_SECRET_ACCESS_KEY=...
 #
-# Optional: R2_BUCKET (default schooldecider-backups), R2_ENDPOINT (a bucket in the EU
+# Optional: R2_BUCKET (default schooldecider-backups-eu), R2_ENDPOINT (a bucket in the EU
 # jurisdiction uses https://<account id>.eu.r2.cloudflarestorage.com), BACKUP_DATABASE
 # (default sofia_schools), BACKUP_DRY_RUN=1 to build and check the archives without
 # uploading. Nothing is pruned: a dump is about 10 MB and R2's free tier holds 10 GB.
@@ -37,7 +37,7 @@ if [ -z "$dry_run" ]; then
 	. "$env_file"
 	: "${R2_ACCOUNT_ID:?}" "${R2_ACCESS_KEY_ID:?}" "${R2_SECRET_ACCESS_KEY:?}"
 fi
-bucket="${R2_BUCKET:-schooldecider-backups}"
+bucket="${R2_BUCKET:-schooldecider-backups-eu}"
 endpoint="${R2_ENDPOINT:-https://${R2_ACCOUNT_ID:-}.r2.cloudflarestorage.com}"
 
 work="$(mktemp -d)"

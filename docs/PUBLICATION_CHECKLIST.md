@@ -37,8 +37,8 @@ repository public, deploy a release or modify the existing school database.
   which is restricted to `main`; no repository-level secrets remain.
 - Off-host backup: `backend/scripts/backup_offsite.sh` copies the launch database and
   `backend/reports/` to a private R2 bucket ([runbook](../deploy/README.md), Off-host
-  backup). Still to do by hand: enable R2, create the bucket and token, run it once and
-  check a restore.
+  backup). First run and a restore from the bucket checked 2026-10-06; run it after
+  each data publish.
 - Confirm the intended license and rights to any published data/assets. Add actual product
   screenshots when useful; never present mockups as implementation evidence.
 
