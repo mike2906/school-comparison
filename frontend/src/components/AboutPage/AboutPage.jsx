@@ -16,12 +16,13 @@ const PRIVACY = ['account', 'browser', 'lookups', 'hosting', 'contact']
 /** Where the data comes from and how to read it: the main trust signal for parents. */
 function AboutPage() {
   const { t } = useTranslation()
-  const { hash } = useLocation()
+  const { hash, key } = useLocation()
 
-  // The page renders after the browser's own jump to the fragment, so repeat it.
+  // The page renders after the browser's own jump to the fragment, so repeat it. `key`
+  // changes on every navigation, so following the same link again scrolls again.
   useEffect(() => {
     if (hash) document.getElementById(hash.slice(1))?.scrollIntoView()
-  }, [hash])
+  }, [hash, key])
 
   useEffect(() => {
     const previous = document.title
