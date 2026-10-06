@@ -171,6 +171,29 @@ class TestSchoolsEndpoint:
         assert schools_router._list_cache == {}
 
     @pytest.mark.asyncio
+    async def test_filters_are_cached_per_city(self, seeded_client, monkeypatch):
+        from app.services.school_service import SchoolService
+
+        calls = 0
+        original = SchoolService.get_available_filters
+
+        async def counting(self, **kwargs):
+            nonlocal calls
+            calls += 1
+            return await original(self, **kwargs)
+
+        monkeypatch.setattr(SchoolService, "get_available_filters", counting)
+
+        first = await seeded_client.get("/schools/filters")
+        second = await seeded_client.get("/schools/filters")
+        assert first.status_code == 200
+        assert second.json() == first.json()
+        assert calls == 1
+
+        await seeded_client.get("/schools/filters?city=all")
+        assert calls == 2
+
+    @pytest.mark.asyncio
     async def test_list_schools_serializes_exam_results_used_by_school_cards(
         self,
         seeded_db,
@@ -199,16 +222,17 @@ class TestSchoolsEndpoint:
         assert response.status_code == 200
         payload = next(item for item in response.json() if item["id"] == school.id)
         assert len(payload["exam_results"]) == 1
+        # List rows carry only what the cards read; ids and the source link are detail-only.
         assert payload["exam_results"][0] == {
-            "id": payload["exam_results"][0]["id"],
-            "school_id": school.id,
             "year": 2025,
             "exam_type": "nvo_4",
             "subject": "math",
             "metric": "average_score",
             "value": 78.25,
-            "source_url": "https://example.edu/nvo-2025",
         }
+        detail = (await seeded_client.get(f"/schools/{school.id}")).json()
+        assert detail["exam_results"][0]["source_url"] == "https://example.edu/nvo-2025"
+        assert detail["exam_results"][0]["school_id"] == school.id
 
     @pytest.mark.asyncio
     async def test_list_schools_filter_by_age_group(self, seeded_client):

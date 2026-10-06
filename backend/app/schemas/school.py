@@ -288,6 +288,21 @@ class ExamResultResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class ExamResultListItem(BaseModel):
+    """Exam row for list and search responses: only what the school cards read.
+
+    The row ids and the source link stay on the detail and compare responses.
+    """
+
+    year: int
+    exam_type: str
+    subject: str
+    metric: str
+    value: float
+
+    model_config = {"from_attributes": True}
+
+
 class SchoolBase(SchoolAttributesMixin):
     country_code: str = "bg"
     name_i18n: dict
@@ -373,7 +388,7 @@ class SchoolListResponse(SchoolPricingMixin):
     school_type: str
     education_level: str
     locations: list[SchoolLocationResponse] = []
-    exam_results: list[ExamResultResponse] = []
+    exam_results: list[ExamResultListItem] = []
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 

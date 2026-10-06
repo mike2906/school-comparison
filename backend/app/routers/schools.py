@@ -27,15 +27,22 @@ router = APIRouter()
 LIST_CACHE_TTL_SECONDS = 600
 LIST_CACHE_MAX_ENTRIES = 32
 _list_cache: dict[tuple, tuple[float, bytes]] = {}
-_list_cache_lock = asyncio.Lock()
+_build_lock = asyncio.Lock()
+_filters_cache: dict[tuple, tuple[float, dict[str, list[str]]]] = {}
 _list_response_adapter = TypeAdapter(list[SchoolListResponse])
 
 
-def _cached_list_body(key: tuple) -> bytes | None:
-    entry = _list_cache.get(key)
+def _cached(cache: dict, key: tuple):
+    entry = cache.get(key)
     if entry is None or time.monotonic() - entry[0] >= LIST_CACHE_TTL_SECONDS:
         return None
     return entry[1]
+
+
+def _store(cache: dict, key: tuple, value) -> None:
+    if len(cache) >= LIST_CACHE_MAX_ENTRIES:
+        cache.clear()
+    cache[key] = (time.monotonic(), value)
 
 
 @router.get("", response_model=list[SchoolListResponse])
@@ -69,15 +76,15 @@ async def list_schools(
             include_crossover,
         )
         if cacheable:
-            body = _cached_list_body(key)
+            body = _cached(_list_cache, key)
             if body is not None:
                 return Response(content=body, media_type="application/json")
 
         # One build at a time, so a burst of visitors on a cold cache waits for a single
         # serialization instead of each running its own.
-        async with _list_cache_lock:
+        async with _build_lock:
             if cacheable:
-                body = _cached_list_body(key)
+                body = _cached(_list_cache, key)
                 if body is not None:
                     return Response(content=body, media_type="application/json")
             service = SchoolService(db)
@@ -100,9 +107,7 @@ async def list_schools(
                 by_alias=True,
             )
             if cacheable:
-                if len(_list_cache) >= LIST_CACHE_MAX_ENTRIES:
-                    _list_cache.clear()
-                _list_cache[key] = (time.monotonic(), body)
+                _store(_list_cache, key, body)
         return Response(content=body, media_type="application/json")
     except Exception as e:
         logger.error(f"Error listing schools: {e}", exc_info=True)
@@ -153,8 +158,18 @@ async def get_available_filters(
 ):
     """Get available advanced filter options based on school attributes."""
     try:
-        service = SchoolService(db)
-        return await service.get_available_filters(country_code=country_code, city=city)
+        # Same projection cost and same change rate as the list, so the same short cache.
+        key = (country_code, SchoolService._normalize_city_filter(city))
+        filters = _cached(_filters_cache, key)
+        if filters is not None:
+            return filters
+        async with _build_lock:
+            filters = _cached(_filters_cache, key)
+            if filters is None:
+                service = SchoolService(db)
+                filters = await service.get_available_filters(country_code=country_code, city=city)
+                _store(_filters_cache, key, filters)
+        return filters
     except Exception as e:
         logger.error(f"Error getting available filters: {e}", exc_info=True)
         raise HTTPException(
