@@ -6,7 +6,8 @@ redirect and the crawler settings. It does not manage the API host: the OVH prov
 order a VPS, but a changed image reinstalls (wipes) it and the SSH key needs an image ID
 that only exists after the first order. The host is ordered by hand and set up by
 `deploy/bootstrap.sh`. Email Routing's records are not declared here, so Terraform leaves
-`contact@` alone.
+`contact@` alone. The same goes for the `google-site-verification` TXT record, which Google
+Search Console added through its Cloudflare integration: do not remove it.
 
 Monthly cost: everything here is on Cloudflare's free plan. The only paid item is the VPS
 (OVH VPS-1: 2 vCPU, 4 GB, 40 GB; EUR 4.49 ex VAT, monthly, no commitment; 2026-10-01).
