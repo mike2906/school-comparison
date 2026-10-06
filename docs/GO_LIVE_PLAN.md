@@ -2135,13 +2135,13 @@ the session scratchpad only.
             Checked: a tile request with that referrer returns the map, any other
             referrer (including `localhost`) gets 403, and the live map loads. Local
             development therefore runs without the key (watermarked tiles).
-      - [ ] External uptime check (free tier) that alerts Mike; Cloudflare Web Analytics
+      - [x] External uptime check (free tier) that alerts Mike; Cloudflare Web Analytics
             (cookieless, no custom events yet); a short privacy notice.
             **2026-10-06:** the `Uptime` workflow runs `deploy/smoke.sh` against
             production every 15 minutes and GitHub emails the owner on failure; the About
-            page has a Privacy section, linked from the footer. Left open: turn on Web
-            Analytics for `schooldecider.com` in the Cloudflare dashboard (automatic
-            setup; the notice already names it).
+            page has a Privacy section, linked from the footer. Web Analytics is on for
+            `schooldecider.com` (Mike, dashboard, automatic injection): a browser visit
+            loads the beacon and posts to `/cdn-cgi/rum`. It is not declared in Terraform.
       - [x] Google Search Console and Bing Webmaster Tools: verify, submit the sitemap,
             inspect representative pages.
             **Done 2026-10-06 (Mike):** Domain property verified through Google's
