@@ -17,6 +17,8 @@ repository public, deploy a release or modify the existing school database.
   archives. Backup files are excluded from Git.
 - Golden-corpus fixtures have people's names, personal email addresses and mobile numbers
   replaced with made-up ones (current tree only; earlier commits keep the originals).
+- The README names the source of `backend/data/bg/education.geojson` (Eurostat GISCO, from
+  the Ministry of Education and Science) and says its licence is not stated.
 - The initial migration now creates the pipeline table before later revisions alter it.
   The schema-alignment revision adds missing fields only where absent, preserving databases
   previously initialized with ORM `create_all`. Its downgrade intentionally retains fields

@@ -160,6 +160,13 @@ the licence below. Names of staff, parents and pupils, personal email addresses 
 numbers in it are replaced with made-up ones. To have an excerpt removed, write to
 contact@schooldecider.com.
 
+`backend/data/bg/education.geojson` is the Bulgaria file of Eurostat GISCO's
+[education services dataset](https://gisco-services.ec.europa.eu/pub/education/), whose
+listed source is the Ministry of Education and Science of Bulgaria. GISCO's
+[metadata](https://gisco-services.ec.europa.eu/pub/education/metadata.pdf) refers to each
+national provider for licence terms and states none for Bulgaria, so the file is not
+covered by the licence below either.
+
 ## License
 
 [MIT](LICENSE)
