@@ -2143,14 +2143,14 @@ the session scratchpad only.
             - [ ] After the next API release, remove the hand-built
                   `schooldecider-api:local` image from the host (Mike; the agent has no
                   host shell): `docker image rm schooldecider-api:local`.
-            - [ ] Deploy secrets are exposed to every branch. The account is on GitHub
-                  Free, where a private repo has no environments (so no `production`
-                  environment limited to `main`) and no branch protection. Any workflow
-                  pushed on any branch can read `DEPLOY_SSH_KEY` and
-                  `CLOUDFLARE_PAGES_TOKEN`. Accepted for now: only Mike and his agents
-                  push, and the key can only run `deploy/deploy.sh`. Decide before stage
-                  B's auto-merge: GitHub Pro (USD 4/month) or a public repo (both features
-                  are free there).
+            - [x] Deploy secrets are exposed to every branch. **Done 2026-10-06:** the
+                  repository is public. `DEPLOY_SSH_KEY`, `DEPLOY_HOST` and
+                  `CLOUDFLARE_PAGES_TOKEN` live only in the `production` environment,
+                  which is limited to `main` (#156); no repository-level secrets remain.
+                  `main` is protected: pull requests, the Backend and Frontend checks,
+                  no force push or deletion, admins included. Workflows from outside
+                  contributors' forks need approval; secret scanning and push protection
+                  are on.
 
       **Stage B — Agent delivery loop.**
       - [ ] Protect the checks from the agents they check: CODEOWNERS plus branch protection

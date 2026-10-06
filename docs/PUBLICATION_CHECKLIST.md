@@ -30,14 +30,11 @@ repository public, deploy a release or modify the existing school database.
 - Review and merge the hardening PR after green CI and independent pre-review.
 - Install the updated host deployment script using [the runbook](../deploy/README.md).
   Verify its backup location, available disk space and recovery process before deploying.
-- Enable protection for `main`: pull requests, required Backend/Frontend checks, restricted
-  force pushes and deletion. Choose a GitHub plan supporting these controls while private,
-  or configure them as part of the deliberate publication change. The current private
-  repository's plan does not provide the requested protection controls.
-- The `production` environment exists, is restricted to `main`, and the deploy jobs name
-  it. Set `DEPLOY_SSH_KEY`, `CLOUDFLARE_PAGES_TOKEN` and `DEPLOY_HOST` in it and delete the
-  repository secrets of the same names ([runbook](../deploy/README.md)); until they are
-  deleted, a workflow on any branch can still read them.
+- Done 2026-10-06, with publication: `main` is protected (pull requests, required
+  Backend/Frontend checks, no force push or deletion, admins included), workflows from
+  outside contributors' forks need approval, and secret scanning with push protection is on.
+- Done 2026-10-06: the three deployment secrets live only in the `production` environment,
+  which is restricted to `main`; no repository-level secrets remain.
 - Set an off-host backup and retention policy; the deployment backup alone is not disaster
   recovery. Test restoration before deleting old archives.
 - Confirm the intended license and rights to any published data/assets. Add actual product
