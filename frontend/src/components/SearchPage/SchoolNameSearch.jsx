@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next'
 import { searchSchools } from '../../api/schools'
 import { getAddress, getSchoolName } from '../../utils/i18n'
 import { normalizeSchoolList } from '../../utils/schoolAttributes'
+import { schoolLevelLabel } from '../../utils/levelLabel'
+import { useCountry } from '../../context/CountryContext'
 
 const MAX_SUGGESTIONS = 6
 
@@ -12,6 +14,7 @@ const MAX_SUGGESTIONS = 6
  */
 function SchoolNameSearch({ value, onChange, onOpenSchool, className = '', compact = false }) {
   const { t, i18n } = useTranslation()
+  const { config } = useCountry()
   const containerRef = useRef(null)
   // Rendered twice (mobile and desktop toolbars), so ids must be unique per instance.
   const idBase = useId()
@@ -129,9 +132,11 @@ function SchoolNameSearch({ value, onChange, onOpenSchool, className = '', compa
               className={`cursor-pointer px-3 py-2 ${index === activeIndex ? 'bg-primary-50' : 'hover:bg-neutral-50'}`}
             >
               <div className="text-sm font-medium text-neutral-900">{getSchoolName(school, i18n.language)}</div>
+              {/* The level tells apart a kindergarten and a school that share a name and address. */}
               <div className="text-xs text-neutral-500">
-                {t(`schoolTypes.${school.school_type}`)}
-                {primaryAddress(school) ? ` · ${primaryAddress(school)}` : ''}
+                {[t(`schoolTypes.${school.school_type}`), schoolLevelLabel(school, t, config), primaryAddress(school)]
+                  .filter(Boolean)
+                  .join(' · ')}
               </div>
             </li>
           ))}
