@@ -14,6 +14,7 @@ import { getFocusEmojis, getFocusLabels } from '../../utils/locationFocus'
 import { AGE_GROUP_KEYS } from '../../utils/education'
 import { useStableCallback } from '../../hooks/useStableCallback'
 import { isDesktopViewport } from '../../utils/searchViewState'
+import { schoolLevelLabel } from '../../utils/levelLabel'
 import { pointsForFit, pickSelectedMarker, pinHasRoom, pinTarget, overlayFitPadding, stackedMarkersByKey } from '../../utils/mapFit'
 
 // CARTO requires an API key; without one every tile is watermarked
@@ -557,6 +558,7 @@ function PopupContent({
   stackedMarkers,
   onSelectMarker,
 }) {
+  const { config } = useCountry()
   if (!marker) return null
 
   const distanceKm = userLocation?.lat && userLocation?.lng
@@ -685,6 +687,10 @@ function PopupContent({
                   className="text-left text-sm font-medium text-primary-700 hover:text-primary-800 hover:underline"
                 >
                   {getSchoolName(other.school, language)}
+                  {/* Schools sharing an address often share a name too (kindergarten + school). */}
+                  <span className="font-normal text-neutral-500">
+                    {' · '}{schoolLevelLabel(other.school, t, config)}
+                  </span>
                 </button>
               </li>
             ))}
