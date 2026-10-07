@@ -176,7 +176,15 @@ function addLanguageFocusPairs(values, pairs) {
   })
 }
 
+// The filter counts ask for a school's pairs once per filter option, so keep the answer
+// per school object (the list is replaced, never mutated, when it reloads).
+const languageFocusPairsBySchool = new WeakMap()
+
 export function getLanguageFocusPairs(school) {
+  const cacheable = school !== null && typeof school === 'object'
+  const cached = cacheable ? languageFocusPairsBySchool.get(school) : undefined
+  if (cached) return cached
+
   const pairs = new Set()
   addLanguageFocusPairs(school?.attributes?.language_focus, pairs)
 
@@ -187,5 +195,6 @@ export function getLanguageFocusPairs(school) {
     }
   })
 
+  if (cacheable) languageFocusPairsBySchool.set(school, pairs)
   return pairs
 }
