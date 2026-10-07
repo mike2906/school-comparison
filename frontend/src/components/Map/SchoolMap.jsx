@@ -14,7 +14,7 @@ import { getFocusEmojis, getFocusLabels } from '../../utils/locationFocus'
 import { AGE_GROUP_KEYS } from '../../utils/education'
 import { useStableCallback } from '../../hooks/useStableCallback'
 import { isDesktopViewport } from '../../utils/searchViewState'
-import { pointsForFit, pickSelectedMarker } from '../../utils/mapFit'
+import { pointsForFit, pickSelectedMarker, pinHasRoom, pinTarget, overlayFitPadding } from '../../utils/mapFit'
 
 // CARTO requires an API key; without one every tile is watermarked
 const CARTO_API_KEY = import.meta.env.VITE_CARTO_API_KEY
@@ -34,7 +34,14 @@ const MARKER_CLICK_GUARD_MS = 350
 // Room a clicked pin needs around it (px) to stay where it is: the popup opens above it
 // on desktop, the info sheet covers the bottom of the map on mobile.
 const PIN_ROOM_DESKTOP = { top: 340, side: 170, bottom: 20 }
-const PIN_ROOM_MOBILE = { top: 60, side: 20, bottom: 320 }
+const PIN_ROOM_MOBILE = { top: 60, side: 20, bottom: 20 }
+// Padding (px) when fitting a school's locations: their markers are 58px tall.
+const OVERLAY_FIT_PADDING = { top: 70, side: 40, bottom: 24 }
+// How far past the country bounds the map can be panned, as a share of their size.
+const MAX_BOUNDS_PAD = 1
+// Fixed when the map is created: the cluster layer builds its grid per zoom level then,
+// and breaks if the minimum changes later (so it cannot wait for the country config).
+const MIN_ZOOM = 9
 
 const HIGHLIGHT_COLOR = '#f97316'
 const TYPE_COLORS = {
@@ -106,7 +113,8 @@ const createLocationMarkerIcon = (type, { label, isSelected }) => {
     className: 'leaflet-div-icon location-marker-wrapper',
     iconSize: [48, 58],
     iconAnchor: [24, 56],
-    popupAnchor: [0, -30],
+    // Above the whole marker: the popup is drawn over the markers.
+    popupAnchor: [0, -60],
   })
 }
 
@@ -270,6 +278,16 @@ const fitMapToPoints = (map, points) => {
   return bounds
 }
 
+// Pan so the pin lands in the middle of the free part of the map (see pinTarget).
+const panPinIntoRoom = (map, latLng, room) => {
+  const size = map.getSize()
+  const target = pinTarget(size, room)
+  const center = map.unproject(
+    map.project(latLng).add([size.x / 2 - target.x, size.y / 2 - target.y])
+  )
+  map.panTo(center, { animate: true, duration: 0.5 })
+}
+
 const getAutoFitKey = (schools, userLocation, countryBounds) => {
   const points = collectPoints(schools, userLocation, countryBounds)
     .map(([lat, lng]) => `${lat},${lng}`)
@@ -337,7 +355,9 @@ function MapUpdater({ schools, userLocation, autoFit, lastValidBoundsRef, defaul
 
     // Remember the country view too, so a map revealed after an empty result refits to it.
     lastValidBoundsRef.current = countryBounds
-    map.fitBounds(countryBounds, { padding: FIT_PADDING, maxZoom: defaultZoom, animate: true, duration: 0.4 })
+    // Not animated: this runs while the schools are loading, and Leaflet drops a fit
+    // requested during a zoom animation, which left the map on the country view.
+    map.fitBounds(countryBounds, { padding: FIT_PADDING, maxZoom: defaultZoom, animate: false })
   }, [schools, userLocation, autoFit, map, lastValidBoundsRef, defaultZoom, countryBounds, fittedWhileHiddenRef])
 
   return null
@@ -426,7 +446,28 @@ function MapLocationPicker({ enabled, onPickLocation, markerInteractionRef }) {
   return null
 }
 
-function MapOverlayNavigator({ overlaySchoolId, overlayLocations, focusLocation }) {
+// Keeps the map near the country: without limits it pans and zooms out to a grey world.
+// Checked when a move ends rather than with Leaflet's maxBounds, which pans at once when
+// set and cuts short a fit that is still animating (the country config loads late).
+function MapLimits({ countryBounds }) {
+  const map = useMap()
+
+  useEffect(() => {
+    const maxBounds = countryBounds.pad(MAX_BOUNDS_PAD)
+    const keepInside = () => {
+      const size = map.getSize()
+      // Hidden map (mobile List tab): nothing to keep in view.
+      if (size.x === 0 || size.y === 0) return
+      map.panInsideBounds(maxBounds, { animate: true, duration: 0.3 })
+    }
+    map.on('moveend', keepInside)
+    return () => map.off('moveend', keepInside)
+  }, [map, countryBounds])
+
+  return null
+}
+
+function MapOverlayNavigator({ overlaySchoolId, overlayLocations, focusLocation, getCovered, getPinRoom }) {
   const map = useMap()
   const lastOverlayRef = useRef(null)
 
@@ -440,22 +481,35 @@ function MapOverlayNavigator({ overlaySchoolId, overlayLocations, focusLocation 
       .join('|')
     if (lastOverlayRef.current === overlayKey) return
     const points = overlayLocations.map(location => [location.__lat ?? location.lat, location.__lng ?? location.lng])
-    const fitOverlay = () => fitMapToPoints(map, points)
+    // Fit into the part of the map the header panel and the mobile sheet leave free.
+    const fitOverlay = () => {
+      const padding = overlayFitPadding(map.getSize(), getCovered(), OVERLAY_FIT_PADDING)
+      if (!padding) {
+        fitMapToPoints(map, points)
+        return
+      }
+      map.fitBounds(L.latLngBounds(points), {
+        ...padding,
+        maxZoom: points.length === 1 ? SINGLE_POINT_ZOOM : MAX_FIT_ZOOM,
+        animate: true,
+        duration: 0.4,
+      })
+    }
     fitOverlay()
     const timer = setTimeout(fitOverlay, 120)
     lastOverlayRef.current = overlayKey
     return () => clearTimeout(timer)
-  }, [overlaySchoolId, overlayLocations, map])
+  }, [overlaySchoolId, overlayLocations, map, getCovered])
 
   useEffect(() => {
     if (!focusLocation?.lat || !focusLocation?.lng) return
-    map.panTo([focusLocation.__lat ?? focusLocation.lat, focusLocation.__lng ?? focusLocation.lng], { animate: true, duration: 0.5 })
-  }, [focusLocation, map])
+    panPinIntoRoom(map, [focusLocation.__lat ?? focusLocation.lat, focusLocation.__lng ?? focusLocation.lng], getPinRoom())
+  }, [focusLocation, map, getPinRoom])
 
   return null
 }
 
-function MapSelectionPan({ marker, mapPickedSchoolIdRef, isMobile }) {
+function MapSelectionPan({ marker, mapPickedSchoolIdRef, getPinRoom }) {
   const map = useMap()
   const markerKey = marker?.key
   const schoolId = marker?.school?.id
@@ -467,19 +521,14 @@ function MapSelectionPan({ marker, mapPickedSchoolIdRef, isMobile }) {
     const pickedOnMap = mapPickedSchoolIdRef.current
     mapPickedSchoolIdRef.current = null
     if (markerKey == null) return
+    // The room is measured when the selection changes; resizing the window must not pan.
+    const room = getPinRoom()
     // A pin clicked on the map is already in view; moving the map under the cursor reads
     // as the pin jumping. Still pan when its popup or the sheet would not fit.
-    if (pickedOnMap === schoolId) {
-      const room = isMobile ? PIN_ROOM_MOBILE : PIN_ROOM_DESKTOP
-      const point = map.latLngToContainerPoint([lat, lng])
-      const size = map.getSize()
-      const hasRoom = point.x >= room.side && point.x <= size.x - room.side
-        && point.y >= room.top && point.y <= size.y - room.bottom
-      if (hasRoom) return
-    }
-    map.panTo([lat, lng], { animate: true, duration: 0.5 })
-    // isMobile is read when the selection changes; resizing the window must not pan.
-  }, [markerKey, schoolId, lat, lng, map, mapPickedSchoolIdRef])
+    if (pickedOnMap === schoolId
+      && pinHasRoom(map.latLngToContainerPoint([lat, lng]), map.getSize(), room)) return
+    panPinIntoRoom(map, [lat, lng], room)
+  }, [markerKey, schoolId, lat, lng, map, mapPickedSchoolIdRef, getPinRoom])
 
   return null
 }
@@ -801,13 +850,15 @@ const OverlayLocationMarker = memo(function OverlayLocationMarker({
         },
       }}
     >
-      {fullLabel && (
-        <Tooltip direction="top" offset={[0, -14]} opacity={0.9} sticky>
+      {/* Popup and tooltip go in Leaflet's own panes: inside the overlay pane the other
+          location markers are drawn over them. The open popup already has the address. */}
+      {fullLabel && !(isSelected && showPopup) && (
+        <Tooltip pane="tooltipPane" direction="top" offset={[0, -14]} opacity={0.9} sticky>
           {fullLabel}
         </Tooltip>
       )}
       {showPopup && (
-        <Popup autoPan={false} closeButton={false}>
+        <Popup pane="popupPane" autoPan={false} closeButton={false}>
           <PopupContent
             marker={marker}
             t={t}
@@ -904,6 +955,22 @@ function SchoolMap({
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768)
   const [sheetOffset, setSheetOffset] = useState(120)
   const sheetStartRef = useRef(null)
+  const sheetRef = useRef(null)
+  const overlayPanelRef = useRef(null)
+
+  // What covers the map's top (locations panel) and bottom (mobile sheet), in px.
+  const getCovered = useStableCallback(() => {
+    const panel = overlayPanelRef.current
+    return {
+      top: panel ? panel.offsetTop + panel.offsetHeight : 0,
+      bottom: sheetRef.current?.offsetHeight || 0,
+    }
+  })
+  const getPinRoom = useStableCallback(() => {
+    const covered = getCovered()
+    const room = isMobile ? PIN_ROOM_MOBILE : PIN_ROOM_DESKTOP
+    return { ...room, top: room.top + covered.top, bottom: room.bottom + covered.bottom }
+  })
 
   const noteMarkerInteraction = useCallback(() => {
     markerInteractionRef.current = Date.now()
@@ -1112,6 +1179,7 @@ function SchoolMap({
         zoom={initialView?.zoom || defaultZoom}
         className="h-full w-full"
         zoomControl={false}
+        minZoom={MIN_ZOOM}
       >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> | &copy; <a href="https://carto.com/">CARTO</a>'
@@ -1176,11 +1244,14 @@ function SchoolMap({
           onPickLocation={onPickLocation}
           markerInteractionRef={markerInteractionRef}
         />
-        <MapSelectionPan marker={selectedMarker} mapPickedSchoolIdRef={mapPickedSchoolIdRef} isMobile={isMobile} />
+        <MapLimits countryBounds={countryBounds} />
+        <MapSelectionPan marker={selectedMarker} mapPickedSchoolIdRef={mapPickedSchoolIdRef} getPinRoom={getPinRoom} />
         <MapOverlayNavigator
           overlaySchoolId={overlaySchoolId}
           overlayLocations={overlayLocations}
           focusLocation={overlayFocusLocation}
+          getCovered={getCovered}
+          getPinRoom={getPinRoom}
         />
 
         <ResetViewControl
@@ -1272,6 +1343,7 @@ function SchoolMap({
 
       {isMobile && selectedMarker && (
         <div
+          ref={sheetRef}
           className="map-bottom-sheet absolute inset-x-0 bottom-0 z-[1200] transition-transform duration-300"
           style={{ transform: `translateY(${sheetOffset}px)` }}
         >
@@ -1367,11 +1439,15 @@ function SchoolMap({
       </div>
 
       {overlaySchool && (
-        <div className="absolute top-4 left-4 bg-white/95 backdrop-blur rounded-lg shadow-panel p-3 z-[1000]">
-          <p className="text-xs font-semibold text-neutral-800">
+        <div
+          ref={overlayPanelRef}
+          className="absolute top-4 left-4 max-w-[calc(100%-2rem)] bg-white/95 backdrop-blur rounded-lg shadow-panel p-3 z-[1000]"
+        >
+          {/* Phones: the sheet below already names the school, and the map is short. */}
+          <p className="mb-2 text-xs font-semibold text-neutral-800 max-sm:hidden">
             {t('map.locationsFor', { name: getSchoolName(overlaySchool, i18n.language) })}
           </p>
-          <div className="mt-2 flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={() => onToggleHideOthers?.(overlaySchool.id)}
