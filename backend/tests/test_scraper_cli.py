@@ -220,6 +220,24 @@ def test_allowed_age_group_repairs_for_kindergarten_excludes_school_grades():
     assert scraper_cli._allowed_age_group_repairs_for_school(school) == {"preschool"}
 
 
+def test_allowed_age_group_repairs_for_gymnasium_excludes_preschool_and_primary():
+    # School 517: a state-funding page quoting "подготвителна група" added preschool.
+    school = School(
+        name_i18n={"bg": '"ПЪРВА ЧАСТНА МАТЕМАТИЧЕСКА ГИМНАЗИЯ" ООД'},
+        country_code="bg",
+        school_type="private",
+        education_level="upper_secondary",
+        city="sofia",
+        website_url="https://www.parvamatematicheska.com",
+        attributes={"moe_detailed_type": 125},
+    )
+
+    assert scraper_cli._allowed_age_group_repairs_for_school(school) == {"grade_5_7", "grade_8_12"}
+
+    school.attributes = {"moe_detailed_type": 124}  # средно училище, grades 1-12
+    assert "preschool" in scraper_cli._allowed_age_group_repairs_for_school(school)
+
+
 def test_allowed_age_group_repairs_for_lower_secondary_excludes_grade_8_12():
     school = School(
         name_i18n={"bg": '124 ОСНОВНО УЧИЛИЩЕ "ВАСИЛ ЛЕВСКИ"'},
