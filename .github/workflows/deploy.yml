@@ -9,9 +9,15 @@ on:
   workflow_dispatch:
     inputs:
       frontend_only:
-        description: Rebuild and upload the site only (after a data publish)
+        description: Rebuild and upload the site only (after a data publish by hand)
         type: boolean
         default: false
+      snapshot:
+        description: >-
+          Data publish: name of a launch-DB dump in the backups bucket (as printed by
+          backend/scripts/backup_offsite.sh). Loads it on the host, then rebuilds the site.
+        type: string
+        default: ""
 
 concurrency:
   group: deploy-production
@@ -21,6 +27,7 @@ permissions: {}
 
 env:
   IMAGE: ghcr.io/mike2906/school-comparison-api
+  SNAPSHOT_BUCKET: schooldecider-backups-eu
   SITE_ORIGIN: https://schooldecider.com
   API_ORIGIN: https://api.schooldecider.com
   PAGES_PROJECT: schooldecider
@@ -40,6 +47,7 @@ jobs:
     outputs:
       release: ${{ steps.decide.outputs.release }}
       api: ${{ steps.decide.outputs.api }}
+      snapshot: ${{ steps.decide.outputs.snapshot }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -50,7 +58,12 @@ jobs:
         id: decide
         env:
           FRONTEND_ONLY: ${{ inputs.frontend_only }}
+          SNAPSHOT: ${{ inputs.snapshot }}
         run: |
+          if [ -n "$SNAPSHOT" ] && ! [[ "$SNAPSHOT" =~ ^[A-Za-z0-9._-]+\.dump$ ]]; then
+            echo "::error::snapshot must be the name of a .dump object in the backups bucket"
+            exit 1
+          fi
           if [ "$GITHUB_REF" != refs/heads/main ]; then
             echo "::error::Only main is deployed"
             exit 1
@@ -70,7 +83,8 @@ jobs:
             fi
           fi
           if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
-            if [ "$FRONTEND_ONLY" = true ]; then
+            # A data publish replaces the data under the running API, then rebuilds the site.
+            if [ "$FRONTEND_ONLY" = true ] || [ -n "$SNAPSHOT" ]; then
               # The site's version.txt also stands for the API. Uploading a site built from
               # this commit without its API changes would mark them as live.
               if [ "$api_changed" = true ]; then
@@ -89,6 +103,7 @@ jobs:
           echo "Live site: ${live:-unknown}; release=$release api=$api"
           echo "release=$release" >> "$GITHUB_OUTPUT"
           echo "api=$api" >> "$GITHUB_OUTPUT"
+          echo "snapshot=$SNAPSHOT" >> "$GITHUB_OUTPUT"
 
   build-api:
     name: Build API image
@@ -145,13 +160,58 @@ jobs:
           deploy/remote.sh rollback
           echo "API deploy failed; the host runs the previous image. Migrations stay applied." >> "$GITHUB_STEP_SUMMARY"
 
+  publish-data:
+    name: Publish data snapshot
+    needs: [ci, changes]
+    if: needs.changes.outputs.snapshot != ''
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+    env:
+      DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+      SNAPSHOT: ${{ needs.changes.outputs.snapshot }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      # The runner fetches the dump and hands it to the host over SSH, so the host holds
+      # no storage credentials. The token is read-only on the one bucket.
+      - name: Download the snapshot
+        env:
+          R2_ACCOUNT_ID: ${{ secrets.SNAPSHOT_R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.SNAPSHOT_R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.SNAPSHOT_R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.SNAPSHOT_R2_ENDPOINT }}
+        run: |
+          : "${R2_ACCOUNT_ID:?}" "${R2_ACCESS_KEY_ID:?}" "${R2_SECRET_ACCESS_KEY:?}"
+          SNAPSHOT_FILE="$RUNNER_TEMP/snapshot.dump"
+          echo "SNAPSHOT_FILE=$SNAPSHOT_FILE" >> "$GITHUB_ENV"
+          curl --fail --silent --show-error --aws-sigv4 "aws:amz:auto:s3" \
+            --user "$R2_ACCESS_KEY_ID:$R2_SECRET_ACCESS_KEY" -o "$SNAPSHOT_FILE" \
+            "${R2_ENDPOINT:-https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com}/$SNAPSHOT_BUCKET/$SNAPSHOT"
+          echo "Snapshot $SNAPSHOT: $(stat -c %s "$SNAPSHOT_FILE") bytes"
+
+      # The host backs up the current data, loads the snapshot in one transaction, migrates
+      # it and waits for /ready; it restores the backup itself if a later step fails.
+      - name: Load it on the host
+        run: |
+          set -o pipefail
+          deploy/remote.sh publish | tee "$RUNNER_TEMP/publish.log"
+          { grep -o 'schools: .*' "$RUNNER_TEMP/publish.log" || true; } | sed "s/^/Published $SNAPSHOT; /" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Smoke test
+        run: deploy/smoke.sh api "$API_ORIGIN" "$SITE_ORIGIN"
+
   frontend:
     name: Build and deploy site
-    needs: [ci, changes, deploy-api]
-    # Runs after a successful API deploy, or without one when the API did not change.
+    needs: [ci, changes, deploy-api, publish-data]
+    # Runs after a successful API deploy or data publish, or without one when neither ran.
     if: >-
       ${{ !cancelled() && needs.ci.result == 'success' && needs.changes.outputs.release == 'true'
-      && (needs.changes.outputs.api != 'true' || needs.deploy-api.result == 'success') }}
+      && (needs.changes.outputs.api != 'true' || needs.deploy-api.result == 'success')
+      && (needs.changes.outputs.snapshot == '' || needs.publish-data.result == 'success') }}
     runs-on: ubuntu-latest
     environment: production
     permissions:

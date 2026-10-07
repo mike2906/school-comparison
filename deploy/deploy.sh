@@ -5,6 +5,9 @@
 #                                       migrate, restart the API, check /ready
 #   rollback <commit sha>               back to the previous image, if the last deploy
 #                                       moved the host to <commit sha>
+#   publish <sha256>                    replace the data with the snapshot on stdin (a
+#                                       pg_dump -Fc of the launch DB); the previous data
+#                                       is restored if anything after the backup fails
 # The running and previous images are recorded in deploy/release.env, which compose reads.
 set -euo pipefail
 
@@ -58,6 +61,53 @@ remove_old_images() {
 	done
 }
 
+# Dumps the database to deploy/backups/<kind>-<label>-XXXXXXXX.dump and checks the dump is
+# readable, or stops: $3 names what must not start without it. Sets $backup.
+take_backup() {
+	local kind="$1" label="$2" blocked="$3"
+	# exec requires a healthy database even after compose down or host recovery.
+	if ! dc up -d --wait --wait-timeout 60 postgres; then
+		die "database startup failed; $blocked not started"
+	fi
+
+	umask 077
+	mkdir -p deploy/backups
+	backup="$(mktemp "$APP_DIR/deploy/backups/$kind-$label-XXXXXXXX.dump")"
+	if ! dc exec -T postgres pg_dump -U schools -d schools --format=custom > "$backup"; then
+		rm -f "$backup"
+		die "database backup failed; $blocked not started"
+	fi
+	if [ ! -s "$backup" ] || ! dc exec -T postgres pg_restore --list < "$backup" >/dev/null; then
+		rm -f "$backup"
+		die "database backup is empty or unreadable; $blocked not started"
+	fi
+	sha256sum "$backup" > "$backup.sha256"
+	echo "deploy: verified $kind backup at $backup"
+
+	# Keep this verified dump and the six most recent previous script-created dumps of
+	# its kind. Never prune on backup failure, and leave manually named archives untouched.
+	local -a older_backups
+	local old_backup
+	mapfile -d '' -t older_backups < <(
+		find "$APP_DIR/deploy/backups" -maxdepth 1 -type f -name "$kind-*.dump" \
+			! -path "$backup" -printf '%T@ %p\0' | sort -z -nr | cut -z -d' ' -f2-
+	)
+	for old_backup in "${older_backups[@]:6}"; do
+		rm -f -- "$old_backup" "$old_backup.sha256"
+	done
+}
+
+# Replaces the database contents with a custom-format dump, in one transaction: on any
+# error nothing has changed.
+load_dump() {
+	dc exec -T postgres pg_restore -U schools -d schools --no-owner --clean --if-exists \
+		--single-transaction --exit-on-error < "$1"
+}
+
+count_schools() {
+	dc exec -T postgres psql -U schools -d schools -Atc 'select count(*) from schools' </dev/null 2>/dev/null || echo unknown
+}
+
 deploy() {
 	local sha="${1:-}" hash="${2:-}" new current previous token=""
 	[[ "$sha" =~ ^[0-9a-f]{40}$ ]] || die "expected a full commit sha"
@@ -81,39 +131,9 @@ deploy() {
 		rm -rf "$docker_config"
 	fi
 
-	# exec requires a healthy database even after compose down or host recovery.
-	if ! dc up -d --wait --wait-timeout 60 postgres; then
-		die "database startup failed; migration not started"
-	fi
-
 	# Keep a recoverable snapshot before any schema change. A failed/invalid dump stops
 	# the release before Alembic runs; code rollback never downgrades the database.
-	local backup
-	umask 077
-	mkdir -p deploy/backups
-	backup="$(mktemp "$APP_DIR/deploy/backups/pre-migrate-${sha:0:12}-XXXXXXXX.dump")"
-	if ! dc exec -T postgres pg_dump -U schools -d schools --format=custom > "$backup"; then
-		rm -f "$backup"
-		die "database backup failed; migration not started"
-	fi
-	if [ ! -s "$backup" ] || ! dc exec -T postgres pg_restore --list < "$backup" >/dev/null; then
-		rm -f "$backup"
-		die "database backup is empty or unreadable; migration not started"
-	fi
-	sha256sum "$backup" > "$backup.sha256"
-	echo "deploy: verified pre-migration backup at $backup"
-
-	# Keep this verified dump and the six most recent previous script-created dumps.
-	# Never prune on backup failure, and leave manually named archives untouched.
-	local -a older_backups
-	local old_backup
-	mapfile -d '' -t older_backups < <(
-		find "$APP_DIR/deploy/backups" -maxdepth 1 -type f -name 'pre-migrate-*.dump' \
-			! -path "$backup" -printf '%T@ %p\0' | sort -z -nr | cut -z -d' ' -f2-
-	)
-	for old_backup in "${older_backups[@]:6}"; do
-		rm -f -- "$old_backup" "$old_backup.sha256"
-	done
+	take_backup pre-migrate "${sha:0:12}" migration
 
 	echo "deploy: migrating with $new"
 	API_IMAGE="$new" dc run --rm -T api alembic upgrade head </dev/null
@@ -159,6 +179,59 @@ rollback() {
 	echo "deploy: rolled back to $previous (migrations stay applied)"
 }
 
+# Upper bound for a snapshot on stdin; a dump is about 10 MB.
+MAX_SNAPSHOT_BYTES=536870912
+
+publish() {
+	local sum="${1:-}" current before after
+	[[ "$sum" =~ ^[0-9a-f]{64}$ ]] || die "expected the snapshot's sha256"
+	current="$(release_value API_IMAGE)"
+
+	umask 077
+	mkdir -p deploy/backups
+	incoming="$(mktemp "$APP_DIR/deploy/backups/incoming-XXXXXXXX.dump")"
+	trap 'rm -f "$incoming"' EXIT
+	head -c "$MAX_SNAPSHOT_BYTES" > "$incoming"
+	if [ "$(sha256sum "$incoming" | cut -d' ' -f1)" != "$sum" ]; then
+		die "the snapshot does not match its checksum; nothing changed"
+	fi
+
+	take_backup pre-publish "$(date -u +%Y%m%d-%H%M%S)" publish
+	if ! dc exec -T postgres pg_restore --list < "$incoming" >/dev/null; then
+		die "the snapshot is not a readable dump; nothing changed"
+	fi
+	before="$(count_schools)"
+
+	# No requests while the tables are replaced. The image stays the same: the snapshot
+	# is migrated to its schema, as on first start.
+	dc stop api
+	if ! load_dump "$incoming"; then
+		dc up -d
+		die "the snapshot could not be restored; the previous data is unchanged"
+	fi
+	if ! dc run --rm -T api alembic upgrade head </dev/null; then
+		restore_previous_data "$current" "the snapshot could not be migrated to the running image's schema"
+	fi
+	dc up -d
+	if ! wait_ready "$current"; then
+		dc logs --tail 50 api >&2 || true
+		dc stop api
+		restore_previous_data "$current" "the API was not ready with the snapshot"
+	fi
+	after="$(count_schools)"
+	echo "deploy: published the snapshot; schools: $before -> $after"
+}
+
+# After a failed publish: back to the data in $backup, then stop with the reason.
+restore_previous_data() {
+	if ! load_dump "$backup"; then
+		die "$2, and restoring $backup failed: the API is stopped, restore by hand (deploy/README.md)"
+	fi
+	dc up -d
+	wait_ready "$1" || die "$2; the previous data is restored but the API is not ready"
+	die "$2; the previous data is restored"
+}
+
 if [ -n "${SSH_ORIGINAL_COMMAND:-}" ]; then
 	read -r -a args <<< "$SSH_ORIGINAL_COMMAND"
 else
@@ -175,5 +248,6 @@ flock -w 300 9 || die "another deploy is still running"
 case "${args[0]:-}" in
 	deploy) deploy "${args[1]:-}" "${args[2]:-}" ;;
 	rollback) rollback "${args[1]:-}" ;;
-	*) die "usage: deploy <commit sha> <config hash> | rollback <commit sha>" ;;
+	publish) publish "${args[1]:-}" ;;
+	*) die "usage: deploy <commit sha> <config hash> | rollback <commit sha> | publish <sha256>" ;;
 esac

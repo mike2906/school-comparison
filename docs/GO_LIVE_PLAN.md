@@ -2195,6 +2195,11 @@ the session scratchpad only.
       - [ ] Versioned published snapshots stored in Cloudflare R2 together with the inputs
             needed to rebuild them. Production loads a named version; rollback loads the
             previous one. Loading must never touch user tables.
+            **Partly done 2026-10-07:** production loads a named dump from the backups
+            bucket (`gh workflow run deploy.yml -f snapshot=<name>`, `deploy/deploy.sh
+            publish`), with a backup and automatic restore on failure; rollback is the same
+            command with the previous dump's name. Open: storing the rebuild inputs with
+            each version, and keeping user tables out of the load once they exist.
       - [ ] Move the internal (pipeline) DB to the VPS as a separate database from the
             public one; local development works from a copy.
       - [ ] Nightly `pg_dump` of the internal DB (and later user data) to R2 or B2, plus a
