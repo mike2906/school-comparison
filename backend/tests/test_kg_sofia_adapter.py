@@ -827,6 +827,17 @@ class TestKgSofiaImportCompleteness:
         assert (locations[0].lat, locations[0].lng, locations[0].is_primary) == (42.69, 23.32, True)
         assert locations[1].is_primary is False
 
+    def test_address_key_ignores_punctuation_and_spacing(self):
+        from app.scrapers.sources.base_adapter import _address_key
+
+        # Two kg.sofia records of one building (school 2309 and its hourly-care record).
+        assert _address_key({"bg": 'гр. София, ул. "Балша", №6-8'}) == _address_key(
+            {"bg": 'гр. София, ул. "Балша", № 6-8,'}
+        )
+        assert _address_key({"bg": "ж.к. Бели брези, бл.4"}) == _address_key({"bg": "ж.к. Бели брези, бл. 4"})
+        assert _address_key({"bg": "ж.к. Бели брези, бл. 4"}) != _address_key({"bg": "ж.к. Бели брези, бл. 6"})
+        assert _address_key({"bg": "ул. Балша № 6-8"}) != _address_key({"bg": "ул. Балша № 68"})
+
     def test_merged_family_keeps_building_that_is_already_its_own_school(self):
         from app.schemas.scraping import DiscoveredLocation, DiscoveredSchool
 

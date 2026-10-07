@@ -1,5 +1,6 @@
 """Base adapter for discovery sources (government registries, search engines, etc.)."""
 import logging
+import re
 import uuid
 from abc import ABC, abstractmethod
 from datetime import datetime
@@ -14,9 +15,13 @@ logger = logging.getLogger(__name__)
 
 
 def _address_key(address_i18n: Optional[dict]) -> str:
-    """Normalized address used to recognise a location that already exists."""
+    """Normalized address used to recognise a location that already exists.
+
+    Punctuation and spacing are ignored: kg.sofia.bg writes one building as
+    "ул. Балша, №6-8" in one record and "ул. Балша, № 6-8," in another.
+    """
     address = (address_i18n or {}).get("bg") or (address_i18n or {}).get("en") or ""
-    return " ".join(address.casefold().split())
+    return " ".join(re.findall(r"\w+", address.casefold()))
 
 
 class BaseSourceAdapter(ABC):
