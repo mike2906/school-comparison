@@ -98,10 +98,8 @@ usable by the previous image (expand first, contract in a later release): add co
 tables, do not drop or rename what the running code reads. A migration that cannot meet
 this is deployed by hand, with a `pg_dump` first, and its PR says so.
 
-**After a data publish** (a new snapshot restored on the host), rebuild the site: Actions →
-Deploy → Run workflow → `frontend_only`. Or `gh workflow run deploy.yml -f frontend_only=true`.
-It refuses to run when the API is behind the commit (a failed or rolled-back release): run
-a full release instead (the same, without `frontend_only`).
+**After a data publish** rebuild the site with `frontend_only`; see
+[Data publish](#data-publish-refreshing-the-snapshot) below.
 
 **What CD does not change.** `docker-compose.prod.yml`, `deploy/Caddyfile`,
 `deploy/cloudflare-proxies.caddy` and `deploy/deploy.sh` itself. A commit that changes one
@@ -152,6 +150,44 @@ The three deployment secrets belong in the `production` environment, which is li
 `main`; the `deploy-api`, `frontend` and `rollback-api` jobs name that environment. A
 repository secret of the same name is readable by a workflow on any branch, so delete it
 once the environment secret is set (`gh secret delete <NAME>`).
+
+## Data publish (refreshing the snapshot)
+
+Production holds a copy of the launch DB. Changes there (imports, corrections, merges)
+reach the site only when a new snapshot is restored on the host. This is done by hand;
+first used on 2026-10-07.
+
+1. **Dump the launch DB** (local machine, repository root):
+   ```bash
+   docker exec sofia_schools_db pg_dump -U postgres -Fc sofia_schools > snapshot.dump
+   ```
+2. **Copy it to the host:** `scp snapshot.dump ubuntu@<ip>:schooldecider/snapshot.dump`
+3. **On the host, in `~/schooldecider`** (the `dc` alias uses relative paths, so it fails
+   from the home directory). Back up first and check both files are several MB:
+   ```bash
+   dc exec -T postgres pg_dump -U schools -d schools -Fc > deploy/backups/pre-publish-$(date +%Y%m%d).dump
+   ls -la deploy/backups/pre-publish-*.dump snapshot.dump
+   ```
+4. **Replace the data.** The API is down from `stop` to `up`, about a minute. The restore
+   runs in one transaction: if it fails the current data is still there, so run
+   `dc up -d api` and investigate.
+   ```bash
+   dc stop api
+   dc exec -T postgres pg_restore -U schools -d schools --no-owner --clean --if-exists --single-transaction --exit-on-error < snapshot.dump
+   dc run --rm api alembic upgrade head
+   dc up -d api
+   ```
+5. **Check the API has the new data** before rebuilding, e.g. the school count from
+   `https://<API_HOST>/schools?country_code=bg&city=sofia` against the launch DB.
+6. **Rebuild the site:** Actions → Deploy → Run workflow → `frontend_only`, or
+   `gh workflow run deploy.yml -f frontend_only=true`. This only rebuilds the pages from
+   whatever the live API serves: on its own, without steps 1-4, it changes nothing. It
+   refuses to run when the API is behind the commit (a failed or rolled-back release): run
+   a full release instead (the same, without `frontend_only`).
+7. **Back up off-host:** `backend/scripts/backup_offsite.sh` (see Off-host backup).
+
+Pages of removed schools can be served from the edge cache for a while after the rebuild;
+a request with any query string shows the real 404.
 
 ## Endpoints
 
