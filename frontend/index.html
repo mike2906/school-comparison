@@ -5,6 +5,43 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Sofia School Compare</title>
+    <script>
+      // Ask the API for what this page will need now, while the app bundle is still
+      // downloading; the app's own fetch of the same URL then reuses the response.
+      // The URLs must match src/api/schools.js exactly (src/api/preload.test.js checks).
+      (function () {
+        var base = '%VITE_API_BASE%'
+        if (base.charAt(0) === '%') base = '/api'
+        base = base.replace(/\/+$/, '')
+        var path = location.pathname.replace(/^\/en(?=\/)/, '')
+        var query = new URLSearchParams(location.search)
+        var urls = ['/countries/bg']
+        if (path === '/search') {
+          var list = new URLSearchParams({ country_code: 'bg', city: 'sofia' })
+          var ageGroup = query.get('age_group')
+          var crossover = query.get('include_crossover') === 'true'
+          var level = query.get('education_level')
+          if (ageGroup) list.set('age_group', ageGroup)
+          if (ageGroup === 'preschool' && !crossover && level) list.set('education_level', level)
+          if (crossover) list.set('include_crossover', 'true')
+          urls.push(
+            '/schools?' + list,
+            '/schools/filters?country_code=bg&city=sofia',
+            '/schools/exam-averages?country_code=bg'
+          )
+        } else if (/^\/schools\/\d+$/.test(path)) {
+          urls.push(path, '/schools/exam-averages?country_code=bg')
+        }
+        urls.forEach(function (url) {
+          var link = document.createElement('link')
+          link.rel = 'preload'
+          link.as = 'fetch'
+          link.crossOrigin = 'anonymous'
+          link.href = base + url
+          document.head.appendChild(link)
+        })
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

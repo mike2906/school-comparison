@@ -1,5 +1,5 @@
-import { API_BASE } from './base'
-import { cachedJson, peekCachedJson } from './cache'
+import { API_BASE } from './base.js'
+import { cachedJson, peekCachedJson } from './cache.js'
 
 function buildSchoolsUrl({
   countryCode = 'bg',
