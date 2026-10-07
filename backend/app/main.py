@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,7 +19,16 @@ settings = get_settings()
 
 READINESS_TIMEOUT_SECONDS = 3.0
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # In the background: the API answers (and passes its health checks) while this runs.
+    warming = asyncio.create_task(schools.keep_cache_warm())
+    yield
+    warming.cancel()
+
+
 app = FastAPI(
+    lifespan=lifespan,
     title="School Comparison API",
     description="API for discovering, filtering, and comparing kindergartens and schools",
     version="0.1.0",

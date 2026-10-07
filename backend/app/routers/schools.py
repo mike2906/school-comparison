@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import time
+from functools import partial
 from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Response
@@ -9,10 +10,12 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
-from app.database import get_db
+from app.database import async_session_maker, get_db
+from app.models.country import Country
 from app.models.exam_results import ExamResult
 from app.models.school import School, SchoolLocation, SchoolLocationAgeGroupShift
 from app.schemas.school import RelatedSchoolResponse, SchoolDetailResponse, SchoolListResponse
+from app.services.country_service import get_valid_keys
 from app.services.school_relations import continues_to
 from app.services.school_service import SchoolService
 
@@ -22,27 +25,139 @@ settings = get_settings()
 router = APIRouter()
 
 # Serializing the whole city (projection and gates for ~700 schools) takes seconds of CPU,
-# while the data only changes when a refresh is published. Keep the serialized body of the
-# requests the site makes for a few minutes; a restart (every deploy) clears it.
+# while the data only changes when a refresh is published. So the serialized responses the
+# site asks for are kept in process and no visitor waits for a rebuild: the common ones are
+# built at startup and rebuilt every TTL (`keep_cache_warm`), so they also pick up a newly
+# restored snapshot; any other entry older than the TTL is still served while a background
+# task rebuilds it for the next request.
 LIST_CACHE_TTL_SECONDS = 600
-LIST_CACHE_MAX_ENTRIES = 32
+LIST_CACHE_MAX_ENTRIES = 64
 _list_cache: dict[tuple, tuple[float, bytes]] = {}
-_build_lock = asyncio.Lock()
 _filters_cache: dict[tuple, tuple[float, dict[str, list[str]]]] = {}
+_build_lock = asyncio.Lock()
+_refreshing: set[tuple] = set()
+_background_tasks: set[asyncio.Task] = set()
+_session_factory = async_session_maker
 _list_response_adapter = TypeAdapter(list[SchoolListResponse])
 
 
-def _cached(cache: dict, key: tuple):
-    entry = cache.get(key)
-    if entry is None or time.monotonic() - entry[0] >= LIST_CACHE_TTL_SECONDS:
-        return None
-    return entry[1]
-
-
 def _store(cache: dict, key: tuple, value) -> None:
-    if len(cache) >= LIST_CACHE_MAX_ENTRIES:
-        cache.clear()
+    # Hits move an entry to the end (`_cached_or_build`), so the first one is the least
+    # recently used: a run of one-off requests cannot push out what visitors keep asking for.
+    if key not in cache and len(cache) >= LIST_CACHE_MAX_ENTRIES:
+        del cache[next(iter(cache))]
     cache[key] = (time.monotonic(), value)
+
+
+async def _refresh(cache: dict, key: tuple, build) -> None:
+    """Rebuild one entry with its own session; the old entry stays if this fails."""
+    try:
+        async with _build_lock:
+            async with _session_factory() as db:
+                value = await build(db)
+            _store(cache, key, value)
+    except Exception:
+        logger.exception("Refreshing a cached schools response failed")
+    finally:
+        _refreshing.discard((id(cache), key))
+
+
+async def _cached_or_build(cache: dict, key: tuple, build, db: AsyncSession):
+    """The cached value for `key`, building it with `build(db)` only when there is none."""
+    entry = cache.get(key)
+    if entry is None:
+        # One build at a time, so a burst of visitors on a cold entry waits for a single
+        # build instead of each running its own.
+        async with _build_lock:
+            entry = cache.get(key)
+            if entry is None:
+                value = await build(db)
+                _store(cache, key, value)
+                return value
+    built_at, value = entry
+    if cache.get(key) is entry:
+        cache[key] = cache.pop(key)
+    marker = (id(cache), key)
+    if time.monotonic() - built_at >= LIST_CACHE_TTL_SECONDS and marker not in _refreshing:
+        _refreshing.add(marker)
+        task = asyncio.create_task(_refresh(cache, key, build))
+        _background_tasks.add(task)
+        task.add_done_callback(_background_tasks.discard)
+    return value
+
+
+def _serialize_list(schools) -> bytes:
+    # The handler returns a Response, which skips FastAPI's own response_model pass, so
+    # serialize through the same allowlisted model here: this is the publish boundary.
+    return _list_response_adapter.dump_json(
+        _list_response_adapter.validate_python(schools, from_attributes=True),
+        by_alias=True,
+    )
+
+
+async def _build_list_body(db: AsyncSession, **filters) -> bytes:
+    schools = await SchoolService(db).list_schools_filtered(**filters)
+    # Seconds of CPU: run it in a thread so other requests are still answered meanwhile.
+    return await asyncio.to_thread(_serialize_list, schools)
+
+
+def _list_key(country_code, city, age_group, school_type, education_level, include_crossover) -> tuple:
+    return (
+        country_code,
+        SchoolService._normalize_city_filter(city),
+        age_group,
+        school_type,
+        education_level,
+        include_crossover,
+    )
+
+
+def _filters_key(country_code, city) -> tuple:
+    return (country_code, SchoolService._normalize_city_filter(city))
+
+
+async def warm_cache(country_code: str = "bg", city: str = "sofia") -> None:
+    """Build what the search page asks for first: the list, its filters, each age group."""
+    try:
+        async with _session_factory() as db:
+            country = await db.get(Country, country_code)
+        age_groups = get_valid_keys(country.education_config, "age_groups") if country else []
+        await _refresh(
+            _filters_cache,
+            _filters_key(country_code, city),
+            partial(_build_filters, country_code=country_code, city=city),
+        )
+        variants = [{"age_group": age_group} for age_group in [None, *age_groups]]
+        if "preschool" in age_groups:
+            # The preschool view also asks "where": kindergarten, school, or both.
+            variants += [
+                {"age_group": "preschool", "education_level": "kindergarten"},
+                {"age_group": "preschool", "education_level": "primary"},
+                {"age_group": "preschool", "include_crossover": True},
+            ]
+        for variant in variants:
+            filters = {
+                "country_code": country_code,
+                "city": city,
+                "age_group": None,
+                "school_type": None,
+                "education_level": None,
+                "include_crossover": False,
+                **variant,
+            }
+            await _refresh(_list_cache, _list_key(**filters), partial(_build_list_body, **filters))
+    except Exception:
+        logger.exception("Warming the schools cache failed")
+
+
+async def keep_cache_warm() -> None:
+    while True:
+        await warm_cache()
+        await asyncio.sleep(LIST_CACHE_TTL_SECONDS)
+
+
+async def _build_filters(db: AsyncSession, *, country_code, city) -> dict[str, list[str]]:
+    return await SchoolService(db).get_available_filters(country_code=country_code, city=city)
 
 
 @router.get("", response_model=list[SchoolListResponse])
@@ -64,50 +179,32 @@ async def list_schools(
         # Map international to private (international is a subtype of private)
         if school_type == "international":
             school_type = "private"
+        filters = dict(
+            country_code=country_code,
+            city=city,
+            age_group=age_group,
+            school_type=school_type,
+            education_level=education_level,
+            include_crossover=include_crossover,
+        )
         # The advanced filters are free-form lists (the site applies them client-side),
         # so those requests are not cached.
-        cacheable = not any([language_focus, special_programs, facilities, teaching_approach])
-        key = (
-            country_code,
-            SchoolService._normalize_city_filter(city),
-            age_group,
-            school_type,
-            education_level,
-            include_crossover,
-        )
-        if cacheable:
-            body = _cached(_list_cache, key)
-            if body is not None:
-                return Response(content=body, media_type="application/json")
-
-        # One build at a time, so a burst of visitors on a cold cache waits for a single
-        # serialization instead of each running its own.
-        async with _build_lock:
-            if cacheable:
-                body = _cached(_list_cache, key)
-                if body is not None:
-                    return Response(content=body, media_type="application/json")
-            service = SchoolService(db)
-            schools = await service.list_schools_filtered(
-                country_code=country_code,
-                city=city,
-                age_group=age_group,
-                school_type=school_type,
-                education_level=education_level,
-                include_crossover=include_crossover,
+        if any([language_focus, special_programs, facilities, teaching_approach]):
+            body = await _build_list_body(
+                db,
+                **filters,
                 language_focus=language_focus,
                 special_programs=special_programs,
                 facilities=facilities,
                 teaching_approach=teaching_approach,
             )
-            # Returning a Response skips FastAPI's own response_model pass, so serialize
-            # through the same allowlisted model here: this is the publish boundary.
-            body = _list_response_adapter.dump_json(
-                _list_response_adapter.validate_python(schools, from_attributes=True),
-                by_alias=True,
+        else:
+            body = await _cached_or_build(
+                _list_cache,
+                _list_key(**filters),
+                partial(_build_list_body, **filters),
+                db,
             )
-            if cacheable:
-                _store(_list_cache, key, body)
         return Response(content=body, media_type="application/json")
     except Exception as e:
         logger.error(f"Error listing schools: {e}", exc_info=True)
@@ -158,18 +255,12 @@ async def get_available_filters(
 ):
     """Get available advanced filter options based on school attributes."""
     try:
-        # Same projection cost and same change rate as the list, so the same short cache.
-        key = (country_code, SchoolService._normalize_city_filter(city))
-        filters = _cached(_filters_cache, key)
-        if filters is not None:
-            return filters
-        async with _build_lock:
-            filters = _cached(_filters_cache, key)
-            if filters is None:
-                service = SchoolService(db)
-                filters = await service.get_available_filters(country_code=country_code, city=city)
-                _store(_filters_cache, key, filters)
-        return filters
+        return await _cached_or_build(
+            _filters_cache,
+            _filters_key(country_code, city),
+            partial(_build_filters, country_code=country_code, city=city),
+            db,
+        )
     except Exception as e:
         logger.error(f"Error getting available filters: {e}", exc_info=True)
         raise HTTPException(
