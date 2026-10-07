@@ -14,7 +14,7 @@ import { getFocusEmojis, getFocusLabels } from '../../utils/locationFocus'
 import { AGE_GROUP_KEYS } from '../../utils/education'
 import { useStableCallback } from '../../hooks/useStableCallback'
 import { isDesktopViewport } from '../../utils/searchViewState'
-import { pointsForFit } from '../../utils/mapFit'
+import { pointsForFit, pickSelectedMarker } from '../../utils/mapFit'
 
 // CARTO requires an API key; without one every tile is watermarked
 const CARTO_API_KEY = import.meta.env.VITE_CARTO_API_KEY
@@ -464,9 +464,7 @@ function MapSelectionPan({ marker, mapPickedSchoolIdRef, isMobile }) {
     mapPickedSchoolIdRef.current = null
     if (markerKey == null) return
     // A pin clicked on the map is already in view; moving the map under the cursor reads
-    // as the pin jumping. Still pan when its popup or the sheet would not fit, or when the
-    // highlighted pin is elsewhere (a school's other location was clicked and its primary
-    // one is off screen).
+    // as the pin jumping. Still pan when its popup or the sheet would not fit.
     if (pickedOnMap === schoolId) {
       const room = isMobile ? PIN_ROOM_MOBILE : PIN_ROOM_DESKTOP
       const point = map.latLngToContainerPoint([lat, lng])
@@ -695,7 +693,7 @@ const SchoolMarker = memo(function SchoolMarker({
           if (event.originalEvent) {
             L.DomEvent.stop(event.originalEvent)
           }
-          onSelect(marker.school)
+          onSelect(marker.school, marker)
         },
       }}
     >
@@ -908,10 +906,19 @@ function SchoolMap({
   }, [])
 
   const mapPickedSchoolIdRef = useRef(null)
-  const handleMarkerSelect = useCallback((school) => {
+  // The pin that was clicked, so a school with several locations highlights that one.
+  const [pickedMarker, setPickedMarker] = useState(null)
+  const handleMarkerSelect = useCallback((school, marker) => {
     mapPickedSchoolIdRef.current = school?.id ?? null
+    setPickedMarker(marker ? { schoolId: school.id, key: marker.key } : null)
     onSchoolSelect?.(school)
   }, [onSchoolSelect])
+  const pickedMarkerKey = pickedMarker?.schoolId === selectedSchoolId ? pickedMarker.key : null
+
+  // Selecting another school, or clearing the selection, forgets the clicked pin.
+  useEffect(() => {
+    setPickedMarker(prev => (prev && prev.schoolId !== selectedSchoolId ? null : prev))
+  }, [selectedSchoolId])
 
   const mapCenter = config?.map_config?.center || FALLBACK_CENTER
   const defaultZoom = config?.map_config?.default_zoom || FALLBACK_ZOOM
@@ -1019,7 +1026,7 @@ function SchoolMap({
     }
     const candidates = markers.filter(marker => marker.school.id === selectedSchoolId)
     if (candidates.length > 0) {
-      return candidates.find(marker => marker.location.is_primary) || candidates[0]
+      return pickSelectedMarker(candidates, pickedMarkerKey)
     }
     if (overlayLocations.length > 0) {
       const fallback = overlayLocations.find(location => location.is_primary) || overlayLocations[0]
@@ -1033,7 +1040,7 @@ function SchoolMap({
         : null
     }
     return null
-  }, [markers, selectedSchoolId, overlayLocations, overlaySelectedLocationId, overlaySchool, overlayFocusActive])
+  }, [markers, selectedSchoolId, overlayLocations, overlaySelectedLocationId, overlaySchool, overlayFocusActive, pickedMarkerKey])
 
   const baseMarkers = useMemo(() => {
     if (!overlayActiveOnMap) return markers
@@ -1045,15 +1052,15 @@ function SchoolMap({
     if (!selectedSchoolId) return []
     if (overlayActiveOnMap) return []
     const candidates = baseMarkers.filter(marker => selectedSchoolId === marker.school.id)
-    if (candidates.length === 0) return []
-    const primary = candidates.find(marker => marker.location?.is_primary) || candidates[0]
-    return primary ? [primary] : []
-  }, [baseMarkers, selectedSchoolId, overlayActiveOnMap])
+    const highlighted = pickSelectedMarker(candidates, pickedMarkerKey)
+    return highlighted ? [highlighted] : []
+  }, [baseMarkers, selectedSchoolId, overlayActiveOnMap, pickedMarkerKey])
 
-  const regularMarkers = useMemo(
-    () => baseMarkers.filter(marker => selectedSchoolId !== marker.school.id),
-    [baseMarkers, selectedSchoolId]
-  )
+  // The selected school's other locations stay on the map as ordinary pins.
+  const regularMarkers = useMemo(() => {
+    const highlightedKey = selectedMarkers[0]?.key
+    return highlightedKey ? baseMarkers.filter(marker => marker.key !== highlightedKey) : baseMarkers
+  }, [baseMarkers, selectedMarkers])
 
   useEffect(() => {
     const handleResize = () => {

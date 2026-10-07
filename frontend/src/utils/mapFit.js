@@ -24,3 +24,15 @@ export function pointsForFit(points, { distance, keepRatio = 0.95, minPoints = 2
   const keep = Math.max(minPoints, Math.ceil(points.length * keepRatio))
   return ranked.slice(0, keep).map(entry => entry.point)
 }
+
+/**
+ * The pin to highlight for a selected school: the location clicked on the map when it is
+ * one of the school's pins, otherwise the primary location (a school picked from the list
+ * has no clicked pin).
+ */
+export function pickSelectedMarker(candidates, pickedKey) {
+  if (!candidates?.length) return null
+  return candidates.find(marker => marker.key === pickedKey)
+    || candidates.find(marker => marker.location?.is_primary)
+    || candidates[0]
+}
