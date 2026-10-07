@@ -90,6 +90,8 @@ export function readSavedViewState(locationKey, search, storage = safeSession())
     if (!saved) return null
     return {
       scrollTop: Number.isFinite(saved.scrollTop) ? saved.scrollTop : 0,
+      // First rendered card: the scroll position is measured from it (see utils/listWindow.js).
+      listStart: Number.isInteger(saved.listStart) && saved.listStart > 0 ? saved.listStart : 0,
       map: saved.map && Array.isArray(saved.map.center) && Number.isFinite(saved.map.zoom) ? saved.map : null,
     }
   } catch {
@@ -97,12 +99,12 @@ export function readSavedViewState(locationKey, search, storage = safeSession())
   }
 }
 
-export function saveViewState(locationKey, { search, scrollTop, map }, storage = safeSession()) {
+export function saveViewState(locationKey, { search, scrollTop, listStart = 0, map }, storage = safeSession()) {
   if (!storage || !locationKey) return
   try {
     // One record per history entry (newest last), so going back several searches still restores each.
     const others = readAll(storage).filter(entry => !(entry?.key === locationKey && entry.search === search))
-    const next = [...others, { key: locationKey, search, scrollTop, map }].slice(-MAX_SAVED_ENTRIES)
+    const next = [...others, { key: locationKey, search, scrollTop, listStart, map }].slice(-MAX_SAVED_ENTRIES)
     storage.setItem(SCROLL_STATE_KEY, JSON.stringify(next))
   } catch {
     // Storage full or blocked: losing the scroll position is acceptable.
