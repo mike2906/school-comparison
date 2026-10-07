@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { pointsForFit, pickSelectedMarker } from './mapFit.js'
+import { pointsForFit, pickSelectedMarker, pinHasRoom, pinTarget, overlayFitPadding } from './mapFit.js'
 
 // Stand-in for Leaflet's distanceTo in node tests; only the ordering matters here.
 const distance = ([aLat, aLng], [bLat, bLng]) => Math.hypot(aLat - bLat, aLng - bLng)
@@ -38,4 +38,45 @@ test('pickSelectedMarker falls back to the primary location, then the first pin'
   assert.equal(pickSelectedMarker(schoolPins, '531-1076').key, '106-106')
   assert.equal(pickSelectedMarker([schoolPins[1]], null).key, '106-107')
   assert.equal(pickSelectedMarker([], '106-107'), null)
+})
+
+// iPhone 13 map area with the info sheet covering the bottom 236px.
+const phoneMap = { x: 390, y: 551 }
+const phoneRoom = { top: 60, side: 20, bottom: 256 }
+
+test('pinHasRoom is false for a pin under the sheet or too close to an edge', () => {
+  assert.equal(pinHasRoom({ x: 195, y: 200 }, phoneMap, phoneRoom), true)
+  assert.equal(pinHasRoom({ x: 195, y: 335 }, phoneMap, phoneRoom), false)
+  assert.equal(pinHasRoom({ x: 195, y: 30 }, phoneMap, phoneRoom), false)
+  assert.equal(pinHasRoom({ x: 5, y: 200 }, phoneMap, phoneRoom), false)
+})
+
+test('pinTarget centres the pin in the part of the map above the sheet', () => {
+  assert.deepEqual(pinTarget(phoneMap, phoneRoom), { x: 195, y: 177.5 })
+  // Desktop: the popup opens above the pin, so the pin sits below the middle.
+  assert.deepEqual(pinTarget({ x: 900, y: 770 }, { top: 340, side: 170, bottom: 20 }), { x: 450, y: 545 })
+})
+
+test('pinTarget falls back to the map centre when nothing is left free', () => {
+  assert.deepEqual(pinTarget({ x: 390, y: 300 }, phoneRoom), { x: 195, y: 150 })
+})
+
+const fitPad = { top: 70, side: 40, bottom: 24 }
+
+test('overlayFitPadding keeps locations clear of the panel and the sheet', () => {
+  assert.deepEqual(overlayFitPadding(phoneMap, { top: 100, bottom: 236 }, fitPad), {
+    paddingTopLeft: [40, 170],
+    paddingBottomRight: [40, 260],
+  })
+  assert.deepEqual(overlayFitPadding({ x: 900, y: 770 }, { top: 91, bottom: 0 }, fitPad), {
+    paddingTopLeft: [40, 161],
+    paddingBottomRight: [40, 24],
+  })
+})
+
+test('overlayFitPadding gives up when the map is too short, hidden or too narrow', () => {
+  // Small phone with the compare bar under the sheet: the padding would exceed the map.
+  assert.equal(overlayFitPadding({ x: 375, y: 440 }, { top: 100, bottom: 320 }, fitPad), null)
+  assert.equal(overlayFitPadding({ x: 0, y: 0 }, { top: 0, bottom: 0 }, fitPad), null)
+  assert.equal(overlayFitPadding({ x: 100, y: 600 }, { top: 0, bottom: 0 }, fitPad), null)
 })

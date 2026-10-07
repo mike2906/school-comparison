@@ -36,3 +36,40 @@ export function pickSelectedMarker(candidates, pickedKey) {
     || candidates.find(marker => marker.location?.is_primary)
     || candidates[0]
 }
+
+/**
+ * Whether a pin at container `point` can stay where it is: `room` is the space (px) it
+ * needs to each edge of the map for what opens around it (popup above, sheet below).
+ */
+export function pinHasRoom(point, size, room) {
+  return point.x >= room.side && point.x <= size.x - room.side
+    && point.y >= room.top && point.y <= size.y - room.bottom
+}
+
+/**
+ * Where to put a pin that has to move: the middle of the part of the map left free by
+ * `room`, so it is centred in what the parent can actually see, not under the sheet.
+ * Falls back to the map centre when the map is too small to have a free part.
+ */
+export function pinTarget(size, room) {
+  const freeHeight = size.y - room.top - room.bottom
+  return {
+    x: size.x / 2,
+    y: freeHeight > 0 ? room.top + freeHeight / 2 : size.y / 2,
+  }
+}
+
+// Less free map than this (px) is not worth fitting into.
+const MIN_FREE_FOR_FIT = 40
+
+/**
+ * fitBounds padding that keeps a school's locations clear of what covers the map
+ * (`covered.top`: the locations panel, `covered.bottom`: the mobile sheet), or null when
+ * too little of the map would be left: padding larger than the map gives Leaflet a NaN zoom.
+ */
+export function overlayFitPadding(size, covered, pad) {
+  const top = covered.top + pad.top
+  const bottom = covered.bottom + pad.bottom
+  if (size.y - top - bottom < MIN_FREE_FOR_FIT || size.x - 2 * pad.side < MIN_FREE_FOR_FIT) return null
+  return { paddingTopLeft: [pad.side, top], paddingBottomRight: [pad.side, bottom] }
+}
