@@ -223,7 +223,9 @@
     "locationsFor": "Locations for {{name}}",
     "legendSchool": "School",
     "legendKindergarten": "Kindergarten",
-    "approximatePin": "Approximate location (street level)"
+    "approximatePin": "Approximate location (street level)",
+    "alsoHere": "At the same address:",
+    "legendStacked": "Several at one address"
   },
   "pricing": {
     "title": "Pricing",
