@@ -165,7 +165,10 @@ def run_publish(tmp_path, failure="", checksum=None):
 def test_publish_backs_up_then_loads_the_snapshot_and_migrates(tmp_path):
     result, commands, loads, app = run_publish(tmp_path)
     assert result.returncode == 0, result.stderr
-    step = lambda match: next(i for i, command in enumerate(commands) if match(command))
+
+    def step(match):
+        return next(i for i, command in enumerate(commands) if match(command))
+
     dump = step(lambda c: "pg_dump" in c)
     stop = step(lambda c: c[-2:] == ["stop", "api"])
     load = step(lambda c: "--single-transaction" in c)
