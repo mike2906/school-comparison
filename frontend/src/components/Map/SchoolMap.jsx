@@ -31,6 +31,10 @@ const SINGLE_POINT_ZOOM = 13
 const MAX_FIT_ZOOM = 14
 const FIT_PADDING = [60, 60]
 const MARKER_CLICK_GUARD_MS = 350
+// Room a clicked pin needs around it (px) to stay where it is: the popup opens above it
+// on desktop, the info sheet covers the bottom of the map on mobile.
+const PIN_ROOM_DESKTOP = { top: 340, side: 170, bottom: 20 }
+const PIN_ROOM_MOBILE = { top: 60, side: 20, bottom: 320 }
 
 const HIGHLIGHT_COLOR = '#f97316'
 const TYPE_COLORS = {
@@ -447,13 +451,33 @@ function MapOverlayNavigator({ overlaySchoolId, overlayLocations, focusLocation 
   return null
 }
 
-function MapSelectionPan({ marker }) {
+function MapSelectionPan({ marker, mapPickedSchoolIdRef, isMobile }) {
   const map = useMap()
+  const markerKey = marker?.key
+  const schoolId = marker?.school?.id
+  const lat = marker?.position?.[0]
+  const lng = marker?.position?.[1]
 
+  // Keyed on the selection, not the marker object: a data refresh must not pan again.
   useEffect(() => {
-    if (!marker) return
-    map.panTo(marker.position, { animate: true, duration: 0.5 })
-  }, [marker, map])
+    const pickedOnMap = mapPickedSchoolIdRef.current
+    mapPickedSchoolIdRef.current = null
+    if (markerKey == null) return
+    // A pin clicked on the map is already in view; moving the map under the cursor reads
+    // as the pin jumping. Still pan when its popup or the sheet would not fit, or when the
+    // highlighted pin is elsewhere (a school's other location was clicked and its primary
+    // one is off screen).
+    if (pickedOnMap === schoolId) {
+      const room = isMobile ? PIN_ROOM_MOBILE : PIN_ROOM_DESKTOP
+      const point = map.latLngToContainerPoint([lat, lng])
+      const size = map.getSize()
+      const hasRoom = point.x >= room.side && point.x <= size.x - room.side
+        && point.y >= room.top && point.y <= size.y - room.bottom
+      if (hasRoom) return
+    }
+    map.panTo([lat, lng], { animate: true, duration: 0.5 })
+    // isMobile is read when the selection changes; resizing the window must not pan.
+  }, [markerKey, schoolId, lat, lng, map, mapPickedSchoolIdRef])
 
   return null
 }
@@ -883,6 +907,12 @@ function SchoolMap({
     markerInteractionRef.current = Date.now()
   }, [])
 
+  const mapPickedSchoolIdRef = useRef(null)
+  const handleMarkerSelect = useCallback((school) => {
+    mapPickedSchoolIdRef.current = school?.id ?? null
+    onSchoolSelect?.(school)
+  }, [onSchoolSelect])
+
   const mapCenter = config?.map_config?.center || FALLBACK_CENTER
   const defaultZoom = config?.map_config?.default_zoom || FALLBACK_ZOOM
   const countryBounds = useMemo(() => {
@@ -1135,7 +1165,7 @@ function SchoolMap({
           onPickLocation={onPickLocation}
           markerInteractionRef={markerInteractionRef}
         />
-        <MapSelectionPan marker={selectedMarker} />
+        <MapSelectionPan marker={selectedMarker} mapPickedSchoolIdRef={mapPickedSchoolIdRef} isMobile={isMobile} />
         <MapOverlayNavigator
           overlaySchoolId={overlaySchoolId}
           overlayLocations={overlayLocations}
@@ -1183,7 +1213,7 @@ function SchoolMap({
               isHovered={hoveredSchoolId === marker.school.id}
               activeAgeGroup={activeAgeGroup}
               isDimmed={overlayActiveOnMap && !hideOthers}
-              onSelect={onSchoolSelect}
+              onSelect={handleMarkerSelect}
               onDeselect={onClearSelection}
               showPopup={!isMobile}
               t={t}
@@ -1209,7 +1239,7 @@ function SchoolMap({
               isHovered={false}
               activeAgeGroup={activeAgeGroup}
               isDimmed={false}
-              onSelect={onSchoolSelect}
+              onSelect={handleMarkerSelect}
               onDeselect={onClearSelection}
               showPopup={!isMobile && !overlayFocusActive}
               t={t}
