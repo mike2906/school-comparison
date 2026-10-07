@@ -111,6 +111,40 @@ def test_parse_nvo_csv_extracts_subject_scores_and_missing_subject_gaps():
     assert entries[0].source_url == resource.resource_view_url
 
 
+def test_parse_nvo_csv_skips_zero_average_when_nobody_sat_the_subject():
+    # Rows as published for 2025 nvo_10: "0","0" means no pupil sat that subject.
+    resource = _resource("nvo_10", 2025)
+    csv_text = _csv_text(
+        '"СОФИЯ-ГРАД","СТОЛИЧНА","ГР.СОФИЯ","ЧСУ Дружба","2203720","0","0","1","80"',
+        '"СОФИЯ-ГРАД","СТОЛИЧНА","ГР.СОФИЯ","ЧСУ Орфей","2208526","0","0","0","0"',
+        '"СОФИЯ-ГРАД","СТОЛИЧНА","ГР.СОФИЯ","35 СУ Добри Войников","222222","0","55.5","","0"',
+    )
+
+    entries, stats = parse_nvo_csv(resource, csv_text)
+
+    assert [(entry.institutional_id, entry.subject, entry.value) for entry in entries] == [
+        ("2203720", "math", 80.0)
+    ]
+    assert stats["missing_subject_values"] == 5
+    assert stats["empty_rows"] == 2
+
+
+def test_parse_nvo_csv_skips_zero_participants_in_legacy_reversed_headers():
+    resource = _resource("nvo_4", 2021)
+    csv_text = "\n".join(
+        [
+            '"Област","Община","Населено място","Код по Админ","Училище",'
+            '"Явили се БЕЛ","Ср. успех в точки БЕЛ","Явили се МАТ","Ср. успех в точки МАТ"',
+            '"СОФИЯ-ГРАД","СТОЛИЧНА","ГР.СОФИЯ","2 208 526","ЧСУ Орфей","0","0","12","71,5"',
+        ]
+    )
+
+    entries, stats = parse_nvo_csv(resource, csv_text)
+
+    assert [(entry.subject, entry.value) for entry in entries] == [("math", 71.5)]
+    assert stats["missing_subject_values"] == 1
+
+
 def test_parse_nvo_csv_handles_legacy_two_row_header_with_admin_code():
     resource = _resource("nvo_4", 2023)
     csv_text = "\n".join(

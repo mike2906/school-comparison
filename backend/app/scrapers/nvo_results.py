@@ -170,6 +170,11 @@ def parse_nvo_csv(resource: NvoResource, csv_text: str) -> tuple[list[ParsedExam
     city_col = _find_first_header(header_map, ("населено място",))
     bulgarian_col = _find_subject_column(header_map, "бел")
     math_col = _find_subject_column(header_map, "мат")
+    # Optional: older files may lack the per-subject "sat the exam" counts.
+    sat_cols = {
+        "bulgarian": _find_subject_column(header_map, "бел", "явили се"),
+        "math": _find_subject_column(header_map, "мат", "явили се"),
+    }
 
     missing_headers = [
         label
@@ -209,7 +214,11 @@ def parse_nvo_csv(resource: NvoResource, csv_text: str) -> tuple[list[ParsedExam
         for subject, column_name in (("bulgarian", bulgarian_col), ("math", math_col)):
             raw_value = row.get(column_name, "")
             parsed_value = _parse_float(raw_value)
-            if parsed_value is None:
+            sat_col = sat_cols[subject]
+            sat_count = _parse_float(row.get(sat_col, "")) if sat_col else None
+            # The files write 0 as the average when nobody sat the subject. That is a
+            # missing value, not a score, so it is never stored.
+            if parsed_value is None or parsed_value == 0 or sat_count == 0:
                 stats["missing_subject_values"] += 1
                 continue
 
@@ -716,9 +725,11 @@ def _find_first_header(header_map: dict[str, str], candidates: tuple[str, ...]) 
     return None
 
 
-def _find_subject_column(header_map: dict[str, str], subject_prefix: str) -> Optional[str]:
+def _find_subject_column(
+    header_map: dict[str, str], subject_prefix: str, label: str = "ср. успех в точки"
+) -> Optional[str]:
     for normalized, original in header_map.items():
-        if subject_prefix in normalized and "ср. успех в точки" in normalized:
+        if subject_prefix in normalized and label in normalized:
             return original
     return None
 
