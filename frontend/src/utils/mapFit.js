@@ -73,3 +73,28 @@ export function overlayFitPadding(size, covered, pad) {
   if (size.y - top - bottom < MIN_FREE_FOR_FIT || size.x - 2 * pad.side < MIN_FREE_FOR_FIT) return null
   return { paddingTopLeft: [pad.side, top], paddingBottomRight: [pad.side, bottom] }
 }
+
+/**
+ * Pins of other schools at the same spot, per marker key. Several schools can share a
+ * building, and their pins then sit exactly on top of each other: only the top one can be
+ * clicked, so the popup lists the rest. Positions are compared to ~1 m (5 decimals).
+ * Markers without company are left out of the result.
+ */
+export function stackedMarkersByKey(markers) {
+  const byPosition = new Map()
+  markers.forEach(marker => {
+    const positionKey = marker.position.map(value => value.toFixed(5)).join(',')
+    if (!byPosition.has(positionKey)) byPosition.set(positionKey, [])
+    byPosition.get(positionKey).push(marker)
+  })
+
+  const result = new Map()
+  byPosition.forEach(group => {
+    if (group.length < 2) return
+    group.forEach(marker => {
+      const others = group.filter(other => other.school.id !== marker.school.id)
+      if (others.length > 0) result.set(marker.key, others)
+    })
+  })
+  return result
+}

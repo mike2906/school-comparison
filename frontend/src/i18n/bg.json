@@ -223,7 +223,9 @@
     "locationsFor": "Локации за {{name}}",
     "legendSchool": "Училище",
     "legendKindergarten": "Детска градина",
-    "approximatePin": "Приблизително местоположение (по улица)"
+    "approximatePin": "Приблизително местоположение (по улица)",
+    "alsoHere": "На същия адрес:",
+    "legendStacked": "Няколко на един адрес"
   },
   "pricing": {
     "title": "Цени",

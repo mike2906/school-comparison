@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { pointsForFit, pickSelectedMarker, pinHasRoom, pinTarget, overlayFitPadding } from './mapFit.js'
+import { pointsForFit, pickSelectedMarker, pinHasRoom, pinTarget, overlayFitPadding, stackedMarkersByKey } from './mapFit.js'
 
 // Stand-in for Leaflet's distanceTo in node tests; only the ordering matters here.
 const distance = ([aLat, aLng], [bLat, bLng]) => Math.hypot(aLat - bLat, aLng - bLng)
@@ -79,4 +79,30 @@ test('overlayFitPadding gives up when the map is too short, hidden or too narrow
   assert.equal(overlayFitPadding({ x: 375, y: 440 }, { top: 100, bottom: 320 }, fitPad), null)
   assert.equal(overlayFitPadding({ x: 0, y: 0 }, { top: 0, bottom: 0 }, fitPad), null)
   assert.equal(overlayFitPadding({ x: 100, y: 600 }, { top: 0, bottom: 0 }, fitPad), null)
+})
+
+const pin = (schoolId, locationId, position) => ({
+  key: `${schoolId}-${locationId}`,
+  school: { id: schoolId },
+  position,
+})
+
+test('stackedMarkersByKey lists the other schools at the same position', () => {
+  const shared = [42.6996588210137, 23.332254598434336]
+  const markers = [
+    pin(327, 858, shared),
+    pin(329, 860, shared),
+    pin(600, 1153, [...shared]),
+    pin(1, 1, [42.7, 23.3]),
+  ]
+  const stacked = stackedMarkersByKey(markers)
+
+  assert.deepEqual(stacked.get('327-858').map(marker => marker.school.id), [329, 600])
+  assert.deepEqual(stacked.get('600-1153').map(marker => marker.school.id), [327, 329])
+  assert.equal(stacked.has('1-1'), false)
+})
+
+test('stackedMarkersByKey ignores a school stacked only on its own locations', () => {
+  const markers = [pin(5, 1, [42.7, 23.3]), pin(5, 2, [42.7, 23.3]), pin(6, 3, [42.70002, 23.3])]
+  assert.equal(stackedMarkersByKey(markers).size, 0)
 })

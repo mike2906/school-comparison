@@ -14,7 +14,7 @@ import { getFocusEmojis, getFocusLabels } from '../../utils/locationFocus'
 import { AGE_GROUP_KEYS } from '../../utils/education'
 import { useStableCallback } from '../../hooks/useStableCallback'
 import { isDesktopViewport } from '../../utils/searchViewState'
-import { pointsForFit, pickSelectedMarker, pinHasRoom, pinTarget, overlayFitPadding } from '../../utils/mapFit'
+import { pointsForFit, pickSelectedMarker, pinHasRoom, pinTarget, overlayFitPadding, stackedMarkersByKey } from '../../utils/mapFit'
 
 // CARTO requires an API key; without one every tile is watermarked
 const CARTO_API_KEY = import.meta.env.VITE_CARTO_API_KEY
@@ -28,12 +28,16 @@ const FALLBACK_ZOOM = 12
 const FALLBACK_BOUNDS = L.latLngBounds([41.235, 22.357], [44.216, 28.887])
 
 const SINGLE_POINT_ZOOM = 13
+// Pins are shown one by one from this zoom; at 14 they still overlap heavily in the centre.
+const UNCLUSTERED_ZOOM = 15
 const MAX_FIT_ZOOM = 14
 const FIT_PADDING = [60, 60]
 const MARKER_CLICK_GUARD_MS = 350
 // Room a clicked pin needs around it (px) to stay where it is: the popup opens above it
 // on desktop, the info sheet covers the bottom of the map on mobile.
 const PIN_ROOM_DESKTOP = { top: 340, side: 170, bottom: 20 }
+// Extra room above the pin when its popup also lists schools at the same address.
+const STACK_LIST_ROOM = { base: 36, perSchool: 24 }
 const PIN_ROOM_MOBILE = { top: 60, side: 20, bottom: 20 }
 // Padding (px) when fitting a school's locations: their markers are 58px tall.
 const OVERLAY_FIT_PADDING = { top: 70, side: 40, bottom: 24 }
@@ -68,7 +72,7 @@ const parseCoordinate = (value) => {
 // Custom marker icons
 // Colour = state / private; inner mark = school (dot) or kindergarten (square), so the
 // two can be told apart in "All ages".
-const createMarkerIcon = (type, { isSelected, isHovered, isDimmed, isKindergarten = false }) => {
+const createMarkerIcon = (type, { isSelected, isHovered, isDimmed, isKindergarten = false, stackCount = 0 }) => {
   const color = isSelected ? HIGHLIGHT_COLOR : getTypeColor(type)
 
   const svgIcon = isSelected
@@ -85,8 +89,11 @@ const createMarkerIcon = (type, { isSelected, isHovered, isDimmed, isKindergarte
           : `<circle cx="16" cy="14" r="5" fill="${color}"/>`}
       </svg>`
 
+  // Schools sharing the spot: the pins are exactly on top of each other.
+  const badge = stackCount > 1 ? `<span class="pin-stack-badge">${stackCount}</span>` : ''
+
   return L.divIcon({
-    html: svgIcon,
+    html: svgIcon + badge,
     className: [
       'custom-div-icon',
       isSelected ? 'is-selected' : '',
@@ -547,6 +554,8 @@ function PopupContent({
   activeAgeGroup,
   onShowLocations,
   overlayActive,
+  stackedMarkers,
+  onSelectMarker,
 }) {
   if (!marker) return null
 
@@ -573,7 +582,13 @@ function PopupContent({
       onClick={(event) => event.stopPropagation()}
     >
       <div className="flex items-start justify-between gap-3">
-        <h3 className="text-base font-semibold text-neutral-900 leading-snug">{schoolName}</h3>
+        {/* Popup: a very long name is cut to three lines so the popup fits above the pin. */}
+        <h3
+          className={`text-base font-semibold text-neutral-900 leading-snug ${isMobile ? '' : 'line-clamp-3'}`}
+          title={isMobile ? undefined : schoolName}
+        >
+          {schoolName}
+        </h3>
         <button
           type="button"
           onClick={(event) => {
@@ -655,6 +670,28 @@ function PopupContent({
         )}
       </div>
 
+      {stackedMarkers?.length > 0 && (
+        <div className="border-t border-neutral-100 pt-2">
+          <p className="text-xs text-neutral-500">{t('map.alsoHere')}</p>
+          <ul className="mt-1 space-y-1">
+            {stackedMarkers.map(other => (
+              <li key={other.key}>
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    onSelectMarker?.(other.school, other)
+                  }}
+                  className="text-left text-sm font-medium text-primary-700 hover:text-primary-800 hover:underline"
+                >
+                  {getSchoolName(other.school, language)}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <div className="flex items-center gap-2 pt-2">
         <button
           type="button"
@@ -709,14 +746,16 @@ const SchoolMarker = memo(function SchoolMarker({
   onShowLocations,
   overlayActive,
   onMarkerInteraction,
+  stackedMarkers,
 }) {
   const markerRef = useRef(null)
   const schoolType = marker.school.school_type
   const isKindergarten = marker.school.education_level === 'kindergarten'
+  const stackCount = stackedMarkers ? stackedMarkers.length + 1 : 0
   // A new icon object makes react-leaflet rebuild the marker DOM, so only create one when its look changes
   const icon = useMemo(
-    () => createMarkerIcon(schoolType, { isSelected, isHovered, isDimmed, isKindergarten }),
-    [schoolType, isSelected, isHovered, isDimmed, isKindergarten]
+    () => createMarkerIcon(schoolType, { isSelected, isHovered, isDimmed, isKindergarten, stackCount }),
+    [schoolType, isSelected, isHovered, isDimmed, isKindergarten, stackCount]
   )
 
   useEffect(() => {
@@ -769,6 +808,8 @@ const SchoolMarker = memo(function SchoolMarker({
             activeAgeGroup={activeAgeGroup}
             onShowLocations={onShowLocations}
             overlayActive={overlayActive}
+            stackedMarkers={stackedMarkers}
+            onSelectMarker={onSelect}
           />
         </Popup>
       )}
@@ -954,6 +995,7 @@ function SchoolMap({
   const markerInteractionRef = useRef(0)
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768)
   const [sheetOffset, setSheetOffset] = useState(120)
+  const [legendOpen, setLegendOpen] = useState(false)
   const sheetStartRef = useRef(null)
   const sheetRef = useRef(null)
   const overlayPanelRef = useRef(null)
@@ -966,10 +1008,15 @@ function SchoolMap({
       bottom: sheetRef.current?.offsetHeight || 0,
     }
   })
+  // Called after render, so it sees the current selection's sheet, panel and stack.
   const getPinRoom = useStableCallback(() => {
     const covered = getCovered()
-    const room = isMobile ? PIN_ROOM_MOBILE : PIN_ROOM_DESKTOP
-    return { ...room, top: room.top + covered.top, bottom: room.bottom + covered.bottom }
+    if (isMobile) {
+      return { ...PIN_ROOM_MOBILE, top: PIN_ROOM_MOBILE.top + covered.top, bottom: PIN_ROOM_MOBILE.bottom + covered.bottom }
+    }
+    const stacked = selectedMarker ? stackedByKey.get(selectedMarker.key)?.length || 0 : 0
+    const stackList = stacked > 0 ? STACK_LIST_ROOM.base + stacked * STACK_LIST_ROOM.perSchool : 0
+    return { ...PIN_ROOM_DESKTOP, top: PIN_ROOM_DESKTOP.top + covered.top + stackList }
   })
 
   const noteMarkerInteraction = useCallback(() => {
@@ -1022,6 +1069,8 @@ function SchoolMap({
     })
     return result
   }, [schools, activeAgeGroup, countryBounds])
+
+  const stackedByKey = useMemo(() => stackedMarkersByKey(markers), [markers])
 
   const overlaySchoolId = locationOverlay?.schoolId ?? null
   const hideOthers = Boolean(locationOverlay?.hideOthers)
@@ -1280,7 +1329,7 @@ function SchoolMap({
         <MarkerClusterGroup
           key={`clusters-${overlayActiveOnMap ? 'overlay' : 'base'}-${hideOthers ? 'hide' : 'show'}`}
           chunkedLoading
-          disableClusteringAtZoom={14}
+          disableClusteringAtZoom={UNCLUSTERED_ZOOM}
           maxClusterRadius={(zoom) => (zoom >= 13 ? 60 : 80)}
           iconCreateFunction={(cluster) => createClusterIcon(cluster, { dimmed: overlayActiveOnMap && !hideOthers })}
           showCoverageOnHover={false}
@@ -1309,6 +1358,7 @@ function SchoolMap({
               onShowLocations={onShowLocations}
               overlayActive={locationOverlay?.schoolId === marker.school.id}
               onMarkerInteraction={noteMarkerInteraction}
+              stackedMarkers={stackedByKey.get(marker.key)}
             />
           ))}
         </MarkerClusterGroup>
@@ -1335,6 +1385,7 @@ function SchoolMap({
             onShowLocations={onShowLocations}
             overlayActive={locationOverlay?.schoolId === marker.school.id}
             onMarkerInteraction={noteMarkerInteraction}
+            stackedMarkers={stackedByKey.get(marker.key)}
           />
         ))}
 
@@ -1385,6 +1436,8 @@ function SchoolMap({
               activeAgeGroup={activeAgeGroup}
               onShowLocations={onShowLocations}
               overlayActive={locationOverlay?.schoolId === selectedMarker.school.id}
+              stackedMarkers={stackedByKey.get(selectedMarker.key)}
+              onSelectMarker={handleMarkerSelect}
             />
           </div>
         </div>
@@ -1415,27 +1468,48 @@ function SchoolMap({
         </div>
       )}
 
-      {/* Map legend */}
-      <div className={`absolute left-4 bg-white rounded-lg shadow-panel p-3 z-[1000] ${hasCompare ? 'bottom-24' : 'bottom-6'}`}>
-        <p className="text-xs font-medium text-neutral-700 mb-2">{t('map.legend')}</p>
-        <div className="space-y-1.5">
-          <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full bg-primary-500" />
-            <span className="text-xs text-neutral-600">{t('schoolTypes.state')}</span>
+      {/* Map legend: always open on desktop, a button on phones where it covered 40% of the map. */}
+      <div className={`absolute left-4 bg-white rounded-lg shadow-panel z-[1000] ${hasCompare ? 'bottom-24' : 'bottom-6'}`}>
+        {isMobile && (
+          <button
+            type="button"
+            onClick={() => setLegendOpen(open => !open)}
+            aria-expanded={legendOpen}
+            className="flex h-9 items-center gap-1.5 px-3 text-xs font-medium text-neutral-700"
+          >
+            {t('map.legend')}
+            <svg className={`h-3 w-3 transition-transform ${legendOpen ? '' : 'rotate-180'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+        )}
+        {(!isMobile || legendOpen) && (
+          <div className={isMobile ? 'px-3 pb-3' : 'p-3'}>
+            {!isMobile && <p className="text-xs font-medium text-neutral-700 mb-2">{t('map.legend')}</p>}
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2">
+                <span className="w-3 h-3 rounded-full bg-primary-500" />
+                <span className="text-xs text-neutral-600">{t('schoolTypes.state')}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-3 h-3 rounded-full bg-violet-500" />
+                <span className="text-xs text-neutral-600">{t('schoolTypes.private')}</span>
+              </div>
+              <div className="flex items-center gap-2 pt-1">
+                <span className="w-3 h-3 rounded-full border-2 border-neutral-500" />
+                <span className="text-xs text-neutral-600">{t('map.legendSchool')}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-3 h-3 rounded-sm border-2 border-neutral-500" />
+                <span className="text-xs text-neutral-600">{t('map.legendKindergarten')}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="flex h-3.5 min-w-[0.875rem] items-center justify-center rounded-full bg-neutral-700 px-1 text-[9px] font-bold leading-none text-white">2</span>
+                <span className="text-xs text-neutral-600">{t('map.legendStacked')}</span>
+              </div>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full bg-violet-500" />
-            <span className="text-xs text-neutral-600">{t('schoolTypes.private')}</span>
-          </div>
-          <div className="flex items-center gap-2 pt-1">
-            <span className="w-3 h-3 rounded-full border-2 border-neutral-500" />
-            <span className="text-xs text-neutral-600">{t('map.legendSchool')}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-sm border-2 border-neutral-500" />
-            <span className="text-xs text-neutral-600">{t('map.legendKindergarten')}</span>
-          </div>
-        </div>
+        )}
       </div>
 
       {overlaySchool && (
