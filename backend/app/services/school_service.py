@@ -1,3 +1,4 @@
+import asyncio
 from typing import Optional
 
 from sqlalchemy import and_, exists, func, or_, select
@@ -290,7 +291,11 @@ class SchoolService:
             query = query.where(city_clause)
         result = await self.db.execute(query)
         rows = result.all()
+        # The projection below is CPU work for every school: keep it off the event loop.
+        return await asyncio.to_thread(self._filter_options, rows)
 
+    @staticmethod
+    def _filter_options(rows) -> dict[str, list[str]]:
         categories = {
             "language_focus_pairs": set(),
             "language_focus_languages": set(),

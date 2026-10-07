@@ -16,11 +16,11 @@ TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 @pytest.fixture(autouse=True)
 def clear_school_list_cache():
     """Each test has its own database, so a cached list or filters response must not outlive the test."""
-    schools_router._list_cache.clear()
-    schools_router._filters_cache.clear()
+    for state in (schools_router._list_cache, schools_router._filters_cache, schools_router._refreshing):
+        state.clear()
     yield
-    schools_router._list_cache.clear()
-    schools_router._filters_cache.clear()
+    for state in (schools_router._list_cache, schools_router._filters_cache, schools_router._refreshing):
+        state.clear()
 
 
 @pytest_asyncio.fixture

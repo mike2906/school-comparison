@@ -1,4 +1,5 @@
 """Tests for API endpoints."""
+import asyncio
 from datetime import datetime
 
 import pytest
@@ -128,8 +129,7 @@ class TestSchoolsEndpoint:
 
     @pytest.mark.asyncio
     async def test_list_schools_reuses_cached_body_until_ttl(self, seeded_client, monkeypatch):
-        """A repeat request is served from the cache; it is rebuilt after the TTL."""
-        from app.routers import schools as schools_router
+        """A repeat request is served from the cache."""
         from app.services.school_service import SchoolService
 
         calls = 0
@@ -158,9 +158,115 @@ class TestSchoolsEndpoint:
         await seeded_client.get("/schools?city=Sofia")
         assert calls == 2
 
+    @pytest.mark.asyncio
+    async def test_stale_list_is_served_and_refreshed_in_background(
+        self, seeded_client, seeded_db, monkeypatch
+    ):
+        """Past the TTL a visitor still gets the cached body; the rebuild is not theirs to wait for."""
+        from contextlib import asynccontextmanager
+
+        from app.routers import schools as schools_router
+
+        @asynccontextmanager
+        async def test_session():
+            yield seeded_db
+
+        monkeypatch.setattr(schools_router, "_session_factory", test_session)
+
+        first = await seeded_client.get("/schools")
+        assert len(first.json()) == 3
+
+        school = (await seeded_db.execute(select(School).limit(1))).scalar_one()
+        school.name_i18n = {"bg": "Renamed", "en": "Renamed"}
+        await seeded_db.commit()
         monkeypatch.setattr(schools_router, "LIST_CACHE_TTL_SECONDS", 0)
+
+        stale = await seeded_client.get("/schools")
+        assert stale.content == first.content
+        assert len(schools_router._background_tasks) == 1
+        await asyncio.gather(*schools_router._background_tasks)
+        assert schools_router._refreshing == set()
+
+        refreshed = await seeded_client.get("/schools")
+        names = {item["name_i18n"]["en"] for item in refreshed.json()}
+        assert "Renamed" in names
+        await asyncio.gather(*schools_router._background_tasks)
+
+    @pytest.mark.asyncio
+    async def test_full_cache_evicts_the_least_recently_used_entry(self, seeded_client, monkeypatch):
+        from app.routers import schools as schools_router
+
+        monkeypatch.setattr(schools_router, "LIST_CACHE_MAX_ENTRIES", 2)
+        default_key = ("bg", "sofia", None, None, None, False)
+
         await seeded_client.get("/schools")
-        assert calls == 3
+        await seeded_client.get("/schools?age_group=first")
+        await seeded_client.get("/schools")  # used again: "first" is now the oldest
+        await seeded_client.get("/schools?age_group=one-off")
+
+        assert set(schools_router._list_cache) == {
+            default_key,
+            ("bg", "sofia", "one-off", None, None, False),
+        }
+
+    @pytest.mark.asyncio
+    async def test_failed_refresh_keeps_the_cached_body(self, seeded_client, monkeypatch):
+        from app.routers import schools as schools_router
+
+        def broken_session():
+            raise RuntimeError("database is down")
+
+        first = await seeded_client.get("/schools")
+        monkeypatch.setattr(schools_router, "_session_factory", broken_session)
+        monkeypatch.setattr(schools_router, "LIST_CACHE_TTL_SECONDS", 0)
+
+        await seeded_client.get("/schools")
+        await asyncio.gather(*schools_router._background_tasks)
+        again = await seeded_client.get("/schools")
+        assert again.status_code == 200
+        assert again.content == first.content
+        await asyncio.gather(*schools_router._background_tasks)
+
+    @pytest.mark.asyncio
+    async def test_warm_cache_builds_the_default_list_filters_and_age_groups(
+        self, seeded_client, seeded_db, monkeypatch
+    ):
+        from contextlib import asynccontextmanager
+
+        from app.models.country import Country
+        from app.routers import schools as schools_router
+        from app.services.school_service import SchoolService
+
+        @asynccontextmanager
+        async def test_session():
+            yield seeded_db
+
+        monkeypatch.setattr(schools_router, "_session_factory", test_session)
+        country = await seeded_db.get(Country, "bg")
+        country.education_config = {**country.education_config, "age_groups": [{"key": "first"}, {"key": "preschool"}]}
+        await seeded_db.commit()
+
+        await schools_router.warm_cache()
+
+        assert set(schools_router._list_cache) == {
+            ("bg", "sofia", None, None, None, False),
+            ("bg", "sofia", "first", None, None, False),
+            ("bg", "sofia", "preschool", None, None, False),
+            ("bg", "sofia", "preschool", None, "kindergarten", False),
+            ("bg", "sofia", "preschool", None, "primary", False),
+            ("bg", "sofia", "preschool", None, None, True),
+        }
+        assert set(schools_router._filters_cache) == {("bg", "sofia")}
+
+        # The requests the site makes are now cache hits.
+        async def fail(self, **kwargs):
+            raise AssertionError("served from the warm cache, not rebuilt")
+
+        monkeypatch.setattr(SchoolService, "list_schools_filtered", fail)
+        monkeypatch.setattr(SchoolService, "get_available_filters", fail)
+        assert len((await seeded_client.get("/schools?country_code=bg&city=sofia")).json()) == 3
+        assert (await seeded_client.get("/schools?age_group=first")).status_code == 200
+        assert (await seeded_client.get("/schools/filters")).status_code == 200
 
     @pytest.mark.asyncio
     async def test_list_schools_advanced_filters_are_not_cached(self, seeded_client):
