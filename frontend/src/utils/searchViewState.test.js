@@ -39,7 +39,7 @@ test('writeViewParams omits defaults, keeps other params, and reports no-ops', (
 test('saved view state is only restored for the same history entry', () => {
   const storage = memoryStorage()
   saveViewState('abc', { search: '?age_group=first', scrollTop: 1500, map: { center: [42.7, 23.3], zoom: 13 } }, storage)
-  assert.deepEqual(readSavedViewState('abc', '?age_group=first', storage), { scrollTop: 1500, map: { center: [42.7, 23.3], zoom: 13 } })
+  assert.deepEqual(readSavedViewState('abc', '?age_group=first', storage), { scrollTop: 1500, listStart: 0, map: { center: [42.7, 23.3], zoom: 13 } })
   assert.equal(readSavedViewState('other', '?age_group=first', storage), null)
   // Every page load's first entry is keyed 'default': a different URL must not restore.
   assert.equal(readSavedViewState('abc', '?age_group=grade_8_12', storage), null)
@@ -50,7 +50,7 @@ test('readSavedViewState tolerates corrupt storage and a missing map view', () =
   storage.setItem('searchViewState', '{not json')
   assert.equal(readSavedViewState('abc', '', storage), null)
   saveViewState('abc', { search: '', scrollTop: 10, map: null }, storage)
-  assert.deepEqual(readSavedViewState('abc', '', storage), { scrollTop: 10, map: null })
+  assert.deepEqual(readSavedViewState('abc', '', storage), { scrollTop: 10, listStart: 0, map: null })
 })
 
 test('getLastSearchUrl only returns search URLs', () => {
@@ -100,4 +100,10 @@ test('shortAddress puts a leading house number after the street', () => {
   assert.equal(shortAddress('ул. Раковски 12, София'), 'ул. Раковски 12')
   assert.equal(shortAddress('Current location'), 'Current location')
   assert.equal(shortAddress(''), '')
+})
+
+test('the first rendered card is saved with the scroll position', () => {
+  const storage = memoryStorage()
+  saveViewState('abc', { search: '', scrollTop: 900, listStart: 470, map: null }, storage)
+  assert.equal(readSavedViewState('abc', '', storage).listStart, 470)
 })

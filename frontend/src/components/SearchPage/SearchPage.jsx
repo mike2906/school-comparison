@@ -24,6 +24,7 @@ import { AGE_GROUP_KEYS } from '../../utils/education'
 import { getLanguageFocusPairs } from '../../utils/schoolAttributes'
 import { matchesAdvancedFilters, matchesSchoolType } from '../../utils/advancedFilters'
 import { getNvoDetail } from '../../utils/nvo'
+import { LIST_PAGE_SIZE, windowForIndex } from '../../utils/listWindow'
 import { canonicalLanguagePair, languageKey, languageLabel } from '../../utils/languages'
 
 const uniqueCanonical = (values, canonical) => (
@@ -58,8 +59,6 @@ const TYPE_SORT_ORDER = {
 }
 
 const EMPTY_LIST = []
-// Cards are rendered in pages as the list scrolls: all ~440 at once took ~0.6 s per render.
-const LIST_PAGE_SIZE = 30
 // Bulgaria, until the country config has loaded.
 const FALLBACK_KINDERGARTEN_ONLY_GROUPS = ['nursery', 'first', 'second', 'third']
 
@@ -78,11 +77,16 @@ function SearchPage() {
   // View state lives in the URL so it survives opening a school and coming back.
   const [initialView] = useState(() => readViewParams(searchParams))
   const [savedViewState] = useState(() => readSavedViewState(location.key, location.search))
+  // The list renders the cards [visibleStart, visibleCount) of the sorted schools.
+  const [visibleStart, setVisibleStart] = useState(() => savedViewState?.listStart || 0)
   // Enough cards to reach a restored scroll position (cards are at least ~100 px tall).
   const [visibleCount, setVisibleCount] = useState(() => (
-    Math.ceil((savedViewState?.scrollTop || 0) / 100) + LIST_PAGE_SIZE
+    (savedViewState?.listStart || 0) + Math.ceil((savedViewState?.scrollTop || 0) / 100) + LIST_PAGE_SIZE
   ))
+  const visibleStartRef = useRef(visibleStart)
+  visibleStartRef.current = visibleStart
   const listSentinelRef = useRef(null)
+  const listTopSentinelRef = useRef(null)
   // The school shown in the side panel (`?detail=<id>`); opening it pushes a history entry
   // so browser Back closes the panel instead of leaving the results.
   const detailSchoolId = (() => {
@@ -332,6 +336,7 @@ function SearchPage() {
       saveViewState(locationRef.current.key, {
         search: locationRef.current.search,
         scrollTop: listScrollTopRef.current,
+        listStart: visibleStartRef.current,
         map: mapViewRef.current,
       })
     }
@@ -1008,20 +1013,28 @@ function SearchPage() {
     }
   }, [searchInBounds])
 
-  useEffect(() => {
+  // Layout effect: after a window change the card is in place before the next paint, so
+  // the top sentinel is not seen at the old scroll position.
+  const listWindowMovedRef = useRef(false)
+  useLayoutEffect(() => {
     if (!selectedSchoolId || !scrollOnSelectRef.current) return
-    // A school picked on the map may be below the rendered page: render up to it first.
+    // A school picked on the map may be outside the rendered cards: render around it first.
     const index = sortedSchools.findIndex(school => school.id === selectedSchoolId)
-    if (index >= visibleCount) {
-      setVisibleCount(index + 20)
+    const nextWindow = windowForIndex(index, { start: visibleStart, end: visibleCount })
+    if (nextWindow) {
+      listWindowMovedRef.current = nextWindow.start !== visibleStart
+      setVisibleStart(nextWindow.start)
+      setVisibleCount(nextWindow.end)
       return
     }
     const node = document.querySelector(`[data-school-id="${selectedSchoolId}"]`)
     if (node) {
-      node.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      // Different cards are now under the old scroll position: nothing to scroll through.
+      node.scrollIntoView({ behavior: listWindowMovedRef.current ? 'auto' : 'smooth', block: 'center' })
     }
+    listWindowMovedRef.current = false
     scrollOnSelectRef.current = false
-  }, [selectedSchoolId, sortedSchools, visibleCount])
+  }, [selectedSchoolId, sortedSchools, visibleStart, visibleCount])
 
   // New results start at the top with the first page (not on map panning).
   const listKey = JSON.stringify([filters, sortBy, nameQuery, distanceFilter])
@@ -1029,9 +1042,19 @@ function SearchPage() {
   useEffect(() => {
     if (lastListKeyRef.current === listKey) return
     lastListKeyRef.current = listKey
+    setVisibleStart(0)
     setVisibleCount(LIST_PAGE_SIZE)
     if (listScrollRef.current) listScrollRef.current.scrollTop = 0
   }, [listKey])
+
+  // A list that shrank without a new list key (map-area filtering) may end before a moved
+  // window starts: go back to the first page rather than show nothing.
+  useEffect(() => {
+    if (loading || sortedSchools.length === 0 || visibleStart < sortedSchools.length) return
+    setVisibleStart(0)
+    setVisibleCount(LIST_PAGE_SIZE)
+    if (listScrollRef.current) listScrollRef.current.scrollTop = 0
+  }, [loading, sortedSchools.length, visibleStart])
 
   // Render the next page as the end of the list comes near.
   useEffect(() => {
@@ -1045,6 +1068,30 @@ function SearchPage() {
     observer.observe(sentinel)
     return () => observer.disconnect()
   }, [visibleCount, sortedSchools.length])
+
+  // Likewise render the previous page as the start of a moved window comes near. The
+  // cards go in above the ones on screen, so keep those where they are.
+  const heightBeforePrependRef = useRef(null)
+  useEffect(() => {
+    const sentinel = listTopSentinelRef.current
+    if (!sentinel || typeof IntersectionObserver === 'undefined') return undefined
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some(entry => entry.isIntersecting)) {
+        heightBeforePrependRef.current = listScrollRef.current?.scrollHeight ?? null
+        setVisibleStart(start => Math.max(0, start - LIST_PAGE_SIZE))
+      }
+    }, { root: listScrollRef.current, rootMargin: '800px 0px' })
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [visibleStart])
+
+  useLayoutEffect(() => {
+    const list = listScrollRef.current
+    if (list && heightBeforePrependRef.current !== null) {
+      list.scrollTop += list.scrollHeight - heightBeforePrependRef.current
+    }
+    heightBeforePrependRef.current = null
+  }, [visibleStart])
 
   // Reachable by Tab: rendered, and not inside a collapsed <details> (only its own
   // <summary> is). Chrome still reports boxes for collapsed content, so check directly.
@@ -1844,7 +1891,7 @@ function SearchPage() {
               <div
                 ref={listScrollRef}
                 onScroll={(event) => { listScrollTopRef.current = event.currentTarget.scrollTop }}
-                className={`flex-1 overflow-y-auto ${hasCompare ? 'pb-24' : ''}`}
+                className={`flex-1 overflow-y-auto [overflow-anchor:none] ${hasCompare ? 'pb-24' : ''}`}
               >
                 {!filters.ageGroup && !nameQuery && !welcomeDismissed && (
                   <div className="mx-3 mt-3 rounded-xl border border-primary-200 bg-primary-50 p-3 sm:p-4">
@@ -1916,7 +1963,10 @@ function SearchPage() {
 
                 {!isFirstLoad && !error && (
                 <div className={loading ? 'opacity-60 transition-opacity' : 'transition-opacity'} aria-busy={loading}>
-                {sortedSchools.slice(0, visibleCount).map(school => (
+                {visibleStart > 0 && (
+                  <div ref={listTopSentinelRef} className="h-16" aria-hidden="true" />
+                )}
+                {sortedSchools.slice(visibleStart, visibleCount).map(school => (
                   <SchoolCard
                     key={school.id}
                     school={school}
