@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
 import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import Layout from '../Layout/Layout'
@@ -27,13 +27,16 @@ import {
   getAvailableExamTypes,
   getExamTypeLabel,
 } from './helpers'
-import NvoTimelineChart from './NvoTimelineChart'
 import KeyFacts from './KeyFacts'
 import LocationMap, { directionsUrl } from './LocationMap'
 import PricingSection from './PricingSection'
 import SchoolActions from './SchoolActions'
 import TagList from './TagList'
 import PhoneLinks from './PhoneLinks'
+
+// The chart library is large and only schools with exam results need it. If the chunk
+// cannot be loaded (a tab that outlived a deploy), the page stays usable without the chart.
+const NvoTimelineChart = lazy(() => import('./NvoTimelineChart').catch(() => ({ default: () => null })))
 
 // Official admission system for Sofia municipal kindergartens (the source of the
 // kindergarten admission thresholds; see AGENTS.md).
@@ -645,12 +648,14 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
                 )}
 
                 {/* Single Grade Chart */}
-                <NvoTimelineChart
-                  examResults={school.exam_results}
-                  examType={activeExamType || getExamTypeForEducationLevel(school.education_level)}
-                  selectedSubjects={selectedSubjects}
-                  examAverages={examAverages}
-                />
+                <Suspense fallback={<div className="h-[400px]" />}>
+                  <NvoTimelineChart
+                    examResults={school.exam_results}
+                    examType={activeExamType || getExamTypeForEducationLevel(school.education_level)}
+                    selectedSubjects={selectedSubjects}
+                    examAverages={examAverages}
+                  />
+                </Suspense>
 
               {/* Subject Filter Toggles (below chart) */}
               <div className="flex items-center justify-center gap-3 mt-6 pt-6 border-t border-neutral-200">

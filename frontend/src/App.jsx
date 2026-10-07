@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { Suspense, lazy, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { createBrowserRouter, RouterProvider, Outlet, Navigate, useLocation } from 'react-router-dom'
 import { CompareProvider } from './context/CompareContext'
@@ -6,7 +6,6 @@ import { CountryProvider } from './context/CountryContext'
 import ErrorBoundary from './components/ErrorBoundary/ErrorBoundary'
 import SearchPage from './components/SearchPage/SearchPage'
 import SchoolDetailPage from './components/SchoolDetailPage/SchoolDetailPage'
-import ComparePage from './components/ComparePage/ComparePage'
 import AboutPage from './components/AboutPage/AboutPage'
 import NotFoundPage from './components/NotFoundPage/NotFoundPage'
 import CompareBar from './components/CompareBar/CompareBar'
@@ -18,6 +17,24 @@ import {
   languageBasename,
   languageFromPath,
 } from './utils/languageUrl'
+
+// Loaded on demand: most visits never open the comparison. A tab that outlives a deploy
+// asks for a chunk file that no longer exists, so reload once to pick up the current build.
+const CHUNK_RELOAD_KEY = 'chunk-reload'
+const ComparePage = lazy(() =>
+  import('./components/ComparePage/ComparePage').then(
+    (module) => {
+      sessionStorage.removeItem(CHUNK_RELOAD_KEY)
+      return module
+    },
+    (error) => {
+      if (sessionStorage.getItem(CHUNK_RELOAD_KEY)) throw error
+      sessionStorage.setItem(CHUNK_RELOAD_KEY, '1')
+      window.location.reload()
+      return new Promise(() => {})
+    }
+  )
+)
 
 // The language is fixed for the lifetime of the document: switching it is a full
 // navigation to the other prefix (see LanguageToggle), which is why links and
@@ -106,7 +123,7 @@ const router = createBrowserRouter([
       },
       {
         path: 'compare',
-        element: <ComparePage />,
+        element: <Suspense fallback={null}><ComparePage /></Suspense>,
       },
       {
         path: 'about',

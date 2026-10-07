@@ -253,3 +253,13 @@ test('getLanguageFocusPairs drops scraped values that are not languages', () => 
   })
   assert.deepEqual([...pairs], ['bulgarian'])
 })
+
+test('getLanguageFocusPairs computes once per school object', () => {
+  const school = { attributes: { language_focus: [{ language: 'English', level: 'intensive' }] } }
+  const first = getLanguageFocusPairs(school)
+  assert.deepEqual([...first], ['english:intensive'])
+  assert.equal(getLanguageFocusPairs(school), first)
+  // A reloaded list is new objects, so it is read afresh.
+  assert.notEqual(getLanguageFocusPairs({ ...school }), first)
+  assert.equal(getLanguageFocusPairs(null).size, 0)
+})
