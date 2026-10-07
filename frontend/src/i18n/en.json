@@ -576,7 +576,7 @@
     "openSchool": "Open a school",
     "filteringBy": "Names matching “{{query}}”",
     "clear": "Clear",
-    "placeholderShort": "School name or №"
+    "placeholderShort": "Name or №"
   },
   "agePicker": {
     "title": "Who are you looking for?",

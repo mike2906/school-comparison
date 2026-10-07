@@ -576,7 +576,7 @@
     "openSchool": "Отвори училище",
     "filteringBy": "Имена, съдържащи „{{query}}“",
     "clear": "Изчисти",
-    "placeholderShort": "Име или № на училище"
+    "placeholderShort": "Име или №"
   },
   "agePicker": {
     "title": "За кого търсите?",

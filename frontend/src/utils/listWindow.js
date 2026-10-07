@@ -20,3 +20,13 @@ export function windowForIndex(index, { start, end }) {
   if (index >= end && index < end + LIST_PAGE_SIZE) return { start, end: index + CARDS_AFTER }
   return { start: Math.max(0, index - CARDS_BEFORE), end: index + CARDS_AFTER }
 }
+
+/**
+ * The list's scrollTop that puts a card in the middle of the list (at its top when the
+ * card is taller than the list). Tops are viewport coordinates (getBoundingClientRect).
+ */
+export function scrollTopToCenter({ scrollTop, listTop, listHeight, cardTop, cardHeight }) {
+  const cardOffset = scrollTop + (cardTop - listTop)
+  const slack = Math.max(0, (listHeight - cardHeight) / 2)
+  return Math.max(0, Math.round(cardOffset - slack))
+}

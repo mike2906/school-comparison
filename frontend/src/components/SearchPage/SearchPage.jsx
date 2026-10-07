@@ -24,7 +24,7 @@ import { AGE_GROUP_KEYS } from '../../utils/education'
 import { getLanguageFocusPairs } from '../../utils/schoolAttributes'
 import { matchesAdvancedFilters, matchesSchoolType } from '../../utils/advancedFilters'
 import { getNvoDetail } from '../../utils/nvo'
-import { LIST_PAGE_SIZE, windowForIndex } from '../../utils/listWindow'
+import { LIST_PAGE_SIZE, windowForIndex, scrollTopToCenter } from '../../utils/listWindow'
 import { canonicalLanguagePair, languageKey, languageLabel } from '../../utils/languages'
 
 const uniqueCanonical = (values, canonical) => (
@@ -1017,7 +1017,13 @@ function SearchPage() {
   // the top sentinel is not seen at the old scroll position.
   const listWindowMovedRef = useRef(false)
   useLayoutEffect(() => {
-    if (!selectedSchoolId || !scrollOnSelectRef.current) return
+    if (!selectedSchoolId) {
+      // A scroll still waiting for the hidden list must not fire for a later selection.
+      scrollOnSelectRef.current = false
+      listWindowMovedRef.current = false
+      return
+    }
+    if (!scrollOnSelectRef.current) return
     // A school picked on the map may be outside the rendered cards: render around it first.
     const index = sortedSchools.findIndex(school => school.id === selectedSchoolId)
     const nextWindow = windowForIndex(index, { start: visibleStart, end: visibleCount })
@@ -1027,14 +1033,32 @@ function SearchPage() {
       setVisibleCount(nextWindow.end)
       return
     }
-    const node = document.querySelector(`[data-school-id="${selectedSchoolId}"]`)
+    const list = listScrollRef.current
+    // The list is hidden (mobile Map tab, map-only view): scroll once it is shown again.
+    if (!list || list.clientHeight === 0) {
+      listWindowMovedRef.current = true
+      return
+    }
+    const node = list.querySelector(`[data-school-id="${selectedSchoolId}"]`)
     if (node) {
-      // Different cards are now under the old scroll position: nothing to scroll through.
-      node.scrollIntoView({ behavior: listWindowMovedRef.current ? 'auto' : 'smooth', block: 'center' })
+      // Scroll the list itself: scrollIntoView also moves the page under it.
+      const listRect = list.getBoundingClientRect()
+      const cardRect = node.getBoundingClientRect()
+      list.scrollTo({
+        top: scrollTopToCenter({
+          scrollTop: list.scrollTop,
+          listTop: listRect.top,
+          listHeight: list.clientHeight,
+          cardTop: cardRect.top,
+          cardHeight: cardRect.height,
+        }),
+        // Different cards are now under the old scroll position: nothing to scroll through.
+        behavior: listWindowMovedRef.current ? 'auto' : 'smooth',
+      })
     }
     listWindowMovedRef.current = false
     scrollOnSelectRef.current = false
-  }, [selectedSchoolId, sortedSchools, visibleStart, visibleCount])
+  }, [selectedSchoolId, sortedSchools, visibleStart, visibleCount, mobileTab, viewMode])
 
   // New results start at the top with the first page (not on map panning).
   const listKey = JSON.stringify([filters, sortBy, nameQuery, distanceFilter])
@@ -1677,7 +1701,7 @@ function SearchPage() {
 
   return (
     <Layout hideNavOnMobile hideFooter>
-      <div className="h-[100dvh] lg:h-[calc(100dvh-64px)] flex flex-col">
+      <div className="h-[100dvh] lg:h-[calc(100dvh-65px)] flex flex-col">
         <h1 className="sr-only">{t('welcome.title')}</h1>
         {/* Mobile/Tablet Header */}
         <div className="lg:hidden border-b border-neutral-200 bg-white">

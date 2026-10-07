@@ -401,6 +401,10 @@ function MapClickHandler({ onClearSelection, markerInteractionRef }) {
       if (target?.closest?.('.map-bottom-sheet')) return
       onClearSelection?.()
     },
+    // Leaflet closes the popup on Esc; a pin left selected without it cannot be reopened.
+    keydown: (event) => {
+      if (event.originalEvent?.key === 'Escape') onClearSelection?.()
+    },
   })
 
   return null
