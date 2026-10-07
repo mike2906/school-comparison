@@ -31,7 +31,9 @@ const FALLBACK_BOUNDS = L.latLngBounds([41.235, 22.357], [44.216, 28.887])
 const SINGLE_POINT_ZOOM = 13
 // Pins are shown one by one from this zoom; at 14 they still overlap heavily in the centre.
 const UNCLUSTERED_ZOOM = 15
-const MAX_FIT_ZOOM = 14
+// A fit may zoom in until pins show one by one: stopping a level short left a school's
+// two nearby locations as a "2" cluster after searching for it by name.
+const MAX_FIT_ZOOM = UNCLUSTERED_ZOOM
 const FIT_PADDING = [60, 60]
 const MARKER_CLICK_GUARD_MS = 350
 // Room a clicked pin needs around it (px) to stay where it is: the popup opens above it
