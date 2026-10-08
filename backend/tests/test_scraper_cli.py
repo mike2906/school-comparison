@@ -159,6 +159,57 @@ def test_infer_age_group_evidence_from_source_pages_detects_all_through_school_s
     assert set(evidence) == {"preschool", "grade_1_4", "grade_5_7", "grade_8_12"}
 
 
+@pytest.mark.parametrize(
+    "text",
+    [
+        # 122 ОУ, 53 ОУ: the certificate a first-grader brings at enrolment.
+        "родителят представя: Оригинал на удостоверение за завършена подготвителна група. Копие на акта за раждане.",
+        # 129 ОУ: first-grade ranking criteria.
+        "4. деца, завършили подготвителна група в избраното училище; 5. дете от семейство с повече от две деца",
+        # СУ Годеч: first-grade enrolment declaration.
+        "декларация на родителя, с която удостоверява, че детето не е посещавало подготвителна група.",
+        # 107 ОУ (school 263).
+        "**Училището не организира предучилищни групи.** Във 2., 3., 4. клас при наличие на свободни места",
+        # ЧОУ Образователни технологии (school 381): partner kindergartens.
+        "Прочети повече... Партньори за предучилищни групи Детска градина и ясла в кв. Слатина",
+        # State-funding rule quoted by private schools (schools 350, 517, 633).
+        "минимален праг от 20 на сто се формира от общия брой на приеманите деца в подготвителна група и от",
+        "общия брой на приеманите деца и ученици в подготвителна група и първи клас в училището",
+    ],
+)
+def test_infer_age_group_evidence_ignores_preschool_mentions_that_are_not_an_offer(text):
+    page = SourcePage(
+        school_id=1,
+        scrape_type=ScrapeType.WEBSITE,
+        source_url="https://example.bg/priem",
+        content_hash="a" * 64,
+        raw_markdown=text,
+    )
+
+    assert "preschool" not in scraper_cli._infer_age_group_evidence_from_source_pages([page])
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Училището предлага: Целодневна подготвителна група за 5 и 6-годишни – от 7.00 до 19.00 часа",
+        "* [Прием] * [Прием в подготвителна група] * [Прием в I клас]",
+        # A real offer still counts when the same page also lists the certificate.
+        "Удостоверение за завършена подготвителна група. Прием в подготвителна група за 2025/2026 година",
+    ],
+)
+def test_infer_age_group_evidence_keeps_preschool_offers(text):
+    page = SourcePage(
+        school_id=1,
+        scrape_type=ScrapeType.WEBSITE,
+        source_url="https://example.bg/priem",
+        content_hash="a" * 64,
+        raw_markdown=text,
+    )
+
+    assert "preschool" in scraper_cli._infer_age_group_evidence_from_source_pages([page])
+
+
 def test_should_refresh_age_group_navigation_for_upper_secondary_missing_primary_stages():
     school = School(
         name_i18n={"bg": '21 СРЕДНО УЧИЛИЩЕ "ХРИСТО БОТЕВ"'},
