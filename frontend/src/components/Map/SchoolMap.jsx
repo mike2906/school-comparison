@@ -533,7 +533,7 @@ function MapOverlayNavigator({ overlaySchoolId, overlayLocations, focusLocation,
   return null
 }
 
-function MapSelectionPan({ marker, mapPickedSchoolIdRef, restoredSchoolIdRef, getPinRoom }) {
+function MapSelectionPan({ marker, mapPickedSchoolIdRef, restoredSelectionRef, getPinRoom }) {
   const map = useMap()
   const markerKey = marker?.key
   const schoolId = marker?.school?.id
@@ -546,9 +546,14 @@ function MapSelectionPan({ marker, mapPickedSchoolIdRef, restoredSchoolIdRef, ge
     mapPickedSchoolIdRef.current = null
     if (markerKey == null) return
     // Back from a school page: the map is where the parent left it, selection included.
-    // The ref is kept while that school stays selected (effects run twice in StrictMode).
-    if (restoredSchoolIdRef.current !== schoolId || pickedOnMap === schoolId) restoredSchoolIdRef.current = null
-    if (restoredSchoolIdRef.current === schoolId) return
+    // Kept for as long as that pin stays the selected one (effects run twice in StrictMode).
+    const restored = restoredSelectionRef.current
+    if (restored && restored.schoolId === schoolId && pickedOnMap !== schoolId
+      && (restored.markerKey ?? markerKey) === markerKey) {
+      restored.markerKey = markerKey
+      return
+    }
+    restoredSelectionRef.current = null
     // The room is measured when the selection changes; resizing the window must not pan.
     const room = getPinRoom()
     // A pin clicked on the map is already in view; moving the map under the cursor reads
@@ -556,7 +561,7 @@ function MapSelectionPan({ marker, mapPickedSchoolIdRef, restoredSchoolIdRef, ge
     if (pickedOnMap === schoolId
       && pinHasRoom(map.latLngToContainerPoint([lat, lng]), map.getSize(), room)) return
     panPinIntoRoom(map, [lat, lng], room)
-  }, [markerKey, schoolId, lat, lng, map, mapPickedSchoolIdRef, restoredSchoolIdRef, getPinRoom])
+  }, [markerKey, schoolId, lat, lng, map, mapPickedSchoolIdRef, restoredSelectionRef, getPinRoom])
 
   return null
 }
@@ -851,6 +856,7 @@ const OverlayLocationMarker = memo(function OverlayLocationMarker({
   activeAgeGroup,
   labelMode = 'age',
   showPopup,
+  addressShown,
   t,
   language,
   userLocation,
@@ -920,7 +926,7 @@ const OverlayLocationMarker = memo(function OverlayLocationMarker({
       {/* Popup and tooltip go in Leaflet's own panes: inside the overlay pane the other
           location markers are drawn over them. The popup or the sheet of the selected
           location already has the address. */}
-      {fullLabel && !isSelected && (
+      {fullLabel && !(isSelected && addressShown) && (
         <Tooltip pane="tooltipPane" direction="top" offset={[0, -14]} opacity={0.9} sticky>
           {fullLabel}
         </Tooltip>
@@ -1054,7 +1060,7 @@ function SchoolMap({
 
   const mapPickedSchoolIdRef = useRef(null)
   // The school that was selected when a saved view was restored (see MapSelectionPan).
-  const restoredSchoolIdRef = useRef(initialView ? selectedSchoolId : null)
+  const restoredSelectionRef = useRef(initialView && selectedSchoolId ? { schoolId: selectedSchoolId, markerKey: null } : null)
   // The pin that was clicked, so a school with several locations highlights that one.
   const [pickedMarker, setPickedMarker] = useState(null)
   const handleMarkerSelect = useCallback((school, marker) => {
@@ -1292,6 +1298,7 @@ function SchoolMap({
                   activeAgeGroup={activeAgeGroup}
                   labelMode={overlayFocusLabels ? 'focus' : 'number'}
                   showPopup={showPopups}
+                  addressShown={showPopups || Boolean(sheetMarker)}
                   t={t}
                   language={i18n.language}
                   userLocation={userLocation}
@@ -1339,7 +1346,7 @@ function SchoolMap({
         <MapSelectionPan
           marker={selectedMarker}
           mapPickedSchoolIdRef={mapPickedSchoolIdRef}
-          restoredSchoolIdRef={restoredSchoolIdRef}
+          restoredSelectionRef={restoredSelectionRef}
           getPinRoom={getPinRoom}
         />
         <MapOverlayNavigator
@@ -1559,7 +1566,7 @@ function SchoolMap({
         )}
       </div>
 
-      {overlaySchool && !sheetMarker && (
+      {overlaySchool && !(sheetMarker && overlayActiveOnMap) && (
         <div
           ref={overlayPanelRef}
           className="absolute top-4 left-4 max-w-[calc(100%-2rem)] bg-white/95 backdrop-blur rounded-lg shadow-panel p-3 z-[1000]"

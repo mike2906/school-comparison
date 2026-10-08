@@ -1,6 +1,6 @@
 import { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link, useSearchParams, useNavigate, useLocation } from 'react-router-dom'
+import { Link, useSearchParams, useNavigate, useNavigationType, useLocation } from 'react-router-dom'
 import debounce from 'lodash.debounce'
 import { useStableCallback } from '../../hooks/useStableCallback'
 import Layout from '../Layout/Layout'
@@ -74,6 +74,7 @@ function SearchPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
   const location = useLocation()
+  const navigationType = useNavigationType()
   // View state lives in the URL so it survives opening a school and coming back.
   const [initialView] = useState(() => readViewParams(searchParams))
   const [savedViewState] = useState(() => readSavedViewState(location.key, location.search))
@@ -117,6 +118,7 @@ function SearchPage() {
   const pendingWritesRef = useRef([])
   const adoptingUrlRef = useRef(false)
   const lastDetailIdRef = useRef(detailSchoolId)
+  const closingDetailRef = useRef(false)
   const [agePickerOpen, setAgePickerOpen] = useState(false)
   const [welcomeDismissed, setWelcomeDismissed] = useState(() => {
     try {
@@ -287,8 +289,13 @@ function SearchPage() {
   // Runs before the state-to-URL sync below, which then skips this commit: it would
   // otherwise write the old state over the URL we are adopting.
   useEffect(() => {
-    const closedDetailId = detailSchoolId ? null : lastDetailIdRef.current
+    // The panel was closed (its button, Esc or browser Back), as opposed to a link that
+    // leaves for another search, such as the logo.
+    const closedDetailId = !detailSchoolId && (closingDetailRef.current || navigationType === 'POP')
+      ? lastDetailIdRef.current
+      : null
     lastDetailIdRef.current = detailSchoolId
+    closingDetailRef.current = false
     const pendingIndex = pendingWritesRef.current.indexOf(location.search)
     if (pendingIndex >= 0) {
       // Our own write landing (earlier ones may have been skipped): nothing to adopt.
@@ -432,6 +439,7 @@ function SearchPage() {
   })
 
   const handleCloseDetails = useStableCallback(() => {
+    closingDetailRef.current = true
     // Opened from these results: step back to them. Opened from a link: just drop the param.
     if (location.state?.detailPushed) {
       navigate(-1)
