@@ -1,6 +1,6 @@
 ---
 name: common-tasks
-description: Step-by-step recipes for routine dev tasks in this repo — add a route/column/translation, seed, run the app, import NVO, print the data-quality scoreboard. Use when performing one of these tasks.
+description: Step-by-step recipes for routine dev tasks in this repo — add a route/column/translation, seed, run the app, import NVO, print the data-quality scoreboard, publish data to production. Use when performing one of these tasks.
 ---
 
 # Common Tasks Skill
@@ -70,6 +70,27 @@ Optional filters:
 - `--school-id 123` for a targeted import
 
 NVO import is independent of the website pipeline — it is not part of `all`.
+
+## Publish data to production
+
+Production serves a copy of the launch DB. A change there (import, correction, merge) is
+not on the site until it is published:
+
+```bash
+backend/scripts/backup_offsite.sh        # uploads the launch DB; the output names the dump
+gh workflow run deploy.yml -f snapshot=sofia_schools-<stamp>.dump
+```
+
+The run loads the dump on the host (backup first, automatic restore on failure) and rebuilds
+the site; the API is down for about a minute. Wait for it in one background command, then
+check the run summary (`schools: <before> -> <after>`) and the live API against the launch DB
+(e.g. the school count from `https://api.schooldecider.com/schools?country_code=bg&city=sofia`).
+A green run alone is not proof: verify the data. Details and the manual fallback:
+`deploy/README.md` → Data publish.
+
+Publish only launch-DB changes that were themselves allowed (the one-off data-fix exception in
+`skills/github-process/SKILL.md`, or approved by Mike), and report each publish to Mike with
+the dump name and the before/after counts. A publish whose diff you cannot explain goes to Mike.
 
 ## Data-quality scoreboard
 ```bash

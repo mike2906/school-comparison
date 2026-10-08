@@ -76,7 +76,8 @@ when the user explicitly asks for that.
    waiting when it has evidence for the fix (e.g. the source page states the value),
    has taken a `pg_dump` backup in the same session, and has checked the effect with a
    dry run or a `WHERE`-guarded statement that returns the changed rows. Report each fix
-   to Mike (what changed, why, backup path). Bulk promotions and anything that changes
+   to Mike (what changed, why, backup path). The fix reaches the site only when it is
+   published (`skills/common-tasks/SKILL.md` → Publish data to production). Bulk promotions and anything that changes
    what the publish gates allow still wait for Mike.
 9. Otherwise follow Mike's direction after independent pre-review. **When Mike says merge, merge** once
    CI is green and the PR is mergeable. Do not request another review first, even if the
