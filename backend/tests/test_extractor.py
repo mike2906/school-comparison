@@ -4633,3 +4633,63 @@ async def test_reextraction_is_not_held_for_a_fee_the_page_no_longer_shows(
 
     assert result.get("held") is None
     assert [row[:2] for row in await _stored(db_session, school)] == [("tuition", 530.0)]
+
+
+def test_pricing_selection_prefers_a_page_that_states_prices_over_preferred_categories():
+    """The school 568 shape: an uncategorised fee.html lost all four slots to
+    admission/contact/home pages, so its fee table never reached the model."""
+    pages = [
+        SourcePage(source_url="https://example-school.bg/admission.html", page_category="admission", raw_markdown="Прием на ученици. " * 20),
+        SourcePage(source_url="https://example-school.bg/contact.html", page_category="contact", raw_markdown="Контакти и адрес. " * 20),
+        SourcePage(source_url="https://example-school.bg", page_category="about", raw_markdown="Начало. " * 20),
+        SourcePage(source_url="https://example-school.bg/apply.html", page_category="admission", raw_markdown="Кандидатстване. " * 20),
+        SourcePage(source_url="https://example-school.bg/team.html", page_category="contact", raw_markdown="Екип и телефон. " * 20),
+        SourcePage(
+            source_url="https://example-school.bg/fee.html",
+            page_category=None,
+            raw_markdown="Годишна такса за учебната 2026/2027 г.\nПГ | EUR 8950 | EUR 9300\nVIII - XII клас | EUR 6700 | EUR 7050",
+        ),
+    ]  # fmt: skip
+
+    selected_text, source_urls = _select_pricing_pages(pages)
+
+    assert source_urls[0] == "https://example-school.bg/fee.html"
+    assert "EUR 6700" in selected_text
+
+
+def test_pricing_selection_counts_url_spellings_of_one_page_once():
+    """`http://host` and `http://host/` (or an escaped and a decoded path) are one page;
+    the newest crawl is the one kept."""
+    old = datetime.datetime(2026, 2, 1, tzinfo=datetime.UTC)
+    new = datetime.datetime(2026, 7, 1, tzinfo=datetime.UTC)
+    pages = [
+        SourcePage(source_url="http://example-school.bg/", page_category="contact", raw_markdown="Начало старо", last_scraped_at=old),
+        SourcePage(source_url="https://www.example-school.bg", page_category="contact", raw_markdown="Начало ново", last_scraped_at=new),
+        SourcePage(source_url="https://example-school.bg/%D1%82%D0%B0%D0%BA%D1%81%D0%B8", page_category="pricing", raw_markdown="Такса 500 евро", last_scraped_at=old),
+        SourcePage(source_url="https://example-school.bg/такси/", page_category="pricing", raw_markdown="Такса 600 евро", last_scraped_at=new),
+    ]  # fmt: skip
+
+    selected_text, source_urls = _select_pricing_pages(pages)
+
+    assert source_urls == ["https://example-school.bg/такси/", "https://www.example-school.bg"]
+    assert "600 евро" in selected_text and "500 евро" not in selected_text
+    assert "Начало старо" not in selected_text
+
+
+def test_long_pricing_page_is_cut_to_its_fee_section_not_its_head(monkeypatch):
+    settings = extractor_module.helpers.get_settings()
+    monkeypatch.setattr(settings, "extraction_max_content_chars", 4000, raising=False)
+    fees = "Такса обучение I - IV клас 7000 евро\nТакса обучение V - VII клас 7500 евро\n"
+    pages = [
+        SourcePage(
+            source_url="https://example-school.bg/taksi",
+            page_category="pricing",
+            raw_markdown=("Меню и навигация. " * 500) + fees + ("Общи условия. " * 500),
+        )
+    ]
+
+    selected_text, _ = _select_pricing_pages(pages)
+
+    assert selected_text.startswith("--- SOURCE: https://example-school.bg/taksi ---\n")
+    assert "7000 евро" in selected_text and "7500 евро" in selected_text
+    assert len(selected_text) <= 4000

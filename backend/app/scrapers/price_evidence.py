@@ -122,6 +122,11 @@ def price_spans(text: str) -> list[tuple[int, int]]:
     return sorted(spans)
 
 
+def currency_price_starts(text: str) -> list[int]:
+    """Start offsets of the prices written with a currency (bare numbers do not count)."""
+    return [m.start() for m in _PRICE_RE.finditer(text)]
+
+
 def _has_words(text: str) -> bool:
     return bool(re.search(r"[^\W\d_]{2,}", re.sub(_CURRENCY, " ", text, flags=re.IGNORECASE)))
 
