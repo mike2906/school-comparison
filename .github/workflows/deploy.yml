@@ -188,9 +188,18 @@ jobs:
           : "${R2_ACCOUNT_ID:?}" "${R2_ACCESS_KEY_ID:?}" "${R2_SECRET_ACCESS_KEY:?}"
           SNAPSHOT_FILE="$RUNNER_TEMP/snapshot.dump"
           echo "SNAPSHOT_FILE=$SNAPSHOT_FILE" >> "$GITHUB_ENV"
-          curl --fail --silent --show-error --aws-sigv4 "aws:amz:auto:s3" \
-            --user "$R2_ACCESS_KEY_ID:$R2_SECRET_ACCESS_KEY" -o "$SNAPSHOT_FILE" \
-            "${R2_ENDPOINT:-https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com}/$SNAPSHOT_BUCKET/$SNAPSHOT"
+          status="$(curl --silent --show-error --aws-sigv4 "aws:amz:auto:s3" \
+            --user "$R2_ACCESS_KEY_ID:$R2_SECRET_ACCESS_KEY" -o "$SNAPSHOT_FILE" -w '%{http_code}' \
+            "${R2_ENDPOINT:-https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com}/$SNAPSHOT_BUCKET/$SNAPSHOT")"
+          if [ "$status" != 200 ]; then
+            # The body is then R2's error document. Only its code and message are shown:
+            # e.g. AccessDenied (token scope), SignatureDoesNotMatch (wrong secret),
+            # InvalidAccessKeyId, NoSuchKey (wrong snapshot name).
+            field() { grep -o "<$1>[^<]*</$1>" "$SNAPSHOT_FILE" | head -n 1 | sed 's/<[^>]*>//g' || true; }
+            echo "::error::Snapshot download failed: HTTP $status $(field Code) $(field Message)"
+            rm -f "$SNAPSHOT_FILE"
+            exit 1
+          fi
           echo "Snapshot $SNAPSHOT: $(stat -c %s "$SNAPSHOT_FILE") bytes"
 
       # The host backs up the current data, loads the snapshot in one transaction, migrates
