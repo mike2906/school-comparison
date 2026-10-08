@@ -4693,3 +4693,76 @@ def test_long_pricing_page_is_cut_to_its_fee_section_not_its_head(monkeypatch):
     assert selected_text.startswith("--- SOURCE: https://example-school.bg/taksi ---\n")
     assert "7000 евро" in selected_text and "7500 евро" in selected_text
     assert len(selected_text) <= 4000
+
+
+def _model_price(**fields):
+    return ExtractedPrice(currency="EUR", confidence=0.9, **fields)
+
+
+def test_model_row_keeps_its_category_under_an_unrelated_heading():
+    """School 404: the admission-steps heading above the fee list carried "registration"
+    onto every tuition line, and the heading outranked the model."""
+    text = """
+    --- SOURCE: https://school.test/priem-i-taksi ---
+    Необходими документи за записване и регистрация
+    Договор и заплащане
+    За ученици от 1 до 3 клас: 6 750 евро / година / девет вноски
+    За ученици от 4 до 7 клас: 7 500 евро / година / десет вноски
+    """
+    rows = [
+        _model_price(category="tuition", amount=6750, period="yearly", plan_name="Ученици от 1 до 3 клас"),
+        _model_price(category="tuition", amount=7500, period="yearly", plan_name="Ученици от 4 до 7 клас"),
+    ]  # fmt: skip
+
+    refined = extractor_module.helpers._filter_supported_prices(rows, text, model_rows=True)
+
+    assert [(row.category, row.amount, row.period) for row in refined] == [
+        ("tuition", 6750, "yearly"),
+        ("tuition", 7500, "yearly"),
+    ]
+    # The keyword extractor's rows still take the heading's category.
+    by_keywords = extractor_module.helpers._filter_supported_prices(rows, text)
+    assert {row.category for row in by_keywords} == {"registration"}
+
+
+def test_model_row_is_supported_by_a_price_line_with_no_fee_word():
+    """School 529: "€ 6.540" stands under a level name; no line near it says what fee."""
+    text = """
+    --- SOURCE: https://school.test/uchebni-taksi ---
+    Правилник за учебната 2026/2027 година
+    Предучилищна
+    € 6.540
+    Гимназия
+    € 6.740
+    """
+    rows = [
+        _model_price(category="tuition", amount=6540, period="yearly", academic_year="2026/2027", plan_name="Предучилищна"),
+        _model_price(category="tuition", amount=6740, period="yearly", academic_year="2026/2027", plan_name="Гимназия"),
+        _model_price(category="tuition", amount=9999, period="yearly", plan_name="Гимназия"),
+    ]  # fmt: skip
+
+    refined = extractor_module.helpers._filter_supported_prices(rows, text, model_rows=True)
+
+    # Both amounts on the page are kept; the period the page does not state is cleared;
+    # an amount that is not on the page is still dropped.
+    assert [(row.category, row.amount, row.period) for row in refined] == [
+        ("tuition", 6540, None),
+        ("tuition", 6740, None),
+    ]
+    assert extractor_module.helpers._filter_supported_prices(rows, text) == []
+
+
+def test_model_row_category_is_still_corrected_by_its_own_line():
+    text = "--- SOURCE: https://school.test/fees ---\nSchool bus service EUR 1,200 per year"
+    row = _model_price(category="tuition", amount=1200, period="yearly")
+
+    refined = extractor_module.helpers._filter_supported_prices([row], text, model_rows=True)
+
+    assert [(r.category, r.amount) for r in refined] == [("transport", 1200)]
+
+
+def test_model_row_for_a_total_fee_line_is_withheld():
+    text = "--- SOURCE: https://school.test/fees ---\nTuition Fee EUR 10,000\nCapital Fee EUR 2,000\nTotal Fee EUR 12,000"
+    row = _model_price(category="tuition", amount=12000, period="yearly", plan_name="Total Fee")
+
+    assert extractor_module.helpers._filter_supported_prices([row], text, model_rows=True) == []

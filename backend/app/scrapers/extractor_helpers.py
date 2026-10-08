@@ -1571,7 +1571,17 @@ def _period_on_following_line(lines: list[str], line_index: int) -> str | None:
     return _detect_explicit_price_period(following)
 
 
-def _iter_price_line_signals(text: str) -> list[dict[str, Any]]:
+def _iter_price_line_signals(
+    text: str, *, include_uncategorized: bool = False
+) -> list[dict[str, Any]]:
+    """One signal per price line: amount, currency and what the text around it says.
+
+    ``category_on_line`` is False when the category only comes from an earlier heading.
+    A heading is weak evidence: on school 404 the admission-steps heading above the fee
+    list made every tuition line "registration". A line with no category at all yields a
+    signal only with ``include_uncategorized`` (school 529's "€ 6.540" rows sit under
+    level names, with no fee word near them).
+    """
     lines = [_clean_price_line(raw) for raw in re.split(r"[\n\r]+", text) if _clean_price_line(raw)]
     if not lines:
         return []
@@ -1658,8 +1668,9 @@ def _iter_price_line_signals(text: str) -> list[dict[str, Any]]:
         )
         if _is_penalty_price_line(semantic_line):
             continue
-        row_category = _detect_price_category(semantic_line) or current_category
-        if row_category is None:
+        line_category = _detect_price_category(semantic_line)
+        row_category = line_category or current_category
+        if row_category is None and not include_uncategorized:
             continue
 
         row_age_group = _detect_price_age_group(line) or current_age_group
@@ -1688,6 +1699,7 @@ def _iter_price_line_signals(text: str) -> list[dict[str, Any]]:
                 "amount": line_amount,
                 "currency": line_currency or "BGN",
                 "category": row_category,
+                "category_on_line": line_category is not None,
                 "period": row_period,
                 "academic_year": row_year,
                 "age_group": row_age_group,
@@ -2214,11 +2226,20 @@ def _pricing_source_staleness(text: str) -> dict[str | None, bool]:
     return staleness
 
 
-def _filter_supported_prices(prices: list[ExtractedPrice], text: str) -> list[ExtractedPrice]:
+def _filter_supported_prices(
+    prices: list[ExtractedPrice], text: str, *, model_rows: bool = False
+) -> list[ExtractedPrice]:
+    """Keep the rows whose amount a price line in ``text`` supports, corrected by that line.
+
+    ``model_rows`` marks rows a model read from the whole page, as opposed to the keyword
+    extractor's. A model row already has a category, so a price line with no fee word
+    near it still supports the row, and only a fee word on the amount's own line corrects
+    the category (a heading further up does not).
+    """
     if not prices or not text:
         return []
 
-    signals = _iter_price_line_signals(text)
+    signals = _iter_price_line_signals(text, include_uncategorized=model_rows)
     if not signals:
         return []
 
@@ -2239,6 +2260,8 @@ def _filter_supported_prices(prices: list[ExtractedPrice], text: str) -> list[Ex
         ]
         if not candidates:
             continue
+        # A line that names its category is better support than one that does not.
+        candidates = [signal for signal in candidates if signal["category"]] or candidates
         academic_year = _normalize_academic_year(price.academic_year)
         if academic_year:
             candidates = [
@@ -2289,9 +2312,15 @@ def _filter_supported_prices(prices: list[ExtractedPrice], text: str) -> list[Ex
         supporting_signal = best_signals[0]
         if "total fee" in str(supporting_signal.get("section_heading") or "").casefold():
             continue
+        if model_rows and "total fee" in str(supporting_signal.get("line") or "").casefold():
+            continue
 
         normalized = price.model_copy(deep=True)
-        if supporting_signal.get("category"):
+        # The amount's own line may correct the model's category; a category carried
+        # down from an earlier heading may not.
+        if supporting_signal.get("category") and (
+            supporting_signal.get("category_on_line") or not model_rows
+        ):
             normalized.category = supporting_signal["category"]
         # Evidence is authoritative in both directions: an explicit supported
         # period corrects the model, and absent period evidence clears a guess.
@@ -2309,6 +2338,8 @@ def _find_supporting_price_source_url(
     school: School,
     pages: list[SourcePage],
     price: ExtractedPrice,
+    *,
+    model_rows: bool = False,
 ) -> str | None:
     amount = _to_optional_float(price.amount)
     if amount is None:
@@ -2331,7 +2362,7 @@ def _find_supporting_price_source_url(
     for page in candidate_pages:
         page_text = page.raw_markdown or ""
         page_context = f"--- SOURCE: {page.source_url} ---\n{page_text}"
-        supported = _filter_supported_prices([price], page_context)
+        supported = _filter_supported_prices([price], page_context, model_rows=model_rows)
         if any(
             row.category == price.category
             and row.period == price.period

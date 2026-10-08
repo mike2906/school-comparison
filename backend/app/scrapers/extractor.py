@@ -1048,7 +1048,7 @@ def _build_display_name_evidence(
 
 
 def _supported_price_rows(
-    prices: list[ExtractedPrice], selected_text: str
+    prices: list[ExtractedPrice], selected_text: str, *, model_rows: bool = False
 ) -> list[ExtractedPrice]:
     """Evidence-filter then de-duplicate extracted price rows.
 
@@ -1057,7 +1057,9 @@ def _supported_price_rows(
     """
     if not prices:
         return []
-    return helpers._dedupe_price_rows(helpers._filter_supported_prices(prices, selected_text))
+    return helpers._dedupe_price_rows(
+        helpers._filter_supported_prices(prices, selected_text, model_rows=model_rows)
+    )
 
 
 def _normalized_price_fields(extracted: ExtractedPrice) -> dict[str, Any] | None:
@@ -1191,7 +1193,9 @@ async def _extract_prices(
         "- Payment schedules: when one fee has multiple payment options (full pay / 2 installments / 10 monthly), emit ONE row with the full-payment amount as `amount` and list the other options as strings in `installments` (e.g. '€8,100 – 2 installments'). Do NOT emit separate rows for the installment amounts.\n"
         "- Set `period` only when the source explicitly states the fee period or represents it unambiguously (for example 'per year', 'monthly fee', or 'per term'). Otherwise set `period` to null. An academic year, fee category, amount, school type, installment count, or payment frequency does NOT by itself establish the fee period.\n"
         "- Distinct tiers: when multiple tiers exist (e.g. 'Bulgarian students' vs 'International students', different grade bands, different meal plans like breakfast vs full-day), emit SEPARATE rows and set `plan_name` to the tier label from the page. `plan_name` must be populated whenever multiple rows share the same category/period/age_group on one page.\n"
+        "- Discounts: an amount after an early-payment, full-payment, sibling or loyalty discount is NOT a separate fee. Emit the undiscounted fee as the row and list the discounted amounts as strings in `discounts`.\n"
         "- Set `age_group` when the page specifies it (grade range, preschool, nursery, etc.).\n"
+        "- Copy `plan_name` and `age_group` from the page in the page's own words and language. Do not translate or paraphrase them.\n"
         "- Set `academic_year` when the page specifies it (e.g. '2025/2026').\n"
         "\n"
         "If no concrete pricing exists, return has_pricing_info=false and prices=[]."
@@ -1232,7 +1236,9 @@ async def _extract_prices(
         parsed = deterministic_pricing
         used_deterministic_pricing = True
 
-    supported_prices = _supported_price_rows(parsed.prices, selected_text)
+    supported_prices = _supported_price_rows(
+        parsed.prices, selected_text, model_rows=not used_deterministic_pricing
+    )
     if supported_prices:
         parsed = parsed.model_copy(update={"prices": supported_prices, "has_pricing_info": True})
     elif deterministic_pricing.has_pricing_info:
@@ -1286,7 +1292,9 @@ async def _extract_prices(
         normalized_installments = helpers._normalize_text_list(extracted.installments)
         normalized_includes = helpers._normalize_text_list(extracted.includes)
         normalized_excludes = helpers._normalize_text_list(extracted.excludes)
-        row_source_url = helpers._find_supporting_price_source_url(school, pages, extracted)
+        row_source_url = helpers._find_supporting_price_source_url(
+            school, pages, extracted, model_rows=not used_deterministic_pricing
+        )
         if not row_source_url:
             continue
         supporting_page = next(
