@@ -8,7 +8,6 @@ import logging
 import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from math import ceil
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlparse
 
@@ -775,7 +774,13 @@ class WebsiteNavigator:
         *,
         max_concurrency: int = 3,
     ) -> dict[str, BatchDiscoverOutcome]:
-        """Discover pages for many school websites using chunked Crawl4AI arun_many."""
+        """Discover pages for many school websites, ``max_concurrency`` sites at a time.
+
+        Each site gets its own :meth:`discover_pages` crawl. crawl4ai 0.9's ``arun_many``
+        returns a deep crawl's pages as one flat list with one page budget for all the
+        seed URLs, so it cannot tell which site a page belongs to: a one-school run kept
+        only the home page, and a second school got none.
+        """
         if not website_urls:
             return {}
 
@@ -788,129 +793,22 @@ class WebsiteNavigator:
             normalized_urls.append(normalized)
             seen.add(normalized)
 
-        if not normalized_urls:
-            return {}
-
         concurrency = max(1, int(max_concurrency))
         outcomes: dict[str, BatchDiscoverOutcome] = {}
 
         for chunk_start in range(0, len(normalized_urls), concurrency):
             chunk_urls = normalized_urls[chunk_start : chunk_start + concurrency]
-            try:
-                chunk_outcomes = await self._discover_pages_many_chunk(
-                    chunk_urls,
-                    max_concurrency=min(concurrency, len(chunk_urls)),
-                )
-            except Exception as exc:
-                logger.warning(
-                    "arun_many failed for %s-school chunk; falling back to sequential discover_pages: %s",
-                    len(chunk_urls),
-                    exc,
-                )
-                chunk_outcomes = await self._discover_pages_sequentially(chunk_urls)
-
-            outcomes.update(chunk_outcomes)
+            chunk_outcomes = await asyncio.gather(*(self._discover_outcome(url) for url in chunk_urls))
+            outcomes.update(zip(chunk_urls, chunk_outcomes))
 
         return outcomes
 
-    async def _discover_pages_sequentially(
-        self,
-        website_urls: list[str],
-    ) -> dict[str, BatchDiscoverOutcome]:
-        outcomes: dict[str, BatchDiscoverOutcome] = {}
-        for url in website_urls:
-            try:
-                final_url, pages = await self.discover_pages(url)
-                outcomes[url] = BatchDiscoverOutcome(
-                    seed_url=url,
-                    final_url=final_url,
-                    pages=pages,
-                )
-            except Exception as school_exc:
-                outcomes[url] = BatchDiscoverOutcome(
-                    seed_url=url,
-                    final_url=None,
-                    pages=[],
-                    error=str(school_exc),
-                )
-        return outcomes
-
-    async def _discover_pages_many_chunk(
-        self,
-        website_urls: list[str],
-        *,
-        max_concurrency: int,
-    ) -> dict[str, BatchDiscoverOutcome]:
-        from crawl4ai import AsyncWebCrawler, RateLimiter, SemaphoreDispatcher  # type: ignore
-
-        if not website_urls:
-            return {}
-
-        browser_config = self._build_browser_config()
-        run_configs = [self._build_run_config(url) for url in website_urls]
-        concurrency = max(1, int(max_concurrency))
-        timeout_budget = max(
-            self.CRAWL_TIMEOUT_SECONDS,
-            float(getattr(self.settings, "nav_school_timeout_seconds", self.CRAWL_TIMEOUT_SECONDS))
-            * max(1, ceil(len(website_urls) / concurrency)),
-        )
-        rate_limiter = RateLimiter(
-            base_delay=(0.2, 0.8),
-            max_delay=6.0,
-            max_retries=1,
-            rate_limit_codes=[429, 503],
-        )
-        dispatcher = SemaphoreDispatcher(
-            semaphore_count=concurrency,
-            rate_limiter=rate_limiter,
-        )
-
-        async with AsyncWebCrawler(config=browser_config) as crawler:
-            containers = await asyncio.wait_for(
-                crawler.arun_many(
-                    urls=website_urls,
-                    config=run_configs,
-                    dispatcher=dispatcher,
-                ),
-                timeout=timeout_budget,
-            )
-
-        if not isinstance(containers, list):
-            containers = [containers]
-
-        outcomes: dict[str, BatchDiscoverOutcome] = {}
-        for idx, url in enumerate(website_urls):
-            container = containers[idx] if idx < len(containers) else None
-            if container is None:
-                outcomes[url] = BatchDiscoverOutcome(
-                    seed_url=url,
-                    final_url=None,
-                    pages=[],
-                    error="Missing crawl result container",
-                )
-                continue
-
-            error_message = getattr(container, "error_message", None)
-            try:
-                final_url, pages = self._extract_pages_from_results(
-                    normalized_url=url,
-                    results_obj=container,
-                )
-                outcomes[url] = BatchDiscoverOutcome(
-                    seed_url=url,
-                    final_url=final_url,
-                    pages=pages,
-                    error=str(error_message) if error_message else None,
-                )
-            except Exception as exc:
-                outcomes[url] = BatchDiscoverOutcome(
-                    seed_url=url,
-                    final_url=None,
-                    pages=[],
-                    error=str(exc),
-                )
-
-        return outcomes
+    async def _discover_outcome(self, url: str) -> BatchDiscoverOutcome:
+        try:
+            final_url, pages = await self.discover_pages(url)
+            return BatchDiscoverOutcome(seed_url=url, final_url=final_url, pages=pages)
+        except Exception as exc:
+            return BatchDiscoverOutcome(seed_url=url, final_url=None, pages=[], error=str(exc))
 
 
 async def _persist_navigation_result(
