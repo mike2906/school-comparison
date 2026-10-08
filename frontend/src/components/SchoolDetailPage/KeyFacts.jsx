@@ -212,7 +212,7 @@ function KeyFacts({ school, examAverages, nvoExamType }) {
       {/* As many columns as fit the strip's own width, not the viewport's: in the search
           page's side panel it is half as wide as on the school page. Text is larger from
           `sm` up, so the cards are wider there. */}
-      <div className="grid gap-3 grid-cols-[repeat(auto-fill,minmax(9.5rem,1fr))] sm:grid-cols-[repeat(auto-fill,minmax(13.5rem,1fr))]">
+      <div className="grid gap-3 grid-cols-[repeat(auto-fill,minmax(9.6rem,1fr))] sm:grid-cols-[repeat(auto-fill,minmax(13.5rem,1fr))]">
         {shown}
       </div>
     </section>
