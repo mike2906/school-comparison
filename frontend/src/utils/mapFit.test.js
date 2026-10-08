@@ -107,20 +107,70 @@ test('stackedMarkersByKey ignores a school stacked only on its own locations', (
   assert.equal(stackedMarkersByKey(markers).size, 0)
 })
 
-test('fitKeepRatio fits nearly all of a shortlist and the central half of a whole city', () => {
-  assert.equal(fitKeepRatio(3), 0.95)
-  assert.equal(fitKeepRatio(50), 0.95)
+test('fitKeepRatio leaves out a tenth at the low end and fits the central half of a whole city', () => {
+  // Below 20 points pointsForFit trims nothing, whatever the ratio.
+  assert.equal(fitKeepRatio(3), 0.9)
+  assert.equal(fitKeepRatio(20), 0.9)
   // Sofia, all ages: 710 pins. Fitting 95% of them opened the map as three clusters.
   assert.equal(fitKeepRatio(710), 0.5)
   assert.equal(fitKeepRatio(500), 0.5)
 })
 
 test('fitKeepRatio falls evenly between a shortlist and a city', () => {
-  assert.ok(Math.abs(fitKeepRatio(275) - 0.725) < 1e-9)
-  for (let count = 50; count < 520; count += 1) {
+  assert.ok(Math.abs(fitKeepRatio(260) - 0.7) < 1e-9)
+  for (let count = 20; count < 520; count += 1) {
     const step = fitKeepRatio(count) - fitKeepRatio(count + 1)
     assert.ok(step >= 0 && step <= 0.0011, `step at ${count}: ${step}`)
   }
+})
+
+const fitted = (points) => pointsForFit(points, { distance, keepRatio: fitKeepRatio(points.length) })
+
+test('a handful of schools are all fitted, outliers included', () => {
+  const shortlist = Array.from({ length: 18 }, (_, i) => [42.69 + (i % 5) * 0.01, 23.32 + Math.floor(i / 5) * 0.01])
+  const points = [...shortlist, [42.5, 23.0]]
+  assert.deepEqual(fitted(points), points)
+})
+
+test('one more result adds at most one point to the fit, and never removes one', () => {
+  const line = (length) => Array.from({ length }, (_, i) => [42.4 + i * 0.001, 23.3])
+  for (let count = 1; count < 720; count += 1) {
+    const step = fitted(line(count + 1)).length - fitted(line(count)).length
+    assert.ok(step === 0 || step === 1, `step at ${count}: ${step}`)
+  }
+})
+
+// Private schools in Sofia for grades 8-12 (/search?school_type=private&age_group=grade_8_12),
+// from the public API on 2026-10-08, rounded to 4 decimals. Most are within 7 km of the
+// middle; five are 9 to 15 km out, west and south-east of the city.
+const PRIVATE_GRADE_8_12 = [
+  [42.6705, 23.3483], [42.6503, 23.3356], [42.7101, 23.187], [42.6433, 23.3361], [42.649, 23.3301],
+  [42.6693, 23.3553], [42.6524, 23.3341], [42.6971, 23.321], [42.6738, 23.3131], [42.6458, 23.2721],
+  [42.6491, 23.3367], [42.6988, 23.3258], [42.697, 23.3223], [42.7068, 23.1433], [42.6663, 23.2536],
+  [42.6663, 23.2536], [42.6333, 23.3681], [42.6739, 23.2978], [42.6371, 23.3679], [42.6763, 23.2939],
+  [42.6335, 23.3168], [42.6141, 23.396], [42.6955, 23.3279], [42.7011, 23.2833], [42.6814, 23.2899],
+  [42.6665, 23.3231], [42.6639, 23.3942], [42.6726, 23.3162], [42.6785, 23.357], [42.614, 23.4609],
+  [42.6153, 23.444], [42.6788, 23.3238], [42.6602, 23.2463], [42.6362, 23.3679], [42.6934, 23.3101],
+  [42.6475, 23.2959], [42.6997, 23.3323], [42.6796, 23.3093], [42.6796, 23.3093], [42.7117, 23.2536],
+  [42.6383, 23.3708], [42.7138, 23.2699], [42.6922, 23.2813], [42.6919, 23.3599], [42.6275, 23.3105],
+  [42.6822, 23.368], [42.6817, 23.3136], [42.6474, 23.3564], [42.7218, 23.3052],
+]
+
+const span = (points, axis) => {
+  const values = points.map(point => point[axis])
+  return Math.max(...values) - Math.min(...values)
+}
+
+test('a mid-size result set is fitted to where most of its pins are', () => {
+  // Fitting 95% of them kept three of the five outliers: zoom 10 on a 390px wide phone.
+  const before = pointsForFit(PRIVATE_GRADE_8_12, { distance, keepRatio: 0.95 })
+  const now = fitted(PRIVATE_GRADE_8_12)
+  assert.equal(before.length, 47)
+  assert.equal(now.length, 43)
+  // The fit is not much more than half as wide (degrees of longitude), a zoom level closer.
+  assert.ok(span(before, 1) > 0.25, `before: ${span(before, 1)}`)
+  assert.ok(span(now, 1) < 0.15, `now: ${span(now, 1)}`)
+  assert.ok(now.every(([, lng]) => lng > 23.24 && lng < 23.4))
 })
 
 test('pointsForFit with the city ratio keeps the central half', () => {
