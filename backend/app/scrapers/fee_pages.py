@@ -144,10 +144,11 @@ def html_links(html: str) -> list[Link]:
 
 
 def content_images(html: str, base_url: str) -> list[Link]:
-    """(image URL, alt text) of the page's content pictures, fee-named ones first.
+    """(image URL, alt text) of the page's pictures that may be its fee table.
 
-    Used for a fee page that states no price in its text: the fee table may be one of
-    its pictures. Logos, icons and small images are left out.
+    Used for a fee page that states no price in its text. Pictures named for fees, or
+    the one or two pictures of a page that has no more; logos, icons and small images
+    are left out. The URL is the unscaled original where the page shows a scaled copy.
     """
     soup = BeautifulSoup(html, "html.parser")
     found: dict[str, tuple[bool, str]] = {}
@@ -162,8 +163,22 @@ def content_images(html: str, base_url: str) -> list[Link]:
         alt = " ".join(str(image.get("alt") or "").split())
         named = bool(_FEE_WORD_RE.search(_words(f"{urlparse(url).path} {alt}")))
         found.setdefault(url, (named, alt))
-    ranked = sorted(found.items(), key=lambda item: not item[1][0])
-    return [(url, alt) for url, (_, alt) in ranked]
+    named = [(url, alt) for url, (is_named, alt) in found.items() if is_named]
+    # A picture not named for fees is worth reading only when it is about all the page
+    # shows: a page of several pictures is a gallery, not a fee table.
+    return named or ([(url, alt) for url, (_, alt) in found.items()] if len(found) <= 2 else [])
+
+
+def scaled_copies(html: str, base_url: str) -> dict[str, str]:
+    """Unscaled picture URL -> the scaled copy the page shows, to fall back on."""
+    soup = BeautifulSoup(html, "html.parser")
+    copies: dict[str, str] = {}
+    for image in soup.find_all("img"):
+        source = urljoin(base_url, (image.get("src") or image.get("data-src") or "").strip())
+        original = _SCALED_COPY_RE.sub("", source)
+        if original != source:
+            copies.setdefault(original, source)
+    return copies
 
 
 def pdf_page_images(data: bytes) -> list[bytes]:
@@ -267,19 +282,30 @@ async def fetch_fee_documents(
             if hop < MAX_LINK_HOPS:
                 # A fee page's own fee links come next: they lead to the fee list, while
                 # the links still queued are its siblings (594's list sat behind six).
-                nested = candidates(html_links(html), final_url)
-                queue[:0] = [(nested_url, nested_label, hop + 1) for nested_url, nested_label in nested]
+                # A link already queued keeps its place and its hop count.
+                queued = {page_key(queued_url) for queued_url, _, _ in queue}
+                nested = [
+                    (nested_url, nested_label, hop + 1)
+                    for nested_url, nested_label in candidates(html_links(html), final_url)
+                    if page_key(nested_url) not in queued
+                ]
+                queue[:0] = nested
             if read_image is not None and not _PRICE_RE.search(text):
+                scaled = scaled_copies(html, final_url)
                 for image_url, alt in content_images(html, final_url):
                     if images_read >= MAX_FEE_IMAGES:
                         break
                     if not _same_site(image_url, site_url) or page_key(image_url) in seen:
                         continue
                     seen.add(page_key(image_url))
-                    try:
-                        image = await _get(client, image_url)
-                    except httpx.HTTPError:
-                        continue
+                    image = None
+                    for candidate_url in dict.fromkeys((image_url, scaled.get(image_url, image_url))):
+                        try:
+                            image = await _get(client, candidate_url)
+                        except httpx.HTTPError:
+                            image = None
+                        if image is not None:
+                            break
                     if image is None or image[1].split(";")[0].strip() not in _IMAGE_TYPES:
                         continue
                     read_text = await read(image[2], image[1].split(";")[0].strip(), alt or label)

@@ -274,10 +274,15 @@ def test_content_images_are_the_pages_pictures_fee_named_first():
         '<img src="data:image/png;base64,AAAA"></main>'
     )
 
+    # A picture named for fees is the one read; the campus photo beside it is not.
     assert fee_pages.content_images(html, "https://school.bg/school-fees/") == [
         ("https://school.bg/uploads/SGS-FEES-2026-2027-ENG.png", ""),
-        ("https://school.bg/uploads/campus.jpg", "Campus"),
     ]
+    # With no fee-named picture, a page's one or two pictures are read; a gallery is not.
+    one = '<main><img src="/uploads/table.png"></main>'
+    gallery = "<main>" + "".join(f'<img src="/uploads/photo-{n}.jpg">' for n in range(4)) + "</main>"
+    assert fee_pages.content_images(one, "https://school.bg/") == [("https://school.bg/uploads/table.png", "")]
+    assert fee_pages.content_images(gallery, "https://school.bg/") == []
 
 
 def _image() -> httpx.Response:
@@ -318,9 +323,9 @@ async def test_fee_page_without_prices_has_its_fee_picture_read():
 @pytest.mark.asyncio
 async def test_pictures_read_are_capped_and_a_picture_with_no_fees_is_not_stored():
     requested: list[str] = []
-    images = "".join(f'<img src="/uploads/page-{n}.png">' for n in range(6))
+    images = "".join(f'<img src="/uploads/fees-page-{n}.png">' for n in range(6))
     routes = {"https://school.bg/fees": _html(f"<main><p>Fees</p>{images}</main>")}
-    routes.update({f"https://school.bg/uploads/page-{n}.png": _image() for n in range(6)})
+    routes.update({f"https://school.bg/uploads/fees-page-{n}.png": _image() for n in range(6)})
     reads = 0
 
     async def read_image(data: bytes, media_type: str) -> str | None:
@@ -336,8 +341,8 @@ async def test_pictures_read_are_capped_and_a_picture_with_no_fees_is_not_stored
 
     assert reads == fee_pages.MAX_FEE_IMAGES
     assert [d.url for d in documents if d.url.endswith(".png")] == [
-        "https://school.bg/uploads/page-1.png",
-        "https://school.bg/uploads/page-2.png",
+        "https://school.bg/uploads/fees-page-1.png",
+        "https://school.bg/uploads/fees-page-2.png",
     ]
 
 
@@ -374,3 +379,45 @@ def test_each_institution_follows_its_own_fee_page_on_a_shared_site():
 
     assert urls("school") == ["fees", "school-fees"]
     assert urls("kindergarten") == ["fees", "preschool-fees"]
+
+
+@pytest.mark.asyncio
+async def test_scaled_copy_is_read_when_the_original_picture_is_gone():
+    requested: list[str] = []
+    routes = {
+        "https://school.bg/fees": _html('<main><p>Fees</p><img src="/uploads/fees-700x453.png"></main>'),
+        "https://school.bg/uploads/fees-700x453.png": _image(),
+    }
+
+    async def read_image(data: bytes, media_type: str) -> str:
+        return "Tuition 9 000 EUR"
+
+    async with _client(routes, requested) as client:
+        documents = await fetch_fee_documents(
+            [("https://school.bg/fees", "Fees")], site_url=SITE, known_urls=[], html_to_text=_text,
+            client=client, read_image=read_image,
+        )  # fmt: skip
+
+    assert requested[1:] == ["https://school.bg/uploads/fees.png", "https://school.bg/uploads/fees-700x453.png"]
+    assert any(document.url.endswith("fees-700x453.png") for document in documents)
+
+
+@pytest.mark.asyncio
+async def test_a_queued_sibling_keeps_its_hop_when_a_fee_page_links_it_again():
+    """/admission/fees links /school-fees/ in its menu; /school-fees/ must still be able
+    to lead to the dated list one click under it."""
+    requested: list[str] = []
+    routes = {
+        "https://school.bg/admission/fees": _html('<p>Fees</p><a href="/school-fees/">School fees</a>'),
+        "https://school.bg/school-fees/": _html('<p>Fees</p><a href="/school-fees-2026-2027/">Fees 2026-2027</a>'),
+        "https://school.bg/school-fees-2026-2027/": _html("<p>Grade 1: 14 750 EUR</p>"),
+    }
+
+    async with _client(routes, requested) as client:
+        documents = await fetch_fee_documents(
+            [("https://school.bg/admission/fees", "Fees and tuition"), ("https://school.bg/school-fees/", "School")],
+            site_url=SITE, known_urls=[], html_to_text=_text, client=client,
+        )  # fmt: skip
+
+    assert "https://school.bg/school-fees-2026-2027/" in requested
+    assert any("14 750" in document.text for document in documents)

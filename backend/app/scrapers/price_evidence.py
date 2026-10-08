@@ -140,7 +140,11 @@ def fee_number_starts(text: str) -> list[int]:
     offset = 0
     for line in text.splitlines(keepends=True):
         if "|" in line:
-            starts.extend(offset + m.start() for m in _TABLE_NUMBER_RE.finditer(line))
+            starts.extend(
+                offset + m.start()
+                for m in _TABLE_NUMBER_RE.finditer(line)
+                if not re.fullmatch(r"(?:19|20)\d{2}", m.group(0))  # a year, not a price
+            )
         offset += len(line)
     return sorted(set(starts))
 
@@ -384,7 +388,8 @@ _PRESCHOOL_LABEL_RE = re.compile(
 # A kindergarten or nursery group: named, or given by the children's age.
 _KINDERGARTEN_LABEL_RE = re.compile(
     r"детска\s+градина|\bградина\b|ясл|kindergarten|nursery|toddler|maternelle|ранно детско"
-    r"|\d\s*(?:г\.|г\b|год|years?\b|yrs?\b|y\.?o\b|месец)"
+    # An age is one or two digits; "2026/2027 г." is a year, "за 10 месеца" a payment span.
+    r"|(?<![\d/.-])\d{1,2}\s*(?:г\.|г\b|годиш|години\b|years?\b|yrs?\b|y\.?o\b)"
 )
 
 

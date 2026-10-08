@@ -594,6 +594,10 @@ PRIMARY, GYMNASIUM, ALL_GRADES = set(range(1, 8)), set(range(8, 13)), set(range(
         ("Подготвителна група - 5 годишни", "school", ALL_GRADES, False),
         ("Предучилищна", "school", ALL_GRADES, False),
         ("Students from Bulgarian schools", "school", PRIMARY, False),
+        # A year or a payment span is not a child's age.
+        ("Годишна такса за учебната 2026/2027 г.", "school", PRIMARY, False),
+        ("Материали / за 10 месеца", "school", PRIMARY, False),
+        ("Яслена група 2-3 г.", "school", ALL_GRADES, True),
         # Grades unknown: nothing to compare against.
         ("8 grade", "school", set(), False),
         # 510/305: a kindergarten took school classes; a pre-school class may be its own.
