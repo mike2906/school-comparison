@@ -452,6 +452,8 @@ async def test_import_nvo_results_matches_register_code_whatever_settlement_the_
                 '"СОФИЯ-ГРАД","СТОЛИЧНА","ГР.БУХОВО","117. СУ","2210117","23","69.98","23","49.28"',
                 '"СОФИЯ-ГРАД","СТОЛИЧНА","офия 14 р-н Искър","ПГ по транспорт","2207412","72","31.69","72","15.52"',
                 '"ПЛОВДИВ","ПЛОВДИВ","ГР.ПЛОВДИВ","Друго училище","515151","100","82.2","100","79.1"',
+                # In our municipality, under a code we do not have: a school missing from the DB.
+                '"СОФИЯ-ГРАД","СТОЛИЧНА","ГР.БАНКЯ","ЧНУ Фоти","2201505","12","70.1","12","66.3"',
             )
         ),
     )
@@ -461,7 +463,7 @@ async def test_import_nvo_results_matches_register_code_whatever_settlement_the_
     assert summary["matched_schools"] == 2
     assert summary["created_rows"] == 4
     assert summary["skipped_rows"] == 2
-    assert summary["unmatched_rows"] == 0
+    assert summary["unmatched_rows"] == 2
 
 
 @pytest.mark.asyncio

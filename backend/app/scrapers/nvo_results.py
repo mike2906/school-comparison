@@ -77,6 +77,8 @@ class ParsedExamResult:
     value: float
     source_url: str
     sat_count: Optional[int] = None
+    # The file's "Община" cell, normalized; None when the file has no such column.
+    municipality_key: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -176,6 +178,7 @@ def parse_nvo_csv(resource: NvoResource, csv_text: str) -> tuple[list[ParsedExam
     school_col = _find_first_header(header_map, ("училище",))
     institutional_id_col = _find_first_header(header_map, ("код по неиспуо", "код по админ"))
     city_col = _find_first_header(header_map, ("населено място",))
+    municipality_col = _find_first_header(header_map, ("община",))
     bulgarian_col = _find_subject_column(header_map, "бел")
     math_col = _find_subject_column(header_map, "мат")
     # Optional: older files may lack the per-subject "sat the exam" counts.
@@ -217,6 +220,7 @@ def parse_nvo_csv(resource: NvoResource, csv_text: str) -> tuple[list[ParsedExam
 
         institutional_id = _clean_institutional_id(row.get(institutional_id_col))
         city_key = _normalize_city_key(row.get(city_col))
+        municipality_key = _normalize_city_key(row.get(municipality_col)) if municipality_col else None
         row_values = 0
 
         for subject, column_name in (("bulgarian", bulgarian_col), ("math", math_col)):
@@ -241,6 +245,7 @@ def parse_nvo_csv(resource: NvoResource, csv_text: str) -> tuple[list[ParsedExam
                     value=parsed_value,
                     source_url=resource.resource_view_url,
                     sat_count=int(sat_count) if sat_count is not None else None,
+                    municipality_key=municipality_key,
                 )
             )
             row_values += 1
@@ -603,7 +608,16 @@ async def _upsert_resource_rows(
     matched_entries: dict[tuple[int, int, str, str, str], ParsedExamResult] = {}
     skipped_rows = 0
     unmatched_rows = 0
+    unmatched_schools: set[str] = set()
     normalized_city_filter = _normalize_city_key(city_filter) if city_filter else None
+    # The municipalities our schools are filed under in this file ("Столична" for Sofia).
+    # A row there with a register code we do not have is a school missing from the DB,
+    # whatever its settlement cell says, and is reported as unmatched rather than skipped.
+    own_municipalities = {
+        entry.municipality_key
+        for entry in parsed_rows
+        if entry.municipality_key and (entry.institutional_id or "") in school_index.by_institutional_id
+    }
 
     for entry in parsed_rows:
         # The index holds only the requested city's schools, so a register-code match is
@@ -611,12 +625,18 @@ async def _upsert_resource_rows(
         # municipality ("Бухово"), districts and typos ("офия 08 р-н Изгрев").
         school_id = school_index.by_institutional_id.get(entry.institutional_id or "")
         if school_id is None:
-            if normalized_city_filter and entry.city_key and entry.city_key != normalized_city_filter:
+            if (
+                normalized_city_filter
+                and entry.city_key
+                and entry.city_key != normalized_city_filter
+                and entry.municipality_key not in own_municipalities
+            ):
                 skipped_rows += 1
                 continue
             school_id = _match_school(entry, school_index)
         if school_id is None:
             unmatched_rows += 1
+            unmatched_schools.add(f"{entry.school_name} ({entry.institutional_id or 'no code'})")
             continue
 
         if allowed_school_ids is not None and school_id not in allowed_school_ids:
@@ -626,6 +646,18 @@ async def _upsert_resource_rows(
         touched_school_ids.add(school_id)
         key = (school_id, entry.year, entry.exam_type, entry.subject, "average_score")
         matched_entries[key] = entry
+
+    # Named only for a whole-city run: with explicit school ids the index holds just those
+    # schools, and every other row in the file is "unmatched".
+    if unmatched_schools and allowed_school_ids is None:
+        names = sorted(unmatched_schools)
+        logger.warning(
+            "NVO %s %s: no school in the DB for %s%s",
+            resource.exam_type,
+            resource.year,
+            "; ".join(names[:20]),
+            f" and {len(names) - 20} more" if len(names) > 20 else "",
+        )
 
     if not matched_entries:
         return {
