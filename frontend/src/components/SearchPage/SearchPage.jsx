@@ -1257,6 +1257,8 @@ function SearchPage() {
   )
 
   // Quick State / Private chips above the list: the most used filter, one tap away.
+  // Tighter chips below 360px: with the result count beside them the row needs 308px in
+  // Bulgarian, and a 320px phone has 288px.
   const renderSchoolTypeChips = () => (
     <div className="flex items-center gap-1.5" role="group" aria-label={t('filters.schoolType')}>
       {[null, 'state', 'private'].map(type => {
@@ -1267,7 +1269,7 @@ function SearchPage() {
             type="button"
             aria-pressed={isActive}
             onClick={() => handleFilterChange({ schoolType: type })}
-            className={`h-11 md:h-8 rounded-full border px-3 text-sm font-medium transition-colors ${
+            className={`h-11 md:h-8 rounded-full border px-2 min-[360px]:px-3 text-sm font-medium transition-colors ${
               isActive
                 ? 'border-primary-600 bg-primary-700 text-white'
                 : 'border-neutral-300 bg-white text-neutral-700 hover:border-neutral-400'
