@@ -606,11 +606,15 @@ async def _upsert_resource_rows(
     normalized_city_filter = _normalize_city_key(city_filter) if city_filter else None
 
     for entry in parsed_rows:
-        if normalized_city_filter and entry.city_key and entry.city_key != normalized_city_filter:
-            skipped_rows += 1
-            continue
-
-        school_id = _match_school(entry, school_index)
+        # The index holds only the requested city's schools, so a register-code match is
+        # in scope whatever settlement the file names: villages and towns of the
+        # municipality ("Бухово"), districts and typos ("офия 08 р-н Изгрев").
+        school_id = school_index.by_institutional_id.get(entry.institutional_id or "")
+        if school_id is None:
+            if normalized_city_filter and entry.city_key and entry.city_key != normalized_city_filter:
+                skipped_rows += 1
+                continue
+            school_id = _match_school(entry, school_index)
         if school_id is None:
             unmatched_rows += 1
             continue
