@@ -4879,3 +4879,54 @@ async def test_prices_only_extraction_rereads_fees_and_leaves_the_rest(
     assert school.scrape_status == "summarized"
     assert school.summary_i18n == {"bg": "Обобщение"}
     assert await _stored(db_session, school) == [("tuition", 530.0, "monthly")]
+
+
+@pytest.mark.parametrize(
+    ("label", "expected"),
+    [
+        ("8 клас", True),
+        ("ПЪРВИ – ТРЕТИ КЛАС", True),
+        ("Grade 5", True),
+        ("1. - 4. клас", True),
+        ("Подготвителен клас", False),
+        ("ПК - 12. клас", False),
+        ("Целодневна група 3-6 години", False),
+        ("Classic programme", False),
+    ],
+)
+def test_names_school_grades(label, expected):
+    row = ExtractedPrice(category="tuition", amount=1, currency="EUR", plan_name=label, confidence=1.0)
+
+    assert extractor_module.helpers._names_school_grades(row) is expected
+
+
+@pytest.mark.asyncio
+async def test_kindergarten_does_not_take_school_grade_fees_and_the_prompt_names_its_level(
+    db_session, sample_school_for_extraction
+):
+    """School 510: the kindergarten shares a site with its school and took "8 клас"."""
+    school = sample_school_for_extraction
+    school.education_level = "kindergarten"
+    pages = (
+        await db_session.execute(select(SourcePage).where(SourcePage.school_id == school.id))
+    ).scalars().all()
+    next(page for page in pages if page.page_category == "pricing").raw_markdown = (
+        "Такси\nДетска градина | 600 евро месечно\n8 клас | 8000 евро годишно\n"
+    )
+    await db_session.flush()
+    output = PriceExtractionOutput(
+        prices=[
+            ExtractedPrice(category="tuition", amount=600.0, currency="EUR", plan_name="Детска градина", confidence=1.0),
+            ExtractedPrice(category="tuition", amount=8000.0, currency="EUR", plan_name="8 клас", confidence=1.0),
+        ],
+        has_pricing_info=True,
+    )  # fmt: skip
+    llm = AsyncMock(return_value=(output, 10, 2, 0.001))
+
+    with patch("app.scrapers.extractor._run_typed_agent", new=llm):
+        await extractor_module._extract_prices(
+            db_session, school, list(pages), 20.0, extractor_module.ExtractionLLMStats()
+        )
+
+    assert "Institution level: kindergarten (kindergarten)" in llm.call_args.kwargs["user_prompt"]
+    assert await _stored(db_session, school) == [("tuition", 600.0, "monthly")]

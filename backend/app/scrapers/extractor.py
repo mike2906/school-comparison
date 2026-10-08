@@ -1196,7 +1196,9 @@ async def _extract_prices(
         "\n"
         "Emit ONE row per distinct fee. Apply these rules:\n"
         "- Dual currencies: when the same fee is quoted in both EUR and BGN (e.g. '€8,100 / 15 842,22 лв'), emit only ONE row in the page's primary currency. Never emit a BGN row for a fee already emitted in EUR (or vice versa).\n"
-        "- Payment schedules: when one fee has multiple payment options (full pay / 2 installments / 10 monthly), emit ONE row with the full-payment amount as `amount` and list the other options as strings in `installments` (e.g. '€8,100 – 2 installments'). Do NOT emit separate rows for the installment amounts.\n"
+        "- Payment schedules: when one fee has multiple payment options (full pay / 2 installments / 10 monthly), emit ONE row with the full-payment amount as `amount` and list the other options as strings in `installments` (e.g. '€8,100 – 2 installments'). Do NOT emit separate rows for the installment amounts or for the total of an installment plan (e.g. '2 x 3,900 = 7,800').\n"
+        "- One institution only: a site often covers a kindergarten and a school of the same brand. Emit only the fees of the institution named below, at its level. For a kindergarten, leave out fees stated for school grades/classes; for a school, leave out fees stated for nursery or kindergarten groups. A pre-school (preparatory) class or group may belong to either: keep it.\n"
+        "- Only fees charged to parents. Leave out donations, prizes, salaries, project budgets and any amount whose purpose the page does not state.\n"
         "- Set `period` only when the source explicitly states the fee period or represents it unambiguously (for example 'per year', 'monthly fee', or 'per term'). Otherwise set `period` to null. An academic year, fee category, amount, school type, installment count, or payment frequency does NOT by itself establish the fee period.\n"
         "- Distinct tiers: when multiple tiers exist (e.g. 'Bulgarian students' vs 'International students', different grade bands, different meal plans like breakfast vs full-day), emit SEPARATE rows and set `plan_name` to the tier label from the page. `plan_name` must be populated whenever multiple rows share the same category/period/age_group on one page.\n"
         "- Discounts: an amount after an early-payment, full-payment, sibling or loyalty discount is NOT a separate fee. Emit the undiscounted fee as the row and list the discounted amounts as strings in `discounts`.\n"
@@ -1208,8 +1210,10 @@ async def _extract_prices(
     )
     # Only the prompt gets glued currency words spaced; deterministic extraction and the
     # evidence checks below keep the original page text.
+    family = level_family(school.education_level)
     user_prompt = (
-        f"School: {school_name}\n\nContent:\n"
+        f"School: {school_name}\n"
+        f"Institution level: {family} ({school.education_level or 'unknown'})\n\nContent:\n"
         f"{helpers._space_glued_currency_words(selected_text)}"
     )
     deterministic_pricing = helpers._extract_prices_deterministic(selected_text)
@@ -1246,6 +1250,10 @@ async def _extract_prices(
     supported_prices = _supported_price_rows(
         parsed.prices, selected_text, model_rows=not used_deterministic_pricing
     )
+    if family == "kindergarten":
+        supported_prices = [
+            row for row in supported_prices if not helpers._names_school_grades(row)
+        ]
     if supported_prices:
         parsed = parsed.model_copy(update={"prices": supported_prices, "has_pricing_info": True})
     elif deterministic_pricing.has_pricing_info:
