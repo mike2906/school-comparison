@@ -210,7 +210,10 @@ class WebsiteNavigator:
         flags=re.IGNORECASE,
     )
 
-    def __init__(self, country_code: str = "bg", *, bypass_cache: bool = False):
+    def __init__(self, country_code: str = "bg", *, bypass_cache: bool = True):
+        # A crawl reads the live site. crawl4ai's local cache is off unless asked for: after
+        # the 0.9 upgrade migrated it, a hit on an older record returned a 16-character
+        # content hash in place of the page, which was stored as the page's text.
         self.country_code = country_code
         self.bypass_cache = bypass_cache
         self.settings = get_settings()

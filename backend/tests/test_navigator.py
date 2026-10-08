@@ -319,17 +319,18 @@ def test_build_run_config_uses_raw_html_for_about_and_contact_pages():
     assert program_config.markdown_generator.content_source == "cleaned_html"
 
 
-def test_build_run_config_can_bypass_cache_for_operational_refresh():
+def test_build_run_config_reads_the_live_site_unless_the_cache_is_asked_for():
+    """School 537's re-run stored a cached content hash as its home page's text."""
     from crawl4ai import CacheMode
 
     ordinary = WebsiteNavigator(country_code="bg")
-    refresh = WebsiteNavigator(country_code="bg", bypass_cache=True)
+    cached = WebsiteNavigator(country_code="bg", bypass_cache=False)
 
     ordinary_config = ordinary._build_run_config("https://school.bg/fees")
-    refresh_config = refresh._build_run_config("https://school.bg/fees")
+    cached_config = cached._build_run_config("https://school.bg/fees")
 
-    assert ordinary_config.cache_mode == CacheMode.ENABLED
-    assert refresh_config.cache_mode == CacheMode.BYPASS
+    assert ordinary_config.cache_mode == CacheMode.BYPASS
+    assert cached_config.cache_mode == CacheMode.ENABLED
 
 
 @pytest.mark.asyncio
