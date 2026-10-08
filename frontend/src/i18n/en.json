@@ -548,7 +548,7 @@
   },
   "schoolDetail": {
     "keyFacts": "Key facts",
-    "tuitionPerYear": "{{price}} {{currency}} / year",
+    "tuitionPerYear": "{{price}} {{currency}}\u00a0/\u00a0year",
     "tuitionUnstated": "{{price}} {{currency}}",
     "groupsAndGrades": "Groups & grades",
     "nvoLatest": "{{exam}}, {{year}}",

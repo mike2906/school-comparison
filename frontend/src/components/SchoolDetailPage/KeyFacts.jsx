@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { Fragment, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   getHeadlineTuition,
@@ -30,12 +30,19 @@ function readSavedLocation() {
 function Fact({ label, value, detail, detailClass = 'text-neutral-500' }) {
   return (
     <div className="min-w-0 rounded-xl border border-neutral-200 bg-white px-4 py-3">
-      <div className="text-xs font-medium uppercase tracking-wide text-neutral-500">{label}</div>
+      <div className="text-balance text-xs font-medium uppercase tracking-wide text-neutral-500">{label}</div>
       <div className="mt-1 text-base sm:text-lg font-bold leading-snug text-neutral-900 break-words">{value}</div>
       {detail && <div className={`mt-0.5 text-xs ${detailClass}`}>{detail}</div>}
     </div>
   )
 }
+
+// A list value wraps between its items, not inside one ("8-12" on one line, "клас" on the next).
+const listValue = (items) => items.map((item, index) => (
+  <Fragment key={item}>
+    <span className="inline-block">{item}{index < items.length - 1 && ','}</span>{' '}
+  </Fragment>
+))
 
 /**
  * The strip of the few facts a parent decides on, right under the hero. Order depends on
@@ -97,7 +104,7 @@ function KeyFacts({ school, examAverages, nvoExamType }) {
   const languageLabels = [...new Set(languages.filter(Boolean).map(lang => getLanguageLabel(lang, t)))]
   if (languageLabels.length > 0) {
     facts.languages = (
-      <Fact key="languages" label={t('schools.languagesOfInstruction')} value={languageLabels.join(', ')} />
+      <Fact key="languages" label={t('schools.languagesOfInstruction')} value={listValue(languageLabels)} />
     )
   }
 
@@ -107,7 +114,7 @@ function KeyFacts({ school, examAverages, nvoExamType }) {
       <Fact
         key="grades"
         label={t('schoolDetail.groupsAndGrades')}
-        value={ageGroups.map(group => t(`ageGroups.${group}`)).join(', ')}
+        value={listValue(ageGroups.map(group => t(`ageGroups.${group}`)))}
       />
     )
   }
@@ -165,7 +172,7 @@ function KeyFacts({ school, examAverages, nvoExamType }) {
   const shifts = getShifts(locations)
   if (shifts.length > 0) {
     facts.shift = (
-      <Fact key="shift" label={t('schools.shift')} value={shifts.map(shift => t(`shifts.${shift}`)).join(', ')} />
+      <Fact key="shift" label={t('schools.shift')} value={listValue(shifts.map(shift => t(`shifts.${shift}`)))} />
     )
   }
 
@@ -202,7 +209,10 @@ function KeyFacts({ school, examAverages, nvoExamType }) {
 
   return (
     <section aria-label={t('schoolDetail.keyFacts')} className="mb-6">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      {/* As many columns as fit the strip's own width, not the viewport's: in the search
+          page's side panel it is half as wide as on the school page. Text is larger from
+          `sm` up, so the cards are wider there. */}
+      <div className="grid gap-3 grid-cols-[repeat(auto-fill,minmax(9.5rem,1fr))] sm:grid-cols-[repeat(auto-fill,minmax(13.5rem,1fr))]">
         {shown}
       </div>
     </section>
