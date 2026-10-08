@@ -8,6 +8,7 @@ import logging
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from fnmatch import fnmatch
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlparse
 
@@ -899,6 +900,16 @@ class WebsiteNavigator:
         return dict(zip(website_urls, outcomes, strict=True))
 
 
+# The crawl's exclusions hold for followed fee links too (an old news post about fees is
+# not the fee list), except that fee PDFs are wanted and usually sit under an uploads
+# folder.
+_FEE_LINK_EXCLUDE_PATTERNS = tuple(
+    pattern
+    for pattern in WebsiteNavigator.EXCLUDE_PATTERNS
+    if pattern not in ("*.pdf", "*/wp-content/*")
+)
+
+
 async def _follow_fee_links(
     navigator: WebsiteNavigator, school: School, site_url: str, pages: list[NavigatedPage]
 ) -> list[NavigatedPage]:
@@ -908,16 +919,26 @@ async def _follow_fee_links(
     when that copy does: a tabbed page can lose its fee tab in the rendered DOM.
     Best effort: a failure here leaves the crawl result as it is.
     """
-    links = [link for page in pages for link in page.links]
+    links = [
+        link
+        for page in pages
+        for link in page.links
+        if not any(fnmatch(link[0].lower(), pattern) for pattern in _FEE_LINK_EXCLUDE_PATTERNS)
+    ]
     if not links:
         return pages
-    priced_urls = [page.url for page in pages if currency_price_starts(page.markdown or "")]
+    # Only a crawled fee page that states no price is worth a second fetch.
+    settled_urls = [
+        page.url
+        for page in pages
+        if page.category != "pricing" or currency_price_starts(page.markdown or "")
+    ]
     try:
         async with fee_http_client() as client:
             documents = await fetch_fee_documents(
                 links,
                 site_url=site_url,
-                known_urls=priced_urls,
+                known_urls=settled_urls,
                 html_to_text=navigator._extract_main_content_text,
                 client=client,
                 school_family=level_family(school.education_level),
@@ -935,7 +956,7 @@ async def _follow_fee_links(
             continue  # the crawled copy is no worse
         fee_page = NavigatedPage(
             url=crawled.url if crawled is not None else document.url,
-            category="pricing",
+            category=(crawled.category if crawled is not None else None) or "pricing",
             markdown=document.text,
             content_hash=BaseScraper.compute_hash(document.text),
         )

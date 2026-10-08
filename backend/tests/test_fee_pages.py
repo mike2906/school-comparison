@@ -222,3 +222,39 @@ async def test_follow_up_failure_keeps_the_crawl_result(monkeypatch):
     home = NavigatedPage(url=SITE, category="about", markdown="Начало", content_hash="h", links=[("https://school.bg/fees", "Fees")])  # fmt: skip
 
     assert await navigator_module._follow_fee_links(WebsiteNavigator(), _school(), SITE, [home]) == [home]
+
+
+@pytest.mark.asyncio
+async def test_follow_up_skips_news_posts_and_crawled_pages_that_are_not_fee_pages(monkeypatch):
+    requested: list[str] = []
+    _patch_http(monkeypatch, {}, requested)
+    home = NavigatedPage(
+        url=SITE,
+        category="about",
+        markdown="Начало",
+        content_hash="h",
+        links=[
+            ("https://school.bg/news/novi-taksi-2023-2024", "Нови такси"),
+            ("https://school.bg/priem", "Прием и такси"),
+            ("https://school.bg/wp-content/uploads/taksi-2026-2027.pdf", "Такси 2026/2027"),
+        ],
+    )
+    admission = NavigatedPage(url="https://school.bg/priem", category="admission", markdown="Прием", content_hash="h2")  # fmt: skip
+
+    await navigator_module._follow_fee_links(WebsiteNavigator(), _school(), SITE, [home, admission])
+
+    assert requested == ["https://school.bg/wp-content/uploads/taksi-2026-2027.pdf"]
+
+
+@pytest.mark.asyncio
+async def test_oversized_download_is_abandoned(monkeypatch):
+    monkeypatch.setattr(fee_pages, "MAX_BODY_BYTES", 10)
+    requested: list[str] = []
+    routes = {"https://school.bg/fees": _html("<p>Такса за обучение 7000 евро годишно</p>")}
+
+    async with _client(routes, requested) as client:
+        documents = await fetch_fee_documents(
+            [("https://school.bg/fees", "Fees")], site_url=SITE, known_urls=[], html_to_text=_text, client=client
+        )  # fmt: skip
+
+    assert requested == ["https://school.bg/fees"] and documents == []

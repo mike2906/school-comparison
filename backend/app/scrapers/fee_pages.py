@@ -12,6 +12,7 @@ evidence checks as any crawled page.
 
 from __future__ import annotations
 
+import asyncio
 import io
 import logging
 import re
@@ -30,7 +31,7 @@ logger = logging.getLogger(__name__)
 MAX_FEE_FETCHES = 6
 MAX_LINK_HOPS = 2  # home page -> admissions page (crawled) -> fee page -> fee PDF
 FETCH_TIMEOUT_SECONDS = 20.0
-MAX_PDF_BYTES = 15 * 1024 * 1024
+MAX_BODY_BYTES = 15 * 1024 * 1024
 MAX_PDF_PAGES = 8
 MAX_TEXT_CHARS = 15000
 
@@ -168,27 +169,25 @@ async def fetch_fee_documents(
             continue
         fetches += 1
         try:
-            response = await client.get(url, follow_redirects=True, timeout=FETCH_TIMEOUT_SECONDS)
+            fetched = await _get(client, url)
         except httpx.HTTPError as exc:
             logger.info("fee link %s failed: %s", url, exc)
             continue
-        final_url = str(response.url)
-        if response.status_code != 200 or not _same_site(final_url, site_url):
+        if fetched is None:
             continue
-        content_type = response.headers.get("content-type", "").lower()
-        body = response.content
+        final_url, content_type, body = fetched
+        if not _same_site(final_url, site_url):
+            continue
         if "pdf" in content_type or body[:5] == b"%PDF-":
-            if len(body) > MAX_PDF_BYTES:
-                continue
             try:
-                text = pdf_text(body)
+                text = await asyncio.to_thread(pdf_text, body)
                 if text.strip() and label:
                     text = f"{label}\n{text}"[:MAX_TEXT_CHARS]
             except Exception as exc:  # pdfplumber raises many types on a damaged file
                 logger.info("fee PDF %s unreadable: %s", url, exc)
                 continue
         elif "html" in content_type:
-            html = response.text
+            html = body.decode(_charset(content_type), errors="replace")
             text = (html_to_text(html) or "")[:MAX_TEXT_CHARS]
             if hop < MAX_LINK_HOPS:
                 nested = candidates(html_links(html), final_url)
@@ -199,6 +198,32 @@ async def fetch_fee_documents(
             seen.add(page_key(final_url))
             documents.append(FeeDocument(url=final_url, text=text))
     return documents
+
+
+async def _get(client: httpx.AsyncClient, url: str) -> tuple[str, str, bytes] | None:
+    """(final URL, content type, body) of a 200 response no larger than the size cap."""
+    async with client.stream(
+        "GET", url, follow_redirects=True, timeout=FETCH_TIMEOUT_SECONDS
+    ) as response:
+        if response.status_code != 200:
+            return None
+        body = bytearray()
+        async for chunk in response.aiter_bytes():
+            body.extend(chunk)
+            if len(body) > MAX_BODY_BYTES:
+                return None
+        content_type = response.headers.get("content-type", "").lower()
+        return str(response.url), content_type, bytes(body)
+
+
+def _charset(content_type: str) -> str:
+    match = re.search(r"charset=([\w-]+)", content_type)
+    name = match.group(1) if match else "utf-8"
+    try:
+        "".encode(name)
+    except LookupError:
+        return "utf-8"
+    return name
 
 
 def fee_http_client() -> httpx.AsyncClient:

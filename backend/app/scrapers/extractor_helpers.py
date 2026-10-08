@@ -28,6 +28,7 @@ from app.schemas.extraction import (
     SummarySourceExtractionOutput,
 )
 from app.scrapers.extraction_rules import get_rules
+from app.scrapers.fee_pages import page_key
 from app.scrapers.price_evidence import currency_price_starts
 from app.scrapers.school_tokens import extract_school_name_tokens
 from app.utils.academic_year import normalize_academic_year
@@ -2260,8 +2261,6 @@ def _filter_supported_prices(
         ]
         if not candidates:
             continue
-        # A line that names its category is better support than one that does not.
-        candidates = [signal for signal in candidates if signal["category"]] or candidates
         academic_year = _normalize_academic_year(price.academic_year)
         if academic_year:
             candidates = [
@@ -2275,6 +2274,8 @@ def _filter_supported_prices(
             ]
         if not candidates:
             continue
+        # A line that names its category is better support than one that does not.
+        candidates = [signal for signal in candidates if signal["category"]] or candidates
         candidate_semantics = {
             (signal.get("category"), signal.get("period"), signal.get("academic_year"))
             for signal in candidates
@@ -2884,33 +2885,32 @@ _PRICE_EVIDENCE_MAX_PRICES = 4
 _PRICE_WINDOW_LEAD_CHARS = 1200
 
 
-def _url_variant_key(url: str | None) -> tuple[str, str, str]:
-    """One key for the spellings of a page: scheme, ``www.``, trailing slash, escaping."""
-    try:
-        parsed = urlparse(url or "")
-    except ValueError:
-        return ("", url or "", "")
-    return (
-        _canonical_host(url) or "",
-        unquote(parsed.path or "").rstrip("/").lower(),
-        parsed.query or "",
-    )
-
-
 def _drop_url_variant_pages(pages: list[SourcePage]) -> list[SourcePage]:
-    """Keep the newest crawl of each page, so two spellings do not take two prompt slots."""
-    newest: dict[tuple[str, str, str], SourcePage] = {}
+    """Keep one crawl of each page, so two spellings do not take two prompt slots.
+
+    The spellings differ in scheme, ``www.``, trailing slash or escaping. The newest
+    crawl wins; of two crawls from the same run, the one stating more prices.
+    """
+    best: dict[tuple[str, str, str], SourcePage] = {}
     for page in pages:
-        key = _url_variant_key(page.source_url)
-        kept = newest.get(key)
-        if kept is None or _crawl_time(page) > _crawl_time(kept):
-            newest[key] = page
-    return list(newest.values())
+        try:
+            key = page_key(page.source_url or "")
+        except ValueError:
+            key = ("", page.source_url or "", "")
+        kept = best.get(key)
+        if kept is None or _variant_rank(page) > _variant_rank(kept):
+            best[key] = page
+    return list(best.values())
 
 
-def _crawl_time(page: SourcePage) -> float:
+def _variant_rank(page: SourcePage) -> tuple[float, int, int]:
     scraped_at = getattr(page, "last_scraped_at", None)
-    return scraped_at.timestamp() if scraped_at is not None else 0.0
+    text = page.raw_markdown or ""
+    return (
+        scraped_at.timestamp() if scraped_at is not None else 0.0,
+        len(currency_price_starts(text)),
+        len(text),
+    )
 
 
 def _price_dense_window(candidate: str, allowance: int) -> str:

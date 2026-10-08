@@ -4766,3 +4766,17 @@ def test_model_row_for_a_total_fee_line_is_withheld():
     row = _model_price(category="tuition", amount=12000, period="yearly", plan_name="Total Fee")
 
     assert extractor_module.helpers._filter_supported_prices([row], text, model_rows=True) == []
+
+
+def test_pricing_selection_keeps_the_priced_spelling_from_one_crawl():
+    """Two spellings stamped by the same crawl: the copy that states the prices is kept."""
+    now = datetime.datetime(2026, 10, 1, tzinfo=datetime.UTC)
+    pages = [
+        SourcePage(source_url="https://example-school.bg/taksi", page_category="pricing", raw_markdown="Прием и такси. Стъпки при кандидатстване.", last_scraped_at=now),
+        SourcePage(source_url="https://example-school.bg/taksi/", page_category="pricing", raw_markdown="Такса 6 750 евро / година", last_scraped_at=now),
+    ]  # fmt: skip
+
+    selected_text, source_urls = _select_pricing_pages(pages)
+
+    assert source_urls == ["https://example-school.bg/taksi/"]
+    assert "6 750 евро" in selected_text
