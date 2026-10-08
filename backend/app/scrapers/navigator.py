@@ -775,6 +775,13 @@ class WebsiteNavigator:
 
         return final_url, self._dedupe_pages(pages)
 
+    def _first_error(self, results_obj: Any) -> str | None:
+        for result in self._iter_results(results_obj):
+            message = getattr(result, "error_message", None)
+            if message:
+                return str(message)
+        return None
+
     def _internal_links(self, crawl_result: Any) -> list[tuple[str, str]]:
         links = getattr(crawl_result, "links", None)
         internal = links.get("internal") if isinstance(links, dict) else None
@@ -893,7 +900,12 @@ class WebsiteNavigator:
                             pages=[],
                             error=str(exc) or type(exc).__name__,
                         )
-                    return BatchDiscoverOutcome(seed_url=url, final_url=final_url, pages=pages)
+                    # A failed fetch comes back as an unsuccessful result, not an
+                    # exception; without its message the caller would not retry.
+                    error = None if pages else self._first_error(results_obj)
+                    return BatchDiscoverOutcome(
+                        seed_url=url, final_url=final_url, pages=pages, error=error
+                    )
 
             outcomes = await asyncio.gather(*(crawl(url) for url in website_urls))
 

@@ -58,6 +58,25 @@ async def published_rows(school_id: int) -> list[str]:
         return sorted(lines)
 
 
+async def _statuses(db, school_ids: list[int]) -> dict[int, str | None]:
+    rows = await db.execute(select(School.id, School.scrape_status).where(School.id.in_(school_ids)))
+    return {school_id: status for school_id, status in rows.all()}
+
+
+async def _restore_statuses(db, statuses: dict[int, str | None]) -> None:
+    """Undo the crawl's ``navigated`` status.
+
+    Navigation marks a school ``navigated`` so that the full extraction runs next. This
+    run re-reads the fees only, and a school left ``navigated`` would have its website
+    data and its validation report withheld by the API.
+    """
+    schools = (await db.execute(select(School).where(School.id.in_(statuses)))).scalars().all()
+    for school in schools:
+        if school.scrape_status == "navigated" and statuses[school.id] != "navigated":
+            school.scrape_status = statuses[school.id]
+    await db.commit()
+
+
 async def refresh(school_ids: list[int], *, navigate: bool, country: str) -> None:
     async with async_session_maker() as db:
         print("database:", (await db.execute(text("select current_database()"))).scalar())
@@ -67,9 +86,11 @@ async def refresh(school_ids: list[int], *, navigate: bool, country: str) -> Non
         for start in range(0, len(school_ids), NAVIGATION_CHUNK):
             chunk = school_ids[start : start + NAVIGATION_CHUNK]
             async with async_session_maker() as db:
+                statuses = await _statuses(db, chunk)
                 for result in await navigate_schools_batch(db, chunk, country_code=country):
                     if not result.get("success"):
                         print(f"school {result.get('school_id')}: navigation: {result.get('reason')}")
+                await _restore_statuses(db, statuses)
 
     for school_id in school_ids:
         async with async_session_maker() as db:

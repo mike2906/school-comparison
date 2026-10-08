@@ -4989,3 +4989,20 @@ async def test_prices_only_extraction_failure_leaves_the_status(db_session, samp
     assert result["status"] == "extraction_failed"
     await db_session.refresh(school)
     assert school.scrape_status == "navigated"
+
+
+def test_bare_table_cell_takes_its_currency_from_its_own_column():
+    """A model row must not move a number from the EUR column into BGN."""
+    text = "--- SOURCE: https://school.test/fees ---\nПлан | EUR | BGN\n1-4 клас | 7000 | 13690\n"
+    helpers = extractor_module.helpers
+
+    def kept(amount, currency):
+        row = ExtractedPrice(category="tuition", amount=amount, currency=currency, confidence=0.9)
+        return len(helpers._filter_model_prices([row], text))
+
+    assert (kept(7000, "EUR"), kept(13690, "BGN")) == (1, 1)
+    assert (kept(7000, "BGN"), kept(13690, "EUR")) == (0, 0)
+    # Two currencies named, but not per column: the cell is evidence for neither.
+    unnamed = "--- SOURCE: https://school.test/fees ---\nТакси в EUR и BGN | A | B\n1-4 клас | 7000 | 13690\n"
+    row = ExtractedPrice(category="tuition", amount=7000, currency="EUR", confidence=0.9)
+    assert helpers._filter_model_prices([row], unnamed) == []

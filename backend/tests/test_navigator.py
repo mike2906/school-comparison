@@ -720,3 +720,28 @@ async def test_batch_crawl_keeps_each_seeds_pages_with_that_seed():
     assert [p.url for p in outcomes["https://first.bg"].pages] == ["https://first.bg", "https://first.bg/taksi"]  # fmt: skip
     assert [p.url for p in outcomes["https://second.bg"].pages] == ["https://second.bg", "https://second.bg/taksi"]  # fmt: skip
     assert outcomes["https://broken.bg"].pages == [] and outcomes["https://broken.bg"].error == "crawl failed"
+
+
+@pytest.mark.asyncio
+async def test_batch_crawl_reports_a_failed_fetch_so_it_is_retried():
+    """Crawl4AI returns a failed fetch as an unsuccessful result instead of raising."""
+
+    class FakeCrawler:
+        def __init__(self, config=None):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *exc):
+            return False
+
+        async def arun(self, url, config):
+            return [SimpleNamespace(success=False, error_message="net::ERR_CONNECTION_RESET")]
+
+    navigator = WebsiteNavigator(country_code="bg")
+    with patch("crawl4ai.AsyncWebCrawler", new=FakeCrawler):
+        outcomes = await navigator._discover_pages_many_chunk(["https://down.bg"], max_concurrency=1)
+
+    outcome = outcomes["https://down.bg"]
+    assert outcome.pages == [] and outcome.error == "net::ERR_CONNECTION_RESET"

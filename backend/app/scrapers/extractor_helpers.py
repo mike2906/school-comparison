@@ -2434,30 +2434,57 @@ def _period_written_for(block: str, span: tuple[int, int]) -> tuple[set[str], bo
     header = _table_header(block, span)
     if header is None:
         return families, unrepresentable
+    cell = _header_cell(block, span, header)
+    return period_families(cell) if cell is not None else (families, unrepresentable)
+
+
+def _header_cell(block: str, span: tuple[int, int], header: str) -> str | None:
+    """The header cell above the amount's own column, when the two rows line up."""
+    line = _line_of(block, span)
     line_start = block.rfind("\n", 0, span[0]) + 1
-    column = line[: span[0] - line_start].count("|")
     cells = header.split("|")
     if len(cells) != line.count("|") + 1:
-        return families, unrepresentable
-    return period_families(cells[column])
+        return None
+    return cells[line[: span[0] - line_start].count("|")]
+
+
+def _currencies_named(text: str) -> set[str]:
+    return {
+        code
+        for code, pattern in (("EUR", r"€|\beur|евро"), ("BGN", r"лв|\bbgn|лева"))
+        if re.search(pattern, text)
+    }
 
 
 def _amount_is_a_fee_in(block: str, span: tuple[int, int], currency: str) -> bool:
     """The occurrence is a price in ``currency`` and not a penalty or a sum of fees."""
     line = _line_of(block, span)
     written = occurrence_currency(block, span)
-    # A number on its own line, or a cell of a fee table, takes its currency from a
-    # heading; a cell of any other table (class sizes, dates) is not a price.
     bare = written is None and (
         _NUMBER_ONLY_LINE_RE.match(line) is not None
-        or (
-            "|" in line
-            and _CURRENCY_OR_FEE_RE.search(f"{line}\n{_table_header(block, span) or ''}") is not None
-        )
+        or ("|" in line and _bare_cell_is_a_price_in(block, span, currency))
     )
     if written != currency and not bare:
         return False
     return not _is_penalty_price_line(line) and "total fee" not in line
+
+
+def _bare_cell_is_a_price_in(block: str, span: tuple[int, int], currency: str) -> bool:
+    """A table cell holding a number with no currency of its own is a price in ``currency``.
+
+    Its column header decides when it names a currency ("Plan | EUR | BGN"). Otherwise
+    the table must be about fees and name no currency but the row's: a class-size table
+    is not a price list, and a two-currency table with unnamed columns is not evidence
+    for either.
+    """
+    line = _line_of(block, span)
+    header = _table_header(block, span) or ""
+    cell = _header_cell(block, span, header) if header else None
+    in_column = _currencies_named(cell or "")
+    if in_column:
+        return currency in in_column
+    table = f"{line}\n{header}"
+    return _currencies_named(table) <= {currency} and _CURRENCY_OR_FEE_RE.search(table) is not None
 
 
 # A school grade in a fee label: "8 клас", "ПЪРВИ – ТРЕТИ КЛАС", "Grade 5", "1.-4. клас".
