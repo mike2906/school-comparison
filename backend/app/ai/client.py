@@ -23,17 +23,17 @@ from app.config import get_settings
 MODEL_TIERS = {
     "cheap": "openrouter/google/gemini-2.5-flash-lite",  # lightweight tier for validation/classification
     "capable": "openrouter/openai/gpt-4o-mini",  # stronger tier for spot-check validation
-    # Fee tables: on the 81 Sofia private schools with fee text (2026-10-08) this model's
-    # rows gave 63 schools a publishable tuition, the cheap tier's 40, at about $0.12 for
-    # all 81.
-    "pricing": "openrouter/anthropic/claude-haiku-5.5",
+    # Fee tables and fee pictures. On 16 hard Sofia fee pages read twice (2026-10-08) this
+    # model gave the same tuition set both times on 15; Claude Haiku 5.5, used first, on
+    # 10, and it returned one row for a 5-group preschool table. About $0.02 a school.
+    "pricing": "openrouter/openai/gpt-6.1-sol",
 }
 
 # Cost per 1M tokens (input/output), verified against OpenRouter 2026-07-13.
 MODEL_COSTS = {
     "cheap": (0.10, 0.40),
     "capable": (0.15, 0.60),
-    "pricing": (0.10, 0.50),  # OpenRouter, 2026-10-08
+    "pricing": (2.00, 10.00),  # OpenRouter, 2026-10-08
 }
 
 ModelTier = Literal["cheap", "capable", "pricing"]

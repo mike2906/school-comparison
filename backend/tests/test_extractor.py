@@ -5023,3 +5023,20 @@ def test_model_row_period_must_fit_its_category():
         ("registration", 300, "one_time"),
         ("food", 345, "quarter"),
     ]
+
+
+def test_pricing_selection_counts_bare_table_cells_as_prices():
+    """School 594: the transcribed fee picture names its currency once in a heading."""
+    table = (
+        "FINANCIAL CONDITIONS FOR 2026-2027 (all fees are in euro)\n"
+        "GRADE | Admission Fee | TUITION FEE NEW STUDENTS\nGrade 1 | 500 | 15 350\nGrade 2 | 500 | 16 250\n"
+    )
+    pages = [
+        SourcePage(source_url=f"https://example-school.bg/fees/terms-{n}", page_category="pricing", raw_markdown="General terms of the tuition contract. " * 10)
+        for n in range(5)
+    ] + [SourcePage(source_url="https://example-school.bg/uploads/FEES-2026-2027.png", page_category="pricing", raw_markdown=table)]  # fmt: skip
+
+    selected_text, source_urls = _select_pricing_pages(pages)
+
+    assert source_urls[0] == "https://example-school.bg/uploads/FEES-2026-2027.png"
+    assert "15 350" in selected_text

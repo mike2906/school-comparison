@@ -25,7 +25,11 @@ from bs4 import BeautifulSoup
 
 from app.config import CRAWLER_USER_AGENT
 from app.scrapers.price_evidence import _PRICE_RE
-from app.scrapers.shared_site_check import describes_level
+from app.scrapers.shared_site_check import (
+    describes_level,
+    registrable_domain,
+    url_names_other_level,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -118,7 +122,11 @@ def fee_link_candidates(
         if not (in_url or in_text):
             continue
         link_words = _words(f"{parsed.path} {text}")
-        if school_family and _names_only_other_level(link_words, school_family):
+        if school_family and (
+            _names_only_other_level(link_words, school_family)
+            # "/preschool-fees/" beside "/school-fees/": the path says whose page it is.
+            or url_names_other_level(url, school_family, registrable_domain(site_url))
+        ):
             continue
         # A link that names a year is the fee list itself ("school-fees-2026-2027").
         dated = bool(re.search(r"20\d{2}", link_words))

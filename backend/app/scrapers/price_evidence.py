@@ -127,6 +127,24 @@ def currency_price_starts(text: str) -> list[int]:
     return [m.start() for m in _PRICE_RE.finditer(text)]
 
 
+_TABLE_NUMBER_RE = re.compile(r"(?<![\d.,/])\d{1,3}(?:[ \u00a0]?\d{3})+(?![\d.,/])|(?<![\d.,/])\d{3,5}(?![\d.,/])")
+
+
+def fee_number_starts(text: str) -> list[int]:
+    """Start offsets of what reads as prices: currency amounts, and table cells of 3+ digits.
+
+    A fee table often names its currency once, in a heading ("all fees are in euro"),
+    and leaves the cells bare.
+    """
+    starts = currency_price_starts(text)
+    offset = 0
+    for line in text.splitlines(keepends=True):
+        if "|" in line:
+            starts.extend(offset + m.start() for m in _TABLE_NUMBER_RE.finditer(line))
+        offset += len(line)
+    return sorted(set(starts))
+
+
 def _has_words(text: str) -> bool:
     return bool(re.search(r"[^\W\d_]{2,}", re.sub(_CURRENCY, " ", text, flags=re.IGNORECASE)))
 

@@ -35,6 +35,7 @@ from app.scrapers.price_evidence import (
     _line_of,
     amount_spans,
     currency_price_starts,
+    fee_number_starts,
     label_spans,
     normalize_text,
     occurrence_currency,
@@ -3091,7 +3092,7 @@ def _price_dense_window(candidate: str, allowance: int) -> str:
     """
     header, separator, body = candidate.partition("\n")
     room = allowance - len(header) - len(separator)
-    starts = currency_price_starts(body)
+    starts = fee_number_starts(body)
     if room <= 0 or not starts or starts[-1] < room:
         return candidate[:allowance]
     best_start, best_count = 0, 0
@@ -3224,7 +3225,7 @@ def _select_pages(
             # preferred-category page that states none (school 568's fee.html had no
             # category and lost to admission/contact pages).
             score += _PRICE_EVIDENCE_SCORE * min(
-                len(currency_price_starts(page.raw_markdown or "")), _PRICE_EVIDENCE_MAX_PRICES
+                len(fee_number_starts(page.raw_markdown or "")), _PRICE_EVIDENCE_MAX_PRICES
             )
         elif use_case == "general_summary_source":
             classification = summary_page_classifications.get(id(page))

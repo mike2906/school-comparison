@@ -360,3 +360,17 @@ async def test_a_fee_pages_own_fee_link_is_followed_before_its_siblings():
 
     assert requested[:2] == ["https://school.bg/fees/doc-0", "https://school.bg/school-fees-2026-2027/"]
     assert any("14 750" in document.text for document in documents)
+
+
+def test_each_institution_follows_its_own_fee_page_on_a_shared_site():
+    """Schools 555/594: "/preschool-fees/" and "/school-fees/" on stgeorgeschool.eu."""
+    links = [("/preschool-fees/", "Preschool"), ("/school-fees/", "School"), ("/admission/fees/", "Fees")]
+
+    def urls(family):
+        found = fee_link_candidates(
+            links, base_url="https://stgeorgeschool.eu/", site_url="https://stgeorgeschool.eu", school_family=family
+        )  # fmt: skip
+        return sorted(url.rsplit("/", 2)[1] for url, _ in found)
+
+    assert urls("school") == ["fees", "school-fees"]
+    assert urls("kindergarten") == ["fees", "preschool-fees"]
