@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.scrape_log import ScrapeLog, ScrapeStatus, ScrapeType
 from app.schemas.scraping import DiscoveredSchool
+from app.services.geocoding.bg.address_match import same_building
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +23,25 @@ def _address_key(address_i18n: Optional[dict]) -> str:
     """
     address = (address_i18n or {}).get("bg") or (address_i18n or {}).get("en") or ""
     return " ".join(re.findall(r"\w+", address.casefold()))
+
+
+def _is_pinned_location(location, address_i18n: Optional[dict]) -> bool:
+    """Whether a source address is this pinned location.
+
+    A hand correction may have replaced the source's address with the real one; the
+    address it replaced is kept in ``geocode_meta.manual_fix.previous``.
+    """
+    known = {_address_key(location.address_i18n)}
+    meta = location.geocode_meta if isinstance(location.geocode_meta, dict) else {}
+    manual_fix = meta.get("manual_fix")
+    previous = manual_fix.get("previous") if isinstance(manual_fix, dict) else None
+    if isinstance(previous, dict):
+        known.add(_address_key(previous.get("address_i18n")))
+    if _address_key(address_i18n) in known:
+        return True
+    return same_building(
+        (location.address_i18n or {}).get("bg") or "", (address_i18n or {}).get("bg") or ""
+    )
 
 
 class BaseSourceAdapter(ABC):
@@ -101,7 +121,7 @@ class BaseSourceAdapter(ABC):
 
         from app.models import School, SchoolLocation, SchoolLocationAgeGroupShift
         from app.services.geocoding.base import GeocodingResult
-        from app.services.geocoding.write_gate import apply_geocode_result_to_location
+        from app.services.geocoding.write_gate import apply_geocode_result_to_location, has_pinned_point
 
         logger = logging.getLogger(__name__)
 
@@ -288,20 +308,62 @@ class BaseSourceAdapter(ABC):
                     # For simplicity, delete old locations and recreate
                     # (In production, might want smarter diffing, but locations rarely change)
                     if existing_school and not keep_existing_locations:
-                        # Remove child shift rows first because raw deletes bypass ORM cascades.
-                        location_ids_result = await self.db.execute(
-                            select(SchoolLocation.id).where(SchoolLocation.school_id == school_id)
-                        )
-                        location_ids = [row[0] for row in location_ids_result.all()]
+                        existing_locations = (
+                            await self.db.execute(
+                                select(SchoolLocation).where(SchoolLocation.school_id == school_id)
+                            )
+                        ).scalars().all()
+                        # Official and hand-corrected points are not recreated: the rows
+                        # stay, and a source location that is one of them only refreshes
+                        # its source fields.
+                        pinned = [loc for loc in existing_locations if has_pinned_point(loc)]
+                        location_ids = [loc.id for loc in existing_locations if loc not in pinned]
                         if location_ids:
+                            # Remove child shift rows first because raw deletes bypass ORM cascades.
                             await self.db.execute(
                                 delete(SchoolLocationAgeGroupShift).where(
                                     SchoolLocationAgeGroupShift.location_id.in_(location_ids)
                                 )
                             )
-                        await self.db.execute(
-                            delete(SchoolLocation).where(SchoolLocation.school_id == school_id)
-                        )
+                            await self.db.execute(
+                                delete(SchoolLocation).where(SchoolLocation.id.in_(location_ids))
+                            )
+                        if pinned:
+                            new_locations = []
+                            unmatched = list(pinned)
+                            for incoming in locations_to_add:
+                                row = next(
+                                    (loc for loc in unmatched if _is_pinned_location(loc, incoming.address_i18n)),
+                                    None,
+                                )
+                                if row is None:
+                                    new_locations.append(incoming)
+                                    continue
+                                # One row is one source location: a second address on the
+                                # same street and number is its own building.
+                                unmatched.remove(row)
+                                # The source's coords_source tag describes its own geocode,
+                                # not the pinned point.
+                                source_tags = [
+                                    tag
+                                    for tag in incoming.location_tags or []
+                                    if not tag.startswith("coords_source=")
+                                ]
+                                await self._sync_source_location(
+                                    row, incoming.model_copy(update={"location_tags": source_tags})
+                                )
+                            if any(loc.is_primary for loc in pinned):
+                                if new_locations and any(loc.is_primary for loc in unmatched):
+                                    logger.warning(
+                                        "%s: school %s keeps a pinned primary location whose address "
+                                        "the source no longer lists; review it against the new one",
+                                        self.ADAPTER_NAME,
+                                        school_id,
+                                    )
+                                new_locations = [
+                                    loc.model_copy(update={"is_primary": False}) for loc in new_locations
+                                ]
+                            locations_to_add = new_locations
 
                     for loc in locations_to_add:
                         new_location = SchoolLocation(

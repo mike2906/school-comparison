@@ -42,6 +42,7 @@ from app.scrapers.shared_site_check import level_family
 from app.scrapers.summarizer import clear_summary_state
 from app.scrapers.validator import validate_school_data
 from app.services.geocoding.base import GeocodingResult
+from app.services.geocoding.bg.address_match import same_building
 from app.services.geocoding.write_gate import (
     OFFICIAL_COORDS_TAG,
     apply_geocode_result_to_location,
@@ -413,6 +414,17 @@ async def _sync_primary_location_from_contact_address(
         }
 
     if not _should_replace_primary_address(current_bg, website_address, len(locations)):
+        return None
+    if current_bg and has_pinned_point(primary_location) and not same_building(current_bg, website_address):
+        # An official or hand-corrected point was matched to the stored address. Under
+        # another building's address it would be wrong and never re-geocoded, so the
+        # pinned location keeps its address.
+        logger.info(
+            "School %s: location %s keeps its pinned address; the website states %r",
+            school.id,
+            primary_location.id,
+            website_address,
+        )
         return None
 
     address_i18n["bg"] = website_address
