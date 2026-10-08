@@ -631,3 +631,17 @@ def test_period_fits_category():
     assert not period_fits_category("REGISTRATION", "yearly")
     assert period_fits_category("registration", "one_time")
     assert period_fits_category("tuition", "yearly") and period_fits_category("food", None)
+
+
+def test_unlabelled_row_is_scoped_by_the_lines_its_amount_stands_under():
+    """School 565 (grades 8-12) took 5773 from under "5-7. клас" with the plan name
+    "такси за нови ученици", which says nothing about whose fee it is."""
+    page = "Такси 2026/2027\nПК-4. клас\n5670 евро\n5-7. клас\n5773 евро\n"
+    row = PriceRow(
+        category="TUITION", amount=5773, amount_min=None, amount_max=None, period=None,
+        plan_name="такси за нови ученици", notes=None, currency="EUR",
+    )  # fmt: skip
+
+    assert RULE_LEVEL in {f.rule for f in check_price_row(row, page, "school", GYMNASIUM)}
+    assert RULE_LEVEL not in {f.rule for f in check_price_row(row, page, "school", PRIMARY)}
+    assert RULE_LEVEL not in {f.rule for f in check_price_row(row, page, "school")}

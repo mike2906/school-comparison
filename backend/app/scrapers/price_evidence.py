@@ -452,6 +452,26 @@ def taught_grades(age_groups: Iterable[str | None]) -> set[int]:
     return grades
 
 
+def _heading_of(text: str, span: tuple[int, int]) -> str:
+    """The amount's own line with the nearest line above it that states no price."""
+    start = text.rfind("\n", 0, span[0]) + 1
+    for line in reversed(text[:start].splitlines()):
+        if line.strip() and not _is_price_line(line):
+            return f"{line}\n{_line_of(text, span)}"
+    return _line_of(text, span)
+
+
+def label_names_a_level(label: str | None) -> bool:
+    """The label names school grades, a pre-school class or a kindergarten group."""
+    text = str(label or "").casefold()
+    return bool(
+        label_grades(text)
+        or _PRESCHOOL_LABEL_RE.search(text)
+        or _KINDERGARTEN_LABEL_RE.search(text)
+        or re.search(r"училищ|school", text)
+    )
+
+
 def label_is_another_institutions(label: str | None, school_family: str, grades: set[int]) -> bool:
     """A fee label places the fee with a sibling institution of the same site.
 
@@ -614,6 +634,13 @@ def check_price_row(
     other_family = "school" if school_family == "kindergarten" else "kindergarten"
     if label_is_another_institutions(row.scope_label, school_family, set(grades)):
         hit(RULE_LEVEL, f"label is a sibling institution's: {row.scope_label!r}", shown)
+    elif not label_names_a_level(row.scope_label) and all(
+        label_is_another_institutions(_heading_of(text, span), school_family, set(grades))
+        for span in chosen
+    ):
+        # The row's own label says nothing about whom it is for ("такси за нови
+        # ученици"); the lines its amount stands under do (565 took "5-7. клас").
+        hit(RULE_LEVEL, "amount stands under a sibling institution's label", contexts[0])
     elif row.label and names_other_level(row.label, school_family):
         hit(RULE_LEVEL, f"label names {other_family}: {row.label!r}", shown)
     elif not row.label and all(names_other_level(context, school_family) for context in contexts):

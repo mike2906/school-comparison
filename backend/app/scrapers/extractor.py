@@ -1218,6 +1218,8 @@ async def _extract_prices(
         "- Payment schedules: when one fee has multiple payment options (full pay / 2 installments / 10 monthly), emit ONE row with the full-payment amount as `amount` and list the other options as strings in `installments` (e.g. '€8,100 – 2 installments'). Do NOT emit separate rows for the installment amounts or for the total of an installment plan (e.g. '2 x 3,900 = 7,800').\n"
         "- One institution only: a site often covers a kindergarten and a school of the same brand. Emit only the fees of the institution named below. If it is a kindergarten, leave out fees stated for school grades/classes. If it is a school, keep every grade band it teaches (see \"Grades taught\" below when given; otherwise all bands the page lists), leave out bands of grades it does not teach, which belong to a sibling school on the same site, and leave out fees stated only for nursery or kindergarten groups. A pre-school (preparatory) class or group may belong to either: keep it.\n"
         "- `confidence`: 0.9 or more when the page states the amount, what it is for and whom it applies to together (a labelled table cell counts). Use 0.5 or less only when you had to guess one of the three.\n"
+        "- Exam, certificate and test fees are category extracurricular, never tuition or registration.\n"
+        "- Currency: Bulgaria has used the euro since January 2026. An amount the page states with no currency, on a page that names none, is EUR.\n"
         "- Only fees charged to parents. Leave out donations, prizes, salaries, project budgets and any amount whose purpose the page does not state.\n"
         "- Set `period` only when the source explicitly states the fee period or represents it unambiguously (for example 'per year', 'monthly fee', or 'per term'). Otherwise set `period` to null. An academic year, fee category, amount, school type, installment count, or payment frequency does NOT by itself establish the fee period.\n"
         "- Distinct tiers: when multiple tiers exist (e.g. 'Bulgarian students' vs 'International students', different grade bands, different meal plans like breakfast vs full-day), emit SEPARATE rows and set `plan_name` to the tier label from the page. `plan_name` must be populated whenever multiple rows share the same category/period/age_group on one page.\n"
@@ -1231,7 +1233,7 @@ async def _extract_prices(
     # Only the prompt gets glued currency words spaced; deterministic extraction and the
     # evidence checks below keep the original page text.
     family = level_family(school.education_level)
-    grades = await school_taught_grades(db, school.id)
+    grades = await school_taught_grades(db, school)
     school_grades = sorted(grades - {PRESCHOOL_GRADE})
     taught = (
         f"Grades taught: {school_grades[0]}-{school_grades[-1]}"

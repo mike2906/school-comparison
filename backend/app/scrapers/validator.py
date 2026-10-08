@@ -732,13 +732,33 @@ _PRICE_EVIDENCE_ERROR_CODES = {
 }
 
 
-async def school_taught_grades(db: AsyncSession, school_id: int) -> set[int]:
-    """The grades the school's locations teach (empty for a kindergarten or when unknown)."""
+async def school_taught_grades(db: AsyncSession, school: School) -> set[int]:
+    """The grades to scope a school's fees by: empty unless a sibling school shares its site.
+
+    The registry's age groups are coarse (an international K-12 school is listed with
+    grades 8-12 only: 505, 529), so they decide whose fee a grade band is only where
+    there is another school on the site to own the rest (151/392, 558/565).
+    """
+    # Local import: school_relations imports app.scrapers, whose package imports us.
+    from app.services.school_relations import same_site_institutions
+
+    group = site_group_key(school.website_url)
+    if level_family(school.education_level) != "school" or not group:
+        return set()
+    siblings = [
+        other
+        for other in await same_site_institutions(db, school)
+        if other.id != school.id
+        and level_family(other.education_level) == "school"
+        and site_group_key(other.website_url) == group
+    ]
+    if not siblings:
+        return set()
     groups = (
         await db.execute(
             select(SchoolLocationAgeGroupShift.age_group)
             .join(SchoolLocation, SchoolLocation.id == SchoolLocationAgeGroupShift.location_id)
-            .where(SchoolLocation.school_id == school_id)
+            .where(SchoolLocation.school_id == school.id)
         )
     ).scalars()
     return taught_grades(groups)
@@ -771,7 +791,7 @@ async def _check_price_evidence(
         ).all()
     )
     family = level_family(school.education_level)
-    grades = await school_taught_grades(db, school.id)
+    grades = await school_taught_grades(db, school)
     for row in rows:
         text = pages.get(row.source_page_id)
         if not text:

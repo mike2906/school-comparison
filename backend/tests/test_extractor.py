@@ -5040,3 +5040,26 @@ def test_pricing_selection_counts_bare_table_cells_as_prices():
 
     assert source_urls[0] == "https://example-school.bg/uploads/FEES-2026-2027.png"
     assert "15 350" in selected_text
+
+
+def test_model_rows_for_a_past_year_a_weekly_fee_or_a_guessed_lev_are_dropped():
+    helpers = extractor_module.helpers
+    old = "--- SOURCE: https://school.test/fees ---\nТакси за учебната 2024/2025 г.\nПГ и I клас 4 300 евро\n"
+    row = _model_price(category="tuition", amount=4300, academic_year="2024/2025")
+    assert helpers._filter_model_prices([row], old) == []
+    assert helpers._academic_year_is_over("2025/2026", today=datetime.date(2026, 10, 9)) is False
+    assert helpers._academic_year_is_over("2025/2026", today=datetime.date(2027, 9, 1)) is True
+
+    weekly = "--- SOURCE: https://school.test/fees ---\nЦелодневно: 690 евро на месец\n\nДруги услуги\nГост\nПрограма\nСедмично: 190 евро\n"
+    rows = [
+        _model_price(category="tuition", amount=190, plan_name="Седмично"),
+        _model_price(category="tuition", amount=690, plan_name="Целодневно"),
+    ]
+    assert [r.amount for r in helpers._filter_model_prices(rows, weekly)] == [690]
+
+    # A fee table that names no currency is in euro: a row calling its cell leva is a guess.
+    table = "--- SOURCE: https://school.test/fees ---\nКлас | Такса\nПодготвителен клас | 7 400\n"
+    lev = ExtractedPrice(category="tuition", amount=7400, currency="BGN", confidence=0.9)
+    euro = ExtractedPrice(category="tuition", amount=7400, currency="EUR", confidence=0.9)
+    assert helpers._filter_model_prices([lev], table) == []
+    assert len(helpers._filter_model_prices([euro], table)) == 1

@@ -2375,6 +2375,8 @@ def _filter_model_prices(prices: list[ExtractedPrice], text: str) -> list[Extrac
         currency = (price.currency or "BGN")[:3].upper()
         year = _normalize_academic_year(price.academic_year)
         label = price.plan_name or price.age_group or price.notes
+        if period_families(f"{price.plan_name or ''} {price.age_group or ''}".casefold()) == (set(), True):
+            continue  # a per-day/week/hour fee has no period the schema can hold
         supported: list[tuple[bool, str | None]] = []  # (page names the year, period)
         for block, stale in blocks:
             spans = [
@@ -2405,6 +2407,8 @@ def _filter_model_prices(prices: list[ExtractedPrice], text: str) -> list[Extrac
                 page_year = None
             if page_year is None and stale:
                 continue
+            if page_year is not None and _academic_year_is_over(page_year):
+                continue  # a fee list of a past year is not this year's price
             supported.append((page_year, period))
         if not supported:
             continue
@@ -2425,6 +2429,20 @@ def _table_header(block: str, span: tuple[int, int]) -> str | None:
             break
         header = line
     return None if header is None or currency_price_starts(header) else header
+
+
+def _academic_year_is_over(year: str | None, *, today: datetime.date | None = None) -> bool:
+    """The academic year ended before the current one began ("2024/2025" in October 2026).
+
+    Last year's list is kept: until a school publishes the new fees it is the best
+    there is, and it carries its year.
+    """
+    normalized = _normalize_academic_year(year)
+    if not normalized:
+        return False
+    today = today or datetime.date.today()
+    current_start = today.year if today.month >= 9 else today.year - 1
+    return int(normalized.split("/")[1]) < current_start
 
 
 def _period_written_for(block: str, span: tuple[int, int]) -> tuple[set[str], bool]:
@@ -2486,7 +2504,11 @@ def _bare_cell_is_a_price_in(block: str, span: tuple[int, int], currency: str) -
     if in_column:
         return currency in in_column
     table = f"{line}\n{header}"
-    return _currencies_named(table) <= {currency} and _CURRENCY_OR_FEE_RE.search(table) is not None
+    named = _currencies_named(table)
+    if not named:
+        # A fee table that names no currency is in euro (Bulgaria's currency since 2026).
+        return currency == "EUR" and _CURRENCY_OR_FEE_RE.search(table) is not None
+    return named == {currency}
 
 
 def _find_supporting_price_source_url(
