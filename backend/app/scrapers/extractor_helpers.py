@@ -2332,6 +2332,14 @@ def _source_blocks(text: str) -> list[tuple[str | None, str]]:
 
 
 _PAGE_ACADEMIC_YEAR_RE = re.compile(r"20\d{2}\s*[-/–]\s*(?:20)?\d{2}")
+_FEE_WORDS = r"такс|\bцен[аи]\b|\bfees?\b|tuition|\bprices?\b"
+# An academic year on a line that is about fees ("Такси за учебната 2026/2027 г.").
+_FEE_YEAR_LINE_RE = re.compile(
+    rf"^.*(?:{_FEE_WORDS}).*{_PAGE_ACADEMIC_YEAR_RE.pattern}"
+    rf"|^.*{_PAGE_ACADEMIC_YEAR_RE.pattern}.*(?:{_FEE_WORDS})",
+    re.MULTILINE,
+)
+_CURRENCY_OR_FEE_RE = re.compile(rf"€|\beur|евро|лв|\bbgn|лева|{_FEE_WORDS}")
 
 
 def _filter_model_prices(prices: list[ExtractedPrice], text: str) -> list[ExtractedPrice]:
@@ -2342,8 +2350,8 @@ def _filter_model_prices(prices: list[ExtractedPrice], text: str) -> list[Extrac
     (``price_evidence``): the amount must be on a page in the row's currency; the period
     is whatever is written next to the amount (or in its table's header row), or none;
     the academic year is kept only when that page names it, and taken from the page when
-    the model gave none and the page names exactly one. A yearless row needs a page that is not a dated old fee
-    list. Rows for late-payment penalties, a "total fee" sum and per-day/week/hour
+    the model gave none and the page names exactly one, on a line about fees. A yearless
+    row needs a page that is not a dated old fee list. Rows for late-payment penalties, a "total fee" sum and per-day/week/hour
     amounts are dropped.
 
     The keyword extractor's rows go through :func:`_filter_supported_prices` instead:
@@ -2388,8 +2396,8 @@ def _filter_model_prices(prices: list[ExtractedPrice], text: str) -> list[Extrac
             } - {None}
             if year in page_years:
                 page_year = price.academic_year
-            elif not year and len(page_years) == 1:
-                # The model left the year out and the page names exactly one.
+            elif not year and len(page_years) == 1 and _FEE_YEAR_LINE_RE.search(block):
+                # The model left the year out; the page names exactly one, with its fees.
                 page_year = next(iter(page_years))
             else:
                 page_year = None
@@ -2407,34 +2415,53 @@ def _filter_model_prices(prices: list[ExtractedPrice], text: str) -> list[Extrac
     return refined
 
 
-def _period_written_for(block: str, span: tuple[int, int]) -> tuple[set[str], bool]:
-    """Period wording for one amount; for a table cell with none, its column headers'."""
-    families, unrepresentable = stated_period(block, span)
-    if families or unrepresentable or "|" not in _line_of(block, span):
-        return families, unrepresentable
+def _table_header(block: str, span: tuple[int, int]) -> str | None:
+    """The first row of the pipe table the amount sits in, when that row holds no price."""
     header = None
     for line in reversed(block[: span[0]].splitlines()[:-1]):
         if "|" not in line:
             break
         header = line
-    if header is None or currency_price_starts(header):
+    return None if header is None or currency_price_starts(header) else header
+
+
+def _period_written_for(block: str, span: tuple[int, int]) -> tuple[set[str], bool]:
+    """Period wording for one amount; for a table cell with none, its column header's."""
+    families, unrepresentable = stated_period(block, span)
+    line = _line_of(block, span)
+    if families or unrepresentable or "|" not in line:
         return families, unrepresentable
-    return period_families(header)
+    header = _table_header(block, span)
+    if header is None:
+        return families, unrepresentable
+    line_start = block.rfind("\n", 0, span[0]) + 1
+    column = line[: span[0] - line_start].count("|")
+    cells = header.split("|")
+    if len(cells) != line.count("|") + 1:
+        return families, unrepresentable
+    return period_families(cells[column])
 
 
 def _amount_is_a_fee_in(block: str, span: tuple[int, int], currency: str) -> bool:
     """The occurrence is a price in ``currency`` and not a penalty or a sum of fees."""
     line = _line_of(block, span)
     written = occurrence_currency(block, span)
-    # A table cell or a number on its own line takes its currency from a header.
-    bare = written is None and ("|" in line or _NUMBER_ONLY_LINE_RE.match(line) is not None)
+    # A number on its own line, or a cell of a fee table, takes its currency from a
+    # heading; a cell of any other table (class sizes, dates) is not a price.
+    bare = written is None and (
+        _NUMBER_ONLY_LINE_RE.match(line) is not None
+        or (
+            "|" in line
+            and _CURRENCY_OR_FEE_RE.search(f"{line}\n{_table_header(block, span) or ''}") is not None
+        )
+    )
     if written != currency and not bare:
         return False
     return not _is_penalty_price_line(line) and "total fee" not in line
 
 
 # A school grade in a fee label: "8 клас", "ПЪРВИ – ТРЕТИ КЛАС", "Grade 5", "1.-4. клас".
-_SCHOOL_GRADE_LABEL_RE = re.compile(r"\bклас(?:ове)?\b|\bgrades?\b|\byear\s+\d", re.IGNORECASE)
+_SCHOOL_GRADE_LABEL_RE = re.compile(r"\bклас(?:ове)?\b|\bgrades?\b", re.IGNORECASE)
 # The class before first grade, which a kindergarten may run itself.
 _PRESCHOOL_CLASS_RE = re.compile(r"подготвител|предучилищ|\bп[гу]?к\b|pre-?school|preparatory", re.IGNORECASE)
 

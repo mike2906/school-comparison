@@ -4930,3 +4930,62 @@ async def test_kindergarten_does_not_take_school_grade_fees_and_the_prompt_names
 
     assert "Institution level: kindergarten (kindergarten)" in llm.call_args.kwargs["user_prompt"]
     assert await _stored(db_session, school) == [("tuition", 600.0, "monthly")]
+
+
+def test_model_row_table_period_comes_from_its_own_column():
+    text = (
+        "--- SOURCE: https://school.test/fees ---\n"
+        "Клас | Годишна такса | Храна | Транспорт\n"
+        "1-4 клас | 7000 евро | 150 евро | 90 евро\n"
+    )
+    rows = [
+        _model_price(category="tuition", amount=7000, plan_name="1-4 клас"),
+        _model_price(category="food", amount=150, plan_name="1-4 клас"),
+    ]
+
+    refined = extractor_module.helpers._filter_model_prices(rows, text)
+
+    assert [(row.amount, row.period) for row in refined] == [(7000, "yearly"), (150, None)]
+
+
+def test_model_row_is_not_supported_by_a_number_in_a_table_that_is_not_about_fees():
+    text = "--- SOURCE: https://school.test/classes ---\nКлас | Ученици | Паралелки\n1 клас | 24 | 2\n"
+    fee_table = "--- SOURCE: https://school.test/fees ---\nКлас | Такса (EUR)\n1 клас | 7000\n"
+
+    helpers = extractor_module.helpers
+    assert helpers._filter_model_prices([_model_price(category="materials", amount=24)], text) == []
+    assert len(helpers._filter_model_prices([_model_price(category="tuition", amount=7000)], fee_table)) == 1
+
+
+@pytest.mark.asyncio
+async def test_keyword_fallback_does_not_replace_model_rows_the_text_does_not_bear_out(
+    db_session, sample_school_for_extraction
+):
+    """School 300: with the model's rows rejected, the keyword extractor stored its own
+    reading of the same page ("materials 7880")."""
+    school = sample_school_for_extraction
+    pages = await _published_rows_and_page(db_session, school, [])
+
+    result = await _run_prices(db_session, school, pages, [("tuition", 9999.0, "monthly")])
+
+    assert result["count"] == 0
+    assert await _stored(db_session, school) == []
+
+
+@pytest.mark.asyncio
+async def test_prices_only_extraction_failure_leaves_the_status(db_session, sample_school_for_extraction):
+    school = sample_school_for_extraction
+    school.school_type = "private"
+    school.scrape_status = "navigated"
+    await db_session.commit()
+
+    async def failing_prices(db, school, pages, timeout_seconds, llm_stats):
+        llm_stats.hard_failures += 1
+        return {"success": False, "count": 0, "detail": "Price extraction LLM call failed", "input_tokens": 0, "output_tokens": 0}  # fmt: skip
+
+    with patch("app.scrapers.extractor._extract_prices", new=failing_prices):
+        result = await extractor_module.extract_school(db_session, school.id, "bg", prices_only=True)
+
+    assert result["status"] == "extraction_failed"
+    await db_session.refresh(school)
+    assert school.scrape_status == "navigated"

@@ -218,7 +218,8 @@ def _build_openrouter_model_settings(tier: str = "cheap") -> dict[str, Any]:
         for model in _csv_items(settings.extraction_openrouter_models)
     ]
     routed_models = [model for model in routed_models if model and model != primary_model]
-    if routed_models:
+    # Price rows from a weaker stand-in model would pass as the pricing model's.
+    if routed_models and tier != "pricing":
         model_settings["openrouter_models"] = routed_models
 
     provider_config: dict[str, Any] = {}
@@ -1247,17 +1248,20 @@ async def _extract_prices(
         parsed = deterministic_pricing
         used_deterministic_pricing = True
 
-    supported_prices = _supported_price_rows(
-        parsed.prices, selected_text, model_rows=not used_deterministic_pricing
-    )
-    if family == "kindergarten":
-        supported_prices = [
-            row for row in supported_prices if not helpers._names_school_grades(row)
-        ]
+    def supported(prices: list[ExtractedPrice], *, model_rows: bool) -> list[ExtractedPrice]:
+        rows = _supported_price_rows(prices, selected_text, model_rows=model_rows)
+        if family == "kindergarten":
+            rows = [row for row in rows if not helpers._names_school_grades(row)]
+        return rows
+
+    # The keyword extractor stands in only when the model read no fee at all. When the
+    # model's rows are not borne out by the text, its misreadings are no better.
+    model_gave_rows = bool(parsed.prices) and not used_deterministic_pricing
+    supported_prices = supported(parsed.prices, model_rows=not used_deterministic_pricing)
     if supported_prices:
         parsed = parsed.model_copy(update={"prices": supported_prices, "has_pricing_info": True})
-    elif deterministic_pricing.has_pricing_info:
-        deterministic_supported_prices = _supported_price_rows(deterministic_pricing.prices, selected_text)
+    elif deterministic_pricing.has_pricing_info and not model_gave_rows:
+        deterministic_supported_prices = supported(deterministic_pricing.prices, model_rows=False)
         if deterministic_supported_prices:
             parsed = deterministic_pricing.model_copy(
                 update={"prices": deterministic_supported_prices, "has_pricing_info": True}
@@ -2173,14 +2177,15 @@ async def extract_school(
         # An extraction LLM call failed or was refused after its retries: the
         # deterministic fallback output is not promoted.
         await db.rollback()
-        kept_status = await keep_previous_website_data(db, school_id)
         stats["status"] = "extraction_failed"
         stats["error"] = "Extraction LLM call failed after retries; fallback output not promoted"
-        stats["details"].append(
-            "Kept previously published website data"
-            if kept_status in {"extracted", "summarized"}
-            else "No previously published website data; website data stays withheld"
-        )
+        if not prices_only:  # a prices-only run never moved the school's status
+            kept_status = await keep_previous_website_data(db, school_id)
+            stats["details"].append(
+                "Kept previously published website data"
+                if kept_status in {"extracted", "summarized"}
+                else "No previously published website data; website data stays withheld"
+            )
         stats["token_cost_usd"] = round(float(stats["token_cost_usd"] or 0.0), 6)
         stats["llm_stats"] = llm_stats.as_dict()
         return stats
