@@ -2487,18 +2487,6 @@ def _bare_cell_is_a_price_in(block: str, span: tuple[int, int], currency: str) -
     return _currencies_named(table) <= {currency} and _CURRENCY_OR_FEE_RE.search(table) is not None
 
 
-# A school grade in a fee label: "8 клас", "ПЪРВИ – ТРЕТИ КЛАС", "Grade 5", "1.-4. клас".
-_SCHOOL_GRADE_LABEL_RE = re.compile(r"\bклас(?:ове)?\b|\bgrades?\b", re.IGNORECASE)
-# The class before first grade, which a kindergarten may run itself.
-_PRESCHOOL_CLASS_RE = re.compile(r"подготвител|предучилищ|\bп[гу]?к\b|pre-?school|preparatory", re.IGNORECASE)
-
-
-def _names_school_grades(price: ExtractedPrice) -> bool:
-    """The row's own labels place it in school grades (and not a pre-school class)."""
-    label = " ".join(str(part or "") for part in (price.plan_name, price.age_group))
-    return bool(_SCHOOL_GRADE_LABEL_RE.search(label)) and not _PRESCHOOL_CLASS_RE.search(label)
-
-
 def _find_supporting_price_source_url(
     school: School,
     pages: list[SourcePage],

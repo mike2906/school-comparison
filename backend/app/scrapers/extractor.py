@@ -37,10 +37,15 @@ from app.schemas.extraction import (
     ServicesExtractionOutput,
     SummarySourceExtractionOutput,
 )
-from app.scrapers.price_evidence import PriceRow, replacement_regressions
+from app.scrapers.price_evidence import (
+    PRESCHOOL_GRADE,
+    PriceRow,
+    label_is_another_institutions,
+    replacement_regressions,
+)
 from app.scrapers.shared_site_check import level_family
 from app.scrapers.summarizer import clear_summary_state
-from app.scrapers.validator import validate_school_data
+from app.scrapers.validator import school_taught_grades, validate_school_data
 from app.services.geocoding.base import GeocodingResult
 from app.services.geocoding.bg.address_match import same_building
 from app.services.geocoding.write_gate import (
@@ -1211,7 +1216,7 @@ async def _extract_prices(
         "Emit ONE row per distinct fee. Apply these rules:\n"
         "- Dual currencies: when the same fee is quoted in both EUR and BGN (e.g. '€8,100 / 15 842,22 лв'), emit only ONE row in the page's primary currency. Never emit a BGN row for a fee already emitted in EUR (or vice versa).\n"
         "- Payment schedules: when one fee has multiple payment options (full pay / 2 installments / 10 monthly), emit ONE row with the full-payment amount as `amount` and list the other options as strings in `installments` (e.g. '€8,100 – 2 installments'). Do NOT emit separate rows for the installment amounts or for the total of an installment plan (e.g. '2 x 3,900 = 7,800').\n"
-        "- One institution only: a site often covers a kindergarten and a school of the same brand. Emit only the fees of the institution named below. If it is a kindergarten, leave out fees stated for school grades/classes. If it is a school, keep every grade band the page lists, from primary to high school, and leave out fees stated only for nursery or kindergarten groups. A pre-school (preparatory) class or group may belong to either: keep it.\n"
+        "- One institution only: a site often covers a kindergarten and a school of the same brand. Emit only the fees of the institution named below. If it is a kindergarten, leave out fees stated for school grades/classes. If it is a school, keep every grade band it teaches (see \"Grades taught\" below when given; otherwise all bands the page lists), leave out bands of grades it does not teach, which belong to a sibling school on the same site, and leave out fees stated only for nursery or kindergarten groups. A pre-school (preparatory) class or group may belong to either: keep it.\n"
         "- `confidence`: 0.9 or more when the page states the amount, what it is for and whom it applies to together (a labelled table cell counts). Use 0.5 or less only when you had to guess one of the three.\n"
         "- Only fees charged to parents. Leave out donations, prizes, salaries, project budgets and any amount whose purpose the page does not state.\n"
         "- Set `period` only when the source explicitly states the fee period or represents it unambiguously (for example 'per year', 'monthly fee', or 'per term'). Otherwise set `period` to null. An academic year, fee category, amount, school type, installment count, or payment frequency does NOT by itself establish the fee period.\n"
@@ -1226,9 +1231,18 @@ async def _extract_prices(
     # Only the prompt gets glued currency words spaced; deterministic extraction and the
     # evidence checks below keep the original page text.
     family = level_family(school.education_level)
+    grades = await school_taught_grades(db, school.id)
+    school_grades = sorted(grades - {PRESCHOOL_GRADE})
+    taught = (
+        f"Grades taught: {school_grades[0]}-{school_grades[-1]}"
+        + (" and a pre-school class" if PRESCHOOL_GRADE in grades else "")
+        + "\n"
+        if school_grades
+        else ""
+    )
     user_prompt = (
         f"School: {school_name}\n"
-        f"Institution type: {family}\n\nContent:\n"
+        f"Institution type: {family}\n{taught}\nContent:\n"
         f"{helpers._space_glued_currency_words(selected_text)}"
     )
     deterministic_pricing = helpers._extract_prices_deterministic(selected_text)
@@ -1258,19 +1272,23 @@ async def _extract_prices(
                 "token_cost_usd": token_cost_usd,
             }
 
-    if not parsed.prices and deterministic_pricing.has_pricing_info:
-        parsed = deterministic_pricing
-        used_deterministic_pricing = True
 
     def supported(prices: list[ExtractedPrice], *, model_rows: bool) -> list[ExtractedPrice]:
         rows = _supported_price_rows(prices, selected_text, model_rows=model_rows)
-        if family == "kindergarten":
-            rows = [row for row in rows if not helpers._names_school_grades(row)]
-        return rows
+        # A sibling kindergarten's or school's fee on a shared site is not this one's.
+        return [
+            row
+            for row in rows
+            if not label_is_another_institutions(
+                " / ".join(part for part in (row.plan_name, row.age_group) if part), family, grades
+            )
+        ]
 
-    # The keyword extractor stands in only when the model read no fee at all. When the
-    # model's rows are not borne out by the text, its misreadings are no better.
-    model_gave_rows = bool(parsed.prices) and not used_deterministic_pricing
+    # The keyword extractor stands in only when the model call gave no answer. A model
+    # that answers "no fees for this institution" is usually right (526: the page a
+    # kindergarten shares lists only the school's fees), and when its rows are not borne
+    # out by the text the keyword reading is no better.
+    model_gave_rows = not used_deterministic_pricing
     supported_prices = supported(parsed.prices, model_rows=not used_deterministic_pricing)
     if supported_prices:
         parsed = parsed.model_copy(update={"prices": supported_prices, "has_pricing_info": True})

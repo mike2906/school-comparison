@@ -527,3 +527,94 @@ def test_rule_6_allows_a_period_change_the_page_states():
     once = [(row(Decimal("680"), period="ONE_TIME"), "Такса: 680 евро")]
     assert replacement_regressions([(row(Decimal("680"), period="YEARLY"), "Такса: 680 евро")], once, "school") == []
 
+
+
+# ---------------------------------------------------------------------------
+# Whose fee: grades in a label against the grades the institution teaches
+# ---------------------------------------------------------------------------
+
+from app.scrapers.price_evidence import (  # noqa: E402
+    RULE_LEVEL,
+    label_grades,
+    label_is_another_institutions,
+    taught_grades,
+)
+
+
+@pytest.mark.parametrize(
+    ("label", "grades"),
+    [
+        ("5 - 7 клас", {5, 6, 7}),
+        ("8. клас", {8}),
+        ("ПК-4. Клас", {0, 1, 2, 3, 4}),
+        ("VIII - XII клас", {8, 9, 10, 11, 12}),
+        ("I - VIІ клас", {1, 2, 3, 4, 5, 6, 7}),  # the second I is Cyrillic
+        ("ПЪРВИ – ТРЕТИ КЛАС", {1, 2, 3}),
+        ("7, 8, 9, 10, 11, 12 клас", {7, 8, 9, 10, 11, 12}),
+        ("Grades 4th - 7th", {4, 5, 6, 7}),
+        ("9 - 10 grade", {9, 10}),
+        ("Начално училище", {1, 2, 3, 4}),
+        ("Прогимназиален етап", {5, 6, 7}),
+        ("Гимназия", {8, 9, 10, 11, 12}),
+        ("Първи клас до 17:00 ч.", {1}),
+        ("Подготвителна група - 5 годишни", set()),
+        ("3г. – 4г. / Основна програма", set()),
+        ("Plan 1 (1 installment)", set()),
+        ("до 15.01.2027 г. II срок", set()),
+    ],
+)
+def test_label_grades(label, grades):
+    assert label_grades(label) == grades
+
+
+def test_taught_grades_from_age_groups():
+    assert taught_grades(["grade_1_4", "grade_5_7", "preschool"]) == set(range(0, 8))
+    assert taught_grades(["first", "second", "third", "nursery"]) == set()
+
+
+PRIMARY, GYMNASIUM, ALL_GRADES = set(range(1, 8)), set(range(8, 13)), set(range(1, 13))
+
+
+@pytest.mark.parametrize(
+    ("label", "family", "grades", "foreign"),
+    [
+        # 151/392: one site lists the primary school's and the gymnasium's bands.
+        ("8 grade / Students from Bulgarian schools", "school", PRIMARY, True),
+        ("5 - 7 grade", "school", GYMNASIUM, True),
+        ("5 - 7 grade", "school", PRIMARY, False),
+        # 565: the gymnasium took its sibling's "ПК-4" and "5-7" fees.
+        ("ПК-4. Клас", "school", GYMNASIUM, True),
+        ("ПК-4. Клас", "school", PRIMARY, False),
+        ("Гимназия", "school", PRIMARY, True),
+        # 522/633: a school took kindergarten programmes.
+        ("3г. – 4г. / Основна програма", "school", ALL_GRADES, True),
+        ("Група ранно детско развитие", "school", PRIMARY, True),
+        ("Детска градина", "school", ALL_GRADES, True),
+        # 300: the school's own preparatory groups are named by age.
+        ("Подготвителна група - 5 годишни", "school", ALL_GRADES, False),
+        ("Предучилищна", "school", ALL_GRADES, False),
+        ("Students from Bulgarian schools", "school", PRIMARY, False),
+        # Grades unknown: nothing to compare against.
+        ("8 grade", "school", set(), False),
+        # 510/305: a kindergarten took school classes; a pre-school class may be its own.
+        ("8 клас", "kindergarten", set(), True),
+        ("ПЪРВИ – ТРЕТИ КЛАС", "kindergarten", set(), True),
+        ("Подготвителен клас", "kindergarten", set(), False),
+        ("Целодневна група 3-6 години", "kindergarten", set(), False),
+    ],
+)
+def test_label_is_another_institutions(label, family, grades, foreign):
+    assert label_is_another_institutions(label, family, grades) is foreign
+
+
+def test_row_check_reads_the_age_group_and_the_schools_grades():
+    """Rule 2 read only the plan name: "8 grade" sat in the age group of 151's rows."""
+    page = "Tuition 2026/2027\n8 grade | € 9780: students from Bulgarian schools\n"
+    row = PriceRow(
+        category="TUITION", amount=9780, amount_min=None, amount_max=None, period=None,
+        plan_name="Students from Bulgarian schools", notes=None, currency="EUR", age_group="8 grade",
+    )  # fmt: skip
+
+    assert RULE_LEVEL in {f.rule for f in check_price_row(row, page, "school", PRIMARY)}
+    assert RULE_LEVEL not in {f.rule for f in check_price_row(row, page, "school", GYMNASIUM)}
+    assert RULE_LEVEL not in {f.rule for f in check_price_row(row, page, "school")}

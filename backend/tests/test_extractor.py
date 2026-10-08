@@ -3105,10 +3105,14 @@ def test_extract_prices_deterministic_prefers_yearly_when_mixed_fee_table_line_m
 
 
 @pytest.mark.asyncio
-async def test_extract_school_uses_deterministic_pricing_fallback_when_llm_reports_no_pricing(
+async def test_extract_school_keeps_the_models_answer_of_no_pricing(
     db_session,
     sample_school_for_extraction,
 ):
+    """The keyword extractor used to stand in when the model reported no fees. In the
+    2026-10-08 cohort that stored a project budget as tuition (286) and the school's
+    fees for the kindergarten sharing its page (526), which the model had left out on
+    purpose. It now stands in only when the model call gives no answer."""
     school = sample_school_for_extraction
     pricing_page = (
         await db_session.execute(select(SourcePage).where(SourcePage.school_id == school.id, SourcePage.page_category == "pricing"))
@@ -3141,25 +3145,13 @@ async def test_extract_school_uses_deterministic_pricing_fallback_when_llm_repor
         result = await extractor_module.extract_school(db_session, school.id, "bg")
 
     assert result["status"] == "extracted"
-    assert result["pricing_count"] == 3
-    assert any("deterministic fallback" in detail for detail in result["details"])
+    assert result["pricing_count"] == 0
+    assert not any("deterministic fallback" in detail for detail in result["details"])
 
     pricing_rows = (
-        await db_session.execute(select(Pricing).where(Pricing.school_id == school.id).order_by(Pricing.id))
+        await db_session.execute(select(Pricing).where(Pricing.school_id == school.id))
     ).scalars().all()
-    assert [
-        (
-            row.category.value,
-            float(row.amount),
-            row.currency,
-            row.period.value if row.period else None,
-        )
-        for row in pricing_rows
-    ] == [
-        ("tuition", 6650.0, "EUR", None),
-        ("tuition", 7150.0, "EUR", None),
-        ("materials", 545.0, "EUR", None),
-    ]
+    assert pricing_rows == []
 
 
 @pytest.mark.asyncio
@@ -4879,25 +4871,6 @@ async def test_prices_only_extraction_rereads_fees_and_leaves_the_rest(
     assert school.scrape_status == "summarized"
     assert school.summary_i18n == {"bg": "Обобщение"}
     assert await _stored(db_session, school) == [("tuition", 530.0, "monthly")]
-
-
-@pytest.mark.parametrize(
-    ("label", "expected"),
-    [
-        ("8 клас", True),
-        ("ПЪРВИ – ТРЕТИ КЛАС", True),
-        ("Grade 5", True),
-        ("1. - 4. клас", True),
-        ("Подготвителен клас", False),
-        ("ПК - 12. клас", False),
-        ("Целодневна група 3-6 години", False),
-        ("Classic programme", False),
-    ],
-)
-def test_names_school_grades(label, expected):
-    row = ExtractedPrice(category="tuition", amount=1, currency="EUR", plan_name=label, confidence=1.0)
-
-    assert extractor_module.helpers._names_school_grades(row) is expected
 
 
 @pytest.mark.asyncio

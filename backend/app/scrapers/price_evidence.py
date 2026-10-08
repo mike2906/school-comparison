@@ -320,6 +320,123 @@ def names_other_level(text: str, school_family: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# Whose fee: the grades a label names against the grades the institution teaches
+# ---------------------------------------------------------------------------
+
+PRESCHOOL_GRADE = 0  # the class before first grade (ПК / ПГ / Pre-K)
+
+_ROMAN_GRADES = {
+    "i": 1, "ii": 2, "iii": 3, "iv": 4, "v": 5, "vi": 6, "vii": 7, "viii": 8, "ix": 9, "x": 10,
+    "xi": 11, "xii": 12,
+}  # fmt: skip
+_WORD_GRADES = {
+    "първи": 1, "втори": 2, "трети": 3, "четвърти": 4, "пети": 5, "шести": 6, "седми": 7,
+    "осми": 8, "девети": 9, "десети": 10, "единадесети": 11, "единайсети": 11,
+    "дванадесети": 12, "дванайсети": 12,
+    "first": 1, "second": 2, "third": 3, "fourth": 4, "fifth": 5, "sixth": 6, "seventh": 7,
+    "eighth": 8, "ninth": 9, "tenth": 10, "eleventh": 11, "twelfth": 12,
+}  # fmt: skip
+_PRESCHOOL_TOKENS = {"пк", "пг", "пгу", "пук", "pk", "prek"}
+# Roman numerals written with Cyrillic look-alikes ("VIІ клас") read as Latin.
+_LOOKALIKES = str.maketrans("іхѵ", "ixv")
+_GRADE_VALUE = (
+    r"(?:1[0-2]|[0-9]|x{0,1}(?:ix|iv|v?i{0,3})|"
+    + "|".join(sorted(_WORD_GRADES, key=len, reverse=True))
+    + "|"
+    + "|".join(sorted(_PRESCHOOL_TOKENS, key=len, reverse=True))
+    + r")"
+)
+_GRADE_SUFFIX = r"(?:\s*\.|\s*-?\s*(?:ви|ри|ти|ми|st|nd|rd|th)\b)?"
+_GRADE_JOIN = r"\s*(?:-|–|—|,|/|\bдо\b|\bи\b|\bto\b|\band\b)\s*"
+_GRADE_RUN = rf"\b{_GRADE_VALUE}{_GRADE_SUFFIX}(?:{_GRADE_JOIN}{_GRADE_VALUE}{_GRADE_SUFFIX})*"
+_GRADE_WORD = r"(?:клас(?:ове)?|кл\.|grades?)"
+# "5 - 7 клас", "VIII - XII клас", "ПК-4. клас" / "Grade 5", "Grades 4th - 7th".
+_GRADES_BEFORE_RE = re.compile(rf"({_GRADE_RUN})\s*{_GRADE_WORD}(?![\w-])")
+_GRADES_AFTER_RE = re.compile(rf"\bgrades?\s*({_GRADE_RUN})")
+_GRADE_TOKEN_RE = re.compile(rf"{_GRADE_VALUE}|-|–|—|\bдо\b|\bto\b")
+# School stages named without a grade.
+_STAGE_GRADES: tuple[tuple[re.Pattern[str], range], ...] = (
+    (re.compile(r"прогимназ|middle school|coll[eè]ge"), range(5, 8)),
+    (re.compile(r"начално училище|начален етап|primary|elementary|[eé]l[eé]mentaire"), range(1, 5)),
+    (re.compile(r"(?<!про)гимназ|high school|lyc[eé]e"), range(8, 13)),
+)
+_PRESCHOOL_LABEL_RE = re.compile(
+    r"подготв|подготов|предучилищ|pre-?school|preparatory|reception|pre[- ]?k(?:indergarten)?\b"
+)
+# A kindergarten or nursery group: named, or given by the children's age.
+_KINDERGARTEN_LABEL_RE = re.compile(
+    r"детска\s+градина|\bградина\b|ясл|kindergarten|nursery|toddler|maternelle|ранно детско"
+    r"|\d\s*(?:г\.|г\b|год|years?\b|yrs?\b|y\.?o\b|месец)"
+)
+
+
+def _grade_number(token: str) -> Optional[int]:
+    if token.isdigit():
+        return int(token)
+    if token in _PRESCHOOL_TOKENS:
+        return PRESCHOOL_GRADE
+    return _ROMAN_GRADES.get(token) or _WORD_GRADES.get(token)
+
+
+def label_grades(label: str | None) -> set[int]:
+    """School grades a fee label names (0 for the pre-school class); empty when none.
+
+    "5 - 7 клас" is {5, 6, 7}, "8 клас" {8}, "ПК-4. клас" {0..4}, "Grades 4th - 7th"
+    {4..7}, "Начално училище" {1..4}. A number with no grade word is not a grade.
+    """
+    text = str(label or "").casefold().translate(_LOOKALIKES)
+    grades: set[int] = set()
+    for run in _GRADES_BEFORE_RE.findall(text) + _GRADES_AFTER_RE.findall(text):
+        previous: Optional[int] = None
+        spanning = False
+        for token in _GRADE_TOKEN_RE.findall(run):
+            number = _grade_number(token)
+            if number is None:
+                spanning = previous is not None
+                continue
+            if spanning and previous is not None and number > previous:
+                grades.update(range(previous, number + 1))
+            grades.add(number)
+            previous, spanning = number, False
+    for pattern, stage in _STAGE_GRADES:
+        if pattern.search(text):
+            grades.update(stage)
+    return grades
+
+
+def taught_grades(age_groups: Iterable[str | None]) -> set[int]:
+    """Grades behind a school's age groups ("grade_5_7" -> 5, 6, 7; "preschool" -> 0)."""
+    grades: set[int] = set()
+    for group in age_groups:
+        match = re.fullmatch(r"grade_(\d+)_(\d+)", str(group or ""))
+        if match:
+            grades.update(range(int(match.group(1)), int(match.group(2)) + 1))
+        elif group == "preschool":
+            grades.add(PRESCHOOL_GRADE)
+    return grades
+
+
+def label_is_another_institutions(label: str | None, school_family: str, grades: set[int]) -> bool:
+    """A fee label places the fee with a sibling institution of the same site.
+
+    ``grades`` are the school's :func:`taught_grades` (empty when unknown). A
+    kindergarten's fee does not name school grades. A school's fee does not name only
+    grades the school does not teach (the gymnasium's "8 - 12 клас" on the primary
+    school's page), nor only a kindergarten or nursery group. A pre-school class may be
+    either's, so a label naming one and no school grade is kept.
+    """
+    text = str(label or "").casefold()
+    named = label_grades(text)
+    preschool = bool(_PRESCHOOL_LABEL_RE.search(text)) or PRESCHOOL_GRADE in named
+    school_grades = named - {PRESCHOOL_GRADE}
+    if school_family == "kindergarten":
+        return bool(school_grades) and not preschool
+    if school_grades:
+        return bool(grades) and not (school_grades & grades)
+    return bool(_KINDERGARTEN_LABEL_RE.search(text)) and not preschool
+
+
+# ---------------------------------------------------------------------------
 # Rules
 # ---------------------------------------------------------------------------
 
@@ -351,10 +468,16 @@ class PriceRow:
     plan_name: Optional[str]
     notes: Optional[str]
     currency: Optional[str] = None
+    age_group: Optional[str] = None
 
     @property
     def label(self) -> Optional[str]:
         return (self.plan_name or self.notes or "").strip() or None
+
+    @property
+    def scope_label(self) -> str:
+        """What says whom the fee is for: the plan name and the age group together."""
+        return " / ".join(part for part in (self.plan_name, self.age_group) if part)
 
     @classmethod
     def from_pricing(cls, row: Any) -> "PriceRow":
@@ -370,6 +493,7 @@ class PriceRow:
             plan_name=row.plan_name,
             notes=notes if isinstance(notes, str) else None,
             currency=str(row.currency or "").strip().upper() or None,
+            age_group=row.age_group,
         )
 
     @property
@@ -384,10 +508,16 @@ def _enum(value: Any) -> Optional[str]:
     return str(value).upper() if value is not None else None
 
 
-def check_price_row(row: PriceRow, page_text: str | None, school_family: str) -> list[PriceFinding]:
+def check_price_row(
+    row: PriceRow,
+    page_text: str | None,
+    school_family: str,
+    grades: Iterable[int] = (),
+) -> list[PriceFinding]:
     """Rule 1-4 findings for one price row against its source page text.
 
-    ``school_family`` is ``shared_site_check.level_family`` of the school's level.
+    ``school_family`` is ``shared_site_check.level_family`` of the school's level;
+    ``grades`` are the grades it teaches (:func:`taught_grades`), when known.
     """
     text = normalize_text(page_text)
     hits: list[PriceFinding] = []
@@ -446,7 +576,9 @@ def check_price_row(row: PriceRow, page_text: str | None, school_family: str) ->
 
     # Rule 2: the row's own label, or every occurrence's label lines, name the other level.
     other_family = "school" if school_family == "kindergarten" else "kindergarten"
-    if row.label and names_other_level(row.label, school_family):
+    if label_is_another_institutions(row.scope_label, school_family, set(grades)):
+        hit(RULE_LEVEL, f"label is a sibling institution's: {row.scope_label!r}", shown)
+    elif row.label and names_other_level(row.label, school_family):
         hit(RULE_LEVEL, f"label names {other_family}: {row.label!r}", shown)
     elif not row.label and all(names_other_level(context, school_family) for context in contexts):
         hit(RULE_LEVEL, f"amount's label lines name {other_family}", contexts[0])

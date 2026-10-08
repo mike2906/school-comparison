@@ -21,7 +21,7 @@ from app.ai.client import calculate_cost, create_agent, extract_provider_cost_us
 from app.config import get_settings
 from app.models.field_source import FieldSource, SourceType
 from app.models.pricing import PricePeriod, PriceSource, Pricing
-from app.models.school import School
+from app.models.school import School, SchoolLocation, SchoolLocationAgeGroupShift
 from app.models.scrape_log import ScrapeType
 from app.models.source_page import SourcePage
 from app.schemas.extraction import ExtractedLanguageFocus, SummarySourceExtractionOutput
@@ -48,6 +48,7 @@ from app.scrapers.price_evidence import (
     PriceRow,
     check_price_row,
     shared_names,
+    taught_grades,
 )
 from app.scrapers.shared_site_check import level_family, site_group_key
 from app.scrapers.summarizer import clear_summary_state
@@ -730,6 +731,18 @@ _PRICE_EVIDENCE_ERROR_CODES = {
 }
 
 
+async def school_taught_grades(db: AsyncSession, school_id: int) -> set[int]:
+    """The grades the school's locations teach (empty for a kindergarten or when unknown)."""
+    groups = (
+        await db.execute(
+            select(SchoolLocationAgeGroupShift.age_group)
+            .join(SchoolLocation, SchoolLocation.id == SchoolLocationAgeGroupShift.location_id)
+            .where(SchoolLocation.school_id == school_id)
+        )
+    ).scalars()
+    return taught_grades(groups)
+
+
 async def _check_price_evidence(
     db: AsyncSession, report: ValidationReport, school: School, rows: list[Pricing]
 ) -> None:
@@ -757,12 +770,13 @@ async def _check_price_evidence(
         ).all()
     )
     family = level_family(school.education_level)
+    grades = await school_taught_grades(db, school.id)
     for row in rows:
         text = pages.get(row.source_page_id)
         if not text:
             continue
         row_prefix = f"pricing[{row.id}]"
-        for finding in check_price_row(PriceRow.from_pricing(row), text, family):
+        for finding in check_price_row(PriceRow.from_pricing(row), text, family, grades):
             if finding.rule == RULE_PERIOD_MISSING:
                 period = PricePeriod(finding.period.lower())
                 _add_fix(
