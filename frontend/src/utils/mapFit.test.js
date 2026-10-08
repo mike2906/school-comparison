@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { pointsForFit, pickSelectedMarker, pinHasRoom, pinTarget, overlayFitPadding, stackedMarkersByKey } from './mapFit.js'
+import { pointsForFit, fitKeepRatio, fitPadding, pickSelectedMarker, pinHasRoom, pinTarget, overlayFitPadding, stackedMarkersByKey } from './mapFit.js'
 
 // Stand-in for Leaflet's distanceTo in node tests; only the ordering matters here.
 const distance = ([aLat, aLng], [bLat, bLng]) => Math.hypot(aLat - bLat, aLng - bLng)
@@ -105,4 +105,37 @@ test('stackedMarkersByKey lists the other schools at the same position', () => {
 test('stackedMarkersByKey ignores a school stacked only on its own locations', () => {
   const markers = [pin(5, 1, [42.7, 23.3]), pin(5, 2, [42.7, 23.3]), pin(6, 3, [42.70002, 23.3])]
   assert.equal(stackedMarkersByKey(markers).size, 0)
+})
+
+test('fitKeepRatio fits nearly all of a shortlist and the central half of a whole city', () => {
+  assert.equal(fitKeepRatio(3), 0.95)
+  assert.equal(fitKeepRatio(50), 0.95)
+  // Sofia, all ages: 710 pins. Fitting 95% of them opened the map as three clusters.
+  assert.equal(fitKeepRatio(710), 0.5)
+  assert.equal(fitKeepRatio(500), 0.5)
+})
+
+test('fitKeepRatio falls evenly between a shortlist and a city', () => {
+  assert.ok(Math.abs(fitKeepRatio(275) - 0.725) < 1e-9)
+  for (let count = 50; count < 520; count += 1) {
+    const step = fitKeepRatio(count) - fitKeepRatio(count + 1)
+    assert.ok(step >= 0 && step <= 0.0011, `step at ${count}: ${step}`)
+  }
+})
+
+test('pointsForFit with the city ratio keeps the central half', () => {
+  const points = Array.from({ length: 600 }, (_, i) => [42.4 + i * 0.001, 23.3])
+  const kept = pointsForFit(points, { distance, keepRatio: fitKeepRatio(points.length) })
+  assert.equal(kept.length, 300)
+  const lats = kept.map(([lat]) => lat)
+  assert.ok(Math.min(...lats) > 42.54 && Math.max(...lats) < 42.86)
+})
+
+test('fitPadding leaves less room on a phone than on a large map', () => {
+  assert.equal(fitPadding({ x: 390, y: 551 }), 31)
+  assert.equal(fitPadding({ x: 544, y: 770 }), 44)
+  assert.equal(fitPadding({ x: 1100, y: 770 }), 60)
+  assert.equal(fitPadding({ x: 200, y: 200 }), 24)
+  // A hidden map (mobile List tab) has no size yet.
+  assert.equal(fitPadding({ x: 0, y: 0 }), 24)
 })

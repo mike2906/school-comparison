@@ -1,6 +1,6 @@
 import { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link, useSearchParams, useNavigate, useLocation } from 'react-router-dom'
+import { Link, useSearchParams, useNavigate, useNavigationType, useLocation } from 'react-router-dom'
 import debounce from 'lodash.debounce'
 import { useStableCallback } from '../../hooks/useStableCallback'
 import Layout from '../Layout/Layout'
@@ -38,6 +38,7 @@ import {
   saveViewState,
   rememberLastSearchUrl,
   isDesktopViewport,
+  closedDetailSchoolId,
 } from '../../utils/searchViewState'
 
 function readStoredUserLocation(fallbackAddress) {
@@ -74,6 +75,7 @@ function SearchPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
   const location = useLocation()
+  const navigationType = useNavigationType()
   // View state lives in the URL so it survives opening a school and coming back.
   const [initialView] = useState(() => readViewParams(searchParams))
   const [savedViewState] = useState(() => readSavedViewState(location.key, location.search))
@@ -116,6 +118,8 @@ function SearchPage() {
   // URLs this page has written but that have not landed yet, oldest first.
   const pendingWritesRef = useRef([])
   const adoptingUrlRef = useRef(false)
+  const lastSearchRef = useRef(location.search)
+  const closingDetailRef = useRef(false)
   const [agePickerOpen, setAgePickerOpen] = useState(false)
   const [welcomeDismissed, setWelcomeDismissed] = useState(() => {
     try {
@@ -286,6 +290,13 @@ function SearchPage() {
   // Runs before the state-to-URL sync below, which then skips this commit: it would
   // otherwise write the old state over the URL we are adopting.
   useEffect(() => {
+    // The panel was closed (its button, Esc or browser Back), as opposed to a link that
+    // leaves for another search, such as the logo.
+    const closedDetailId = closingDetailRef.current || navigationType === 'POP'
+      ? closedDetailSchoolId(lastSearchRef.current, location.search)
+      : null
+    lastSearchRef.current = location.search
+    closingDetailRef.current = false
     const pendingIndex = pendingWritesRef.current.indexOf(location.search)
     if (pendingIndex >= 0) {
       // Our own write landing (earlier ones may have been skipped): nothing to adopt.
@@ -299,7 +310,9 @@ function SearchPage() {
     setDistanceFilter(view.within)
     setViewMode(view.view)
     setMobileTab(view.tab)
-    setSelectedSchoolId(view.school)
+    // Closing the detail panel leaves the school it showed selected, not the one that was
+    // selected before the panel opened.
+    setSelectedSchoolId(closedDetailId || view.school)
     setNameQuery(view.q)
   }, [location.search])
 
@@ -427,6 +440,7 @@ function SearchPage() {
   })
 
   const handleCloseDetails = useStableCallback(() => {
+    closingDetailRef.current = true
     // Opened from these results: step back to them. Opened from a link: just drop the param.
     if (location.state?.detailPushed) {
       navigate(-1)
@@ -489,6 +503,12 @@ function SearchPage() {
 
   const handleClearSelection = useStableCallback(() => {
     setSelectedSchoolId(null)
+  })
+
+  // Esc on the map closes what is on top: the detail panel first, then the selection.
+  const handleMapEscape = useStableCallback(() => {
+    if (detailSchoolId) handleCloseDetails()
+    else setSelectedSchoolId(null)
   })
 
   const handleToggleLocationsPanel = useStableCallback((school) => {
@@ -2045,6 +2065,7 @@ function SearchPage() {
                   onOpenDetails={handleOpenDetails}
                   onSchoolSelect={handleMapSchoolSelect}
                   onClearSelection={handleClearSelection}
+                  onEscape={handleMapEscape}
                   loading={loading}
                   userLocation={userLocation}
                   isPickingLocation={isPickingLocation}
@@ -2054,6 +2075,7 @@ function SearchPage() {
                   initialView={savedViewState?.map || null}
                   autoFit={!searchInBounds && !selectedSchoolId && !locationOverlay.schoolId}
                   hasCompare={hasCompare}
+                  detailOpen={Boolean(detailSchoolId)}
                   resizeKey={`${viewMode}-${mobileTab}-${showMap}-${panelBesideMap}`}
                   locationOverlay={locationOverlay}
                   onShowLocations={handleShowLocationsForSchool}

@@ -15,7 +15,7 @@ import { AGE_GROUP_KEYS } from '../../utils/education'
 import { useStableCallback } from '../../hooks/useStableCallback'
 import { isDesktopViewport } from '../../utils/searchViewState'
 import { schoolLevelLabel } from '../../utils/levelLabel'
-import { pointsForFit, pickSelectedMarker, pinHasRoom, pinTarget, overlayFitPadding, stackedMarkersByKey } from '../../utils/mapFit'
+import { pointsForFit, fitKeepRatio, fitPadding, pickSelectedMarker, pinHasRoom, pinTarget, overlayFitPadding, stackedMarkersByKey } from '../../utils/mapFit'
 
 // CARTO requires an API key; without one every tile is watermarked
 const CARTO_API_KEY = import.meta.env.VITE_CARTO_API_KEY
@@ -34,7 +34,6 @@ const UNCLUSTERED_ZOOM = 15
 // A fit may zoom in until pins show one by one: stopping a level short left a school's
 // two nearby locations as a "2" cluster after searching for it by name.
 const MAX_FIT_ZOOM = UNCLUSTERED_ZOOM
-const FIT_PADDING = [60, 60]
 const MARKER_CLICK_GUARD_MS = 350
 // Room a clicked pin needs around it (px) to stay where it is: the popup opens above it
 // on desktop, the info sheet covers the bottom of the map on mobile.
@@ -44,6 +43,10 @@ const STACK_LIST_ROOM = { base: 36, perSchool: 24 }
 const PIN_ROOM_MOBILE = { top: 60, side: 20, bottom: 20 }
 // Padding (px) when fitting a school's locations: their markers are 58px tall.
 const OVERLAY_FIT_PADDING = { top: 70, side: 40, bottom: 24 }
+// Without the sheet, the legend and reset buttons sit over the bottom of the map (px), and
+// the fixed compare bar lifts them further (see .map-has-compare).
+const MAP_CONTROLS_COVER = 70
+const COMPARE_BAR_COVER = 72
 // How far past the country bounds the map can be panned, as a share of their size.
 const MAX_BOUNDS_PAD = 1
 // Fixed when the map is created: the cluster layer builds its grid per zoom level then,
@@ -266,13 +269,19 @@ const collectSchoolPoints = (schools, countryBounds) => {
 const leafletDistance = (a, b) => L.latLng(a).distanceTo(b)
 
 const collectPoints = (schools, userLocation, countryBounds) => {
-  const points = pointsForFit(collectSchoolPoints(schools, countryBounds), { distance: leafletDistance })
+  const schoolPoints = collectSchoolPoints(schools, countryBounds)
+  const points = pointsForFit(schoolPoints, { distance: leafletDistance, keepRatio: fitKeepRatio(schoolPoints.length) })
 
   if (userLocation?.lat && userLocation?.lng) {
     points.push([userLocation.lat, userLocation.lng])
   }
 
   return points
+}
+
+const fitPaddingFor = (map) => {
+  const pad = fitPadding(map.getSize())
+  return [pad, pad]
 }
 
 const fitMapToPoints = (map, points) => {
@@ -284,7 +293,7 @@ const fitMapToPoints = (map, points) => {
   }
 
   const bounds = L.latLngBounds(points)
-  map.fitBounds(bounds, { padding: FIT_PADDING, maxZoom: MAX_FIT_ZOOM, animate: true, duration: 0.4 })
+  map.fitBounds(bounds, { padding: fitPaddingFor(map), maxZoom: MAX_FIT_ZOOM, animate: true, duration: 0.4 })
   return bounds
 }
 
@@ -359,7 +368,7 @@ function MapUpdater({ schools, userLocation, autoFit, lastValidBoundsRef, defaul
     }
 
     if (lastValidBoundsRef.current) {
-      map.fitBounds(lastValidBoundsRef.current, { padding: FIT_PADDING, maxZoom: MAX_FIT_ZOOM, animate: true, duration: 0.4 })
+      map.fitBounds(lastValidBoundsRef.current, { padding: fitPaddingFor(map), maxZoom: MAX_FIT_ZOOM, animate: true, duration: 0.4 })
       return
     }
 
@@ -367,7 +376,7 @@ function MapUpdater({ schools, userLocation, autoFit, lastValidBoundsRef, defaul
     lastValidBoundsRef.current = countryBounds
     // Not animated: this runs while the schools are loading, and Leaflet drops a fit
     // requested during a zoom animation, which left the map on the country view.
-    map.fitBounds(countryBounds, { padding: FIT_PADDING, maxZoom: defaultZoom, animate: false })
+    map.fitBounds(countryBounds, { padding: fitPaddingFor(map), maxZoom: defaultZoom, animate: false })
   }, [schools, userLocation, autoFit, map, lastValidBoundsRef, defaultZoom, countryBounds, fittedWhileHiddenRef])
 
   return null
@@ -411,7 +420,7 @@ function MapResizer({ resizeKey, lastValidBoundsRef, fittedWhileHiddenRef }) {
       // size and zoomed out to the whole province: redo it once the map is visible. Only
       // then, so a view the parent zoomed to themselves is kept across tab switches.
       if (fittedWhileHiddenRef.current && size.x > 0 && size.y > 0 && lastValidBoundsRef.current) {
-        map.fitBounds(lastValidBoundsRef.current, { padding: FIT_PADDING, maxZoom: MAX_FIT_ZOOM, animate: false })
+        map.fitBounds(lastValidBoundsRef.current, { padding: fitPaddingFor(map), maxZoom: MAX_FIT_ZOOM, animate: false })
         fittedWhileHiddenRef.current = false
       }
     }, 0)
@@ -421,7 +430,7 @@ function MapResizer({ resizeKey, lastValidBoundsRef, fittedWhileHiddenRef }) {
   return null
 }
 
-function MapClickHandler({ onClearSelection, markerInteractionRef }) {
+function MapClickHandler({ onClearSelection, onEscape, markerInteractionRef }) {
   useMapEvents({
     click: (event) => {
       if (Date.now() - (markerInteractionRef.current || 0) < MARKER_CLICK_GUARD_MS) return
@@ -432,8 +441,13 @@ function MapClickHandler({ onClearSelection, markerInteractionRef }) {
       onClearSelection?.()
     },
     // Leaflet closes the popup on Esc; a pin left selected without it cannot be reopened.
+    // It also swallows the key once any popup has been opened, so nothing outside the map
+    // hears it: the page's own Esc action (closing the detail panel) is run from here.
     keydown: (event) => {
-      if (event.originalEvent?.key === 'Escape') onClearSelection?.()
+      if (event.originalEvent?.key !== 'Escape') return
+      // Marked handled, for the case where Leaflet lets the key through to the page.
+      event.originalEvent.preventDefault()
+      onEscape?.()
     },
   })
 
@@ -519,7 +533,7 @@ function MapOverlayNavigator({ overlaySchoolId, overlayLocations, focusLocation,
   return null
 }
 
-function MapSelectionPan({ marker, mapPickedSchoolIdRef, getPinRoom }) {
+function MapSelectionPan({ marker, mapPickedSchoolIdRef, restoredSelectionRef, getPinRoom }) {
   const map = useMap()
   const markerKey = marker?.key
   const schoolId = marker?.school?.id
@@ -531,6 +545,15 @@ function MapSelectionPan({ marker, mapPickedSchoolIdRef, getPinRoom }) {
     const pickedOnMap = mapPickedSchoolIdRef.current
     mapPickedSchoolIdRef.current = null
     if (markerKey == null) return
+    // Back from a school page: the map is where the parent left it, selection included.
+    // Kept for as long as that pin stays the selected one (effects run twice in StrictMode).
+    const restored = restoredSelectionRef.current
+    if (restored && restored.schoolId === schoolId && pickedOnMap !== schoolId
+      && (restored.markerKey ?? markerKey) === markerKey) {
+      restored.markerKey = markerKey
+      return
+    }
+    restoredSelectionRef.current = null
     // The room is measured when the selection changes; resizing the window must not pan.
     const room = getPinRoom()
     // A pin clicked on the map is already in view; moving the map under the cursor reads
@@ -538,7 +561,7 @@ function MapSelectionPan({ marker, mapPickedSchoolIdRef, getPinRoom }) {
     if (pickedOnMap === schoolId
       && pinHasRoom(map.latLngToContainerPoint([lat, lng]), map.getSize(), room)) return
     panPinIntoRoom(map, [lat, lng], room)
-  }, [markerKey, schoolId, lat, lng, map, mapPickedSchoolIdRef, getPinRoom])
+  }, [markerKey, schoolId, lat, lng, map, mapPickedSchoolIdRef, restoredSelectionRef, getPinRoom])
 
   return null
 }
@@ -833,6 +856,7 @@ const OverlayLocationMarker = memo(function OverlayLocationMarker({
   activeAgeGroup,
   labelMode = 'age',
   showPopup,
+  addressShown,
   t,
   language,
   userLocation,
@@ -900,8 +924,9 @@ const OverlayLocationMarker = memo(function OverlayLocationMarker({
       }}
     >
       {/* Popup and tooltip go in Leaflet's own panes: inside the overlay pane the other
-          location markers are drawn over them. The open popup already has the address. */}
-      {fullLabel && !(isSelected && showPopup) && (
+          location markers are drawn over them. The popup or the sheet of the selected
+          location already has the address. */}
+      {fullLabel && !(isSelected && addressShown) && (
         <Tooltip pane="tooltipPane" direction="top" offset={[0, -14]} opacity={0.9} sticky>
           {fullLabel}
         </Tooltip>
@@ -951,7 +976,7 @@ function ResetViewControl({ schools, userLocation, lastValidBoundsRef, label, de
       return
     }
 
-    map.fitBounds(countryBounds, { padding: FIT_PADDING, maxZoom: defaultZoom, animate: true, duration: 0.4 })
+    map.fitBounds(countryBounds, { padding: fitPaddingFor(map), maxZoom: defaultZoom, animate: true, duration: 0.4 })
   }, [map, schools, userLocation, lastValidBoundsRef, defaultZoom, countryBounds])
 
   return (
@@ -977,6 +1002,7 @@ function SchoolMap({
   hoveredSchoolId,
   onSchoolSelect,
   onClearSelection,
+  onEscape,
   loading,
   userLocation,
   isPickingLocation,
@@ -987,6 +1013,7 @@ function SchoolMap({
   initialView = null,
   autoFit = true,
   hasCompare = false,
+  detailOpen = false,
   resizeKey,
   locationOverlay,
   onShowLocations,
@@ -1013,7 +1040,7 @@ function SchoolMap({
     const panel = overlayPanelRef.current
     return {
       top: panel ? panel.offsetTop + panel.offsetHeight : 0,
-      bottom: sheetRef.current?.offsetHeight || 0,
+      bottom: sheetRef.current?.offsetHeight || MAP_CONTROLS_COVER + (hasCompare ? COMPARE_BAR_COVER : 0),
     }
   })
   // Called after render, so it sees the current selection's sheet, panel and stack.
@@ -1032,6 +1059,8 @@ function SchoolMap({
   }, [])
 
   const mapPickedSchoolIdRef = useRef(null)
+  // The school that was selected when a saved view was restored (see MapSelectionPan).
+  const restoredSelectionRef = useRef(initialView && selectedSchoolId ? { schoolId: selectedSchoolId, markerKey: null } : null)
   // The pin that was clicked, so a school with several locations highlights that one.
   const [pickedMarker, setPickedMarker] = useState(null)
   const handleMarkerSelect = useCallback((school, marker) => {
@@ -1190,6 +1219,16 @@ function SchoolMap({
     return highlightedKey ? baseMarkers.filter(marker => marker.key !== highlightedKey) : baseMarkers
   }, [baseMarkers, selectedMarkers])
 
+  // Desktop only, and not beside the detail panel: it already shows the school, and a
+  // popup closed there (Esc, its ×) left an orange pin that could not be reopened.
+  const showPopups = !isMobile && !detailOpen
+  // Phones: a school's locations get the whole map until one of them is tapped; the sheet
+  // then takes the place of the locations panel (a short phone has no room for both).
+  const sheetMarker = isMobile
+    && !(overlayActiveOnMap && selectedSchoolId === overlaySchoolId && !overlaySelectedLocationId)
+    ? selectedMarker
+    : null
+
   useEffect(() => {
     const handleResize = () => {
       setIsMobile(window.innerWidth < 768)
@@ -1258,7 +1297,8 @@ function SchoolMap({
                   ageGroupOrder={ageGroupOrder}
                   activeAgeGroup={activeAgeGroup}
                   labelMode={overlayFocusLabels ? 'focus' : 'number'}
-                  showPopup={!isMobile}
+                  showPopup={showPopups}
+                  addressShown={showPopups || Boolean(sheetMarker)}
                   t={t}
                   language={i18n.language}
                   userLocation={userLocation}
@@ -1294,6 +1334,7 @@ function SchoolMap({
         <MapResizer resizeKey={resizeKey} lastValidBoundsRef={lastValidBoundsRef} fittedWhileHiddenRef={fittedWhileHiddenRef} />
         <MapClickHandler
           onClearSelection={onClearSelection}
+          onEscape={onEscape || onClearSelection}
           markerInteractionRef={markerInteractionRef}
         />
         <MapLocationPicker
@@ -1302,7 +1343,12 @@ function SchoolMap({
           markerInteractionRef={markerInteractionRef}
         />
         <MapLimits countryBounds={countryBounds} />
-        <MapSelectionPan marker={selectedMarker} mapPickedSchoolIdRef={mapPickedSchoolIdRef} getPinRoom={getPinRoom} />
+        <MapSelectionPan
+          marker={selectedMarker}
+          mapPickedSchoolIdRef={mapPickedSchoolIdRef}
+          restoredSelectionRef={restoredSelectionRef}
+          getPinRoom={getPinRoom}
+        />
         <MapOverlayNavigator
           overlaySchoolId={overlaySchoolId}
           overlayLocations={overlayLocations}
@@ -1354,7 +1400,7 @@ function SchoolMap({
               isDimmed={overlayActiveOnMap && !hideOthers}
               onSelect={handleMarkerSelect}
               onDeselect={onClearSelection}
-              showPopup={!isMobile}
+              showPopup={showPopups}
               t={t}
               language={i18n.language}
               userLocation={userLocation}
@@ -1381,7 +1427,7 @@ function SchoolMap({
               isDimmed={false}
               onSelect={handleMarkerSelect}
               onDeselect={onClearSelection}
-              showPopup={!isMobile && !overlayFocusActive}
+              showPopup={showPopups && !overlayFocusActive}
               t={t}
               language={i18n.language}
               userLocation={userLocation}
@@ -1400,7 +1446,7 @@ function SchoolMap({
         {/* overlay markers and flow are rendered inside the overlay pane */}
       </MapContainer>
 
-      {isMobile && selectedMarker && (
+      {sheetMarker && (
         <div
           ref={sheetRef}
           className="map-bottom-sheet absolute inset-x-0 bottom-0 z-[1200] transition-transform duration-300"
@@ -1408,7 +1454,7 @@ function SchoolMap({
         >
           {/* Clear the fixed compare bar so its buttons do not cover the sheet's actions. */}
           <div
-            className={`mx-3 ${hasCompare ? 'mb-24' : 'mb-3'} rounded-2xl bg-white shadow-2xl border border-neutral-200`}
+            className={`mx-3 ${hasCompare ? 'mb-[calc(4.5rem+env(safe-area-inset-bottom))]' : 'mb-3'} rounded-2xl bg-white shadow-2xl border border-neutral-200`}
           >
             <div
               className="flex items-center justify-center py-2 cursor-grab active:cursor-grabbing"
@@ -1431,7 +1477,7 @@ function SchoolMap({
               <span className="h-1.5 w-12 rounded-full bg-neutral-200" />
             </div>
             <PopupContent
-              marker={selectedMarker}
+              marker={sheetMarker}
               t={t}
               language={i18n.language}
               userLocation={userLocation}
@@ -1439,12 +1485,12 @@ function SchoolMap({
               onViewDetails={handleViewDetails}
               onClose={onClearSelection}
               isMobile
-              inCompare={isInCompare(selectedMarker.school.id)}
+              inCompare={isInCompare(sheetMarker.school.id)}
               canAddMore={canAddMore}
               activeAgeGroup={activeAgeGroup}
               onShowLocations={onShowLocations}
-              overlayActive={locationOverlay?.schoolId === selectedMarker.school.id}
-              stackedMarkers={stackedByKey.get(selectedMarker.key)}
+              overlayActive={locationOverlay?.schoolId === sheetMarker.school.id}
+              stackedMarkers={stackedByKey.get(sheetMarker.key)}
               onSelectMarker={handleMarkerSelect}
             />
           </div>
@@ -1520,13 +1566,12 @@ function SchoolMap({
         )}
       </div>
 
-      {overlaySchool && (
+      {overlaySchool && !(sheetMarker && overlayActiveOnMap) && (
         <div
           ref={overlayPanelRef}
           className="absolute top-4 left-4 max-w-[calc(100%-2rem)] bg-white/95 backdrop-blur rounded-lg shadow-panel p-3 z-[1000]"
         >
-          {/* Phones: the sheet below already names the school, and the map is short. */}
-          <p className="mb-2 text-xs font-semibold text-neutral-800 max-sm:hidden">
+          <p className="mb-2 text-xs font-semibold text-neutral-800 line-clamp-2">
             {t('map.locationsFor', { name: getSchoolName(overlaySchool, i18n.language) })}
           </p>
           <div className="flex flex-wrap items-center gap-2">
