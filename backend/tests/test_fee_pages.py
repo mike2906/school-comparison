@@ -421,3 +421,23 @@ async def test_a_queued_sibling_keeps_its_hop_when_a_fee_page_links_it_again():
 
     assert "https://school.bg/school-fees-2026-2027/" in requested
     assert any("14 750" in document.text for document in documents)
+
+
+@pytest.mark.asyncio
+async def test_a_picture_robots_disallows_is_not_fetched():
+    requested: list[str] = []
+    routes = {"https://school.bg/fees": _html('<main><p>Fees</p><img src="/private/fees.png"></main>')}
+
+    async def disallowed(url: str) -> bool:
+        return "/private/" in url
+
+    async def read_image(data: bytes, media_type: str) -> str:
+        return "Tuition 9 000 EUR"
+
+    async with _client(routes, requested) as client:
+        await fetch_fee_documents(
+            [("https://school.bg/fees", "Fees")], site_url=SITE, known_urls=[], html_to_text=_text,
+            client=client, read_image=read_image, disallowed=disallowed,
+        )  # fmt: skip
+
+    assert requested == ["https://school.bg/fees"]

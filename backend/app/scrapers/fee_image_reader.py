@@ -7,7 +7,8 @@ extraction and evidence checks as any page.
 
 A misread digit would become a wrong published price, and the evidence check cannot
 catch it (it compares rows with this same transcription). So the picture is read twice
-and the transcription is used only when both readings contain the same numbers.
+and the transcription is used only when both readings name the same currencies and give
+the same numbers under the same row labels.
 """
 
 from __future__ import annotations
@@ -38,6 +39,27 @@ def numbers_in(text: str) -> list[str]:
     return [re.sub(r"\D", "", match) for match in re.findall(r"\d[\d  .,]*\d|\d", text or "")]
 
 
+_CURRENCIES = (("EUR", r"€|\beur|евро"), ("BGN", r"лв|\bbgn|лева"), ("USD", r"\$|\busd"), ("GBP", r"£|\bgbp"))
+
+
+def reading_signature(text: str) -> tuple[frozenset[str], list[tuple[str, tuple[str, ...]]]]:
+    """What two readings of one picture must agree on.
+
+    The currencies named anywhere, and for each line that holds numbers its label (the
+    words before the first number) with those numbers: the same digits under another
+    row's label or another currency are a different fee.
+    """
+    lowered = (text or "").casefold()
+    currencies = frozenset(code for code, pattern in _CURRENCIES if re.search(pattern, lowered))
+    rows = []
+    for line in lowered.splitlines():
+        numbers = tuple(numbers_in(line))
+        if numbers:
+            label = re.split(r"\d", line, maxsplit=1)[0]
+            rows.append(("".join(re.findall(r"[^\W\d_]+", label)), numbers))
+    return currencies, rows
+
+
 async def read_fee_image(data: bytes, media_type: str, *, school_id: int | None = None) -> str | None:
     """The image's text, or None when it shows no fees or two readings disagree."""
     readings: list[str] = []
@@ -58,7 +80,7 @@ async def read_fee_image(data: bytes, media_type: str, *, school_id: int | None 
         if not text or text.upper() == NOTHING:
             return None
         readings.append(text)
-    if numbers_in(readings[0]) != numbers_in(readings[1]):
+    if reading_signature(readings[0]) != reading_signature(readings[1]):
         logger.warning("Fee image readings disagree for school %s; not stored", school_id)
         return None
     return readings[0]

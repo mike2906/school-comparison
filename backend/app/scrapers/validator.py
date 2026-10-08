@@ -47,6 +47,7 @@ from app.scrapers.price_evidence import (
     RULE_PERIOD_UNREPRESENTABLE,
     PriceRow,
     check_price_row,
+    period_fits_category,
     shared_names,
     taught_grades,
 )
@@ -778,6 +779,8 @@ async def _check_price_evidence(
         row_prefix = f"pricing[{row.id}]"
         for finding in check_price_row(PriceRow.from_pricing(row), text, family, grades):
             if finding.rule == RULE_PERIOD_MISSING:
+                if not period_fits_category(getattr(row.category, "value", row.category), finding.period):
+                    continue  # extraction left it empty on purpose
                 period = PricePeriod(finding.period.lower())
                 _add_fix(
                     report,

@@ -300,6 +300,8 @@ async def fetch_fee_documents(
                     seen.add(page_key(image_url))
                     image = None
                     for candidate_url in dict.fromkeys((image_url, scaled.get(image_url, image_url))):
+                        if disallowed is not None and await disallowed(candidate_url):
+                            continue
                         try:
                             image = await _get(client, candidate_url)
                         except httpx.HTTPError:

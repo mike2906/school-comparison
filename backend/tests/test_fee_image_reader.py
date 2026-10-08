@@ -34,3 +34,10 @@ async def test_a_misread_digit_discards_the_picture():
 @pytest.mark.asyncio
 async def test_a_picture_without_fees_gives_nothing():
     assert await _read("NONE") is None
+
+
+@pytest.mark.asyncio
+async def test_same_digits_under_another_label_or_currency_discard_the_picture():
+    assert await _read("Grade 1 | 1000 EUR", "Nursery | 1000 EUR") is None
+    assert await _read("Grade 1 | 1000 EUR", "Grade 1 | 1000 BGN") is None
+    assert await _read("Grade 1 | 1 000 EUR", "GRADE 1 | 1000 eur") == "Grade 1 | 1 000 EUR"

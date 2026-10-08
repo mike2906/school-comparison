@@ -310,6 +310,19 @@ _INSTALLMENT_RE = re.compile(
 _NURSERY_RE = re.compile(r"\bясл[аи]\b|яслен")
 
 
+def period_fits_category(category: str | None, period: str | None) -> bool:
+    """False for a period the fee category cannot have, whatever stands beside the amount.
+
+    "Еднократно плащане" beside a tuition fee is the fee paid in one instalment (517's
+    "ГОДИШНА ТАКСА" came out one_time), and a recurring word beside a registration fee
+    belongs to a neighbouring fee on the line (151's came out yearly).
+    """
+    category, period = str(category or "").lower(), str(period or "").lower() or None
+    if category == "tuition" and period == "one_time":
+        return False
+    return not (category == "registration" and period not in (None, "one_time"))
+
+
 def period_families(context: str) -> tuple[set[str], bool]:
     """(representable period families named, whether an unrepresentable one is named)."""
     cleaned = _AGE_RE.sub(" ", _FREQUENCY_RE.sub(" ", context))

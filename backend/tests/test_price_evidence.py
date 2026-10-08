@@ -622,3 +622,12 @@ def test_row_check_reads_the_age_group_and_the_schools_grades():
     assert RULE_LEVEL in {f.rule for f in check_price_row(row, page, "school", PRIMARY)}
     assert RULE_LEVEL not in {f.rule for f in check_price_row(row, page, "school", GYMNASIUM)}
     assert RULE_LEVEL not in {f.rule for f in check_price_row(row, page, "school")}
+
+
+def test_period_fits_category():
+    from app.scrapers.price_evidence import period_fits_category
+
+    assert not period_fits_category("tuition", "ONE_TIME")
+    assert not period_fits_category("REGISTRATION", "yearly")
+    assert period_fits_category("registration", "one_time")
+    assert period_fits_category("tuition", "yearly") and period_fits_category("food", None)
