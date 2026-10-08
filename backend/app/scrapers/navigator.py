@@ -1141,7 +1141,9 @@ async def navigate_schools_batch(
                 }
             )
             continue
-        if outcome.error and not outcome.pages:
+        # A failed fetch comes back from the crawler as no pages rather than an error, so
+        # an empty result gets the same one retry as an exception.
+        if not outcome.pages:
             try:
                 retry_final_url, retry_pages = await navigator.discover_pages(normalized_url)
                 outcome = BatchDiscoverOutcome(
@@ -1155,7 +1157,7 @@ async def navigate_schools_batch(
                     {
                         "school_id": school_id,
                         "success": False,
-                        "reason": f"Navigation failed: {outcome.error} (retry failed: {retry_exc})",
+                        "reason": f"Navigation failed: {outcome.error or 'no page crawled'} (retry failed: {retry_exc})",
                     }
                 )
                 continue
