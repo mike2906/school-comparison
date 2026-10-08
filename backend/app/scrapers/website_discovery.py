@@ -279,6 +279,10 @@ _LOCALITY_HINT_STOPWORDS = {
 }
 
 
+# Validation failures that say nothing about the site itself.
+_PASSING_FAILURE_REASONS = ("LLM validation failed", "Connection timeout", "HTTP error")
+
+
 class WebsiteDiscoverer:
     """Find likely official website URLs for schools."""
 
@@ -428,6 +432,36 @@ class WebsiteDiscoverer:
         school_aliases = self._validation_aliases_for_school(school)
         discovery_hints = self._discovery_hints_for_school(school)
         max_attempts = max(1, int(max_attempts))
+
+        # A candidate that failed for a passing reason (the model call or the site timed
+        # out) is tried again before searching: a new search can settle on a third
+        # party's page about the school (505 got a sports club's page for vhugo.org).
+        candidate = (school.attributes or {}).get("website_candidate_url")
+        earlier_reason = str((school.attributes or {}).get("website_candidate_reason") or "")
+        if candidate and earlier_reason.startswith(_PASSING_FAILURE_REASONS):
+            validation_result, _, reason = await validate_school_url(
+                school_id=school.id,
+                url=candidate,
+                country_code=self.country_code,
+                update_db=True,
+                school_name=school_name,
+                school_aliases=extract_validation_aliases(school.attributes),
+            )
+            await db.refresh(school)
+            if validation_result == ValidationResult.VALID:
+                return {
+                    "school_id": school.id,
+                    "discovery_found": False,
+                    "discovery_updated": False,
+                    "validation_result": validation_result.value,
+                    "status": school.scrape_status,
+                    "reason": reason,
+                    "attempts": 1,
+                }
+            if school.scrape_status != "failed_validate":
+                school.scrape_status = "failed_validate"
+                await db.commit()
+                await db.refresh(school)
 
         discovery = await self.discover(
             db=db,

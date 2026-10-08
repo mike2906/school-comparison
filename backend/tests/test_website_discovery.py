@@ -823,6 +823,49 @@ class TestWebsiteDiscovery:
         # Only ONE search call was made, not two
         assert search_call_count == 1
 
+    async def test_recover_retries_a_candidate_that_failed_for_a_passing_reason(self, db_session):
+        """School 505: the model call timed out on vhugo.org; a new search then settled
+        on a sports club's page about the school. The stored candidate is tried first."""
+        from app.scrapers.url_validator import ValidationResult
+        from app.scrapers.website_discovery import WebsiteDiscoverer
+
+        school = School(
+            name_i18n={"bg": "Френско училище Виктор Юго"},
+            country_code="bg",
+            school_type="international",
+            education_level="upper_secondary",
+            city="sofia",
+            scrape_status="failed_validate",
+            attributes={
+                "website_candidate_url": "https://vhugo.org/",
+                "website_candidate_reason": "LLM validation failed: ",
+            },
+        )
+        db_session.add(school)
+        await db_session.commit()
+        discoverer = WebsiteDiscoverer(country_code="bg")
+        validated: list[str] = []
+
+        async def mock_validate(school_id, url, country_code, update_db, school_name, school_aliases=None):
+            validated.append(url)
+            school.website_url = url
+            school.scrape_status = "validated"
+            await db_session.commit()
+            return ValidationResult.VALID, url, "school site"
+
+        search = AsyncMock(return_value=["https://club.example/victor-hugo"])
+        with (
+            patch.object(discoverer, "_search_candidates", new=search),
+            patch("app.scrapers.url_validator.validate_school_url", new=AsyncMock(side_effect=mock_validate)),
+        ):
+            result = await discoverer.recover_failed_school(db=db_session, school=school, max_attempts=4)
+
+        assert result["validation_result"] == "valid"
+        assert validated == ["https://vhugo.org/"]
+        assert search.await_count == 0
+        await db_session.refresh(school)
+        assert school.website_url == "https://vhugo.org/"
+
     async def test_searxng_403_falls_back_to_brave_and_disables_searxng(self, db_session):
         school = School(
             name_i18n={"bg": "Училище Тест", "en": "Test School"},
