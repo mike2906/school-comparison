@@ -3,10 +3,12 @@
 # deploy/deploy.sh there, and the host key is pinned in deploy/ssh_host_key.pub.
 #   deploy/remote.sh deploy     needs GHCR_TOKEN (read access to the image)
 #   deploy/remote.sh rollback
-# Environment: DEPLOY_SSH_KEY, DEPLOY_HOST, GITHUB_SHA; DEPLOY_USER (default ubuntu).
+#   deploy/remote.sh publish    needs SNAPSHOT_FILE (a pg_dump -Fc of the launch DB)
+# Environment: DEPLOY_SSH_KEY, DEPLOY_HOST; GITHUB_SHA for deploy and rollback;
+# DEPLOY_USER (default ubuntu).
 set -euo pipefail
 
-: "${DEPLOY_SSH_KEY:?}" "${DEPLOY_HOST:?}" "${GITHUB_SHA:?}"
+: "${DEPLOY_SSH_KEY:?}" "${DEPLOY_HOST:?}"
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 key="$(mktemp)"
@@ -26,13 +28,17 @@ case "${1:-}" in
 	deploy)
 		# Must match the hash deploy/deploy.sh computes on the host.
 		config_hash="$(cat docker-compose.prod.yml deploy/Caddyfile deploy/cloudflare-proxies.caddy deploy/deploy.sh | sha256sum | cut -d' ' -f1)"
-		printf '%s\n' "${GHCR_TOKEN:?}" | remote "deploy $GITHUB_SHA $config_hash"
+		printf '%s\n' "${GHCR_TOKEN:?}" | remote "deploy ${GITHUB_SHA:?} $config_hash"
 		;;
 	rollback)
-		remote "rollback $GITHUB_SHA" </dev/null
+		remote "rollback ${GITHUB_SHA:?}" </dev/null
+		;;
+	publish)
+		# The host checks what it received against this before touching the database.
+		remote "publish $(sha256sum "${SNAPSHOT_FILE:?}" | cut -d' ' -f1)" < "$SNAPSHOT_FILE"
 		;;
 	*)
-		echo "usage: deploy/remote.sh deploy|rollback" >&2
+		echo "usage: deploy/remote.sh deploy|rollback|publish" >&2
 		exit 1
 		;;
 esac

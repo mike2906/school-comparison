@@ -154,40 +154,69 @@ once the environment secret is set (`gh secret delete <NAME>`).
 ## Data publish (refreshing the snapshot)
 
 Production holds a copy of the launch DB. Changes there (imports, corrections, merges)
-reach the site only when a new snapshot is restored on the host. This is done by hand;
-first used on 2026-10-07.
+reach the site only when a new snapshot is loaded on the host.
 
-1. **Dump the launch DB** (local machine, repository root):
+1. **Upload the launch DB** (local machine, repository root). The last lines name the dump:
    ```bash
-   docker exec sofia_schools_db pg_dump -U postgres -Fc sofia_schools > snapshot.dump
+   backend/scripts/backup_offsite.sh
    ```
+2. **Publish it:**
+   ```bash
+   gh workflow run deploy.yml -f snapshot=sofia_schools-<stamp>.dump
+   ```
+
+The run downloads the dump from the bucket with a read-only token and passes it to
+`deploy/deploy.sh publish` on the host over SSH, so the host holds no storage credentials.
+The host checks the dump against its checksum, backs up the current data
+(`deploy/backups/pre-publish-*.dump`, the seven most recent are kept), stops the API, loads
+the snapshot in one transaction, runs `alembic upgrade head` and waits for `/ready`. The
+API is down for about a minute. If the load, the migration or the readiness check fails,
+the host puts the backup back and the run fails. The run then rebuilds the site, and its
+summary shows the school count before and after.
+
+It refuses to run when the API is behind the commit (a failed or rolled-back release): run
+a full release first. If the site build fails after the data was loaded, the new data
+stays; rerun with `frontend_only`.
+
+Loading replaces every table that is in the dump. Production has no tables of its own yet;
+when it gets some (user data), this must change so that it does not touch them.
+
+One-time setup (human): an R2 API token with **Object Read only** on the bucket
+`schooldecider-backups-eu`, saved as secrets of the `production` environment:
+`SNAPSHOT_R2_ACCOUNT_ID`, `SNAPSHOT_R2_ACCESS_KEY_ID`, `SNAPSHOT_R2_SECRET_ACCESS_KEY`, and
+`SNAPSHOT_R2_ENDPOINT` for a bucket in the EU jurisdiction
+(`https://<account id>.eu.r2.cloudflarestorage.com`). Do not reuse the read-write token of
+the backup script.
+
+Pages of removed schools can be served from the edge cache for a while after the rebuild;
+a request with any query string shows the real 404.
+
+### By hand
+
+If the workflow cannot be used. First done on 2026-10-07.
+
+1. **Dump the launch DB:**
+   `docker exec sofia_schools_db pg_dump -U postgres -Fc sofia_schools > snapshot.dump`
 2. **Copy it to the host:** `scp snapshot.dump ubuntu@<ip>:schooldecider/snapshot.dump`
 3. **On the host, in `~/schooldecider`** (the `dc` alias uses relative paths, so it fails
    from the home directory). Back up first and check both files are several MB:
    ```bash
-   dc exec -T postgres pg_dump -U schools -d schools -Fc > deploy/backups/pre-publish-$(date +%Y%m%d).dump
-   ls -la deploy/backups/pre-publish-*.dump snapshot.dump
+   dc exec -T postgres pg_dump -U schools -d schools -Fc > deploy/backups/manual-pre-publish-$(date +%Y%m%d).dump
+   ls -la deploy/backups/manual-pre-publish-*.dump snapshot.dump
    ```
-4. **Replace the data.** The API is down from `stop` to `up`, about a minute. The restore
-   runs in one transaction: if it fails the current data is still there, so run
-   `dc up -d api` and investigate.
+4. **Replace the data.** The restore runs in one transaction: if it fails the current data
+   is still there, so run `dc up -d api` and investigate.
    ```bash
    dc stop api
    dc exec -T postgres pg_restore -U schools -d schools --no-owner --clean --if-exists --single-transaction --exit-on-error < snapshot.dump
    dc run --rm api alembic upgrade head
    dc up -d api
    ```
-5. **Check the API has the new data** before rebuilding, e.g. the school count from
-   `https://<API_HOST>/schools?country_code=bg&city=sofia` against the launch DB.
-6. **Rebuild the site:** Actions → Deploy → Run workflow → `frontend_only`, or
-   `gh workflow run deploy.yml -f frontend_only=true`. This only rebuilds the pages from
-   whatever the live API serves: on its own, without steps 1-4, it changes nothing. It
-   refuses to run when the API is behind the commit (a failed or rolled-back release): run
-   a full release instead (the same, without `frontend_only`).
-7. **Back up off-host:** `backend/scripts/backup_offsite.sh` (see Off-host backup).
-
-Pages of removed schools can be served from the edge cache for a while after the rebuild;
-a request with any query string shows the real 404.
+5. **Check the API has the new data** (the school count from
+   `https://<API_HOST>/schools?country_code=bg&city=sofia` against the launch DB), then
+   rebuild the site: `gh workflow run deploy.yml -f frontend_only=true`. The rebuild only
+   uses whatever the live API serves: without steps 1-4 it changes nothing.
+6. **Back up off-host:** `backend/scripts/backup_offsite.sh` (see Off-host backup).
 
 ## Endpoints
 
@@ -256,7 +285,8 @@ One-time setup (human), in the Cloudflare dashboard under R2:
    For a bucket created in the EU jurisdiction, also set
    `export R2_ENDPOINT=https://<account id>.eu.r2.cloudflarestorage.com`.
 
-After each data publish, from the repository root:
+After each launch-DB change worth keeping, and as the first step of a data publish, from
+the repository root:
 
 ```bash
 backend/scripts/backup_offsite.sh

@@ -29,9 +29,20 @@ elif "pg_dump" in args:
     if os.environ.get("BACKUP_FAILURE") != "empty":
         sys.stdout.write("fake custom archive")
 elif "pg_restore" in args:
-    sys.stdin.read()
+    data = sys.stdin.read()
     if os.environ.get("BACKUP_FAILURE") == "list":
         sys.exit(1)
+    if "--single-transaction" in args:
+        # A load: record what was loaded; "load" fails the snapshot, never the backup.
+        with open(os.environ["DOCKER_CALLS"] + ".loads", "a") as f:
+            f.write(data + "\n")
+        if os.environ.get("PUBLISH_FAILURE") == "load" and data == "new snapshot":
+            sys.exit(1)
+elif "alembic" in args:
+    if os.environ.get("PUBLISH_FAILURE") == "migrate":
+        sys.exit(1)
+elif "psql" in args:
+    print("714")
 elif args[:2] == ["image", "inspect"]:
     pass
 elif "ps" in args:
@@ -119,3 +130,81 @@ def test_failed_backup_preserves_all_previous_archives(tmp_path, failure):
     backup_dir = app / "deploy/backups"
     assert len(list(backup_dir.glob("pre-migrate-*.dump"))) == 9
     assert len(list(backup_dir.glob("pre-migrate-*.sha256"))) == 9
+
+
+IMAGE = "ghcr.io/mike2906/school-comparison-api:" + "a" * 40
+
+
+def run_publish(tmp_path, failure="", checksum=None):
+    app = tmp_path / "app"
+    (app / "deploy").mkdir(parents=True)
+    for name in ["docker-compose.prod.yml", "deploy/deploy.sh"]:
+        shutil.copyfile(REPO / name, app / name)
+    (app / "deploy/release.env").write_text(f"API_IMAGE={IMAGE}\nPREVIOUS_API_IMAGE=older\n")
+    binaries = tmp_path / "bin"
+    binaries.mkdir()
+    docker = binaries / "docker"
+    docker.write_text(DOCKER_STUB)
+    docker.chmod(0o755)
+    calls = tmp_path / "calls.jsonl"
+    calls.touch()
+    snapshot = b"new snapshot"
+    env = dict(os.environ, PATH=f"{binaries}:/usr/local/bin:/usr/bin:/bin", SCHOOLDECIDER_DIR=str(app),
+               DOCKER_CALLS=str(calls), BACKUP_FAILURE="", PUBLISH_FAILURE=failure,
+               POSTGRES_READY=str(tmp_path / "postgres-ready"), READY_POLL_SECONDS="0")
+    env.pop("SSH_ORIGINAL_COMMAND", None)
+    result = subprocess.run(
+        ["bash", str(app / "deploy/deploy.sh"), "publish", checksum or hashlib.sha256(snapshot).hexdigest()],
+        env=env, input=snapshot, capture_output=True, timeout=20)
+    commands = [json.loads(line) for line in calls.read_text().splitlines()]
+    loads_file = Path(str(calls) + ".loads")
+    loads = loads_file.read_text().splitlines() if loads_file.exists() else []
+    return result, commands, loads, app
+
+
+def test_publish_backs_up_then_loads_the_snapshot_and_migrates(tmp_path):
+    result, commands, loads, app = run_publish(tmp_path)
+    assert result.returncode == 0, result.stderr
+
+    def step(match):
+        return next(i for i, command in enumerate(commands) if match(command))
+
+    dump = step(lambda c: "pg_dump" in c)
+    stop = step(lambda c: c[-2:] == ["stop", "api"])
+    load = step(lambda c: "--single-transaction" in c)
+    migrate = step(lambda c: "alembic" in c)
+    start = step(lambda c: c[-2:] == ["up", "-d"])
+    assert dump < stop < load < migrate < start
+    assert loads == ["new snapshot"]
+    assert "--clean" in commands[load] and "--exit-on-error" in commands[load]
+    assert len(list((app / "deploy/backups").glob("pre-publish-*.dump"))) == 1
+    assert not list((app / "deploy/backups").glob("incoming-*"))
+    assert b"schools: 714 -> 714" in result.stdout
+    assert (app / "deploy/release.env").read_text() == f"API_IMAGE={IMAGE}\nPREVIOUS_API_IMAGE=older\n"
+
+
+def test_publish_rejects_a_snapshot_that_does_not_match_its_checksum(tmp_path):
+    result, commands, loads, app = run_publish(tmp_path, checksum="0" * 64)
+    assert result.returncode != 0
+    assert b"nothing changed" in result.stderr
+    assert commands == [] and loads == []
+    assert not list((app / "deploy/backups").glob("incoming-*"))
+
+
+def test_publish_keeps_the_previous_data_when_the_snapshot_does_not_load(tmp_path):
+    result, commands, loads, _ = run_publish(tmp_path, failure="load")
+    assert result.returncode != 0
+    assert b"previous data is unchanged" in result.stderr
+    assert loads == ["new snapshot"]
+    assert not any("alembic" in command for command in commands)
+    assert commands[-1][-2:] == ["up", "-d"]
+
+
+def test_publish_restores_the_backup_when_migration_fails(tmp_path):
+    result, commands, loads, app = run_publish(tmp_path, failure="migrate")
+    assert result.returncode != 0
+    assert b"previous data is restored" in result.stderr
+    # The snapshot was loaded, then the pre-publish backup over it.
+    assert loads == ["new snapshot", "fake custom archive"]
+    assert any(command[-2:] == ["up", "-d"] for command in commands)
+    assert len(list((app / "deploy/backups").glob("pre-publish-*.dump"))) == 1
