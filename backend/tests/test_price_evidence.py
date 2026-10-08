@@ -494,6 +494,21 @@ def test_rule_6_holds_a_period_change_the_page_does_not_state():
     assert replacement_regressions(published, kept, "kindergarten") == []
 
 
+def test_rule_6_does_not_let_a_kept_row_vouch_for_a_changed_sibling():
+    """Three yearly tiers at one amount come back as one yearly and one monthly row."""
+    page = "Такса\n3000 евро\nТакса\n3000 евро"
+    published = [(row(Decimal("3000"), period="YEARLY", plan_name=name), page) for name in ("A", "B", "C")]
+    proposed = [(row(Decimal("3000"), period="YEARLY"), page), (row(Decimal("3000"), period="MONTHLY"), page)]
+    assert replacement_regressions(published, proposed, "school") == [
+        "changes the YEARLY period of TUITION 3000.00 to MONTHLY, "
+        "which the page does not state next to the amount"
+    ]
+    # Two fees at one amount with different periods, one of them lost: still held.
+    mixed = [(row(Decimal("500"), category="FOOD", period="MONTHLY"), page), (row(Decimal("500"), period="YEARLY"), page)]
+    both_monthly = [(row(Decimal("500"), category="FOOD", period="MONTHLY"), page), (row(Decimal("500"), period="MONTHLY"), page)]
+    assert replacement_regressions(mixed, both_monthly, "school") == ["loses the YEARLY period of TUITION 500.00"]
+
+
 def test_rule_6_allows_a_period_change_the_page_states():
     """302: rows stored yearly although the page says "Месечна такса" beside them."""
     page = "Месечна такса: 680 евро"

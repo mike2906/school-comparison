@@ -576,6 +576,28 @@ def replacement_regressions(
             # one row. The rows that remain still have to keep the period.
             if not matches:
                 continue
+        # A period none of the published rows at this amount had needs the page's word for
+        # it, whichever published row it replaces: one row that kept its period does not
+        # vouch for a sibling that changed.
+        old_periods = {old.period for old, _ in olds if old.period}
+        introduced = sorted(
+            {
+                new.period
+                for new, new_text in matches
+                if old_periods
+                and new.period
+                and new.period not in old_periods
+                and not any({new.period, period} == _INTERCHANGEABLE_PERIODS for period in old_periods)
+                and not _page_states_period(new, new_text)
+            }
+        )
+        if introduced:
+            reasons.append(
+                f"changes the {', '.join(sorted(old_periods))} period of {olds[0][0].category} "
+                f"{', '.join(key)} to {', '.join(introduced)}, which the page does not state next "
+                "to the amount"
+            )
+            continue
         for old, _ in olds:
             if old.period and all(new.period is None for new, _ in matches):
                 filled = any(
@@ -592,10 +614,6 @@ def replacement_regressions(
                 or _page_states_period(new, new_text)
                 for new, new_text in matches
             ):
-                periods = ", ".join(sorted({new.period for new, _ in matches if new.period}))
-                reasons.append(
-                    f"changes the {old.period} period of {old.category} {', '.join(key)} to "
-                    f"{periods}, which the page does not state next to the amount"
-                )
+                reasons.append(f"loses the {old.period} period of {old.category} {', '.join(key)}")
                 break
     return reasons
