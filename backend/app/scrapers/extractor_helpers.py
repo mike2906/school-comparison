@@ -35,10 +35,12 @@ from app.scrapers.price_evidence import (
     _line_of,
     amount_spans,
     currency_price_starts,
+    fee_number_starts,
     label_spans,
     normalize_text,
     occurrence_currency,
     period_families,
+    period_fits_category,
     stated_period,
 )
 from app.scrapers.school_tokens import extract_school_name_tokens
@@ -2373,6 +2375,8 @@ def _filter_model_prices(prices: list[ExtractedPrice], text: str) -> list[Extrac
         currency = (price.currency or "BGN")[:3].upper()
         year = _normalize_academic_year(price.academic_year)
         label = price.plan_name or price.age_group or price.notes
+        if period_families(f"{price.plan_name or ''} {price.age_group or ''}".casefold()) == (set(), True):
+            continue  # a per-day/week/hour fee has no period the schema can hold
         supported: list[tuple[bool, str | None]] = []  # (page names the year, period)
         for block, stale in blocks:
             spans = [
@@ -2403,13 +2407,15 @@ def _filter_model_prices(prices: list[ExtractedPrice], text: str) -> list[Extrac
                 page_year = None
             if page_year is None and stale:
                 continue
+            if page_year is not None and _academic_year_is_over(page_year):
+                continue  # a fee list of a past year is not this year's price
             supported.append((page_year, period))
         if not supported:
             continue
         # A page that names the year is the better witness.
         page_year, period = max(supported, key=lambda item: item[0] is not None)
         normalized = price.model_copy(deep=True)
-        normalized.period = period
+        normalized.period = period if period_fits_category(price.category, period) else None
         normalized.academic_year = page_year
         refined.append(normalized)
     return refined
@@ -2423,6 +2429,20 @@ def _table_header(block: str, span: tuple[int, int]) -> str | None:
             break
         header = line
     return None if header is None or currency_price_starts(header) else header
+
+
+def _academic_year_is_over(year: str | None, *, today: datetime.date | None = None) -> bool:
+    """The academic year ended before the current one began ("2024/2025" in October 2026).
+
+    Last year's list is kept: until a school publishes the new fees it is the best
+    there is, and it carries its year.
+    """
+    normalized = _normalize_academic_year(year)
+    if not normalized:
+        return False
+    today = today or datetime.date.today()
+    current_start = today.year if today.month >= 9 else today.year - 1
+    return int(normalized.split("/")[1]) < current_start
 
 
 def _period_written_for(block: str, span: tuple[int, int]) -> tuple[set[str], bool]:
@@ -2484,19 +2504,11 @@ def _bare_cell_is_a_price_in(block: str, span: tuple[int, int], currency: str) -
     if in_column:
         return currency in in_column
     table = f"{line}\n{header}"
-    return _currencies_named(table) <= {currency} and _CURRENCY_OR_FEE_RE.search(table) is not None
-
-
-# A school grade in a fee label: "8 клас", "ПЪРВИ – ТРЕТИ КЛАС", "Grade 5", "1.-4. клас".
-_SCHOOL_GRADE_LABEL_RE = re.compile(r"\bклас(?:ове)?\b|\bgrades?\b", re.IGNORECASE)
-# The class before first grade, which a kindergarten may run itself.
-_PRESCHOOL_CLASS_RE = re.compile(r"подготвител|предучилищ|\bп[гу]?к\b|pre-?school|preparatory", re.IGNORECASE)
-
-
-def _names_school_grades(price: ExtractedPrice) -> bool:
-    """The row's own labels place it in school grades (and not a pre-school class)."""
-    label = " ".join(str(part or "") for part in (price.plan_name, price.age_group))
-    return bool(_SCHOOL_GRADE_LABEL_RE.search(label)) and not _PRESCHOOL_CLASS_RE.search(label)
+    named = _currencies_named(table)
+    if not named:
+        # A fee table that names no currency is in euro (Bulgaria's currency since 2026).
+        return currency == "EUR" and _CURRENCY_OR_FEE_RE.search(table) is not None
+    return named == {currency}
 
 
 def _find_supporting_price_source_url(
@@ -3089,7 +3101,7 @@ def _price_dense_window(candidate: str, allowance: int) -> str:
     """
     header, separator, body = candidate.partition("\n")
     room = allowance - len(header) - len(separator)
-    starts = currency_price_starts(body)
+    starts = fee_number_starts(body)
     if room <= 0 or not starts or starts[-1] < room:
         return candidate[:allowance]
     best_start, best_count = 0, 0
@@ -3222,7 +3234,7 @@ def _select_pages(
             # preferred-category page that states none (school 568's fee.html had no
             # category and lost to admission/contact pages).
             score += _PRICE_EVIDENCE_SCORE * min(
-                len(currency_price_starts(page.raw_markdown or "")), _PRICE_EVIDENCE_MAX_PRICES
+                len(fee_number_starts(page.raw_markdown or "")), _PRICE_EVIDENCE_MAX_PRICES
             )
         elif use_case == "general_summary_source":
             classification = summary_page_classifications.get(id(page))

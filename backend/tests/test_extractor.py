@@ -3105,10 +3105,14 @@ def test_extract_prices_deterministic_prefers_yearly_when_mixed_fee_table_line_m
 
 
 @pytest.mark.asyncio
-async def test_extract_school_uses_deterministic_pricing_fallback_when_llm_reports_no_pricing(
+async def test_extract_school_keeps_the_models_answer_of_no_pricing(
     db_session,
     sample_school_for_extraction,
 ):
+    """The keyword extractor used to stand in when the model reported no fees. In the
+    2026-10-08 cohort that stored a project budget as tuition (286) and the school's
+    fees for the kindergarten sharing its page (526), which the model had left out on
+    purpose. It now stands in only when the model call gives no answer."""
     school = sample_school_for_extraction
     pricing_page = (
         await db_session.execute(select(SourcePage).where(SourcePage.school_id == school.id, SourcePage.page_category == "pricing"))
@@ -3141,25 +3145,13 @@ async def test_extract_school_uses_deterministic_pricing_fallback_when_llm_repor
         result = await extractor_module.extract_school(db_session, school.id, "bg")
 
     assert result["status"] == "extracted"
-    assert result["pricing_count"] == 3
-    assert any("deterministic fallback" in detail for detail in result["details"])
+    assert result["pricing_count"] == 0
+    assert not any("deterministic fallback" in detail for detail in result["details"])
 
     pricing_rows = (
-        await db_session.execute(select(Pricing).where(Pricing.school_id == school.id).order_by(Pricing.id))
+        await db_session.execute(select(Pricing).where(Pricing.school_id == school.id))
     ).scalars().all()
-    assert [
-        (
-            row.category.value,
-            float(row.amount),
-            row.currency,
-            row.period.value if row.period else None,
-        )
-        for row in pricing_rows
-    ] == [
-        ("tuition", 6650.0, "EUR", None),
-        ("tuition", 7150.0, "EUR", None),
-        ("materials", 545.0, "EUR", None),
-    ]
+    assert pricing_rows == []
 
 
 @pytest.mark.asyncio
@@ -4881,25 +4873,6 @@ async def test_prices_only_extraction_rereads_fees_and_leaves_the_rest(
     assert await _stored(db_session, school) == [("tuition", 530.0, "monthly")]
 
 
-@pytest.mark.parametrize(
-    ("label", "expected"),
-    [
-        ("8 клас", True),
-        ("ПЪРВИ – ТРЕТИ КЛАС", True),
-        ("Grade 5", True),
-        ("1. - 4. клас", True),
-        ("Подготвителен клас", False),
-        ("ПК - 12. клас", False),
-        ("Целодневна група 3-6 години", False),
-        ("Classic programme", False),
-    ],
-)
-def test_names_school_grades(label, expected):
-    row = ExtractedPrice(category="tuition", amount=1, currency="EUR", plan_name=label, confidence=1.0)
-
-    assert extractor_module.helpers._names_school_grades(row) is expected
-
-
 @pytest.mark.asyncio
 async def test_kindergarten_does_not_take_school_grade_fees_and_the_prompt_names_its_level(
     db_session, sample_school_for_extraction
@@ -5026,3 +4999,67 @@ def test_extraction_reads_only_the_freshest_copy_of_a_page():
         "https://izzi.academy/about-us",
         "https://izzi.academy/admissions/tuition-fees/",
     ]
+
+
+def test_model_row_period_must_fit_its_category():
+    text = (
+        "--- SOURCE: https://school.test/fees ---\n"
+        "8. клас ГОДИШНА ТАКСА еднократно плащане 7000 евро\n"
+        "Registration fee: € 200, cafeteria € 345 per quarter\n"
+        "Такса записване 300 евро еднократно\n"
+    )
+    rows = [
+        _model_price(category="tuition", amount=7000, plan_name="8. клас"),
+        _model_price(category="registration", amount=200),
+        _model_price(category="registration", amount=300),
+        _model_price(category="food", amount=345),
+    ]
+
+    refined = extractor_module.helpers._filter_model_prices(rows, text)
+
+    assert [(row.category, row.amount, row.period) for row in refined] == [
+        ("tuition", 7000, None),
+        ("registration", 200, None),
+        ("registration", 300, "one_time"),
+        ("food", 345, "quarter"),
+    ]
+
+
+def test_pricing_selection_counts_bare_table_cells_as_prices():
+    """School 594: the transcribed fee picture names its currency once in a heading."""
+    table = (
+        "FINANCIAL CONDITIONS FOR 2026-2027 (all fees are in euro)\n"
+        "GRADE | Admission Fee | TUITION FEE NEW STUDENTS\nGrade 1 | 500 | 15 350\nGrade 2 | 500 | 16 250\n"
+    )
+    pages = [
+        SourcePage(source_url=f"https://example-school.bg/fees/terms-{n}", page_category="pricing", raw_markdown="General terms of the tuition contract. " * 10)
+        for n in range(5)
+    ] + [SourcePage(source_url="https://example-school.bg/uploads/FEES-2026-2027.png", page_category="pricing", raw_markdown=table)]  # fmt: skip
+
+    selected_text, source_urls = _select_pricing_pages(pages)
+
+    assert source_urls[0] == "https://example-school.bg/uploads/FEES-2026-2027.png"
+    assert "15 350" in selected_text
+
+
+def test_model_rows_for_a_past_year_a_weekly_fee_or_a_guessed_lev_are_dropped():
+    helpers = extractor_module.helpers
+    old = "--- SOURCE: https://school.test/fees ---\nТакси за учебната 2024/2025 г.\nПГ и I клас 4 300 евро\n"
+    row = _model_price(category="tuition", amount=4300, academic_year="2024/2025")
+    assert helpers._filter_model_prices([row], old) == []
+    assert helpers._academic_year_is_over("2025/2026", today=datetime.date(2026, 10, 9)) is False
+    assert helpers._academic_year_is_over("2025/2026", today=datetime.date(2027, 9, 1)) is True
+
+    weekly = "--- SOURCE: https://school.test/fees ---\nЦелодневно: 690 евро на месец\n\nДруги услуги\nГост\nПрограма\nСедмично: 190 евро\n"
+    rows = [
+        _model_price(category="tuition", amount=190, plan_name="Седмично"),
+        _model_price(category="tuition", amount=690, plan_name="Целодневно"),
+    ]
+    assert [r.amount for r in helpers._filter_model_prices(rows, weekly)] == [690]
+
+    # A fee table that names no currency is in euro: a row calling its cell leva is a guess.
+    table = "--- SOURCE: https://school.test/fees ---\nКлас | Такса\nПодготвителен клас | 7 400\n"
+    lev = ExtractedPrice(category="tuition", amount=7400, currency="BGN", confidence=0.9)
+    euro = ExtractedPrice(category="tuition", amount=7400, currency="EUR", confidence=0.9)
+    assert helpers._filter_model_prices([lev], table) == []
+    assert len(helpers._filter_model_prices([euro], table)) == 1

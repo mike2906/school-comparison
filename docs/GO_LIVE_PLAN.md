@@ -2350,6 +2350,24 @@ revision. None of this may widen the public boundary without a reviewed pilot.
         plausibility gate. Fee tables published as images are not read (555/594). 48
         schools still have no fee text after the crawl; 46 have no valid website
         (634/635 withheld by the shared-site check).
+      - **Second pass 2026-10-09 (PR "price scope and fee pictures").**
+        (1) *Shared sites:* a fee is scoped by the grades its label names
+        (`price_evidence.label_grades`) against the grades the school teaches (its
+        locations' age groups): another institution's row is dropped at extraction and
+        is an error under Stage 6 rule 2, which now reads the age group as well as the
+        plan name and knows single grades, roman and worded grades and stage names.
+        Followed fee links are scoped by the path's level word ("/preschool-fees/").
+        (2) *Fee pictures:* a fee page that states no price has its fee picture read by
+        the pricing model, twice, and used only when both readings hold the same
+        numbers; scanned PDFs likewise. The picture is the row's source link (555/594).
+        (3) The keyword extractor no longer overrides a model answer of "no fees" (526).
+        (4) URL recovery retries a candidate that failed for a passing reason before
+        searching again (505 had been given a third party's page).
+        (5) The pricing tier moved to GPT-6.1 Sol: read twice, it gave the same tuition
+        set on 15 of 16 hard pages, Haiku 5.5 on 10. About $0.02 a school.
+        **Still open:** Uwekind (634/635) is withheld by the shared-site check because
+        the registry holds its old address; a multi-price table row can still take a
+        neighbour's label (301); a picture misread the same way twice would pass.
 - [ ] **E5 Gymnasium admission thresholds (state schools).** Import the official minimum
       admission scores after 7th grade into `admission_info.historical_min_scores`. Scores
       come from the city-wide NVO ranking, so no address logic is needed, but they are per

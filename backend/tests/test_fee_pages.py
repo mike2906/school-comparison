@@ -38,8 +38,8 @@ def test_candidates_are_same_site_links_that_name_fees():
         "https://school.bg/uploads/2026/taksi-2026-2027.pdf",
         "https://school.bg/admission/fees/",
         "https://school.bg/finansovi-usloviya/",
-        "https://school.bg/priem",
         "https://school.bg/registration/frais-de-scolarite-2026-2027/",
+        "https://school.bg/priem",
     ]
 
 
@@ -169,6 +169,11 @@ def _patch_http(monkeypatch, routes, requested):
 
     monkeypatch.setattr(WebsiteNavigator, "robots_disallows", allowed)
 
+    async def no_image_text(data, media_type, *, school_id=None):
+        return None
+
+    monkeypatch.setattr(navigator_module, "read_fee_image", no_image_text)
+
 
 @pytest.mark.asyncio
 async def test_crawl_gains_the_linked_fee_page_and_replaces_a_priceless_fee_tab(monkeypatch):
@@ -258,3 +263,181 @@ async def test_oversized_download_is_abandoned(monkeypatch):
         )  # fmt: skip
 
     assert requested == ["https://school.bg/fees"] and documents == []
+
+
+def test_content_images_are_the_pages_pictures_fee_named_first():
+    html = (
+        '<header><img src="/img/logo.png"></header><main>'
+        '<img src="/uploads/campus-700x400.jpg" alt="Campus">'
+        '<img src="/uploads/SGS-FEES-2026-2027-ENG-700x453.png" width="980">'
+        '<img src="/uploads/icon-phone.png"><img src="/uploads/small.png" width="64">'
+        '<img src="data:image/png;base64,AAAA"></main>'
+    )
+
+    # A picture named for fees is the one read; the campus photo beside it is not.
+    assert fee_pages.content_images(html, "https://school.bg/school-fees/") == [
+        ("https://school.bg/uploads/SGS-FEES-2026-2027-ENG.png", ""),
+    ]
+    # With no fee-named picture, a page's one or two pictures are read; a gallery is not.
+    one = '<main><img src="/uploads/table.png"></main>'
+    gallery = "<main>" + "".join(f'<img src="/uploads/photo-{n}.jpg">' for n in range(4)) + "</main>"
+    assert fee_pages.content_images(one, "https://school.bg/") == [("https://school.bg/uploads/table.png", "")]
+    assert fee_pages.content_images(gallery, "https://school.bg/") == []
+
+
+def _image() -> httpx.Response:
+    return httpx.Response(200, headers={"content-type": "image/png"}, content=b"\x89PNG...")
+
+
+@pytest.mark.asyncio
+async def test_fee_page_without_prices_has_its_fee_picture_read():
+    """Schools 555/594: the fee table is a picture on a page whose text states no price."""
+    requested: list[str] = []
+    read: list[str] = []
+    routes = {
+        "https://school.bg/school-fees/": _html(
+            '<main><p>School fees 2026-2027</p><img src="/uploads/fees-2026-2027-700x453.png"></main>'
+        ),
+        "https://school.bg/uploads/fees-2026-2027.png": _image(),
+        "https://school.bg/taksi": _html('<main><p>Такса 7000 евро годишно</p><img src="/uploads/photo.png"></main>'),
+    }
+
+    async def read_image(data: bytes, media_type: str) -> str:
+        read.append(media_type)
+        return "Grade 1 | 14 750 | 15 350"
+
+    async with _client(routes, requested) as client:
+        documents = await fetch_fee_documents(
+            [("https://school.bg/school-fees/", "School fees"), ("https://school.bg/taksi", "Такси")],
+            site_url=SITE, known_urls=[], html_to_text=_text, client=client, read_image=read_image,
+        )  # fmt: skip
+
+    by_url = {document.url: document.text for document in documents}
+    # The picture is stored under its own URL, headed by the link that led to it.
+    assert by_url["https://school.bg/uploads/fees-2026-2027.png"] == "School fees\nGrade 1 | 14 750 | 15 350"
+    # A page that states its prices in text has no picture read.
+    assert "https://school.bg/uploads/photo.png" not in requested
+    assert read == ["image/png"]
+
+
+@pytest.mark.asyncio
+async def test_pictures_read_are_capped_and_a_picture_with_no_fees_is_not_stored():
+    requested: list[str] = []
+    images = "".join(f'<img src="/uploads/fees-page-{n}.png">' for n in range(6))
+    routes = {"https://school.bg/fees": _html(f"<main><p>Fees</p>{images}</main>")}
+    routes.update({f"https://school.bg/uploads/fees-page-{n}.png": _image() for n in range(6)})
+    reads = 0
+
+    async def read_image(data: bytes, media_type: str) -> str | None:
+        nonlocal reads
+        reads += 1
+        return None if reads == 1 else "Tuition 9 000 EUR"
+
+    async with _client(routes, requested) as client:
+        documents = await fetch_fee_documents(
+            [("https://school.bg/fees", "Fees")], site_url=SITE, known_urls=[], html_to_text=_text,
+            client=client, read_image=read_image,
+        )  # fmt: skip
+
+    assert reads == fee_pages.MAX_FEE_IMAGES
+    assert [d.url for d in documents if d.url.endswith(".png")] == [
+        "https://school.bg/uploads/fees-page-1.png",
+        "https://school.bg/uploads/fees-page-2.png",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_a_fee_pages_own_fee_link_is_followed_before_its_siblings():
+    """School 594: the dated fee list sat one click under /school-fees/, behind six
+    sibling fee links that used up the fetch budget."""
+    requested: list[str] = []
+    siblings = [(f"https://school.bg/fees/doc-{n}", "Fees") for n in range(fee_pages.MAX_FEE_FETCHES)]
+    routes = {url: _html("<p>General terms of the tuition contract</p>") for url, _ in siblings}
+    routes["https://school.bg/fees/doc-0"] = _html(
+        '<p>School fees</p><a href="/school-fees-2026-2027/">School fees 2026-2027</a>'
+    )
+    routes["https://school.bg/school-fees-2026-2027/"] = _html("<p>Grade 1: 14 750 EUR</p>")
+
+    async with _client(routes, requested) as client:
+        documents = await fetch_fee_documents(
+            siblings, site_url=SITE, known_urls=[], html_to_text=_text, client=client
+        )
+
+    assert requested[:2] == ["https://school.bg/fees/doc-0", "https://school.bg/school-fees-2026-2027/"]
+    assert any("14 750" in document.text for document in documents)
+
+
+def test_each_institution_follows_its_own_fee_page_on_a_shared_site():
+    """Schools 555/594: "/preschool-fees/" and "/school-fees/" on stgeorgeschool.eu."""
+    links = [("/preschool-fees/", "Preschool"), ("/school-fees/", "School"), ("/admission/fees/", "Fees")]
+
+    def urls(family):
+        found = fee_link_candidates(
+            links, base_url="https://stgeorgeschool.eu/", site_url="https://stgeorgeschool.eu", school_family=family
+        )  # fmt: skip
+        return sorted(url.rsplit("/", 2)[1] for url, _ in found)
+
+    assert urls("school") == ["fees", "school-fees"]
+    assert urls("kindergarten") == ["fees", "preschool-fees"]
+
+
+@pytest.mark.asyncio
+async def test_scaled_copy_is_read_when_the_original_picture_is_gone():
+    requested: list[str] = []
+    routes = {
+        "https://school.bg/fees": _html('<main><p>Fees</p><img src="/uploads/fees-700x453.png"></main>'),
+        "https://school.bg/uploads/fees-700x453.png": _image(),
+    }
+
+    async def read_image(data: bytes, media_type: str) -> str:
+        return "Tuition 9 000 EUR"
+
+    async with _client(routes, requested) as client:
+        documents = await fetch_fee_documents(
+            [("https://school.bg/fees", "Fees")], site_url=SITE, known_urls=[], html_to_text=_text,
+            client=client, read_image=read_image,
+        )  # fmt: skip
+
+    assert requested[1:] == ["https://school.bg/uploads/fees.png", "https://school.bg/uploads/fees-700x453.png"]
+    assert any(document.url.endswith("fees-700x453.png") for document in documents)
+
+
+@pytest.mark.asyncio
+async def test_a_queued_sibling_keeps_its_hop_when_a_fee_page_links_it_again():
+    """/admission/fees links /school-fees/ in its menu; /school-fees/ must still be able
+    to lead to the dated list one click under it."""
+    requested: list[str] = []
+    routes = {
+        "https://school.bg/admission/fees": _html('<p>Fees</p><a href="/school-fees/">School fees</a>'),
+        "https://school.bg/school-fees/": _html('<p>Fees</p><a href="/school-fees-2026-2027/">Fees 2026-2027</a>'),
+        "https://school.bg/school-fees-2026-2027/": _html("<p>Grade 1: 14 750 EUR</p>"),
+    }
+
+    async with _client(routes, requested) as client:
+        documents = await fetch_fee_documents(
+            [("https://school.bg/admission/fees", "Fees and tuition"), ("https://school.bg/school-fees/", "School")],
+            site_url=SITE, known_urls=[], html_to_text=_text, client=client,
+        )  # fmt: skip
+
+    assert "https://school.bg/school-fees-2026-2027/" in requested
+    assert any("14 750" in document.text for document in documents)
+
+
+@pytest.mark.asyncio
+async def test_a_picture_robots_disallows_is_not_fetched():
+    requested: list[str] = []
+    routes = {"https://school.bg/fees": _html('<main><p>Fees</p><img src="/private/fees.png"></main>')}
+
+    async def disallowed(url: str) -> bool:
+        return "/private/" in url
+
+    async def read_image(data: bytes, media_type: str) -> str:
+        return "Tuition 9 000 EUR"
+
+    async with _client(routes, requested) as client:
+        await fetch_fee_documents(
+            [("https://school.bg/fees", "Fees")], site_url=SITE, known_urls=[], html_to_text=_text,
+            client=client, read_image=read_image, disallowed=disallowed,
+        )  # fmt: skip
+
+    assert requested == ["https://school.bg/fees"]
