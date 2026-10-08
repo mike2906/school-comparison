@@ -250,27 +250,13 @@ const pointInBounds = (lat, lng, bounds) => {
   return !bounds || bounds.contains([lat, lng])
 }
 
-const collectSchoolPoints = (schools, countryBounds) => {
-  const points = []
-
-  schools.forEach(school => {
-    school.locations?.forEach(location => {
-      const lat = parseCoordinate(location.lat)
-      const lng = parseCoordinate(location.lng)
-      if (pointInBounds(lat, lng, countryBounds)) {
-        points.push([lat, lng])
-      }
-    })
-  })
-
-  return points
-}
-
 const leafletDistance = (a, b) => L.latLng(a).distanceTo(b)
 
-const collectPoints = (schools, userLocation, countryBounds) => {
-  const schoolPoints = collectSchoolPoints(schools, countryBounds)
-  const points = pointsForFit(schoolPoints, { distance: leafletDistance, keepRatio: fitKeepRatio(schoolPoints.length) })
+// `schoolPoints` are the positions of the pins on the map (see `markers` in SchoolMap), so
+// the fit never makes room for a location that the age filter left without a pin.
+const collectPoints = (schoolPoints, userLocation) => {
+  // A copy: below its minimum pointsForFit returns the array it was given.
+  const points = [...pointsForFit(schoolPoints, { distance: leafletDistance, keepRatio: fitKeepRatio(schoolPoints.length) })]
 
   if (userLocation?.lat && userLocation?.lng) {
     points.push([userLocation.lat, userLocation.lng])
@@ -307,8 +293,8 @@ const panPinIntoRoom = (map, latLng, room) => {
   map.panTo(center, { animate: true, duration: 0.5 })
 }
 
-const getAutoFitKey = (schools, userLocation, countryBounds) => {
-  const points = collectPoints(schools, userLocation, countryBounds)
+const getAutoFitKey = (schoolPoints, userLocation, countryBounds) => {
+  const points = collectPoints(schoolPoints, userLocation)
     .map(([lat, lng]) => `${lat},${lng}`)
     .sort()
 
@@ -326,8 +312,13 @@ const serializeBounds = (bounds) => ({
   },
 })
 
-function MapUpdater({ schools, userLocation, autoFit, lastValidBoundsRef, defaultZoom, countryBounds, keepInitialView, fittedWhileHiddenRef }) {
+function MapUpdater({ schools, schoolPoints, userLocation, autoFit, lastValidBoundsRef, defaultZoom, countryBounds, keepInitialView, fittedWhileHiddenRef }) {
   const map = useMap()
+  // The pins change twice when the age group does: at once (the previous result, filtered
+  // by the new group) and again when the new result loads. Only a new result refits, so
+  // the pins are read through a ref and `schools` is what the effect depends on.
+  const schoolPointsRef = useRef(schoolPoints)
+  schoolPointsRef.current = schoolPoints
   const lastAutoFitKeyRef = useRef(null)
   // A restored view (returning from a school page) wins over the first auto-fit.
   const keepInitialViewRef = useRef(keepInitialView)
@@ -335,11 +326,11 @@ function MapUpdater({ schools, userLocation, autoFit, lastValidBoundsRef, defaul
   useEffect(() => {
     if (!autoFit) return
 
-    const autoFitKey = getAutoFitKey(schools, userLocation, countryBounds)
+    const schoolPoints = schoolPointsRef.current
+    const autoFitKey = getAutoFitKey(schoolPoints, userLocation, countryBounds)
     if (lastAutoFitKeyRef.current === autoFitKey) return
 
-    const schoolPoints = collectSchoolPoints(schools, countryBounds)
-    const points = collectPoints(schools, userLocation, countryBounds)
+    const points = collectPoints(schoolPoints, userLocation)
 
     if (keepInitialViewRef.current) {
       if (schoolPoints.length === 0) return
@@ -956,12 +947,11 @@ const OverlayLocationMarker = memo(function OverlayLocationMarker({
   )
 })
 
-function ResetViewControl({ schools, userLocation, lastValidBoundsRef, label, defaultZoom, countryBounds }) {
+function ResetViewControl({ schoolPoints, userLocation, lastValidBoundsRef, label, defaultZoom, countryBounds }) {
   const map = useMap()
 
   const handleResetView = useCallback(() => {
-    const schoolPoints = collectSchoolPoints(schools, countryBounds)
-    const points = collectPoints(schools, userLocation, countryBounds)
+    const points = collectPoints(schoolPoints, userLocation)
 
     if (schoolPoints.length > 0) {
       const bounds = fitMapToPoints(map, points)
@@ -977,7 +967,7 @@ function ResetViewControl({ schools, userLocation, lastValidBoundsRef, label, de
     }
 
     map.fitBounds(countryBounds, { padding: fitPaddingFor(map), maxZoom: defaultZoom, animate: true, duration: 0.4 })
-  }, [map, schools, userLocation, lastValidBoundsRef, defaultZoom, countryBounds])
+  }, [map, schoolPoints, userLocation, lastValidBoundsRef, defaultZoom, countryBounds])
 
   return (
     // Bottom-right, so a school's popup (opened near the top) never covers it.
@@ -1108,6 +1098,7 @@ function SchoolMap({
   }, [schools, activeAgeGroup, countryBounds])
 
   const stackedByKey = useMemo(() => stackedMarkersByKey(markers), [markers])
+  const schoolPoints = useMemo(() => markers.map(marker => marker.position), [markers])
 
   const overlaySchoolId = locationOverlay?.schoolId ?? null
   const hideOthers = Boolean(locationOverlay?.hideOthers)
@@ -1321,6 +1312,7 @@ function SchoolMap({
 
         <MapUpdater
           schools={schools}
+          schoolPoints={schoolPoints}
           userLocation={userLocation}
           autoFit={autoFit}
           lastValidBoundsRef={lastValidBoundsRef}
@@ -1358,7 +1350,7 @@ function SchoolMap({
         />
 
         <ResetViewControl
-          schools={schools}
+          schoolPoints={schoolPoints}
           userLocation={userLocation}
           lastValidBoundsRef={lastValidBoundsRef}
           label={t('map.resetView')}
