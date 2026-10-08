@@ -17,6 +17,8 @@ SOFIA_WRITE_BOUNDS = SOFIA_MUNICIPALITY_BOUNDS
 # Official building points (scripts/import_sofia_municipal_points.py); geocoders and website
 # map links never replace them.
 OFFICIAL_COORDS_TAG = "coords_source=sofia_municipal"
+# A pin corrected by hand (`geocode_meta.method`), with its evidence in `geocode_meta.manual_fix`.
+MANUAL_FIX_METHOD = "manual_fix"
 
 
 def _normalize_address(value: Optional[str]) -> str:
@@ -30,6 +32,16 @@ def _normalize_address(value: Optional[str]) -> str:
 def _location_address(location: SchoolLocation) -> str:
     address_i18n = location.address_i18n or {}
     return address_i18n.get("bg") or address_i18n.get("en") or ""
+
+
+def has_pinned_point(location: SchoolLocation) -> bool:
+    """Whether the location's point is official or hand-corrected: never replaced automatically."""
+    if location.lat is None or location.lng is None:
+        return False
+    if OFFICIAL_COORDS_TAG in (location.location_tags or []):
+        return True
+    meta = location.geocode_meta
+    return isinstance(meta, dict) and meta.get("method") == MANUAL_FIX_METHOD
 
 
 def _result_meta(result: GeocodingResult, *, status: str, reason: Optional[str] = None) -> dict:
