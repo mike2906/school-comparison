@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { pointsForFit, fitKeepRatio, fitPadding, pickSelectedMarker, pinHasRoom, pinTarget, overlayFitPadding, stackedMarkersByKey } from './mapFit.js'
+import { pointsForFit, fitKeepRatio, fitPadding, pickSelectedMarker, pinHasRoom, pinTarget, overlayFitPadding, stackedMarkersByKey, pinnedLocations, isSchoolInBounds } from './mapFit.js'
 
 // Stand-in for Leaflet's distanceTo in node tests; only the ordering matters here.
 const distance = ([aLat, aLng], [bLat, bLng]) => Math.hypot(aLat - bLat, aLng - bLng)
@@ -188,4 +188,34 @@ test('fitPadding leaves less room on a phone than on a large map', () => {
   assert.equal(fitPadding({ x: 200, y: 200 }), 24)
   // A hidden map (mobile List tab) has no size yet.
   assert.equal(fitPadding({ x: 0, y: 0 }), 24)
+})
+
+test('pinnedLocations keeps only the locations that serve the active age group', () => {
+  const school = {
+    locations: [
+      { id: 1, lat: 42.7, lng: 23.3, age_groups: ['grade_1_4'] },
+      { id: 2, lat: 42.6, lng: 23.4, age_groups: ['grade_8_12'] },
+      { id: 3, lat: 42.5, lng: 23.5, age_group: 'grade_8_12' },
+      { id: 4, lat: 42.4, lng: 23.6 },
+    ],
+  }
+  assert.deepEqual(pinnedLocations(school, 'grade_8_12').map(l => l.id), [2, 3])
+  assert.deepEqual(pinnedLocations(school, null).map(l => l.id), [1, 2, 3, 4])
+  assert.equal(pinnedLocations({}, 'grade_8_12'), undefined)
+})
+
+test('isSchoolInBounds ignores locations without a pin for the active age group', () => {
+  const bounds = { southWest: { lat: 42.6, lng: 23.2 }, northEast: { lat: 42.8, lng: 23.4 } }
+  const school = {
+    locations: [
+      // Inside the bounds, but it serves another age group: no pin there.
+      { id: 1, lat: 42.7, lng: 23.3, age_groups: ['grade_1_4'] },
+      // Serves the active group, but lies outside the bounds.
+      { id: 2, lat: 42.5, lng: 23.3, age_groups: ['grade_8_12'] },
+    ],
+  }
+  assert.equal(isSchoolInBounds(school, bounds, 'grade_8_12'), false)
+  assert.equal(isSchoolInBounds(school, bounds, 'grade_1_4'), true)
+  assert.equal(isSchoolInBounds(school, bounds, null), true)
+  assert.equal(isSchoolInBounds(school, null, 'grade_8_12'), true)
 })

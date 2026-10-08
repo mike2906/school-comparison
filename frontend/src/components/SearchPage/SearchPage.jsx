@@ -24,6 +24,7 @@ import { AGE_GROUP_KEYS } from '../../utils/education'
 import { getLanguageFocusPairs } from '../../utils/schoolAttributes'
 import { matchesAdvancedFilters, matchesSchoolType } from '../../utils/advancedFilters'
 import { getNvoDetail } from '../../utils/nvo'
+import { isSchoolInBounds } from '../../utils/mapFit'
 import { LIST_PAGE_SIZE, windowForIndex, scrollTopToCenter } from '../../utils/listWindow'
 import { canonicalLanguagePair, languageKey, languageLabel } from '../../utils/languages'
 
@@ -890,23 +891,10 @@ function SearchPage() {
     ))
   }, [schoolsWithDistance, distanceLimit, nameQuery])
 
-  const isSchoolInBounds = (school, bounds) => {
-    if (!bounds?.southWest || !bounds?.northEast) return true
-    return school.locations?.some(location => {
-      if (!location?.lat || !location?.lng) return false
-      return (
-        location.lat >= bounds.southWest.lat &&
-        location.lat <= bounds.northEast.lat &&
-        location.lng >= bounds.southWest.lng &&
-        location.lng <= bounds.northEast.lng
-      )
-    })
-  }
-
   const boundedSchools = useMemo(() => {
     if (!searchInBounds || !mapBounds) return filteredSchools
-    return filteredSchools.filter(school => isSchoolInBounds(school, mapBounds))
-  }, [filteredSchools, searchInBounds, mapBounds])
+    return filteredSchools.filter(school => isSchoolInBounds(school, mapBounds, filters.ageGroup))
+  }, [filteredSchools, searchInBounds, mapBounds, filters.ageGroup])
 
   useEffect(() => {
     if (!entrySchoolIdRef.current) return

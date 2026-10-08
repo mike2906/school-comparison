@@ -127,3 +127,36 @@ export function stackedMarkersByKey(markers) {
   })
   return result
 }
+
+/** The age groups a location serves. */
+export function normalizeAgeGroups(location) {
+  if (!location) return []
+  if (Array.isArray(location.age_groups)) return location.age_groups.filter(Boolean)
+  if (location.age_group) return [location.age_group]
+  return []
+}
+
+/**
+ * The locations of a school that get a pin for the active age group (all of them without
+ * one). The map draws them and "search in this area" tests them, so a school never stays
+ * in the list for a location that has no pin.
+ */
+export function pinnedLocations(school, activeAgeGroup) {
+  return activeAgeGroup
+    ? school.locations?.filter(location => normalizeAgeGroups(location).includes(activeAgeGroup))
+    : school.locations
+}
+
+/** Whether a school has a pin inside the map bounds ({ southWest, northEast }, plain lat/lng). */
+export function isSchoolInBounds(school, bounds, activeAgeGroup) {
+  if (!bounds?.southWest || !bounds?.northEast) return true
+  return pinnedLocations(school, activeAgeGroup)?.some(location => {
+    if (!location?.lat || !location?.lng) return false
+    return (
+      location.lat >= bounds.southWest.lat &&
+      location.lat <= bounds.northEast.lat &&
+      location.lng >= bounds.southWest.lng &&
+      location.lng <= bounds.northEast.lng
+    )
+  }) ?? false
+}
