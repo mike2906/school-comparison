@@ -32,6 +32,10 @@ dist/
 # Local Claude Code state is ignored; the skills symlink is shared (see AGENTS.md)
 .claude/*
 !.claude/skills
+# Shared subagent definition (pins implementation subagents to a cheaper model)
+!.claude/agents/
+.claude/agents/*
+!.claude/agents/implementer.md
 *.swp
 *.swo
 *~
@@ -42,6 +46,7 @@ dist/
 .DS_Store
 Thumbs.db
 *.Zone.Identifier
+*:Zone.Identifier
 
 # Logs
 *.log

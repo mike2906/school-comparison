@@ -114,6 +114,11 @@ A data-refresh run that trips a circuit breaker also goes to Mike; normal runs d
   when they span hours); long sessions carry their full history into every turn.
 - **No subagents or high reasoning effort for routine edits** (a regex fix plus a test).
   Subagents start cold and rebuild context.
+- **Delegated implementation runs on the cheaper model.** When a batch run does hand
+  implementation to subagents, start the `implementer` agent (Claude Code:
+  `.claude/agents/implementer.md`, pinned to Sonnet) rather than a general-purpose one, and
+  do not pass a model when starting it: an explicit model overrides the pin. The
+  orchestrator keeps its own model for planning, review and merge decisions.
 
 ## Commit / PR conventions
 
