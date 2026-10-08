@@ -500,6 +500,14 @@ def test_rule_6_allows_a_period_change_the_page_states():
     published = [(row(Decimal("680"), period="YEARLY"), page)]
     proposed = [(row(Decimal("680"), period="MONTHLY"), page)]
     assert replacement_regressions(published, proposed, "kindergarten") == []
+    # Another fee at the same amount stating another period settles nothing.
+    both = "Храна: 680 евро месечно\nТакса: 680 евро годишно"
+    assert replacement_regressions(
+        [(row(Decimal("680"), period="YEARLY"), both)], [(row(Decimal("680"), period="MONTHLY"), both)], "kindergarten"
+    ) == [
+        "changes the YEARLY period of TUITION 680.00 to MONTHLY, "
+        "which the page does not state next to the amount"
+    ]
     # A yearly fee and a one-time fee are one statement to rule 3; a swap is not a change.
     once = [(row(Decimal("680"), period="ONE_TIME"), "Такса: 680 евро")]
     assert replacement_regressions([(row(Decimal("680"), period="YEARLY"), "Такса: 680 евро")], once, "school") == []

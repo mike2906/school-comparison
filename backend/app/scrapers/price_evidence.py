@@ -508,12 +508,20 @@ _INTERCHANGEABLE_PERIODS = {"ONE_TIME", "YEARLY"}
 
 
 def _page_states_period(row: PriceRow, page_text: Optional[str]) -> bool:
-    """True when some occurrence of each of the row's amounts has exactly its period beside it."""
+    """True when each of the row's amounts has its period beside it and no other period.
+
+    Every occurrence that states a period must state this one: "500 евро месечно" for
+    food does not make a 500 tuition monthly when "500 евро годишно" is on the page too.
+    """
     text = normalize_text(page_text)
-    return bool(text and row.period and row.amounts) and all(
-        any(stated_period(text, span)[0] == {row.period} for span in amount_spans(text, value))
-        for value in row.amounts
-    )
+    if not (text and row.period and row.amounts):
+        return False
+    for value in row.amounts:
+        stated = [stated_period(text, span)[0] for span in amount_spans(text, value)]
+        stated = [families for families in stated if families]
+        if not stated or any(families != {row.period} for families in stated):
+            return False
+    return True
 
 
 def replacement_regressions(

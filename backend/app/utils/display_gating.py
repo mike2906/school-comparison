@@ -385,6 +385,11 @@ def _yearly_tuition_eur(row: Any) -> decimal.Decimal | None:
     return base * per_year
 
 
+def _median(ordered: list[decimal.Decimal]) -> decimal.Decimal:
+    middle = len(ordered) // 2
+    return ordered[middle] if len(ordered) % 2 else (ordered[middle - 1] + ordered[middle]) / 2
+
+
 def implausible_tuition_row_ids(rows: Iterable[Any]) -> set[int]:
     """Ids of one school's tuition rows too cheap or too dear to be its tuition.
 
@@ -392,8 +397,9 @@ def implausible_tuition_row_ids(rows: Iterable[Any]) -> set[int]:
     A row is withheld when its yearly equivalent is below
     :data:`TUITION_YEARLY_FLOOR_EUR`, or below :data:`TUITION_PEER_RATIO_FLOOR` times the
     median yearly tuition across those rows; likewise above
-    :data:`TUITION_YEARLY_CEILING_EUR` or :data:`TUITION_PEER_RATIO_CEILING` times that
-    median. Rows that cannot be annualized are left alone.
+    :data:`TUITION_YEARLY_CEILING_EUR`, or :data:`TUITION_PEER_RATIO_CEILING` times the
+    median of the rows inside those two yearly bounds. Rows that cannot be annualized are
+    left alone.
     """
     yearly = {}
     for row in rows:
@@ -404,15 +410,19 @@ def implausible_tuition_row_ids(rows: Iterable[Any]) -> set[int]:
     if not yearly:
         return set()
     ordered = sorted(yearly.values())
-    middle = len(ordered) // 2
-    median = ordered[middle] if len(ordered) % 2 else (ordered[middle - 1] + ordered[middle]) / 2
+    median = _median(ordered)
     peer_floor = median * TUITION_PEER_RATIO_FLOOR
-    peer_ceiling = median * TUITION_PEER_RATIO_CEILING
+    # The ceiling compares against the rows inside the yearly bounds only: three misfiled
+    # add-ons below the floor must not make the school's one real fee look too dear.
+    bounded = [
+        value for value in ordered if TUITION_YEARLY_FLOOR_EUR <= value <= TUITION_YEARLY_CEILING_EUR
+    ]
+    peer_ceiling = _median(bounded) * TUITION_PEER_RATIO_CEILING if bounded else None
     return {
         row_id
         for row_id, value in yearly.items()
         if value < TUITION_YEARLY_FLOOR_EUR
         or value < peer_floor
         or value > TUITION_YEARLY_CEILING_EUR
-        or value > peer_ceiling
+        or (peer_ceiling is not None and value > peer_ceiling)
     }

@@ -448,6 +448,9 @@ def test_yearly_fee_stored_as_monthly_is_withheld():
     # Below the ceiling, a row at more than four times the school's median tuition.
     rows = [_tuition_row(1, 300), _tuition_row(2, 320), _tuition_row(3, 3600)]
     assert implausible_tuition_row_ids(rows) == {3}
+    # Misfiled add-ons below the floor do not make the one real fee look too dear.
+    rows = [_tuition_row(1, 25), _tuition_row(2, 30), _tuition_row(3, 20), _tuition_row(4, 560)]
+    assert implausible_tuition_row_ids(rows) == {1, 2, 3}
     # The dearest real tuition in Sofia (school 506) is well inside both bounds.
     rows = [_tuition_row(i, a, "yearly") for i, a in enumerate([10000, 12008, 20000, 22300, 23983, 25619], 1)]
     assert implausible_tuition_row_ids(rows) == set()
