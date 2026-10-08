@@ -1723,12 +1723,14 @@ function SearchPage() {
     <Layout hideNavOnMobile hideFooter>
       <div className="h-[100dvh] lg:h-[calc(100dvh-65px)] flex flex-col">
         <h1 className="sr-only">{t('welcome.title')}</h1>
-        {/* Mobile/Tablet Header */}
+        {/* Mobile/Tablet Header. None of its items shrinks, so the row has to fit the
+            narrowest phone in Bulgarian (the longer tab labels): tighter tabs below 390px,
+            and no home link below 360px. */}
         <div className="lg:hidden border-b border-neutral-200 bg-white">
           <div className="flex items-center gap-2 px-3 py-2">
             <Link
               to="/search"
-              className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary-500 to-primary-600 text-white"
+              className="hidden h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary-500 to-primary-600 text-white min-[360px]:flex"
               aria-label={t('nav.home')}
             >
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
@@ -1745,7 +1747,7 @@ function SearchPage() {
                     role="tab"
                     aria-selected={mobileTab === tab}
                     onClick={() => setMobileTab(tab)}
-                    className={`h-10 px-4 text-sm font-medium rounded-md transition-colors ${
+                    className={`h-10 px-2 min-[390px]:px-4 text-sm font-medium rounded-md transition-colors ${
                       mobileTab === tab
                         ? 'bg-white text-neutral-900 shadow-sm'
                         : 'text-neutral-600 hover:text-neutral-800'
