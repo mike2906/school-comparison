@@ -3201,6 +3201,13 @@ def _is_low_quality_display_name(value: str | None) -> bool:
         return True
     if lowered.startswith("на "):
         return True
+    # Page copy (testimonials, team/about headings, sentences) is not a school name.
+    if len(raw_value.split()) > 12:
+        return True
+    if re.search(r"[a-zа-я]{3,}[.:]$", lowered):
+        return True
+    if lowered.startswith(("нашето ", "нашата ", "нашия ", "мили ", "ръководство на ", "екип на ", "our family", "dear ")):
+        return True
     if lowered.startswith(("преподаватели в", "teachers at")):
         return True
     if lowered.startswith(("стратегически план", "strategic plan")):
