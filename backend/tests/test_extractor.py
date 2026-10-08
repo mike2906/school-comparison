@@ -4467,7 +4467,7 @@ async def test_only_the_llm_prompt_sees_spaced_currency_words(
     with patch("app.scrapers.extractor._run_typed_agent", new=llm), patch.object(
         helpers, "_extract_prices_deterministic", wraps=helpers._extract_prices_deterministic
     ) as deterministic, patch.object(
-        helpers, "_filter_supported_prices", wraps=helpers._filter_supported_prices
+        helpers, "_filter_model_prices", wraps=helpers._filter_model_prices
     ) as support:
         await extractor_module._extract_prices(
             db_session, school, list(pages), 20.0, extractor_module.ExtractionLLMStats()
@@ -4608,7 +4608,8 @@ async def test_reextraction_losing_a_period_the_page_does_not_state_is_held(
 async def test_reextraction_losing_a_period_the_page_states_is_written(
     db_session, sample_school_for_extraction
 ):
-    """Validation fills "ежемесечно" back in, so this is not a regression."""
+    """The page says "ежемесечно" next to the amount, so the row gets its period back
+    from the text and nothing is lost."""
     school = sample_school_for_extraction
     school.attributes = {extractor_module.PRICING_HOLD_KEY: {"reasons": ["earlier"]}}
     pages = await _published_rows_and_page(db_session, school, [("tuition", 530, "monthly")])
@@ -4616,7 +4617,7 @@ async def test_reextraction_losing_a_period_the_page_states_is_written(
     result = await _run_prices(db_session, school, pages, [("tuition", 530.0, None)])
 
     assert result.get("held") is None
-    assert await _stored(db_session, school) == [("tuition", 530.0, None)]
+    assert await _stored(db_session, school) == [("tuition", 530.0, "monthly")]
     # A replacement that goes through clears the earlier hold.
     assert extractor_module.PRICING_HOLD_KEY not in school.attributes
 
@@ -4714,7 +4715,7 @@ def test_model_row_keeps_its_category_under_an_unrelated_heading():
         _model_price(category="tuition", amount=7500, period="yearly", plan_name="Ученици от 4 до 7 клас"),
     ]  # fmt: skip
 
-    refined = extractor_module.helpers._filter_supported_prices(rows, text, model_rows=True)
+    refined = extractor_module.helpers._filter_model_prices(rows, text)
 
     assert [(row.category, row.amount, row.period) for row in refined] == [
         ("tuition", 6750, "yearly"),
@@ -4725,7 +4726,7 @@ def test_model_row_keeps_its_category_under_an_unrelated_heading():
     assert {row.category for row in by_keywords} == {"registration"}
 
 
-def test_model_row_is_supported_by_a_price_line_with_no_fee_word():
+def test_model_row_needs_no_fee_word_near_its_amount():
     """School 529: "€ 6.540" stands under a level name; no line near it says what fee."""
     text = """
     --- SOURCE: https://school.test/uchebni-taksi ---
@@ -4737,35 +4738,87 @@ def test_model_row_is_supported_by_a_price_line_with_no_fee_word():
     """
     rows = [
         _model_price(category="tuition", amount=6540, period="yearly", academic_year="2026/2027", plan_name="Предучилищна"),
-        _model_price(category="tuition", amount=6740, period="yearly", academic_year="2026/2027", plan_name="Гимназия"),
+        _model_price(category="tuition", amount=6740, period="yearly", academic_year="2026-2027", plan_name="Гимназия"),
         _model_price(category="tuition", amount=9999, period="yearly", plan_name="Гимназия"),
     ]  # fmt: skip
 
-    refined = extractor_module.helpers._filter_supported_prices(rows, text, model_rows=True)
+    refined = extractor_module.helpers._filter_model_prices(rows, text)
 
-    # Both amounts on the page are kept; the period the page does not state is cleared;
-    # an amount that is not on the page is still dropped.
-    assert [(row.category, row.amount, row.period) for row in refined] == [
-        ("tuition", 6540, None),
-        ("tuition", 6740, None),
+    # Both amounts on the page are kept with the year the page names; the period the
+    # page does not state is cleared; an amount that is not on the page is dropped.
+    assert [(row.amount, row.period, row.academic_year) for row in refined] == [
+        (6540, None, "2026/2027"),
+        (6740, None, "2026-2027"),
     ]
     assert extractor_module.helpers._filter_supported_prices(rows, text) == []
 
 
-def test_model_row_category_is_still_corrected_by_its_own_line():
-    text = "--- SOURCE: https://school.test/fees ---\nSchool bus service EUR 1,200 per year"
-    row = _model_price(category="tuition", amount=1200, period="yearly")
+def test_model_row_in_a_table_of_several_prices_per_line():
+    """School 300's PDF: one line carries five grade bands' fees, and an unrelated
+    sentence further up names the following year."""
+    text = """
+    --- SOURCE: https://school.test/taksi-2026-2027.pdf ---
+    Такси за учебната 2026/2027 г.
+    до 15.01.2027 г. при преустановяване на обучението от учебната 2027/2028 г.
+    За цялата учебна година Подготвителна група Първи клас 2-7 клас
+    при плащане в срок до 31.08.2026г. € 7880 € 8580 €8800
+    """
+    rows = [
+        _model_price(category="tuition", amount=amount, period="yearly", academic_year="2026/2027", age_group=band)
+        for amount, band in ((7880, "Подготвителна група"), (8580, "Първи клас"), (8800, "2-7 клас"))
+    ]  # fmt: skip
 
-    refined = extractor_module.helpers._filter_supported_prices([row], text, model_rows=True)
+    refined = extractor_module.helpers._filter_model_prices(rows, text)
 
-    assert [(r.category, r.amount) for r in refined] == [("transport", 1200)]
+    assert [(row.amount, row.academic_year) for row in refined] == [
+        (7880, "2026/2027"),
+        (8580, "2026/2027"),
+        (8800, "2026/2027"),
+    ]
 
 
-def test_model_row_for_a_total_fee_line_is_withheld():
-    text = "--- SOURCE: https://school.test/fees ---\nTuition Fee EUR 10,000\nCapital Fee EUR 2,000\nTotal Fee EUR 12,000"
-    row = _model_price(category="tuition", amount=12000, period="yearly", plan_name="Total Fee")
+def test_model_row_year_and_period_come_from_the_page():
+    text = "--- SOURCE: https://school.test/fees ---\nTuition 2025/2026\nGrades 1-4 EUR 9,000 per year\nBus EUR 90"
+    rows = [
+        _model_price(category="tuition", amount=9000, period="monthly", academic_year="2026/2027", plan_name="Grades 1-4"),
+        _model_price(category="transport", amount=90, period="monthly"),
+    ]  # fmt: skip
 
-    assert extractor_module.helpers._filter_supported_prices([row], text, model_rows=True) == []
+    refined = extractor_module.helpers._filter_model_prices(rows, text)
+
+    # A year the page does not name is not kept, the period is the one written next to
+    # the amount, and a period nothing states is cleared.
+    assert [(row.amount, row.period, row.academic_year) for row in refined] == [
+        (9000, "yearly", None),
+        (90, None, None),
+    ]
+
+
+@pytest.mark.parametrize(
+    ("text", "row"),
+    [
+        (
+            "Tuition Fee EUR 10,000\nCapital Fee EUR 2,000\nTotal Fee EUR 12,000",
+            _model_price(category="tuition", amount=12000, period="yearly", plan_name="Total Fee"),
+        ),
+        (
+            "Tuition EUR 10,000\nLate payment fee EUR 150",
+            _model_price(category="registration", amount=150),
+        ),
+        ("Guest pupils: EUR 80 per day", _model_price(category="tuition", amount=80)),
+        ("Tuition 10 000 лв. per year", _model_price(category="tuition", amount=10000)),
+        ("Our campus is at 300 Vitosha Blvd. Tuition EUR 9,000", _model_price(category="materials", amount=300)),
+        (
+            "## Tuition fees\nAnnual tuition EUR 8,000\nPayment deadline: 15 September 2023",
+            _model_price(category="tuition", amount=8000, period="yearly"),
+        ),
+    ],
+    ids=["total", "penalty", "per-day", "other-currency", "bare-number", "stale-page"],
+)
+def test_model_row_the_page_does_not_bear_out_is_dropped(text, row):
+    text = f"--- SOURCE: https://school.test/fees ---\n{text}"
+
+    assert extractor_module.helpers._filter_model_prices([row], text) == []
 
 
 def test_pricing_selection_keeps_the_priced_spelling_from_one_crawl():

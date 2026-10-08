@@ -1052,14 +1052,20 @@ def _supported_price_rows(
 ) -> list[ExtractedPrice]:
     """Evidence-filter then de-duplicate extracted price rows.
 
+    ``model_rows`` marks rows a model read from the page; the keyword extractor's rows
+    (the default) are checked against line and heading keywords instead.
+
     Shared by the price-extraction path (LLM and deterministic branches) and the
     golden-corpus harness so the filter/dedupe sequence can never drift between them.
     """
     if not prices:
         return []
-    return helpers._dedupe_price_rows(
-        helpers._filter_supported_prices(prices, selected_text, model_rows=model_rows)
+    supported = (
+        helpers._filter_model_prices(prices, selected_text)
+        if model_rows
+        else helpers._filter_supported_prices(prices, selected_text)
     )
+    return helpers._dedupe_price_rows(supported)
 
 
 def _normalized_price_fields(extracted: ExtractedPrice) -> dict[str, Any] | None:

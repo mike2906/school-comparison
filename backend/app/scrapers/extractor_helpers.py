@@ -29,7 +29,17 @@ from app.schemas.extraction import (
 )
 from app.scrapers.extraction_rules import get_rules
 from app.scrapers.fee_pages import page_key
-from app.scrapers.price_evidence import currency_price_starts
+from app.scrapers.price_evidence import (
+    _NUMBER_ONLY_LINE_RE,
+    _gap,
+    _line_of,
+    amount_spans,
+    currency_price_starts,
+    label_spans,
+    normalize_text,
+    occurrence_currency,
+    stated_period,
+)
 from app.scrapers.school_tokens import extract_school_name_tokens
 from app.utils.academic_year import normalize_academic_year
 from app.utils.i18n_resolver import is_generic_numbered_display_label
@@ -1572,17 +1582,7 @@ def _period_on_following_line(lines: list[str], line_index: int) -> str | None:
     return _detect_explicit_price_period(following)
 
 
-def _iter_price_line_signals(
-    text: str, *, include_uncategorized: bool = False
-) -> list[dict[str, Any]]:
-    """One signal per price line: amount, currency and what the text around it says.
-
-    ``category_on_line`` is False when the category only comes from an earlier heading.
-    A heading is weak evidence: on school 404 the admission-steps heading above the fee
-    list made every tuition line "registration". A line with no category at all yields a
-    signal only with ``include_uncategorized`` (school 529's "€ 6.540" rows sit under
-    level names, with no fee word near them).
-    """
+def _iter_price_line_signals(text: str) -> list[dict[str, Any]]:
     lines = [_clean_price_line(raw) for raw in re.split(r"[\n\r]+", text) if _clean_price_line(raw)]
     if not lines:
         return []
@@ -1669,9 +1669,8 @@ def _iter_price_line_signals(
         )
         if _is_penalty_price_line(semantic_line):
             continue
-        line_category = _detect_price_category(semantic_line)
-        row_category = line_category or current_category
-        if row_category is None and not include_uncategorized:
+        row_category = _detect_price_category(semantic_line) or current_category
+        if row_category is None:
             continue
 
         row_age_group = _detect_price_age_group(line) or current_age_group
@@ -1700,7 +1699,6 @@ def _iter_price_line_signals(
                 "amount": line_amount,
                 "currency": line_currency or "BGN",
                 "category": row_category,
-                "category_on_line": line_category is not None,
                 "period": row_period,
                 "academic_year": row_year,
                 "age_group": row_age_group,
@@ -2227,20 +2225,11 @@ def _pricing_source_staleness(text: str) -> dict[str | None, bool]:
     return staleness
 
 
-def _filter_supported_prices(
-    prices: list[ExtractedPrice], text: str, *, model_rows: bool = False
-) -> list[ExtractedPrice]:
-    """Keep the rows whose amount a price line in ``text`` supports, corrected by that line.
-
-    ``model_rows`` marks rows a model read from the whole page, as opposed to the keyword
-    extractor's. A model row already has a category, so a price line with no fee word
-    near it still supports the row, and only a fee word on the amount's own line corrects
-    the category (a heading further up does not).
-    """
+def _filter_supported_prices(prices: list[ExtractedPrice], text: str) -> list[ExtractedPrice]:
     if not prices or not text:
         return []
 
-    signals = _iter_price_line_signals(text, include_uncategorized=model_rows)
+    signals = _iter_price_line_signals(text)
     if not signals:
         return []
 
@@ -2274,8 +2263,6 @@ def _filter_supported_prices(
             ]
         if not candidates:
             continue
-        # A line that names its category is better support than one that does not.
-        candidates = [signal for signal in candidates if signal["category"]] or candidates
         candidate_semantics = {
             (signal.get("category"), signal.get("period"), signal.get("academic_year"))
             for signal in candidates
@@ -2313,15 +2300,9 @@ def _filter_supported_prices(
         supporting_signal = best_signals[0]
         if "total fee" in str(supporting_signal.get("section_heading") or "").casefold():
             continue
-        if model_rows and "total fee" in str(supporting_signal.get("line") or "").casefold():
-            continue
 
         normalized = price.model_copy(deep=True)
-        # The amount's own line may correct the model's category; a category carried
-        # down from an earlier heading may not.
-        if supporting_signal.get("category") and (
-            supporting_signal.get("category_on_line") or not model_rows
-        ):
+        if supporting_signal.get("category"):
             normalized.category = supporting_signal["category"]
         # Evidence is authoritative in both directions: an explicit supported
         # period corrects the model, and absent period evidence clears a guess.
@@ -2333,6 +2314,100 @@ def _filter_supported_prices(
         refined.append(normalized)
 
     return refined
+
+
+def _source_blocks(text: str) -> list[tuple[str | None, str]]:
+    """(source URL, text) per ``--- SOURCE ---`` block; one block for unmarked text."""
+    headers = list(
+        re.finditer(r"^\s*---\s*SOURCE:\s*(.*?)\s*---\s*$", text or "", flags=re.IGNORECASE | re.MULTILINE)
+    )
+    if not headers:
+        return [(None, text or "")]
+    blocks = []
+    for index, header in enumerate(headers):
+        end = headers[index + 1].start() if index + 1 < len(headers) else len(text)
+        blocks.append((header.group(1).strip() or None, text[header.end() : end]))
+    return blocks
+
+
+_PAGE_ACADEMIC_YEAR_RE = re.compile(r"20\d{2}\s*[-/–]\s*(?:20)?\d{2}")
+
+
+def _filter_model_prices(prices: list[ExtractedPrice], text: str) -> list[ExtractedPrice]:
+    """Keep a model's price rows that the page text bears out, corrected by that text.
+
+    The model read the whole page, so its category, plan and age group stand. The text
+    decides the rest, by the same reading Stage 6 uses to gate publication
+    (``price_evidence``): the amount must be on a page in the row's currency; the period
+    is whatever is written next to the amount, or none; the academic year is kept only
+    when that page names it. A yearless row needs a page that is not a dated old fee
+    list. Rows for late-payment penalties, a "total fee" sum and per-day/week/hour
+    amounts are dropped.
+
+    The keyword extractor's rows go through :func:`_filter_supported_prices` instead:
+    they have no reading of their own, so there the line and heading keywords decide.
+    """
+    if not prices or not text:
+        return []
+    staleness = _pricing_source_staleness(text)
+    blocks = [
+        (normalize_text(block), staleness.get(url, staleness.get(None, False)))
+        for url, block in _source_blocks(text)
+    ]
+
+    refined: list[ExtractedPrice] = []
+    for price in prices:
+        amount = _to_optional_float(price.amount)
+        if amount is None:
+            continue
+        currency = (price.currency or "BGN")[:3].upper()
+        year = _normalize_academic_year(price.academic_year)
+        label = price.plan_name or price.age_group or price.notes
+        supported: list[tuple[bool, str | None]] = []  # (page names the year, period)
+        for block, stale in blocks:
+            spans = [
+                span
+                for span in amount_spans(block, amount)
+                if _amount_is_a_fee_in(block, span, currency)
+            ]
+            if not spans:
+                continue
+            labels = label_spans(block, label)
+            if labels:
+                spans = [min(spans, key=lambda span: min(_gap(span, found) for found in labels))]
+            stated = [stated_period(block, span) for span in spans]
+            if all(unrepresentable for _, unrepresentable in stated):
+                continue
+            families = [found for found, _ in stated]
+            agreed = families[0] if all(found == families[0] for found in families) else set()
+            period = next(iter(agreed)).lower() if len(agreed) == 1 else None
+            names_year = bool(year) and year in {
+                _normalize_academic_year(found) for found in _PAGE_ACADEMIC_YEAR_RE.findall(block)
+            }
+            if not names_year and stale:
+                continue
+            supported.append((names_year, period))
+        if not supported:
+            continue
+        # A page that names the row's year is the better witness.
+        names_year, period = max(supported, key=lambda item: item[0])
+        normalized = price.model_copy(deep=True)
+        normalized.period = period
+        if not names_year:
+            normalized.academic_year = None
+        refined.append(normalized)
+    return refined
+
+
+def _amount_is_a_fee_in(block: str, span: tuple[int, int], currency: str) -> bool:
+    """The occurrence is a price in ``currency`` and not a penalty or a sum of fees."""
+    line = _line_of(block, span)
+    written = occurrence_currency(block, span)
+    # A table cell or a number on its own line takes its currency from a header.
+    bare = written is None and ("|" in line or _NUMBER_ONLY_LINE_RE.match(line) is not None)
+    if written != currency and not bare:
+        return False
+    return not _is_penalty_price_line(line) and "total fee" not in line
 
 
 def _find_supporting_price_source_url(
@@ -2363,7 +2438,11 @@ def _find_supporting_price_source_url(
     for page in candidate_pages:
         page_text = page.raw_markdown or ""
         page_context = f"--- SOURCE: {page.source_url} ---\n{page_text}"
-        supported = _filter_supported_prices([price], page_context, model_rows=model_rows)
+        supported = (
+            _filter_model_prices([price], page_context)
+            if model_rows
+            else _filter_supported_prices([price], page_context)
+        )
         if any(
             row.category == price.category
             and row.period == price.period
