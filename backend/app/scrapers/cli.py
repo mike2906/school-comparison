@@ -309,6 +309,14 @@ _AGE_GROUP_REPAIR_TEXT_PATTERNS = {
         re.compile(r"\bбалообразуване\b", flags=re.IGNORECASE),
     ),
 }
+# Words right before a preschool mention that show the school is not offering the group:
+# the certificate a first-grader brings ("удостоверение за завършена подготвителна група"),
+# a negation, a partner kindergarten, or the state-funding rule quoted from the law.
+_PRESCHOOL_NON_OFFER_PREFIX_RE = re.compile(
+    r"(?:завършен\w*|завършил\w*|не\s+е\s+посещавал\w*|не\s+организира|партньори\s+за"
+    r"|приеманите\s+деца(?:\s+и\s+ученици)?\s+в)\W*$",
+    flags=re.IGNORECASE,
+)
 _CLASS_TEACHER_PAGE_RE = re.compile(r"(класни\s+ръководители|class\s+teachers?)", flags=re.IGNORECASE)
 _AGE_GROUP_CLASS_PATTERNS = {
     "preschool": re.compile(r"(?im)^\s*(?:3|4)\.\s*група\b"),
@@ -1369,7 +1377,16 @@ def _infer_age_group_evidence_from_source_pages(source_pages) -> dict[str, list[
                 evidence[age_group].append(source_url)
 
         for age_group, patterns in _AGE_GROUP_REPAIR_TEXT_PATTERNS.items():
-            if any(pattern.search(normalized_text) for pattern in patterns):
+            matches = (match for pattern in patterns for match in pattern.finditer(normalized_text))
+            if age_group == "preschool":
+                matches = (
+                    match
+                    for match in matches
+                    if not _PRESCHOOL_NON_OFFER_PREFIX_RE.search(
+                        normalized_text[max(0, match.start() - 60) : match.start()]
+                    )
+                )
+            if next(matches, None) is not None:
                 evidence[age_group].append(source_url)
 
         if "класни-ръководители" in decoded_url or "klasni-rakovoditeli" in decoded_url or _CLASS_TEACHER_PAGE_RE.search(
