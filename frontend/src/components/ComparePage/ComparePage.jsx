@@ -23,7 +23,7 @@ import {
   normalizeSchoolList,
 } from '../../utils/schoolAttributes'
 import { getBenchmarkComparison, getBenchmarkToneClasses, getNvoDetail as getSharedNvoDetail } from '../../utils/nvo'
-import { classifyAdmissionRequirement } from '../../utils/admission'
+import { classifyAdmissionRequirement, curatedRequirement } from '../../utils/admission'
 import { yearlyTuitionRangeEur } from '../../utils/pricing'
 
 const SOURCE_BADGE_STYLES = {
@@ -1006,7 +1006,7 @@ function ComparePage() {
         label: t('compare.labels.entryRequirements'),
         getValue: (school) => {
           const requirement = getAdmissionRequirement(
-            school.admission_info?.requirements ||
+            curatedRequirement(school.admission_info, i18n.language) ||
             school.attributes?.entry_requirements,
             t
           )
@@ -1014,7 +1014,7 @@ function ComparePage() {
             <span className="text-sm text-neutral-700">{requirement}</span>
           ) : renderPlaceholder()
         },
-        getCompare: (school) => school.admission_info?.requirements || school.attributes?.entry_requirements || null,
+        getCompare: (school) => curatedRequirement(school.admission_info, i18n.language) || school.attributes?.entry_requirements || null,
       },
       {
         label: t('compare.labels.pointsThreshold'),

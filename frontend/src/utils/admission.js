@@ -38,6 +38,19 @@ function classifyPart(text) {
   return 'other'
 }
 
+/**
+ * The curated `admission_info.requirements`. It is free text, so it may be written per
+ * language ({ bg, en }); a plain string or list is returned as is.
+ */
+export function curatedRequirement(admissionInfo, language) {
+  const raw = admissionInfo?.requirements
+  if (raw && typeof raw === 'object' && !Array.isArray(raw) && (raw.bg || raw.en)) {
+    const preferred = language?.startsWith('en') ? 'en' : 'bg'
+    return raw[preferred] || raw.bg || raw.en
+  }
+  return raw
+}
+
 export function classifyAdmissionRequirement(rawRequirement) {
   const parts = requirementParts(rawRequirement)
   if (parts.length === 0) return null

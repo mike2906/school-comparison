@@ -7,7 +7,7 @@ import { getSchoolName, getAddress, getSummary } from '../../utils/i18n'
 import { normalizeSchool } from '../../utils/schoolAttributes'
 import { getLastSearchUrl } from '../../utils/searchViewState'
 import { examTypeForAgeGroup } from '../../utils/nvo'
-import { usesSofiaKindergartenSystem } from '../../utils/admission'
+import { curatedRequirement, usesSofiaKindergartenSystem } from '../../utils/admission'
 import { schoolLevelLabel } from '../../utils/levelLabel'
 import { useCountry } from '../../context/CountryContext'
 import { useCompare } from '../../context/CompareContext'
@@ -500,7 +500,7 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
                   }
                 } else if (school.school_type === 'private' || school.school_type === 'international') {
                   const requirement = getAdmissionRequirement(
-                    school.admission_info?.requirements || attributes.entry_requirements,
+                    curatedRequirement(school.admission_info, i18n.language) || attributes.entry_requirements,
                     t
                   )
                   if (requirement) {

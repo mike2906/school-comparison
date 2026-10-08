@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { classifyAdmissionRequirement, usesSofiaKindergartenSystem } from './admission.js'
+import { classifyAdmissionRequirement, curatedRequirement, usesSofiaKindergartenSystem } from './admission.js'
 
 test('classifies English and Bulgarian interview requirements', () => {
   assert.equal(classifyAdmissionRequirement('Interview with the family').kind, 'interview')
@@ -65,4 +65,19 @@ test('usesSofiaKindergartenSystem only for Bulgarian state kindergartens', () =>
   assert.equal(usesSofiaKindergartenSystem({ school_type: 'private', education_level: 'kindergarten', country_code: 'bg' }), false)
   assert.equal(usesSofiaKindergartenSystem({ school_type: 'state', education_level: 'kindergarten', country_code: 'ro' }), false)
   assert.equal(usesSofiaKindergartenSystem({ school_type: 'state', education_level: 'primary', country_code: 'bg' }), false)
+})
+
+test('curated requirement text is picked for the page language', () => {
+  const perLanguage = { requirements: { bg: 'Прием чрез ИСОДЗ', en: 'Places through ISODZ' } }
+  assert.equal(curatedRequirement(perLanguage, 'bg'), 'Прием чрез ИСОДЗ')
+  assert.equal(curatedRequirement(perLanguage, 'en-GB'), 'Places through ISODZ')
+  assert.equal(curatedRequirement({ requirements: { bg: 'Само на български' } }, 'en'), 'Само на български')
+  // Plain values and the older { type } shape pass through unchanged.
+  assert.equal(curatedRequirement({ requirements: 'Official interview' }, 'en'), 'Official interview')
+  assert.deepEqual(curatedRequirement({ requirements: { type: 'interview' } }, 'bg'), { type: 'interview' })
+  assert.equal(curatedRequirement(null, 'bg'), undefined)
+  assert.equal(
+    classifyAdmissionRequirement(curatedRequirement(perLanguage, 'bg')).text,
+    'Прием чрез ИСОДЗ'
+  )
 })
