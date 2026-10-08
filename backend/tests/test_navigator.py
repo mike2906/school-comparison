@@ -623,58 +623,51 @@ async def test_navigate_schools_batch_retries_failed_outcome_sequentially(db_ses
 
 
 @pytest.mark.asyncio
-async def test_discover_pages_many_falls_back_per_chunk_on_timeout():
+async def test_discover_pages_many_crawls_each_site_on_its_own():
+    """One deep crawl per site: crawl4ai 0.9's arun_many mixes every site's pages in one list."""
     navigator = WebsiteNavigator(country_code="bg")
-    chunk_calls: list[list[str]] = []
-
-    async def fake_discover_many_chunk(self, website_urls, *, max_concurrency):
-        chunk_calls.append(list(website_urls))
-        if website_urls[0] == "https://school0.bg":
-            raise asyncio.TimeoutError("chunk timeout")
-        return {
-            "https://school2.bg": BatchDiscoverOutcome(
-                seed_url="https://school2.bg",
-                final_url="https://school2.bg",
-                pages=[
-                    NavigatedPage(
-                        url="https://school2.bg/about",
-                        category="about",
-                        markdown="About",
-                        content_hash="hash-about",
-                    )
-                ],
-            )
-        }
+    running = 0
+    most_running = 0
 
     async def fake_discover_pages(self, website_url: str):
+        nonlocal running, most_running
+        running += 1
+        most_running = max(most_running, running)
+        await asyncio.sleep(0)
+        running -= 1
+        if website_url == "https://school1.bg":
+            raise asyncio.TimeoutError("crawl timeout")
         return (
             website_url,
             [
+                NavigatedPage(url=website_url, category=None, markdown="Home", content_hash="h0"),
                 NavigatedPage(
                     url=f"{website_url}/about",
                     category="about",
                     markdown=f"About {website_url}",
                     content_hash=f"hash-{website_url}",
-                )
+                ),
             ],
         )
 
     from unittest.mock import patch
 
-    with (
-        patch.object(WebsiteNavigator, "_discover_pages_many_chunk", new=fake_discover_many_chunk),
-        patch.object(WebsiteNavigator, "discover_pages", new=fake_discover_pages),
-    ):
+    with patch.object(WebsiteNavigator, "discover_pages", new=fake_discover_pages):
         outcomes = await navigator.discover_pages_many(
-            ["https://school0.bg", "https://school1.bg", "https://school2.bg"],
+            ["https://school0.bg", "https://school1.bg", "https://school2.bg", "https://school0.bg"],
             max_concurrency=2,
         )
 
-    assert chunk_calls == [
-        ["https://school0.bg", "https://school1.bg"],
-        ["https://school2.bg"],
-    ]
+    assert most_running == 2
     assert set(outcomes) == {"https://school0.bg", "https://school1.bg", "https://school2.bg"}
-    assert outcomes["https://school0.bg"].pages[0].url == "https://school0.bg/about"
-    assert outcomes["https://school1.bg"].pages[0].url == "https://school1.bg/about"
-    assert outcomes["https://school2.bg"].pages[0].url == "https://school2.bg/about"
+    # Every page of a site stays with that site; one site's failure is its own.
+    assert [page.url for page in outcomes["https://school0.bg"].pages] == [
+        "https://school0.bg",
+        "https://school0.bg/about",
+    ]
+    assert [page.url for page in outcomes["https://school2.bg"].pages] == [
+        "https://school2.bg",
+        "https://school2.bg/about",
+    ]
+    assert outcomes["https://school1.bg"].pages == []
+    assert outcomes["https://school1.bg"].error == "crawl timeout"
