@@ -25,15 +25,18 @@ export function pointsForFit(points, { distance, keepRatio = 0.95, minPoints = 2
   return ranked.slice(0, keep).map(entry => entry.point)
 }
 
-// Up to SHORTLIST points nearly all are fitted; from CITY points on, the central half.
-const SHORTLIST = { points: 50, keep: 0.95 }
+// At SHORTLIST points the farthest tenth is left out; from CITY points on, the outer half.
+// SHORTLIST.points is where pointsForFit starts trimming at all (its minPoints).
+const SHORTLIST = { points: 20, keep: 0.9 }
 const CITY = { points: 500, keep: 0.5 }
 
 /**
- * Share of the points the first view fits. A shortlist shows nearly all of its schools.
- * A whole city fitted that way opens as three clusters holding everything, so it opens
- * on its central half, where the pins already spread out, and the rest is a pan away.
- * In between the share falls evenly, so one more result never changes the view much.
+ * Share of the points the first view fits. A handful of schools are all shown
+ * (pointsForFit trims nothing below its minPoints). A mid-size result opens on where most
+ * of its pins are: fitted nearly whole, a few schools in outlying villages zoomed 48
+ * private schools out a level on a phone, into three clusters. A whole city opens on its
+ * central half, where the pins already spread out, and the rest is a pan away. In between
+ * the share falls evenly, so one more result never changes the view much.
  */
 export function fitKeepRatio(count) {
   if (count <= SHORTLIST.points) return SHORTLIST.keep
