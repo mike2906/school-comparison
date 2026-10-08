@@ -12,6 +12,7 @@ from sqlalchemy.orm import selectinload
 
 from app.ai import summariser as ai_summariser
 from app.models import School, SchoolLocation
+from app.models.exam_results import ExamResult
 from app.schemas.llm_outputs import SchoolSummaryStrict
 from app.scrapers import summarizer as summarizer_module
 from tasks import scrape_tasks
@@ -1300,3 +1301,16 @@ async def test_summarize_school_fails_closed_when_generated_summary_is_semantica
     metadata = (school.attributes or {}).get("summary_generation", {})
     assert metadata.get("last_error")
     assert "generated_at" not in metadata
+
+
+def test_summary_facts_ignore_exam_results_withheld_for_too_few_pupils():
+    school = School(name_i18n={"bg": "ЧСУ"}, school_type="private", education_level="upper_secondary")
+    school.exam_results = [
+        ExamResult(year=2025, exam_type="nvo_10", subject="math", metric="average_score", value=80, pupil_count=1),
+        ExamResult(year=2024, exam_type="nvo_7", subject="math", metric="average_score", value=55, pupil_count=40),
+    ]
+
+    academic = summarizer_module._build_academic(school)
+
+    assert academic.exam_result_types == ["nvo_7"]
+    assert academic.recent_exam_years == [2024]

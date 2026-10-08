@@ -26,7 +26,7 @@ from app.ai.summariser import (
 from app.models import School, SchoolLocation
 from app.scrapers.extractor_helpers import _is_low_quality_display_name
 from app.services.geocoding.bounds import get_city_bounds
-from app.utils.display_gating import iter_blocking_field_paths
+from app.utils.display_gating import exam_result_is_publishable, iter_blocking_field_paths
 from app.utils.i18n_resolver import (
     derive_english_name,
     resolve_address_i18n,
@@ -518,14 +518,17 @@ def _build_pricing(attrs: Mapping[str, Any], school: School) -> SummaryPricing |
 
 
 def _build_academic(school: School) -> SummaryAcademic | None:
+    exam_results = [
+        result for result in school.exam_results if exam_result_is_publishable(result.pupil_count)
+    ]
     exam_types = sorted(
         {
             str(getattr(result.exam_type, "value", result.exam_type))
-            for result in school.exam_results
+            for result in exam_results
             if getattr(result, "exam_type", None)
         }
     )
-    exam_years = sorted({int(result.year) for result in school.exam_results if result.year}, reverse=True)
+    exam_years = sorted({int(result.year) for result in exam_results if result.year}, reverse=True)
 
     admission_info = dict(school.admission_info or {})
     rounds = admission_info.get("rounds") if isinstance(admission_info.get("rounds"), list) else []

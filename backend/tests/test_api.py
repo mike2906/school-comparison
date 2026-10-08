@@ -10,6 +10,7 @@ from app.models.field_source import FieldSource, SourceType
 from app.models.pricing import PriceSource, Pricing
 from app.models.school import School, SchoolLocation, SchoolLocationAgeGroupShift
 from app.models.source_page import ScrapeType, SourcePage
+from app.utils.display_gating import NVO_MIN_PUPILS
 
 PRICING_VERIFIED_AT = datetime(2026, 7, 16, 9, 0)
 
@@ -339,6 +340,47 @@ class TestSchoolsEndpoint:
         detail = (await seeded_client.get(f"/schools/{school.id}")).json()
         assert detail["exam_results"][0]["source_url"] == "https://example.edu/nvo-2025"
         assert detail["exam_results"][0]["school_id"] == school.id
+
+    @pytest.mark.asyncio
+    async def test_exam_results_resting_on_too_few_pupils_are_withheld(
+        self,
+        seeded_db,
+        seeded_client,
+    ):
+        school = (
+            await seeded_db.execute(
+                select(School).where(School.education_level == "primary")
+            )
+        ).scalar_one()
+        # 2025 rests on one pupil; 2024 is a full cohort; 2023 predates the stored count.
+        for year, value, pupil_count in (
+            (2025, 80.0, 1),
+            (2024, 61.5, NVO_MIN_PUPILS),
+            (2023, 58.0, None),
+        ):
+            seeded_db.add(
+                ExamResult(
+                    school_id=school.id,
+                    year=year,
+                    exam_type="nvo_4",
+                    subject="math",
+                    metric="average_score",
+                    value=value,
+                    pupil_count=pupil_count,
+                )
+            )
+        await seeded_db.commit()
+
+        listed = next(
+            item for item in (await seeded_client.get("/schools")).json() if item["id"] == school.id
+        )
+        detail = (await seeded_client.get(f"/schools/{school.id}")).json()
+        compared = (await seeded_client.get(f"/compare?ids={school.id}")).json()[0]
+
+        for payload in (listed, detail, compared):
+            assert sorted(row["year"] for row in payload["exam_results"]) == [2023, 2024]
+            # The count gates the result; it is not itself a response field.
+            assert all("pupil_count" not in row for row in payload["exam_results"])
 
     @pytest.mark.asyncio
     async def test_list_schools_filter_by_age_group(self, seeded_client):

@@ -6,7 +6,7 @@ from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Response
 from pydantic import TypeAdapter
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
@@ -18,6 +18,7 @@ from app.schemas.school import RelatedSchoolResponse, SchoolDetailResponse, Scho
 from app.services.country_service import get_valid_keys
 from app.services.school_relations import continues_to
 from app.services.school_service import SchoolService
+from app.utils.display_gating import NVO_MIN_PUPILS
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -315,6 +316,8 @@ async def get_exam_averages(
             .join(School, ExamResult.school_id == School.id)
             .where(School.country_code == country_code)
             .where(ExamResult.metric == "average_score")
+            # Results withheld for too few pupils do not feed the benchmark either.
+            .where(or_(ExamResult.pupil_count.is_(None), ExamResult.pupil_count >= NVO_MIN_PUPILS))
             .group_by(ExamResult.exam_type, ExamResult.year, ExamResult.subject)
             .order_by(ExamResult.exam_type, ExamResult.year)
         )
