@@ -43,6 +43,10 @@ _PRICE_PERIODS = {"monthly", "yearly", "one_time", "quarter", "term", "semester"
 # card's "from" headline, so it is withheld rather than shown.
 TUITION_YEARLY_FLOOR_EUR = decimal.Decimal("1000")
 TUITION_PEER_RATIO_FLOOR = decimal.Decimal("0.25")
+# The other direction: a yearly fee stored as monthly is multiplied by twelve (school 199's
+# "6792 EUR monthly"). The dearest Sofia tuition is about 26,000 EUR a year.
+TUITION_YEARLY_CEILING_EUR = decimal.Decimal("50000")
+TUITION_PEER_RATIO_CEILING = decimal.Decimal("4")
 _BGN_PER_EUR = decimal.Decimal("1.95583")  # fixed euro conversion rate
 _PERIODS_PER_YEAR = {"monthly": 12, "quarter": 4, "yearly": 1}
 
@@ -381,13 +385,21 @@ def _yearly_tuition_eur(row: Any) -> decimal.Decimal | None:
     return base * per_year
 
 
+def _median(ordered: list[decimal.Decimal]) -> decimal.Decimal:
+    middle = len(ordered) // 2
+    return ordered[middle] if len(ordered) % 2 else (ordered[middle - 1] + ordered[middle]) / 2
+
+
 def implausible_tuition_row_ids(rows: Iterable[Any]) -> set[int]:
-    """Ids of one school's tuition rows too cheap to be its tuition.
+    """Ids of one school's tuition rows too cheap or too dear to be its tuition.
 
     ``rows`` are the school's rows that already pass :func:`pricing_row_is_publishable`.
     A row is withheld when its yearly equivalent is below
     :data:`TUITION_YEARLY_FLOOR_EUR`, or below :data:`TUITION_PEER_RATIO_FLOOR` times the
-    median yearly tuition across those rows. Rows that cannot be annualized are left alone.
+    median yearly tuition across those rows; likewise above
+    :data:`TUITION_YEARLY_CEILING_EUR`, or :data:`TUITION_PEER_RATIO_CEILING` times the
+    median of the rows inside those two yearly bounds. Rows that cannot be annualized are
+    left alone.
     """
     yearly = {}
     for row in rows:
@@ -398,11 +410,19 @@ def implausible_tuition_row_ids(rows: Iterable[Any]) -> set[int]:
     if not yearly:
         return set()
     ordered = sorted(yearly.values())
-    middle = len(ordered) // 2
-    median = ordered[middle] if len(ordered) % 2 else (ordered[middle - 1] + ordered[middle]) / 2
+    median = _median(ordered)
     peer_floor = median * TUITION_PEER_RATIO_FLOOR
+    # The ceiling compares against the rows inside the yearly bounds only: three misfiled
+    # add-ons below the floor must not make the school's one real fee look too dear.
+    bounded = [
+        value for value in ordered if TUITION_YEARLY_FLOOR_EUR <= value <= TUITION_YEARLY_CEILING_EUR
+    ]
+    peer_ceiling = _median(bounded) * TUITION_PEER_RATIO_CEILING if bounded else None
     return {
         row_id
         for row_id, value in yearly.items()
-        if value < TUITION_YEARLY_FLOOR_EUR or value < peer_floor
+        if value < TUITION_YEARLY_FLOOR_EUR
+        or value < peer_floor
+        or value > TUITION_YEARLY_CEILING_EUR
+        or (peer_ceiling is not None and value > peer_ceiling)
     }

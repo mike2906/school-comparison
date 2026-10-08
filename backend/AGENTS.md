@@ -74,8 +74,11 @@ prices, whose label names the other level, whose period is per day/week, or that
 deposit or one installment filed as tuition gets an error on `pricing[{id}]`; a null
 period the page states is filled in. A kindergarten showing a same-site school's name
 gets an error on `attributes.display_name_i18n` and falls back to its registry name.
-A re-extraction that would drop a fee the page still shows, or a stated period, is held
-(`attributes.pricing_hold`) and the published rows stay.
+A re-extraction that would drop a fee the page still shows, drop a stated period, or
+change a period to one the page does not state beside the amount, is held
+(`attributes.pricing_hold`) and the published rows stay. Published tuition is also
+bounded both ways (`implausible_tuition_row_ids`): too cheap or too dear for a year, or
+against the school's median tuition, is withheld.
 
 URL validation failures set a persistent website-data withholding marker; only extraction plus
 deterministic validation may clear it. Gate coverage is coupled to the validator's spot-check

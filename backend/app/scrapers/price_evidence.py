@@ -503,6 +503,27 @@ def _amount_key(row: PriceRow) -> tuple[str, ...]:
     return tuple(keys)
 
 
+# Rule 3 treats a yearly fee and a one-time fee as the same statement; so does rule 6.
+_INTERCHANGEABLE_PERIODS = {"ONE_TIME", "YEARLY"}
+
+
+def _page_states_period(row: PriceRow, page_text: Optional[str]) -> bool:
+    """True when each of the row's amounts has its period beside it and no other period.
+
+    Every occurrence that states a period must state this one: "500 евро месечно" for
+    food does not make a 500 tuition monthly when "500 евро годишно" is on the page too.
+    """
+    text = normalize_text(page_text)
+    if not (text and row.period and row.amounts):
+        return False
+    for value in row.amounts:
+        stated = [stated_period(text, span)[0] for span in amount_spans(text, value)]
+        stated = [families for families in stated if families]
+        if not stated or any(families != {row.period} for families in stated):
+            return False
+    return True
+
+
 def replacement_regressions(
     published: Iterable[tuple[PriceRow, Optional[str]]],
     proposed: Iterable[tuple[PriceRow, Optional[str]]],
@@ -516,7 +537,11 @@ def replacement_regressions(
       shows it (525's re-run dropped its registration rows);
     * a published row has a period and every proposed row with that amount has none,
       unless the page states the period next to it (validation then fills it in), so
-      a period a person set from the page is not silently lost.
+      a period a person set from the page is not silently lost;
+    * a published row has a period and every proposed row with that amount has another
+      one, unless the page states the new period next to the amount (199's re-run turned
+      "6792 EUR yearly" into "6792 EUR monthly" from a table whose column headers are
+      lines away from the amounts).
 
     An empty list means the replacement may go ahead.
     """
@@ -546,6 +571,32 @@ def replacement_regressions(
                     if len(olds) > 1
                     else f"drops {label}, which the page still shows"
                 )
+                continue
+            # Fewer rows than before, but no more than the page shows: tiers merged into
+            # one row. The rows that remain still have to keep the period.
+            if not matches:
+                continue
+        # A period none of the published rows at this amount had needs the page's word for
+        # it, whichever published row it replaces: one row that kept its period does not
+        # vouch for a sibling that changed.
+        old_periods = {old.period for old, _ in olds if old.period}
+        introduced = sorted(
+            {
+                new.period
+                for new, new_text in matches
+                if old_periods
+                and new.period
+                and new.period not in old_periods
+                and not any({new.period, period} == _INTERCHANGEABLE_PERIODS for period in old_periods)
+                and not _page_states_period(new, new_text)
+            }
+        )
+        if introduced:
+            reasons.append(
+                f"changes the {', '.join(sorted(old_periods))} period of {olds[0][0].category} "
+                f"{', '.join(key)} to {', '.join(introduced)}, which the page does not state next "
+                "to the amount"
+            )
             continue
         for old, _ in olds:
             if old.period and all(new.period is None for new, _ in matches):
@@ -557,4 +608,12 @@ def replacement_regressions(
                 if not filled:
                     reasons.append(f"loses the {old.period} period of {old.category} {', '.join(key)}")
                     break
+            elif old.period and not any(
+                new.period == old.period
+                or {new.period, old.period} == _INTERCHANGEABLE_PERIODS
+                or _page_states_period(new, new_text)
+                for new, new_text in matches
+            ):
+                reasons.append(f"loses the {old.period} period of {old.category} {', '.join(key)}")
+                break
     return reasons
