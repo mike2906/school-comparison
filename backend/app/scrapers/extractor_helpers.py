@@ -2409,10 +2409,24 @@ def _filter_model_prices(prices: list[ExtractedPrice], text: str) -> list[Extrac
         # A page that names the year is the better witness.
         page_year, period = max(supported, key=lambda item: item[0] is not None)
         normalized = price.model_copy(deep=True)
-        normalized.period = period
+        normalized.period = _period_fitting(str(price.category or "").lower(), period)
         normalized.academic_year = page_year
         refined.append(normalized)
     return refined
+
+
+def _period_fitting(category: str, period: str | None) -> str | None:
+    """Drop a period the category cannot have; the wording meant something else.
+
+    "Еднократно плащане" beside a tuition fee is the fee paid in one instalment (517's
+    "ГОДИШНА ТАКСА" came out one_time), and a recurring word beside a registration fee
+    belongs to a neighbouring fee on the line (151's came out yearly).
+    """
+    if category == "tuition" and period == "one_time":
+        return None
+    if category == "registration" and period not in (None, "one_time"):
+        return None
+    return period
 
 
 def _table_header(block: str, span: tuple[int, int]) -> str | None:

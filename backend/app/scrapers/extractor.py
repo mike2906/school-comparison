@@ -1224,7 +1224,7 @@ async def _extract_prices(
         "- Discounts: an amount after an early-payment, full-payment, sibling or loyalty discount is NOT a separate fee. Emit the undiscounted fee as the row and list the discounted amounts as strings in `discounts`.\n"
         "- Set `age_group` when the page specifies it (grade range, preschool, nursery, etc.).\n"
         "- Copy `plan_name` and `age_group` from the page in the page's own words and language. Do not translate or paraphrase them.\n"
-        "- Set `academic_year` when the page specifies it (e.g. '2025/2026').\n"
+        "- Set `academic_year` when the page specifies it (e.g. '2025/2026'). When the pages give fees for more than one academic year, emit only the most recent year's.\n"
         "\n"
         "If no concrete pricing exists, return has_pricing_info=false and prices=[]."
     )

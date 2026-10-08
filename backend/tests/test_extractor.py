@@ -4999,3 +4999,27 @@ def test_extraction_reads_only_the_freshest_copy_of_a_page():
         "https://izzi.academy/about-us",
         "https://izzi.academy/admissions/tuition-fees/",
     ]
+
+
+def test_model_row_period_must_fit_its_category():
+    text = (
+        "--- SOURCE: https://school.test/fees ---\n"
+        "8. клас ГОДИШНА ТАКСА еднократно плащане 7000 евро\n"
+        "Registration fee: € 200, cafeteria € 345 per quarter\n"
+        "Такса записване 300 евро еднократно\n"
+    )
+    rows = [
+        _model_price(category="tuition", amount=7000, plan_name="8. клас"),
+        _model_price(category="registration", amount=200),
+        _model_price(category="registration", amount=300),
+        _model_price(category="food", amount=345),
+    ]
+
+    refined = extractor_module.helpers._filter_model_prices(rows, text)
+
+    assert [(row.category, row.amount, row.period) for row in refined] == [
+        ("tuition", 7000, None),
+        ("registration", 200, None),
+        ("registration", 300, "one_time"),
+        ("food", 345, "quarter"),
+    ]
