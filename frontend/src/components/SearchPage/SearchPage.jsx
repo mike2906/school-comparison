@@ -116,6 +116,7 @@ function SearchPage() {
   // URLs this page has written but that have not landed yet, oldest first.
   const pendingWritesRef = useRef([])
   const adoptingUrlRef = useRef(false)
+  const lastDetailIdRef = useRef(detailSchoolId)
   const [agePickerOpen, setAgePickerOpen] = useState(false)
   const [welcomeDismissed, setWelcomeDismissed] = useState(() => {
     try {
@@ -286,6 +287,8 @@ function SearchPage() {
   // Runs before the state-to-URL sync below, which then skips this commit: it would
   // otherwise write the old state over the URL we are adopting.
   useEffect(() => {
+    const closedDetailId = detailSchoolId ? null : lastDetailIdRef.current
+    lastDetailIdRef.current = detailSchoolId
     const pendingIndex = pendingWritesRef.current.indexOf(location.search)
     if (pendingIndex >= 0) {
       // Our own write landing (earlier ones may have been skipped): nothing to adopt.
@@ -299,7 +302,9 @@ function SearchPage() {
     setDistanceFilter(view.within)
     setViewMode(view.view)
     setMobileTab(view.tab)
-    setSelectedSchoolId(view.school)
+    // Closing the detail panel leaves the school it showed selected, not the one that was
+    // selected before the panel opened.
+    setSelectedSchoolId(closedDetailId || view.school)
     setNameQuery(view.q)
   }, [location.search])
 
@@ -489,6 +494,12 @@ function SearchPage() {
 
   const handleClearSelection = useStableCallback(() => {
     setSelectedSchoolId(null)
+  })
+
+  // Esc on the map closes what is on top: the detail panel first, then the selection.
+  const handleMapEscape = useStableCallback(() => {
+    if (detailSchoolId) handleCloseDetails()
+    else setSelectedSchoolId(null)
   })
 
   const handleToggleLocationsPanel = useStableCallback((school) => {
@@ -2045,6 +2056,7 @@ function SearchPage() {
                   onOpenDetails={handleOpenDetails}
                   onSchoolSelect={handleMapSchoolSelect}
                   onClearSelection={handleClearSelection}
+                  onEscape={handleMapEscape}
                   loading={loading}
                   userLocation={userLocation}
                   isPickingLocation={isPickingLocation}
@@ -2054,6 +2066,7 @@ function SearchPage() {
                   initialView={savedViewState?.map || null}
                   autoFit={!searchInBounds && !selectedSchoolId && !locationOverlay.schoolId}
                   hasCompare={hasCompare}
+                  detailOpen={Boolean(detailSchoolId)}
                   resizeKey={`${viewMode}-${mobileTab}-${showMap}-${panelBesideMap}`}
                   locationOverlay={locationOverlay}
                   onShowLocations={handleShowLocationsForSchool}

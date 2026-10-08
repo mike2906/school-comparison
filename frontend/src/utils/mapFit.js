@@ -25,6 +25,32 @@ export function pointsForFit(points, { distance, keepRatio = 0.95, minPoints = 2
   return ranked.slice(0, keep).map(entry => entry.point)
 }
 
+// Up to SHORTLIST points nearly all are fitted; from CITY points on, the central half.
+const SHORTLIST = { points: 50, keep: 0.95 }
+const CITY = { points: 500, keep: 0.5 }
+
+/**
+ * Share of the points the first view fits. A shortlist shows nearly all of its schools.
+ * A whole city fitted that way opens as three clusters holding everything, so it opens
+ * on its central half, where the pins already spread out, and the rest is a pan away.
+ * In between the share falls evenly, so one more result never changes the view much.
+ */
+export function fitKeepRatio(count) {
+  if (count <= SHORTLIST.points) return SHORTLIST.keep
+  if (count >= CITY.points) return CITY.keep
+  const share = (count - SHORTLIST.points) / (CITY.points - SHORTLIST.points)
+  return SHORTLIST.keep - share * (SHORTLIST.keep - CITY.keep)
+}
+
+/**
+ * Padding (px) around fitted points: room for a pin (40px tall) on a large map, less on
+ * a phone, where 60px a side cost a whole zoom level.
+ */
+export function fitPadding(size) {
+  const pad = Math.round(Math.min(size.x, size.y) * 0.08)
+  return Math.min(60, Math.max(24, pad))
+}
+
 /**
  * The pin to highlight for a selected school: the location clicked on the map when it is
  * one of the school's pins, otherwise the primary location (a school picked from the list
