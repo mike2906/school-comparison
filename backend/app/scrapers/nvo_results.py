@@ -647,12 +647,16 @@ async def _upsert_resource_rows(
         key = (school_id, entry.year, entry.exam_type, entry.subject, "average_score")
         matched_entries[key] = entry
 
-    if unmatched_schools:
+    # Named only for a whole-city run: with explicit school ids the index holds just those
+    # schools, and every other row in the file is "unmatched".
+    if unmatched_schools and allowed_school_ids is None:
+        names = sorted(unmatched_schools)
         logger.warning(
-            "NVO %s %s: no school in the DB for %s",
+            "NVO %s %s: no school in the DB for %s%s",
             resource.exam_type,
             resource.year,
-            "; ".join(sorted(unmatched_schools)),
+            "; ".join(names[:20]),
+            f" and {len(names) - 20} more" if len(names) > 20 else "",
         )
 
     if not matched_entries:
