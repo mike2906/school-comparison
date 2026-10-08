@@ -80,6 +80,33 @@ def test_parse_index_dataset_links_extracts_all_exam_types():
     }
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("index_status, index_body", [(403, "Forbidden"), (200, "<html></html>")])
+async def test_discover_uses_known_dataset_pages_when_index_is_unusable(index_status, index_body):
+    resource_id = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+    requested: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requested.append(str(request.url))
+        if request.url.host == "io.mon.bg":
+            return httpx.Response(index_status, text=index_body)
+        return httpx.Response(
+            200,
+            text=f'<a href="/data/resourceView/{resource_id}">Ресурс – учебна 2025/2026 година</a>',
+        )
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        resources = await nvo_results.discover_nvo_resources(["nvo_7"], client=client)
+
+    assert requested == [
+        nvo_results.IO_MON_NVO_INDEX_URL,
+        nvo_results.KNOWN_NVO_DATASET_URLS["nvo_7"],
+    ]
+    assert [(r.exam_type, r.year, r.download_url) for r in resources] == [
+        ("nvo_7", 2026, f"https://data.egov.bg/resource/download/{resource_id}/csv")
+    ]
+
+
 def test_parse_dataset_resources_returns_latest_years_sorted():
     html = """
     <html><body>
