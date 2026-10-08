@@ -4928,7 +4928,7 @@ async def test_kindergarten_does_not_take_school_grade_fees_and_the_prompt_names
             db_session, school, list(pages), 20.0, extractor_module.ExtractionLLMStats()
         )
 
-    assert "Institution level: kindergarten (kindergarten)" in llm.call_args.kwargs["user_prompt"]
+    assert "Institution type: kindergarten\n" in llm.call_args.kwargs["user_prompt"]
     assert await _stored(db_session, school) == [("tuition", 600.0, "monthly")]
 
 
