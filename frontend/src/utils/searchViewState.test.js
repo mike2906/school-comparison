@@ -9,6 +9,7 @@ import {
   getLastSearchUrl,
   rememberLastSearchUrl,
   shortAddress,
+  closedDetailSchoolId,
 } from './searchViewState.js'
 
 const memoryStorage = () => {
@@ -106,4 +107,19 @@ test('the first rendered card is saved with the scroll position', () => {
   const storage = memoryStorage()
   saveViewState('abc', { search: '', scrollTop: 900, listStart: 470, map: null }, storage)
   assert.equal(readSavedViewState('abc', '', storage).listStart, 470)
+})
+
+test('closedDetailSchoolId names the school whose panel was closed', () => {
+  assert.equal(closedDetailSchoolId('?school=396&detail=384', '?school=396'), 384)
+  assert.equal(closedDetailSchoolId('?age_group=first&detail=384', '?age_group=first'), 384)
+  assert.equal(closedDetailSchoolId('?detail=384&view=map-only', '?view=map-only&school=12'), 384)
+})
+
+test('closedDetailSchoolId ignores other URL changes', () => {
+  // Back from a shared detail link to a different search.
+  assert.equal(closedDetailSchoolId('?detail=384', '?age_group=first&school=12'), null)
+  // The panel switched school, or was never open.
+  assert.equal(closedDetailSchoolId('?detail=384', '?detail=396'), null)
+  assert.equal(closedDetailSchoolId('?school=396', '?school=12'), null)
+  assert.equal(closedDetailSchoolId('?detail=abc', ''), null)
 })

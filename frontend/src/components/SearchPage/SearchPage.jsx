@@ -38,6 +38,7 @@ import {
   saveViewState,
   rememberLastSearchUrl,
   isDesktopViewport,
+  closedDetailSchoolId,
 } from '../../utils/searchViewState'
 
 function readStoredUserLocation(fallbackAddress) {
@@ -117,7 +118,7 @@ function SearchPage() {
   // URLs this page has written but that have not landed yet, oldest first.
   const pendingWritesRef = useRef([])
   const adoptingUrlRef = useRef(false)
-  const lastDetailIdRef = useRef(detailSchoolId)
+  const lastSearchRef = useRef(location.search)
   const closingDetailRef = useRef(false)
   const [agePickerOpen, setAgePickerOpen] = useState(false)
   const [welcomeDismissed, setWelcomeDismissed] = useState(() => {
@@ -291,10 +292,10 @@ function SearchPage() {
   useEffect(() => {
     // The panel was closed (its button, Esc or browser Back), as opposed to a link that
     // leaves for another search, such as the logo.
-    const closedDetailId = !detailSchoolId && (closingDetailRef.current || navigationType === 'POP')
-      ? lastDetailIdRef.current
+    const closedDetailId = closingDetailRef.current || navigationType === 'POP'
+      ? closedDetailSchoolId(lastSearchRef.current, location.search)
       : null
-    lastDetailIdRef.current = detailSchoolId
+    lastSearchRef.current = location.search
     closingDetailRef.current = false
     const pendingIndex = pendingWritesRef.current.indexOf(location.search)
     if (pendingIndex >= 0) {

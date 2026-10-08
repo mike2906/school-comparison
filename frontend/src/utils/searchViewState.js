@@ -57,6 +57,27 @@ export function writeViewParams(searchParams, view) {
   return next.toString() === new URLSearchParams(searchParams).toString() ? null : next
 }
 
+/**
+ * The school whose detail panel a URL change closed, or null: `previousSearch` showed a
+ * panel (`detail=<id>`), `nextSearch` does not, and they are otherwise the same results
+ * (only the selection may differ). Back from a shared detail link to some other search
+ * is not a close.
+ */
+export function closedDetailSchoolId(previousSearch, nextSearch) {
+  const previous = new URLSearchParams(previousSearch)
+  const next = new URLSearchParams(nextSearch)
+  const detail = Number.parseInt(previous.get('detail') || '', 10)
+  if (!(detail > 0) || next.has('detail')) return null
+  const rest = (params) => {
+    const copy = new URLSearchParams(params)
+    copy.delete('detail')
+    copy.delete('school')
+    copy.sort()
+    return copy.toString()
+  }
+  return rest(previous) === rest(next) ? detail : null
+}
+
 const SCROLL_STATE_KEY = 'searchViewState'
 const MAX_SAVED_ENTRIES = 20
 
