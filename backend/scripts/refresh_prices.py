@@ -87,10 +87,12 @@ async def refresh(school_ids: list[int], *, navigate: bool, country: str) -> Non
             chunk = school_ids[start : start + NAVIGATION_CHUNK]
             async with async_session_maker() as db:
                 statuses = await _statuses(db, chunk)
-                for result in await navigate_schools_batch(db, chunk, country_code=country):
-                    if not result.get("success"):
-                        print(f"school {result.get('school_id')}: navigation: {result.get('reason')}")
-                await _restore_statuses(db, statuses)
+                try:
+                    for result in await navigate_schools_batch(db, chunk, country_code=country):
+                        if not result.get("success"):
+                            print(f"school {result.get('school_id')}: navigation: {result.get('reason')}")
+                finally:
+                    await _restore_statuses(db, statuses)
 
     for school_id in school_ids:
         async with async_session_maker() as db:
