@@ -169,6 +169,11 @@ def _patch_http(monkeypatch, routes, requested):
 
     monkeypatch.setattr(WebsiteNavigator, "robots_disallows", allowed)
 
+    async def no_image_text(data, media_type, *, school_id=None):
+        return None
+
+    monkeypatch.setattr(navigator_module, "read_fee_image", no_image_text)
+
 
 @pytest.mark.asyncio
 async def test_crawl_gains_the_linked_fee_page_and_replaces_a_priceless_fee_tab(monkeypatch):
@@ -258,3 +263,79 @@ async def test_oversized_download_is_abandoned(monkeypatch):
         )  # fmt: skip
 
     assert requested == ["https://school.bg/fees"] and documents == []
+
+
+def test_content_images_are_the_pages_pictures_fee_named_first():
+    html = (
+        '<header><img src="/img/logo.png"></header><main>'
+        '<img src="/uploads/campus-700x400.jpg" alt="Campus">'
+        '<img src="/uploads/SGS-FEES-2026-2027-ENG-700x453.png" width="980">'
+        '<img src="/uploads/icon-phone.png"><img src="/uploads/small.png" width="64">'
+        '<img src="data:image/png;base64,AAAA"></main>'
+    )
+
+    assert fee_pages.content_images(html, "https://school.bg/school-fees/") == [
+        ("https://school.bg/uploads/SGS-FEES-2026-2027-ENG.png", ""),
+        ("https://school.bg/uploads/campus.jpg", "Campus"),
+    ]
+
+
+def _image() -> httpx.Response:
+    return httpx.Response(200, headers={"content-type": "image/png"}, content=b"\x89PNG...")
+
+
+@pytest.mark.asyncio
+async def test_fee_page_without_prices_has_its_fee_picture_read():
+    """Schools 555/594: the fee table is a picture on a page whose text states no price."""
+    requested: list[str] = []
+    read: list[str] = []
+    routes = {
+        "https://school.bg/school-fees/": _html(
+            '<main><p>School fees 2026-2027</p><img src="/uploads/fees-2026-2027-700x453.png"></main>'
+        ),
+        "https://school.bg/uploads/fees-2026-2027.png": _image(),
+        "https://school.bg/taksi": _html('<main><p>Такса 7000 евро годишно</p><img src="/uploads/photo.png"></main>'),
+    }
+
+    async def read_image(data: bytes, media_type: str) -> str:
+        read.append(media_type)
+        return "Grade 1 | 14 750 | 15 350"
+
+    async with _client(routes, requested) as client:
+        documents = await fetch_fee_documents(
+            [("https://school.bg/school-fees/", "School fees"), ("https://school.bg/taksi", "Такси")],
+            site_url=SITE, known_urls=[], html_to_text=_text, client=client, read_image=read_image,
+        )  # fmt: skip
+
+    by_url = {document.url: document.text for document in documents}
+    # The picture is stored under its own URL, headed by the link that led to it.
+    assert by_url["https://school.bg/uploads/fees-2026-2027.png"] == "School fees\nGrade 1 | 14 750 | 15 350"
+    # A page that states its prices in text has no picture read.
+    assert "https://school.bg/uploads/photo.png" not in requested
+    assert read == ["image/png"]
+
+
+@pytest.mark.asyncio
+async def test_pictures_read_are_capped_and_a_picture_with_no_fees_is_not_stored():
+    requested: list[str] = []
+    images = "".join(f'<img src="/uploads/page-{n}.png">' for n in range(6))
+    routes = {"https://school.bg/fees": _html(f"<main><p>Fees</p>{images}</main>")}
+    routes.update({f"https://school.bg/uploads/page-{n}.png": _image() for n in range(6)})
+    reads = 0
+
+    async def read_image(data: bytes, media_type: str) -> str | None:
+        nonlocal reads
+        reads += 1
+        return None if reads == 1 else "Tuition 9 000 EUR"
+
+    async with _client(routes, requested) as client:
+        documents = await fetch_fee_documents(
+            [("https://school.bg/fees", "Fees")], site_url=SITE, known_urls=[], html_to_text=_text,
+            client=client, read_image=read_image,
+        )  # fmt: skip
+
+    assert reads == fee_pages.MAX_FEE_IMAGES
+    assert [d.url for d in documents if d.url.endswith(".png")] == [
+        "https://school.bg/uploads/page-1.png",
+        "https://school.bg/uploads/page-2.png",
+    ]

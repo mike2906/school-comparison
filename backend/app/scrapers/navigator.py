@@ -9,6 +9,7 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from fnmatch import fnmatch
+from functools import partial
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlparse
 
@@ -19,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import CRAWLER_USER_AGENT, get_settings
 from app.models import School, ScrapeType, SourcePage
 from app.scrapers.base import BaseScraper
+from app.scrapers.fee_image_reader import read_fee_image
 from app.scrapers.fee_pages import fee_http_client, fetch_fee_documents, page_key
 from app.scrapers.price_evidence import currency_price_starts
 from app.scrapers.shared_site_check import level_family
@@ -870,6 +872,7 @@ async def _follow_fee_links(
                 client=client,
                 school_family=level_family(school.education_level),
                 disallowed=navigator.robots_disallows,
+                read_image=partial(read_fee_image, school_id=school.id),
             )
     except Exception as exc:
         logger.warning("Fee link follow-up failed for school %s: %s", school.id, exc)
