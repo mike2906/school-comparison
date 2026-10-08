@@ -30,6 +30,10 @@ from app.utils.academic_year import academic_year_is_resolvable
 # exactly what the display gate hides.
 PRICING_CONFIDENCE_FLOOR = 0.7
 
+# An official school average resting on fewer pupils than this is withheld from the API:
+# it describes those few pupils, not the school.
+NVO_MIN_PUPILS = 5
+
 _CURRENCY_RE = re.compile(r"^[A-Z]{3}$")
 _PRICE_PERIODS = {"monthly", "yearly", "one_time", "quarter", "term", "semester"}
 
@@ -262,6 +266,15 @@ def summary_is_publishable(attributes: Mapping[str, Any] | None) -> bool:
         return False
     status = str(report.get("status") or "").strip().lower()
     return status == "ok" and not any(_blocking_field_paths(attributes))
+
+
+def exam_result_is_publishable(pupil_count: int | None) -> bool:
+    """False when an exam average rests on fewer than ``NVO_MIN_PUPILS`` pupils.
+
+    A missing count does not withhold: the gate hides results known to be thin, and
+    every official file since 2021 carries the count.
+    """
+    return pupil_count is None or pupil_count >= NVO_MIN_PUPILS
 
 
 def passes_pricing_gate(source_url: Any, pricing_context: Any) -> bool:

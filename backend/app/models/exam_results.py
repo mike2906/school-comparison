@@ -36,6 +36,9 @@ class ExamResult(Base):
     subject: Mapped[str] = mapped_column(String(100), nullable=False)
     metric: Mapped[str] = mapped_column(String(100), nullable=False)
     value: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
+    # Pupils who sat the exam ("явили се"). Internal: it gates the result, see
+    # ``display_gating.exam_result_is_publishable``. Null when the file had no count.
+    pupil_count: Mapped[Optional[int]] = mapped_column(Integer)
     source_url: Mapped[Optional[str]] = mapped_column(String(1000))
     scraped_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 

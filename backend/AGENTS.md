@@ -44,6 +44,9 @@ columns are SQLAlchemy `JSON` (Postgres `json`, not `jsonb`).
 - `school_id` (FK), `year`, `exam_type` (nvo_4 | nvo_7 | nvo_10)
 - `subject`, `metric`, `value`
 - Current canonical imported metric: `average_score` (official school-level average scores)
+- `pupil_count` — pupils who sat the exam ("явили се"); internal, never a response field.
+  A result with fewer than `NVO_MIN_PUPILS` (`app/utils/display_gating.py`) is withheld from
+  every response, the benchmark averages and the summary facts.
 
 Pipeline/provenance tables: `field_sources`, `source_pages`, `spot_check_results`,
 `scrape_log`, `pipeline_runs`, `provider_request_ledger`, `countries`.

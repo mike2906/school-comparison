@@ -69,6 +69,7 @@ class ParsedExamResult:
     subject: str
     value: float
     source_url: str
+    sat_count: Optional[int] = None
 
 
 @dataclass(frozen=True)
@@ -232,6 +233,7 @@ def parse_nvo_csv(resource: NvoResource, csv_text: str) -> tuple[list[ParsedExam
                     subject=subject,
                     value=parsed_value,
                     source_url=resource.resource_view_url,
+                    sat_count=int(sat_count) if sat_count is not None else None,
                 )
             )
             row_values += 1
@@ -375,6 +377,7 @@ async def import_nvo_results(
     exam_types: Optional[Iterable[str]] = None,
     school_ids: Optional[Iterable[int]] = None,
     client: Optional[httpx.AsyncClient] = None,
+    resources: Optional[list[NvoResource]] = None,
 ) -> dict:
     started_at = _utcnow()
     selected_exam_types = normalize_exam_types(exam_types)
@@ -404,12 +407,13 @@ async def import_nvo_results(
         client = httpx.AsyncClient(timeout=60.0, follow_redirects=True)
 
     try:
-        resources = await discover_nvo_resources(
-            selected_exam_types,
-            year=year,
-            history_years=history_years,
-            client=client,
-        )
+        if resources is None:
+            resources = await discover_nvo_resources(
+                selected_exam_types,
+                year=year,
+                history_years=history_years,
+                client=client,
+            )
         found_exam_types = {resource.exam_type for resource in resources}
         for exam_type in selected_exam_types:
             if exam_type in found_exam_types:
@@ -642,6 +646,7 @@ async def _upsert_resource_rows(
                     subject=entry.subject,
                     metric="average_score",
                     value=entry.value,
+                    pupil_count=entry.sat_count,
                     source_url=entry.source_url,
                     scraped_at=timestamp,
                 )
@@ -650,6 +655,9 @@ async def _upsert_resource_rows(
             continue
 
         existing.value = entry.value
+        # A file without the count must not un-gate a result known to be thin.
+        if entry.sat_count is not None:
+            existing.pupil_count = entry.sat_count
         existing.source_url = entry.source_url
         existing.scraped_at = timestamp
         updated_rows += 1

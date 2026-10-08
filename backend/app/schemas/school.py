@@ -8,6 +8,7 @@ from app.schemas.field_source import FieldSourceResponse
 from app.schemas.pricing import PricingResponse
 from app.utils.display_gating import (
     blocked_pricing_row_ids,
+    exam_result_is_publishable,
     implausible_tuition_row_ids,
     pricing_row_is_publishable,
     summary_is_publishable,
@@ -275,6 +276,13 @@ class SchoolLocationResponse(SchoolLocationBase):
     school_id: int
 
 
+def _publishable_exam_results(rows: Any) -> Any:
+    """Drop exam rows resting on too few pupils before they are serialized."""
+    if not isinstance(rows, (list, tuple)):
+        return rows
+    return [row for row in rows if exam_result_is_publishable(getattr(row, "pupil_count", None))]
+
+
 class ExamResultResponse(BaseModel):
     id: int
     school_id: int
@@ -351,6 +359,11 @@ class SchoolResponse(SchoolBase, SchoolPricingMixin):
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
+    @field_validator("exam_results", mode="before")
+    @classmethod
+    def withhold_thin_exam_results(cls, value: Any) -> Any:
+        return _publishable_exam_results(value)
+
     @computed_field(return_type=list[FieldSourceResponse])
     @property
     def field_sources(self) -> list[FieldSourceResponse]:
@@ -391,6 +404,11 @@ class SchoolListResponse(SchoolPricingMixin):
     exam_results: list[ExamResultListItem] = []
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    @field_validator("exam_results", mode="before")
+    @classmethod
+    def withhold_thin_exam_results(cls, value: Any) -> Any:
+        return _publishable_exam_results(value)
 
     @computed_field(return_type=dict[str, str])
     @property

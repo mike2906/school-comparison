@@ -20,6 +20,7 @@ from app.scrapers.nvo_results import (
     parse_index_dataset_links,
     parse_nvo_csv,
 )
+from app.utils.display_gating import NVO_MIN_PUPILS
 
 
 async def _seed_country(db_session):
@@ -527,3 +528,179 @@ async def test_exam_averages_endpoint_uses_canonical_average_score_metric(client
     assert payload["by_year"]["nvo_7"]["2025"]["math"] == 61.0
     assert payload["by_year"]["nvo_7"]["2025"]["foreign_language"] == 80.0
     assert "history" not in payload["by_year"]["nvo_7"]["2025"]
+
+
+def test_parse_nvo_csv_reads_the_pupil_count_next_to_each_average():
+    resource = _resource("nvo_10", 2025)
+    csv_text = _csv_text(
+        '"СОФИЯ-ГРАД","СТОЛИЧНА","ГР.СОФИЯ","ЧСУ Дружба","2203720","0","0","1","80"',
+        '"СОФИЯ-ГРАД","СТОЛИЧНА","ГР.СОФИЯ","35 СУ Добри Войников","222222","118","55.5","120","41"',
+    )
+
+    entries, _ = parse_nvo_csv(resource, csv_text)
+
+    assert [(entry.institutional_id, entry.subject, entry.sat_count) for entry in entries] == [
+        ("2203720", "math", 1),
+        ("222222", "bulgarian", 118),
+        ("222222", "math", 120),
+    ]
+
+
+def test_parse_nvo_csv_reads_the_pupil_count_in_legacy_reversed_headers():
+    resource = _resource("nvo_4", 2021)
+    csv_text = "\n".join(
+        [
+            '"Област","Община","Населено място","Код по Админ","Училище",'
+            '"Явили се БЕЛ","Ср. успех в точки БЕЛ","Явили се МАТ","Ср. успех в точки МАТ"',
+            '"СОФИЯ-ГРАД","СТОЛИЧНА","ГР.СОФИЯ","2 208 526","ЧСУ Орфей","3","60","12","71,5"',
+        ]
+    )
+
+    entries, _ = parse_nvo_csv(resource, csv_text)
+
+    assert [(entry.subject, entry.sat_count) for entry in entries] == [("bulgarian", 3), ("math", 12)]
+
+
+def test_parse_nvo_csv_leaves_the_pupil_count_unknown_when_the_file_has_none():
+    resource = _resource("nvo_7", 2025)
+    csv_text = "\n".join(
+        [
+            '"Област","Община","Населено място","Училище","Код по НЕИСПУО",'
+            '"БЕЛ Ср. успех в точки","МАТ Ср. успех в точки"',
+            '"СОФИЯ-ГРАД","СТОЛИЧНА","ГР.СОФИЯ","35 СУ Добри Войников","222222","78.5","65.25"',
+        ]
+    )
+
+    entries, _ = parse_nvo_csv(resource, csv_text)
+
+    assert [entry.sat_count for entry in entries] == [None, None]
+
+
+@pytest.mark.asyncio
+async def test_import_nvo_results_stores_the_pupil_count_and_backfills_existing_rows(db_session, monkeypatch):
+    await _seed_country(db_session)
+    school = School(
+        name_i18n={"bg": "ЧСУ Дружба"},
+        country_code="bg",
+        school_type="private",
+        education_level="upper_secondary",
+        city="sofia",
+        institutional_id="2203720",
+    )
+    db_session.add(school)
+    await db_session.flush()
+    # A row imported before the count was stored.
+    db_session.add(
+        ExamResult(
+            school_id=school.id,
+            year=2025,
+            exam_type="nvo_10",
+            subject="math",
+            metric="average_score",
+            value=80,
+        )
+    )
+    await db_session.commit()
+
+    resource = _resource("nvo_10", 2025)
+    monkeypatch.setattr(nvo_results, "discover_nvo_resources", AsyncMock(return_value=[resource]))
+    monkeypatch.setattr(
+        nvo_results,
+        "_download_resource_csv",
+        AsyncMock(
+            return_value=_csv_text(
+                '"СОФИЯ-ГРАД","СТОЛИЧНА","ГР.СОФИЯ","ЧСУ Дружба","2203720","14","61.5","1","80"'
+            )
+        ),
+    )
+
+    summary = await import_nvo_results(db_session, country_code="bg", city="sofia", year=2025)
+
+    assert (summary["created_rows"], summary["updated_rows"]) == (1, 1)
+    rows = (await db_session.execute(select(ExamResult).order_by(ExamResult.subject))).scalars().all()
+    assert [(row.subject, row.pupil_count) for row in rows] == [("bulgarian", 14), ("math", 1)]
+
+
+@pytest.mark.asyncio
+async def test_import_nvo_results_keeps_a_stored_pupil_count_when_the_file_has_none(db_session, monkeypatch):
+    await _seed_country(db_session)
+    school = School(
+        name_i18n={"bg": "ЧСУ Дружба"},
+        country_code="bg",
+        school_type="private",
+        education_level="upper_secondary",
+        city="sofia",
+        institutional_id="2203720",
+    )
+    db_session.add(school)
+    await db_session.flush()
+    db_session.add(
+        ExamResult(
+            school_id=school.id,
+            year=2025,
+            exam_type="nvo_10",
+            subject="math",
+            metric="average_score",
+            value=80,
+            pupil_count=1,
+        )
+    )
+    await db_session.commit()
+
+    resource = _resource("nvo_10", 2025)
+    monkeypatch.setattr(nvo_results, "discover_nvo_resources", AsyncMock(return_value=[resource]))
+    monkeypatch.setattr(
+        nvo_results,
+        "_download_resource_csv",
+        AsyncMock(
+            return_value="\n".join(
+                [
+                    '"Област","Община","Населено място","Училище","Код по НЕИСПУО",'
+                    '"БЕЛ Ср. успех в точки","МАТ Ср. успех в точки"',
+                    '"СОФИЯ-ГРАД","СТОЛИЧНА","ГР.СОФИЯ","ЧСУ Дружба","2203720","","82"',
+                ]
+            )
+        ),
+    )
+
+    await import_nvo_results(db_session, country_code="bg", city="sofia", year=2025)
+
+    row = (await db_session.execute(select(ExamResult))).scalar_one()
+    assert (float(row.value), row.pupil_count) == (82.0, 1)
+
+
+@pytest.mark.asyncio
+async def test_exam_averages_endpoint_leaves_out_results_with_too_few_pupils(client, db_session):
+    await _seed_country(db_session)
+    schools = [
+        School(
+            name_i18n={"bg": f"School {idx}"},
+            country_code="bg",
+            school_type="state",
+            education_level="upper_secondary",
+            city="sofia",
+        )
+        for idx in range(3)
+    ]
+    db_session.add_all(schools)
+    await db_session.flush()
+    for school, value, pupil_count in zip(
+        schools, (40.0, 50.0, 90.0), (120, None, NVO_MIN_PUPILS - 1)
+    ):
+        db_session.add(
+            ExamResult(
+                school_id=school.id,
+                year=2025,
+                exam_type="nvo_10",
+                subject="math",
+                metric="average_score",
+                value=value,
+                pupil_count=pupil_count,
+            )
+        )
+    await db_session.commit()
+
+    response = await client.get("/schools/exam-averages?country_code=bg")
+
+    assert response.status_code == 200
+    assert response.json()["by_year"]["nvo_10"]["2025"]["math"] == 45.0

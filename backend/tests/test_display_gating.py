@@ -22,7 +22,9 @@ from app.scrapers import validator as validator_module
 from app.scrapers.validator import _spot_check_path_is_core
 from app.utils.display_gating import (
     _FIELD_PATH_DISPLAY_FIELDS,
+    NVO_MIN_PUPILS,
     blocked_display_fields,
+    exam_result_is_publishable,
     implausible_tuition_row_ids,
     iter_blocking_field_paths,
     passes_pricing_gate,
@@ -469,3 +471,19 @@ def test_plausible_tuition_spread_publishes_in_full():
     # School 625: half-day through annual-prepay monthly rates, all genuine.
     rows = [_tuition_row(i, amount) for i, amount in enumerate([454, 680, 646, 612], start=1)]
     assert implausible_tuition_row_ids(rows) == set()
+
+
+@pytest.mark.parametrize(
+    ("pupil_count", "expected"),
+    [
+        (1, False),
+        (NVO_MIN_PUPILS - 1, False),
+        (NVO_MIN_PUPILS, True),
+        (120, True),
+        # No count stored (a file without the column): the official average still shows.
+        (None, True),
+    ],
+)
+def test_exam_result_needs_enough_pupils_to_be_published(pupil_count, expected):
+    assert NVO_MIN_PUPILS > 1
+    assert exam_result_is_publishable(pupil_count) is expected
