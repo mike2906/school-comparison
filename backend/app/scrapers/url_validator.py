@@ -950,7 +950,10 @@ Be strict:
                 prompt=prompt,
             )
         except Exception as cheap_error:
-            if self._is_model_or_provider_error(cheap_error):
+            # A timed-out call says nothing about the site; it gets the same one retry.
+            if isinstance(cheap_error, asyncio.TimeoutError) or self._is_model_or_provider_error(
+                cheap_error
+            ):
                 logger.warning(
                     "Cheap LLM validation failed for %s (%s). Retrying once with cheap tier.",
                     url,
@@ -968,7 +971,7 @@ Be strict:
                     return (
                         ValidationResult.AMBIGUOUS,
                         url,
-                        f"LLM validation failed after retry: {str(retry_error)}",
+                        f"LLM validation failed after retry: {str(retry_error) or type(retry_error).__name__}",
                     )
             else:
                 logger.error(f"LLM validation failed for {url}: {cheap_error}")
