@@ -8,7 +8,7 @@ import datetime
 import json
 import re
 from typing import Any, Optional
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 from pydantic_ai.exceptions import ModelAPIError, ModelHTTPError, UnexpectedModelBehavior
 
@@ -28,6 +28,19 @@ from app.schemas.extraction import (
     SummarySourceExtractionOutput,
 )
 from app.scrapers.extraction_rules import get_rules
+from app.scrapers.fee_pages import page_key
+from app.scrapers.price_evidence import (
+    _NUMBER_ONLY_LINE_RE,
+    _gap,
+    _line_of,
+    amount_spans,
+    currency_price_starts,
+    label_spans,
+    normalize_text,
+    occurrence_currency,
+    period_families,
+    stated_period,
+)
 from app.scrapers.school_tokens import extract_school_name_tokens
 from app.utils.academic_year import normalize_academic_year
 from app.utils.i18n_resolver import is_generic_numbered_display_label
@@ -2304,10 +2317,194 @@ def _filter_supported_prices(prices: list[ExtractedPrice], text: str) -> list[Ex
     return refined
 
 
+def _source_blocks(text: str) -> list[tuple[str | None, str]]:
+    """(source URL, text) per ``--- SOURCE ---`` block; one block for unmarked text."""
+    headers = list(
+        re.finditer(r"^\s*---\s*SOURCE:\s*(.*?)\s*---\s*$", text or "", flags=re.IGNORECASE | re.MULTILINE)
+    )
+    if not headers:
+        return [(None, text or "")]
+    blocks = []
+    for index, header in enumerate(headers):
+        end = headers[index + 1].start() if index + 1 < len(headers) else len(text)
+        blocks.append((header.group(1).strip() or None, text[header.end() : end]))
+    return blocks
+
+
+_PAGE_ACADEMIC_YEAR_RE = re.compile(r"20\d{2}\s*[-/–]\s*(?:20)?\d{2}")
+_FEE_WORDS = r"такс|\bцен[аи]\b|\bfees?\b|tuition|\bprices?\b"
+# An academic year on a line that is about fees ("Такси за учебната 2026/2027 г.").
+_FEE_YEAR_LINE_RE = re.compile(
+    rf"^.*(?:{_FEE_WORDS}).*{_PAGE_ACADEMIC_YEAR_RE.pattern}"
+    rf"|^.*{_PAGE_ACADEMIC_YEAR_RE.pattern}.*(?:{_FEE_WORDS})",
+    re.MULTILINE,
+)
+_CURRENCY_OR_FEE_RE = re.compile(rf"€|\beur|евро|лв|\bbgn|лева|{_FEE_WORDS}")
+
+
+def _filter_model_prices(prices: list[ExtractedPrice], text: str) -> list[ExtractedPrice]:
+    """Keep a model's price rows that the page text bears out, corrected by that text.
+
+    The model read the whole page, so its category, plan and age group stand. The text
+    decides the rest, by the same reading Stage 6 uses to gate publication
+    (``price_evidence``): the amount must be on a page in the row's currency; the period
+    is whatever is written next to the amount (or in its table's header row), or none;
+    the academic year is kept only when that page names it, and taken from the page when
+    the model gave none and the page names exactly one, on a line about fees. A yearless
+    row needs a page that is not a dated old fee list. Rows for late-payment penalties, a "total fee" sum and per-day/week/hour
+    amounts are dropped.
+
+    The keyword extractor's rows go through :func:`_filter_supported_prices` instead:
+    they have no reading of their own, so there the line and heading keywords decide.
+    """
+    if not prices or not text:
+        return []
+    staleness = _pricing_source_staleness(text)
+    blocks = [
+        (normalize_text(block), staleness.get(url, staleness.get(None, False)))
+        for url, block in _source_blocks(text)
+    ]
+
+    refined: list[ExtractedPrice] = []
+    for price in prices:
+        amount = _to_optional_float(price.amount)
+        if amount is None:
+            continue
+        currency = (price.currency or "BGN")[:3].upper()
+        year = _normalize_academic_year(price.academic_year)
+        label = price.plan_name or price.age_group or price.notes
+        supported: list[tuple[bool, str | None]] = []  # (page names the year, period)
+        for block, stale in blocks:
+            spans = [
+                span
+                for span in amount_spans(block, amount)
+                if _amount_is_a_fee_in(block, span, currency)
+            ]
+            if not spans:
+                continue
+            labels = label_spans(block, label)
+            if labels:
+                spans = [min(spans, key=lambda span: min(_gap(span, found) for found in labels))]
+            stated = [_period_written_for(block, span) for span in spans]
+            if all(unrepresentable for _, unrepresentable in stated):
+                continue
+            families = [found for found, _ in stated]
+            agreed = families[0] if all(found == families[0] for found in families) else set()
+            period = next(iter(agreed)).lower() if len(agreed) == 1 else None
+            page_years = {
+                _normalize_academic_year(found) for found in _PAGE_ACADEMIC_YEAR_RE.findall(block)
+            } - {None}
+            if year in page_years:
+                page_year = price.academic_year
+            elif not year and len(page_years) == 1 and _FEE_YEAR_LINE_RE.search(block):
+                # The model left the year out; the page names exactly one, with its fees.
+                page_year = next(iter(page_years))
+            else:
+                page_year = None
+            if page_year is None and stale:
+                continue
+            supported.append((page_year, period))
+        if not supported:
+            continue
+        # A page that names the year is the better witness.
+        page_year, period = max(supported, key=lambda item: item[0] is not None)
+        normalized = price.model_copy(deep=True)
+        normalized.period = period
+        normalized.academic_year = page_year
+        refined.append(normalized)
+    return refined
+
+
+def _table_header(block: str, span: tuple[int, int]) -> str | None:
+    """The first row of the pipe table the amount sits in, when that row holds no price."""
+    header = None
+    for line in reversed(block[: span[0]].splitlines()[:-1]):
+        if "|" not in line:
+            break
+        header = line
+    return None if header is None or currency_price_starts(header) else header
+
+
+def _period_written_for(block: str, span: tuple[int, int]) -> tuple[set[str], bool]:
+    """Period wording for one amount; for a table cell with none, its column header's."""
+    families, unrepresentable = stated_period(block, span)
+    line = _line_of(block, span)
+    if families or unrepresentable or "|" not in line:
+        return families, unrepresentable
+    header = _table_header(block, span)
+    if header is None:
+        return families, unrepresentable
+    cell = _header_cell(block, span, header)
+    return period_families(cell) if cell is not None else (families, unrepresentable)
+
+
+def _header_cell(block: str, span: tuple[int, int], header: str) -> str | None:
+    """The header cell above the amount's own column, when the two rows line up."""
+    line = _line_of(block, span)
+    line_start = block.rfind("\n", 0, span[0]) + 1
+    cells = header.split("|")
+    if len(cells) != line.count("|") + 1:
+        return None
+    return cells[line[: span[0] - line_start].count("|")]
+
+
+def _currencies_named(text: str) -> set[str]:
+    return {
+        code
+        for code, pattern in (("EUR", r"€|\beur|евро"), ("BGN", r"лв|\bbgn|лева"))
+        if re.search(pattern, text)
+    }
+
+
+def _amount_is_a_fee_in(block: str, span: tuple[int, int], currency: str) -> bool:
+    """The occurrence is a price in ``currency`` and not a penalty or a sum of fees."""
+    line = _line_of(block, span)
+    written = occurrence_currency(block, span)
+    bare = written is None and (
+        _NUMBER_ONLY_LINE_RE.match(line) is not None
+        or ("|" in line and _bare_cell_is_a_price_in(block, span, currency))
+    )
+    if written != currency and not bare:
+        return False
+    return not _is_penalty_price_line(line) and "total fee" not in line
+
+
+def _bare_cell_is_a_price_in(block: str, span: tuple[int, int], currency: str) -> bool:
+    """A table cell holding a number with no currency of its own is a price in ``currency``.
+
+    Its column header decides when it names a currency ("Plan | EUR | BGN"). Otherwise
+    the table must be about fees and name no currency but the row's: a class-size table
+    is not a price list, and a two-currency table with unnamed columns is not evidence
+    for either.
+    """
+    line = _line_of(block, span)
+    header = _table_header(block, span) or ""
+    cell = _header_cell(block, span, header) if header else None
+    in_column = _currencies_named(cell or "")
+    if in_column:
+        return currency in in_column
+    table = f"{line}\n{header}"
+    return _currencies_named(table) <= {currency} and _CURRENCY_OR_FEE_RE.search(table) is not None
+
+
+# A school grade in a fee label: "8 клас", "ПЪРВИ – ТРЕТИ КЛАС", "Grade 5", "1.-4. клас".
+_SCHOOL_GRADE_LABEL_RE = re.compile(r"\bклас(?:ове)?\b|\bgrades?\b", re.IGNORECASE)
+# The class before first grade, which a kindergarten may run itself.
+_PRESCHOOL_CLASS_RE = re.compile(r"подготвител|предучилищ|\bп[гу]?к\b|pre-?school|preparatory", re.IGNORECASE)
+
+
+def _names_school_grades(price: ExtractedPrice) -> bool:
+    """The row's own labels place it in school grades (and not a pre-school class)."""
+    label = " ".join(str(part or "") for part in (price.plan_name, price.age_group))
+    return bool(_SCHOOL_GRADE_LABEL_RE.search(label)) and not _PRESCHOOL_CLASS_RE.search(label)
+
+
 def _find_supporting_price_source_url(
     school: School,
     pages: list[SourcePage],
     price: ExtractedPrice,
+    *,
+    model_rows: bool = False,
 ) -> str | None:
     amount = _to_optional_float(price.amount)
     if amount is None:
@@ -2330,7 +2527,11 @@ def _find_supporting_price_source_url(
     for page in candidate_pages:
         page_text = page.raw_markdown or ""
         page_context = f"--- SOURCE: {page.source_url} ---\n{page_text}"
-        supported = _filter_supported_prices([price], page_context)
+        supported = (
+            _filter_model_prices([price], page_context)
+            if model_rows
+            else _filter_supported_prices([price], page_context)
+        )
         if any(
             row.category == price.category
             and row.period == price.period
@@ -2839,6 +3040,67 @@ _MAX_RESERVE_FRACTION = 3
 _MIN_USABLE_PAGE_CHARS = 500
 
 
+# URL words (matched against the decoded URL) that mark a fee page.
+_PRICING_URL_TOKENS = (
+    "pricing", "price", "fee", "tuition", "taksi", "ceni", "tseni", "цени", "такс",
+    "tarif", "frais", "schulgeld", "gebuehr", "gebühr",
+)  # fmt: skip
+# Pricing selection: score per currency-attached price in the page text, up to a cap, so
+# four prices outweigh the preferred-category and URL bonuses together.
+_PRICE_EVIDENCE_SCORE = 45
+_PRICE_EVIDENCE_MAX_PRICES = 4
+# Text kept in front of the first price when a long page is cut to its fee section.
+_PRICE_WINDOW_LEAD_CHARS = 1200
+
+
+def _drop_url_variant_pages(pages: list[SourcePage]) -> list[SourcePage]:
+    """Keep one crawl of each page, so two spellings do not take two prompt slots.
+
+    The spellings differ in scheme, ``www.``, trailing slash or escaping. The newest
+    crawl wins; of two crawls from the same run, the one stating more prices.
+    """
+    best: dict[tuple[str, str, str], SourcePage] = {}
+    for page in pages:
+        try:
+            key = page_key(page.source_url or "")
+        except ValueError:
+            key = ("", page.source_url or "", "")
+        kept = best.get(key)
+        if kept is None or _variant_rank(page) > _variant_rank(kept):
+            best[key] = page
+    return list(best.values())
+
+
+def _variant_rank(page: SourcePage) -> tuple[float, int, int]:
+    scraped_at = getattr(page, "last_scraped_at", None)
+    text = page.raw_markdown or ""
+    return (
+        scraped_at.timestamp() if scraped_at is not None else 0.0,
+        len(currency_price_starts(text)),
+        len(text),
+    )
+
+
+def _price_dense_window(candidate: str, allowance: int) -> str:
+    """Cut a ``--- SOURCE ---`` page to ``allowance`` chars around its densest run of prices.
+
+    Cutting at the head keeps a long page's navigation and drops a fee table further
+    down. With no price beyond the head, the head is kept.
+    """
+    header, separator, body = candidate.partition("\n")
+    room = allowance - len(header) - len(separator)
+    starts = currency_price_starts(body)
+    if room <= 0 or not starts or starts[-1] < room:
+        return candidate[:allowance]
+    best_start, best_count = 0, 0
+    for first in starts:
+        start = max(0, first - _PRICE_WINDOW_LEAD_CHARS)
+        count = sum(1 for position in starts if start <= position < start + room)
+        if count > best_count:
+            best_start, best_count = start, count
+    return header + separator + body[best_start : best_start + room]
+
+
 def _select_pages(
     school: School,
     pages: list[SourcePage],
@@ -2954,11 +3216,14 @@ def _select_pages(
             if category in {"admission", "pricing"}:
                 score -= 35
         elif use_case == "pricing":
-            if any(
-                token in page_url
-                for token in ("pricing", "prices", "fees", "tuition", "taksi", "ceni", "tseni", "цени", "grafik-i-tseni", "price")
-            ):
+            if any(token in unquote(page_url) for token in _PRICING_URL_TOKENS):
                 score += 60
+            # The page text is the evidence: a page that states prices outranks a
+            # preferred-category page that states none (school 568's fee.html had no
+            # category and lost to admission/contact pages).
+            score += _PRICE_EVIDENCE_SCORE * min(
+                len(currency_price_starts(page.raw_markdown or "")), _PRICE_EVIDENCE_MAX_PRICES
+            )
         elif use_case == "general_summary_source":
             classification = summary_page_classifications.get(id(page))
             if classification == "narrative":
@@ -2984,6 +3249,8 @@ def _select_pages(
                 score -= 90
         return score
 
+    if use_case == "pricing":
+        candidate_pages = _drop_url_variant_pages(candidate_pages)
     sorted_pages = sorted(candidate_pages, key=score_page, reverse=True)
 
     max_pages = 3 if (use_case == "general_info" or use_case.startswith("general_")) else 4
@@ -3027,7 +3294,10 @@ def _select_pages(
                 # Only a useless fragment would fit; skip it and keep going, so pages
                 # behind it can still use the room reserved for them.
                 continue
-            candidate = candidate[:allowance]
+            if use_case == "pricing":
+                candidate = _price_dense_window(candidate, allowance)
+            else:
+                candidate = candidate[:allowance]
 
         content_parts.append(candidate)
         urls_used.append(source_url)

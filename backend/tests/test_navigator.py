@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from unittest.mock import patch
 from urllib.robotparser import RobotFileParser
 
 import pytest
@@ -368,7 +369,6 @@ async def test_navigate_school_creates_source_pages(db_session):
         assert website_url == "https://school.bg"
         return "https://school.bg", pages
 
-    from unittest.mock import patch
 
     with patch("app.scrapers.navigator.WebsiteNavigator.discover_pages", new=fake_discover_pages):
         result = await navigate_school(db=db_session, school_id=school.id, country_code="bg")
@@ -419,7 +419,6 @@ async def test_navigate_school_returns_failure_when_no_extractable_content(db_se
     async def fake_discover_pages(self, website_url: str):
         return website_url, pages
 
-    from unittest.mock import patch
 
     with patch("app.scrapers.navigator.WebsiteNavigator.discover_pages", new=fake_discover_pages):
         result = await navigate_school(db=db_session, school_id=school.id, country_code="bg")
@@ -431,7 +430,6 @@ async def test_navigate_school_returns_failure_when_no_extractable_content(db_se
 @pytest.mark.asyncio
 @pytest.mark.parametrize("robots_blocked", [True, False])
 async def test_navigate_school_withholds_cached_data_only_when_robots_txt_blocks(db_session, robots_blocked):
-    from unittest.mock import patch
 
     from app.utils.website_data import WEBSITE_DATA_WITHHELD_KEY
 
@@ -530,7 +528,6 @@ async def test_navigate_schools_batch_uses_discover_many_and_persists(db_session
         assert set(website_urls) == {"https://school0.bg", "https://school1.bg"}
         return outcomes
 
-    from unittest.mock import patch
 
     with patch("app.scrapers.navigator.WebsiteNavigator.discover_pages_many", new=fake_discover_many):
         results = await navigate_schools_batch(
@@ -595,7 +592,6 @@ async def test_navigate_schools_batch_retries_failed_outcome_sequentially(db_ses
             ],
         )
 
-    from unittest.mock import patch
 
     with (
         patch("app.scrapers.navigator.WebsiteNavigator.discover_pages_many", new=fake_discover_many),
@@ -650,7 +646,6 @@ async def test_discover_pages_many_crawls_each_site_on_its_own():
             ],
         )
 
-    from unittest.mock import patch
 
     with patch.object(WebsiteNavigator, "discover_pages", new=fake_discover_pages):
         outcomes = await navigator.discover_pages_many(

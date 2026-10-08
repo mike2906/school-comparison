@@ -6,8 +6,9 @@ import asyncio
 import json
 import logging
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from fnmatch import fnmatch
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlparse
 
@@ -18,6 +19,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import CRAWLER_USER_AGENT, get_settings
 from app.models import School, ScrapeType, SourcePage
 from app.scrapers.base import BaseScraper
+from app.scrapers.fee_pages import fee_http_client, fetch_fee_documents, page_key
+from app.scrapers.price_evidence import currency_price_starts
+from app.scrapers.shared_site_check import level_family
 from app.scrapers.url_validator import URLValidator
 from app.utils.website_data import WEBSITE_DATA_WITHHELD_KEY
 
@@ -34,6 +38,8 @@ class NavigatedPage:
     content_hash: str
     cache_status: str | None = None
     head_fingerprint: str | None = None
+    # Same-site links found on the page, as (absolute URL, link text).
+    links: list[tuple[str, str]] = field(default_factory=list)
 
 
 @dataclass
@@ -763,10 +769,20 @@ class WebsiteNavigator:
                     content_hash=BaseScraper.compute_hash(str(hash_seed)),
                     cache_status=str(cache_status) if cache_status is not None else None,
                     head_fingerprint=str(head_fingerprint) if head_fingerprint else None,
+                    links=self._internal_links(result),
                 )
             )
 
         return final_url, self._dedupe_pages(pages)
+
+    def _internal_links(self, crawl_result: Any) -> list[tuple[str, str]]:
+        links = getattr(crawl_result, "links", None)
+        internal = links.get("internal") if isinstance(links, dict) else None
+        return [
+            (str(link["href"]), str(link.get("text") or ""))
+            for link in internal or []
+            if isinstance(link, dict) and link.get("href")
+        ]
 
     async def discover_pages_many(
         self,
@@ -811,6 +827,73 @@ class WebsiteNavigator:
             return BatchDiscoverOutcome(seed_url=url, final_url=None, pages=[], error=str(exc))
 
 
+# The crawl's exclusions hold for followed fee links too (an old news post about fees is
+# not the fee list), except that fee PDFs are wanted and usually sit under an uploads
+# folder.
+_FEE_LINK_EXCLUDE_PATTERNS = tuple(
+    pattern
+    for pattern in WebsiteNavigator.EXCLUDE_PATTERNS
+    if pattern not in ("*.pdf", "*/wp-content/*")
+)
+
+
+async def _follow_fee_links(
+    navigator: WebsiteNavigator, school: School, site_url: str, pages: list[NavigatedPage]
+) -> list[NavigatedPage]:
+    """``pages`` plus the fee pages and PDFs they link to that the crawl did not capture.
+
+    A crawled fee page that states no price is fetched again as plain HTML and replaced
+    when that copy does: a tabbed page can lose its fee tab in the rendered DOM.
+    Best effort: a failure here leaves the crawl result as it is.
+    """
+    links = [
+        link
+        for page in pages
+        for link in page.links
+        if not any(fnmatch(link[0].lower(), pattern) for pattern in _FEE_LINK_EXCLUDE_PATTERNS)
+    ]
+    if not links:
+        return pages
+    # Only a crawled fee page that states no price is worth a second fetch.
+    settled_urls = [
+        page.url
+        for page in pages
+        if page.category != "pricing" or currency_price_starts(page.markdown or "")
+    ]
+    try:
+        async with fee_http_client() as client:
+            documents = await fetch_fee_documents(
+                links,
+                site_url=site_url,
+                known_urls=settled_urls,
+                html_to_text=navigator._extract_main_content_text,
+                client=client,
+                school_family=level_family(school.education_level),
+                disallowed=navigator.robots_disallows,
+            )
+    except Exception as exc:
+        logger.warning("Fee link follow-up failed for school %s: %s", school.id, exc)
+        return pages
+
+    by_key = {page_key(page.url): page for page in pages}
+    merged = list(pages)
+    for document in documents:
+        crawled = by_key.get(page_key(document.url))
+        if crawled is not None and not currency_price_starts(document.text):
+            continue  # the crawled copy is no worse
+        fee_page = NavigatedPage(
+            url=crawled.url if crawled is not None else document.url,
+            category=(crawled.category if crawled is not None else None) or "pricing",
+            markdown=document.text,
+            content_hash=BaseScraper.compute_hash(document.text),
+        )
+        if crawled is not None:
+            merged[merged.index(crawled)] = fee_page
+        else:
+            merged.append(fee_page)
+    return merged
+
+
 async def _persist_navigation_result(
     db: AsyncSession,
     school: School,
@@ -826,6 +909,8 @@ async def _persist_navigation_result(
             normalized_url=normalized_url,
             final_url=final_url,
         )
+
+    pages = await _follow_fee_links(navigator, school, final_url or normalized_url, pages)
 
     school_id = school.id
     now = datetime.now(timezone.utc)

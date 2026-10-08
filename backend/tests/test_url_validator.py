@@ -1386,3 +1386,32 @@ class TestBotProtectionValidation:
 
         llm_mock.assert_not_called()
         assert result == ValidationResult.VALID
+
+
+@pytest.mark.asyncio
+async def test_llm_validation_timeout_is_retried_once():
+    """A timed-out model call left schools 505 and others in failed_validate with the
+    empty reason "LLM validation failed: "; it is retried like a provider error."""
+    validator = URLValidator(country_code="bg")
+    verdict = URLValidationOutput(
+        is_school_website=True, matches_expected_school=True, confidence=0.95, reason="school site"
+    )
+    tier = AsyncMock(side_effect=[asyncio.TimeoutError(), verdict])
+
+    with patch.object(validator, "_run_llm_validation_tier", new=tier):
+        result, url, _reason = await validator._llm_validate("Lycée français", "https://school.bg")
+
+    assert (result, url) == (ValidationResult.VALID, "https://school.bg")
+    assert tier.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_llm_validation_timeout_twice_names_the_timeout():
+    validator = URLValidator(country_code="bg")
+    tier = AsyncMock(side_effect=[asyncio.TimeoutError(), asyncio.TimeoutError()])
+
+    with patch.object(validator, "_run_llm_validation_tier", new=tier):
+        result, _url, reason = await validator._llm_validate("Lycée français", "https://school.bg")
+
+    assert result == ValidationResult.AMBIGUOUS
+    assert reason == "LLM validation failed after retry: TimeoutError"

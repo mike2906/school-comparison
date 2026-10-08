@@ -218,7 +218,8 @@ def _build_openrouter_model_settings(tier: str = "cheap") -> dict[str, Any]:
         for model in _csv_items(settings.extraction_openrouter_models)
     ]
     routed_models = [model for model in routed_models if model and model != primary_model]
-    if routed_models:
+    # Price rows from a weaker stand-in model would pass as the pricing model's.
+    if routed_models and tier != "pricing":
         model_settings["openrouter_models"] = routed_models
 
     provider_config: dict[str, Any] = {}
@@ -1048,16 +1049,24 @@ def _build_display_name_evidence(
 
 
 def _supported_price_rows(
-    prices: list[ExtractedPrice], selected_text: str
+    prices: list[ExtractedPrice], selected_text: str, *, model_rows: bool = False
 ) -> list[ExtractedPrice]:
     """Evidence-filter then de-duplicate extracted price rows.
+
+    ``model_rows`` marks rows a model read from the page; the keyword extractor's rows
+    (the default) are checked against line and heading keywords instead.
 
     Shared by the price-extraction path (LLM and deterministic branches) and the
     golden-corpus harness so the filter/dedupe sequence can never drift between them.
     """
     if not prices:
         return []
-    return helpers._dedupe_price_rows(helpers._filter_supported_prices(prices, selected_text))
+    supported = (
+        helpers._filter_model_prices(prices, selected_text)
+        if model_rows
+        else helpers._filter_supported_prices(prices, selected_text)
+    )
+    return helpers._dedupe_price_rows(supported)
 
 
 def _normalized_price_fields(extracted: ExtractedPrice) -> dict[str, Any] | None:
@@ -1201,18 +1210,25 @@ async def _extract_prices(
         "\n"
         "Emit ONE row per distinct fee. Apply these rules:\n"
         "- Dual currencies: when the same fee is quoted in both EUR and BGN (e.g. '€8,100 / 15 842,22 лв'), emit only ONE row in the page's primary currency. Never emit a BGN row for a fee already emitted in EUR (or vice versa).\n"
-        "- Payment schedules: when one fee has multiple payment options (full pay / 2 installments / 10 monthly), emit ONE row with the full-payment amount as `amount` and list the other options as strings in `installments` (e.g. '€8,100 – 2 installments'). Do NOT emit separate rows for the installment amounts.\n"
+        "- Payment schedules: when one fee has multiple payment options (full pay / 2 installments / 10 monthly), emit ONE row with the full-payment amount as `amount` and list the other options as strings in `installments` (e.g. '€8,100 – 2 installments'). Do NOT emit separate rows for the installment amounts or for the total of an installment plan (e.g. '2 x 3,900 = 7,800').\n"
+        "- One institution only: a site often covers a kindergarten and a school of the same brand. Emit only the fees of the institution named below. If it is a kindergarten, leave out fees stated for school grades/classes. If it is a school, keep every grade band the page lists, from primary to high school, and leave out fees stated only for nursery or kindergarten groups. A pre-school (preparatory) class or group may belong to either: keep it.\n"
+        "- `confidence`: 0.9 or more when the page states the amount, what it is for and whom it applies to together (a labelled table cell counts). Use 0.5 or less only when you had to guess one of the three.\n"
+        "- Only fees charged to parents. Leave out donations, prizes, salaries, project budgets and any amount whose purpose the page does not state.\n"
         "- Set `period` only when the source explicitly states the fee period or represents it unambiguously (for example 'per year', 'monthly fee', or 'per term'). Otherwise set `period` to null. An academic year, fee category, amount, school type, installment count, or payment frequency does NOT by itself establish the fee period.\n"
         "- Distinct tiers: when multiple tiers exist (e.g. 'Bulgarian students' vs 'International students', different grade bands, different meal plans like breakfast vs full-day), emit SEPARATE rows and set `plan_name` to the tier label from the page. `plan_name` must be populated whenever multiple rows share the same category/period/age_group on one page.\n"
+        "- Discounts: an amount after an early-payment, full-payment, sibling or loyalty discount is NOT a separate fee. Emit the undiscounted fee as the row and list the discounted amounts as strings in `discounts`.\n"
         "- Set `age_group` when the page specifies it (grade range, preschool, nursery, etc.).\n"
+        "- Copy `plan_name` and `age_group` from the page in the page's own words and language. Do not translate or paraphrase them.\n"
         "- Set `academic_year` when the page specifies it (e.g. '2025/2026').\n"
         "\n"
         "If no concrete pricing exists, return has_pricing_info=false and prices=[]."
     )
     # Only the prompt gets glued currency words spaced; deterministic extraction and the
     # evidence checks below keep the original page text.
+    family = level_family(school.education_level)
     user_prompt = (
-        f"School: {school_name}\n\nContent:\n"
+        f"School: {school_name}\n"
+        f"Institution type: {family}\n\nContent:\n"
         f"{helpers._space_glued_currency_words(selected_text)}"
     )
     deterministic_pricing = helpers._extract_prices_deterministic(selected_text)
@@ -1224,6 +1240,7 @@ async def _extract_prices(
         result_type=PriceExtractionOutput,
         timeout_seconds=timeout_seconds,
         llm_stats=llm_stats,
+        preferred_tier="pricing",
         school_id=school.id,
     )
 
@@ -1245,11 +1262,20 @@ async def _extract_prices(
         parsed = deterministic_pricing
         used_deterministic_pricing = True
 
-    supported_prices = _supported_price_rows(parsed.prices, selected_text)
+    def supported(prices: list[ExtractedPrice], *, model_rows: bool) -> list[ExtractedPrice]:
+        rows = _supported_price_rows(prices, selected_text, model_rows=model_rows)
+        if family == "kindergarten":
+            rows = [row for row in rows if not helpers._names_school_grades(row)]
+        return rows
+
+    # The keyword extractor stands in only when the model read no fee at all. When the
+    # model's rows are not borne out by the text, its misreadings are no better.
+    model_gave_rows = bool(parsed.prices) and not used_deterministic_pricing
+    supported_prices = supported(parsed.prices, model_rows=not used_deterministic_pricing)
     if supported_prices:
         parsed = parsed.model_copy(update={"prices": supported_prices, "has_pricing_info": True})
-    elif deterministic_pricing.has_pricing_info:
-        deterministic_supported_prices = _supported_price_rows(deterministic_pricing.prices, selected_text)
+    elif deterministic_pricing.has_pricing_info and not model_gave_rows:
+        deterministic_supported_prices = supported(deterministic_pricing.prices, model_rows=False)
         if deterministic_supported_prices:
             parsed = deterministic_pricing.model_copy(
                 update={"prices": deterministic_supported_prices, "has_pricing_info": True}
@@ -1299,7 +1325,9 @@ async def _extract_prices(
         normalized_installments = helpers._normalize_text_list(extracted.installments)
         normalized_includes = helpers._normalize_text_list(extracted.includes)
         normalized_excludes = helpers._normalize_text_list(extracted.excludes)
-        row_source_url = helpers._find_supporting_price_source_url(school, pages, extracted)
+        row_source_url = helpers._find_supporting_price_source_url(
+            school, pages, extracted, model_rows=not used_deterministic_pricing
+        )
         if not row_source_url:
             continue
         supporting_page = next(
@@ -2067,8 +2095,15 @@ async def extract_school(
     db: AsyncSession,
     school_id: int,
     country_code: str,
+    *,
+    prices_only: bool = False,
 ) -> dict[str, Any]:
-    """Extract pricing + general information for one school (canonical path)."""
+    """Extract pricing + general information for one school (canonical path).
+
+    ``prices_only`` re-reads the fees and nothing else: general information, the
+    school's status and its summary state are left as they are. Validation still runs
+    over the result before the commit.
+    """
     settings = get_settings()
 
     school_result = await db.execute(select(School).where(School.id == school_id))
@@ -2093,8 +2128,9 @@ async def extract_school(
     content_pages = [page for page in pages if (page.raw_markdown or "").strip()]
 
     if not content_pages:
-        school.scrape_status = "extraction_failed"
-        await db.commit()
+        if not prices_only:
+            school.scrape_status = "extraction_failed"
+            await db.commit()
         return {
             "school_id": school_id,
             "status": "extraction_failed",
@@ -2136,37 +2172,42 @@ async def extract_school(
         if price_result.get("detail"):
             stats["details"].append(price_result["detail"])
 
-    general_result = await _extract_general_info(
-        db=db,
-        school=school,
-        pages=content_pages,
-        timeout_seconds=settings.extraction_llm_timeout_seconds,
-        llm_stats=llm_stats,
-    )
-    stats["general_info_success"] = general_result["success"]
-    stats["input_tokens"] += general_result["input_tokens"]
-    stats["output_tokens"] += general_result["output_tokens"]
-    stats["token_cost_usd"] += float(general_result.get("token_cost_usd", 0.0) or 0.0)
-    if general_result.get("detail"):
-        stats["details"].append(general_result["detail"])
+    if not prices_only:
+        general_result = await _extract_general_info(
+            db=db,
+            school=school,
+            pages=content_pages,
+            timeout_seconds=settings.extraction_llm_timeout_seconds,
+            llm_stats=llm_stats,
+        )
+        stats["general_info_success"] = general_result["success"]
+        stats["input_tokens"] += general_result["input_tokens"]
+        stats["output_tokens"] += general_result["output_tokens"]
+        stats["token_cost_usd"] += float(general_result.get("token_cost_usd", 0.0) or 0.0)
+        if general_result.get("detail"):
+            stats["details"].append(general_result["detail"])
 
     if llm_stats.hard_failures:
         # An extraction LLM call failed or was refused after its retries: the
         # deterministic fallback output is not promoted.
         await db.rollback()
-        kept_status = await keep_previous_website_data(db, school_id)
         stats["status"] = "extraction_failed"
         stats["error"] = "Extraction LLM call failed after retries; fallback output not promoted"
-        stats["details"].append(
-            "Kept previously published website data"
-            if kept_status in {"extracted", "summarized"}
-            else "No previously published website data; website data stays withheld"
-        )
+        if not prices_only:  # a prices-only run never moved the school's status
+            kept_status = await keep_previous_website_data(db, school_id)
+            stats["details"].append(
+                "Kept previously published website data"
+                if kept_status in {"extracted", "summarized"}
+                else "No previously published website data; website data stays withheld"
+            )
         stats["token_cost_usd"] = round(float(stats["token_cost_usd"] or 0.0), 6)
         stats["llm_stats"] = llm_stats.as_dict()
         return stats
 
-    if stats["pricing_success"] or stats["general_info_success"]:
+    if prices_only:
+        if stats["pricing_success"]:
+            stats["status"] = "extracted"
+    elif stats["pricing_success"] or stats["general_info_success"]:
         clear_summary_state(school)
         school.scrape_status = "extracted"
         stats["status"] = "extracted"

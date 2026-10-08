@@ -2315,6 +2315,41 @@ revision. None of this may widen the public boundary without a reviewed pilot.
       - Known gap: the plausibility check only catches implausibly *cheap* tuition. An
         overstated or wrong-programme price (e.g. 606's legacy €7,550 total) still needs
         E1's heading/plan association.
+      - **Pricing recall pass 2026-10-08 (PR "pricing pipeline recall").** Traced ten
+        private schools with no published price through the pipeline, then all 153 without
+        one: 47 had no valid website, 66 had no fee text stored, 40 had fee text but no
+        publishable rows. Causes fixed in that PR, each with a regression test:
+        (1) the extractor chose its four prompt pages by category and URL only, so a fee
+        page with no category never reached the model (568), and two URL spellings of
+        one page took two slots; pages are now ranked by the prices they state.
+        (2) The crawl is one click deep and skips PDFs; a fee-link follow-up fetches
+        same-site fee pages and fee PDFs two hops out, and replaces a crawled fee page
+        that lost its fee tab in the rendered DOM (404, 300, 529, 505).
+        (3) Batch navigation gave schools each other's pages and websites (crawl4ai 0.9
+        `arun_many` with a deep crawl returns one flat page list); found here in the
+        sandbox and fixed separately in #198.
+        (4) Model price rows were gated by the keyword line signals, which dropped rows
+        with no fee word on the line (529), renamed tuition after an unrelated heading
+        (404) and read one price per table line (300). This is the 538/570/153 failure
+        family E1 describes: model rows are now checked with the `price_evidence`
+        primitives instead and keep the model's category.
+        (5) Price extraction runs on its own model tier (Claude Haiku 5.5): 63 of 81
+        schools with fee text got a publishable tuition against 40 on the cheap tier,
+        about $0.12 for all 81. The prompt names the institution's level.
+        (6) `recover-failed-urls --school-id` crashed on a lazy load, and a timed-out
+        URL-validation model call was terminal (505).
+        `scripts/refresh_prices.py` re-reads fees only and prints the published rows
+        before and after per school. Sandbox run over the 129 private/international
+        schools with a website: 67 would publish a tuition (22 on launch before), no
+        published tuition lost, 18 re-extractions held by rule 6.
+        **Still open:** entity scoping on shared kindergarten/school sites is the main
+        source of wrong rows (565, 587/522, 633, 305), then installment-plan totals
+        filed as fees (558), unlabeled amounts (286, 588) and a wrong site (590); Stage 6
+        rule 2 reads only `plan_name`, not `age_group`, and knows grade ranges but not
+        single grades ("8 клас"). A tuition row with no period is not checked by the
+        plausibility gate. Fee tables published as images are not read (555/594). 48
+        schools still have no fee text after the crawl; 46 have no valid website
+        (634/635 withheld by the shared-site check).
 - [ ] **E5 Gymnasium admission thresholds (state schools).** Import the official minimum
       admission scores after 7th grade into `admission_info.historical_min_scores`. Scores
       come from the city-wide NVO ranking, so no address logic is needed, but they are per
