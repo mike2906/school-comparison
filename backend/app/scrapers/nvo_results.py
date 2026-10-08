@@ -25,6 +25,13 @@ from app.utils.transliteration import transliterate_bulgarian
 logger = logging.getLogger(__name__)
 
 IO_MON_NVO_INDEX_URL = "https://io.mon.bg/node/745"
+# The datasets the index links to. The index may refuse automated requests (HTTP 403
+# since 2026-10), while the open-data portal itself still serves them.
+KNOWN_NVO_DATASET_URLS = {
+    "nvo_4": "https://data.egov.bg/data/view/5613e75f-2b1b-4244-9f54-b27580a91dfb",
+    "nvo_7": "https://data.egov.bg/data/view/b56288b6-25aa-4049-9aa6-de2cd4cdabf8",
+    "nvo_10": "https://data.egov.bg/data/view/2f801b2f-d4cb-4ddb-a23d-3e372339c80f",
+}
 SUPPORTED_EXAM_TYPES = ("nvo_4", "nvo_7", "nvo_10")
 REQUIRED_SUBJECTS = ("bulgarian", "math")
 DEFAULT_HISTORY_YEARS = 5
@@ -346,8 +353,16 @@ async def discover_nvo_resources(
         client = httpx.AsyncClient(timeout=60.0, follow_redirects=True)
 
     try:
-        index_html = await _fetch_text(client, IO_MON_NVO_INDEX_URL)
-        dataset_links = parse_index_dataset_links(index_html)
+        try:
+            index_html = await _fetch_text(client, IO_MON_NVO_INDEX_URL)
+            dataset_links = parse_index_dataset_links(index_html)
+        except (httpx.HTTPError, NvoImportError) as exc:
+            logger.warning(
+                "NVO index %s unavailable (%s); using the known dataset pages",
+                IO_MON_NVO_INDEX_URL,
+                exc,
+            )
+            dataset_links = KNOWN_NVO_DATASET_URLS
         all_resources: list[NvoResource] = []
 
         for exam_type in selected_exam_types:
