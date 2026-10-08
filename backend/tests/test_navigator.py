@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+from types import SimpleNamespace
+from unittest.mock import patch
 from urllib.robotparser import RobotFileParser
 
 import pytest
@@ -678,3 +680,43 @@ async def test_discover_pages_many_falls_back_per_chunk_on_timeout():
     assert outcomes["https://school0.bg"].pages[0].url == "https://school0.bg/about"
     assert outcomes["https://school1.bg"].pages[0].url == "https://school1.bg/about"
     assert outcomes["https://school2.bg"].pages[0].url == "https://school2.bg/about"
+
+
+@pytest.mark.asyncio
+async def test_batch_crawl_keeps_each_seeds_pages_with_that_seed():
+    """`arun_many` with a deep crawl returned one flat page list, so results indexed by
+    seed gave a school another school's pages and website. Each seed is crawled alone."""
+
+    def page(url: str):
+        return SimpleNamespace(
+            success=True, url=url, redirected_url=None, markdown="Съдържание на страницата",
+            html=None, cleaned_html=None, metadata={}, links={},
+        )  # fmt: skip
+
+    class FakeCrawler:
+        def __init__(self, config=None):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *exc):
+            return False
+
+        async def arun(self, url, config):
+            if "broken" in url:
+                raise RuntimeError("crawl failed")
+            return [page(url), page(f"{url}/taksi")]
+
+        async def arun_many(self, *args, **kwargs):
+            raise AssertionError("results of arun_many cannot be matched to their seeds")
+
+    navigator = WebsiteNavigator(country_code="bg")
+    seeds = ["https://first.bg", "https://broken.bg", "https://second.bg"]
+    with patch("crawl4ai.AsyncWebCrawler", new=FakeCrawler):
+        outcomes = await navigator._discover_pages_many_chunk(seeds, max_concurrency=2)
+
+    assert list(outcomes) == seeds
+    assert [p.url for p in outcomes["https://first.bg"].pages] == ["https://first.bg", "https://first.bg/taksi"]  # fmt: skip
+    assert [p.url for p in outcomes["https://second.bg"].pages] == ["https://second.bg", "https://second.bg/taksi"]  # fmt: skip
+    assert outcomes["https://broken.bg"].pages == [] and outcomes["https://broken.bg"].error == "crawl failed"

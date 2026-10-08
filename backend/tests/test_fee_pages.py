@@ -6,7 +6,8 @@ import httpx
 import pytest
 
 from app.models import School
-from app.scrapers import fee_pages, navigator as navigator_module
+from app.scrapers import fee_pages
+from app.scrapers import navigator as navigator_module
 from app.scrapers.fee_pages import fee_link_candidates, fetch_fee_documents
 from app.scrapers.navigator import NavigatedPage, WebsiteNavigator
 

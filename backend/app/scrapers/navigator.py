@@ -8,7 +8,6 @@ import logging
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from math import ceil
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlparse
 
@@ -856,76 +855,48 @@ class WebsiteNavigator:
         *,
         max_concurrency: int,
     ) -> dict[str, BatchDiscoverOutcome]:
-        from crawl4ai import AsyncWebCrawler, RateLimiter, SemaphoreDispatcher  # type: ignore
+        """Crawl each seed with its own ``arun`` on one shared browser.
+
+        ``arun_many`` with a deep-crawl strategy returns one flat list of pages, not one
+        result per seed, so its results cannot be matched back to the schools: indexing
+        them by seed handed a school another school's pages and website.
+        """
+        from crawl4ai import AsyncWebCrawler  # type: ignore
 
         if not website_urls:
             return {}
 
-        browser_config = self._build_browser_config()
-        run_configs = [self._build_run_config(url) for url in website_urls]
-        concurrency = max(1, int(max_concurrency))
-        timeout_budget = max(
+        semaphore = asyncio.Semaphore(max(1, int(max_concurrency)))
+        timeout = max(
             self.CRAWL_TIMEOUT_SECONDS,
-            float(getattr(self.settings, "nav_school_timeout_seconds", self.CRAWL_TIMEOUT_SECONDS))
-            * max(1, ceil(len(website_urls) / concurrency)),
-        )
-        rate_limiter = RateLimiter(
-            base_delay=(0.2, 0.8),
-            max_delay=6.0,
-            max_retries=1,
-            rate_limit_codes=[429, 503],
-        )
-        dispatcher = SemaphoreDispatcher(
-            semaphore_count=concurrency,
-            rate_limiter=rate_limiter,
+            float(getattr(self.settings, "nav_school_timeout_seconds", self.CRAWL_TIMEOUT_SECONDS)),
         )
 
-        async with AsyncWebCrawler(config=browser_config) as crawler:
-            containers = await asyncio.wait_for(
-                crawler.arun_many(
-                    urls=website_urls,
-                    config=run_configs,
-                    dispatcher=dispatcher,
-                ),
-                timeout=timeout_budget,
-            )
+        async with AsyncWebCrawler(config=self._build_browser_config()) as crawler:
 
-        if not isinstance(containers, list):
-            containers = [containers]
+            async def crawl(url: str) -> BatchDiscoverOutcome:
+                async with semaphore:
+                    try:
+                        results_obj = await asyncio.wait_for(
+                            crawler.arun(url=url, config=self._build_run_config(url)),
+                            timeout=timeout,
+                        )
+                        final_url, pages = self._extract_pages_from_results(
+                            normalized_url=url,
+                            results_obj=results_obj,
+                        )
+                    except Exception as exc:
+                        return BatchDiscoverOutcome(
+                            seed_url=url,
+                            final_url=None,
+                            pages=[],
+                            error=str(exc) or type(exc).__name__,
+                        )
+                    return BatchDiscoverOutcome(seed_url=url, final_url=final_url, pages=pages)
 
-        outcomes: dict[str, BatchDiscoverOutcome] = {}
-        for idx, url in enumerate(website_urls):
-            container = containers[idx] if idx < len(containers) else None
-            if container is None:
-                outcomes[url] = BatchDiscoverOutcome(
-                    seed_url=url,
-                    final_url=None,
-                    pages=[],
-                    error="Missing crawl result container",
-                )
-                continue
+            outcomes = await asyncio.gather(*(crawl(url) for url in website_urls))
 
-            error_message = getattr(container, "error_message", None)
-            try:
-                final_url, pages = self._extract_pages_from_results(
-                    normalized_url=url,
-                    results_obj=container,
-                )
-                outcomes[url] = BatchDiscoverOutcome(
-                    seed_url=url,
-                    final_url=final_url,
-                    pages=pages,
-                    error=str(error_message) if error_message else None,
-                )
-            except Exception as exc:
-                outcomes[url] = BatchDiscoverOutcome(
-                    seed_url=url,
-                    final_url=None,
-                    pages=[],
-                    error=str(exc),
-                )
-
-        return outcomes
+        return dict(zip(website_urls, outcomes, strict=True))
 
 
 async def _follow_fee_links(
