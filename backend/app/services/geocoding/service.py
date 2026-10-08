@@ -20,6 +20,7 @@ from app.services.geocoding.nominatim import (
 from app.services.geocoding.write_gate import (
     OFFICIAL_COORDS_TAG,
     apply_geocode_result_to_location,
+    has_pinned_point,
     location_holding_point,
 )
 
@@ -189,11 +190,11 @@ class GeocodingService:
         Returns:
             GeocodingResult with status and coordinates
         """
-        # Official points (Sofia Municipality) are never replaced by a geocoder guess.
-        has_official_point = OFFICIAL_COORDS_TAG in (location.location_tags or [])
+        # Official points (Sofia Municipality) and hand-corrected pins are never replaced
+        # by a geocoder guess.
         # Check if already geocoded (unless force=True)
         if (
-            (not force or has_official_point)
+            (not force or has_pinned_point(location))
             and location.lat is not None
             and location.lng is not None
         ):

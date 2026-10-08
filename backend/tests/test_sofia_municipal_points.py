@@ -166,6 +166,21 @@ async def test_forced_geocode_keeps_official_point(db_session):
 
 
 @pytest.mark.asyncio
+async def test_forced_geocode_keeps_hand_corrected_pin(db_session):
+    meta = {"status": "accepted", "method": "manual_fix", "manual_fix": {"source": "OSM"}}
+    _, location = await _location(db_session, lat=42.6474, lng=23.3564, geocode_meta=meta)
+    provider = AsyncMock()
+    service = GeocodingService(db=db_session, provider=provider)
+
+    result = await service.geocode_location(location, force=True)
+
+    assert (result.success, result.provider) == (True, "cached")
+    provider.geocode.assert_not_awaited()
+    assert (location.lat, location.lng) == (42.6474, 23.3564)
+    assert location.geocode_meta == meta
+
+
+@pytest.mark.asyncio
 async def test_fill_districts_uses_exact_pins_only(db_session, monkeypatch):
     from scripts import import_sofia_municipal_points as script
 

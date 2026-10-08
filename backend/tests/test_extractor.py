@@ -1503,6 +1503,41 @@ async def test_website_map_coordinates_do_not_replace_official_point(db_session)
 
 
 @pytest.mark.asyncio
+async def test_website_map_coordinates_do_not_replace_hand_corrected_pin(db_session):
+    school = School(
+        name_i18n={"bg": "ЧДГ Светлина"},
+        country_code="bg",
+        city="sofia",
+        school_type="private",
+        education_level="kindergarten",
+    )
+    db_session.add(school)
+    await db_session.flush()
+    location = SchoolLocation(
+        school_id=school.id,
+        address_i18n={"bg": 'ул. "Св. Седмочисленици" № 23'},
+        lat=42.674748,
+        lng=23.325031,
+        geocode_meta={"status": "accepted", "method": "manual_fix"},
+        is_primary=True,
+    )
+    db_session.add(location)
+    await db_session.commit()
+
+    await extractor_module._sync_primary_location_from_contact_address(
+        db_session,
+        school,
+        {"address": 'ул. "Св. Седмочисленици" № 23', "coordinates": {"lat": 42.70, "lng": 23.28}},
+    )
+    await db_session.commit()
+
+    await db_session.refresh(location)
+    assert (location.lat, location.lng) == (42.674748, 23.325031)
+    assert location.geocode_meta["method"] == "manual_fix"
+    assert "coords_source=website_map_link" not in (location.location_tags or [])
+
+
+@pytest.mark.asyncio
 async def test_extract_school_does_not_replace_with_office_like_website_contact_address(
     db_session,
     sample_school_for_extraction,

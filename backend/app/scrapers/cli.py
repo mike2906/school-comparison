@@ -1700,6 +1700,7 @@ async def _repair_oblast_geocodes_command(
     from app.models import School
     from app.scrapers.sources.bg.moe_registry import MoeRegistryAdapter
     from app.services.geocoding.service import GeocodingService, nominatim_user_agent
+    from app.services.geocoding.write_gate import has_pinned_point
 
     settings = get_settings()
     user_agent = nominatim_user_agent(settings)
@@ -1855,7 +1856,8 @@ async def _repair_oblast_geocodes_command(
                 if school is None:
                     continue
                 location = next((item for item in builtins.list(school.locations or []) if item.id == row["location_id"]), None)
-                if location is None:
+                if location is None or has_pinned_point(location):
+                    # Official and hand-corrected points are not this repair's to clear.
                     continue
 
                 result = await geocoder.geocode_location(location, force=True, country_code=country)
