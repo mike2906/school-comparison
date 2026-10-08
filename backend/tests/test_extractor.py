@@ -1538,6 +1538,53 @@ async def test_website_map_coordinates_do_not_replace_hand_corrected_pin(db_sess
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("stored_address", "pin", "expected_address"),
+    [
+        # A different building: the pin was matched to the stored address, so both stay.
+        ('ул. "Роза" № 3, ап. 4', {"location_tags": [OFFICIAL_COORDS_TAG]}, 'ул. "Роза" № 3, ап. 4'),
+        ('ул. "Роза" № 3, офис 2', {"geocode_meta": {"method": "manual_fix"}}, 'ул. "Роза" № 3, офис 2'),
+        # The same building written differently, or no stored address: nothing to contradict.
+        ('ул. "Ела" № 6, офис 2', {"geocode_meta": {"method": "manual_fix"}}, 'ул. "Ела" № 6'),
+        ("", {"location_tags": [OFFICIAL_COORDS_TAG]}, 'ул. "Ела" № 6'),
+        # An ordinary geocoded point is not pinned and follows the address as before.
+        ('ул. "Роза" № 3, офис 2', {"geocode_meta": {"method": "nominatim"}}, 'ул. "Ела" № 6'),
+    ],
+)
+async def test_website_address_does_not_replace_a_pinned_locations_other_building(
+    db_session, stored_address, pin, expected_address
+):
+    school = School(
+        name_i18n={"bg": "ЧДГ Светлина"},
+        country_code="bg",
+        city="sofia",
+        school_type="private",
+        education_level="kindergarten",
+    )
+    db_session.add(school)
+    await db_session.flush()
+    location = SchoolLocation(
+        school_id=school.id,
+        address_i18n={"bg": stored_address},
+        lat=42.6812,
+        lng=23.2012,
+        is_primary=True,
+        **pin,
+    )
+    db_session.add(location)
+    await db_session.commit()
+
+    await extractor_module._sync_primary_location_from_contact_address(
+        db_session, school, {"address": 'ул. "Ела" № 6'}
+    )
+    await db_session.commit()
+
+    await db_session.refresh(location)
+    assert location.address_i18n["bg"] == expected_address
+    assert (location.lat, location.lng) == (42.6812, 23.2012)
+
+
+@pytest.mark.asyncio
 async def test_extract_school_does_not_replace_with_office_like_website_contact_address(
     db_session,
     sample_school_for_extraction,
