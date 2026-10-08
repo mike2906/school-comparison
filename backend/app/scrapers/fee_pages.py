@@ -29,7 +29,7 @@ from app.scrapers.shared_site_check import describes_level
 
 logger = logging.getLogger(__name__)
 
-MAX_FEE_FETCHES = 6
+MAX_FEE_FETCHES = 8
 MAX_LINK_HOPS = 2  # home page -> admissions page (crawled) -> fee page -> fee PDF
 FETCH_TIMEOUT_SECONDS = 20.0
 MAX_BODY_BYTES = 15 * 1024 * 1024
@@ -120,7 +120,9 @@ def fee_link_candidates(
         link_words = _words(f"{parsed.path} {text}")
         if school_family and _names_only_other_level(link_words, school_family):
             continue
-        score = 2 * in_url + 2 * in_text + path.endswith(".pdf")
+        # A link that names a year is the fee list itself ("school-fees-2026-2027").
+        dated = bool(re.search(r"20\d{2}", link_words))
+        score = 2 * in_url + 2 * in_text + path.endswith(".pdf") + dated
         key = page_key(url)
         if key not in scored or score > scored[key][0]:
             scored[key] = (score, url, " ".join((text or "").split()))
@@ -255,8 +257,10 @@ async def fetch_fee_documents(
             html = body.decode(_charset(content_type), errors="replace")
             text = (html_to_text(html) or "")[:MAX_TEXT_CHARS]
             if hop < MAX_LINK_HOPS:
+                # A fee page's own fee links come next: they lead to the fee list, while
+                # the links still queued are its siblings (594's list sat behind six).
                 nested = candidates(html_links(html), final_url)
-                queue.extend((nested_url, nested_label, hop + 1) for nested_url, nested_label in nested)
+                queue[:0] = [(nested_url, nested_label, hop + 1) for nested_url, nested_label in nested]
             if read_image is not None and not _PRICE_RE.search(text):
                 for image_url, alt in content_images(html, final_url):
                     if images_read >= MAX_FEE_IMAGES:

@@ -38,8 +38,8 @@ def test_candidates_are_same_site_links_that_name_fees():
         "https://school.bg/uploads/2026/taksi-2026-2027.pdf",
         "https://school.bg/admission/fees/",
         "https://school.bg/finansovi-usloviya/",
-        "https://school.bg/priem",
         "https://school.bg/registration/frais-de-scolarite-2026-2027/",
+        "https://school.bg/priem",
     ]
 
 
@@ -339,3 +339,24 @@ async def test_pictures_read_are_capped_and_a_picture_with_no_fees_is_not_stored
         "https://school.bg/uploads/page-1.png",
         "https://school.bg/uploads/page-2.png",
     ]
+
+
+@pytest.mark.asyncio
+async def test_a_fee_pages_own_fee_link_is_followed_before_its_siblings():
+    """School 594: the dated fee list sat one click under /school-fees/, behind six
+    sibling fee links that used up the fetch budget."""
+    requested: list[str] = []
+    siblings = [(f"https://school.bg/fees/doc-{n}", "Fees") for n in range(fee_pages.MAX_FEE_FETCHES)]
+    routes = {url: _html("<p>General terms of the tuition contract</p>") for url, _ in siblings}
+    routes["https://school.bg/fees/doc-0"] = _html(
+        '<p>School fees</p><a href="/school-fees-2026-2027/">School fees 2026-2027</a>'
+    )
+    routes["https://school.bg/school-fees-2026-2027/"] = _html("<p>Grade 1: 14 750 EUR</p>")
+
+    async with _client(routes, requested) as client:
+        documents = await fetch_fee_documents(
+            siblings, site_url=SITE, known_urls=[], html_to_text=_text, client=client
+        )
+
+    assert requested[:2] == ["https://school.bg/fees/doc-0", "https://school.bg/school-fees-2026-2027/"]
+    assert any("14 750" in document.text for document in documents)

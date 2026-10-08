@@ -906,6 +906,7 @@ async def _persist_navigation_result(
     pages: list[NavigatedPage],
     validator: URLValidator,
     navigator: WebsiteNavigator,
+    fee_links_followed: bool = False,
 ) -> dict[str, Any]:
     if final_url:
         final_url = validator._canonicalize_bot_protection_final_url(
@@ -913,7 +914,8 @@ async def _persist_navigation_result(
             final_url=final_url,
         )
 
-    pages = await _follow_fee_links(navigator, school, final_url or normalized_url, pages)
+    if not fee_links_followed:
+        pages = await _follow_fee_links(navigator, school, final_url or normalized_url, pages)
 
     school_id = school.id
     now = datetime.now(timezone.utc)
@@ -1119,6 +1121,23 @@ async def navigate_schools_batch(
         await db.commit()
 
     outcomes = await navigator.discover_pages_many(batch_urls, max_concurrency=max_concurrency)
+
+    # Fee links are followed here, several schools at a time: inside the persistence loop
+    # below they would run one school after another.
+    followed_pages: dict[int, list[NavigatedPage]] = {}
+    follow_limit = asyncio.Semaphore(max(1, int(max_concurrency)))
+
+    async def follow(school_id: int) -> None:
+        url = normalized_by_school.get(school_id)
+        outcome = outcomes.get(url) if url else None
+        if outcome is None or not outcome.pages:
+            return
+        async with follow_limit:
+            followed_pages[school_id] = await _follow_fee_links(
+                navigator, by_id[school_id], outcome.final_url or url, outcome.pages
+            )
+
+    await asyncio.gather(*(follow(school_id) for school_id in school_ids if school_id in by_id))
     results: list[dict[str, Any]] = []
 
     for school_id in school_ids:
@@ -1172,14 +1191,17 @@ async def navigate_schools_batch(
                 )
                 continue
 
+        # A retried crawl replaced the outcome the fee links were followed from.
+        followed = followed_pages.get(school_id) if outcome is outcomes.get(normalized_url) else None
         result = await _persist_navigation_result(
             db=db,
             school=school,
             normalized_url=normalized_url,
             final_url=outcome.final_url,
-            pages=outcome.pages,
+            pages=followed if followed is not None else outcome.pages,
             validator=validator,
             navigator=navigator,
+            fee_links_followed=followed is not None,
         )
         results.append(result)
 
