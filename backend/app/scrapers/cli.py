@@ -3075,12 +3075,16 @@ async def _run_validate_urls_batch(
 async def _run_recover_failed_school(db, school_id: int, country: str) -> dict:
     """Rediscover + revalidate URL for one failed school, trying multiple candidates."""
     from sqlalchemy import select
+    from sqlalchemy.orm import selectinload
 
     from app.config import get_settings
     from app.models import School
     from app.scrapers.website_discovery import WebsiteDiscoverer
 
-    result = await db.execute(select(School).where(School.id == school_id))
+    # Discovery builds its search queries from the school's address.
+    result = await db.execute(
+        select(School).where(School.id == school_id).options(selectinload(School.locations))
+    )
     school = result.scalar_one_or_none()
     if not school:
         raise ValueError(f"School {school_id} not found")

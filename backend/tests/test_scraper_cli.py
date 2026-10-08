@@ -937,3 +937,29 @@ async def test_repair_out_of_bounds_geocodes_checks_contact_email_only_before_ge
                 await command
 
     provider_cls.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_run_recover_failed_school_loads_the_address_discovery_reads(db_session):
+    """Discovery builds search queries from `school.locations`; a lazy load there raised
+    MissingGreenlet, so `recover-failed-urls --school-id` never recovered anything."""
+    school = School(
+        name_i18n={"bg": "Тест училище"},
+        country_code="bg",
+        school_type="private",
+        education_level="primary",
+        city="sofia",
+        scrape_status="failed_validate",
+    )
+    db_session.add(school)
+    await db_session.commit()
+    school_id = school.id
+    db_session.expunge_all()
+
+    async def fake_recover(self, db, school, max_attempts):
+        return {"school_id": school.id, "locations": len(school.locations)}
+
+    with patch("app.scrapers.website_discovery.WebsiteDiscoverer.recover_failed_school", new=fake_recover):
+        out = await scraper_cli._run_recover_failed_school(db_session, school_id, "bg")
+
+    assert out == {"school_id": school_id, "locations": 0}
