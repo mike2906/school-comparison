@@ -5006,3 +5006,23 @@ def test_bare_table_cell_takes_its_currency_from_its_own_column():
     unnamed = "--- SOURCE: https://school.test/fees ---\nТакси в EUR и BGN | A | B\n1-4 клас | 7000 | 13690\n"
     row = ExtractedPrice(category="tuition", amount=7000, currency="EUR", confidence=0.9)
     assert helpers._filter_model_prices([row], unnamed) == []
+
+
+def test_extraction_reads_only_the_freshest_copy_of_a_page():
+    """School 593: the fee page stored as /tuition-fees in July and /tuition-fees/ today."""
+    def page(url, day):
+        return SimpleNamespace(source_url=url, last_scraped_at=datetime.datetime(2026, day[0], day[1]))
+
+    stale = page("https://izzi.academy/admissions/tuition-fees", (7, 15))
+    fresh = page("https://izzi.academy/admissions/tuition-fees/", (10, 8))
+    older_slash = page("https://izzi.academy/about-us/", (2, 26))
+    newer_bare = page("https://izzi.academy/about-us", (7, 15))
+    only = page("https://izzi.academy/", (10, 8))
+
+    kept = extractor_module._freshest_url_variants([stale, fresh, older_slash, newer_bare, only])
+
+    assert sorted(p.source_url for p in kept) == [
+        "https://izzi.academy/",
+        "https://izzi.academy/about-us",
+        "https://izzi.academy/admissions/tuition-fees/",
+    ]

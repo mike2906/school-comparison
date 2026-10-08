@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-from types import SimpleNamespace
 from unittest.mock import patch
 from urllib.robotparser import RobotFileParser
 
@@ -370,7 +369,6 @@ async def test_navigate_school_creates_source_pages(db_session):
         assert website_url == "https://school.bg"
         return "https://school.bg", pages
 
-    from unittest.mock import patch
 
     with patch("app.scrapers.navigator.WebsiteNavigator.discover_pages", new=fake_discover_pages):
         result = await navigate_school(db=db_session, school_id=school.id, country_code="bg")
@@ -421,7 +419,6 @@ async def test_navigate_school_returns_failure_when_no_extractable_content(db_se
     async def fake_discover_pages(self, website_url: str):
         return website_url, pages
 
-    from unittest.mock import patch
 
     with patch("app.scrapers.navigator.WebsiteNavigator.discover_pages", new=fake_discover_pages):
         result = await navigate_school(db=db_session, school_id=school.id, country_code="bg")
@@ -433,7 +430,6 @@ async def test_navigate_school_returns_failure_when_no_extractable_content(db_se
 @pytest.mark.asyncio
 @pytest.mark.parametrize("robots_blocked", [True, False])
 async def test_navigate_school_withholds_cached_data_only_when_robots_txt_blocks(db_session, robots_blocked):
-    from unittest.mock import patch
 
     from app.utils.website_data import WEBSITE_DATA_WITHHELD_KEY
 
@@ -532,7 +528,6 @@ async def test_navigate_schools_batch_uses_discover_many_and_persists(db_session
         assert set(website_urls) == {"https://school0.bg", "https://school1.bg"}
         return outcomes
 
-    from unittest.mock import patch
 
     with patch("app.scrapers.navigator.WebsiteNavigator.discover_pages_many", new=fake_discover_many):
         results = await navigate_schools_batch(
@@ -597,7 +592,6 @@ async def test_navigate_schools_batch_retries_failed_outcome_sequentially(db_ses
             ],
         )
 
-    from unittest.mock import patch
 
     with (
         patch("app.scrapers.navigator.WebsiteNavigator.discover_pages_many", new=fake_discover_many),
@@ -625,123 +619,50 @@ async def test_navigate_schools_batch_retries_failed_outcome_sequentially(db_ses
 
 
 @pytest.mark.asyncio
-async def test_discover_pages_many_falls_back_per_chunk_on_timeout():
+async def test_discover_pages_many_crawls_each_site_on_its_own():
+    """One deep crawl per site: crawl4ai 0.9's arun_many mixes every site's pages in one list."""
     navigator = WebsiteNavigator(country_code="bg")
-    chunk_calls: list[list[str]] = []
-
-    async def fake_discover_many_chunk(self, website_urls, *, max_concurrency):
-        chunk_calls.append(list(website_urls))
-        if website_urls[0] == "https://school0.bg":
-            raise asyncio.TimeoutError("chunk timeout")
-        return {
-            "https://school2.bg": BatchDiscoverOutcome(
-                seed_url="https://school2.bg",
-                final_url="https://school2.bg",
-                pages=[
-                    NavigatedPage(
-                        url="https://school2.bg/about",
-                        category="about",
-                        markdown="About",
-                        content_hash="hash-about",
-                    )
-                ],
-            )
-        }
+    running = 0
+    most_running = 0
 
     async def fake_discover_pages(self, website_url: str):
+        nonlocal running, most_running
+        running += 1
+        most_running = max(most_running, running)
+        await asyncio.sleep(0)
+        running -= 1
+        if website_url == "https://school1.bg":
+            raise asyncio.TimeoutError("crawl timeout")
         return (
             website_url,
             [
+                NavigatedPage(url=website_url, category=None, markdown="Home", content_hash="h0"),
                 NavigatedPage(
                     url=f"{website_url}/about",
                     category="about",
                     markdown=f"About {website_url}",
                     content_hash=f"hash-{website_url}",
-                )
+                ),
             ],
         )
 
-    from unittest.mock import patch
 
-    with (
-        patch.object(WebsiteNavigator, "_discover_pages_many_chunk", new=fake_discover_many_chunk),
-        patch.object(WebsiteNavigator, "discover_pages", new=fake_discover_pages),
-    ):
+    with patch.object(WebsiteNavigator, "discover_pages", new=fake_discover_pages):
         outcomes = await navigator.discover_pages_many(
-            ["https://school0.bg", "https://school1.bg", "https://school2.bg"],
+            ["https://school0.bg", "https://school1.bg", "https://school2.bg", "https://school0.bg"],
             max_concurrency=2,
         )
 
-    assert chunk_calls == [
-        ["https://school0.bg", "https://school1.bg"],
-        ["https://school2.bg"],
-    ]
+    assert most_running == 2
     assert set(outcomes) == {"https://school0.bg", "https://school1.bg", "https://school2.bg"}
-    assert outcomes["https://school0.bg"].pages[0].url == "https://school0.bg/about"
-    assert outcomes["https://school1.bg"].pages[0].url == "https://school1.bg/about"
-    assert outcomes["https://school2.bg"].pages[0].url == "https://school2.bg/about"
-
-
-@pytest.mark.asyncio
-async def test_batch_crawl_keeps_each_seeds_pages_with_that_seed():
-    """`arun_many` with a deep crawl returned one flat page list, so results indexed by
-    seed gave a school another school's pages and website. Each seed is crawled alone."""
-
-    def page(url: str):
-        return SimpleNamespace(
-            success=True, url=url, redirected_url=None, markdown="Съдържание на страницата",
-            html=None, cleaned_html=None, metadata={}, links={},
-        )  # fmt: skip
-
-    class FakeCrawler:
-        def __init__(self, config=None):
-            pass
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *exc):
-            return False
-
-        async def arun(self, url, config):
-            if "broken" in url:
-                raise RuntimeError("crawl failed")
-            return [page(url), page(f"{url}/taksi")]
-
-        async def arun_many(self, *args, **kwargs):
-            raise AssertionError("results of arun_many cannot be matched to their seeds")
-
-    navigator = WebsiteNavigator(country_code="bg")
-    seeds = ["https://first.bg", "https://broken.bg", "https://second.bg"]
-    with patch("crawl4ai.AsyncWebCrawler", new=FakeCrawler):
-        outcomes = await navigator._discover_pages_many_chunk(seeds, max_concurrency=2)
-
-    assert list(outcomes) == seeds
-    assert [p.url for p in outcomes["https://first.bg"].pages] == ["https://first.bg", "https://first.bg/taksi"]  # fmt: skip
-    assert [p.url for p in outcomes["https://second.bg"].pages] == ["https://second.bg", "https://second.bg/taksi"]  # fmt: skip
-    assert outcomes["https://broken.bg"].pages == [] and outcomes["https://broken.bg"].error == "crawl failed"
-
-
-@pytest.mark.asyncio
-async def test_batch_crawl_reports_a_failed_fetch_so_it_is_retried():
-    """Crawl4AI returns a failed fetch as an unsuccessful result instead of raising."""
-
-    class FakeCrawler:
-        def __init__(self, config=None):
-            pass
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *exc):
-            return False
-
-        async def arun(self, url, config):
-            return [SimpleNamespace(success=False, error_message="net::ERR_CONNECTION_RESET")]
-
-    navigator = WebsiteNavigator(country_code="bg")
-    with patch("crawl4ai.AsyncWebCrawler", new=FakeCrawler):
-        outcomes = await navigator._discover_pages_many_chunk(["https://down.bg"], max_concurrency=1)
-
-    outcome = outcomes["https://down.bg"]
-    assert outcome.pages == [] and outcome.error == "net::ERR_CONNECTION_RESET"
+    # Every page of a site stays with that site; one site's failure is its own.
+    assert [page.url for page in outcomes["https://school0.bg"].pages] == [
+        "https://school0.bg",
+        "https://school0.bg/about",
+    ]
+    assert [page.url for page in outcomes["https://school2.bg"].pages] == [
+        "https://school2.bg",
+        "https://school2.bg/about",
+    ]
+    assert outcomes["https://school1.bg"].pages == []
+    assert outcomes["https://school1.bg"].error == "crawl timeout"

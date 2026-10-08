@@ -775,13 +775,6 @@ class WebsiteNavigator:
 
         return final_url, self._dedupe_pages(pages)
 
-    def _first_error(self, results_obj: Any) -> str | None:
-        for result in self._iter_results(results_obj):
-            message = getattr(result, "error_message", None)
-            if message:
-                return str(message)
-        return None
-
     def _internal_links(self, crawl_result: Any) -> list[tuple[str, str]]:
         links = getattr(crawl_result, "links", None)
         internal = links.get("internal") if isinstance(links, dict) else None
@@ -797,7 +790,13 @@ class WebsiteNavigator:
         *,
         max_concurrency: int = 3,
     ) -> dict[str, BatchDiscoverOutcome]:
-        """Discover pages for many school websites using chunked Crawl4AI arun_many."""
+        """Discover pages for many school websites, ``max_concurrency`` sites at a time.
+
+        Each site gets its own :meth:`discover_pages` crawl. crawl4ai 0.9's ``arun_many``
+        returns a deep crawl's pages as one flat list with one page budget for all the
+        seed URLs, so it cannot tell which site a page belongs to: a one-school run kept
+        only the home page, and a second school got none.
+        """
         if not website_urls:
             return {}
 
@@ -810,106 +809,22 @@ class WebsiteNavigator:
             normalized_urls.append(normalized)
             seen.add(normalized)
 
-        if not normalized_urls:
-            return {}
-
         concurrency = max(1, int(max_concurrency))
         outcomes: dict[str, BatchDiscoverOutcome] = {}
 
         for chunk_start in range(0, len(normalized_urls), concurrency):
             chunk_urls = normalized_urls[chunk_start : chunk_start + concurrency]
-            try:
-                chunk_outcomes = await self._discover_pages_many_chunk(
-                    chunk_urls,
-                    max_concurrency=min(concurrency, len(chunk_urls)),
-                )
-            except Exception as exc:
-                logger.warning(
-                    "arun_many failed for %s-school chunk; falling back to sequential discover_pages: %s",
-                    len(chunk_urls),
-                    exc,
-                )
-                chunk_outcomes = await self._discover_pages_sequentially(chunk_urls)
-
-            outcomes.update(chunk_outcomes)
+            chunk_outcomes = await asyncio.gather(*(self._discover_outcome(url) for url in chunk_urls))
+            outcomes.update(zip(chunk_urls, chunk_outcomes))
 
         return outcomes
 
-    async def _discover_pages_sequentially(
-        self,
-        website_urls: list[str],
-    ) -> dict[str, BatchDiscoverOutcome]:
-        outcomes: dict[str, BatchDiscoverOutcome] = {}
-        for url in website_urls:
-            try:
-                final_url, pages = await self.discover_pages(url)
-                outcomes[url] = BatchDiscoverOutcome(
-                    seed_url=url,
-                    final_url=final_url,
-                    pages=pages,
-                )
-            except Exception as school_exc:
-                outcomes[url] = BatchDiscoverOutcome(
-                    seed_url=url,
-                    final_url=None,
-                    pages=[],
-                    error=str(school_exc),
-                )
-        return outcomes
-
-    async def _discover_pages_many_chunk(
-        self,
-        website_urls: list[str],
-        *,
-        max_concurrency: int,
-    ) -> dict[str, BatchDiscoverOutcome]:
-        """Crawl each seed with its own ``arun`` on one shared browser.
-
-        ``arun_many`` with a deep-crawl strategy returns one flat list of pages, not one
-        result per seed, so its results cannot be matched back to the schools: indexing
-        them by seed handed a school another school's pages and website.
-        """
-        from crawl4ai import AsyncWebCrawler  # type: ignore
-
-        if not website_urls:
-            return {}
-
-        semaphore = asyncio.Semaphore(max(1, int(max_concurrency)))
-        timeout = max(
-            self.CRAWL_TIMEOUT_SECONDS,
-            float(getattr(self.settings, "nav_school_timeout_seconds", self.CRAWL_TIMEOUT_SECONDS)),
-        )
-
-        async with AsyncWebCrawler(config=self._build_browser_config()) as crawler:
-
-            async def crawl(url: str) -> BatchDiscoverOutcome:
-                async with semaphore:
-                    try:
-                        results_obj = await asyncio.wait_for(
-                            crawler.arun(url=url, config=self._build_run_config(url)),
-                            timeout=timeout,
-                        )
-                        final_url, pages = self._extract_pages_from_results(
-                            normalized_url=url,
-                            results_obj=results_obj,
-                        )
-                    except Exception as exc:
-                        return BatchDiscoverOutcome(
-                            seed_url=url,
-                            final_url=None,
-                            pages=[],
-                            error=str(exc) or type(exc).__name__,
-                        )
-                    # A failed fetch comes back as an unsuccessful result, not an
-                    # exception; without its message the caller would not retry.
-                    error = None if pages else self._first_error(results_obj)
-                    return BatchDiscoverOutcome(
-                        seed_url=url, final_url=final_url, pages=pages, error=error
-                    )
-
-            outcomes = await asyncio.gather(*(crawl(url) for url in website_urls))
-
-        return dict(zip(website_urls, outcomes, strict=True))
+    async def _discover_outcome(self, url: str) -> BatchDiscoverOutcome:
+        try:
+            final_url, pages = await self.discover_pages(url)
+            return BatchDiscoverOutcome(seed_url=url, final_url=final_url, pages=pages)
+        except Exception as exc:
+            return BatchDiscoverOutcome(seed_url=url, final_url=None, pages=[], error=str(exc))
 
 
 # The crawl's exclusions hold for followed fee links too (an old news post about fees is

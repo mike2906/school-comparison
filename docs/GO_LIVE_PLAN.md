@@ -2325,10 +2325,9 @@ revision. None of this may widen the public boundary without a reviewed pilot.
         (2) The crawl is one click deep and skips PDFs; a fee-link follow-up fetches
         same-site fee pages and fee PDFs two hops out, and replaces a crawled fee page
         that lost its fee tab in the rendered DOM (404, 300, 529, 505).
-        (3) Batch navigation matched `arun_many` results to schools by index, but with
-        a deep crawl crawl4ai 0.9 returns one flat page list: a batch run gave schools
-        each other's pages and websites (caught in the sandbox, never run on launch).
-        Each seed is now crawled on its own.
+        (3) Batch navigation gave schools each other's pages and websites (crawl4ai 0.9
+        `arun_many` with a deep crawl returns one flat page list); found here in the
+        sandbox and fixed separately in #198.
         (4) Model price rows were gated by the keyword line signals, which dropped rows
         with no fee word on the line (529), renamed tuition after an unrelated heading
         (404) and read one price per table line (300). This is the 538/570/153 failure
