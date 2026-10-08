@@ -101,7 +101,8 @@ Procedures you only need for a specific task. Read the `SKILL.md` when its "use 
   PR → pre-review → optional `@codex review` → merge). Use when the user says "follow github
   process" or asks you to open/land a PR.
 - `skills/common-tasks/SKILL.md` — Recipes: add route/column/translation, seed, run the app,
-  import NVO, data-quality scoreboard, promote curated identities. Use when doing one of these.
+  import NVO, data-quality scoreboard, promote curated identities, publish data to
+  production. Use when doing one of these.
 - `skills/geocoding/SKILL.md` — BG geocoding: GeoJSON province naming (СТОЛИЧНА, not СОФИЯ),
   GeoJSON→Nominatim tiers, city-match rules. Use when touching `app/services/geocoding`.
 - `skills/pdf-reader/SKILL.md` — Extract text/tables from PDFs (files, URLs, linked from a
@@ -153,11 +154,14 @@ Stored per location and age group in `location_age_group_shifts.shift`.
    or changing any response field.
 2. **NVO import is independent** of the website pipeline: use the dedicated `nvo` stage; it
    is not part of `all`.
-3. **JSON over columns:** put one-off or per-school fields in the `attributes` /
+3. **Production serves a published copy of the launch DB.** A launch-DB change is not live
+   until it is published (`skills/common-tasks/SKILL.md` → Publish data to production); say
+   so when reporting a data fix.
+4. **JSON over columns:** put one-off or per-school fields in the `attributes` /
    `admission_info` JSON, not new columns.
-4. **Migrations start from autogenerate** and are reviewed and verified before applying
+5. **Migrations start from autogenerate** and are reviewed and verified before applying
    (details in `backend/AGENTS.md`).
-5. **All UI strings go through i18n.** Never hardcode English or Bulgarian in components.
+6. **All UI strings go through i18n.** Never hardcode English or Bulgarian in components.
 
 ---
 
