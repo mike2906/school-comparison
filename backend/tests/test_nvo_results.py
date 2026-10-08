@@ -419,6 +419,52 @@ async def test_import_nvo_results_updates_existing_rows_and_scraped_at(db_sessio
 
 
 @pytest.mark.asyncio
+async def test_import_nvo_results_matches_register_code_whatever_settlement_the_file_names(
+    db_session, monkeypatch
+):
+    """Sofia municipality's villages and mistyped city cells still belong to our Sofia schools."""
+    await _seed_country(db_session)
+    village = School(
+        name_i18n={"bg": "117. Средно училище"},
+        country_code="bg",
+        school_type="state",
+        education_level="secondary",
+        city="sofia",
+        institutional_id="2210117",
+    )
+    mistyped = School(
+        name_i18n={"bg": "Професионална гимназия по транспорт"},
+        country_code="bg",
+        school_type="state",
+        education_level="secondary",
+        city="sofia",
+        institutional_id="2207412",
+    )
+    db_session.add_all([village, mistyped])
+    await db_session.commit()
+
+    monkeypatch.setattr(nvo_results, "discover_nvo_resources", AsyncMock(return_value=[_resource("nvo_7", 2025)]))
+    monkeypatch.setattr(
+        nvo_results,
+        "_download_resource_csv",
+        AsyncMock(
+            return_value=_csv_text(
+                '"СОФИЯ-ГРАД","СТОЛИЧНА","ГР.БУХОВО","117. СУ","2210117","23","69.98","23","49.28"',
+                '"СОФИЯ-ГРАД","СТОЛИЧНА","офия 14 р-н Искър","ПГ по транспорт","2207412","72","31.69","72","15.52"',
+                '"ПЛОВДИВ","ПЛОВДИВ","ГР.ПЛОВДИВ","Друго училище","515151","100","82.2","100","79.1"',
+            )
+        ),
+    )
+
+    summary = await import_nvo_results(db_session, country_code="bg", city="sofia", year=2025, exam_types=["nvo_7"])
+
+    assert summary["matched_schools"] == 2
+    assert summary["created_rows"] == 4
+    assert summary["skipped_rows"] == 2
+    assert summary["unmatched_rows"] == 0
+
+
+@pytest.mark.asyncio
 async def test_import_nvo_results_ignores_city_filter_for_explicit_school_ids(db_session, monkeypatch):
     await _seed_country(db_session)
     school = School(
