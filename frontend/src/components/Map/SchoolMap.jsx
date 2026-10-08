@@ -15,7 +15,7 @@ import { AGE_GROUP_KEYS } from '../../utils/education'
 import { useStableCallback } from '../../hooks/useStableCallback'
 import { isDesktopViewport } from '../../utils/searchViewState'
 import { schoolLevelLabel } from '../../utils/levelLabel'
-import { pointsForFit, fitKeepRatio, fitPadding, pickSelectedMarker, pinHasRoom, pinTarget, overlayFitPadding, stackedMarkersByKey } from '../../utils/mapFit'
+import { pointsForFit, fitKeepRatio, fitPadding, pickSelectedMarker, pinHasRoom, pinTarget, overlayFitPadding, stackedMarkersByKey, normalizeAgeGroups, pinnedLocations } from '../../utils/mapFit'
 
 // CARTO requires an API key; without one every tile is watermarked
 const CARTO_API_KEY = import.meta.env.VITE_CARTO_API_KEY
@@ -148,13 +148,6 @@ const getAgeGroupFullLabel = (t, ageGroup) => {
   const fullLabel = t(fullKey)
   if (fullLabel && fullLabel !== fullKey) return fullLabel
   return ageGroup
-}
-
-const normalizeAgeGroups = (location) => {
-  if (!location) return []
-  if (Array.isArray(location.age_groups)) return location.age_groups.filter(Boolean)
-  if (location.age_group) return [location.age_group]
-  return []
 }
 
 const getAgeGroupShifts = (location) => {
@@ -1078,10 +1071,7 @@ function SchoolMap({
   const markers = useMemo(() => {
     const result = []
     schools.forEach(school => {
-      const eligibleLocations = activeAgeGroup
-        ? school.locations?.filter(location => normalizeAgeGroups(location).includes(activeAgeGroup))
-        : school.locations
-      eligibleLocations?.forEach((location, idx) => {
+      pinnedLocations(school, activeAgeGroup)?.forEach((location, idx) => {
         const lat = parseCoordinate(location.lat)
         const lng = parseCoordinate(location.lng)
         if (pointInBounds(lat, lng, countryBounds)) {
