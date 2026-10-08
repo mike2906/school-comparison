@@ -666,3 +666,64 @@ async def test_discover_pages_many_crawls_each_site_on_its_own():
     ]
     assert outcomes["https://school1.bg"].pages == []
     assert outcomes["https://school1.bg"].error == "crawl timeout"
+
+
+async def _batch_with_empty_first_crawl(db_session, retry_pages):
+    school = School(
+        name_i18n={"bg": "Тестово училище"},
+        country_code="bg",
+        school_type="state",
+        education_level="primary",
+        city="sofia",
+        website_url="https://school.bg",
+        scrape_status="validated",
+    )
+    db_session.add(school)
+    await db_session.commit()
+    retries: list[str] = []
+
+    async def fake_discover_many(self, website_urls, *, max_concurrency):
+        # A failed fetch: the crawler raised nothing and returned no page.
+        return {
+            "https://school.bg": BatchDiscoverOutcome(
+                seed_url="https://school.bg", final_url="https://school.bg", pages=[]
+            )
+        }
+
+    async def fake_discover_pages(self, website_url: str):
+        retries.append(website_url)
+        return website_url, retry_pages
+
+    async def not_blocked(self, url: str) -> bool:
+        return False
+
+    with (
+        patch("app.scrapers.navigator.WebsiteNavigator.discover_pages_many", new=fake_discover_many),
+        patch("app.scrapers.navigator.WebsiteNavigator.discover_pages", new=fake_discover_pages),
+        patch("app.scrapers.navigator.WebsiteNavigator.robots_disallows", new=not_blocked),
+    ):
+        results = await navigate_schools_batch(
+            db=db_session, school_ids=[school.id], country_code="bg", max_concurrency=2
+        )
+    return results, retries
+
+
+@pytest.mark.asyncio
+async def test_navigate_schools_batch_retries_a_crawl_that_returned_no_page(db_session):
+    page = NavigatedPage(url="https://school.bg/about", category="about", markdown="About", content_hash="h")
+
+    results, retries = await _batch_with_empty_first_crawl(db_session, [page])
+
+    assert retries == ["https://school.bg"]
+    assert results[0]["success"] is True and results[0]["pages_with_content"] == 1
+
+
+@pytest.mark.asyncio
+async def test_navigate_schools_batch_still_records_a_site_with_no_pages_after_the_retry(db_session):
+    """An empty site is not an error: it goes on to persistence, which is where a
+    robots.txt block is recognised and the stored pages are invalidated."""
+    results, retries = await _batch_with_empty_first_crawl(db_session, [])
+
+    assert retries == ["https://school.bg"]
+    assert results[0]["success"] is False
+    assert results[0]["reason"] == "No extractable page content"
