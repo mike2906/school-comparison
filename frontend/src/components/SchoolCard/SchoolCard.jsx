@@ -11,7 +11,7 @@ import { formatDistance } from '../../utils/distance'
 import { getFocusEmoji } from '../../utils/locationFocus'
 import { getBenchmarkComparison, getNvoDetail as getSharedNvoDetail } from '../../utils/nvo'
 import { getAdmissionStatusKey, getCanonicalAmenityFlags } from '../../utils/schoolAttributes'
-import { classifyAdmissionRequirement, usesSofiaKindergartenSystem } from '../../utils/admission'
+import { classifyAdmissionRequirement, curatedRequirement, usesSofiaKindergartenSystem } from '../../utils/admission'
 import {
   isInstallmentPlan,
   lowestUnstatedPeriodTuition,
@@ -766,7 +766,7 @@ const SchoolCard = memo(function SchoolCard({
           : null
 
       const requirement = getAdmissionRequirement(
-        admissionInfo?.requirements || attributes?.entry_requirements,
+        curatedRequirement(admissionInfo, i18n.language) || attributes?.entry_requirements,
         t
       )
 
