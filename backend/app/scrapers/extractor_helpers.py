@@ -38,6 +38,7 @@ from app.scrapers.price_evidence import (
     label_spans,
     normalize_text,
     occurrence_currency,
+    period_families,
     stated_period,
 )
 from app.scrapers.school_tokens import extract_school_name_tokens
@@ -2339,8 +2340,9 @@ def _filter_model_prices(prices: list[ExtractedPrice], text: str) -> list[Extrac
     The model read the whole page, so its category, plan and age group stand. The text
     decides the rest, by the same reading Stage 6 uses to gate publication
     (``price_evidence``): the amount must be on a page in the row's currency; the period
-    is whatever is written next to the amount, or none; the academic year is kept only
-    when that page names it. A yearless row needs a page that is not a dated old fee
+    is whatever is written next to the amount (or in its table's header row), or none;
+    the academic year is kept only when that page names it, and taken from the page when
+    the model gave none and the page names exactly one. A yearless row needs a page that is not a dated old fee
     list. Rows for late-payment penalties, a "total fee" sum and per-day/week/hour
     amounts are dropped.
 
@@ -2375,28 +2377,49 @@ def _filter_model_prices(prices: list[ExtractedPrice], text: str) -> list[Extrac
             labels = label_spans(block, label)
             if labels:
                 spans = [min(spans, key=lambda span: min(_gap(span, found) for found in labels))]
-            stated = [stated_period(block, span) for span in spans]
+            stated = [_period_written_for(block, span) for span in spans]
             if all(unrepresentable for _, unrepresentable in stated):
                 continue
             families = [found for found, _ in stated]
             agreed = families[0] if all(found == families[0] for found in families) else set()
             period = next(iter(agreed)).lower() if len(agreed) == 1 else None
-            names_year = bool(year) and year in {
+            page_years = {
                 _normalize_academic_year(found) for found in _PAGE_ACADEMIC_YEAR_RE.findall(block)
-            }
-            if not names_year and stale:
+            } - {None}
+            if year in page_years:
+                page_year = price.academic_year
+            elif not year and len(page_years) == 1:
+                # The model left the year out and the page names exactly one.
+                page_year = next(iter(page_years))
+            else:
+                page_year = None
+            if page_year is None and stale:
                 continue
-            supported.append((names_year, period))
+            supported.append((page_year, period))
         if not supported:
             continue
-        # A page that names the row's year is the better witness.
-        names_year, period = max(supported, key=lambda item: item[0])
+        # A page that names the year is the better witness.
+        page_year, period = max(supported, key=lambda item: item[0] is not None)
         normalized = price.model_copy(deep=True)
         normalized.period = period
-        if not names_year:
-            normalized.academic_year = None
+        normalized.academic_year = page_year
         refined.append(normalized)
     return refined
+
+
+def _period_written_for(block: str, span: tuple[int, int]) -> tuple[set[str], bool]:
+    """Period wording for one amount; for a table cell with none, its column headers'."""
+    families, unrepresentable = stated_period(block, span)
+    if families or unrepresentable or "|" not in _line_of(block, span):
+        return families, unrepresentable
+    header = None
+    for line in reversed(block[: span[0]].splitlines()[:-1]):
+        if "|" not in line:
+            break
+        header = line
+    if header is None or currency_price_starts(header):
+        return families, unrepresentable
+    return period_families(header)
 
 
 def _amount_is_a_fee_in(block: str, span: tuple[int, int], currency: str) -> bool:

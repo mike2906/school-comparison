@@ -1221,6 +1221,7 @@ async def _extract_prices(
         result_type=PriceExtractionOutput,
         timeout_seconds=timeout_seconds,
         llm_stats=llm_stats,
+        preferred_tier="pricing",
         school_id=school.id,
     )
 
@@ -2068,8 +2069,15 @@ async def extract_school(
     db: AsyncSession,
     school_id: int,
     country_code: str,
+    *,
+    prices_only: bool = False,
 ) -> dict[str, Any]:
-    """Extract pricing + general information for one school (canonical path)."""
+    """Extract pricing + general information for one school (canonical path).
+
+    ``prices_only`` re-reads the fees and nothing else: general information, the
+    school's status and its summary state are left as they are. Validation still runs
+    over the result before the commit.
+    """
     settings = get_settings()
 
     school_result = await db.execute(select(School).where(School.id == school_id))
@@ -2094,8 +2102,9 @@ async def extract_school(
     content_pages = [page for page in pages if (page.raw_markdown or "").strip()]
 
     if not content_pages:
-        school.scrape_status = "extraction_failed"
-        await db.commit()
+        if not prices_only:
+            school.scrape_status = "extraction_failed"
+            await db.commit()
         return {
             "school_id": school_id,
             "status": "extraction_failed",
@@ -2137,19 +2146,20 @@ async def extract_school(
         if price_result.get("detail"):
             stats["details"].append(price_result["detail"])
 
-    general_result = await _extract_general_info(
-        db=db,
-        school=school,
-        pages=content_pages,
-        timeout_seconds=settings.extraction_llm_timeout_seconds,
-        llm_stats=llm_stats,
-    )
-    stats["general_info_success"] = general_result["success"]
-    stats["input_tokens"] += general_result["input_tokens"]
-    stats["output_tokens"] += general_result["output_tokens"]
-    stats["token_cost_usd"] += float(general_result.get("token_cost_usd", 0.0) or 0.0)
-    if general_result.get("detail"):
-        stats["details"].append(general_result["detail"])
+    if not prices_only:
+        general_result = await _extract_general_info(
+            db=db,
+            school=school,
+            pages=content_pages,
+            timeout_seconds=settings.extraction_llm_timeout_seconds,
+            llm_stats=llm_stats,
+        )
+        stats["general_info_success"] = general_result["success"]
+        stats["input_tokens"] += general_result["input_tokens"]
+        stats["output_tokens"] += general_result["output_tokens"]
+        stats["token_cost_usd"] += float(general_result.get("token_cost_usd", 0.0) or 0.0)
+        if general_result.get("detail"):
+            stats["details"].append(general_result["detail"])
 
     if llm_stats.hard_failures:
         # An extraction LLM call failed or was refused after its retries: the
@@ -2167,7 +2177,10 @@ async def extract_school(
         stats["llm_stats"] = llm_stats.as_dict()
         return stats
 
-    if stats["pricing_success"] or stats["general_info_success"]:
+    if prices_only:
+        if stats["pricing_success"]:
+            stats["status"] = "extracted"
+    elif stats["pricing_success"] or stats["general_info_success"]:
         clear_summary_state(school)
         school.scrape_status = "extracted"
         stats["status"] = "extracted"

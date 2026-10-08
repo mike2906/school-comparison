@@ -4777,6 +4777,22 @@ def test_model_row_in_a_table_of_several_prices_per_line():
     ]
 
 
+def test_model_row_in_a_table_takes_period_and_year_from_the_header():
+    """School 568: the header row says "Годишна такса за учебната 2026/2027 г."."""
+    text = (
+        "--- SOURCE: http://school.test/fee.html ---\n"
+        "Етап на обучение | Годишна такса за учебната 2026/2027 г. | Годишна такса при разсрочено плащане\n"
+        "ПГ | EUR 8950 | EUR 9300\n"
+        "I - VII клас | EUR 8950 | EUR 9300\n"
+        "VIII - XII клас | EUR 6700 | EUR 7050\n"
+    )
+    row = _model_price(category="tuition", amount=6700, age_group="VIII - XII клас")
+
+    refined = extractor_module.helpers._filter_model_prices([row], text)
+
+    assert [(r.amount, r.period, r.academic_year) for r in refined] == [(6700, "yearly", "2026/2027")]
+
+
 def test_model_row_year_and_period_come_from_the_page():
     text = "--- SOURCE: https://school.test/fees ---\nTuition 2025/2026\nGrades 1-4 EUR 9,000 per year\nBus EUR 90"
     rows = [
@@ -4786,11 +4802,11 @@ def test_model_row_year_and_period_come_from_the_page():
 
     refined = extractor_module.helpers._filter_model_prices(rows, text)
 
-    # A year the page does not name is not kept, the period is the one written next to
-    # the amount, and a period nothing states is cleared.
+    # A year the page does not name is not kept; a row without one takes the only year
+    # the page names. The period is the one written next to the amount, or none.
     assert [(row.amount, row.period, row.academic_year) for row in refined] == [
         (9000, "yearly", None),
-        (90, None, None),
+        (90, None, "2025/2026"),
     ]
 
 
@@ -4833,3 +4849,33 @@ def test_pricing_selection_keeps_the_priced_spelling_from_one_crawl():
 
     assert source_urls == ["https://example-school.bg/taksi/"]
     assert "6 750 евро" in selected_text
+
+
+@pytest.mark.asyncio
+async def test_prices_only_extraction_rereads_fees_and_leaves_the_rest(
+    db_session, sample_school_for_extraction
+):
+    school = sample_school_for_extraction
+    school.school_type = "private"
+    school.scrape_status = "summarized"
+    school.summary_i18n = {"bg": "Обобщение"}
+    await _published_rows_and_page(db_session, school, [])
+    await db_session.commit()
+    output = PriceExtractionOutput(
+        prices=[ExtractedPrice(category="tuition", amount=530.0, currency="EUR", period="monthly", confidence=1.0)],
+        has_pricing_info=True,
+    )  # fmt: skip
+    llm = AsyncMock(return_value=(output, 10, 2, 0.001))
+
+    with patch("app.scrapers.extractor._run_typed_agent", new=llm), patch(
+        "app.scrapers.extractor._extract_general_info",
+        new=AsyncMock(side_effect=AssertionError("general information must not be re-read")),
+    ):
+        result = await extractor_module.extract_school(db_session, school.id, "bg", prices_only=True)
+
+    assert result["status"] == "extracted" and result["pricing_count"] == 1
+    assert llm.call_args.kwargs["preferred_tier"] == "pricing"
+    await db_session.refresh(school)
+    assert school.scrape_status == "summarized"
+    assert school.summary_i18n == {"bg": "Обобщение"}
+    assert await _stored(db_session, school) == [("tuition", 530.0, "monthly")]
