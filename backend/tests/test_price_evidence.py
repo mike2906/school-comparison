@@ -435,3 +435,72 @@ def test_183_deposit_filed_as_tuition_still_trips_rule_4():
 def test_deposit_context_trips_rule_4_even_when_the_label_omits_the_word():
     wrong = row(Decimal("265"), notes="за запазване на място")
     assert "4_deposit_not_tuition" in rules(wrong, SLAVEICHE, "kindergarten")
+
+
+# arlekino.info/taksi (school 199, kindergarten) as crawled on 2026-10-08: a table with
+# one cell per line, so the column headers are nowhere near the amounts.
+ARLEKINO = """Такси
+Такси за обучение в частна детска градина и ясла Арлекино
+Програма
+Възраст
+Часове
+Такса / месец
+Такса / годишно плащане
+Nursery one
+1-2
+08:00 - 18:00
+650.00 €
+6 792.00 €
+Book
+4 - 5
+08:00 - 18:00
+450.00 €
+4 702.00 €
+Preschool
+5 - 7
+08:00 - 18:00
+450.00 €
+4 702.00 €
+Включени в цената са
+три здравословни хранения
+на ден.
+"""
+
+
+def test_rule_6_holds_a_period_change_the_page_does_not_state():
+    """199's re-run: the published yearly fees came back as monthly, with no plan names."""
+    published = [
+        (row(Decimal("6792"), period="YEARLY", plan_name="Nursery one"), ARLEKINO),
+        # Three published tiers at an amount the page shows twice: not a dropped fee,
+        # and the row that remains must still keep the period.
+        (row(Decimal("4702"), period="YEARLY", plan_name="Starter"), ARLEKINO),
+        (row(Decimal("4702"), period="YEARLY", plan_name="Book"), ARLEKINO),
+        (row(Decimal("4702"), period="YEARLY", plan_name="Preschool"), ARLEKINO),
+    ]
+    proposed = [
+        (row(Decimal("650"), period="MONTHLY"), ARLEKINO),
+        (row(Decimal("6792"), period="MONTHLY"), ARLEKINO),
+        (row(Decimal("450"), period="MONTHLY"), ARLEKINO),
+        (row(Decimal("4702"), period="MONTHLY"), ARLEKINO),
+    ]
+    assert replacement_regressions(published, proposed, "kindergarten") == [
+        "changes the YEARLY period of TUITION 6792.00 to MONTHLY, "
+        "which the page does not state next to the amount",
+        "changes the YEARLY period of TUITION 4702.00 to MONTHLY, "
+        "which the page does not state next to the amount",
+    ]
+    # The same amounts with their periods kept may replace the published rows.
+    kept = [(row(Decimal("6792"), period="YEARLY"), ARLEKINO), (row(Decimal("4702"), period="YEARLY"), ARLEKINO)]
+    assert replacement_regressions(published, kept, "kindergarten") == []
+
+
+def test_rule_6_allows_a_period_change_the_page_states():
+    """302: rows stored yearly although the page says "Месечна такса" beside them."""
+    page = "Месечна такса: 680 евро"
+    published = [(row(Decimal("680"), period="YEARLY"), page)]
+    proposed = [(row(Decimal("680"), period="MONTHLY"), page)]
+    assert replacement_regressions(published, proposed, "kindergarten") == []
+    # A yearly fee and a one-time fee are one statement to rule 3; a swap is not a change.
+    once = [(row(Decimal("680"), period="ONE_TIME"), "Такса: 680 евро")]
+    assert replacement_regressions([(row(Decimal("680"), period="YEARLY"), "Такса: 680 евро")], once, "school") == []
+

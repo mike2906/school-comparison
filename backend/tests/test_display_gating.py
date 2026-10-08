@@ -436,6 +436,23 @@ def test_monthly_fee_stored_as_yearly_is_withheld():
     assert implausible_tuition_row_ids(rows) == {1}
 
 
+def test_yearly_fee_stored_as_monthly_is_withheld():
+    # School 199's re-run: the yearly fees came back as "6792 EUR monthly", "4702 EUR monthly".
+    rows = [
+        _tuition_row(i, amount)
+        for i, amount in enumerate([613.55, 409.03, 650, 6792, 450, 4702], start=1)
+    ]
+    assert implausible_tuition_row_ids(rows) == {4, 6}
+    # Without cheaper peers the yearly ceiling still catches it.
+    assert implausible_tuition_row_ids([_tuition_row(1, 6792), _tuition_row(2, 4702)]) == {1, 2}
+    # Below the ceiling, a row at more than four times the school's median tuition.
+    rows = [_tuition_row(1, 300), _tuition_row(2, 320), _tuition_row(3, 3600)]
+    assert implausible_tuition_row_ids(rows) == {3}
+    # The dearest real tuition in Sofia (school 506) is well inside both bounds.
+    rows = [_tuition_row(i, a, "yearly") for i, a in enumerate([10000, 12008, 20000, 22300, 23983, 25619], 1)]
+    assert implausible_tuition_row_ids(rows) == set()
+
+
 def test_bgn_tuition_is_converted_before_comparison():
     # 1500 BGN/year is about €767: below the floor. 1500 BGN/month is not.
     assert implausible_tuition_row_ids([_tuition_row(1, 1500, "yearly", "BGN")]) == {1}
@@ -464,7 +481,7 @@ def test_quarterly_tuition_annualizes_and_ranges_use_the_lower_bound():
     ],
 )
 def test_rows_that_cannot_be_compared_are_left_alone(row):
-    assert implausible_tuition_row_ids([row, _tuition_row(2, 9000)]) == set()
+    assert implausible_tuition_row_ids([row, _tuition_row(2, 900)]) == set()
 
 
 def test_plausible_tuition_spread_publishes_in_full():
