@@ -1133,6 +1133,19 @@ def _retention_year_key(value: str | None) -> tuple[bool, str]:
     return (True, canonical) if canonical else (False, raw)
 
 
+def _freshest_url_variants(pages: list[SourcePage]) -> list[SourcePage]:
+    """One page per URL, ignoring a trailing slash: the copy scraped last.
+
+    Crawls have stored the same page as ``/fees`` and as ``/fees/`` at different times.
+    Both stay valid, so extraction read the page twice, once as it was months ago
+    (school 593's July fee page beside the current one).
+    """
+    freshest: dict[str, SourcePage] = {}
+    for page in sorted(pages, key=lambda p: p.last_scraped_at.timestamp() if p.last_scraped_at else 0.0):
+        freshest[(page.source_url or "").rstrip("/")] = page
+    return list(freshest.values())
+
+
 # UF45 rule 6: why the last re-extraction's pricing was not written (internal only).
 PRICING_HOLD_KEY = "pricing_hold"
 
@@ -2076,7 +2089,7 @@ async def extract_school(
             SourcePage.raw_markdown.isnot(None),
         )
     )
-    pages = pages_result.scalars().all()
+    pages = _freshest_url_variants(pages_result.scalars().all())
     content_pages = [page for page in pages if (page.raw_markdown or "").strip()]
 
     if not content_pages:

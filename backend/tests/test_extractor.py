@@ -4633,3 +4633,23 @@ async def test_reextraction_is_not_held_for_a_fee_the_page_no_longer_shows(
 
     assert result.get("held") is None
     assert [row[:2] for row in await _stored(db_session, school)] == [("tuition", 530.0)]
+
+
+def test_extraction_reads_only_the_freshest_copy_of_a_page():
+    """School 593: the fee page stored as /tuition-fees in July and /tuition-fees/ today."""
+    def page(url, day):
+        return SimpleNamespace(source_url=url, last_scraped_at=datetime.datetime(2026, day[0], day[1]))
+
+    stale = page("https://izzi.academy/admissions/tuition-fees", (7, 15))
+    fresh = page("https://izzi.academy/admissions/tuition-fees/", (10, 8))
+    older_slash = page("https://izzi.academy/about-us/", (2, 26))
+    newer_bare = page("https://izzi.academy/about-us", (7, 15))
+    only = page("https://izzi.academy/", (10, 8))
+
+    kept = extractor_module._freshest_url_variants([stale, fresh, older_slash, newer_bare, only])
+
+    assert sorted(p.source_url for p in kept) == [
+        "https://izzi.academy/",
+        "https://izzi.academy/about-us",
+        "https://izzi.academy/admissions/tuition-fees/",
+    ]
