@@ -359,6 +359,12 @@ def pricing_row_is_publishable(row: Any) -> bool:
     )
 
 
+def is_scraped_price(row: Any) -> bool:
+    """True for a row taken from the school's website, which shares its publication state."""
+    source = _pricing_row_value(row, "source")
+    return str(getattr(source, "value", source) or "").lower() == "scraped_website"
+
+
 def _yearly_tuition_eur(row: Any) -> decimal.Decimal | None:
     """Yearly EUR equivalent of a tuition row, or None when it cannot be compared.
 

@@ -33,6 +33,8 @@ async def _make_school(db_session, name: str) -> School:
         education_level="primary",
         city="sofia",
         scrape_status="extracted",
+        # Published website data, so scraped prices may publish.
+        attributes={"data_validation": {"_schema_version": 1, "status": "ok", "issues": []}},
     )
     db_session.add(school)
     await db_session.flush()
