@@ -292,6 +292,12 @@ _AGE_GROUP_REPAIR_TEXT_PATTERNS = {
     "preschool": (
         re.compile(r"\bпредучилищни\s+групи\b", flags=re.IGNORECASE),
         re.compile(r"\bподготвителна\s+група\b", flags=re.IGNORECASE),
+        # Private schools' own names for the group: "ПУК 1" / "ПУК (5-6 г.)" (предучилищен
+        # клас) and "ПК" in a grade range such as "ПК – 4 клас". Both need that context: a
+        # bare "ПУК" is also an ordinary word in all-caps text, and "ПК" a PC or postal code.
+        # "Подготвителен клас" is left out: it is also the 8th-grade intensive-language year.
+        re.compile(r"\bПУК\s*(?:\d|\()"),
+        re.compile(r"\bПК\s*[-–—‑]\s*(?:4|IV)\.?\s*(?i:клас)\b"),
     ),
     "grade_1_4": (
         re.compile(r"\bпърви\s+клас\b", flags=re.IGNORECASE),
