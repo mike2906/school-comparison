@@ -292,6 +292,10 @@ async def test_vague_registry_address_is_withheld():
         ("ж. к. Люлин 6", "Ерих Кестнер, жк Люлин 6, София", True),
         ('с. Бусманци, ул. "Крива ливада"', "с. Бусманци, ул. Крива ливада 11А", True),
         ('ул. "Александър Пушкин" № 63', "бул. Александър Малинов 63", False),
+        # One name of three written as its initial (372).
+        ('район Сердика, ул. "Марин Дочев Христов" № 18', "ул. „Марин Д. Христов“ № 18", True),
+        ('район Сердика, ул. "Марин Дочев Христов" № 18', "ул. Марин Дринов 18", False),
+        ('ул. "Иван Вазов" № 18', "ул. И. Вазов 18", False),
     ],
 )
 def test_address_matching(address, text, expected):
@@ -612,3 +616,140 @@ async def test_website_discovery_batch_runs_the_check_for_its_schools(db_session
     check_mock.assert_awaited_once()
     assert check_mock.await_args.kwargs["school_ids"] == [school.id]
     assert check_mock.await_args.kwargs["country"] == "bg"
+
+
+# ---------------------------------------------------------------------------
+# A site that states no member's registry address (the registry is behind the site)
+# ---------------------------------------------------------------------------
+
+from app.scrapers.shared_site_check import (  # noqa: E402
+    REGISTRY_ADDRESS_SUPERSEDED,
+    settle_group,
+    stated_address_for,
+    stated_addresses,
+)
+
+MOVED_SITE = (
+    "Частна детска градина и училище Пример. Прием в 1 клас, 1 - 12 клас.\n"
+    "Новият ни адрес: ул. Манастирска воденица 71 - детска градина и начално училище\n"
+)
+
+
+async def _decide_all(members, text, domain="example-school.bg"):
+    url = f"https://{domain}/"
+    reader = SiteReader(fake_fetcher({url: page(url, text)}))
+    return settle_group(
+        [await decide_member(m, domain=domain, reader=reader) for m in members],
+        [m.education_level for m in members],
+    )
+
+
+@pytest.mark.asyncio
+async def test_members_keep_a_site_that_states_none_of_their_registry_addresses():
+    """634/635: the brand moved to a new campus and the registry still has the old one."""
+    members = [sibling(1, "kindergarten", 'ул. "Крум Попов" № 69'), sibling(2, "upper_secondary", 'ул. "Крум Попов" № 69')]
+
+    decisions = await _decide_all(members, MOVED_SITE)
+
+    assert [(d.action, d.reason) for d in decisions] == [(KEEP, REGISTRY_ADDRESS_SUPERSEDED)] * 2
+    assert decisions[0].evidence["current_site"]["stated_addresses"] == ["ул. Манастирска воденица 71"]
+
+
+@pytest.mark.asyncio
+async def test_a_sibling_whose_registry_address_is_on_the_site_keeps_the_rule_as_it_was():
+    """589/610: the school's address is on the site, so the site's addresses do tell the
+    members apart, and the kindergarten at another address stays withheld."""
+    members = [sibling(1, "lower_secondary", 'ул. "Липа" № 5'), sibling(2, "kindergarten", 'ул. "Бреза" № 7')]
+    text = "Частно основно училище и детска градина Пример. Прием в 1 клас. Адрес: ул. Липа № 5"
+
+    decisions = await _decide_all(members, text)
+
+    assert [(d.action, d.reason) for d in decisions] == [
+        (KEEP, "address_and_level_match"),
+        (WITHHOLD, "registry_address_not_on_site"),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_superseded_registry_needs_the_level_and_an_address_on_the_site():
+    members = [sibling(1, "kindergarten", 'ул. "Бреза" № 7'), sibling(2, "upper_secondary", 'ул. "Бреза" № 7')]
+
+    # The site describes only the school: the kindergarten is still not on it.
+    school_only = await _decide_all(members, "Средно училище Пример, 1 - 12 клас. ул. Нова 12")
+    assert [d.action for d in school_only] == [WITHHOLD, KEEP]
+    # The site states no address at all: nothing says the registry is behind it.
+    silent = await _decide_all(members, "Детска градина и средно училище Пример, 1 - 12 клас.")
+    assert [d.action for d in silent] == [WITHHOLD, WITHHOLD]
+
+
+@pytest.mark.asyncio
+async def test_two_members_of_one_level_stay_withheld_when_no_address_tells_them_apart():
+    """Two kindergartens of a brand on one site: with neither registry address on it,
+    nothing says whose site it is. A third member of another level is still kept."""
+    members = [
+        sibling(1, "kindergarten", 'ул. "Бреза" № 7'),
+        sibling(2, "kindergarten", 'ул. "Клен" № 9'),
+        sibling(3, "upper_secondary", 'ул. "Бреза" № 7'),
+    ]
+
+    decisions = await _decide_all(members, MOVED_SITE)
+
+    assert [d.action for d in decisions] == [WITHHOLD, WITHHOLD, KEEP]
+
+
+@pytest.mark.asyncio
+async def test_a_brand_hub_is_not_kept_by_the_superseded_rule():
+    kindergarten, school = maple_members()
+    reader = SiteReader(fake_fetcher(maple_bear_pages(kindergarten_campus_has_address=False)))
+    decisions = settle_group(
+        [await decide_member(m, domain="maplebear.bg", reader=reader) for m in (kindergarten, school)]
+    )
+
+    assert REGISTRY_ADDRESS_SUPERSEDED not in {d.reason for d in decisions}
+
+
+def test_stated_addresses_and_the_one_for_a_level():
+    text = (
+        "Лозен парк, ул. Манастирска воденица 71 – детска градина и начално училище\n"
+        "1186 София, ж.к. Лозен парк\n"
+        "Гимназия: бул. „Черни връх“ № 32А, София\n"
+    )
+
+    assert [address for address, _ in stated_addresses(text)] == [
+        "ул. Манастирска воденица 71",
+        "бул. „Черни връх“ № 32А",
+    ]
+    assert stated_address_for(text, "kindergarten") == "ул. Манастирска воденица 71"
+    # Two lines name a school level: nothing is chosen between them.
+    assert stated_address_for(text, "upper_secondary") is None
+    assert stated_address_for("Адрес: ул. Липа 5", "primary") == "ул. Липа 5"
+    assert stated_address_for("ул. Липа 5 и ул. Бреза 7", "primary") is None
+    # Prose that runs on to a number is not an address.
+    assert stated_addresses("Приемно време: ул. Иван Вазов от 9 до 17 ч.") == []
+    assert stated_addresses("бул. България до бл. 5") == []
+
+
+@pytest.mark.asyncio
+async def test_superseded_keep_remembers_the_registry_address_for_the_next_check(db_session):
+    from app.scrapers.shared_site_check import Decision, _member_from_school, apply_decision
+
+    school = School(
+        name_i18n={"bg": "ЧДГ Пример"}, country_code="bg", city="sofia", school_type="private",
+        education_level="kindergarten", website_url="https://example-school.bg/", scrape_status="validated",
+    )  # fmt: skip
+    school.locations = [SchoolLocation(address_i18n={"bg": 'ул. "Крум Попов" № 69'}, is_primary=True, location_tags=[])]
+    db_session.add(school)
+    await db_session.commit()
+    decision = Decision(
+        school.id, KEEP, REGISTRY_ADDRESS_SUPERSEDED, school.website_url,
+        evidence={"registry_addresses": ['ул. "Крум Попов" № 69']},
+    )  # fmt: skip
+
+    await apply_decision(db_session, school, decision)
+    # Extraction then replaces the address with the site's and tags it as the site's.
+    school.locations[0].address_i18n = {"bg": "ул. Манастирска воденица 71"}
+    school.locations[0].location_tags = ["address_source=website_contact"]
+
+    member = _member_from_school(school)
+    assert member.registry_addresses == ['ул. "Крум Попов" № 69']
+    assert member.website_derived_addresses == ["ул. Манастирска воденица 71"]
