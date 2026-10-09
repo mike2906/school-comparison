@@ -16,7 +16,11 @@ this holds:
 
 The link needs a site that passed the checks, not publishable extracted data: it is
 built from the URL, the registry name/level/city and the target's public name, so
-no website-extracted value crosses the boundary.
+no website-extracted value crosses the boundary. The school's detail shows the same
+link in reverse (``continued_from``).
+
+``same_place`` is a second, looser relation for the map and the list: one brand's
+private kindergarten and school whose pins are next door (see the section below).
 """
 
 from __future__ import annotations
@@ -237,3 +241,218 @@ async def continues_to(db, school) -> Optional[dict[str, Any]]:
         "school_type": target.school_type,
         "education_level": target.education_level,
     }
+
+
+async def continued_from(db, school) -> list[dict[str, Any]]:
+    """The kindergartens that continue to this school (the inverse of ``continues_to``)."""
+    from sqlalchemy import select
+
+    from app.models import School
+    from app.services.school_service import SchoolService
+    from app.utils.i18n_resolver import resolve_name_i18n
+    from app.utils.website_data import attributes_for_publication
+
+    target = Institution.from_row(school)
+    if level_family(target.education_level) != "school" or not website_passed_site_checks(target):
+        return []
+    others = await same_site_institutions(db, school)
+    source_ids = [
+        other.id
+        for other in others
+        if level_family(other.education_level) == "kindergarten"
+        and continues_to_target(other, others) == target.id
+    ]
+    if not source_ids:
+        return []
+    rows = (
+        await db.execute(
+            select(
+                School.id,
+                School.name_i18n,
+                School.school_type,
+                School.education_level,
+                School.scrape_status,
+                School.attributes,
+            ).where(
+                School.id.in_(source_ids),
+                SchoolService._has_listable_location(target.city),
+            ).order_by(School.id)
+        )
+    ).all()
+    return [
+        {
+            "id": int(row.id),
+            "resolved_name_i18n": resolve_name_i18n(
+                row.name_i18n, attributes_for_publication(row.attributes, row.scrape_status)
+            ),
+            "school_type": row.school_type,
+            "education_level": row.education_level,
+        }
+        for row in rows
+    ]
+
+
+# ---------------------------------------------------------------------------
+# Same place: one pin and one card for a kindergarten and its school
+# ---------------------------------------------------------------------------
+#
+# A private kindergarten and a private school of one brand whose pins are this close
+# are one place to a parent (Светлина, Д-р Петър Берон). Registry name, level, type,
+# city and pin are all public, so no website evidence is needed. State institutions
+# are left out: a municipal kindergarten and a state school are separate bodies even
+# when they share a patron's name.
+
+SAME_PLACE_MAX_METRES = 150
+
+
+@dataclass(frozen=True)
+class PlacePin:
+    school_id: int
+    location_id: int
+    lat: float
+    lng: float
+    name: str
+    education_level: str
+    school_type: str
+    city: str
+
+
+def same_place_groups(pins: Iterable[PlacePin]) -> list[list[PlacePin]]:
+    """Pins of two or more institutions that form one place.
+
+    A private kindergarten pin joins a private school pin of the same city and brand
+    (``shared_brand_key``, at least ``MIN_BRAND_KEY_LENGTH``) within
+    ``SAME_PLACE_MAX_METRES``. A place is everything joined that way, so a kindergarten
+    next to a school and its gymnasium is one place of three (members at most twice
+    the distance apart, through the kindergarten).
+    """
+    from app.services.geocoding.service import _distance_m
+
+    pins = [pin for pin in pins if pin.school_type != "state" and pin.city]
+    keys = [brand_key(brand(pin.name)) for pin in pins]  # once per pin: the regexes are the cost
+    parent = list(range(len(pins)))
+
+    def root(index: int) -> int:
+        while parent[index] != index:
+            parent[index] = parent[parent[index]]
+            index = parent[index]
+        return index
+
+    kindergartens = [i for i, pin in enumerate(pins) if level_family(pin.education_level) == "kindergarten"]
+    schools = [i for i, pin in enumerate(pins) if level_family(pin.education_level) == "school"]
+    for k in kindergartens:
+        for s in schools:
+            first, second = pins[k], pins[s]
+            if first.city != second.city or first.school_id == second.school_id:
+                continue
+            if _distance_m(first.lat, first.lng, second.lat, second.lng) > SAME_PLACE_MAX_METRES:
+                continue
+            shared = shared_brand_key([keys[k], keys[s]])
+            if shared and len(shared) >= MIN_BRAND_KEY_LENGTH:
+                parent[root(k)] = root(s)
+
+    groups: dict[int, list[PlacePin]] = {}
+    for index, pin in enumerate(pins):
+        groups.setdefault(root(index), []).append(pin)
+    return [
+        sorted(group, key=lambda pin: (pin.school_id, pin.location_id))
+        for group in groups.values()
+        if len({pin.school_id for pin in group}) > 1
+    ]
+
+
+async def same_place_by_school(db, *, country_code: str, city: Optional[str]) -> dict[int, list[dict[str, Any]]]:
+    """For each listed school in a place with others: the others, as published.
+
+    Each entry is the other institution's public projection plus ``place_id`` (a pin id
+    naming the place), ``location_id`` (this school's pin in the place) and
+    ``other_location_id`` (the other's pin there).
+    """
+    from sqlalchemy import select
+
+    from app.models import School, SchoolLocation
+    from app.services.school_service import SchoolService
+    from app.utils.i18n_resolver import resolve_name_i18n
+    from app.utils.website_data import attributes_for_publication
+
+    query = (
+        select(
+            School.id,
+            School.name_i18n,
+            School.education_level,
+            School.school_type,
+            School.city,
+            SchoolLocation.id.label("location_id"),
+            SchoolLocation.lat,
+            SchoolLocation.lng,
+        )
+        .join(SchoolLocation, SchoolLocation.school_id == School.id)
+        .where(
+            School.country_code == country_code,
+            School.school_type != "state",
+            SchoolService._scoped_resolved_location_clause(SchoolLocation, city),
+        )
+    )
+    city_clause = SchoolService._city_clause(city)
+    if city_clause is not None:
+        query = query.where(city_clause)
+    rows = (await db.execute(query)).all()
+    pins = [
+        PlacePin(
+            school_id=int(row.id),
+            location_id=int(row.location_id),
+            lat=float(row.lat),
+            lng=float(row.lng),
+            name=str((row.name_i18n or {}).get("bg") or (row.name_i18n or {}).get("en") or ""),
+            education_level=str(row.education_level or ""),
+            school_type=str(row.school_type or ""),
+            city=str(row.city or "").strip().casefold(),
+        )
+        for row in rows
+    ]
+    groups = same_place_groups(pins)
+    if not groups:
+        return {}
+
+    ids = {pin.school_id for group in groups for pin in group}
+    published = {
+        int(row.id): {
+            "id": int(row.id),
+            "resolved_name_i18n": resolve_name_i18n(
+                row.name_i18n, attributes_for_publication(row.attributes, row.scrape_status)
+            ),
+            "school_type": row.school_type,
+            "education_level": row.education_level,
+        }
+        for row in (
+            await db.execute(
+                select(
+                    School.id,
+                    School.name_i18n,
+                    School.school_type,
+                    School.education_level,
+                    School.scrape_status,
+                    School.attributes,
+                ).where(School.id.in_(ids))
+            )
+        ).all()
+    }
+
+    result: dict[int, list[dict[str, Any]]] = {}
+    for group in groups:
+        place_id = group[0].location_id  # one id per place, so a client can tell two places apart
+        for pin in group:
+            seen: set[int] = set()
+            for other in group:
+                if other.school_id == pin.school_id or other.school_id in seen:
+                    continue
+                seen.add(other.school_id)
+                result.setdefault(pin.school_id, []).append(
+                    {
+                        **published[other.school_id],
+                        "place_id": place_id,
+                        "location_id": pin.location_id,
+                        "other_location_id": other.location_id,
+                    }
+                )
+    return result

@@ -15,7 +15,7 @@ import { AGE_GROUP_KEYS } from '../../utils/education'
 import { useStableCallback } from '../../hooks/useStableCallback'
 import { isDesktopViewport } from '../../utils/searchViewState'
 import { schoolLevelLabel } from '../../utils/levelLabel'
-import { pointsForFit, fitKeepRatio, fitPadding, pickSelectedMarker, pinHasRoom, pinTarget, overlayFitPadding, stackedMarkersByKey, normalizeAgeGroups, pinnedLocations } from '../../utils/mapFit'
+import { pointsForFit, fitKeepRatio, fitPadding, pickSelectedMarker, pinHasRoom, pinTarget, overlayFitPadding, stackedMarkersByKey, joinSamePlaceMarkers, normalizeAgeGroups, pinnedLocations } from '../../utils/mapFit'
 
 // CARTO requires an API key; without one every tile is watermarked
 const CARTO_API_KEY = import.meta.env.VITE_CARTO_API_KEY
@@ -683,7 +683,9 @@ function PopupContent({
 
       {stackedMarkers?.length > 0 && (
         <div className="border-t border-neutral-100 pt-2">
-          <p className="text-xs text-neutral-500">{t('map.alsoHere')}</p>
+          <p className="text-xs text-neutral-500">
+            {t(marker.samePlace && stackedMarkers.every(other => other.samePlace) ? 'map.samePlace' : 'map.alsoHere')}
+          </p>
           <ul className="mt-1 space-y-1">
             {stackedMarkers.map(other => (
               <li key={other.key}>
@@ -1084,7 +1086,7 @@ function SchoolMap({
         }
       })
     })
-    return result
+    return joinSamePlaceMarkers(result)
   }, [schools, activeAgeGroup, countryBounds])
 
   const stackedByKey = useMemo(() => stackedMarkersByKey(markers), [markers])

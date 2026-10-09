@@ -1978,6 +1978,23 @@ the session scratchpad only.
       7200 in 4 installments) as row 2999, yearly; backup
       `..._pre_329_tuition_20260929_1459.dump`; deterministic validation ok. Rule 6 now holds
       a re-extraction that drops it.
+- [x] **UF46 A kindergarten and its school next door read as one place (Mike, 2026-10-09).**
+      Svetlina showed as two listings ("На същия адрес"), Д-р Петър Берон as two pins 64 m
+      apart. Not merged: each keeps its registry id, fees, ages, NVO and sources. Computed,
+      not stored (`same_place_by_school` in `app/services/school_relations.py`): a private
+      kindergarten-level and a private school-level institution of one brand
+      (`shared_brand_key`, ≥4 characters) in one city with pins ≤150 m apart; places are the
+      joined pins, so a kindergarten next to a school and its gymnasium is one place of three.
+      State institutions are left out (a municipal kindergarten and a state school sharing a
+      patron's name are separate bodies). Published on the list and detail responses as
+      `same_place` (the other's id, resolved name, type, level, a place id and the two pin ids), and the
+      detail adds `continued_from`, the school-side inverse of `continues_to`. The map draws
+      one pin per place, the list one card per place (the other institutions named on it,
+      also when the age filter hides them), the detail page a switch between them. Launch DB
+      (read-only, 2026-10-09): 6 places, 13 institutions: Светлина (3), Меридиан 22 (3),
+      Д-р Петър Берон, Никатор, Свети Георги, Проф. Николай Райнов. Left apart: Куест
+      (209 m), Малкото школо / Българско школо and Малки стъпки / Азбуки (no shared brand),
+      Монтесори (shares a pin with unrelated schools).
 
 ## Phase 3 — Go live
 

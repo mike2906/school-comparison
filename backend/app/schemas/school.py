@@ -388,10 +388,20 @@ class RelatedSchoolResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class SamePlaceSchoolResponse(RelatedSchoolResponse):
+    """A related institution in the same place (one pin, one card); computed, not stored."""
+
+    place_id: int  # names the place: one of its pin ids, the same on every entry for it
+    location_id: int  # this school's pin in the place
+    other_location_id: int  # the other institution's pin there
+
+
 class SchoolDetailResponse(SchoolResponse):
-    """Detail endpoint only: adds the computed kindergarten → school link (UF42c)."""
+    """Detail endpoint only: adds the computed kindergarten ↔ school links (UF42c)."""
 
     continues_to: Optional[RelatedSchoolResponse] = None
+    continued_from: list[RelatedSchoolResponse] = []
+    same_place: list[SamePlaceSchoolResponse] = []
 
 
 class SchoolListResponse(SchoolPricingMixin):
@@ -402,6 +412,8 @@ class SchoolListResponse(SchoolPricingMixin):
     education_level: str
     locations: list[SchoolLocationResponse] = []
     exam_results: list[ExamResultListItem] = []
+    # Set on the list endpoint only (``same_place_by_school``); search leaves it empty.
+    same_place: list[SamePlaceSchoolResponse] = []
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
