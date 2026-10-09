@@ -90,8 +90,9 @@ function nvoLine(result, t) {
 
 function tuitionLine(school, t) {
   const tuition = statedTuition(school?.pricing)
-  // Euro only, in the period the school states; never annualised.
-  if (!tuition || tuition.currency !== 'EUR' || !tuition.period) return ''
+  // Euro only, in the period the school states (never annualised), and never an older
+  // year's fee, which the description has no room to label as such.
+  if (!tuition || tuition.currency !== 'EUR' || !tuition.period || tuition.yearStatus === 'dated_other') return ''
   const [min, max] = [tuition.min, tuition.max].map((value) => Math.round(value))
   const period = t(`pricing.per.${tuition.period}`)
   return min === max ? t('seo.tuitionOne', { min, period }) : t('seo.tuitionRange', { min, max, period })

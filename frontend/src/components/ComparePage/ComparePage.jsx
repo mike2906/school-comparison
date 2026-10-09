@@ -745,7 +745,11 @@ function ComparePage() {
                   {formatted}{periodSuffix(pricingRange.period, t)}
                 </div>
                 <div className="text-xs text-neutral-500">
-                  {[t('pricing.tuition'), pricingRange.academicYear].filter(Boolean).join(' · ')}
+                  {[
+                    t('pricing.tuition'),
+                    pricingRange.academicYear,
+                    pricingRange.yearStatus === YEAR_STATUS.DATED_OTHER ? t('pricing.notCurrentYear') : null,
+                  ].filter(Boolean).join(' · ')}
                 </div>
               </div>
             )

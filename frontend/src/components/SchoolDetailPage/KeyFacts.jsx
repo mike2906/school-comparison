@@ -67,7 +67,9 @@ function KeyFacts({ school, examAverages, nvoExamType }) {
   if (tuition) {
     const yearDetail = tuition.yearStatus === YEAR_STATUS.NOT_STATED
       ? t('pricing.yearNotStated')
-      : tuition.academicYear
+      : tuition.yearStatus === YEAR_STATUS.DATED_OTHER
+        ? `${tuition.academicYear} · ${t('pricing.notCurrentYear')}`
+        : tuition.academicYear
     const price = formatNumber(tuition.min) === formatNumber(tuition.max)
       ? formatNumber(tuition.min)
       : `${formatNumber(tuition.min)}–${formatNumber(tuition.max)}`
