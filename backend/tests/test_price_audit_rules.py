@@ -21,6 +21,7 @@ from app.scrapers.price_evidence import (
     label_is_another_institutions,
     normalize_text,
     page_is_another_institutions,
+    stated_period,
 )
 
 TODAY = datetime.date(2026, 10, 9)
@@ -94,8 +95,17 @@ def test_517_period_from_the_tables_heading_is_filled():
             Decimal("600"),
             None,
         ),
-        # A markdown heading with no period ends the search.
+        # Another section's heading ends the search: a markdown or bold line, or a line
+        # over fee lines that carry their own words.
         ("Годишна такса\n# Детска градина\nГрупа 1\n€ 600\n", Decimal("600"), None),
+        (
+            "Годишна такса за обучение\n1-4 клас | 6000 лв.\n5-7 клас | 7000 лв.\n"
+            "Допълнителни услуги\nТранспорт | 80 лв.\nХрана | 150 лв.\n",
+            Decimal("150"),
+            None,
+        ),
+        ("**Месечна такса**\nЦелодневна група 900 лв.\n**Други такси**\nУниформа 120 лв.\n", Decimal("120"), None),
+        ("**Месечна такса**\nЦелодневна група 900 лв.\nПолудневна група 600 лв.\n", Decimal("600"), "MONTHLY"),
     ],
 )
 def test_heading_period(page, amount, period):
@@ -108,9 +118,23 @@ def test_a_period_stated_beside_the_amount_outranks_the_heading():
 
 
 def test_330_paid_by_the_previous_month_is_monthly():
-    page = "Месечна такса за детската градина\n899.68 лв. / 460 €, платима до 15 число на предидущия месец\n"
-    stored = row(Decimal("899.68"), currency="BGN")
-    assert findings(stored, page, "kindergarten") == {(RULE_PERIOD_MISSING, "MONTHLY")}
+    """The words after the euro twin are the lev figure's too."""
+    page = "Б. ВТОРИ ВАРИАНТ 8:00 – 15.00 часа\n899.68 лв. / 460 € / платима до 15 число на предидущия месец\n"
+    for amount, currency in ((Decimal("899.68"), "BGN"), (Decimal("460"), "EUR")):
+        stored = row(amount, currency=currency)
+        assert findings(stored, page, "kindergarten") == {(RULE_PERIOD_MISSING, "MONTHLY")}
+    # Two prices in one currency are two fees: the second's words are not the first's.
+    assert stated_period(normalize_text("650 € / 6 792 € годишно"), (0, 3)) == (set(), False)
+
+
+def test_517_a_one_time_word_under_a_yearly_fee_gives_way_to_the_heading():
+    """517's 5th grade: "Еднократно плащане: До 09.07.2026 г." under the amount."""
+    page = (
+        "ГОДИШНА ТАКСА | НА ДВЕ ВНОСКИ | НА ОСЕМ ВНОСКИ\n"
+        "7810 евро | 2 х 4022 евро | 8 х 1045 евро\n"
+        "Еднократно плащане: До 09.07.2026 г.\n"
+    )
+    assert (RULE_PERIOD_MISSING, "YEARLY") in findings(row(Decimal("7810"), plan_name="ГОДИШНА ТАКСА"), page, "school")
 
 
 def test_a_monthly_tier_is_not_given_its_neighbours_period():
@@ -139,6 +163,9 @@ def test_a_monthly_tier_is_not_given_its_neighbours_period():
         ("Такса кандидатстване за училище", True, True),  # 634's €150
         ("Лятно училище по английски", False, False),
         ("Подготовка за училище", True, False),
+        ("School readiness program", True, False),
+        ("Целодневна група (обяд в училищния стол)", True, False),
+        ("Annual fee per pupil", False, False),
     ],
 )
 def test_kindergarten_fee_labels(label, shares_site, foreign):
@@ -200,9 +227,40 @@ def test_587_kindergarten_keeps_its_own_row_on_the_shared_page():
         # A due date and the end of enrolment are not the end of the fee.
         ("Годишна такса 8000 €, платима до 15.09.2026 г.\n", Decimal("8000"), "TUITION", False),
         ("Годишна такса 8000 €. Записване до 15.09.2026 г.\n", Decimal("8000"), "TUITION", False),
+        # An early-bird discount noted beside the regular price leaves the price alone.
+        ("Годишна такса: 6 000 €\nРанно записване до 31.03.2026 г. - 10% отстъпка\n", Decimal("6000"), "TUITION", False),
+        ("Годишна такса 6000 €. При записване до 31.05.2026 г. отстъпка 10%.\n", Decimal("6000"), "TUITION", False),
+        # 598: the price for children enrolled before a passed date; the one after stays.
+        (
+            "Цени за целодневно обучение:\n1240 лв. (634,03 euro)/месец за деца записани до 01.10.2025г.\n"
+            "1380 лв.(705,61 euro)/месец за деца записани след 01.10.2025г.\n",
+            Decimal("634.03"),
+            "TUITION",
+            True,
+        ),
+        (
+            "Цени за целодневно обучение:\n1240 лв. (634,03 euro)/месец за деца записани до 01.10.2025г.\n"
+            "1380 лв.(705,61 euro)/месец за деца записани след 01.10.2025г.\n",
+            Decimal("705.61"),
+            "TUITION",
+            False,
+        ),
     ],
 )
 def test_expired_offers(page, amount, category, expired):
     period = None if category == "CAMP" else "YEARLY"
     stored = row(amount, category=category, period=period)
     assert any(rule == RULE_EXPIRED for rule, _ in findings(stored, page, "school")) is expired
+
+
+def test_517_extraction_reads_the_heading_when_the_word_beside_the_amount_cannot_fit():
+    from app.scrapers.extractor_helpers import ExtractedPrice, _filter_model_prices
+
+    page = (
+        "--- SOURCE: https://school.test/fees ---\n"
+        "ГОДИШНА ТАКСА | НА ДВЕ ВНОСКИ | НА ОСЕМ ВНОСКИ\n"
+        "7810 евро | 2 х 4022 евро | 8 х 1045 евро\n"
+        "Еднократно плащане: До 09.07.2026 г.\n"
+    )
+    price = ExtractedPrice(category="tuition", amount=7810, currency="EUR", plan_name="ГОДИШНА ТАКСА", confidence=0.9)
+    assert [row.period for row in _filter_model_prices([price], page)] == ["yearly"]

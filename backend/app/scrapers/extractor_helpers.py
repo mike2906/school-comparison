@@ -2713,6 +2713,10 @@ def _filter_model_prices(prices: list[ExtractedPrice], text: str) -> list[Extrac
             families = [found for found, _ in stated]
             agreed = families[0] if all(found == families[0] for found in families) else set()
             period = next(iter(agreed)).lower() if len(agreed) == 1 else None
+            if period and not period_fits_category(price.category, period):
+                # "Еднократно плащане" under a yearly fee (517): the heading may say.
+                headed = {heading_period(block, span) for span in spans}
+                period = headed.pop().lower() if len(headed) == 1 and None not in headed else period
             page_years = {
                 _normalize_academic_year(found) for found in _PAGE_ACADEMIC_YEAR_RE.findall(block)
             } - {None}
