@@ -31,6 +31,7 @@ from app.utils.display_gating import (  # noqa: F401
     PRICING_CONFIDENCE_FLOOR,
     blocked_pricing_row_ids,
     implausible_tuition_row_ids,
+    is_scraped_price,
     passes_pricing_gate,
     pricing_row_is_publishable,
     summary_is_publishable,
@@ -225,11 +226,19 @@ def _location_metrics(locations: list[SchoolLocation]) -> tuple[dict[str, Any], 
 
 
 def _pricing_gate_failures(
-    rows: list[Pricing], blocked_ids: set[int] | frozenset[int] = frozenset()
+    rows: list[Pricing],
+    blocked_ids: set[int] | frozenset[int] = frozenset(),
+    website_withheld_school_ids: set[int] | frozenset[int] = frozenset(),
 ) -> dict[str, Any]:
-    """``blocked_ids``: rows withheld by the schools' validation reports (e.g. UF45)."""
+    """``blocked_ids``: rows withheld by the schools' validation reports (e.g. UF45).
+
+    ``website_withheld_school_ids``: schools whose website data is withheld, so their
+    scraped rows are too.
+    """
     by_school: dict[int, list[Pricing]] = {}
     for row in rows:
+        if row.school_id in website_withheld_school_ids and is_scraped_price(row):
+            continue
         if pricing_row_is_publishable(row):
             by_school.setdefault(row.school_id, []).append(row)
     publishable = sum(
@@ -332,6 +341,11 @@ async def compute_quality_metrics(
                 for row_id in blocked_pricing_row_ids(
                     attributes_for_publication(school.attributes, school.scrape_status)
                 )
+            },
+            {
+                school.id
+                for school in schools
+                if not website_data_is_publishable(school.attributes, school.scrape_status)
             },
         ),
     }

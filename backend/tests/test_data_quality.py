@@ -50,6 +50,14 @@ async def _evidence_page(db, school, url="https://example.com/fees"):
     return page
 
 
+def _published_website():
+    """A school whose website data is published, so its scraped prices may be too."""
+    return {
+        "scrape_status": "extracted",
+        "attributes": {"data_validation": {"_schema_version": 1, "status": "ok", "issues": []}},
+    }
+
+
 async def _make_school(db, **kwargs):
     school = School(
         country_code=kwargs.pop("country_code", "bg"),
@@ -301,7 +309,7 @@ async def test_website_validation_coverage_excludes_registry_only_and_withheld_d
 
 
 async def test_pricing_failure_metric_matches_fail_closed_publication_gate(db_session):
-    school = await _make_school(db_session)
+    school = await _make_school(db_session, **_published_website())
     page = await _evidence_page(db_session, school)
     contexts = [
         _verified_context(0.9),
@@ -354,7 +362,7 @@ async def test_pricing_failure_metric_matches_fail_closed_publication_gate(db_se
 
 
 async def test_scoreboard_publishable_pricing_matches_schema_serialization(db_session):
-    school = await _make_school(db_session)
+    school = await _make_school(db_session, **_published_website())
     verified_page = await _evidence_page(db_session, school, url="https://example.com/verified-fees")
     scraped_page = await _evidence_page(db_session, school, url="https://example.com/scraped-fees")
     rows = [
@@ -402,6 +410,7 @@ async def test_scoreboard_publishable_pricing_matches_schema_serialization(db_se
             "school_type": school.school_type,
             "education_level": school.education_level,
             "attributes": school.attributes,
+            "scrape_status": school.scrape_status,
             "pricing": rows,
         }
     )
@@ -417,8 +426,48 @@ async def test_scoreboard_publishable_pricing_matches_schema_serialization(db_se
     assert metrics["pricing_rows_failing_gates"]["publishable"] == len(public.pricing)
 
 
+async def test_scoreboard_withholds_scraped_prices_of_a_withheld_website_like_the_api(db_session):
+    attrs = _published_website()["attributes"] | {"website_data_withheld": True}
+    school = await _make_school(db_session, scrape_status="validated", attributes=attrs)
+    page = await _evidence_page(db_session, school, url="https://example.com/fees")
+    rows = [
+        Pricing(
+            school_id=school.id,
+            category=PriceCategory.TUITION,
+            period=PricePeriod.YEARLY,
+            amount=amount,
+            source=source,
+            source_url="https://example.com/fees",
+            scraped_at=PRICING_VERIFIED_AT,
+            source_page_id=page.id,
+            pricing_context=_verified_context(1.0),
+        )
+        for amount, source in ((7000, PriceSource.SCRAPED_WEBSITE), (6000, PriceSource.OFFICIAL))
+    ]
+    db_session.add_all(rows)
+    await db_session.commit()
+
+    public = SchoolListResponse.model_validate(
+        {
+            "id": school.id,
+            "country_code": school.country_code,
+            "name_i18n": school.name_i18n,
+            "school_type": school.school_type,
+            "education_level": school.education_level,
+            "attributes": school.attributes,
+            "scrape_status": school.scrape_status,
+            "pricing": rows,
+        }
+    )
+    metrics = await compute_quality_metrics(db_session, country="bg", city="sofia")
+
+    assert [row.source for row in public.pricing] == [PriceSource.OFFICIAL]
+    assert metrics["pricing_rows_failing_gates"]["publishable"] == 1
+    assert metrics["pricing_rows_failing_gates"]["failing"] == 1
+
+
 async def test_scoreboard_counts_implausible_tuition_as_failing_like_the_api(db_session):
-    school = await _make_school(db_session)
+    school = await _make_school(db_session, **_published_website())
     page = await _evidence_page(db_session, school, url="https://example.com/fees")
 
     def tuition(amount, period):
@@ -445,6 +494,7 @@ async def test_scoreboard_counts_implausible_tuition_as_failing_like_the_api(db_
             "school_type": school.school_type,
             "education_level": school.education_level,
             "attributes": school.attributes,
+            "scrape_status": school.scrape_status,
             "pricing": rows,
         }
     )
