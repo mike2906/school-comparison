@@ -649,3 +649,49 @@ def test_unlabelled_row_is_scoped_by_the_lines_its_amount_stands_under():
     assert RULE_LEVEL in {f.rule for f in check_price_row(row, page, "school", GYMNASIUM)}
     assert RULE_LEVEL not in {f.rule for f in check_price_row(row, page, "school", PRIMARY)}
     assert RULE_LEVEL not in {f.rule for f in check_price_row(row, page, "school")}
+
+
+def test_a_label_that_names_the_school_itself_is_its_own_fee():
+    """School 565: its fee line is "5-7 клас и ЧГПНП „Асен Йорданов“" on the shared site."""
+    from app.scrapers.price_evidence import proper_name
+
+    gymnasium = '"ЧАСТНА ГИМНАЗИЯ ПО ПРИРОДНИ НАУКИ И ПРЕДПРИЕМАЧЕСТВО "АСЕН ЙОРДАНОВ" ЕООД'
+    assert proper_name(gymnasium) == "АСЕН ЙОРДАНОВ"
+    assert proper_name('"ЧАСТНО ОСНОВНО УЧИЛИЩЕ ЦАР СИМЕОН ВЕЛИКИ" ЕООД') is None
+    assert proper_name('Частна детска градина „Слънце“ ООД') == "Слънце"
+    assert proper_name('ЧАСТНА ГИМНАЗИЯ "АСЕН ЙОРДАНОВ" гр. София') == "АСЕН ЙОРДАНОВ"
+    assert proper_name("Частна гимназия Асен Йорданов, гр. София") is None
+    assert proper_name(None) is None
+
+    label = "Годишна такса обучение / 5-7 клас и ЧГПНП „Асен Йорданов“"
+    assert label_is_another_institutions(label, "school", GYMNASIUM)
+    assert not label_is_another_institutions(label, "school", GYMNASIUM, "АСЕН ЙОРДАНОВ")
+    assert not label_is_another_institutions(label, "school", PRIMARY)
+    # The name does not make another band's fee the school's.
+    assert label_is_another_institutions("ПК – 4 клас", "school", GYMNASIUM, "АСЕН ЙОРДАНОВ")
+
+    page = f"Такси\n{label}\n5773 евро\n"
+    row = PriceRow(
+        category="TUITION", amount=5773, amount_min=None, amount_max=None, period=None,
+        plan_name=label, notes=None, currency="EUR",
+    )  # fmt: skip
+    assert RULE_LEVEL in {f.rule for f in check_price_row(row, page, "school", GYMNASIUM)}
+    assert RULE_LEVEL not in {f.rule for f in check_price_row(row, page, "school", GYMNASIUM, "АСЕН ЙОРДАНОВ")}
+
+
+def test_a_page_address_that_names_another_stage_is_a_siblings_page():
+    """School 550, a gymnasium, read the basic school's "priem-petoklasnici" page."""
+    from app.scrapers.price_evidence import page_is_another_institutions
+
+    basic = "https://eduteh.eu/chastno-osnovno-uchilishte/price-and-admission-chou/priem-petoklasnici"
+    own = "https://eduteh.eu/chastna-profilirana-gimnazia/admission"
+    assert page_is_another_institutions(basic, GYMNASIUM)
+    assert not page_is_another_institutions(own, GYMNASIUM)
+    assert page_is_another_institutions(own, PRIMARY) and not page_is_another_institutions(basic, PRIMARY)
+    assert page_is_another_institutions("https://school.bg/%D0%BF%D1%80%D0%BE%D0%B3%D0%B8%D0%BC%D0%BD%D0%B0%D0%B7%D0%B8%D1%8F/taksi", GYMNASIUM)
+    # No stage in the address, or no sibling to own the other grades: no judgement.
+    assert not page_is_another_institutions("https://eduteh.eu/taksi", GYMNASIUM)
+    assert not page_is_another_institutions(basic, set())
+    assert label_grades("Основно училище") == set(range(1, 8))
+    # 635: the site's English page spells it "Kindergarden".
+    assert label_is_another_institutions("Academic resources fee / Kindergarden", "school", set())

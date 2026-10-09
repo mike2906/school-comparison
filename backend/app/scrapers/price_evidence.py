@@ -24,6 +24,7 @@ import decimal
 import re
 from dataclasses import dataclass
 from typing import Any, Iterable, Optional
+from urllib.parse import unquote, urlparse
 
 from app.scrapers.shared_site_check import describes_level
 
@@ -390,18 +391,22 @@ _GRADE_WORD = r"(?:клас(?:ове)?|кл\.|grades?)"
 _GRADES_BEFORE_RE = re.compile(rf"({_GRADE_RUN})\s*{_GRADE_WORD}(?![\w-])")
 _GRADES_AFTER_RE = re.compile(rf"\bgrades?\s*({_GRADE_RUN})")
 _GRADE_TOKEN_RE = re.compile(rf"{_GRADE_VALUE}|-|–|—|\bдо\b|\bto\b")
-# School stages named without a grade.
+# School stages named without a grade, also as a page address spells them.
 _STAGE_GRADES: tuple[tuple[re.Pattern[str], range], ...] = (
-    (re.compile(r"прогимназ|middle school|coll[eè]ge"), range(5, 8)),
-    (re.compile(r"начално училище|начален етап|primary|elementary|[eé]l[eé]mentaire"), range(1, 5)),
-    (re.compile(r"(?<!про)гимназ|high school|lyc[eé]e"), range(8, 13)),
+    (re.compile(r"прогимназ|progimnazi|middle school|coll[eè]ge"), range(5, 8)),
+    (
+        re.compile(r"начално училище|nachalno uchilishte|начален етап|primary|elementary|[eé]l[eé]mentaire"),
+        range(1, 5),
+    ),
+    (re.compile(r"основно училище|osnovno uchilishte"), range(1, 8)),
+    (re.compile(r"(?<!про)гимназ|(?<!pro)gimnazi|high school|lyc[eé]e"), range(8, 13)),
 )
 _PRESCHOOL_LABEL_RE = re.compile(
     r"подготв|подготов|предучилищ|pre-?school|preparatory|reception|pre[- ]?k(?:indergarten)?\b"
 )
 # A kindergarten or nursery group: named, or given by the children's age.
 _KINDERGARTEN_LABEL_RE = re.compile(
-    r"детска\s+градина|\bградина\b|ясл|kindergarten|nursery|toddler|maternelle|ранно детско"
+    r"детска\s+градина|\bградина\b|ясл|kindergar[td]en|nursery|toddler|maternelle|ранно детско"
     # An age is one or two digits; "2026/2027 г." is a year, "за 10 месеца" a payment span.
     r"|(?<![\d/.-])\d{1,2}\s*(?:г\.|г\b|годиш|години\b|years?\b|yrs?\b|y\.?o\b)"
 )
@@ -473,14 +478,49 @@ def label_names_a_level(label: str | None) -> bool:
     )
 
 
-def label_is_another_institutions(label: str | None, school_family: str, grades: set[int]) -> bool:
+def proper_name(registry_name: str | None) -> Optional[str]:
+    """The name in quotes inside a registry name: 'ЧАСТНА ГИМНАЗИЯ ... "АСЕН ЙОРДАНОВ" ЕООД'.
+
+    None when the quoted part is the whole name, kind of institution included.
+    """
+    parts = [part.strip() for part in re.split(r"[\"„“”«»]", str(registry_name or ""))]
+    names = [
+        part
+        for part in parts[1:-1]  # between two quotation marks
+        if len(part) >= 4
+        and part[0].isalpha()
+        and not re.search(r"училищ|гимназ|градин|school|kindergarten", part.casefold())
+        and not re.fullmatch(r"е?оо?д|е?ад", part.casefold())
+    ]
+    return names[-1] if names else None
+
+
+def page_is_another_institutions(url: str | None, grades: Iterable[int]) -> bool:
+    """The page's address names only a stage the school does not teach.
+
+    550, a gymnasium, took its fees from "/chastno-osnovno-uchilishte/.../priem-petoklasnici",
+    the basic school's section of the site they share. ``grades`` are the school's
+    :func:`taught_grades`: empty, and so no judgement, unless a sibling shares the site.
+    """
+    grades = set(grades)
+    words = re.sub(r"[/_\-.+%=&?]+", " ", unquote(urlparse(str(url or "")).path)).casefold()
+    named = {grade for pattern, stage in _STAGE_GRADES if pattern.search(words) for grade in stage}
+    return bool(grades and named) and not (named & grades)
+
+
+def label_is_another_institutions(
+    label: str | None, school_family: str, grades: set[int], own_name: str | None = None
+) -> bool:
     """A fee label places the fee with a sibling institution of the same site.
 
     ``grades`` are the school's :func:`taught_grades` (empty when unknown). A
     kindergarten's fee does not name school grades. A school's fee does not name only
     grades the school does not teach (the gymnasium's "8 - 12 клас" on the primary
     school's page), nor only a kindergarten or nursery group. A pre-school class may be
-    either's, so a label naming one and no school grade is kept.
+    either's, so a label naming one and no school grade is kept. So is a label that
+    names other grades and the school itself (``own_name``, a name no sibling school
+    bears): "5-7 клас и ЧГПНП „Асен Йорданов“" is the gymnasium's fee as well as the
+    fifth grade's.
     """
     text = str(label or "").casefold()
     named = label_grades(text)
@@ -489,7 +529,8 @@ def label_is_another_institutions(label: str | None, school_family: str, grades:
     if school_family == "kindergarten":
         return bool(school_grades) and not preschool
     if school_grades:
-        return bool(grades) and not (school_grades & grades)
+        named_itself = bool(own_name and _label_key(own_name) and _label_key(own_name) in _label_key(label))
+        return bool(grades) and not (school_grades & grades) and not named_itself
     return bool(_KINDERGARTEN_LABEL_RE.search(text)) and not preschool
 
 
@@ -570,11 +611,13 @@ def check_price_row(
     page_text: str | None,
     school_family: str,
     grades: Iterable[int] = (),
+    own_name: str | None = None,
 ) -> list[PriceFinding]:
     """Rule 1-4 findings for one price row against its source page text.
 
     ``school_family`` is ``shared_site_check.level_family`` of the school's level;
-    ``grades`` are the grades it teaches (:func:`taught_grades`), when known.
+    ``grades`` are the grades it teaches (:func:`taught_grades`), when known, and
+    ``own_name`` the name that tells it from its siblings on the site, when it has one.
     """
     text = normalize_text(page_text)
     hits: list[PriceFinding] = []
@@ -633,10 +676,10 @@ def check_price_row(
 
     # Rule 2: the row's own label, or every occurrence's label lines, name the other level.
     other_family = "school" if school_family == "kindergarten" else "kindergarten"
-    if label_is_another_institutions(row.scope_label, school_family, set(grades)):
+    if label_is_another_institutions(row.scope_label, school_family, set(grades), own_name):
         hit(RULE_LEVEL, f"label is a sibling institution's: {row.scope_label!r}", shown)
     elif not label_names_a_level(row.scope_label) and all(
-        label_is_another_institutions(_heading_of(text, span), school_family, set(grades))
+        label_is_another_institutions(_heading_of(text, span), school_family, set(grades), own_name)
         for span in chosen
     ):
         # The row's own label says nothing about whom it is for ("такси за нови

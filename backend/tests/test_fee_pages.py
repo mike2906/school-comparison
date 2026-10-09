@@ -441,3 +441,30 @@ async def test_a_picture_robots_disallows_is_not_fetched():
         )  # fmt: skip
 
     assert requested == ["https://school.bg/fees"]
+
+
+@pytest.mark.asyncio
+async def test_a_timed_out_fee_page_is_fetched_once_more():
+    """555/594: the site answers slowly now and then, and the fee pictures were missed."""
+    attempts: dict[str, int] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        url = str(request.url)
+        attempts[url] = attempts.get(url, 0) + 1
+        if url.endswith("/fees") and attempts[url] == 1:
+            raise httpx.ReadTimeout("slow", request=request)
+        if url.endswith("/taksi"):
+            raise httpx.ConnectTimeout("down", request=request)
+        if url.endswith("/ceni"):
+            raise httpx.ConnectError("refused", request=request)
+        return _html("<p>Такса 500 евро</p>")
+
+    links = [(f"{SITE}/fees", "Fees"), (f"{SITE}/taksi", "Такси"), (f"{SITE}/ceni", "Цени")]
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        documents = await fetch_fee_documents(
+            links, site_url=SITE, known_urls=[], html_to_text=_text, client=client
+        )
+
+    assert [document.url for document in documents] == [f"{SITE}/fees"]
+    # One retry after a timeout, none after another failure; a second timeout is given up.
+    assert attempts == {f"{SITE}/fees": 2, f"{SITE}/taksi": 2, f"{SITE}/ceni": 1}

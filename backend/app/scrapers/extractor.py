@@ -41,6 +41,7 @@ from app.schemas.extraction import (
 from app.scrapers.price_evidence import (
     PriceRow,
     label_is_another_institutions,
+    page_is_another_institutions,
     replacement_regressions,
 )
 from app.scrapers.shared_site_check import (
@@ -51,7 +52,7 @@ from app.scrapers.shared_site_check import (
     stated_address_for,
 )
 from app.scrapers.summarizer import clear_summary_state
-from app.scrapers.validator import school_taught_grades, validate_school_data
+from app.scrapers.validator import school_fee_scope, validate_school_data
 from app.services.geocoding.base import GeocodingResult
 from app.services.geocoding.bg.address_match import same_building
 from app.services.geocoding.write_gate import (
@@ -1148,9 +1149,9 @@ def _normalized_price_fields(extracted: ExtractedPrice) -> dict[str, Any] | None
         "amount_min": amount_min,
         "amount_max": amount_max,
         "currency": (extracted.currency or "BGN")[:3].upper(),
-        "plan_name": helpers._normalize_scalar_text(extracted.plan_name, max_len=100),
+        "plan_name": helpers._fee_label(extracted.plan_name, 100),
         "academic_year": helpers._normalize_scalar_text(extracted.academic_year, max_len=20),
-        "age_group": helpers._normalize_scalar_text(extracted.age_group, max_len=50),
+        "age_group": helpers._fee_label(extracted.age_group, 50),
     }
 
 
@@ -1198,16 +1199,23 @@ def _retention_year_key(value: str | None) -> tuple[bool, str]:
     return (True, canonical) if canonical else (False, raw)
 
 
+# A visitor's session id in the query string: a new one on every crawl of the same page.
+_SESSION_ID_PARAM_RE = re.compile(r"(?i)(?<=[?&])(?:phpsessid|jsessionid|sessionid)=[^&#]*&?")
+
+
 def _freshest_url_variants(pages: list[SourcePage]) -> list[SourcePage]:
-    """One page per URL, ignoring a trailing slash: the copy scraped last.
+    """One page per URL, ignoring a trailing slash and a session id: the copy scraped last.
 
     Crawls have stored the same page as ``/fees`` and as ``/fees/`` at different times.
     Both stay valid, so extraction read the page twice, once as it was months ago
-    (school 593's July fee page beside the current one).
+    (school 593's July fee page beside the current one). A site that puts a session id
+    in its links gets a new URL per crawl: 511's fee page of July, with the old prices,
+    was read beside October's.
     """
     freshest: dict[str, SourcePage] = {}
     for page in sorted(pages, key=lambda p: p.last_scraped_at.timestamp() if p.last_scraped_at else 0.0):
-        freshest[(page.source_url or "").rstrip("/")] = page
+        key = _SESSION_ID_PARAM_RE.sub("", page.source_url or "").rstrip("?&").rstrip("/")
+        freshest[key] = page
     return list(freshest.values())
 
 
@@ -1243,6 +1251,15 @@ async def _extract_prices(
     timeout_seconds: float,
     llm_stats: ExtractionLLMStats,
 ) -> dict[str, Any]:
+    scope = await school_fee_scope(db, school)
+    # Not fee pages of this school: a site template's sample text (590's "$1,800/mo"
+    # between lines of lorem ipsum), and a sibling school's section of a shared site.
+    pages = [
+        page
+        for page in pages
+        if not helpers._is_template_filler(page.raw_markdown)
+        and not page_is_another_institutions(page.source_url, scope.grades)
+    ]
     selected_text, _source_urls = helpers._select_pages(
         school=school,
         pages=pages,
@@ -1275,7 +1292,6 @@ async def _extract_prices(
     # Only the prompt gets glued currency words spaced; deterministic extraction and the
     # evidence checks below keep the original page text.
     family = level_family(school.education_level)
-    grades = await school_taught_grades(db, school)
     user_prompt = helpers._space_glued_currency_words(selected_text)
     deterministic_pricing = helpers._extract_prices_deterministic(selected_text)
     used_deterministic_pricing = False
@@ -1316,7 +1332,10 @@ async def _extract_prices(
             row
             for row in rows
             if not label_is_another_institutions(
-                " / ".join(part for part in (row.plan_name, row.age_group) if part), family, grades
+                " / ".join(part for part in (row.plan_name, row.age_group) if part),
+                family,
+                set(scope.grades),
+                scope.own_name,
             )
         ]
 

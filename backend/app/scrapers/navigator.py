@@ -22,12 +22,19 @@ from app.models import School, ScrapeType, SourcePage
 from app.scrapers.base import BaseScraper
 from app.scrapers.fee_image_reader import read_fee_image
 from app.scrapers.fee_pages import fee_http_client, fetch_fee_documents, page_key
-from app.scrapers.price_evidence import currency_price_starts
+from app.scrapers.price_evidence import _PRICE_RE, currency_price_starts
 from app.scrapers.shared_site_check import level_family
 from app.scrapers.url_validator import URLValidator
 from app.utils.website_data import WEBSITE_DATA_WITHHELD_KEY
 
 logger = logging.getLogger(__name__)
+
+# A price: a number with its currency, or a line that is only an amount of three to six
+# digits (a fee card writes "€", "7880" and "/ година" on lines of their own). A phone
+# number is longer.
+_PRICED_LINE_RE = re.compile(
+    rf"{_PRICE_RE.pattern}|^[€$£]?\s*(?:\d{{3,6}}|\d{{1,3}}[ \u00a0.,]\d{{3}})(?:[.,]\d{{1,2}})?$", re.IGNORECASE
+)
 
 
 @dataclass
@@ -294,15 +301,21 @@ class WebsiteNavigator:
         text = re.sub(r"\s+", " ", (raw or "")).strip()
         return text
 
-    def _dedupe_lines(self, lines: list[str]) -> list[str]:
+    def _dedupe_lines(self, lines: list[str], *, keep_fee_cards: bool = False) -> list[str]:
+        """The lines without the ones already seen (menus and footers repeat on a page).
+
+        With ``keep_fee_cards`` a repeated line stays when it is a price or stands next
+        to one. A page that shows one fee card per level repeats the first card's wording
+        and often its prices in the next: dropped as repeats, Uwekind's school card (the
+        same 7880 a year as its pre-school class) left "Училище" with no price under it.
+        """
+        cleaned = [text for text in (self._clean_text(line) for line in lines) if text]
+        priced = [bool(_PRICED_LINE_RE.search(text)) for text in cleaned] if keep_fee_cards else []
         seen: set[str] = set()
         deduped: list[str] = []
-        for line in lines:
-            normalized = self._clean_text(line)
-            if not normalized:
-                continue
+        for index, normalized in enumerate(cleaned):
             key = normalized.lower()
-            if key in seen:
+            if key in seen and not (keep_fee_cards and any(priced[max(0, index - 1) : index + 2])):
                 continue
             seen.add(key)
             deduped.append(normalized)
@@ -519,7 +532,7 @@ class WebsiteNavigator:
                     table_lines.append(" | ".join(cells))
 
         text_lines = root.get_text("\n", strip=True).splitlines()
-        lines = self._dedupe_lines(table_lines + text_lines)
+        lines = self._dedupe_lines(table_lines + text_lines, keep_fee_cards=True)
         if len(lines) < 3:
             return None
 
