@@ -92,13 +92,13 @@ export function getLatestNvoFact(examResults = [], examType, examAverages = null
   )
   const hasBenchmark = benchmark && subjects.every(key => benchmark[key] != null)
   if (!hasBenchmark) {
-    return { examType, year, value, national: null, diff: null, tone: null }
+    return { examType, year, value, subjects, national: null, diff: null, tone: null }
   }
 
   const national = subjects.reduce((sum, key) => sum + Number(benchmark[key]), 0) / subjects.length
   const diff = value - national
   const tone = diff >= tolerance ? 'above' : diff <= -tolerance ? 'below' : 'near'
-  return { examType, year, value, national, diff, tone, ...getBenchmarkToneClasses(tone) }
+  return { examType, year, value, subjects, national, diff, tone, ...getBenchmarkToneClasses(tone) }
 }
 
 /** Distinct age groups across a school's locations, in first-seen order. */

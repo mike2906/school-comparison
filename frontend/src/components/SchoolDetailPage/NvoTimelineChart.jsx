@@ -89,7 +89,7 @@ function NvoTimelineChart({ examResults = [], examType, examAverages = null, sel
               stroke="#6b7280"
               style={{ fontSize: '14px', fontFamily: 'inherit' }}
               label={{
-                value: t('academicPerformance.scorePercent'),
+                value: t('academicPerformance.scorePoints'),
                 angle: -90,
                 position: 'insideLeft',
                 style: { fontSize: '14px', fill: '#6b7280' }
@@ -289,11 +289,11 @@ function CustomTooltip({ active, payload, label }) {
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-sm font-semibold text-neutral-900">
-                  {value.toFixed(1)}%
+                  {t('academicPerformance.pointsValue', { value: value.toFixed(1) })}
                 </span>
                 {change != null && (
                   <span className={`text-xs font-medium ${getChangeColor(change)}`}>
-                    {change > 0 ? '+' : ''}{change.toFixed(1)}% {getChangeArrow(change)}
+                    {change > 0 ? '+' : ''}{change.toFixed(1)} {t('academicPerformance.pointsShort')} {getChangeArrow(change)}
                   </span>
                 )}
               </div>
@@ -347,14 +347,14 @@ function YearOverYearBadge({ subject, data, dataKey, color }) {
       </div>
       <div className="flex items-baseline gap-2">
         <span className={`text-2xl font-bold ${benchmarkInfo?.textClass || 'text-neutral-900'}`}>
-          {currentValue.toFixed(1)}%
+          {t('academicPerformance.pointsValue', { value: currentValue.toFixed(1) })}
         </span>
         <span className={`text-sm font-semibold ${changeColorClass}`}>
           {change > 0 ? '+' : ''}{change.toFixed(1)} {t('academicPerformance.pointsShort')} {arrow}
         </span>
       </div>
       <p className="text-xs text-neutral-500 mt-1">
-        {t('academicPerformance.vsLastYear')}: {previousValue.toFixed(1)}%
+        {t('academicPerformance.vsLastYear')}: {t('academicPerformance.pointsValue', { value: previousValue.toFixed(1) })}
         {benchmarkInfo && (
           <> • {t('academicPerformance.nationalBenchmarkValue', { value: benchmarkInfo.benchmarkValue.toFixed(1) })}</>
         )}

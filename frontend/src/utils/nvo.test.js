@@ -1,7 +1,14 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { examTypeForAgeGroup, getBenchmarkComparison, getNvoDetail, prepareNvoTimelineData } from './nvo.js'
+import {
+  comparisonExamType,
+  examTypeForAgeGroup,
+  getBenchmarkComparison,
+  getNvoDetail,
+  prepareNvoTimelineData,
+  rankingExamType,
+} from './nvo.js'
 
 test('getNvoDetail only exposes school averages when both subjects have enough history', () => {
   const school = {
@@ -163,4 +170,43 @@ test('getNvoDetail falls back when the searched exam lacks a subject the card ne
   assert.equal(detail.examType, 'nvo_10')
   assert.equal(examTypeForAgeGroup('grade_5_7'), 'nvo_7')
   assert.equal(examTypeForAgeGroup(null), null)
+})
+
+const nvoResult = (examType, subject, year, value) => (
+  { exam_type: examType, subject, metric: 'average_score', year, value }
+)
+
+test('getNvoDetail with an exam type uses only that exam', () => {
+  const school = {
+    education_level: 'upper_secondary',
+    exam_results: [
+      nvoResult('nvo_10', 'math', 2025, 50),
+      nvoResult('nvo_10', 'bulgarian', 2025, 60),
+    ],
+  }
+
+  assert.equal(getNvoDetail(school, null, { examType: 'nvo_7' }), null)
+  assert.equal(getNvoDetail(school, null, { examType: 'nvo_10' }).latestCombined, 55)
+})
+
+test('rankingExamType ranks by the searched stage, else the 7th-grade exam', () => {
+  assert.equal(rankingExamType('grade_1_4'), 'nvo_4')
+  assert.equal(rankingExamType('grade_8_12'), 'nvo_10')
+  assert.equal(rankingExamType('preschool'), 'nvo_4')
+  assert.equal(rankingExamType(null), 'nvo_7')
+})
+
+test('comparisonExamType picks the searched stage, else the exam most schools share', () => {
+  const primary = { exam_results: [nvoResult('nvo_4', 'math', 2025, 80)] }
+  const basic = { exam_results: [nvoResult('nvo_4', 'math', 2025, 75), nvoResult('nvo_7', 'math', 2025, 50)] }
+  const gymnasium = { exam_results: [nvoResult('nvo_10', 'math', 2025, 45)] }
+
+  assert.equal(comparisonExamType([basic, gymnasium], 'grade_8_12'), 'nvo_10')
+  // The searched stage's exam is skipped when none of the schools has it.
+  assert.equal(comparisonExamType([primary, basic], 'grade_8_12'), 'nvo_4')
+  assert.equal(comparisonExamType([primary, basic, gymnasium]), 'nvo_4')
+  // A tie goes to the 7th grade, then the 10th.
+  assert.equal(comparisonExamType([basic, gymnasium]), 'nvo_7')
+  assert.equal(comparisonExamType([gymnasium, primary]), 'nvo_10')
+  assert.equal(comparisonExamType([{ exam_results: [] }]), null)
 })
