@@ -344,7 +344,11 @@ async def test_a_gymnasium_keeps_the_fee_that_names_it_and_not_its_siblings_page
     own = _row(gymnasium, page, "tuition", 5773, plan_name=label)
     other_band = _row(gymnasium, page, "tuition", 5670, plan_name="Годишна такса обучение / ПК – 4 клас")
     from_sibling = _row(gymnasium, siblings_section, "tuition", 8110, plan_name="Таксата за обучение")
-    db_session.add_all([own, other_band, from_sibling])
+    from_sibling.academic_year = "2026/2027"
+    # Fee history is not checked against the page text, but whose page it is still counts.
+    last_year = _row(gymnasium, siblings_section, "food", 174, plan_name="Таксата за храна")
+    last_year.academic_year = "2025/2026"
+    db_session.add_all([own, other_band, from_sibling, last_year])
     await db_session.commit()
 
     await validator_module.validate_school_data(db_session, gymnasium.id, "bg")
@@ -353,5 +357,6 @@ async def test_a_gymnasium_keeps_the_fee_that_names_it_and_not_its_siblings_page
     assert _issue_codes(gymnasium, own) == set()
     assert _issue_codes(gymnasium, other_band) == {"pricing_label_names_other_level"}
     assert _issue_codes(gymnasium, from_sibling) == {"pricing_label_names_other_level"}
+    assert _issue_codes(gymnasium, last_year) == {"pricing_label_names_other_level"}
     response = await client.get(f"/schools/{gymnasium.id}")
     assert [row["id"] for row in response.json()["pricing"]] == [own.id]

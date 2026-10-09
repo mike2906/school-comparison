@@ -796,6 +796,18 @@ async def _check_price_evidence(
     So are rows of an earlier academic year than the school's newest: extraction keeps
     them as fee history, and the page now shows the new year's fees.
     """
+    # Whose page a row is linked to does not depend on its year: checked for every row.
+    scope = await school_fee_scope(db, school)
+    on_siblings_page = [row for row in rows if page_is_another_institutions(row.source_url, scope.grades)]
+    for row in on_siblings_page:
+        _add_issue(
+            report,
+            code=_PRICE_EVIDENCE_ERROR_CODES[RULE_LEVEL],
+            severity="error",
+            field_path=f"pricing[{row.id}]",
+            message=f"the page is a sibling institution's by its address: {row.source_url}",
+        )
+    rows = [row for row in rows if row not in on_siblings_page]
     years = {row.id: normalize_academic_year(row.academic_year) for row in rows}
     newest = max((year for year in years.values() if year), default=None)
     rows = [row for row in rows if not years[row.id] or years[row.id] == newest]
@@ -812,21 +824,11 @@ async def _check_price_evidence(
         ).all()
     )
     family = level_family(school.education_level)
-    scope = await school_fee_scope(db, school)
     for row in rows:
         text = pages.get(row.source_page_id)
         if not text:
             continue
         row_prefix = f"pricing[{row.id}]"
-        if page_is_another_institutions(row.source_url, scope.grades):
-            _add_issue(
-                report,
-                code=_PRICE_EVIDENCE_ERROR_CODES[RULE_LEVEL],
-                severity="error",
-                field_path=row_prefix,
-                message=f"the page is a sibling institution's by its address: {row.source_url}",
-            )
-            continue
         for finding in check_price_row(
             PriceRow.from_pricing(row), text, family, scope.grades, scope.own_name
         ):

@@ -2584,8 +2584,8 @@ def _fee_label(text: str | None, max_len: int, *, cut: bool = False) -> str | No
     "Детска Ясла ,,Йор Кидс“ / Целодневен престой" down to its heading (542).
     """
     label = " ".join(str(text or "").split())
-    if cut:
-        label = label[:max_len].strip(" /")
+    if cut and len(label) > max_len:
+        label = label[:max_len].rsplit(" ", 1)[0].strip(" /")
     return _sanitize_label(label, max_len=max_len)
 
 
