@@ -106,6 +106,8 @@ def test_517_period_from_the_tables_heading_is_filled():
         ),
         ("**Месечна такса**\nЦелодневна група 900 лв.\n**Други такси**\nУниформа 120 лв.\n", Decimal("120"), None),
         ("**Месечна такса**\nЦелодневна група 900 лв.\nПолудневна група 600 лв.\n", Decimal("600"), "MONTHLY"),
+        # A fee laid out unlike the list under the heading is not in that list.
+        ("Годишни такси\n1 клас | 7000 €\nХрана\n150 €\n", Decimal("150"), None),
     ],
 )
 def test_heading_period(page, amount, period):
@@ -123,6 +125,9 @@ def test_330_paid_by_the_previous_month_is_monthly():
     for amount, currency in ((Decimal("899.68"), "BGN"), (Decimal("460"), "EUR")):
         stored = row(amount, currency=currency)
         assert findings(stored, page, "kindergarten") == {(RULE_PERIOD_MISSING, "MONTHLY")}
+    # The twin's clause only: "а при годишно плащане" is another fee's.
+    page = "Такса 900 лв. / 460 €, а при годишно плащане 9000 лв.\n"
+    assert findings(row(Decimal("900"), currency="BGN"), page, "kindergarten") == set()
     # Two prices in one currency are two fees: the second's words are not the first's.
     assert stated_period(normalize_text("650 € / 6 792 € годишно"), (0, 3)) == (set(), False)
 
@@ -178,6 +183,8 @@ def test_510_kindergarten_does_not_read_the_schools_page():
     assert not page_is_another_institutions(school_page, set(), "kindergarten", shares_site=False)
     assert not page_is_another_institutions("https://svetlina.net/kindergarten/taksi", set(), "kindergarten", True)
     assert not page_is_another_institutions("https://svetlina.net/preschool/", set(), "kindergarten", True)
+    assert page_is_another_institutions("https://school.brand.bg/fees", set(), "kindergarten", True)
+    assert not page_is_another_institutions("https://britanica-parkschool.bg/fees", set(), "kindergarten", True)
 
 
 # 522 (school) and 587 (kindergarten) share one Druzhba page.
@@ -227,6 +234,11 @@ def test_587_kindergarten_keeps_its_own_row_on_the_shared_page():
         # A due date and the end of enrolment are not the end of the fee.
         ("Годишна такса 8000 €, платима до 15.09.2026 г.\n", Decimal("8000"), "TUITION", False),
         ("Годишна такса 8000 €. Записване до 15.09.2026 г.\n", Decimal("8000"), "TUITION", False),
+        ("Цена: 8000 евро. Записване до 15.09.2026 г.\n", Decimal("8000"), "TUITION", False),
+        ("Годишна такса 6000 €. Отстъпка 5% при записване до 31.05.2026\n", Decimal("6000"), "TUITION", False),
+        ("Отстъпка 10% за записани до 31.03.2026 г.\nГодишна такса 6000 €\n", Decimal("6000"), "TUITION", False),
+        ("Цени за договори, сключени до 31.03.2026\n5500 €\n", Decimal("5500"), "TUITION", True),
+        ("Early bird price 7500 EUR, offer valid from 1 January 2026 until 30 May 2026\n", Decimal("7500"), "TUITION", True),
         # An early-bird discount noted beside the regular price leaves the price alone.
         ("Годишна такса: 6 000 €\nРанно записване до 31.03.2026 г. - 10% отстъпка\n", Decimal("6000"), "TUITION", False),
         ("Годишна такса 6000 €. При записване до 31.05.2026 г. отстъпка 10%.\n", Decimal("6000"), "TUITION", False),

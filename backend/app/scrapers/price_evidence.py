@@ -27,7 +27,7 @@ from dataclasses import dataclass
 from typing import Any, Iterable, Optional
 from urllib.parse import unquote, urlparse
 
-from app.scrapers.shared_site_check import _URL_KINDERGARTEN_RE, _URL_SCHOOL_RE, describes_level
+from app.scrapers.shared_site_check import describes_level, registrable_domain, url_names_other_level
 
 CONTEXT_CHARS = 100  # max characters taken either side of the amount on its own line
 ATTACHED_LINES = 2  # label lines before / description lines after an amount line
@@ -217,7 +217,10 @@ def amount_segment(text: str, span: tuple[int, int]) -> str:
             )
             if twin:
                 own_end = None  # one twin at most; the next price is a neighbour
-                right = min(len(line), max(right, match.end() + CONTEXT_CHARS))
+                clause_end = re.search(r"[,;|]", line[match.end():])
+                right = min(len(line), match.end() + CONTEXT_CHARS)
+                if clause_end:
+                    right = min(right, match.end() + clause_end.start())
                 continue
             right = min(right, match.start())
             break
@@ -349,7 +352,7 @@ _NURSERY_RE = re.compile(r"\bясл[аи]\b|яслен")
 _MONTHS = {
     "януари": 1, "февруари": 2, "март": 3, "април": 4, "май": 5, "юни": 6, "юли": 7,
     "август": 8, "септември": 9, "октомври": 10, "ноември": 11, "декември": 12,
-    "january": 1, "february": 2, "march": 3, "april": 4, "june": 6, "july": 7,
+    "january": 1, "february": 2, "march": 3, "april": 4, "may": 5, "june": 6, "july": 7,
     "august": 8, "september": 9, "october": 10, "november": 11, "december": 12,
 }  # fmt: skip
 _DEADLINE_RE = re.compile(
@@ -364,6 +367,10 @@ _OFFER_WINDOW = 60  # characters before "до <date>" that say what ends then
 _DUE_DATE_RE = re.compile(r"платим|плаща|вноск|заплат|падеж|\bpaid\b|\bpay(?:able|ment)?\b|\bdue\b|instal")
 # After the date: a later price ("след това 8 500 €"), or a percentage off the price.
 _AFTER_RE = re.compile(r"\bслед\b|\bafter\b|thereafter|%")
+# ...or before it ("Отстъпка 5% при записване до 31.05.2026"): a discount on the price.
+_DISCOUNT_NOTE_RE = re.compile(r"%|процент|percent")
+# "Записване до 15.09.2026" closes enrolment; the price stays ("в срок до" sets a tier).
+_ENROLMENT_END_RE = re.compile(r"записване\s*$|кандидатстване\s*$|прием\s*$|enrol?lment\s*$|applications?\s*$")
 
 
 def period_fits_category(category: str | None, period: str | None) -> bool:
@@ -415,15 +422,23 @@ def heading_period(text: str, span: tuple[int, int]) -> Optional[str]:
     row; "- ежемесечно" under a price describes that price. In the header row of the
     amount's own table only the amount's column counts. A line naming no period over a
     fee line with its own words ("Допълнителни услуги" over "Транспорт | 80 лв."), a bold
-    line or a markdown heading starts another section and ends the search. Several periods, a per-day/week one, or a long line of prose decide nothing. A
-    markdown heading ends the search either way.
+    line or a markdown heading starts another section and ends the search, and so does a
+    fee laid out unlike the amount's own ("1 клас | 7000 €" above "Храна" over a bare
+    "150 €"): the two are not one list. Several periods, a per-day/week one, or a long
+    line of prose decide nothing.
     """
     line_start = text.rfind("\n", 0, span[0]) + 1
     amount_line, column_at = _line_of(text, span), span[0] - line_start
     lines = text[:line_start].split("\n")[:-1][-HEADING_LINES:]
+
+    def shape(line: str) -> tuple[bool, bool]:
+        return "|" in line, _is_bare_price_line(line)
+
     for index in range(len(lines) - 1, -1, -1):
         line = lines[index]
         markdown_heading = line.lstrip().startswith("#")
+        if _is_price_line(line) and not markdown_heading and shape(line) != shape(amount_line):
+            return None
         if not line.strip() or _TABLE_RULE_RE.match(line) or (_is_price_line(line) and not markdown_heading):
             continue
         if index and _is_price_line(lines[index - 1]) and re.match(r"\s*[-–—/]", line):
@@ -633,9 +648,10 @@ def page_is_another_institutions(
     fees from a page whose address names a school and no kindergarten (510 read
     "svetlina.net/school/").
     """
-    words = re.sub(r"[/_\-.+%=&?]+", " ", unquote(urlparse(str(url or "")).path)).casefold()
     if school_family == "kindergarten":
-        return shares_site and bool(_URL_SCHOOL_RE.search(words)) and not _URL_KINDERGARTEN_RE.search(words)
+        # The subdomain counts too ("school.brand.bg"), the shared domain does not.
+        return shares_site and url_names_other_level(str(url or ""), "kindergarten", registrable_domain(url))
+    words = re.sub(r"[/_\-.+%=&?]+", " ", unquote(urlparse(str(url or "")).path)).casefold()
     grades = set(grades)
     named = {grade for pattern, stage in _STAGE_GRADES if pattern.search(words) for grade in stage}
     return bool(grades and named) and not (named & grades)
@@ -700,14 +716,21 @@ def expired_offer(context: str, today: datetime.date) -> Optional[datetime.date]
     and not of paying: "I вноска до 23.01.2026" or "платима до 15.09.2026" is when a fee
     falls due, not the last day it is charged. A date followed by "след" ("до 31.05.2026,
     след това 8 500 €") ends the offer before the price that replaced it, and one followed
-    by a percentage ("до 31.05.2026 г. отстъпка 10%") is a discount on the price shown.
+    by a percentage ("до 31.05.2026 г. отстъпка 10%"), or preceded by one ("Отстъпка 5%
+    при записване до 31.05.2026"), is a discount on the price shown.
     """
     previous_end = 0
     for match in _DEADLINE_RE.finditer(context):
         before = context[max(previous_end, match.start() - _OFFER_WINDOW): match.start()]
         after = context[match.end(): match.end() + 40]
         previous_end = match.end()
-        if _DUE_DATE_RE.search(before) or _AFTER_RE.search(after) or not _OFFER_WORDS_RE.search(before):
+        if (
+            _DUE_DATE_RE.search(before)
+            or _AFTER_RE.search(after)
+            or not _OFFER_WORDS_RE.search(before)
+            or (_ENROLMENT_END_RE.search(before) and "в срок" not in before)
+            or _DISCOUNT_NOTE_RE.search(before)
+        ):
             continue
         day, month, year = (
             (match.group(1), match.group(2), match.group(3))
