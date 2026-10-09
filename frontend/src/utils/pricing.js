@@ -113,22 +113,6 @@ export function monthlyEquivalent(row) {
   return null
 }
 
-/**
- * The lowest tuition amount among rows whose period the school did not state.
- *
- * A headline fallback only: such a price is shown as-is and labelled "period not
- * stated", never converted to a yearly or monthly figure. Returns null when there is
- * no such row.
- */
-export function lowestUnstatedPeriodTuition(rows = []) {
-  const candidates = (Array.isArray(rows) ? rows : [])
-    .filter(row => row.category === 'tuition' && row.period == null && !isInstallmentPlan(row))
-    .map(row => ({ amount: priceBase(row), currency: row.currency }))
-    .filter(entry => entry.amount != null)
-  if (candidates.length === 0) return null
-  return candidates.reduce((best, entry) => (entry.amount < best.amount ? entry : best))
-}
-
 // Bulgaria adopted the euro on 2026-01-01 at this irrevocably fixed rate.
 export const BGN_PER_EUR = 1.95583
 

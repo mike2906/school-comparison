@@ -710,7 +710,7 @@ const SchoolCard = memo(function SchoolCard({
     if (isPrivate) {
       // The fee as the school states it, in euro: never annualised, since schools bill
       // over 9, 10 or 12 months (the detail page and compare show it the same way).
-      const tuition = statedTuition(school.pricing)
+      const tuition = statedTuition(pricing)
       const price = tuition && (formatCurrency(tuition.min, locale) === formatCurrency(tuition.max, locale)
         ? formatCurrency(tuition.min, locale)
         : `${formatCurrency(tuition.min, locale)}–${formatCurrency(tuition.max, locale)}`)
@@ -766,7 +766,7 @@ const SchoolCard = memo(function SchoolCard({
     }
 
     return null
-  }, [school, pricing, pricingCohort, attributes, i18n.language, t, primaryLocation])
+  }, [school, pricing, attributes, i18n.language, t, primaryLocation])
 
   const nvoDetail = useMemo(() => {
     // Sorted by NVO: only the exam the list is ranked by, so no card shows a score from a
