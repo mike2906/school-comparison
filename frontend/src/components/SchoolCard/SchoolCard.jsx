@@ -13,9 +13,8 @@ import { getBenchmarkComparison, getNvoDetail as getSharedNvoDetail } from '../.
 import { getAdmissionStatusKey, getCanonicalAmenityFlags } from '../../utils/schoolAttributes'
 import { classifyAdmissionRequirement, curatedRequirement, usesSofiaKindergartenSystem } from '../../utils/admission'
 import {
-  isInstallmentPlan,
-  lowestUnstatedPeriodTuition,
   selectPricingCohort,
+  statedTuition,
   YEAR_STATUS,
 } from '../../utils/pricing'
 
@@ -216,44 +215,6 @@ function formatCurrency(amount, locale) {
   return new Intl.NumberFormat(locale, {
     maximumFractionDigits: 0,
   }).format(amount)
-}
-
-function getPriceBase(item) {
-  if (item?.amount_min != null) return Number(item.amount_min)
-  if (item?.amount != null) return Number(item.amount)
-  if (item?.amount_max != null) return Number(item.amount_max)
-  return null
-}
-
-function getYearlyEquivalent(item) {
-  const base = getPriceBase(item)
-  if (base == null) return null
-  if (item.period === 'yearly') return base
-  if (item.period === 'monthly') return base * 12
-  if (item.period === 'quarter') return base * 4
-  return null
-}
-
-function getMinTuitionPriceYearly(pricing = []) {
-  const tuition = pricing.filter(
-    item => item.category === 'tuition' && !isInstallmentPlan(item),
-  )
-  if (tuition.length === 0) return null
-
-  let minValue = null
-  let currency = null
-
-  tuition.forEach(item => {
-    const yearlyValue = getYearlyEquivalent(item)
-    if (yearlyValue == null) return
-    if (minValue == null || yearlyValue < minValue) {
-      minValue = yearlyValue
-      currency = item.currency || 'EUR'
-    }
-  })
-
-  if (minValue == null) return null
-  return { amount: minValue, currency }
 }
 
 function getAdmissionRequirement(rawRequirement, t) {
@@ -747,25 +708,17 @@ const SchoolCard = memo(function SchoolCard({
     const admissionInfo = school.admission_info || {}
 
     if (isPrivate) {
-      const yearlyPrice = getMinTuitionPriceYearly(pricingCohort?.rows || [])
-      // A tuition fee whose period the school did not state cannot be annualised, but a
-      // well-supported amount should not vanish from the card for that reason alone:
-      // show it as-is, labelled, only when nothing can be annualised.
-      const unstatedPrice = yearlyPrice?.amount == null
-        ? lowestUnstatedPeriodTuition(pricingCohort?.rows || [])
-        : null
-      const priceLabel = yearlyPrice?.amount != null
-        ? t('schoolCard.admissions.fromPrice', {
-          price: formatCurrency(yearlyPrice.amount, locale),
-          currency: yearlyPrice.currency || t('pricing.currency'),
-          period: t('schoolCard.period.year'),
-        })
-        : unstatedPrice
-          ? t('schoolCard.admissions.priceUnstatedPeriod', {
-            price: formatCurrency(unstatedPrice.amount, locale),
-            currency: unstatedPrice.currency || t('pricing.currency'),
-          })
-          : null
+      // The fee as the school states it, in euro: never annualised, since schools bill
+      // over 9, 10 or 12 months (the detail page and compare show it the same way).
+      const tuition = statedTuition(school.pricing)
+      const price = tuition && (formatCurrency(tuition.min, locale) === formatCurrency(tuition.max, locale)
+        ? formatCurrency(tuition.min, locale)
+        : `${formatCurrency(tuition.min, locale)}–${formatCurrency(tuition.max, locale)}`)
+      const priceLabel = !tuition
+        ? null
+        : tuition.period
+          ? t('pricing.pricePerPeriod', { price, currency: tuition.currency, period: t(`pricing.per.${tuition.period}`) })
+          : t('schoolCard.admissions.priceUnstatedPeriod', { price, currency: tuition.currency })
 
       const requirement = getAdmissionRequirement(
         curatedRequirement(admissionInfo, i18n.language) || attributes?.entry_requirements,

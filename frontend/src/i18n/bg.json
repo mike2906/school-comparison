@@ -483,7 +483,6 @@
       "project_based": "Проектно обучение"
     },
     "admissions": {
-      "fromPrice": "От {{price}} {{currency}}/{{period}}",
       "interviewRequired": "Изисква се интервю",
       "testRequired": "Изисква се тест",
       "noEntranceExam": "Без входен изпит",
@@ -491,10 +490,6 @@
       "minScore": "Минимален бал: {{score}} ({{year}})",
       "priceUnstatedPeriod": "{{price}} {{currency}} · периодът не е посочен",
       "kgByPoints": "Прием по точки чрез kg.sofia.bg"
-    },
-    "period": {
-      "year": "год.",
-      "month": "мес."
     },
     "nvo": {
       "grade4": "4. клас",
