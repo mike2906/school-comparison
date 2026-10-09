@@ -668,7 +668,7 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
               </div>
 
               {/* One exam at a time: 4th/7th/10th-grade NVO are different exams, so they
-                  are not plotted together; each is compared with its own national average. */}
+                  are not plotted together; each is compared with its own Sofia schools' average. */}
                 {/* Tabs for Multiple Grade Levels */}
                 {hasMultipleGrades && (
                   <div className="flex gap-2 mb-6 overflow-x-auto pb-2">

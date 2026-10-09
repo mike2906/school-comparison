@@ -27,10 +27,10 @@
           urls.push(
             '/schools?' + list,
             '/schools/filters?country_code=bg&city=sofia',
-            '/schools/exam-averages?country_code=bg'
+            '/schools/exam-averages?country_code=bg&city=sofia'
           )
         } else if (/^\/schools\/\d+$/.test(path)) {
-          urls.push(path, '/schools/exam-averages?country_code=bg')
+          urls.push(path, '/schools/exam-averages?country_code=bg&city=sofia')
         }
         urls.forEach(function (url) {
           var link = document.createElement('link')

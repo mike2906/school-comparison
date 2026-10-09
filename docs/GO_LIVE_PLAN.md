@@ -1609,6 +1609,7 @@ the session scratchpad only.
       "+1.5%" deltas next to "+19.7 pp", an unexplained "Trend" column, "(33%)" on tabs,
       "Под ориентира" jargon. One term (national average), deltas in pp everywhere.
       **Done 2026-09-24:** "national average" everywhere (EN/BG), year-on-year change in pp, "vs 5-yr avg" column, tab percentages removed.
+      **Changed 2026-10-09 (#216):** the benchmark is relabelled "Sofia schools' average", since the DB holds only Sofia schools.
 - [x] **UF11 Compare colours NVO on fixed 60/75 % cut-offs,** contradicting the detail
       page's "above national average" green; the row doesn't name the grade and "School
       avg" doesn't say "5-year". Colour relative to the national average; label both.

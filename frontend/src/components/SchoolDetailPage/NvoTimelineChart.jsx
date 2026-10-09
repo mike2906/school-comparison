@@ -182,7 +182,7 @@ function ChartLegend({ t, showMath, showBulgarian, showNationalMath, showNationa
   const showNational = showNationalMath || showNationalBulgarian
   return (
     <div className="rounded-lg border border-neutral-200 bg-white/80 px-3 py-2 sm:p-4">
-      {/* Phones: subject colours plus one dashed "national benchmark" key, so the legend
+      {/* Phones: subject colours plus one dashed "Sofia average" benchmark key, so the legend
           fits in one or two short lines instead of four long ones. */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-neutral-700 sm:hidden">
         {showBulgarian && <LegendLine color="#8b5cf6" label={t('schoolCard.nvo.subjectBulgarian')} />}
