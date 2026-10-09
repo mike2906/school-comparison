@@ -2373,7 +2373,7 @@ def _prices_from_fee_lines(lines: list[FeeLine]) -> list[ExtractedPrice]:
     )
     # A page that still shows the lev beside the euro states one fee, not two.
     euro = [(row.category, row.amount) for row in rows if row.currency == "EUR"]
-    return [
+    rows = [
         row
         for row in rows
         if row.currency != "BGN"
@@ -2382,6 +2382,20 @@ def _prices_from_fee_lines(lines: list[FeeLine]) -> list[ExtractedPrice]:
             for category, amount in euro
         )
     ]
+    # The same fee copied twice, from the page's two language versions or from a summary
+    # and its table, differs at most in the grammar of its label.
+    distinct: dict[tuple[Any, ...], ExtractedPrice] = {}
+    for row in rows:
+        kept = distinct.setdefault((row.category, row.amount, row.currency, _label_stems(row.plan_name)), row)
+        if kept is not row:
+            kept.period = kept.period or row.period
+            kept.academic_year = kept.academic_year or row.academic_year
+    return list(distinct.values())
+
+
+def _label_stems(label: str | None) -> frozenset[str]:
+    """Word stems of a label: "Месечната такса" and "Месечна такса" are one label."""
+    return frozenset(word[:5] for word in re.findall(r"[^\W_]+", str(label or "").casefold()))
 
 
 def _price_from_fee_line(line: FeeLine, category: str) -> ExtractedPrice:

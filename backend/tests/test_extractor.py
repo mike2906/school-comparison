@@ -5275,3 +5275,21 @@ async def test_site_map_point_stands_for_a_readdressed_location(db_session, samp
 
     assert "geocode=address_changed" not in location.location_tags
     assert "coords_source=website_map_link" in location.location_tags
+
+
+def test_fee_lines_copied_twice_with_the_same_label_are_one_row():
+    """School 155: "Месечната такса 857" came back three times from two pages."""
+    lines = [
+        _line("Месечната такса", 857),
+        _line("Месечна такса", 857, per="month"),
+        _line("I GROUP", 10900),
+        _line("II GROUP", 10900),
+    ]
+
+    rows = extractor_module.helpers._prices_from_fee_lines(lines)
+
+    assert [(r.amount, r.plan_name, r.period) for r in rows] == [
+        (857, "Месечната такса", "monthly"),
+        (10900, "I GROUP", None),
+        (10900, "II GROUP", None),
+    ]
