@@ -18,6 +18,7 @@ from app.schemas.extraction import (
     ExtractedLanguageFocus,
     ExtractedPrice,
     GeneralInfoExtractionOutput,
+    PageFees,
     PriceExtractionOutput,
     SummarySourceExtractionOutput,
 )
@@ -173,7 +174,7 @@ async def test_extract_school_does_not_promote_fallback_when_llm_call_fails(
     calls = iter([(mock_price, 100, 10, 0.001)])
 
     async def _price_ok_general_fails(**kwargs):
-        if kwargs["result_type"] is PriceExtractionOutput:
+        if kwargs["result_type"] is PageFees:
             return next(calls)
         return await _failed_llm_call(**kwargs)
 
@@ -4489,7 +4490,7 @@ async def test_extract_school_pins_campus_locations_after_its_commit(db_session,
         languages=[ExtractedLanguageFocus(language="English")], has_useful_info=True
     )
     async def fake_agent(**kwargs):
-        if kwargs["result_type"] is PriceExtractionOutput:
+        if kwargs["result_type"] is PageFees:
             return mock_price, 1, 1, 0.0
         if kwargs["result_type"] is GeneralInfoExtractionOutput:
             return mock_general, 1, 1, 0.0
@@ -4874,7 +4875,7 @@ async def test_prices_only_extraction_rereads_fees_and_leaves_the_rest(
 
 
 @pytest.mark.asyncio
-async def test_kindergarten_does_not_take_school_grade_fees_and_the_prompt_names_its_level(
+async def test_kindergarten_does_not_take_school_grade_fees(
     db_session, sample_school_for_extraction
 ):
     """School 510: the kindergarten shares a site with its school and took "8 клас"."""
@@ -4901,7 +4902,6 @@ async def test_kindergarten_does_not_take_school_grade_fees_and_the_prompt_names
             db_session, school, list(pages), 20.0, extractor_module.ExtractionLLMStats()
         )
 
-    assert "Institution type: kindergarten\n" in llm.call_args.kwargs["user_prompt"]
     assert await _stored(db_session, school) == [("tuition", 600.0, "monthly")]
 
 
@@ -5063,3 +5063,80 @@ def test_model_rows_for_a_past_year_a_weekly_fee_or_a_guessed_lev_are_dropped():
     euro = ExtractedPrice(category="tuition", amount=7400, currency="EUR", confidence=0.9)
     assert helpers._filter_model_prices([lev], table) == []
     assert len(helpers._filter_model_prices([euro], table)) == 1
+
+
+def _line(label, amount, **fields):
+    from app.schemas.extraction import FeeLine
+
+    defaults = dict(currency="EUR", per="unstated", kind="tuition", role="full", quote=f"{label} {amount}")
+    return FeeLine(label=label, amount=amount, **{**defaults, **fields})
+
+
+def test_fee_lines_become_rows_with_plans_and_discounts_under_their_full_price():
+    """School 404's shape: a yearly price, its discounted one-payment price, and plans."""
+    lines = [
+        _line("За ученици от 1 до 3 клас", 6750, per="year"),
+        _line("При заплащане на цялата такса получавате 10% отстъпка", 6075, role="discounted"),
+        _line("Възможности за плащане на 2 вноски", 6547.5, role="plan"),
+        _line("9 равни месечни вноски", 750, role="plan", per="month"),
+        _line("храна", 9, kind="food", per="day"),
+        _line("учебни материали", 300, kind="materials", per="year", currency="unstated"),
+        _line("Общо за годината", 7050, role="sum"),
+        _line("Неустойка при забавяне", 50, role="penalty", kind="other"),
+        _line("Депозит за запазване на място", 500, kind="deposit", per="one_time"),
+        _line("Изпит Cambridge", 120, kind="exam"),
+    ]
+
+    rows = extractor_module.helpers._prices_from_fee_lines(lines)
+
+    assert [(r.category, r.amount, r.currency, r.period) for r in rows] == [
+        ("tuition", 6750, "EUR", "yearly"),
+        ("materials", 300, "EUR", "yearly"),
+        ("registration", 500, "EUR", "one_time"),
+        ("extracurricular", 120, "EUR", None),
+    ]
+    assert rows[0].plan_name == "За ученици от 1 до 3 клас"
+    assert rows[0].discounts == ["При заплащане на цялата такса получавате 10% отстъпка: 6075 EUR"]
+    assert rows[0].installments == [
+        "Възможности за плащане на 2 вноски: 6547.5 EUR",
+        "9 равни месечни вноски: 750 EUR",
+    ]
+
+
+def test_a_plans_yearly_total_is_the_price_where_no_full_price_is_stated():
+    lines = [
+        _line("1-4 клас / 10 вноски", 7000, role="plan", per="year"),
+        _line("1-4 клас / месечна вноска", 700, role="plan", per="month"),
+    ]
+
+    rows = extractor_module.helpers._prices_from_fee_lines(lines)
+
+    assert [(r.amount, r.period) for r in rows] == [(7000, "yearly")]
+
+
+@pytest.mark.asyncio
+async def test_price_extraction_asks_for_copied_lines_and_stores_the_rows(
+    db_session, sample_school_for_extraction
+):
+    school = sample_school_for_extraction
+    pages = await _published_rows_and_page(db_session, school, [])
+    copied = PageFees(
+        lines=[
+            _line("целодневно гледане", 530, per="month", quote="€ 530 | 1037 лв."),
+            _line("депозит за запазване на място", 265, kind="deposit", per="one_time"),
+        ]
+    )
+    llm = AsyncMock(return_value=(copied, 10, 2, 0.001))
+
+    with patch("app.scrapers.extractor._run_typed_agent", new=llm):
+        result = await extractor_module._extract_prices(
+            db_session, school, pages, 20.0, extractor_module.ExtractionLLMStats()
+        )
+
+    call = llm.call_args.kwargs
+    assert call["result_type"] is PageFees and call["preferred_tier"] == "pricing"
+    assert call["timeout_seconds"] == extractor_module.PRICE_CALL_TIMEOUT_SECONDS
+    assert call["user_prompt"].startswith("--- SOURCE: ")
+    assert result["count"] == 2
+    # The page does not say the deposit is paid once, so its period is left empty.
+    assert await _stored(db_session, school) == [("registration", 265.0, None), ("tuition", 530.0, "monthly")]

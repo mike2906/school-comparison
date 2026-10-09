@@ -20,6 +20,7 @@ from app.schemas.extraction import (
     AdmissionExtractionOutput,
     ExtractedLanguageFocus,
     ExtractedPrice,
+    FeeLine,
     GeneralInfoExtractionOutput,
     OperationsExtractionOutput,
     PriceExtractionOutput,
@@ -2317,6 +2318,71 @@ def _filter_supported_prices(prices: list[ExtractedPrice], text: str) -> list[Ex
         refined.append(normalized)
 
     return refined
+
+
+# What a copied fee line's kind and period are in the stored vocabulary. An exam fee is an
+# extra; a deposit is paid on registration (Stage 6 keeps it from passing as tuition).
+_FEE_KIND_CATEGORY = {
+    "tuition": "tuition", "registration": "registration", "deposit": "registration",
+    "food": "food", "transport": "transport", "materials": "materials",
+    "extended_day": "extended_day", "uniforms": "uniforms", "extracurricular": "extracurricular",
+    "camp": "camp", "exam": "extracurricular",
+}  # fmt: skip
+_FEE_PERIOD = {
+    "year": "yearly", "month": "monthly", "term": "term", "semester": "semester",
+    "quarter": "quarter", "one_time": "one_time", "unstated": None,
+}  # fmt: skip
+# The copied lines carry no judgement of their own; the text check below is the gate.
+_FEE_LINE_CONFIDENCE = 0.9
+
+
+def _prices_from_fee_lines(lines: list[FeeLine]) -> list[ExtractedPrice]:
+    """Price rows from the lines a model copied off the pages.
+
+    A full price is a row. A payment plan's amount or a discounted price is not a fee of
+    its own: it is listed under the full price of the same kind that precedes it. Where a
+    kind has no full price at all, a plan's yearly total is the price there is. Sums of
+    several fees, penalties, per-day/week/hour amounts and amounts of no fee kind are
+    left out. An amount with no currency is in euro (Bulgaria's currency since 2026).
+    """
+    rows: list[ExtractedPrice] = []
+    last_full: dict[str, ExtractedPrice] = {}
+    unattached: list[tuple[FeeLine, str]] = []
+    for line in lines:
+        category = _FEE_KIND_CATEGORY.get(line.kind)
+        if category is None or line.per not in _FEE_PERIOD or line.role in ("sum", "penalty"):
+            continue
+        if line.role == "full":
+            row = _price_from_fee_line(line, category)
+            rows.append(row)
+            last_full[category] = row
+            continue
+        target = last_full.get(category)
+        if target is None:
+            unattached.append((line, category))
+            continue
+        currency = "EUR" if line.currency == "unstated" else line.currency
+        terms = target.installments if line.role == "plan" else target.discounts
+        terms.append(f"{line.label}: {line.amount:g} {currency}")
+    rows.extend(
+        _price_from_fee_line(line, category)
+        for line, category in unattached
+        if category not in last_full and line.role == "plan" and line.per == "year"
+    )
+    return rows
+
+
+def _price_from_fee_line(line: FeeLine, category: str) -> ExtractedPrice:
+    return ExtractedPrice(
+        category=category,
+        amount=line.amount,
+        currency="EUR" if line.currency == "unstated" else line.currency,
+        period=_FEE_PERIOD[line.per],
+        plan_name=_normalize_scalar_text(line.label, max_len=100),
+        academic_year=line.academic_year,
+        notes=line.quote,
+        confidence=_FEE_LINE_CONFIDENCE,
+    )
 
 
 def _source_blocks(text: str) -> list[tuple[str | None, str]]:

@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -30,6 +30,49 @@ class ExtractedPrice(BaseModel):
         strict=True,
         description="Required confidence score from 0 to 1",
     )
+
+
+class FeeLine(BaseModel):
+    """One amount of money as a page states it. The model copies; code decides what to keep."""
+
+    label: str = Field(
+        description=(
+            "What the amount is for and for whom, copied from the page in its own words: the "
+            "row label and, in a table, the column heading, joined with ' / '"
+        )
+    )
+    amount: float
+    currency: Literal["EUR", "BGN", "USD", "GBP", "unstated"]
+    per: Literal[
+        "year", "month", "term", "semester", "quarter", "week", "day", "hour", "one_time", "unstated"
+    ] = Field(
+        description=(
+            "The period written beside the amount or in its column heading; 'unstated' when "
+            "the page does not say"
+        )
+    )  # fmt: skip
+    kind: Literal[
+        "tuition", "registration", "deposit", "food", "transport", "materials", "extended_day",
+        "uniforms", "extracurricular", "camp", "exam", "other",
+    ]  # fmt: skip
+    role: Literal["full", "plan", "discounted", "sum", "penalty"] = Field(
+        description=(
+            "full: the price when paid in one go, or the only price stated. plan: any amount "
+            "tied to paying in two or more installments, including that plan's total. "
+            "discounted: the price after a discount. sum: several different fees added up. "
+            "penalty: a late-payment charge"
+        )
+    )
+    academic_year: Optional[str] = Field(
+        default=None, description="The academic year the page gives for this amount, e.g. 2026/2027"
+    )
+    quote: str = Field(description="The line of the page that holds the amount, copied exactly")
+
+
+class PageFees(BaseModel):
+    """Output of price extraction: every priced line of the pages given."""
+
+    lines: list[FeeLine] = Field(default_factory=list)
 
 
 class PriceExtractionOutput(BaseModel):
