@@ -5063,3 +5063,52 @@ def test_model_rows_for_a_past_year_a_weekly_fee_or_a_guessed_lev_are_dropped():
     euro = ExtractedPrice(category="tuition", amount=7400, currency="EUR", confidence=0.9)
     assert helpers._filter_model_prices([lev], table) == []
     assert len(helpers._filter_model_prices([euro], table)) == 1
+
+
+@pytest.mark.asyncio
+async def test_site_address_replaces_a_superseded_registry_address(db_session, sample_school_for_extraction):
+    """634: the shared-site check kept the site although it states no registry address;
+    the school then takes the address the site gives for its level, and loses its old
+    point so that the new address is geocoded."""
+    from app.scrapers.shared_site_check import REGISTRY_ADDRESS_SUPERSEDED, SHARED_SITE_CHECK_KEY
+
+    school = sample_school_for_extraction
+    school.education_level = "kindergarten"
+    location = SchoolLocation(
+        school_id=school.id, address_i18n={"bg": 'ул. "Крум Попов" № 69', "en": "69 Krum Popov St"},
+        lat=42.65, lng=23.25, is_primary=True, location_tags=["coords_source=nominatim"],
+    )  # fmt: skip
+    db_session.add(location)
+    await db_session.flush()
+    text = "Лозен парк, ул. Манастирска воденица 71 – детска градина и начално училище\nГимназия: бул. Черни връх 32"
+
+    # Without the check's verdict the registry address stands.
+    assert await extractor_module._adopt_stated_address(db_session, school, text) is None
+
+    school.attributes = {SHARED_SITE_CHECK_KEY: {"action": "keep", "reason": REGISTRY_ADDRESS_SUPERSEDED}}
+    assert await extractor_module._adopt_stated_address(db_session, school, text) == "ул. Манастирска воденица 71"
+    assert location.address_i18n == {"bg": "ул. Манастирска воденица 71"}
+    assert (location.lat, location.lng) == (None, None)
+    assert location.location_tags == ["address_source=website_contact"]
+    # Already there: nothing more to do.
+    assert await extractor_module._adopt_stated_address(db_session, school, text) is None
+
+
+@pytest.mark.asyncio
+async def test_a_pinned_location_keeps_its_address_when_the_registry_is_superseded(
+    db_session, sample_school_for_extraction
+):
+    from app.scrapers.shared_site_check import REGISTRY_ADDRESS_SUPERSEDED, SHARED_SITE_CHECK_KEY
+    from app.services.geocoding.write_gate import OFFICIAL_COORDS_TAG
+
+    school = sample_school_for_extraction
+    school.attributes = {SHARED_SITE_CHECK_KEY: {"action": "keep", "reason": REGISTRY_ADDRESS_SUPERSEDED}}
+    location = SchoolLocation(
+        school_id=school.id, address_i18n={"bg": 'ул. "Крум Попов" № 69'}, lat=42.65, lng=23.25,
+        is_primary=True, location_tags=[OFFICIAL_COORDS_TAG],
+    )  # fmt: skip
+    db_session.add(location)
+    await db_session.flush()
+
+    assert await extractor_module._adopt_stated_address(db_session, school, "Адрес: ул. Нова 12") is None
+    assert location.address_i18n == {"bg": 'ул. "Крум Попов" № 69'}

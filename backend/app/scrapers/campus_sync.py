@@ -630,9 +630,11 @@ async def geocode_campus_locations(db, school_id: int, *, country_code: str = "b
             select(SchoolLocation).where(SchoolLocation.school_id == school_id, SchoolLocation.lat.is_(None))
         )
     ).scalars().all()
+    # Also a location whose address was just taken from the site and has no point yet.
     locations = [
         loc for loc in candidates
-        if CAMPUS_TAG in (loc.location_tags or []) and not geocode_failure_is_terminal(loc.geocode_meta)
+        if {CAMPUS_TAG, WEBSITE_CONTACT_ADDRESS_TAG} & set(loc.location_tags or [])
+        and not geocode_failure_is_terminal(loc.geocode_meta)
     ]
     if not locations:
         return []
@@ -645,7 +647,8 @@ async def geocode_campus_locations(db, school_id: int, *, country_code: str = "b
         except Exception as exc:  # a missing pin must not undo the validated data
             logger.warning("Campus location %s geocoding failed: %s", location.id, exc)
             continue
-        await _drop_if_same_building(db, location)
+        if CAMPUS_TAG in (location.location_tags or []):
+            await _drop_if_same_building(db, location)
     return [loc.id for loc in locations]
 
 

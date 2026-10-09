@@ -43,7 +43,13 @@ from app.scrapers.price_evidence import (
     label_is_another_institutions,
     replacement_regressions,
 )
-from app.scrapers.shared_site_check import level_family
+from app.scrapers.shared_site_check import (
+    REGISTRY_ADDRESS_SUPERSEDED,
+    SHARED_SITE_CHECK_KEY,
+    WEBSITE_CONTACT_ADDRESS_TAG,
+    level_family,
+    stated_address_for,
+)
 from app.scrapers.summarizer import clear_summary_state
 from app.scrapers.validator import school_taught_grades, validate_school_data
 from app.services.geocoding.base import GeocodingResult
@@ -349,6 +355,43 @@ def _should_replace_primary_address(
     if not _address_has_street_signal(current_address) and _address_has_street_signal(website_address):
         return True
     return False
+
+
+async def _adopt_stated_address(db: AsyncSession, school: School, page_text: str) -> str | None:
+    """Give the school the address its site states, where the registry's is superseded.
+
+    Only for a site the shared-site check kept because it states no member's registry
+    address (the school moved and the registry is behind), and only when the site gives
+    one address for an institution of this level. The old point is dropped so that the
+    new address is geocoded; an official or hand-corrected point keeps its address.
+    """
+    check = (school.attributes or {}).get(SHARED_SITE_CHECK_KEY) or {}
+    if check.get("reason") != REGISTRY_ADDRESS_SUPERSEDED:
+        return None
+    address = stated_address_for(page_text, school.education_level)
+    if not address:
+        return None
+    primary = (
+        await db.execute(
+            select(SchoolLocation)
+            .where(SchoolLocation.school_id == school.id)
+            .order_by(SchoolLocation.is_primary.desc(), SchoolLocation.id.asc())
+        )
+    ).scalars().first()
+    if primary is None or has_pinned_point(primary):
+        return None
+    current = (primary.address_i18n or {}).get("bg") or ""
+    if same_building(current, address):
+        return None
+    logger.info("School %s: registry address %r superseded by the site's %r", school.id, current, address)
+    primary.address_i18n = {"bg": address}
+    primary.location_tags = [
+        tag for tag in primary.location_tags or [] if not str(tag).startswith("coords_source=")
+    ] + ([] if WEBSITE_CONTACT_ADDRESS_TAG in (primary.location_tags or []) else [WEBSITE_CONTACT_ADDRESS_TAG])
+    primary.lat = primary.lng = None
+    primary.geocode_meta = None
+    db.add(primary)
+    return address
 
 
 async def _sync_primary_location_from_contact_address(
@@ -1674,6 +1717,7 @@ async def _extract_general_info(
         pages=pages,
     )
     contact_info = helpers._extract_contact_info_deterministic(all_page_text)
+    await _adopt_stated_address(db, school, all_page_text)
     location_address_update = await _sync_primary_location_from_contact_address(db, school, contact_info)
 
     attrs = prepare_validation_rollover(school.attributes)
