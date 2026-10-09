@@ -87,3 +87,12 @@ export function safeLocalStorage() {
     return null
   }
 }
+
+/**
+ * The compare page link, carrying the searched age group from the current URL's query so
+ * the comparison shows that stage's NVO exam. `/compare` when no group is searched.
+ */
+export function compareHref(search = '') {
+  const ageGroup = new URLSearchParams(search).get('age_group')
+  return ageGroup ? `/compare?age_group=${encodeURIComponent(ageGroup)}` : '/compare'
+}

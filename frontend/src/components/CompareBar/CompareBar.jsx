@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useCompare } from '../../context/CompareContext'
+import { compareHref } from '../../utils/compareList'
 import { getSchoolName } from '../../utils/i18n'
 
 function RemoveIcon() {
@@ -15,7 +16,7 @@ function RemoveIcon() {
 function CompareBar() {
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
-  const { pathname } = useLocation()
+  const { pathname, search } = useLocation()
   const { compareList, removeFromCompare, clearCompare, maxCompare } = useCompare()
   const [showHint, setShowHint] = useState(false)
   const [pillsOpen, setPillsOpen] = useState(false)
@@ -82,7 +83,7 @@ function CompareBar() {
     >
       <button
         type="button"
-        onClick={() => navigate('/compare')}
+        onClick={() => navigate(compareHref(search))}
         disabled={!canCompare}
         className={`
           px-4 md:px-6 py-2.5 md:py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap
