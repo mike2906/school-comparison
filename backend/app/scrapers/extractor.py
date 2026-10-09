@@ -388,6 +388,7 @@ async def _adopt_stated_address(db: AsyncSession, school: School, page_text: str
         return None
     logger.info("School %s: registry address %r superseded by the site's %r", school.id, current, address)
     primary.address_i18n = {"bg": address}
+    primary.district = None  # the old premises' district; geocoding would be biased by it
     primary.location_tags = [
         *(tag for tag in primary.location_tags or [] if tag not in (WEBSITE_CONTACT_ADDRESS_TAG, READDRESSED_TAG)),
         WEBSITE_CONTACT_ADDRESS_TAG,
@@ -455,6 +456,9 @@ async def _sync_primary_location_from_contact_address(
         coordinates_accepted = await apply_website_coordinates()
         if coordinates_accepted and "coords_source=website_map_link" not in tags:
             tags.append("coords_source=website_map_link")
+        if coordinates_accepted:
+            # The site's own map point is better than geocoding its address again.
+            tags = [tag for tag in tags if tag != "geocode=address_changed"]
         if "address_source=website_contact" not in tags:
             tags.append("address_source=website_contact")
         primary_location.location_tags = tags

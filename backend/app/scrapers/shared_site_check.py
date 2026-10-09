@@ -657,7 +657,7 @@ async def decide_member(
     return Decision(member.school_id, WITHHOLD, reason, url, evidence=evidence)
 
 
-def settle_group(decisions: Sequence[Decision]) -> list[Decision]:
+def settle_group(decisions: Sequence[Decision], levels: Sequence[str] = ()) -> list[Decision]:
     """Keep a site whose addresses cannot tell the group's members apart.
 
     A member is withheld when the site does not state its registry address, because on a
@@ -667,7 +667,12 @@ def settle_group(decisions: Sequence[Decision]) -> list[Decision]:
     registry is behind the site (634/635 moved to a new campus). Each member the site
     describes at its level then keeps the site, and its address is taken from the site
     at extraction (:func:`stated_address_for`).
+
+    ``levels`` are the members' education levels, in order. Two members of one level
+    (two kindergartens of a brand) stay withheld: with the address gone, nothing says
+    which of them the site is.
     """
+    levels = list(levels) or [""] * len(decisions)
     sites = [decision.evidence.get("current_site") or {} for decision in decisions]
     if any(site.get("address_matched") for site in sites) or any(
         decision.action == REPLACE or "current_site_is_brand_hub" in decision.evidence
@@ -675,10 +680,11 @@ def settle_group(decisions: Sequence[Decision]) -> list[Decision]:
     ):
         return list(decisions)
     settled = []
-    for decision, site in zip(decisions, sites, strict=True):
+    for decision, site, level in zip(decisions, sites, levels, strict=True):
         if (
             decision.action == WITHHOLD
             and decision.reason == "registry_address_not_on_site"
+            and levels.count(level) == 1
             and site.get("level_fit")
             and not site.get("url_names_other_level")
             and site.get("stated_addresses")
@@ -929,7 +935,8 @@ async def run_shared_site_check(
             [
                 await decide_member(member, domain=hub_domain, reader=reader, country_code=country)
                 for member in members
-            ]
+            ],
+            [member.education_level for member in members],
         )
         for member, decision in zip(members, decisions, strict=True):
             counts[decision.action] += 1

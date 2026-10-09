@@ -638,7 +638,10 @@ MOVED_SITE = (
 async def _decide_all(members, text, domain="example-school.bg"):
     url = f"https://{domain}/"
     reader = SiteReader(fake_fetcher({url: page(url, text)}))
-    return settle_group([await decide_member(m, domain=domain, reader=reader) for m in members])
+    return settle_group(
+        [await decide_member(m, domain=domain, reader=reader) for m in members],
+        [m.education_level for m in members],
+    )
 
 
 @pytest.mark.asyncio
@@ -677,6 +680,21 @@ async def test_superseded_registry_needs_the_level_and_an_address_on_the_site():
     # The site states no address at all: nothing says the registry is behind it.
     silent = await _decide_all(members, "Детска градина и средно училище Пример, 1 - 12 клас.")
     assert [d.action for d in silent] == [WITHHOLD, WITHHOLD]
+
+
+@pytest.mark.asyncio
+async def test_two_members_of_one_level_stay_withheld_when_no_address_tells_them_apart():
+    """Two kindergartens of a brand on one site: with neither registry address on it,
+    nothing says whose site it is. A third member of another level is still kept."""
+    members = [
+        sibling(1, "kindergarten", 'ул. "Бреза" № 7'),
+        sibling(2, "kindergarten", 'ул. "Клен" № 9'),
+        sibling(3, "upper_secondary", 'ул. "Бреза" № 7'),
+    ]
+
+    decisions = await _decide_all(members, MOVED_SITE)
+
+    assert [d.action for d in decisions] == [WITHHOLD, WITHHOLD, KEEP]
 
 
 @pytest.mark.asyncio
