@@ -280,7 +280,7 @@ function getPerformanceStyle(value) {
   return { text: 'text-red-500' }
 }
 
-// Combined (Bulgarian + maths) result against the national average for the same exam and
+// Combined (Bulgarian + maths) result against the Sofia schools' average for the same exam and
 // year, with the same ±5 pp tolerance as the detail page, so the colours agree.
 function getCombinedBenchmark(nvoDetail, year, value, examAverages) {
   const national = examAverages?.by_year?.[nvoDetail?.examType]?.[String(year)]

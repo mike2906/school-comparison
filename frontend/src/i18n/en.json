@@ -283,7 +283,7 @@
     "nationalBulgarian": "Sofia avg, Bulgarian",
     "seriesLegend": "Lines",
     "seriesSchool": "{{subject}} school result",
-    "seriesNational": "{{subject}} Sofia schools' average",
+    "seriesNational": "{{subject}}: Sofia schools' average",
     "latestStatus": "Latest-year status",
     "aboveBenchmark": "Above the Sofia average",
     "nearBenchmark": "Near the Sofia average",

@@ -283,7 +283,7 @@
     "nationalBulgarian": "Средно за София, БЕЛ",
     "seriesLegend": "Линии",
     "seriesSchool": "{{subject}} резултат на училището",
-    "seriesNational": "{{subject}} средно за София",
+    "seriesNational": "{{subject}}: средно за София",
     "latestStatus": "Статус за последната година",
     "aboveBenchmark": "Над средното за София",
     "nearBenchmark": "Близо до средното за София",

@@ -49,7 +49,7 @@ test('getNvoDetail can hide incomplete subject pairs for SchoolCard', () => {
   assert.equal(getNvoDetail(school, (key) => key).latestMath, 61.0)
 })
 
-test('prepareNvoTimelineData merges subject-specific national benchmarks by year', () => {
+test('prepareNvoTimelineData merges subject-specific Sofia benchmarks by year', () => {
   const chartData = prepareNvoTimelineData(
     [
       { exam_type: 'nvo_7', subject: 'math', metric: 'average_score', year: 2024, value: 58.0 },
