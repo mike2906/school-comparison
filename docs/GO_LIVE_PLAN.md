@@ -1987,7 +1987,7 @@ the session scratchpad only.
       joined pins, so a kindergarten next to a school and its gymnasium is one place of three.
       State institutions are left out (a municipal kindergarten and a state school sharing a
       patron's name are separate bodies). Published on the list and detail responses as
-      `same_place` (the other's id, resolved name, type, level and the two pin ids), and the
+      `same_place` (the other's id, resolved name, type, level, a place id and the two pin ids), and the
       detail adds `continued_from`, the school-side inverse of `continues_to`. The map draws
       one pin per place, the list one card per place (the other institutions named on it,
       also when the age filter hides them), the detail page a switch between them. Launch DB

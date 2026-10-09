@@ -355,8 +355,10 @@ class TestSamePlaceEndpoints:
         assert [entry["id"] for entry in rows[school.id]["same_place"]] == [kg.id]
         entry = rows[kg.id]["same_place"][0]
         assert set(entry) == {
-            "id", "resolved_name_i18n", "school_type", "education_level", "location_id", "other_location_id",
+            "id", "resolved_name_i18n", "school_type", "education_level", "place_id", "location_id",
+            "other_location_id",
         }
+        assert entry["place_id"] == rows[school.id]["same_place"][0]["place_id"]
         assert entry["location_id"] == rows[kg.id]["locations"][0]["id"]
         assert entry["other_location_id"] == rows[school.id]["locations"][0]["id"]
         assert "must not ship" not in response.text

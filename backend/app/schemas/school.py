@@ -391,6 +391,7 @@ class RelatedSchoolResponse(BaseModel):
 class SamePlaceSchoolResponse(RelatedSchoolResponse):
     """A related institution in the same place (one pin, one card); computed, not stored."""
 
+    place_id: int  # names the place: one of its pin ids, the same on every entry for it
     location_id: int  # this school's pin in the place
     other_location_id: int  # the other institution's pin there
 

@@ -1911,9 +1911,9 @@ function SearchPage() {
                     <div className="h-4 w-32 bg-neutral-200 animate-pulse rounded" />
                   ) : (
                     <p className="whitespace-nowrap text-sm text-neutral-600">
-                      <span className="font-semibold text-neutral-900">{listCards.length}</span>
+                      <span className="font-semibold text-neutral-900">{sortedSchools.length}</span>
                       {/* Phones show just the number beside the type chips; the noun stays for screen readers. */}
-                      <span className="max-sm:sr-only">{' '}{t(resultNounKey, { count: listCards.length })}</span>
+                      <span className="max-sm:sr-only">{' '}{t(resultNounKey, { count: sortedSchools.length })}</span>
                     </p>
                   )}
                 </div>
@@ -2013,7 +2013,7 @@ function SearchPage() {
                     school={school}
                     samePlace={samePlace}
                     location={getLocationForAgeGroup(school, filters.ageGroup)}
-                    isSelected={[school.id, ...samePlace.map(member => member.school.id)].includes(detailSchoolId || selectedSchoolId)}
+                    isSelected={(samePlaceHostById.get(detailSchoolId || selectedSchoolId) ?? (detailSchoolId || selectedSchoolId)) === school.id}
                     onClick={handleListSchoolSelect}
                     onOpenDetails={handleOpenDetails}
                     onHover={handleSchoolHover}

@@ -3,8 +3,8 @@ import assert from 'node:assert/strict'
 
 import { foldSamePlace } from './samePlace.js'
 
-const kindergarten = { id: 1, same_place: [{ id: 2, location_id: 11, other_location_id: 21 }] }
-const school = { id: 2, same_place: [{ id: 1, location_id: 21, other_location_id: 11 }] }
+const kindergarten = { id: 1, same_place: [{ id: 2, place_id: 11, location_id: 11, other_location_id: 21 }] }
+const school = { id: 2, same_place: [{ id: 1, place_id: 11, location_id: 21, other_location_id: 11 }] }
 const other = { id: 3 }
 
 test('foldSamePlace shows a place on the card of whichever comes first', () => {
@@ -24,10 +24,28 @@ test('foldSamePlace lists each neighbour once when it shares several pins', () =
   const twoPins = {
     id: 1,
     same_place: [
-      { id: 2, location_id: 11, other_location_id: 21 },
-      { id: 2, location_id: 12, other_location_id: 21 },
+      { id: 2, place_id: 11, location_id: 11, other_location_id: 21 },
+      { id: 2, place_id: 11, location_id: 12, other_location_id: 21 },
     ],
   }
   const { cards } = foldSamePlace([twoPins, school])
   assert.deepEqual(cards.map(card => [card.school.id, card.samePlace.length]), [[1, 1]])
+})
+
+test('foldSamePlace keeps two places apart whatever the order', () => {
+  // School 2 has one campus next to kindergarten 1 and another next to kindergarten 4.
+  const bothCampuses = {
+    id: 2,
+    same_place: [
+      { id: 1, place_id: 11, location_id: 21, other_location_id: 11 },
+      { id: 4, place_id: 22, location_id: 22, other_location_id: 41 },
+    ],
+  }
+  const first = { id: 1, same_place: [{ id: 2, place_id: 11, location_id: 11, other_location_id: 21 }] }
+  const second = { id: 4, same_place: [{ id: 2, place_id: 22, location_id: 41, other_location_id: 22 }] }
+  for (const order of [[bothCampuses, first, second], [first, second, bothCampuses]]) {
+    const { cards } = foldSamePlace(order)
+    assert.equal(cards.length, 3)
+    assert.deepEqual(cards.find(card => card.school.id === 2).samePlace.map(member => member.school.id), [1, 4])
+  }
 })

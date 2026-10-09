@@ -364,8 +364,9 @@ def same_place_groups(pins: Iterable[PlacePin]) -> list[list[PlacePin]]:
 async def same_place_by_school(db, *, country_code: str, city: Optional[str]) -> dict[int, list[dict[str, Any]]]:
     """For each listed school in a place with others: the others, as published.
 
-    Each entry is the other institution's public projection plus ``location_id`` (this
-    school's pin in the place) and ``other_location_id`` (the other's pin there).
+    Each entry is the other institution's public projection plus ``place_id`` (a pin id
+    naming the place), ``location_id`` (this school's pin in the place) and
+    ``other_location_id`` (the other's pin there).
     """
     from sqlalchemy import select
 
@@ -439,6 +440,7 @@ async def same_place_by_school(db, *, country_code: str, city: Optional[str]) ->
 
     result: dict[int, list[dict[str, Any]]] = {}
     for group in groups:
+        place_id = group[0].location_id  # one id per place, so a client can tell two places apart
         for pin in group:
             seen: set[int] = set()
             for other in group:
@@ -446,6 +448,11 @@ async def same_place_by_school(db, *, country_code: str, city: Optional[str]) ->
                     continue
                 seen.add(other.school_id)
                 result.setdefault(pin.school_id, []).append(
-                    {**published[other.school_id], "location_id": pin.location_id, "other_location_id": other.location_id}
+                    {
+                        **published[other.school_id],
+                        "place_id": place_id,
+                        "location_id": pin.location_id,
+                        "other_location_id": other.location_id,
+                    }
                 )
     return result
