@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { pointsForFit, fitKeepRatio, fitPadding, pickSelectedMarker, pinHasRoom, pinTarget, overlayFitPadding, stackedMarkersByKey, pinnedLocations, isSchoolInBounds } from './mapFit.js'
+import { pointsForFit, fitKeepRatio, fitPadding, pickSelectedMarker, pinHasRoom, pinTarget, overlayFitPadding, stackedMarkersByKey, joinSamePlaceMarkers, pinnedLocations, isSchoolInBounds } from './mapFit.js'
 
 // Stand-in for Leaflet's distanceTo in node tests; only the ordering matters here.
 const distance = ([aLat, aLng], [bLat, bLng]) => Math.hypot(aLat - bLat, aLng - bLng)
@@ -218,4 +218,48 @@ test('isSchoolInBounds ignores locations without a pin for the active age group'
   assert.equal(isSchoolInBounds(school, bounds, 'grade_1_4'), true)
   assert.equal(isSchoolInBounds(school, bounds, null), true)
   assert.equal(isSchoolInBounds(school, null, 'grade_8_12'), true)
+})
+
+test('joinSamePlaceMarkers puts a kindergarten and its school next door on one pin', () => {
+  const kindergarten = { id: 1, same_place: [{ id: 2, location_id: 11, other_location_id: 21 }] }
+  const school = { id: 2, same_place: [{ id: 1, location_id: 21, other_location_id: 11 }] }
+  const other = { id: 3 }
+  const markers = [
+    { key: '1-11', school: kindergarten, location: { id: 11 }, position: [42.6500, 23.33] },
+    { key: '1-12', school: kindergarten, location: { id: 12 }, position: [42.6750, 23.33] },
+    { key: '2-21', school, location: { id: 21 }, position: [42.6506, 23.33] },
+    { key: '3-31', school: other, location: { id: 31 }, position: [42.6506, 23.33] },
+  ]
+  const joined = joinSamePlaceMarkers(markers)
+  assert.deepEqual(joined.map(marker => [marker.key, marker.position, Boolean(marker.samePlace)]), [
+    ['1-11', [42.6500, 23.33], true],
+    ['1-12', [42.6750, 23.33], false],
+    ['2-21', [42.6500, 23.33], true],
+    ['3-31', [42.6506, 23.33], false],
+  ])
+  const stacked = stackedMarkersByKey(joined)
+  assert.deepEqual(stacked.get('1-11').map(marker => marker.key), ['2-21'])
+})
+
+test('joinSamePlaceMarkers keeps one pin per school in a place', () => {
+  const kindergarten = {
+    id: 1,
+    same_place: [
+      { id: 2, location_id: 11, other_location_id: 21 },
+      { id: 2, location_id: 12, other_location_id: 21 },
+    ],
+  }
+  const school = { id: 2, same_place: [{ id: 1, location_id: 21, other_location_id: 11 }] }
+  const joined = joinSamePlaceMarkers([
+    { key: '1-11', school: kindergarten, location: { id: 11 }, position: [1, 1] },
+    { key: '1-12', school: kindergarten, location: { id: 12 }, position: [1.001, 1] },
+    { key: '2-21', school, location: { id: 21 }, position: [1.0005, 1] },
+  ])
+  assert.deepEqual(joined.map(marker => marker.key), ['1-11', '2-21'])
+})
+
+test('joinSamePlaceMarkers leaves a pin alone when its neighbour is filtered out', () => {
+  const kindergarten = { id: 1, same_place: [{ id: 2, location_id: 11, other_location_id: 21 }] }
+  const marker = { key: '1-11', school: kindergarten, location: { id: 11 }, position: [1, 1] }
+  assert.deepEqual(joinSamePlaceMarkers([marker]), [marker])
 })

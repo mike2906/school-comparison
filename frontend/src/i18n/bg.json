@@ -72,7 +72,6 @@
     "distance": "Разстояние",
     "name": "Име",
     "type": "Тип",
-    "price": "Цена",
     "pricePrivate": "Цена (само частни)",
     "nvo": "НВО {{grade}} (най-висок)"
   },
@@ -141,6 +140,8 @@
     "website": "Уебсайт",
     "continuesTo": "Продължава в:",
     "continuesToSchool": "(училище)",
+    "continuedFrom": "Свързана детска градина:",
+    "samePlaceHere": "На това място:",
     "pupils": "Ученици",
     "shift": "Смяна",
     "organisedGroups": "Занималня",
@@ -220,6 +221,7 @@
     "legendKindergarten": "Детска градина",
     "approximatePin": "Приблизително местоположение (по улица)",
     "alsoHere": "На същия адрес:",
+    "samePlace": "Също тук, под същото име:",
     "legendStacked": "Няколко на един адрес"
   },
   "pricing": {
@@ -246,7 +248,16 @@
     "currency": "EUR",
     "yearNotStated": "Учебната година не е посочена от училището",
     "notCurrentYear": "не е за текущата учебна година",
-    "periodNotStated": "Периодът не е посочен от училището"
+    "periodNotStated": "Периодът не е посочен от училището",
+    "per": {
+      "monthly": "месец",
+      "quarter": "тримесечие",
+      "term": "срок",
+      "semester": "семестър",
+      "yearly": "година"
+    },
+    "pricePerPeriod": "{{price}} {{currency}} / {{period}}",
+    "priceOnly": "{{price}} {{currency}}"
   },
   "priceSource": {
     "official": "Официална",
@@ -340,7 +351,6 @@
       "type": "Тип",
       "educationLevel": "Предлага",
       "tuitionOrAdmission": "Такса / Прием",
-      "tuitionYearly": "Годишна такса",
       "pointsLastYear": "Последно приети ({{year}})",
       "minScoreYear": "Минимален бал ({{year}})",
       "nvoAverage": "НВО {{grade}}, средно от БЕЛ и математика",
@@ -434,6 +444,7 @@
     }
   },
   "schoolCard": {
+    "samePlaceBadge": "Детска градина и училище",
     "status": {
       "accepting": "Приемат кандидатури",
       "waitlist": "Списък с чакащи",
@@ -542,8 +553,6 @@
   },
   "schoolDetail": {
     "keyFacts": "Основни факти",
-    "tuitionPerYear": "{{price}} {{currency}}\u00a0/\u00a0година",
-    "tuitionUnstated": "{{price}} {{currency}}",
     "groupsAndGrades": "Групи и класове",
     "nvoLatest": "{{exam}}, {{year}} г.: средно от БЕЛ и математика",
     "nvoLatestSubject": "{{exam}}, {{year}} г.: само {{subject}}",
@@ -688,7 +697,7 @@
     "nvoLine": "{{exam}} {{year}}: {{scores}}",
     "nvoBulgarian": "български език {{value}}",
     "nvoMath": "математика {{value}}",
-    "tuitionOne": "Такса за обучение: около €{{min}} на година",
-    "tuitionRange": "Такса за обучение: €{{min}}–€{{max}} на година"
+    "tuitionOne": "Такса за обучение: €{{min}} на {{period}}",
+    "tuitionRange": "Такса за обучение: €{{min}}–€{{max}} на {{period}}"
   }
 }

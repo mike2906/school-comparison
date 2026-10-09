@@ -9,7 +9,9 @@ import {
   isInstallmentPlan,
   YEAR_STATUS,
   toEur,
-  yearlyTuitionRangeEur,
+  displayPrice,
+  statedTuition,
+  tuitionSortValue,
 } from './pricing.js'
 
 const row = (overrides = {}) => ({
@@ -240,29 +242,65 @@ test('toEur converts BGN at the fixed euro rate and rejects other currencies', (
   assert.equal(toEur(null, 'EUR'), null)
 })
 
-test('yearlyTuitionRangeEur reports euro and never mislabels EUR amounts', () => {
-  const range = yearlyTuitionRangeEur([
-    row({ id: 1, amount: 8965, currency: 'EUR', period: 'yearly', year_status: 'current' }),
-    row({ id: 2, amount: 75, currency: 'EUR', category: 'registration', period: 'one_time', year_status: 'current' }),
+test('statedTuition keeps the period the school states and never annualises', () => {
+  const tuition = statedTuition([
+    row({ id: 1, amount: 650, period: 'monthly', year_status: 'current', academic_year_canonical: '2026/2027' }),
+    row({ id: 2, amount: 900, period: 'monthly', year_status: 'current', academic_year_canonical: '2026/2027' }),
+    row({ id: 3, amount: 8000, period: 'yearly', year_status: 'current', academic_year_canonical: '2026/2027' }),
+    row({ id: 4, amount: 75, category: 'registration', period: 'one_time', year_status: 'current' }),
   ])
-  assert.deepEqual(range, { min: 8965, max: 8965, currency: 'EUR' })
+  assert.deepEqual(
+    [tuition.min, tuition.max, tuition.period, tuition.currency, tuition.academicYear],
+    [650, 900, 'monthly', 'EUR', '2026/2027']
+  )
 })
 
-test('yearlyTuitionRangeEur converts BGN, annualises monthly fees, skips instalments and USD', () => {
-  const range = yearlyTuitionRangeEur([
+test('statedTuition converts BGN, skips instalments, and falls back to a yearly fee', () => {
+  const tuition = statedTuition([
     row({ id: 1, amount: 1955.83, currency: 'BGN', period: 'yearly', year_status: 'current' }),
-    row({ id: 2, amount: 100, currency: 'EUR', period: 'monthly', year_status: 'current' }),
-    row({ id: 3, amount: 50, currency: 'EUR', period: 'monthly', plan_name: '10 installments', year_status: 'current' }),
-    row({ id: 4, amount: 10, currency: 'USD', period: 'yearly', year_status: 'current' }),
+    row({ id: 2, amount: 50, period: 'monthly', plan_name: '10 installments', year_status: 'current' }),
   ])
-  assert.equal(Math.round(range.min), 1000)
-  assert.equal(range.max, 1200)
+  assert.deepEqual([Math.round(tuition.min), tuition.period, tuition.currency], [1000, 'yearly', 'EUR'])
 })
 
-test('yearlyTuitionRangeEur ignores rows outside the headline cohort', () => {
-  const range = yearlyTuitionRangeEur([
+test('statedTuition keeps a currency without a euro rate and reports an unstated period', () => {
+  const usd = statedTuition([row({ currency: 'USD', period: 'monthly', amount: 1000 })])
+  assert.deepEqual([usd.min, usd.period, usd.currency], [1000, 'monthly', 'USD'])
+  const unstated = statedTuition([row({ period: null, amount: 4000 })])
+  assert.deepEqual([unstated.min, unstated.period], [4000, null])
+  assert.equal(statedTuition([row({ category: 'food', amount: 100 })]), null)
+  assert.equal(statedTuition(undefined), null)
+})
+
+test('statedTuition ignores rows outside the headline cohort', () => {
+  const tuition = statedTuition([
     row({ id: 1, amount: 9000, period: 'yearly', year_status: 'current' }),
-    row({ id: 2, amount: 3000, period: 'yearly', year_status: 'dated_other', academic_year_canonical: '2023/2024' }),
+    row({ id: 2, amount: 300, period: 'monthly', year_status: 'dated_other', academic_year_canonical: '2023/2024' }),
   ])
-  assert.equal(range.min, 9000)
+  assert.deepEqual([tuition.min, tuition.period], [9000, 'yearly'])
+})
+
+test('tuitionSortValue orders by the cheapest headline tuition per month, in euro', () => {
+  assert.equal(tuitionSortValue([row({ amount: 6000, period: 'yearly', year_status: 'current' })]), 500)
+  assert.equal(tuitionSortValue([
+    row({ id: 1, amount: 400, period: 'monthly', year_status: 'current' }),
+    row({ id: 2, amount: 100, period: 'monthly', plan_name: '10 installments', year_status: 'current' }),
+    row({ id: 3, amount: 100, period: 'monthly', year_status: 'dated_other', academic_year_canonical: '2023/2024' }),
+  ]), 400)
+  assert.equal(tuitionSortValue([row({ amount: 4000, period: 'semester', year_status: 'current' })]), null)
+  assert.equal(tuitionSortValue([]), null)
+})
+
+test('statedTuition leads with the period of the cheapest fee per month, as the sort does', () => {
+  const tuition = statedTuition([
+    row({ id: 1, amount: 900, period: 'monthly', year_status: 'current' }),
+    row({ id: 2, amount: 3000, period: 'yearly', year_status: 'current' }),
+  ])
+  assert.deepEqual([tuition.min, tuition.period], [3000, 'yearly'])
+})
+
+test('displayPrice shows lev in euro and keeps other currencies', () => {
+  assert.deepEqual(displayPrice(195.583, 'BGN'), { value: 100, currency: 'EUR' })
+  assert.deepEqual(displayPrice(100, 'USD'), { value: 100, currency: 'USD' })
+  assert.deepEqual(displayPrice(null, null), { value: null, currency: 'EUR' })
 })

@@ -72,7 +72,6 @@
     "distance": "Distance",
     "name": "Name",
     "type": "Type",
-    "price": "Price",
     "pricePrivate": "Price (Private only)",
     "nvo": "NVO {{grade}} (highest)"
   },
@@ -141,6 +140,8 @@
     "website": "Website",
     "continuesTo": "Continues to:",
     "continuesToSchool": "(school)",
+    "continuedFrom": "Related kindergarten:",
+    "samePlaceHere": "At this place:",
     "pupils": "Pupils",
     "shift": "Shift",
     "organisedGroups": "After-school care",
@@ -220,6 +221,7 @@
     "legendKindergarten": "Kindergarten",
     "approximatePin": "Approximate location (street level)",
     "alsoHere": "At the same address:",
+    "samePlace": "Also here, under the same name:",
     "legendStacked": "Several at one address"
   },
   "pricing": {
@@ -246,7 +248,16 @@
     "currency": "EUR",
     "yearNotStated": "Academic year not stated by the school",
     "notCurrentYear": "not for the current academic year",
-    "periodNotStated": "Period not stated by school"
+    "periodNotStated": "Period not stated by school",
+    "per": {
+      "monthly": "month",
+      "quarter": "quarter",
+      "term": "term",
+      "semester": "semester",
+      "yearly": "year"
+    },
+    "pricePerPeriod": "{{price}} {{currency}} / {{period}}",
+    "priceOnly": "{{price}} {{currency}}"
   },
   "priceSource": {
     "official": "Official",
@@ -340,7 +351,6 @@
       "type": "Type",
       "educationLevel": "Offers",
       "tuitionOrAdmission": "Tuition / Admission",
-      "tuitionYearly": "Yearly tuition",
       "pointsLastYear": "Last admitted ({{year}})",
       "minScoreYear": "Min. score ({{year}})",
       "nvoAverage": "NVO {{grade}}, average of Bulgarian and maths",
@@ -434,6 +444,7 @@
     }
   },
   "schoolCard": {
+    "samePlaceBadge": "Kindergarten and school",
     "status": {
       "accepting": "Accepting applications",
       "waitlist": "Waitlist",
@@ -542,8 +553,6 @@
   },
   "schoolDetail": {
     "keyFacts": "Key facts",
-    "tuitionPerYear": "{{price}} {{currency}}\u00a0/\u00a0year",
-    "tuitionUnstated": "{{price}} {{currency}}",
     "groupsAndGrades": "Groups & grades",
     "nvoLatest": "{{exam}}, {{year}}: average of Bulgarian and maths",
     "nvoLatestSubject": "{{exam}}, {{year}}: {{subject}} only",
@@ -688,7 +697,7 @@
     "nvoLine": "{{exam}} {{year}}: {{scores}}",
     "nvoBulgarian": "Bulgarian {{value}}",
     "nvoMath": "maths {{value}}",
-    "tuitionOne": "Tuition: about €{{min}} a year",
-    "tuitionRange": "Tuition: €{{min}}–€{{max}} a year"
+    "tuitionOne": "Tuition: €{{min}} per {{period}}",
+    "tuitionRange": "Tuition: €{{min}}–€{{max}} per {{period}}"
   }
 }

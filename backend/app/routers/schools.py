@@ -14,9 +14,14 @@ from app.database import async_session_maker, get_db
 from app.models.country import Country
 from app.models.exam_results import ExamResult
 from app.models.school import School, SchoolLocation, SchoolLocationAgeGroupShift
-from app.schemas.school import RelatedSchoolResponse, SchoolDetailResponse, SchoolListResponse
+from app.schemas.school import (
+    RelatedSchoolResponse,
+    SamePlaceSchoolResponse,
+    SchoolDetailResponse,
+    SchoolListResponse,
+)
 from app.services.country_service import get_valid_keys
-from app.services.school_relations import continues_to
+from app.services.school_relations import continued_from, continues_to, same_place_by_school
 from app.services.school_service import SchoolService
 from app.utils.display_gating import NVO_MIN_PUPILS
 
@@ -98,6 +103,16 @@ def _serialize_list(schools) -> bytes:
 
 async def _build_list_body(db: AsyncSession, **filters) -> bytes:
     schools = await SchoolService(db).list_schools_filtered(**filters)
+    # Across the whole city, not only the filtered rows: a card names the school next
+    # door even when the age filter hides it.
+    try:
+        same_place = await same_place_by_school(db, country_code=filters["country_code"], city=filters["city"])
+    except Exception:
+        # Optional grouping: the list still works without it.
+        logger.warning("same_place failed for the list", exc_info=True)
+        same_place = {}
+    for school in schools:
+        school.same_place = same_place.get(school.id, [])
     # Seconds of CPU: run it in a thread so other requests are still answered meanwhile.
     return await asyncio.to_thread(_serialize_list, schools)
 
@@ -383,6 +398,15 @@ async def get_school(
             link = None
         if link is not None:
             response.continues_to = RelatedSchoolResponse.model_validate(link)
+        try:
+            response.continued_from = [RelatedSchoolResponse.model_validate(row) for row in await continued_from(db, school)]
+        except Exception:
+            logger.warning("continued_from failed for school %s", school_id, exc_info=True)
+        try:
+            same_place = await same_place_by_school(db, country_code=school.country_code, city=school.city)
+            response.same_place = [SamePlaceSchoolResponse.model_validate(row) for row in same_place.get(school.id, [])]
+        except Exception:
+            logger.warning("same_place failed for school %s", school_id, exc_info=True)
         return response
     except HTTPException:
         # Re-raise HTTP exceptions (like 404)

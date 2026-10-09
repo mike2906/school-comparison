@@ -1,7 +1,7 @@
 /**
  * Static HTML for crawlers and link previews: per-page head tags plus a small content
- * block inside `#root` that React replaces on mount. Pure builders; the file and network
- * work lives in `scripts/prerender.js`.
+ * block inside `#root` that React replaces on mount (hidden until then, see index.html).
+ * Pure builders; the file and network work lives in `scripts/prerender.js`.
  */
 import { getAddress, getSchoolName } from '../utils/i18n.js'
 import { URL_LANGUAGES, alternateLinks, canonicalUrl, languagePath } from '../utils/languageUrl.js'
@@ -13,7 +13,7 @@ import {
   getNvoSubjectKey,
   isAverageMetric,
 } from '../utils/nvo.js'
-import { yearlyTuitionRangeEur } from '../utils/pricing.js'
+import { statedTuition } from '../utils/pricing.js'
 
 // Our own thin-content heuristic, not an SEO rule: a published Bulgarian summary shorter
 // than this says little beyond the name, type and address the page already shows.
@@ -89,10 +89,13 @@ function nvoLine(result, t) {
 }
 
 function tuitionLine(school, t) {
-  const range = yearlyTuitionRangeEur(school?.pricing)
-  if (!range) return ''
-  const [min, max] = [range.min, range.max].map((value) => Math.round(value))
-  return min === max ? t('seo.tuitionOne', { min }) : t('seo.tuitionRange', { min, max })
+  const tuition = statedTuition(school?.pricing)
+  // Euro only, in the period the school states (never annualised), and never an older
+  // year's fee, which the description has no room to label as such.
+  if (!tuition || tuition.currency !== 'EUR' || !tuition.period || tuition.yearStatus === 'dated_other') return ''
+  const [min, max] = [tuition.min, tuition.max].map((value) => Math.round(value))
+  const period = t(`pricing.per.${tuition.period}`)
+  return min === max ? t('seo.tuitionOne', { min, period }) : t('seo.tuitionRange', { min, max, period })
 }
 
 /**
@@ -125,7 +128,7 @@ export function outputFile(routePath, language) {
 }
 
 function mainBlock(parts) {
-  return `<main class="${BODY_CLASS}">${parts.filter(Boolean).join('')}</main>`
+  return `<main data-prerender class="${BODY_CLASS}">${parts.filter(Boolean).join('')}</main>`
 }
 
 function heading(text) {
