@@ -539,6 +539,8 @@ class TestSchoolsEndpoint:
         registry_page = await _pricing_evidence_page(
             seeded_db, school, "https://registry.bg/fees"
         )
+        # A valid page and full confidence: only the website gate can withhold this row.
+        old_page = await _pricing_evidence_page(seeded_db, school, "https://old.bg/fees")
         seeded_db.add_all(
             [
                 Pricing(
@@ -549,6 +551,7 @@ class TestSchoolsEndpoint:
                     period="monthly",
                     source=PriceSource.SCRAPED_WEBSITE,
                     source_url="https://old.bg/fees",
+                    source_page_id=old_page.id,
                     pricing_context={"confidence": 0.9},
                 ),
                 Pricing(
