@@ -1,7 +1,7 @@
 /**
  * Static HTML for crawlers and link previews: per-page head tags plus a small content
- * block inside `#root` that React replaces on mount. Pure builders; the file and network
- * work lives in `scripts/prerender.js`.
+ * block inside `#root` that React replaces on mount (hidden until then, see index.html).
+ * Pure builders; the file and network work lives in `scripts/prerender.js`.
  */
 import { getAddress, getSchoolName } from '../utils/i18n.js'
 import { URL_LANGUAGES, alternateLinks, canonicalUrl, languagePath } from '../utils/languageUrl.js'
@@ -128,7 +128,7 @@ export function outputFile(routePath, language) {
 }
 
 function mainBlock(parts) {
-  return `<main class="${BODY_CLASS}">${parts.filter(Boolean).join('')}</main>`
+  return `<main data-prerender class="${BODY_CLASS}">${parts.filter(Boolean).join('')}</main>`
 }
 
 function heading(text) {

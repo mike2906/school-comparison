@@ -41,6 +41,7 @@ import {
   isDesktopViewport,
   closedDetailSchoolId,
 } from '../../utils/searchViewState'
+import { LANGUAGE_SWITCH_EVENT, languageSwitchArrival } from '../../utils/languageSwitch'
 
 function readStoredUserLocation(fallbackAddress) {
   try {
@@ -79,7 +80,12 @@ function SearchPage() {
   const navigationType = useNavigationType()
   // View state lives in the URL so it survives opening a school and coming back.
   const [initialView] = useState(() => readViewParams(searchParams))
-  const [savedViewState] = useState(() => readSavedViewState(location.key, location.search))
+  // Arrived by switching language: the map view and the school that was at the top of the
+  // list. Newer than any view state saved for this entry (a full navigation saves none).
+  const [languageSwitch] = useState(() => languageSwitchArrival(location))
+  const [savedViewState] = useState(() => (
+    languageSwitch ? null : readSavedViewState(location.key, location.search)
+  ))
   // The list renders the cards [visibleStart, visibleCount) of the sorted schools.
   const [visibleStart, setVisibleStart] = useState(() => savedViewState?.listStart || 0)
   // Enough cards to reach a restored scroll position (cards are at least ~100 px tall).
@@ -145,7 +151,10 @@ function SearchPage() {
   const listScrollRef = useRef(null)
   // Tracked on scroll: the list node is already detached when the unmount cleanup runs.
   const listScrollTopRef = useRef(0)
-  const mapViewRef = useRef(savedViewState?.map || null)
+  const switchedMap = languageSwitch?.map
+  const initialMapView = savedViewState?.map
+    || (Array.isArray(switchedMap?.center) && Number.isFinite(switchedMap.zoom) ? switchedMap : null)
+  const mapViewRef = useRef(initialMapView)
   const locationRef = useRef(location)
   locationRef.current = location
   const previousViewModeRef = useRef(null)
@@ -354,6 +363,24 @@ function SearchPage() {
         map: mapViewRef.current,
       })
     }
+  }, [])
+
+  // A language switch loads a new document: hand it the map view and the first card in view.
+  useEffect(() => {
+    const handOff = (event) => {
+      event.detail.map = mapViewRef.current
+      const list = listScrollRef.current
+      if (!list || list.clientHeight === 0) return
+      const listTop = list.getBoundingClientRect().top
+      const card = [...list.querySelectorAll('[data-school-id]')]
+        .find(node => node.getBoundingClientRect().bottom > listTop)
+      if (card && list.scrollTop > 0) {
+        event.detail.listSchoolId = Number(card.dataset.schoolId)
+        event.detail.listOffset = Math.round(card.getBoundingClientRect().top - listTop)
+      }
+    }
+    window.addEventListener(LANGUAGE_SWITCH_EVENT, handOff)
+    return () => window.removeEventListener(LANGUAGE_SWITCH_EVENT, handOff)
   }, [])
 
   const handleMapViewChange = useStableCallback((view) => {
@@ -984,6 +1011,28 @@ function SearchPage() {
     }
     pendingScrollRestoreRef.current = 0
   }, [loading, sortedSchools.length])
+
+  // After a language switch, put the school that was at the top of the list back there
+  // (the list is sorted by name, so its index differs per language).
+  const pendingListSchoolRef = useRef(languageSwitch?.listSchoolId || null)
+  useLayoutEffect(() => {
+    const schoolId = pendingListSchoolRef.current
+    if (!schoolId || loading || sortedSchools.length === 0) return
+    const index = sortedSchools.findIndex(school => school.id === schoolId)
+    const nextWindow = windowForIndex(index, { start: visibleStart, end: visibleCount })
+    if (nextWindow) {
+      setVisibleStart(nextWindow.start)
+      setVisibleCount(nextWindow.end)
+      return
+    }
+    pendingListSchoolRef.current = null
+    const list = listScrollRef.current
+    const node = index >= 0 && list?.querySelector(`[data-school-id="${schoolId}"]`)
+    if (!node) return
+    const offset = node.getBoundingClientRect().top - list.getBoundingClientRect().top
+    list.scrollTop += offset - (languageSwitch.listOffset || 0)
+    listScrollTopRef.current = list.scrollTop
+  }, [loading, sortedSchools, visibleStart, visibleCount, languageSwitch])
 
   const totalFilteredCount = filteredSchools.length
   const visibleFilteredCount = boundedSchools.length
@@ -2059,7 +2108,7 @@ function SearchPage() {
                   onPickLocation={handleMapPickLocation}
                   onBoundsChange={handleBoundsChange}
                   onViewChange={handleMapViewChange}
-                  initialView={savedViewState?.map || null}
+                  initialView={initialMapView}
                   autoFit={!searchInBounds && !selectedSchoolId && !locationOverlay.schoolId}
                   hasCompare={hasCompare}
                   detailOpen={Boolean(detailSchoolId)}
