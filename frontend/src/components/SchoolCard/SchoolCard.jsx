@@ -640,6 +640,7 @@ const SchoolCard = memo(function SchoolCard({
   onClearLocations,
   onOpenDetails,
   examAverages = null,
+  samePlace = [],
 }) {
   const { t, i18n } = useTranslation()
   const { config: countryConfig } = useCountry()
@@ -1010,6 +1011,11 @@ const SchoolCard = memo(function SchoolCard({
         <span className="text-xs text-neutral-600">
           {schoolLevelLabel(school, t, countryConfig)}
         </span>
+        {samePlace.length > 0 && (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border border-teal-200 bg-teal-50 text-teal-800">
+            {t('schoolCard.samePlaceBadge')}
+          </span>
+        )}
         {pricingYearLabel && (
           <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border ${pricingYearBadgeClass}`}>
             {pricingYearLabel}
@@ -1495,6 +1501,32 @@ const SchoolCard = memo(function SchoolCard({
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {samePlace.length > 0 && (
+        <div className="mt-3 rounded-lg border border-teal-200/70 bg-teal-50/40 px-3 py-2">
+          <p className="text-xs text-neutral-500">{t('map.samePlace')}</p>
+          <ul className="mt-1 space-y-1">
+            {samePlace.map(({ school: member }) => (
+              <li key={member.id} className="text-sm">
+                <Link
+                  to={activeAgeGroup ? `/schools/${member.id}?group=${encodeURIComponent(activeAgeGroup)}` : `/schools/${member.id}`}
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    if (onOpenDetails && isPlainLeftClick(event) && isDesktopViewport()) {
+                      event.preventDefault()
+                      onOpenDetails(member)
+                    }
+                  }}
+                  className="font-medium text-primary-700 hover:text-primary-800 hover:underline"
+                >
+                  {getSchoolName(member, i18n.language)}
+                </Link>
+                <span className="text-neutral-500">{' · '}{schoolLevelLabel(member, t, countryConfig)}</span>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 

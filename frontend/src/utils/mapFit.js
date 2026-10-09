@@ -128,6 +128,46 @@ export function stackedMarkersByKey(markers) {
   return result
 }
 
+/**
+ * One pin per place: a kindergarten and its school next door (the API's `same_place`) share
+ * the first one's position, so they stack like schools at one address. A school keeps one
+ * pin per place even when two of its locations fall inside it. Markers are not mutated.
+ */
+export function joinSamePlaceMarkers(markers) {
+  const indexByPin = new Map(markers.map((marker, index) => [`${marker.school.id}:${marker.location?.id}`, index]))
+  const parent = markers.map((_, index) => index)
+  const root = (index) => {
+    while (parent[index] !== index) index = parent[index] = parent[parent[index]]
+    return index
+  }
+  markers.forEach((marker, index) => {
+    marker.school.same_place?.forEach(entry => {
+      if (entry.location_id !== marker.location?.id) return
+      const other = indexByPin.get(`${entry.id}:${entry.other_location_id}`)
+      if (other !== undefined) parent[root(index)] = root(other)
+    })
+  })
+
+  const sizeByRoot = new Map()
+  markers.forEach((_, index) => sizeByRoot.set(root(index), (sizeByRoot.get(root(index)) || 0) + 1))
+  const anchorByRoot = new Map()
+  const seen = new Set()
+  const result = []
+  markers.forEach((marker, index) => {
+    const group = root(index)
+    if (sizeByRoot.get(group) < 2) {
+      result.push(marker)
+      return
+    }
+    const schoolInGroup = `${group}:${marker.school.id}`
+    if (seen.has(schoolInGroup)) return
+    seen.add(schoolInGroup)
+    if (!anchorByRoot.has(group)) anchorByRoot.set(group, marker.position)
+    result.push({ ...marker, position: anchorByRoot.get(group), samePlace: true })
+  })
+  return result
+}
+
 /** The age groups a location serves. */
 export function normalizeAgeGroups(location) {
   if (!location) return []

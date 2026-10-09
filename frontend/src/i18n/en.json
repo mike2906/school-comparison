@@ -141,6 +141,8 @@
     "website": "Website",
     "continuesTo": "Continues to:",
     "continuesToSchool": "(school)",
+    "continuedFrom": "Related kindergarten:",
+    "samePlaceHere": "At this place:",
     "pupils": "Pupils",
     "shift": "Shift",
     "organisedGroups": "After-school care",
@@ -225,6 +227,7 @@
     "legendKindergarten": "Kindergarten",
     "approximatePin": "Approximate location (street level)",
     "alsoHere": "At the same address:",
+    "samePlace": "Also here, under the same name:",
     "legendStacked": "Several at one address"
   },
   "pricing": {
@@ -438,6 +441,7 @@
     }
   },
   "schoolCard": {
+    "samePlaceBadge": "Kindergarten and school",
     "status": {
       "accepting": "Accepting applications",
       "waitlist": "Waitlist",

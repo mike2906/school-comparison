@@ -141,6 +141,8 @@
     "website": "Уебсайт",
     "continuesTo": "Продължава в:",
     "continuesToSchool": "(училище)",
+    "continuedFrom": "Свързана детска градина:",
+    "samePlaceHere": "На това място:",
     "pupils": "Ученици",
     "shift": "Смяна",
     "organisedGroups": "Занималня",
@@ -225,6 +227,7 @@
     "legendKindergarten": "Детска градина",
     "approximatePin": "Приблизително местоположение (по улица)",
     "alsoHere": "На същия адрес:",
+    "samePlace": "Също тук, под същото име:",
     "legendStacked": "Няколко на един адрес"
   },
   "pricing": {
@@ -438,6 +441,7 @@
     }
   },
   "schoolCard": {
+    "samePlaceBadge": "Детска градина и училище",
     "status": {
       "accepting": "Приемат кандидатури",
       "waitlist": "Списък с чакащи",

@@ -188,6 +188,10 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
   const attributes = school.attributes || {}
   const pricing = school.pricing || []
   const locations = school.locations || []
+  // One entry per institution: the API lists each shared pin.
+  const samePlace = (school.same_place || []).filter((other, index, all) => all.findIndex(item => item.id === other.id) === index)
+  const samePlaceIds = new Set(samePlace.map(other => other.id))
+  const continuedFrom = (school.continued_from || []).filter(kindergarten => !samePlaceIds.has(kindergarten.id))
   const primaryLocation = locations.find(l => l.is_primary) || locations[0]
   const nvoDetail = getNvoDetail(school, t, preferredAgeGroup)
   const availableExamTypes = getAvailableExamTypes(school.exam_results)
@@ -321,8 +325,31 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
             )}
           </div>
 
-          {/* Computed server-side: the one school this kindergarten leads to. */}
-          {school.continues_to && (
+          {/* Computed server-side: a kindergarten and its school next door are one place. */}
+          {samePlace.length > 0 && (
+            <nav className="flex flex-wrap items-center gap-2 mb-6" aria-label={t('schools.samePlaceHere')}>
+              <span className="text-sm text-neutral-600">{t('schools.samePlaceHere')}</span>
+              <span
+                aria-current="page"
+                className="px-3 py-1.5 rounded-full text-sm font-semibold bg-primary-700 text-white"
+              >
+                {schoolLevelLabel(school, t, countryConfig)}
+              </span>
+              {samePlace.map(other => (
+                <Link
+                  key={other.id}
+                  to={`/schools/${other.id}`}
+                  title={getSchoolName(other, i18n.language)}
+                  className="px-3 py-1.5 rounded-full text-sm font-semibold border border-primary-300 text-primary-700 hover:bg-primary-50"
+                >
+                  {schoolLevelLabel(other, t, countryConfig)}
+                </Link>
+              ))}
+            </nav>
+          )}
+
+          {/* Computed server-side: the one school this kindergarten leads to, elsewhere. */}
+          {school.continues_to && !samePlaceIds.has(school.continues_to.id) && (
             <p className="text-neutral-700 mb-6">
               {t('schools.continuesTo')}{' '}
               <Link
@@ -332,6 +359,24 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
                 {getSchoolName(school.continues_to, i18n.language)}
               </Link>{' '}
               {t('schools.continuesToSchool')}
+            </p>
+          )}
+
+          {/* ...and the same link from the school's side. */}
+          {continuedFrom.length > 0 && (
+            <p className="text-neutral-700 mb-6">
+              {t('schools.continuedFrom')}{' '}
+              {continuedFrom.map((kindergarten, index) => (
+                <span key={kindergarten.id}>
+                  {index > 0 && ', '}
+                  <Link
+                    to={`/schools/${kindergarten.id}`}
+                    className="font-semibold text-primary-700 hover:text-primary-800 underline underline-offset-2"
+                  >
+                    {getSchoolName(kindergarten, i18n.language)}
+                  </Link>
+                </span>
+              ))}
             </p>
           )}
 

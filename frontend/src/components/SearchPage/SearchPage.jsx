@@ -16,6 +16,7 @@ import { useSchools } from '../../hooks/useSchools'
 import { calculateDistance } from '../../utils/distance'
 import { geocodeAddress, reverseGeocode, cancelGeocode } from '../../utils/geocoding'
 import { compareSchoolNames, getSchoolName, schoolMatchesQuery } from '../../utils/i18n'
+import { foldSamePlace } from '../../utils/samePlace'
 import { useCompare } from '../../context/CompareContext'
 import { useCountry } from '../../context/CountryContext'
 import { fetchAvailableFilters, fetchExamAverages } from '../../api/schools'
@@ -982,6 +983,9 @@ function SearchPage() {
     return list
   }, [boundedSchools, sortBy, i18n.language, filters.ageGroup])
 
+  // A kindergarten and its school next door share one card.
+  const { cards: listCards, hostById: samePlaceHostById } = useMemo(() => foldSamePlace(sortedSchools), [sortedSchools])
+
   // Restore the list position once the restored list has rendered.
   const pendingScrollRestoreRef = useRef(savedViewState?.scrollTop || 0)
   useLayoutEffect(() => {
@@ -1033,7 +1037,8 @@ function SearchPage() {
     }
     if (!scrollOnSelectRef.current) return
     // A school picked on the map may be outside the rendered cards: render around it first.
-    const index = sortedSchools.findIndex(school => school.id === selectedSchoolId)
+    const cardSchoolId = samePlaceHostById.get(selectedSchoolId) ?? selectedSchoolId
+    const index = listCards.findIndex(card => card.school.id === cardSchoolId)
     const nextWindow = windowForIndex(index, { start: visibleStart, end: visibleCount })
     if (nextWindow) {
       listWindowMovedRef.current = nextWindow.start !== visibleStart
@@ -1047,7 +1052,7 @@ function SearchPage() {
       listWindowMovedRef.current = true
       return
     }
-    const node = list.querySelector(`[data-school-id="${selectedSchoolId}"]`)
+    const node = list.querySelector(`[data-school-id="${cardSchoolId}"]`)
     if (node) {
       // Scroll the list itself: scrollIntoView also moves the page under it.
       const listRect = list.getBoundingClientRect()
@@ -1066,7 +1071,7 @@ function SearchPage() {
     }
     listWindowMovedRef.current = false
     scrollOnSelectRef.current = false
-  }, [selectedSchoolId, sortedSchools, visibleStart, visibleCount, mobileTab, viewMode])
+  }, [selectedSchoolId, listCards, samePlaceHostById, visibleStart, visibleCount, mobileTab, viewMode])
 
   // New results start at the top with the first page (not on map panning).
   const listKey = JSON.stringify([filters, sortBy, nameQuery, distanceFilter])
@@ -1082,11 +1087,11 @@ function SearchPage() {
   // A list that shrank without a new list key (map-area filtering) may end before a moved
   // window starts: go back to the first page rather than show nothing.
   useEffect(() => {
-    if (loading || sortedSchools.length === 0 || visibleStart < sortedSchools.length) return
+    if (loading || listCards.length === 0 || visibleStart < listCards.length) return
     setVisibleStart(0)
     setVisibleCount(LIST_PAGE_SIZE)
     if (listScrollRef.current) listScrollRef.current.scrollTop = 0
-  }, [loading, sortedSchools.length, visibleStart])
+  }, [loading, listCards.length, visibleStart])
 
   // Render the next page as the end of the list comes near.
   useEffect(() => {
@@ -1099,7 +1104,7 @@ function SearchPage() {
     }, { root: listScrollRef.current, rootMargin: '800px 0px' })
     observer.observe(sentinel)
     return () => observer.disconnect()
-  }, [visibleCount, sortedSchools.length])
+  }, [visibleCount, listCards.length])
 
   // Likewise render the previous page as the start of a moved window comes near. The
   // cards go in above the ones on screen, so keep those where they are.
@@ -1906,9 +1911,9 @@ function SearchPage() {
                     <div className="h-4 w-32 bg-neutral-200 animate-pulse rounded" />
                   ) : (
                     <p className="whitespace-nowrap text-sm text-neutral-600">
-                      <span className="font-semibold text-neutral-900">{sortedSchools.length}</span>
+                      <span className="font-semibold text-neutral-900">{listCards.length}</span>
                       {/* Phones show just the number beside the type chips; the noun stays for screen readers. */}
-                      <span className="max-sm:sr-only">{' '}{t(resultNounKey, { count: sortedSchools.length })}</span>
+                      <span className="max-sm:sr-only">{' '}{t(resultNounKey, { count: listCards.length })}</span>
                     </p>
                   )}
                 </div>
@@ -2002,12 +2007,13 @@ function SearchPage() {
                 {visibleStart > 0 && (
                   <div ref={listTopSentinelRef} className="h-16" aria-hidden="true" />
                 )}
-                {sortedSchools.slice(visibleStart, visibleCount).map(school => (
+                {listCards.slice(visibleStart, visibleCount).map(({ school, samePlace }) => (
                   <SchoolCard
                     key={school.id}
                     school={school}
+                    samePlace={samePlace}
                     location={getLocationForAgeGroup(school, filters.ageGroup)}
-                    isSelected={(detailSchoolId || selectedSchoolId) === school.id}
+                    isSelected={[school.id, ...samePlace.map(member => member.school.id)].includes(detailSchoolId || selectedSchoolId)}
                     onClick={handleListSchoolSelect}
                     onOpenDetails={handleOpenDetails}
                     onHover={handleSchoolHover}
@@ -2023,7 +2029,7 @@ function SearchPage() {
                     examAverages={examAverages}
                   />
                 ))}
-                {visibleCount < sortedSchools.length && (
+                {visibleCount < listCards.length && (
                   <div ref={listSentinelRef} className="h-16" aria-hidden="true" />
                 )}
                 </div>
