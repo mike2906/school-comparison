@@ -28,6 +28,9 @@ MODEL_TIERS = {
     # this model's lines gave the same tuition set both times on 14 and held every tuition
     # amount GPT-6.1 Sol had found, at about $0.003 a school against Sol's $0.02.
     "pricing": "openrouter/openai/gpt-6-luna",
+    # Reading a fee table off a picture. GPT-6 Luna's two readings of St George's tables
+    # disagreed on digits; this model's agreed. A handful of pictures per city.
+    "vision": "openrouter/openai/gpt-6.1-sol",
 }
 
 # Cost per 1M tokens (input/output), verified against OpenRouter 2026-07-13.
@@ -35,9 +38,10 @@ MODEL_COSTS = {
     "cheap": (0.10, 0.40),
     "capable": (0.15, 0.60),
     "pricing": (0.10, 0.50),  # OpenRouter, 2026-10-09
+    "vision": (2.00, 10.00),  # OpenRouter, 2026-10-09
 }
 
-ModelTier = Literal["cheap", "capable", "pricing"]
+ModelTier = Literal["cheap", "capable", "pricing", "vision"]
 
 
 def get_model(tier: ModelTier) -> str:

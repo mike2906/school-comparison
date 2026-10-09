@@ -34,6 +34,7 @@ class TestModelTier:
             "cheap": "openrouter/google/gemini-2.5-flash-lite",
             "capable": "openrouter/openai/gpt-4o-mini",
             "pricing": "openrouter/openai/gpt-6-luna",
+            "vision": "openrouter/openai/gpt-6.1-sol",
         }
 
     def test_model_costs_defined(self):
@@ -41,6 +42,7 @@ class TestModelTier:
             "cheap": (0.10, 0.40),
             "capable": (0.15, 0.60),
             "pricing": (0.10, 0.50),
+            "vision": (2.00, 10.00),
         }
 
     def test_get_model_cheap(self):

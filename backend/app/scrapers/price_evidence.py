@@ -381,7 +381,8 @@ _GRADE_VALUE = (
     + "|".join(sorted(_PRESCHOOL_TOKENS, key=len, reverse=True))
     + r")"
 )
-_GRADE_SUFFIX = r"(?:\s*\.|\s*-?\s*(?:ви|ри|ти|ми|st|nd|rd|th)\b)?"
+# A grade is a whole word: the "I" of "International" is not grade one.
+_GRADE_SUFFIX = r"(?:\s*\.|\s*-?\s*(?:ви|ри|ти|ми|st|nd|rd|th)\b)?(?![^\W\d_])"
 _GRADE_JOIN = r"\s*(?:-|–|—|,|/|\bдо\b|\bи\b|\bto\b|\band\b)\s*"
 _GRADE_RUN = rf"\b{_GRADE_VALUE}{_GRADE_SUFFIX}(?:{_GRADE_JOIN}{_GRADE_VALUE}{_GRADE_SUFFIX})*"
 _GRADE_WORD = r"(?:клас(?:ове)?|кл\.|grades?)"
