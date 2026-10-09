@@ -24,7 +24,7 @@ import { getAgeGroupKeys, getExclusiveAgeGroups } from '../../utils/countryConfi
 import { AGE_GROUP_KEYS } from '../../utils/education'
 import { getLanguageFocusPairs } from '../../utils/schoolAttributes'
 import { matchesAdvancedFilters, matchesSchoolType } from '../../utils/advancedFilters'
-import { getNvoDetail } from '../../utils/nvo'
+import { examGradeLabel, getNvoDetail, rankingExamType } from '../../utils/nvo'
 import { isSchoolInBounds } from '../../utils/mapFit'
 import { LIST_PAGE_SIZE, windowForIndex, scrollTopToCenter } from '../../utils/listWindow'
 import { canonicalLanguagePair, languageKey, languageLabel } from '../../utils/languages'
@@ -32,7 +32,7 @@ import { canonicalLanguagePair, languageKey, languageLabel } from '../../utils/l
 const uniqueCanonical = (values, canonical) => (
   [...new Set((values || []).map(canonical).filter(Boolean))]
 )
-import { monthlyEquivalent, toEur } from '../../utils/pricing'
+import { tuitionSortValue } from '../../utils/pricing'
 import {
   readViewParams,
   writeViewParams,
@@ -856,21 +856,6 @@ function SearchPage() {
     return matching.find(location => location.is_primary) || matching[0] || getPrimaryLocation(school)
   }
 
-  const getStartingPrice = (school) => {
-    if (school.school_type === 'state' || !school.pricing || school.pricing.length === 0) {
-      return null
-    }
-
-    const tuitionPrices = school.pricing
-      .filter(price => price.category === 'tuition')
-      .map(price => toEur(monthlyEquivalent(price), price.currency))
-      .filter(value => value != null)
-
-    if (tuitionPrices.length === 0) return null
-
-    return Math.min(...tuitionPrices)
-  }
-
   const schoolsWithDistance = useMemo(() => {
     if (!userLocation) return schools
 
@@ -952,20 +937,27 @@ function SearchPage() {
       case 'type':
         list.sort((a, b) => (TYPE_SORT_ORDER[a.school_type] ?? 99) - (TYPE_SORT_ORDER[b.school_type] ?? 99))
         break
-      case 'price':
+      case 'price': {
+        // Private schools by their headline-year tuition per month, cheapest first; then
+        // those without a fee that converts to a month; state schools last.
+        const rank = new Map(list.map((school) => {
+          const value = school.school_type === 'state' ? null : tuitionSortValue(school.pricing)
+          return [school.id, school.school_type === 'state' ? [2, 0] : [value == null ? 1 : 0, value ?? 0]]
+        }))
         list.sort((a, b) => {
-          const priceA = getStartingPrice(a)
-          const priceB = getStartingPrice(b)
-          const valueA = a.school_type === 'state' ? 0 : (priceA ?? Number.POSITIVE_INFINITY)
-          const valueB = b.school_type === 'state' ? 0 : (priceB ?? Number.POSITIVE_INFINITY)
-          return valueA - valueB
+          const [groupA, valueA] = rank.get(a.id)
+          const [groupB, valueB] = rank.get(b.id)
+          return groupA - groupB || valueA - valueB
         })
         break
+      }
       case 'nvo': {
-        // Highest latest combined NVO first; schools without results last.
+        // Highest latest combined result of one exam for every school; schools without
+        // that exam last. Mixing exams would rank 4th-grade scores above 7th-grade ones.
+        const examType = rankingExamType(filters.ageGroup)
         const scores = new Map(list.map(school => [
           school.id,
-          getNvoDetail(school, null, { ageGroup: filters.ageGroup })?.latestCombined ?? Number.NEGATIVE_INFINITY,
+          getNvoDetail(school, null, { examType })?.latestCombined ?? Number.NEGATIVE_INFINITY,
         ]))
         list.sort((a, b) => scores.get(b.id) - scores.get(a.id))
         break
@@ -1215,17 +1207,19 @@ function SearchPage() {
   // Kindergartens have no NVO results, so that sort only applies when schools are listed.
   const kindergartensOnly = kindergartenOnlyGroups.includes(filters.ageGroup) ||
     (filters.ageGroup === 'preschool' && filters.educationLevel === 'kindergarten')
+  const nvoSortExamType = rankingExamType(filters.ageGroup)
+  const nvoSortLabel = t('sorting.nvo', { grade: examGradeLabel(nvoSortExamType, t) })
   const allSortOptions = userLocation
     ? [
         { value: 'distance', label: t('sorting.distance') },
         { value: 'name', label: t('sorting.name') },
-        { value: 'nvo', label: t('sorting.nvo') },
+        { value: 'nvo', label: nvoSortLabel },
         { value: 'type', label: t('sorting.type') },
-        { value: 'price', label: t('sorting.price') },
+        { value: 'price', label: t('sorting.pricePrivate') },
       ]
     : [
         { value: 'name', label: t('sorting.name') },
-        { value: 'nvo', label: t('sorting.nvo') },
+        { value: 'nvo', label: nvoSortLabel },
         { value: 'type', label: t('sorting.type') },
         { value: 'price', label: t('sorting.pricePrivate') },
       ]
@@ -2020,6 +2014,7 @@ function SearchPage() {
                     onHoverEnd={handleSchoolHoverEnd}
                     ageGroupOrder={ageGroupOrder}
                     activeAgeGroup={filters.ageGroup}
+                    nvoExamType={sortBy === 'nvo' ? nvoSortExamType : null}
                     isLocationsOpen={openLocationsId === school.id}
                     locationOverlay={locationOverlay}
                     onToggleLocations={handleToggleLocationsPanel}

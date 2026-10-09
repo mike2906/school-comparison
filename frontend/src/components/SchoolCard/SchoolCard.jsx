@@ -405,8 +405,8 @@ function hexToRgba(hex, alpha) {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`
 }
 
-function getNvoDetail(school, t, ageGroup = null) {
-  return getSharedNvoDetail(school, t, { requireCompleteSubjects: true, ageGroup })
+function getNvoDetail(school, t, ageGroup = null, examType = null) {
+  return getSharedNvoDetail(school, t, { requireCompleteSubjects: true, ageGroup, examType })
 }
 
 function getAmenityFlags(attributes, hasAfterSchool) {
@@ -631,6 +631,7 @@ const SchoolCard = memo(function SchoolCard({
   onHoverEnd,
   location,
   activeAgeGroup = null,
+  nvoExamType = null,
   ageGroupOrder = [],
   isLocationsOpen = false,
   locationOverlay = null,
@@ -815,9 +816,11 @@ const SchoolCard = memo(function SchoolCard({
   }, [school, pricing, pricingCohort, attributes, i18n.language, t, primaryLocation])
 
   const nvoDetail = useMemo(() => {
-    // The searched stage's exam (e.g. 7th grade for grades 5–7), else the school's own.
-    return getNvoDetail(school, t, activeAgeGroup)
-  }, [school, t, activeAgeGroup])
+    // Sorted by NVO: only the exam the list is ranked by, so no card shows a score from a
+    // different exam. Otherwise the searched stage's exam (e.g. 7th grade for grades 5–7),
+    // else the school's own.
+    return nvoExamType ? getNvoDetail(school, t, null, nvoExamType) : getNvoDetail(school, t, activeAgeGroup)
+  }, [school, t, activeAgeGroup, nvoExamType])
 
   const nvoSummary = useMemo(() => {
     if (!nvoDetail) return null
@@ -1085,7 +1088,7 @@ const SchoolCard = memo(function SchoolCard({
                   className={`font-medium ${nvoSummary.math.style.text} ${nvoSummary.math.style.benchmark ? 'cursor-help' : ''}`}
                   title={getBenchmarkTooltip(nvoSummary.math.value, nvoSummary.math.style.benchmark, t) || undefined}
                 >
-                  {formatPercent(nvoSummary.math.value, 0)}%
+                  {t('academicPerformance.pointsValue', { value: formatPercent(nvoSummary.math.value, 0) })}
                   {nvoSummary.math.trend && (
                     <span
                       className={`ml-1 ${nvoSummary.math.trend.className} cursor-help`}
@@ -1102,7 +1105,7 @@ const SchoolCard = memo(function SchoolCard({
                   className={`font-medium ${nvoSummary.bulgarian.style.text} ${nvoSummary.bulgarian.style.benchmark ? 'cursor-help' : ''}`}
                   title={getBenchmarkTooltip(nvoSummary.bulgarian.value, nvoSummary.bulgarian.style.benchmark, t) || undefined}
                 >
-                  {formatPercent(nvoSummary.bulgarian.value, 0)}%
+                  {t('academicPerformance.pointsValue', { value: formatPercent(nvoSummary.bulgarian.value, 0) })}
                   {nvoSummary.bulgarian.trend && (
                     <span
                       className={`ml-1 ${nvoSummary.bulgarian.trend.className} cursor-help`}
@@ -1118,7 +1121,7 @@ const SchoolCard = memo(function SchoolCard({
                   className={`font-medium ${nvoSummary.math.style.text} ${nvoSummary.math.style.benchmark ? 'cursor-help' : ''}`}
                   title={getBenchmarkTooltip(nvoSummary.math.value, nvoSummary.math.style.benchmark, t) || undefined}
                 >
-                  {t('schoolCard.nvo.subjectMath')}: {formatPercent(nvoSummary.math.value, 0)}%
+                  {t('schoolCard.nvo.subjectMath')}: {t('academicPerformance.pointsValue', { value: formatPercent(nvoSummary.math.value, 0) })}
                   {nvoSummary.math.trend && (
                     <span
                       className={`ml-1 ${nvoSummary.math.trend.className} cursor-help`}
@@ -1133,7 +1136,7 @@ const SchoolCard = memo(function SchoolCard({
                   className={`font-medium ${nvoSummary.bulgarian.style.text} ${nvoSummary.bulgarian.style.benchmark ? 'cursor-help' : ''}`}
                   title={getBenchmarkTooltip(nvoSummary.bulgarian.value, nvoSummary.bulgarian.style.benchmark, t) || undefined}
                 >
-                  {t('schoolCard.nvo.subjectBulgarian')}: {formatPercent(nvoSummary.bulgarian.value, 0)}%
+                  {t('schoolCard.nvo.subjectBulgarian')}: {t('academicPerformance.pointsValue', { value: formatPercent(nvoSummary.bulgarian.value, 0) })}
                   {nvoSummary.bulgarian.trend && (
                     <span
                       className={`ml-1 ${nvoSummary.bulgarian.trend.className} cursor-help`}
@@ -1397,16 +1400,16 @@ const SchoolCard = memo(function SchoolCard({
                             className={`text-center font-mono ${item.style.text} ${item.style.benchmark ? 'cursor-help' : ''}`}
                             title={getBenchmarkTooltip(latestValue, item.style.benchmark, t) || undefined}
                           >
-                            {formatPercent(latestValue, 1)}%
+                            {t('academicPerformance.pointsValue', { value: formatPercent(latestValue, 1) })}
                           </span>
                           <span className="text-center font-mono text-neutral-700">
-                            {formatPercent(item.avg, 1)}%
+                            {t('academicPerformance.pointsValue', { value: formatPercent(item.avg, 1) })}
                           </span>
                           <span
                             className={`text-center font-mono ${trend ? `${trend.className} cursor-help` : 'text-neutral-400'}`}
                             title={getTrendTooltip(item.latest, item.avg, trend, t) || undefined}
                           >
-                            {trend ? `${trend.arrow} ${formatPercent(diff, 1)}%` : '—'}
+                            {trend ? `${trend.arrow} ${t('academicPerformance.pointsValue', { value: formatPercent(diff, 1) })}` : '—'}
                           </span>
                         </div>
                       )
@@ -1445,7 +1448,7 @@ const SchoolCard = memo(function SchoolCard({
                           t
                         ) || undefined}
                       >
-                        {formatPercent(nvoDetail.latestMath, 1)}%
+                        {t('academicPerformance.pointsValue', { value: formatPercent(nvoDetail.latestMath, 1) })}
                       </span>
                     </div>
                     <div className="flex items-center justify-between py-2">
@@ -1476,7 +1479,7 @@ const SchoolCard = memo(function SchoolCard({
                           t
                         ) || undefined}
                       >
-                        {formatPercent(nvoDetail.latestBg, 1)}%
+                        {t('academicPerformance.pointsValue', { value: formatPercent(nvoDetail.latestBg, 1) })}
                       </span>
                     </div>
                   </div>
