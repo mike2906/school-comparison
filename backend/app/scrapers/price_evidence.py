@@ -406,7 +406,7 @@ _PRESCHOOL_LABEL_RE = re.compile(
 )
 # A kindergarten or nursery group: named, or given by the children's age.
 _KINDERGARTEN_LABEL_RE = re.compile(
-    r"детска\s+градина|\bградина\b|ясл|kindergarten|nursery|toddler|maternelle|ранно детско"
+    r"детска\s+градина|\bградина\b|ясл|kindergar[td]en|nursery|toddler|maternelle|ранно детско"
     # An age is one or two digits; "2026/2027 г." is a year, "за 10 месеца" a payment span.
     r"|(?<![\d/.-])\d{1,2}\s*(?:г\.|г\b|годиш|години\b|years?\b|yrs?\b|y\.?o\b)"
 )

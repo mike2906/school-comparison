@@ -691,3 +691,5 @@ def test_a_page_address_that_names_another_stage_is_a_siblings_page():
     assert not page_is_another_institutions("https://eduteh.eu/taksi", GYMNASIUM)
     assert not page_is_another_institutions(basic, set())
     assert label_grades("Основно училище") == set(range(1, 8))
+    # 635: the site's English page spells it "Kindergarden".
+    assert label_is_another_institutions("Academic resources fee / Kindergarden", "school", set())

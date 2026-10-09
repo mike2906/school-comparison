@@ -2371,9 +2371,11 @@ def _prices_from_fee_lines(lines: list[FeeLine]) -> list[ExtractedPrice]:
         if category is None or line.per not in _FEE_PERIOD or line.role in ("sum", "penalty"):
             continue
         # "Плащане на 2 вноски" copied as a price of its own is a plan of the full price
-        # before it; with no full price before it, it is the price there is.
+        # before it, and so is the rate an employer pays (505's "Company < 50 employees"
+        # column); with no full price before it, it is the price there is.
         if line.role == "full" and not (
-            category in last_full and _names_several_installments(line.label)
+            category in last_full
+            and (_names_several_installments(line.label) or _EMPLOYER_RATE_RE.search(line.label))
         ):
             row = _price_from_fee_line(line, category)
             rows.append(row)
@@ -2438,6 +2440,9 @@ _TEMPLATE_FILLER_RE = re.compile(
 
 def _is_template_filler(text: str | None) -> bool:
     return len({word.casefold() for word in _TEMPLATE_FILLER_RE.findall(text or "")}) >= 2
+
+
+_EMPLOYER_RATE_RE = re.compile(r"\bcompan(?:y|ies)\b|\bemployers?\b|работодател|\bфирм[аи]\b|entreprise", re.IGNORECASE)
 
 
 def _names_several_installments(label: str | None) -> bool:

@@ -5383,6 +5383,8 @@ def test_later_amounts_of_one_line_under_one_label_are_left_out():
         # A range for a club is not a fee and its variant.
         _line("Клубове", 10, kind="extracurricular", quote="от 10 до 20 EUR"),
         _line("Клубове", 20, kind="extracurricular", quote="от 10 до 20 EUR"),
+        # Labelled as what it is, the employer's rate is listed under the family's price.
+        _line("Youngest Class / 2nd child (-9%) / Company < 50 employees", 7600, per="year", quote="2nd child"),
         # The same label on another line of the page is another fee.
         _line("Целодневен престой", 1100, quote="Целодневен престой – 1100 лв."),
         _line("Целодневен престой", 950, quote="Целодневен престой – 950 лв."),
@@ -5391,6 +5393,9 @@ def test_later_amounts_of_one_line_under_one_label_are_left_out():
     rows = extractor_module.helpers._prices_from_fee_lines(lines)
 
     assert [r.amount for r in rows] == [7965.52, 2550, 1950, 10, 20, 1100, 950]
+    assert [r.installments for r in rows if r.installments] == [
+        ["Youngest Class / 2nd child (-9%) / Company < 50 employees: 7600 EUR"]
+    ]
 
 
 def test_the_slices_of_a_total_are_not_fees_of_their_own():
