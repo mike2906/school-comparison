@@ -624,6 +624,10 @@
         "title": "NVO exam results",
         "body": "Official results of the national external assessments (NVO) for 4th, 7th and 10th grade, published by the Ministry of Education and Science as open data. We show each school’s average in Bulgarian and maths and the national average for the same year."
       },
+      "dzi": {
+        "title": "Matura exam results (DZI)",
+        "body": "Official results of the 12th-grade state matura exams (May–June session) for each school, published by the Ministry of Education and Science as open data. We show each school’s average grade per subject on the 2–6 scale. The ministry’s portal keeps only recent years, so older results are not available."
+      },
       "prices": {
         "title": "Private school fees",
         "body": "Taken from each school’s own website and shown only where the page states the price. Every price is marked with its source, and the comparison page links to the page it came from and shows when we checked it. Fees change, so confirm with the school before deciding."
@@ -694,5 +698,43 @@
     "nvoMath": "maths {{value}}",
     "tuitionOne": "Tuition: €{{min}} per {{period}}",
     "tuitionRange": "Tuition: €{{min}}–€{{max}} per {{period}}"
+  },
+  "dzi": {
+    "title": "Matura exam results (DZI, 12th grade)",
+    "intro": "The average grade of the school’s 12th-graders in the May–June state matura exams, on the 2–6 scale where 6 is the top grade. These are grades, not NVO points, so they cannot be compared with NVO results.",
+    "subject": "Subject",
+    "sofiaAverage": "Sofia schools, {{year}}",
+    "subjectWithCurriculum": "{{subject}} ({{curriculum}})",
+    "curriculum": {
+      "oop": "general curriculum",
+      "pp": "specialised curriculum"
+    },
+    "grades": {
+      "poor": "Poor",
+      "fair": "Fair",
+      "good": "Good",
+      "veryGood": "Very good",
+      "excellent": "Excellent"
+    },
+    "footnote": "Results from fewer than 5 pupils are not shown. The Sofia column is the average of the Sofia schools’ results in that subject.",
+    "source": "Source: Ministry of Education open data",
+    "subjects": {
+      "bulgarian": "Bulgarian language and literature",
+      "math": "Maths",
+      "english": "English",
+      "german": "German",
+      "french": "French",
+      "spanish": "Spanish",
+      "italian": "Italian",
+      "russian": "Russian",
+      "history": "History and civilisations",
+      "geography": "Geography and economics",
+      "philosophy": "Philosophy",
+      "biology": "Biology and health education",
+      "physics": "Physics and astronomy",
+      "chemistry": "Chemistry and environmental protection",
+      "informatics": "Informatics",
+      "it": "Information technology"
+    }
   }
 }

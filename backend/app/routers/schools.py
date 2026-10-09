@@ -6,7 +6,7 @@ from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Response
 from pydantic import TypeAdapter
-from sqlalchemy import func, or_, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
@@ -330,7 +330,14 @@ async def get_exam_averages(
             )
             .join(School, ExamResult.school_id == School.id)
             .where(School.country_code == country_code)
-            .where(ExamResult.metric == "average_score")
+            # NVO points and ДЗИ grades (2–6) sit under their own exam types and are
+            # never averaged together.
+            .where(
+                or_(
+                    and_(ExamResult.exam_type != "dzi", ExamResult.metric == "average_score"),
+                    and_(ExamResult.exam_type == "dzi", ExamResult.metric == "average_grade"),
+                )
+            )
             # Results withheld for too few pupils do not feed the benchmark either.
             .where(or_(ExamResult.pupil_count.is_(None), ExamResult.pupil_count >= NVO_MIN_PUPILS))
             .group_by(ExamResult.exam_type, ExamResult.year, ExamResult.subject)
@@ -352,11 +359,15 @@ async def get_exam_averages(
             if year not in averages[exam_type]:
                 averages[exam_type][year] = {}
 
-            averages[exam_type][year][row.subject] = round(average_value, 1)
+            # Grades differ in the second decimal (4.45 is "Добър", 4.50 "Много добър").
+            averages[exam_type][year][row.subject] = round(average_value, 2 if exam_type == "dzi" else 1)
 
-        # Also calculate overall average per exam type (across all years and subjects)
+        # Also calculate overall average per exam type (across all years and subjects).
+        # Not for ДЗИ: a mean over a dozen different subjects means nothing.
         overall = {}
         for exam_type, years_data in averages.items():
+            if exam_type == "dzi":
+                continue
             all_values = []
             for year_data in years_data.values():
                 all_values.extend(year_data.values())
