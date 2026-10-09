@@ -45,17 +45,23 @@ _CURRENCIES = (("EUR", r"€|\beur|евро"), ("BGN", r"лв|\bbgn|лева"), 
 def reading_signature(text: str) -> tuple[frozenset[str], list[tuple[str, tuple[str, ...]]]]:
     """What two readings of one picture must agree on.
 
-    The currencies named anywhere, and each table row that holds a price: its first cell
-    with the numbers of the row. The same digits under another row's label or another
+    The currencies named anywhere, and each table row from the first one that holds a
+    price: its first cell with the numbers of the row. The same digits under another row's label or another
     currency are a different fee. Titles and header rows are left out: how a reading
     wraps them varies and says nothing about the fees.
     """
     lowered = (text or "").casefold()
     currencies = frozenset(code for code, pattern in _CURRENCIES if re.search(pattern, lowered))
     rows = []
+    in_table = False
     for line in lowered.splitlines():
         numbers = tuple(numbers_in(line))
-        if "|" in line and any(len(number) >= 3 for number in numbers):
+        if "|" not in line or not numbers:
+            continue
+        # Header rows come first and hold only small numbers ("1 installment"); from the
+        # first row with a price on, every row counts, also one with a small fee.
+        in_table = in_table or any(len(number) >= 3 for number in numbers)
+        if in_table:
             label = "".join(re.findall(r"[^\W_]+", line.split("|", 1)[0]))
             rows.append((label, numbers))
     return currencies, sorted(rows)

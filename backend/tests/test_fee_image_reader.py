@@ -51,3 +51,10 @@ async def test_a_title_wrapped_differently_does_not_discard_matching_tables():
 
     assert await _read(first, second) == first
     assert await _read(first, swapped) is None
+
+
+@pytest.mark.asyncio
+async def test_a_small_fee_misread_in_a_table_discards_the_picture():
+    first = "Fee | 1 installment | 2 installments\nTuition | 1000 EUR | 520\nFood | 9 EUR | 5"
+    assert await _read(first, first.replace("Food | 9 EUR", "Food | 90 EUR")) is None
+    assert await _read(first, first) == first
