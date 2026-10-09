@@ -659,6 +659,8 @@ def test_a_label_that_names_the_school_itself_is_its_own_fee():
     assert proper_name(gymnasium) == "АСЕН ЙОРДАНОВ"
     assert proper_name('"ЧАСТНО ОСНОВНО УЧИЛИЩЕ ЦАР СИМЕОН ВЕЛИКИ" ЕООД') is None
     assert proper_name('Частна детска градина „Слънце“ ООД') == "Слънце"
+    assert proper_name('ЧАСТНА ГИМНАЗИЯ "АСЕН ЙОРДАНОВ" гр. София') == "АСЕН ЙОРДАНОВ"
+    assert proper_name("Частна гимназия Асен Йорданов, гр. София") is None
     assert proper_name(None) is None
 
     label = "Годишна такса обучение / 5-7 клас и ЧГПНП „Асен Йорданов“"

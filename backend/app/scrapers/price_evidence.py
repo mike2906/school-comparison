@@ -486,7 +486,7 @@ def proper_name(registry_name: str | None) -> Optional[str]:
     parts = [part.strip() for part in re.split(r"[\"„“”«»]", str(registry_name or ""))]
     names = [
         part
-        for part in parts
+        for part in parts[1:-1]  # between two quotation marks
         if len(part) >= 4
         and part[0].isalpha()
         and not re.search(r"училищ|гимназ|градин|school|kindergarten", part.casefold())

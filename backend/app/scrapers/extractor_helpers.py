@@ -2523,6 +2523,23 @@ def _label_is_generic(label: str | None) -> bool:
     return not _GENERIC_FEE_LABEL_RE.sub(" ", _label_key(label)).strip()
 
 
+def _label_adds_words(longer: str | None, shorter: str | None) -> bool:
+    """The longer label is the shorter one's " / " parts, as written, plus fee wording.
+
+    Shared words are not enough: "Такса за чуждестранни ученици" and "Такса за български
+    ученици, идващи от чуждестранни училища" are two fees at one price (301). Nor may
+    the added words say which fee: "Grade 1 tuition" and "Grade 1 tuition full day" are
+    two plans.
+    """
+    whole = f" {_label_key(longer)} "
+    parts = [_label_key(part) for part in str(shorter or "").split(" / ")]
+    if not parts or not all(part and f" {part} " in whole for part in parts):
+        return False
+    for part in parts:
+        whole = whole.replace(f" {part} ", "  ")
+    return _label_is_generic(whole.replace("/", " "))
+
+
 def _without_restated_fees(rows: list[ExtractedPrice]) -> list[ExtractedPrice]:
     """One row for a fee the pages state more than once.
 
@@ -2544,8 +2561,12 @@ def _without_restated_fees(rows: list[ExtractedPrice]) -> list[ExtractedPrice]:
                 and (
                     generic
                     or _label_is_generic(other.plan_name)
+                    or stems == _label_stems(other.plan_name)
                     or (
-                        (stems <= _label_stems(other.plan_name) or _label_stems(other.plan_name) <= stems)
+                        (
+                            _label_adds_words(row.plan_name, other.plan_name)
+                            or _label_adds_words(other.plan_name, row.plan_name)
+                        )
                         and label_grades(row.plan_name) == label_grades(other.plan_name)
                     )
                 )

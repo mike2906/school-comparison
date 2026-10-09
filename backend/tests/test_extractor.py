@@ -5369,6 +5369,16 @@ def test_a_fee_stated_again_under_a_longer_or_a_bare_label_is_one_row():
         [_line("ПГ", 8950), _line("I - VII клас", 8950), _line("1 клас", 9000), _line("1 - 4 клас", 9000)]
     )
     assert len(rows) == 4
+    # 301: two fees at one price whose labels share their words.
+    foreign = "Такса за чуждестранни ученици"
+    returning = "Такса за български ученици, идващи от чуждестранни училища извън страната"
+    rows = helpers._prices_from_fee_lines([_line(foreign, 22200), _line(returning, 22200)])
+    assert [r.plan_name for r in rows] == [foreign, returning]
+    # Added words that say which fee make another fee.
+    rows = helpers._prices_from_fee_lines(
+        [_line("Grade 1 / annual tuition", 9000), _line("Grade 1 / annual tuition / full day", 9000)]
+    )
+    assert len(rows) == 2
 
 
 def test_later_amounts_of_one_line_under_one_label_are_left_out():
