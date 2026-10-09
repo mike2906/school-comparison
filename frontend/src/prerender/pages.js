@@ -13,7 +13,7 @@ import {
   getNvoSubjectKey,
   isAverageMetric,
 } from '../utils/nvo.js'
-import { yearlyTuitionRangeEur } from '../utils/pricing.js'
+import { statedTuition } from '../utils/pricing.js'
 
 // Our own thin-content heuristic, not an SEO rule: a published Bulgarian summary shorter
 // than this says little beyond the name, type and address the page already shows.
@@ -89,10 +89,12 @@ function nvoLine(result, t) {
 }
 
 function tuitionLine(school, t) {
-  const range = yearlyTuitionRangeEur(school?.pricing)
-  if (!range) return ''
-  const [min, max] = [range.min, range.max].map((value) => Math.round(value))
-  return min === max ? t('seo.tuitionOne', { min }) : t('seo.tuitionRange', { min, max })
+  const tuition = statedTuition(school?.pricing)
+  // Euro only, in the period the school states; never annualised.
+  if (!tuition || tuition.currency !== 'EUR' || !tuition.period) return ''
+  const [min, max] = [tuition.min, tuition.max].map((value) => Math.round(value))
+  const period = t(`pricing.per.${tuition.period}`)
+  return min === max ? t('seo.tuitionOne', { min, period }) : t('seo.tuitionRange', { min, max, period })
 }
 
 /**
