@@ -7,6 +7,7 @@ const SOURCES = [
   { key: 'schools', href: null },
   { key: 'kindergartens', href: 'https://kg.sofia.bg', coverage: true },
   { key: 'nvo', href: 'https://data.egov.bg' },
+  { key: 'dzi', href: 'https://data.egov.bg' },
   { key: 'prices', href: null },
   { key: 'maps', href: 'https://www.openstreetmap.org/copyright' },
 ]

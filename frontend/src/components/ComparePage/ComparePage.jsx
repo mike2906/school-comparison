@@ -26,6 +26,7 @@ import {
   comparisonExamType,
   examGradeLabel,
   getBenchmarkComparison,
+  getAvailableExamTypes,
   getBenchmarkToneClasses,
   getNvoDetail as getSharedNvoDetail,
 } from '../../utils/nvo'
@@ -1323,7 +1324,8 @@ function ComparePage() {
       if (hasContact) {
         present.add('contact')
       }
-      if ((school.exam_results || []).length > 0) {
+      // The academic section shows NVO only; ДЗИ rows alone would leave it empty.
+      if (getAvailableExamTypes(school.exam_results || []).length > 0) {
         present.add('academic')
       }
       const hasAdmission = Boolean(

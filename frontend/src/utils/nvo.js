@@ -96,7 +96,8 @@ export function getAvailableExamTypes(examResults = []) {
   const types = new Set()
 
   examResults.forEach((result) => {
-    if (result.exam_type && isAverageMetric(result.metric)) {
+    // NVO only: ДЗИ grades (exam_type "dzi") have their own section.
+    if (result.exam_type in GRADE_ORDER && isAverageMetric(result.metric)) {
       types.add(result.exam_type)
     }
   })

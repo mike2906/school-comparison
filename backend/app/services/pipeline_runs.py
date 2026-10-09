@@ -26,7 +26,7 @@ from app.models.pipeline_run import (
 )
 from app.services.data_quality import compute_quality_metrics
 
-# CLI stage string -> coarse PipelineStage enum. Stages absent here (e.g. "nvo",
+# CLI stage string -> coarse PipelineStage enum. Stages absent here (e.g. "nvo", "dzi",
 # which AGENTS.md documents as independent of the website pipeline) are not tracked.
 _CLI_STAGE_TO_ENUM: dict[str, PipelineStage] = {
     "discover": PipelineStage.DISCOVER,

@@ -40,10 +40,12 @@ columns are SQLAlchemy `JSON` (Postgres `json`, not `jsonb`).
 - `source` enum: official | scraped_website | forum | not_found — MUST display in UI
 - `source_url`, `pricing_context` (JSON, internal)
 
-### exam_results (NVO scores for state schools)
-- `school_id` (FK), `year`, `exam_type` (nvo_4 | nvo_7 | nvo_10)
+### exam_results (official NVO and ДЗИ results)
+- `school_id` (FK), `year`, `exam_type` (nvo_4 | nvo_7 | nvo_10 | dzi)
 - `subject`, `metric`, `value`
-- Current canonical imported metric: `average_score` (official school-level average scores)
+- NVO metric: `average_score` (points). ДЗИ metric: `average_grade` (2–6 scale), subject
+  `<subject>[_<cefr>]_<oop|pp>`. Grades and points never share a chart, sort or benchmark;
+  list responses carry NVO rows only.
 - `pupil_count` — pupils who sat the exam ("явили се"); internal, never a response field.
   A result with fewer than `NVO_MIN_PUPILS` (`app/utils/display_gating.py`) is withheld from
   every response, the benchmark averages and the summary facts.
