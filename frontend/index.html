@@ -42,6 +42,17 @@
         })
       })()
     </script>
+    <script>
+      // The prerendered block in #root (src/prerender/pages.js) is for crawlers and link
+      // previews. With JavaScript the app replaces it as soon as it mounts, so keep it
+      // hidden instead of flashing it for the moment the bundle takes to load; show it
+      // after all if the app has not mounted in a few seconds (the bundle failed to load).
+      ;(function () {
+        var style = document.head.appendChild(document.createElement('style'))
+        style.textContent = '#root > [data-prerender] { display: none }'
+        setTimeout(function () { style.remove() }, 4000)
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>
