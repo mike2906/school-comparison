@@ -2365,9 +2365,24 @@ revision. None of this may widen the public boundary without a reviewed pilot.
         searching again (505 had been given a third party's page).
         (5) The pricing tier moved to GPT-6.1 Sol: read twice, it gave the same tuition
         set on 15 of 16 hard pages, Haiku 5.5 on 10. About $0.02 a school.
-        **Still open:** Uwekind (634/635) is withheld by the shared-site check because
-        the registry holds its old address; a multi-price table row can still take a
-        neighbour's label (301); a picture misread the same way twice would pass.
+        **Still open:** a multi-price table row can still take a neighbour's label
+        (301); a picture misread the same way twice would pass.
+      - **Shared-site check, superseded registry address (2026-10-09, Mike's call: where
+        the site has an updated address, use it).** A member was withheld whenever the
+        site did not state its registry address. When the site states addresses and none
+        is *any* member's registry address, they cannot tell the members apart: the
+        registry is behind the site. Each member the site describes at its level now
+        keeps it (`settle_group`, reason `site_states_no_members_registry_address`), and
+        extraction gives a single-location school the address the site states for its
+        level (the only one on the site, or the only one on a line naming the level);
+        the old point stays until the new address geocodes. Also: the check reads the
+        text of pages it invalidated itself (up to 180 days old), and one name of a
+        three-word street may be an initial. Sandbox dry run over all 18 shared-site
+        groups: Uwekind's three institutions (634, 635, 153) and VEDA's two (372, 534)
+        are kept; 589 and 150 stay withheld because a sibling's registry address is on
+        their site; no member that was kept is withheld.
+        **Open:** 635 has two registered locations, so its address is not replaced;
+        589's site names a second address no member claims, which may be its new one.
 - [ ] **E5 Gymnasium admission thresholds (state schools).** Import the official minimum
       admission scores after 7th grade into `admission_info.historical_min_scores`. Scores
       come from the city-wide NVO ranking, so no address logic is needed, but they are per

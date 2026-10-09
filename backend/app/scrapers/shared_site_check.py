@@ -98,6 +98,7 @@ _ADDRESS_STOP_WORDS = frozenset(
 )
 
 MAX_CAMPUS_CANDIDATES = 12
+STORED_TEXT_MAX_AGE = datetime.timedelta(days=180)  # for pages no longer marked valid
 MAX_CONTACT_PAGES = 3
 NUMBER_WINDOW = 6
 
@@ -260,7 +261,13 @@ def address_matches(key: AddressKey, corpus_tokens: Sequence[str]) -> bool:
 # A street address as a site writes it: "ул. Манастирска воденица 71", "бул. „Витоша“ № 15А".
 _STATED_ADDRESS_RE = re.compile(
     r"(?<![^\W\d_])(?:улица|ул|булевард|бул|площад|пл)\s*\.?\s*[„\"“«]?\s*"
-    r"[^\W\d_][^,;:\d№\n„\"“”«»|]{1,40}?[”\"“»]?\s*(?:№|N|No\.?)?\s*\d{1,3}\s?[^\W\d_]?(?![^\W_])",
+    r"[^\W\d_][^,;:\d№\n„\"“”«»|]{1,40}?[”\"“»]?\s*(?:№|N|No\.?)?\s*\d{1,3}[^\W\d_]?(?![^\W_])",
+    re.IGNORECASE,
+)
+
+
+_NOT_A_STREET_NAME_RE = re.compile(
+    r"(?<![^\W\d_])(?:от|до|бл|блок|ет|етаж|вх|вход|тел|телефон|и|или|на|за|в|с|час|ч|from|to|and|floor|tel)(?![^\W\d_])",
     re.IGNORECASE,
 )
 
@@ -272,6 +279,9 @@ def stated_addresses(text: str) -> list[tuple[str, str]]:
         for match in _STATED_ADDRESS_RE.finditer(line):
             address = " ".join(match.group(0).split())
             key = address_key(address)
+            # Prose that runs on to some number is not an address ("ул. Вазов от 9 до 17 ч.").
+            if _NOT_A_STREET_NAME_RE.search(address):
+                continue
             if key is not None and key.kind == "street_number":
                 found.setdefault((key.words, key.number), (address, line.strip()))
     return list(found.values())
@@ -728,7 +738,7 @@ def _member_from_school(school) -> Member:
 
 
 async def _stored_texts_by_host(db, school_ids: Sequence[int]) -> dict[str, list[str]]:
-    from sqlalchemy import select
+    from sqlalchemy import or_, select
 
     from app.models import SourcePage
     from app.models.scrape_log import ScrapeType
@@ -740,8 +750,13 @@ async def _stored_texts_by_host(db, school_ids: Sequence[int]) -> dict[str, list
                 SourcePage.scrape_type == ScrapeType.WEBSITE,
                 # Pages this check invalidated when it withheld the site keep their
                 # text, and it is still what the site said (a rendered contact page
-                # the plain fetch below cannot read: 534's address).
+                # the plain fetch below cannot read: 534's address). Not for ever: a
+                # domain can change hands.
                 SourcePage.raw_markdown.isnot(None),
+                or_(
+                    SourcePage.is_valid.is_(True),
+                    SourcePage.last_scraped_at >= datetime.datetime.now(datetime.timezone.utc) - STORED_TEXT_MAX_AGE,
+                ),
             )
         )
     ).all()

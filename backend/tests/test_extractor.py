@@ -5088,9 +5088,18 @@ async def test_site_address_replaces_a_superseded_registry_address(db_session, s
     school.attributes = {SHARED_SITE_CHECK_KEY: {"action": "keep", "reason": REGISTRY_ADDRESS_SUPERSEDED}}
     assert await extractor_module._adopt_stated_address(db_session, school, text) == "ул. Манастирска воденица 71"
     assert location.address_i18n == {"bg": "ул. Манастирска воденица 71"}
-    assert (location.lat, location.lng) == (None, None)
-    assert location.location_tags == ["address_source=website_contact"]
+    # The old point stays until the new address is geocoded after the commit.
+    assert (location.lat, location.lng) == (42.65, 23.25)
+    assert location.location_tags == [
+        "coords_source=nominatim", "address_source=website_contact", "geocode=address_changed",
+    ]  # fmt: skip
     # Already there: nothing more to do.
+    assert await extractor_module._adopt_stated_address(db_session, school, text) is None
+
+    # A school with a second registered location is left alone: it may be the new premises.
+    location.address_i18n = {"bg": 'ул. "Крум Попов" № 69'}
+    db_session.add(SchoolLocation(school_id=school.id, address_i18n={"bg": "с. Лозен, ул. Лозен парк 1"}, is_primary=False))
+    await db_session.flush()
     assert await extractor_module._adopt_stated_address(db_session, school, text) is None
 
 

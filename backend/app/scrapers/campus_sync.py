@@ -46,6 +46,8 @@ logger = logging.getLogger(__name__)
 CAMPUSES_KEY = "website_campuses"
 WEBSITE_CONTACT_ADDRESS_TAG = "address_source=website_contact"
 CAMPUS_TAG = "location_source=website_campus"
+# Set with a new address taken from the site; cleared once geocoding has been tried.
+READDRESSED_TAG = "geocode=address_changed"
 AGE_GROUP_TAG_PREFIX = "age_group_source=website:"
 
 _CONTACT_PATH_RE = re.compile(r"contact|kontakt|контакт", re.IGNORECASE)
@@ -626,30 +628,39 @@ async def geocode_campus_locations(db, school_id: int, *, country_code: str = "b
     from app.services.geocoding.service import geocode_failure_is_terminal
 
     candidates = (
-        await db.execute(
-            select(SchoolLocation).where(SchoolLocation.school_id == school_id, SchoolLocation.lat.is_(None))
-        )
+        await db.execute(select(SchoolLocation).where(SchoolLocation.school_id == school_id))
     ).scalars().all()
-    # Also a location whose address was just taken from the site and has no point yet.
-    locations = [
+    campuses = [
         loc for loc in candidates
-        if {CAMPUS_TAG, WEBSITE_CONTACT_ADDRESS_TAG} & set(loc.location_tags or [])
+        if loc.lat is None
+        and CAMPUS_TAG in (loc.location_tags or [])
         and not geocode_failure_is_terminal(loc.geocode_meta)
     ]
-    if not locations:
+    # A location whose address was just replaced by the site's keeps its old point
+    # until the new address is found: a school with no point drops off the map.
+    readdressed = [loc for loc in candidates if READDRESSED_TAG in (loc.location_tags or [])]
+    if not campuses and not readdressed:
         return []
     from app.services.geocoding.service import GeocodingService
 
     geocoder = GeocodingService(db)
-    for location in locations:
+    for location in campuses:
         try:
             await geocoder.geocode_location(location, country_code=country_code)
         except Exception as exc:  # a missing pin must not undo the validated data
             logger.warning("Campus location %s geocoding failed: %s", location.id, exc)
             continue
-        if CAMPUS_TAG in (location.location_tags or []):
-            await _drop_if_same_building(db, location)
-    return [loc.id for loc in locations]
+        await _drop_if_same_building(db, location)
+    for location in readdressed:
+        try:
+            await geocoder.geocode_location(location, force=True, country_code=country_code)
+        except Exception as exc:
+            logger.warning("Re-addressed location %s geocoding failed: %s", location.id, exc)
+        location.location_tags = [tag for tag in location.location_tags or [] if tag != READDRESSED_TAG]
+        db.add(location)
+    if readdressed:
+        await db.commit()
+    return [loc.id for loc in campuses + readdressed]
 
 
 async def _drop_if_same_building(db, campus) -> bool:

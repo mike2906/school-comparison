@@ -593,3 +593,35 @@ def test_module_has_no_hardcoded_age_group_keys():
     source = inspect.getsource(cs)
     for key in ('"grade_1_4"', '"grade_5_7"', '"preschool"', '"nursery"'):
         assert key not in source
+
+
+@pytest.mark.asyncio
+async def test_readdressed_location_is_geocoded_again_and_keeps_its_point_if_that_fails(db_session):
+    """A location given the site's address keeps its old point until the new address is
+    found; the marker is cleared after one try either way."""
+    from unittest.mock import AsyncMock, MagicMock
+
+    school = School(
+        name_i18n={"bg": "ЧДГ Пример"}, country_code="bg", city="sofia", school_type="private",
+        education_level="kindergarten",
+    )  # fmt: skip
+    school.locations = [
+        SchoolLocation(
+            address_i18n={"bg": "ул. Манастирска воденица 71"}, lat=42.65, lng=23.25, is_primary=True,
+            location_tags=["address_source=website_contact", cs.READDRESSED_TAG],
+        )
+    ]  # fmt: skip
+    db_session.add(school)
+    await db_session.commit()
+    school_id = school.id
+
+    geocoder = MagicMock()
+    geocoder.geocode_location = AsyncMock(side_effect=RuntimeError("geocoder down"))
+    with patch("app.services.geocoding.service.GeocodingService", return_value=geocoder):
+        tried = await cs.geocode_campus_locations(db_session, school_id)
+
+    location = (await _locations(db_session, school_id))[0]
+    assert tried == [location.id]
+    assert geocoder.geocode_location.await_args.kwargs["force"] is True
+    assert (location.lat, location.lng) == (42.65, 23.25)
+    assert location.location_tags == ["address_source=website_contact"]

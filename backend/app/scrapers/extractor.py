@@ -362,8 +362,10 @@ async def _adopt_stated_address(db: AsyncSession, school: School, page_text: str
 
     Only for a site the shared-site check kept because it states no member's registry
     address (the school moved and the registry is behind), and only when the site gives
-    one address for an institution of this level. The old point is dropped so that the
-    new address is geocoded; an official or hand-corrected point keeps its address.
+    one address for an institution of this level and the school has a single location.
+    The old point stays until the new address is geocoded after the commit
+    (``campus_sync.geocode_campus_locations``); an official or hand-corrected point
+    keeps its address.
     """
     check = (school.attributes or {}).get(SHARED_SITE_CHECK_KEY) or {}
     if check.get("reason") != REGISTRY_ADDRESS_SUPERSEDED:
@@ -371,25 +373,26 @@ async def _adopt_stated_address(db: AsyncSession, school: School, page_text: str
     address = stated_address_for(page_text, school.education_level)
     if not address:
         return None
-    primary = (
-        await db.execute(
-            select(SchoolLocation)
-            .where(SchoolLocation.school_id == school.id)
-            .order_by(SchoolLocation.is_primary.desc(), SchoolLocation.id.asc())
-        )
-    ).scalars().first()
-    if primary is None or has_pinned_point(primary):
+    # Local import: campus_sync imports app.scrapers modules that import this one.
+    from app.scrapers.campus_sync import READDRESSED_TAG
+
+    locations = (
+        await db.execute(select(SchoolLocation).where(SchoolLocation.school_id == school.id))
+    ).scalars().all()
+    # With several registered locations one may already be the new premises (635).
+    if len(locations) != 1 or has_pinned_point(locations[0]):
         return None
+    primary = locations[0]
     current = (primary.address_i18n or {}).get("bg") or ""
     if same_building(current, address):
         return None
     logger.info("School %s: registry address %r superseded by the site's %r", school.id, current, address)
     primary.address_i18n = {"bg": address}
     primary.location_tags = [
-        tag for tag in primary.location_tags or [] if not str(tag).startswith("coords_source=")
-    ] + ([] if WEBSITE_CONTACT_ADDRESS_TAG in (primary.location_tags or []) else [WEBSITE_CONTACT_ADDRESS_TAG])
-    primary.lat = primary.lng = None
-    primary.geocode_meta = None
+        *(tag for tag in primary.location_tags or [] if tag not in (WEBSITE_CONTACT_ADDRESS_TAG, READDRESSED_TAG)),
+        WEBSITE_CONTACT_ADDRESS_TAG,
+        READDRESSED_TAG,
+    ]
     db.add(primary)
     return address
 

@@ -706,6 +706,9 @@ def test_stated_addresses_and_the_one_for_a_level():
     assert stated_address_for(text, "upper_secondary") is None
     assert stated_address_for("Адрес: ул. Липа 5", "primary") == "ул. Липа 5"
     assert stated_address_for("ул. Липа 5 и ул. Бреза 7", "primary") is None
+    # Prose that runs on to a number is not an address.
+    assert stated_addresses("Приемно време: ул. Иван Вазов от 9 до 17 ч.") == []
+    assert stated_addresses("бул. България до бл. 5") == []
 
 
 @pytest.mark.asyncio
