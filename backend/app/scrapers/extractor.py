@@ -1314,6 +1314,7 @@ async def _extract_prices(
 
     pricing_rows: list[Pricing] = []
     source_rows: list[FieldSource] = []
+    seen_fees: set[tuple[Any, Any, Any]] = set()
 
     for extracted in parsed.prices:
         fields = _normalized_price_fields(extracted)
@@ -1338,6 +1339,15 @@ async def _extract_prices(
             (page for page in pages if page.source_url == row_source_url),
             None,
         )
+        # The same fee copied from a second page (the site's other language, an older
+        # copy) resolves to the first page that states the amount; there its label is
+        # not to be found, unlike that of a second band with the same price.
+        fee_key = (category, amount, fields["currency"])
+        if fee_key in seen_fees and not helpers._label_is_on_page(
+            fields["plan_name"], supporting_page.raw_markdown if supporting_page else None
+        ):
+            continue
+        seen_fees.add(fee_key)
         if (
             not fields["academic_year"]
             and supporting_page is not None

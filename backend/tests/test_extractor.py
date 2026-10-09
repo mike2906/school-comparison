@@ -5140,3 +5140,37 @@ async def test_price_extraction_asks_for_copied_lines_and_stores_the_rows(
     assert result["count"] == 2
     # The page does not say the deposit is paid once, so its period is left empty.
     assert await _stored(db_session, school) == [("registration", 265.0, None), ("tuition", 530.0, "monthly")]
+
+
+@pytest.mark.asyncio
+async def test_fee_copied_from_a_second_language_page_is_stored_once(db_session, sample_school_for_extraction):
+    """School 301: the Bulgarian and the English fee page both went to the model."""
+    school = sample_school_for_extraction
+    pages = (
+        await db_session.execute(select(SourcePage).where(SourcePage.school_id == school.id))
+    ).scalars().all()
+    next(page for page in pages if page.page_category == "pricing").raw_markdown = (
+        "Такси 2026/2027\nПГ | EUR 8950\nI - VII клас | EUR 8950\nVIII - XII клас | EUR 6700\n"
+    )
+    await db_session.flush()
+    copied = PageFees(
+        lines=[
+            _line("ПГ", 8950, per="year"),
+            _line("I - VII клас", 8950, per="year"),
+            _line("Preparatory group", 8950, per="year"),
+            _line("VIII - XII клас", 6700, per="year"),
+            _line("Grades VIII - XII", 6700, per="year"),
+        ]
+    )
+
+    with patch("app.scrapers.extractor._run_typed_agent", new=AsyncMock(return_value=(copied, 10, 2, 0.001))):
+        await extractor_module._extract_prices(
+            db_session, school, list(pages), 20.0, extractor_module.ExtractionLLMStats()
+        )
+
+    rows = (await db_session.execute(select(Pricing).where(Pricing.school_id == school.id))).scalars().all()
+    assert sorted((float(row.amount), row.plan_name) for row in rows) == [
+        (6700.0, "VIII - XII клас"),
+        (8950.0, "I - VII клас"),
+        (8950.0, "ПГ"),
+    ]

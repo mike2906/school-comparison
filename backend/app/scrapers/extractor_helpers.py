@@ -2385,6 +2385,13 @@ def _price_from_fee_line(line: FeeLine, category: str) -> ExtractedPrice:
     )
 
 
+def _label_is_on_page(label: str | None, page_text: str | None) -> bool:
+    """Some part of a copied label ("row / column heading") is written on the page."""
+    text = normalize_text(page_text)
+    parts = [part.strip() for part in str(label or "").split(" / ") if len(part.strip()) >= 3]
+    return any(label_spans(text, part) for part in parts)
+
+
 def _source_blocks(text: str) -> list[tuple[str | None, str]]:
     """(source URL, text) per ``--- SOURCE ---`` block; one block for unmarked text."""
     headers = list(
