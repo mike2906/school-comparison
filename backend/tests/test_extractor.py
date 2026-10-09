@@ -5194,3 +5194,84 @@ def test_fee_lines_in_euro_and_leva_are_one_fee_and_the_level_part_of_a_label_is
     ]
     assert rows[0].age_group == "Подготвителен клас" and rows[2].age_group == "Grade 11"
     assert len(rows[2].plan_name) <= 100 and rows[2].notes is None
+
+
+@pytest.mark.asyncio
+async def test_site_address_replaces_a_superseded_registry_address(db_session, sample_school_for_extraction):
+    """634: the shared-site check kept the site although it states no registry address;
+    the school then takes the address the site gives for its level, and loses its old
+    point so that the new address is geocoded."""
+    from app.scrapers.shared_site_check import REGISTRY_ADDRESS_SUPERSEDED, SHARED_SITE_CHECK_KEY
+
+    school = sample_school_for_extraction
+    school.education_level = "kindergarten"
+    location = SchoolLocation(
+        school_id=school.id, address_i18n={"bg": 'ул. "Крум Попов" № 69', "en": "69 Krum Popov St"},
+        lat=42.65, lng=23.25, is_primary=True, location_tags=["coords_source=nominatim"], district="Витоша",
+    )  # fmt: skip
+    db_session.add(location)
+    await db_session.flush()
+    text = "Лозен парк, ул. Манастирска воденица 71 – детска градина и начално училище\nГимназия: бул. Черни връх 32"
+
+    # Without the check's verdict the registry address stands.
+    assert await extractor_module._adopt_stated_address(db_session, school, text) is None
+
+    school.attributes = {SHARED_SITE_CHECK_KEY: {"action": "keep", "reason": REGISTRY_ADDRESS_SUPERSEDED}}
+    assert await extractor_module._adopt_stated_address(db_session, school, text) == "ул. Манастирска воденица 71"
+    assert location.address_i18n == {"bg": "ул. Манастирска воденица 71"}
+    assert location.district is None
+    # The old point stays until the new address is geocoded after the commit.
+    assert (location.lat, location.lng) == (42.65, 23.25)
+    assert location.location_tags == [
+        "coords_source=nominatim", "address_source=website_contact", "geocode=address_changed",
+    ]  # fmt: skip
+    # Already there: nothing more to do.
+    assert await extractor_module._adopt_stated_address(db_session, school, text) is None
+
+    # A school with a second registered location is left alone: it may be the new premises.
+    location.address_i18n = {"bg": 'ул. "Крум Попов" № 69'}
+    db_session.add(SchoolLocation(school_id=school.id, address_i18n={"bg": "с. Лозен, ул. Лозен парк 1"}, is_primary=False))
+    await db_session.flush()
+    assert await extractor_module._adopt_stated_address(db_session, school, text) is None
+
+
+@pytest.mark.asyncio
+async def test_a_pinned_location_keeps_its_address_when_the_registry_is_superseded(
+    db_session, sample_school_for_extraction
+):
+    from app.scrapers.shared_site_check import REGISTRY_ADDRESS_SUPERSEDED, SHARED_SITE_CHECK_KEY
+    from app.services.geocoding.write_gate import OFFICIAL_COORDS_TAG
+
+    school = sample_school_for_extraction
+    school.attributes = {SHARED_SITE_CHECK_KEY: {"action": "keep", "reason": REGISTRY_ADDRESS_SUPERSEDED}}
+    location = SchoolLocation(
+        school_id=school.id, address_i18n={"bg": 'ул. "Крум Попов" № 69'}, lat=42.65, lng=23.25,
+        is_primary=True, location_tags=[OFFICIAL_COORDS_TAG],
+    )  # fmt: skip
+    db_session.add(location)
+    await db_session.flush()
+
+    assert await extractor_module._adopt_stated_address(db_session, school, "Адрес: ул. Нова 12") is None
+    assert location.address_i18n == {"bg": 'ул. "Крум Попов" № 69'}
+
+
+@pytest.mark.asyncio
+async def test_site_map_point_stands_for_a_readdressed_location(db_session, sample_school_for_extraction):
+    """The site's own map point is accepted with the address; geocoding the address
+    again afterwards would replace it with a rougher one, so the marker is dropped."""
+    school = sample_school_for_extraction
+    location = SchoolLocation(
+        school_id=school.id, address_i18n={"bg": "ул. Манастирска воденица 71"}, lat=42.65, lng=23.25,
+        is_primary=True, location_tags=["address_source=website_contact", "geocode=address_changed"],
+    )  # fmt: skip
+    db_session.add(location)
+    await db_session.flush()
+    contact = {"address": "ул. Манастирска воденица 71", "coordinates": {"lat": 42.61, "lng": 23.44}}
+
+    with patch.object(
+        extractor_module, "apply_geocode_result_to_location", new=AsyncMock(return_value=SimpleNamespace(success=True))
+    ):
+        await extractor_module._sync_primary_location_from_contact_address(db_session, school, contact)
+
+    assert "geocode=address_changed" not in location.location_tags
+    assert "coords_source=website_map_link" in location.location_tags

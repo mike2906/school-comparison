@@ -47,6 +47,9 @@ KEEP = "keep"
 REPLACE = "replace"
 WITHHOLD = "withhold"
 
+# KEEP reason: the site states addresses, none of them any member's registry address.
+REGISTRY_ADDRESS_SUPERSEDED = "site_states_no_members_registry_address"
+
 WEBSITE_CONTACT_ADDRESS_TAG = "address_source=website_contact"
 SHARED_SITE_CHECK_KEY = "shared_site_check"
 
@@ -95,6 +98,7 @@ _ADDRESS_STOP_WORDS = frozenset(
 )
 
 MAX_CAMPUS_CANDIDATES = 12
+STORED_TEXT_MAX_AGE = datetime.timedelta(days=180)  # for pages no longer marked valid
 MAX_CONTACT_PAGES = 3
 NUMBER_WINDOW = 6
 
@@ -244,9 +248,61 @@ def address_matches(key: AddressKey, corpus_tokens: Sequence[str]) -> bool:
             if all(n in nearby for n in numbered_street):
                 return True
             continue
-        if all(word in nearby for word in words):
+        missing = [word for word in words if word not in nearby]
+        if not missing:
+            return True
+        # One name of three or more written as its initial: "Марин Д. Христов" for
+        # "Марин Дочев Христов" (372).
+        if len(missing) == 1 and len(words) >= 3 and missing[0][:1] in nearby:
             return True
     return False
+
+
+# A street address as a site writes it: "ул. Манастирска воденица 71", "бул. „Витоша“ № 15А".
+_STATED_ADDRESS_RE = re.compile(
+    r"(?<![^\W\d_])(?:улица|ул|булевард|бул|площад|пл)\s*\.?\s*[„\"“«]?\s*"
+    r"[^\W\d_][^,;:\d№\n„\"“”«»|]{1,40}?[”\"“»]?\s*(?:№|N|No\.?)?\s*\d{1,3}[^\W\d_]?(?![^\W_])",
+    re.IGNORECASE,
+)
+
+
+_NOT_A_STREET_NAME_RE = re.compile(
+    r"(?<![^\W\d_])(?:от|до|бл|блок|ет|етаж|вх|вход|тел|телефон|и|или|на|за|в|с|час|ч|from|to|and|floor|tel)(?![^\W\d_])",
+    re.IGNORECASE,
+)
+
+
+def stated_addresses(text: str) -> list[tuple[str, str]]:
+    """(address, the line it stands on) for each distinct street address in a site's text."""
+    found: dict[tuple[tuple[str, ...], Optional[str]], tuple[str, str]] = {}
+    for line in str(text or "").splitlines():
+        for match in _STATED_ADDRESS_RE.finditer(line):
+            address = " ".join(match.group(0).split())
+            key = address_key(address)
+            # Prose that runs on to some number is not an address ("ул. Вазов от 9 до 17 ч.").
+            if _NOT_A_STREET_NAME_RE.search(address):
+                continue
+            if key is not None and key.kind == "street_number":
+                found.setdefault((key.words, key.number), (address, line.strip()))
+    return list(found.values())
+
+
+def stated_address_for(text: str, education_level: str | None) -> Optional[str]:
+    """The one address a site gives for an institution of this level, or None.
+
+    A brand's site may list several premises. The address is taken only when it is the
+    single one on the site, or the single one on a line naming the institution's level
+    ("ул. Манастирска воденица 71 - детска градина и начално училище"); between two
+    candidates nothing is chosen.
+    """
+    addresses = stated_addresses(text)
+    family = level_family(education_level)
+    for candidates in ([a for a, line in addresses if describes_level(line, family)], [a for a, _ in addresses]):
+        if len(candidates) == 1:
+            return candidates[0]
+        if candidates:
+            return None
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -418,6 +474,7 @@ class SiteEvidence:
     level_fit: bool
     url_level_conflict: bool
     pages: int
+    stated_addresses: list[str] = field(default_factory=list)
 
     @property
     def accepted(self) -> bool:
@@ -429,6 +486,7 @@ class SiteEvidence:
             "level_fit": self.level_fit,
             "url_names_other_level": self.url_level_conflict,
             "pages": self.pages,
+            "stated_addresses": self.stated_addresses,
         }
 
 
@@ -448,6 +506,7 @@ def evaluate_site(member: Member, url: str, texts: Iterable[str], domain: Option
         level_fit=describes_level(corpus, family),
         url_level_conflict=url_names_other_level(url, family, domain),
         pages=len(texts),
+        stated_addresses=[address for address, _ in stated_addresses(corpus)][:8],
     )
 
 
@@ -598,6 +657,49 @@ async def decide_member(
     return Decision(member.school_id, WITHHOLD, reason, url, evidence=evidence)
 
 
+def settle_group(decisions: Sequence[Decision], levels: Sequence[str] = ()) -> list[Decision]:
+    """Keep a site whose addresses cannot tell the group's members apart.
+
+    A member is withheld when the site does not state its registry address, because on a
+    shared site that address is what says whose site it is (a kindergarten at another
+    address than its sibling school's site states). When the site states addresses and
+    none is the registry address of *any* member, they say nothing against anyone: the
+    registry is behind the site (634/635 moved to a new campus). Each member the site
+    describes at its level then keeps the site, and its address is taken from the site
+    at extraction (:func:`stated_address_for`).
+
+    ``levels`` are the members' education levels, in order. Two members of one level
+    (two kindergartens of a brand) stay withheld: with the address gone, nothing says
+    which of them the site is.
+    """
+    levels = list(levels) or [""] * len(decisions)
+    sites = [decision.evidence.get("current_site") or {} for decision in decisions]
+    if any(site.get("address_matched") for site in sites) or any(
+        decision.action == REPLACE or "current_site_is_brand_hub" in decision.evidence
+        for decision in decisions
+    ):
+        return list(decisions)
+    settled = []
+    for decision, site, level in zip(decisions, sites, levels, strict=True):
+        if (
+            decision.action == WITHHOLD
+            and decision.reason == "registry_address_not_on_site"
+            and levels.count(level) == 1
+            and site.get("level_fit")
+            and not site.get("url_names_other_level")
+            and site.get("stated_addresses")
+        ):
+            decision = Decision(
+                decision.school_id,
+                KEEP,
+                REGISTRY_ADDRESS_SUPERSEDED,
+                decision.current_url,
+                evidence=decision.evidence,
+            )
+        settled.append(decision)
+    return settled
+
+
 def shared_groups(members: Iterable[Member]) -> dict[str, list[Member]]:
     grouped: dict[str, list[Member]] = defaultdict(list)
     for member in members:
@@ -624,6 +726,11 @@ def _member_from_school(school) -> Member:
             derived.append(address)
         else:
             registry.append(address)
+    # An address taken from the site after a superseded-registry keep replaced the
+    # registry's; the check goes on comparing the site with what the registry said.
+    earlier = (getattr(school, "attributes", None) or {}).get(SHARED_SITE_CHECK_KEY) or {}
+    if earlier.get("reason") == REGISTRY_ADDRESS_SUPERSEDED:
+        registry.extend(a for a in earlier.get("registry_addresses") or [] if a not in registry)
     return Member(
         school_id=int(school.id),
         name=str((school.name_i18n or {}).get("bg") or (school.name_i18n or {}).get("en") or ""),
@@ -637,7 +744,7 @@ def _member_from_school(school) -> Member:
 
 
 async def _stored_texts_by_host(db, school_ids: Sequence[int]) -> dict[str, list[str]]:
-    from sqlalchemy import select
+    from sqlalchemy import or_, select
 
     from app.models import SourcePage
     from app.models.scrape_log import ScrapeType
@@ -647,8 +754,15 @@ async def _stored_texts_by_host(db, school_ids: Sequence[int]) -> dict[str, list
             select(SourcePage.source_url, SourcePage.raw_markdown).where(
                 SourcePage.school_id.in_(list(school_ids)),
                 SourcePage.scrape_type == ScrapeType.WEBSITE,
-                SourcePage.is_valid.is_(True),
+                # Pages this check invalidated when it withheld the site keep their
+                # text, and it is still what the site said (a rendered contact page
+                # the plain fetch below cannot read: 534's address). Not for ever: a
+                # domain can change hands.
                 SourcePage.raw_markdown.isnot(None),
+                or_(
+                    SourcePage.is_valid.is_(True),
+                    SourcePage.last_scraped_at >= datetime.datetime.now(datetime.timezone.utc) - STORED_TEXT_MAX_AGE,
+                ),
             )
         )
     ).all()
@@ -722,6 +836,10 @@ async def apply_decision(db, school, decision: Decision, *, country_code: str = 
             "previous_url": decision.current_url,
             "new_url": decision.current_url,
         }
+        if decision.reason == REGISTRY_ADDRESS_SUPERSEDED:
+            attrs[SHARED_SITE_CHECK_KEY]["registry_addresses"] = list(
+                decision.evidence.get("registry_addresses") or []
+            )
         school.attributes = attrs
         db.add(school)
         return {"pages_invalidated": 0, "locations_cleared": []}
@@ -813,8 +931,14 @@ async def run_shared_site_check(
         # Platform-hosted sites have no brand hub to follow.
         hub_domain = "" if key != domain or _is_platform_host(domain) else domain
         rows = []
-        for member in members:
-            decision = await decide_member(member, domain=hub_domain, reader=reader, country_code=country)
+        decisions = settle_group(
+            [
+                await decide_member(member, domain=hub_domain, reader=reader, country_code=country)
+                for member in members
+            ],
+            [member.education_level for member in members],
+        )
+        for member, decision in zip(members, decisions, strict=True):
             counts[decision.action] += 1
             if dry_run:
                 locations = []
