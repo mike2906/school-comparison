@@ -37,6 +37,7 @@ from app.scrapers.price_evidence import (
     amount_spans,
     currency_price_starts,
     fee_number_starts,
+    label_names_a_level,
     label_spans,
     normalize_text,
     occurrence_currency,
@@ -2334,6 +2335,7 @@ _FEE_PERIOD = {
 }  # fmt: skip
 # The copied lines carry no judgement of their own; the text check below is the gate.
 _FEE_LINE_CONFIDENCE = 0.9
+_BGN_PER_EUR = 1.95583
 
 
 def _prices_from_fee_lines(lines: list[FeeLine]) -> list[ExtractedPrice]:
@@ -2369,7 +2371,17 @@ def _prices_from_fee_lines(lines: list[FeeLine]) -> list[ExtractedPrice]:
         for line, category in unattached
         if category not in last_full and line.role == "plan" and line.per == "year"
     )
-    return rows
+    # A page that still shows the lev beside the euro states one fee, not two.
+    euro = [(row.category, row.amount) for row in rows if row.currency == "EUR"]
+    return [
+        row
+        for row in rows
+        if row.currency != "BGN"
+        or not any(
+            category == row.category and abs(row.amount / _BGN_PER_EUR - amount) <= 0.005 * amount
+            for category, amount in euro
+        )
+    ]
 
 
 def _price_from_fee_line(line: FeeLine, category: str) -> ExtractedPrice:
@@ -2378,9 +2390,17 @@ def _price_from_fee_line(line: FeeLine, category: str) -> ExtractedPrice:
         amount=line.amount,
         currency="EUR" if line.currency == "unstated" else line.currency,
         period=_FEE_PERIOD[line.per],
-        plan_name=_normalize_scalar_text(line.label, max_len=100),
+        plan_name=_normalize_scalar_text(line.label[:100].strip(), max_len=100),
+        # The part of the label that says for whom, kept whole: the scope rules read
+        # it, and a long label is cut before it gets there.
+        age_group=_normalize_scalar_text(
+            next(
+                (part[:50].strip() for part in line.label.split(" / ") if label_names_a_level(part)),
+                None,
+            ),
+            max_len=50,
+        ),
         academic_year=line.academic_year,
-        notes=line.quote,
         confidence=_FEE_LINE_CONFIDENCE,
     )
 

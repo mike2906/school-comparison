@@ -5174,3 +5174,23 @@ async def test_fee_copied_from_a_second_language_page_is_stored_once(db_session,
         (8950.0, "I - VII клас"),
         (8950.0, "ПГ"),
     ]
+
+
+def test_fee_lines_in_euro_and_leva_are_one_fee_and_the_level_part_of_a_label_is_kept():
+    long_heading = "TUITION FEE RETURNING STUDENTS with signed contracts before 30.04.2025 / FULL DAY PROGRAMME WITH CAMBRIDGE"
+    lines = [
+        _line("Подготвителен клас / Плащане наведнъж", 4230, per="year"),
+        _line("Подготвителен клас / Плащане наведнъж", 8273.16, per="year", currency="BGN"),
+        _line("Транспорт", 300, kind="transport", currency="BGN"),
+        _line(f"{long_heading} / Grade 11", 18250),
+    ]
+
+    rows = extractor_module.helpers._prices_from_fee_lines(lines)
+
+    assert [(r.category, r.amount, r.currency) for r in rows] == [
+        ("tuition", 4230, "EUR"),
+        ("transport", 300, "BGN"),
+        ("tuition", 18250, "EUR"),
+    ]
+    assert rows[0].age_group == "Подготвителен клас" and rows[2].age_group == "Grade 11"
+    assert len(rows[2].plan_name) <= 100 and rows[2].notes is None
