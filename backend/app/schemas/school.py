@@ -10,6 +10,7 @@ from app.utils.display_gating import (
     blocked_pricing_row_ids,
     exam_result_is_publishable,
     implausible_tuition_row_ids,
+    is_scraped_price,
     pricing_row_is_publishable,
     summary_is_publishable,
 )
@@ -174,7 +175,8 @@ class SchoolPricingMixin(SchoolAttributesMixin):
     A row is withheld when it has no ``source_url``, a confidence below the shared
     floor, or an error-level validation issue on its ``pricing[{id}]`` path — so the
     API never publishes a price a parent can't trace, that we're unsure of, or that
-    Stage 6 already flagged as wrong. Tuition rows implausibly cheap next to the school's
+    Stage 6 already flagged as wrong, and a scraped row while the school's website data
+    is withheld. Tuition rows implausibly cheap next to the school's
     other tuition are also withheld, so a misfiled add-on never becomes the headline
     price. Extends ``SchoolAttributesMixin`` to reach the
     validation report via ``raw_attributes``.
@@ -192,7 +194,13 @@ class SchoolPricingMixin(SchoolAttributesMixin):
         blocked_ids = blocked_pricing_row_ids(self.public_attributes_input)
         # Gate the stored values before Pydantic can coerce malformed input
         # (for example, a string confidence of "0.9") into a valid public type.
-        publishable = [row for row in self.raw_pricing if pricing_row_is_publishable(row)]
+        # A scraped row is website-derived data (P1.16): withheld with the rest of it.
+        website_ok = self.website_data_publishable
+        publishable = [
+            row
+            for row in self.raw_pricing
+            if pricing_row_is_publishable(row) and (website_ok or not is_scraped_price(row))
+        ]
         blocked_ids |= implausible_tuition_row_ids(publishable)
         published: list[PricingResponse] = []
         for raw_row in publishable:
@@ -388,10 +396,20 @@ class RelatedSchoolResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class SamePlaceSchoolResponse(RelatedSchoolResponse):
+    """A related institution in the same place (one pin, one card); computed, not stored."""
+
+    place_id: int  # names the place: one of its pin ids, the same on every entry for it
+    location_id: int  # this school's pin in the place
+    other_location_id: int  # the other institution's pin there
+
+
 class SchoolDetailResponse(SchoolResponse):
-    """Detail endpoint only: adds the computed kindergarten → school link (UF42c)."""
+    """Detail endpoint only: adds the computed kindergarten ↔ school links (UF42c)."""
 
     continues_to: Optional[RelatedSchoolResponse] = None
+    continued_from: list[RelatedSchoolResponse] = []
+    same_place: list[SamePlaceSchoolResponse] = []
 
 
 class SchoolListResponse(SchoolPricingMixin):
@@ -402,6 +420,8 @@ class SchoolListResponse(SchoolPricingMixin):
     education_level: str
     locations: list[SchoolLocationResponse] = []
     exam_results: list[ExamResultListItem] = []
+    # Set on the list endpoint only (``same_place_by_school``); search leaves it empty.
+    same_place: list[SamePlaceSchoolResponse] = []
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 

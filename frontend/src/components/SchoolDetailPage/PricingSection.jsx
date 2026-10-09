@@ -1,12 +1,12 @@
 import { useTranslation } from 'react-i18next'
-import { groupPricingByAcademicYear, YEAR_STATUS } from '../../utils/pricing'
+import { displayPrice, groupPricingByAcademicYear, YEAR_STATUS } from '../../utils/pricing'
 import { groupPricingByCategory, getSourceBadgeColor } from './helpers'
 
 /** Every published price, grouped by academic year and then by category. */
 function PricingSection({ pricing }) {
   const { t, i18n } = useTranslation()
 
-  const formatAmount = (value) => {
+  const formatNumber = (value) => {
     if (value == null || Number.isNaN(value)) return null
     return new Intl.NumberFormat(i18n.language, { maximumFractionDigits: 0 }).format(value)
   }
@@ -49,10 +49,12 @@ function PricingSection({ pricing }) {
                     </h3>
                     <div className="space-y-3">
                       {items.map((price, idx) => {
+                        const { currency } = displayPrice(null, price.currency)
+                        const formatAmount = (value) => formatNumber(displayPrice(value, price.currency).value)
                         const amountText = price.amount_min != null || price.amount_max != null
-                          ? `${price.amount_min != null ? formatAmount(price.amount_min) : ''}${price.amount_min != null && price.amount_max != null ? '–' : ''}${price.amount_max != null ? formatAmount(price.amount_max) : ''} ${price.currency || 'EUR'}`
+                          ? `${price.amount_min != null ? formatAmount(price.amount_min) : ''}${price.amount_min != null && price.amount_max != null ? '–' : ''}${price.amount_max != null ? formatAmount(price.amount_max) : ''} ${currency}`
                           : price.amount != null
-                          ? `${formatAmount(price.amount)} ${price.currency || 'EUR'}`
+                          ? `${formatAmount(price.amount)} ${currency}`
                           : t('pricing.priceOnRequest')
 
                         return (

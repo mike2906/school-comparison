@@ -4,60 +4,7 @@
  * Each helper returns null when the fact is not available, so the strip shows only the
  * facts a school actually has.
  */
-import {
-  isInstallmentPlan,
-  lowestUnstatedPeriodTuition,
-  monthlyEquivalent,
-  selectPricingCohort,
-  yearlyTuitionRangeEur,
-} from './pricing.js'
 import { getBenchmarkToneClasses, getNvoSubjectKey, isAverageMetric } from './nvo.js'
-
-/**
- * The headline tuition of a school's current pricing cohort.
- *
- * Returns one of:
- * - `{ kind: 'yearly', min, max, currency, academicYear, yearStatus }` — annualised
- *   tuition (EUR/BGN in euro; any other currency in its own currency);
- * - `{ kind: 'unstated_period', amount, currency, academicYear, yearStatus }` — a fee
- *   whose period the school did not state, shown as-is;
- * - null.
- */
-export function getHeadlineTuition(pricing = []) {
-  const cohort = selectPricingCohort(pricing)
-  if (!cohort) return null
-  const meta = { academicYear: cohort.academicYear, yearStatus: cohort.yearStatus }
-
-  const eurRange = yearlyTuitionRangeEur(pricing)
-  if (eurRange) {
-    return { kind: 'yearly', min: eurRange.min, max: eurRange.max, currency: 'EUR', ...meta }
-  }
-
-  // Currencies without a fixed euro rate stay in their own currency; pick the currency
-  // of the cheapest row and never mix currencies in one range.
-  const yearly = cohort.rows
-    .filter(row => row.category === 'tuition' && !isInstallmentPlan(row) && row.currency)
-    .map(row => ({ value: monthlyEquivalent(row), currency: row.currency }))
-    .filter(entry => entry.value != null)
-    .map(entry => ({ value: entry.value * 12, currency: entry.currency }))
-  if (yearly.length > 0) {
-    const cheapest = yearly.reduce((best, entry) => (entry.value < best.value ? entry : best))
-    const sameCurrency = yearly.filter(entry => entry.currency === cheapest.currency).map(e => e.value)
-    return {
-      kind: 'yearly',
-      min: Math.min(...sameCurrency),
-      max: Math.max(...sameCurrency),
-      currency: cheapest.currency,
-      ...meta,
-    }
-  }
-
-  const unstated = lowestUnstatedPeriodTuition(cohort.rows)
-  if (unstated) {
-    return { kind: 'unstated_period', amount: unstated.amount, currency: unstated.currency || 'EUR', ...meta }
-  }
-  return null
-}
 
 /**
  * The latest year's combined (Bulgarian + maths) NVO result for one exam, with the
@@ -92,13 +39,13 @@ export function getLatestNvoFact(examResults = [], examType, examAverages = null
   )
   const hasBenchmark = benchmark && subjects.every(key => benchmark[key] != null)
   if (!hasBenchmark) {
-    return { examType, year, value, national: null, diff: null, tone: null }
+    return { examType, year, value, subjects, national: null, diff: null, tone: null }
   }
 
   const national = subjects.reduce((sum, key) => sum + Number(benchmark[key]), 0) / subjects.length
   const diff = value - national
   const tone = diff >= tolerance ? 'above' : diff <= -tolerance ? 'below' : 'near'
-  return { examType, year, value, national, diff, tone, ...getBenchmarkToneClasses(tone) }
+  return { examType, year, value, subjects, national, diff, tone, ...getBenchmarkToneClasses(tone) }
 }
 
 /** Distinct age groups across a school's locations, in first-seen order. */

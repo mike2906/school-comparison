@@ -18,6 +18,49 @@ export function examTypeForAgeGroup(ageGroup) {
   return AGE_GROUP_EXAM_TYPE[ageGroup] || null
 }
 
+// Results of different exams are not comparable: the 4th-grade NVO usually scores far
+// higher than the 7th or 10th. A ranking or a comparison uses one exam for every school.
+const RANKING_EXAM_PREFERENCE = ['nvo_7', 'nvo_10', 'nvo_4']
+
+/**
+ * The one exam a list of schools is ranked by: the searched stage's, else the 4th-grade
+ * exam for the preschool year (children often continue into 1st grade at that school),
+ * else the 7th-grade exam, which decides 8th-grade admission.
+ */
+export function rankingExamType(ageGroup) {
+  return examTypeForAgeGroup(ageGroup) || (ageGroup === 'preschool' ? 'nvo_4' : 'nvo_7')
+}
+
+/**
+ * The one exam a side-by-side comparison shows: the searched stage's when any of the
+ * schools has it, else the exam most
+ * of the compared schools have (ties go to the 7th, then 10th, then 4th grade). Null when
+ * none of them has results.
+ */
+export function comparisonExamType(schools = [], ageGroup = null) {
+  const counts = Object.fromEntries(RANKING_EXAM_PREFERENCE.map(type => [type, 0]))
+  schools.forEach((school) => {
+    const types = new Set((school?.exam_results || [])
+      .filter(result => isAverageMetric(result.metric))
+      .map(result => result.exam_type))
+    types.forEach((type) => {
+      if (type in counts) counts[type] += 1
+    })
+  })
+  // The searched stage's exam only when one of the schools has it; otherwise every NVO
+  // row would be empty.
+  const preferred = examTypeForAgeGroup(ageGroup)
+  if (preferred && counts[preferred] > 0) return preferred
+  const best = RANKING_EXAM_PREFERENCE.reduce((top, type) => (counts[type] > counts[top] ? type : top))
+  return counts[best] > 0 ? best : null
+}
+
+/** "7th grade" for nvo_7, or the raw type when unknown. */
+export function examGradeLabel(examType, t) {
+  const config = EXAM_CONFIG_BY_TYPE[examType]
+  return config && t ? t(config.gradeKey) : examType
+}
+
 function hasExamResults(examResults, examType, requireBothSubjects) {
   const subjects = new Set(
     examResults
@@ -139,18 +182,21 @@ function getLatestResult(items) {
 export function getNvoDetail(
   school,
   t,
-  { minimumYearsForAverage = 3, maxAverageYears = 5, requireCompleteSubjects = false, ageGroup = null } = {}
+  { minimumYearsForAverage = 3, maxAverageYears = 5, requireCompleteSubjects = false, ageGroup = null, examType = null } = {}
 ) {
   const examResults = school.exam_results || []
   if (examResults.length === 0) {
     return null
   }
 
-  // The searched age group's exam when the school has it; otherwise its highest stage's.
+  // A given exam type is used strictly (null without it). Otherwise: the searched age
+  // group's exam when the school has it, else its highest stage's.
   const preferredType = examTypeForAgeGroup(ageGroup)
-  const examConfig = preferredType && hasExamResults(examResults, preferredType, requireCompleteSubjects)
-    ? EXAM_CONFIG_BY_TYPE[preferredType]
-    : EXAM_TYPE_CONFIG[school.education_level]
+  const examConfig = examType
+    ? EXAM_CONFIG_BY_TYPE[examType]
+    : preferredType && hasExamResults(examResults, preferredType, requireCompleteSubjects)
+      ? EXAM_CONFIG_BY_TYPE[preferredType]
+      : EXAM_TYPE_CONFIG[school.education_level]
   if (!examConfig) {
     return null
   }
@@ -222,7 +268,7 @@ export function getNvoDetail(
 
   return {
     examType: examConfig.examType,
-    gradeLabel: t ? t(examConfig.gradeKey) : examConfig.examType,
+    gradeLabel: examGradeLabel(examConfig.examType, t),
     latestMathYear: latestMathResult?.year || null,
     latestBgYear: latestBgResult?.year || null,
     mathAvg: mathData?.average ?? null,

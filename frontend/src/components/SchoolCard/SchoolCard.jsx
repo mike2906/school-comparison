@@ -13,9 +13,8 @@ import { getBenchmarkComparison, getNvoDetail as getSharedNvoDetail } from '../.
 import { getAdmissionStatusKey, getCanonicalAmenityFlags } from '../../utils/schoolAttributes'
 import { classifyAdmissionRequirement, curatedRequirement, usesSofiaKindergartenSystem } from '../../utils/admission'
 import {
-  isInstallmentPlan,
-  lowestUnstatedPeriodTuition,
   selectPricingCohort,
+  statedTuition,
   YEAR_STATUS,
 } from '../../utils/pricing'
 
@@ -218,44 +217,6 @@ function formatCurrency(amount, locale) {
   }).format(amount)
 }
 
-function getPriceBase(item) {
-  if (item?.amount_min != null) return Number(item.amount_min)
-  if (item?.amount != null) return Number(item.amount)
-  if (item?.amount_max != null) return Number(item.amount_max)
-  return null
-}
-
-function getYearlyEquivalent(item) {
-  const base = getPriceBase(item)
-  if (base == null) return null
-  if (item.period === 'yearly') return base
-  if (item.period === 'monthly') return base * 12
-  if (item.period === 'quarter') return base * 4
-  return null
-}
-
-function getMinTuitionPriceYearly(pricing = []) {
-  const tuition = pricing.filter(
-    item => item.category === 'tuition' && !isInstallmentPlan(item),
-  )
-  if (tuition.length === 0) return null
-
-  let minValue = null
-  let currency = null
-
-  tuition.forEach(item => {
-    const yearlyValue = getYearlyEquivalent(item)
-    if (yearlyValue == null) return
-    if (minValue == null || yearlyValue < minValue) {
-      minValue = yearlyValue
-      currency = item.currency || 'EUR'
-    }
-  })
-
-  if (minValue == null) return null
-  return { amount: minValue, currency }
-}
-
 function getAdmissionRequirement(rawRequirement, t) {
   const requirement = classifyAdmissionRequirement(rawRequirement)
   if (!requirement) return null
@@ -405,8 +366,8 @@ function hexToRgba(hex, alpha) {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`
 }
 
-function getNvoDetail(school, t, ageGroup = null) {
-  return getSharedNvoDetail(school, t, { requireCompleteSubjects: true, ageGroup })
+function getNvoDetail(school, t, ageGroup = null, examType = null) {
+  return getSharedNvoDetail(school, t, { requireCompleteSubjects: true, ageGroup, examType })
 }
 
 function getAmenityFlags(attributes, hasAfterSchool) {
@@ -631,6 +592,7 @@ const SchoolCard = memo(function SchoolCard({
   onHoverEnd,
   location,
   activeAgeGroup = null,
+  nvoExamType = null,
   ageGroupOrder = [],
   isLocationsOpen = false,
   locationOverlay = null,
@@ -640,6 +602,7 @@ const SchoolCard = memo(function SchoolCard({
   onClearLocations,
   onOpenDetails,
   examAverages = null,
+  samePlace = [],
 }) {
   const { t, i18n } = useTranslation()
   const { config: countryConfig } = useCountry()
@@ -745,25 +708,17 @@ const SchoolCard = memo(function SchoolCard({
     const admissionInfo = school.admission_info || {}
 
     if (isPrivate) {
-      const yearlyPrice = getMinTuitionPriceYearly(pricingCohort?.rows || [])
-      // A tuition fee whose period the school did not state cannot be annualised, but a
-      // well-supported amount should not vanish from the card for that reason alone:
-      // show it as-is, labelled, only when nothing can be annualised.
-      const unstatedPrice = yearlyPrice?.amount == null
-        ? lowestUnstatedPeriodTuition(pricingCohort?.rows || [])
-        : null
-      const priceLabel = yearlyPrice?.amount != null
-        ? t('schoolCard.admissions.fromPrice', {
-          price: formatCurrency(yearlyPrice.amount, locale),
-          currency: yearlyPrice.currency || t('pricing.currency'),
-          period: t('schoolCard.period.year'),
-        })
-        : unstatedPrice
-          ? t('schoolCard.admissions.priceUnstatedPeriod', {
-            price: formatCurrency(unstatedPrice.amount, locale),
-            currency: unstatedPrice.currency || t('pricing.currency'),
-          })
-          : null
+      // The fee as the school states it, in euro: never annualised, since schools bill
+      // over 9, 10 or 12 months (the detail page and compare show it the same way).
+      const tuition = statedTuition(pricing)
+      const price = tuition && (formatCurrency(tuition.min, locale) === formatCurrency(tuition.max, locale)
+        ? formatCurrency(tuition.min, locale)
+        : `${formatCurrency(tuition.min, locale)}–${formatCurrency(tuition.max, locale)}`)
+      const priceLabel = !tuition
+        ? null
+        : tuition.period
+          ? t('pricing.pricePerPeriod', { price, currency: tuition.currency, period: t(`pricing.per.${tuition.period}`) })
+          : t('schoolCard.admissions.priceUnstatedPeriod', { price, currency: tuition.currency })
 
       const requirement = getAdmissionRequirement(
         curatedRequirement(admissionInfo, i18n.language) || attributes?.entry_requirements,
@@ -811,12 +766,14 @@ const SchoolCard = memo(function SchoolCard({
     }
 
     return null
-  }, [school, pricing, pricingCohort, attributes, i18n.language, t, primaryLocation])
+  }, [school, pricing, attributes, i18n.language, t, primaryLocation])
 
   const nvoDetail = useMemo(() => {
-    // The searched stage's exam (e.g. 7th grade for grades 5–7), else the school's own.
-    return getNvoDetail(school, t, activeAgeGroup)
-  }, [school, t, activeAgeGroup])
+    // Sorted by NVO: only the exam the list is ranked by, so no card shows a score from a
+    // different exam. Otherwise the searched stage's exam (e.g. 7th grade for grades 5–7),
+    // else the school's own.
+    return nvoExamType ? getNvoDetail(school, t, null, nvoExamType) : getNvoDetail(school, t, activeAgeGroup)
+  }, [school, t, activeAgeGroup, nvoExamType])
 
   const nvoSummary = useMemo(() => {
     if (!nvoDetail) return null
@@ -1010,6 +967,11 @@ const SchoolCard = memo(function SchoolCard({
         <span className="text-xs text-neutral-600">
           {schoolLevelLabel(school, t, countryConfig)}
         </span>
+        {samePlace.length > 0 && (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border border-teal-200 bg-teal-50 text-teal-800">
+            {t('schoolCard.samePlaceBadge')}
+          </span>
+        )}
         {pricingYearLabel && (
           <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border ${pricingYearBadgeClass}`}>
             {pricingYearLabel}
@@ -1079,7 +1041,7 @@ const SchoolCard = memo(function SchoolCard({
                   className={`font-medium ${nvoSummary.math.style.text} ${nvoSummary.math.style.benchmark ? 'cursor-help' : ''}`}
                   title={getBenchmarkTooltip(nvoSummary.math.value, nvoSummary.math.style.benchmark, t) || undefined}
                 >
-                  {formatPercent(nvoSummary.math.value, 0)}%
+                  {t('academicPerformance.pointsValue', { value: formatPercent(nvoSummary.math.value, 0) })}
                   {nvoSummary.math.trend && (
                     <span
                       className={`ml-1 ${nvoSummary.math.trend.className} cursor-help`}
@@ -1096,7 +1058,7 @@ const SchoolCard = memo(function SchoolCard({
                   className={`font-medium ${nvoSummary.bulgarian.style.text} ${nvoSummary.bulgarian.style.benchmark ? 'cursor-help' : ''}`}
                   title={getBenchmarkTooltip(nvoSummary.bulgarian.value, nvoSummary.bulgarian.style.benchmark, t) || undefined}
                 >
-                  {formatPercent(nvoSummary.bulgarian.value, 0)}%
+                  {t('academicPerformance.pointsValue', { value: formatPercent(nvoSummary.bulgarian.value, 0) })}
                   {nvoSummary.bulgarian.trend && (
                     <span
                       className={`ml-1 ${nvoSummary.bulgarian.trend.className} cursor-help`}
@@ -1112,7 +1074,7 @@ const SchoolCard = memo(function SchoolCard({
                   className={`font-medium ${nvoSummary.math.style.text} ${nvoSummary.math.style.benchmark ? 'cursor-help' : ''}`}
                   title={getBenchmarkTooltip(nvoSummary.math.value, nvoSummary.math.style.benchmark, t) || undefined}
                 >
-                  {t('schoolCard.nvo.subjectMath')}: {formatPercent(nvoSummary.math.value, 0)}%
+                  {t('schoolCard.nvo.subjectMath')}: {t('academicPerformance.pointsValue', { value: formatPercent(nvoSummary.math.value, 0) })}
                   {nvoSummary.math.trend && (
                     <span
                       className={`ml-1 ${nvoSummary.math.trend.className} cursor-help`}
@@ -1127,7 +1089,7 @@ const SchoolCard = memo(function SchoolCard({
                   className={`font-medium ${nvoSummary.bulgarian.style.text} ${nvoSummary.bulgarian.style.benchmark ? 'cursor-help' : ''}`}
                   title={getBenchmarkTooltip(nvoSummary.bulgarian.value, nvoSummary.bulgarian.style.benchmark, t) || undefined}
                 >
-                  {t('schoolCard.nvo.subjectBulgarian')}: {formatPercent(nvoSummary.bulgarian.value, 0)}%
+                  {t('schoolCard.nvo.subjectBulgarian')}: {t('academicPerformance.pointsValue', { value: formatPercent(nvoSummary.bulgarian.value, 0) })}
                   {nvoSummary.bulgarian.trend && (
                     <span
                       className={`ml-1 ${nvoSummary.bulgarian.trend.className} cursor-help`}
@@ -1391,16 +1353,16 @@ const SchoolCard = memo(function SchoolCard({
                             className={`text-center font-mono ${item.style.text} ${item.style.benchmark ? 'cursor-help' : ''}`}
                             title={getBenchmarkTooltip(latestValue, item.style.benchmark, t) || undefined}
                           >
-                            {formatPercent(latestValue, 1)}%
+                            {t('academicPerformance.pointsValue', { value: formatPercent(latestValue, 1) })}
                           </span>
                           <span className="text-center font-mono text-neutral-700">
-                            {formatPercent(item.avg, 1)}%
+                            {t('academicPerformance.pointsValue', { value: formatPercent(item.avg, 1) })}
                           </span>
                           <span
                             className={`text-center font-mono ${trend ? `${trend.className} cursor-help` : 'text-neutral-400'}`}
                             title={getTrendTooltip(item.latest, item.avg, trend, t) || undefined}
                           >
-                            {trend ? `${trend.arrow} ${formatPercent(diff, 1)}%` : '—'}
+                            {trend ? `${trend.arrow} ${t('academicPerformance.pointsValue', { value: formatPercent(diff, 1) })}` : '—'}
                           </span>
                         </div>
                       )
@@ -1439,7 +1401,7 @@ const SchoolCard = memo(function SchoolCard({
                           t
                         ) || undefined}
                       >
-                        {formatPercent(nvoDetail.latestMath, 1)}%
+                        {t('academicPerformance.pointsValue', { value: formatPercent(nvoDetail.latestMath, 1) })}
                       </span>
                     </div>
                     <div className="flex items-center justify-between py-2">
@@ -1470,7 +1432,7 @@ const SchoolCard = memo(function SchoolCard({
                           t
                         ) || undefined}
                       >
-                        {formatPercent(nvoDetail.latestBg, 1)}%
+                        {t('academicPerformance.pointsValue', { value: formatPercent(nvoDetail.latestBg, 1) })}
                       </span>
                     </div>
                   </div>
@@ -1495,6 +1457,32 @@ const SchoolCard = memo(function SchoolCard({
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {samePlace.length > 0 && (
+        <div className="mt-3 rounded-lg border border-teal-200/70 bg-teal-50/40 px-3 py-2">
+          <p className="text-xs text-neutral-500">{t('map.samePlace')}</p>
+          <ul className="mt-1 space-y-1">
+            {samePlace.map(({ school: member }) => (
+              <li key={member.id} className="text-sm">
+                <Link
+                  to={activeAgeGroup ? `/schools/${member.id}?group=${encodeURIComponent(activeAgeGroup)}` : `/schools/${member.id}`}
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    if (onOpenDetails && isPlainLeftClick(event) && isDesktopViewport()) {
+                      event.preventDefault()
+                      onOpenDetails(member)
+                    }
+                  }}
+                  className="font-medium text-primary-700 hover:text-primary-800 hover:underline"
+                >
+                  {getSchoolName(member, i18n.language)}
+                </Link>
+                <span className="text-neutral-500">{' · '}{schoolLevelLabel(member, t, countryConfig)}</span>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
+  compareHref,
   loadCompareList,
   normalizeCompareList,
   saveCompareList,
@@ -90,4 +91,10 @@ test('syncCompareList returns the same array when nothing changed', () => {
   const list = [{ id: 1, name_i18n: { en: 'A' }, school_type: 'state' }]
   const fresh = [{ id: 1, name_i18n: { en: 'A' }, school_type: 'state', locations: [] }]
   assert.equal(syncCompareList(list, [1], fresh), list)
+})
+
+test('compareHref carries the searched age group, and only that', () => {
+  assert.equal(compareHref('?age_group=grade_8_12&sort=nvo'), '/compare?age_group=grade_8_12')
+  assert.equal(compareHref('?sort=name'), '/compare')
+  assert.equal(compareHref(''), '/compare')
 })

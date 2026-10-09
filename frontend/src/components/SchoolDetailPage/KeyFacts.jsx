@@ -1,14 +1,13 @@
 import { Fragment, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  getHeadlineTuition,
   getLatestNvoFact,
   getOfferedAgeGroups,
   getShifts,
   parseSavedLocation,
 } from '../../utils/keyFacts'
 import { calculateDistance } from '../../utils/distance'
-import { YEAR_STATUS } from '../../utils/pricing'
+import { statedTuition, YEAR_STATUS } from '../../utils/pricing'
 import {
   getLastAdmittedPoints,
   getMinNvoScore,
@@ -64,37 +63,28 @@ function KeyFacts({ school, examAverages, nvoExamType }) {
 
   const facts = {}
 
-  const tuition = isPrivate ? getHeadlineTuition(school.pricing) : null
+  const tuition = isPrivate ? statedTuition(school.pricing) : null
   if (tuition) {
     const yearDetail = tuition.yearStatus === YEAR_STATUS.NOT_STATED
       ? t('pricing.yearNotStated')
-      : tuition.academicYear
-    if (tuition.kind === 'yearly') {
-      const formatRange = (min, max) => (
-        formatNumber(min) === formatNumber(max) ? formatNumber(min) : `${formatNumber(min)}–${formatNumber(max)}`
-      )
-      facts.tuition = (
-        <Fact
-          key="tuition"
-          label={t('pricing.tuition')}
-          value={t('schoolDetail.tuitionPerYear', {
-            price: formatRange(tuition.min, tuition.max),
-            currency: tuition.currency,
-          })}
-          // No "per month" figure: yearly ÷ 12 misleads when schools bill over 9–10 months.
-          detail={yearDetail}
-        />
-      )
-    } else {
-      facts.tuition = (
-        <Fact
-          key="tuition"
-          label={t('pricing.tuition')}
-          value={t('schoolDetail.tuitionUnstated', { price: formatNumber(tuition.amount), currency: tuition.currency })}
-          detail={[t('pricing.periodNotStated'), yearDetail].filter(Boolean).join(' · ')}
-        />
-      )
-    }
+      : tuition.yearStatus === YEAR_STATUS.DATED_OTHER
+        ? `${tuition.academicYear} · ${t('pricing.notCurrentYear')}`
+        : tuition.academicYear
+    const price = formatNumber(tuition.min) === formatNumber(tuition.max)
+      ? formatNumber(tuition.min)
+      : `${formatNumber(tuition.min)}–${formatNumber(tuition.max)}`
+    // The fee in the period the school states it in: never annualised, since schools
+    // bill over 9, 10 or 12 months.
+    facts.tuition = (
+      <Fact
+        key="tuition"
+        label={t('pricing.tuition')}
+        value={tuition.period
+          ? t('pricing.pricePerPeriod', { price, currency: tuition.currency, period: t(`pricing.per.${tuition.period}`) })
+          : t('pricing.priceOnly', { price, currency: tuition.currency })}
+        detail={[tuition.period ? null : t('pricing.periodNotStated'), yearDetail].filter(Boolean).join(' · ')}
+      />
+    )
   }
 
   const languages = [
@@ -125,8 +115,14 @@ function KeyFacts({ school, examAverages, nvoExamType }) {
     facts.nvo = (
       <Fact
         key="nvo"
-        label={t('schoolDetail.nvoLatest', { exam: getExamTypeLabel(nvo.examType, t), year: nvo.year })}
-        value={`${formatNumber(nvo.value, 1)}%`}
+        label={nvo.subjects.length === 1
+          ? t('schoolDetail.nvoLatestSubject', {
+            exam: getExamTypeLabel(nvo.examType, t),
+            year: nvo.year,
+            subject: t(nvo.subjects[0] === 'math' ? 'schoolCard.nvo.subjectMath' : 'schoolCard.nvo.subjectBulgarian'),
+          })
+          : t('schoolDetail.nvoLatest', { exam: getExamTypeLabel(nvo.examType, t), year: nvo.year })}
+        value={t('academicPerformance.pointsValue', { value: formatNumber(nvo.value, 1) })}
         detail={nvo.national != null
           ? `${toneLabel} · ${t('schoolDetail.nvoVsNational', { value: formatNumber(nvo.national, 1) })}`
           : null}

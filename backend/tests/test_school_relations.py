@@ -1,14 +1,16 @@
-"""UF42c: computed kindergarten → school link on the detail endpoint only."""
+"""UF42c: computed kindergarten ↔ school links (continues_to, continued_from, same_place)."""
 
 import pytest
 
 from app.models.school import School, SchoolLocation
 from app.services.school_relations import (
     Institution,
+    PlacePin,
     brand,
     brand_key,
     continues_to_target,
     link_rejection,
+    same_place_groups,
     shared_brand_key,
 )
 from app.utils.website_data import WEBSITE_DATA_WITHHELD_KEY
@@ -199,10 +201,20 @@ class TestDetailEndpoint:
         assert "must not ship" not in response.text
 
     @pytest.mark.asyncio
-    async def test_school_side_has_no_link(self, seeded_db, seeded_client):
-        _, school = await _maple_bear(seeded_db)
+    async def test_school_side_links_back(self, seeded_db, seeded_client):
+        kg, school = await _maple_bear(seeded_db)
         response = await seeded_client.get(f"/schools/{school.id}")
-        assert response.json()["continues_to"] is None
+        body = response.json()
+        assert body["continues_to"] is None
+        assert [row["id"] for row in body["continued_from"]] == [kg.id]
+        assert set(body["continued_from"][0]) == {"id", "resolved_name_i18n", "school_type", "education_level"}
+        assert "must not ship" not in response.text
+
+    @pytest.mark.asyncio
+    async def test_school_side_has_no_link_back_when_the_link_fails(self, seeded_db, seeded_client):
+        _, school = await _maple_bear(seeded_db, kg_checked=False)
+        response = await seeded_client.get(f"/schools/{school.id}")
+        assert response.json()["continued_from"] == []
 
     @pytest.mark.asyncio
     async def test_withheld_school_website_removes_link(self, seeded_db, seeded_client):
@@ -246,3 +258,127 @@ class TestDetailEndpoint:
         await _maple_bear(seeded_db)
         response = await seeded_client.get("/schools")
         assert all("continues_to" not in row for row in response.json())
+
+
+def pin(school_id, name, level, lat, *, location_id=None, school_type="private", city="sofia", lng=23.33):
+    return PlacePin(
+        school_id=school_id,
+        location_id=location_id or school_id * 10,
+        lat=lat,
+        lng=lng,
+        name=name,
+        education_level=level,
+        school_type=school_type,
+        city=city,
+    )
+
+
+SVETLINA_KG = '"Частна детска градина Светлина" ЕООД'
+SVETLINA_SCHOOL = '"ЧАСТНО ОСНОВНО УЧИЛИЩЕ СВЕТЛИНА" ЕООД'
+SVETLINA_HIGH = '"Частна профилирана гимназия Светлина" ЕООД'
+
+
+class TestSamePlaceRule:
+    def ids(self, groups):
+        return [sorted({p.school_id for p in group}) for group in groups]
+
+    def test_kindergarten_school_and_gymnasium_next_door_are_one_place(self):
+        groups = same_place_groups([
+            pin(1, SVETLINA_KG, "kindergarten", 42.6500),
+            pin(2, SVETLINA_SCHOOL, "lower_secondary", 42.6500),
+            pin(3, SVETLINA_HIGH, "upper_secondary", 42.6504),  # ~45 m away
+        ])
+        assert self.ids(groups) == [[1, 2, 3]]
+
+    def test_other_pins_of_a_kindergarten_stay_apart(self):
+        groups = same_place_groups([
+            pin(1, SVETLINA_KG, "kindergarten", 42.6500, location_id=11),
+            pin(1, SVETLINA_KG, "kindergarten", 42.6750, location_id=12),  # Лозенец branch
+            pin(2, SVETLINA_SCHOOL, "lower_secondary", 42.6500),
+        ])
+        assert [[p.location_id for p in group] for group in groups] == [[11, 20]]
+
+    def test_two_schools_alone_are_not_a_place(self):
+        # Primary and gymnasium of one brand group only through their kindergarten.
+        assert same_place_groups([
+            pin(2, SVETLINA_SCHOOL, "lower_secondary", 42.65),
+            pin(3, SVETLINA_HIGH, "upper_secondary", 42.65),
+        ]) == []
+
+    def test_within_150_metres_only(self):
+        kg = pin(1, '"ЧАСТНА ДЕТСКА ГРАДИНА "Д-Р ПЕТЪР БЕРОН" ЕООД', "kindergarten", 42.6500)
+        near = pin(2, '"ЧАСТНО ОСНОВНО УЧИЛИЩЕ "Д-Р ПЕТЪР БЕРОН" ЕООД', "lower_secondary", 42.6500 + 0.0006)
+        far = pin(2, '"ЧАСТНО ОСНОВНО УЧИЛИЩЕ "Д-Р ПЕТЪР БЕРОН" ЕООД', "lower_secondary", 42.6500 + 0.0019)
+        assert self.ids(same_place_groups([kg, near])) == [[1, 2]]
+        assert same_place_groups([kg, far]) == []  # ~210 m, Куест's distance
+
+    def test_a_shared_building_without_a_shared_brand_is_not_a_place(self):
+        assert same_place_groups([
+            pin(1, '"Частна детска градина Монтесори" ЕООД', "kindergarten", 42.65),
+            pin(2, '"Частно основно училище Стремеж" ЕООД', "lower_secondary", 42.65),
+        ]) == []
+
+    @pytest.mark.parametrize("types", [("state", "private"), ("private", "state"), ("state", "state")])
+    def test_state_institutions_are_left_out(self, types):
+        assert same_place_groups([
+            pin(1, "ДГ Христо Ботев", "kindergarten", 42.65, school_type=types[0]),
+            pin(2, "СУ Христо Ботев", "upper_secondary", 42.65, school_type=types[1]),
+        ]) == []
+
+    def test_different_city_is_not_a_place(self):
+        assert same_place_groups([
+            pin(1, SVETLINA_KG, "kindergarten", 42.65),
+            pin(2, SVETLINA_SCHOOL, "lower_secondary", 42.65, city="plovdiv"),
+        ]) == []
+
+
+class TestSamePlaceEndpoints:
+    async def _pair(self, db, *, school_lat=42.6505):
+        kg = await _add(db, name=SVETLINA_KG, level="kindergarten", url=None,
+                        attributes={"extracted": {"secret": "must not ship"}})
+        school = await _add(db, name=SVETLINA_SCHOOL, level="lower_secondary", url=None)
+        location = (await db.execute(
+            SchoolLocation.__table__.select().where(SchoolLocation.school_id == school.id)
+        )).first()
+        await db.execute(
+            SchoolLocation.__table__.update().where(SchoolLocation.id == location.id).values(lat=school_lat)
+        )
+        await db.commit()
+        return kg, school
+
+    @pytest.mark.asyncio
+    async def test_list_names_the_other_institution_both_ways(self, seeded_db, seeded_client):
+        kg, school = await self._pair(seeded_db)
+        response = await seeded_client.get("/schools")
+        rows = {row["id"]: row for row in response.json()}
+        assert [entry["id"] for entry in rows[kg.id]["same_place"]] == [school.id]
+        assert [entry["id"] for entry in rows[school.id]["same_place"]] == [kg.id]
+        entry = rows[kg.id]["same_place"][0]
+        assert set(entry) == {
+            "id", "resolved_name_i18n", "school_type", "education_level", "place_id", "location_id",
+            "other_location_id",
+        }
+        assert entry["place_id"] == rows[school.id]["same_place"][0]["place_id"]
+        assert entry["location_id"] == rows[kg.id]["locations"][0]["id"]
+        assert entry["other_location_id"] == rows[school.id]["locations"][0]["id"]
+        assert "must not ship" not in response.text
+
+    @pytest.mark.asyncio
+    async def test_age_filter_keeps_the_hidden_neighbour_named(self, seeded_db, seeded_client):
+        kg, school = await self._pair(seeded_db)
+        response = await seeded_client.get("/schools", params={"education_level": "kindergarten"})
+        rows = {row["id"]: row for row in response.json()}
+        assert school.id not in rows
+        assert [entry["id"] for entry in rows[kg.id]["same_place"]] == [school.id]
+
+    @pytest.mark.asyncio
+    async def test_detail_carries_same_place(self, seeded_db, seeded_client):
+        kg, school = await self._pair(seeded_db)
+        response = await seeded_client.get(f"/schools/{school.id}")
+        assert [entry["id"] for entry in response.json()["same_place"]] == [kg.id]
+
+    @pytest.mark.asyncio
+    async def test_too_far_apart_is_two_places(self, seeded_db, seeded_client):
+        kg, _ = await self._pair(seeded_db, school_lat=42.6520)
+        response = await seeded_client.get(f"/schools/{kg.id}")
+        assert response.json()["same_place"] == []

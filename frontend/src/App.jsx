@@ -17,6 +17,7 @@ import {
   languageBasename,
   languageFromPath,
 } from './utils/languageUrl'
+import { languageSwitchArrival, restoreWindowScroll } from './utils/languageSwitch'
 
 // Loaded on demand: most visits never open the comparison. A tab that outlives a deploy
 // asks for a chunk file that no longer exists, so reload once to pick up the current build.
@@ -85,6 +86,17 @@ function useLanguageHead() {
   }, [pathname, t])
 }
 
+// After a language switch, scroll to where the other language's page was; moving on to
+// another page first cancels it.
+function useLanguageSwitchScroll() {
+  const location = useLocation()
+  useEffect(() => {
+    const scrollY = languageSwitchArrival(location)?.scrollY
+    return scrollY > 0 ? restoreWindowScroll(scrollY) : undefined
+    // Only the document's first history entry can be the page the switch landed on.
+  }, [location.key])
+}
+
 // The results page is the home page; old `/?age_group=...` links keep their filters.
 function HomeRedirect() {
   const { search } = useLocation()
@@ -94,6 +106,7 @@ function HomeRedirect() {
 // Root layout with CompareBar
 function RootLayout() {
   useLanguageHead()
+  useLanguageSwitchScroll()
 
   return (
     <>

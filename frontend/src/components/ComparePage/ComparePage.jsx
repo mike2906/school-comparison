@@ -22,9 +22,15 @@ import {
   hasDisplayEvidence,
   normalizeSchoolList,
 } from '../../utils/schoolAttributes'
-import { getBenchmarkComparison, getBenchmarkToneClasses, getNvoDetail as getSharedNvoDetail } from '../../utils/nvo'
+import {
+  comparisonExamType,
+  examGradeLabel,
+  getBenchmarkComparison,
+  getBenchmarkToneClasses,
+  getNvoDetail as getSharedNvoDetail,
+} from '../../utils/nvo'
 import { classifyAdmissionRequirement, curatedRequirement } from '../../utils/admission'
-import { yearlyTuitionRangeEur } from '../../utils/pricing'
+import { displayPrice, groupPricingByAcademicYear, statedTuition, tuitionSortValue, YEAR_STATUS } from '../../utils/pricing'
 
 const SOURCE_BADGE_STYLES = {
   official: 'bg-emerald-50 text-emerald-700',
@@ -82,16 +88,27 @@ function formatCurrency(amount, locale, currency = 'EUR') {
 }
 
 function formatPriceLabel(price, locale, t) {
-  const currency = price.currency || 'EUR'
-  const min = price.amount_min != null ? formatCurrency(Number(price.amount_min), locale, currency) : null
-  const max = price.amount_max != null ? formatCurrency(Number(price.amount_max), locale, currency) : null
-  const exact = price.amount != null ? formatCurrency(Number(price.amount), locale, currency) : null
+  const format = (value) => {
+    if (value == null) return null
+    const shown = displayPrice(value, price.currency)
+    return formatCurrency(shown.value, locale, shown.currency)
+  }
+  const min = format(price.amount_min)
+  const max = format(price.amount_max)
+  const exact = format(price.amount)
 
   if (min && max) return `${min}–${max}`
   if (min) return min
   if (max) return max
   if (exact) return exact
   return t('pricing.priceOnRequest')
+}
+
+/** " / month", " (one-time)" or " · period not stated", after a price. */
+function periodSuffix(period, t) {
+  if (!period) return ` · ${t('pricing.periodNotStated')}`
+  if (period === 'one_time') return ` (${t('pricing.one_time')})`
+  return ` / ${t(`pricing.per.${period}`)}`
 }
 
 function shortenUrl(url) {
@@ -356,8 +373,8 @@ function getTrendInfo(latest, average) {
   return { arrow: '→', className: 'text-neutral-400', diff }
 }
 
-function getNvoDetail(school, t, ageGroup = null) {
-  return getSharedNvoDetail(school, t, { ageGroup })
+function getNvoDetail(school, t, examType) {
+  return examType ? getSharedNvoDetail(school, t, { examType }) : null
 }
 
 function normalizeCompareValue(value) {
@@ -501,6 +518,13 @@ function ComparePage() {
     [schools, i18n.language]
   )
 
+  // One exam for every column: different exams' results are not comparable.
+  const nvoExamType = useMemo(
+    () => comparisonExamType(localizedSchools.filter(school => school.school_type !== 'international'), selectedAgeGroup),
+    [localizedSchools, selectedAgeGroup]
+  )
+  const nvoGrade = examGradeLabel(nvoExamType || 'nvo_7', t)
+
   const metricsById = useMemo(() => {
     const map = new Map()
     localizedSchools.forEach((school) => {
@@ -508,8 +532,9 @@ function ComparePage() {
       const distance = userLocation && primaryLocation?.lat && primaryLocation?.lng
         ? calculateDistance(userLocation.lat, userLocation.lng, primaryLocation.lat, primaryLocation.lng)
         : null
-      const pricingRange = yearlyTuitionRangeEur(school.pricing)
-      const nvoDetail = school.school_type === 'international' ? null : getNvoDetail(school, t, selectedAgeGroup)
+      const pricingRange = statedTuition(school.pricing)
+      const priceSort = tuitionSortValue(school.pricing)
+      const nvoDetail = school.school_type === 'international' ? null : getNvoDetail(school, t, nvoExamType)
       const overallLatest = nvoDetail?.latestCombined ?? null
       const overallAvg = nvoDetail?.schoolAverageCombined ?? null
 
@@ -517,13 +542,14 @@ function ComparePage() {
         distance,
         distanceApproximate: Boolean(primaryLocation?.coordinates_approximate),
         pricingRange,
+        priceSort,
         nvoDetail,
         overallLatest,
         overallAvg,
       })
     })
     return map
-  }, [localizedSchools, t, userLocation, selectedAgeGroup])
+  }, [localizedSchools, t, userLocation, nvoExamType])
 
   const sortedSchools = useMemo(() => {
     const list = [...localizedSchools]
@@ -545,8 +571,8 @@ function ComparePage() {
       }
 
       if (sortBy === 'price') {
-        const priceA = metricsById.get(a.id)?.pricingRange?.min
-        const priceB = metricsById.get(b.id)?.pricingRange?.min
+        const priceA = metricsById.get(a.id)?.priceSort
+        const priceB = metricsById.get(b.id)?.priceSort
         if (priceA == null && priceB == null) return 0
         if (priceA == null) return 1
         if (priceB == null) return -1
@@ -711,11 +737,20 @@ function ComparePage() {
           if (school.school_type !== 'state' && pricingRange) {
             const formatted = pricingRange.min === pricingRange.max
               ? formatCurrency(pricingRange.min, i18n.language, pricingRange.currency)
-              : `${formatCurrency(pricingRange.min, i18n.language, pricingRange.currency)} - ${formatCurrency(pricingRange.max, i18n.language, pricingRange.currency)}`
+              : `${formatCurrency(pricingRange.min, i18n.language, pricingRange.currency)}–${formatCurrency(pricingRange.max, i18n.language, pricingRange.currency)}`
+            // As the school states it, never annualised (schools bill over 9–12 months).
             return (
               <div>
-                <div className="text-sm font-semibold text-neutral-900">{formatted}</div>
-                <div className="text-xs text-neutral-500">{t('compare.labels.tuitionYearly')}</div>
+                <div className="text-sm font-semibold text-neutral-900">
+                  {formatted}{periodSuffix(pricingRange.period, t)}
+                </div>
+                <div className="text-xs text-neutral-500">
+                  {[
+                    t('pricing.tuition'),
+                    pricingRange.academicYear,
+                    pricingRange.yearStatus === YEAR_STATUS.DATED_OTHER ? t('pricing.notCurrentYear') : null,
+                  ].filter(Boolean).join(' · ')}
+                </div>
               </div>
             )
           }
@@ -742,7 +777,8 @@ function ComparePage() {
         },
         getCompare: (school) => {
           if (school.school_type !== 'state') {
-            return metricsById.get(school.id)?.pricingRange?.min ?? null
+            const metrics = metricsById.get(school.id)
+            return metrics?.priceSort ?? metrics?.pricingRange?.min ?? null
           }
           const primaryAgeGroup = getPrimaryAgeGroup(school)
           const lastAdmitted = getLastAdmittedPoints(school.admission_info, primaryAgeGroup)
@@ -751,7 +787,7 @@ function ComparePage() {
         },
       },
       {
-        label: t('compare.labels.nvoAverage'),
+        label: t('compare.labels.nvoAverage', { grade: nvoGrade }),
         getValue: (school) => {
           if (school.school_type === 'international') {
             return renderPlaceholder('compare.notApplicable')
@@ -765,12 +801,9 @@ function ComparePage() {
           const benchmark = isLatest ? getCombinedBenchmark(detail, year, value, examAverages) : null
           return (
             <div>
-              <div className={`text-sm font-semibold ${benchmark?.textClass || 'text-neutral-900'}`}>{formatPercent(value, 1)}%</div>
+              <div className={`text-sm font-semibold ${benchmark?.textClass || 'text-neutral-900'}`}>{t('academicPerformance.pointsValue', { value: formatPercent(value, 1) })}</div>
               <div className="text-xs text-neutral-500">
-                {[
-                  detail?.gradeLabel,
-                  isLatest ? year : t('compare.labels.fiveYearAverage'),
-                ].filter(Boolean).join(' · ')}
+                {isLatest ? year : t('compare.labels.fiveYearAverage')}
               </div>
               {benchmark && (
                 <div className="text-xs text-neutral-500">
@@ -841,7 +874,7 @@ function ComparePage() {
 
     const academicRows = [
       {
-        label: t('compare.labels.nvoMath'),
+        label: t('compare.labels.nvoMath', { grade: nvoGrade }),
         getValue: (school) => {
           if (school.school_type === 'international') return renderPlaceholder('compare.notApplicable')
           const detail = metricsById.get(school.id)?.nvoDetail
@@ -864,7 +897,7 @@ function ComparePage() {
                   className={`text-sm font-semibold ${style.text} ${style.benchmark ? 'cursor-help' : ''}`}
                   title={getBenchmarkTooltip(value, style.benchmark, t) || undefined}
                 >
-                  {formatPercent(value, 1)}%
+                  {t('academicPerformance.pointsValue', { value: formatPercent(value, 1) })}
                 </span>
                 {trend ? (
                   <span
@@ -893,7 +926,7 @@ function ComparePage() {
         getCompare: (school) => metricsById.get(school.id)?.nvoDetail?.latestMath ?? metricsById.get(school.id)?.nvoDetail?.mathAvg ?? null,
       },
       {
-        label: t('compare.labels.nvoBulgarian'),
+        label: t('compare.labels.nvoBulgarian', { grade: nvoGrade }),
         getValue: (school) => {
           if (school.school_type === 'international') return renderPlaceholder('compare.notApplicable')
           const detail = metricsById.get(school.id)?.nvoDetail
@@ -916,7 +949,7 @@ function ComparePage() {
                   className={`text-sm font-semibold ${style.text} ${style.benchmark ? 'cursor-help' : ''}`}
                   title={getBenchmarkTooltip(value, style.benchmark, t) || undefined}
                 >
-                  {formatPercent(value, 1)}%
+                  {t('academicPerformance.pointsValue', { value: formatPercent(value, 1) })}
                 </span>
                 {trend ? (
                   <span
@@ -1123,27 +1156,37 @@ function ComparePage() {
           }
 
 
+          // Grouped by academic year like the school page, so last year's fee is never
+          // read as this year's.
           return (
-            <div className="space-y-3">
-              {school.pricing.map((price) => (
-                <div key={price.id} className="space-y-1">
-                  <div className="text-sm font-medium text-neutral-900">
-                    {t(`pricing.${price.category}`)}
-                    {price.age_group ? ` • ${t(`ageGroups.${price.age_group}`)}` : ''}
-                    {price.plan_name ? ` • ${price.plan_name}` : ''}
-                    {price.academic_year ? ` • ${price.academic_year}` : ''}
+            <div className="space-y-4">
+              {groupPricingByAcademicYear(school.pricing).map(group => (
+                <div key={group.key} className="space-y-3">
+                  <div className="text-xs font-semibold text-neutral-500">
+                    {group.academicYear || t('pricing.yearNotStated')}
+                    {group.yearStatus === YEAR_STATUS.DATED_OTHER ? ` · ${t('pricing.notCurrentYear')}` : ''}
                   </div>
-                  <div className="text-sm text-neutral-700">
-                    {formatPriceLabel(price, i18n.language, t)}
-                    {` / ${price.period ? t(`pricing.${price.period}`) : t('pricing.periodNotStated')}`}
-                  </div>
-                  <InlineSource
-                    badgeKey={price.source}
-                    badgeLabel={t(`priceSource.${price.source}`)}
-                    url={price.source_url}
-                    dateLabel={formatDate(price.scraped_at, i18n.language)}
-                    t={t}
-                  />
+                  {group.rows.map((price) => (
+                    <div key={price.id} className="space-y-1">
+                      <div className="text-sm font-medium text-neutral-900">
+                        {t(`pricing.${price.category}`)}
+                        {price.age_group ? ` • ${t(`ageGroups.${price.age_group}`)}` : ''}
+                        {price.plan_name ? ` • ${price.plan_name}` : ''}
+                        {!group.academicYear && price.academic_year ? ` • ${price.academic_year}` : ''}
+                      </div>
+                      <div className="text-sm text-neutral-700">
+                        {formatPriceLabel(price, i18n.language, t)}
+                        {periodSuffix(price.period, t)}
+                      </div>
+                      <InlineSource
+                        badgeKey={price.source}
+                        badgeLabel={t(`priceSource.${price.source}`)}
+                        url={price.source_url}
+                        dateLabel={formatDate(price.scraped_at, i18n.language)}
+                        t={t}
+                      />
+                    </div>
+                  ))}
                 </div>
               ))}
             </div>
@@ -1242,7 +1285,7 @@ function ComparePage() {
       { key: 'locations', title: t('compare.sections.locations'), rows: locationRows },
       { key: 'contact', title: t('compare.sections.contact'), rows: contactRows },
     ]
-  }, [t, i18n.language, metricsById, userLocation, schools, selectedAgeGroup, examAverages])
+  }, [t, i18n.language, metricsById, userLocation, schools, selectedAgeGroup, examAverages, nvoGrade])
 
   const visibleSections = useMemo(() => sections
     .map(section => ({

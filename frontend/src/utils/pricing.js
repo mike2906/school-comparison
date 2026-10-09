@@ -113,22 +113,6 @@ export function monthlyEquivalent(row) {
   return null
 }
 
-/**
- * The lowest tuition amount among rows whose period the school did not state.
- *
- * A headline fallback only: such a price is shown as-is and labelled "period not
- * stated", never converted to a yearly or monthly figure. Returns null when there is
- * no such row.
- */
-export function lowestUnstatedPeriodTuition(rows = []) {
-  const candidates = (Array.isArray(rows) ? rows : [])
-    .filter(row => row.category === 'tuition' && row.period == null && !isInstallmentPlan(row))
-    .map(row => ({ amount: priceBase(row), currency: row.currency }))
-    .filter(entry => entry.amount != null)
-  if (candidates.length === 0) return null
-  return candidates.reduce((best, entry) => (entry.amount < best.amount ? entry : best))
-}
-
 // Bulgaria adopted the euro on 2026-01-01 at this irrevocably fixed rate.
 export const BGN_PER_EUR = 1.95583
 
@@ -142,31 +126,84 @@ export function toEur(amount, currency) {
   return null
 }
 
+// The order a headline picks a stated period in: parents budget per month, and a
+// monthly fee is the figure most schools publish first.
+const HEADLINE_PERIODS = ['monthly', 'quarter', 'term', 'semester', 'yearly']
+
+function tuitionRows(rows) {
+  return rows.filter(row => row.category === 'tuition' && !isInstallmentPlan(row))
+}
+
+function rangeOf(rows, convert) {
+  const values = rows.flatMap((row) => {
+    const low = row.amount_min ?? row.amount ?? row.amount_max
+    const high = row.amount_max ?? row.amount ?? row.amount_min
+    return [low, high].map(value => convert(value, row))
+  }).filter(value => value != null)
+  return values.length > 0 ? { min: Math.min(...values), max: Math.max(...values) } : null
+}
+
 /**
- * The yearly tuition range of a school's headline pricing cohort, in euro.
- *
- * Uses the same cohort as the headline price, skips instalment rows, and only converts
- * explicit monthly / quarterly / yearly periods. BGN rows are converted at the fixed
- * rate; rows in other currencies are left out. Returns `{ min, max, currency: 'EUR' }`
- * or null.
+ * A price for display: lev amounts in euro (Bulgaria's currency since 2026) at the fixed
+ * rate, any other currency as it is. Returns `{ value, currency }`.
  */
-export function yearlyTuitionRangeEur(pricing = []) {
+export function displayPrice(value, currency) {
+  if (currency === 'BGN') return { value: toEur(value, 'BGN'), currency: 'EUR' }
+  return { value: value == null ? null : Number(value), currency: currency || 'EUR' }
+}
+
+/**
+ * The tuition a school states for its headline cohort, in the period it states it in.
+ *
+ * Never annualised: a monthly fee multiplied by 12 overstates the year by up to a fifth
+ * at a school that bills 10 months. Picks one stated period: the one of the cheapest fee
+ * per month (so the headline agrees with `tuitionSortValue`), else monthly first, then
+ * quarter, term, semester, year, else a fee whose period the school did not state
+ * (`period: null`). EUR and BGN are shown in euro; another currency stays as it is, never mixed.
+ * Returns `{ min, max, currency, period, academicYear, yearStatus }` or null.
+ */
+export function statedTuition(pricing = []) {
   const cohort = selectPricingCohort(pricing)
   if (!cohort) return null
-  const perYear = { yearly: 1, quarter: 4, monthly: 12 }
+  const meta = { academicYear: cohort.academicYear, yearStatus: cohort.yearStatus }
+  const rows = tuitionRows(cohort.rows)
 
-  const values = cohort.rows
-    .filter(row => row.category === 'tuition' && !isInstallmentPlan(row) && perYear[row.period])
-    .flatMap(row => {
-      const low = row.amount_min ?? row.amount ?? row.amount_max
-      const high = row.amount_max ?? row.amount ?? row.amount_min
-      return [low, high].map(value => {
-        const eur = toEur(value, row.currency)
-        return eur == null ? null : eur * perYear[row.period]
-      })
-    })
+  const cheapest = rows
+    .map(row => ({ row, perMonth: toEur(monthlyEquivalent(row), row.currency) }))
+    .filter(entry => entry.perMonth != null)
+    .reduce((best, entry) => (best == null || entry.perMonth < best.perMonth ? entry : best), null)
+  const periods = [...HEADLINE_PERIODS, null]
+  if (cheapest) periods.unshift(cheapest.row.period)
+
+  for (const period of periods) {
+    const periodRows = rows.filter(row => (row.period ?? null) === period)
+    if (periodRows.length === 0) continue
+
+    const euro = rangeOf(periodRows, (value, row) => toEur(value, row.currency))
+    if (euro) return { ...euro, currency: 'EUR', period, ...meta }
+
+    // No euro rate: the currency of the cheapest row, never mixed with another.
+    const priced = periodRows.filter(row => row.currency && priceBase(row) != null)
+    if (priced.length === 0) continue
+    const cheapest = priced.reduce((best, row) => (priceBase(row) < priceBase(best) ? row : best))
+    const own = rangeOf(priced.filter(row => row.currency === cheapest.currency), value => value)
+    if (own) return { ...own, currency: cheapest.currency, period, ...meta }
+  }
+  return null
+}
+
+/**
+ * A number to order schools by price: the lowest headline tuition per month, in euro.
+ *
+ * For sorting only, never shown: putting a yearly and a monthly fee in one order needs a
+ * common unit, and the order survives the 10-vs-12-month error that a displayed figure
+ * would not. Null when no stated tuition converts.
+ */
+export function tuitionSortValue(pricing = []) {
+  const cohort = selectPricingCohort(pricing)
+  if (!cohort) return null
+  const values = tuitionRows(cohort.rows)
+    .map(row => toEur(monthlyEquivalent(row), row.currency))
     .filter(value => value != null)
-
-  if (values.length === 0) return null
-  return { min: Math.min(...values), max: Math.max(...values), currency: 'EUR' }
+  return values.length > 0 ? Math.min(...values) : null
 }
