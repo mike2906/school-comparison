@@ -483,7 +483,6 @@
       "project_based": "Project-based learning"
     },
     "admissions": {
-      "fromPrice": "From {{price}} {{currency}}/{{period}}",
       "interviewRequired": "Interview required",
       "testRequired": "Test required",
       "noEntranceExam": "No entrance exam",
@@ -491,10 +490,6 @@
       "minScore": "Min score: {{score}} ({{year}})",
       "priceUnstatedPeriod": "{{price}} {{currency}} · period not stated",
       "kgByPoints": "Admission by points through kg.sofia.bg"
-    },
-    "period": {
-      "year": "year",
-      "month": "month"
     },
     "nvo": {
       "grade4": "4th grade",

@@ -5,7 +5,6 @@ import {
   selectPricingCohort,
   groupPricingByAcademicYear,
   monthlyEquivalent,
-  lowestUnstatedPeriodTuition,
   isInstallmentPlan,
   YEAR_STATUS,
   toEur,
@@ -174,57 +173,6 @@ test('monthlyEquivalent does not invent a period the school did not state', () =
 test('monthlyEquivalent uses amount_min for a range and ignores rows with no amount', () => {
   assert.equal(monthlyEquivalent({ amount_min: 400, amount_max: 700, period: 'monthly' }), 400)
   assert.equal(monthlyEquivalent({ period: 'monthly' }), null)
-})
-
-test('lowestUnstatedPeriodTuition returns the raw tuition amount, unconverted', () => {
-  // School 615: EUR 500 tuition whose period the page does not state.
-  assert.deepEqual(
-    lowestUnstatedPeriodTuition([{ category: 'tuition', amount: 500, currency: 'EUR', period: null }]),
-    { amount: 500, currency: 'EUR' },
-  )
-})
-
-test('lowestUnstatedPeriodTuition ignores rows that state a period, and non-tuition fees', () => {
-  assert.equal(
-    lowestUnstatedPeriodTuition([
-      { category: 'tuition', amount: 300, currency: 'EUR', period: 'monthly' },
-      { category: 'food', amount: 88, currency: 'EUR', period: null },
-    ]),
-    null,
-  )
-})
-
-test('lowestUnstatedPeriodTuition picks the lowest unstated-period tuition', () => {
-  assert.deepEqual(
-    lowestUnstatedPeriodTuition([
-      { category: 'tuition', amount: 750, currency: 'EUR', period: null },
-      { category: 'tuition', amount: 500, currency: 'EUR' },
-    ]),
-    { amount: 500, currency: 'EUR' },
-  )
-  assert.equal(lowestUnstatedPeriodTuition([]), null)
-})
-
-test('lowestUnstatedPeriodTuition never offers one instalment as the tuition price', () => {
-  // Codex P2 on PR #74: EUR 3490 is one of two instalments, not the tuition fee.
-  assert.equal(
-    lowestUnstatedPeriodTuition([
-      { category: 'tuition', amount: 3490, currency: 'EUR', period: null, plan_name: '2 installments' },
-    ]),
-    null,
-  )
-})
-
-test('lowestUnstatedPeriodTuition skips a cheaper instalment in favour of the full fee', () => {
-  // "Lowest" must not reach past the exclusion: the instalment is cheaper, so picking
-  // it here would be the exact bug.
-  assert.deepEqual(
-    lowestUnstatedPeriodTuition([
-      { category: 'tuition', amount: 3490, currency: 'EUR', period: null, plan_name: '2 installments' },
-      { category: 'tuition', amount: 6600, currency: 'EUR', period: null },
-    ]),
-    { amount: 6600, currency: 'EUR' },
-  )
 })
 
 test('isInstallmentPlan recognises instalment plan names, as it did in SchoolCard', () => {
