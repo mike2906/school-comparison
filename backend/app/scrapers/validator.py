@@ -8,6 +8,7 @@ import hashlib
 import json
 import logging
 import re
+from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any, Literal
 from urllib.parse import urldefrag
@@ -47,7 +48,10 @@ from app.scrapers.price_evidence import (
     RULE_PERIOD_UNREPRESENTABLE,
     PriceRow,
     check_price_row,
+    name_key,
+    page_is_another_institutions,
     period_fits_category,
+    proper_name,
     shared_names,
     taught_grades,
 )
@@ -732,19 +736,29 @@ _PRICE_EVIDENCE_ERROR_CODES = {
 }
 
 
-async def school_taught_grades(db: AsyncSession, school: School) -> set[int]:
+@dataclass(frozen=True)
+class FeeScope:
+    """What tells a school's fees from a sibling's on the site they share."""
+
+    grades: frozenset[int] = frozenset()
+    own_name: str | None = None
+
+
+async def school_fee_scope(db: AsyncSession, school: School) -> FeeScope:
     """The grades to scope a school's fees by: empty unless a sibling school shares its site.
 
     The registry's age groups are coarse (an international K-12 school is listed with
     grades 8-12 only: 505, 529), so they decide whose fee a grade band is only where
-    there is another school on the site to own the rest (151/392, 558/565).
+    there is another school on the site to own the rest (151/392, 558/565). With them
+    comes the school's proper name, when no sibling bears it too: a fee line may name
+    the school instead of its grades.
     """
     # Local import: school_relations imports app.scrapers, whose package imports us.
     from app.services.school_relations import same_site_institutions
 
     group = site_group_key(school.website_url)
     if level_family(school.education_level) != "school" or not group:
-        return set()
+        return FeeScope()
     siblings = [
         other
         for other in await same_site_institutions(db, school)
@@ -753,7 +767,7 @@ async def school_taught_grades(db: AsyncSession, school: School) -> set[int]:
         and site_group_key(other.website_url) == group
     ]
     if not siblings:
-        return set()
+        return FeeScope()
     groups = (
         await db.execute(
             select(SchoolLocationAgeGroupShift.age_group)
@@ -761,7 +775,14 @@ async def school_taught_grades(db: AsyncSession, school: School) -> set[int]:
             .where(SchoolLocation.school_id == school.id)
         )
     ).scalars()
-    return taught_grades(groups)
+
+    def name_of(institution: School) -> str | None:
+        return proper_name((institution.name_i18n or {}).get("bg"))
+
+    own_name = name_of(school)
+    if own_name and any(name_key(name_of(other)) == name_key(own_name) for other in siblings):
+        own_name = None
+    return FeeScope(frozenset(taught_grades(groups)), own_name)
 
 
 async def _check_price_evidence(
@@ -791,13 +812,24 @@ async def _check_price_evidence(
         ).all()
     )
     family = level_family(school.education_level)
-    grades = await school_taught_grades(db, school)
+    scope = await school_fee_scope(db, school)
     for row in rows:
         text = pages.get(row.source_page_id)
         if not text:
             continue
         row_prefix = f"pricing[{row.id}]"
-        for finding in check_price_row(PriceRow.from_pricing(row), text, family, grades):
+        if page_is_another_institutions(row.source_url, scope.grades):
+            _add_issue(
+                report,
+                code=_PRICE_EVIDENCE_ERROR_CODES[RULE_LEVEL],
+                severity="error",
+                field_path=row_prefix,
+                message=f"the page is a sibling institution's by its address: {row.source_url}",
+            )
+            continue
+        for finding in check_price_row(
+            PriceRow.from_pricing(row), text, family, scope.grades, scope.own_name
+        ):
             if finding.rule == RULE_PERIOD_MISSING:
                 if not period_fits_category(getattr(row.category, "value", row.category), finding.period):
                     continue  # extraction left it empty on purpose

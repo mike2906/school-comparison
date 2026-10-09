@@ -32,11 +32,14 @@ from app.scrapers.extraction_rules import get_rules
 from app.scrapers.fee_pages import page_key
 from app.scrapers.price_evidence import (
     _NUMBER_ONLY_LINE_RE,
+    _PRICE_RE,
     _gap,
+    _label_key,
     _line_of,
     amount_spans,
     currency_price_starts,
     fee_number_starts,
+    label_grades,
     label_names_a_level,
     label_spans,
     normalize_text,
@@ -2089,16 +2092,23 @@ def _dedupe_price_rows(prices: list[ExtractedPrice]) -> list[ExtractedPrice]:
     latest_start_year = (
         int(latest_explicit_year.split("/", 1)[0]) if latest_explicit_year else None
     )
+    # Last year's list beside this year's tuition is superseded as a whole, also its fees
+    # the new list does not repeat (596: the 2025/2026 food and transport prices).
+    latest_year_has_tuition = any(
+        (row.category or "").casefold() == "tuition"
+        and _normalize_academic_year(row.academic_year) == latest_explicit_year
+        for row in rows
+    )
     return [
         row
         for row in rows
         if (
             (year := _normalize_academic_year(row.academic_year)) is None
             or latest_start_year is None
-            # Keep the immediately preceding/current academic year when a
-            # page legitimately mixes adjacent schedules. Older fee tables
+            # Keep the immediately preceding academic year while the newest one states
+            # no tuition yet (a page that mixes adjacent schedules). Older fee tables
             # are superseded even when the new table has different categories.
-            or int(year.split("/", 1)[0]) >= latest_start_year - 1
+            or int(year.split("/", 1)[0]) >= latest_start_year - (0 if latest_year_has_tuition else 1)
         )
         and (
             (key := comparable_group_key(row)) not in latest_year_by_group
@@ -2346,7 +2356,13 @@ def _prices_from_fee_lines(lines: list[FeeLine]) -> list[ExtractedPrice]:
     kind has no full price at all, a plan's yearly total is the price there is. Sums of
     several fees, penalties, per-day/week/hour amounts and amounts of no fee kind are
     left out. An amount with no currency is in euro (Bulgaria's currency since 2026).
+
+    The labels decide what the model's role leaves open: a price whose label says it is
+    paid in several installments is a plan, the slices of a stated total are not fees of
+    their own, and of several amounts one table row gives under one label the first is
+    the fee.
     """
+    lines = _first_amount_per_label_and_line(_without_slices_of_a_total(lines))
     rows: list[ExtractedPrice] = []
     last_full: dict[str, ExtractedPrice] = {}
     unattached: list[tuple[FeeLine, str]] = []
@@ -2354,7 +2370,11 @@ def _prices_from_fee_lines(lines: list[FeeLine]) -> list[ExtractedPrice]:
         category = _FEE_KIND_CATEGORY.get(line.kind)
         if category is None or line.per not in _FEE_PERIOD or line.role in ("sum", "penalty"):
             continue
-        if line.role == "full":
+        # "Плащане на 2 вноски" copied as a price of its own is a plan of the full price
+        # before it; with no full price before it, it is the price there is.
+        if line.role == "full" and not (
+            category in last_full and _names_several_installments(line.label)
+        ):
             row = _price_from_fee_line(line, category)
             rows.append(row)
             last_full[category] = row
@@ -2364,13 +2384,26 @@ def _prices_from_fee_lines(lines: list[FeeLine]) -> list[ExtractedPrice]:
             unattached.append((line, category))
             continue
         currency = "EUR" if line.currency == "unstated" else line.currency
-        terms = target.installments if line.role == "plan" else target.discounts
+        terms = target.discounts if line.role == "discounted" else target.installments
         terms.append(f"{line.label}: {line.amount:g} {currency}")
-    rows.extend(
-        _price_from_fee_line(line, category)
-        for line, category in unattached
-        if category not in last_full and line.role == "plan" and line.per == "year"
-    )
+    # No full price of the kind: the yearly total of a plan stands in. A total whose label
+    # says "in 2 installments" is a variant of the one before it (404's "6 750 евро /
+    # година" was followed by "Възможности за плащане на 2 вноски – 6 547,5 евро").
+    stand_in: dict[str, ExtractedPrice] = {}
+    for line, category in unattached:
+        if category in last_full or line.role == "discounted" or line.per != "year":
+            continue
+        whole = stand_in.get(category)
+        if (
+            whole is not None
+            and _names_several_installments(line.label)
+            and not _names_several_installments(whole.plan_name)
+        ):
+            currency = "EUR" if line.currency == "unstated" else line.currency
+            whole.installments.append(f"{line.label}: {line.amount:g} {currency}")
+            continue
+        stand_in[category] = _price_from_fee_line(line, category)
+        rows.append(stand_in[category])
     # A page that still shows the lev beside the euro states one fee, not two.
     euro = [(row.category, row.amount) for row in rows if row.currency == "EUR"]
     rows = [
@@ -2382,20 +2415,173 @@ def _prices_from_fee_lines(lines: list[FeeLine]) -> list[ExtractedPrice]:
             for category, amount in euro
         )
     ]
-    # The same fee copied twice, from the page's two language versions or from a summary
-    # and its table, differs at most in the grammar of its label.
-    distinct: dict[tuple[Any, ...], ExtractedPrice] = {}
+    return _without_restated_fees(rows)
+
+
+# "на 2 вноски", "10 installments", "на равни месечни вноски", "разсрочено плащане": the
+# price of paying in parts. "1 вноска" and "1 installment" are the fee paid in one go.
+_SEVERAL_INSTALLMENTS_RE = re.compile(
+    r"(?<![\d.,])(?:[2-9]|1\d)\s*(?:x\s*)?(?:равни\s+)?(?:месечни\s+)?(?:вноски|плащания|instal?lments|payments)"
+    r"|\b(?:две|три|четири|пет|шест|девет|десет|two|three|four|nine|ten)\s+(?:равни\s+)?(?:месечни\s+)?"
+    r"(?:вноски|плащания|instal?lments|payments)"
+    r"|равни\s+(?:месечни\s+)?вноски|разсрочен|\bна\s+вноски\b|\bin\s+instal?lments\b",
+    re.IGNORECASE,
+)
+
+
+# Sample text a site template ships with. Two different words of it make a page filler.
+_TEMPLATE_FILLER_RE = re.compile(
+    r"\b(?:lorem|ipsum|pellentesque|vestibulum|scelerisque|consectetur|adipiscing|lobortis|malesuada)\b",
+    re.IGNORECASE,
+)
+
+
+def _is_template_filler(text: str | None) -> bool:
+    return len({word.casefold() for word in _TEMPLATE_FILLER_RE.findall(text or "")}) >= 2
+
+
+def _names_several_installments(label: str | None) -> bool:
+    return bool(_SEVERAL_INSTALLMENTS_RE.search(str(label or "")))
+
+
+def _without_slices_of_a_total(lines: list[FeeLine]) -> list[FeeLine]:
+    """Leave out the parts of a total in which tuition is the smaller half.
+
+    533 and 633 split one yearly charge into "Такса обучение" 2960, a research programme
+    2960 and two smaller parts, and give "Общо" 7400 below: the 2960 is not what the
+    school costs. A total of tuition and optional extras (food, transport) is mostly
+    tuition, and its parts stay. In a table the parts of a total are the lines that share
+    its column heading, one " / " part of the label.
+    """
+
+    def label_parts(line: FeeLine) -> set[str]:
+        return {_label_key(part) for part in line.label.split(" / ")}
+
+    dropped: set[int] = set()
+    for total in lines:
+        if total.role != "sum" or total.amount <= 0:
+            continue
+        others = [
+            index
+            for index, line in enumerate(lines)
+            if line.role not in ("sum", "penalty") and line.currency == total.currency
+        ]
+        columns = label_parts(total) if " / " in total.label else {None}
+        for column in columns:
+            parts = [index for index in others if column is None or column in label_parts(lines[index])]
+            if abs(sum(lines[index].amount for index in parts) - total.amount) > 0.005 * total.amount:
+                continue
+            tuition = sum(lines[index].amount for index in parts if lines[index].kind == "tuition")
+            if 0 < tuition < total.amount / 2:
+                dropped.update(parts)
+    return [line for index, line in enumerate(lines) if index not in dropped]
+
+
+def _first_amount_per_label_and_line(lines: list[FeeLine]) -> list[FeeLine]:
+    """Of several tuition prices one line of the page gives under one label, the first.
+
+    A table row gives the fee and then its variants in further columns. When the copied
+    labels do not tell the columns apart, the later amounts would be stored as the same
+    fee at other prices (505's company-paid +5% and +10% rates under the family price's
+    label). Other kinds are left alone: "от 10 до 20 EUR" for a club is a range.
+    """
+    kept: list[FeeLine] = []
+    first: dict[tuple[Any, ...], list[FeeLine]] = {}
+    for line in lines:
+        if line.role != "full" or line.kind != "tuition":
+            kept.append(line)
+            continue
+        earlier = first.setdefault((line.kind, line.currency, line.per, _label_key(line.label)), [])
+        if any(
+            other.amount != line.amount
+            and (
+                amount_spans(normalize_text(line.quote), other.amount)
+                or amount_spans(normalize_text(other.quote), line.amount)
+            )
+            for other in earlier
+        ):
+            continue
+        earlier.append(line)
+        kept.append(line)
+    return kept
+
+
+# Words that say a label is a fee or how it is paid, and nothing about which fee.
+_GENERIC_FEE_LABEL_RE = re.compile(
+    r"\b(?:такс\w*|цена\w*|годишн\w*|обучение\w*|учебна\w*|година\w*|плащане\w*|заплащане\w*"
+    r"|еднократн\w*|пълна\w*|размер\w*|tuition|fees?|annual|yearly|payment|full|total|price|year"
+    r"|for|the|of|на|за|в)\b"
+)
+
+
+def _label_is_generic(label: str | None) -> bool:
+    return not _GENERIC_FEE_LABEL_RE.sub(" ", _label_key(label)).strip()
+
+
+def _without_restated_fees(rows: list[ExtractedPrice]) -> list[ExtractedPrice]:
+    """One row for a fee the pages state more than once.
+
+    The same amount of the same kind is one fee when the labels differ only in grammar
+    (the page's two language versions, a summary and its table), when one label is the
+    other with words added that name no other grades (214: "1. - 4. клас / Плащане на
+    пълна такса" and the same under its table's title), or when one of them only says
+    "fee" (569: "Годишна такса обучение" beside "1-4 клас / Годишна такса обучение").
+    Two bands at one price each name their own level and stay.
+    """
+    kept: list[ExtractedPrice] = []
     for row in rows:
-        kept = distinct.setdefault((row.category, row.amount, row.currency, _label_stems(row.plan_name)), row)
-        if kept is not row:
-            kept.period = kept.period or row.period
-            kept.academic_year = kept.academic_year or row.academic_year
-    return list(distinct.values())
+        stems, generic = _label_stems(row.plan_name), _label_is_generic(row.plan_name)
+        same = next(
+            (
+                index
+                for index, other in enumerate(kept)
+                if (other.category, other.amount, other.currency) == (row.category, row.amount, row.currency)
+                and (
+                    generic
+                    or _label_is_generic(other.plan_name)
+                    or (
+                        (stems <= _label_stems(other.plan_name) or _label_stems(other.plan_name) <= stems)
+                        and label_grades(row.plan_name) == label_grades(other.plan_name)
+                    )
+                )
+            ),
+            None,
+        )
+        if same is None:
+            kept.append(row)
+            continue
+        other = kept[same]
+        # The label that says which fee is the one to keep; between two that do, the shorter.
+        if generic:
+            prefer_new = False
+        elif _label_is_generic(other.plan_name):
+            prefer_new = True
+        else:
+            prefer_new = len(stems) < len(_label_stems(other.plan_name))
+        winner, loser = (row, other) if prefer_new else (other, row)
+        winner.period = winner.period or loser.period
+        winner.academic_year = winner.academic_year or loser.academic_year
+        kept[same] = winner
+    return kept
 
 
 def _label_stems(label: str | None) -> frozenset[str]:
     """Word stems of a label: "Месечната такса" and "Месечна такса" are one label."""
     return frozenset(word[:5] for word in re.findall(r"[^\W_]+", str(label or "").casefold()))
+
+
+def _fee_label(text: str | None, max_len: int, *, cut: bool = False) -> str | None:
+    """A fee label kept whole; one over the length is cut when asked, else dropped.
+
+    The general text cleaner keeps the first of a comma-separated list, which cut
+    "Детска Ясла ,,Йор Кидс“ / Целодневен престой" down to its heading (542).
+    """
+    label = " ".join(str(text or "").split())
+    if len(label) > max_len:
+        if not cut:
+            return None
+        label = label[:max_len]
+    return label.strip(" ,;|/") or None
 
 
 def _price_from_fee_line(line: FeeLine, category: str) -> ExtractedPrice:
@@ -2404,15 +2590,13 @@ def _price_from_fee_line(line: FeeLine, category: str) -> ExtractedPrice:
         amount=line.amount,
         currency="EUR" if line.currency == "unstated" else line.currency,
         period=_FEE_PERIOD[line.per],
-        plan_name=_normalize_scalar_text(line.label[:100].strip(), max_len=100),
+        plan_name=_fee_label(line.label, 100, cut=True),
         # The part of the label that says for whom, kept whole: the scope rules read
         # it, and a long label is cut before it gets there.
-        age_group=_normalize_scalar_text(
-            next(
-                (part[:50].strip() for part in line.label.split(" / ") if label_names_a_level(part)),
-                None,
-            ),
-            max_len=50,
+        age_group=_fee_label(
+            next((part for part in line.label.split(" / ") if label_names_a_level(part)), None),
+            50,
+            cut=True,
         ),
         academic_year=line.academic_year,
         confidence=_FEE_LINE_CONFIDENCE,
@@ -2525,7 +2709,55 @@ def _filter_model_prices(prices: list[ExtractedPrice], text: str) -> list[Extrac
         normalized.period = period if period_fits_category(price.category, period) else None
         normalized.academic_year = page_year
         refined.append(normalized)
-    return refined
+    return _told_apart_by_heading(refined, text)
+
+
+def _told_apart_by_heading(rows: list[ExtractedPrice], text: str) -> list[ExtractedPrice]:
+    """Rows that share a label at different prices get the heading each one stands under.
+
+    542 lists "Целодневен престой" twice, under "Месечни такси в Частна Детска Ясла" and
+    under "Месечни такси в Частна Детска Градина": copied without their headings the
+    nursery's prices read as the kindergarten's. The heading says for whom, so it goes
+    where the label's own "for whom" part would. The rows are left as they are unless
+    each price has a heading of its own.
+    """
+    groups: dict[tuple[Any, ...], list[ExtractedPrice]] = {}
+    for row in rows:
+        if row.plan_name and row.amount is not None:
+            groups.setdefault((row.category, row.currency, _label_key(row.plan_name)), []).append(row)
+    lines = [line.strip() for line in (text or "").splitlines() if line.strip()]
+    for group in groups.values():
+        amounts = {row.amount for row in group}
+        if len(amounts) < 2 or any(row.age_group for row in group):
+            continue
+        headings = [_fee_label(_heading_above_labelled_amount(lines, row), 50, cut=True) for row in group]
+        if None in headings or len(set(headings)) < len(amounts):
+            continue
+        for row, heading in zip(group, headings):
+            row.age_group = heading
+    return rows
+
+
+def _heading_above_labelled_amount(lines: list[str], row: ExtractedPrice) -> str | None:
+    """The one line without a price above the lines that hold the row's label and amount."""
+    found: set[str] = set()
+    for index, line in enumerate(lines):
+        normalized = normalize_text(line)
+        if not (amount_spans(normalized, row.amount) and label_spans(normalized, row.plan_name)):
+            continue
+        heading = next(
+            (
+                above
+                for above in reversed(lines[:index])
+                if not above.startswith("---") and not _PRICE_RE.search(above)
+                and not _NUMBER_ONLY_LINE_RE.match(above)
+            ),
+            None,
+        )
+        if heading is None:
+            return None
+        found.add(heading.rstrip(" :"))
+    return found.pop() if len(found) == 1 else None
 
 
 def _table_header(block: str, span: tuple[int, int]) -> str | None:

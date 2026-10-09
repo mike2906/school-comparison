@@ -255,7 +255,7 @@ async def fetch_fee_documents(
             continue
         fetches += 1
         try:
-            fetched = await _get(client, url)
+            fetched = await _get_retrying_timeout(client, url)
         except httpx.HTTPError as exc:
             logger.info("fee link %s failed: %s", url, exc)
             continue
@@ -303,7 +303,7 @@ async def fetch_fee_documents(
                         if disallowed is not None and await disallowed(candidate_url):
                             continue
                         try:
-                            image = await _get(client, candidate_url)
+                            image = await _get_retrying_timeout(client, candidate_url)
                         except httpx.HTTPError:
                             image = None
                         if image is not None:
@@ -319,6 +319,20 @@ async def fetch_fee_documents(
             seen.add(page_key(final_url))
             documents.append(FeeDocument(url=final_url, text=text))
     return documents
+
+
+async def _get_retrying_timeout(client: httpx.AsyncClient, url: str) -> tuple[str, str, bytes] | None:
+    """:func:`_get`, once more after a timeout.
+
+    A slow site answers the second time more often than not, and a fee page missed here
+    is not fetched again until the next crawl (555/594's fee pictures on the first pass).
+    Other failures are not retried.
+    """
+    try:
+        return await _get(client, url)
+    except httpx.TimeoutException as exc:
+        logger.info("fee link %s timed out, trying once more: %s", url, exc)
+        return await _get(client, url)
 
 
 async def _get(client: httpx.AsyncClient, url: str) -> tuple[str, str, bytes] | None:

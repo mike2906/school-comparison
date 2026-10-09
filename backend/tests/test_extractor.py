@@ -5293,3 +5293,243 @@ def test_fee_lines_copied_twice_with_the_same_label_are_one_row():
         (10900, "I GROUP", None),
         (10900, "II GROUP", None),
     ]
+
+
+def test_a_two_installment_total_is_a_plan_of_the_price_before_it():
+    """School 404: every tuition line came back as a plan, the 2-installment totals too."""
+    lines = [
+        _line("За ученици от 1 до 3 клас", 6750, role="plan", per="year"),
+        _line("При заплащане на цялата такса получавате 10% отстъпка", 6075, role="discounted", per="year"),
+        _line("Възможности за плащане на 2 вноски", 6547.5, role="plan", per="year"),
+        _line("Възможност за плащане на 9 равни месечни вноски", 750, role="plan", per="month"),
+        _line("За ученици от 4 до 7 клас", 7500, role="plan", per="year"),
+        _line("Възможности за плащане на 2 вноски", 7275, role="plan", per="year"),
+    ]
+
+    rows = extractor_module.helpers._prices_from_fee_lines(lines)
+
+    assert [(r.amount, r.plan_name) for r in rows] == [
+        (6750, "За ученици от 1 до 3 клас"),
+        (7500, "За ученици от 4 до 7 клас"),
+    ]
+    assert rows[0].installments == ["Възможности за плащане на 2 вноски: 6547.5 EUR"]
+
+
+def test_installment_wording_decides_only_where_a_whole_price_is_stated():
+    helpers = extractor_module.helpers
+    # Copied as a full price after the full price: a plan of it.
+    rows = helpers._prices_from_fee_lines(
+        [_line("Годишна такса", 5900, per="year"), _line("Плащане на 2 вноски", 6000, per="year")]
+    )
+    assert [r.amount for r in rows] == [5900]
+    # Two bands that are both priced by their plan are two fees.
+    rows = helpers._prices_from_fee_lines(
+        [
+            _line("1-4 клас / 10 вноски", 7000, role="plan", per="year"),
+            _line("5-7 клас / 10 вноски", 7500, role="plan", per="year"),
+        ]
+    )
+    assert [r.amount for r in rows] == [7000, 7500]
+    # The only price there is stays, and "1 installment" is the fee paid in one go.
+    rows = helpers._prices_from_fee_lines(
+        [_line("Месечна такса, 10 вноски", 500, per="month"), _line("Grade 1 / 1 installment", 9000, per="year")]
+    )
+    assert [r.amount for r in rows] == [500, 9000]
+
+
+def test_a_fee_stated_again_under_a_longer_or_a_bare_label_is_one_row():
+    helpers = extractor_module.helpers
+    # 214: the band under its table's title as well.
+    rows = helpers._prices_from_fee_lines(
+        [
+            _line("1. - 4. клас / Годишна такса „Обучение“ / 1. - 4. клас / Плащане на пълна такса", 7950),
+            _line("1. - 4. клас / Плащане на пълна такса", 7950, per="year"),
+            _line("5. - 7. клас / Плащане на пълна такса", 8300),
+        ]
+    )
+    assert [(r.amount, r.plan_name, r.period) for r in rows] == [
+        (7950, "1. - 4. клас / Плащане на пълна такса", "yearly"),
+        (8300, "5. - 7. клас / Плащане на пълна такса", None),
+    ]
+    # 569: the payment terms repeat the fee without saying whose it is.
+    rows = helpers._prices_from_fee_lines(
+        [
+            _line("ПГУ от 15.09.2026 г. до 31.05.2027 г. / Годишна такса обучение **", 5900),
+            _line("1-4 клас от 15.09.2026 г. до 31.05.2027 г. / Годишна такса обучение **", 5900),
+            _line("Годишна такса обучение", 5900, per="year"),
+            _line("Еднократно плащане", 5900),
+        ]
+    )
+    assert [r.plan_name[:8] for r in rows] == ["ПГУ от 1", "1-4 клас"]
+    assert rows[0].period == "yearly"
+    # Bands at one price stay apart, and so does a longer label that names other grades.
+    rows = helpers._prices_from_fee_lines(
+        [_line("ПГ", 8950), _line("I - VII клас", 8950), _line("1 клас", 9000), _line("1 - 4 клас", 9000)]
+    )
+    assert len(rows) == 4
+
+
+def test_later_amounts_of_one_line_under_one_label_are_left_out():
+    """School 505: the company-paid +5% and +10% rates came back under the family price's label."""
+    row = "1st child 7 965,52 EUR 3 186,21 EUR 2 389,66 EUR 2 389,66 EUR 8 363,80 EUR 8 762,07 EUR"
+    lines = [
+        _line("Youngest Class (Très Petite Section)", 7965.52, per="year", quote="1st child 7 965,52 EUR"),
+        _line("Youngest Class (Très Petite Section)", 8363.80, per="year", quote=row),
+        _line("Youngest Class (Très Petite Section)", 8762.07, per="year", quote=row),
+        _line("Grade 1 / new students", 2550, quote="Grade 1 € 2,550 (new) / € 1,950 (returning)"),
+        _line("Grade 1 / returning students", 1950, quote="Grade 1 € 2,550 (new) / € 1,950 (returning)"),
+        # A range for a club is not a fee and its variant.
+        _line("Клубове", 10, kind="extracurricular", quote="от 10 до 20 EUR"),
+        _line("Клубове", 20, kind="extracurricular", quote="от 10 до 20 EUR"),
+        # The same label on another line of the page is another fee.
+        _line("Целодневен престой", 1100, quote="Целодневен престой – 1100 лв."),
+        _line("Целодневен престой", 950, quote="Целодневен престой – 950 лв."),
+    ]
+
+    rows = extractor_module.helpers._prices_from_fee_lines(lines)
+
+    assert [r.amount for r in rows] == [7965.52, 2550, 1950, 10, 20, 1100, 950]
+
+
+def test_the_slices_of_a_total_are_not_fees_of_their_own():
+    """Schools 533 and 633: "Такса обучение" is 2960 of the 7400 a year costs."""
+    helpers = extractor_module.helpers
+    columns = {"на 1 вноска годишно": (2960, 740, 7400, "full"), "на 3 вноски годишно": (3040, 760, 7600, "plan")}
+    lines = []
+    for column, (half, small, total, role) in columns.items():
+        lines += [
+            _line(f"Такса обучение / {column}", half, per="year", role=role),
+            _line(f"Извънкласни дейности / Изследователска програма / {column}", half, per="year", role=role, kind="extracurricular"),
+            _line(f"Летни въвеждащи и завършващи дейности / {column}", small, per="year", role=role, kind="other"),
+            _line(f"Дарение за развитие ФОТ (препоръчително) / {column}", small, per="year", role=role, kind="other"),
+            _line(f"Общо / {column}", total, per="year", role="sum", kind="other"),
+        ]
+    lines.append(_line("Материали", 100, kind="materials"))
+    # The column heading may come first in the copied label.
+    lines += [
+        _line("на равни месечни вноски / Такса обучение", 3120, per="year", role="plan"),
+        _line("на равни месечни вноски / Изследователска програма", 4680, per="year", role="plan", kind="other"),
+        _line("на равни месечни вноски / Общо", 7800, per="year", role="sum", kind="other"),
+    ]
+
+    assert [(r.category, r.amount) for r in helpers._prices_from_fee_lines(lines)] == [("materials", 100)]
+
+    # A total that is mostly tuition leaves its parts as they are.
+    lines = [
+        _line("Такса обучение", 5000, per="year"),
+        _line("Храна", 1000, per="year", kind="food"),
+        _line("Общо", 6000, per="year", role="sum"),
+    ]
+    assert [(r.category, r.amount) for r in helpers._prices_from_fee_lines(lines)] == [
+        ("tuition", 5000),
+        ("food", 1000),
+    ]
+
+
+def test_rows_that_share_a_label_take_the_heading_each_stands_under():
+    """School 542: the nursery's prices under the kindergarten's labels."""
+    text = (
+        "--- SOURCE: https://school.test/fees ---\n"
+        "Месечни такси в Частна Детска Ясла:\n"
+        "Целодневен престой – 1100 лв.\n"
+        "Полудневен престой – 800 лв.\n"
+        "Месечни такси в Частна Детска Градина:\n"
+        "Целодневен престой – 950 лв.\n"
+        "Полудневен престой – 750 лв.\n"
+        "Годишна такса за учебни материали – 150лв\n"
+    )
+    prices = [
+        ExtractedPrice(category="tuition", amount=amount, currency="BGN", plan_name=label, confidence=0.9)
+        for label, amount in (
+            ("Целодневен престой", 1100),
+            ("Полудневен престой", 800),
+            ("Целодневен престой", 950),
+            ("Полудневен престой", 750),
+            ("Годишна такса за учебни материали", 150),
+        )
+    ]
+
+    rows = extractor_module.helpers._filter_model_prices(prices, text)
+
+    assert [(r.amount, r.plan_name, r.age_group) for r in rows] == [
+        (1100, "Целодневен престой", "Месечни такси в Частна Детска Ясла"),
+        (800, "Полудневен престой", "Месечни такси в Частна Детска Ясла"),
+        (950, "Целодневен престой", "Месечни такси в Частна Детска Градина"),
+        (750, "Полудневен престой", "Месечни такси в Частна Детска Градина"),
+        (150, "Годишна такса за учебни материали", None),
+    ]
+
+    # Under one heading there is nothing to tell them apart by: left as copied.
+    same = "Такси:\nЦелодневен престой – 1100 лв.\nЦелодневен престой – 950 лв.\n"
+    rows = extractor_module.helpers._filter_model_prices([p.model_copy() for p in prices[:1] + prices[2:3]], same)
+    assert [(r.plan_name, r.age_group) for r in rows] == [("Целодневен престой", None)] * 2
+
+
+def test_last_years_list_goes_once_this_year_states_tuition():
+    """School 596: the 2025/2026 food and transport prices beside the 2026/2027 tuition."""
+    prices = [
+        ExtractedPrice(category="tuition", amount=8950, currency="EUR", academic_year="2026/2027", plan_name="Grade 0", confidence=0.9),
+        ExtractedPrice(category="tuition", amount=8400, currency="EUR", academic_year="2025/2026", plan_name="Annual Tuition Fee", confidence=0.9),
+        ExtractedPrice(category="food", amount=1290, currency="EUR", academic_year="2025/2026", plan_name="FOOD", confidence=0.9),
+        ExtractedPrice(category="materials", amount=550, currency="EUR", academic_year="2026/2027", confidence=0.9),
+    ]
+
+    deduped = extractor_module.helpers._dedupe_price_rows(prices)
+
+    assert [(row.category, row.amount) for row in deduped] == [("tuition", 8950), ("materials", 550)]
+
+
+def test_a_page_stored_under_two_session_ids_is_read_once():
+    """School 511: July's fee page, with the old prices, was read beside October's."""
+    def page(url, month):
+        return SimpleNamespace(source_url=url, last_scraped_at=datetime.datetime(2026, month, 9))
+
+    pages = [
+        page("https://www.arty.bg/bg/pages/charges.html?phpsessid=ee8a6ac484e8", 7),
+        page("https://www.arty.bg/bg/pages/charges.html?PHPSESSID=ecf72ad1383c", 10),
+        page("https://www.arty.bg/bg/pages/charges.html?PHPSESSID=bbdfa3fbde8c&lang=bg", 10),
+        page("https://www.arty.bg/bg/gallery.html?id=7&PHPSESSID=ecf72ad1383c", 10),
+        page("https://www.arty.bg/bg/gallery.html?id=8", 7),
+    ]
+
+    kept = extractor_module._freshest_url_variants(pages)
+
+    assert sorted(p.source_url for p in kept) == [
+        "https://www.arty.bg/bg/gallery.html?id=7&PHPSESSID=ecf72ad1383c",
+        "https://www.arty.bg/bg/gallery.html?id=8",
+        "https://www.arty.bg/bg/pages/charges.html?PHPSESSID=bbdfa3fbde8c&lang=bg",
+        "https://www.arty.bg/bg/pages/charges.html?PHPSESSID=ecf72ad1383c",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_a_templates_sample_prices_are_not_read(db_session, sample_school_for_extraction):
+    """School 590: "$1,800/mo" between lines of lorem ipsum on a site still half template."""
+    school = sample_school_for_extraction
+    pages = (
+        await db_session.execute(select(SourcePage).where(SourcePage.school_id == school.id))
+    ).scalars().all()
+    for page in pages:
+        page.raw_markdown = (
+            "Schedule and tuition\nHalf Days\nEu vestibulum praesent pretium platea fusce amet lobortis ut "
+            "malesuada neque scelerisque pulvinar.\n8:30 - 12:00\n$1,800/mo\nFull Days\n$2,300/mo\n"
+        )
+    await db_session.flush()
+    llm = AsyncMock(return_value=(PageFees(lines=[_line("Half Days", 1800, currency="USD", per="month")]), 1, 1, 0.0))
+
+    with patch("app.scrapers.extractor._run_typed_agent", new=llm):
+        result = await extractor_module._extract_prices(
+            db_session, school, list(pages), 20.0, extractor_module.ExtractionLLMStats()
+        )
+
+    assert (result["success"], result["count"]) == (False, 0)
+    llm.assert_not_called()
+    assert not extractor_module.helpers._is_template_filler("Lorem Hall, 5 Ipswich Road. Tuition 500 EUR")
+
+
+def test_a_copied_label_with_a_comma_is_kept_whole():
+    """School 542: 'Детска Ясла ,,Йор Кидс“ / Целодневен престой' was cut to its heading."""
+    label = "Месечни такси в Частна Детска Ясла ,,Йор Кидс“ / Целодневен престой"
+    (row,) = extractor_module.helpers._prices_from_fee_lines([_line(label, 1100, currency="BGN")])
+    assert row.plan_name == label and row.age_group == "Месечни такси в Частна Детска Ясла ,,Йор Кидс“"
+    assert extractor_module._normalized_price_fields(row)["plan_name"] == label

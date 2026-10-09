@@ -2392,6 +2392,39 @@ revision. None of this may widen the public boundary without a reviewed pilot.
         GPT-6.1 Sol's tuition amounts at about a seventh of the cost (about $0.50 for all
         Sofia private schools). Fee pictures stay on Sol (a separate `vision` tier):
         Luna's two readings of one table disagreed on digits.
+      - **Fourth pass 2026-10-09 (PR "fee rows decided from labels and page text").** The
+        41 rows removed by hand after the 2026-10-09 refresh, and the schools it left
+        out, traced to causes code can decide:
+        (1) *Restated fee* (214, 569): the same amount of the same kind under a label
+        that only adds words, or only says "fee", is one row.
+        (2) *Plan totals* (404): a yearly total whose label says "in 2 installments" is
+        listed under the price before it, also where the model called every line a plan.
+        (3) *Variant columns* (505): of several tuition amounts on one line under one
+        label, the first is the fee.
+        (4) *Repeated label* (542): rows that share a label at different prices take the
+        heading each stands under (nursery, kindergarten) as their "for whom".
+        (5) *Slices of a total* (533, 633): where the parts add up to a stated total and
+        tuition is under half of it, the parts are not stored.
+        (6) *Last year's list* (596): superseded as a whole once the newest year states
+        tuition.
+        (7) *Stale copy* (511): a page stored under a new session id per crawl is one
+        page; the freshest copy is read. The rows kept by hand on 2026-10-09 (620/450)
+        were July's; the site says 700/600.
+        (8) *Fee cards* (635): the crawl dropped every repeated line, so the school's
+        card, which repeats the pre-school card's 7880, lost its price. A repeated line
+        now stays when it is a price or stands next to one. The five rows Stage 6 blocks
+        there are three kindergarten fees (right) and two rule 1 misses (one-way
+        transport, the admission fee), left as they are.
+        (9) *Shared sites* (565, 550): a label that names the school itself is its fee
+        whatever grades it also names; a page whose address names only another stage
+        ("/chastno-osnovno-uchilishte/" for a gymnasium) is not read for fees, and a row
+        linked to such a page is withheld by Stage 6.
+        (10) *Template text* (590): a page with a site template's filler text is not
+        read for fees (its "$1,800/mo" is sample content; the website itself is right).
+        (11) The fee-link follow-up fetches a timed-out page once more (555/594).
+        **Still open:** 533/633 publish no tuition (the stated total includes a
+        recommended donation: whether to show it as the price is Mike's call); 505's
+        maternelle rows are dropped as a kindergarten's although the school runs it.
 - [ ] **E5 Gymnasium admission thresholds (state schools).** Import the official minimum
       admission scores after 7th grade into `admission_info.historical_min_scores`. Scores
       come from the city-wide NVO ranking, so no address logic is needed, but they are per

@@ -291,3 +291,67 @@ async def test_a_row_made_identical_by_the_period_fill_is_removed_in_the_same_ru
     await db_session.refresh(school)
     report = school.attributes["data_validation"]
     assert not any(fix["field_path"].startswith(f"pricing[{unstated.id}]") and fix["code"] != "duplicate_pricing_row_removed" for fix in report["auto_fixes"])
+
+
+async def _teaches(db_session, school, *age_groups):
+    from app.models import SchoolLocation, SchoolLocationAgeGroupShift
+
+    location = SchoolLocation(
+        school_id=school.id, address_i18n={"bg": "ул. Тест 1"}, lat=42.7, lng=23.3, is_primary=True
+    )
+    db_session.add(location)
+    await db_session.flush()
+    db_session.add_all(
+        SchoolLocationAgeGroupShift(location_id=location.id, age_group=group, shift="full_day")
+        for group in age_groups
+    )
+    await db_session.flush()
+
+
+@pytest.mark.asyncio
+async def test_a_gymnasium_keeps_the_fee_that_names_it_and_not_its_siblings_page(db_session, client):
+    """565 is named in a fee line of the shared site; 550 read its sibling's section."""
+    site = "https://tzarsimeon.test"
+    label = "Годишна такса обучение / 5-7 клас и ЧГПНП „Асен Йорданов“"
+    text = f"Такси\nГодишна такса обучение / ПК – 4 клас\n5670 евро\n{label}\n5773 евро\n"
+    gymnasium, page = await _school_with_page(
+        db_session,
+        level="upper_secondary",
+        website_url=site,
+        page_text=text,
+        name='"ЧАСТНА ГИМНАЗИЯ ПО ПРИРОДНИ НАУКИ "АСЕН ЙОРДАНОВ" ЕООД',
+    )
+    basic, _ = await _school_with_page(
+        db_session,
+        level="lower_secondary",
+        website_url=site,
+        page_text=text,
+        name='"ЧАСТНО ОСНОВНО УЧИЛИЩЕ ЦАР СИМЕОН ВЕЛИКИ" ЕООД',
+    )
+    await _teaches(db_session, gymnasium, "grade_8_12")
+    await _teaches(db_session, basic, "grade_1_4", "grade_5_7")
+    siblings_section = SourcePage(
+        school_id=gymnasium.id,
+        scrape_type=ScrapeType.WEBSITE,
+        source_url=f"{site}/chastno-osnovno-uchilishte/priem-petoklasnici",
+        content_hash="y",
+        page_category="pricing",
+        is_valid=True,
+        raw_markdown="Таксата за обучение е 8110 евро.",
+    )
+    db_session.add(siblings_section)
+    await db_session.flush()
+    own = _row(gymnasium, page, "tuition", 5773, plan_name=label)
+    other_band = _row(gymnasium, page, "tuition", 5670, plan_name="Годишна такса обучение / ПК – 4 клас")
+    from_sibling = _row(gymnasium, siblings_section, "tuition", 8110, plan_name="Таксата за обучение")
+    db_session.add_all([own, other_band, from_sibling])
+    await db_session.commit()
+
+    await validator_module.validate_school_data(db_session, gymnasium.id, "bg")
+    await db_session.refresh(gymnasium)
+
+    assert _issue_codes(gymnasium, own) == set()
+    assert _issue_codes(gymnasium, other_band) == {"pricing_label_names_other_level"}
+    assert _issue_codes(gymnasium, from_sibling) == {"pricing_label_names_other_level"}
+    response = await client.get(f"/schools/{gymnasium.id}")
+    assert [row["id"] for row in response.json()["pricing"]] == [own.id]

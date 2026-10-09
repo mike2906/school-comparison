@@ -727,3 +727,28 @@ async def test_navigate_schools_batch_still_records_a_site_with_no_pages_after_t
     assert retries == ["https://school.bg"]
     assert results[0]["success"] is False
     assert results[0]["reason"] == "No extractable page content"
+
+
+def test_a_second_fee_card_keeps_the_lines_it_repeats():
+    """Uwekind: the school's card repeats the pre-school card, price and all."""
+    def card(title, price, second):
+        return (
+            f"<div><h2>{title}</h2><span>Такса</span><span>€</span><span>{price}</span><span>/</span>"
+            f"<span>година</span><ul><li><strong>{second} €</strong> – при разсрочено плащане на 2 вноски</li>"
+            "<li>В таксата не е включена храна</li></ul></div>"
+        )
+
+    html = (
+        "<html><body><main><p>Финансови условия 2026-2027 за всички деца и ученици на училището</p>"
+        + card("Детска градина", 6820, 7000)
+        + card("Предучилищен клас", 7880, 8100)
+        + card("Училище", 7880, 8100)
+        + "<p>Отстъпки</p><p>Отстъпки</p></main></body></html>"
+    )
+
+    text = WebsiteNavigator()._extract_main_content_text(html)
+
+    school_card = text.split("Училище\n", 1)[1]
+    assert school_card.startswith("€\n7880\n/\nгодина\n8100 €\n– при разсрочено плащане на 2 вноски\n")
+    # Wording away from a price is still stored once.
+    assert text.count("В таксата не е включена храна") == 1 and text.count("Отстъпки") == 1
