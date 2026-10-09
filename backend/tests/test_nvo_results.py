@@ -779,3 +779,26 @@ async def test_exam_averages_endpoint_leaves_out_results_with_too_few_pupils(cli
 
     assert response.status_code == 200
     assert response.json()["by_year"]["nvo_10"]["2025"]["math"] == 45.0
+
+
+@pytest.mark.asyncio
+async def test_exam_averages_endpoint_is_scoped_to_one_city(client, db_session):
+    # The UI labels the benchmark "Sofia schools' average", so schools elsewhere must not
+    # feed it unless a caller asks for the whole country.
+    await _seed_country(db_session)
+    sofia = School(name_i18n={"bg": "Sofia school"}, country_code="bg", school_type="state",
+                   education_level="lower_secondary", city="sofia")
+    plovdiv = School(name_i18n={"bg": "Plovdiv school"}, country_code="bg", school_type="state",
+                     education_level="lower_secondary", city="plovdiv")
+    db_session.add_all([sofia, plovdiv])
+    await db_session.flush()
+    for school, value in ((sofia, 60.0), (plovdiv, 40.0)):
+        db_session.add(ExamResult(school_id=school.id, year=2025, exam_type="nvo_7", subject="math",
+                                  metric="average_score", value=value))
+    await db_session.commit()
+
+    sofia_only = await client.get("/schools/exam-averages?country_code=bg")
+    everywhere = await client.get("/schools/exam-averages?country_code=bg&city=all")
+
+    assert sofia_only.json()["by_year"]["nvo_7"]["2025"]["math"] == 60.0
+    assert everywhere.json()["by_year"]["nvo_7"]["2025"]["math"] == 50.0

@@ -313,11 +313,15 @@ async def search_schools(
 @router.get("/exam-averages")
 async def get_exam_averages(
     country_code: str = Query("bg", description="Country code (ISO 3166-1 alpha-2)"),
+    city: Optional[str] = Query("sofia", description="City scope; use 'all' for country-wide results"),
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Calculate average exam scores across all schools for each exam type.
+    Calculate average exam scores across the city's schools for each exam type.
     Returns averages grouped by exam_type, year, and subject.
+
+    The UI labels this the Sofia schools' average, not a national one: it is the mean of
+    the schools we hold, so it is scoped to one city to keep that label true.
     """
     try:
         # Query canonical school-level average scores only.
@@ -336,6 +340,10 @@ async def get_exam_averages(
             .group_by(ExamResult.exam_type, ExamResult.year, ExamResult.subject)
             .order_by(ExamResult.exam_type, ExamResult.year)
         )
+
+        city_clause = SchoolService._city_clause(city)
+        if city_clause is not None:
+            query = query.where(city_clause)
 
         result = await db.execute(query)
         rows = result.fetchall()
