@@ -64,6 +64,8 @@ test('latest NVO fact compares the latest combined score to the national average
 test('latest NVO fact without a benchmark still reports the score', () => {
   const fact = getLatestNvoFact([nvo(2025, 'math', 40)], 'nvo_7', null)
   assert.deepEqual([fact.value, fact.national, fact.tone], [40, null, null])
+  // A single-subject year is labelled by its subject, not as the two-subject average.
+  assert.deepEqual(fact.subjects, ['math'])
   assert.equal(getLatestNvoFact([], 'nvo_7', null), null)
   assert.equal(getLatestNvoFact([nvo(2025, 'math', 40)], null, null), null)
 })

@@ -125,8 +125,14 @@ function KeyFacts({ school, examAverages, nvoExamType }) {
     facts.nvo = (
       <Fact
         key="nvo"
-        label={t('schoolDetail.nvoLatest', { exam: getExamTypeLabel(nvo.examType, t), year: nvo.year })}
-        value={`${formatNumber(nvo.value, 1)}%`}
+        label={nvo.subjects.length === 1
+          ? t('schoolDetail.nvoLatestSubject', {
+            exam: getExamTypeLabel(nvo.examType, t),
+            year: nvo.year,
+            subject: t(nvo.subjects[0] === 'math' ? 'schoolCard.nvo.subjectMath' : 'schoolCard.nvo.subjectBulgarian'),
+          })
+          : t('schoolDetail.nvoLatest', { exam: getExamTypeLabel(nvo.examType, t), year: nvo.year })}
+        value={t('academicPerformance.pointsValue', { value: formatNumber(nvo.value, 1) })}
         detail={nvo.national != null
           ? `${toneLabel} · ${t('schoolDetail.nvoVsNational', { value: formatNumber(nvo.national, 1) })}`
           : null}

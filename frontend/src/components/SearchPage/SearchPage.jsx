@@ -23,7 +23,7 @@ import { getAgeGroupKeys, getExclusiveAgeGroups } from '../../utils/countryConfi
 import { AGE_GROUP_KEYS } from '../../utils/education'
 import { getLanguageFocusPairs } from '../../utils/schoolAttributes'
 import { matchesAdvancedFilters, matchesSchoolType } from '../../utils/advancedFilters'
-import { getNvoDetail } from '../../utils/nvo'
+import { examGradeLabel, getNvoDetail, rankingExamType } from '../../utils/nvo'
 import { isSchoolInBounds } from '../../utils/mapFit'
 import { LIST_PAGE_SIZE, windowForIndex, scrollTopToCenter } from '../../utils/listWindow'
 import { canonicalLanguagePair, languageKey, languageLabel } from '../../utils/languages'
@@ -961,10 +961,12 @@ function SearchPage() {
         })
         break
       case 'nvo': {
-        // Highest latest combined NVO first; schools without results last.
+        // Highest latest combined result of one exam for every school; schools without
+        // that exam last. Mixing exams would rank 4th-grade scores above 7th-grade ones.
+        const examType = rankingExamType(filters.ageGroup)
         const scores = new Map(list.map(school => [
           school.id,
-          getNvoDetail(school, null, { ageGroup: filters.ageGroup })?.latestCombined ?? Number.NEGATIVE_INFINITY,
+          getNvoDetail(school, null, { examType })?.latestCombined ?? Number.NEGATIVE_INFINITY,
         ]))
         list.sort((a, b) => scores.get(b.id) - scores.get(a.id))
         break
@@ -1210,17 +1212,19 @@ function SearchPage() {
   // Kindergartens have no NVO results, so that sort only applies when schools are listed.
   const kindergartensOnly = kindergartenOnlyGroups.includes(filters.ageGroup) ||
     (filters.ageGroup === 'preschool' && filters.educationLevel === 'kindergarten')
+  const nvoSortExamType = rankingExamType(filters.ageGroup)
+  const nvoSortLabel = t('sorting.nvo', { grade: examGradeLabel(nvoSortExamType, t) })
   const allSortOptions = userLocation
     ? [
         { value: 'distance', label: t('sorting.distance') },
         { value: 'name', label: t('sorting.name') },
-        { value: 'nvo', label: t('sorting.nvo') },
+        { value: 'nvo', label: nvoSortLabel },
         { value: 'type', label: t('sorting.type') },
         { value: 'price', label: t('sorting.price') },
       ]
     : [
         { value: 'name', label: t('sorting.name') },
-        { value: 'nvo', label: t('sorting.nvo') },
+        { value: 'nvo', label: nvoSortLabel },
         { value: 'type', label: t('sorting.type') },
         { value: 'price', label: t('sorting.pricePrivate') },
       ]
@@ -2014,6 +2018,7 @@ function SearchPage() {
                     onHoverEnd={handleSchoolHoverEnd}
                     ageGroupOrder={ageGroupOrder}
                     activeAgeGroup={filters.ageGroup}
+                    nvoExamType={sortBy === 'nvo' ? nvoSortExamType : null}
                     isLocationsOpen={openLocationsId === school.id}
                     locationOverlay={locationOverlay}
                     onToggleLocations={handleToggleLocationsPanel}

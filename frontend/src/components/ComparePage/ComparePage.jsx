@@ -22,7 +22,13 @@ import {
   hasDisplayEvidence,
   normalizeSchoolList,
 } from '../../utils/schoolAttributes'
-import { getBenchmarkComparison, getBenchmarkToneClasses, getNvoDetail as getSharedNvoDetail } from '../../utils/nvo'
+import {
+  comparisonExamType,
+  examGradeLabel,
+  getBenchmarkComparison,
+  getBenchmarkToneClasses,
+  getNvoDetail as getSharedNvoDetail,
+} from '../../utils/nvo'
 import { classifyAdmissionRequirement, curatedRequirement } from '../../utils/admission'
 import { yearlyTuitionRangeEur } from '../../utils/pricing'
 
@@ -356,8 +362,8 @@ function getTrendInfo(latest, average) {
   return { arrow: '→', className: 'text-neutral-400', diff }
 }
 
-function getNvoDetail(school, t, ageGroup = null) {
-  return getSharedNvoDetail(school, t, { ageGroup })
+function getNvoDetail(school, t, examType) {
+  return examType ? getSharedNvoDetail(school, t, { examType }) : null
 }
 
 function normalizeCompareValue(value) {
@@ -501,6 +507,13 @@ function ComparePage() {
     [schools, i18n.language]
   )
 
+  // One exam for every column: different exams' results are not comparable.
+  const nvoExamType = useMemo(
+    () => comparisonExamType(localizedSchools.filter(school => school.school_type !== 'international'), selectedAgeGroup),
+    [localizedSchools, selectedAgeGroup]
+  )
+  const nvoGrade = examGradeLabel(nvoExamType || 'nvo_7', t)
+
   const metricsById = useMemo(() => {
     const map = new Map()
     localizedSchools.forEach((school) => {
@@ -509,7 +522,7 @@ function ComparePage() {
         ? calculateDistance(userLocation.lat, userLocation.lng, primaryLocation.lat, primaryLocation.lng)
         : null
       const pricingRange = yearlyTuitionRangeEur(school.pricing)
-      const nvoDetail = school.school_type === 'international' ? null : getNvoDetail(school, t, selectedAgeGroup)
+      const nvoDetail = school.school_type === 'international' ? null : getNvoDetail(school, t, nvoExamType)
       const overallLatest = nvoDetail?.latestCombined ?? null
       const overallAvg = nvoDetail?.schoolAverageCombined ?? null
 
@@ -523,7 +536,7 @@ function ComparePage() {
       })
     })
     return map
-  }, [localizedSchools, t, userLocation, selectedAgeGroup])
+  }, [localizedSchools, t, userLocation, nvoExamType])
 
   const sortedSchools = useMemo(() => {
     const list = [...localizedSchools]
@@ -751,7 +764,7 @@ function ComparePage() {
         },
       },
       {
-        label: t('compare.labels.nvoAverage'),
+        label: t('compare.labels.nvoAverage', { grade: nvoGrade }),
         getValue: (school) => {
           if (school.school_type === 'international') {
             return renderPlaceholder('compare.notApplicable')
@@ -765,12 +778,9 @@ function ComparePage() {
           const benchmark = isLatest ? getCombinedBenchmark(detail, year, value, examAverages) : null
           return (
             <div>
-              <div className={`text-sm font-semibold ${benchmark?.textClass || 'text-neutral-900'}`}>{formatPercent(value, 1)}%</div>
+              <div className={`text-sm font-semibold ${benchmark?.textClass || 'text-neutral-900'}`}>{t('academicPerformance.pointsValue', { value: formatPercent(value, 1) })}</div>
               <div className="text-xs text-neutral-500">
-                {[
-                  detail?.gradeLabel,
-                  isLatest ? year : t('compare.labels.fiveYearAverage'),
-                ].filter(Boolean).join(' · ')}
+                {isLatest ? year : t('compare.labels.fiveYearAverage')}
               </div>
               {benchmark && (
                 <div className="text-xs text-neutral-500">
@@ -841,7 +851,7 @@ function ComparePage() {
 
     const academicRows = [
       {
-        label: t('compare.labels.nvoMath'),
+        label: t('compare.labels.nvoMath', { grade: nvoGrade }),
         getValue: (school) => {
           if (school.school_type === 'international') return renderPlaceholder('compare.notApplicable')
           const detail = metricsById.get(school.id)?.nvoDetail
@@ -864,7 +874,7 @@ function ComparePage() {
                   className={`text-sm font-semibold ${style.text} ${style.benchmark ? 'cursor-help' : ''}`}
                   title={getBenchmarkTooltip(value, style.benchmark, t) || undefined}
                 >
-                  {formatPercent(value, 1)}%
+                  {t('academicPerformance.pointsValue', { value: formatPercent(value, 1) })}
                 </span>
                 {trend ? (
                   <span
@@ -893,7 +903,7 @@ function ComparePage() {
         getCompare: (school) => metricsById.get(school.id)?.nvoDetail?.latestMath ?? metricsById.get(school.id)?.nvoDetail?.mathAvg ?? null,
       },
       {
-        label: t('compare.labels.nvoBulgarian'),
+        label: t('compare.labels.nvoBulgarian', { grade: nvoGrade }),
         getValue: (school) => {
           if (school.school_type === 'international') return renderPlaceholder('compare.notApplicable')
           const detail = metricsById.get(school.id)?.nvoDetail
@@ -916,7 +926,7 @@ function ComparePage() {
                   className={`text-sm font-semibold ${style.text} ${style.benchmark ? 'cursor-help' : ''}`}
                   title={getBenchmarkTooltip(value, style.benchmark, t) || undefined}
                 >
-                  {formatPercent(value, 1)}%
+                  {t('academicPerformance.pointsValue', { value: formatPercent(value, 1) })}
                 </span>
                 {trend ? (
                   <span
@@ -1242,7 +1252,7 @@ function ComparePage() {
       { key: 'locations', title: t('compare.sections.locations'), rows: locationRows },
       { key: 'contact', title: t('compare.sections.contact'), rows: contactRows },
     ]
-  }, [t, i18n.language, metricsById, userLocation, schools, selectedAgeGroup, examAverages])
+  }, [t, i18n.language, metricsById, userLocation, schools, selectedAgeGroup, examAverages, nvoGrade])
 
   const visibleSections = useMemo(() => sections
     .map(section => ({

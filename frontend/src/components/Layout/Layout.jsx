@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { Link, NavLink, useLocation } from 'react-router-dom'
 import { useCompare } from '../../context/CompareContext'
+import { compareHref } from '../../utils/compareList'
 import LanguageToggle from '../LanguageToggle/LanguageToggle'
 
 export const CONTACT_EMAIL = 'contact@schooldecider.com'
@@ -33,7 +34,7 @@ function Footer({ clearCompareBar }) {
 function Layout({ children, hideNavOnMobile = false, compactNavOnMobile = false, hideFooter = false }) {
   const { t } = useTranslation()
   const { compareList } = useCompare()
-  const { pathname } = useLocation()
+  const { pathname, search } = useLocation()
   // Same condition CompareBar uses to show itself.
   const compareBarVisible = compareList.length > 0 && !pathname.startsWith('/compare')
 
@@ -73,7 +74,7 @@ function Layout({ children, hideNavOnMobile = false, compactNavOnMobile = false,
             <div className="flex items-center gap-1 md:gap-2">
               {compareList.length >= 2 && (
                 <NavLink
-                  to="/compare"
+                  to={compareHref(search)}
                   className={({ isActive }) => `hidden sm:inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-sm font-medium ${
                     isActive ? 'bg-primary-50 text-primary-800' : 'text-neutral-700 hover:bg-neutral-100'
                   }`}
