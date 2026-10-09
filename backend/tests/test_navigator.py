@@ -743,7 +743,7 @@ def test_a_second_fee_card_keeps_the_lines_it_repeats():
         + card("Детска градина", 6820, 7000)
         + card("Предучилищен клас", 7880, 8100)
         + card("Училище", 7880, 8100)
-        + "<p>Отстъпки</p><p>Отстъпки</p></main></body></html>"
+        + "<p>Отстъпки</p><p>02 987 6543</p><p>Отстъпки</p><p>02 987 6543</p></main></body></html>"
     )
 
     text = WebsiteNavigator()._extract_main_content_text(html)

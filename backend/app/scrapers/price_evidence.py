@@ -488,6 +488,7 @@ def proper_name(registry_name: str | None) -> Optional[str]:
         part
         for part in parts
         if len(part) >= 4
+        and part[0].isalpha()
         and not re.search(r"училищ|гимназ|градин|school|kindergarten", part.casefold())
         and not re.fullmatch(r"е?оо?д|е?ад", part.casefold())
     ]

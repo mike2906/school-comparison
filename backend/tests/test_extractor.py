@@ -5343,6 +5343,7 @@ def test_a_fee_stated_again_under_a_longer_or_a_bare_label_is_one_row():
     rows = helpers._prices_from_fee_lines(
         [
             _line("1. - 4. клас / Годишна такса „Обучение“ / 1. - 4. клас / Плащане на пълна такса", 7950),
+            _line("1. - 4. клас / Плащане на две вноски", 4094, role="plan"),
             _line("1. - 4. клас / Плащане на пълна такса", 7950, per="year"),
             _line("5. - 7. клас / Плащане на пълна такса", 8300),
         ]
@@ -5351,6 +5352,7 @@ def test_a_fee_stated_again_under_a_longer_or_a_bare_label_is_one_row():
         (7950, "1. - 4. клас / Плащане на пълна такса", "yearly"),
         (8300, "5. - 7. клас / Плащане на пълна такса", None),
     ]
+    assert rows[0].installments == ["1. - 4. клас / Плащане на две вноски: 4094 EUR"]
     # 569: the payment terms repeat the fee without saying whose it is.
     rows = helpers._prices_from_fee_lines(
         [
@@ -5533,3 +5535,5 @@ def test_a_copied_label_with_a_comma_is_kept_whole():
     (row,) = extractor_module.helpers._prices_from_fee_lines([_line(label, 1100, currency="BGN")])
     assert row.plan_name == label and row.age_group == "Месечни такси в Частна Детска Ясла ,,Йор Кидс“"
     assert extractor_module._normalized_price_fields(row)["plan_name"] == label
+    row.plan_name = "N/A"
+    assert extractor_module._normalized_price_fields(row)["plan_name"] is None

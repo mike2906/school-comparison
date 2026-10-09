@@ -29,9 +29,12 @@ from app.utils.website_data import WEBSITE_DATA_WITHHELD_KEY
 
 logger = logging.getLogger(__name__)
 
-# A price: a number with its currency, or a line that is only a number of three digits
-# or more (a fee card writes "€", "7880" and "/ година" on lines of their own).
-_PRICED_LINE_RE = re.compile(rf"{_PRICE_RE.pattern}|^[€$£]?\s*\d[\d \u00a0.,]{{2,}}$", re.IGNORECASE)
+# A price: a number with its currency, or a line that is only an amount of three to six
+# digits (a fee card writes "€", "7880" and "/ година" on lines of their own). A phone
+# number is longer.
+_PRICED_LINE_RE = re.compile(
+    rf"{_PRICE_RE.pattern}|^[€$£]?\s*(?:\d{{3,6}}|\d{{1,3}}[ \u00a0.,]\d{{3}})(?:[.,]\d{{1,2}})?$", re.IGNORECASE
+)
 
 
 @dataclass

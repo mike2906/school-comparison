@@ -2561,6 +2561,8 @@ def _without_restated_fees(rows: list[ExtractedPrice]) -> list[ExtractedPrice]:
         winner, loser = (row, other) if prefer_new else (other, row)
         winner.period = winner.period or loser.period
         winner.academic_year = winner.academic_year or loser.academic_year
+        winner.installments = winner.installments or loser.installments
+        winner.discounts = winner.discounts or loser.discounts
         kept[same] = winner
     return kept
 
@@ -2577,11 +2579,9 @@ def _fee_label(text: str | None, max_len: int, *, cut: bool = False) -> str | No
     "Детска Ясла ,,Йор Кидс“ / Целодневен престой" down to its heading (542).
     """
     label = " ".join(str(text or "").split())
-    if len(label) > max_len:
-        if not cut:
-            return None
-        label = label[:max_len]
-    return label.strip(" ,;|/") or None
+    if cut:
+        label = label[:max_len].strip(" /")
+    return _sanitize_label(label, max_len=max_len)
 
 
 def _price_from_fee_line(line: FeeLine, category: str) -> ExtractedPrice:
@@ -2719,7 +2719,7 @@ def _told_apart_by_heading(rows: list[ExtractedPrice], text: str) -> list[Extrac
     under "Месечни такси в Частна Детска Градина": copied without their headings the
     nursery's prices read as the kindergarten's. The heading says for whom, so it goes
     where the label's own "for whom" part would. The rows are left as they are unless
-    each price has a heading of its own.
+    each price has a heading of its own that names a level.
     """
     groups: dict[tuple[Any, ...], list[ExtractedPrice]] = {}
     for row in rows:
@@ -2731,7 +2731,11 @@ def _told_apart_by_heading(rows: list[ExtractedPrice], text: str) -> list[Extrac
         if len(amounts) < 2 or any(row.age_group for row in group):
             continue
         headings = [_fee_label(_heading_above_labelled_amount(lines, row), 50, cut=True) for row in group]
-        if None in headings or len(set(headings)) < len(amounts):
+        if (
+            None in headings
+            or len(set(headings)) < len(amounts)
+            or not all(label_names_a_level(heading) for heading in headings)
+        ):
             continue
         for row, heading in zip(group, headings):
             row.age_group = heading
