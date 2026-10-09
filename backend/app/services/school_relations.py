@@ -317,30 +317,19 @@ class PlacePin:
     city: str
 
 
-def _same_place_pair(first: PlacePin, second: PlacePin) -> bool:
-    from app.services.geocoding.service import _distance_m
-
-    families = {level_family(first.education_level), level_family(second.education_level)}
-    if families != {"kindergarten", "school"}:
-        return False
-    if "state" in (first.school_type, second.school_type):
-        return False
-    if not first.city or first.city != second.city:
-        return False
-    shared = shared_brand_key([brand_key(brand(first.name)), brand_key(brand(second.name))])
-    if not shared or len(shared) < MIN_BRAND_KEY_LENGTH:
-        return False
-    return _distance_m(first.lat, first.lng, second.lat, second.lng) <= SAME_PLACE_MAX_METRES
-
-
 def same_place_groups(pins: Iterable[PlacePin]) -> list[list[PlacePin]]:
     """Pins of two or more institutions that form one place.
 
-    A kindergarten pin joins a school pin under :func:`_same_place_pair`; a place is
-    everything joined that way, so a kindergarten next to a school and its gymnasium
-    makes one place of three.
+    A private kindergarten pin joins a private school pin of the same city and brand
+    (``shared_brand_key``, at least ``MIN_BRAND_KEY_LENGTH``) within
+    ``SAME_PLACE_MAX_METRES``. A place is everything joined that way, so a kindergarten
+    next to a school and its gymnasium is one place of three (members at most twice
+    the distance apart, through the kindergarten).
     """
-    pins = list(pins)
+    from app.services.geocoding.service import _distance_m
+
+    pins = [pin for pin in pins if pin.school_type != "state" and pin.city]
+    keys = [brand_key(brand(pin.name)) for pin in pins]  # once per pin: the regexes are the cost
     parent = list(range(len(pins)))
 
     def root(index: int) -> int:
@@ -349,10 +338,18 @@ def same_place_groups(pins: Iterable[PlacePin]) -> list[list[PlacePin]]:
             index = parent[index]
         return index
 
-    for i, first in enumerate(pins):
-        for j in range(i + 1, len(pins)):
-            if pins[j].school_id != first.school_id and _same_place_pair(first, pins[j]):
-                parent[root(i)] = root(j)
+    kindergartens = [i for i, pin in enumerate(pins) if level_family(pin.education_level) == "kindergarten"]
+    schools = [i for i, pin in enumerate(pins) if level_family(pin.education_level) == "school"]
+    for k in kindergartens:
+        for s in schools:
+            first, second = pins[k], pins[s]
+            if first.city != second.city or first.school_id == second.school_id:
+                continue
+            if _distance_m(first.lat, first.lng, second.lat, second.lng) > SAME_PLACE_MAX_METRES:
+                continue
+            shared = shared_brand_key([keys[k], keys[s]])
+            if shared and len(shared) >= MIN_BRAND_KEY_LENGTH:
+                parent[root(k)] = root(s)
 
     groups: dict[int, list[PlacePin]] = {}
     for index, pin in enumerate(pins):

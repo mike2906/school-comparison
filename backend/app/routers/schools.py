@@ -105,7 +105,12 @@ async def _build_list_body(db: AsyncSession, **filters) -> bytes:
     schools = await SchoolService(db).list_schools_filtered(**filters)
     # Across the whole city, not only the filtered rows: a card names the school next
     # door even when the age filter hides it.
-    same_place = await same_place_by_school(db, country_code=filters["country_code"], city=filters["city"])
+    try:
+        same_place = await same_place_by_school(db, country_code=filters["country_code"], city=filters["city"])
+    except Exception:
+        # Optional grouping: the list still works without it.
+        logger.warning("same_place failed for the list", exc_info=True)
+        same_place = {}
     for school in schools:
         school.same_place = same_place.get(school.id, [])
     # Seconds of CPU: run it in a thread so other requests are still answered meanwhile.
@@ -395,10 +400,13 @@ async def get_school(
             response.continues_to = RelatedSchoolResponse.model_validate(link)
         try:
             response.continued_from = [RelatedSchoolResponse.model_validate(row) for row in await continued_from(db, school)]
+        except Exception:
+            logger.warning("continued_from failed for school %s", school_id, exc_info=True)
+        try:
             same_place = await same_place_by_school(db, country_code=school.country_code, city=school.city)
             response.same_place = [SamePlaceSchoolResponse.model_validate(row) for row in same_place.get(school.id, [])]
         except Exception:
-            logger.warning("related schools failed for school %s", school_id, exc_info=True)
+            logger.warning("same_place failed for school %s", school_id, exc_info=True)
         return response
     except HTTPException:
         # Re-raise HTTP exceptions (like 404)
