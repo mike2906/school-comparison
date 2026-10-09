@@ -41,3 +41,20 @@ async def test_same_digits_under_another_label_or_currency_discard_the_picture()
     assert await _read("Grade 1 | 1000 EUR", "Nursery | 1000 EUR") is None
     assert await _read("Grade 1 | 1000 EUR", "Grade 1 | 1000 BGN") is None
     assert await _read("Grade 1 | 1 000 EUR", "GRADE 1 | 1000 eur") == "Grade 1 | 1 000 EUR"
+
+
+@pytest.mark.asyncio
+async def test_a_title_wrapped_differently_does_not_discard_matching_tables():
+    first = "ST. GEORGE\nFINANCIAL CONDITIONS FOR 2026-2027\nGrade | Fee\nGrade 1 | 14 750\nGrade 2 | 15 650"
+    second = "ST. GEORGE FINANCIAL CONDITIONS FOR 2026-2027\nGrade | Fee\nGrade 1 | 14 750\nGrade 2 | 15 650"
+    swapped = "ST. GEORGE\nGrade | Fee\nGrade 1 | 15 650\nGrade 2 | 14 750"
+
+    assert await _read(first, second) == first
+    assert await _read(first, swapped) is None
+
+
+@pytest.mark.asyncio
+async def test_a_small_fee_misread_in_a_table_discards_the_picture():
+    first = "Fee | 1 installment | 2 installments\nTuition | 1000 EUR | 520\nFood | 9 EUR | 5"
+    assert await _read(first, first.replace("Food | 9 EUR", "Food | 90 EUR")) is None
+    assert await _read(first, first) == first

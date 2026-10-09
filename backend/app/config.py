@@ -25,7 +25,8 @@ class Settings(BaseSettings):
     # Set this to override default model selection.
     model_tier_cheap: str = ""  # Default: google/gemini-2.5-flash-lite
     model_tier_capable: str = ""  # Default: openai/gpt-4o-mini
-    model_tier_pricing: str = ""  # Default: openai/gpt-6.1-sol (price extraction)
+    model_tier_pricing: str = ""  # Default: openai/gpt-6-luna (price extraction)
+    model_tier_vision: str = ""  # Default: openai/gpt-6.1-sol (fee tables published as pictures)
 
     # Spot-check validation settings
     spot_check_sample_size: int = 10  # Number of schools to spot-check per run (-1 = all, for calibration)

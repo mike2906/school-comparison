@@ -2383,6 +2383,15 @@ revision. None of this may widen the public boundary without a reviewed pilot.
         their site; no member that was kept is withheld.
         **Open:** 635 has two registered locations, so its address is not replaced;
         589's site names a second address no member claims, which may be its new one.
+      - **Third pass 2026-10-09 (PR "copied fee lines").** The run-to-run differences
+        between models turned out to come from how they were asked, not from reading:
+        the prompt had them decide scope, year, discounts and payment plans in the same
+        pass, with free-text category and period fields. The pricing call now returns
+        `FeeLine` entries (label as written, amount, fixed choices for currency, period,
+        kind and role) and code turns them into rows. With that, GPT-6 Luna matched
+        GPT-6.1 Sol's tuition amounts at about a seventh of the cost (about $0.50 for all
+        Sofia private schools). Fee pictures stay on Sol (a separate `vision` tier):
+        Luna's two readings of one table disagreed on digits.
 - [ ] **E5 Gymnasium admission thresholds (state schools).** Import the official minimum
       admission scores after 7th grade into `admission_info.historical_min_scores`. Scores
       come from the city-wide NVO ranking, so no address logic is needed, but they are per

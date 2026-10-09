@@ -20,6 +20,7 @@ from app.schemas.extraction import (
     AdmissionExtractionOutput,
     ExtractedLanguageFocus,
     ExtractedPrice,
+    FeeLine,
     GeneralInfoExtractionOutput,
     OperationsExtractionOutput,
     PriceExtractionOutput,
@@ -36,6 +37,7 @@ from app.scrapers.price_evidence import (
     amount_spans,
     currency_price_starts,
     fee_number_starts,
+    label_names_a_level,
     label_spans,
     normalize_text,
     occurrence_currency,
@@ -2317,6 +2319,111 @@ def _filter_supported_prices(prices: list[ExtractedPrice], text: str) -> list[Ex
         refined.append(normalized)
 
     return refined
+
+
+# What a copied fee line's kind and period are in the stored vocabulary. An exam fee is an
+# extra; a deposit is paid on registration (Stage 6 keeps it from passing as tuition).
+_FEE_KIND_CATEGORY = {
+    "tuition": "tuition", "registration": "registration", "deposit": "registration",
+    "food": "food", "transport": "transport", "materials": "materials",
+    "extended_day": "extended_day", "uniforms": "uniforms", "extracurricular": "extracurricular",
+    "camp": "camp", "exam": "extracurricular",
+}  # fmt: skip
+_FEE_PERIOD = {
+    "year": "yearly", "month": "monthly", "term": "term", "semester": "semester",
+    "quarter": "quarter", "one_time": "one_time", "unstated": None,
+}  # fmt: skip
+# The copied lines carry no judgement of their own; the text check below is the gate.
+_FEE_LINE_CONFIDENCE = 0.9
+_BGN_PER_EUR = 1.95583
+
+
+def _prices_from_fee_lines(lines: list[FeeLine]) -> list[ExtractedPrice]:
+    """Price rows from the lines a model copied off the pages.
+
+    A full price is a row. A payment plan's amount or a discounted price is not a fee of
+    its own: it is listed under the full price of the same kind that precedes it. Where a
+    kind has no full price at all, a plan's yearly total is the price there is. Sums of
+    several fees, penalties, per-day/week/hour amounts and amounts of no fee kind are
+    left out. An amount with no currency is in euro (Bulgaria's currency since 2026).
+    """
+    rows: list[ExtractedPrice] = []
+    last_full: dict[str, ExtractedPrice] = {}
+    unattached: list[tuple[FeeLine, str]] = []
+    for line in lines:
+        category = _FEE_KIND_CATEGORY.get(line.kind)
+        if category is None or line.per not in _FEE_PERIOD or line.role in ("sum", "penalty"):
+            continue
+        if line.role == "full":
+            row = _price_from_fee_line(line, category)
+            rows.append(row)
+            last_full[category] = row
+            continue
+        target = last_full.get(category)
+        if target is None:
+            unattached.append((line, category))
+            continue
+        currency = "EUR" if line.currency == "unstated" else line.currency
+        terms = target.installments if line.role == "plan" else target.discounts
+        terms.append(f"{line.label}: {line.amount:g} {currency}")
+    rows.extend(
+        _price_from_fee_line(line, category)
+        for line, category in unattached
+        if category not in last_full and line.role == "plan" and line.per == "year"
+    )
+    # A page that still shows the lev beside the euro states one fee, not two.
+    euro = [(row.category, row.amount) for row in rows if row.currency == "EUR"]
+    rows = [
+        row
+        for row in rows
+        if row.currency != "BGN"
+        or not any(
+            category == row.category and abs(row.amount / _BGN_PER_EUR - amount) <= 0.005 * amount
+            for category, amount in euro
+        )
+    ]
+    # The same fee copied twice, from the page's two language versions or from a summary
+    # and its table, differs at most in the grammar of its label.
+    distinct: dict[tuple[Any, ...], ExtractedPrice] = {}
+    for row in rows:
+        kept = distinct.setdefault((row.category, row.amount, row.currency, _label_stems(row.plan_name)), row)
+        if kept is not row:
+            kept.period = kept.period or row.period
+            kept.academic_year = kept.academic_year or row.academic_year
+    return list(distinct.values())
+
+
+def _label_stems(label: str | None) -> frozenset[str]:
+    """Word stems of a label: "Месечната такса" and "Месечна такса" are one label."""
+    return frozenset(word[:5] for word in re.findall(r"[^\W_]+", str(label or "").casefold()))
+
+
+def _price_from_fee_line(line: FeeLine, category: str) -> ExtractedPrice:
+    return ExtractedPrice(
+        category=category,
+        amount=line.amount,
+        currency="EUR" if line.currency == "unstated" else line.currency,
+        period=_FEE_PERIOD[line.per],
+        plan_name=_normalize_scalar_text(line.label[:100].strip(), max_len=100),
+        # The part of the label that says for whom, kept whole: the scope rules read
+        # it, and a long label is cut before it gets there.
+        age_group=_normalize_scalar_text(
+            next(
+                (part[:50].strip() for part in line.label.split(" / ") if label_names_a_level(part)),
+                None,
+            ),
+            max_len=50,
+        ),
+        academic_year=line.academic_year,
+        confidence=_FEE_LINE_CONFIDENCE,
+    )
+
+
+def _label_is_on_page(label: str | None, page_text: str | None) -> bool:
+    """Some part of a copied label ("row / column heading") is written on the page."""
+    text = normalize_text(page_text)
+    parts = [part.strip() for part in str(label or "").split(" / ") if len(part.strip()) >= 3]
+    return any(label_spans(text, part) for part in parts)
 
 
 def _source_blocks(text: str) -> list[tuple[str | None, str]]:

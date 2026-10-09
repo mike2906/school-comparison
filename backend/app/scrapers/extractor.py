@@ -32,13 +32,13 @@ from app.schemas.extraction import (
     ExtractedPrice,
     GeneralInfoExtractionOutput,
     OperationsExtractionOutput,
+    PageFees,
     PriceExtractionOutput,
     PricingTermsExtractionOutput,
     ServicesExtractionOutput,
     SummarySourceExtractionOutput,
 )
 from app.scrapers.price_evidence import (
-    PRESCHOOL_GRADE,
     PriceRow,
     label_is_another_institutions,
     replacement_regressions,
@@ -133,6 +133,7 @@ GENERAL_INFO_HINT_TOKENS: tuple[str, ...] = (
 # Preferred `_select_pages` category orderings. Kept as module constants (not inline
 # literals) so the deterministic path in `deterministic.py` imports the same lists and
 # page selection can never silently diverge between production and the golden corpus.
+PRICE_CALL_TIMEOUT_SECONDS = 120.0
 PRICING_PAGE_CATEGORIES: list[str] = ["pricing", "admission", "contact"]
 GENERAL_INFO_PAGE_CATEGORIES: list[str] = [
     "about",
@@ -1257,58 +1258,41 @@ async def _extract_prices(
             "output_tokens": 0,
         }
 
-    school_name = (school.name_i18n or {}).get("bg") or (school.name_i18n or {}).get("en") or ""
+    # The model copies the priced lines; it is not asked whose fee a line is, which year
+    # counts or what a payment plan's total means. Asked to decide those in the same pass,
+    # models read the same page differently from one run to the next, while the amounts
+    # they copied were the same. Code decides them below, from the labels.
     system_prompt = (
-        "Extract school pricing into structured output.\n"
-        "Categories: tuition, food, transport, registration, materials, extended_day, uniforms, extracurricular, camp.\n"
-        "Periods: monthly, yearly, one_time, quarter, term, semester.\n"
-        "\n"
-        "Emit ONE row per distinct fee. Apply these rules:\n"
-        "- Dual currencies: when the same fee is quoted in both EUR and BGN (e.g. '€8,100 / 15 842,22 лв'), emit only ONE row in the page's primary currency. Never emit a BGN row for a fee already emitted in EUR (or vice versa).\n"
-        "- Payment schedules: when one fee has multiple payment options (full pay / 2 installments / 10 monthly), emit ONE row with the full-payment amount as `amount` and list the other options as strings in `installments` (e.g. '€8,100 – 2 installments'). Do NOT emit separate rows for the installment amounts or for the total of an installment plan (e.g. '2 x 3,900 = 7,800').\n"
-        "- One institution only: a site often covers a kindergarten and a school of the same brand. Emit only the fees of the institution named below. If it is a kindergarten, leave out fees stated for school grades/classes. If it is a school, keep every grade band it teaches (see \"Grades taught\" below when given; otherwise all bands the page lists), leave out bands of grades it does not teach, which belong to a sibling school on the same site, and leave out fees stated only for nursery or kindergarten groups. A pre-school (preparatory) class or group may belong to either: keep it.\n"
-        "- `confidence`: 0.9 or more when the page states the amount, what it is for and whom it applies to together (a labelled table cell counts). Use 0.5 or less only when you had to guess one of the three.\n"
-        "- Exam, certificate and test fees are category extracurricular, never tuition or registration.\n"
-        "- Currency: Bulgaria has used the euro since January 2026. An amount the page states with no currency, on a page that names none, is EUR.\n"
-        "- Only fees charged to parents. Leave out donations, prizes, salaries, project budgets and any amount whose purpose the page does not state.\n"
-        "- Set `period` only when the source explicitly states the fee period or represents it unambiguously (for example 'per year', 'monthly fee', or 'per term'). Otherwise set `period` to null. An academic year, fee category, amount, school type, installment count, or payment frequency does NOT by itself establish the fee period.\n"
-        "- Distinct tiers: when multiple tiers exist (e.g. 'Bulgarian students' vs 'International students', different grade bands, different meal plans like breakfast vs full-day), emit SEPARATE rows and set `plan_name` to the tier label from the page. `plan_name` must be populated whenever multiple rows share the same category/period/age_group on one page.\n"
-        "- Discounts: an amount after an early-payment, full-payment, sibling or loyalty discount is NOT a separate fee. Emit the undiscounted fee as the row and list the discounted amounts as strings in `discounts`.\n"
-        "- Set `age_group` when the page specifies it (grade range, preschool, nursery, etc.).\n"
-        "- Copy `plan_name` and `age_group` from the page in the page's own words and language. Do not translate or paraphrase them.\n"
-        "- Set `academic_year` when the page specifies it (e.g. '2025/2026'). When the pages give fees for more than one academic year, emit only the most recent year's.\n"
-        "\n"
-        "If no concrete pricing exists, return has_pricing_info=false and prices=[]."
+        "You are given the text of a few pages of a school's website, each under a "
+        "'--- SOURCE: url ---' line. List every amount of money on them that a family could be "
+        "charged: one entry per amount. Copy, do not interpret: keep labels and quotes in the "
+        "page's own words and language, and do not leave an amount out because it is for "
+        "another age group, another school of the same brand, an earlier year, or a payment "
+        "plan. Say what each amount is with the fields provided. Leave out amounts that are "
+        "not charged to families (prizes, salaries, budgets, percentages). If the pages state "
+        "no such amounts, return an empty list."
     )
     # Only the prompt gets glued currency words spaced; deterministic extraction and the
     # evidence checks below keep the original page text.
     family = level_family(school.education_level)
     grades = await school_taught_grades(db, school)
-    school_grades = sorted(grades - {PRESCHOOL_GRADE})
-    taught = (
-        f"Grades taught: {school_grades[0]}-{school_grades[-1]}"
-        + (" and a pre-school class" if PRESCHOOL_GRADE in grades else "")
-        + "\n"
-        if school_grades
-        else ""
-    )
-    user_prompt = (
-        f"School: {school_name}\n"
-        f"Institution type: {family}\n{taught}\nContent:\n"
-        f"{helpers._space_glued_currency_words(selected_text)}"
-    )
+    user_prompt = helpers._space_glued_currency_words(selected_text)
     deterministic_pricing = helpers._extract_prices_deterministic(selected_text)
     used_deterministic_pricing = False
 
     parsed, input_tokens, output_tokens, token_cost_usd = await _run_typed_agent(
         system_prompt=system_prompt,
         user_prompt=user_prompt,
-        result_type=PriceExtractionOutput,
-        timeout_seconds=timeout_seconds,
+        result_type=PageFees,
+        # A long fee table takes the model over a minute to copy out.
+        timeout_seconds=max(timeout_seconds, PRICE_CALL_TIMEOUT_SECONDS),
         llm_stats=llm_stats,
         preferred_tier="pricing",
         school_id=school.id,
     )
+    if isinstance(parsed, PageFees):
+        prices = helpers._prices_from_fee_lines(parsed.lines)
+        parsed = PriceExtractionOutput(prices=prices, has_pricing_info=bool(prices))
 
     if parsed is None:
         if deterministic_pricing.has_pricing_info:
@@ -1380,6 +1364,7 @@ async def _extract_prices(
 
     pricing_rows: list[Pricing] = []
     source_rows: list[FieldSource] = []
+    seen_fees: set[tuple[Any, Any, Any]] = set()
 
     for extracted in parsed.prices:
         fields = _normalized_price_fields(extracted)
@@ -1404,6 +1389,15 @@ async def _extract_prices(
             (page for page in pages if page.source_url == row_source_url),
             None,
         )
+        # The same fee copied from a second page (the site's other language, an older
+        # copy) resolves to the first page that states the amount; there its label is
+        # not to be found, unlike that of a second band with the same price.
+        fee_key = (category, amount, fields["currency"])
+        if fee_key in seen_fees and not helpers._label_is_on_page(
+            fields["plan_name"], supporting_page.raw_markdown if supporting_page else None
+        ):
+            continue
+        seen_fees.add(fee_key)
         if (
             not fields["academic_year"]
             and supporting_page is not None

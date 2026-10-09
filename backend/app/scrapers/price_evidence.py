@@ -375,7 +375,8 @@ _PRESCHOOL_TOKENS = {"пк", "пг", "пгу", "пук", "pk", "prek"}
 # Roman numerals written with Cyrillic look-alikes ("VIІ клас") read as Latin.
 _LOOKALIKES = str.maketrans("іхѵ", "ixv")
 _GRADE_VALUE = (
-    r"(?:1[0-2]|[0-9]|x{0,1}(?:ix|iv|v?i{0,3})|"
+    # A roman grade is a whole word: the "I" of "International" is not grade one.
+    r"(?:1[0-2]|[0-9]|x{0,1}(?:ix|iv|v?i{0,3})(?![^\W\d_])|"
     + "|".join(sorted(_WORD_GRADES, key=len, reverse=True))
     + "|"
     + "|".join(sorted(_PRESCHOOL_TOKENS, key=len, reverse=True))
