@@ -9,7 +9,9 @@
 export const LANGUAGE_SWITCH_EVENT = 'app:languageswitch'
 
 const HANDOFF_KEY = 'languageSwitch'
-// Give up restoring the window scroll once the page has had this long to load.
+// A record older than this belongs to a switch that never arrived (cancelled, offline).
+const HANDOFF_MAX_AGE_MS = 30000
+// How long the window scroll waits for the page to grow tall enough.
 const RESTORE_TIMEOUT_MS = 5000
 
 function safeSession() {
@@ -25,7 +27,7 @@ function safeSession() {
  * the open page adds its own state to `event.detail` (see SearchPage).
  */
 export function prepareLanguageSwitch(routeUrl, storage = safeSession()) {
-  const record = { url: routeUrl, scrollY: Math.round(window.scrollY) }
+  const record = { url: routeUrl, scrollY: Math.round(window.scrollY), at: Date.now() }
   window.dispatchEvent(new CustomEvent(LANGUAGE_SWITCH_EVENT, { detail: record }))
   try {
     storage?.setItem(HANDOFF_KEY, JSON.stringify(record))
@@ -34,12 +36,13 @@ export function prepareLanguageSwitch(routeUrl, storage = safeSession()) {
   }
 }
 
-/** The record a language switch left, removed from storage (null when none or corrupt). */
-export function readLanguageSwitch(storage = safeSession()) {
+/** The record a language switch left, removed from storage (null when none, stale or corrupt). */
+export function readLanguageSwitch(storage = safeSession(), now = Date.now()) {
   try {
     const record = JSON.parse(storage?.getItem(HANDOFF_KEY) || 'null')
     storage?.removeItem(HANDOFF_KEY)
-    return record && typeof record.url === 'string' ? record : null
+    const fresh = Number.isFinite(record?.at) && now - record.at >= 0 && now - record.at < HANDOFF_MAX_AGE_MS
+    return fresh && typeof record.url === 'string' ? record : null
   } catch {
     return null
   }
@@ -59,14 +62,17 @@ export function languageSwitchArrival({ key, pathname, search }) {
 }
 
 /**
- * Scroll the window to `y` once the page is tall enough (its content loads after mount).
- * Stops when the visitor scrolls first, after the timeout, or when the returned function
- * is called.
+ * Scroll the window to `y` once the page is tall enough (its content loads after mount);
+ * at the timeout, as far as the page allows (the other language's page can be shorter).
+ * Stops when the visitor scrolls first, or when the returned function is called.
  */
 export function restoreWindowScroll(y) {
   const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(() => tryScroll()) : null
   const userInput = ['scroll', 'wheel', 'touchstart', 'keydown']
-  const timer = setTimeout(() => stop(), RESTORE_TIMEOUT_MS)
+  const timer = setTimeout(() => {
+    stop()
+    window.scrollTo(0, Math.min(y, document.documentElement.scrollHeight - window.innerHeight))
+  }, RESTORE_TIMEOUT_MS)
 
   function stop() {
     clearTimeout(timer)

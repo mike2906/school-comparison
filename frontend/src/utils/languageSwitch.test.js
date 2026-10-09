@@ -49,8 +49,16 @@ test('a language switch lets the page add its state and hands the record on, onc
     page.window.addEventListener(LANGUAGE_SWITCH_EVENT, (event) => { event.detail.listSchoolId = 7 })
     prepareLanguageSwitch('/search?school_type=state', storage)
   })
-  assert.deepEqual(readLanguageSwitch(storage), { url: '/search?school_type=state', scrollY: 812, listSchoolId: 7 })
-  assert.equal(readLanguageSwitch(storage), null)
+  const { at, ...record } = JSON.parse(storage.getItem('languageSwitch'))
+  assert.deepEqual(record, { url: '/search?school_type=state', scrollY: 812, listSchoolId: 7 })
+  assert.equal(readLanguageSwitch(storage, at + 1000)?.listSchoolId, 7)
+  assert.equal(readLanguageSwitch(storage, at + 1000), null)
+})
+
+test('a record from a switch that never arrived is ignored', () => {
+  const storage = memoryStorage()
+  storage.setItem('languageSwitch', JSON.stringify({ url: '/about', scrollY: 400, at: 1000 }))
+  assert.equal(readLanguageSwitch(storage, 1000 + 60000), null)
 })
 
 test('missing or corrupt storage means no record', () => {

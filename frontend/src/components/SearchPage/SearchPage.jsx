@@ -80,9 +80,12 @@ function SearchPage() {
   const navigationType = useNavigationType()
   // View state lives in the URL so it survives opening a school and coming back.
   const [initialView] = useState(() => readViewParams(searchParams))
-  const [savedViewState] = useState(() => readSavedViewState(location.key, location.search))
-  // Arrived by switching language: the map view and the school that was at the top of the list.
-  const [languageSwitch] = useState(() => (savedViewState ? null : languageSwitchArrival(location)))
+  // Arrived by switching language: the map view and the school that was at the top of the
+  // list. Newer than any view state saved for this entry (a full navigation saves none).
+  const [languageSwitch] = useState(() => languageSwitchArrival(location))
+  const [savedViewState] = useState(() => (
+    languageSwitch ? null : readSavedViewState(location.key, location.search)
+  ))
   // The list renders the cards [visibleStart, visibleCount) of the sorted schools.
   const [visibleStart, setVisibleStart] = useState(() => savedViewState?.listStart || 0)
   // Enough cards to reach a restored scroll position (cards are at least ~100 px tall).
