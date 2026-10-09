@@ -175,10 +175,12 @@ def test_infer_age_group_evidence_from_source_pages_detects_all_through_school_s
         # State-funding rule quoted by private schools (schools 350, 517, 633).
         "минимален праг от 20 на сто се формира от общия брой на приеманите деца в подготвителна група и от",
         "общия брой на приеманите деца и ученици в подготвителна група и първи клас в училището",
-        "Оригинал на удостоверение за завършен подготвителен клас.",
-        # Ordinary words that only resemble the abbreviations.
-        "Компютърен кабинет с 20 пк – 4 класни стаи са оборудвани",
-        "Купих пук цветя за учителката",
+        # The 8th-grade intensive-language year at language schools.
+        "Прием в VIII подготвителен клас с интензивно изучаване на английски език",
+        # Ordinary words and codes that only resemble the abbreviations.
+        "Компютърен кабинет с 20 ПК – 4 класни стаи са оборудвани",
+        "НЕ ВИ ПУК ЗА ДЕТЕТО",
+        "ПК 1000 София, за прием в 4 клас",
     ],
 )
 def test_infer_age_group_evidence_ignores_preschool_mentions_that_are_not_an_offer(text):
@@ -204,6 +206,7 @@ def test_infer_age_group_evidence_ignores_preschool_mentions_that_are_not_an_off
         "Такси за нови ученици / ПК-4. Клас / 1 вноска",
         "Годишна такса обучение / ПК – 4 клас",
         "ПУК (5–6 г.): €9,900 годишно",
+        "Такса ПК — 4 клас",
         "Подготвителен клас / ПУК 1 / Плащане на 1 вноска",
     ],
 )
