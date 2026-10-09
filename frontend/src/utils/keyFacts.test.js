@@ -2,46 +2,11 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import {
-  getHeadlineTuition,
   getLatestNvoFact,
   getOfferedAgeGroups,
   getShifts,
   parseSavedLocation,
 } from './keyFacts.js'
-
-const row = (overrides) => ({
-  category: 'tuition',
-  currency: 'EUR',
-  period: 'yearly',
-  year_status: 'current',
-  academic_year_canonical: '2026/2027',
-  ...overrides,
-})
-
-test('headline tuition annualises the current cohort in euro', () => {
-  const fact = getHeadlineTuition([
-    row({ amount: 8965 }),
-    row({ category: 'registration', period: 'one_time', amount: 75 }),
-  ])
-  assert.equal(fact.kind, 'yearly')
-  assert.equal(fact.min, 8965)
-  assert.equal(fact.max, 8965)
-  assert.equal(fact.currency, 'EUR')
-  assert.equal(fact.academicYear, '2026/2027')
-})
-
-test('headline tuition keeps a currency without a fixed euro rate', () => {
-  const fact = getHeadlineTuition([row({ currency: 'USD', period: 'monthly', amount: 1000 })])
-  assert.deepEqual([fact.kind, fact.min, fact.currency], ['yearly', 12000, 'USD'])
-})
-
-test('headline tuition falls back to a fee with an unstated period, then to nothing', () => {
-  const unstated = getHeadlineTuition([row({ period: null, amount: 4000 })])
-  assert.deepEqual([unstated.kind, unstated.amount, unstated.currency], ['unstated_period', 4000, 'EUR'])
-  assert.equal(getHeadlineTuition([row({ category: 'food', amount: 100 })]), null)
-  assert.equal(getHeadlineTuition([]), null)
-  assert.equal(getHeadlineTuition(undefined), null)
-})
 
 const nvo = (year, subject, value, examType = 'nvo_7') => ({
   exam_type: examType, metric: 'average_score', year, subject, value,

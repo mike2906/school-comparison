@@ -31,7 +31,7 @@ import { canonicalLanguagePair, languageKey, languageLabel } from '../../utils/l
 const uniqueCanonical = (values, canonical) => (
   [...new Set((values || []).map(canonical).filter(Boolean))]
 )
-import { monthlyEquivalent, toEur } from '../../utils/pricing'
+import { tuitionSortValue } from '../../utils/pricing'
 import {
   readViewParams,
   writeViewParams,
@@ -855,21 +855,6 @@ function SearchPage() {
     return matching.find(location => location.is_primary) || matching[0] || getPrimaryLocation(school)
   }
 
-  const getStartingPrice = (school) => {
-    if (school.school_type === 'state' || !school.pricing || school.pricing.length === 0) {
-      return null
-    }
-
-    const tuitionPrices = school.pricing
-      .filter(price => price.category === 'tuition')
-      .map(price => toEur(monthlyEquivalent(price), price.currency))
-      .filter(value => value != null)
-
-    if (tuitionPrices.length === 0) return null
-
-    return Math.min(...tuitionPrices)
-  }
-
   const schoolsWithDistance = useMemo(() => {
     if (!userLocation) return schools
 
@@ -951,15 +936,20 @@ function SearchPage() {
       case 'type':
         list.sort((a, b) => (TYPE_SORT_ORDER[a.school_type] ?? 99) - (TYPE_SORT_ORDER[b.school_type] ?? 99))
         break
-      case 'price':
+      case 'price': {
+        // Private schools by their headline-year tuition per month, cheapest first; then
+        // those without a fee that converts to a month; state schools last.
+        const rank = new Map(list.map((school) => {
+          const value = school.school_type === 'state' ? null : tuitionSortValue(school.pricing)
+          return [school.id, school.school_type === 'state' ? [2, 0] : [value == null ? 1 : 0, value ?? 0]]
+        }))
         list.sort((a, b) => {
-          const priceA = getStartingPrice(a)
-          const priceB = getStartingPrice(b)
-          const valueA = a.school_type === 'state' ? 0 : (priceA ?? Number.POSITIVE_INFINITY)
-          const valueB = b.school_type === 'state' ? 0 : (priceB ?? Number.POSITIVE_INFINITY)
-          return valueA - valueB
+          const [groupA, valueA] = rank.get(a.id)
+          const [groupB, valueB] = rank.get(b.id)
+          return groupA - groupB || valueA - valueB
         })
         break
+      }
       case 'nvo': {
         // Highest latest combined result of one exam for every school; schools without
         // that exam last. Mixing exams would rank 4th-grade scores above 7th-grade ones.
@@ -1220,7 +1210,7 @@ function SearchPage() {
         { value: 'name', label: t('sorting.name') },
         { value: 'nvo', label: nvoSortLabel },
         { value: 'type', label: t('sorting.type') },
-        { value: 'price', label: t('sorting.price') },
+        { value: 'price', label: t('sorting.pricePrivate') },
       ]
     : [
         { value: 'name', label: t('sorting.name') },
