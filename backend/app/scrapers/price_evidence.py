@@ -20,13 +20,14 @@ No model is involved: every rule reads the page text.
 
 from __future__ import annotations
 
+import datetime
 import decimal
 import re
 from dataclasses import dataclass
 from typing import Any, Iterable, Optional
 from urllib.parse import unquote, urlparse
 
-from app.scrapers.shared_site_check import describes_level
+from app.scrapers.shared_site_check import _URL_KINDERGARTEN_RE, _URL_SCHOOL_RE, describes_level
 
 CONTEXT_CHARS = 100  # max characters taken either side of the amount on its own line
 ATTACHED_LINES = 2  # label lines before / description lines after an amount line
@@ -288,8 +289,15 @@ _FREQUENCY_RE = re.compile(
 _AGE_RE = re.compile(r"\d+ ?- ?(?:годиш|месеч)\w*")
 PERIOD_KEYWORDS: dict[str, re.Pattern[str]] = {
     # Stems, so "месечна", "месечен" and "ежемесечно" all count; not "тримесечна".
-    "MONTHLY": re.compile(r"(?<!три)месеч|\bна месец|/\s*мес|per month|/\s*month|\bmonthly\b|a month\b"),
-    "YEARLY": re.compile(r"(?<!полу)годиш|\bна година|/\s*год|per year|/\s*year|\bannual|\byearly\b|a year\b"),
+    # "платима до 15 число на предходния месец" (330) is paid every month.
+    "MONTHLY": re.compile(
+        r"(?<!три)месеч|\bна месец|/\s*мес|per month|/\s*month|\bmonthly\b|a month\b"
+        r"|\b(?:всеки|предходния|предишния|предидущия|текущия|следващия) месец"
+    ),
+    # "Total tuition fees (year)" heads a yearly table.
+    "YEARLY": re.compile(
+        r"(?<!полу)годиш|\bна година|/\s*год|per year|/\s*year|\bannual|\byearly\b|a year\b|\(\s*year\s*\)"
+    ),
     "ONE_TIME": re.compile(r"еднократ|one[- ]time|one[- ]off|\bonce\b"),
     "QUARTER": re.compile(r"тримесеч|quarterly|per quarter"),
     "SEMESTER": re.compile(r"семестър|семестриал|полугодиш|per semester"),
@@ -309,6 +317,29 @@ _INSTALLMENT_RE = re.compile(
 )
 # Nursery wording the shared-site vocabulary leaves out ("ясла" alone).
 _NURSERY_RE = re.compile(r"\bясл[аи]\b|яслен")
+
+# A price on offer until a date: early enrolment, the first contracts, a dated price
+# list ("Цени: 1 050 EUR до 7 февруари 2026 г.", 581; "до 19.12.2025 г. за първите 7
+# договора", 171). A payment's due date ("платима до 15.09.") is not an offer's end, nor
+# is the end of enrolment ("записване до 15.09.") the end of the fee.
+_MONTHS = {
+    "януари": 1, "февруари": 2, "март": 3, "април": 4, "май": 5, "юни": 6, "юли": 7,
+    "август": 8, "септември": 9, "октомври": 10, "ноември": 11, "декември": 12,
+    "january": 1, "february": 2, "march": 3, "april": 4, "june": 6, "july": 7,
+    "august": 8, "september": 9, "october": 10, "november": 11, "december": 12,
+}  # fmt: skip
+_DEADLINE_RE = re.compile(
+    r"(?:\bдо|\buntil|\bby|\bbefore)\s+(?:(\d{1,2})\s*[./]\s*(\d{1,2})\s*[./]\s*(20\d{2})"
+    rf"|(\d{{1,2}})\s+({'|'.join(_MONTHS)})\s+(20\d{{2}}))"
+)
+_OFFER_WORDS_RE = re.compile(
+    r"записани|сключ|договор|ранн|отстъпк|намален|промо|цени\b|цена\b|валидн|важи"
+    r"|early|contract|discount|offer|valid|price"
+)
+# ...and a price that applies after a date ("след 31.05.2026 – 8 500 €") is the current one.
+_DUE_DATE_RE = re.compile(
+    r"платим|плаща|вноск|заплат|\bpaid\b|\bpay(?:able|ment)?\b|\bdue\b|\bслед\b|\bafter\b|\bfrom\b"
+)
 
 
 def period_fits_category(category: str | None, period: str | None) -> bool:
@@ -341,6 +372,61 @@ def stated_period(text: str, span: tuple[int, int]) -> tuple[set[str], bool]:
     if families or unrepresentable:
         return families, unrepresentable
     return period_families(amount_context(text, span))
+
+
+HEADING_LINES = 20  # how far above an amount its table or list heading may stand
+HEADING_CHARS = 80  # a longer line is prose, not a heading
+_TABLE_RULE_RE = re.compile(r"^[\s|:\-–—=*_]*$")
+
+
+def heading_period(text: str, span: tuple[int, int]) -> Optional[str]:
+    """The one period the heading over an amount's table or list states, if any.
+
+    For an amount with no period of its own: 517's "ГОДИШНА ТАКСА" heads a table of
+    grades and prices, and 542's "Месечни такси" a list of programmes. Going up from the
+    amount, price lines (other fees) and lines naming no period (row labels, column
+    headers) are passed over; the first short line naming a period decides. A line
+    followed by a bare price ("Депозит (еднократно):" over "500 €") is that fee's label,
+    not a heading, unless the bare price is this amount or the line is a table's header
+    row; "- ежемесечно" under a price describes that price. In the header row of the
+    amount's own table only the amount's column counts. Several periods, a per-day/week one, or a long line of prose decide nothing. A
+    markdown heading ends the search either way.
+    """
+    line_start = text.rfind("\n", 0, span[0]) + 1
+    amount_line, column_at = _line_of(text, span), span[0] - line_start
+    lines = text[:line_start].split("\n")[:-1][-HEADING_LINES:]
+    for index in range(len(lines) - 1, -1, -1):
+        line = lines[index]
+        markdown_heading = line.lstrip().startswith("#")
+        if not line.strip() or _TABLE_RULE_RE.match(line) or (_is_price_line(line) and not markdown_heading):
+            continue
+        if index and _is_price_line(lines[index - 1]) and re.match(r"\s*[-–—/]", line):
+            continue  # "€ 530\n- ежемесечно заплащане": the price above's description
+        families, unrepresentable = period_families(line)
+        if not (families or unrepresentable):
+            if markdown_heading:
+                return None
+            continue
+        if "|" in line and "|" in amount_line:
+            # The header row of the amount's table: only the amount's own column speaks.
+            cells = line.split("|")
+            if len(cells) != amount_line.count("|") + 1:
+                return None
+            families, unrepresentable = period_families(cells[amount_line[:column_at].count("|")])
+        if unrepresentable or len(families) != 1 or len(line.strip(" #*_|")) > HEADING_CHARS:
+            return None
+        following = next(
+            (later for later in lines[index + 1:] if later.strip() and not _TABLE_RULE_RE.match(later)), None
+        )
+        if following is not None and "|" not in line and _is_bare_price_line(following):
+            return None
+        return next(iter(families))
+    return None
+
+
+def _is_bare_price_line(line: str) -> bool:
+    """A price with no words of its own: the amount of the label line above it."""
+    return _is_price_line(line) and not _has_words(_PRICE_RE.sub(" ", line))
 
 
 # An international school's Pre-K is its own reception class, not a kindergarten.
@@ -495,26 +581,50 @@ def proper_name(registry_name: str | None) -> Optional[str]:
     return names[-1] if names else None
 
 
-def page_is_another_institutions(url: str | None, grades: Iterable[int]) -> bool:
+def page_is_another_institutions(
+    url: str | None, grades: Iterable[int], school_family: str = "school", shares_site: bool = False
+) -> bool:
     """The page's address names only a stage the school does not teach.
 
     550, a gymnasium, took its fees from "/chastno-osnovno-uchilishte/.../priem-petoklasnici",
     the basic school's section of the site they share. ``grades`` are the school's
     :func:`taught_grades`: empty, and so no judgement, unless a sibling shares the site.
+    A kindergarten that shares its site with a school (``shares_site``) does not take
+    fees from a page whose address names a school and no kindergarten (510 read
+    "svetlina.net/school/").
     """
-    grades = set(grades)
     words = re.sub(r"[/_\-.+%=&?]+", " ", unquote(urlparse(str(url or "")).path)).casefold()
+    if school_family == "kindergarten":
+        return shares_site and bool(_URL_SCHOOL_RE.search(words)) and not _URL_KINDERGARTEN_RE.search(words)
+    grades = set(grades)
     named = {grade for pattern, stage in _STAGE_GRADES if pattern.search(words) for grade in stage}
     return bool(grades and named) and not (named & grades)
 
 
+# Fees only a school charges: its pupils, its homework club, its diploma programme.
+_SCHOOL_ONLY_LABEL_RE = re.compile(
+    r"\bученици|\bученик|занималн|\bib\b|international baccalaureate|бакалавр|\bpupils?\b"
+)
+# A school named in a kindergarten's fee label; a kindergarten may mean school readiness
+# ("подготовка за училище") or a summer school, so it counts only on a site it shares.
+_SCHOOL_WORD_RE = re.compile(r"училищ|\bschool|гимназ|lyc[eé]e|\bч?(?:оу|су)\b|\bчпг\b")
+
+
 def label_is_another_institutions(
-    label: str | None, school_family: str, grades: set[int], own_name: str | None = None
+    label: str | None,
+    school_family: str,
+    grades: set[int],
+    own_name: str | None = None,
+    shares_site: bool = False,
 ) -> bool:
     """A fee label places the fee with a sibling institution of the same site.
 
     ``grades`` are the school's :func:`taught_grades` (empty when unknown). A
-    kindergarten's fee does not name school grades. A school's fee does not name only
+    kindergarten's fee does not name school grades, beyond readiness for the first
+    ("подготовка за 1 клас"); a band that runs from the pre-school class into school
+    ("ПК, 1-12 клас", 634) is the school's. Nor is it for pupils, a homework club or the
+    IB (526, 587, 634), or, on a site it shares with a school (``shares_site``), for a
+    school it names. A school's fee does not name only
     grades the school does not teach (the gymnasium's "8 - 12 клас" on the primary
     school's page), nor only a kindergarten or nursery group. A pre-school class may be
     either's, so a label naming one and no school grade is kept. So is a label that
@@ -527,11 +637,40 @@ def label_is_another_institutions(
     preschool = bool(_PRESCHOOL_LABEL_RE.search(text)) or PRESCHOOL_GRADE in named
     school_grades = named - {PRESCHOOL_GRADE}
     if school_family == "kindergarten":
-        return bool(school_grades) and not preschool
+        if school_grades and not (preschool and school_grades == {1}):
+            return True
+        if preschool or _KINDERGARTEN_LABEL_RE.search(text):
+            return False
+        return bool(_SCHOOL_ONLY_LABEL_RE.search(text) or (shares_site and _SCHOOL_WORD_RE.search(text)))
     if school_grades:
         named_itself = bool(own_name and _label_key(own_name) and _label_key(own_name) in _label_key(label))
         return bool(grades) and not (school_grades & grades) and not named_itself
     return bool(_KINDERGARTEN_LABEL_RE.search(text)) and not preschool
+
+
+def expired_offer(context: str, today: datetime.date) -> Optional[datetime.date]:
+    """The passed end date of the offer an amount's words make, or None.
+
+    The words must speak of an offer (early enrolment, contracts, a discount, a dated
+    price list) and not of paying: "до 15.09.2026" beside "платима" is when this year's
+    fee falls due, not the last day it is charged. Words of a price that starts after a
+    date ("след") leave the row alone too: it may be the price that replaced the offer.
+    """
+    if not _OFFER_WORDS_RE.search(context) or _DUE_DATE_RE.search(context):
+        return None
+    for match in _DEADLINE_RE.finditer(context):
+        day, month, year = (
+            (match.group(1), match.group(2), match.group(3))
+            if match.group(1)
+            else (match.group(4), _MONTHS[match.group(5)], match.group(6))
+        )
+        try:
+            deadline = datetime.date(int(year), int(month), int(day))
+        except ValueError:
+            continue
+        if deadline < today:
+            return deadline
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -545,6 +684,7 @@ RULE_PERIOD_CONFLICT = "3_period_conflict"
 RULE_PERIOD_UNREPRESENTABLE = "3_period_unrepresentable"
 RULE_DEPOSIT = "4_deposit_not_tuition"
 RULE_INSTALLMENT = "4_installment_not_tuition"
+RULE_EXPIRED = "7_offer_expired"
 
 
 @dataclass(frozen=True)
@@ -612,12 +752,15 @@ def check_price_row(
     school_family: str,
     grades: Iterable[int] = (),
     own_name: str | None = None,
+    shares_site: bool = False,
+    today: datetime.date | None = None,
 ) -> list[PriceFinding]:
     """Rule 1-4 findings for one price row against its source page text.
 
     ``school_family`` is ``shared_site_check.level_family`` of the school's level;
     ``grades`` are the grades it teaches (:func:`taught_grades`), when known, and
     ``own_name`` the name that tells it from its siblings on the site, when it has one.
+    ``shares_site`` says an institution of the other family shares its site.
     """
     text = normalize_text(page_text)
     hits: list[PriceFinding] = []
@@ -676,15 +819,19 @@ def check_price_row(
 
     # Rule 2: the row's own label, or every occurrence's label lines, name the other level.
     other_family = "school" if school_family == "kindergarten" else "kindergarten"
-    if label_is_another_institutions(row.scope_label, school_family, set(grades), own_name):
+    def foreign(label: str | None) -> bool:
+        return label_is_another_institutions(label, school_family, set(grades), own_name, shares_site)
+
+    if foreign(row.scope_label):
         hit(RULE_LEVEL, f"label is a sibling institution's: {row.scope_label!r}", shown)
-    elif not label_names_a_level(row.scope_label) and all(
-        label_is_another_institutions(_heading_of(text, span), school_family, set(grades), own_name)
-        for span in chosen
-    ):
+    elif not label_names_a_level(row.scope_label) and all(foreign(_heading_of(text, span)) for span in chosen):
         # The row's own label says nothing about whom it is for ("такси за нови
         # ученици"); the lines its amount stands under do (565 took "5-7. клас").
         hit(RULE_LEVEL, "amount stands under a sibling institution's label", contexts[0])
+    elif shares_site and all(foreign(amount_segment(text, span)) for span in chosen):
+        # Whatever the row's label says, the amount's own words are the sibling's: 522,
+        # a school, stored the kindergarten's "5г. – 6г. 7865 за година" as "1 - 12 клас".
+        hit(RULE_LEVEL, "the amount's own line is a sibling institution's", contexts[0])
     elif row.label and names_other_level(row.label, school_family):
         hit(RULE_LEVEL, f"label names {other_family}: {row.label!r}", shown)
     elif not row.label and all(names_other_level(context, school_family) for context in contexts):
@@ -701,6 +848,12 @@ def check_price_row(
         if single and stored is None:
             stated = next(iter(single))
             hit(RULE_PERIOD_MISSING, f"null period, text says {stated}", contexts[0], stated)
+        elif stored is None and not any(families):
+            # Nothing beside the amount: the heading of its table or list may say.
+            headed = {heading_period(text, span) for span in chosen}
+            if len(headed) == 1 and None not in headed:
+                stated = headed.pop()
+                hit(RULE_PERIOD_MISSING, f"null period, heading says {stated}", contexts[0], stated)
         elif single and stored and stored not in single and {stored} | single != {"ONE_TIME", "YEARLY"}:
             stated = next(iter(single))
             hit(RULE_PERIOD_CONFLICT, f"stored {stored}, text says {stated}", contexts[0], stated)
@@ -716,6 +869,11 @@ def check_price_row(
             _INSTALLMENT_RE.search(_line_of(text, span)) for span in chosen
         ):
             hit(RULE_INSTALLMENT, "tuition row is one installment", _line_of(text, chosen[0]))
+
+    # Rule 7: an offer whose last day has passed (an early-enrolment tier, last season's trip).
+    ended = [expired_offer(context, today or datetime.date.today()) for context in contexts]
+    if all(ended):
+        hit(RULE_EXPIRED, f"offered until {ended[0].isoformat()}", contexts[0])
     return hits
 
 

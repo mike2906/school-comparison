@@ -39,6 +39,7 @@ from app.scrapers.price_evidence import (
     amount_spans,
     currency_price_starts,
     fee_number_starts,
+    heading_period,
     label_grades,
     label_names_a_level,
     label_spans,
@@ -2815,16 +2816,18 @@ def _academic_year_is_over(year: str | None, *, today: datetime.date | None = No
 
 
 def _period_written_for(block: str, span: tuple[int, int]) -> tuple[set[str], bool]:
-    """Period wording for one amount; for a table cell with none, its column header's."""
+    """Period wording for one amount; with none, its column header's, else its heading's."""
     families, unrepresentable = stated_period(block, span)
-    line = _line_of(block, span)
-    if families or unrepresentable or "|" not in line:
+    if families or unrepresentable:
         return families, unrepresentable
-    header = _table_header(block, span)
-    if header is None:
-        return families, unrepresentable
-    cell = _header_cell(block, span, header)
-    return period_families(cell) if cell is not None else (families, unrepresentable)
+    header = _table_header(block, span) if "|" in _line_of(block, span) else None
+    cell = _header_cell(block, span, header) if header is not None else None
+    if cell is not None:
+        families, unrepresentable = period_families(cell)
+        if families or unrepresentable:
+            return families, unrepresentable
+    headed = heading_period(block, span)
+    return ({headed} if headed else set()), False
 
 
 def _header_cell(block: str, span: tuple[int, int], header: str) -> str | None:

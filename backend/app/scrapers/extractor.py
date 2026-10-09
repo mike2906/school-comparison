@@ -1252,13 +1252,14 @@ async def _extract_prices(
     llm_stats: ExtractionLLMStats,
 ) -> dict[str, Any]:
     scope = await school_fee_scope(db, school)
+    family = level_family(school.education_level)
     # Not fee pages of this school: a site template's sample text (590's "$1,800/mo"
     # between lines of lorem ipsum), and a sibling school's section of a shared site.
     pages = [
         page
         for page in pages
         if not helpers._is_template_filler(page.raw_markdown)
-        and not page_is_another_institutions(page.source_url, scope.grades)
+        and not page_is_another_institutions(page.source_url, scope.grades, family, scope.shares_site)
     ]
     selected_text, _source_urls = helpers._select_pages(
         school=school,
@@ -1291,7 +1292,6 @@ async def _extract_prices(
     )
     # Only the prompt gets glued currency words spaced; deterministic extraction and the
     # evidence checks below keep the original page text.
-    family = level_family(school.education_level)
     user_prompt = helpers._space_glued_currency_words(selected_text)
     deterministic_pricing = helpers._extract_prices_deterministic(selected_text)
     used_deterministic_pricing = False
@@ -1336,6 +1336,7 @@ async def _extract_prices(
                 family,
                 set(scope.grades),
                 scope.own_name,
+                scope.shares_site,
             )
         ]
 
