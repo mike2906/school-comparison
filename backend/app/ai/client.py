@@ -11,9 +11,7 @@ from math import isfinite
 from typing import Any, Literal
 
 from pydantic_ai import Agent
-from pydantic_ai.models.openai import OpenAIModel
 from pydantic_ai.models.openrouter import OpenRouterModel
-from pydantic_ai.providers.openai import OpenAIProvider
 from pydantic_ai.providers.openrouter import OpenRouterProvider
 
 from app.config import get_settings
@@ -136,50 +134,6 @@ def extract_provider_cost_usd(result: Any) -> float:
     return 0.0
 
 
-def get_openai_model(tier: ModelTier) -> OpenAIModel:
-    """
-    Get an OpenAIModel instance configured for OpenRouter.
-
-    PydanticAI uses the OpenAI-compatible API that OpenRouter provides.
-
-    Args:
-        tier: Model tier to use
-
-    Returns:
-        Configured OpenAIModel instance
-
-    Example:
-        >>> model = get_openai_model("cheap")
-        >>> # Use with PydanticAI Agent:
-        >>> agent = Agent(model=model, result_type=MySchema)
-    """
-    settings = get_settings()
-    model_name = get_model(tier)
-
-    # Extract the model name without the openrouter/ prefix for the API
-    # OpenRouter expects format: google/gemini-2.0-flash-lite
-    api_model_name = model_name.replace("openrouter/", "")
-
-    # pydantic-ai changed OpenAIModel initialization to use `provider=...`.
-    # Keep a compatibility fallback for older versions that accept base_url/api_key directly.
-    init_params = inspect.signature(OpenAIModel.__init__).parameters
-    if "provider" in init_params:
-        provider = OpenAIProvider(
-            base_url="https://openrouter.ai/api/v1",
-            api_key=settings.openrouter_api_key,
-        )
-        return OpenAIModel(
-            model_name=api_model_name,
-            provider=provider,
-        )
-
-    return OpenAIModel(
-        model_name=api_model_name,
-        base_url="https://openrouter.ai/api/v1",
-        api_key=settings.openrouter_api_key,
-    )
-
-
 def get_openrouter_model(tier: ModelTier) -> OpenRouterModel:
     """Build the native OpenRouter model required for exact usage metadata."""
     settings = get_settings()
@@ -252,7 +206,6 @@ __all__ = [
     "get_model_costs",
     "calculate_cost",
     "extract_provider_cost_usd",
-    "get_openai_model",
     "get_openrouter_model",
     "create_agent",
     "MODEL_TIERS",

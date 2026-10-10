@@ -132,8 +132,6 @@ class BaseSourceAdapter(ABC):
 
         for disc in discovered_schools:
             try:
-                self._ensure_i18n_fallbacks(disc)
-
                 # Step 1: Try to find existing school
                 existing_school = None
 
@@ -439,10 +437,6 @@ class BaseSourceAdapter(ABC):
 
         logger.info(f"Discovery complete: created={created}, updated={updated}, skipped={skipped}")
         return {"created": created, "updated": updated, "skipped": skipped}
-
-    def _ensure_i18n_fallbacks(self, disc: DiscoveredSchool) -> None:
-        """Keep discovery data source-backed; synthetic EN fallbacks are added at display time only."""
-        return None
 
     async def _sync_source_location(self, row, incoming) -> None:
         """Update a source-owned location's source fields; never its coordinates."""
