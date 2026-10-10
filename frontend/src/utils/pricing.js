@@ -88,9 +88,9 @@ export function groupPricingByAcademicYear(pricing = []) {
 }
 
 const INSTALLMENT_PLAN_NAME_RE = /(\d+\s*(installment|monthly|вноск)|(installment|monthly|вноск)\s*\d+)/i
-// One instalment named without a count: "Годишна такса – първа вноска", "II вноска"; not
-// "Плащане на една вноска", the whole fee paid at once.
-const ONE_INSTALLMENT_RE = /(?<![\p{L}])(?<!една\s)вноска(?![\p{L}])|(?:first|second|third|final) instal+ment/iu
+// One instalment named by its place: "Годишна такса – първа вноска", "II вноска". Not
+// "Месечна вноска" or "Еднократна вноска", which are the whole fee.
+const ONE_INSTALLMENT_RE = /(?<![\p{L}])(?:първа|втора|трета|четвърта|последна|i{1,3}|iv)\s+вноска(?![\p{L}])|вноска\s*(?:№\s*)?(?:i{1,3}|iv)(?![\p{L}])|(?:first|second|third|final) instal+ment/iu
 
 /** True for a row describing one instalment of a fee rather than the whole fee. */
 export function isInstallmentPlan(item) {

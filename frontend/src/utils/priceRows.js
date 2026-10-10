@@ -1,4 +1,4 @@
-import { gradeRangeInText, rowGradeBand } from './gradeBand.js'
+import { gradesInText, rowGradeBand } from './gradeBand.js'
 
 /**
  * Facts a price row states in its own words: how often it is paid and which age groups it
@@ -13,9 +13,9 @@ const PERIOD_WORDS = [
   // "годишнина" (an anniversary).
   ['yearly', /(?<![\p{L}\p{N}-])(?<!\p{N}\s)годишн(?!ин)|за (?:учебната |цялата )?(?:учебна )?година|(?<![\p{L}-])annual|yearly|per year/u],
   ['monthly', /(?<![\p{L}\p{N}-])(?<!\p{N}\s)(?:еже)?месечн|на месец|monthly|per month/u],
-  ['semester', /семест|semester|полугодишн|semi-?annual|bi-?annual/u],
+  ['semester', /семест|semester|полугодишн|semi[- ]?annual|bi-?annual/u],
   // "за първи срок", "на срок", never a deadline's "в срок до 30.06".
-  ['term', /(?:за (?:първи |втори |един |учебен )?|на )срок(?![\p{L}])|per term|(?<![\p{L}-])term(?:ly)? fee/u],
+  ['term', /(?:за (?:първи|втори|i|ii) |(?<![\p{L}])(?:i|ii) |на )срок(?![\p{L}])|per term|(?<![\p{L}-])term(?:ly)? fee/u],
   ['quarter', /тримесеч|quarter/u],
 ]
 
@@ -47,9 +47,9 @@ const GROUP_LIST_RE = new RegExp(
   'gu',
 )
 const ORDINAL_TOKEN_RE = new RegExp(`(?<![\\p{L}\\p{N}])(${ORDINAL})(?![\\p{L}\\p{N}])|(-|–)`, 'gu')
-// Ясла alone; "ДГ и ясла" or "Детска ясла и градина" name both, so neither.
-const NURSERY_RE = /яслен|nursery|cr[eè]che|(?<![\p{L}])ясл[аи](?![\p{L}])/u
-const KINDERGARTEN_WORD_RE = /градин|kindergarten|(?<![\p{L}])дг(?![\p{L}])/u
+// "Ясла", "Яслена група"; but "ДГ и ясла" or "Детска ясла и градина" name both, so neither.
+const NURSERY_RE = /яслен|nursery|cr[eè]che|(?<![\p{L}])ясл(?:а|и|ата)(?![\p{L}])/u
+const BOTH_RE = /ясл(?:а|и) и (?:детска )?градин|(?:градина|дг) и (?:детска )?ясл|ясла и дг/u
 const PRESCHOOL_NAME_RE = /подготвителн[аи] груп|предучилищн[аи] груп|подготвителен клас|(?<![\p{L}])п[гк](?![\p{L}])|pre-?school/u
 
 const AGE_GROUP_KEYS = new Set([
@@ -70,7 +70,7 @@ function ordinalKey(word) {
 function groupKeys(text) {
   const keys = new Set()
   const normalized = String(text || '').toLocaleLowerCase('bg')
-  if (NURSERY_RE.test(normalized) && !KINDERGARTEN_WORD_RE.test(normalized)) keys.add('nursery')
+  if (NURSERY_RE.test(normalized) && !BOTH_RE.test(normalized)) keys.add('nursery')
   if (PRESCHOOL_NAME_RE.test(normalized)) keys.add('preschool')
   for (const match of normalized.matchAll(GROUP_LIST_RE)) {
     // "2 групи" counts groups; only a worded ordinal names them in the plural.
@@ -119,7 +119,7 @@ function gradeKeys(band) {
 export function rowAgeGroupKeys(row) {
   const keys = new Set()
   if (AGE_GROUP_KEYS.has(row?.age_group?.trim())) keys.add(row.age_group.trim())
-  const band = rowGradeBand(row) || gradeRangeInText(row?.plan_name)
+  const band = rowGradeBand(row) || gradesInText(row?.age_group) || gradesInText(row?.plan_name)
   for (const key of gradeKeys(band)) keys.add(key)
   for (const key of groupKeys(`${row?.age_group || ''} / ${row?.plan_name || ''}`)) keys.add(key)
   return keys

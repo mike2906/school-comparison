@@ -15,6 +15,7 @@ test('periodFromLabel: the period a fee name states', () => {
     'Semi-annual payment': 'semester',
     'Annual fee': 'yearly',
     'Такса на срок': 'term',
+    'Такса за I срок': 'term',
   }
   for (const [label, period] of Object.entries(cases)) assert.equal(periodFromLabel(label), period, label)
 })
@@ -29,6 +30,7 @@ test('periodFromLabel: ages, one-off payments, two periods or none state no peri
     'Еднократно плащане при записване в срок до 30.06', // a deadline, not a term
     'Записване в срок',
     'Long-term discount',
+    'Записване за срок от 1 година',
     'Отстъпка по случай годишнината на училището',
     '',
     null,
@@ -63,6 +65,15 @@ test('rowAgeGroupKeys: kindergarten groups, grades and stored keys', () => {
   assert.deepEqual(keys('ДГ и ясла „Звездица“', 'Целодневна'), [])
   assert.deepEqual(keys('Детска ясла и градина', null), [])
   assert.deepEqual(keys('Частна Детска Ясла ,,Йор Кидс“', null), ['nursery'])
+  assert.deepEqual(keys('Детска градина „Слънце“ / Яслена група', null), ['nursery'])
+  assert.deepEqual(keys('ДГ „Слънце“', 'Ясла'), ['nursery'])
+  // "ПГ-6 г." is the preschool year for six-year-olds, not preschool to grade 6.
+  assert.deepEqual(keys(null, 'Такса ПГ-6 г.'), ['preschool'])
+  // Grades written in the plan name or a free-text age group (Codex review).
+  assert.deepEqual(keys(null, 'Grade 1 / annual tuition'), ['grade_1_4'])
+  assert.deepEqual(keys(null, '8. клас'), ['grade_8_12'])
+  assert.deepEqual(keys(null, 'Ученици от 4 до 7 клас'), ['grade_1_4', 'grade_5_7'])
+  assert.deepEqual(keys('Годишна такса за 8. клас за учебната 2026/2027 год', null), ['grade_8_12'])
   // A count of groups is not a group.
   assert.deepEqual(keys(null, '2 групи по 12 деца'), [])
   assert.deepEqual(keys(null, 'Програма за 3 групи'), [])

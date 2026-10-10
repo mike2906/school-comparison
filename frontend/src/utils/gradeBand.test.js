@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { gradeBandLabel, gradeRangeInText, parseGradeBand } from './gradeBand.js'
+import { gradeBandLabel, gradeRangeInText, gradesInText, parseGradeBand } from './gradeBand.js'
 
 test('parseGradeBand: the grade texts schools write', () => {
   const cases = {
@@ -59,4 +59,14 @@ test('gradeBandLabel: one label per shape', () => {
   assert.equal(gradeBandLabel({ from: 0, to: 7 }, t), 'pricing.grades.preschoolTo{"to":7}')
   assert.equal(gradeBandLabel({ from: 5, to: 5 }, t), 'pricing.grades.one{"n":5}')
   assert.equal(gradeBandLabel({ from: 8, to: 12 }, t), 'pricing.grades.range{"from":8,"to":12}')
+})
+
+test('gradesInText: single grades and worded ranges beside a grade word, never bare numbers', () => {
+  assert.deepEqual(gradesInText('Grade 1 / annual tuition'), { from: 1, to: 1 })
+  assert.deepEqual(gradesInText('Ученици от 4 до 7 клас'), { from: 4, to: 7 })
+  assert.deepEqual(gradesInText('1-4 клас и 5-7 клас'), { from: 1, to: 7 })
+  assert.deepEqual(gradesInText('Grades 2 to 4'), { from: 2, to: 4 })
+  for (const text of ['Такса 2 x 3490', '12 месеца', '20.02.2026', 'Групи 3-6 години', null]) {
+    assert.equal(gradesInText(text), null, String(text))
+  }
 })

@@ -369,4 +369,7 @@ test('isInstallmentPlan: one instalment named without a count, not the fee paid 
   assert.equal(isInstallmentPlan({ plan_name: 'Годишна такса - I вноска' }), true)
   assert.equal(isInstallmentPlan({ plan_name: 'Годишна такса / Плащане на една вноска' }), false)
   assert.equal(isInstallmentPlan({ plan_name: 'Годишна такса' }), false)
+  // "Месечна вноска" is the monthly fee itself.
+  assert.equal(isInstallmentPlan({ plan_name: 'Месечна вноска за обучение' }), false)
+  assert.equal(isInstallmentPlan({ plan_name: 'Годишна такса (еднократна вноска)' }), false)
 })
