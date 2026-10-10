@@ -266,7 +266,13 @@
     "other": "Other fees",
     "sourceLink": "Source: {{site}}",
     "sourceLinkLabel": "See these prices on {{site}} (opens in a new window)",
-    "checkedOn": "checked {{date}}"
+    "checkedOn": "checked {{date}}",
+    "grades": {
+      "preschool": "Preschool",
+      "preschoolTo": "Preschool to grade {{to}}",
+      "one": "Grade {{n}}",
+      "range": "Grades {{from}}–{{to}}"
+    }
   },
   "priceSource": {
     "official": "From the school",

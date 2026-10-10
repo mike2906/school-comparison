@@ -2009,6 +2009,13 @@ the session scratchpad only.
       171's expired early-bird tiers (rule 7 should withhold them on the next
       validation run and publish), its "ПК" age group on the PK–7 row, and plan names
       that are English-only in the Bulgarian UI.
+      Follow-up (Mike, 2026-10-10): the age-group headings showed the website's own words
+      ("ПК", "VIII - XII клас") on the English page. Grade texts we can read
+      (`src/utils/gradeBand.js`: ПК/ПГ/PK, Arabic and Roman grades and ranges) now show
+      our label ("Preschool" / "Подготвителна група (ПГ)", "Grades 8–12" / "8–12 клас");
+      anything else stays as written. A plan name that writes out a wider overlapping
+      range widens the band, so 171's "PK–7: …" row reads "Preschool to grade 7" instead
+      of sitting under "Preschool". The compare page's per-row labels use the same code.
 
 ## Phase 3 — Go live
 
