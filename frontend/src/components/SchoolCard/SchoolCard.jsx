@@ -26,6 +26,7 @@ import {
   getTrendTooltip,
 } from '../../utils/nvoDisplay'
 import {
+  formatPriceLabel,
   selectPricingCohort,
   statedTuition,
   YEAR_STATUS,
@@ -360,20 +361,14 @@ function buildExpandedSections({
 
   if (pricing.length > 0 && school.school_type !== 'state') {
     const pricingLines = pricing.map(item => {
-      const amountMin = item.amount_min != null ? formatCurrency(item.amount_min, locale) : null
-      const amountMax = item.amount_max != null ? formatCurrency(item.amount_max, locale) : null
-      const amount = item.amount != null ? formatCurrency(item.amount, locale) : null
       const category = t(`pricing.${item.category}`)
       const periodKey = item.period ? t(`pricing.${item.period}`) : t('pricing.periodNotStated')
       const plan = item.plan_name ? `${t('pricing.plan')}: ${item.plan_name}` : ''
       const year = item.academic_year ? `${t('pricing.academicYear')}: ${item.academic_year}` : ''
       const meta = [plan, year].filter(Boolean).join(' • ')
       const source = item.source ? t(`priceSource.${item.source}`) : ''
-      const priceLabel = amountMin && amountMax
-        ? `${amountMin}–${amountMax} ${item.currency || 'EUR'}`
-        : amount
-          ? `${amount} ${item.currency || 'EUR'}`
-          : t('pricing.priceOnRequest')
+      // BGN rows are converted to euro, as on the detail and compare pages.
+      const priceLabel = formatPriceLabel(item, locale, t)
       const periodLabel = periodKey ? ` (${periodKey})` : ''
       const metaLabel = meta ? ` • ${meta}` : ''
       const sourceLabel = source ? ` • ${source}` : ''

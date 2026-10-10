@@ -8,6 +8,7 @@ import {
   isInstallmentPlan,
   YEAR_STATUS,
   toEur,
+  formatPriceLabel,
   displayPrice,
   statedTuition,
   tuitionSortValue,
@@ -251,4 +252,13 @@ test('displayPrice shows lev in euro and keeps other currencies', () => {
   assert.deepEqual(displayPrice(195.583, 'BGN'), { value: 100, currency: 'EUR' })
   assert.deepEqual(displayPrice(100, 'USD'), { value: 100, currency: 'USD' })
   assert.deepEqual(displayPrice(null, null), { value: null, currency: 'EUR' })
+})
+
+test('formatPriceLabel shows BGN rows in euro and falls back to price on request', () => {
+  const t = (key) => key
+  assert.equal(formatPriceLabel({ amount: 1955.83, currency: 'BGN' }, 'en-GB', t), '€1,000')
+  assert.equal(formatPriceLabel({ amount: 500, currency: 'EUR' }, 'en-GB', t), '€500')
+  assert.equal(formatPriceLabel({ amount_min: 391.166, amount_max: 782.332, currency: 'BGN' }, 'en-GB', t), '€200–€400')
+  assert.equal(formatPriceLabel({ amount_min: 500, amount_max: 500, currency: 'EUR' }, 'en-GB', t), '€500')
+  assert.equal(formatPriceLabel({ currency: 'EUR' }, 'en-GB', t), 'pricing.priceOnRequest')
 })
