@@ -16,6 +16,10 @@ test('periodFromLabel: the period a fee name states', () => {
     'Annual fee': 'yearly',
     'Такса на срок': 'term',
     'Такса за I срок': 'term',
+    'Такса за срок': 'term',
+    'Първи срок': 'term',
+    'I-ви срок': 'term',
+    'за първия срок': 'term',
   }
   for (const [label, period] of Object.entries(cases)) assert.equal(periodFromLabel(label), period, label)
 })
@@ -31,6 +35,7 @@ test('periodFromLabel: ages, one-off payments, two periods or none state no peri
     'Записване в срок',
     'Long-term discount',
     'Записване за срок от 1 година',
+    'Договор на срок от 1 година',
     'Отстъпка по случай годишнината на училището',
     '',
     null,
@@ -64,6 +69,9 @@ test('rowAgeGroupKeys: kindergarten groups, grades and stored keys', () => {
   // "Ясла" in the name of a place that is also a kindergarten names no one group.
   assert.deepEqual(keys('ДГ и ясла „Звездица“', 'Целодневна'), [])
   assert.deepEqual(keys('Детска ясла и градина', null), [])
+  for (const both of ['Ясли и ДГ', 'ДГ / ясла', 'Ясла/ДГ', 'ясла, градина', 'Яслена и градинска група']) {
+    assert.deepEqual(keys(both, null), [], both)
+  }
   assert.deepEqual(keys('Частна Детска Ясла ,,Йор Кидс“', null), ['nursery'])
   assert.deepEqual(keys('Детска градина „Слънце“ / Яслена група', null), ['nursery'])
   assert.deepEqual(keys('ДГ „Слънце“', 'Ясла'), ['nursery'])

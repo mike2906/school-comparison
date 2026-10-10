@@ -367,6 +367,9 @@ test('statedTuition and tuitionSortValue: the chosen age group only, never anoth
 test('isInstallmentPlan: one instalment named without a count, not the fee paid at once', () => {
   assert.equal(isInstallmentPlan({ plan_name: 'Годишна такса – първа вноска' }), true)
   assert.equal(isInstallmentPlan({ plan_name: 'Годишна такса - I вноска' }), true)
+  for (const name of ['1-ва вноска', '2-ра вноска', 'I-ва вноска', 'Вноска 1', 'Вноска № 1', 'Годишна такса – вноска 2']) {
+    assert.equal(isInstallmentPlan({ plan_name: name }), true, name)
+  }
   assert.equal(isInstallmentPlan({ plan_name: 'Годишна такса / Плащане на една вноска' }), false)
   assert.equal(isInstallmentPlan({ plan_name: 'Годишна такса' }), false)
   // "Месечна вноска" is the monthly fee itself.

@@ -14,8 +14,9 @@ const PERIOD_WORDS = [
   ['yearly', /(?<![\p{L}\p{N}-])(?<!\p{N}\s)годишн(?!ин)|за (?:учебната |цялата )?(?:учебна )?година|(?<![\p{L}-])annual|yearly|per year/u],
   ['monthly', /(?<![\p{L}\p{N}-])(?<!\p{N}\s)(?:еже)?месечн|на месец|monthly|per month/u],
   ['semester', /семест|semester|полугодишн|semi[- ]?annual|bi-?annual/u],
-  // "за първи срок", "на срок", never a deadline's "в срок до 30.06".
-  ['term', /(?:за (?:първи|втори|i|ii) |(?<![\p{L}])(?:i|ii) |на )срок(?![\p{L}])|per term|(?<![\p{L}-])term(?:ly)? fee/u],
+  // "за първи срок", "на срок", "I-ви срок"; never a deadline's "в срок до 30.06" or a
+  // length's "за срок от 1 година".
+  ['term', /(?:(?<![\p{L}])(?:първия|втория|първи|втори|един|i|ii)(?:-?(?:ви|ри))? |на |за )срок(?![\p{L}])(?!\s+от)|per term|(?<![\p{L}-])term(?:ly)? fee/u],
   ['quarter', /тримесеч|quarter/u],
 ]
 
@@ -49,7 +50,7 @@ const GROUP_LIST_RE = new RegExp(
 const ORDINAL_TOKEN_RE = new RegExp(`(?<![\\p{L}\\p{N}])(${ORDINAL})(?![\\p{L}\\p{N}])|(-|–)`, 'gu')
 // "Ясла", "Яслена група"; but "ДГ и ясла" or "Детска ясла и градина" name both, so neither.
 const NURSERY_RE = /яслен|nursery|cr[eè]che|(?<![\p{L}])ясл(?:а|и|ата)(?![\p{L}])/u
-const BOTH_RE = /ясл(?:а|и) и (?:детска )?градин|(?:градина|дг) и (?:детска )?ясл|ясла и дг/u
+const BOTH_RE = /ясл(?:а|и)\s*(?:и|\/|,)\s*(?:детск[аи] )?(?:градин|дг(?![\p{L}]))|(?:градин[аи]|(?<![\p{L}])дг)\s*(?:и|\/|,)\s*(?:детска )?ясл|яслена и градинска/u
 const PRESCHOOL_NAME_RE = /подготвителн[аи] груп|предучилищн[аи] груп|подготвителен клас|(?<![\p{L}])п[гк](?![\p{L}])|pre-?school/u
 
 const AGE_GROUP_KEYS = new Set([
