@@ -213,6 +213,11 @@ test('admission status omits unknown and unrecognized values', () => {
   assert.equal(getAdmissionStatusKey('Accepting applications'), 'accepting')
   assert.equal(getAdmissionStatusKey('waitlist'), 'waitlist')
   assert.equal(getAdmissionStatusKey('closed'), 'full')
+  assert.equal(getAdmissionStatusKey('waitlist open'), 'waitlist')
+  assert.equal(getAdmissionStatusKey('Not accepting applications'), 'full')
+  assert.equal(getAdmissionStatusKey('No places available'), 'full')
+  assert.equal(getAdmissionStatusKey('Places available'), 'accepting')
+  assert.equal(getAdmissionStatusKey('Open'), 'accepting')
 })
 
 test('display evidence treats explicit false as evidence but empty values as absent', () => {
@@ -292,4 +297,13 @@ test('normalizeLanguageFocus accepts strings, objects and a single value', () =>
   ])
   assert.deepEqual(normalizeLanguageFocus('french'), [{ language: 'french', level: undefined }])
   assert.deepEqual(normalizeLanguageFocus(undefined), [])
+})
+
+test('getOptionLabel does not treat a colon in scraped text as an i18next namespace', async () => {
+  const { default: i18next } = await import('i18next')
+  const i18n = i18next.createInstance()
+  await i18n.init({ lng: 'en', resources: { en: { translation: { advancedFilters: { options: { montessori: 'Montessori' } } } } } })
+  const t = i18n.t.bind(i18n)
+  assert.equal(getOptionLabel('montessori', t), 'Montessori')
+  assert.equal(getOptionLabel('Speaking clubs: English, German', t), 'Speaking clubs: English, German')
 })

@@ -141,11 +141,12 @@ export function getLocationDisplayEvidence(location, address = null, distance = 
 
 export function getAdmissionStatusKey(rawStatus) {
   const status = String(rawStatus || '').trim().toLowerCase()
+  // Waitlist and negations first, so "waitlist open" and "no places available" are not "accepting".
+  if (status.includes('wait')) return 'waitlist'
+  if (status.includes('full') || status.includes('closed') || /\b(not|no)\b/.test(status)) return 'full'
   if (status.includes('accept') || status.includes('open') || status.includes('available')) {
     return 'accepting'
   }
-  if (status.includes('wait')) return 'waitlist'
-  if (status.includes('full') || status.includes('closed')) return 'full'
   return null
 }
 
@@ -217,7 +218,8 @@ export function getStatusInfo(school, t) {
 export function getOptionLabel(option, t) {
   if (!option) return ''
   const key = `advancedFilters.options.${option}`
-  const translated = t(key)
+  // nsSeparator off: scraped text with a colon ("Clubs: English") is not a namespace.
+  const translated = t(key, { nsSeparator: false })
   if (translated !== key) return translated
   // Free text scraped from a website: tidy it, but never Title-Case a sentence.
   return humanizeTag(option)
