@@ -5,7 +5,8 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { calculateDistance, formatDistance } from '../../utils/distance'
+import { calculateDistance } from '../../utils/distance'
+import { formatDistance } from '../../utils/format'
 import { getSchoolName, getAddress } from '../../utils/i18n'
 import { useCompare } from '../../context/CompareContext'
 import { useCountry } from '../../context/CountryContext'
@@ -643,7 +644,7 @@ function PopupContent({
           <div className="flex items-start gap-2">
             <span className="text-neutral-400">📏</span>
             <span>
-              {formatDistance(distanceKm, { approximate: marker.location.coordinates_approximate })}{' '}
+              {formatDistance(distanceKm, { approximate: marker.location.coordinates_approximate, language })}{' '}
               {t('location.fromYou')}
             </span>
           </div>
