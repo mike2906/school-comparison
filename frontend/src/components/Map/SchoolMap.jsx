@@ -14,7 +14,7 @@ import { getFocusEmojis, getFocusLabels } from '../../utils/locationFocus'
 import { AGE_GROUP_KEYS } from '../../utils/education'
 import { useStableCallback } from '../../hooks/useStableCallback'
 import { isDesktopViewport } from '../../utils/searchViewState'
-import { schoolLevelLabel } from '../../utils/levelLabel'
+import { schoolLevelLabel, schoolTypeLabel } from '../../utils/levelLabel'
 import { pointsForFit, fitKeepRatio, fitPadding, pickSelectedMarker, pinHasRoom, pinTarget, overlayFitPadding, stackedMarkersByKey, joinSamePlaceMarkers, normalizeAgeGroups, pinnedLocations } from '../../utils/mapFit'
 
 // CARTO requires an API key; without one every tile is watermarked
@@ -615,7 +615,7 @@ function PopupContent({
 
       <div className="flex flex-wrap items-center gap-2">
         <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border bg-primary-50 text-primary-700 border-primary-200">
-          {t(`schoolTypes.${displayType}`)}
+          {schoolTypeLabel(marker.school, t, displayType)}
         </span>
         <span className="text-xs text-neutral-500">{locationLabel}</span>
       </div>

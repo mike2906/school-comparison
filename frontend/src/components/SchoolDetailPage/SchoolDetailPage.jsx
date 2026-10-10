@@ -8,7 +8,7 @@ import { normalizeSchool } from '../../utils/schoolAttributes'
 import { getLastSearchUrl } from '../../utils/searchViewState'
 import { examTypeForAgeGroup } from '../../utils/nvo'
 import { curatedRequirement, usesSofiaKindergartenSystem } from '../../utils/admission'
-import { schoolLevelLabel } from '../../utils/levelLabel'
+import { schoolLevelLabel, schoolTypeLabel } from '../../utils/levelLabel'
 import { useCountry } from '../../context/CountryContext'
 import { useCompare } from '../../context/CompareContext'
 import {
@@ -234,7 +234,7 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
       try {
         await navigator.share({
           title: schoolName,
-          text: summary || `${schoolName} - ${t(`schoolTypes.${school.school_type}`)}`,
+          text: summary || `${schoolName} - ${schoolTypeLabel(school, t)}`,
           url: window.location.href,
         })
       } catch (err) {
@@ -306,7 +306,7 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
                 : 'bg-blue-50 text-blue-700 border border-blue-200'
               }
             `}>
-              {t(`schoolTypes.${school.school_type}`)}
+              {schoolTypeLabel(school, t)}
             </span>
             <span className="px-4 py-2 rounded-lg text-sm font-semibold bg-neutral-100 text-neutral-700 border border-neutral-200">
               {schoolLevelLabel(school, t, countryConfig)}

@@ -2,7 +2,7 @@ import { memo, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { isDesktopViewport, isPlainLeftClick } from '../../utils/searchViewState'
-import { schoolLevelLabel } from '../../utils/levelLabel'
+import { schoolLevelLabel, schoolTypeLabel } from '../../utils/levelLabel'
 import { useCountry } from '../../context/CountryContext'
 import { languageLabel } from '../../utils/languages'
 import { useCompare } from '../../context/CompareContext'
@@ -962,7 +962,7 @@ const SchoolCard = memo(function SchoolCard({
 
       <div className="mt-1.5 flex flex-wrap items-center gap-2">
         <span className={`inline-flex items-center px-2.5 py-1 rounded text-[11px] font-semibold uppercase tracking-[0.08em] ${colors}`}>
-          {t(`schoolTypes.${displayType}`)}
+          {schoolTypeLabel(school, t, displayType)}
         </span>
         <span className="text-xs text-neutral-600">
           {schoolLevelLabel(school, t, countryConfig)}

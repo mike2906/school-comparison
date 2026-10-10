@@ -142,7 +142,7 @@ Many state schools run two shifts:
 Stored per location and age group in `location_age_group_shifts.shift`.
 
 ### Domain terms (dedicated i18n keys)
-НВО → NVO · Бал → Points · Смена → Shift · Организирани групи → After-school care
+НВО → NVO · Бал → Points · Смена → Shift · Занималня → After-school care
 
 ---
 

@@ -5,7 +5,7 @@
  */
 import { getAddress, getSchoolName } from '../utils/i18n.js'
 import { URL_LANGUAGES, alternateLinks, canonicalUrl, languagePath } from '../utils/languageUrl.js'
-import { schoolLevelLabel } from '../utils/levelLabel.js'
+import { schoolLevelLabel, schoolTypeLabel } from '../utils/levelLabel.js'
 import {
   getAvailableExamTypes,
   getExamTypeForEducationLevel,
@@ -188,7 +188,7 @@ export function fixedPages(t, language) {
 export function schoolPage(school, t, language, { listed = true } = {}) {
   const name = getSchoolName(school, language)
   const facts = t('seo.schoolFacts', {
-    type: t(`schoolTypes.${school.school_type}`),
+    type: schoolTypeLabel(school, t),
     level: schoolLevelLabel(school, t),
   })
   const locations = Array.isArray(school.locations) ? school.locations : []
