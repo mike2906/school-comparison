@@ -6,6 +6,9 @@ import {
   getAfterSchoolEvidence,
   getCanonicalAmenityEvidence,
   getCanonicalAmenityFlags,
+  getOptionLabel,
+  getStatusInfo,
+  normalizeLanguageFocus,
   getFilterTags,
   getLanguageFocusPairs,
   getLocationDisplayEvidence,
@@ -262,4 +265,31 @@ test('getLanguageFocusPairs computes once per school object', () => {
   // A reloaded list is new objects, so it is read afresh.
   assert.notEqual(getLanguageFocusPairs({ ...school }), first)
   assert.equal(getLanguageFocusPairs(null).size, 0)
+})
+
+const fakeT = (key) => (key === 'advancedFilters.options.montessori' ? 'Монтесори' : key.startsWith('schoolCard.status.') ? `label:${key.split('.').pop()}` : key)
+
+test('getStatusInfo maps known statuses to key, hex colour and label', () => {
+  assert.deepEqual(getStatusInfo({ admission_info: { status: 'accepting' } }, fakeT), {
+    key: 'accepting', color: '#10b981', label: 'label:accepting',
+  })
+  assert.equal(getStatusInfo({ admission_info: { status: 'full' } }, fakeT).color, '#ef4444')
+  assert.equal(getStatusInfo({ admission_info: {} }, fakeT), null)
+  assert.equal(getStatusInfo({}, fakeT), null)
+})
+
+test('getOptionLabel prefers the translation and sentence-cases the fallback', () => {
+  assert.equal(getOptionLabel('montessori', fakeT), 'Монтесори')
+  assert.equal(getOptionLabel('bilingual_program', fakeT), 'Bilingual program')
+  assert.equal(getOptionLabel('', fakeT), '')
+  assert.equal(getOptionLabel(null, fakeT), '')
+})
+
+test('normalizeLanguageFocus accepts strings, objects and a single value', () => {
+  assert.deepEqual(normalizeLanguageFocus(['english:intensive', { language: 'german', level: 'basic' }, null, { level: 'x' }]), [
+    { language: 'english', level: 'intensive' },
+    { language: 'german', level: 'basic' },
+  ])
+  assert.deepEqual(normalizeLanguageFocus('french'), [{ language: 'french', level: undefined }])
+  assert.deepEqual(normalizeLanguageFocus(undefined), [])
 })

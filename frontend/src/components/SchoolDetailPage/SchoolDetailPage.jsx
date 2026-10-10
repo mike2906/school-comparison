@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import Layout from '../Layout/Layout'
 import { fetchSchool, fetchExamAverages } from '../../api/schools'
 import { getSchoolName, getAddress, getSummary } from '../../utils/i18n'
-import { normalizeSchool } from '../../utils/schoolAttributes'
+import { getOptionLabel, getStatusInfo, normalizeLanguageFocus, normalizeSchool } from '../../utils/schoolAttributes'
 import { getLastSearchUrl } from '../../utils/searchViewState'
 import { examTypeForAgeGroup } from '../../utils/nvo'
 import {
@@ -18,13 +18,10 @@ import { schoolLevelLabel, schoolTypeLabel } from '../../utils/levelLabel'
 import { useCountry } from '../../context/CountryContext'
 import { useCompare } from '../../context/CompareContext'
 import {
-  getStatusInfo,
   parseCoordinate,
   getNvoDetail,
   getAmenityFlags,
   getLanguageLabel,
-  getOptionLabel,
-  normalizeLanguageFocus,
   hexToRgba,
   getExamTypeForEducationLevel,
   getAvailableExamTypes,

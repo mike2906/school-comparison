@@ -11,9 +11,9 @@ import { statedTuition, YEAR_STATUS } from '../../utils/pricing'
 import { getLastAdmittedPoints, getMinNvoScore } from '../../utils/admission'
 import {
   getLanguageLabel,
-  normalizeLanguageFocus,
   getExamTypeLabel,
 } from './helpers'
+import { normalizeLanguageFocus } from '../../utils/schoolAttributes'
 import { getMappableLocations } from './LocationMap'
 import { usesSofiaKindergartenSystem } from '../../utils/admission'
 
