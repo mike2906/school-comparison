@@ -1,5 +1,5 @@
 /**
- * Text checks for scripts/ui-scan.mjs, kept free of the browser so they can be unit tested.
+ * Text checks for scripts/ui-scan.js, kept free of the browser so they can be unit tested.
  * Each check takes the visible strings of one rendered page and returns findings
  * `{ check, text }`. Layout checks need the browser and live in the scan itself.
  */
@@ -41,7 +41,8 @@ export function buildDictionaryIndex(dictionaries) {
 
 /** "ageGroups.Grade 0", "schoolCard.status.full": a translation key shown as text. */
 export function findRawKeys(texts, namespaces) {
-  const pattern = new RegExp(`(?:^|[^\\w.])(?:${namespaces.join('|')})\\.[A-Za-z0-9_]`)
+  // Not after "/", "@" or ".": "https://search.bg" and "info@map.com" are not keys.
+  const pattern = new RegExp(`(?:^|[^\\w./@])(?:${namespaces.join('|')})\\.[A-Za-z0-9_]`)
   return texts.filter(text => pattern.test(text)).map(text => ({ check: 'raw-translation-key', text }))
 }
 
@@ -61,12 +62,12 @@ export function findLev(texts) {
 }
 
 // Grouped thousands ("1 200", "1,200", "1.200") or plain digits, with optional decimals.
-const AMOUNT = String.raw`(?:\d{1,3}(?:[\s  .,]\d{3})+|\d+)(?:[.,]\d{1,2})?`
+const AMOUNT = String.raw`(?:\d{1,3}(?:[\s.,]\d{3})+|\d+)(?:[.,]\d{1,2})?`
 const EURO_AMOUNTS_RE = new RegExp(String.raw`(${AMOUNT}(?:\s*[–-]\s*${AMOUNT})?)\s*(?:€|EUR\b)|€\s*(${AMOUNT}(?:\s*[–-]\s*€?\s*${AMOUNT})?)`, 'gu')
 
 /** Parse "1,200", "1 200", "1.200", "12,50" or "12.50" to a number. */
 export function parseAmount(raw) {
-  const text = raw.replace(/[\s  ]/g, '')
+  const text = raw.replace(/[\s]/g, '')
   // A separator followed by exactly two digits at the end is a decimal mark.
   const decimal = text.match(/^(.*?)[.,](\d{1,2})$/)
   const whole = (decimal ? decimal[1] : text).replace(/[.,]/g, '')
@@ -96,10 +97,16 @@ export function findImplausiblePrices(texts) {
     .map(text => ({ check: 'implausible-price', text }))
 }
 
-/** The API sent a numeric price for this school but the page shows no euro amount. */
+/**
+ * The API sent a numeric euro or lev price for a private school but the page shows no
+ * euro amount. State schools show no fees, and other currencies are shown as they are.
+ */
 export function findMissingPrice(texts, schoolPayload) {
+  if (schoolPayload?.school_type === 'state') return []
   const rows = Array.isArray(schoolPayload?.pricing) ? schoolPayload.pricing : []
-  const priced = rows.some(row => [row.amount, row.amount_min, row.amount_max].some(v => typeof v === 'number'))
+  const priced = rows.some(row =>
+    ['EUR', 'BGN', undefined, null].includes(row.currency) &&
+    [row.amount, row.amount_min, row.amount_max].some(v => v != null && Number.isFinite(Number(v))))
   if (!priced) return []
   if (texts.some(text => euroAmounts(text).length > 0)) return []
   return [{ check: 'price-not-shown', text: `${rows.length} pricing row(s) in the API response, no euro amount on the page` }]

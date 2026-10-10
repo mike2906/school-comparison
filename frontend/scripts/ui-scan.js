@@ -17,7 +17,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { chromium } from 'playwright'
 
-import { buildDictionaryIndex, textFindings } from './ui-scan-checks.mjs'
+import { buildDictionaryIndex, textFindings } from './ui-scan-checks.js'
 
 const SITE = (process.env.SCAN_SITE_URL || 'https://schooldecider.com').replace(/\/+$/, '')
 const API = (process.env.SCAN_API_URL || 'https://api.schooldecider.com').replace(/\/+$/, '')
@@ -149,8 +149,9 @@ async function scanPage(context, page, index) {
   })
   tab.on('response', async response => {
     if (response.status() >= 400) findings.push({ check: 'request-failed', text: `${response.url()} HTTP ${response.status()}` })
-    if (page.schoolId && response.ok() && new URL(response.url()).pathname.endsWith(`/schools/${page.schoolId}`)) {
-      schoolPayload = await response.json().catch(() => null)
+    // The API's answer, not the page's own HTML at the same path.
+    if (page.schoolId && response.ok() && response.url().startsWith(`${API}/schools/${page.schoolId}`)) {
+      schoolPayload = await response.json().catch(() => schoolPayload)
     }
   })
 

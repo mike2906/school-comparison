@@ -8,7 +8,7 @@
     "build": "vite build && node scripts/prerender.js",
     "build:production": "vite build && node scripts/prerender.js --strict",
     "test": "node --test src/**/*.test.js scripts/*.test.js",
-    "scan:ui": "node scripts/ui-scan.mjs",
+    "scan:ui": "node scripts/ui-scan.js",
     "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"
   },

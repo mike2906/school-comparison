@@ -10,7 +10,7 @@ import {
   findMissingPrice,
   findRawKeys,
   findWrongLanguage,
-} from './ui-scan-checks.mjs'
+} from './ui-scan-checks.js'
 
 const index = buildDictionaryIndex({
   bg: { ageGroups: { first: 'Първа група' }, pricing: { title: 'Такси', currency: 'EUR' } },
@@ -55,4 +55,18 @@ test('findMissingPrice flags a priced school whose page shows no euro amount', (
 test('findWrongLanguage flags the other language’s UI strings, never shared or short ones', () => {
   assert.deepEqual(findWrongLanguage(['First group', 'Такси', 'EUR'], 'bg', index.foreignStrings).map(f => f.text), ['First group'])
   assert.deepEqual(findWrongLanguage(['Първа група', 'Fees'], 'en', index.foreignStrings).map(f => f.text), ['Първа група'])
+})
+
+test('findMissingPrice skips state schools and prices in other currencies', () => {
+  assert.equal(findMissingPrice(['Fees'], { school_type: 'state', pricing: [{ amount: 900, currency: 'EUR' }] }).length, 0)
+  assert.equal(findMissingPrice(['Fees'], { pricing: [{ amount: 900, currency: 'USD' }] }).length, 0)
+  assert.equal(findMissingPrice(['Fees'], { pricing: [{ amount: '900.00', currency: 'BGN' }] }).length, 1)
+})
+
+test('findRawKeys ignores domains and e-mail addresses', () => {
+  assert.deepEqual(findRawKeys(['https://search.bg', 'info@map.com'], index.namespaces), [])
+})
+
+test('euroAmounts reads the non-breaking spaces Intl uses in bg-BG', () => {
+  assert.deepEqual(euroAmounts(new Intl.NumberFormat('bg-BG', { style: 'currency', currency: 'EUR' }).format(12345.5)), [12345.5])
 })

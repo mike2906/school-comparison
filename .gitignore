@@ -89,5 +89,5 @@ infra/.terraform/
 *.tfvars
 *.tfplan
 
-# UI scan output (frontend/scripts/ui-scan.mjs)
+# UI scan output (frontend/scripts/ui-scan.js)
 frontend/ui-scan-report/

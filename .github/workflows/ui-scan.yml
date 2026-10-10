@@ -4,7 +4,7 @@ name: UI scan
 # phone width and reports raw translation keys, leaked NaN/undefined, overflowing text,
 # lev or implausible prices, wrong-language labels, console errors and failed requests.
 # Read-only. GitHub emails the repository owner when a scheduled run finds something;
-# the report and screenshots are attached to the run. Script: frontend/scripts/ui-scan.mjs
+# the report and screenshots are attached to the run. Script: frontend/scripts/ui-scan.js
 on:
   schedule:
     - cron: "17 5 * * 1"
