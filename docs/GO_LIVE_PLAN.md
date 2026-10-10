@@ -2016,6 +2016,17 @@ the session scratchpad only.
       anything else stays as written. A plan name that writes out a wider overlapping
       range widens the band, so 171's "PK–7: …" row reads "Preschool to grade 7" instead
       of sitting under "Preschool". The compare page's per-row labels use the same code.
+- [x] **UF48 Headline tuition shows another group's fee, or misses one with no stored
+      period (site review 2026-10-10, items 2 and 3).** The search card for a parent who
+      picked "Third group" showed a kindergarten's first- and second-group fees, and 517's
+      headline read €7,000 because its grade 5 row (€7,810, "ГОДИШНА ТАКСА") has no stored
+      period. Computed, not stored (`src/utils/priceRows.js`): a row's period is the stored
+      one, else the one its own name states (годишна / месечна / срок / семестър, never
+      two); a row's age groups are read from its age group and plan name (kindergarten
+      group ordinals, ясла, ПК/ПГ, grade ranges). The search card headline and the price sort
+      use only the chosen group's rows plus rows naming no group, and show no price when the
+      school lists tuition only for other groups. Not fixed here: the validator's period fill
+      still misses table-heading periods like 517's (the root cause, ~125 rows).
 
 ## Phase 3 — Go live
 

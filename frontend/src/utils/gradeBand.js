@@ -83,6 +83,19 @@ export function gradeRangeInText(text) {
   return found
 }
 
+/**
+ * The grades a price row is for: its age group, widened by an overlapping grade range its
+ * plan name writes out (171's "PK–7: full payment" filed under "ПК" covers PK to grade 7).
+ * Null when the age group names no grades.
+ */
+export function rowGradeBand(price) {
+  const named = gradeRangeInText(price?.plan_name)
+  const band = parseGradeBand(price?.age_group)
+  if (!band) return null
+  if (!named || named.from > band.to + 1 || named.to < band.from - 1) return band
+  return { from: Math.min(band.from, named.from), to: Math.max(band.to, named.to) }
+}
+
 /** A grade band in the UI language: "Preschool", "Grade 5", "Grades 8–12", "Preschool to grade 7". */
 export function gradeBandLabel({ from, to }, t) {
   if (from === 0 && to === 0) return t('pricing.grades.preschool')
