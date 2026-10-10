@@ -265,28 +265,61 @@ test('formatPriceLabel shows BGN rows in euro and falls back to price on request
   assert.equal(formatPriceLabel({ currency: 'EUR' }, 'en-GB', t), 'pricing.priceOnRequest')
 })
 
-test('priceAgeGroupLabel: known key translated, website text as written, never a raw key', () => {
-  const t = (key) => (key === 'ageGroups.preschool' ? 'Pre-school' : key)
-  assert.equal(priceAgeGroupLabel({ age_group: 'preschool' }, t), 'Pre-school')
-  assert.equal(priceAgeGroupLabel({ age_group: 'Grade 1' }, t), 'Grade 1')
-  assert.equal(priceAgeGroupLabel({ age_group: 'Grade 0', plan_name: 'Grade 0 / Plan 1' }, t), null)
-  assert.equal(priceAgeGroupLabel({ age_group: 'Grade 1', plan_name: 'Grade 10 tuition' }, t), 'Grade 1')
-  assert.equal(priceAgeGroupLabel({ age_group: 'grade 2 - 4', plan_name: 'Grade 2 - 4 / Plan 1' }, t), null)
-  assert.equal(priceAgeGroupLabel({ age_group: ' ' }, t), null)
-  assert.equal(priceAgeGroupLabel({}, t), null)
+// A `t` that knows the grade labels and one ageGroups key, and echoes any other key.
+const EN = {
+  'ageGroups.preschool': 'Pre-school',
+  'pricing.grades.preschool': 'Preschool',
+  'pricing.grades.preschoolTo': 'Preschool to grade {{to}}',
+  'pricing.grades.one': 'Grade {{n}}',
+  'pricing.grades.range': 'Grades {{from}}–{{to}}',
+}
+const tEn = (key, vars = {}) =>
+  key in EN ? EN[key].replace(/\{\{(\w+)\}\}/g, (_, name) => String(vars[name])) : key
+
+test('priceAgeGroupLabel: known key translated, grades as our label, other text as written', () => {
+  assert.equal(priceAgeGroupLabel({ age_group: 'preschool' }, tEn), 'Pre-school')
+  assert.equal(priceAgeGroupLabel({ age_group: 'ПК' }, tEn), 'Preschool')
+  assert.equal(priceAgeGroupLabel({ age_group: 'VIII - XII клас' }, tEn), 'Grades 8–12')
+  assert.equal(priceAgeGroupLabel({ age_group: 'Grade 1', plan_name: 'Grade 10 tuition' }, tEn), 'Grade 1')
+  assert.equal(priceAgeGroupLabel({ age_group: 'Детска градина' }, tEn), 'Детска градина')
+  assert.equal(priceAgeGroupLabel({ age_group: 'Grade 0', plan_name: 'Grade 0 / Plan 1' }, tEn), null)
+  assert.equal(priceAgeGroupLabel({ age_group: 'grade 2 - 4', plan_name: 'Grade 2 - 4 / Plan 1' }, tEn), null)
+  assert.equal(priceAgeGroupLabel({ age_group: ' ' }, tEn), null)
+  assert.equal(priceAgeGroupLabel({}, tEn), null)
+})
+
+test('priceAgeGroupLabel: a plan name naming the same grades is not repeated, a wider one widens', () => {
+  assert.equal(priceAgeGroupLabel({ age_group: 'VIII - XII клас', plan_name: '8–12: full payment' }, tEn), null)
+  assert.equal(
+    priceAgeGroupLabel({ age_group: 'ПК', plan_name: 'PK–7: full payment, enrolment after 20.02.2026' }, tEn),
+    'Preschool to grade 7',
+  )
 })
 
 test('groupRowsByAgeGroup: one band per age group, in page order, unnamed rows first', () => {
-  const t = (key) => (key === 'ageGroups.preschool' ? 'Pre-school' : key)
   const rows = [
     row({ id: 1, age_group: 'ПК' }),
     row({ id: 2, age_group: 'VIII - XII клас' }),
     row({ id: 3, age_group: 'пк ' }),
     row({ id: 4, age_group: null }),
+    row({ id: 5, age_group: 'Детска градина' }),
   ]
-  const bands = groupRowsByAgeGroup(rows, t)
-  assert.deepEqual(bands.map(band => band.label), [null, 'ПК', 'VIII - XII клас'])
-  assert.deepEqual(bands.map(band => band.rows.map(r => r.id)), [[4], [1, 3], [2]])
+  const bands = groupRowsByAgeGroup(rows, tEn)
+  assert.deepEqual(bands.map(band => band.label), [null, 'Preschool', 'Grades 8–12', 'Детска градина'])
+  assert.deepEqual(bands.map(band => band.rows.map(r => r.id)), [[4], [1, 3], [2], [5]])
+})
+
+test('groupRowsByAgeGroup: a row whose plan name covers more grades is not hidden under the narrower band', () => {
+  // 171: the PK–7 fee is filed under "ПК".
+  const rows = [
+    row({ id: 2896, age_group: 'ПК', plan_name: 'Full payment with Christmas discount' }),
+    row({ id: 2897, age_group: 'ПК', plan_name: 'PK–7: full payment, enrolment after 20.02.2026' }),
+    row({ id: 2900, age_group: 'VIII - XII клас', plan_name: '8–12: full payment' }),
+  ]
+  assert.deepEqual(
+    groupRowsByAgeGroup(rows, tEn).map(band => [band.label, band.rows.map(r => r.id)]),
+    [['Preschool', [2896]], ['Preschool to grade 7', [2897]], ['Grades 8–12', [2900]]],
+  )
 })
 
 test('groupRowsByAgeGroup: fewer than two age groups is not split', () => {
@@ -297,7 +330,6 @@ test('groupRowsByAgeGroup: fewer than two age groups is not split', () => {
 })
 
 test('groupRowsByAgeGroup: a known age-group key is shown translated', () => {
-  const t = (key) => (key === 'ageGroups.preschool' ? 'Pre-school' : key)
-  const bands = groupRowsByAgeGroup([row({ id: 1, age_group: 'preschool' }), row({ id: 2, age_group: 'Grade 1' })], t)
+  const bands = groupRowsByAgeGroup([row({ id: 1, age_group: 'preschool' }), row({ id: 2, age_group: 'Grade 1' })], tEn)
   assert.deepEqual(bands.map(band => band.label), ['Pre-school', 'Grade 1'])
 })

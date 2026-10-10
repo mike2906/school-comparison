@@ -1,4 +1,5 @@
 import { intlLocale } from './format.js'
+import { gradeBandLabel, gradeRangeInText, parseGradeBand } from './gradeBand.js'
 /**
  * Academic-year cohort helpers for pricing display.
  *
@@ -183,30 +184,49 @@ export function formatPriceLabel(price, locale, t) {
   return t('pricing.priceOnRequest')
 }
 
-// The age group a row names, as a known `ageGroups` label or as the website wrote it.
+// The grades a row is for: its age group, widened by an overlapping grade range its plan
+// name writes out (171's "PK–7: full payment" filed under "ПК" covers PK to grade 7).
+function rowGradeBand(price) {
+  const band = parseGradeBand(price?.age_group)
+  if (!band) return null
+  const named = gradeRangeInText(price.plan_name)
+  if (!named || named.from > band.to + 1 || named.to < band.from - 1) return band
+  return { from: Math.min(band.from, named.from), to: Math.max(band.to, named.to) }
+}
+
+// The age group a row names in the UI language: a known `ageGroups` key, else the grades
+// it names ("ПК" → "Preschool"), else the website's own words.
 function ageGroupName(price, t) {
   const raw = price?.age_group?.trim()
   if (!raw) return null
   const key = `ageGroups.${raw}`
   const translated = t(key)
-  return translated && translated !== key ? translated : raw
+  if (translated && translated !== key) return translated
+  const band = rowGradeBand(price)
+  return band ? gradeBandLabel(band, t) : raw
 }
 
 /**
  * The age group a pricing row names, or null when there is nothing worth showing.
  *
- * A price row's `age_group` is the text the school's website used ("Grade 1", "5-7 years"),
- * not one of our `ageGroups` keys, so it is shown as written unless it is a known key.
- * Null when the plan name already carries it ("Grade 0 / Plan 1"), to avoid saying it twice.
+ * A price row's `age_group` is the text the school's website used ("ПК", "VIII - XII клас"),
+ * not one of our `ageGroups` keys. A known key or grades we can read are shown as our own
+ * label in the UI language; anything else as written.
+ * Null when the plan name already carries it ("Grade 0 / Plan 1", or "8–12: …" for
+ * grades 8–12), to avoid saying it twice.
  */
 export function priceAgeGroupLabel(price, t) {
   const raw = price?.age_group?.trim()
-  const name = ageGroupName(price, t)
-  if (!name || name !== raw) return name
+  if (!raw) return null
   // Whole-word match, so "Grade 1" is still shown next to a "Grade 10" plan.
   const escaped = raw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   if (new RegExp(`(^|[^\\p{L}\\p{N}])${escaped}($|[^\\p{L}\\p{N}])`, 'iu').test(price.plan_name || '')) return null
-  return raw
+  // A plan name that writes out the same grades says it already, unless it starts at
+  // preschool: "PK"/"ПК" is an abbreviation parents may not know.
+  const band = rowGradeBand(price)
+  const named = gradeRangeInText(price.plan_name)
+  if (band && named && band.from > 0 && band.from === named.from && band.to === named.to) return null
+  return ageGroupName(price, t)
 }
 
 /**

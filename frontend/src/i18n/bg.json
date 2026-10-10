@@ -266,7 +266,13 @@
     "other": "Други такси",
     "sourceLink": "Източник: {{site}}",
     "sourceLinkLabel": "Вижте тези цени на {{site}} (отваря се в нов прозорец)",
-    "checkedOn": "проверено на {{date}}"
+    "checkedOn": "проверено на {{date}}",
+    "grades": {
+      "preschool": "Подготвителна група (ПГ)",
+      "preschoolTo": "От подготвителна група до {{to}} клас",
+      "one": "{{n}} клас",
+      "range": "{{from}}–{{to}} клас"
+    }
   },
   "priceSource": {
     "official": "От училището",
