@@ -413,7 +413,7 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
           </div>
         </div>
 
-        <KeyFacts school={school} examAverages={examAverages} nvoExamType={keyFactsExamType} />
+        <KeyFacts school={school} examAverages={examAverages} nvoExamType={keyFactsExamType} ageGroup={preferredAgeGroup} />
 
         {/* Price is what a private-school parent decides on first. */}
         {hasPricing && <PricingSection pricing={pricing} />}

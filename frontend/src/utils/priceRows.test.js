@@ -12,6 +12,9 @@ test('periodFromLabel: the period a fee name states', () => {
     'Monthly fee': 'monthly',
     'Занималня / Таксата за първи срок': 'term',
     'Такса за семестър': 'semester',
+    'Semi-annual payment': 'semester',
+    'Annual fee': 'yearly',
+    'Такса на срок': 'term',
   }
   for (const [label, period] of Object.entries(cases)) assert.equal(periodFromLabel(label), period, label)
 })
@@ -23,6 +26,10 @@ test('periodFromLabel: ages, one-off payments, two periods or none state no peri
     'Еднократно плащане', // the year's tuition paid at once
     'Годишна такса, платима месечно',
     'Регистрационна такса',
+    'Еднократно плащане при записване в срок до 30.06', // a deadline, not a term
+    'Записване в срок',
+    'Long-term discount',
+    'Отстъпка по случай годишнината на училището',
     '',
     null,
   ]) assert.equal(periodFromLabel(label), null, String(label))
@@ -46,6 +53,19 @@ test('rowAgeGroupKeys: kindergarten groups, grades and stored keys', () => {
   assert.deepEqual(keys('third', null), ['third'])
   assert.deepEqual(keys(null, 'Група 3-6 години'), [])
   assert.deepEqual(keys(null, 'Full-day Program'), [])
+  // A range of groups includes the ones between.
+  assert.deepEqual(keys(null, 'Първа - трета група'), ['first', 'second', 'third'])
+  assert.deepEqual(keys(null, '1-3 група'), ['first', 'second', 'third'])
+  // The preschool year by its official names.
+  assert.deepEqual(keys('Предучилищна група', null), ['preschool'])
+  assert.deepEqual(keys(null, 'Такса ПГ'), ['preschool'])
+  // "Ясла" in the name of a place that is also a kindergarten names no one group.
+  assert.deepEqual(keys('ДГ и ясла „Звездица“', 'Целодневна'), [])
+  assert.deepEqual(keys('Детска ясла и градина', null), [])
+  assert.deepEqual(keys('Частна Детска Ясла ,,Йор Кидс“', null), ['nursery'])
+  // A count of groups is not a group.
+  assert.deepEqual(keys(null, '2 групи по 12 деца'), [])
+  assert.deepEqual(keys(null, 'Програма за 3 групи'), [])
 })
 
 test('rowsForAgeGroup: only the chosen group, plus rows naming none', () => {
