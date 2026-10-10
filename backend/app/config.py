@@ -15,9 +15,6 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/sofia_schools"
     database_echo: bool = False
 
-    # Redis
-    REDIS_URL: str = "redis://localhost:6379/0"
-
     # OpenRouter (for AI features)
     openrouter_api_key: str = ""
 

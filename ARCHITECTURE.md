@@ -41,8 +41,8 @@ generated text is not evidence of school quality. Official NVO import is indepen
   Explicit projections keep flexible inputs out of the public API by default.
 - Locations use latitude/longitude floats without PostGIS. GeoJSON comes first, with guarded
   Nominatim fallback; area centroids are not street-level evidence.
-- One PostgreSQL API and a static frontend suit the city-scale workload. Redis/Celery support
-  offline work rather than production browsing.
+- One PostgreSQL API and a static frontend suit the city-scale workload. The scraping
+  pipeline is an offline CLI, not part of production browsing.
 - Withholding uncertain values favors correctness over recall. Some comparisons therefore
   have sparse data rather than inferred prices or facilities.
 
