@@ -269,6 +269,8 @@ test('priceAgeGroupLabel: known key translated, website text as written, never a
   assert.equal(priceAgeGroupLabel({ age_group: 'preschool' }, t), 'Pre-school')
   assert.equal(priceAgeGroupLabel({ age_group: 'Grade 1' }, t), 'Grade 1')
   assert.equal(priceAgeGroupLabel({ age_group: 'Grade 0', plan_name: 'Grade 0 / Plan 1' }, t), null)
+  assert.equal(priceAgeGroupLabel({ age_group: 'Grade 1', plan_name: 'Grade 10 tuition' }, t), 'Grade 1')
+  assert.equal(priceAgeGroupLabel({ age_group: 'grade 2 - 4', plan_name: 'Grade 2 - 4 / Plan 1' }, t), null)
   assert.equal(priceAgeGroupLabel({ age_group: ' ' }, t), null)
   assert.equal(priceAgeGroupLabel({}, t), null)
 })

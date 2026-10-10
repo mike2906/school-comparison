@@ -982,7 +982,7 @@ function ComparePage() {
                     <div key={price.id} className="space-y-1">
                       <div className="text-sm font-medium text-neutral-900">
                         {t(`pricing.${price.category}`)}
-                        {priceAgeGroupLabel(price, t) ? ` • ${priceAgeGroupLabel(price, t)}` : ''}
+                        {[priceAgeGroupLabel(price, t)].filter(Boolean).map(label => ` • ${label}`)}
                         {price.plan_name ? ` • ${price.plan_name}` : ''}
                         {!group.academicYear && price.academic_year ? ` • ${price.academic_year}` : ''}
                       </div>

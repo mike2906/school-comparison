@@ -196,7 +196,9 @@ export function priceAgeGroupLabel(price, t) {
   const key = `ageGroups.${raw}`
   const translated = t(key)
   if (translated && translated !== key) return translated
-  if (price.plan_name?.toLowerCase().includes(raw.toLowerCase())) return null
+  // Whole-word match, so "Grade 1" is still shown next to a "Grade 10" plan.
+  const escaped = raw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  if (new RegExp(`(^|[^\\p{L}\\p{N}])${escaped}($|[^\\p{L}\\p{N}])`, 'iu').test(price.plan_name || '')) return null
   return raw
 }
 
