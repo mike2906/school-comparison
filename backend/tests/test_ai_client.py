@@ -105,3 +105,32 @@ class TestCostEstimates:
         assert total == pytest.approx(1.085)
 
 
+def test_create_agent_uses_native_openrouter_exact_usage_settings(monkeypatch):
+    from app.ai import client as ai_client
+
+    captured = {}
+
+    class DummyProvider:
+        def __init__(self, *, api_key):
+            captured["api_key"] = api_key
+
+    class DummyModel:
+        def __init__(self, model_name, *, provider):
+            captured["model_name"] = model_name
+            captured["provider"] = provider
+
+    class DummyAgent:
+        def __init__(self, **kwargs):
+            captured["agent_kwargs"] = kwargs
+
+    monkeypatch.setattr(ai_client, "OpenRouterProvider", DummyProvider)
+    monkeypatch.setattr(ai_client, "OpenRouterModel", DummyModel)
+    monkeypatch.setattr(ai_client, "Agent", DummyAgent)
+
+    ai_client.create_agent("cheap", "system", dict)
+
+    assert captured["model_name"] == "google/gemini-2.5-flash-lite"
+    assert captured["api_key"] == "test-key"
+    assert captured["agent_kwargs"]["model_settings"] == {
+        "openrouter_usage": {"include": True}
+    }
