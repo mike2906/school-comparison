@@ -46,7 +46,7 @@ import {
   getTrendInfo,
   getTrendTooltip,
 } from '../../utils/nvoDisplay'
-import { displayPrice, groupPricingByAcademicYear, statedTuition, tuitionSortValue, YEAR_STATUS } from '../../utils/pricing'
+import { formatCurrency, formatPriceLabel, groupPricingByAcademicYear, statedTuition, tuitionSortValue, YEAR_STATUS } from '../../utils/pricing'
 
 const SOURCE_BADGE_STYLES = {
   official: 'bg-emerald-50 text-emerald-700',
@@ -92,32 +92,6 @@ function formatDate(value, locale) {
     month: 'short',
     day: 'numeric',
   }).format(date)
-}
-
-function formatCurrency(amount, locale, currency = 'EUR') {
-  if (amount == null || Number.isNaN(amount)) return null
-  return new Intl.NumberFormat(locale, {
-    style: 'currency',
-    currency,
-    maximumFractionDigits: 0,
-  }).format(amount)
-}
-
-function formatPriceLabel(price, locale, t) {
-  const format = (value) => {
-    if (value == null) return null
-    const shown = displayPrice(value, price.currency)
-    return formatCurrency(shown.value, locale, shown.currency)
-  }
-  const min = format(price.amount_min)
-  const max = format(price.amount_max)
-  const exact = format(price.amount)
-
-  if (min && max) return `${min}–${max}`
-  if (min) return min
-  if (max) return max
-  if (exact) return exact
-  return t('pricing.priceOnRequest')
 }
 
 const PRESCHOOL_LEVELS = new Set(['nursery', 'kindergarten'])

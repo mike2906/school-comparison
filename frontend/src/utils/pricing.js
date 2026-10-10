@@ -152,6 +152,34 @@ export function displayPrice(value, currency) {
   return { value: value == null ? null : Number(value), currency: currency || 'EUR' }
 }
 
+/** An amount as currency text in the given locale, e.g. "€1,200"; null for no amount. */
+export function formatCurrency(amount, locale, currency = 'EUR') {
+  if (amount == null || Number.isNaN(amount)) return null
+  return new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency,
+    maximumFractionDigits: 0,
+  }).format(amount)
+}
+
+/** One pricing row's amount or range, shown in euro like every other price surface. */
+export function formatPriceLabel(price, locale, t) {
+  const format = (value) => {
+    if (value == null) return null
+    const shown = displayPrice(value, price.currency)
+    return formatCurrency(shown.value, locale, shown.currency)
+  }
+  const min = format(price.amount_min)
+  const max = format(price.amount_max)
+  const exact = format(price.amount)
+
+  if (min && max) return `${min}–${max}`
+  if (min) return min
+  if (max) return max
+  if (exact) return exact
+  return t('pricing.priceOnRequest')
+}
+
 /**
  * The tuition a school states for its headline cohort, in the period it states it in.
  *
