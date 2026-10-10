@@ -38,6 +38,7 @@ from app.schemas.extraction import (
     ServicesExtractionOutput,
     SummarySourceExtractionOutput,
 )
+from app.scrapers.llm_record import record_answer
 from app.scrapers.price_evidence import (
     PriceRow,
     label_is_another_institutions,
@@ -600,6 +601,17 @@ async def _run_typed_agent(
                 )
         llm_stats.model_retries += retries_state["count"]
         parsed = _parse_agent_output(result, result_type)
+        record_answer(
+            settings.extraction_llm_record_dir,
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            result_type=result_type,
+            tier=tier,
+            model=get_model(tier),
+            temperature=settings.extraction_temperature,
+            parsed=parsed,
+            school_id=school_id,
+        )
         input_tokens, output_tokens = helpers._get_usage(result)
         token_cost_usd = _extract_openrouter_cost_usd(result)
         return parsed, input_tokens, output_tokens, token_cost_usd

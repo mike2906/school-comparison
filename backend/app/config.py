@@ -61,6 +61,9 @@ class Settings(BaseSettings):
     extraction_max_content_chars: int = 15000
     extraction_general_info_min_quality_score: int = 4
     extraction_output_retries: int = 2
+    # When set, every successful extraction LLM answer is saved under this directory
+    # (app/scrapers/llm_record.py) so later runs can be compared without new calls.
+    extraction_llm_record_dir: str = ""
     extraction_temperature: float = 0.0
     # Optional OpenRouter model routing controls.
     # Comma-separated list of fallback model ids, e.g. "openai/gpt-4o-mini,anthropic/claude-3.5-haiku".
