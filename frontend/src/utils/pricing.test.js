@@ -12,6 +12,7 @@ import {
   displayPrice,
   statedTuition,
   tuitionSortValue,
+  priceAgeGroupLabel,
 } from './pricing.js'
 
 const row = (overrides = {}) => ({
@@ -261,4 +262,15 @@ test('formatPriceLabel shows BGN rows in euro and falls back to price on request
   assert.equal(formatPriceLabel({ amount_min: 391.166, amount_max: 782.332, currency: 'BGN' }, 'en-GB', t), '€200–€400')
   assert.equal(formatPriceLabel({ amount_min: 500, amount_max: 500, currency: 'EUR' }, 'en-GB', t), '€500')
   assert.equal(formatPriceLabel({ currency: 'EUR' }, 'en-GB', t), 'pricing.priceOnRequest')
+})
+
+test('priceAgeGroupLabel: known key translated, website text as written, never a raw key', () => {
+  const t = (key) => (key === 'ageGroups.preschool' ? 'Pre-school' : key)
+  assert.equal(priceAgeGroupLabel({ age_group: 'preschool' }, t), 'Pre-school')
+  assert.equal(priceAgeGroupLabel({ age_group: 'Grade 1' }, t), 'Grade 1')
+  assert.equal(priceAgeGroupLabel({ age_group: 'Grade 0', plan_name: 'Grade 0 / Plan 1' }, t), null)
+  assert.equal(priceAgeGroupLabel({ age_group: 'Grade 1', plan_name: 'Grade 10 tuition' }, t), 'Grade 1')
+  assert.equal(priceAgeGroupLabel({ age_group: 'grade 2 - 4', plan_name: 'Grade 2 - 4 / Plan 1' }, t), null)
+  assert.equal(priceAgeGroupLabel({ age_group: ' ' }, t), null)
+  assert.equal(priceAgeGroupLabel({}, t), null)
 })

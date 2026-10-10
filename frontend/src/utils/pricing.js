@@ -184,6 +184,25 @@ export function formatPriceLabel(price, locale, t) {
 }
 
 /**
+ * The age group a pricing row names, or null when there is nothing worth showing.
+ *
+ * A price row's `age_group` is the text the school's website used ("Grade 1", "5-7 years"),
+ * not one of our `ageGroups` keys, so it is shown as written unless it is a known key.
+ * Null when the plan name already carries it ("Grade 0 / Plan 1"), to avoid saying it twice.
+ */
+export function priceAgeGroupLabel(price, t) {
+  const raw = price?.age_group?.trim()
+  if (!raw) return null
+  const key = `ageGroups.${raw}`
+  const translated = t(key)
+  if (translated && translated !== key) return translated
+  // Whole-word match, so "Grade 1" is still shown next to a "Grade 10" plan.
+  const escaped = raw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  if (new RegExp(`(^|[^\\p{L}\\p{N}])${escaped}($|[^\\p{L}\\p{N}])`, 'iu').test(price.plan_name || '')) return null
+  return raw
+}
+
+/**
  * The tuition a school states for its headline cohort, in the period it states it in.
  *
  * Never annualised: a monthly fee multiplied by 12 overstates the year by up to a fifth
