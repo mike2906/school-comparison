@@ -25,11 +25,25 @@ import {
 import {
   comparisonExamType,
   examGradeLabel,
-  getBenchmarkComparison,
-  getBenchmarkToneClasses,
   getNvoDetail as getSharedNvoDetail,
 } from '../../utils/nvo'
-import { classifyAdmissionRequirement, curatedRequirement, usesSofiaKindergartenSystem } from '../../utils/admission'
+import {
+  curatedRequirement,
+  getAdmissionRequirement,
+  getLastAdmittedPoints,
+  getMinNvoScore,
+  getMinNvoScores,
+  getPointsHistory,
+  usesSofiaKindergartenSystem,
+} from '../../utils/admission'
+import {
+  formatPercent,
+  getBenchmarkTooltip,
+  getCombinedBenchmark,
+  getNvoValueStyle,
+  getTrendInfo,
+  getTrendTooltip,
+} from '../../utils/nvoDisplay'
 import { displayPrice, groupPricingByAcademicYear, statedTuition, tuitionSortValue, YEAR_STATUS } from '../../utils/pricing'
 
 const SOURCE_BADGE_STYLES = {
@@ -193,61 +207,6 @@ function getStatusInfo(school, t) {
   return null
 }
 
-function getAdmissionRequirement(rawRequirement, t) {
-  const requirement = classifyAdmissionRequirement(rawRequirement)
-  if (!requirement) return null
-  if (requirement.kind === 'interview') {
-    return t('schoolCard.admissions.interviewRequired')
-  }
-  if (requirement.kind === 'test') {
-    return t('schoolCard.admissions.testRequired')
-  }
-  if (requirement.kind === 'none') {
-    return t('schoolCard.admissions.noEntranceExam')
-  }
-  return requirement.text
-}
-
-function getLastAdmittedPoints(admissionInfo, ageGroup) {
-  const thresholds = admissionInfo?.historical_thresholds || []
-  if (thresholds.length === 0) return null
-
-  const relevant = ageGroup
-    ? thresholds.filter(item => item.age_group === ageGroup)
-    : thresholds
-
-  if (relevant.length === 0) return null
-
-  const latest = relevant.reduce((acc, item) => (item.year > acc.year ? item : acc), relevant[0])
-  const rounds = latest.rounds || []
-  if (rounds.length === 0) return null
-
-  const lastRound = rounds.reduce((acc, item) => (item.round > acc.round ? item : acc), rounds[0])
-
-  return {
-    points: lastRound.last_admitted_points,
-    year: latest.year,
-  }
-}
-
-function getPointsHistory(admissionInfo, ageGroup) {
-  const thresholds = admissionInfo?.historical_thresholds || []
-  if (thresholds.length === 0) return []
-
-  const relevant = ageGroup
-    ? thresholds.filter(item => item.age_group === ageGroup)
-    : thresholds
-
-  return relevant
-    .map(item => {
-      const rounds = item.rounds || []
-      const lastRound = rounds.reduce((acc, round) => (round.round > acc.round ? round : acc), rounds[0])
-      return lastRound ? { year: item.year, points: lastRound.last_admitted_points } : null
-    })
-    .filter(Boolean)
-    .sort((a, b) => b.year - a.year)
-}
-
 function getLocationAgeGroups(location) {
   if (!location) return []
   if (Array.isArray(location.age_groups)) return location.age_groups.filter(Boolean)
@@ -269,128 +228,6 @@ function getPrimaryShiftInfo(school) {
     if (match) return match
   }
   return primaryLocation.age_group_shifts[0] || null
-}
-
-function getMinNvoScore(admissionInfo) {
-  const scores = admissionInfo?.historical_min_scores || []
-  if (scores.length === 0) return null
-  const latest = scores.reduce((acc, item) => (item.year > acc.year ? item : acc), scores[0])
-  return {
-    score: latest.min_score,
-    year: latest.year,
-  }
-}
-
-function getMinNvoScores(admissionInfo) {
-  const scores = admissionInfo?.historical_min_scores || []
-  return scores
-    .map(item => ({ year: item.year, score: item.min_score }))
-    .sort((a, b) => b.year - a.year)
-}
-
-function formatPercent(value, decimals = 1) {
-  if (value == null || Number.isNaN(value)) return null
-  return Number(value).toFixed(decimals)
-}
-
-function getPerformanceStyle(value) {
-  if (value == null) return { text: 'text-neutral-600' }
-  if (value >= 75) return { text: 'text-emerald-500' }
-  if (value >= 60) return { text: 'text-amber-500' }
-  return { text: 'text-red-500' }
-}
-
-// Combined (Bulgarian + maths) result against the Sofia schools' average for the same exam and
-// year, with the same ±5 pp tolerance as the detail page, so the colours agree.
-function getCombinedBenchmark(nvoDetail, year, value, examAverages) {
-  const national = examAverages?.by_year?.[nvoDetail?.examType]?.[String(year)]
-  if (value == null || national?.math == null || national?.bulgarian == null) return null
-  const nationalValue = (Number(national.math) + Number(national.bulgarian)) / 2
-  const diff = value - nationalValue
-  const tone = diff >= 5 ? 'above' : diff <= -5 ? 'below' : 'near'
-  return { nationalValue, ...getBenchmarkToneClasses(tone) }
-}
-
-function getNvoValueStyle({ value, examType, year, subjectKey, examAverages }) {
-  const benchmark = getBenchmarkComparison({
-    examType,
-    year,
-    subjectKey,
-    value,
-    examAverages,
-  })
-
-  if (benchmark) {
-    return { text: benchmark.textClass, benchmark }
-  }
-
-  return { text: getPerformanceStyle(value).text, benchmark: null }
-}
-
-function getBenchmarkTooltip(value, benchmark, t) {
-  if (value == null || !benchmark) return null
-
-  const diff = Math.abs(benchmark.diff).toFixed(1)
-  const valueText = formatPercent(value, 1)
-  const benchmarkText = formatPercent(benchmark.benchmarkValue, 1)
-
-  if (benchmark.tone === 'above') {
-    return t('academicPerformance.tooltipBenchmarkAbove', {
-      value: valueText,
-      diff,
-      benchmark: benchmarkText,
-    })
-  }
-  if (benchmark.tone === 'below') {
-    return t('academicPerformance.tooltipBenchmarkBelow', {
-      value: valueText,
-      diff,
-      benchmark: benchmarkText,
-    })
-  }
-
-  return t('academicPerformance.tooltipBenchmarkNear', {
-    value: valueText,
-    diff,
-    benchmark: benchmarkText,
-  })
-}
-
-function getTrendTooltip(latest, average, trend, t) {
-  if (latest == null || average == null || !trend) return null
-
-  const diff = Math.abs(trend.diff).toFixed(1)
-  const latestText = formatPercent(latest, 1)
-  const averageText = formatPercent(average, 1)
-
-  if (trend.arrow === '↑') {
-    return t('academicPerformance.tooltipTrendUp', {
-      latest: latestText,
-      average: averageText,
-      diff,
-    })
-  }
-  if (trend.arrow === '↓') {
-    return t('academicPerformance.tooltipTrendDown', {
-      latest: latestText,
-      average: averageText,
-      diff,
-    })
-  }
-
-  return t('academicPerformance.tooltipTrendFlat', {
-    latest: latestText,
-    average: averageText,
-    diff,
-  })
-}
-
-function getTrendInfo(latest, average) {
-  if (latest == null || average == null) return null
-  const diff = latest - average
-  if (diff >= 2) return { arrow: '↑', className: 'text-emerald-500', diff }
-  if (diff <= -2) return { arrow: '↓', className: 'text-red-500', diff }
-  return { arrow: '→', className: 'text-neutral-400', diff }
 }
 
 function getNvoDetail(school, t, examType) {
@@ -1076,7 +913,7 @@ function ComparePage() {
             t
           )
           return requirement ? (
-            <span className="text-sm text-neutral-700">{requirement}</span>
+            <span className="text-sm text-neutral-700">{requirement.text}</span>
           ) : renderPlaceholder()
         },
         getCompare: (school) => curatedRequirement(school.admission_info, i18n.language) || school.attributes?.entry_requirements || null,

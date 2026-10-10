@@ -8,9 +8,8 @@ import {
 } from '../../utils/keyFacts'
 import { calculateDistance } from '../../utils/distance'
 import { statedTuition, YEAR_STATUS } from '../../utils/pricing'
+import { getLastAdmittedPoints, getMinNvoScore } from '../../utils/admission'
 import {
-  getLastAdmittedPoints,
-  getMinNvoScore,
   getLanguageLabel,
   normalizeLanguageFocus,
   getExamTypeLabel,

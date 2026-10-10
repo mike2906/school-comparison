@@ -80,3 +80,85 @@ export function usesSofiaKindergartenSystem(school) {
     school?.education_level === 'kindergarten' &&
     school?.country_code === 'bg'
 }
+
+const REQUIREMENT_LABELS = {
+  interview: { icon: '📝', key: 'schoolCard.admissions.interviewRequired' },
+  test: { icon: '📋', key: 'schoolCard.admissions.testRequired' },
+  none: { icon: '✅', key: 'schoolCard.admissions.noEntranceExam' },
+}
+
+/**
+ * A parent-facing label for an entry requirement: a translated phrase for the known kinds
+ * (interview, test, none), otherwise the source text as written.
+ */
+export function getAdmissionRequirement(rawRequirement, t) {
+  const requirement = classifyAdmissionRequirement(rawRequirement)
+  if (!requirement) return null
+  const label = REQUIREMENT_LABELS[requirement.kind]
+  if (label) return { kind: requirement.kind, icon: label.icon, text: t(label.key) }
+  return { kind: requirement.kind, icon: 'ℹ️', text: requirement.text }
+}
+
+function latestByYear(items) {
+  return items.reduce((acc, item) => (item.year > acc.year ? item : acc), items[0])
+}
+
+function lastRound(rounds) {
+  const list = rounds || []
+  if (list.length === 0) return null
+  return list.reduce((acc, item) => (item.round > acc.round ? item : acc), list[0])
+}
+
+function thresholdsFor(admissionInfo, ageGroup) {
+  const thresholds = admissionInfo?.historical_thresholds || []
+  return ageGroup ? thresholds.filter(item => item.age_group === ageGroup) : thresholds
+}
+
+/**
+ * State kindergartens: the points of the last child admitted in the final round of the
+ * latest year, for one age group when given.
+ */
+export function getLastAdmittedPoints(admissionInfo, ageGroup) {
+  const relevant = thresholdsFor(admissionInfo, ageGroup)
+  if (relevant.length === 0) return null
+
+  const latest = latestByYear(relevant)
+  const round = lastRound(latest.rounds)
+  if (!round) return null
+
+  return {
+    points: round.last_admitted_points,
+    year: latest.year,
+    round: round.round,
+  }
+}
+
+/** Final-round admission points per year, newest first. */
+export function getPointsHistory(admissionInfo, ageGroup) {
+  return thresholdsFor(admissionInfo, ageGroup)
+    .map(item => {
+      const round = lastRound(item.rounds)
+      return round ? { year: item.year, points: round.last_admitted_points } : null
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.year - a.year)
+}
+
+/** State gymnasiums: the latest year's minimum admission score. */
+export function getMinNvoScore(admissionInfo) {
+  const scores = admissionInfo?.historical_min_scores || []
+  if (scores.length === 0) return null
+  const latest = latestByYear(scores)
+  return {
+    score: latest.min_score,
+    year: latest.year,
+  }
+}
+
+/** Minimum admission scores per year, newest first. */
+export function getMinNvoScores(admissionInfo) {
+  const scores = admissionInfo?.historical_min_scores || []
+  return scores
+    .map(item => ({ year: item.year, score: item.min_score }))
+    .sort((a, b) => b.year - a.year)
+}

@@ -7,7 +7,6 @@ import {
   getLatestScoreForExamType as getSharedLatestScoreForExamType,
 } from '../../utils/nvo'
 import { getAdmissionStatusKey, getCanonicalAmenityFlags } from '../../utils/schoolAttributes'
-import { classifyAdmissionRequirement } from '../../utils/admission'
 import { humanizeTag } from '../../utils/tags'
 
 /**
@@ -57,91 +56,6 @@ export function parseCoordinate(value) {
   }
   const parsed = Number(value)
   return Number.isFinite(parsed) ? parsed : null
-}
-
-/**
- * Get last admitted points for state kindergartens
- */
-export function getLastAdmittedPoints(admissionInfo, ageGroup) {
-  const thresholds = admissionInfo?.historical_thresholds || []
-  if (thresholds.length === 0) return null
-
-  const relevant = ageGroup
-    ? thresholds.filter(item => item.age_group === ageGroup)
-    : thresholds
-
-  if (relevant.length === 0) return null
-
-  const latest = relevant.reduce((acc, item) => (item.year > acc.year ? item : acc), relevant[0])
-  const rounds = latest.rounds || []
-  if (rounds.length === 0) return null
-
-  const lastRound = rounds.reduce((acc, item) => (item.round > acc.round ? item : acc), rounds[0])
-
-  return {
-    points: lastRound.last_admitted_points,
-    year: latest.year,
-    round: lastRound.round,
-  }
-}
-
-/**
- * Get minimum NVO score for state gymnasiums
- */
-export function getMinNvoScore(admissionInfo) {
-  const scores = admissionInfo?.historical_min_scores || []
-  if (scores.length === 0) return null
-  const latest = scores.reduce((acc, item) => (item.year > acc.year ? item : acc), scores[0])
-  return {
-    score: latest.min_score,
-    year: latest.year,
-  }
-}
-
-/**
- * Get admission requirement for private schools
- */
-export function getAdmissionRequirement(rawRequirement, t) {
-  const requirement = classifyAdmissionRequirement(rawRequirement)
-  if (!requirement) return null
-  if (requirement.kind === 'interview') {
-    return { icon: '📝', text: t('schoolCard.admissions.interviewRequired') }
-  }
-  if (requirement.kind === 'test') {
-    return { icon: '📋', text: t('schoolCard.admissions.testRequired') }
-  }
-  if (requirement.kind === 'none') {
-    return { icon: '✅', text: t('schoolCard.admissions.noEntranceExam') }
-  }
-  return { icon: 'ℹ️', text: requirement.text }
-}
-
-/**
- * Format percentage value
- */
-export function formatPercent(value, decimals = 1) {
-  if (value == null || Number.isNaN(value)) return null
-  return Number(value).toFixed(decimals)
-}
-
-/**
- * Get performance style based on score
- */
-export function getPerformanceStyle(value) {
-  if (value >= 75) return { text: 'text-emerald-500', bg: 'bg-emerald-500' }
-  if (value >= 60) return { text: 'text-amber-500', bg: 'bg-amber-500' }
-  return { text: 'text-red-500', bg: 'bg-red-500' }
-}
-
-/**
- * Get trend information
- */
-export function getTrendInfo(latest, average) {
-  if (latest == null || average == null) return null
-  const diff = latest - average
-  if (diff >= 2) return { arrow: '↑', className: 'text-emerald-500', diff }
-  if (diff <= -2) return { arrow: '↓', className: 'text-red-500', diff }
-  return { arrow: '→', className: 'text-neutral-400', diff }
 }
 
 /**

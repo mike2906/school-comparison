@@ -9,9 +9,22 @@ import { useCompare } from '../../context/CompareContext'
 import { getSchoolName, getAddress } from '../../utils/i18n'
 import { formatDistance } from '../../utils/distance'
 import { getFocusEmoji } from '../../utils/locationFocus'
-import { getBenchmarkComparison, getNvoDetail as getSharedNvoDetail } from '../../utils/nvo'
+import { getNvoDetail as getSharedNvoDetail } from '../../utils/nvo'
 import { getAdmissionStatusKey, getCanonicalAmenityFlags } from '../../utils/schoolAttributes'
-import { classifyAdmissionRequirement, curatedRequirement, usesSofiaKindergartenSystem } from '../../utils/admission'
+import {
+  curatedRequirement,
+  getAdmissionRequirement,
+  getLastAdmittedPoints,
+  getMinNvoScore,
+  usesSofiaKindergartenSystem,
+} from '../../utils/admission'
+import {
+  formatPercent,
+  getBenchmarkTooltip,
+  getNvoValueStyle,
+  getTrendInfo,
+  getTrendTooltip,
+} from '../../utils/nvoDisplay'
 import {
   selectPricingCohort,
   statedTuition,
@@ -215,146 +228,6 @@ function formatCurrency(amount, locale) {
   return new Intl.NumberFormat(locale, {
     maximumFractionDigits: 0,
   }).format(amount)
-}
-
-function getAdmissionRequirement(rawRequirement, t) {
-  const requirement = classifyAdmissionRequirement(rawRequirement)
-  if (!requirement) return null
-  if (requirement.kind === 'interview') {
-    return { icon: '📝', text: t('schoolCard.admissions.interviewRequired') }
-  }
-  if (requirement.kind === 'test') {
-    return { icon: '📋', text: t('schoolCard.admissions.testRequired') }
-  }
-  if (requirement.kind === 'none') {
-    return { icon: '✅', text: t('schoolCard.admissions.noEntranceExam') }
-  }
-  return { icon: 'ℹ️', text: requirement.text }
-}
-
-function getLastAdmittedPoints(admissionInfo, ageGroup) {
-  const thresholds = admissionInfo?.historical_thresholds || []
-  if (thresholds.length === 0) return null
-
-  const relevant = ageGroup
-    ? thresholds.filter(item => item.age_group === ageGroup)
-    : thresholds
-
-  if (relevant.length === 0) return null
-
-  const latest = relevant.reduce((acc, item) => (item.year > acc.year ? item : acc), relevant[0])
-  const rounds = latest.rounds || []
-  if (rounds.length === 0) return null
-
-  const lastRound = rounds.reduce((acc, item) => (item.round > acc.round ? item : acc), rounds[0])
-
-  return {
-    points: lastRound.last_admitted_points,
-    year: latest.year,
-  }
-}
-
-function getMinNvoScore(admissionInfo) {
-  const scores = admissionInfo?.historical_min_scores || []
-  if (scores.length === 0) return null
-  const latest = scores.reduce((acc, item) => (item.year > acc.year ? item : acc), scores[0])
-  return {
-    score: latest.min_score,
-    year: latest.year,
-  }
-}
-
-function formatPercent(value, decimals = 1) {
-  if (value == null || Number.isNaN(value)) return null
-  return Number(value).toFixed(decimals)
-}
-
-function getPerformanceStyle(value) {
-  if (value >= 75) return { text: 'text-emerald-500' }
-  if (value >= 60) return { text: 'text-amber-500' }
-  return { text: 'text-red-500' }
-}
-
-function getNvoValueStyle({ value, examType, year, subjectKey, examAverages }) {
-  const benchmark = getBenchmarkComparison({
-    examType,
-    year,
-    subjectKey,
-    value,
-    examAverages,
-  })
-
-  if (benchmark) {
-    return { text: benchmark.textClass, benchmark }
-  }
-
-  return { text: getPerformanceStyle(value).text, benchmark: null }
-}
-
-function getBenchmarkTooltip(value, benchmark, t) {
-  if (value == null || !benchmark) return null
-
-  const diff = Math.abs(benchmark.diff).toFixed(1)
-  const valueText = formatPercent(value, 1)
-  const benchmarkText = formatPercent(benchmark.benchmarkValue, 1)
-
-  if (benchmark.tone === 'above') {
-    return t('academicPerformance.tooltipBenchmarkAbove', {
-      value: valueText,
-      diff,
-      benchmark: benchmarkText,
-    })
-  }
-  if (benchmark.tone === 'below') {
-    return t('academicPerformance.tooltipBenchmarkBelow', {
-      value: valueText,
-      diff,
-      benchmark: benchmarkText,
-    })
-  }
-
-  return t('academicPerformance.tooltipBenchmarkNear', {
-    value: valueText,
-    diff,
-    benchmark: benchmarkText,
-  })
-}
-
-function getTrendTooltip(latest, average, trend, t) {
-  if (latest == null || average == null || !trend) return null
-
-  const diff = Math.abs(trend.diff).toFixed(1)
-  const latestText = formatPercent(latest, 1)
-  const averageText = formatPercent(average, 1)
-
-  if (trend.arrow === '↑') {
-    return t('academicPerformance.tooltipTrendUp', {
-      latest: latestText,
-      average: averageText,
-      diff,
-    })
-  }
-  if (trend.arrow === '↓') {
-    return t('academicPerformance.tooltipTrendDown', {
-      latest: latestText,
-      average: averageText,
-      diff,
-    })
-  }
-
-  return t('academicPerformance.tooltipTrendFlat', {
-    latest: latestText,
-    average: averageText,
-    diff,
-  })
-}
-
-function getTrendInfo(latest, average) {
-  if (latest == null || average == null) return null
-  const diff = latest - average
-  if (diff >= 2) return { arrow: '↑', className: 'text-emerald-500', diff }
-  if (diff <= -2) return { arrow: '↓', className: 'text-red-500', diff }
-  return { arrow: '→', className: 'text-neutral-400', diff }
 }
 
 function hexToRgba(hex, alpha) {
