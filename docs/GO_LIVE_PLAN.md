@@ -521,7 +521,9 @@ will need to be repeated.
 
 ## Phase 2 — User-facing correctness bugs
 
-- [x] **P2.1 diff=2 age-group gap.** `app/utils/education.py:15-24`: nursery covers
+- [x] **P2.1 diff=2 age-group gap.** (`app/utils/education.py` and `tests/test_education.py`
+      were deleted as unused in the tech-debt cleanup; the boundaries are now tested on the
+      seed config in `tests/test_country_seed_age_groups.py`.) `app/utils/education.py:15-24`: nursery covers
       diff 0–1, `first` starts at 3, so 2-year-olds get zero results.
       `tests/test_education.py:111-116` asserts the bug. Extend nursery to `max_diff: 2`
       (confirm against kg.sofia.bg group definitions), fix test, mirror in
@@ -1886,7 +1888,7 @@ the session scratchpad only.
       register gives the institution an address none of its locations has (then unchanged:
       1174, 1080); Nominatim pins are exact only for the house number asked for;
       `geocode_locations.py --check-shared-points` (0 pairs after apply). Applied
-      `scripts/geocode_pin_gaps_uf44.py` (dry run `backend/reports/uf44/20260925T104215Z/`,
+      `scripts/geocode_pin_gaps_uf44.py` (deleted once done; see git history) (dry run `backend/reports/uf44/20260925T104215Z/`,
       backup `~/backups/sofia_schools_pre_uf44_20260925_1342.dump`): 42 locations changed.
       Sofia locations without a pin: private 38 → 25, state 8 → 4. 8 wrong name-match pins
       moved to their own address and 2 cleared (1072, 1095); 11 host-building tenants on the
