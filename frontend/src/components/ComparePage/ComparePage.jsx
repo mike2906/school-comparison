@@ -15,11 +15,13 @@ import { compareSchoolNames, getSchoolName, getAddress, getSummary } from '../..
 import { hasAnySchoolSummary } from './summaryVisibility'
 import { getProvenanceSourceKey } from './sourceMetadata'
 import {
-  getAdmissionStatusKey,
   getAfterSchoolEvidence,
   getCanonicalAmenityEvidence,
   getLocationDisplayEvidence,
+  getOptionLabel,
+  getStatusInfo,
   hasDisplayEvidence,
+  normalizeLanguageFocus,
   normalizeSchoolList,
 } from '../../utils/schoolAttributes'
 import {
@@ -157,54 +159,18 @@ function shortenUrl(url) {
   }
 }
 
+const STATUS_BADGE_CLASSES = {
+  accepting: 'bg-emerald-50 text-emerald-700',
+  waitlist: 'bg-amber-50 text-amber-700',
+  full: 'bg-red-50 text-red-700',
+}
+
 function getPrimaryLocation(school) {
   return school.locations?.find(location => location.is_primary) || school.locations?.[0] || null
 }
 
-function normalizeLanguageFocus(languageFocus = []) {
-  const normalized = []
-  const items = Array.isArray(languageFocus) ? languageFocus : [languageFocus]
-  items.forEach((item) => {
-    if (!item) return
-    if (typeof item === 'string') {
-      const [language, level] = item.split(':')
-      normalized.push({ language, level })
-      return
-    }
-    if (typeof item === 'object') {
-      normalized.push({
-        language: item.language,
-        level: item.level,
-      })
-    }
-  })
-  return normalized.filter(item => item.language)
-}
-
 function getLanguageLabel(language, t) {
   return languageLabel(language, t)
-}
-
-function getOptionLabel(option, t) {
-  if (!option) return ''
-  const key = `advancedFilters.options.${option}`
-  const translated = t(key)
-  if (translated !== key) return translated
-  return option.replace(/_/g, ' ').replace(/\b\w/g, char => char.toUpperCase())
-}
-
-function getStatusInfo(school, t) {
-  const statusKey = getAdmissionStatusKey(school.admission_info?.status)
-  if (statusKey === 'accepting') {
-    return { key: 'accepting', label: t('schoolCard.status.accepting'), color: 'bg-emerald-50 text-emerald-700' }
-  }
-  if (statusKey === 'waitlist') {
-    return { key: 'waitlist', label: t('schoolCard.status.waitlist'), color: 'bg-amber-50 text-amber-700' }
-  }
-  if (statusKey === 'full') {
-    return { key: 'full', label: t('schoolCard.status.full'), color: 'bg-red-50 text-red-700' }
-  }
-  return null
 }
 
 function getLocationAgeGroups(location) {
@@ -732,7 +698,7 @@ function ComparePage() {
         getValue: (school) => {
           const status = getStatusInfo(school, t)
           return status ? (
-            <span className={`inline-flex rounded px-2 py-0.5 text-xs font-medium ${status.color}`}>
+            <span className={`inline-flex rounded px-2 py-0.5 text-xs font-medium ${STATUS_BADGE_CLASSES[status.key]}`}>
               {status.label}
             </span>
           ) : renderPlaceholder()

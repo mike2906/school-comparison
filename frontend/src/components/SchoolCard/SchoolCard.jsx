@@ -10,7 +10,7 @@ import { getSchoolName, getAddress } from '../../utils/i18n'
 import { formatDistance } from '../../utils/distance'
 import { getFocusEmoji } from '../../utils/locationFocus'
 import { getNvoDetail as getSharedNvoDetail } from '../../utils/nvo'
-import { getAdmissionStatusKey, getCanonicalAmenityFlags } from '../../utils/schoolAttributes'
+import { getCanonicalAmenityFlags, getOptionLabel, getStatusInfo, normalizeLanguageFocus } from '../../utils/schoolAttributes'
 import {
   curatedRequirement,
   getAdmissionRequirement,
@@ -35,12 +35,6 @@ const typeColors = {
   state: 'bg-teal-700 text-white',
   private: 'bg-violet-600 text-white',
   international: 'bg-blue-700 text-white',
-}
-
-const STATUS_COLORS = {
-  accepting: '#10b981',
-  waitlist: '#f59e0b',
-  full: '#ef4444',
 }
 
 const SHIFT_ICONS = {
@@ -101,48 +95,6 @@ function getLanguageCode(language) {
   if (!language) return ''
   const lower = language.toLowerCase()
   return LANGUAGE_CODES[lower] || lower.slice(0, 2).toUpperCase()
-}
-
-function getOptionLabel(option, t) {
-  if (!option) return ''
-  const key = `advancedFilters.options.${option}`
-  const translated = t(key)
-  if (translated !== key) return translated
-  return option.replace(/_/g, ' ').replace(/\b\w/g, char => char.toUpperCase())
-}
-
-function normalizeLanguageFocus(languageFocus = []) {
-  const normalized = []
-  const items = Array.isArray(languageFocus) ? languageFocus : [languageFocus]
-  items.forEach((item) => {
-    if (!item) return
-    if (typeof item === 'string') {
-      const [language, level] = item.split(':')
-      normalized.push({ language, level })
-      return
-    }
-    if (typeof item === 'object') {
-      normalized.push({
-        language: item.language,
-        level: item.level,
-      })
-    }
-  })
-  return normalized.filter(item => item.language)
-}
-
-function getStatusInfo(school, t) {
-  const statusKey = getAdmissionStatusKey(school.admission_info?.status)
-  if (statusKey === 'accepting') {
-    return { key: 'accepting', color: STATUS_COLORS.accepting, label: t('schoolCard.status.accepting') }
-  }
-  if (statusKey === 'waitlist') {
-    return { key: 'waitlist', color: STATUS_COLORS.waitlist, label: t('schoolCard.status.waitlist') }
-  }
-  if (statusKey === 'full') {
-    return { key: 'full', color: STATUS_COLORS.full, label: t('schoolCard.status.full') }
-  }
-  return null
 }
 
 function getPrimaryFeature(attributes, t) {

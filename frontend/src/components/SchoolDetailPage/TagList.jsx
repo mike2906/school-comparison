@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { splitTagsByLanguage } from '../../utils/tags'
-import { getOptionLabel } from './helpers'
+import { getOptionLabel } from '../../utils/schoolAttributes'
 
 /**
  * Scraped free-text tags. In a non-Bulgarian UI, Bulgarian tags (which are never

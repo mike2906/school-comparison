@@ -6,42 +6,13 @@ import {
   getExamTypeLabel as getSharedExamTypeLabel,
   getLatestScoreForExamType as getSharedLatestScoreForExamType,
 } from '../../utils/nvo'
-import { getAdmissionStatusKey, getCanonicalAmenityFlags } from '../../utils/schoolAttributes'
-import { humanizeTag } from '../../utils/tags'
-
-/**
- * SchoolDetailPage Helper Functions
- * Extracted from SchoolCard.jsx for reuse in detail page
- */
-
-const STATUS_COLORS = {
-  accepting: '#10b981',
-  waitlist: '#f59e0b',
-  full: '#ef4444',
-}
+import { getCanonicalAmenityFlags } from '../../utils/schoolAttributes'
 
 const SOURCE_BADGE_COLORS = {
   official: 'bg-emerald-100 text-emerald-700 border-emerald-300',
   scraped_website: 'bg-blue-100 text-blue-700 border-blue-300',
   forum: 'bg-amber-100 text-amber-700 border-amber-300',
   not_found: 'bg-neutral-100 text-neutral-600 border-neutral-300',
-}
-
-/**
- * Get enrollment/admission status information
- */
-export function getStatusInfo(school, t) {
-  const statusKey = getAdmissionStatusKey(school.admission_info?.status)
-  if (statusKey === 'accepting') {
-    return { key: 'accepting', color: STATUS_COLORS.accepting, label: t('schoolCard.status.accepting') }
-  }
-  if (statusKey === 'waitlist') {
-    return { key: 'waitlist', color: STATUS_COLORS.waitlist, label: t('schoolCard.status.waitlist') }
-  }
-  if (statusKey === 'full') {
-    return { key: 'full', color: STATUS_COLORS.full, label: t('schoolCard.status.full') }
-  }
-  return null
 }
 
 /**
@@ -134,41 +105,6 @@ export function getAmenityFlags(attributes, hasAfterSchool) {
  */
 export function getLanguageLabel(language, t) {
   return languageLabel(language, t)
-}
-
-/**
- * Get option label (generic)
- */
-export function getOptionLabel(option, t) {
-  if (!option) return ''
-  const key = `advancedFilters.options.${option}`
-  const translated = t(key)
-  if (translated !== key) return translated
-  // Free text scraped from a website: tidy it, but never Title-Case a sentence.
-  return humanizeTag(option)
-}
-
-/**
- * Normalize language focus array
- */
-export function normalizeLanguageFocus(languageFocus = []) {
-  const normalized = []
-  const items = Array.isArray(languageFocus) ? languageFocus : [languageFocus]
-  items.forEach((item) => {
-    if (!item) return
-    if (typeof item === 'string') {
-      const [language, level] = item.split(':')
-      normalized.push({ language, level })
-      return
-    }
-    if (typeof item === 'object') {
-      normalized.push({
-        language: item.language,
-        level: item.level,
-      })
-    }
-  })
-  return normalized.filter(item => item.language)
 }
 
 /**

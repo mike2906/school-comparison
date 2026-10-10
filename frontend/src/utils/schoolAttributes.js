@@ -1,4 +1,5 @@
 import { canonicalLanguagePair } from './languages.js'
+import { humanizeTag } from './tags.js'
 /**
  * Resolves the locale-specific view of a school's display attributes.
  *
@@ -197,4 +198,45 @@ export function getLanguageFocusPairs(school) {
 
   if (cacheable) languageFocusPairsBySchool.set(school, pairs)
   return pairs
+}
+
+const STATUS_COLORS = {
+  accepting: '#10b981',
+  waitlist: '#f59e0b',
+  full: '#ef4444',
+}
+
+/** Admission status for display: `{key, color (hex), label}`, or null when unknown. */
+export function getStatusInfo(school, t) {
+  const key = getAdmissionStatusKey(school?.admission_info?.status)
+  if (!key || !STATUS_COLORS[key]) return null
+  return { key, color: STATUS_COLORS[key], label: t(`schoolCard.status.${key}`) }
+}
+
+/** Label for a filter option or scraped tag: the translation if there is one, else tidied text. */
+export function getOptionLabel(option, t) {
+  if (!option) return ''
+  const key = `advancedFilters.options.${option}`
+  const translated = t(key)
+  if (translated !== key) return translated
+  // Free text scraped from a website: tidy it, but never Title-Case a sentence.
+  return humanizeTag(option)
+}
+
+/** `language_focus` as `[{language, level}]`; accepts strings like "english:intensive" or objects. */
+export function normalizeLanguageFocus(languageFocus = []) {
+  const items = Array.isArray(languageFocus) ? languageFocus : [languageFocus]
+  const normalized = []
+  items.forEach((item) => {
+    if (!item) return
+    if (typeof item === 'string') {
+      const [language, level] = item.split(':')
+      normalized.push({ language, level })
+      return
+    }
+    if (typeof item === 'object') {
+      normalized.push({ language: item.language, level: item.level })
+    }
+  })
+  return normalized.filter(item => item.language)
 }
