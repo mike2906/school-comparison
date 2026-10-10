@@ -60,7 +60,7 @@ class BaseSourceAdapter(ABC):
     COUNTRY_CODE: str = "bg"
     CITY: Optional[str] = None  # e.g., "sofia" - None means country-wide
     DESCRIPTION: str = "Base adapter (override in subclass)"
-    RATE_LIMIT: str = "2/m"  # Celery rate limit (e.g., "2/m" = 2 requests per minute)
+    RATE_LIMIT: str = "2/m"  # Informational only; nothing enforces it (e.g., "2/m" = 2 requests per minute)
     SCRAPE_TYPE: Optional[ScrapeType] = None  # Override to set explicit scrape type (REGISTRY or DISCOVERY)
     # If True, existing records are treated as authoritative for core identity/classification
     # fields and this adapter only enriches supplemental fields.

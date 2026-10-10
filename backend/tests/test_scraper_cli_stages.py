@@ -1067,3 +1067,58 @@ async def test_run_summarize_batch_aggregates_usage_for_all_results(db_session):
         "output_tokens": 25,
         "token_cost_usd": pytest.approx(0.005),
     }
+
+
+@pytest.mark.asyncio
+async def test_validate_data_automatic_cohort_includes_summarized_schools(db_session):
+    def _school(name, status):
+        return School(
+            name_i18n={"bg": name},
+            country_code="bg",
+            city="sofia",
+            school_type="private",
+            education_level="primary",
+            scrape_status=status,
+            attributes={"extracted": {"programs": ["Primary"]}},
+        )
+
+    extracted = _school("Извлечено", "extracted")
+    summarized = _school("Обобщено", "summarized")
+    navigated = _school("Навигирано", "navigated")
+    db_session.add_all([extracted, summarized, navigated])
+    await db_session.commit()
+
+    class SessionContext:
+        async def __aenter__(self):
+            return db_session
+
+        async def __aexit__(self, *_args):
+            return False
+
+    settings = SimpleNamespace(validation_batch_concurrency=1, spot_check_sample_size=0)
+    validate = AsyncMock(return_value={"status": "ok"})
+    with (
+        patch("app.config.get_settings", return_value=settings),
+        patch("app.database.async_session_maker", side_effect=lambda: SessionContext()),
+        patch("app.scrapers.validator.validate_school_data", new=validate),
+    ):
+        summary = await scraper_cli._run_validate_data_batch(
+            db_session, country="bg", city="sofia", limit=None
+        )
+
+    validated = {call.kwargs["school_id"] for call in validate.await_args_list}
+    assert validated == {extracted.id, summarized.id}
+    assert summary["validated_school_ids"] == sorted([extracted.id, summarized.id])
+
+
+@pytest.mark.parametrize("extra_args", [[], ["--sync"]])
+def test_run_always_executes_in_process(extra_args):
+    with patch.object(scraper_cli, "_run_sync", new=AsyncMock()) as run_sync:
+        result = CliRunner().invoke(
+            scraper_cli.cli,
+            ["run", "--stage", "nvo", "--city", "sofia", *extra_args],
+        )
+
+    assert result.exit_code == 0, result.output
+    run_sync.assert_awaited_once()
+    assert run_sync.await_args.args[2] == "nvo"

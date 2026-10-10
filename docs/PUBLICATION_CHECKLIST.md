@@ -5,7 +5,7 @@ repository public, deploy a release or modify the existing school database.
 
 ## Prepared in code
 
-- Local PostgreSQL, Redis and SearXNG ports bind to loopback.
+- Local PostgreSQL and SearXNG ports bind to loopback.
 - Demo seeding requires an explicit reset flag and a local database named
   `sofia_schools_demo`; query-string connection overrides are refused.
 - Locked dependency updates remove known fixable advisories and unused AI provider SDKs.
