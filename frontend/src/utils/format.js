@@ -3,7 +3,7 @@ export function intlLocale(language) {
   return String(language || '').startsWith('bg') ? 'bg-BG' : 'en-GB'
 }
 
-/** A plain localised number ("1 200" / "1,200"); null for no value. */
+/** A plain localised number ("12 000" / "12,000"); null for no value. */
 export function formatAmount(value, language, digits = 0) {
   if (value == null || Number.isNaN(value)) return null
   return new Intl.NumberFormat(intlLocale(language), { maximumFractionDigits: digits }).format(value)

@@ -48,11 +48,11 @@ function PricingSection({ pricing }) {
                     <div className="space-y-3">
                       {items.map((price, idx) => {
                         const { currency } = displayPrice(null, price.currency)
-                        const formatAmount = (value) => formatNumber(displayPrice(value, price.currency).value)
+                        const formatShown = (value) => formatNumber(displayPrice(value, price.currency).value)
                         const amountText = price.amount_min != null || price.amount_max != null
-                          ? `${price.amount_min != null ? formatAmount(price.amount_min) : ''}${price.amount_min != null && price.amount_max != null ? '–' : ''}${price.amount_max != null ? formatAmount(price.amount_max) : ''} ${currency}`
+                          ? `${price.amount_min != null ? formatShown(price.amount_min) : ''}${price.amount_min != null && price.amount_max != null ? '–' : ''}${price.amount_max != null ? formatShown(price.amount_max) : ''} ${currency}`
                           : price.amount != null
-                          ? `${formatAmount(price.amount)} ${currency}`
+                          ? `${formatShown(price.amount)} ${currency}`
                           : t('pricing.priceOnRequest')
 
                         return (
