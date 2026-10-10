@@ -25,6 +25,9 @@ from app.schemas.extraction import (
 from app.scrapers import extractor as extractor_module
 from app.services.geocoding.write_gate import OFFICIAL_COORDS_TAG
 
+# Fee pages in these tests name academic years such as 2025/2026; pin the date they are read on.
+pytestmark = pytest.mark.usefixtures("frozen_today")
+
 
 @pytest.fixture
 async def sample_school_for_extraction(db_session):

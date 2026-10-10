@@ -273,16 +273,19 @@ async def test_missing_reports_and_precision_count_against_coverage(db_session):
 
 
 async def test_website_validation_coverage_excludes_registry_only_and_withheld_data(db_session):
-    publishable = await _make_school(
+    # All three carry a current report, so only the registry-only status and the withheld
+    # marker can keep the last two out.
+    report = {"_schema_version": 1, "status": "ok", "issues": []}
+    await _make_school(
         db_session,
         scrape_status="extracted",
         website_url="https://publishable.bg",
-        attributes={"extracted": {"programs": ["STEM"]}},
+        attributes={"extracted": {"programs": ["STEM"]}, "data_validation": report},
     )
     await _make_school(
         db_session,
         scrape_status="no_official_website",
-        attributes={"extracted": {"programs": ["Legacy"]}},
+        attributes={"extracted": {"programs": ["Legacy"]}, "data_validation": report},
     )
     await _make_school(
         db_session,
@@ -291,19 +294,19 @@ async def test_website_validation_coverage_excludes_registry_only_and_withheld_d
         attributes={
             "website_data_withheld": True,
             "extracted": {"programs": ["Stored"]},
+            "data_validation": report,
         },
     )
     await db_session.commit()
 
     metrics = await compute_quality_metrics(db_session, country="bg", city="sofia")
 
-    assert publishable.id is not None
     assert metrics["website_validation_coverage"] == {
-        "eligible": 0,
-        "with_report": 0,
-        "coverage_pct": None,
-        "ok": 0,
-        "ok_pct": None,
+        "eligible": 1,
+        "with_report": 1,
+        "coverage_pct": 100.0,
+        "ok": 1,
+        "ok_pct": 100.0,
         "published_without_report": 0,
     }
 
@@ -558,43 +561,29 @@ async def test_scoreboard_counts_validation_blocked_rows_as_failing_like_the_api
     assert metrics["pricing_rows_failing_gates"]["failing"] == 1
 
 
-async def test_scraped_pricing_never_counts_as_publishable_website_data(db_session):
-    publishable = await _make_school(db_session, scrape_status="extracted", attributes={})
-    withheld = await _make_school(db_session, scrape_status="extracted", attributes={})
-    db_session.add_all(
-        [
-            Pricing(
-                school_id=publishable.id,
-                category=PriceCategory.TUITION,
-                period=PricePeriod.MONTHLY,
-                amount=500,
-                source=PriceSource.SCRAPED_WEBSITE,
-                source_url="https://example.com/fees",
-                pricing_context={"confidence": 0.9},
-            ),
-            Pricing(
-                school_id=withheld.id,
-                category=PriceCategory.TUITION,
-                period=PricePeriod.MONTHLY,
-                amount=500,
-                source=PriceSource.SCRAPED_WEBSITE,
-                source_url=None,
-                pricing_context={"confidence": "0.9"},
-            ),
-        ]
+async def test_scraped_pricing_alone_does_not_make_a_school_eligible_for_validation_coverage(db_session):
+    # A current report and published-status school, so only "has website data" decides.
+    school = await _make_school(
+        db_session,
+        scrape_status="extracted",
+        attributes={"data_validation": {"_schema_version": 1, "status": "ok", "issues": []}},
+    )
+    db_session.add(
+        Pricing(
+            school_id=school.id,
+            category=PriceCategory.TUITION,
+            period=PricePeriod.MONTHLY,
+            amount=500,
+            source=PriceSource.SCRAPED_WEBSITE,
+            source_url="https://example.com/fees",
+            pricing_context={"confidence": 0.9},
+        )
     )
     await db_session.commit()
 
     metrics = await compute_quality_metrics(db_session, country="bg", city="sofia")
 
-    assert metrics["website_validation_coverage"] == {
-        "eligible": 0,
-        "with_report": 0,
-        "coverage_pct": None,
-        "ok": 0,
-        "ok_pct": None,
-        "published_without_report": 0,
-    }
+    assert metrics["website_validation_coverage"]["eligible"] == 0
 
 
 async def test_validation_coverage_tracks_launch_flags_and_public_projection(
