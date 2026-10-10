@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { displayPrice, groupPricingByAcademicYear, YEAR_STATUS } from '../../utils/pricing'
+import { displayPrice, groupPricingByAcademicYear, priceAgeGroupLabel, YEAR_STATUS } from '../../utils/pricing'
 import { groupPricingByCategory, getSourceBadgeColor } from './helpers'
 import { formatAmount } from '../../utils/format'
 
@@ -55,14 +55,16 @@ function PricingSection({ pricing }) {
                           ? `${formatShown(price.amount)} ${currency}`
                           : t('pricing.priceOnRequest')
 
+                        const ageGroupLabel = priceAgeGroupLabel(price, t)
+
                         return (
                           <div key={idx} className="flex items-center justify-between gap-3 p-4 bg-neutral-50 rounded-lg border border-neutral-200">
                             <div className="flex-1 min-w-0">
-                              <div className="font-medium text-neutral-900">
+                              <div className="font-medium text-neutral-900 break-words">
                                 {price.plan_name || t(`pricing.${price.category}`)}
                               </div>
-                              {price.age_group && (
-                                <div className="text-sm text-neutral-500">{t(`ageGroups.${price.age_group}`)}</div>
+                              {ageGroupLabel && (
+                                <div className="text-sm text-neutral-500 break-words">{ageGroupLabel}</div>
                               )}
                             </div>
                             <div className="text-right flex flex-col-reverse items-end sm:flex-row sm:items-center gap-2 sm:gap-3">
