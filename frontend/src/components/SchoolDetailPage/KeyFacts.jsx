@@ -7,7 +7,7 @@ import {
   parseSavedLocation,
 } from '../../utils/keyFacts'
 import { calculateDistance } from '../../utils/distance'
-import { formatKm, intlLocale } from '../../utils/format'
+import { formatAmount, formatKm, intlLocale } from '../../utils/format'
 import { statedTuition, YEAR_STATUS } from '../../utils/pricing'
 import { getLastAdmittedPoints, getMinNvoScore } from '../../utils/admission'
 import {
@@ -53,8 +53,7 @@ function KeyFacts({ school, examAverages, nvoExamType }) {
   const locale = intlLocale(i18n.language)
   const savedLocation = useMemo(readSavedLocation, [])
 
-  const formatNumber = (value, digits = 0) =>
-    new Intl.NumberFormat(locale, { maximumFractionDigits: digits }).format(value)
+  const formatNumber = (value, digits = 0) => formatAmount(value, locale, digits)
 
   const attributes = school.attributes || {}
   const locations = school.locations || []

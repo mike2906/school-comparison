@@ -7,7 +7,7 @@ import { useCountry } from '../../context/CountryContext'
 import { languageLabel } from '../../utils/languages'
 import { useCompare } from '../../context/CompareContext'
 import { getSchoolName, getAddress } from '../../utils/i18n'
-import { formatDistance, intlLocale } from '../../utils/format'
+import { formatAmount, formatDistance, intlLocale } from '../../utils/format'
 import { getFocusEmoji } from '../../utils/locationFocus'
 import { getNvoDetail as getSharedNvoDetail } from '../../utils/nvo'
 import { getCanonicalAmenityFlags, getOptionLabel, getStatusInfo, normalizeLanguageFocus } from '../../utils/schoolAttributes'
@@ -174,13 +174,6 @@ function getPrimaryFeature(attributes, t) {
   }
 
   return null
-}
-
-function formatCurrency(amount, locale) {
-  if (amount == null || Number.isNaN(amount)) return null
-  return new Intl.NumberFormat(locale, {
-    maximumFractionDigits: 0,
-  }).format(amount)
 }
 
 function hexToRgba(hex, alpha) {
@@ -531,9 +524,9 @@ const SchoolCard = memo(function SchoolCard({
       // The fee as the school states it, in euro: never annualised, since schools bill
       // over 9, 10 or 12 months (the detail page and compare show it the same way).
       const tuition = statedTuition(pricing)
-      const price = tuition && (formatCurrency(tuition.min, locale) === formatCurrency(tuition.max, locale)
-        ? formatCurrency(tuition.min, locale)
-        : `${formatCurrency(tuition.min, locale)}–${formatCurrency(tuition.max, locale)}`)
+      const price = tuition && (formatAmount(tuition.min, locale) === formatAmount(tuition.max, locale)
+        ? formatAmount(tuition.min, locale)
+        : `${formatAmount(tuition.min, locale)}–${formatAmount(tuition.max, locale)}`)
       const priceLabel = !tuition
         ? null
         : tuition.period

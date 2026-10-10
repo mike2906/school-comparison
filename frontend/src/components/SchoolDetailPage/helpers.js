@@ -70,16 +70,6 @@ export function getSourceBadgeColor(source) {
 }
 
 /**
- * Format currency amount
- */
-export function formatCurrency(amount, locale) {
-  if (amount == null || Number.isNaN(amount)) return null
-  return new Intl.NumberFormat(locale, {
-    maximumFractionDigits: 0,
-  }).format(amount)
-}
-
-/**
  * Get amenity flags from attributes
  */
 export function getAmenityFlags(attributes, hasAfterSchool) {
