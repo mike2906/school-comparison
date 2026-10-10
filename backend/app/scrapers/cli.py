@@ -4,7 +4,7 @@ from __future__ import annotations
 CLI tool for running scraping pipeline stages.
 
 This provides a convenient interface for testing and debugging the scraping
-pipeline without needing Celery workers.
+pipeline. Every stage runs in this process.
 
 Usage:
     # Run by school name (fuzzy match)
@@ -22,8 +22,8 @@ Usage:
     # Run batch with limit
     uv run python -m app.scrapers.cli run --stage discover --city sofia --limit 10
 
-    # Synchronous mode (no Celery)
-    uv run python -m app.scrapers.cli run --stage all --sync --limit 5
+    # Run every website stage (--sync is accepted for older scripts; runs are always synchronous)
+    uv run python -m app.scrapers.cli run --stage all --limit 5
 
     # Dry run (show what would happen)
     uv run python -m app.scrapers.cli run --stage discover --dry-run
@@ -52,7 +52,6 @@ import datetime
 import logging
 import random
 import re
-import sys
 import time
 from collections import defaultdict
 from contextlib import nullcontext
@@ -792,7 +791,7 @@ async def _promote_curated_identities_command(
     default=None,
     help="Required per-run hard cap before a billable stage may dispatch a provider request",
 )
-@click.option("--sync", is_flag=True, help="Run synchronously (no Celery)")
+@click.option("--sync", is_flag=True, help="No effect; kept so older commands still work. Runs are always synchronous.")
 @click.option("--dry-run", is_flag=True, help="Show what would happen without executing")
 def run(
     school,
@@ -854,35 +853,28 @@ def run(
         console.print(f"  Force validate: {force_validate}")
         console.print(f"  Skip summarize: {skip_summarize}")
         console.print(f"  Provider cost cap: {provider_cost_cap_usd or 'required before execution'}")
-        console.print(f"  Mode: {'sync' if sync else 'celery'}")
         return
 
-    if sync:
-        # Run synchronously
-        asyncio.run(
-            _run_sync(
-                school,
-                school_id,
-                stage,
-                city,
-                country,
-                limit,
-                year,
-                history_years,
-                builtins.list(exam_types),
-                sample_ratio,
-                include_navigated,
-                include_extracted,
-                force_validate,
-                skip_summarize,
-                cohort_ids,
-                provider_cost_cap_usd,
-            )
+    asyncio.run(
+        _run_sync(
+            school,
+            school_id,
+            stage,
+            city,
+            country,
+            limit,
+            year,
+            history_years,
+            builtins.list(exam_types),
+            sample_ratio,
+            include_navigated,
+            include_extracted,
+            force_validate,
+            skip_summarize,
+            cohort_ids,
+            provider_cost_cap_usd,
         )
-    else:
-        # Run via Celery
-        console.print("[yellow]Celery mode not yet implemented. Use --sync for now.[/yellow]")
-        sys.exit(1)
+    )
 
 
 async def _run_sync(
