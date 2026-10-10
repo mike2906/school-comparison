@@ -46,8 +46,9 @@ function isNamespace(leafMap, prefix) {
 // Any quoted string shaped like a key under one of our namespaces: t('a.b'), labelKey: 'a.b',
 // ternaries and lookup tables alike.
 const LITERAL_KEY_RE = /(['"])([A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z0-9_]+)+)\1/g
-// The fixed part of a template key: t(`ageGroups.${group}`) → "ageGroups."
-const TEMPLATE_PREFIX_RE = /\bt\(\s*`([A-Za-z][A-Za-z0-9_.]*\.)\$\{/g
+// The fixed part of a template key, inside t() or stored for later:
+// `ageGroups.${group}` → "ageGroups.", `location.distance${n}km` → "location.distance"
+const TEMPLATE_PREFIX_RE = /`([A-Za-z][A-Za-z0-9_]*\.[A-Za-z0-9_.]*)\$\{/g
 
 const sources = sourceFiles(SRC_DIR).map(file => ({
   file: path.relative(SRC_DIR, file),
@@ -67,10 +68,11 @@ test('every literal translation key in src exists in bg and en', () => {
   assert.deepEqual(missing, [])
 })
 
-test('every template translation key starts with an existing namespace', () => {
+test('every template translation key starts like an existing key', () => {
   const missing = []
   for (const { file, text } of sources) {
     for (const [, prefix] of text.matchAll(TEMPLATE_PREFIX_RE)) {
+      if (!namespaces.has(prefix.split('.')[0])) continue
       for (const lang of LANGUAGES) {
         if (!isNamespace(leafMaps[lang], prefix)) missing.push(`${file}: ${prefix}* (${lang})`)
       }
