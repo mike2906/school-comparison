@@ -282,7 +282,8 @@ test('priceAgeGroupLabel: known key translated, grades as our label, other text 
   assert.equal(priceAgeGroupLabel({ age_group: 'VIII - XII клас' }, tEn), 'Grades 8–12')
   assert.equal(priceAgeGroupLabel({ age_group: 'Grade 1', plan_name: 'Grade 10 tuition' }, tEn), 'Grade 1')
   assert.equal(priceAgeGroupLabel({ age_group: 'Детска градина' }, tEn), 'Детска градина')
-  assert.equal(priceAgeGroupLabel({ age_group: 'Grade 0', plan_name: 'Grade 0 / Plan 1' }, tEn), null)
+  assert.equal(priceAgeGroupLabel({ age_group: 'Grade 0', plan_name: 'Grade 0 / Plan 1' }, tEn), 'Preschool')
+  assert.equal(priceAgeGroupLabel({ age_group: 'preschool', plan_name: 'Preschool fees' }, tEn), 'Pre-school')
   assert.equal(priceAgeGroupLabel({ age_group: 'grade 2 - 4', plan_name: 'Grade 2 - 4 / Plan 1' }, tEn), null)
   assert.equal(priceAgeGroupLabel({ age_group: ' ' }, tEn), null)
   assert.equal(priceAgeGroupLabel({}, tEn), null)
@@ -294,6 +295,11 @@ test('priceAgeGroupLabel: a plan name naming the same grades is not repeated, a 
     priceAgeGroupLabel({ age_group: 'ПК', plan_name: 'PK–7: full payment, enrolment after 20.02.2026' }, tEn),
     'Preschool to grade 7',
   )
+  // ПК in the plan name is still explained, as it is for Latin PK.
+  assert.equal(priceAgeGroupLabel({ age_group: 'ПК', plan_name: 'ПК-4: такса' }, tEn), 'Preschool to grade 4')
+  // An instalment count is not a grade range: the grade stays, unwidened.
+  assert.equal(priceAgeGroupLabel({ age_group: '1 клас', plan_name: 'Вноски 1-2: по 1500' }, tEn), 'Grade 1')
+  assert.equal(priceAgeGroupLabel({ age_group: 'ПК', plan_name: 'Plan 1-2: monthly' }, tEn), 'Preschool')
 })
 
 test('groupRowsByAgeGroup: one band per age group, in page order, unnamed rows first', () => {

@@ -26,6 +26,10 @@ test('parseGradeBand: anything more than grades is not read', () => {
     'Годишна такса за 8. клас за учебната 2027/2028 год',
     '13 клас',
     '7 - 3 клас',
+    '3-6', // ages as likely as grades without a grade word
+    '0-3',
+    '3',
+    'от 3 до 6',
     '',
     null,
   ]) assert.equal(parseGradeBand(text), null, String(text))
@@ -42,6 +46,9 @@ test('gradeRangeInText: a grade range in a plan name, not dates, times or ages',
     'Група 3-6 години',
     'Целодневно 8:00-12:00',
     'Plan 1-2',
+    'Plan 1-2: monthly',
+    'Вноски 1-2: по 1500',
+    'Payment 1-10: Sep-Jun',
     null,
   ]) assert.equal(gradeRangeInText(text), null, String(text))
 })

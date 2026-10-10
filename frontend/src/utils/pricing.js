@@ -218,14 +218,18 @@ function ageGroupName(price, t) {
 export function priceAgeGroupLabel(price, t) {
   const raw = price?.age_group?.trim()
   if (!raw) return null
+  const key = `ageGroups.${raw}`
+  const translated = t(key)
+  if (translated && translated !== key) return translated
+  // A plan name that already says it needs no repeat, unless it starts at preschool:
+  // "PK"/"ПК" is an abbreviation parents may not know.
+  const band = rowGradeBand(price)
+  if (band?.from === 0) return ageGroupName(price, t)
   // Whole-word match, so "Grade 1" is still shown next to a "Grade 10" plan.
   const escaped = raw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   if (new RegExp(`(^|[^\\p{L}\\p{N}])${escaped}($|[^\\p{L}\\p{N}])`, 'iu').test(price.plan_name || '')) return null
-  // A plan name that writes out the same grades says it already, unless it starts at
-  // preschool: "PK"/"ПК" is an abbreviation parents may not know.
-  const band = rowGradeBand(price)
   const named = gradeRangeInText(price.plan_name)
-  if (band && named && band.from > 0 && band.from === named.from && band.to === named.to) return null
+  if (band && named && band.from === named.from && band.to === named.to) return null
   return ageGroupName(price, t)
 }
 

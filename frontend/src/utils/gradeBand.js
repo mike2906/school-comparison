@@ -15,10 +15,13 @@ const WHOLE_BAND_RE = new RegExp(
 const PRESCHOOL_RE = new RegExp(`^(?:${PRESCHOOL})$`, 'u')
 // A range inside free text ("PK–7: full payment"), not part of a date, time or longer number.
 const RANGE_IN_TEXT_RE = /(?<![\p{L}\p{N}.:])(пк|пг|pk|[ivx]{1,4}|\d{1,2})\s*-\s*([ivx]{1,4}|\d{1,2})(?![\p{L}\p{N}]|\.\d)/gu
-// Bare numbers ("3-6") are grades only when grade words or a label colon frame them; a
-// kindergarten's "3-6 години" is ages.
+// Bare numbers ("3-6") are grades only when grade words frame them, or when they open the
+// plan name as its label ("8–12: full payment"); a kindergarten's "3-6 години" is ages, and
+// "Вноски 1-2:" counts instalments.
+const GRADE_WORD_RE = new RegExp(GRADE_WORD, 'u')
 const GRADES_BEFORE_RE = /(?:grades?|класове|клас)\s*$/u
-const GRADES_AFTER_RE = /^\.?\s*(?:клас|кл(?!\p{L})|grades?(?!\p{L})|:)/u
+const GRADES_AFTER_RE = /^\.?\s*(?:клас|кл(?!\p{L})|grades?(?!\p{L}))/u
+const LABEL_COLON_RE = /^\.?\s*:/u
 
 function normalize(text) {
   return String(text || '')
@@ -48,8 +51,14 @@ function band(fromToken, toToken) {
 
 /** The grades a whole age-group text names, `{ from, to }`, or null if it says anything else. */
 export function parseGradeBand(text) {
-  const match = normalize(text).match(WHOLE_BAND_RE)
-  return match ? band(match[1], match[2]) : null
+  const normalized = normalize(text)
+  const match = normalized.match(WHOLE_BAND_RE)
+  if (!match) return null
+  // A bare "3-6" or "5" is as likely ages as grades: it needs a grade word, a Roman
+  // numeral or a preschool name.
+  const bare = [match[1], match[2]].every(token => !token || /^\d+$/.test(token))
+  if (bare && !GRADE_WORD_RE.test(normalized)) return null
+  return band(match[1], match[2])
 }
 
 /** Every grade range written inside free text (a plan name), widest span, or null. */
@@ -59,7 +68,10 @@ export function gradeRangeInText(text) {
   for (const match of normalized.matchAll(RANGE_IN_TEXT_RE)) {
     const before = normalized.slice(0, match.index)
     const after = normalized.slice(match.index + match[0].length)
-    const framed = PRESCHOOL_RE.test(match[1]) || GRADES_BEFORE_RE.test(before) || GRADES_AFTER_RE.test(after)
+    const framed = PRESCHOOL_RE.test(match[1])
+      || GRADES_BEFORE_RE.test(before)
+      || GRADES_AFTER_RE.test(after)
+      || (match.index === 0 && LABEL_COLON_RE.test(after))
     if (!framed) continue
     const range = band(match[1], match[2])
     if (range && range.from < range.to) {
