@@ -42,7 +42,7 @@ function PricingSection({ pricing }) {
             <PriceSource source={price.source} url={price.source_url} checkedAt={price.scraped_at} />
           )}
         </div>
-        <div className="flex items-baseline gap-2 sm:block sm:text-right sm:shrink-0">
+        <div className="flex flex-wrap items-baseline gap-x-2 sm:block sm:text-right sm:shrink-0">
           <div className="text-lg font-bold text-neutral-900 whitespace-nowrap">{amountText}</div>
           {/* A fee with no period stands out, so it is not read as the monthly fee beside it. */}
           <div className={`text-sm ${pricePeriod(price) ? 'text-neutral-500' : 'text-amber-700'}`}>
