@@ -259,6 +259,6 @@ test('formatPriceLabel shows BGN rows in euro and falls back to price on request
   assert.equal(formatPriceLabel({ amount: 1955.83, currency: 'BGN' }, 'en-GB', t), '€1,000')
   assert.equal(formatPriceLabel({ amount: 500, currency: 'EUR' }, 'en-GB', t), '€500')
   assert.equal(formatPriceLabel({ amount_min: 391.166, amount_max: 782.332, currency: 'BGN' }, 'en-GB', t), '€200–€400')
-  assert.equal(formatPriceLabel({ amount_min: 300 }, 'en-GB', t), '€300')
+  assert.equal(formatPriceLabel({ amount_min: 500, amount_max: 500, currency: 'EUR' }, 'en-GB', t), '€500')
   assert.equal(formatPriceLabel({ currency: 'EUR' }, 'en-GB', t), 'pricing.priceOnRequest')
 })

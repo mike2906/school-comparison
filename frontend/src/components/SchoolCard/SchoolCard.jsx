@@ -367,7 +367,7 @@ function buildExpandedSections({
       const year = item.academic_year ? `${t('pricing.academicYear')}: ${item.academic_year}` : ''
       const meta = [plan, year].filter(Boolean).join(' • ')
       const source = item.source ? t(`priceSource.${item.source}`) : ''
-      // BGN rows are shown in euro, as on the detail and compare pages.
+      // BGN rows are converted to euro, as on the detail and compare pages.
       const priceLabel = formatPriceLabel(item, locale, t)
       const periodLabel = periodKey ? ` (${periodKey})` : ''
       const metaLabel = meta ? ` • ${meta}` : ''

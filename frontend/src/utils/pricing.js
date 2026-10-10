@@ -158,6 +158,8 @@ export function formatCurrency(amount, locale, currency = 'EUR') {
   return new Intl.NumberFormat(locale, {
     style: 'currency',
     currency,
+    // Both bounds: older browsers throw when only the maximum is below the currency default.
+    minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(amount)
 }
@@ -173,7 +175,7 @@ export function formatPriceLabel(price, locale, t) {
   const max = format(price.amount_max)
   const exact = format(price.amount)
 
-  if (min && max) return `${min}–${max}`
+  if (min && max) return min === max ? min : `${min}–${max}`
   if (min) return min
   if (max) return max
   if (exact) return exact
