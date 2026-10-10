@@ -1,6 +1,6 @@
 # Tech debt review and refactor plan
 
-Written 2026-10-10 against `main` at `fdbc0b9` (after PR #218). It is a plan only: no refactor PRs until Mike approves it.
+Written 2026-10-10 against `main` at `fdbc0b9` (after PR #218). Approved 2026-10-10; see "Decisions taken". Each step's status is in the "Can start" column; check that a step is still open before starting it.
 
 Updated the same day with the findings of the test audit (the 2026-10-10 test audit, kept in the project files rather than the repo). The changes are marked **(test audit)**.
 
@@ -26,13 +26,13 @@ There are three independent lanes. Within a lane, order matters. Across lanes, P
 
 | # | Step | Kind | Depends on | Can start |
 |---|---|---|---|---|
-| T1 | **Fix the time bomb.** `test_extractor.py:4789` relies on `date.today()` and fails from 2027-09-15. Freeze the date. | Test only, 1 small PR | nothing | Now |
-| T2 | **Rewrite the ~10 tests that can't fail.** Only those on code that stays: the `test_api.py` compare-five, crossover and search tests, `test_data_quality.py:275`, the validator dedup test, the timeout tests and the CLI usage totals. | Test only, 1-2 PRs | nothing | Now |
-| T3 | **Pin the unprotected behaviour** found by mutation testing: the `display_gating` monthly multiplier, peer median, January-June admission cycle and `NVO_MIN_PUPILS` boundary; the `{subject: value}` asserts in the three NVO import tests; the year-in-fee-table filter and the month and ordinal tables in `price_evidence`. | Test only, 1-2 PRs | nothing | Now |
-| T4 | **Write the price-parsing and BGN tests as one shared table.** It covers mixed separators, `6.200 лв.` and BGN detection, and runs against *both* amount parsers (`extractor_helpers._parse_price_amount_token` and `price_evidence`'s). | Test only, 1 PR | nothing | Now; it touches no production code |
-| P0 | **Delete dead code together with its ~150 dead tests:** Celery, the finished scripts, `education.py` if Mike agrees, and the no-ops. Also add the AGENTS.md "no new code in giant files" rule. | Deletion, 2-3 PRs | nothing | Now |
+| T1 | **Fix the time bomb.** `test_extractor.py:4789` relies on `date.today()` and fails from 2027-09-15. Freeze the date. | Test only, 1 small PR | nothing | Done (#221) |
+| T2 | **Rewrite the ~10 tests that can't fail.** Only those on code that stays: the `test_api.py` compare-five, crossover and search tests, `test_data_quality.py:275`, the validator dedup test, the timeout tests and the CLI usage totals. | Test only, 1-2 PRs | nothing | Done (#221) |
+| T3 | **Pin the unprotected behaviour** found by mutation testing: the `display_gating` monthly multiplier, peer median, January-June admission cycle and `NVO_MIN_PUPILS` boundary; the `{subject: value}` asserts in the three NVO import tests; the year-in-fee-table filter and the month and ordinal tables in `price_evidence`. | Test only, 1-2 PRs | nothing | Done (#221) |
+| T4 | **Write the price-parsing and BGN tests as one shared table.** It covers mixed separators, `6.200 лв.` and BGN detection, and runs against *both* amount parsers (`extractor_helpers._parse_price_amount_token` and `price_evidence`'s). | Test only, 1 PR | nothing | Done (#221) |
+| P0 | **Delete dead code together with its ~150 dead tests:** Celery, the finished scripts, `education.py` if Mike agrees, and the no-ops. Also add the AGENTS.md "no new code in giant files" rule. | Deletion, 2-3 PRs | nothing | Done (#219, #220; the rule is in #224) |
 | T5 | **Switch the 28 price-LLM mocks** from `PriceExtractionOutput` to `PageFees`, so `_prices_from_fee_lines` is actually exercised. | Test only, 1 PR | nothing, but it edits `test_extractor.py` | After Monday, since #212/#217 just touched this area |
-| T0 | **Record LLM answers (before Monday).** An opt-in `EXTRACTION_LLM_RECORD_DIR` setting saves each successful extraction LLM answer to disk, keyed by a hash of the prompts, output type and tier. It is off by default, so behaviour is unchanged. With it set during Monday's run, the schools re-extracted then can later be replayed for free. It only covers those schools; a full LLM baseline would need a full recorded extraction run. | Code, 1 small PR | nothing | Now |
+| T0 | **Record LLM answers (before Monday).** An opt-in `EXTRACTION_LLM_RECORD_DIR` setting saves each successful extraction LLM answer to disk, keyed by a hash of the prompts, output type and tier. It is off by default, so behaviour is unchanged. With it set during Monday's run, the schools re-extracted then can later be replayed for free. It only covers those schools; a full LLM baseline would need a full recorded extraction run. | Code, 1 small PR | nothing | Done (#222) |
 | T6 | **Offline extraction diff, added after the Monday question.** A small script runs `app/scrapers/deterministic.run_deterministic_extraction` over every school's stored pages in the launch DB and writes one JSON line per school. It needs no network, LLM or DB writes. It runs once on the code before a refactor and once after, and any difference blocks the PR. This covers the deterministic layer for all schools; the 20-case golden corpus already covers it for a sample in CI. **It does not cover the LLM half.** Raw LLM answers were not stored, so re-running the LLM steps meant paying for new calls. T0 starts recording them, and T6 adds a replay mode for the recorded answers. Schools without a recording are covered only by the unit tests, which is why T5 matters. | Script, 1 PR | nothing | After Monday (it reads the launch DB on Mike's PC) |
 | P2 | **Untangle `cli.py`.** Every move PR retargets the patches on the moved functions (see the ground rules). | Refactor, 3-4 PRs | P0 (Celery gone, so stage logic exists only once), T2 (the CLI usage-total tests fixed) | After Monday |
 | P3 | **Split `extractor_helpers.py`** and dedupe it. | Refactor, 6-8 PRs | T4, T5 and T6 (step 13, merging the parsers, is only safe when the shared table passes on both parsers before the merge and on the survivor after), and P2 for the shared helper modules | After P2 |
@@ -42,13 +42,17 @@ There are three independent lanes. Within a lane, order matters. Across lanes, P
 
 | # | Step | Kind | Depends on | Can start |
 |---|---|---|---|---|
-| P1a | **Move the duplicated helpers into `src/utils/`, with tests in the same PR.** Tests for the admission and NVO helpers are required. They can't come first, because the in-component copies aren't exported, so they become testable only by moving. | Refactor and tests, 2-3 PRs | nothing | Now |
+| P1a | **Move the duplicated helpers into `src/utils/`, with tests in the same PR.** Tests for the admission and NVO helpers are required. They can't come first, because the in-component copies aren't exported, so they become testable only by moving. | Refactor and tests, 2-3 PRs | nothing | In progress (#223 merged) |
 | P1b | **Fix the `SchoolCard` currency display and the locale drift.** | Behaviour change, 1 PR | P1a | After P1a |
 | P1c | **Split the big components.** | Refactor, 3 PRs | P1a | After P1a |
 
 ### Lane C: decisions that are not code moves
 
 - **The data-quality scoreboard metric needs redefining.** The test audit found that `_website_validation_coverage` can only ever report 0 published without a report and 100% coverage. That is a product question about what the metric should mean, not a refactor. It is parked until Mike decides, and its five constant-asserting tests are left alone until then.
+
+### Relation to `docs/GO_LIVE_PLAN.md` Phase 4
+
+This plan supersedes GO_LIVE_PLAN P4.1 (split `SearchPage`, here step 6) and P4.4 (the `cli.py` repair commands, here steps 7-9; the plan's module locations win). P4.7 (TypeScript) stays optional; see "Not recommended now".
 
 ### Where this differs from the suggested order "all tests first, then Phase 0"
 
@@ -67,8 +71,8 @@ Phases P0 and P1 alone, together with T1-T4, remove about 3,000 lines, fix a lik
 | File | Lines | Problem |
 |---|---|---|
 | `app/scrapers/extractor_helpers.py` | 4,967 | Contains 165 private `_foo` functions in about 17 unrelated clusters: display names, price-line parsing, price dedupe, contacts, page selection, summary normalisation and others. Many other modules import its "private" helpers. `_get_usage` has 5 external callers. |
-| `app/scrapers/cli.py` | 4,683 | This is not just a CLI. It holds about 56 DB query sites, the age-group inference rules, geocode repair, and raw Nominatim HTTP calls (`cli.py:1633-1690`) that bypass `app/services/geocoding`. It has 58% coverage, the lowest of the big modules, and its two stage dispatch chains are duplicated (`:967-997` and `:1079-1121`). Tests import its private helpers, which locks the file in place. |
-| `app/scrapers/extractor.py` | 2,351 | `_extract_general_info` is 340 lines and `_extract_prices` is 315, each with nested closures. |
+| `app/scrapers/cli.py` | 4,675 | This is not just a CLI. It holds about 56 DB query sites, the age-group inference rules, geocode repair, and raw Nominatim HTTP calls (`cli.py:1633-1690`) that bypass `app/services/geocoding`. It has 58% coverage, the lowest of the big modules, and its two stage dispatch chains are duplicated (`:967-997` and `:1079-1121`). Tests import its private helpers, which locks the file in place. |
+| `app/scrapers/extractor.py` | 2,363 | `_extract_general_info` is 340 lines and `_extract_prices` is 315, each with nested closures. |
 | `app/scrapers/validator.py` | 1,734 | `validate_school_data` is one function of **582 lines**, the longest in the repo. |
 
 ### 2. A dead second pipeline: Celery
@@ -78,7 +82,7 @@ Phases P0 and P1 alone, together with T1-T4, remove about 3,000 lines, fix a lik
 - The beat schedule is empty, and no worker is defined in docker-compose. Prod has no Redis.
 - The README and deploy README both say Celery is not used.
 
-The copy has already drifted from the CLI. Its website-discovery cohort differs, it has no recovery stage and no cost tracking, and it alone has spot checks. That makes it a trap for any agent that greps for a stage. `AGENTS.md` still says "wired into the CLI/Celery pipeline" and "Redis is for Celery".
+The copy has already drifted from the CLI. Its website-discovery cohort differs, it has no recovery stage and no cost tracking, and no stage of its own that the CLI lacks (the CLI's validate-data stage already runs spot checks). That made it a trap for any agent that grepped for a stage. **Removed in #219**; the AGENTS.md wording was fixed in #224.
 
 ### 3. Duplicated logic (backend)
 
@@ -106,14 +110,14 @@ The copy has already drifted from the CLI. Its website-discovery cohort differs,
 | File | Lines | Problem |
 |---|---|---|
 | `SearchPage.jsx` | 2,192 | One component of about 2,100 lines, with 29 `useState` and 25 `useEffect` calls. It mixes URL sync, localStorage, geolocation, filtering and sorting, and a 200-line inline advanced-filters renderer. |
-| `ComparePage.jsx` | 1,951 | About 30 helpers plus 9 inner components in one file. |
+| `ComparePage.jsx` | 1,788 | About 30 helpers plus 9 inner components in one file. |
 | `SchoolMap.jsx` | 1,592 | Ten inner components. Its type colours differ from `SchoolCard`'s. |
-| `SchoolCard.jsx` | 1,526 | About 25 helpers. The component itself is about 940 lines. |
+| `SchoolCard.jsx` | 1,399 | About 25 helpers. The component itself is about 940 lines. |
 
 The costlier problem is duplication, because it causes display drift between pages:
 - **NVO, admission and status helpers are copied three ways.** The benchmark, trend and performance styles, `getAdmissionRequirement`, `getLastAdmittedPoints`, `getMinNvoScore`, `getStatusInfo` and the language labels all exist in `SchoolCard`, `ComparePage` and `SchoolDetailPage/helpers.js`.
 - **There are five price/number formatters.**
-- **Likely user-visible bug.** The expanded pricing section in `SchoolCard.jsx:538-550` prints raw amounts with `item.currency`. Every other price surface goes through `displayPrice` / `toEur`, so a BGN row would show as BGN on the card and as EUR elsewhere. To be confirmed against real data.
+- **Likely user-visible bug.** The expanded pricing section in `SchoolCard.jsx` prints raw amounts with `item.currency`. Every other price surface goes through `displayPrice` / `toEur`, so a BGN row would show as BGN on the card and as EUR elsewhere. To be confirmed against real data.
 - **The locale mapping is inconsistent.** Most places map to `en-US` and `KeyFacts` maps to `en-GB`.
 - **Distance has a hardcoded unit.** `formatDistance` hardcodes "km" and the "." decimal separator, which is wrong in Bulgarian.
 
@@ -121,7 +125,7 @@ There are no component tests. The 25 frontend tests cover pure utils only. `reac
 
 ### 6. Accumulated one-off scripts
 
-There are 11 finished one-off scripts in `backend/scripts/`, about 2,600 lines in total:
+There were 11 one-off scripts in `backend/scripts/`, about 2,600 lines in total. **#220 deleted the finished ones; the ones kept on purpose are listed under "Decisions taken".** The original list:
 - `audit_p2_12_boundary.py`, `repair_p2_12_boundary.py`, `geocode_pin_gaps_uf44.py`
 - `merge_kindergarten_buildings.py`, `backfill_nvo_pupil_counts.py`, `backfill_i18n_en.py`, `cleanup_synthetic_i18n_en.py`
 - `refresh_pricing_evidence.py`, `pilot_identity_adjudication.py`, `repair_city_scope.py`
@@ -153,8 +157,7 @@ Every step below follows the same ground rules:
 
 ### Phase 0: delete and document (can start any time; no overlap with Monday's data work)
 
-1. **Remove the Celery path.** Delete `tasks/`, the `celery[redis]` and `redis` dependencies, and the Redis service in `docker-compose.yml`. Remove the CLI's non-`--sync` branch. Fix the `AGENTS.md` wording. Retire the tests that only exercise `tasks/`, after porting the one useful thing (spot checks, if still wanted) to the CLI. About −1,300 lines.
-   - *Decision for Mike:* are spot checks still wanted as a stage? If yes, port them to the CLI first. If no, drop them too.
+1. **Remove the Celery path.** Delete `tasks/`, the `celery[redis]` and `redis` dependencies, and the Redis service in `docker-compose.yml`. Remove the CLI's non-`--sync` branch. Fix the `AGENTS.md` wording. Retire the tests that only exercise `tasks/`, (the CLI already runs spot checks, so nothing needs porting). About −1,300 lines.
    - Delete the Celery tests in the same PR: `test_pipeline_integration.py:299-396` and `test_summarizer.py:613` (test audit).
 2. **Archive the finished one-off scripts** above, together with their own tests (test audit). The list:
    - `test_refresh_pricing_evidence.py`, `test_p2_12_boundary_repair.py` and `test_identity_adjudication.py`. The last one also needs one new test for `_registrable_domain`, the only part of it used in production.
@@ -164,7 +167,7 @@ Every step below follows the same ground rules:
 
    Together with step 1, this removes about 150 tests. The count drops, but no live code loses protection.
    - Keep `audit_price_rows_uf45.py` if it is still used as a standing price audit.
-3. **Add a working rule to `AGENTS.md`.** No new functions go into `cli.py`, `extractor_helpers.py`, `extractor.py` or `SearchPage.jsx`. New code goes into a focused module. This stops the growth while the rest of the plan runs, and costs nothing.
+3. **Add a working rule to `AGENTS.md`.** No new functions go into `cli.py`, `extractor_helpers.py`, `extractor.py`, `validator.py` or `SearchPage.jsx`. New code goes into a focused module. This stops the growth while the rest of the plan runs, and costs nothing.
 
 ### Phase 1: frontend shared helpers (independent of the backend, user-visible payoff)
 
@@ -203,7 +206,7 @@ Prerequisites from the test audit (test-only PRs, done before step 10):
     - Promote the cross-module "private" functions to public names (`get_usage`, `normalize_display_name_i18n`).
 11. **Remove the unused `_ACTIVE_RULES` indirection.** Call the rules module directly, replacing 122 call sites. If multi-country extraction comes, it can be reintroduced at the one place it is needed.
 12. **Dedupe the text normalisers into one `app/utils/text.py`, each with a test.** This covers text-list dedupe, the comparison key, markdown-link stripping and `_now_iso`. It changes behaviour subtly, so it is one PR per helper, with the differing behaviours pinned in tests first.
-13. **Make the price helpers use `price_evidence` for currency and period.** This deletes the helpers' own sets and regex chains. It is a behaviour change (`$` and `£` become recognised). Run it with the price-audit evidence rows in `price-audit/` as a regression check.
+13. **Make the price helpers use `price_evidence` for currency and period.** This deletes the helpers' own sets and regex chains. It is a behaviour change (`$` and `£` become recognised). Run it with the price-audit evidence rows (kept outside the repo, on Mike's PC) as a regression check.
 14. **Define the founded-year and class-size rules once each,** in `school_attributes`, with the validator and extractor calling them.
 15. **Rename `scrapers/summarizer.py`** to `summary_pipeline.py`. Move `get_usage` out of `scrapers` so `ai/` stops importing from it. Break the `url_validator` / `campus_sync` / `shared_site_check` cycle by moving the shared pieces into a small leaf module.
 
@@ -230,5 +233,5 @@ Mike asked for the work to go ahead without waiting for him, so these defaults w
 2. **Spot checks: nothing to port.** The CLI's validate-data stage already runs sampled spot checks (`_run_validate_data_batch`). The Celery task was a duplicate.
 3. **`audit_price_rows_uf45.py` and `refresh_prices.py` stay.** They are still price tooling, and `price_evidence.py` cites the audit.
 4. **`app/utils/education.py` is deleted with its tests.** The admission calculator gets written test-first when that work starts.
-5. **Kept on purpose:** `merge_kindergarten_buildings.py` (needed again if kg.sofia.bg is re-imported), `import_sofia_municipal_points.py` (the geocoding write gate references it), and `pilot_identity_adjudication.py` with its service, which needs its own review before deletion.
+5. **Kept on purpose:** `merge_kindergarten_buildings.py` (needed again if kg.sofia.bg is re-imported), `import_sofia_municipal_points.py` (the geocoding write gate references it), `pilot_identity_adjudication.py` with its service, which needs its own review before deletion, and `backfill_nvo_pupil_counts.py`, because `cli run --stage nvo` can't replace it while io.mon.bg blocks automated requests.
 6. **Still open for Mike:** what the data-quality scoreboard's website-validation coverage should measure (lane C).
