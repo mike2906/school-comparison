@@ -1729,12 +1729,13 @@ class TestCompareEndpoint:
         ]  # fmt: skip
         seeded_db.add_all(extra)
         await seeded_db.commit()
-        all_ids = sorted((await seeded_db.execute(select(School.id))).scalars().all())
-        assert len(all_ids) == 6
+        # Requested newest first, so keeping the lowest five ids would not pass.
+        requested = sorted((await seeded_db.execute(select(School.id))).scalars().all(), reverse=True)
+        assert len(requested) == 6
 
-        response = await seeded_client.get(f"/compare?ids={','.join(str(i) for i in all_ids)}")
+        response = await seeded_client.get(f"/compare?ids={','.join(str(i) for i in requested)}")
         assert response.status_code == 200
-        assert sorted(item["id"] for item in response.json()) == all_ids[:5]
+        assert sorted(item["id"] for item in response.json()) == sorted(requested[:5])
 
     @pytest.mark.asyncio
     async def test_compare_returns_locations(self, seeded_client):

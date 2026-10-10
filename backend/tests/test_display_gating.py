@@ -471,6 +471,7 @@ def test_monthly_tuition_annualizes_twelve_times_against_both_yearly_bounds():
     assert implausible_tuition_row_ids([_tuition_row(1, 4000)]) == set()
     assert implausible_tuition_row_ids([_tuition_row(1, 4200)]) == {1}
     # Both bounds are inclusive.
+    assert implausible_tuition_row_ids([_tuition_row(1, 1000, "yearly")]) == set()
     assert implausible_tuition_row_ids([_tuition_row(1, 50000, "yearly")]) == set()
 
 
