@@ -36,29 +36,30 @@ export function getNvoDetail(school, t, ageGroup = null) {
   return getSharedNvoDetail(school, t, { ageGroup })
 }
 
+// Every category the API sends, in the order the school page lists them, then a catch-all.
+const PRICE_CATEGORY_ORDER = [
+  'tuition',
+  'registration',
+  'food',
+  'transport',
+  'extended_day',
+  'activities',
+  'extracurricular',
+  'materials',
+  'uniforms',
+  'camp',
+  'other',
+]
+
 /**
- * Group pricing items by category
+ * Group pricing items by category, in display order. Each category keeps its own
+ * heading; only a category the app does not know goes under "other".
  */
 export function groupPricingByCategory(pricing) {
-  const grouped = {
-    tuition: [],
-    food: [],
-    transport: [],
-    activities: [],
-    registration: [],
-    materials: [],
-    other: [],
-  }
-
+  const grouped = Object.fromEntries(PRICE_CATEGORY_ORDER.map(category => [category, []]))
   pricing.forEach(item => {
-    const category = item.category || 'other'
-    if (grouped[category]) {
-      grouped[category].push(item)
-    } else {
-      grouped.other.push(item)
-    }
+    grouped[grouped[item.category] ? item.category : 'other'].push(item)
   })
-
   return grouped
 }
 

@@ -13,6 +13,7 @@ import {
   statedTuition,
   tuitionSortValue,
   priceAgeGroupLabel,
+  groupRowsByAgeGroup,
 } from './pricing.js'
 
 const row = (overrides = {}) => ({
@@ -273,4 +274,30 @@ test('priceAgeGroupLabel: known key translated, website text as written, never a
   assert.equal(priceAgeGroupLabel({ age_group: 'grade 2 - 4', plan_name: 'Grade 2 - 4 / Plan 1' }, t), null)
   assert.equal(priceAgeGroupLabel({ age_group: ' ' }, t), null)
   assert.equal(priceAgeGroupLabel({}, t), null)
+})
+
+test('groupRowsByAgeGroup: one band per age group, in page order, unnamed rows first', () => {
+  const t = (key) => (key === 'ageGroups.preschool' ? 'Pre-school' : key)
+  const rows = [
+    row({ id: 1, age_group: 'ПК' }),
+    row({ id: 2, age_group: 'VIII - XII клас' }),
+    row({ id: 3, age_group: 'пк ' }),
+    row({ id: 4, age_group: null }),
+  ]
+  const bands = groupRowsByAgeGroup(rows, t)
+  assert.deepEqual(bands.map(band => band.label), [null, 'ПК', 'VIII - XII клас'])
+  assert.deepEqual(bands.map(band => band.rows.map(r => r.id)), [[4], [1, 3], [2]])
+})
+
+test('groupRowsByAgeGroup: fewer than two age groups is not split', () => {
+  const t = (key) => key
+  const rows = [row({ id: 1, age_group: 'Grade 1' }), row({ id: 2, age_group: null })]
+  assert.deepEqual(groupRowsByAgeGroup(rows, t), [{ label: null, rows }])
+  assert.deepEqual(groupRowsByAgeGroup([], t), [])
+})
+
+test('groupRowsByAgeGroup: a known age-group key is shown translated', () => {
+  const t = (key) => (key === 'ageGroups.preschool' ? 'Pre-school' : key)
+  const bands = groupRowsByAgeGroup([row({ id: 1, age_group: 'preschool' }), row({ id: 2, age_group: 'Grade 1' })], t)
+  assert.deepEqual(bands.map(band => band.label), ['Pre-school', 'Grade 1'])
 })

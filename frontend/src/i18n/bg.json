@@ -262,7 +262,11 @@
       "yearly": "година"
     },
     "pricePerPeriod": "{{price}} {{currency}} / {{period}}",
-    "priceOnly": "{{price}} {{currency}}"
+    "priceOnly": "{{price}} {{currency}}",
+    "other": "Други такси",
+    "sourceLink": "Източник: {{site}}",
+    "sourceLinkLabel": "Вижте тези цени на {{site}} (отваря се в нов прозорец)",
+    "checkedOn": "проверено на {{date}}"
   },
   "priceSource": {
     "official": "От училището",

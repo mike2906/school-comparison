@@ -183,6 +183,15 @@ export function formatPriceLabel(price, locale, t) {
   return t('pricing.priceOnRequest')
 }
 
+// The age group a row names, as a known `ageGroups` label or as the website wrote it.
+function ageGroupName(price, t) {
+  const raw = price?.age_group?.trim()
+  if (!raw) return null
+  const key = `ageGroups.${raw}`
+  const translated = t(key)
+  return translated && translated !== key ? translated : raw
+}
+
 /**
  * The age group a pricing row names, or null when there is nothing worth showing.
  *
@@ -192,14 +201,41 @@ export function formatPriceLabel(price, locale, t) {
  */
 export function priceAgeGroupLabel(price, t) {
   const raw = price?.age_group?.trim()
-  if (!raw) return null
-  const key = `ageGroups.${raw}`
-  const translated = t(key)
-  if (translated && translated !== key) return translated
+  const name = ageGroupName(price, t)
+  if (!name || name !== raw) return name
   // Whole-word match, so "Grade 1" is still shown next to a "Grade 10" plan.
   const escaped = raw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   if (new RegExp(`(^|[^\\p{L}\\p{N}])${escaped}($|[^\\p{L}\\p{N}])`, 'iu').test(price.plan_name || '')) return null
   return raw
+}
+
+/**
+ * A category's rows split by the age group each names, so a parent reads the options for
+ * one grade band together instead of interleaved with another band's.
+ *
+ * Returns `[{ label, rows }]` in the order the bands first appear, rows in their own
+ * order. Rows naming no age group come first with a null label. With fewer than two
+ * bands nothing is split: one group with a null label, and each row keeps its own
+ * age-group line.
+ */
+export function groupRowsByAgeGroup(rows = [], t) {
+  const bands = new Map()
+  const unnamed = []
+  rows.forEach(row => {
+    const label = ageGroupName(row, t)
+    if (!label) {
+      unnamed.push(row)
+      return
+    }
+    const key = label.toLocaleLowerCase()
+    if (!bands.has(key)) bands.set(key, { label, rows: [] })
+    bands.get(key).rows.push(row)
+  })
+  if (bands.size < 2) return rows.length > 0 ? [{ label: null, rows }] : []
+  return [
+    ...(unnamed.length > 0 ? [{ label: null, rows: unnamed }] : []),
+    ...bands.values(),
+  ]
 }
 
 /**
