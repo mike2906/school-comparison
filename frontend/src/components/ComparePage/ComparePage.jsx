@@ -10,7 +10,8 @@ import { languageLabel } from '../../utils/languages'
 import TagList from '../SchoolDetailPage/TagList'
 import PhoneLinks from '../SchoolDetailPage/PhoneLinks'
 import { fetchCompare, fetchExamAverages } from '../../api/schools'
-import { calculateDistance, formatDistance } from '../../utils/distance'
+import { calculateDistance } from '../../utils/distance'
+import { formatDistance } from '../../utils/format'
 import { compareSchoolNames, getSchoolName, getAddress, getSummary } from '../../utils/i18n'
 import { hasAnySchoolSummary } from './summaryVisibility'
 import { getProvenanceSourceKey } from './sourceMetadata'
@@ -652,7 +653,7 @@ function ComparePage() {
           return distance != null
             ? (
               <span className="text-sm text-neutral-700">
-                {formatDistance(distance, { approximate: metrics.distanceApproximate })}
+                {formatDistance(distance, { approximate: metrics.distanceApproximate, language: i18n.language, t })}
               </span>
             )
             : renderPlaceholder()
@@ -1031,7 +1032,7 @@ function ComparePage() {
                     <div className="text-xs text-neutral-500">
                       {shiftInfo?.shift ? t(`schoolCard.shift.${shiftInfo.shift}`) : null}
                       {distance != null
-                        ? ` • ${formatDistance(distance, { approximate: location.coordinates_approximate })}`
+                        ? ` • ${formatDistance(distance, { approximate: location.coordinates_approximate, language: i18n.language, t })}`
                         : ''}
                     </div>
                   </div>

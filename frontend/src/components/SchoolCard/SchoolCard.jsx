@@ -7,7 +7,7 @@ import { useCountry } from '../../context/CountryContext'
 import { languageLabel } from '../../utils/languages'
 import { useCompare } from '../../context/CompareContext'
 import { getSchoolName, getAddress } from '../../utils/i18n'
-import { formatDistance } from '../../utils/distance'
+import { formatDistance, intlLocale } from '../../utils/format'
 import { getFocusEmoji } from '../../utils/locationFocus'
 import { getNvoDetail as getSharedNvoDetail } from '../../utils/nvo'
 import { getCanonicalAmenityFlags, getOptionLabel, getStatusInfo, normalizeLanguageFocus } from '../../utils/schoolAttributes'
@@ -523,7 +523,7 @@ const SchoolCard = memo(function SchoolCard({
       : 'text-neutral-600 bg-neutral-100 border-neutral-300'
 
   const admissionsInfo = useMemo(() => {
-    const locale = i18n.language?.startsWith('bg') ? 'bg-BG' : 'en-US'
+    const locale = intlLocale(i18n.language)
     const isPrivate = school.school_type === 'private' || school.school_type === 'international'
     const admissionInfo = school.admission_info || {}
 
@@ -660,7 +660,7 @@ const SchoolCard = memo(function SchoolCard({
     locations,
     pricing,
     t,
-    locale: i18n.language?.startsWith('bg') ? 'bg-BG' : 'en-US',
+    locale: intlLocale(i18n.language),
   }), [school, attributes, locations, pricing, t, i18n.language])
 
   const hasExpandedContent = expandedSections.length > 0 || Boolean(nvoDetail)
@@ -669,7 +669,7 @@ const SchoolCard = memo(function SchoolCard({
   const distanceValue = typeof school.distance === 'number' ? school.distance : null
   // Only a known distance is shown; the list header prompts for a location once instead.
   const distanceLabel = distanceValue != null
-    ? formatDistance(distanceValue, { approximate: school.distanceApproximate })
+    ? formatDistance(distanceValue, { approximate: school.distanceApproximate, language: i18n.language, t })
     : null
   const distanceStyle = distanceValue == null
     ? { backgroundColor: '#f3f4f6', color: '#6b7280' }
@@ -772,7 +772,7 @@ const SchoolCard = memo(function SchoolCard({
             style={distanceStyle}
             aria-label={t(
               school.distanceApproximate ? 'schoolCard.aria.distanceApprox' : 'schoolCard.aria.distance',
-              { distance: formatDistance(distanceValue) },
+              { distance: formatDistance(distanceValue, { language: i18n.language, t }) },
             )}
           >
             📍 {distanceLabel}

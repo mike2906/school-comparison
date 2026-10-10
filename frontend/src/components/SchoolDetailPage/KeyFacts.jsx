@@ -7,6 +7,7 @@ import {
   parseSavedLocation,
 } from '../../utils/keyFacts'
 import { calculateDistance } from '../../utils/distance'
+import { formatKm, intlLocale } from '../../utils/format'
 import { statedTuition, YEAR_STATUS } from '../../utils/pricing'
 import { getLastAdmittedPoints, getMinNvoScore } from '../../utils/admission'
 import {
@@ -49,7 +50,7 @@ const listValue = (items) => items.map((item, index) => (
  */
 function KeyFacts({ school, examAverages, nvoExamType }) {
   const { t, i18n } = useTranslation()
-  const locale = i18n.language?.startsWith('bg') ? 'bg-BG' : 'en-GB'
+  const locale = intlLocale(i18n.language)
   const savedLocation = useMemo(readSavedLocation, [])
 
   const formatNumber = (value, digits = 0) =>
@@ -186,7 +187,7 @@ function KeyFacts({ school, examAverages, nvoExamType }) {
           label={t('schoolDetail.distance')}
           value={t(
             nearest.approximate ? 'schoolDetail.distanceValueApprox' : 'schoolDetail.distanceValue',
-            { km: formatNumber(nearest.km, 1) },
+            { km: formatKm(nearest.km, i18n.language) },
           )}
         />
       )
