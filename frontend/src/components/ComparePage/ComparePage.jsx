@@ -47,7 +47,7 @@ import {
   getTrendInfo,
   getTrendTooltip,
 } from '../../utils/nvoDisplay'
-import { formatCurrency, formatPriceLabel, groupPricingByAcademicYear, priceAgeGroupLabel, statedTuition, tuitionSortValue, YEAR_STATUS } from '../../utils/pricing'
+import { formatCurrency, formatPriceLabel, groupPricingByAcademicYear, priceAgeGroupLabel, sortByCategory, statedTuition, tuitionSortValue, YEAR_STATUS } from '../../utils/pricing'
 import { pricePeriod } from '../../utils/priceRows'
 
 const SOURCE_BADGE_STYLES = {
@@ -979,7 +979,7 @@ function ComparePage() {
                     {group.academicYear || t('pricing.yearNotStated')}
                     {group.yearStatus === YEAR_STATUS.DATED_OTHER ? ` · ${t('pricing.notCurrentYear')}` : ''}
                   </div>
-                  {group.rows.map((price) => (
+                  {sortByCategory(group.rows).map((price) => (
                     <div key={price.id} className="space-y-1">
                       <div className="text-sm font-medium text-neutral-900">
                         {t(`pricing.${price.category}`)}

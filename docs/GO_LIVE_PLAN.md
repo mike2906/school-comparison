@@ -2027,6 +2027,12 @@ the session scratchpad only.
       use only the chosen group's rows plus rows naming no group, and show no price when the
       school lists tuition only for other groups. Not fixed here: the validator's period fill
       still misses table-heading periods like 517's (the root cause, ~125 rows).
+- [x] **UF49 Fee rows are hard to read on phones and in compare (site review 2026-10-10,
+      items 5, 7 and part of 9).** Long fee names broke mid-word beside the price; rows now
+      stack on narrow screens. A fee with no period shows a short amber "Period not stated",
+      so 700 or 1,620 isn't read as monthly beside a monthly fee. Compare lists tuition first.
+      Not done: one aligned row per category in compare (waits for the ComparePage split),
+      and English names for Bulgarian fee names (needs the extractor to store them).
 
 ## Phase 3 — Go live
 
