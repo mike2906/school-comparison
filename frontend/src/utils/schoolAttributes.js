@@ -139,14 +139,20 @@ export function getLocationDisplayEvidence(location, address = null, distance = 
   }
 }
 
+const STATUS_KEYS = new Set(['accepting', 'waitlist', 'full'])
+
+/**
+ * Curated data uses the exact keys. Free text is matched only on clear phrases, so
+ * "Not specified" stays unknown and "Accepting, no waitlist" stays accepting.
+ */
 export function getAdmissionStatusKey(rawStatus) {
   const status = String(rawStatus || '').trim().toLowerCase()
-  // Waitlist and negations first, so "waitlist open" and "no places available" are not "accepting".
-  if (status.includes('wait')) return 'waitlist'
-  if (status.includes('full') || status.includes('closed') || /\b(not|no)\b/.test(status)) return 'full'
-  if (status.includes('accept') || status.includes('open') || status.includes('available')) {
-    return 'accepting'
+  if (STATUS_KEYS.has(status)) return status
+  if (/\b(no|not)\s+(places|spots|vacanc|accepting|open)|\bclosed\b|\bfully booked\b|^full\b(?![- ]day)/.test(status)) {
+    return 'full'
   }
+  if (/\bwait(ing)?[- ]?list/.test(status) && !/\bno\s+wait/.test(status)) return 'waitlist'
+  if (/\baccept|\bopen\b|\bavailable\b/.test(status)) return 'accepting'
   return null
 }
 

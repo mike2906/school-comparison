@@ -218,6 +218,13 @@ test('admission status omits unknown and unrecognized values', () => {
   assert.equal(getAdmissionStatusKey('No places available'), 'full')
   assert.equal(getAdmissionStatusKey('Places available'), 'accepting')
   assert.equal(getAdmissionStatusKey('Open'), 'accepting')
+  assert.equal(getAdmissionStatusKey('full'), 'full')
+  assert.equal(getAdmissionStatusKey('Not specified'), null)
+  assert.equal(getAdmissionStatusKey('No information'), null)
+  assert.equal(getAdmissionStatusKey('Accepting applications, no waitlist'), 'accepting')
+  assert.equal(getAdmissionStatusKey('Accepting, full-day programme'), 'accepting')
+  assert.equal(getAdmissionStatusKey('Open - no entrance exam'), 'accepting')
+  assert.equal(getAdmissionStatusKey('Waiting list'), 'waitlist')
 })
 
 test('display evidence treats explicit false as evidence but empty values as absent', () => {

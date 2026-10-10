@@ -19,6 +19,8 @@ i18n
     resources,
     fallbackLng: 'bg',
     supportedLngs: ['bg', 'en'],
+    // One namespace; scraped text used as a key may contain ':' ("Clubs: English").
+    nsSeparator: false,
     lng: languageFromPath(window.location.pathname),
     interpolation: {
       escapeValue: false,
