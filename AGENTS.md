@@ -36,7 +36,7 @@ Bulgarian cities, then other countries.
 - Bilingual interface (Bulgarian primary, English secondary for MVP)
 
 **Current status:** Multi-country refactoring complete. Scraping pipeline Stages 1-7 are
-implemented and wired into the CLI/Celery pipeline (discovery, website discovery, URL
+implemented and run through the scraper CLI (discovery, website discovery, URL
 validation, navigation, extraction, validation/spot checks, summarization). Official Bulgaria
 NVO import is an independent stage, with Sofia backfilled for `nvo_4`, `nvo_7`, `nvo_10`
 across 2021-2025. Current work is data quality and go-live (backlog: `docs/GO_LIVE_PLAN.md`).
@@ -55,7 +55,7 @@ admission-threshold tooling.
 - **Backend:** FastAPI (async), SQLAlchemy 2.0 async ORM, Alembic, PostgreSQL (no PostGIS —
   plain lat/lng floats), Pydantic v2 (also for LLM structured output), **uv** for packages.
 - **Frontend:** React 18 + Vite, Leaflet (CartoDB Positron tiles), i18next (BG/EN), Tailwind.
-- **Infra:** PostgreSQL + Redis via `docker-compose.yml` (Redis is for Celery).
+- **Infra:** PostgreSQL + SearXNG (website search) via `docker-compose.yml`.
 
 **uv, not pip:** every backend command is `uv run X`; add dependencies with `uv add`. Never
 use `pip install` or `requirements.txt`.
@@ -88,7 +88,7 @@ use `pip install` or `requirements.txt`.
 │   └── src/              # components/, i18n/, api/, utils/
 ├── skills/               # Task procedures (index below)
 ├── docs/                 # Plans and design notes (GO_LIVE_PLAN.md)
-└── docker-compose.yml    # PostgreSQL + Redis
+└── docker-compose.yml    # PostgreSQL + SearXNG
 ```
 
 ---
@@ -179,7 +179,13 @@ you hit a real problem.
 - Prefer what libraries already do (Leaflet distance, not a custom haversine) and simple
   retries (1-2-3, not backoff with jitter). No caching/queues before a real performance problem.
 - Large files (`app/scrapers/extractor_helpers.py`, `extractor.py`, `cli.py` are
-  2,000–4,500 lines): locate code with `grep -n` and read only the needed line ranges.
+  2,000–5,000 lines): locate code with `grep -n` and read only the needed line ranges.
+- **Don't grow the giant files.** New functions do not go into `app/scrapers/cli.py`,
+  `app/scrapers/extractor_helpers.py`, `app/scrapers/extractor.py`, `app/scrapers/validator.py`
+  or `frontend/src/components/SearchPage/SearchPage.jsx`. Put new logic in a focused module
+  (a service, a stage module, a `src/utils/` file) and call it from there; a CLI command
+  stays a thin wrapper. Fixing existing code in place is fine. The plan for breaking these
+  files up is in `docs/TECH_DEBT_PLAN.md`.
 
 Before implementing, ask: can this be computed instead of stored? Can it go in JSON instead of
 a new column? Can I use what's already installed? Is there a simpler way?

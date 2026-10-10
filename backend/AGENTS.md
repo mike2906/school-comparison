@@ -133,7 +133,7 @@ before touching `app/services/geocoding`.
 
 **Environment** — copy `backend/.env.example` (every variable, with defaults) to
 `backend/.env`. Required:
-`DATABASE_URL`, `REDIS_URL`; `OPENROUTER_API_KEY` for LLM stages.
+`DATABASE_URL`; `OPENROUTER_API_KEY` for LLM stages.
 
 ---
 

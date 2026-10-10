@@ -2273,6 +2273,8 @@ the session scratchpad only.
 
 ## Phase 4 — Post-live / portfolio polish (parallelizable, low risk)
 
+P4.1 and P4.4 are scheduled in `docs/TECH_DEBT_PLAN.md` (steps 6 and 7-9), and that plan's order and module locations win.
+
 - [ ] **P4.1 Decompose `SearchPage.jsx`** (2,049 lines, ~25 useState) into custom hooks
       (`useUserLocation`, `useSchoolFilters`, `useMapSync`) + subcomponents. Then
       `ComparePage.jsx` (1,783) and `SchoolCard.jsx` (1,546) if appetite remains.
