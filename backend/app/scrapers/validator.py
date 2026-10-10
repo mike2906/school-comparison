@@ -41,6 +41,7 @@ from app.scrapers.campus_sync import (
 from app.scrapers.price_evidence import (
     RULE_AMOUNT_NEAR_LABEL,
     RULE_DEPOSIT,
+    RULE_EXPIRED,
     RULE_INSTALLMENT,
     RULE_LEVEL,
     RULE_PERIOD_CONFLICT,
@@ -733,6 +734,7 @@ _PRICE_EVIDENCE_ERROR_CODES = {
     RULE_PERIOD_UNREPRESENTABLE: "pricing_period_unrepresentable",
     RULE_DEPOSIT: "pricing_deposit_as_tuition",
     RULE_INSTALLMENT: "pricing_installment_as_tuition",
+    RULE_EXPIRED: "pricing_offer_expired",
 }
 
 
@@ -742,6 +744,8 @@ class FeeScope:
 
     grades: frozenset[int] = frozenset()
     own_name: str | None = None
+    # A kindergarten and a school share the site (Druzhba 522/587, Uwekind 634/635).
+    shares_site: bool = False
 
 
 async def school_fee_scope(db: AsyncSession, school: School) -> FeeScope:
@@ -751,23 +755,25 @@ async def school_fee_scope(db: AsyncSession, school: School) -> FeeScope:
     grades 8-12 only: 505, 529), so they decide whose fee a grade band is only where
     there is another school on the site to own the rest (151/392, 558/565). With them
     comes the school's proper name, when no sibling bears it too: a fee line may name
-    the school instead of its grades.
+    the school instead of its grades. ``shares_site`` says an institution of the other
+    family (a kindergarten for a school, a school for a kindergarten) shares the site.
     """
     # Local import: school_relations imports app.scrapers, whose package imports us.
     from app.services.school_relations import same_site_institutions
 
     group = site_group_key(school.website_url)
-    if level_family(school.education_level) != "school" or not group:
+    family = level_family(school.education_level)
+    if not group:
         return FeeScope()
-    siblings = [
+    on_site = [
         other
         for other in await same_site_institutions(db, school)
-        if other.id != school.id
-        and level_family(other.education_level) == "school"
-        and site_group_key(other.website_url) == group
+        if other.id != school.id and site_group_key(other.website_url) == group
     ]
-    if not siblings:
-        return FeeScope()
+    shares_site = any(level_family(other.education_level) != family for other in on_site)
+    siblings = [other for other in on_site if level_family(other.education_level) == "school"]
+    if family != "school" or not siblings:
+        return FeeScope(shares_site=shares_site)
     groups = (
         await db.execute(
             select(SchoolLocationAgeGroupShift.age_group)
@@ -782,7 +788,7 @@ async def school_fee_scope(db: AsyncSession, school: School) -> FeeScope:
     own_name = name_of(school)
     if own_name and any(name_key(name_of(other)) == name_key(own_name) for other in siblings):
         own_name = None
-    return FeeScope(frozenset(taught_grades(groups)), own_name)
+    return FeeScope(frozenset(taught_grades(groups)), own_name, shares_site)
 
 
 async def _check_price_evidence(
@@ -798,7 +804,12 @@ async def _check_price_evidence(
     """
     # Whose page a row is linked to does not depend on its year: checked for every row.
     scope = await school_fee_scope(db, school)
-    on_siblings_page = [row for row in rows if page_is_another_institutions(row.source_url, scope.grades)]
+    family = level_family(school.education_level)
+    on_siblings_page = [
+        row
+        for row in rows
+        if page_is_another_institutions(row.source_url, scope.grades, family, scope.shares_site)
+    ]
     for row in on_siblings_page:
         _add_issue(
             report,
@@ -823,14 +834,13 @@ async def _check_price_evidence(
             )
         ).all()
     )
-    family = level_family(school.education_level)
     for row in rows:
         text = pages.get(row.source_page_id)
         if not text:
             continue
         row_prefix = f"pricing[{row.id}]"
         for finding in check_price_row(
-            PriceRow.from_pricing(row), text, family, scope.grades, scope.own_name
+            PriceRow.from_pricing(row), text, family, scope.grades, scope.own_name, scope.shares_site
         ):
             if finding.rule == RULE_PERIOD_MISSING:
                 if not period_fits_category(getattr(row.category, "value", row.category), finding.period):

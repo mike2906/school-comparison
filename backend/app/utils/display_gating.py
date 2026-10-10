@@ -365,17 +365,22 @@ def is_scraped_price(row: Any) -> bool:
     return str(getattr(source, "value", source) or "").lower() == "scraped_website"
 
 
-def _yearly_tuition_eur(row: Any) -> decimal.Decimal | None:
-    """Yearly EUR equivalent of a tuition row, or None when it cannot be compared.
+def _yearly_tuition_eur(row: Any) -> tuple[decimal.Decimal, bool] | None:
+    """Yearly EUR equivalent of a tuition row, and whether its period was stated.
 
     Mirrors the frontend's conversion: only monthly, quarterly and yearly fees annualize,
-    and the lower end of a range is the price. Currencies other than EUR/BGN are skipped.
+    and the lower end of a range is the price. A row with no period counts once a year,
+    the least it can cost: a monthly fee saved without its period (330's "460 €") still
+    shows as a whole price, so it must clear the floor too. None when the row cannot be
+    compared (another period, another currency, no amount).
     """
     category = _pricing_row_value(row, "category")
     if str(getattr(category, "value", category) or "").lower() != "tuition":
         return None
     period = _pricing_row_value(row, "period")
-    per_year = _PERIODS_PER_YEAR.get(str(getattr(period, "value", period) or "").lower())
+    period_value = str(getattr(period, "value", period) or "").lower()
+    stated = bool(period_value)
+    per_year = _PERIODS_PER_YEAR.get(period_value) if stated else 1
     if per_year is None:
         return None
     base = _positive_price(_pricing_row_value(row, "amount"))
@@ -388,7 +393,7 @@ def _yearly_tuition_eur(row: Any) -> decimal.Decimal | None:
         base = base / _BGN_PER_EUR
     elif currency != "EUR":
         return None
-    return base * per_year
+    return base * per_year, stated
 
 
 def _median(ordered: list[decimal.Decimal]) -> decimal.Decimal:
@@ -404,31 +409,38 @@ def implausible_tuition_row_ids(rows: Iterable[Any]) -> set[int]:
     :data:`TUITION_YEARLY_FLOOR_EUR`, or below :data:`TUITION_PEER_RATIO_FLOOR` times the
     median yearly tuition across those rows; likewise above
     :data:`TUITION_YEARLY_CEILING_EUR`, or :data:`TUITION_PEER_RATIO_CEILING` times the
-    median of the rows inside those two yearly bounds. Rows that cannot be annualized are
-    left alone.
+    median of the rows inside those two yearly bounds. A row with no period is held to
+    the floors as a yearly fee, but neither sets the median nor meets the peer ceiling:
+    how often it is paid is unknown. Rows that cannot be annualized are left alone.
     """
-    yearly = {}
+    yearly: dict[int, decimal.Decimal] = {}
+    unstated: dict[int, decimal.Decimal] = {}
     for row in rows:
-        value = _yearly_tuition_eur(row)
+        found = _yearly_tuition_eur(row)
         row_id = _pricing_row_value(row, "id")
-        if value is not None and row_id is not None:
-            yearly[row_id] = value
-    if not yearly:
-        return set()
+        if found is not None and row_id is not None:
+            value, stated = found
+            (yearly if stated else unstated)[row_id] = value
     ordered = sorted(yearly.values())
-    median = _median(ordered)
-    peer_floor = median * TUITION_PEER_RATIO_FLOOR
+    peer_floor = _median(ordered) * TUITION_PEER_RATIO_FLOOR if ordered else None
     # The ceiling compares against the rows inside the yearly bounds only: three misfiled
     # add-ons below the floor must not make the school's one real fee look too dear.
     bounded = [
         value for value in ordered if TUITION_YEARLY_FLOOR_EUR <= value <= TUITION_YEARLY_CEILING_EUR
     ]
     peer_ceiling = _median(bounded) * TUITION_PEER_RATIO_CEILING if bounded else None
+
+    def too_cheap(value: decimal.Decimal) -> bool:
+        return value < TUITION_YEARLY_FLOOR_EUR or (peer_floor is not None and value < peer_floor)
+
     return {
         row_id
         for row_id, value in yearly.items()
-        if value < TUITION_YEARLY_FLOOR_EUR
-        or value < peer_floor
+        if too_cheap(value)
         or value > TUITION_YEARLY_CEILING_EUR
         or (peer_ceiling is not None and value > peer_ceiling)
+    } | {
+        row_id
+        for row_id, value in unstated.items()
+        if too_cheap(value) or value > TUITION_YEARLY_CEILING_EUR
     }
