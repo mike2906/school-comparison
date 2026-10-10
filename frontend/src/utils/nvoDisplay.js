@@ -9,10 +9,10 @@ export function formatPercent(value, decimals = 1) {
 }
 
 export function getPerformanceStyle(value) {
-  if (value == null) return { text: 'text-neutral-600', bg: 'bg-neutral-300' }
-  if (value >= 75) return { text: 'text-emerald-500', bg: 'bg-emerald-500' }
-  if (value >= 60) return { text: 'text-amber-500', bg: 'bg-amber-500' }
-  return { text: 'text-red-500', bg: 'bg-red-500' }
+  if (value == null) return { text: 'text-neutral-600' }
+  if (value >= 75) return { text: 'text-emerald-500' }
+  if (value >= 60) return { text: 'text-amber-500' }
+  return { text: 'text-red-500' }
 }
 
 /** Colour against the Sofia average for the same exam and year when known, else by score band. */

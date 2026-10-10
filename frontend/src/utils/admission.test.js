@@ -122,6 +122,7 @@ const kindergartenAdmission = {
     },
     { year: 2025, age_group: 'nursery', rounds: [{ round: 1, last_admitted_points: 12 }] },
     { year: 2025, age_group: 'second', rounds: [] },
+    { year: 2025, age_group: 'third', rounds: null },
   ],
 }
 
@@ -130,6 +131,8 @@ test('last admitted points come from the final round of the latest year for the 
   assert.deepEqual(getLastAdmittedPoints(kindergartenAdmission, 'nursery'), { points: 12, year: 2025, round: 1 })
   assert.equal(getLastAdmittedPoints(kindergartenAdmission, 'second'), null)
   assert.equal(getLastAdmittedPoints(kindergartenAdmission, 'third'), null)
+  assert.deepEqual(getPointsHistory(kindergartenAdmission, 'third'), [])
+  assert.equal(getLastAdmittedPoints(kindergartenAdmission, 'preschool'), null)
   assert.equal(getLastAdmittedPoints({}, 'first'), null)
   assert.equal(getLastAdmittedPoints(null, null), null)
 })

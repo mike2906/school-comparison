@@ -103,9 +103,10 @@ function latestByYear(items) {
   return items.reduce((acc, item) => (item.year > acc.year ? item : acc), items[0])
 }
 
-function lastRound(rounds = []) {
-  if (rounds.length === 0) return null
-  return rounds.reduce((acc, item) => (item.round > acc.round ? item : acc), rounds[0])
+function lastRound(rounds) {
+  const list = rounds || []
+  if (list.length === 0) return null
+  return list.reduce((acc, item) => (item.round > acc.round ? item : acc), list[0])
 }
 
 function thresholdsFor(admissionInfo, ageGroup) {
