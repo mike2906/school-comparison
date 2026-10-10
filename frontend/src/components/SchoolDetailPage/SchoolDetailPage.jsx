@@ -7,16 +7,19 @@ import { getSchoolName, getAddress, getSummary } from '../../utils/i18n'
 import { normalizeSchool } from '../../utils/schoolAttributes'
 import { getLastSearchUrl } from '../../utils/searchViewState'
 import { examTypeForAgeGroup } from '../../utils/nvo'
-import { curatedRequirement, usesSofiaKindergartenSystem } from '../../utils/admission'
+import {
+  curatedRequirement,
+  getAdmissionRequirement,
+  getLastAdmittedPoints,
+  getMinNvoScore,
+  usesSofiaKindergartenSystem,
+} from '../../utils/admission'
 import { schoolLevelLabel, schoolTypeLabel } from '../../utils/levelLabel'
 import { useCountry } from '../../context/CountryContext'
 import { useCompare } from '../../context/CompareContext'
 import {
   getStatusInfo,
   parseCoordinate,
-  getLastAdmittedPoints,
-  getMinNvoScore,
-  getAdmissionRequirement,
   getNvoDetail,
   getAmenityFlags,
   getLanguageLabel,
