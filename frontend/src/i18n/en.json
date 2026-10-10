@@ -262,7 +262,11 @@
       "yearly": "year"
     },
     "pricePerPeriod": "{{price}} {{currency}} / {{period}}",
-    "priceOnly": "{{price}} {{currency}}"
+    "priceOnly": "{{price}} {{currency}}",
+    "other": "Other fees",
+    "sourceLink": "Source: {{site}}",
+    "sourceLinkLabel": "See these prices on {{site}} (opens in a new window)",
+    "checkedOn": "checked {{date}}"
   },
   "priceSource": {
     "official": "From the school",

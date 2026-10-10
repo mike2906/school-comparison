@@ -1998,6 +1998,17 @@ the session scratchpad only.
       Д-р Петър Берон, Никатор, Свети Георги, Проф. Николай Райнов. Left apart: Куест
       (209 m), Малкото школо / Българско школо and Малки стъпки / Азбуки (no shared brand),
       Монтесори (shares a pin with unrelated schools).
+- [x] **UF47 School-page fees are hard to read and can't be checked (Mike, 2026-10-10).**
+      Ryorih (171) showed five tuition rows for two grade bands as one flat list, each
+      with its own source badge and no link. The school page now groups each category's fees by
+      the age group they name (when there are two or more), says once per academic year
+      where the prices came from (badge, link to the stored `source_url` page, the day we
+      checked it), or on each row when rows come from different pages, and shows no link
+      when none is stored. Camp, uniform, extended-day and extracurricular fees get their
+      own headings instead of an untranslated "pricing.other". Not fixed here (data):
+      171's expired early-bird tiers (rule 7 should withhold them on the next
+      validation run and publish), its "ПК" age group on the PK–7 row, and plan names
+      that are English-only in the Bulgarian UI.
 
 ## Phase 3 — Go live
 
