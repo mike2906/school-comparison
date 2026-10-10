@@ -1,4 +1,7 @@
 """Test fixtures with SQLite."""
+import datetime
+import types
+
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
@@ -11,6 +14,38 @@ from app.models.school import School, SchoolLocation, SchoolLocationAgeGroupShif
 from app.routers import schools as schools_router
 
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
+
+# The date a test sees through `frozen_today`. Pricing code drops fee tables whose academic
+# year is over, so a test page naming "2025/2026" only means the same thing on a fixed date.
+FROZEN_TODAY = datetime.date(2026, 10, 10)
+
+
+class _FrozenDate(datetime.date):
+    @classmethod
+    def today(cls):
+        return cls(FROZEN_TODAY.year, FROZEN_TODAY.month, FROZEN_TODAY.day)
+
+
+class _FrozenDateTime(datetime.datetime):
+    @classmethod
+    def now(cls, tz=None):
+        moment = cls(FROZEN_TODAY.year, FROZEN_TODAY.month, FROZEN_TODAY.day, 12, tzinfo=datetime.timezone.utc)
+        return moment.astimezone(tz) if tz else moment.replace(tzinfo=None)
+
+
+@pytest.fixture
+def frozen_today(monkeypatch):
+    """Pin the clock that the price extraction and evidence code reads to FROZEN_TODAY."""
+    from app.scrapers import extractor_helpers, price_evidence
+    from app.utils import academic_year
+
+    clock = types.SimpleNamespace(**vars(datetime))
+    clock.date = _FrozenDate
+    clock.datetime = _FrozenDateTime
+    monkeypatch.setattr(extractor_helpers, "datetime", clock)
+    monkeypatch.setattr(price_evidence, "datetime", clock)
+    monkeypatch.setattr(academic_year, "date", _FrozenDate)
+    return FROZEN_TODAY
 
 
 @pytest.fixture(autouse=True)

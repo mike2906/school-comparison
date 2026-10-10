@@ -18,6 +18,8 @@ from app.scrapers.price_evidence import (
     PriceRow,
     amount_spans,
     check_price_row,
+    expired_offer,
+    fee_number_starts,
     heading_period,
     label_is_another_institutions,
     normalize_text,
@@ -26,6 +28,9 @@ from app.scrapers.price_evidence import (
 )
 
 TODAY = datetime.date(2026, 10, 9)
+
+# Extraction helpers read the clock too; pin it so year-relative cases do not expire.
+pytestmark = pytest.mark.usefixtures("frozen_today")
 
 
 def row(amount, category="TUITION", period=None, plan_name=None, currency="EUR", age_group=None):
@@ -292,3 +297,53 @@ def test_517_extraction_reads_the_heading_when_the_word_beside_the_amount_cannot
 )
 def test_text_list_keeps_decimal_commas(raw, expected):
     assert helpers._normalize_text_list([raw]) == expected
+
+
+# ---------------------------------------------------------------------------
+# Amounts, currencies and dates as written on Bulgarian fee pages
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize(
+    "text,expected",
+    [
+        ("1.234,56 лв.", (1234.56, "BGN")),  # dot thousands, decimal comma
+        ("1,234.56 EUR", (1234.56, "EUR")),  # comma thousands, decimal point
+        ("6.200 лв.", (6200.0, "BGN")),  # a dot before three digits groups thousands
+        ("12.50 евро", (12.5, "EUR")),  # before two digits it is a decimal point
+        ("6,200 EUR", (6200.0, "EUR")),
+        ("181,44 лв.", (181.44, "BGN")),
+        ("1.234.567 лв", (1234567.0, "BGN")),
+        ("1,234,567 €", (1234567.0, "EUR")),
+        ("6 200 лв.", (6200.0, "BGN")),
+        ("лв 450", (450.0, "BGN")),
+        ("BGN 1 200", (1200.0, "BGN")),
+        ("500 лева", (500.0, "BGN")),
+        ("€ 7 500", (7500.0, "EUR")),
+        ("300 USD", (None, None)),
+    ],
+)
+def test_price_line_amount_and_currency(text, expected):
+    assert helpers._extract_price_amount_currency(text) == expected
+
+
+@pytest.mark.parametrize(
+    "name,month",
+    [
+        ("януари", 1), ("февруари", 2), ("март", 3), ("април", 4), ("май", 5), ("юни", 6),
+        ("юли", 7), ("август", 8), ("септември", 9), ("октомври", 10), ("ноември", 11), ("декември", 12),
+        ("january", 1), ("february", 2), ("march", 3), ("april", 4), ("may", 5), ("june", 6),
+        ("july", 7), ("august", 8), ("september", 9), ("october", 10), ("november", 11), ("december", 12),
+    ],
+)  # fmt: skip
+def test_offer_deadline_reads_every_month_name(name, month):
+    if name.isascii():
+        context = f"Early bird price, offer valid until 15 {name} 2026\n5500 EUR"
+    else:
+        context = f"Цени за договори, сключени до 15 {name} 2026\n5500 €"
+    # Five days after the deadline: expired on the 15th of that same month.
+    assert expired_offer(context, datetime.date(2026, month, 20)) == datetime.date(2026, month, 15)
+
+
+def test_years_in_a_fee_table_are_not_read_as_bare_prices():
+    text = "| Клас | Такса |\n|---|---|\n| 2025 | 2026 |\n| 1-4 | 7500 |\n"
+    assert [text[start:start + 4] for start in fee_number_starts(text)] == ["7500"]

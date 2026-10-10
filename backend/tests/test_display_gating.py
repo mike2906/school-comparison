@@ -8,7 +8,7 @@ rather than only on hand-written report payloads.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 import pytest
 from sqlalchemy import select
@@ -23,6 +23,7 @@ from app.scrapers.validator import _spot_check_path_is_core
 from app.utils.display_gating import (
     _FIELD_PATH_DISPLAY_FIELDS,
     NVO_MIN_PUPILS,
+    admission_value_is_semantically_valid,
     blocked_display_fields,
     exam_result_is_publishable,
     implausible_tuition_row_ids,
@@ -460,6 +461,45 @@ def test_bgn_tuition_is_converted_before_comparison():
     # 1500 BGN/year is about €767: below the floor. 1500 BGN/month is not.
     assert implausible_tuition_row_ids([_tuition_row(1, 1500, "yearly", "BGN")]) == {1}
     assert implausible_tuition_row_ids([_tuition_row(1, 1500, "monthly", "BGN")]) == set()
+
+
+def test_monthly_tuition_annualizes_twelve_times_against_both_yearly_bounds():
+    # 80/month is 960 a year, under the 1,000 floor; 90/month is 1,080, over it.
+    assert implausible_tuition_row_ids([_tuition_row(1, 80)]) == {1}
+    assert implausible_tuition_row_ids([_tuition_row(1, 90)]) == set()
+    # 4,000/month is 48,000 a year, under the 50,000 ceiling; 4,200/month is 50,400.
+    assert implausible_tuition_row_ids([_tuition_row(1, 4000)]) == set()
+    assert implausible_tuition_row_ids([_tuition_row(1, 4200)]) == {1}
+    # Both bounds are inclusive.
+    assert implausible_tuition_row_ids([_tuition_row(1, 1000, "yearly")]) == set()
+    assert implausible_tuition_row_ids([_tuition_row(1, 50000, "yearly")]) == set()
+
+
+def test_peer_floor_uses_the_middle_two_rows_when_a_school_has_an_even_number():
+    # Median of 4,000 and 5,000 is 4,500, so the peer floor is 1,125 a year.
+    rows = [_tuition_row(i, a, "yearly") for i, a in enumerate([1100, 4000, 5000, 6000], 1)]
+    assert implausible_tuition_row_ids(rows) == {1}
+    rows = [_tuition_row(i, a, "yearly") for i, a in enumerate([1150, 4000, 5000, 6000], 1)]
+    assert implausible_tuition_row_ids(rows) == set()
+
+
+@pytest.mark.parametrize(
+    "today,text,valid",
+    [
+        # Before July the admission cycle in progress is the one that started last autumn.
+        (date(2027, 3, 10), "Прием за 2026/2027 учебна година с тест и интервю.", True),
+        (date(2027, 3, 10), "Прием за 2025/2026 учебна година с тест и интервю.", False),
+        (date(2027, 6, 30), "Прием за 2026/2027 учебна година с тест и интервю.", True),
+        # From 1 July the next cycle has started.
+        (date(2027, 7, 1), "Прием за 2026/2027 учебна година с тест и интервю.", False),
+        (date(2027, 7, 1), "Прием за 2027/2028 учебна година с тест и интервю.", True),
+        # A bare year counts as current when it is the cycle's start year or later.
+        (date(2027, 3, 10), "Приемният изпит се проведе през 2026 г.", True),
+        (date(2027, 3, 10), "Приемният изпит се проведе през 2025 г.", False),
+    ],
+)
+def test_admission_text_is_current_only_for_the_cycle_in_progress(today, text, valid):
+    assert admission_value_is_semantically_valid("entrance_requirements", text, today=today) is valid
 
 
 def test_quarterly_tuition_annualizes_and_ranges_use_the_lower_bound():
