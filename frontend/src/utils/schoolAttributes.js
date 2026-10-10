@@ -148,7 +148,7 @@ const STATUS_KEYS = new Set(['accepting', 'waitlist', 'full'])
 export function getAdmissionStatusKey(rawStatus) {
   const status = String(rawStatus || '').trim().toLowerCase()
   if (STATUS_KEYS.has(status)) return status
-  if (/\b(no|not)\s+(places|spots|vacanc|accepting|open)|\bclosed\b|\bfully booked\b|^full\b(?![- ]day)/.test(status)) {
+  if (/\b(no|not)\s+(places|spots|vacanc|accepting|open)|\bclosed\b|\bfully booked\b|(?<!\b(?:not|yet)\s)\bfull\b(?![- ]day)/.test(status)) {
     return 'full'
   }
   if (/\bwait(ing)?[- ]?list/.test(status) && !/\bno\s+wait/.test(status)) return 'waitlist'
