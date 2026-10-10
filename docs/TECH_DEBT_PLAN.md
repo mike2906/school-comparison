@@ -146,6 +146,7 @@ Every step below follows the same ground rules:
   - The shim never re-exports a name that any test patches. A stale patch then raises `AttributeError` instead of passing quietly. This is safe for `cli.py`, because nothing in `app/` or `scripts/` imports it.
   - Each PR body lists the patch targets it changed, and reviewers check that list.
   - Plain calls through the shim (`helpers._X(...)` in `test_extractor.py`) are fine. They still exercise the moved code.
+  - The `frozen_today` fixture in `tests/conftest.py` (from #221) monkeypatches `datetime` on `app.scrapers.extractor_helpers` and `app.scrapers.price_evidence`, and `date` on `app.utils.academic_year`. A move that takes date-reading code into a new module must add that module to the fixture, or those tests go back to the real clock and start expiring. Check by running the suite with the clock moved forward (`uv run --with time-machine`); it passes up to 2035 today.
 - **Review follows the merge policy.**
   - Small PRs get a fresh-context code review.
   - The big pure-move PRs are larger in diff than in risk, so Codex is best spent on the dedupe steps (3.x and 5.x), where behaviour actually changes.
