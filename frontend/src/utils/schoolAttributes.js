@@ -227,6 +227,10 @@ export function getOptionLabel(option, t) {
   // nsSeparator off: scraped text with a colon ("Clubs: English") is not a namespace.
   const translated = t(key, { nsSeparator: false })
   if (translated !== key) return translated
+  // Language-focus levels ("immersion", "bilingual") have their own keys.
+  const levelKey = `advancedFilters.levels.${option}`
+  const level = t(levelKey, { nsSeparator: false })
+  if (level !== levelKey) return level
   // Free text scraped from a website: tidy it, but never Title-Case a sentence.
   return humanizeTag(option)
 }

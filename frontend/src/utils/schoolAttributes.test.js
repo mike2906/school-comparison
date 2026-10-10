@@ -317,3 +317,10 @@ test('getOptionLabel does not treat a colon in scraped text as an i18next namesp
   assert.equal(getOptionLabel('montessori', t), 'Montessori')
   assert.equal(getOptionLabel('Speaking clubs: English, German', t), 'Speaking clubs: English, German')
 })
+
+test('getOptionLabel translates language-focus levels', async () => {
+  const { default: i18next } = await import('i18next')
+  const i18n = i18next.createInstance()
+  await i18n.init({ lng: 'bg', resources: { bg: { translation: { advancedFilters: { options: {}, levels: { immersion: 'Пълна програма' } } } } } })
+  assert.equal(getOptionLabel('immersion', i18n.t.bind(i18n)), 'Пълна програма')
+})
