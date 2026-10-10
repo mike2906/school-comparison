@@ -139,13 +139,20 @@ export function getLocationDisplayEvidence(location, address = null, distance = 
   }
 }
 
+const STATUS_KEYS = new Set(['accepting', 'waitlist', 'full'])
+
+/**
+ * Curated data uses the exact keys. Free text is matched only on clear phrases, so
+ * "Not specified" stays unknown and "Accepting, no waitlist" stays accepting.
+ */
 export function getAdmissionStatusKey(rawStatus) {
   const status = String(rawStatus || '').trim().toLowerCase()
-  if (status.includes('accept') || status.includes('open') || status.includes('available')) {
-    return 'accepting'
+  if (STATUS_KEYS.has(status)) return status
+  if (/\b(no|not)\s+(places|spots|vacanc|accepting|open)|\bclosed\b|\bfully booked\b|(?<!\b(?:not|yet)\s)\bfull\b(?![- ]day)/.test(status)) {
+    return 'full'
   }
-  if (status.includes('wait')) return 'waitlist'
-  if (status.includes('full') || status.includes('closed')) return 'full'
+  if (/\bwait(ing)?[- ]?list/.test(status) && !/\bno\s+wait/.test(status)) return 'waitlist'
+  if (/\baccept|\bopen\b|\bavailable\b/.test(status)) return 'accepting'
   return null
 }
 
@@ -217,7 +224,8 @@ export function getStatusInfo(school, t) {
 export function getOptionLabel(option, t) {
   if (!option) return ''
   const key = `advancedFilters.options.${option}`
-  const translated = t(key)
+  // nsSeparator off: scraped text with a colon ("Clubs: English") is not a namespace.
+  const translated = t(key, { nsSeparator: false })
   if (translated !== key) return translated
   // Free text scraped from a website: tidy it, but never Title-Case a sentence.
   return humanizeTag(option)
