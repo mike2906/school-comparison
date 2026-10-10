@@ -644,7 +644,7 @@ function PopupContent({
           <div className="flex items-start gap-2">
             <span className="text-neutral-400">📏</span>
             <span>
-              {formatDistance(distanceKm, { approximate: marker.location.coordinates_approximate, language })}{' '}
+              {formatDistance(distanceKm, { approximate: marker.location.coordinates_approximate, language, t })}{' '}
               {t('location.fromYou')}
             </span>
           </div>

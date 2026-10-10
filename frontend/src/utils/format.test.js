@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { formatDistance, intlLocale } from './format.js'
+import { formatDistance, formatKm, intlLocale } from './format.js'
 
 test('intlLocale maps the UI language to one Intl locale', () => {
   assert.equal(intlLocale('bg'), 'bg-BG')
@@ -9,10 +9,12 @@ test('intlLocale maps the UI language to one Intl locale', () => {
   assert.equal(intlLocale(undefined), 'en-GB')
 })
 
-test('formatDistance uses the locale decimal separator and marks approximate pins', () => {
-  assert.equal(formatDistance(1.234, { language: 'en' }), '1.2 km')
-  assert.match(formatDistance(1.234, { language: 'bg' }), /^1,2\s/)
-  assert.equal(formatDistance(3, { language: 'en', approximate: true }), '~3.0 km')
-  assert.equal(formatDistance(null), null)
-  assert.equal(formatDistance(Number.NaN), null)
+test('formatDistance formats the number by locale and the unit through i18n', () => {
+  const t = (key, { km }) => (key.endsWith('Approx') ? `~${km} км` : `${km} км`)
+  assert.equal(formatKm(1.234, 'en'), '1.2')
+  assert.equal(formatKm(2, 'bg'), '2,0')
+  assert.equal(formatDistance(1.234, { language: 'bg', t }), '1,2 км')
+  assert.equal(formatDistance(3, { language: 'en', approximate: true, t }), '~3.0 км')
+  assert.equal(formatDistance(null, { language: 'en', t }), null)
+  assert.equal(formatDistance(Number.NaN, { language: 'en', t }), null)
 })

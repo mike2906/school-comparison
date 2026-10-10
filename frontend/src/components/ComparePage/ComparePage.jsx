@@ -653,7 +653,7 @@ function ComparePage() {
           return distance != null
             ? (
               <span className="text-sm text-neutral-700">
-                {formatDistance(distance, { approximate: metrics.distanceApproximate, language: i18n.language })}
+                {formatDistance(distance, { approximate: metrics.distanceApproximate, language: i18n.language, t })}
               </span>
             )
             : renderPlaceholder()
@@ -1032,7 +1032,7 @@ function ComparePage() {
                     <div className="text-xs text-neutral-500">
                       {shiftInfo?.shift ? t(`schoolCard.shift.${shiftInfo.shift}`) : null}
                       {distance != null
-                        ? ` • ${formatDistance(distance, { approximate: location.coordinates_approximate, language: i18n.language })}`
+                        ? ` • ${formatDistance(distance, { approximate: location.coordinates_approximate, language: i18n.language, t })}`
                         : ''}
                     </div>
                   </div>
