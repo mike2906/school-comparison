@@ -700,7 +700,7 @@ def test_normalize_spot_check_output_derives_direction_and_requires_evidence():
     assert normalized.has_discrepancy is True
 
 
-def test_build_spot_check_context_balances_categories_and_deduplicates():
+def test_build_spot_check_context_balances_categories_within_the_cap():
     pages = [
         SimpleNamespace(id=1, source_url="https://school.test/", page_category="homepage", raw_markdown="HOME " * 1000),
         SimpleNamespace(id=2, source_url="https://school.test/admission", page_category="admission", raw_markdown="ADMISSION " * 500),
@@ -714,8 +714,30 @@ def test_build_spot_check_context_balances_categories_and_deduplicates():
     assert "[admission] https://school.test/admission" in context
     assert "[programs] https://school.test/programs" in context
     assert "[facilities] https://school.test/facilities" in context
-    assert context.count("PROGRAMS") < 500
     assert len(context) <= 3000
+
+
+def test_build_spot_check_context_drops_repeated_urls_and_repeated_content():
+    pages = [
+        SimpleNamespace(id=5, source_url="https://school.test/programs#top", page_category="programs", raw_markdown="PROGRAMS new"),
+        SimpleNamespace(id=4, source_url="https://school.test/fees", page_category="fees", raw_markdown="FEES table"),
+        SimpleNamespace(id=3, source_url="https://school.test/admission", page_category="admission", raw_markdown="ADMISSION  rules"),
+        # Same text as page 3 once whitespace is collapsed.
+        SimpleNamespace(id=2, source_url="https://school.test/admission-copy", page_category="admission", raw_markdown="ADMISSION rules"),
+        # Same URL as page 5 once the fragment is dropped; the newer page wins.
+        SimpleNamespace(id=1, source_url="https://school.test/programs", page_category="programs", raw_markdown="PROGRAMS old"),
+    ]  # fmt: skip
+
+    context = validator_module._build_spot_check_context(pages, max_chars=10000)
+
+    headers = sorted(line for line in context.splitlines() if line.startswith("["))
+    assert headers == [
+        "[admission] https://school.test/admission",
+        "[fees] https://school.test/fees",
+        "[programs] https://school.test/programs",
+    ]
+    assert "PROGRAMS new" in context
+    assert "PROGRAMS old" not in context
 
 
 def test_filter_spot_check_evidence_requires_source_quote_for_omission_and_contradiction():

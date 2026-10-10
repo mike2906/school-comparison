@@ -132,8 +132,11 @@ def test_parse_nvo_csv_extracts_subject_scores_and_missing_subject_gaps():
 
     entries, stats = parse_nvo_csv(resource, csv_text)
 
-    assert len(entries) == 3
-    assert {entry.subject for entry in entries} == {"bulgarian", "math"}
+    assert sorted((e.institutional_id, e.subject, e.value, e.sat_count) for e in entries) == [
+        ("222222", "bulgarian", 78.5, 120),
+        ("222222", "math", 65.25, 120),
+        ("333333", "bulgarian", 70.1, 80),
+    ]
     assert stats["missing_subject_values"] == 1
     assert entries[0].year == 2025
     assert entries[0].source_url == resource.resource_view_url
@@ -185,9 +188,12 @@ def test_parse_nvo_csv_handles_legacy_two_row_header_with_admin_code():
 
     entries, stats = parse_nvo_csv(resource, csv_text)
 
-    assert len(entries) == 2
-    assert {entry.subject for entry in entries} == {"bulgarian", "math"}
-    assert all(entry.institutional_id == "222222" for entry in entries)
+    # The two-row header names the subject above and the measure below: БЕЛ's average is
+    # the 78.5 under "Ср. успех в точки", not the 120 who sat it.
+    assert sorted((e.institutional_id, e.subject, e.value, e.sat_count) for e in entries) == [
+        ("222222", "bulgarian", 78.5, 120),
+        ("222222", "math", 65.25, 120),
+    ]
     assert stats["missing_subject_values"] == 0
 
 
@@ -207,8 +213,10 @@ def test_parse_nvo_csv_handles_legacy_preamble_and_secondary_subject_row():
 
     entries, _ = parse_nvo_csv(resource, csv_text)
 
-    assert len(entries) == 2
-    assert {entry.subject for entry in entries} == {"bulgarian", "math"}
+    assert sorted((e.institutional_id, e.subject, e.value, e.sat_count) for e in entries) == [
+        ("333333", "bulgarian", 70.1, 80),
+        ("333333", "math", 61.4, 80),
+    ]
     assert all(entry.city_key == "sofia" for entry in entries)
 
 

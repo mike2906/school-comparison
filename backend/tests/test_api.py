@@ -1099,20 +1099,37 @@ class TestSchoolsFilterEndpoint:
         assert school.id in ids
 
     @pytest.mark.asyncio
-    async def test_include_crossover_preschool(self, seeded_client):
-        """Test include_crossover=true for preschool age group."""
-        # Without crossover - should only get kindergartens
-        response1 = await seeded_client.get("/schools?age_group=preschool&education_level=kindergarten")
-        assert response1.status_code == 200
-        data1 = response1.json()
-        assert len(data1) == 1  # Only state KG with preschool
+    async def test_include_crossover_preschool(self, seeded_db, seeded_client):
+        """include_crossover=true lifts the education-level filter for the preschool age group."""
+        school = School(
+            name_i18n={"bg": "Училище с подготвителна група", "en": "School with a preschool group"},
+            country_code="bg",
+            school_type="state",
+            education_level="primary",
+            city="sofia",
+        )
+        seeded_db.add(school)
+        await seeded_db.flush()
+        location = SchoolLocation(
+            school_id=school.id, address_i18n={"bg": "ул. Оборище 5, София"}, lat=42.68, lng=23.31, is_primary=True
+        )
+        seeded_db.add(location)
+        await seeded_db.flush()
+        seeded_db.add(SchoolLocationAgeGroupShift(location_id=location.id, age_group="preschool", shift="morning"))
+        await seeded_db.commit()
 
-        # With crossover - should get both kindergartens and primary schools
-        response2 = await seeded_client.get("/schools?age_group=preschool&include_crossover=true")
-        assert response2.status_code == 200
-        data2 = response2.json()
-        # Should have both the state KG with preschool location
-        assert len(data2) >= 1
+        def names(response):
+            assert response.status_code == 200
+            return sorted(item["name_i18n"]["en"] for item in response.json())
+
+        # Without crossover, the kindergarten filter keeps the school out.
+        assert names(
+            await seeded_client.get("/schools?age_group=preschool&education_level=kindergarten")
+        ) == ["KG #1 Happy Childhood"]
+        # With crossover, the same filter returns both.
+        assert names(
+            await seeded_client.get("/schools?age_group=preschool&education_level=kindergarten&include_crossover=true")
+        ) == ["KG #1 Happy Childhood", "School with a preschool group"]
 
     @pytest.mark.asyncio
     async def test_preschool_school_filter_includes_all_through_schools(self, seeded_db, seeded_client):
@@ -1167,25 +1184,21 @@ class TestSchoolsSearchEndpoint:
         """Search schools by English name."""
         response = await seeded_client.get("/schools/search?q=Happy")
         assert response.status_code == 200
-        data = response.json()
-        assert len(data) >= 1
-        assert "Happy" in data[0]["name_i18n"]["en"]
+        assert [d["name_i18n"]["en"] for d in response.json()] == ["KG #1 Happy Childhood"]
 
     @pytest.mark.asyncio
     async def test_search_partial_match(self, seeded_client):
         """Search with partial name match."""
         response = await seeded_client.get("/schools/search?q=Joliot")
         assert response.status_code == 200
-        data = response.json()
-        assert len(data) >= 1
+        assert [d["name_i18n"]["en"] for d in response.json()] == ["23 SU Frederic Joliot-Curie"]
 
     @pytest.mark.asyncio
     async def test_search_case_insensitive(self, seeded_client):
         """Search is case-insensitive."""
         response = await seeded_client.get("/schools/search?q=sunshine")
         assert response.status_code == 200
-        data = response.json()
-        assert len(data) >= 1
+        assert [d["name_i18n"]["en"] for d in response.json()] == ["Private KG Sunshine"]
 
     @pytest.mark.asyncio
     async def test_search_matches_location_address(self, seeded_client):
@@ -1707,17 +1720,21 @@ class TestCompareEndpoint:
         assert response.status_code == 404
 
     @pytest.mark.asyncio
-    async def test_compare_max_five_schools(self, seeded_client):
-        """Compare is limited to 5 schools."""
-        # We only have 3 schools, but test the logic
-        list_response = await seeded_client.get("/schools")
-        schools = list_response.json()
-        ids = ",".join(str(s["id"]) for s in schools)
+    async def test_compare_max_five_schools(self, seeded_db, seeded_client):
+        """Compare keeps the first 5 of more requested ids."""
+        extra = [
+            School(name_i18n={"bg": f"Училище {i}"}, country_code="bg", school_type="state",
+                   education_level="primary", city="sofia")
+            for i in range(3)
+        ]  # fmt: skip
+        seeded_db.add_all(extra)
+        await seeded_db.commit()
+        all_ids = sorted((await seeded_db.execute(select(School.id))).scalars().all())
+        assert len(all_ids) == 6
 
-        response = await seeded_client.get(f"/compare?ids={ids}")
+        response = await seeded_client.get(f"/compare?ids={','.join(str(i) for i in all_ids)}")
         assert response.status_code == 200
-        data = response.json()
-        assert len(data) <= 5
+        assert sorted(item["id"] for item in response.json()) == all_ids[:5]
 
     @pytest.mark.asyncio
     async def test_compare_returns_locations(self, seeded_client):

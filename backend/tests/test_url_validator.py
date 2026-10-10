@@ -241,7 +241,7 @@ class TestURLValidatorHeuristics:
             mock_client = AsyncMock()
             mock_client.__aenter__.return_value = mock_client
             mock_client.__aexit__.return_value = None
-            mock_client.get.side_effect = Exception("Timeout")
+            mock_client.get.side_effect = httpx.ReadTimeout("timed out")
             mock_client_class.return_value = mock_client
 
             result, final_url, reason = await validator.validate_url(
@@ -251,6 +251,7 @@ class TestURLValidatorHeuristics:
 
             assert result == ValidationResult.INVALID
             assert final_url is None
+            assert reason == "Connection timeout"
 
     async def test_validate_url_strong_keywords(self):
         """URLs with 3+ keywords are validated without LLM."""

@@ -259,42 +259,6 @@ class TestPipelineStateTransitions:
 
         assert school.scrape_status == "pending"
 
-    async def test_status_progression_pending_to_validated(self, db_session):
-        """Status can progress from pending to validated."""
-        school = School(
-            name_i18n={"bg": "Училище", "en": "School"},
-            country_code="bg",
-            school_type="state",
-            education_level="primary",
-            scrape_status="pending",
-        )
-        db_session.add(school)
-        await db_session.commit()
-
-        # Simulate validation success
-        school.scrape_status = "validated"
-        await db_session.commit()
-
-        assert school.scrape_status == "validated"
-
-    async def test_status_progression_pending_to_failed(self, db_session):
-        """Status can progress from pending to failed_validate."""
-        school = School(
-            name_i18n={"bg": "Училище", "en": "School"},
-            country_code="bg",
-            school_type="state",
-            education_level="primary",
-            scrape_status="pending",
-        )
-        db_session.add(school)
-        await db_session.commit()
-
-        # Simulate validation failure
-        school.scrape_status = "failed_validate"
-        await db_session.commit()
-
-        assert school.scrape_status == "failed_validate"
-
 
 @pytest.mark.asyncio
 class TestPipelineOrchestration:
@@ -434,28 +398,6 @@ class TestAdapterRegistry:
 @pytest.mark.asyncio
 class TestErrorHandling:
     """Test error handling in pipeline."""
-
-    async def test_validator_handles_http_timeout(self):
-        """Validator handles HTTP timeout gracefully."""
-        from app.scrapers.url_validator import URLValidator
-
-        validator = URLValidator(country_code="bg")
-
-        with patch("httpx.AsyncClient") as mock_client_class:
-            mock_client = AsyncMock()
-            mock_client.__aenter__.return_value = mock_client
-            mock_client.__aexit__.return_value = None
-            mock_client.get.side_effect = Exception("Timeout")
-            mock_client_class.return_value = mock_client
-
-            result, final_url, reason = await validator.validate_url(
-                url="https://slow-school.bg",
-                use_llm_fallback=False,
-            )
-
-            assert result == ValidationResult.INVALID
-            assert final_url is None
-            assert "error" in reason.lower() or "validation error" in reason.lower()
 
     async def test_validator_handles_404(self):
         """Validator handles 404 errors."""

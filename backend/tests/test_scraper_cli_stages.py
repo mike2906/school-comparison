@@ -78,16 +78,19 @@ def test_read_cohort_file_rejects_invalid_or_ambiguous_ids(tmp_path, contents):
 
 @pytest.mark.asyncio
 async def test_validate_batch_aggregates_spot_check_usage(db_session):
-    school = School(
-        name_i18n={"bg": "Usage school"},
-        country_code="bg",
-        city="sofia",
-        school_type="private",
-        education_level="primary",
-        scrape_status="extracted",
-        attributes={"extracted": {"programs": ["Primary"]}},
-    )
-    db_session.add(school)
+    schools = [
+        School(
+            name_i18n={"bg": f"Usage school {i}"},
+            country_code="bg",
+            city="sofia",
+            school_type="private",
+            education_level="primary",
+            scrape_status="extracted",
+            attributes={"extracted": {"programs": ["Primary"]}},
+        )
+        for i in range(2)
+    ]
+    db_session.add_all(schools)
     await db_session.commit()
 
     class SessionContext:
@@ -111,15 +114,26 @@ async def test_validate_batch_aggregates_spot_check_usage(db_session):
         ),
         patch(
             "app.scrapers.validator.run_spot_check_for_school",
+            # Two schools with different usage: the batch total must be their sum.
             new=AsyncMock(
-                return_value={
-                    "status": "checked",
-                    "has_discrepancy": False,
-                    "kind_counts": {},
-                    "input_tokens": 500,
-                    "output_tokens": 75,
-                    "token_cost_usd": 0.0042,
-                }
+                side_effect=[
+                    {
+                        "status": "checked",
+                        "has_discrepancy": False,
+                        "kind_counts": {},
+                        "input_tokens": 500,
+                        "output_tokens": 75,
+                        "token_cost_usd": 0.0042,
+                    },
+                    {
+                        "status": "checked",
+                        "has_discrepancy": False,
+                        "kind_counts": {},
+                        "input_tokens": 300,
+                        "output_tokens": 25,
+                        "token_cost_usd": 0.0018,
+                    },
+                ]
             ),
         ),
     ):
@@ -129,12 +143,12 @@ async def test_validate_batch_aggregates_spot_check_usage(db_session):
             city="sofia",
             limit=None,
             force_validate=True,
-            school_ids=[school.id],
+            school_ids=[school.id for school in schools],
         )
 
-    assert summary["input_tokens"] == 500
-    assert summary["output_tokens"] == 75
-    assert summary["token_cost_usd"] == 0.0042
+    assert summary["input_tokens"] == 800
+    assert summary["output_tokens"] == 100
+    assert summary["token_cost_usd"] == pytest.approx(0.006)
 
 
 @pytest.mark.asyncio
@@ -487,23 +501,29 @@ async def test_run_all_stages_batch_narrows_follow_on_stages_to_fresh_successes(
 
 @pytest.mark.asyncio
 async def test_validate_urls_batch_aggregates_llm_usage(db_session):
-    school = School(
-        name_i18n={"bg": "Тестово училище"},
-        country_code="bg",
-        school_type="state",
-        education_level="primary",
-        city="sofia",
-        website_url="https://school.example",
-        scrape_status="pending",
-    )
-    db_session.add(school)
-    await db_session.commit()
-
-    async def fake_validate_school_url(*_args, usage_out=None, **_kwargs):
-        usage_out.update(
-            {"input_tokens": 120, "output_tokens": 30, "token_cost_usd": 0.000024}
+    schools = [
+        School(
+            name_i18n={"bg": f"Тестово училище {i}"},
+            country_code="bg",
+            school_type="state",
+            education_level="primary",
+            city="sofia",
+            website_url=f"https://school{i}.example",
+            scrape_status="pending",
         )
-        return SimpleNamespace(value="valid"), "https://school.example", "LLM validation: valid"
+        for i in range(2)
+    ]
+    db_session.add_all(schools)
+    await db_session.commit()
+    # Different usage per school, so a batch that kept only the last result would show it.
+    usage_by_url = {
+        "https://school0.example": {"input_tokens": 120, "output_tokens": 30, "token_cost_usd": 0.000024},
+        "https://school1.example": {"input_tokens": 80, "output_tokens": 10, "token_cost_usd": 0.000016},
+    }
+
+    async def fake_validate_school_url(*_args, url=None, usage_out=None, **_kwargs):
+        usage_out.update(usage_by_url[url])
+        return SimpleNamespace(value="valid"), url, "LLM validation: valid"
 
     with patch(
         "app.scrapers.url_validator.validate_school_url",
@@ -514,12 +534,12 @@ async def test_validate_urls_batch_aggregates_llm_usage(db_session):
             "bg",
             "sofia",
             None,
-            school_ids=[school.id],
+            school_ids=[school.id for school in schools],
         )
 
-    assert summary["input_tokens"] == 120
-    assert summary["output_tokens"] == 30
-    assert summary["token_cost_usd"] == pytest.approx(0.000024)
+    assert summary["input_tokens"] == 200
+    assert summary["output_tokens"] == 40
+    assert summary["token_cost_usd"] == pytest.approx(0.00004)
 
 
 @pytest.mark.asyncio
