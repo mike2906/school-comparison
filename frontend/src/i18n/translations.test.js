@@ -1,6 +1,5 @@
 // Missing translations fail here instead of reaching the page as a raw key ("schoolCard.foo").
-// Keys built from data at runtime (`ageGroups.${group}`) can only be checked against real
-// data; scripts/ui-scan.mjs does that on the rendered site.
+// Keys built from data at runtime (`ageGroups.${group}`) only show up on the rendered site.
 import assert from 'node:assert/strict'
 import { readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
