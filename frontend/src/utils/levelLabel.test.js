@@ -50,3 +50,7 @@ test('schoolTypeLabel uses kindergarten forms for kindergartens', () => {
   assert.equal(schoolTypeLabel({ school_type: 'international', education_level: 'kindergarten' }, t, 'private'), 'schoolTypesKindergarten.private')
   assert.equal(schoolTypeLabel({}, t), '')
 })
+
+test('schoolTypeLabel treats nurseries like kindergartens', () => {
+  assert.equal(schoolTypeLabel({ school_type: 'state', education_level: 'nursery' }, t), 'schoolTypesKindergarten.state')
+})

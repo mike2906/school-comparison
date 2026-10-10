@@ -63,13 +63,13 @@ export function schoolLevelLabel(school, t, config = null) {
 }
 
 /**
- * "Държавно / Частно" agree with "училище"; a kindergarten needs its own forms, and a
- * state kindergarten is municipal ("Общинска"). `type` overrides the school's own type
+ * "Държавно / Частно" agree with "училище"; a kindergarten or nursery ("градина",
+ * "ясла") needs its own forms, and a state one is municipal ("Общинска"). `type` overrides the school's own type
  * (the card and map show international schools as private).
  */
 export function schoolTypeLabel(school, t, type = school?.school_type) {
   if (!type) return ''
-  return school?.education_level === 'kindergarten'
+  return ['kindergarten', 'nursery'].includes(school?.education_level)
     ? t(`schoolTypesKindergarten.${type}`)
     : t(`schoolTypes.${type}`)
 }

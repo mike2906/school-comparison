@@ -104,17 +104,24 @@ function formatPriceLabel(price, locale, t) {
   return t('pricing.priceOnRequest')
 }
 
-// International schools don't sit the NVO and kindergartens have no exams, so a blank
-// NVO cell there is "not applicable", not missing data.
+const PRESCHOOL_LEVELS = new Set(['nursery', 'kindergarten'])
+
+// International schools don't sit the NVO and kindergartens and nurseries have no exams,
+// so a blank NVO cell there is "not applicable", not missing data. The stored level is a
+// single category, so a kindergarten with exam results keeps them.
 function nvoNotApplicable(school) {
-  return school.school_type === 'international' || school.education_level === 'kindergarten'
+  return school.school_type === 'international' ||
+    (PRESCHOOL_LEVELS.has(school.education_level) && !(school.exam_results || []).length)
 }
 
-/** How a state school admits pupils, for the fee row; null when we can't say. */
-function stateAdmissionHint(school, t) {
+/**
+ * How a state school admits pupils, for the fee row; null when we can't say. The NVO hint
+ * only fits gymnasium entry: an СУ is stored as upper_secondary but admits grade 1 too.
+ */
+function stateAdmissionHint(school, t, ageGroup) {
   if (usesSofiaKindergartenSystem(school)) return t('schoolCard.admissions.kgByPoints')
-  if (school.education_level === 'upper_secondary') return t('compare.admissionByNvo')
-  return null
+  const gymnasiumEntry = ageGroup ? ageGroup === 'grade_8_12' : school.education_level === 'upper_secondary'
+  return gymnasiumEntry ? t('compare.admissionByNvo') : null
 }
 
 /** " / month", " (one-time)" or " · period not stated", after a price. */
@@ -546,7 +553,8 @@ function ComparePage() {
         ? calculateDistance(userLocation.lat, userLocation.lng, primaryLocation.lat, primaryLocation.lng)
         : null
       const pricingRange = statedTuition(school.pricing)
-      const priceSort = tuitionSortValue(school.pricing)
+      // State schools charge no tuition, so they sort as the cheapest, matching "Безплатно".
+      const priceSort = tuitionSortValue(school.pricing) ?? (school.school_type === 'state' ? 0 : null)
       const nvoDetail = nvoNotApplicable(school) ? null : getNvoDetail(school, t, nvoExamType)
       const overallLatest = nvoDetail?.latestCombined ?? null
       const overallAvg = nvoDetail?.schoolAverageCombined ?? null
@@ -788,7 +796,7 @@ function ComparePage() {
 
           if (school.school_type === 'state') {
             // State schools and kindergartens charge no fee; say so, and how admission works.
-            const hint = stateAdmissionHint(school, t)
+            const hint = stateAdmissionHint(school, t, selectedAgeGroup)
             return (
               <div>
                 <div className="text-sm font-semibold text-neutral-900">{t('compare.free')}</div>

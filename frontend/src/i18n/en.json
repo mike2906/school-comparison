@@ -181,7 +181,7 @@
     "addedToCompare": "In Comparison",
     "atAGlance": "At a Glance",
     "totalStudents": "Total Students",
-    "avgClassSize": "Children per group/class (school's figure)",
+    "avgClassSize": "Children per group/class",
     "teacherRatio": "Teacher:Student",
     "schoolHours": "School Hours",
     "languages": "Languages",
@@ -389,7 +389,7 @@
     },
     "sourceTypes": {
       "official_website": "School website",
-      "government": "Official data (Ministry)",
+      "government": "Official data",
       "community_forum": "Community",
       "parent_submitted": "Parent reported",
       "school_contact": "From the school",

@@ -181,7 +181,7 @@
     "addedToCompare": "В списъка за сравнение",
     "atAGlance": "Накратко",
     "totalStudents": "Общо ученици",
-    "avgClassSize": "Деца в група/клас (по данни на училището)",
+    "avgClassSize": "Деца в група/клас",
     "teacherRatio": "Учител:ученици",
     "schoolHours": "Работно време",
     "languages": "Езици",
@@ -389,7 +389,7 @@
     },
     "sourceTypes": {
       "official_website": "Сайт на училището",
-      "government": "Официални данни (МОН)",
+      "government": "Официални данни",
       "community_forum": "Форум",
       "parent_submitted": "Споделено от родител",
       "school_contact": "От училището",
