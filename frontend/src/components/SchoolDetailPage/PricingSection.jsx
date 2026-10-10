@@ -1,15 +1,13 @@
 import { useTranslation } from 'react-i18next'
 import { displayPrice, groupPricingByAcademicYear, YEAR_STATUS } from '../../utils/pricing'
 import { groupPricingByCategory, getSourceBadgeColor } from './helpers'
+import { formatAmount } from '../../utils/format'
 
 /** Every published price, grouped by academic year and then by category. */
 function PricingSection({ pricing }) {
   const { t, i18n } = useTranslation()
 
-  const formatNumber = (value) => {
-    if (value == null || Number.isNaN(value)) return null
-    return new Intl.NumberFormat(i18n.language, { maximumFractionDigits: 0 }).format(value)
-  }
+  const formatNumber = (value) => formatAmount(value, i18n.language)
 
   return (
     <div className="bg-white rounded-2xl shadow-card border border-neutral-200 p-6 md:p-8 mb-6">

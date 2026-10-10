@@ -3,6 +3,12 @@ export function intlLocale(language) {
   return String(language || '').startsWith('bg') ? 'bg-BG' : 'en-GB'
 }
 
+/** A plain localised number ("1 200" / "1,200"); null for no value. */
+export function formatAmount(value, language, digits = 0) {
+  if (value == null || Number.isNaN(value)) return null
+  return new Intl.NumberFormat(intlLocale(language), { maximumFractionDigits: digits }).format(value)
+}
+
 const kmFormatters = new Map()
 
 /** A distance in km as a localised number with one decimal: "1.2" (English), "1,2" (Bulgarian). */

@@ -30,6 +30,7 @@ import {
 import KeyFacts from './KeyFacts'
 import LocationMap, { directionsUrl } from './LocationMap'
 import PricingSection from './PricingSection'
+import { formatAmount } from '../../utils/format'
 import SchoolActions from './SchoolActions'
 import TagList from './TagList'
 import PhoneLinks from './PhoneLinks'
@@ -81,11 +82,6 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
   const [activeExamType, setActiveExamType] = useState(null)
   const [selectedSubjects, setSelectedSubjects] = useState(['math', 'bulgarian'])
   const [examAverages, setExamAverages] = useState(null)
-
-  const formatAmount = (value) => {
-    if (value == null || Number.isNaN(value)) return null
-    return new Intl.NumberFormat(i18n.language, { maximumFractionDigits: 0 }).format(value)
-  }
 
   useEffect(() => {
     const loadSchool = async () => {
@@ -434,7 +430,7 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                 </svg>
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-neutral-900">{formatAmount(school.num_pupils)}</div>
+                  <div className="text-2xl font-bold text-neutral-900">{formatAmount(school.num_pupils, i18n.language)}</div>
                   <div className="text-xs text-neutral-600 mt-1">{t('schools.totalStudents')}</div>
                 </div>
               </div>
@@ -447,7 +443,7 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                 </svg>
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-neutral-900">{formatAmount(attributes.class_size)}</div>
+                  <div className="text-2xl font-bold text-neutral-900">{formatAmount(attributes.class_size, i18n.language)}</div>
                   <div className="text-xs text-neutral-600 mt-1">{t('schools.avgClassSize')}</div>
                 </div>
               </div>

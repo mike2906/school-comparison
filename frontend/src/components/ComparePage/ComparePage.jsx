@@ -11,7 +11,7 @@ import TagList from '../SchoolDetailPage/TagList'
 import PhoneLinks from '../SchoolDetailPage/PhoneLinks'
 import { fetchCompare, fetchExamAverages } from '../../api/schools'
 import { calculateDistance } from '../../utils/distance'
-import { formatDistance } from '../../utils/format'
+import { formatDistance, intlLocale } from '../../utils/format'
 import { compareSchoolNames, getSchoolName, getAddress, getSummary } from '../../utils/i18n'
 import { hasAnySchoolSummary } from './summaryVisibility'
 import { getProvenanceSourceKey } from './sourceMetadata'
@@ -88,7 +88,7 @@ function formatDate(value, locale) {
   if (!value) return null
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return null
-  return new Intl.DateTimeFormat(locale, {
+  return new Intl.DateTimeFormat(intlLocale(locale), {
     year: 'numeric',
     month: 'short',
     day: 'numeric',

@@ -1,3 +1,4 @@
+import { intlLocale } from './format.js'
 /**
  * Academic-year cohort helpers for pricing display.
  *
@@ -155,7 +156,7 @@ export function displayPrice(value, currency) {
 /** An amount as currency text in the given locale, e.g. "€1,200"; null for no amount. */
 export function formatCurrency(amount, locale, currency = 'EUR') {
   if (amount == null || Number.isNaN(amount)) return null
-  return new Intl.NumberFormat(locale, {
+  return new Intl.NumberFormat(intlLocale(locale), {
     style: 'currency',
     currency,
     // Both bounds: older browsers throw when only the maximum is below the currency default.
