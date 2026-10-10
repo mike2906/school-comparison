@@ -7,6 +7,7 @@ import {
   getLatestScoreForExamType as getSharedLatestScoreForExamType,
 } from '../../utils/nvo'
 import { getCanonicalAmenityFlags } from '../../utils/schoolAttributes'
+import { PRICE_CATEGORY_ORDER } from '../../utils/pricing'
 
 const SOURCE_BADGE_COLORS = {
   official: 'bg-emerald-100 text-emerald-700 border-emerald-300',
@@ -35,21 +36,6 @@ export function parseCoordinate(value) {
 export function getNvoDetail(school, t, ageGroup = null) {
   return getSharedNvoDetail(school, t, { ageGroup })
 }
-
-// Every category the API sends, in the order the school page lists them, then a catch-all.
-const PRICE_CATEGORY_ORDER = [
-  'tuition',
-  'registration',
-  'food',
-  'transport',
-  'extended_day',
-  'activities',
-  'extracurricular',
-  'materials',
-  'uniforms',
-  'camp',
-  'other',
-]
 
 /**
  * Group pricing items by category, in display order. Each category keeps its own

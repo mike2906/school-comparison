@@ -14,6 +14,7 @@ import {
   tuitionSortValue,
   priceAgeGroupLabel,
   groupRowsByAgeGroup,
+  sortByCategory,
 } from './pricing.js'
 
 const row = (overrides = {}) => ({
@@ -375,4 +376,15 @@ test('isInstallmentPlan: one instalment named without a count, not the fee paid 
   // "Месечна вноска" is the monthly fee itself.
   assert.equal(isInstallmentPlan({ plan_name: 'Месечна вноска за обучение' }), false)
   assert.equal(isInstallmentPlan({ plan_name: 'Годишна такса (еднократна вноска)' }), false)
+})
+
+test('sortByCategory: tuition first, then the listing order, unknown categories last', () => {
+  const rows = [
+    row({ id: 1, category: 'food' }),
+    row({ id: 2, category: 'tuition' }),
+    row({ id: 3, category: 'mystery' }),
+    row({ id: 4, category: 'tuition' }),
+    row({ id: 5, category: 'registration' }),
+  ]
+  assert.deepEqual(sortByCategory(rows).map(r => r.id), [2, 4, 5, 1, 3])
 })

@@ -87,6 +87,33 @@ export function groupPricingByAcademicYear(pricing = []) {
   })
 }
 
+// Every category the API sends, in the order fees are listed (tuition first), then a
+// catch-all.
+export const PRICE_CATEGORY_ORDER = [
+  'tuition',
+  'registration',
+  'food',
+  'transport',
+  'extended_day',
+  'activities',
+  'extracurricular',
+  'materials',
+  'uniforms',
+  'camp',
+  'other',
+]
+
+/** Rows in listing order by category, tuition first; the order within a category kept. */
+export function sortByCategory(rows = []) {
+  const rank = (row) => {
+    const index = PRICE_CATEGORY_ORDER.indexOf(row.category)
+    return index === -1 ? PRICE_CATEGORY_ORDER.length : index
+  }
+  return rows.map((row, index) => ({ row, index }))
+    .sort((a, b) => rank(a.row) - rank(b.row) || a.index - b.index)
+    .map(({ row }) => row)
+}
+
 const INSTALLMENT_PLAN_NAME_RE = /(\d+\s*(installment|monthly|вноск)|(installment|monthly|вноск)\s*\d+)/i
 // One instalment named by its place: "Годишна такса – първа вноска", "II вноска",
 // "2-ра вноска", "Вноска № 1". Not "Месечна вноска" or "Еднократна вноска", which are the
