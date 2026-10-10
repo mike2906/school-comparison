@@ -4,6 +4,7 @@ import { sharedPriceSource } from '../../utils/priceSources'
 import { groupPricingByCategory } from './helpers'
 import { formatAmount } from '../../utils/format'
 import PriceSource from './PriceSource'
+import { pricePeriod } from '../../utils/priceRows'
 
 /**
  * Every published price, grouped by academic year, then by category, then by the age
@@ -42,7 +43,7 @@ function PricingSection({ pricing }) {
         <div className="text-right">
           <div className="text-lg font-bold text-neutral-900 whitespace-nowrap">{amountText}</div>
           <div className="text-sm text-neutral-500">
-            {price.period ? t(`pricing.${price.period}`) : t('pricing.periodNotStated')}
+            {pricePeriod(price) ? t(`pricing.${pricePeriod(price)}`) : t('pricing.periodNotStated')}
           </div>
         </div>
       </div>

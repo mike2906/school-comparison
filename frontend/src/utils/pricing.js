@@ -1,5 +1,6 @@
 import { intlLocale } from './format.js'
-import { gradeBandLabel, gradeRangeInText, parseGradeBand } from './gradeBand.js'
+import { gradeBandLabel, gradeRangeInText, rowGradeBand } from './gradeBand.js'
+import { pricePeriod, rowsForAgeGroup } from './priceRows.js'
 /**
  * Academic-year cohort helpers for pricing display.
  *
@@ -87,10 +88,14 @@ export function groupPricingByAcademicYear(pricing = []) {
 }
 
 const INSTALLMENT_PLAN_NAME_RE = /(\d+\s*(installment|monthly|вноск)|(installment|monthly|вноск)\s*\d+)/i
+// One instalment named by its place: "Годишна такса – първа вноска", "II вноска",
+// "2-ра вноска", "Вноска № 1". Not "Месечна вноска" or "Еднократна вноска", which are the
+// whole fee.
+const ONE_INSTALLMENT_RE = /(?<![\p{L}\p{N}])(?:първа|втора|трета|четвърта|последна|(?:i{1,3}|iv|\d{1,2})(?:-?(?:ва|ра|та|ма))?)\s+вноска(?![\p{L}])|вноска\s*(?:№\s*)?(?:i{1,3}|iv|\d{1,2})(?![\p{L}\p{N}])|(?:first|second|third|final) instal+ment/iu
 
 /** True for a row describing one instalment of a fee rather than the whole fee. */
 export function isInstallmentPlan(item) {
-  return !!(item?.plan_name && INSTALLMENT_PLAN_NAME_RE.test(item.plan_name))
+  return !!(item?.plan_name && (INSTALLMENT_PLAN_NAME_RE.test(item.plan_name) || ONE_INSTALLMENT_RE.test(item.plan_name)))
 }
 
 function priceBase(row) {
@@ -109,9 +114,10 @@ function priceBase(row) {
 export function monthlyEquivalent(row) {
   const base = priceBase(row)
   if (base == null) return null
-  if (row.period === 'monthly') return base
-  if (row.period === 'yearly') return base / 12
-  if (row.period === 'quarter') return base / 3
+  const period = pricePeriod(row)
+  if (period === 'monthly') return base
+  if (period === 'yearly') return base / 12
+  if (period === 'quarter') return base / 3
   return null
 }
 
@@ -132,8 +138,10 @@ export function toEur(amount, currency) {
 // monthly fee is the figure most schools publish first.
 const HEADLINE_PERIODS = ['monthly', 'quarter', 'term', 'semester', 'yearly']
 
-function tuitionRows(rows) {
-  return rows.filter(row => row.category === 'tuition' && !isInstallmentPlan(row))
+// The headline's tuition rows: whole fees (not one instalment), for the chosen age group
+// when there is one.
+function tuitionRows(rows, ageGroup = null) {
+  return rowsForAgeGroup(rows.filter(row => row.category === 'tuition' && !isInstallmentPlan(row)), ageGroup)
 }
 
 function rangeOf(rows, convert) {
@@ -182,16 +190,6 @@ export function formatPriceLabel(price, locale, t) {
   if (max) return max
   if (exact) return exact
   return t('pricing.priceOnRequest')
-}
-
-// The grades a row is for: its age group, widened by an overlapping grade range its plan
-// name writes out (171's "PK–7: full payment" filed under "ПК" covers PK to grade 7).
-function rowGradeBand(price) {
-  const band = parseGradeBand(price?.age_group)
-  if (!band) return null
-  const named = gradeRangeInText(price.plan_name)
-  if (!named || named.from > band.to + 1 || named.to < band.from - 1) return band
-  return { from: Math.min(band.from, named.from), to: Math.max(band.to, named.to) }
 }
 
 // The age group a row names in the UI language: a known `ageGroups` key, else the grades
@@ -269,24 +267,28 @@ export function groupRowsByAgeGroup(rows = [], t) {
  * at a school that bills 10 months. Picks one stated period: the one of the cheapest fee
  * per month (so the headline agrees with `tuitionSortValue`), else monthly first, then
  * quarter, term, semester, year, else a fee whose period the school did not state
- * (`period: null`). EUR and BGN are shown in euro; another currency stays as it is, never mixed.
+ * (`period: null`). A row's period is the stored one, else the one its own name states
+ * ("ГОДИШНА ТАКСА"), so a fee is not left out of the range for a missed period. With an
+ * `ageGroup`, only rows for that group (or naming none) count; null when the school lists
+ * tuition only for other groups. EUR and BGN are shown in euro; another currency stays as
+ * it is, never mixed.
  * Returns `{ min, max, currency, period, academicYear, yearStatus }` or null.
  */
-export function statedTuition(pricing = []) {
+export function statedTuition(pricing = [], { ageGroup = null } = {}) {
   const cohort = selectPricingCohort(pricing)
   if (!cohort) return null
   const meta = { academicYear: cohort.academicYear, yearStatus: cohort.yearStatus }
-  const rows = tuitionRows(cohort.rows)
+  const rows = tuitionRows(cohort.rows, ageGroup)
 
   const cheapest = rows
     .map(row => ({ row, perMonth: toEur(monthlyEquivalent(row), row.currency) }))
     .filter(entry => entry.perMonth != null)
     .reduce((best, entry) => (best == null || entry.perMonth < best.perMonth ? entry : best), null)
   const periods = [...HEADLINE_PERIODS, null]
-  if (cheapest) periods.unshift(cheapest.row.period)
+  if (cheapest) periods.unshift(pricePeriod(cheapest.row))
 
   for (const period of periods) {
-    const periodRows = rows.filter(row => (row.period ?? null) === period)
+    const periodRows = rows.filter(row => pricePeriod(row) === period)
     if (periodRows.length === 0) continue
 
     const euro = rangeOf(periodRows, (value, row) => toEur(value, row.currency))
@@ -309,10 +311,10 @@ export function statedTuition(pricing = []) {
  * common unit, and the order survives the 10-vs-12-month error that a displayed figure
  * would not. Null when no stated tuition converts.
  */
-export function tuitionSortValue(pricing = []) {
+export function tuitionSortValue(pricing = [], { ageGroup = null } = {}) {
   const cohort = selectPricingCohort(pricing)
   if (!cohort) return null
-  const values = tuitionRows(cohort.rows)
+  const values = tuitionRows(cohort.rows, ageGroup)
     .map(row => toEur(monthlyEquivalent(row), row.currency))
     .filter(value => value != null)
   return values.length > 0 ? Math.min(...values) : null

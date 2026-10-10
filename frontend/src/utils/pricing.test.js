@@ -339,3 +339,40 @@ test('groupRowsByAgeGroup: a known age-group key is shown translated', () => {
   const bands = groupRowsByAgeGroup([row({ id: 1, age_group: 'preschool' }), row({ id: 2, age_group: 'Grade 1' })], tEn)
   assert.deepEqual(bands.map(band => band.label), ['Pre-school', 'Grade 1'])
 })
+
+test('statedTuition: a fee whose name states its period is in the range (517 grade 5)', () => {
+  const rows = [
+    current({ id: 1, age_group: '8. клас', amount: 7000, period: 'yearly' }),
+    current({ id: 2, age_group: '5. клас', plan_name: 'ГОДИШНА ТАКСА', amount: 7810, period: null }),
+  ]
+  assert.deepEqual(
+    [statedTuition(rows).min, statedTuition(rows).max, statedTuition(rows).period],
+    [7000, 7810, 'yearly'],
+  )
+})
+
+test('statedTuition and tuitionSortValue: the chosen age group only, never another group', () => {
+  const rows = [
+    current({ id: 1, age_group: 'Първа група', amount: 240, period: 'monthly' }),
+    current({ id: 2, age_group: 'Втора група', amount: 266, period: 'monthly' }),
+  ]
+  assert.equal(statedTuition(rows, { ageGroup: 'second' }).min, 266)
+  assert.equal(statedTuition(rows, { ageGroup: 'second' }).max, 266)
+  assert.equal(statedTuition(rows, { ageGroup: 'third' }), null)
+  assert.equal(tuitionSortValue(rows, { ageGroup: 'third' }), null)
+  assert.equal(tuitionSortValue(rows, { ageGroup: 'second' }), 266)
+  assert.equal(statedTuition(rows).min, 240)
+})
+
+test('isInstallmentPlan: one instalment named without a count, not the fee paid at once', () => {
+  assert.equal(isInstallmentPlan({ plan_name: 'Годишна такса – първа вноска' }), true)
+  assert.equal(isInstallmentPlan({ plan_name: 'Годишна такса - I вноска' }), true)
+  for (const name of ['1-ва вноска', '2-ра вноска', 'I-ва вноска', 'Вноска 1', 'Вноска № 1', 'Годишна такса – вноска 2']) {
+    assert.equal(isInstallmentPlan({ plan_name: name }), true, name)
+  }
+  assert.equal(isInstallmentPlan({ plan_name: 'Годишна такса / Плащане на една вноска' }), false)
+  assert.equal(isInstallmentPlan({ plan_name: 'Годишна такса' }), false)
+  // "Месечна вноска" is the monthly fee itself.
+  assert.equal(isInstallmentPlan({ plan_name: 'Месечна вноска за обучение' }), false)
+  assert.equal(isInstallmentPlan({ plan_name: 'Годишна такса (еднократна вноска)' }), false)
+})

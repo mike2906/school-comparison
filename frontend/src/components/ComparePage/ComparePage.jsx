@@ -48,6 +48,7 @@ import {
   getTrendTooltip,
 } from '../../utils/nvoDisplay'
 import { formatCurrency, formatPriceLabel, groupPricingByAcademicYear, priceAgeGroupLabel, statedTuition, tuitionSortValue, YEAR_STATUS } from '../../utils/pricing'
+import { pricePeriod } from '../../utils/priceRows'
 
 const SOURCE_BADGE_STYLES = {
   official: 'bg-emerald-50 text-emerald-700',
@@ -988,7 +989,7 @@ function ComparePage() {
                       </div>
                       <div className="text-sm text-neutral-700">
                         {formatPriceLabel(price, i18n.language, t)}
-                        {periodSuffix(price.period, t)}
+                        {periodSuffix(pricePeriod(price), t)}
                       </div>
                       <InlineSource
                         badgeKey={price.source}

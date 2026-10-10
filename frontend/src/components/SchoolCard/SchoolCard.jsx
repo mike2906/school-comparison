@@ -31,6 +31,7 @@ import {
   statedTuition,
   YEAR_STATUS,
 } from '../../utils/pricing'
+import { pricePeriod } from '../../utils/priceRows'
 
 const typeColors = {
   state: 'bg-teal-700 text-white',
@@ -355,7 +356,8 @@ function buildExpandedSections({
   if (pricing.length > 0 && school.school_type !== 'state') {
     const pricingLines = pricing.map(item => {
       const category = t(`pricing.${item.category}`)
-      const periodKey = item.period ? t(`pricing.${item.period}`) : t('pricing.periodNotStated')
+      const period = pricePeriod(item)
+      const periodKey = period ? t(`pricing.${period}`) : t('pricing.periodNotStated')
       const plan = item.plan_name ? `${t('pricing.plan')}: ${item.plan_name}` : ''
       const year = item.academic_year ? `${t('pricing.academicYear')}: ${item.academic_year}` : ''
       const meta = [plan, year].filter(Boolean).join(' • ')
@@ -523,7 +525,8 @@ const SchoolCard = memo(function SchoolCard({
     if (isPrivate) {
       // The fee as the school states it, in euro: never annualised, since schools bill
       // over 9, 10 or 12 months (the detail page and compare show it the same way).
-      const tuition = statedTuition(pricing)
+      // The chosen age group's fee, never another group's.
+      const tuition = statedTuition(pricing, { ageGroup: activeAgeGroup })
       const price = tuition && (formatAmount(tuition.min, locale) === formatAmount(tuition.max, locale)
         ? formatAmount(tuition.min, locale)
         : `${formatAmount(tuition.min, locale)}–${formatAmount(tuition.max, locale)}`)
@@ -579,7 +582,7 @@ const SchoolCard = memo(function SchoolCard({
     }
 
     return null
-  }, [school, pricing, attributes, i18n.language, t, primaryLocation])
+  }, [school, pricing, attributes, i18n.language, t, primaryLocation, activeAgeGroup])
 
   const nvoDetail = useMemo(() => {
     // Sorted by NVO: only the exam the list is ranked by, so no card shows a score from a

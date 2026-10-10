@@ -48,7 +48,7 @@ const listValue = (items) => items.map((item, index) => (
  * the school type (price first for private schools, NVO / admission for state ones), and
  * facts a school does not have are left out rather than shown as "unavailable".
  */
-function KeyFacts({ school, examAverages, nvoExamType }) {
+function KeyFacts({ school, examAverages, nvoExamType, ageGroup = null }) {
   const { t, i18n } = useTranslation()
   const locale = intlLocale(i18n.language)
   const savedLocation = useMemo(readSavedLocation, [])
@@ -62,7 +62,8 @@ function KeyFacts({ school, examAverages, nvoExamType }) {
 
   const facts = {}
 
-  const tuition = isPrivate ? statedTuition(school.pricing) : null
+  // The searched age group's fee when the parent came from a search for one.
+  const tuition = isPrivate ? statedTuition(school.pricing, { ageGroup }) : null
   if (tuition) {
     const yearDetail = tuition.yearStatus === YEAR_STATUS.NOT_STATED
       ? t('pricing.yearNotStated')

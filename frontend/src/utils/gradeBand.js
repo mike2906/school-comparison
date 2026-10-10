@@ -22,6 +22,7 @@ const GRADE_WORD_RE = new RegExp(GRADE_WORD, 'u')
 const GRADES_BEFORE_RE = /(?:grades?|класове|клас)\s*$/u
 const GRADES_AFTER_RE = /^\.?\s*(?:клас|кл(?!\p{L})|grades?(?!\p{L}))/u
 const LABEL_COLON_RE = /^\.?\s*:/u
+const AGES_AFTER_RE = /^\s*(?:г\.|г(?!\p{L})|год|y(?:ea)?rs?(?!\p{L}))/u
 
 function normalize(text) {
   return String(text || '')
@@ -68,6 +69,8 @@ export function gradeRangeInText(text) {
   for (const match of normalized.matchAll(RANGE_IN_TEXT_RE)) {
     const before = normalized.slice(0, match.index)
     const after = normalized.slice(match.index + match[0].length)
+    // "ПГ-6 г." is the preschool year for six-year-olds, not preschool to grade 6.
+    if (AGES_AFTER_RE.test(after)) continue
     const framed = PRESCHOOL_RE.test(match[1])
       || GRADES_BEFORE_RE.test(before)
       || GRADES_AFTER_RE.test(after)
@@ -81,6 +84,44 @@ export function gradeRangeInText(text) {
     }
   }
   return found
+}
+
+// Grades named inside free text: "8. клас", "от 4 до 7 клас", "1-4 клас", "Grade 1",
+// "Grades 2 to 4". A number counts only beside a grade word.
+const GRADE_ITEM = '(\\d{1,2}|[ivx]{1,4})\\.?'
+const GRADES_IN_TEXT_RES = [
+  new RegExp(`(?<![\\p{L}\\p{N}.])(?:от\\s+)?${GRADE_ITEM}\\s*(?:-|до)\\s*${GRADE_ITEM}\\s*(?:клас|кл(?!\\p{L}))`, 'gu'),
+  new RegExp(`(?<![\\p{L}\\p{N}.])${GRADE_ITEM}\\s*(?:клас|кл(?!\\p{L}))`, 'gu'),
+  new RegExp(`(?<![\\p{L}])grades?\\s+${GRADE_ITEM}(?:\\s*(?:-|to)\\s*${GRADE_ITEM})?(?![\\p{L}\\p{N}])`, 'gu'),
+]
+
+/** Every grade free text names beside a grade word, as one widest span, or null. */
+export function gradesInText(text) {
+  const normalized = normalize(text)
+  let found = gradeRangeInText(text)
+  for (const re of GRADES_IN_TEXT_RES) {
+    for (const match of normalized.matchAll(re)) {
+      const range = band(match[1], match[2])
+      if (!range) continue
+      found = found
+        ? { from: Math.min(found.from, range.from), to: Math.max(found.to, range.to) }
+        : range
+    }
+  }
+  return found
+}
+
+/**
+ * The grades a price row is for: its age group, widened by an overlapping grade range its
+ * plan name writes out (171's "PK–7: full payment" filed under "ПК" covers PK to grade 7).
+ * Null when the age group names no grades.
+ */
+export function rowGradeBand(price) {
+  const named = gradeRangeInText(price?.plan_name)
+  const band = parseGradeBand(price?.age_group)
+  if (!band) return null
+  if (!named || named.from > band.to + 1 || named.to < band.from - 1) return band
+  return { from: Math.min(band.from, named.from), to: Math.max(band.to, named.to) }
 }
 
 /** A grade band in the UI language: "Preschool", "Grade 5", "Grades 8–12", "Preschool to grade 7". */
