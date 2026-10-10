@@ -1,9 +1,9 @@
 """Integration tests for scraping pipeline orchestration (Stages 1-3).
 
 These tests focus on the integration points between pipeline stages,
-not the full end-to-end execution (which requires Celery workers).
+not the full end-to-end execution against live websites.
 """
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -258,106 +258,6 @@ class TestPipelineStateTransitions:
         await db_session.commit()
 
         assert school.scrape_status == "pending"
-
-
-@pytest.mark.asyncio
-class TestPipelineOrchestration:
-    """Test Celery task orchestration."""
-
-    async def test_run_full_pipeline_returns_id(self):
-        """Pipeline returns execution ID."""
-        from tasks.scrape_tasks import run_full_pipeline
-
-        with patch("tasks.scrape_tasks.chain") as mock_chain:
-            mock_pipeline = MagicMock()
-            mock_pipeline.apply_async.return_value.id = "test-pipeline-123"
-            mock_chain.return_value = mock_pipeline
-
-            result = run_full_pipeline(
-                country_code="bg",
-                city="sofia",
-                limit=5,
-            )
-
-            assert "pipeline_id" in result
-            assert result["pipeline_id"] == "test-pipeline-123"
-            assert "Stages 1-7" in result["message"]
-
-    async def test_pipeline_uses_chain_for_stages(self):
-        """Pipeline chains discovery, website discovery, validation, and navigation."""
-        from tasks.scrape_tasks import run_full_pipeline
-
-        with patch("tasks.scrape_tasks.chain") as mock_chain:
-            mock_pipeline = MagicMock()
-            mock_pipeline.apply_async.return_value.id = "test-123"
-            mock_chain.return_value = mock_pipeline
-
-            run_full_pipeline(country_code="bg", city="sofia")
-
-            # Verify chain was called
-            mock_chain.assert_called_once()
-            assert len(mock_chain.call_args.args) == 8
-
-    async def test_run_stage_dispatches_nvo_task(self):
-        """run_stage should expose the independent NVO task."""
-        from tasks.scrape_tasks import run_stage
-
-        with patch("tasks.scrape_tasks.scrape_nvo_results.apply_async") as apply_async_mock:
-            apply_async_mock.return_value.id = "nvo-task-123"
-
-            result = run_stage(
-                stage="nvo",
-                country_code="bg",
-                city="sofia",
-                school_ids=[42],
-                year=2025,
-                history_years=3,
-                exam_types=["nvo_7"],
-            )
-
-            apply_async_mock.assert_called_once_with(
-                kwargs={
-                    "country_code": "bg",
-                    "city": "sofia",
-                    "year": 2025,
-                    "history_years": 3,
-                    "exam_types": ["nvo_7"],
-                    "school_ids": [42],
-                }
-            )
-            assert result["stage"] == "nvo"
-            assert result["task_id"] == "nvo-task-123"
-
-    async def test_scrape_nvo_results_task_passes_arguments_to_async_import(self):
-        """NVO task wrapper should pass through task arguments."""
-        from tasks.scrape_tasks import scrape_nvo_results
-
-        with patch(
-            "tasks.scrape_tasks._scrape_nvo_results_async",
-            new=Mock(return_value="nvo-coro"),
-        ) as async_mock, patch(
-            "tasks.scrape_tasks.run_async",
-            return_value={"created_rows": 2},
-        ) as run_async_mock:
-            result = scrape_nvo_results(
-                country_code="bg",
-                city="sofia",
-                year=2025,
-                history_years=4,
-                exam_types=["nvo_4", "nvo_7"],
-                school_ids=[7],
-            )
-
-            async_mock.assert_called_once_with(
-                country_code="bg",
-                city="sofia",
-                year=2025,
-                history_years=4,
-                exam_types=["nvo_4", "nvo_7"],
-                school_ids=[7],
-            )
-            run_async_mock.assert_called_once_with("nvo-coro")
-            assert result == {"created_rows": 2}
 
 
 @pytest.mark.asyncio

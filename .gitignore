@@ -75,9 +75,6 @@ build/
 *.db
 *.sqlite3
 
-# Celery
-celerybeat-schedule
-celerybeat.pid
 
 # Written on the API host by deploy/deploy.sh
 deploy/release.env
