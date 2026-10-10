@@ -10,6 +10,7 @@ from decimal import Decimal
 
 import pytest
 
+from app.scrapers import extractor_helpers as helpers
 from app.scrapers.price_evidence import (
     RULE_EXPIRED,
     RULE_LEVEL,
@@ -276,3 +277,18 @@ def test_517_extraction_reads_the_heading_when_the_word_beside_the_amount_cannot
     )
     price = ExtractedPrice(category="tuition", amount=7810, currency="EUR", plan_name="ГОДИШНА ТАКСА", confidence=0.9)
     assert [row.period for row in _filter_model_prices([price], page)] == ["yearly"]
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        # 564: a lev amount with a decimal comma stays one amount.
+        ("7774,42 лв. - 2 вноски", ["7774,42 лв. - 2 вноски"]),
+        ("827€ / 1617,47 лв. - 10 вноски", ["827€ / 1617,47 лв. - 10 вноски"]),
+        # A comma between words still separates values.
+        ("Английски, немски, френски", ["Английски", "немски", "френски"]),
+        ("2 вноски,10 вноски", ["2 вноски", "10 вноски"]),
+    ],
+)
+def test_text_list_keeps_decimal_commas(raw, expected):
+    assert helpers._normalize_text_list([raw]) == expected

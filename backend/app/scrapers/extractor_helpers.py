@@ -4608,8 +4608,9 @@ def _extract_clean_text_candidates(raw_value: Any) -> list[str]:
 
     # Split common multi-value separators.
     fragments = re.split(r"[;\n|]+", text)
+    # A comma between digits is a decimal or thousands mark ("7774,42 лв."), not a separator.
     if len(fragments) == 1 and "," in text and len(text) < 120:
-        fragments = [part.strip() for part in text.split(",")]
+        fragments = [part.strip() for part in re.split(r"(?<!\d),|,(?!\d)", text)]
     return [fragment.strip() for fragment in fragments if fragment.strip()]
 
 def _try_parse_structured_text(text: str) -> Any | None:
