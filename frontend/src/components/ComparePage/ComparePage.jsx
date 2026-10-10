@@ -4,7 +4,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import Layout from '../Layout/Layout'
 import { useCompare } from '../../context/CompareContext'
 import { getLastSearchUrl } from '../../utils/searchViewState'
-import { schoolLevelLabel } from '../../utils/levelLabel'
+import { schoolLevelLabel, schoolTypeLabel } from '../../utils/levelLabel'
 import { useCountry } from '../../context/CountryContext'
 import { languageLabel } from '../../utils/languages'
 import TagList from '../SchoolDetailPage/TagList'
@@ -29,7 +29,7 @@ import {
   getBenchmarkToneClasses,
   getNvoDetail as getSharedNvoDetail,
 } from '../../utils/nvo'
-import { classifyAdmissionRequirement, curatedRequirement } from '../../utils/admission'
+import { classifyAdmissionRequirement, curatedRequirement, usesSofiaKindergartenSystem } from '../../utils/admission'
 import { displayPrice, groupPricingByAcademicYear, statedTuition, tuitionSortValue, YEAR_STATUS } from '../../utils/pricing'
 
 const SOURCE_BADGE_STYLES = {
@@ -102,6 +102,19 @@ function formatPriceLabel(price, locale, t) {
   if (max) return max
   if (exact) return exact
   return t('pricing.priceOnRequest')
+}
+
+// International schools don't sit the NVO and kindergartens have no exams, so a blank
+// NVO cell there is "not applicable", not missing data.
+function nvoNotApplicable(school) {
+  return school.school_type === 'international' || school.education_level === 'kindergarten'
+}
+
+/** How a state school admits pupils, for the fee row; null when we can't say. */
+function stateAdmissionHint(school, t) {
+  if (usesSofiaKindergartenSystem(school)) return t('schoolCard.admissions.kgByPoints')
+  if (school.education_level === 'upper_secondary') return t('compare.admissionByNvo')
+  return null
 }
 
 /** " / month", " (one-time)" or " · period not stated", after a price. */
@@ -520,7 +533,7 @@ function ComparePage() {
 
   // One exam for every column: different exams' results are not comparable.
   const nvoExamType = useMemo(
-    () => comparisonExamType(localizedSchools.filter(school => school.school_type !== 'international'), selectedAgeGroup),
+    () => comparisonExamType(localizedSchools.filter(school => !nvoNotApplicable(school)), selectedAgeGroup),
     [localizedSchools, selectedAgeGroup]
   )
   const nvoGrade = examGradeLabel(nvoExamType || 'nvo_7', t)
@@ -534,7 +547,7 @@ function ComparePage() {
         : null
       const pricingRange = statedTuition(school.pricing)
       const priceSort = tuitionSortValue(school.pricing)
-      const nvoDetail = school.school_type === 'international' ? null : getNvoDetail(school, t, nvoExamType)
+      const nvoDetail = nvoNotApplicable(school) ? null : getNvoDetail(school, t, nvoExamType)
       const overallLatest = nvoDetail?.latestCombined ?? null
       const overallAvg = nvoDetail?.schoolAverageCombined ?? null
 
@@ -703,7 +716,7 @@ function ComparePage() {
       {
         label: t('compare.labels.type'),
         getValue: (school) => (
-          <span className="text-sm text-neutral-700">{t(`schoolTypes.${school.school_type}`)}</span>
+          <span className="text-sm text-neutral-700">{schoolTypeLabel(school, t)}</span>
         ),
         getCompare: (school) => school.school_type,
       },
@@ -773,7 +786,18 @@ function ComparePage() {
             )
           }
 
-          return renderPlaceholder(school.school_type === 'international' ? 'compare.notApplicable' : 'compare.notAvailable')
+          if (school.school_type === 'state') {
+            // State schools and kindergartens charge no fee; say so, and how admission works.
+            const hint = stateAdmissionHint(school, t)
+            return (
+              <div>
+                <div className="text-sm font-semibold text-neutral-900">{t('compare.free')}</div>
+                {hint && <div className="text-xs text-neutral-500">{hint}</div>}
+              </div>
+            )
+          }
+
+          return renderPlaceholder('compare.notAvailable')
         },
         getCompare: (school) => {
           if (school.school_type !== 'state') {
@@ -783,13 +807,13 @@ function ComparePage() {
           const primaryAgeGroup = getPrimaryAgeGroup(school)
           const lastAdmitted = getLastAdmittedPoints(school.admission_info, primaryAgeGroup)
           const minScore = getMinNvoScore(school.admission_info)
-          return lastAdmitted?.points ?? minScore?.score ?? null
+          return lastAdmitted?.points ?? minScore?.score ?? 'free'
         },
       },
       {
         label: t('compare.labels.nvoAverage', { grade: nvoGrade }),
         getValue: (school) => {
-          if (school.school_type === 'international') {
+          if (nvoNotApplicable(school)) {
             return renderPlaceholder('compare.notApplicable')
           }
           const metrics = metricsById.get(school.id)
@@ -803,7 +827,7 @@ function ComparePage() {
             <div>
               <div className={`text-sm font-semibold ${benchmark?.textClass || 'text-neutral-900'}`}>{t('academicPerformance.pointsValue', { value: formatPercent(value, 1) })}</div>
               <div className="text-xs text-neutral-500">
-                {isLatest ? year : t('compare.labels.fiveYearAverage')}
+                {isLatest ? year : t('compare.labels.fiveYearAverage', { start: detail?.minYear, end: detail?.maxYear })}
               </div>
               {benchmark && (
                 <div className="text-xs text-neutral-500">
@@ -876,7 +900,7 @@ function ComparePage() {
       {
         label: t('compare.labels.nvoMath', { grade: nvoGrade }),
         getValue: (school) => {
-          if (school.school_type === 'international') return renderPlaceholder('compare.notApplicable')
+          if (nvoNotApplicable(school)) return renderPlaceholder('compare.notApplicable')
           const detail = metricsById.get(school.id)?.nvoDetail
           if (!detail?.latestMath && !detail?.mathAvg) return renderPlaceholder()
           const value = detail.latestMath ?? detail.mathAvg
@@ -910,7 +934,7 @@ function ComparePage() {
               </div>
               {detail.mathAvg != null && detail.latestMath != null && (
                 <div className="text-xs text-neutral-500">
-                  {t('compare.labels.avgValue', { value: formatPercent(detail.mathAvg, 1) })}
+                  {t('compare.labels.avgValue', { value: formatPercent(detail.mathAvg, 1), start: detail.minYear, end: detail.maxYear })}
                 </div>
               )}
               <InlineSource
@@ -928,7 +952,7 @@ function ComparePage() {
       {
         label: t('compare.labels.nvoBulgarian', { grade: nvoGrade }),
         getValue: (school) => {
-          if (school.school_type === 'international') return renderPlaceholder('compare.notApplicable')
+          if (nvoNotApplicable(school)) return renderPlaceholder('compare.notApplicable')
           const detail = metricsById.get(school.id)?.nvoDetail
           if (!detail?.latestBg && !detail?.bgAvg) return renderPlaceholder()
           const value = detail.latestBg ?? detail.bgAvg
@@ -962,7 +986,7 @@ function ComparePage() {
               </div>
               {detail.bgAvg != null && detail.latestBg != null && (
                 <div className="text-xs text-neutral-500">
-                  {t('compare.labels.avgValue', { value: formatPercent(detail.bgAvg, 1) })}
+                  {t('compare.labels.avgValue', { value: formatPercent(detail.bgAvg, 1), start: detail.minYear, end: detail.maxYear })}
                 </div>
               )}
               <InlineSource
@@ -1152,7 +1176,9 @@ function ComparePage() {
         label: t('compare.labels.pricingOverview'),
         getValue: (school) => {
           if (!school.pricing || school.pricing.length === 0) {
-            return renderPlaceholder(school.school_type === 'state' ? 'compare.notApplicable' : 'compare.notAvailable')
+            return school.school_type === 'state'
+              ? <span className="text-sm text-neutral-700">{t('compare.free')}</span>
+              : renderPlaceholder('compare.notAvailable')
           }
 
 
@@ -1300,7 +1326,7 @@ function ComparePage() {
     const map = new Map()
     schools.forEach((school) => {
       const expected = new Set(['locations', 'schedule', 'contact', 'admission'])
-      if (school.school_type !== 'international') {
+      if (!nvoNotApplicable(school)) {
         expected.add('academic')
       }
       if (school.school_type !== 'state') {
@@ -1708,7 +1734,7 @@ function SchoolHeader({ school, onRemove, t, language, compact = false }) {
             ? 'bg-primary-50 text-primary-700'
             : 'bg-violet-50 text-violet-700'
         }`}>
-          {t(`schoolTypes.${school.school_type}`)}
+          {schoolTypeLabel(school, t)}
         </span>
         {!compact && school.education_level && (
           <span className="px-2 py-0.5 rounded text-xs bg-neutral-100 text-neutral-700">
