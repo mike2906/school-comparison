@@ -27,6 +27,7 @@ def test_record_key_changes_with_every_part():
         {"user_prompt": "u2"},
         {"result_type": dict},
         {"tier": "capable"},
+        {"model": "other/model"},
     ):
         assert record_key(**{**base, **change}) != key
     # Parts are delimited, so moving text between prompts changes the key.
@@ -68,6 +69,28 @@ def test_record_answer_never_raises(tmp_path):
                   result_type=PageFees, tier="cheap", parsed=_answer(), school_id=None)
 
 
+def test_record_answer_never_raises_on_unencodable_prompts_or_dump_errors(tmp_path):
+    record_answer(str(tmp_path), system_prompt="s", user_prompt="lone surrogate \ud800",
+                  result_type=PageFees, tier="cheap", parsed=_answer(), school_id=None)
+
+    class Broken(PageFees):
+        def model_dump(self, **_kwargs):
+            raise ValueError("cannot dump")
+
+    record_answer(str(tmp_path / "broken"), system_prompt="s", user_prompt="u",
+                  result_type=PageFees, tier="cheap", parsed=Broken(lines=[]), school_id=None)
+    assert not (tmp_path / "broken").exists()
+
+
+def test_record_answer_keeps_the_first_recording(tmp_path):
+    common = dict(system_prompt="s", user_prompt="u", result_type=PageFees, tier="cheap")
+    record_answer(str(tmp_path), **common, parsed=_answer(), school_id=1)
+    record_answer(str(tmp_path), **common, parsed=_answer(), school_id=2)
+
+    [path] = list(tmp_path.iterdir())
+    assert json.loads(path.read_text(encoding="utf-8"))["school_id"] == 1
+
+
 @pytest.mark.asyncio
 async def test_run_typed_agent_records_when_enabled(tmp_path, monkeypatch):
     class FakeAgent:
@@ -106,6 +129,8 @@ async def test_run_typed_agent_records_when_enabled(tmp_path, monkeypatch):
 
     assert parsed == _answer()
     expected_key = record_key(
-        system_prompt="system", user_prompt="user", result_type=PageFees, tier="cheap"
+        system_prompt="system", user_prompt="user", result_type=PageFees, tier="cheap",
+        model=extractor.get_model("cheap"),
     )
-    assert (tmp_path / f"{expected_key}.json").exists()
+    payload = json.loads((tmp_path / f"{expected_key}.json").read_text(encoding="utf-8"))
+    assert payload["model"] == extractor.get_model("cheap")

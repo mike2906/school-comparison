@@ -607,6 +607,8 @@ async def _run_typed_agent(
             user_prompt=user_prompt,
             result_type=result_type,
             tier=tier,
+            model=get_model(tier),
+            temperature=settings.extraction_temperature,
             parsed=parsed,
             school_id=school_id,
         )
