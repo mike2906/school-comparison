@@ -502,7 +502,10 @@ const SchoolCard = memo(function SchoolCard({
   )
   // Badge and headline price must come from the same cohort, or a current-year label
   // can end up above a previous year's fee.
-  const pricingCohort = useMemo(() => selectPricingCohort(pricing), [pricing])
+  const pricingCohort = useMemo(
+    () => selectPricingCohort(pricing, { ageGroup: activeAgeGroup }),
+    [pricing, activeAgeGroup]
+  )
   const pricingYearLabel = useMemo(() => {
     if (!pricingCohort) return null
     if (pricingCohort.yearStatus === YEAR_STATUS.NOT_STATED) {
@@ -510,10 +513,10 @@ const SchoolCard = memo(function SchoolCard({
     }
     return pricingCohort.academicYear
   }, [pricingCohort, t])
-  // Only a current-year price wears the highlighted badge, so an older fee is never
-  // styled as though it were this year's.
+  // Only a current-year price, or next year's for families enrolling now, wears the
+  // highlighted badge, so an older fee is never styled as though it were this year's.
   const pricingYearBadgeClass =
-    pricingCohort?.yearStatus === YEAR_STATUS.CURRENT
+    pricingCohort?.yearStatus === YEAR_STATUS.CURRENT || pricingCohort?.yearStatus === YEAR_STATUS.NEXT
       ? 'text-teal-700 bg-teal-50 border-teal-200'
       : 'text-neutral-600 bg-neutral-100 border-neutral-300'
 

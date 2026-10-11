@@ -70,16 +70,16 @@ function PricingSection({ pricing }) {
                 <div className="flex items-center gap-2">
                   <span
                     className={`text-sm px-3 py-1 rounded-lg border ${
-                      group.yearStatus === YEAR_STATUS.CURRENT
+                      group.yearStatus === YEAR_STATUS.CURRENT || group.yearStatus === YEAR_STATUS.NEXT
                         ? 'bg-teal-50 text-teal-700 border-teal-200'
                         : 'bg-neutral-100 text-neutral-600 border-neutral-300'
                     }`}
                   >
                     {group.academicYear || t('pricing.yearNotStated')}
                   </span>
-                  {group.yearStatus === YEAR_STATUS.DATED_OTHER && (
+                  {(group.yearStatus === YEAR_STATUS.DATED_OTHER || group.yearStatus === YEAR_STATUS.NEXT) && (
                     <span className="text-xs text-neutral-500">
-                      {t('pricing.notCurrentYear')}
+                      {t(group.yearStatus === YEAR_STATUS.NEXT ? 'pricing.nextYear' : 'pricing.notCurrentYear')}
                     </span>
                   )}
                 </div>

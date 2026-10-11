@@ -1,6 +1,6 @@
 import { intlLocale } from './format.js'
 import { gradeBandLabel, gradeRangeInText, rowGradeBand } from './gradeBand.js'
-import { pricePeriod, rowsForAgeGroup } from './priceRows.js'
+import { pricePeriod, rowAgeGroupKeys, rowsForAgeGroup } from './priceRows.js'
 /**
  * Academic-year cohort helpers for pricing display.
  *
@@ -13,10 +13,37 @@ export const YEAR_STATUS = {
   CURRENT: 'current',
   DATED_OTHER: 'dated_other',
   NOT_STATED: 'not_stated',
+  // Set here, not by the API: a `dated_other` year that is the one families now enrol for.
+  NEXT: 'next',
+}
+
+/**
+ * The first calendar year of the academic year families are enrolling for on `today`.
+ *
+ * In September that is the year just starting. From October the year in progress is
+ * settled and schools take enrolments for next September, so it is the next one
+ * (October 2026 → 2027/2028, March 2027 → 2027/2028).
+ */
+export function intakeYearStart(today = new Date()) {
+  const month = today.getMonth()
+  const year = today.getFullYear()
+  return month > 8 ? year + 1 : year
+}
+
+// The age groups a set of tuition rows names.
+function namedGroups(rows) {
+  return new Set(rows.flatMap(row => [...rowAgeGroupKeys(row)]))
+}
+
+/** True for a `dated_other` row or group whose year is the one families now enrol for. */
+function isIntakeYear(entry, today) {
+  return entry?.yearStatus === YEAR_STATUS.DATED_OTHER || entry?.year_status === YEAR_STATUS.DATED_OTHER
+    ? yearStartOf(entry) === intakeYearStart(today)
+    : false
 }
 
 function yearStartOf(row) {
-  const canonical = row?.academic_year_canonical
+  const canonical = row?.academic_year_canonical ?? row?.academicYear
   if (!canonical) return -1
   const start = Number(String(canonical).split('/')[0])
   return Number.isFinite(start) ? start : -1
@@ -25,11 +52,30 @@ function yearStartOf(row) {
 /**
  * Pick the single cohort a school's headline pricing should be drawn from.
  *
- * Preference: current year, else prices the school published without a year, else the
- * most recent dated year. Returns null when there is nothing publishable.
+ * Preference: the year families now enrol for (`intakeYearStart`) when it is not the
+ * current one and has whole-fee tuition (for `ageGroup` when given), else the current
+ * year, else prices the school published without a year, else the most recent dated
+ * year. `intake: false` skips the first step. Returns null when there is nothing
+ * publishable.
  */
-export function selectPricingCohort(pricing = []) {
+export function selectPricingCohort(pricing = [], { ageGroup = null, intake = true, today = new Date() } = {}) {
   if (!Array.isArray(pricing) || pricing.length === 0) return null
+
+  if (intake) {
+    const next = pricing.filter(row => isIntakeYear(row, today))
+    const nextTuition = tuitionRows(next, ageGroup)
+    // With no group chosen, next year leads only when it prices every group this year
+    // does: a grade 1 fee for next year must not replace a grades 1–12 range.
+    const thisYear = ageGroup ? [] : tuitionRows(pricing.filter(row => row.year_status === YEAR_STATUS.CURRENT))
+    const covered = namedGroups(nextTuition)
+    if (nextTuition.length > 0 && [...namedGroups(thisYear)].every(key => covered.has(key))) {
+      return {
+        rows: next,
+        academicYear: next[0].academic_year_canonical || next[0].academic_year || null,
+        yearStatus: YEAR_STATUS.NEXT,
+      }
+    }
+  }
 
   const current = pricing.filter(row => row.year_status === YEAR_STATUS.CURRENT)
   if (current.length > 0) {
@@ -61,9 +107,10 @@ export function selectPricingCohort(pricing = []) {
  * Group every published price by academic year, newest first, undated last.
  *
  * Used by the detail page so a mixed-year price list is labelled per group instead of
- * inheriting one arbitrary row's year.
+ * inheriting one arbitrary row's year. The year families now enrol for is marked
+ * `YEAR_STATUS.NEXT` rather than as another year.
  */
-export function groupPricingByAcademicYear(pricing = []) {
+export function groupPricingByAcademicYear(pricing = [], { today = new Date() } = {}) {
   if (!Array.isArray(pricing) || pricing.length === 0) return []
 
   const groups = new Map()
@@ -78,6 +125,9 @@ export function groupPricingByAcademicYear(pricing = []) {
       })
     }
     groups.get(key).rows.push(row)
+  })
+  groups.forEach(group => {
+    if (isIntakeYear(group, today)) group.yearStatus = YEAR_STATUS.NEXT
   })
 
   return [...groups.values()].sort((a, b) => {
@@ -299,12 +349,18 @@ export function groupRowsByAgeGroup(rows = [], t) {
  * `ageGroup`, only rows for that group (or naming none) count; null when the school lists
  * tuition only for other groups. EUR and BGN are shown in euro; another currency stays as
  * it is, never mixed.
- * Returns `{ min, max, currency, period, academicYear, yearStatus }` or null.
+ * When the headline is next year's fee (`YEAR_STATUS.NEXT`), `currentYear` carries the
+ * current year's tuition the same way, or null when there is none.
+ * Returns `{ min, max, currency, period, academicYear, yearStatus, currentYear? }` or null.
  */
-export function statedTuition(pricing = [], { ageGroup = null } = {}) {
-  const cohort = selectPricingCohort(pricing)
+export function statedTuition(pricing = [], { ageGroup = null, intake = true, today = new Date() } = {}) {
+  const cohort = selectPricingCohort(pricing, { ageGroup, intake, today })
   if (!cohort) return null
   const meta = { academicYear: cohort.academicYear, yearStatus: cohort.yearStatus }
+  if (cohort.yearStatus === YEAR_STATUS.NEXT) {
+    const current = statedTuition(pricing, { ageGroup, intake: false, today })
+    meta.currentYear = current?.yearStatus === YEAR_STATUS.CURRENT ? current : null
+  }
   const rows = tuitionRows(cohort.rows, ageGroup)
 
   const cheapest = rows
@@ -338,11 +394,15 @@ export function statedTuition(pricing = [], { ageGroup = null } = {}) {
  * common unit, and the order survives the 10-vs-12-month error that a displayed figure
  * would not. Null when no stated tuition converts.
  */
-export function tuitionSortValue(pricing = [], { ageGroup = null } = {}) {
-  const cohort = selectPricingCohort(pricing)
+export function tuitionSortValue(pricing = [], { ageGroup = null, intake = true, today = new Date() } = {}) {
+  const cohort = selectPricingCohort(pricing, { ageGroup, intake, today })
   if (!cohort) return null
   const values = tuitionRows(cohort.rows, ageGroup)
     .map(row => toEur(monthlyEquivalent(row), row.currency))
     .filter(value => value != null)
-  return values.length > 0 ? Math.min(...values) : null
+  if (values.length > 0) return Math.min(...values)
+  // Next year's fee has no monthly figure (a term fee): sort by this year's instead.
+  return cohort.yearStatus === YEAR_STATUS.NEXT
+    ? tuitionSortValue(pricing, { ageGroup, intake: false, today })
+    : null
 }

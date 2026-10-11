@@ -253,6 +253,8 @@
     "currency": "EUR",
     "yearNotStated": "Учебната година не е посочена от училището",
     "notCurrentYear": "не е за текущата учебна година",
+    "nextYear": "следващата учебна година",
+    "yearPrice": "{{year}}: {{price}}",
     "periodNotStated": "Периодът не е посочен",
     "per": {
       "monthly": "месец",
