@@ -253,6 +253,8 @@
     "currency": "EUR",
     "yearNotStated": "Academic year not stated by the school",
     "notCurrentYear": "not for the current academic year",
+    "nextYear": "next academic year",
+    "yearPrice": "{{year}}: {{price}}",
     "periodNotStated": "Period not stated",
     "per": {
       "monthly": "month",

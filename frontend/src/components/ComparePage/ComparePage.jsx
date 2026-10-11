@@ -535,22 +535,31 @@ function ComparePage() {
           const minScore = getMinNvoScore(school.admission_info)
 
           if (school.school_type !== 'state' && pricingRange) {
-            const formatted = pricingRange.min === pricingRange.max
-              ? formatCurrency(pricingRange.min, i18n.language, pricingRange.currency)
-              : `${formatCurrency(pricingRange.min, i18n.language, pricingRange.currency)}–${formatCurrency(pricingRange.max, i18n.language, pricingRange.currency)}`
+            const formatted = (fee) => (fee.min === fee.max
+              ? formatCurrency(fee.min, i18n.language, fee.currency)
+              : `${formatCurrency(fee.min, i18n.language, fee.currency)}–${formatCurrency(fee.max, i18n.language, fee.currency)}`
+            ) + periodSuffix(fee.period, t)
             // As the school states it, never annualised (schools bill over 9–12 months).
+            // Next year's fee leads when families now enrol for it; this year's follows.
+            const current = pricingRange.currentYear
             return (
               <div>
                 <div className="text-sm font-semibold text-neutral-900">
-                  {formatted}{periodSuffix(pricingRange.period, t)}
+                  {formatted(pricingRange)}
                 </div>
                 <div className="text-xs text-neutral-500">
                   {[
                     t('pricing.tuition'),
                     pricingRange.academicYear,
                     pricingRange.yearStatus === YEAR_STATUS.DATED_OTHER ? t('pricing.notCurrentYear') : null,
+                    pricingRange.yearStatus === YEAR_STATUS.NEXT ? t('pricing.nextYear') : null,
                   ].filter(Boolean).join(' · ')}
                 </div>
+                {current && (
+                  <div className="text-xs text-neutral-500">
+                    {t('pricing.yearPrice', { year: current.academicYear, price: formatted(current) })}
+                  </div>
+                )}
               </div>
             )
           }
@@ -978,6 +987,7 @@ function ComparePage() {
                   <div className="text-xs font-semibold text-neutral-500">
                     {group.academicYear || t('pricing.yearNotStated')}
                     {group.yearStatus === YEAR_STATUS.DATED_OTHER ? ` · ${t('pricing.notCurrentYear')}` : ''}
+                    {group.yearStatus === YEAR_STATUS.NEXT ? ` · ${t('pricing.nextYear')}` : ''}
                   </div>
                   {sortByCategory(group.rows).map((price) => (
                     <div key={price.id} className="space-y-1">
