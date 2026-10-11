@@ -1,6 +1,6 @@
 import { intlLocale } from './format.js'
 import { gradeBandLabel, gradeRangeInText, rowGradeBand } from './gradeBand.js'
-import { pricePeriod, rowsForAgeGroup } from './priceRows.js'
+import { pricePeriod, rowAgeGroupKeys, rowsForAgeGroup } from './priceRows.js'
 /**
  * Academic-year cohort helpers for pricing display.
  *
@@ -27,8 +27,12 @@ export const YEAR_STATUS = {
 export function intakeYearStart(today = new Date()) {
   const month = today.getMonth()
   const year = today.getFullYear()
-  if (month === 8) return year
   return month > 8 ? year + 1 : year
+}
+
+// The age groups a set of tuition rows names.
+function namedGroups(rows) {
+  return new Set(rows.flatMap(row => [...rowAgeGroupKeys(row)]))
 }
 
 /** True for a `dated_other` row or group whose year is the one families now enrol for. */
@@ -59,7 +63,12 @@ export function selectPricingCohort(pricing = [], { ageGroup = null, intake = tr
 
   if (intake) {
     const next = pricing.filter(row => isIntakeYear(row, today))
-    if (tuitionRows(next, ageGroup).length > 0) {
+    const nextTuition = tuitionRows(next, ageGroup)
+    // With no group chosen, next year leads only when it prices every group this year
+    // does: a grade 1 fee for next year must not replace a grades 1–12 range.
+    const thisYear = ageGroup ? [] : tuitionRows(pricing.filter(row => row.year_status === YEAR_STATUS.CURRENT))
+    const covered = namedGroups(nextTuition)
+    if (nextTuition.length > 0 && [...namedGroups(thisYear)].every(key => covered.has(key))) {
       return {
         rows: next,
         academicYear: next[0].academic_year_canonical || next[0].academic_year || null,
@@ -385,11 +394,15 @@ export function statedTuition(pricing = [], { ageGroup = null, intake = true, to
  * common unit, and the order survives the 10-vs-12-month error that a displayed figure
  * would not. Null when no stated tuition converts.
  */
-export function tuitionSortValue(pricing = [], { ageGroup = null, today = new Date() } = {}) {
-  const cohort = selectPricingCohort(pricing, { ageGroup, today })
+export function tuitionSortValue(pricing = [], { ageGroup = null, intake = true, today = new Date() } = {}) {
+  const cohort = selectPricingCohort(pricing, { ageGroup, intake, today })
   if (!cohort) return null
   const values = tuitionRows(cohort.rows, ageGroup)
     .map(row => toEur(monthlyEquivalent(row), row.currency))
     .filter(value => value != null)
-  return values.length > 0 ? Math.min(...values) : null
+  if (values.length > 0) return Math.min(...values)
+  // Next year's fee has no monthly figure (a term fee): sort by this year's instead.
+  return cohort.yearStatus === YEAR_STATUS.NEXT
+    ? tuitionSortValue(pricing, { ageGroup, intake: false, today })
+    : null
 }

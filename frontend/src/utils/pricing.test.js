@@ -456,3 +456,21 @@ test('groupPricingByAcademicYear marks the intake year as next, not as another y
   ])
   assert.equal(groupPricingByAcademicYear([nextYear()], { today: SEPTEMBER })[0].yearStatus, YEAR_STATUS.DATED_OTHER)
 })
+
+test('with no group chosen, next year leads only when it prices every group this year does', () => {
+  const partial = [
+    thisYear({ id: 1, age_group: 'Grade 1', amount: 5000 }),
+    thisYear({ id: 2, age_group: 'Grade 12', amount: 9000 }),
+    nextYear({ id: 3, age_group: 'Grade 1', amount: 6000 }),
+  ]
+  const tuition = statedTuition(partial, { today: OCTOBER })
+  assert.equal(tuition.yearStatus, YEAR_STATUS.CURRENT)
+  assert.deepEqual([tuition.min, tuition.max], [5000, 9000])
+  // The parent chose grades 1–4: next year's grade 1 fee leads.
+  assert.equal(statedTuition(partial, { ageGroup: 'grade_1_4', today: OCTOBER }).min, 6000)
+})
+
+test('price sort falls back to this year when next year\'s fee has no monthly figure', () => {
+  const pricing = [thisYear({ period: 'monthly', amount: 700 }), nextYear({ period: 'semester' })]
+  assert.equal(tuitionSortValue(pricing, { today: OCTOBER }), 700)
+})

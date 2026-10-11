@@ -85,7 +85,10 @@ function KeyFacts({ school, examAverages, nvoExamType, ageGroup = null }) {
     }
     // Next year's fee leads (it is what a family enrolling now pays); this year's follows.
     const currentYear = tuition.currentYear
-      ? t('pricing.yearPrice', { year: tuition.currentYear.academicYear, price: priceText(tuition.currentYear) })
+      ? [
+          t('pricing.yearPrice', { year: tuition.currentYear.academicYear, price: priceText(tuition.currentYear) }),
+          tuition.currentYear.period ? null : t('pricing.periodNotStated'),
+        ].filter(Boolean).join(' · ')
       : null
     facts.tuition = (
       <Fact

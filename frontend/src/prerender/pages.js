@@ -89,7 +89,8 @@ function nvoLine(result, t) {
 }
 
 function tuitionLine(school, t) {
-  const tuition = statedTuition(school?.pricing)
+  // This year's fee, not next year's: the description has no room to label the year.
+  const tuition = statedTuition(school?.pricing, { intake: false })
   // Euro only, in the period the school states (never annualised), and never an older
   // year's fee, which the description has no room to label as such.
   if (!tuition || tuition.currency !== 'EUR' || !tuition.period || tuition.yearStatus === 'dated_other') return ''
