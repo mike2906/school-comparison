@@ -2,7 +2,7 @@
 
 import pytest
 
-from app.models.school import School, SchoolLocation
+from app.models.school import School, SchoolLocation, SchoolLocationAgeGroupShift
 from app.services.school_relations import (
     Institution,
     PlacePin,
@@ -382,3 +382,39 @@ class TestSamePlaceEndpoints:
         kg, _ = await self._pair(seeded_db, school_lat=42.6520)
         response = await seeded_client.get(f"/schools/{kg.id}")
         assert response.json()["same_place"] == []
+
+    @pytest.mark.asyncio
+    async def test_school_side_preschool_includes_the_schools_own_kindergarten(self, seeded_db, seeded_client):
+        # Д-р Петър Берон: the school teaches grades 1-7, its preschool groups are the
+        # kindergarten's next door. "Preschool at a school" should find them.
+        kg, school = await self._pair(seeded_db)
+        loner = await _add(seeded_db, name='"Частна детска градина Монтесори" ЕООД', level="kindergarten", url=None)
+        for institution in (kg, loner):
+            location = (await seeded_db.execute(
+                SchoolLocation.__table__.select().where(SchoolLocation.school_id == institution.id)
+            )).first()
+            seeded_db.add(SchoolLocationAgeGroupShift(location_id=location.id, age_group="preschool"))
+        await seeded_db.commit()
+
+        def ids(response):
+            assert response.status_code == 200
+            return {row["id"] for row in response.json()}
+
+        school_side = ids(await seeded_client.get("/schools?age_group=preschool&education_level=primary"))
+        assert kg.id in school_side
+        assert loner.id not in school_side
+        assert school.id not in school_side  # it has no preschool of its own
+        kindergartens = ids(await seeded_client.get("/schools?age_group=preschool&education_level=kindergarten"))
+        assert {kg.id, loner.id} <= kindergartens
+
+    @pytest.mark.asyncio
+    async def test_school_side_preschool_needs_the_preschool_at_the_shared_pin(self, seeded_db, seeded_client):
+        kg, _ = await self._pair(seeded_db)
+        branch = SchoolLocation(school_id=kg.id, address_i18n={"bg": "Лозенец"}, lat=42.675, lng=23.33, is_primary=False)
+        seeded_db.add(branch)
+        await seeded_db.flush()
+        seeded_db.add(SchoolLocationAgeGroupShift(location_id=branch.id, age_group="preschool"))
+        await seeded_db.commit()
+
+        response = await seeded_client.get("/schools?age_group=preschool&education_level=primary")
+        assert kg.id not in {row["id"] for row in response.json()}
