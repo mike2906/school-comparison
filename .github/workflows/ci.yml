@@ -90,6 +90,17 @@ jobs:
           restored_rows="$(psql -U postgres -d schooldecider_restore -Atc 'SELECT row_to_json(s)::text FROM schools s ORDER BY id')"
           test -n "$original_rows" && test "$original_rows" = "$restored_rows"
 
+      - name: Run PostgreSQL-marked tests
+        # The suite above runs on SQLite and skips these. They run on a migrated schema
+        # of their own: the tests empty its tables before each test.
+        env:
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/schooldecider_pgtests
+          POSTGRES_TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/schooldecider_pgtests
+        run: |
+          createdb -U postgres schooldecider_pgtests
+          uv run alembic upgrade head
+          uv run pytest -m postgres
+
   frontend:
     name: Frontend
     runs-on: ubuntu-latest
