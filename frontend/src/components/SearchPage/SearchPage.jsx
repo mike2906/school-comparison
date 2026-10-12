@@ -606,9 +606,11 @@ function SearchPage() {
   }
 
   const handleClearLocation = () => {
-    clearLocation()
+    // Page state first: clearLocation removes the saved location, which throws when
+    // storage is blocked.
     setIsPickingLocation(false)
     setDistanceFilter('any')
+    clearLocation()
   }
 
   const handleStartMapPick = () => {
