@@ -31,6 +31,7 @@ from app.scrapers.deterministic import run_deterministic_extraction
 from app.scrapers.extractor import _freshest_url_variants
 
 _WEBSITE_PAGE_FILTER = (
+    SourcePage.school_id.isnot(None),
     SourcePage.scrape_type == ScrapeType.WEBSITE,
     SourcePage.is_valid.is_(True),
     SourcePage.raw_markdown.isnot(None),
