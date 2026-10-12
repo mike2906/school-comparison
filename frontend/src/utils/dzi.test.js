@@ -15,6 +15,8 @@ test('parseDziSubject reads the level and curriculum and rejects unknown subject
   assert.deepEqual(parseDziSubject('english_b2_pp'), { base: 'english', cefr: 'B2', curriculum: 'pp' })
   assert.deepEqual(parseDziSubject('english_b11_oop'), { base: 'english', cefr: 'B1.1', curriculum: 'oop' })
   assert.deepEqual(parseDziSubject('bulgarian'), { base: 'bulgarian', cefr: null, curriculum: null })
+  assert.deepEqual(parseDziSubject('fine_arts_pp'), { base: 'fine_arts', cefr: null, curriculum: 'pp' })
+  assert.equal(parseDziSubject('fine_pp'), null)
   assert.equal(parseDziSubject('law_pp'), null)
 })
 

@@ -77,8 +77,8 @@ _CYRILLIC_TO_LATIN = str.maketrans({"А": "A", "а": "a", "В": "B", "в": "b"})
 # none is not imported and is listed in the summary, so a new one is added here rather
 # than shown under a made-up name. The 2023–2026 files (first import, 2026-10-12) use
 # e.g. БЕЛ, Мат, АЕ, БЗО, ГИ, ИсЕ, ИтЕ, ФА, ХООС, МУЗ; the long forms are kept for
-# other years. "ИИ" is left unmapped: it may be Изобразително изкуство rather than
-# history, so it waits for a look at the file.
+# other years. History is "Ист", so "ИИ" is Изобразително изкуство; "Пр" is
+# Предприемачество.
 _SUBJECT_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = tuple(
     (re.compile(pattern, re.IGNORECASE), key)
     for pattern, key in (
@@ -91,6 +91,8 @@ _SUBJECT_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = tuple(
         (r"^(физ|фа$)", "physics"),
         (r"^(хим|хоос$)", "chemistry"),
         (r"^муз", "music"),
+        (r"^(изоб|ии$)", "fine_arts"),
+        (r"^(предпр|пр$)", "entrepreneurship"),
         (r"^инф", "informatics"),
         (r"^ит$", "it"),
         (r"^(ае|англ)", "english"),
