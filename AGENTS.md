@@ -178,7 +178,7 @@ you hit a real problem.
 - Treat existing implementation work as sunk cost when a simpler design is available.
 - Prefer what libraries already do (Leaflet distance, not a custom haversine) and simple
   retries (1-2-3, not backoff with jitter). No caching/queues before a real performance problem.
-- Large files (`app/scrapers/extractor.py`, `validator.py` are 1,700–2,400 lines): locate
+- Large files (`app/scrapers/extractor.py` is ~2,400 lines): locate
   code with `grep -n` and read only the needed line ranges.
 - **Don't grow the giant files.** New functions do not go into `app/scrapers/cli.py`,
   `app/scrapers/extractor.py`, `app/scrapers/validator.py` or
