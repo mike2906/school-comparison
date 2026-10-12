@@ -7,6 +7,7 @@ import ErrorBoundary from './components/ErrorBoundary/ErrorBoundary'
 import SearchPage from './components/SearchPage/SearchPage'
 import SchoolDetailPage from './components/SchoolDetailPage/SchoolDetailPage'
 import AboutPage from './components/AboutPage/AboutPage'
+import DirectoryPage from './components/DirectoryPage/DirectoryPage'
 import NotFoundPage from './components/NotFoundPage/NotFoundPage'
 import CompareBar from './components/CompareBar/CompareBar'
 import {
@@ -68,7 +69,7 @@ function useLanguageHead() {
         'link[rel="canonical"], link[rel="alternate"][hreflang], meta[name="description"], meta[name="robots"], meta[property^="og:"]'
       )
       .forEach((element) => element.remove())
-    // These two pages set no title of their own; the others do (school, about, not found).
+    // These two pages set no title of their own; the others do (school, schools, about, not found).
     if (pathname === '/search') document.title = t('seo.searchTitle')
     if (pathname === '/compare') document.title = `${t('compare.title')} · ${t('nav.title')}`
     if (!hasCanonical(pathname)) return
@@ -129,6 +130,10 @@ const router = createBrowserRouter([
       {
         path: 'search',
         element: <SearchPage />,
+      },
+      {
+        path: 'schools',
+        element: <DirectoryPage />,
       },
       {
         path: 'schools/:id',

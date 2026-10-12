@@ -16,6 +16,9 @@ function Footer({ clearCompareBar }) {
       <div className="mx-auto flex max-w-5xl flex-col gap-2 px-6 py-6 text-sm text-neutral-600 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
         <p>{t('footer.dataNote')}</p>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <Link to="/schools" className="text-primary-700 underline">
+            {t('seo.allSchools')}
+          </Link>
           <Link to="/about" className="text-primary-700 underline">
             {t('nav.about')}
           </Link>

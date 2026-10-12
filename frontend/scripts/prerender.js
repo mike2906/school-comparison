@@ -19,7 +19,6 @@ import {
   indexReasons,
   outputFile,
   renderPage,
-  schoolLinks,
   schoolPage,
 } from '../src/prerender/pages.js'
 import { DEFAULT_SITE_ORIGIN, URL_LANGUAGES } from '../src/utils/languageUrl.js'
@@ -102,8 +101,10 @@ async function main() {
   for (const language of URL_LANGUAGES) {
     const dictionary = JSON.parse(await readFile(path.resolve(`src/i18n/${language}.json`), 'utf8'))
     const t = createTranslator(dictionary)
-    const schoolPages = schools.map((school) => schoolPage(school, t, language, { listed: listedIds.has(school.id) }))
-    const pages = [...fixedPages(t, language, schoolLinks(schoolPages, language)), ...schoolPages]
+    const pages = [
+      ...fixedPages(t, language, schools.filter((school) => listedIds.has(school.id))),
+      ...schools.map((school) => schoolPage(school, t, language, { listed: listedIds.has(school.id) })),
+    ]
     for (const page of pages) {
       await write(outputFile(page.routePath, language), renderPage(template, page, { language, origin, siteName: t('nav.title') }))
     }

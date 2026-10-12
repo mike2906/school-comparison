@@ -67,6 +67,6 @@ test('canonicalUrl is the absolute URL in the page language', () => {
 })
 
 test('hasCanonical covers indexable routes only', () => {
-  for (const path of ['/search', '/about', '/schools/12']) assert.equal(hasCanonical(path), true)
+  for (const path of ['/search', '/about', '/schools', '/schools/12']) assert.equal(hasCanonical(path), true)
   for (const path of ['/', '/compare', '/nope', '/schools/abc', '/schools/12/x']) assert.equal(hasCanonical(path), false)
 })
