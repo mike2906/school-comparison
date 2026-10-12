@@ -3,7 +3,7 @@
  * block inside `#root` that React replaces on mount (hidden until then, see index.html).
  * Pure builders; the file and network work lives in `scripts/prerender.js`.
  */
-import { compareSchoolNames, getAddress, getSchoolName } from '../utils/i18n.js'
+import { getAddress, getSchoolName } from '../utils/i18n.js'
 import { URL_LANGUAGES, alternateLinks, canonicalUrl, languagePath } from '../utils/languageUrl.js'
 import { schoolLevelLabel, schoolTypeLabel } from '../utils/levelLabel.js'
 import {
@@ -14,6 +14,7 @@ import {
   isAverageMetric,
 } from '../utils/nvo.js'
 import { statedTuition } from '../utils/pricing.js'
+import { directorySections } from '../utils/schoolDirectory.js'
 
 // Our own thin-content heuristic, not an SEO rule: a published Bulgarian summary shorter
 // than this says little beyond the name, type and address the page already shows.
@@ -140,42 +141,35 @@ function paragraph(text) {
   return text ? `<p>${escapeHtml(text)}</p>` : ''
 }
 
-/**
- * A link to every indexable school. The app's list shows a few dozen cards at a time and
- * crawlers do not scroll, so without this most school pages are reachable only from the
- * sitemap, and search engines treat such orphan pages as unimportant.
- */
-function schoolDirectory(links, t, language) {
-  if (links.length === 0) return ''
-  const items = links
-    .map(({ routePath, name }) => `<li><a href="${escapeHtml(languagePath(routePath, language))}">${escapeHtml(name)}</a></li>`)
-    .join('')
-  return `<section><h2 class="font-semibold">${escapeHtml(t('seo.allSchools'))}</h2><ul>${items}</ul></section>`
-}
-
-/** The school pages the search page links: those in the sitemap, by name as the app sorts. */
-export function schoolLinks(schoolPages, language) {
-  return schoolPages
-    .filter((page) => page.sitemap && page.name)
-    .map(({ routePath, name }) => ({ routePath, name }))
-    .sort((a, b) => compareSchoolNames(a.name, b.name, language))
+/** The A–Z list of `/schools`, the same sections and links the app renders there. */
+function directoryBody(listedSchools, t, language) {
+  const sections = directorySections(listedSchools, language).map(({ key, entries }) => {
+    const items = entries
+      .map(({ school, name }) => {
+        const href = languagePath(`/schools/${school.id}`, language)
+        const facts = t('seo.schoolFacts', { type: schoolTypeLabel(school, t), level: schoolLevelLabel(school, t) })
+        return `<li><a href="${escapeHtml(href)}">${escapeHtml(name)}</a> · ${escapeHtml(facts)}</li>`
+      })
+      .join('')
+    return `<section><h2 class="font-semibold">${escapeHtml(`${t(`directory.${key}`)} (${entries.length})`)}</h2><ul>${items}</ul></section>`
+  })
+  return mainBlock([heading(t('directory.title')), paragraph(t('directory.intro')), ...sections])
 }
 
 /**
  * The pages that exist without school data, including the two aliases of `/search`.
- * `links` (from `schoolLinks`) are listed on the search page.
+ * `listedSchools` (the schools the site lists) fill the A–Z list at `/schools`.
  */
-export function fixedPages(t, language, links = []) {
+export function fixedPages(t, language, listedSchools = []) {
   const siteName = t('nav.title')
+  // The app's list shows a few dozen cards at a time and crawlers do not scroll, so the
+  // search page points them at the A–Z list, which links every school page.
+  const directoryLink = `<p><a href="${escapeHtml(languagePath('/schools', language))}">${escapeHtml(t('seo.allSchools'))}</a></p>`
   const search = {
     title: t('seo.searchTitle'),
     description: t('seo.searchDescription'),
     canonicalPath: '/search',
-    body: mainBlock([
-      heading(t('seo.searchTitle')),
-      paragraph(t('seo.searchDescription')),
-      schoolDirectory(links, t, language),
-    ]),
+    body: mainBlock([heading(t('seo.searchTitle')), paragraph(t('seo.searchDescription')), directoryLink]),
   }
   const searchLink = `<p><a href="${escapeHtml(languagePath('/search', language))}">${escapeHtml(t('notFound.cta'))}</a></p>`
   return [
@@ -189,6 +183,14 @@ export function fixedPages(t, language, links = []) {
       canonicalPath: '/about',
       sitemap: true,
       body: mainBlock([heading(t('about.title')), paragraph(t('about.intro'))]),
+    },
+    {
+      routePath: '/schools',
+      title: `${t('directory.title')} · ${siteName}`,
+      description: truncate(t('directory.intro')),
+      canonicalPath: '/schools',
+      sitemap: true,
+      body: directoryBody(listedSchools, t, language),
     },
     {
       routePath: '/compare',
@@ -249,7 +251,6 @@ export function schoolPage(school, t, language, { listed = true } = {}) {
 
   return {
     routePath: `/schools/${school.id}`,
-    name,
     title: `${name} · ${t('nav.title')}`,
     description: truncate(description),
     canonicalPath: `/schools/${school.id}`,

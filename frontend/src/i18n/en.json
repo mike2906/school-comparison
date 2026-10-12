@@ -18,6 +18,7 @@
     "subtitle": "Find the perfect school for your child",
     "home": "Home",
     "compare": "Compare",
+    "allSchools": "All schools",
     "about": "About the data",
     "language": "Language"
   },
@@ -716,6 +717,12 @@
     "dataNote": "Found a mistake in a school’s details? Tell us and we’ll check it.",
     "reportError": "Report a data error",
     "reportSubject": "Data error report"
+  },
+  "directory": {
+    "title": "All schools and kindergartens in Sofia",
+    "intro": "Every school and kindergarten on the site, by name. Open one to see its details, exam results and fees.",
+    "schools": "Schools",
+    "kindergartens": "Kindergartens"
   },
   "seo": {
     "allSchools": "All schools and kindergartens",
