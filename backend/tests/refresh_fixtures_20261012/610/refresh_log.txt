@@ -1,0 +1,6 @@
+== school 610: Extracted 4 pricing rows; Validation completed before commit (needs_review)
+  - tuition 7400.00 EUR no period 2026/2027 [Гимназия / Гимназия / 8 – 10. клас / Плащане на 1 вноска] https://montessorischools.bg/nachalen-etap/
+  - tuition 7400.00 EUR no period 2026/2027 [Подготвителен клас / Подготвителен клас / ПУК 1 / Плащане на 1 вноска] https://montessorischools.bg/nachalen-etap/
+  - tuition 7650.00 EUR no period 2026/2027 [Начален и Прогимназиален етап / Начален и Прогимназиален етап / ПЪК 2 – 1 – 7. клас / Плащане на 1 вноска] https://montessorischools.bg/nachalen-etap/
+  - tuition 7800.00 EUR no period 2026/2027 [11 – 12. клас / Дипломна програма / 11 – 12. клас / Плащане на 1 вноска] https://montessorischools.bg/nachalen-etap/
+    registration 650.00 EUR one_time no year [ПУК1] https://montessorischools.bg/nachalen-etap/

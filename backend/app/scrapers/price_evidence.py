@@ -321,9 +321,11 @@ PERIOD_KEYWORDS: dict[str, re.Pattern[str]] = {
         r"(?<!три)месеч|\bна месец|/\s*мес|per month|/\s*month|\bmonthly\b|a month\b"
         r"|\b(?:всеки|предходния|предишния|предидущия|текущия|следващия) месец"
     ),
-    # "Total tuition fees (year)" heads a yearly table.
+    # "Total tuition fees (year)" heads a yearly table. "Плащане на 1 вноска" (610) is the
+    # year's fee paid in one go, beside its 2- and 10-instalment plans.
     "YEARLY": re.compile(
         r"(?<!полу)годиш|\bна година|/\s*год|per year|/\s*year|\bannual|\byearly\b|a year\b|\(\s*year\s*\)"
+        r"|\b(?:на|в)\s+(?:1|една)\s+вноска\b|\b(?:in\s+)?(?:one|1|a single)\s+instal?lment\b"
     ),
     "ONE_TIME": re.compile(r"еднократ|one[- ]time|one[- ]off|\bonce\b"),
     "QUARTER": re.compile(r"тримесеч|quarterly|per quarter"),
@@ -410,7 +412,7 @@ HEADING_CHARS = 80  # a longer line is prose, not a heading
 _TABLE_RULE_RE = re.compile(r"^[\s|:\-–—=*_]*$")
 
 
-def heading_period(text: str, span: tuple[int, int]) -> Optional[str]:
+def heading_period(text: str, span: tuple[int, int], skip: frozenset[str] = frozenset()) -> Optional[str]:
     """The one period the heading over an amount's table or list states, if any.
 
     For an amount with no period of its own: 517's "ГОДИШНА ТАКСА" heads a table of
@@ -425,7 +427,10 @@ def heading_period(text: str, span: tuple[int, int]) -> Optional[str]:
     line or a markdown heading starts another section and ends the search, and so does a
     fee laid out unlike the amount's own ("1 клас | 7000 €" above "Храна" over a bare
     "150 €"): the two are not one list. Several periods, a per-day/week one, or a long
-    line of prose decide nothing.
+    line of prose decide nothing. A line naming a payment plan ("Плащане на 10 месечни
+    вноски", a flattened table's column header, 610) speaks for that plan's column only.
+    A period in ``skip`` is passed over: under "Годишна такса", "ЕДНОКРАТНО ПЛАЩАНЕ" says
+    how a yearly tuition is paid (564).
     """
     line_start = text.rfind("\n", 0, span[0]) + 1
     amount_line, column_at = _line_of(text, span), span[0] - line_start
@@ -450,6 +455,10 @@ def heading_period(text: str, span: tuple[int, int]) -> Optional[str]:
             if markdown_heading or section or re.fullmatch(r"\s*\*\*.+\*\*\s*", line):
                 return None  # another section's heading: "Допълнителни услуги" over "Транспорт | 80 лв."
             continue
+        if "|" not in line and _PLAN_LINE_RE.search(line):
+            return None
+        if families and families <= skip and not unrepresentable:
+            continue
         if "|" in line and "|" in amount_line:
             # The header row of the amount's table: only the amount's own column speaks.
             cells = line.split("|")
@@ -465,6 +474,9 @@ def heading_period(text: str, span: tuple[int, int]) -> Optional[str]:
             return None
         return next(iter(families))
     return None
+
+
+_PLAN_LINE_RE = re.compile(r"вноск|instal?lment")
 
 
 def _is_bare_price_line(line: str) -> bool:
@@ -600,6 +612,18 @@ def _line_above(text: str, span: tuple[int, int]) -> str:
     """The nearest line above the amount's that states no price ("" when none)."""
     heading = _heading_of(text, span)
     return heading.split("\n", 1)[0] if "\n" in heading else ""
+
+
+def _terms_above(text: str, span: tuple[int, int], limit: int = 3) -> str:
+    """The lines just above the amount's, up to the price before it: the terms of its tier."""
+    lines = text[: text.rfind("\n", 0, span[0]) + 1].split("\n")[:-1]
+    terms: list[str] = []
+    for line in reversed(lines):
+        if _is_price_line(line) or len(terms) == limit:
+            break
+        if line.strip():
+            terms.insert(0, line)
+    return "\n".join(terms)
 
 
 def _own_words(text: str, span: tuple[int, int]) -> str:
@@ -926,6 +950,9 @@ def check_price_row(
             # "Еднократно плащане: До 09.07.2026" under a yearly fee): the heading of its
             # table or list may say.
             headed = {heading_period(text, span) for span in chosen}
+            if len(headed) == 1 and None not in headed and not period_fits_category(row.category, next(iter(headed))):
+                # "ЕДНОКРАТНО ПЛАЩАНЕ" under "Годишна такса" (564): the heading above it says.
+                headed = {heading_period(text, span, skip=frozenset(headed)) for span in chosen}
         if len(headed) == 1 and None not in headed and period_fits_category(row.category, next(iter(headed))):
             stated = headed.pop()
             hit(RULE_PERIOD_MISSING, f"null period, heading says {stated}", contexts[0], stated)
@@ -949,11 +976,12 @@ def check_price_row(
             hit(RULE_INSTALLMENT, "tuition row is one installment", _line_of(text, chosen[0]))
 
     # Rule 7: an offer whose last day has passed (an early-enrolment tier, last season's trip).
-    # The amount's own words and the line it stands under (171's "При записване в срок
-    # до 19.12.2025 г."), not a note below it ("Ранно записване до 31.03. - 10% отстъпка"
-    # is a discount on the price above, which stays).
+    # The amount's own words and the lines it stands under back to the price before it
+    # (171's "При записване в срок до 23.01.2026 г." over a line on how it is paid), not a
+    # note below it ("Ранно записване до 31.03. - 10% отстъпка" is a discount on the price
+    # above, which stays).
     ended = [
-        expired_offer(f"{_line_above(text, span)}\n{amount_segment(text, span)}", today or datetime.date.today())
+        expired_offer(f"{_terms_above(text, span)}\n{amount_segment(text, span)}", today or datetime.date.today())
         for span in chosen
     ]
     if all(ended):
@@ -1010,20 +1038,44 @@ def _page_states_period(row: PriceRow, page_text: Optional[str]) -> bool:
     return True
 
 
+_UNIT_AFTER_RE = re.compile(rf"^[ \t]*(?:{_CURRENCY_TOKEN})?[ \t]*\n?[ \t]*/[ \t]*\n?[ \t]*(?P<unit>[^\n|]+)")
+
+
+def states_another_unit(page_text: Optional[str], value: Any) -> bool:
+    """True when the page writes what the amount covers after a slash, and it is no period.
+
+    "≈ 950 EUR / за всички" (533's green school, for all its trips) and "100 EUR / за 10
+    месеца" are the whole charge: a monthly period stored for them came from elsewhere.
+    """
+    text = normalize_text(page_text)
+    for span in amount_spans(text, value) if text else []:
+        match = _UNIT_AFTER_RE.match(text[span[1]:])
+        if match and _has_words(match["unit"]) and period_families(f"/ {match['unit']}") == (set(), False):
+            return True
+    return False
+
+
 def replacement_regressions(
     published: Iterable[tuple[PriceRow, Optional[str]]],
     proposed: Iterable[tuple[PriceRow, Optional[str]]],
     school_family: str,
+    accounted_for: Iterable[Any] = (),
 ) -> list[str]:
     """Why replacing published rows with a re-extraction's rows would lose evidence.
 
-    Each row comes with the current text of its page. A replacement regresses when:
+    Each row comes with the current text of its page. ``accounted_for`` are the amounts
+    the re-extraction read and listed under a fee instead of storing as one: a discounted
+    price or a payment plan's instalment (171's Christmas discount, 564's 827 a month of
+    the 10-instalment plan). A replacement regresses when:
 
     * a published amount is missing from the proposed rows although its page still
-      shows it (525's re-run dropped its registration rows);
+      shows it (525's re-run dropped its registration rows), and the re-extraction did
+      not account for it;
     * a published row has a period and every proposed row with that amount has none,
       unless the page states the period next to it (validation then fills it in), so
-      a period a person set from the page is not silently lost;
+      a period a person set from the page is not silently lost. A period the page
+      contradicts by writing another unit after the amount (533's "≈ 950 EUR / за
+      всички" stored as monthly) is not evidence;
     * a published row has a period and every proposed row with that amount has another
       one, unless the page states the new period next to the amount (199's re-run turned
       "6792 EUR yearly" into "6792 EUR monthly" from a table whose column headers are
@@ -1038,9 +1090,12 @@ def replacement_regressions(
     for row, text in published:
         published_by_amount.setdefault(_amount_key(row), []).append((row, text))
 
+    accounted = {_amount_key(PriceRow("", value, None, None, None, None, None)) for value in accounted_for}
     reasons = []
     for key, olds in published_by_amount.items():
         matches = by_amount.get(key, [])
+        if len(matches) < len(olds) and key in accounted:
+            continue
         # Counted, not just matched: a €500 registration and a €500 tuition tier are two
         # fees, and one proposed €500 row keeps only one of them. A category change on
         # the same amount (a deposit refiled from tuition to registration) is not a loss.
@@ -1084,7 +1139,9 @@ def replacement_regressions(
                 "to the amount"
             )
             continue
-        for old, _ in olds:
+        for old, old_text in olds:
+            if states_another_unit(old_text, old.amounts[0]):
+                continue
             if old.period and all(new.period is None for new, _ in matches):
                 filled = any(
                     finding.rule == RULE_PERIOD_MISSING

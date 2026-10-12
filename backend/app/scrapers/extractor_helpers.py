@@ -1896,9 +1896,13 @@ def _amounts_in_installment_text(text: str) -> list[float]:
 def _is_installment_plan_name(plan_name: Optional[str]) -> bool:
     # "10 installments", "2 вноски", "monthly installment", etc. signal that a
     # row represents a payment-schedule variant rather than a distinct fee.
+    # "Плащане на 1 вноска" is the whole fee paid at once, not a schedule.
     if not plan_name:
         return False
-    return bool(_INSTALLMENT_PLAN_NAME_RE.search(plan_name))
+    return any(
+        (match.group(1) or match.group(2)) != "1"
+        for match in _INSTALLMENT_PLAN_NAME_RE.finditer(plan_name)
+    )
 
 
 def _dedupe_installment_variants(prices: list[ExtractedPrice]) -> list[ExtractedPrice]:
@@ -2714,9 +2718,11 @@ def _filter_model_prices(prices: list[ExtractedPrice], text: str) -> list[Extrac
             agreed = families[0] if all(found == families[0] for found in families) else set()
             period = next(iter(agreed)).lower() if len(agreed) == 1 else None
             if period and not period_fits_category(price.category, period):
-                # "Еднократно плащане" under a yearly fee (517): the heading may say.
-                headed = {heading_period(block, span) for span in spans}
+                # "Еднократно плащане" under a yearly fee (517, 564): the heading may say.
+                headed = {heading_period(block, span, skip=frozenset({period.upper()})) for span in spans}
                 period = headed.pop().lower() if len(headed) == 1 and None not in headed else period
+            if period is None:
+                period = _period_in_label_parts(block, label)
             page_years = {
                 _normalize_academic_year(found) for found in _PAGE_ACADEMIC_YEAR_RE.findall(block)
             } - {None}
@@ -2741,6 +2747,23 @@ def _filter_model_prices(prices: list[ExtractedPrice], text: str) -> list[Extrac
         normalized.academic_year = page_year
         refined.append(normalized)
     return _told_apart_by_heading(refined, text)
+
+
+def _period_in_label_parts(block: str, label: str | None) -> str | None:
+    """The one period the parts of a copied label name, counting only parts on the page.
+
+    The model joins a row's words with " / "; a part the page states may carry the period
+    the layout lost: "Плащане на 1 вноска" heads a column of a table flattened one cell
+    a line (610), so nothing above the amount says which column it is in.
+    """
+    found: set[str] = set()
+    for part in str(label or "").split(" / "):
+        named, per_unit = period_families(part.casefold())
+        if per_unit:
+            return None
+        if named and label_spans(block, part):
+            found |= named
+    return next(iter(found)).lower() if len(found) == 1 else None
 
 
 def _told_apart_by_heading(rows: list[ExtractedPrice], text: str) -> list[ExtractedPrice]:
