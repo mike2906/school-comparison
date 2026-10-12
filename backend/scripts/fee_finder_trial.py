@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import re
 import sys
 from pathlib import Path
 from urllib.parse import unquote, urldefrag, urlparse
@@ -53,6 +54,8 @@ MAX_HOPS = 3
 MAX_PICKS = 4
 MAX_FETCHES = 12
 MAX_LINKS_SHOWN = 150
+# When the picker returns nothing, follow links whose URL or text names fees or admissions.
+_FEE_LINK_RE = re.compile(r"такс|цени|цена|прием|fee|tuition|pric|admission", re.IGNORECASE)
 _SKIPPED = (".jpg", ".jpeg", ".png", ".gif", ".svg", ".webp", ".css", ".js", ".zip", ".mp4", ".mp3", ".doc", ".docx")
 
 
@@ -141,6 +144,8 @@ async def _find(crawler, run_config, client, school: School, budget) -> tuple[li
             except Exception as exc:  # a failed page is recorded and skipped
                 read.append({"url": url, "hop": hop, "prices": False, "text": "", "note": str(exc)[:120]})
                 continue
+            if _key(final) != key and _key(final) in seen:
+                continue  # a second link to a page already read (often a percent-encoded redirect)
             seen.add(_key(final))
             read.append({"url": final, "hop": hop, "prices": bool(_PRICE_RE.search(text)), "text": text})
             for href, label in page_links:
@@ -154,6 +159,8 @@ async def _find(crawler, run_config, client, school: School, budget) -> tuple[li
             break
         queue, cost, _, _ = await _pick(name, read, unopened)
         spent += cost
+        if not queue:
+            queue = [url for url, label in unopened if _FEE_LINK_RE.search(f"{unquote(url)} {label}")][:MAX_PICKS]
         if not queue:
             break
     return read, spent
@@ -248,11 +255,21 @@ async def main(args: argparse.Namespace) -> None:
     _summarise(results, state["spent"])
 
 
+def _scored(fees: list[dict]) -> list[dict]:
+    """Fees as scored: lines without an amount dropped, and activities and extracurricular
+    counted as one category (the reference and the reader split optional classes differently)."""
+    return [
+        fee | {"category": "activities" if fee["category"] == "extracurricular" else fee["category"]}
+        for fee in fees
+        if fee.get("amount") is not None or fee.get("amount_min") is not None
+    ]
+
+
 def _summarise(results: list[dict], spent: float) -> None:
     right = total = found = ref_total = pub_found = 0
     extra = []
     for r in results:
-        reference, reader = r["reference_fees"], r["reader_fees"]
+        reference, reader = _scored(r["reference_fees"]), _scored(r["reader_fees"])
         if not reference:
             extra += [(r["school_id"], fee) for fee in reader]
             continue
@@ -260,7 +277,7 @@ def _summarise(results: list[dict], spent: float) -> None:
         right += sum(bool(match_any(fee, reference)) for fee in reader)
         ref_total += len(reference)
         found += sum(bool(match_any(fee, reader)) for fee in reference)
-        published = [row for row in r["stored_rows"] if row["published"]]
+        published = _scored([row for row in r["stored_rows"] if row["published"]])
         pub_found += sum(any(match_any(row, [fee]) for row in published) for fee in reference)
     n = len(results)
     print()
