@@ -517,6 +517,47 @@ class TestLocalizedProjection:
         localized = build_localized_attributes(attrs, "bg")
         assert localized["language_focus"] == [{"language": "Spanish", "level": None}]
 
+    def test_keeps_a_levelled_focus_on_an_instruction_language(self):
+        # A bilingual private school keeps "English: immersion" in its focus and filter.
+        attrs = {
+            "languages_of_instruction": ["bulgarian", "english"],
+            "language_focus": [{"language": "english", "level": "immersion"}],
+        }
+        localized = build_localized_attributes(attrs, "bg", "private")
+        assert localized["language_focus"] == [{"language": "English", "level": "immersion"}]
+        filterable = build_filterable_attributes(attrs, "private")
+        assert filterable["language_focus"] == [{"language": "English", "level": "immersion"}]
+
+    def test_language_with_qualifier_and_ambiguous_codes(self):
+        attrs = {
+            "extracted": {
+                "languages": [
+                    {"language": "Английски език (интензивно)", "level": None},
+                    {"language": "IT", "level": None},
+                ]
+            }
+        }
+        localized = build_localized_attributes(attrs, "bg")
+        assert localized["language_focus"] == [{"language": "English", "level": None}]
+
+    @pytest.mark.parametrize(
+        "item",
+        [
+            "Национална програма на МОН „Заедно в изкуствата и спорта“",
+            "НП „Иновации в училище“ на МОН",
+            "Проект „Подкрепа за успех“ на Министерството на образованието",
+            "Шахматен турнир",
+            "Фолклорен фестивал",
+            "Български празник и обичаи",
+        ],
+    )
+    def test_keeps_named_programmes_and_clubs(self, item):
+        localized = build_localized_attributes(
+            {"extracted": {"programs": [item], "extracurricular": [item]}}, "bg"
+        )
+        assert localized["special_programs"] == [item]
+        assert localized["activities_offered"] == [item]
+
     def test_drops_register_metadata_and_events_from_lists(self):
         # Site review G: "МОН лиценз" showed as a programme on 50 schools.
         attrs = {

@@ -387,7 +387,10 @@ def build_localized_attributes(
             _normalize_focus_entries(attrs.get("language_focus"))
             + _normalize_focus_entries(extracted.get("languages"))
         )
-        if (language := canonical_language(entry["language"])) and language not in instruction
+        # A plain "Bulgarian" at a school taught in Bulgarian says nothing; a focus with a
+        # level ("English: immersion" at a bilingual school) is kept.
+        if (language := canonical_language(entry["language"]))
+        and (entry.get("level") or language not in instruction)
     ])
 
     def admission_values(field_name: str) -> list[str]:

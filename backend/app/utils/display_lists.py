@@ -30,7 +30,7 @@ _LANGUAGE_NAMES: dict[str, tuple[str, ...]] = {
     "French": ("french", "fr", "френски"),
     "Spanish": ("spanish", "es", "испански"),
     "Russian": ("russian", "ru", "руски"),
-    "Italian": ("italian", "it", "италиански"),
+    "Italian": ("italian", "италиански"),
     "Chinese": ("chinese", "mandarin", "zh", "китайски"),
     "Japanese": ("japanese", "ja", "японски"),
     "Turkish": ("turkish", "tr", "турски"),
@@ -40,7 +40,7 @@ _LANGUAGE_NAMES: dict[str, tuple[str, ...]] = {
     "Romanian": ("romanian", "ro", "румънски"),
     "Hebrew": ("hebrew", "he", "иврит"),
     "Danish": ("danish", "da", "датски"),
-    "Norwegian": ("norwegian", "no", "норвежки"),
+    "Norwegian": ("norwegian", "норвежки"),
     "Latin": ("latin", "la", "латински"),
     "Portuguese": ("portuguese", "pt", "португалски"),
     "Polish": ("polish", "pl", "полски"),
@@ -55,26 +55,33 @@ _LANGUAGE_ALIASES: dict[str, str] = {
 }
 _LANGUAGE_SUFFIX_RE = re.compile(r"\s+(?:език|езикът|езика|language)$")
 
-# Register metadata, not a programme: "МОН лиценз", "Лицензирана от МОН", "Licensed by
-# the Ministry of Education".
-_REGISTER_RE = re.compile(
-    r"\bмон\b|ministry of education|министерств|\bрегистъра?\b"
-    r"|^(?:лиценз|licen[cs])\w*(?:\s+\w+)?$",
+# Register metadata, not a programme: "МОН лиценз", "Лицензирано от МОН", a bare "МОН"
+# or "Ministry of Education and Science". A named programme that only mentions the
+# ministry ("Национална програма на МОН „...“") is kept.
+_REGISTER_RE = re.compile(r"лиценз|licen[cs]|\bрегистъра?\b", re.IGNORECASE)
+_BARE_MINISTRY_RE = re.compile(
+    r"^(?:мон|министерство(?:то)? на образованието(?: и науката)?"
+    r"|ministry of education(?: and science)?(?: of bulgaria)?)"
+    r"(?:\s+(?:програма|задължителни предмети))?$",
     re.IGNORECASE,
 )
-# One-off events: tournaments, "Седмица на ...", "Ден на ...", festivals, concerts.
+# One-off events: "Седмица на ...", "Ден на ...", "Празник на ...", a tournament
+# between or for someone, a concert. A club ("Шахматен турнир") or a folk festival
+# that runs every year stays.
 _EVENT_RE = re.compile(
-    r"турнир|tournament|\bседмица на\b|\bден на\b|\bday of\b|\bweek of\b"
-    r"|фестивал|festival|празник|концерт\b|concert\b",
+    r"\bседмица на\b|\bден на\b|\bпразник на\b|\bday of\b|\bweek of\b"
+    r"|турнир (?:между|за)\b|концерт\b|concert\b",
     re.IGNORECASE,
 )
+_PARENTHETICAL_RE = re.compile(r"\s*\([^)]*\)")
 
 
 def canonical_language(value: Any) -> Optional[str]:
     """The English name of a language value, or None when it is not a known language."""
     if not isinstance(value, str):
         return None
-    text = _LANGUAGE_SUFFIX_RE.sub("", value.strip().lower())
+    text = _PARENTHETICAL_RE.sub("", value).strip().lower()
+    text = _LANGUAGE_SUFFIX_RE.sub("", text)
     return _LANGUAGE_ALIASES.get(text)
 
 
@@ -91,8 +98,9 @@ def canonical_languages(values: Iterable[Any]) -> list[str]:
 def instruction_languages(curated: Iterable[Any], school_type: Optional[str]) -> list[str]:
     """The languages a school teaches in.
 
-    A state school or kindergarten teaches in Bulgarian. Otherwise only a curated value
-    counts: the scraped language list is what a school teaches, so it is a language focus.
+    A state school or kindergarten teaches in Bulgarian (a curated value is ignored).
+    Otherwise only a curated value counts: the scraped language list is what a school
+    teaches, so it is a language focus.
     """
     if school_type == "state":
         return [INSTRUCTION_LANGUAGE_STATE]
@@ -104,6 +112,6 @@ def is_list_noise(text: str, field: str) -> bool:
 
     The event rule skips facilities: "concert hall" is a place, not a concert.
     """
-    if _REGISTER_RE.search(text):
+    if _REGISTER_RE.search(text) or _BARE_MINISTRY_RE.match(text.strip()):
         return True
     return field != "facilities" and bool(_EVENT_RE.search(text))
