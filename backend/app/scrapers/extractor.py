@@ -1242,7 +1242,7 @@ def _pricing_replacement_regressions(
     pages: list[SourcePage],
     superseded: list[Pricing],
     proposed: list[Pricing],
-    listed_under_a_fee: Iterable[float] = (),
+    listed_under_a_fee: Iterable[tuple[str, float]] = (),
 ) -> list[str]:
     """Rule 6 over the rows a re-extraction would replace: only rows the API publishes."""
     blocked = blocked_pricing_row_ids(school.attributes if isinstance(school.attributes, dict) else None)
@@ -1324,9 +1324,13 @@ async def _extract_prices(
     )
     # Amounts the model read as a discounted price or a payment plan's part: listed under
     # a fee, not stored as one, so a re-extraction that leaves them out has not lost them.
-    listed_under_a_fee: list[float] = []
+    listed_under_a_fee: list[tuple[str, float]] = []
     if isinstance(parsed, PageFees):
-        listed_under_a_fee = [line.amount for line in parsed.lines if line.role in ("discounted", "plan")]
+        listed_under_a_fee = [
+            (helpers._FEE_KIND_CATEGORY.get(line.kind, "other"), line.amount)
+            for line in parsed.lines
+            if line.role in ("discounted", "plan")
+        ]
         prices = helpers._prices_from_fee_lines(parsed.lines)
         parsed = PriceExtractionOutput(prices=prices, has_pricing_info=bool(prices))
 
@@ -1520,12 +1524,13 @@ async def _extract_prices(
         )
         .options(selectinload(Pricing.source_page).load_only(SourcePage.id, SourcePage.is_valid))
     )
-    # An undated row whose fee this run reads with a year is that fee, not history: 610's
-    # undated "7400" (filed in lev) beside this year's 7400 EUR.
+    # An undated row whose fee this run reads with a year from the same page is that fee,
+    # not history: 610's undated "7400" (filed in lev) beside this year's 7400 EUR. The
+    # currency is not compared, since a wrong one is what such a row can carry.
     dated_fees = {
-        (row.category, float(row.amount))
+        (row.category, float(row.amount), row.source_page_id)
         for row in pricing_rows
-        if row.amount is not None and _retention_year_key(row.academic_year)[0]
+        if row.amount is not None and row.source_page_id is not None and _retention_year_key(row.academic_year)[0]
     }
     superseded = [
         existing
@@ -1534,7 +1539,7 @@ async def _extract_prices(
         or (
             not str(existing.academic_year or "").strip()
             and existing.amount is not None
-            and (existing.category, float(existing.amount)) in dated_fees
+            and (existing.category, float(existing.amount), existing.source_page_id) in dated_fees
         )
     ]
     superseded_ids = [existing.id for existing in superseded]

@@ -1059,12 +1059,13 @@ def replacement_regressions(
     published: Iterable[tuple[PriceRow, Optional[str]]],
     proposed: Iterable[tuple[PriceRow, Optional[str]]],
     school_family: str,
-    accounted_for: Iterable[Any] = (),
+    accounted_for: Iterable[tuple[str, Any]] = (),
 ) -> list[str]:
     """Why replacing published rows with a re-extraction's rows would lose evidence.
 
-    Each row comes with the current text of its page. ``accounted_for`` are the amounts
-    the re-extraction read and listed under a fee instead of storing as one: a discounted
+    Each row comes with the current text of its page. ``accounted_for`` are the
+    (category, amount) pairs the re-extraction read and listed under a fee instead of
+    storing as one: a discounted
     price or a payment plan's instalment (171's Christmas discount, 564's 827 a month of
     the 10-instalment plan). A replacement regresses when:
 
@@ -1090,33 +1091,38 @@ def replacement_regressions(
     for row, text in published:
         published_by_amount.setdefault(_amount_key(row), []).append((row, text))
 
-    accounted = {_amount_key(PriceRow("", value, None, None, None, None, None)) for value in accounted_for}
+    accounted = {
+        (str(category).upper(), _amount_key(PriceRow("", value, None, None, None, None, None)))
+        for category, value in accounted_for
+    }
     reasons = []
     for key, olds in published_by_amount.items():
         matches = by_amount.get(key, [])
-        if len(matches) < len(olds) and key in accounted:
-            continue
+        # Only a row of the category the listed amount was for may go: a €500 instalment
+        # does not account for a €500 registration fee.
+        needed = [(row, text) for row, text in olds if (str(row.category).upper(), key) not in accounted]
         # Counted, not just matched: a €500 registration and a €500 tuition tier are two
         # fees, and one proposed €500 row keeps only one of them. A category change on
         # the same amount (a deposit refiled from tuition to registration) is not a loss.
-        if len(matches) < len(olds):
-            old, text = olds[0]
+        if len(matches) < len(needed):
+            old, text = needed[0]
             normalized = normalize_text(text)
             shown = min(len(amount_spans(normalized, value)) for value in old.amounts) if normalized else 0
-            if shown >= len(olds):
-                dropped = len(olds) - len(matches)
-                label = ", ".join(f"{row.category} {', '.join(key)}" for row, _ in olds)
+            if shown >= len(needed):
+                dropped = len(needed) - len(matches)
+                label = ", ".join(f"{row.category} {', '.join(key)}" for row, _ in needed)
                 reasons.append(
-                    f"drops {dropped} of {len(olds)} rows at {', '.join(key)} ({label}), "
+                    f"drops {dropped} of {len(needed)} rows at {', '.join(key)} ({label}), "
                     "which the page still shows"
-                    if len(olds) > 1
+                    if len(needed) > 1
                     else f"drops {label}, which the page still shows"
                 )
                 continue
-            # Fewer rows than before, but no more than the page shows: tiers merged into
-            # one row. The rows that remain still have to keep the period.
-            if not matches:
-                continue
+        # Fewer rows than before, but no more than the page shows (tiers merged into one
+        # row) or than the listed amounts leave: the rows that remain still have to keep
+        # the period.
+        if not matches:
+            continue
         # A period none of the published rows at this amount had needs the page's word for
         # it, whichever published row it replaces: one row that kept its period does not
         # vouch for a sibling that changed.

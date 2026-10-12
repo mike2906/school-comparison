@@ -407,4 +407,21 @@ def test_rule_6_accepts_an_amount_listed_under_a_fee():
     published = [(row(7580, period="YEARLY"), page), (row(3975, period="YEARLY"), page)]
     proposed = [(row(7580, period="YEARLY"), page)]
     assert replacement_regressions(published, proposed, "school")
-    assert replacement_regressions(published, proposed, "school", accounted_for=[3975.0]) == []
+    assert replacement_regressions(published, proposed, "school", accounted_for=[("tuition", 3975.0)]) == []
+
+
+def test_rule_6_a_listed_amount_accounts_only_for_its_own_category():
+    """A €500 instalment does not let a €500 registration fee go, nor vouch for a period."""
+    page = "Записване 500 €\nТакса 5000 € годишно\nI вноска 500 €\n"
+    published = [(row(5000, period="YEARLY"), page), (row(500, category="REGISTRATION", period="ONE_TIME"), page)]
+    proposed = [(row(5000, period="YEARLY"), page)]
+    assert replacement_regressions(published, proposed, "school", accounted_for=[("tuition", 500.0)]) == [
+        "drops REGISTRATION 500.00, which the page still shows"
+    ]
+    # The fee that remains at a listed amount still keeps its period.
+    page = "Такса 500 €\nI вноска 500 €\n"
+    published = [(row(500, period="YEARLY"), page), (row(500, period="YEARLY", plan_name="плащане"), page)]
+    proposed = [(row(500), page)]
+    assert replacement_regressions(published, proposed, "school", accounted_for=[("tuition", 500.0)]) == [
+        "loses the YEARLY period of TUITION 500.00"
+    ]
