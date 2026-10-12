@@ -15,9 +15,9 @@ const STAGE_KEYS = {
   'ясла': 'ageGroups.nursery',
   'детска ясла': 'ageGroups.nursery',
   'nursery': 'ageGroups.nursery',
-  'градина': 'pricing.stages.kindergarten',
-  'детска градина': 'pricing.stages.kindergarten',
-  'kindergarten': 'pricing.stages.kindergarten',
+  'градина': 'educationLevels.kindergarten',
+  'детска градина': 'educationLevels.kindergarten',
+  'kindergarten': 'educationLevels.kindergarten',
 }
 
 /** Our label for a kindergarten stage ("Ясла" → "Nursery"), or null. */
@@ -26,9 +26,14 @@ export function stageLabel(text, t) {
   return key ? t(key) : null
 }
 
+// A grade word or a preschool name; a bare "I" or "IV" may number payment options.
+const GRADE_NAMED_RE = /клас|кл\.|grade|pre-?school|^(?:пгу|пг|пк|pk)$/iu
+
 // "10. клас", "VIII - XII клас", "Preschool" or a school stage ("Гимназия"), and nothing else.
+// Not "Подготвителен клас": at a language gymnasium that is the intensive 8th-grade year.
 function gradesOnlyLabel(text, t) {
-  const band = parseGradeBand(text)
+  const name = normalize(text)
+  const band = (GRADE_NAMED_RE.test(name) && name !== 'подготвителен клас' ? parseGradeBand(text) : null)
     || (!/[/|]/.test(text) && !gradesInText(text) ? gradesNamedIn(text) : null)
   return band ? gradeBandLabel(band, t) : null
 }

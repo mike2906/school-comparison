@@ -275,9 +275,6 @@
       "preschoolTo": "От подготвителна група до {{to}} клас",
       "one": "{{n}} клас",
       "range": "{{from}}–{{to}} клас"
-    },
-    "stages": {
-      "kindergarten": "Детска градина"
     }
   },
   "priceSource": {

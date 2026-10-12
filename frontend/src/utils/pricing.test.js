@@ -13,6 +13,7 @@ import {
   statedTuition,
   tuitionSortValue,
   priceAgeGroupLabel,
+  pricePlanLabel,
   groupRowsByAgeGroup,
   sortByCategory,
   intakeYearStart,
@@ -274,7 +275,7 @@ const EN = {
   'pricing.grades.preschoolTo': 'Preschool to grade {{to}}',
   'pricing.grades.one': 'Grade {{n}}',
   'pricing.grades.range': 'Grades {{from}}–{{to}}',
-  'pricing.stages.kindergarten': 'Kindergarten',
+  'educationLevels.kindergarten': 'Kindergarten',
 }
 const tEn = (key, vars = {}) =>
   key in EN ? EN[key].replace(/\{\{(\w+)\}\}/g, (_, name) => String(vars[name])) : key
@@ -529,4 +530,12 @@ test('statedTuition: a ПГУ (preschool group at school) fee is not a grades 1�
   const stated = statedTuition(rows, { ageGroup: 'grade_1_4', today: new Date('2026-06-01') })
   assert.deepEqual([stated.min, stated.max, stated.period], [5900, 5900, 'yearly'])
   assert.equal(statedTuition(rows, { ageGroup: 'preschool', today: new Date('2026-06-01') }).max, 8000)
+})
+
+test('pricePlanLabel drops a plan name that reads the same as its age group', () => {
+  assert.equal(pricePlanLabel({ category: 'tuition', age_group: 'ПК', plan_name: 'ПК' }, tEn), null)
+  assert.equal(pricePlanLabel({ category: 'tuition', age_group: '5 клас', plan_name: '5. клас' }, tEn), null)
+  assert.equal(pricePlanLabel({ category: 'tuition', age_group: '1 клас', plan_name: 'I клас' }, tEn), null)
+  assert.equal(pricePlanLabel({ category: 'tuition', age_group: 'ПК', plan_name: '8. клас' }, tEn), 'Grade 8')
+  assert.equal(pricePlanLabel({ category: 'tuition', plan_name: '8. клас' }, tEn), 'Grade 8')
 })

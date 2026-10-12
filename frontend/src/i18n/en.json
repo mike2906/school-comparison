@@ -275,9 +275,6 @@
       "preschoolTo": "Preschool to grade {{to}}",
       "one": "Grade {{n}}",
       "range": "Grades {{from}}–{{to}}"
-    },
-    "stages": {
-      "kindergarten": "Kindergarten"
     }
   },
   "priceSource": {

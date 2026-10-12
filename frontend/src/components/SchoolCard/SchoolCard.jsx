@@ -27,12 +27,12 @@ import {
 } from '../../utils/nvoDisplay'
 import {
   formatPriceLabel,
+  pricePlanLabel,
   selectPricingCohort,
   statedTuition,
   YEAR_STATUS,
 } from '../../utils/pricing'
 import { pricePeriod } from '../../utils/priceRows'
-import { planNameLabel } from '../../utils/priceLabels'
 import { parsePhones } from '../../utils/phone'
 import { orderAgeGroups } from '../../utils/ageGroupOrder'
 
@@ -361,7 +361,7 @@ function buildExpandedSections({
       const category = t(`pricing.${item.category}`)
       const period = pricePeriod(item)
       const periodKey = period ? t(`pricing.${period}`) : t('pricing.periodNotStated')
-      const planName = planNameLabel(item, t)
+      const planName = pricePlanLabel(item, t)
       const plan = planName ? `${t('pricing.plan')}: ${planName}` : ''
       const year = item.academic_year ? `${t('pricing.academicYear')}: ${item.academic_year}` : ''
       const meta = [plan, year].filter(Boolean).join(' • ')

@@ -1,11 +1,11 @@
 import { useTranslation } from 'react-i18next'
-import { displayPrice, groupPricingByAcademicYear, groupRowsByAgeGroup, priceAgeGroupLabel, YEAR_STATUS } from '../../utils/pricing'
+import { displayPrice, groupPricingByAcademicYear, pricePlanLabel, groupRowsByAgeGroup, priceAgeGroupLabel, YEAR_STATUS } from '../../utils/pricing'
 import { sharedPriceSource } from '../../utils/priceSources'
 import { groupPricingByCategory } from './helpers'
 import { formatAmount } from '../../utils/format'
 import PriceSource from './PriceSource'
 import { pricePeriod, periodUnknown } from '../../utils/priceRows'
-import { planNameLabel, textLang } from '../../utils/priceLabels'
+import { textLang } from '../../utils/priceLabels'
 
 /**
  * Every published price, grouped by academic year, then by category, then by the age
@@ -27,7 +27,7 @@ function PricingSection({ pricing }) {
       : t('pricing.priceOnRequest')
 
     const ageGroupLabel = showAgeGroup ? priceAgeGroupLabel(price, t) : null
-    const planName = planNameLabel(price, t)
+    const planName = pricePlanLabel(price, t)
 
     return (
       // Stacked on phones: beside the price, a long fee name was squeezed into a column a

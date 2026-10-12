@@ -8,7 +8,7 @@ const STRINGS = {
     'pricing.transport': 'Transport',
     'pricing.materials': 'Materials',
     'ageGroups.nursery': 'Nursery',
-    'pricing.stages.kindergarten': 'Kindergarten',
+    'educationLevels.kindergarten': 'Kindergarten',
     'pricing.grades.preschool': 'Preschool',
     'pricing.grades.one': 'Grade {{n}}',
     'pricing.grades.range': 'Grades {{from}}–{{to}}',
@@ -61,4 +61,11 @@ test('planNameLabel reads preschool and school stages written alone', () => {
   // A stage beside other words is the website's own name.
   assert.equal(planNameLabel({ category: 'tuition', plan_name: 'Гимназия / Месечна такса' }, t), 'Гимназия / Месечна такса')
   assert.equal(planNameLabel({ category: 'tuition', plan_name: 'Такса за 8. клас за годината' }, t), 'Такса за 8. клас за годината')
+})
+
+test('planNameLabel keeps names that only look like grades', () => {
+  // A language gymnasium's intensive 8th-grade year, not preschool.
+  assert.equal(planNameLabel({ category: 'tuition', plan_name: 'Подготвителен клас' }, t), 'Подготвителен клас')
+  // Payment options numbered I, II, IV.
+  assert.equal(planNameLabel({ category: 'tuition', plan_name: 'IV' }, t), 'IV')
 })
