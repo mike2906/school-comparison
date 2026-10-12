@@ -28,8 +28,15 @@ export function periodFromLabel(text) {
   return found.length === 1 ? found[0] : null
 }
 
-// The whole fee paid at once: "Плащане на 1 вноска", "една вноска", "in one payment".
-export const ONE_PAYMENT_RE = /(?<![\p{L}\p{N}-])(?:1|една|еднократна)\s+вноска(?![\p{L}])|in (?:one|1|a single) (?:payment|instal+ment)|single payment/iu
+// The whole fee paid at once: "Плащане на 1 вноска", "на една вноска", "in one payment";
+// not "1 вноска до 15.09" or "10 вноски, 1 вноска = 500", which are one instalment.
+const ONE_PAYMENT_RE = /(?:на|в)\s+(?:1|една)\s+вноска(?![\p{L}])|еднократна\s+вноска|in (?:one|1|a single) (?:payment|instal+ment)|single payment/iu
+const SEVERAL_INSTALMENTS_RE = /(?<![\p{L}\p{N}])(?:[2-9]|\d{2,}|две|три|четири|пет|шест|седем|осем|девет|десет)\s+вноски|общо|instal+ments/iu
+
+/** True when a fee name says the whole fee is paid in one payment. */
+export function isOnePayment(name) {
+  return ONE_PAYMENT_RE.test(name || '') && !SEVERAL_INSTALMENTS_RE.test(name || '')
+}
 
 /**
  * How often a row is paid: its stored period, else the one its own name states, else null.
@@ -38,7 +45,7 @@ export const ONE_PAYMENT_RE = /(?<![\p{L}\p{N}-])(?:1|една|еднократ�
 export function pricePeriod(row) {
   const named = periodFromLabel(row?.plan_name)
   if (row?.period || named) return row?.period || named
-  if (row?.category === 'tuition' && ONE_PAYMENT_RE.test(row?.plan_name || '')) return 'yearly'
+  if (row?.category === 'tuition' && isOnePayment(row?.plan_name)) return 'yearly'
   return null
 }
 
@@ -60,7 +67,7 @@ const ORDINAL_TOKEN_RE = new RegExp(`(?<![\\p{L}\\p{N}])(${ORDINAL})(?![\\p{L}\\
 // "Ясла", "Яслена група"; but "ДГ и ясла" or "Детска ясла и градина" name both, so neither.
 const NURSERY_RE = /яслен|nursery|cr[eè]che|(?<![\p{L}])ясл(?:а|и|ата)(?![\p{L}])/u
 const BOTH_RE = /ясл(?:а|и)\s*(?:и|\/|,)\s*(?:детск[аи] )?(?:градин|дг(?![\p{L}]))|(?:градин[аи]|(?<![\p{L}])дг)\s*(?:и|\/|,)\s*(?:детска )?ясл|яслена и градинска/u
-const PRESCHOOL_NAME_RE = /подготвителн[аи] груп|предучилищн[аи] груп|подготвителен клас|(?<![\p{L}])п[гк](?![\p{L}])|pre-?school/u
+const PRESCHOOL_NAME_RE = /подготвителн[аи] груп|предучилищн[аи] груп|подготвителен клас|(?<![\p{L}])п[гк]у?(?![\p{L}])|pre-?school/u
 
 const AGE_GROUP_KEYS = new Set([
   'nursery', 'first', 'second', 'third', 'preschool', 'grade_1_4', 'grade_5_7', 'grade_8_12',

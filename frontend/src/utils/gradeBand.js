@@ -5,7 +5,7 @@
  */
 
 const ROMAN = { i: 1, ii: 2, iii: 3, iv: 4, v: 5, vi: 6, vii: 7, viii: 8, ix: 9, x: 10, xi: 11, xii: 12 }
-const PRESCHOOL = 'пк|пг|pk|подготвителна група|подготвителен клас|pre-?school'
+const PRESCHOOL = 'пгу|пк|пг|pk|подготвителна група|подготвителен клас|pre-?school'
 const ITEM = `(${PRESCHOOL}|[ivx]{1,4}|\\d{1,2})\\.?`
 const GRADE_WORD = '(?:клас(?:ове)?|кл\\.?|grades?)'
 const WHOLE_BAND_RE = new RegExp(
@@ -97,13 +97,37 @@ const GRADES_IN_TEXT_RES = [
   new RegExp(`(?<![\\p{L}\\p{N}])(\\d{1,2})(?:st|nd|rd|th)\\s+grade(?![\\p{L}])`, 'gu'),
 ]
 
-// School stages by name: "Начален и Прогимназиален етап" is grades 1-7, "Гимназия" 8-12.
-const STAGES = [
-  [/предучилищ/u, 0, 0],
-  [/(?<![\p{L}])начал(?:ен|но|ния)(?![\p{L}])|primary school|elementary/u, 1, 4],
-  [/прогимназ|middle school/u, 5, 7],
-  [/(?<![\p{L}])гимназ|high school/u, 8, 12],
+// School stages by name, when a whole part of the text is the stage ("Гимназия",
+// "Начален и Прогимназиален етап", "Гимназия / 8 – 10. клас"); a school called "Частна
+// гимназия …" may teach grades 1-12, and "Начално плащане" is a first payment.
+const STAGE_WORDS = [
+  ['начален', 1, 4],
+  ['прогимназиален', 5, 7],
+  ['гимназиален', 8, 12],
 ]
+const STAGE_WORD = STAGE_WORDS.map(([word]) => word).join('|')
+const STAGE_PART_RE = new RegExp(
+  `^(?:(?:${STAGE_WORD})(?:\\s*(?:,|и)\\s*(?:${STAGE_WORD}))*\\s+(?:етап|етапи|курс)|гимназия|primary school|middle school|high school)$`,
+  'u',
+)
+const STAGE_BANDS = [
+  [/(?<![\p{L}])начален|primary school/u, 1, 4],
+  [/прогимназиален|middle school/u, 5, 7],
+  [/(?<![\p{L}])гимнази(?:ален|я)|high school/u, 8, 12],
+]
+// "Предучилищен и от 1-ви до 7-ми клас" (630): preschool listed with grades.
+const PRESCHOOL_WITH_GRADES_RE = /(?<![\p{L}])предучилищ(?:ен|на|но)\s+и\s/u
+
+function stageBand(text) {
+  let found = null
+  for (const part of text.split(/\s*[/|]\s*/)) {
+    if (!STAGE_PART_RE.test(part)) continue
+    for (const [re, from, to] of STAGE_BANDS) {
+      if (re.test(part)) found = widen(found, { from, to })
+    }
+  }
+  return found
+}
 
 function widen(found, range) {
   if (!range) return found
@@ -113,10 +137,8 @@ function widen(found, range) {
 /** The grades free text names, by number beside a grade word or by school stage, or null. */
 export function gradesNamedIn(text) {
   const normalized = normalize(text)
-  let found = gradesInText(text)
-  for (const [re, from, to] of STAGES) {
-    if (re.test(normalized)) found = widen(found, { from, to })
-  }
+  let found = widen(gradesInText(text), stageBand(normalized))
+  if (found && PRESCHOOL_WITH_GRADES_RE.test(normalized)) found = widen(found, { from: 0, to: 0 })
   return found
 }
 

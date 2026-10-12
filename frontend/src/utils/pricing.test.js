@@ -512,4 +512,19 @@ test('isInstallmentPlan: the whole fee paid in one payment is not an instalment'
   for (const name of ['Плащане на 1 вноска', 'Годишна такса / Плащане на една вноска', 'Payment in one instalment']) {
     assert.equal(isInstallmentPlan({ plan_name: name }), false, name)
   }
+  // A numbered first instalment is still one instalment.
+  for (const name of ['Такса 1 вноска до 15.09', 'Плащане на 2 вноски: 1 вноска до 15 септември', '10 вноски, 1 вноска = 500']) {
+    assert.equal(isInstallmentPlan({ plan_name: name }), true, name)
+  }
+})
+
+test('statedTuition: a ПГУ (preschool group at school) fee is not a grades 1–4 price (569)', () => {
+  const rows = [
+    row({ id: 1, plan_name: 'ПГУ от 15. 09.2026 г. до 31.05.2027 г. / Годишна такса обучение **', amount: 5900, period: null }),
+    row({ id: 2, plan_name: 'ПГУ от 15.09.2026г. до 14.09.2027 г. / Годишна такса обучение **', amount: 8000, period: null }),
+    row({ id: 3, age_group: '1-4 клас от 15.09.2026 г. до 31.05.2027 г.', plan_name: '1-4 клас от 15.09.2026 г. до 31.05.2027 г. / Годишна такса обучение **', amount: 5900, period: null }),
+  ]
+  const stated = statedTuition(rows, { ageGroup: 'grade_1_4', today: new Date('2026-06-01') })
+  assert.deepEqual([stated.min, stated.max, stated.period], [5900, 5900, 'yearly'])
+  assert.equal(statedTuition(rows, { ageGroup: 'preschool', today: new Date('2026-06-01') }).max, 8000)
 })

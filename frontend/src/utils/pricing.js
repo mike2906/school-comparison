@@ -1,6 +1,6 @@
 import { intlLocale } from './format.js'
 import { gradeBandLabel, gradeRangeInText, gradesInText, gradesNamedIn, rowGradeBand } from './gradeBand.js'
-import { ONE_PAYMENT_RE, pricePeriod, rowAgeGroupKeys, rowsForAgeGroup } from './priceRows.js'
+import { isOnePayment, pricePeriod, rowAgeGroupKeys, rowsForAgeGroup } from './priceRows.js'
 /**
  * Academic-year cohort helpers for pricing display.
  *
@@ -172,7 +172,7 @@ const ONE_INSTALLMENT_RE = /(?<![\p{L}\p{N}])(?:първа|втора|трета
 
 /** True for a row describing one instalment of a fee rather than the whole fee. */
 export function isInstallmentPlan(item) {
-  if (!item?.plan_name || ONE_PAYMENT_RE.test(item.plan_name)) return false
+  if (!item?.plan_name || isOnePayment(item.plan_name)) return false
   return INSTALLMENT_PLAN_NAME_RE.test(item.plan_name) || ONE_INSTALLMENT_RE.test(item.plan_name)
 }
 
@@ -272,7 +272,7 @@ export function formatPriceLabel(price, locale, t) {
 
 // The grades free text names; a stage ("Гимназия", 8-12) narrowed to the grades the plan
 // name writes inside it ("Гимназия / 8 – 10. клас" is grades 8-10).
-function stageBand(text, planName) {
+function namedBand(text, planName) {
   const named = gradesNamedIn(text)
   const written = gradesInText(planName)
   if (named && !gradesInText(text) && written && written.from >= named.from && written.to <= named.to) return written
@@ -289,7 +289,7 @@ function ageGroupName(price, t) {
   if (translated && translated !== key) return translated
   // Grades named in free text too: "Гимназия", or Buditel's whole sentence "Годишна такса за
   // 8. клас за учебната …".
-  const band = rowGradeBand(price) || stageBand(raw, price.plan_name)
+  const band = rowGradeBand(price) || namedBand(raw, price.plan_name)
   return band ? gradeBandLabel(band, t) : raw
 }
 
