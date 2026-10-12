@@ -32,6 +32,7 @@ from app.scrapers.extraction import (
     page_selection,
     price_lines,
     price_rows,
+    price_step,
     summary_sources,
 )
 from app.services.geocoding.write_gate import OFFICIAL_COORDS_TAG
@@ -2405,7 +2406,7 @@ def test_unrecognised_markdown_heading_ends_price_section():
 
 
 def test_normalized_price_fields_preserves_unstated_period():
-    fields = extractor_module._normalized_price_fields(
+    fields = price_step._normalized_price_fields(
         ExtractedPrice(
             category="tuition",
             amount=8000,
@@ -2420,7 +2421,7 @@ def test_normalized_price_fields_preserves_unstated_period():
 
 
 def test_normalized_price_fields_still_rejects_unknown_stated_period():
-    fields = extractor_module._normalized_price_fields(
+    fields = price_step._normalized_price_fields(
         ExtractedPrice(
             category="tuition",
             amount=8000,
@@ -2922,7 +2923,7 @@ def test_supported_prices_keep_only_current_fee_structure_across_categories():
     """
 
     parsed = price_lines._extract_prices_deterministic(text)
-    supported = extractor_module._supported_price_rows(parsed.prices, text)
+    supported = price_step._supported_price_rows(parsed.prices, text)
 
     assert {(row.amount, row.academic_year) for row in supported} == {
         (7820.0, "2026/2027"),
@@ -4559,7 +4560,7 @@ async def test_reextraction_dropping_a_fee_the_page_still_shows_is_held(
     assert await _stored(db_session, school) == sorted(
         [("tuition", 530.0, "monthly"), ("registration", 265.0, "one_time")]
     )
-    hold = school.attributes[extractor_module.PRICING_HOLD_KEY]
+    hold = school.attributes[price_step.PRICING_HOLD_KEY]
     assert hold["reasons"] == ["drops REGISTRATION 265.00, which the page still shows"]
 
 
@@ -4585,7 +4586,7 @@ async def test_reextraction_losing_a_period_the_page_states_is_written(
     """The page says "ежемесечно" next to the amount, so the row gets its period back
     from the text and nothing is lost."""
     school = sample_school_for_extraction
-    school.attributes = {extractor_module.PRICING_HOLD_KEY: {"reasons": ["earlier"]}}
+    school.attributes = {price_step.PRICING_HOLD_KEY: {"reasons": ["earlier"]}}
     pages = await _published_rows_and_page(db_session, school, [("tuition", 530, "monthly")])
 
     result = await _run_prices(db_session, school, pages, [("tuition", 530.0, None)])
@@ -4593,7 +4594,7 @@ async def test_reextraction_losing_a_period_the_page_states_is_written(
     assert result.get("held") is None
     assert await _stored(db_session, school) == [("tuition", 530.0, "monthly")]
     # A replacement that goes through clears the earlier hold.
-    assert extractor_module.PRICING_HOLD_KEY not in school.attributes
+    assert price_step.PRICING_HOLD_KEY not in school.attributes
 
 
 @pytest.mark.asyncio
@@ -5520,6 +5521,6 @@ def test_a_copied_label_with_a_comma_is_kept_whole():
     label = "Месечни такси в Частна Детска Ясла ,,Йор Кидс“ / Целодневен престой"
     (row,) = fee_lines._prices_from_fee_lines([_line(label, 1100, currency="BGN")])
     assert row.plan_name == label and row.age_group == "Месечни такси в Частна Детска Ясла ,,Йор Кидс“"
-    assert extractor_module._normalized_price_fields(row)["plan_name"] == label
+    assert price_step._normalized_price_fields(row)["plan_name"] == label
     row.plan_name = "N/A"
-    assert extractor_module._normalized_price_fields(row)["plan_name"] is None
+    assert price_step._normalized_price_fields(row)["plan_name"] is None

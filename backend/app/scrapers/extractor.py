@@ -47,11 +47,6 @@ from app.scrapers.extraction import (
     summary_sources,
     text_values,
 )
-from app.scrapers.extraction.price_step import (  # noqa: F401  (re-exported: tests and deterministic.py read them here)
-    PRICING_HOLD_KEY,
-    _normalized_price_fields,
-    _supported_price_rows,
-)
 from app.scrapers.llm_record import record_answer
 from app.scrapers.price_carry_over import carry_over_periods
 from app.scrapers.shared_site_check import (

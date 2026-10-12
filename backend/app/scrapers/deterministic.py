@@ -20,7 +20,7 @@ from typing import Any
 from app.models.school import School
 from app.models.source_page import SourcePage
 from app.scrapers import extractor
-from app.scrapers.extraction import contact_details, general_fields, page_selection, price_lines
+from app.scrapers.extraction import contact_details, general_fields, page_selection, price_lines, price_step
 
 
 def deterministic_pricing_rows(school: School, pages: list[SourcePage]) -> list[dict[str, Any]]:
@@ -35,11 +35,11 @@ def deterministic_pricing_rows(school: School, pages: list[SourcePage]) -> list[
         return []
 
     deterministic = price_lines._extract_prices_deterministic(selected_text)
-    supported = extractor._supported_price_rows(deterministic.prices, selected_text)
+    supported = price_step._supported_price_rows(deterministic.prices, selected_text)
 
     rows: list[dict[str, Any]] = []
     for extracted in supported:
-        fields = extractor._normalized_price_fields(extracted)
+        fields = price_step._normalized_price_fields(extracted)
         if fields is None:
             continue
         rows.append(
