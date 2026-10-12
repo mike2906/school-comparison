@@ -56,8 +56,7 @@ def test_record_answer_writes_the_parsed_answer_without_the_prompts(tmp_path):
 
 def test_record_answer_fills_in_the_date(tmp_path):
     for day in ("2026-10-12", "2026-10-13"):
-        with patch("app.scrapers.llm_record.date") as fake_date:
-            fake_date.today.return_value.isoformat.return_value = day
+        with patch("app.scrapers.llm_record._RUN_DATE", day):
             record_answer(str(tmp_path / "{date}"), system_prompt="s", user_prompt="u", result_type=PageFees,
                           tier="cheap", parsed=_answer(), school_id=None)
 
