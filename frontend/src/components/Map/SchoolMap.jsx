@@ -7,6 +7,7 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { calculateDistance } from '../../utils/distance'
 import { formatDistance } from '../../utils/format'
+import { parseCoordinate } from '../../utils/coordinates'
 import { getSchoolName, getAddress } from '../../utils/i18n'
 import { useCompare } from '../../context/CompareContext'
 import { useCountry } from '../../context/CountryContext'
@@ -63,17 +64,6 @@ const TYPE_COLORS = {
 const getTypeColor = (type) => {
   const normalizedType = type === 'international' ? 'private' : type
   return TYPE_COLORS[normalizedType] || TYPE_COLORS.state
-}
-
-const parseCoordinate = (value) => {
-  if (value === null || value === undefined) return null
-  if (typeof value === 'string') {
-    const normalized = value.replace(',', '.').trim()
-    const parsed = Number.parseFloat(normalized)
-    return Number.isFinite(parsed) ? parsed : null
-  }
-  const parsed = Number(value)
-  return Number.isFinite(parsed) ? parsed : null
 }
 
 // Custom marker icons

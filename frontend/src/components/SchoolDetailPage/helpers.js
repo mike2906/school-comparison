@@ -17,20 +17,6 @@ const SOURCE_BADGE_COLORS = {
 }
 
 /**
- * Parse and validate coordinate values
- */
-export function parseCoordinate(value) {
-  if (value === null || value === undefined) return null
-  if (typeof value === 'string') {
-    const normalized = value.replace(',', '.').trim()
-    const parsed = Number.parseFloat(normalized)
-    return Number.isFinite(parsed) ? parsed : null
-  }
-  const parsed = Number(value)
-  return Number.isFinite(parsed) ? parsed : null
-}
-
-/**
  * Get detailed NVO data for a school
  */
 export function getNvoDetail(school, t, ageGroup = null) {

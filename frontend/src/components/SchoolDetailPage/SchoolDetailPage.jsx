@@ -19,7 +19,6 @@ import { useCountry } from '../../context/CountryContext'
 import { orderAgeGroups } from '../../utils/ageGroupOrder'
 import { useCompare } from '../../context/CompareContext'
 import {
-  parseCoordinate,
   getNvoDetail,
   getAmenityFlags,
   getLanguageLabel,
@@ -33,6 +32,7 @@ import DziResults from './DziResults'
 import LocationMap, { directionsUrl } from './LocationMap'
 import PricingSection from './PricingSection'
 import { formatAmount } from '../../utils/format'
+import { parseCoordinate } from '../../utils/coordinates'
 import SchoolActions from './SchoolActions'
 import TagList from './TagList'
 import PhoneLinks from './PhoneLinks'
