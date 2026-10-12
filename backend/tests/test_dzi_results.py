@@ -82,7 +82,20 @@ async def _seed_country(db_session):
         ("Фил(ПП)", "philosophy_pp"),
         ("Физ(ПП)", "physics_pp"),
         ("БЕЛ", "bulgarian"),
-        ("Музика(ПП)", None),
+        # 2024–2026 headers: level after the curriculum, session tag already stripped.
+        ("АЕ(ПП) B1", "english_b1_pp"),
+        ("АЕ(ПП) B1.1", "english_b11_pp"),
+        ("АЕ(ПП) B2", "english_b2_pp"),
+        ("РЕ(ПП) B1", "russian_b1_pp"),
+        ("БЗО(ПП)", "biology_pp"),
+        ("ГИ(ПП)", "geography_pp"),
+        ("ИИ(ПП)", "history_pp"),
+        ("ИсЕ(ПП) B2", "spanish_b2_pp"),
+        ("ИтЕ(ПП) B2", "italian_b2_pp"),
+        ("ФА(ПП)", "physics_pp"),
+        ("ХООС(ПП)", "chemistry_pp"),
+        ("МУЗ(ПП)", "music_pp"),
+        ("Пр(ПП)", None),
     ],
 )
 def test_subject_key(label, expected):
@@ -321,3 +334,64 @@ async def test_exam_averages_keeps_dzi_grades_apart_and_to_two_decimals(client, 
     assert payload["by_year"]["dzi"]["2025"] == {"bulgarian_oop": 4.53}
     assert payload["by_year"]["nvo_10"]["2025"] == {"bulgarian": 55.0}
     assert "dzi" not in payload["overall"]
+
+
+def test_parse_keeps_each_language_level_and_skips_vocational_exams():
+    header = (
+        '"Област","Община","Населено място","Училище","Код по НЕИСПУО",'
+        '"Бр. АЕ(ПП) B1-З","Ср.усп. АЕ(ПП) B1-З","Бр. АЕ(ПП) B1.1-З","Ср.усп. АЕ(ПП) B1.1-З",'
+        '"Бр. АЕ(ПП) B2-З","Ср.усп. АЕ(ПП) B2-З","Бр. ДИППК-тест","Ср.усп. ДИППК-тест"'
+    )
+    entries, stats = parse_dzi_csv(
+        _resource(2025),
+        "\n".join([header, '"СОФИЯ-ГРАД","СТОЛИЧНА","ГР.СОФИЯ","1 СУ","2201001","10","4.10","12","4.20","50","5.30","8","5.00"']),
+    )
+
+    assert {(e.subject, e.value) for e in entries} == {
+        ("english_b1_pp", 4.1),
+        ("english_b11_pp", 4.2),
+        ("english_b2_pp", 5.3),
+    }
+    assert stats["unknown_subjects"] == []
+    assert stats["subject_labels"]["АЕ(ПП) B2"] == "english_b2_pp"
+
+
+def test_parse_names_the_columns_that_clash():
+    header = (
+        '"Област","Община","Населено място","Училище","Код по НЕИСПУО",'
+        '"Бр. Био(ПП)","Ср.усп. Био(ПП)","Бр. БЗО(ПП)","Ср.усп. БЗО(ПП)"'
+    )
+    with pytest.raises(DziSliceError, match="biology_pp ← Био\\(ПП\\), БЗО\\(ПП\\)"):
+        parse_dzi_csv(
+            _resource(),
+            "\n".join([header, '"СОФИЯ-ГРАД","СТОЛИЧНА","ГР.СОФИЯ","1 СУ","2201001","10","4.10","12","4.20"']),
+        )
+
+
+@pytest.mark.asyncio
+async def test_fetch_retries_a_failed_connection_but_not_an_http_error(monkeypatch):
+    from app.scrapers import nvo_results
+
+    monkeypatch.setattr(nvo_results.asyncio, "sleep", AsyncMock())
+    calls = {"n": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls["n"] += 1
+        if calls["n"] < 3:
+            raise httpx.ConnectError("[SSL: CERTIFICATE_VERIFY_FAILED] certificate has expired", request=request)
+        return httpx.Response(200, content="ok".encode())
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        assert await nvo_results._fetch_text(client, "https://data.egov.bg/x") == "ok"
+    assert calls["n"] == 3
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(lambda request: httpx.Response(404))) as client:
+        with pytest.raises(httpx.HTTPStatusError):
+            await nvo_results._fetch_text(client, "https://data.egov.bg/x")
+
+    def always_fails(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("certificate has expired", request=request)
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(always_fails)) as client:
+        with pytest.raises(httpx.ConnectError):
+            await nvo_results._fetch_text(client, "https://data.egov.bg/x")
