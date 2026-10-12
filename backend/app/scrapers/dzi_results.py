@@ -7,11 +7,11 @@ who sat it ("Бр.") and their average grade ("Ср.усп.", the 2–6 scale), 
 
 Grades are not NVO points: the two never share a row, a sort or a benchmark.
 
-Unverified (data.egov.bg is unreachable from where this was written): the layouts below
-come from a third-party parser that reads these files (atanasster/electionsbg,
-``scripts/schools/build_index.ts``), not from the files themselves. The parser fails a
-year loudly rather than guess when a layout does not fit:
-- 2022–2025, 2026: one header row with "Бр. БЕЛ(ООП) З" / "Ср.усп. БЕЛ(ООП) З" pairs
+Layouts seen (first read from atanasster/electionsbg's parser, then confirmed by the
+first import on 2026-10-12). The parser fails a year loudly rather than guess when a
+layout does not fit:
+- one header row of "Бр. <subject>" / "Ср.усп. <subject>" pairs, e.g. "БЕЛ(ООП) З";
+  since 2024 language exams carry their level and a "-З" tag: "АЕ(ПП) B1.1-З"
   (2026 has line breaks inside the quoted header cells);
 - 2023: a three-row header (subject, then "З", then "Бр." / "Ср.усп.");
 - 2022–2023 name the code column "Код по Админ", later years "Код по НЕИСПУО".
@@ -76,14 +76,15 @@ _CYRILLIC_TO_LATIN = str.maketrans({"А": "A", "а": "a", "В": "B", "в": "b"})
 # Subject abbreviations in the file headers → our subject keys. A subject that matches
 # none is not imported and is listed in the summary, so a new one is added here rather
 # than shown under a made-up name. The 2023–2026 files (first import, 2026-10-12) use
-# e.g. БЕЛ, Мат, АЕ, БЗО, ГИ, ИИ, ИсЕ, ИтЕ, ФА, ХООС, МУЗ; the long forms are kept for
-# other years.
+# e.g. БЕЛ, Мат, АЕ, БЗО, ГИ, ИсЕ, ИтЕ, ФА, ХООС, МУЗ; the long forms are kept for
+# other years. "ИИ" is left unmapped: it may be Изобразително изкуство rather than
+# history, so it waits for a look at the file.
 _SUBJECT_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = tuple(
     (re.compile(pattern, re.IGNORECASE), key)
     for pattern, key in (
         (r"^бел", "bulgarian"),
         (r"^мат", "math"),
-        (r"^(ист|ии$)", "history"),
+        (r"^ист", "history"),
         (r"^(геогр?|ги$)", "geography"),
         (r"^фил", "philosophy"),
         (r"^(био|бзо$)", "biology"),
@@ -156,7 +157,7 @@ def _parse_session_year(title: str) -> Optional[int]:
 
 
 def subject_key(label: str) -> Optional[str]:
-    """``"БЕЛ(ООП) З"`` → ``"bulgarian_oop"``, ``"АЕ B2(ПП)"`` → ``"english_b2_pp"``.
+    """``"БЕЛ(ООП)"`` → ``"bulgarian_oop"``, ``"АЕ(ПП) B2"`` → ``"english_b2_pp"``.
 
     None when the abbreviation is not one we know.
     """

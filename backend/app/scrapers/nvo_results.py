@@ -767,7 +767,7 @@ async def _fetch_text(client: httpx.AsyncClient, url: str) -> str:
         try:
             response = await client.get(url)
             break
-        except httpx.TransportError as exc:
+        except (httpx.ConnectError, httpx.ConnectTimeout) as exc:
             if attempt == FETCH_ATTEMPTS:
                 raise
             logger.warning("Fetching %s failed (%s); retrying (%d/%d)", url, exc, attempt, FETCH_ATTEMPTS - 1)

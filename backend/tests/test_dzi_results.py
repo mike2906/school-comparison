@@ -89,7 +89,7 @@ async def _seed_country(db_session):
         ("РЕ(ПП) B1", "russian_b1_pp"),
         ("БЗО(ПП)", "biology_pp"),
         ("ГИ(ПП)", "geography_pp"),
-        ("ИИ(ПП)", "history_pp"),
+        ("ИИ(ПП)", None),
         ("ИсЕ(ПП) B2", "spanish_b2_pp"),
         ("ИтЕ(ПП) B2", "italian_b2_pp"),
         ("ФА(ПП)", "physics_pp"),
