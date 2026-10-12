@@ -65,8 +65,16 @@ def _same_amount(a: Decimal, b: Decimal) -> bool:
     return abs(a - b) <= TOLERANCE * max(a, b)
 
 
+def _period(row: dict[str, Any], fee: dict[str, Any]) -> str | None:
+    """'exact', 'no_period' (the site states a period the row lacks) or None (they differ)."""
+    row_period, fee_period = _value(row.get("period")), _value(fee.get("period"))
+    if fee_period is None or row_period == fee_period:
+        return "exact"  # nothing to compare when the site states no period
+    return "no_period" if row_period is None else None
+
+
 def match(row: dict[str, Any], fee: dict[str, Any]) -> str | None:
-    """'exact', 'no_period' (the row has no period) or None."""
+    """'exact', 'no_period' (the row lacks the period the site states) or None."""
     if _value(row.get("category")) != _value(fee.get("category")):
         return None
     row_amounts, fee_amounts = _amounts(row), _amounts(fee)
@@ -74,9 +82,21 @@ def match(row: dict[str, Any], fee: dict[str, Any]) -> str | None:
         return None
     if not all(_same_amount(a, b) for a, b in zip(sorted(row_amounts), sorted(fee_amounts))):
         return None
-    if _value(row.get("period")) is None:
-        return "no_period"
-    return "exact" if _value(row.get("period")) == _value(fee.get("period")) else None
+    return _period(row, fee)
+
+
+def match_any(row: dict[str, Any], fees: list[dict[str, Any]]) -> str | None:
+    """The best match among the site's fees. A range row also matches when both its ends are
+    fees the site states on their own (one range across age groups)."""
+    kinds = {kind for kind in (match(row, fee) for fee in fees) if kind}
+    if not kinds and row.get("amount") is None and row.get("amount_min") is not None:
+        ends = [
+            {kind for kind in (match({**row, "amount": row[key]}, fee) for fee in fees) if kind}
+            for key in ("amount_min", "amount_max")
+        ]
+        if all(ends):
+            kinds = {"exact"} if all("exact" in end for end in ends) else {"no_period"}
+    return "exact" if "exact" in kinds else next(iter(kinds), None)
 
 
 def _row_dict(row: Pricing) -> dict[str, Any]:
@@ -124,23 +144,23 @@ async def main(reference_path: Path) -> None:
                 published_ids = {row["id"] for row in response.json().get("pricing") or []}
 
             wrong = []
+            published_rows = [row for row in stored if row["id"] in published_ids]
             for row in stored:
-                kinds = [kind for kind in (match(row, fee) for fee in fees) if kind]
+                kind = match_any(row, fees)
                 published = row["id"] in published_ids
                 totals["published"] += published
-                if kinds:
+                if kind:
                     totals["matched"] += 1
                     totals["matched_withheld"] += not published
-                    totals["no_period"] += published and "exact" not in kinds
+                    totals["no_period"] += published and kind == "no_period"
                 elif published:
                     totals["published_wrong"] += 1
                     wrong.append(row)
-            published_rows = [row for row in stored if row["id"] in published_ids]
-            found = sum(any(match(row, fee) for row in published_rows) for fee in fees)
+            found = sum(any(match_any(row, [fee]) for row in published_rows) for fee in fees)
             fees_total += len(fees)
             fees_published += found
             lines.append(
-                f"school {school_id}: site fees {len(fees)}, stored {len(stored)}, published {len(published_ids)}, "
+                f"school {school_id}: site fees {len(fees)}, stored {len(stored)}, published {len(published_rows)}, "
                 f"site fees published {found}, published wrong {len(wrong)}"
                 + "".join(
                     f"\n    wrong row {row['id']}: {row['category']} {row['amount'] or (row['amount_min'], row['amount_max'])}"
