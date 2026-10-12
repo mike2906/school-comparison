@@ -3,8 +3,9 @@
 Off unless ``EXTRACTION_LLM_RECORD_DIR`` is set. Each successful typed answer is written to
 ``<dir>/<key>.json``, where the key hashes the system prompt, the user prompt (which holds
 the page text), the output type, the model tier and the model id. An existing file is never
-overwritten, so use a fresh absolute directory per recorded run. A refactor that leaves prompts unchanged
-produces the same keys, so a replay of the recorded answers isolates our own code. Only the
+overwritten, so use a fresh absolute directory per recorded run: a ``{date}`` in the setting
+becomes the run's date (``/home/you/llm-recordings/{date}``), so one setting serves every
+run. A refactor that leaves prompts unchanged produces the same keys, so a replay of the recorded answers isolates our own code. Only the
 key and the parsed answer are stored, never the page text.
 
 Recording must never break extraction: any write error is logged and ignored.
@@ -16,6 +17,7 @@ import hashlib
 import json
 import logging
 import os
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -52,7 +54,7 @@ def record_answer(
         key = record_key(
             system_prompt=system_prompt, user_prompt=user_prompt, result_type=result_type, tier=tier, model=model
         )
-        path = Path(record_dir) / f"{key}.json"
+        path = Path(record_dir.replace("{date}", date.today().isoformat())) / f"{key}.json"
         if path.exists():
             # Never overwrite: a later run with recording still on must not replace the baseline.
             return

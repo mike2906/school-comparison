@@ -54,6 +54,18 @@ def test_record_answer_writes_the_parsed_answer_without_the_prompts(tmp_path):
     assert "page text" not in path.read_text(encoding="utf-8")
 
 
+def test_record_answer_fills_in_the_date(tmp_path):
+    for day in ("2026-10-12", "2026-10-13"):
+        with patch("app.scrapers.llm_record.date") as fake_date:
+            fake_date.today.return_value.isoformat.return_value = day
+            record_answer(str(tmp_path / "{date}"), system_prompt="s", user_prompt="u", result_type=PageFees,
+                          tier="cheap", parsed=_answer(), school_id=None)
+
+    # Each run day gets its own folder, so a second run's answers are kept, not skipped.
+    assert sorted(path.name for path in tmp_path.iterdir()) == ["2026-10-12", "2026-10-13"]
+    assert all(len(list(day.iterdir())) == 1 for day in tmp_path.iterdir())
+
+
 def test_record_answer_is_off_without_a_dir_and_skips_failed_parses(tmp_path):
     record_answer("", system_prompt="s", user_prompt="u", result_type=PageFees,
                   tier="cheap", parsed=_answer(), school_id=None)
