@@ -815,9 +815,12 @@ async def test_a_parked_domain_withholds_the_schools_website_data(db_session):
 
 
 @pytest.mark.asyncio
-async def test_a_template_page_is_not_the_schools_but_its_real_pages_are(db_session):
-    """590: the home page is a theme's sample with lorem ipsum and "$1,800/mo"."""
-    filler = "Our Programs\nLorem ipsum dolor sit amet, consectetur adipiscing elit.\n$1,800/mo"
+async def test_sample_text_does_not_make_the_navigator_drop_a_page(db_session):
+    """A real page may keep a theme's lorem block (15 sites do); only the price step skips templates."""
+    filler = (
+        "Our Programs\nLorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor.\n"
+        "Half Days\nEu vestibulum praesent pretium platea fusce amet lobortis.\n$1,800/mo"
+    )
     school, page = _school_with_a_page(filler)
     crawled = [
         NavigatedPage(url="https://school.bg/", category="about", markdown=filler, content_hash="hash-home"),
@@ -827,7 +830,7 @@ async def test_a_template_page_is_not_the_schools_but_its_real_pages_are(db_sess
     result, valid, withheld = await _navigate(db_session, school, page, crawled)
 
     assert result["success"] is True
-    assert valid == {"https://school.bg/": False, "https://school.bg/priem": True}
+    assert valid == {"https://school.bg/": True, "https://school.bg/priem": True}
     assert not withheld
 
 
@@ -840,4 +843,39 @@ def test_photo_captions_do_not_make_a_real_page_a_template():
     home = Path(__file__).parent / "golden_corpus/cases/506-anglo-amerikansko-uchilishte-v-s/page01.md"
     assert "Lorem Ipsum" in home.read_text(encoding="utf-8")
     assert not is_template_filler(home.read_text(encoding="utf-8"))
-    assert is_template_filler("Lorem ipsum dolor sit amet, consectetur adipiscing elit.")
+
+
+_REAL_PAGE = (
+    "За нас\nУчилището е основано през 1971 г. и днес в него учат над 900 ученици от 1. до 12. клас. "
+    "Предлагаме профилирано обучение по природни науки и чужди езици, целодневна организация за "
+    "началния етап, занималня, спортни клубове и извънкласни дейности по роботика и изкуства.\n"
+    "Прием в 1. клас\nДокументи се подават от 1 до 15 юни в канцеларията на училището.\n"
+)
+
+
+@pytest.mark.parametrize(
+    "leftover",
+    [
+        # A theme block left on a real page (397's Elementor, 185 and 577's team widget).
+        "I am text block. Click edit button to change this text. Lorem ipsum dolor sit amet, "
+        "consectetur adipiscing elit. Ut elit tellus, luctus nec ullamcorper mattis, pulvinar dapibus leo.",
+        # A Bulgarian note on what Lorem Ipsum is (411, 413).
+        "Lorem Ipsum е елементарен примерен текст, използван в печатарската и типографската индустрия. "
+        "Lorem Ipsum е индустриален стандарт от около 1500 година.",
+        # Link text and a carousel slug (195, 298).
+        "[Reference site about Lorem Ipsum](https://lipsum.com/) /slider/24-lorem-ipsum-dolor-amet-elit",
+    ],
+)
+def test_a_real_page_that_kept_some_sample_text_is_still_the_schools(leftover):
+    from app.scrapers.page_content import is_template_filler
+
+    assert not is_template_filler(_REAL_PAGE + leftover)
+
+
+def test_a_themes_sample_page_is_a_template():
+    from app.scrapers.page_content import is_template_filler
+
+    assert is_template_filler(
+        "Welcome\nLorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor "
+        "incididunt ut labore et dolore magna aliqua.\nHalf Days $1,800/mo\nFull Days $2,300/mo"
+    )

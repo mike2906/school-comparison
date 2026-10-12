@@ -22,7 +22,7 @@ from app.models import School, ScrapeType, SourcePage
 from app.scrapers.base import BaseScraper
 from app.scrapers.fee_image_reader import read_fee_image
 from app.scrapers.fee_pages import fee_http_client, fetch_fee_documents, page_key
-from app.scrapers.page_content import is_parked_domain, is_template_filler
+from app.scrapers.page_content import is_parked_domain
 from app.scrapers.price_evidence import _PRICE_RE, currency_price_starts
 from app.scrapers.shared_site_check import level_family
 from app.scrapers.url_validator import URLValidator
@@ -671,9 +671,10 @@ class WebsiteNavigator:
             return False
         if self._is_bot_protection_content(text):
             return False
-        # Not the school's words: a lapsed domain's for-sale page (551) or a theme's sample
-        # page with lorem ipsum and "$1,800/mo" (590).
-        if is_parked_domain(text) or is_template_filler(text):
+        # Not the school's words: a lapsed domain's for-sale page (551). A page with a theme's
+        # sample text stays: real pages keep leftover lorem blocks, and only the price step,
+        # where a template's "$1,800/mo" does harm, skips template pages.
+        if is_parked_domain(text):
             return False
         return True
 
@@ -1013,7 +1014,6 @@ async def _persist_navigation_result(
             navigator._is_bot_challenge_url(existing_page.source_url)
             or navigator._is_bot_protection_content(text)
             or is_parked_domain(text)
-            or is_template_filler(text)
         ):
             existing_page.is_valid = False
             existing_page.raw_markdown = None
