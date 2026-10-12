@@ -154,3 +154,9 @@ Simple CRUD routes and UI components don't need tests yet.
 uv run pytest -q 2>&1 | tail -3        # full suite
 uv run pytest tests/test_api.py -v     # one file
 ```
+
+The suite runs on in-memory SQLite. Tests whose behaviour depends on the engine (JSON path
+predicates, JSON text matching, rollback, JSON persistence) are marked `postgres` and run
+in CI against a migrated PostgreSQL database; locally they are skipped unless
+`POSTGRES_TEST_DATABASE_URL` names a scratch database at head (its tables are emptied).
+Mark a new test `postgres` when it exercises such a query or write.

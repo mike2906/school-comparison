@@ -1,10 +1,12 @@
-"""Test fixtures with SQLite."""
+"""Test fixtures with SQLite (and PostgreSQL for tests marked ``postgres``)."""
 import datetime
+import os
 import types
 
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.database import Base, get_db
@@ -14,6 +16,10 @@ from app.models.school import School, SchoolLocation, SchoolLocationAgeGroupShif
 from app.routers import schools as schools_router
 
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
+# A PostgreSQL database already migrated to head (``alembic upgrade head``), for the
+# tests marked ``postgres``; they are skipped without it. Its tables are emptied before
+# each test, so never point this at a database whose data matters.
+POSTGRES_TEST_URL_ENV = "POSTGRES_TEST_DATABASE_URL"
 
 # The date a test sees through `frozen_today`. Pricing code drops fee tables whose academic
 # year is over, so a test page naming "2025/2026" only means the same thing on a fixed date.
@@ -60,8 +66,34 @@ def clear_school_list_cache():
         state.clear()
 
 
+async def _empty_tables(engine) -> None:
+    """Empty every table of the migrated schema (not the models': they may be ahead of it)."""
+    async with engine.begin() as conn:
+        tables = (
+            await conn.execute(
+                text("SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'alembic_version'")
+            )
+        ).scalars().all()
+        if not tables:
+            raise RuntimeError(f"{POSTGRES_TEST_URL_ENV} has no tables: run `alembic upgrade head` on it first")
+        names = ", ".join(f'"{name}"' for name in tables)
+        await conn.execute(text(f"TRUNCATE {names} RESTART IDENTITY CASCADE"))
+
+
 @pytest_asyncio.fixture
-async def async_engine():
+async def async_engine(request):
+    if request.node.get_closest_marker("postgres"):
+        url = os.environ.get(POSTGRES_TEST_URL_ENV)
+        if not url:
+            pytest.skip(f"{POSTGRES_TEST_URL_ENV} is not set")
+        # The schema comes from the migrations, not from the models.
+        engine = create_async_engine(url, echo=False)
+        try:
+            await _empty_tables(engine)
+            yield engine
+        finally:
+            await engine.dispose()
+        return
     engine = create_async_engine(TEST_DATABASE_URL, echo=False)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
