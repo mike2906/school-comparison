@@ -57,7 +57,8 @@ _SKIPPED = (".jpg", ".jpeg", ".png", ".gif", ".svg", ".webp", ".css", ".js", ".z
 
 
 class Picks(BaseModel):
-    urls: list[str] = Field(default_factory=list, description="Up to 4 URLs copied exactly from the list")
+    # Required: with a default the cheap model calls the output tool with no URLs at all.
+    urls: list[str] = Field(description="Up to 4 URLs copied exactly from the list; empty if none fits")
 
 
 PICK_PROMPT = """You help find the pages of a school website that state its fees (tuition, monthly fee,
@@ -65,6 +66,14 @@ registration, food, transport, price lists, fee PDFs). You get the institution's
 (with whether they already show prices), and the same-site links not yet opened, as "URL | link text".
 Return up to 4 URLs, copied exactly from the list, most likely first, that are likely to state this
 institution's fees or lead to them (admissions or "for parents" pages often do). Return none if nothing fits."""
+
+
+def _key(url: str) -> str:
+    """One key per page: no fragment, decoded, host lowercased, no trailing slash or www."""
+    parsed = urlparse(unquote(urldefrag(url)[0]))
+    host = (parsed.hostname or "").removeprefix("www.")
+    query = f"?{parsed.query}" if parsed.query else ""
+    return f"{host}{parsed.path.rstrip('/')}{query}"
 
 
 def _same_site(url: str, site: str) -> bool:
@@ -120,7 +129,7 @@ async def _find(crawler, run_config, client, school: School, budget) -> tuple[li
     queue = [site]
     for hop in range(MAX_HOPS + 1):
         for url in queue:
-            key = urldefrag(url)[0].rstrip("/")
+            key = _key(url)
             if key in seen or len(read) >= MAX_FETCHES:
                 continue
             seen.add(key)
@@ -132,7 +141,7 @@ async def _find(crawler, run_config, client, school: School, budget) -> tuple[li
             except Exception as exc:  # a failed page is recorded and skipped
                 read.append({"url": url, "hop": hop, "prices": False, "text": "", "note": str(exc)[:120]})
                 continue
-            seen.add(urldefrag(final)[0].rstrip("/"))
+            seen.add(_key(final))
             read.append({"url": final, "hop": hop, "prices": bool(_PRICE_RE.search(text)), "text": text})
             for href, label in page_links:
                 href = urldefrag(href)[0]
@@ -140,8 +149,8 @@ async def _find(crawler, run_config, client, school: School, budget) -> tuple[li
                     links.setdefault(href, label)
         if hop == MAX_HOPS or len(read) >= MAX_FETCHES:
             break
-        unopened = [(url, label) for url, label in links.items() if urldefrag(url)[0].rstrip("/") not in seen]
-        if not unopened or not budget(0.002):
+        unopened = [(url, label) for url, label in links.items() if _key(url) not in seen]
+        if not unopened or not budget(spent + 0.002):
             break
         queue, cost, _, _ = await _pick(name, read, unopened)
         spent += cost
