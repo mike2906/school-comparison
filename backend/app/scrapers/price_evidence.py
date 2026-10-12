@@ -1160,3 +1160,20 @@ def replacement_regressions(
                 reasons.append(f"loses the {old.period} period of {old.category} {', '.join(key)}")
                 break
     return reasons
+
+
+def period_in_label_parts(block: str, label: str | None) -> str | None:
+    """The one period the parts of a copied label name, counting only parts on the page.
+
+    The model joins a row's words with " / "; a part the page states may carry the period
+    the layout lost: "Плащане на 1 вноска" heads a column of a table flattened one cell
+    a line (610), so nothing above the amount says which column it is in.
+    """
+    found: set[str] = set()
+    for part in str(label or "").split(" / "):
+        named, per_unit = period_families(part.casefold())
+        if per_unit:
+            return None
+        if named and label_spans(block, part):
+            found |= named
+    return next(iter(found)).lower() if len(found) == 1 else None

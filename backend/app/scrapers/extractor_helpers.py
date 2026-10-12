@@ -47,6 +47,7 @@ from app.scrapers.price_evidence import (
     occurrence_currency,
     period_families,
     period_fits_category,
+    period_in_label_parts,
     stated_period,
 )
 from app.scrapers.school_tokens import extract_school_name_tokens
@@ -2722,7 +2723,7 @@ def _filter_model_prices(prices: list[ExtractedPrice], text: str) -> list[Extrac
                 headed = {heading_period(block, span, skip=frozenset({period.upper()})) for span in spans}
                 period = headed.pop().lower() if len(headed) == 1 and None not in headed else period
             if period is None:
-                period = _period_in_label_parts(block, label)
+                period = period_in_label_parts(block, label)
             page_years = {
                 _normalize_academic_year(found) for found in _PAGE_ACADEMIC_YEAR_RE.findall(block)
             } - {None}
@@ -2747,23 +2748,6 @@ def _filter_model_prices(prices: list[ExtractedPrice], text: str) -> list[Extrac
         normalized.academic_year = page_year
         refined.append(normalized)
     return _told_apart_by_heading(refined, text)
-
-
-def _period_in_label_parts(block: str, label: str | None) -> str | None:
-    """The one period the parts of a copied label name, counting only parts on the page.
-
-    The model joins a row's words with " / "; a part the page states may carry the period
-    the layout lost: "Плащане на 1 вноска" heads a column of a table flattened one cell
-    a line (610), so nothing above the amount says which column it is in.
-    """
-    found: set[str] = set()
-    for part in str(label or "").split(" / "):
-        named, per_unit = period_families(part.casefold())
-        if per_unit:
-            return None
-        if named and label_spans(block, part):
-            found |= named
-    return next(iter(found)).lower() if len(found) == 1 else None
 
 
 def _told_apart_by_heading(rows: list[ExtractedPrice], text: str) -> list[ExtractedPrice]:
