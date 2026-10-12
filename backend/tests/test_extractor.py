@@ -12,7 +12,7 @@ from sqlalchemy import select
 
 from app.config import get_settings
 from app.models import FieldSource, Pricing, School, SchoolLocation
-from app.models.pricing import PriceSource
+from app.models.pricing import PriceCategory, PricePeriod, PriceSource
 from app.models.scrape_log import ScrapeType
 from app.models.source_page import SourcePage
 from app.schemas.extraction import (
@@ -285,6 +285,120 @@ async def test_extract_school_keeps_previously_published_data_when_llm_retries_f
         await db_session.execute(select(Pricing).where(Pricing.school_id == school.id))
     ).scalars().all()
     assert [(row.amount, row.currency) for row in pricing_rows] == [(900.0, "EUR")]
+
+
+async def _recrawled_school_with_prices(db_session, school, *, status):
+    """A published school whose price page was re-crawled: 900 EUR is gone, 1000 BGN stays."""
+    school.attributes = {
+        "extracted": {"facilities": ["pool"]},
+        "data_validation": {
+            "_schema_version": 1,
+            "validated_at": "2026-09-01T00:00:00+00:00",
+            "status": "ok",
+            "issue_counts": {"error": 0, "warning": 0},
+            "issues": [],
+            "auto_fixes": [],
+        },
+    }
+    school.scrape_status = status
+    page = (
+        await db_session.execute(select(SourcePage).where(SourcePage.source_url == "https://test-school.bg/prices"))
+    ).scalar_one()
+    rows = [
+        Pricing(
+            school_id=school.id,
+            category=PriceCategory.TUITION,
+            amount=amount,
+            currency=currency,
+            period=PricePeriod(period),
+            source=PriceSource.SCRAPED_WEBSITE,
+            source_url=page.source_url,
+            source_page_id=page.id,
+            pricing_context={"confidence": 1.0},
+        )
+        for amount, currency, period in ((900.0, "EUR", "yearly"), (1000.0, "BGN", "monthly"))
+    ]
+    db_session.add_all(rows)
+    db_session.add(_website_field_source(school.id, "https://www.test-school.bg/about"))
+    await db_session.commit()
+    return rows
+
+
+@pytest.mark.parametrize("prices_only,status", [(False, "navigated"), (True, "extracted")])
+@pytest.mark.asyncio
+async def test_failed_extraction_keeps_only_prices_the_recrawled_page_still_shows(
+    db_session, client, sample_school_for_extraction, prices_only, status
+):
+    school = sample_school_for_extraction
+    gone, still = await _recrawled_school_with_prices(db_session, school, status=status)
+
+    with patch("app.scrapers.extractor._run_typed_agent", new=_failed_llm_call):
+        result = await extractor_module.extract_school(db_session, school.id, "bg", prices_only=prices_only)
+    assert result["status"] == "extraction_failed"
+
+    await db_session.refresh(school)
+    assert school.scrape_status == "extracted"
+    report = school.attributes["data_validation"]
+    assert [issue["field_path"] for issue in report["kept_price_issues"]] == [f"pricing[{gone.id}]"]
+    # The report itself is untouched: same run, status, issues.
+    assert (report["validated_at"], report["status"], report["issues"]) == (
+        "2026-09-01T00:00:00+00:00", "ok", []
+    )
+
+    response = await client.get(f"/schools/{school.id}")
+    assert [row["id"] for row in response.json()["pricing"]] == [still.id]
+
+    # The page shows the amount again; the next failed run publishes the row again.
+    page = (
+        await db_session.execute(select(SourcePage).where(SourcePage.source_url == "https://test-school.bg/prices"))
+    ).scalar_one()
+    page.raw_markdown += " Yearly tuition 900 EUR."
+    await db_session.commit()
+    with patch("app.scrapers.extractor._run_typed_agent", new=_failed_llm_call):
+        await extractor_module.extract_school(db_session, school.id, "bg", prices_only=prices_only)
+    await db_session.refresh(school)
+    assert "kept_price_issues" not in school.attributes["data_validation"]
+
+
+@pytest.mark.asyncio
+async def test_prices_only_run_that_finds_no_fees_checks_the_kept_ones(
+    db_session, client, sample_school_for_extraction
+):
+    school = sample_school_for_extraction
+    gone, still = await _recrawled_school_with_prices(db_session, school, status="extracted")
+
+    async def _no_fee_pages(*_args, **_kwargs):
+        return {"success": False, "count": 0, "detail": "No pricing-related content found",
+                "input_tokens": 0, "output_tokens": 0}
+
+    with patch("app.scrapers.extractor._extract_prices", new=_no_fee_pages):
+        result = await extractor_module.extract_school(db_session, school.id, "bg", prices_only=True)
+    assert result["status"] != "extracted"
+
+    response = await client.get(f"/schools/{school.id}")
+    assert [row["id"] for row in response.json()["pricing"]] == [still.id]
+
+
+@pytest.mark.asyncio
+async def test_prices_only_run_on_emptied_pages_withholds_the_kept_prices(
+    db_session, client, sample_school_for_extraction
+):
+    school = sample_school_for_extraction
+    await _recrawled_school_with_prices(db_session, school, status="extracted")
+    pages = (await db_session.execute(select(SourcePage).where(SourcePage.school_id == school.id))).scalars().all()
+    for page in pages:
+        page.raw_markdown = ""
+    await db_session.commit()
+
+    result = await extractor_module.extract_school(db_session, school.id, "bg", prices_only=True)
+    assert result["status"] == "extraction_failed"
+
+    response = await client.get(f"/schools/{school.id}")
+    assert response.json()["pricing"] == []
+    await db_session.refresh(school)
+    assert {issue["code"] for issue in school.attributes["data_validation"]["kept_price_issues"]} == {
+        "pricing_current_page_empty"
+    }
 
 
 @pytest.mark.asyncio

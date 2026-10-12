@@ -747,8 +747,8 @@ def label_is_another_institutions(
     return bool(_KINDERGARTEN_LABEL_RE.search(text)) and not preschool
 
 
-def expired_offer(context: str, today: datetime.date) -> Optional[datetime.date]:
-    """The passed end date of the offer an amount's words make, or None.
+def offer_end(context: str) -> Optional[datetime.date]:
+    """The last day of the offer an amount's words make, past or not, or None.
 
     Each "до <date>" is read with the words just before it. They must speak of an offer
     ("при записване в срок до", "записани до", contracts, a discount, a dated price list)
@@ -759,6 +759,7 @@ def expired_offer(context: str, today: datetime.date) -> Optional[datetime.date]
     при записване до 31.05.2026"), is a discount on the price shown.
     """
     previous_end = 0
+    deadlines = []
     for match in _DEADLINE_RE.finditer(context):
         before = context[max(previous_end, match.start() - _OFFER_WINDOW): match.start()]
         after = context[match.end(): match.end() + 40]
@@ -777,12 +778,11 @@ def expired_offer(context: str, today: datetime.date) -> Optional[datetime.date]
             else (match.group(4), _MONTHS[match.group(5)], match.group(6))
         )
         try:
-            deadline = datetime.date(int(year), int(month), int(day))
+            deadlines.append(datetime.date(int(year), int(month), int(day)))
         except ValueError:
             continue
-        if deadline < today:
-            return deadline
-    return None
+    # Any one of the offer's deadlines passing ends it.
+    return min(deadlines, default=None)
 
 
 # ---------------------------------------------------------------------------
@@ -797,6 +797,9 @@ RULE_PERIOD_UNREPRESENTABLE = "3_period_unrepresentable"
 RULE_DEPOSIT = "4_deposit_not_tuition"
 RULE_INSTALLMENT = "4_installment_not_tuition"
 RULE_EXPIRED = "7_offer_expired"
+# Not a fault: the offer still runs, and ends on the date in ``offer_ends``. Validation
+# stores it on the row so the publish gate withholds the row once it passes.
+RULE_OFFER_ENDS = "7_offer_ends"
 
 
 @dataclass(frozen=True)
@@ -806,6 +809,8 @@ class PriceFinding:
     snippet: str
     # RULE_PERIOD_MISSING / RULE_PERIOD_CONFLICT: the period the text states (upper case).
     period: Optional[str] = None
+    # RULE_OFFER_ENDS / RULE_EXPIRED: the offer's last day.
+    offer_ends: Optional[datetime.date] = None
 
 
 @dataclass(frozen=True)
@@ -995,12 +1000,14 @@ def check_price_row(
     # (171's "При записване в срок до 23.01.2026 г." over a line on how it is paid), not a
     # note below it ("Ранно записване до 31.03. - 10% отстъпка" is a discount on the price
     # above, which stays).
-    ended = [
-        expired_offer(f"{_terms_above(text, span)}\n{amount_segment(text, span)}", today or datetime.date.today())
-        for span in chosen
-    ]
-    if all(ended):
-        hit(RULE_EXPIRED, f"offered until {ended[0].isoformat()}", contexts[0])
+    # Every occurrence must be a dated offer; the row ends with the last of them.
+    ends = [offer_end(f"{_terms_above(text, span)}\n{amount_segment(text, span)}") for span in chosen]
+    if all(ends):
+        end = max(ends)
+        if end < (today or datetime.date.today()):
+            hits.append(PriceFinding(RULE_EXPIRED, f"offered until {end.isoformat()}", contexts[0], offer_ends=end))
+        else:
+            hits.append(PriceFinding(RULE_OFFER_ENDS, f"offered until {end.isoformat()}", contexts[0], offer_ends=end))
     return hits
 
 

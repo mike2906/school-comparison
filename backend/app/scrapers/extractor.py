@@ -57,6 +57,10 @@ from app.scrapers.shared_site_check import (
     stated_address_for,
 )
 from app.scrapers.summary_pipeline import clear_summary_state
+from app.scrapers.validation.kept_prices import (
+    recheck_after_failed_price_refresh,
+    withhold_unsupported_kept_prices,
+)
 from app.scrapers.validator import school_fee_scope, validate_school_data
 from app.services.geocoding.base import GeocodingResult
 from app.services.geocoding.bg.address_match import same_building
@@ -1671,8 +1675,9 @@ async def keep_previous_website_data(db: AsyncSession, school_id: int) -> str | 
     Earlier stages of the run set a non-publishable status (e.g. ``navigated``). A
     school whose last validated website data is still intact (current validation
     report, no withholding marker) and came from its current website host gets a
-    publishable status back, so that data stays published; otherwise it is
-    ``extraction_failed`` and stays withheld.
+    publishable status back, so that data stays published, except price rows whose
+    linked page no longer supports them; otherwise it is ``extraction_failed`` and
+    stays withheld.
     """
     school = (
         await db.execute(
@@ -1687,6 +1692,8 @@ async def keep_previous_website_data(db: AsyncSession, school_id: int) -> str | 
         school.attributes, "extracted"
     ) and await _stored_website_data_matches_current_site(db, school):
         school.scrape_status = "summarized" if school.summary_i18n else "extracted"
+        # The old report vouched for the rows against pages navigation may have rewritten.
+        await withhold_unsupported_kept_prices(db, school)
     else:
         school.scrape_status = "extraction_failed"
     school.updated_at = datetime.datetime.now(datetime.timezone.utc)
@@ -1734,6 +1741,9 @@ async def extract_school(
         if not prices_only:
             school.scrape_status = "extraction_failed"
             await db.commit()
+        else:
+            # The stored fees stay up on the old report; their pages may now be empty.
+            await recheck_after_failed_price_refresh(db, school_id)
         return {
             "school_id": school_id,
             "status": "extraction_failed",
@@ -1803,6 +1813,9 @@ async def extract_school(
                 if kept_status in {"extracted", "summarized"}
                 else "No previously published website data; website data stays withheld"
             )
+        else:
+            # The crawl before a prices-only run rewrites the pages just the same.
+            await recheck_after_failed_price_refresh(db, school_id)
         stats["token_cost_usd"] = round(float(stats["token_cost_usd"] or 0.0), 6)
         stats["llm_stats"] = llm_stats.as_dict()
         return stats
@@ -1863,6 +1876,9 @@ async def extract_school(
             await geocode_campus_locations(db, school_id, country_code=country_code)
         except Exception as exc:  # a missing pin must not fail the extraction
             logger.warning("Campus geocoding failed for school %s: %s", school_id, exc)
+    elif prices_only:
+        # No fees were read, so the stored ones stay up on the old report: check them.
+        await recheck_after_failed_price_refresh(db, school_id)
 
     stats["token_cost_usd"] = round(float(stats["token_cost_usd"] or 0.0), 6)
     stats["llm_stats"] = llm_stats.as_dict()

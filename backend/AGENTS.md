@@ -74,14 +74,17 @@ Stage 6 also checks each price row against its linked page text
 (`app/scrapers/price_evidence.py`, UF45): a row whose amount is not in its label's run of
 prices, whose label names the other level, whose period is per day/week, or that is a
 deposit or one installment filed as tuition, or an offer whose end date has passed, gets
-an error on `pricing[{id}]`; a null period the page states, beside the amount or in the
+an error on `pricing[{id}]` (an offer that still runs has its last day stored as
+`pricing_context.offer_ends_on`, and the row gate withholds it from the next day); a null period the page states, beside the amount or in the
 heading of its table or list, is filled in. On a site a sibling school shares, so does a
 row linked to a page whose address names only a stage the school does not teach; on a
 site a kindergarten shares with a school, a fee whose own words are the other one's. A kindergarten showing a same-site school's name
 gets an error on `attributes.display_name_i18n` and falls back to its registry name.
 A re-extraction that would drop a fee the page still shows, drop a stated period, or
 change a period to one the page does not state beside the amount, is held
-(`attributes.pricing_hold`) and the published rows stay. Published tuition is also
+(`attributes.pricing_hold`) and the published rows stay. A failed extraction that keeps the old
+report re-checks the stored rows against their pages' current text and withholds the ones
+it no longer supports (`data_validation.kept_price_issues`). Published tuition is also
 bounded both ways (`implausible_tuition_row_ids`): too cheap or too dear for a year, or
 against the school's median tuition, is withheld; a tuition row with no period is held to
 the floors as a yearly fee.

@@ -7,6 +7,9 @@ sibling shows (rule 5) falls back to the registry name.
 
 from __future__ import annotations
 
+import datetime
+import types
+
 import pytest
 from sqlalchemy import select
 
@@ -15,7 +18,8 @@ from app.models.pricing import PriceSource
 from app.models.scrape_log import ScrapeType
 from app.models.source_page import SourcePage
 from app.scrapers import validator as validator_module
-from app.utils.display_gating import display_name_blocked
+from app.utils import display_gating
+from app.utils.display_gating import OFFER_ENDS_KEY, display_name_blocked
 from tests.test_price_evidence import SLAVEICHE, WALDORF
 
 
@@ -407,3 +411,108 @@ async def test_a_kindergarten_and_a_school_on_one_site_keep_their_own_fees(db_se
     assert _issue_codes(school, kindergartens_price) == {"pricing_label_names_other_level"}
     response = await client.get(f"/schools/{school.id}")
     assert [row["id"] for row in response.json()["pricing"]] == [schools_own.id]
+
+
+def _clock_on(day, hour=12):
+    """A stand-in for the ``datetime`` module whose clock reads ``day`` at ``hour`` UTC."""
+
+    class _DateTime(datetime.datetime):
+        @classmethod
+        def now(cls, tz=None):
+            moment = cls(day.year, day.month, day.day, hour, tzinfo=datetime.timezone.utc)
+            return moment.astimezone(tz) if tz else moment.replace(tzinfo=None)
+
+    return types.SimpleNamespace(**{**vars(datetime), "datetime": _DateTime})
+
+
+@pytest.mark.asyncio
+async def test_offer_stops_publishing_the_day_after_it_ends_without_revalidation(
+    db_session, client, frozen_today, monkeypatch
+):
+    # Validated on 10 October: the early-enrolment price still runs, until the 15th.
+    page_text = "Цени за договори, сключени до 15 октомври 2026\nГодишна такса 1-4 клас\n7500 €\n"
+    school, page = await _school_with_page(
+        db_session, level="primary", website_url="https://offer.example", page_text=page_text
+    )
+    offer = _row(school, page, "tuition", 7500, "yearly", "Годишна такса 1-4 клас")
+    db_session.add(offer)
+    await db_session.commit()
+
+    await validator_module.validate_school_data(db_session, school.id, "bg")
+    await db_session.refresh(school)
+    await db_session.refresh(offer)
+    assert _issue_codes(school, offer) == set()
+    assert offer.pricing_context[OFFER_ENDS_KEY] == "2026-10-15"
+
+    published = {}
+    for day in (datetime.date(2026, 10, 14), datetime.date(2026, 10, 15), datetime.date(2026, 10, 16)):
+        monkeypatch.setattr(display_gating, "datetime", _clock_on(day))
+        response = await client.get(f"/schools/{school.id}")
+        published[day.day] = [row["id"] for row in response.json()["pricing"]]
+    assert published == {14: [offer.id], 15: [offer.id], 16: []}
+
+
+@pytest.mark.asyncio
+async def test_offer_end_date_is_cleared_when_the_page_drops_the_deadline(db_session, frozen_today):
+    school, page = await _school_with_page(
+        db_session, level="primary", website_url="https://offer2.example", page_text="Годишна такса 1-4 клас\n7500 €\n"
+    )
+    row = _row(school, page, "tuition", 7500, "yearly", "Годишна такса 1-4 клас")
+    row.pricing_context = {"confidence": 1.0, OFFER_ENDS_KEY: "2026-10-15"}
+    db_session.add(row)
+    await db_session.commit()
+
+    await validator_module.validate_school_data(db_session, school.id, "bg")
+    await db_session.refresh(row)
+    assert OFFER_ENDS_KEY not in row.pricing_context
+
+
+@pytest.mark.parametrize(
+    "context,ended",
+    [
+        (None, False),
+        ({"confidence": 1.0}, False),
+        ({OFFER_ENDS_KEY: "2026-10-15"}, False),
+        ({OFFER_ENDS_KEY: "2026-10-14"}, True),
+        ({OFFER_ENDS_KEY: "not a date"}, True),
+    ],
+)
+def test_offer_has_ended(monkeypatch, context, ended):
+    monkeypatch.setattr(display_gating, "datetime", _clock_on(datetime.date(2026, 10, 15)))
+    assert display_gating.offer_has_ended(context) is ended
+
+
+@pytest.mark.parametrize(
+    "day,hour,ended",
+    [
+        # 15 October 2026 is summer time (UTC+3): Sofia's 16th starts at 21:00 UTC.
+        (datetime.date(2026, 10, 15), 20, False),
+        (datetime.date(2026, 10, 15), 21, True),
+        # 15 December is winter time (UTC+2): it starts at 22:00 UTC.
+        (datetime.date(2026, 12, 15), 21, False),
+        (datetime.date(2026, 12, 15), 22, True),
+    ],
+)
+def test_offer_ends_by_the_bulgarian_day_not_the_servers(monkeypatch, day, hour, ended):
+    monkeypatch.setattr(display_gating, "datetime", _clock_on(day, hour))
+    assert display_gating.offer_has_ended({OFFER_ENDS_KEY: day.isoformat()}) is ended
+
+
+@pytest.mark.parametrize(
+    "moment,sofia_day",
+    [
+        # 2026: summer time from 29 March 01:00 UTC to 25 October 01:00 UTC.
+        (datetime.datetime(2026, 3, 28, 21, 30), datetime.date(2026, 3, 28)),  # 23:30, UTC+2
+        (datetime.datetime(2026, 3, 29, 21, 30), datetime.date(2026, 3, 30)),  # 00:30, UTC+3
+        (datetime.datetime(2026, 10, 24, 21, 30), datetime.date(2026, 10, 25)),  # 00:30, UTC+3
+        (datetime.datetime(2026, 10, 25, 21, 30), datetime.date(2026, 10, 25)),  # 23:30, UTC+2
+    ],
+)
+def test_sofia_today_follows_eu_summer_time(monkeypatch, moment, sofia_day):
+    class _DateTime(datetime.datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return cls(*moment.timetuple()[:6], tzinfo=datetime.timezone.utc)
+
+    monkeypatch.setattr(display_gating, "datetime", types.SimpleNamespace(**{**vars(datetime), "datetime": _DateTime}))
+    assert display_gating._sofia_today() == sofia_day
