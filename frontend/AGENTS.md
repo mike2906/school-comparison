@@ -2,6 +2,8 @@
 
 Read the root `AGENTS.md` first. This file adds what you need before changing anything under
 `frontend/`. Checks: `npm run lint`, `npm run test`, `npm run build`.
+After a build, `npm run test:journeys` drives the search page's history in a browser
+(`e2e/`, recorded API answers); run it when changing `SearchPage` URL or history handling.
 
 ---
 
