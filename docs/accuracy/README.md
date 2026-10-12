@@ -19,7 +19,7 @@ the launch DB's stored website price rows and with what the API publishes.
 | Sites that state any fee | 13 of 24. 11 state none |
 | **Published and wrong** | **7 of 58 published rows (12 %)** |
 | **Correct but withheld** | **9 of 60 stored rows that match the site (15 %)** |
-| Published without the period the site states | 18 |
+| Published without the period the site states | 16 |
 | Site fees that are published | 57 of 164 (35 %; an upper bound, one row can cover two equal fees) |
 | Reviewer time | 18 agent-minutes for 30 schools; 0.7 per school that states fees |
 

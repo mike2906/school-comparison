@@ -178,7 +178,7 @@ async def main(reference_path: Path) -> None:
     print(f"published and wrong: {rate(totals['published_wrong'], totals['published'])} of published rows")
     print(f"correct but withheld: {rate(totals['matched_withheld'], totals['matched'])} of rows matching the site")
     print(f"published without a period the site states: {totals['no_period']}")
-    print(f"site fees that are published: {rate(fees_published, fees_total)}")
+    print(f"site fees that are published: {rate(fees_published, fees_total)} (upper bound: equal fees share a row)")
 
 
 if __name__ == "__main__":
