@@ -257,3 +257,12 @@ async def seeded_client(seeded_db):
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
     app.dependency_overrides.clear()
+
+
+@pytest.fixture(autouse=True)
+def _empty_list_translations(monkeypatch):
+    """Projection tests use English and Bulgarian fixture items as written; the glossary
+    (`app/utils/list_translations.json`) is exercised in `test_list_translations.py`."""
+    from app.utils import list_translations
+
+    monkeypatch.setattr(list_translations, "_glossary", lambda: {})

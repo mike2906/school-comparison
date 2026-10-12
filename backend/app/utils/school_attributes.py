@@ -40,6 +40,7 @@ from app.utils.facility_vocabulary import (
     PROGRAM_VOCAB,
     canonical_tags,
 )
+from app.utils.list_translations import translate_items
 
 DISPLAY_LOCALES: tuple[str, ...] = ("bg", "en")
 
@@ -364,12 +365,15 @@ def build_localized_attributes(
     attributes: Mapping[str, Any] | None,
     locale: str,
     school_type: Optional[str] = None,
+    translate: bool = True,
 ) -> dict[str, Any]:
     """Resolve the free-text display fields for a single locale.
 
     Fields flagged by the current validation report (P1.7) are emitted empty so a
     validator-rejected value never reaches the browser. ``school_type`` decides the
-    language of instruction (see ``app.utils.display_lists``).
+    language of instruction (see ``app.utils.display_lists``). ``translate`` applies the
+    list glossary (``app.utils.list_translations``); filters read the untranslated items,
+    so a translation never changes a school's filter tags.
     """
     attrs = _as_mapping(attributes)
     extracted = _localized_extracted(attrs, locale)
@@ -446,7 +450,8 @@ def build_localized_attributes(
             if (text := publishable_display_text(value)) is not None
         ]
     for field in ("facilities", "special_programs", "activities_offered"):
-        resolved[field] = [text for text in resolved[field] if not is_list_noise(text, field)]
+        kept = [text for text in resolved[field] if not is_list_noise(text, field)]
+        resolved[field] = _dedupe_strings(translate_items(kept, locale) if translate else kept)
     return resolved
 
 
@@ -495,7 +500,9 @@ def compute_filter_tags(attributes: Mapping[str, Any] | None) -> dict[str, list[
     for display. See ``app.utils.facility_vocabulary`` (P1.9).
     """
     attrs = _as_mapping(attributes)
-    localized = [build_localized_attributes(attrs, locale) for locale in DISPLAY_LOCALES]
+    localized = [
+        build_localized_attributes(attrs, locale, translate=False) for locale in DISPLAY_LOCALES
+    ]
     blocked = blocked_display_fields(attrs)
 
     def _union(field: str) -> list[str]:
@@ -628,7 +635,8 @@ def build_filterable_attributes(
     agree on the vocabulary.
     """
     localized = [
-        build_localized_attributes(attributes, locale, school_type) for locale in DISPLAY_LOCALES
+        build_localized_attributes(attributes, locale, school_type, translate=False)
+        for locale in DISPLAY_LOCALES
     ]
 
     def _union(field: str) -> list[str]:
