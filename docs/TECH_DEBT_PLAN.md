@@ -36,7 +36,7 @@ There are three independent lanes. Within a lane, order matters. Across lanes, P
 | T6 | **Offline extraction diff, added after the Monday question.** A small script runs `app/scrapers/deterministic.run_deterministic_extraction` over every school's stored pages in the launch DB and writes one JSON line per school. It needs no network, LLM or DB writes. It runs once on the code before a refactor and once after, and any difference blocks the PR. This covers the deterministic layer for all schools; the 20-case golden corpus already covers it for a sample in CI. **It does not cover the LLM half.** Raw LLM answers were not stored, so re-running the LLM steps meant paying for new calls. T0 starts recording them, and T6 adds a replay mode for the recorded answers. Schools without a recording are covered only by the unit tests, which is why T5 matters. | Script, 1 PR | nothing | After Monday (it reads the launch DB on Mike's PC) |
 | P2 | **Untangle `cli.py`.** Every move PR retargets the patches on the moved functions (see the ground rules). | Refactor, 3-4 PRs | P0 (Celery gone, so stage logic exists only once), T2 (the CLI usage-total tests fixed) | Done (#248, #249): stage runners in `app/scrapers/stages/`, repair commands in `app/scrapers/repairs/`, `cli.py` down to 928 lines. Steps 8 and the dispatch table were dropped; see Phase 2 |
 | P3 | **Split `extractor_helpers.py`** and dedupe it. | Refactor, 6-8 PRs | T4, T5 and T6 (step 13, merging the parsers, is only safe when the shared table passes on both parsers before the merge and on the survivor after), and P2 for the shared helper modules | Done except step 13 (#252 rules, #253 split and rename): 12 and 14 dropped, 13 waits for T6; see Phase 3 |
-| P4 | **Split the long functions** (`validate_school_data`, `_extract_prices`, `_extract_general_info`). | Refactor, 3 PRs | P3, plus T5 for `_extract_prices` | After P3 |
+| P4 | **Split the long functions** (`validate_school_data`, `_extract_prices`, `_extract_general_info`). | Refactor, 3 PRs | P3, plus T5 for `_extract_prices` | In progress: step 16 done |
 
 ### Lane B: frontend
 
@@ -220,6 +220,7 @@ Prerequisites from the test audit (test-only PRs, done before step 10):
 ### Phase 4: long functions
 
 16. **Split `validate_school_data`** (582 lines) into per-section validators.
+    *Done (2026-10-12).* It is now a ~110-line orchestrator over private `_check_*` / `_persist_*` helpers in `validator.py`, moved verbatim.
 17. **Split `_extract_general_info` and `_extract_prices`** into named steps, replacing the nested closures.
 
 These come last because they are the riskiest, and they get easier once phases 2 and 3 have made the helpers they call importable and testable on their own.
