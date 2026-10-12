@@ -337,12 +337,51 @@ def _linked_evidence_is_valid(row: Any) -> bool:
     return _pricing_row_value(source_page, "is_valid") is True
 
 
+# Set on a row's ``pricing_context`` by validation when the page offers its price only
+# until a date (an early-enrolment tier); the row is withheld from the day after.
+OFFER_ENDS_KEY = "offer_ends_on"
+
+
+def _sofia_today() -> datetime.date:
+    """Today in Sofia. The offer's day is a Bulgarian one, and the server runs on UTC.
+
+    EU summer time (UTC+3) runs from 01:00 UTC on the last Sunday of March to 01:00 UTC
+    on the last Sunday of October; the rest of the year is UTC+2. Written out rather than
+    read from the system's time-zone database, which the slim API image may not carry.
+    """
+    now = datetime.datetime.now(datetime.timezone.utc)
+
+    def last_sunday_0100(month: int) -> datetime.datetime:
+        last_day = datetime.datetime(now.year, month, 31, 1, tzinfo=datetime.timezone.utc)
+        return last_day - datetime.timedelta(days=(last_day.weekday() + 1) % 7)
+
+    summer = last_sunday_0100(3) <= now < last_sunday_0100(10)
+    return (now + datetime.timedelta(hours=3 if summer else 2)).date()
+
+
+def offer_has_ended(pricing_context: Any) -> bool:
+    """True once the day after the row's stored offer end date has come.
+
+    An end date that does not parse withholds the row: it was written by validation, so
+    a bad one means something is wrong with the row.
+    """
+    ends_on = pricing_context.get(OFFER_ENDS_KEY) if isinstance(pricing_context, Mapping) else None
+    if ends_on is None:
+        return False
+    try:
+        ends = datetime.date.fromisoformat(str(ends_on))
+    except ValueError:
+        return True
+    return ends < _sofia_today()
+
+
 def pricing_row_is_publishable(row: Any) -> bool:
     """Fail-closed launch gate shared by API serialization and the scoreboard.
 
     Trust comes from evidence, not from a human sign-off: the row must still be backed by
     a valid source page, and any academic year it carries must be a real one. A year that
-    does not normalize is withheld rather than guessed at.
+    does not normalize is withheld rather than guessed at. An offer that ends on a date
+    stops being published the day after, without waiting for the next validation run.
     """
     source_url = _pricing_row_value(row, "source_url")
     pricing_context = _pricing_row_value(row, "pricing_context")
@@ -352,6 +391,7 @@ def pricing_row_is_publishable(row: Any) -> bool:
 
     return (
         passes_pricing_gate(source_url, pricing_context)
+        and not offer_has_ended(pricing_context)
         and _linked_evidence_is_valid(row)
         and academic_year_is_resolvable(_pricing_row_value(row, "academic_year"))
         and _valid_price_shape(row)

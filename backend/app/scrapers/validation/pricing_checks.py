@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime
 import json
 from typing import Any
 
@@ -11,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.pricing import Pricing
 from app.schemas.validation import ValidationReport
 from app.scrapers.validation.report_entries import _add_fix, _add_issue, _to_json_value
+from app.utils.display_gating import OFFER_ENDS_KEY
 
 
 def _pricing_signature(row: Pricing) -> tuple[Any, ...]:
@@ -176,3 +178,17 @@ async def _remove_duplicate_pricing_rows(
                 fixed_value=None,
                 reason="Removed exact duplicate scraped pricing row.",
             )
+
+
+def store_offer_end(row: Pricing, offer_ends: datetime.date | None) -> None:
+    """Keep the row's offer end date in step with its page, so the gate can expire it."""
+    context = dict(row.pricing_context) if isinstance(row.pricing_context, dict) else {}
+    stored = context.get(OFFER_ENDS_KEY)
+    wanted = offer_ends.isoformat() if offer_ends else None
+    if stored == wanted:
+        return
+    if wanted:
+        context[OFFER_ENDS_KEY] = wanted
+    else:
+        context.pop(OFFER_ENDS_KEY, None)
+    row.pricing_context = context
