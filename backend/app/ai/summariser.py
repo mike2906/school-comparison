@@ -10,7 +10,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 from pydantic_ai import ModelRetry
 
-from app.ai.client import calculate_cost, create_agent, get_model
+from app.ai.client import calculate_cost, create_agent, get_model, get_usage
 from app.config import get_settings
 from app.schemas.llm_outputs import SchoolSummaryStrict
 from app.services.provider_costs import execute_billable_request
@@ -351,9 +351,8 @@ async def generate_school_summary(summary_input: SummaryInput, *, school_id: int
                 summary_input,
                 lang,
             )
-        from app.scrapers import extractor_helpers as helpers
 
-        input_tokens, output_tokens = helpers._get_usage(result)
+        input_tokens, output_tokens = get_usage(result)
         token_cost_usd = calculate_cost(SUMMARY_MODEL_TIER, input_tokens, output_tokens)
         return {
             "summary_i18n": summary_i18n,

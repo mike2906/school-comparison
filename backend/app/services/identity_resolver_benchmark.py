@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import School, SourcePage
 from app.models.scrape_log import ScrapeType
 from app.scrapers import extractor
-from app.scrapers import extractor_helpers as helpers
+from app.scrapers.extraction import display_naming
 
 DEFAULT_BENCHMARK_PATH = (
     Path(__file__).resolve().parents[2]
@@ -35,7 +35,7 @@ def _identity_key(value: str | None) -> str:
 def _normalized_candidate(value: Any, country_code: str) -> dict[str, str]:
     if not isinstance(value, dict):
         return {}
-    return helpers._normalize_display_name_i18n(value, country_code) or {}
+    return display_naming._normalize_display_name_i18n(value, country_code) or {}
 
 
 def _english_candidate(candidate: dict[str, str]) -> str | None:

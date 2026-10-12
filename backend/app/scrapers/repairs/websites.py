@@ -134,7 +134,7 @@ async def repair_websites_command(
     from app.database import async_session_maker
     from app.models import School, SourcePage
     from app.models.scrape_log import ScrapeType
-    from app.scrapers.extractor_helpers import _extract_display_name_i18n_deterministic
+    from app.scrapers.extraction.display_naming import _extract_display_name_i18n_deterministic
     from app.scrapers.url_validator import extract_validation_aliases, validate_school_url
 
     async with async_session_maker() as db:

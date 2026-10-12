@@ -10,6 +10,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from sqlalchemy import select
 
+from app.config import get_settings
 from app.models import FieldSource, Pricing, School, SchoolLocation
 from app.models.pricing import PriceSource
 from app.models.scrape_log import ScrapeType
@@ -24,6 +25,15 @@ from app.schemas.extraction import (
     SummarySourceExtractionOutput,
 )
 from app.scrapers import extractor as extractor_module
+from app.scrapers.extraction import (
+    contact_details,
+    display_naming,
+    fee_lines,
+    page_selection,
+    price_lines,
+    price_rows,
+    summary_sources,
+)
 from app.services.geocoding.write_gate import OFFICIAL_COORDS_TAG
 
 # Fee pages in these tests name academic years such as 2025/2026; pin the date they are read on.
@@ -451,7 +461,7 @@ async def test_extract_school_recovers_display_name_with_targeted_capable_fallba
     )
 
     with (
-        patch.object(extractor_module.helpers, "_extract_display_name_i18n_deterministic", return_value=None),
+        patch.object(display_naming, "_extract_display_name_i18n_deterministic", return_value=None),
         patch(
             "app.scrapers.extractor._run_typed_agent",
             new=AsyncMock(
@@ -1281,7 +1291,7 @@ async def test_extract_school_clears_stale_summary_metadata_on_success(db_sessio
 
 
 def test_extract_contact_info_deterministic_captures_postal_address():
-    contact = extractor_module.helpers._extract_contact_info_deterministic(
+    contact = contact_details._extract_contact_info_deterministic(
         """
         ## Контакти
         **Телефон** 02/1234567
@@ -1928,7 +1938,7 @@ def test_extract_openrouter_cost_usd_falls_back_to_response_details():
 
 
 def test_normalize_summary_source_output_drops_generic_fluff():
-    normalized = extractor_module.helpers._normalize_summary_source_output(
+    normalized = summary_sources._normalize_summary_source_output(
         SummarySourceExtractionOutput(
             positioning="Innovative school",
             teaching_approach=["project-based learning", "quality education", "project-based learning"],
@@ -1946,7 +1956,7 @@ def test_normalize_summary_source_output_drops_generic_fluff():
 
 
 def test_normalize_summary_source_output_filters_category_noise():
-    normalized = extractor_module.helpers._normalize_summary_source_output(
+    normalized = summary_sources._normalize_summary_source_output(
         SummarySourceExtractionOutput(
             positioning="Научете разликите в подхода на двете места",
             teaching_approach=["Waldorf pedagogy", "administration@waldorf.bg"],
@@ -1965,7 +1975,7 @@ def test_normalize_summary_source_output_filters_category_noise():
 
 
 def test_normalize_summary_source_output_derives_canonical_tags_from_languages_and_programs():
-    normalized = extractor_module.helpers._normalize_summary_source_output(
+    normalized = summary_sources._normalize_summary_source_output(
         SummarySourceExtractionOutput(
             teaching_approach=["project-based learning"],
         ),
@@ -2007,7 +2017,7 @@ def test_select_pages_for_summary_source_prefers_about_over_news_and_parents():
         ),
     ]
 
-    selected_text, source_urls = extractor_module.helpers._select_pages(
+    selected_text, source_urls = page_selection._select_pages(
         school=school,
         pages=pages,
         preferred_categories=["about", "programs", "facilities"],
@@ -2042,7 +2052,7 @@ def test_select_pages_for_summary_source_filters_operational_pages_when_narrativ
         ),
     ]
 
-    selected_text, source_urls = extractor_module.helpers._select_pages(
+    selected_text, source_urls = page_selection._select_pages(
         school=school,
         pages=pages,
         preferred_categories=["about", "programs", "facilities"],
@@ -2076,7 +2086,7 @@ def test_select_pages_for_pricing_prefers_tseni_slug_even_without_pricing_catego
         ),
     ]
 
-    selected_text, source_urls = extractor_module.helpers._select_pages(
+    selected_text, source_urls = page_selection._select_pages(
         school=school,
         pages=pages,
         preferred_categories=["pricing", "admission", "contact"],
@@ -2089,7 +2099,7 @@ def test_select_pages_for_pricing_prefers_tseni_slug_even_without_pricing_catego
 
 
 def test_extract_prices_deterministic_parses_fusion_style_pricing_sections():
-    parsed = extractor_module.helpers._extract_prices_deterministic(
+    parsed = price_lines._extract_prices_deterministic(
         """
         # График и цени
         ## Такси „Обучение“ за Предучилищна – учебна 2025-2026 година
@@ -2122,7 +2132,7 @@ def test_extract_prices_deterministic_parses_fusion_style_pricing_sections():
 
 
 def test_extract_prices_deterministic_handles_generic_monthly_fee_page():
-    parsed = extractor_module.helpers._extract_prices_deterministic(
+    parsed = price_lines._extract_prices_deterministic(
         """
         ## ТАКСИ
         € 530 | 1037 лв. - целодневно гледане, ежемесечно заплащане
@@ -2150,7 +2160,7 @@ def test_extract_prices_deterministic_handles_generic_monthly_fee_page():
 
 
 def test_extract_prices_deterministic_resets_after_optional_services_section():
-    parsed = extractor_module.helpers._extract_prices_deterministic(
+    parsed = price_lines._extract_prices_deterministic(
         """
         Такса "Обучение, консумативи и образователни ресурси" за една уч. година
         Първи клас - € 8170
@@ -2173,7 +2183,7 @@ def test_extract_prices_deterministic_resets_after_optional_services_section():
 
 
 def test_extract_prices_deterministic_keeps_registration_and_optional_services_out_of_tuition():
-    parsed = extractor_module.helpers._extract_prices_deterministic(
+    parsed = price_lines._extract_prices_deterministic(
         """
         School fees
         TUITION FEES FOR THE ACADEMIC 2025/2026 YEAR
@@ -2198,7 +2208,7 @@ def test_extract_prices_deterministic_keeps_registration_and_optional_services_o
 
 
 def test_extract_prices_deterministic_does_not_turn_installments_into_periods():
-    parsed = extractor_module.helpers._extract_prices_deterministic(
+    parsed = price_lines._extract_prices_deterministic(
         """
         Годишна такса „Обучение“
         Плащане на пълна такса
@@ -2229,7 +2239,7 @@ def test_detect_price_period_does_not_infer_from_installment_plans(
     line,
     expected_period,
 ):
-    assert extractor_module.helpers._detect_price_period(line) == expected_period
+    assert price_lines._detect_price_period(line) == expected_period
 
 
 @pytest.mark.parametrize(
@@ -2244,7 +2254,7 @@ def test_detect_price_period_does_not_infer_from_installment_plans(
     ],
 )
 def test_detect_price_period_normalizes_explicit_supported_periods(line, expected_period):
-    assert extractor_module.helpers._detect_price_period(line) == expected_period
+    assert price_lines._detect_price_period(line) == expected_period
 
 
 @pytest.mark.parametrize(
@@ -2260,7 +2270,7 @@ def test_detect_price_period_normalizes_explicit_supported_periods(line, expecte
     ],
 )
 def test_price_period_distinguishes_quarterly_fees_from_payments(line, expected_period):
-    assert extractor_module.helpers._detect_price_period(line) == expected_period
+    assert price_lines._detect_price_period(line) == expected_period
 
 
 @pytest.mark.parametrize(
@@ -2276,15 +2286,15 @@ def test_price_period_distinguishes_quarterly_fees_from_payments(line, expected_
 def test_bulgarian_one_time_fee_wording_distinguishes_fee_from_payment_plan(
     line, expected_period
 ):
-    assert extractor_module.helpers._detect_explicit_price_period(line) == expected_period
+    assert price_lines._detect_explicit_price_period(line) == expected_period
 
 
 def test_price_period_on_following_line_applies_to_preceding_amount():
     text = "Tuition fee: EUR 8,000\nper year\nRegistration fee: EUR 200"
 
-    parsed = extractor_module.helpers._extract_prices_deterministic(text)
-    signals = extractor_module.helpers._iter_price_line_signals(text)
-    supported = extractor_module.helpers._filter_supported_prices(
+    parsed = price_lines._extract_prices_deterministic(text)
+    signals = price_lines._iter_price_line_signals(text)
+    supported = price_rows._filter_supported_prices(
         [ExtractedPrice(category="tuition", amount=8000, currency="EUR", period="yearly", confidence=0.9)],
         text,
     )
@@ -2303,14 +2313,14 @@ def test_price_period_on_following_line_applies_to_preceding_amount():
 
 @pytest.mark.parametrize("line", ["Quarterly instalment: EUR 2,000", "Quarterly payment: EUR 2,000"])
 def test_quarterly_payment_does_not_inherit_fee_period(line):
-    assert extractor_module.helpers._detect_price_period(line, default_period="yearly") is None
+    assert price_lines._detect_price_period(line, default_period="yearly") is None
 
 
 def test_annual_heading_survives_payment_cadence_on_amount_line():
     text = "Annual tuition fee\nEUR 8,000 payable quarterly"
 
-    parsed = extractor_module.helpers._extract_prices_deterministic(text)
-    signals = extractor_module.helpers._iter_price_line_signals(text)
+    parsed = price_lines._extract_prices_deterministic(text)
+    signals = price_lines._iter_price_line_signals(text)
 
     assert [(price.amount, price.period) for price in parsed.prices] == [(8000, "yearly")]
     assert [(signal["amount"], signal["period"]) for signal in signals] == [
@@ -2333,8 +2343,8 @@ def test_annual_heading_survives_payment_cadence_on_amount_line():
 def test_explicit_bulgarian_monthly_headings_set_period(heading):
     text = f"## Такси\n## {heading}\nEUR 409"
 
-    parsed = extractor_module.helpers._extract_prices_deterministic(text)
-    signals = extractor_module.helpers._iter_price_line_signals(text)
+    parsed = price_lines._extract_prices_deterministic(text)
+    signals = price_lines._iter_price_line_signals(text)
 
     assert [(price.amount, price.period) for price in parsed.prices] == [(409, "monthly")]
     assert [(signal["amount"], signal["period"]) for signal in signals] == [
@@ -2351,7 +2361,7 @@ def test_explicit_bulgarian_monthly_headings_set_period(heading):
     ],
 )
 def test_bulgarian_payment_cadence_does_not_set_monthly_period(line):
-    assert extractor_module.helpers._detect_explicit_price_period(line) is None
+    assert price_lines._detect_explicit_price_period(line) is None
 
 
 def test_price_period_does_not_carry_into_next_tuition_section():
@@ -2362,8 +2372,8 @@ def test_price_period_does_not_carry_into_next_tuition_section():
     EUR 9,000
     """
 
-    parsed = extractor_module.helpers._extract_prices_deterministic(text)
-    signals = extractor_module.helpers._iter_price_line_signals(text)
+    parsed = price_lines._extract_prices_deterministic(text)
+    signals = price_lines._iter_price_line_signals(text)
 
     assert {price.amount: price.period for price in parsed.prices} == {
         8000: "yearly",
@@ -2383,8 +2393,8 @@ def test_unrecognised_markdown_heading_ends_price_section():
     EUR 200
     """
 
-    parsed = extractor_module.helpers._extract_prices_deterministic(text)
-    signals = extractor_module.helpers._iter_price_line_signals(text)
+    parsed = price_lines._extract_prices_deterministic(text)
+    signals = price_lines._iter_price_line_signals(text)
 
     assert [(price.category, price.amount, price.period) for price in parsed.prices] == [
         ("tuition", 8000, "yearly"),
@@ -2436,7 +2446,7 @@ def test_dedupe_price_rows_drops_currency_and_installment_duplicates():
         ExtractedPrice(category="food", amount=15411.94, currency="BGN", period="yearly", academic_year="2026-2027", confidence=0.9),
     ]
 
-    deduped = extractor_module.helpers._dedupe_price_rows(prices)
+    deduped = price_rows._dedupe_price_rows(prices)
     by_amount = {p.amount: p for p in deduped}
 
     assert 7880 in by_amount
@@ -2447,10 +2457,10 @@ def test_dedupe_price_rows_drops_currency_and_installment_duplicates():
 
 def test_one_payment_plan_name_is_the_whole_fee_not_an_installment_variant():
     # Otkrivatel: "Плащане на 1 вноска" is the full yearly fee beside its plans.
-    assert not extractor_module.helpers._is_installment_plan_name("Плащане на 1 вноска")
-    assert not extractor_module.helpers._is_installment_plan_name("1 installment")
-    assert extractor_module.helpers._is_installment_plan_name("Плащане на 2 вноски")
-    assert extractor_module.helpers._is_installment_plan_name("10 monthly installments")
+    assert not price_rows._is_installment_plan_name("Плащане на 1 вноска")
+    assert not price_rows._is_installment_plan_name("1 installment")
+    assert price_rows._is_installment_plan_name("Плащане на 2 вноски")
+    assert price_rows._is_installment_plan_name("10 monthly installments")
 
 
 def test_dedupe_price_rows_drops_installment_plan_name_variants():
@@ -2477,7 +2487,7 @@ def test_dedupe_price_rows_drops_installment_plan_name_variants():
         ),
     ]
 
-    deduped = extractor_module.helpers._dedupe_price_rows(prices)
+    deduped = price_rows._dedupe_price_rows(prices)
     amounts = sorted(p.amount for p in deduped)
 
     assert amounts == [7580]
@@ -2489,7 +2499,7 @@ def test_dedupe_price_rows_preserves_a_sole_total_fee():
         plan_name="Total Fee", confidence=0.9,
     )
 
-    deduped = extractor_module.helpers._dedupe_price_rows([price])
+    deduped = price_rows._dedupe_price_rows([price])
 
     assert [(row.amount, row.plan_name) for row in deduped] == [(12000, "Total Fee")]
 
@@ -2506,7 +2516,7 @@ def test_dedupe_price_rows_drops_total_fee_when_component_sibling_exists():
         ),
     ]
 
-    deduped = extractor_module.helpers._dedupe_price_rows(prices)
+    deduped = price_rows._dedupe_price_rows(prices)
 
     assert [(row.amount, row.plan_name) for row in deduped] == [(10000, "Tuition Fee")]
 
@@ -2523,7 +2533,7 @@ def test_filter_supported_prices_drops_unsupported_llm_rows():
         ExtractedPrice(category="tuition", amount=400, currency="EUR", period="monthly", confidence=0.9),
     ]
 
-    refined = extractor_module.helpers._filter_supported_prices(prices, text)
+    refined = price_rows._filter_supported_prices(prices, text)
 
     assert refined == []
 
@@ -2541,7 +2551,7 @@ def test_filter_supported_prices_uses_source_line_to_fix_period_and_category():
         ExtractedPrice(category="tuition", amount=265, currency="EUR", period="yearly", confidence=0.9),
     ]
 
-    refined = extractor_module.helpers._filter_supported_prices(prices, text)
+    refined = price_rows._filter_supported_prices(prices, text)
     by_amount = {price.amount: price for price in refined}
 
     assert by_amount[530].period is None
@@ -2561,7 +2571,7 @@ def test_filter_supported_prices_clears_llm_period_without_source_evidence():
         confidence=0.9,
     )
 
-    refined = extractor_module.helpers._filter_supported_prices([guessed], text)
+    refined = price_rows._filter_supported_prices([guessed], text)
 
     assert len(refined) == 1
     assert refined[0].period is None
@@ -2585,7 +2595,7 @@ def test_filter_supported_prices_uses_plan_context_when_amount_repeats():
         )
     ]
 
-    refined = extractor_module.helpers._filter_supported_prices(prices, text)
+    refined = price_rows._filter_supported_prices(prices, text)
 
     assert len(refined) == 1
     assert refined[0].category == "transport"
@@ -2605,7 +2615,7 @@ def test_filter_supported_prices_uses_category_when_amount_repeats():
         for category in ("tuition", "transport")
     ]
 
-    refined = extractor_module.helpers._filter_supported_prices(prices, text)
+    refined = price_rows._filter_supported_prices(prices, text)
 
     assert {price.category for price in refined} == {"tuition", "transport"}
 
@@ -2616,7 +2626,7 @@ def test_filter_supported_prices_clears_guess_when_category_resolves_repeated_am
         category="tuition", amount=500, currency="EUR", period="yearly", confidence=0.9,
     )
 
-    refined = extractor_module.helpers._filter_supported_prices([price], text)
+    refined = price_rows._filter_supported_prices([price], text)
 
     assert len(refined) == 1
     assert refined[0].category == "tuition"
@@ -2632,7 +2642,7 @@ def test_filter_supported_prices_uses_heading_to_fix_high_confidence_category():
         category="tuition", amount=160, currency="EUR", period="monthly", confidence=0.9,
     )
 
-    refined = extractor_module.helpers._filter_supported_prices([price], text)
+    refined = price_rows._filter_supported_prices([price], text)
 
     assert len(refined) == 1
     assert refined[0].category == "transport"
@@ -2644,7 +2654,7 @@ def test_filter_supported_prices_keeps_tuition_when_transport_is_included():
         category="tuition", amount=10000, currency="EUR", period="yearly", confidence=0.9,
     )
 
-    refined = extractor_module.helpers._filter_supported_prices([price], text)
+    refined = price_rows._filter_supported_prices([price], text)
 
     assert len(refined) == 1
     assert refined[0].category == "tuition"
@@ -2656,7 +2666,7 @@ def test_filter_supported_prices_prefers_food_over_generic_monthly_fee():
         category="food", amount=100, currency="BGN", period="monthly", confidence=0.9,
     )
 
-    refined = extractor_module.helpers._filter_supported_prices([price], text)
+    refined = price_rows._filter_supported_prices([price], text)
 
     assert len(refined) == 1
     assert refined[0].category == "food"
@@ -2678,7 +2688,7 @@ def test_dedupe_price_rows_keeps_only_latest_academic_year():
         ),
     ]
 
-    deduped = extractor_module.helpers._dedupe_price_rows(prices)
+    deduped = price_rows._dedupe_price_rows(prices)
 
     assert {(row.amount, row.academic_year) for row in deduped} == {
         (11000, "2026/2027"),
@@ -2698,7 +2708,7 @@ def test_dedupe_price_rows_drops_yearless_rows_when_explicit_year_exists():
         ),
     ]
 
-    deduped = extractor_module.helpers._dedupe_price_rows(prices)
+    deduped = price_rows._dedupe_price_rows(prices)
 
     assert [(row.amount, row.academic_year) for row in deduped] == [(6000, "2026/2027")]
 
@@ -2715,7 +2725,7 @@ def test_dedupe_price_rows_preserves_distinct_yearless_fee_in_same_category():
         ),
     ]
 
-    deduped = extractor_module.helpers._dedupe_price_rows(prices)
+    deduped = price_rows._dedupe_price_rows(prices)
 
     assert {(row.amount, row.academic_year) for row in deduped} == {
         (500, None),
@@ -2735,7 +2745,7 @@ def test_dedupe_price_rows_preserves_yearless_fee_in_other_category():
         ),
     ]
 
-    deduped = extractor_module.helpers._dedupe_price_rows(prices)
+    deduped = price_rows._dedupe_price_rows(prices)
 
     assert {(row.category, row.amount) for row in deduped} == {
         ("tuition", 6000),
@@ -2755,7 +2765,7 @@ def test_dedupe_price_rows_keeps_latest_year_per_comparable_fee_group():
         ),
     ]
 
-    deduped = extractor_module.helpers._dedupe_price_rows(prices)
+    deduped = price_rows._dedupe_price_rows(prices)
 
     assert {(row.category, row.amount) for row in deduped} == {
         ("tuition", 6000),
@@ -2772,7 +2782,7 @@ def test_price_signals_reset_semantic_state_between_source_pages():
     EUR 1,885
     """
 
-    signals = extractor_module.helpers._iter_price_line_signals(text)
+    signals = price_lines._iter_price_line_signals(text)
 
     assert [signal for signal in signals if signal["amount"] == 1885] == []
 
@@ -2791,7 +2801,7 @@ def test_filter_supported_prices_uses_academic_year_to_resolve_repeated_amount()
         academic_year="2026-2027", confidence=0.9,
     )
 
-    refined = extractor_module.helpers._filter_supported_prices([price], text)
+    refined = price_rows._filter_supported_prices([price], text)
 
     assert len(refined) == 1
     assert refined[0].academic_year == "2026-2027"
@@ -2809,7 +2819,7 @@ def test_filter_supported_prices_scopes_staleness_to_supporting_page():
         category="tuition", amount=500, currency="EUR", period="monthly", confidence=0.9,
     )
 
-    refined = extractor_module.helpers._filter_supported_prices([price], text)
+    refined = price_rows._filter_supported_prices([price], text)
 
     assert len(refined) == 1
     assert refined[0].amount == 500
@@ -2826,7 +2836,7 @@ def test_filter_supported_prices_ignores_unrelated_old_year_on_current_page():
         category="tuition", amount=500, currency="EUR", period="monthly", confidence=0.9,
     )
 
-    refined = extractor_module.helpers._filter_supported_prices([price], text)
+    refined = price_rows._filter_supported_prices([price], text)
 
     assert len(refined) == 1
     assert refined[0].amount == 500
@@ -2856,7 +2866,7 @@ def test_filter_supported_prices_ignores_unrelated_old_year_on_current_page():
     ],
 )
 def test_filter_supported_prices_withholds_ambiguous_or_composite_rows(text, price):
-    assert extractor_module.helpers._filter_supported_prices([price], text) == []
+    assert price_rows._filter_supported_prices([price], text) == []
 
 
 def test_filter_supported_prices_withholds_stale_yearless_fee_table():
@@ -2866,7 +2876,7 @@ def test_filter_supported_prices_withholds_stale_yearless_fee_table():
     Payment deadline: 15 September 2023
     Second payment deadline: 15 January 2024
     """
-    assert extractor_module.helpers._yearless_pricing_text_is_stale(text, current_year=2026) is True
+    assert price_lines._yearless_pricing_text_is_stale(text, current_year=2026) is True
 
 
 def test_filter_supported_prices_supports_bulgarian_euro_fee_table():
@@ -2882,7 +2892,7 @@ def test_filter_supported_prices_supports_bulgarian_euro_fee_table():
         ExtractedPrice(category="transport", amount=160, currency="EUR", period="monthly", confidence=0.9),
     ]
 
-    refined = extractor_module.helpers._filter_supported_prices(prices, text)
+    refined = price_rows._filter_supported_prices(prices, text)
 
     assert [(row.category, row.amount, row.period) for row in refined] == [
         ("tuition", 580, "monthly"),
@@ -2911,7 +2921,7 @@ def test_supported_prices_keep_only_current_fee_structure_across_categories():
     80 EUR
     """
 
-    parsed = extractor_module.helpers._extract_prices_deterministic(text)
+    parsed = price_lines._extract_prices_deterministic(text)
     supported = extractor_module._supported_price_rows(parsed.prices, text)
 
     assert {(row.amount, row.academic_year) for row in supported} == {
@@ -2948,14 +2958,14 @@ def test_supported_prices_keep_only_current_fee_structure_across_categories():
     ],
 )
 def test_filter_supported_prices_preserves_unlabeled_service_with_null_period(text, price):
-    refined = extractor_module.helpers._filter_supported_prices([price], text)
+    refined = price_rows._filter_supported_prices([price], text)
 
     assert len(refined) == 1
     assert refined[0].period is None
 
 
 def test_deterministic_pricing_preserves_bare_transport_with_unstated_period():
-    parsed = extractor_module.helpers._extract_prices_deterministic(
+    parsed = price_lines._extract_prices_deterministic(
         """
         TUITION FEES FOR THE ACADEMIC 2026/2027 YEAR
         Grade 1 tuition fee: 8,000 EUR
@@ -2976,7 +2986,7 @@ def test_filter_supported_prices_withholds_late_payment_penalties():
         confidence=0.9,
     )
 
-    assert extractor_module.helpers._filter_supported_prices([price], text) == []
+    assert price_rows._filter_supported_prices([price], text) == []
 
 
 def test_filter_supported_prices_withholds_yearless_table_with_stale_due_dates():
@@ -2997,7 +3007,7 @@ def test_filter_supported_prices_withholds_yearless_table_with_stale_due_dates()
         ),
     ]
 
-    assert extractor_module.helpers._filter_supported_prices(prices, text) == []
+    assert price_rows._filter_supported_prices(prices, text) == []
 
 
 def test_dedupe_price_rows_drops_exact_indistinguishable_duplicates():
@@ -3009,7 +3019,7 @@ def test_dedupe_price_rows_drops_exact_indistinguishable_duplicates():
         for _ in range(2)
     ]
 
-    deduped = extractor_module.helpers._dedupe_price_rows(rows)
+    deduped = price_rows._dedupe_price_rows(rows)
 
     assert len(deduped) == 1
 
@@ -3030,7 +3040,7 @@ def test_price_signals_do_not_treat_inclusion_text_as_section_heading():
         ExtractedPrice(category="extracurricular", amount=25, currency="EUR", period="monthly", confidence=0.9),
     ]
 
-    refined = extractor_module.helpers._filter_supported_prices(prices, text)
+    refined = price_rows._filter_supported_prices(prices, text)
 
     assert [(row.category, row.amount) for row in refined] == [
         ("tuition", 8100),
@@ -3064,7 +3074,7 @@ def test_find_supporting_price_source_url_returns_page_with_matching_amount(amou
         category="tuition", amount=amount, currency="EUR", period=period, confidence=0.9
     )
 
-    source_url = extractor_module.helpers._find_supporting_price_source_url(school, pages, price)
+    source_url = fee_lines._find_supporting_price_source_url(school, pages, price)
 
     assert source_url == "https://example-school.bg/enroll"
 
@@ -3089,13 +3099,13 @@ def test_find_supporting_price_source_url_uses_semantics_when_amount_repeats():
         plan_name="Full School Bus Service Fee", confidence=0.9,
     )
 
-    source_url = extractor_module.helpers._find_supporting_price_source_url(school, pages, price)
+    source_url = fee_lines._find_supporting_price_source_url(school, pages, price)
 
     assert source_url == "https://school.test/bus"
 
 
 def test_extract_prices_deterministic_prefers_yearly_when_mixed_fee_table_line_mentions_monthly_installments():
-    parsed = extractor_module.helpers._extract_prices_deterministic(
+    parsed = price_lines._extract_prices_deterministic(
         """
         #### 02
         #### Годишна такса „Обучение“
@@ -3201,8 +3211,7 @@ async def test_extract_school_discards_unsupported_llm_pricing_rows(db_session, 
             ]
         ),
     ), patch.object(
-        extractor_module.helpers,
-        "_find_supporting_price_source_url",
+        fee_lines, "_find_supporting_price_source_url",
         return_value=None,
     ):
         result = await extractor_module.extract_school(db_session, school.id, "bg")
@@ -3283,7 +3292,7 @@ async def test_successful_no_price_refresh_preserves_historical_scraped_rows(
 
 
 def test_prepare_summary_source_page_text_drops_navigation_and_keeps_narrative_lines():
-    prepared = extractor_module.helpers._prepare_summary_source_page_text(
+    prepared = summary_sources._prepare_summary_source_page_text(
         """
         * [Начало](https://example-school.bg)
         * [Контакти](https://example-school.bg/contact)
@@ -3299,7 +3308,7 @@ def test_prepare_summary_source_page_text_drops_navigation_and_keeps_narrative_l
 
 
 def test_normalize_display_name_i18n_duplicates_single_brand_name_for_bg_and_en():
-    normalized = extractor_module.helpers._normalize_display_name_i18n(
+    normalized = display_naming._normalize_display_name_i18n(
         {"en": "Fusion School"},
         "bg",
     )
@@ -3311,7 +3320,7 @@ def test_normalize_display_name_i18n_duplicates_single_brand_name_for_bg_and_en(
 
 
 def test_normalize_display_name_i18n_keeps_cyrillic_single_value_in_bg_only():
-    normalized = extractor_module.helpers._normalize_display_name_i18n(
+    normalized = display_naming._normalize_display_name_i18n(
         {"bg": "ЧОУ ПЕТЪР БЕРОН"},
         "bg",
     )
@@ -3322,7 +3331,7 @@ def test_normalize_display_name_i18n_keeps_cyrillic_single_value_in_bg_only():
 
 
 def test_normalize_display_name_i18n_drops_duplicated_cyrillic_en_value():
-    normalized = extractor_module.helpers._normalize_display_name_i18n(
+    normalized = display_naming._normalize_display_name_i18n(
         {"bg": "Българско школо", "en": "Българско школо"},
         "bg",
     )
@@ -3333,7 +3342,7 @@ def test_normalize_display_name_i18n_drops_duplicated_cyrillic_en_value():
 
 
 def test_normalize_display_name_i18n_drops_transliterated_en_value():
-    normalized = extractor_module.helpers._normalize_display_name_i18n(
+    normalized = display_naming._normalize_display_name_i18n(
         {"bg": "Българско школо", "en": "BALGARSKO SHKOLO"},
         "bg",
     )
@@ -3344,7 +3353,7 @@ def test_normalize_display_name_i18n_drops_transliterated_en_value():
 
 
 def test_normalize_display_name_i18n_simplifies_generic_bg_label_to_brand_core():
-    normalized = extractor_module.helpers._normalize_display_name_i18n(
+    normalized = display_naming._normalize_display_name_i18n(
         {"bg": 'Частно начално училище "БИЗИ"'},
         "bg",
     )
@@ -3355,11 +3364,11 @@ def test_normalize_display_name_i18n_simplifies_generic_bg_label_to_brand_core()
 
 
 def test_normalize_display_name_i18n_simplifies_quoted_brand_but_keeps_location_only_case():
-    normalized = extractor_module.helpers._normalize_display_name_i18n(
+    normalized = display_naming._normalize_display_name_i18n(
         {"bg": 'Учебен комплекс “Българско школо”'},
         "bg",
     )
-    location_only = extractor_module.helpers._normalize_display_name_i18n(
+    location_only = display_naming._normalize_display_name_i18n(
         {"bg": 'Частна Детска Градина “София”'},
         "bg",
     )
@@ -3375,7 +3384,7 @@ def test_normalize_display_name_i18n_simplifies_quoted_brand_but_keeps_location_
 def test_extract_display_name_i18n_deterministic_accepts_matching_brand_signal():
     text = '[ЧДГ Доверие](https://doverie-bg.net "ЧДГ Доверие")'
 
-    extracted = extractor_module.helpers._extract_display_name_i18n_deterministic(
+    extracted = display_naming._extract_display_name_i18n_deterministic(
         text,
         registry_name='ЧАСТНА ДЕТСКА ГРАДИНА "ДОВЕРИЕ" ЕООД',
         country_code="bg",
@@ -3390,7 +3399,7 @@ def test_extract_display_name_i18n_deterministic_accepts_matching_brand_signal()
 def test_extract_display_name_i18n_deterministic_rejects_wrong_site_name():
     text = '![ЧОУ “Азбуки” | София](https://azbuki-school.bg/wp-content/uploads/logo.svg)'
 
-    extracted = extractor_module.helpers._extract_display_name_i18n_deterministic(
+    extracted = display_naming._extract_display_name_i18n_deterministic(
         text,
         registry_name='ЧАСТНА ДЕТСКА ГРАДИНА МАЛКИ СТЪПКИ - ЛИТЪЛ СТЕПС',
         country_code="bg",
@@ -3405,7 +3414,7 @@ def test_extract_display_name_i18n_deterministic_keeps_explicit_bg_and_en_varian
         '[ЧОУ „Фюжън“](https://school.fusion.bg)'
     )
 
-    extracted = extractor_module.helpers._extract_display_name_i18n_deterministic(
+    extracted = display_naming._extract_display_name_i18n_deterministic(
         text,
         registry_name='ЧАСТНО ОСНОВНО УЧИЛИЩЕ ФЮЖЪН ЕООД',
         country_code="bg",
@@ -3423,7 +3432,7 @@ def test_extract_display_name_i18n_deterministic_accepts_cross_script_house_bran
         '(https://www.montessori-bulgaria.com/en "Montessori House")'
     )
 
-    extracted = extractor_module.helpers._extract_display_name_i18n_deterministic(
+    extracted = display_naming._extract_display_name_i18n_deterministic(
         text,
         registry_name='Частна детска градина "Детска къща Монтесори" ООД',
         country_code="bg",
@@ -3438,7 +3447,7 @@ def test_extract_display_name_i18n_deterministic_accepts_cross_script_house_bran
 def test_extract_display_name_i18n_deterministic_strips_section_prefixes():
     text = '[Защо BRITANICA Park School](https://britanica-parkschool.bg/)'
 
-    extracted = extractor_module.helpers._extract_display_name_i18n_deterministic(
+    extracted = display_naming._extract_display_name_i18n_deterministic(
         text,
         registry_name='ЧАСТНА ДЕТСКА ГРАДИНА БРИТАНИКА ООД',
         country_code="bg",
@@ -3453,7 +3462,7 @@ def test_extract_display_name_i18n_deterministic_strips_section_prefixes():
 def test_extract_display_name_i18n_deterministic_strips_about_prefix_when_name_matches():
     text = '[За Веда](https://wedaschule.com/)'
 
-    extracted = extractor_module.helpers._extract_display_name_i18n_deterministic(
+    extracted = display_naming._extract_display_name_i18n_deterministic(
         text,
         registry_name='ЧАСТНА ДЕТСКА ГРАДИНА ВЕДА ООД',
         country_code="bg",
@@ -3468,7 +3477,7 @@ def test_extract_display_name_i18n_deterministic_strips_about_prefix_when_name_m
 def test_extract_display_name_i18n_deterministic_rejects_blog_title_noise():
     text = '[Блогът на Увекинд](https://uwekind.com/blog)'
 
-    extracted = extractor_module.helpers._extract_display_name_i18n_deterministic(
+    extracted = display_naming._extract_display_name_i18n_deterministic(
         text,
         registry_name='ЧАСТНО НАЧАЛНО УЧИЛИЩЕ ЛОЗЕН ЕООД',
         country_code="bg",
@@ -3480,7 +3489,7 @@ def test_extract_display_name_i18n_deterministic_rejects_blog_title_noise():
 def test_extract_display_name_i18n_deterministic_rejects_school_news_host_title():
     text = "# 21-во училище стана домакин"
 
-    extracted = extractor_module.helpers._extract_display_name_i18n_deterministic(
+    extracted = display_naming._extract_display_name_i18n_deterministic(
         text,
         registry_name='21 СРЕДНО УЧИЛИЩЕ "ХРИСТО БОТЕВ"',
         country_code="bg",
@@ -3493,7 +3502,7 @@ def test_extract_display_name_i18n_deterministic_rejects_school_news_host_title(
 def test_extract_display_name_i18n_deterministic_rejects_reference_school_noise():
     text = '[Google Reference School](https://espa.bg)'
 
-    extracted = extractor_module.helpers._extract_display_name_i18n_deterministic(
+    extracted = display_naming._extract_display_name_i18n_deterministic(
         text,
         registry_name='Частно средно училище ЕСПА ЕООД',
         country_code="bg",
@@ -3505,7 +3514,7 @@ def test_extract_display_name_i18n_deterministic_rejects_reference_school_noise(
 def test_extract_display_name_i18n_deterministic_strips_markdown_emphasis():
     text = '[**ЧДГ „Приказка без край“**](https://novigradini.com/pbk/)'
 
-    extracted = extractor_module.helpers._extract_display_name_i18n_deterministic(
+    extracted = display_naming._extract_display_name_i18n_deterministic(
         text,
         registry_name='ЧАСТНА ДЕТСКА ГРАДИНА ПРИКАЗКА БЕЗ КРАЙ 1',
         country_code="bg",
@@ -3518,7 +3527,7 @@ def test_extract_display_name_i18n_deterministic_strips_markdown_emphasis():
 
 
 def test_extract_display_name_i18n_deterministic_ignores_city_only_overlap():
-    extracted = extractor_module.helpers._extract_display_name_i18n_deterministic(
+    extracted = display_naming._extract_display_name_i18n_deterministic(
         '[УЧИЛИЩА В СОФИЯ](https://luiskarol.com/)',
         registry_name='"Частно начално училище Луис Карол - гр. София" ЕООД',
         country_code="bg",
@@ -3528,7 +3537,7 @@ def test_extract_display_name_i18n_deterministic_ignores_city_only_overlap():
 
 
 def test_extract_display_name_i18n_deterministic_falls_back_to_host_aligned_registry_brand():
-    extracted = extractor_module.helpers._extract_display_name_i18n_deterministic(
+    extracted = display_naming._extract_display_name_i18n_deterministic(
         '[УЧИЛИЩА В СОФИЯ](https://luiskarol.com/)',
         registry_name='"Частно начално училище Луис Карол - гр. София" ЕООД',
         country_code="bg",
@@ -3542,7 +3551,7 @@ def test_extract_display_name_i18n_deterministic_falls_back_to_host_aligned_regi
 
 
 def test_extract_display_name_i18n_deterministic_backfills_en_from_host_when_bg_found():
-    extracted = extractor_module.helpers._extract_display_name_i18n_deterministic(
+    extracted = display_naming._extract_display_name_i18n_deterministic(
         '[Луис Карол](https://luiskarol.com/)',
         registry_name='"Частно начално училище Луис Карол - гр. София" ЕООД',
         country_code="bg",
@@ -3556,7 +3565,7 @@ def test_extract_display_name_i18n_deterministic_backfills_en_from_host_when_bg_
 
 
 def test_merge_display_name_i18n_backfills_missing_locale_from_deterministic():
-    merged = extractor_module.helpers._merge_display_name_i18n(
+    merged = display_naming._merge_display_name_i18n(
         {"bg": "Луис Карол"},
         {"bg": "Луис Карол", "en": "Luis Karol"},
         "bg",
@@ -3568,7 +3577,7 @@ def test_merge_display_name_i18n_backfills_missing_locale_from_deterministic():
 
 
 def test_normalize_display_name_i18n_rejects_low_quality_headings():
-    normalized = extractor_module.helpers._normalize_display_name_i18n(
+    normalized = display_naming._normalize_display_name_i18n(
         {"en": "Our kindergartens", "bg": "Стратегически план на Американския колеж 2027"},
         "bg",
     )
@@ -3577,7 +3586,7 @@ def test_normalize_display_name_i18n_rejects_low_quality_headings():
 
 
 def test_normalize_display_name_i18n_rejects_email_contact_labels():
-    normalized = extractor_module.helpers._normalize_display_name_i18n(
+    normalized = display_naming._normalize_display_name_i18n(
         {
             "bg": "Email: school.p.beron@gmail.com",
             "en": "school.p.beron@gmail.com",
@@ -3589,7 +3598,7 @@ def test_normalize_display_name_i18n_rejects_email_contact_labels():
 
 
 def test_normalize_display_name_i18n_rejects_report_titles():
-    normalized = extractor_module.helpers._normalize_display_name_i18n(
+    normalized = display_naming._normalize_display_name_i18n(
         {"bg": "Тримесечен отчет на 145. ОУ Симеон Радев за м.Декември"},
         "bg",
     )
@@ -3598,7 +3607,7 @@ def test_normalize_display_name_i18n_rejects_report_titles():
 
 
 def test_normalize_display_name_i18n_rejects_news_host_titles():
-    normalized = extractor_module.helpers._normalize_display_name_i18n(
+    normalized = display_naming._normalize_display_name_i18n(
         {"bg": "21-во училище стана домакин"},
         "bg",
     )
@@ -3607,7 +3616,7 @@ def test_normalize_display_name_i18n_rejects_news_host_titles():
 
 
 def test_normalize_display_name_i18n_rejects_generic_numbered_school_labels():
-    normalized = extractor_module.helpers._normalize_display_name_i18n(
+    normalized = display_naming._normalize_display_name_i18n(
         {"bg": "131. средно училище"},
         "bg",
     )
@@ -3616,7 +3625,7 @@ def test_normalize_display_name_i18n_rejects_generic_numbered_school_labels():
 
 
 def test_normalize_display_name_i18n_rejects_generic_numbered_school_abbreviations():
-    normalized = extractor_module.helpers._normalize_display_name_i18n(
+    normalized = display_naming._normalize_display_name_i18n(
         {"bg": "21. СУ", "en": "21 Secondary School"},
         "bg",
     )
@@ -3625,7 +3634,7 @@ def test_normalize_display_name_i18n_rejects_generic_numbered_school_abbreviatio
 
 
 def test_normalize_display_name_i18n_extracts_core_from_teacher_page_heading():
-    normalized = extractor_module.helpers._normalize_display_name_i18n(
+    normalized = display_naming._normalize_display_name_i18n(
         {"bg": 'Преподаватели в 123 СУ "Стефан Стамболов"'},
         "bg",
     )
@@ -3634,11 +3643,11 @@ def test_normalize_display_name_i18n_extracts_core_from_teacher_page_heading():
 
 
 def test_normalize_display_name_i18n_strips_logo_prefix_and_early_language_prefix():
-    logo_name = extractor_module.helpers._normalize_display_name_i18n(
+    logo_name = display_naming._normalize_display_name_i18n(
         {"bg": "лого Веселата къща"},
         "bg",
     )
-    espa_name = extractor_module.helpers._normalize_display_name_i18n(
+    espa_name = display_naming._normalize_display_name_i18n(
         {"bg": "с ранно чуждоезиково обучение ЕСПА"},
         "bg",
     )
@@ -3648,11 +3657,11 @@ def test_normalize_display_name_i18n_strips_logo_prefix_and_early_language_prefi
 
 
 def test_normalize_display_name_i18n_strips_transliterated_generic_en_prefixes():
-    german_name = extractor_module.helpers._normalize_display_name_i18n(
+    german_name = display_naming._normalize_display_name_i18n(
         {"bg": "Ерих Кестнер", "en": "nemska gimnaziya Erih Kestner"},
         "bg",
     )
-    espa_name = extractor_module.helpers._normalize_display_name_i18n(
+    espa_name = display_naming._normalize_display_name_i18n(
         {"bg": "ЕСПА", "en": "s ranno chuzhdoezikovo obuchenie ESPA"},
         "bg",
     )
@@ -3662,7 +3671,7 @@ def test_normalize_display_name_i18n_strips_transliterated_generic_en_prefixes()
 
 
 def test_normalize_display_name_i18n_rejects_junk_group_and_markdown_values():
-    normalized = extractor_module.helpers._normalize_display_name_i18n(
+    normalized = display_naming._normalize_display_name_i18n(
         {"bg": "Групи", "en": "![39"},
         "bg",
     )
@@ -3671,7 +3680,7 @@ def test_normalize_display_name_i18n_rejects_junk_group_and_markdown_values():
 
 
 def test_normalize_display_name_i18n_rejects_screenshot_filename_values():
-    normalized = extractor_module.helpers._normalize_display_name_i18n(
+    normalized = display_naming._normalize_display_name_i18n(
         {
             "bg": "Screenshot 2019-01-02 at 17.18.42.png",
             "en": "Screenshot 2019-01-02 at 17.18.42.png",
@@ -3683,11 +3692,11 @@ def test_normalize_display_name_i18n_rejects_screenshot_filename_values():
 
 
 def test_normalize_display_name_i18n_rejects_role_and_icon_noise():
-    role_noise = extractor_module.helpers._normalize_display_name_i18n(
+    role_noise = display_naming._normalize_display_name_i18n(
         {"bg": 'Директор на ЧСУ “ДРУЖБА”'},
         "bg",
     )
-    icon_noise = extractor_module.helpers._normalize_display_name_i18n(
+    icon_noise = display_naming._normalize_display_name_i18n(
         {"en": "language-school-icon"},
         "bg",
     )
@@ -3697,11 +3706,11 @@ def test_normalize_display_name_i18n_rejects_role_and_icon_noise():
 
 
 def test_normalize_display_name_i18n_rejects_logo_slug_and_portal_noise():
-    logo_slug = extractor_module.helpers._normalize_display_name_i18n(
+    logo_slug = display_naming._normalize_display_name_i18n(
         {"en": "school-logo"},
         "bg",
     )
-    portal_noise = extractor_module.helpers._normalize_display_name_i18n(
+    portal_noise = display_naming._normalize_display_name_i18n(
         {"bg": "Към Портал МИЛЕА"},
         "bg",
     )
@@ -3711,7 +3720,7 @@ def test_normalize_display_name_i18n_rejects_logo_slug_and_portal_noise():
 
 
 def test_normalize_display_name_i18n_rejects_submenu_navigation_noise():
-    normalized = extractor_module.helpers._normalize_display_name_i18n(
+    normalized = display_naming._normalize_display_name_i18n(
         {"bg": "Close submenu (Училището)", "en": "Close submenu (Училището)"},
         "bg",
     )
@@ -3720,7 +3729,7 @@ def test_normalize_display_name_i18n_rejects_submenu_navigation_noise():
 
 
 def test_extract_display_name_i18n_deterministic_falls_back_to_known_aliases():
-    extracted = extractor_module.helpers._extract_display_name_i18n_deterministic(
+    extracted = display_naming._extract_display_name_i18n_deterministic(
         text="## Our kindergartens",
         registry_name='Частна детска градина АВСландия',
         country_code="bg",
@@ -3732,7 +3741,7 @@ def test_extract_display_name_i18n_deterministic_falls_back_to_known_aliases():
 
 
 def test_extract_alias_display_name_i18n_keeps_bg_and_en_aliases():
-    extracted = extractor_module.helpers._extract_alias_display_name_i18n(
+    extracted = display_naming._extract_alias_display_name_i18n(
         ["Йор Кидс", "Your Kids"],
         "bg",
     )
@@ -3741,7 +3750,7 @@ def test_extract_alias_display_name_i18n_keeps_bg_and_en_aliases():
 
 
 def test_extract_alias_display_name_i18n_prefers_specific_brand_over_acronym():
-    extracted = extractor_module.helpers._extract_alias_display_name_i18n(
+    extracted = display_naming._extract_alias_display_name_i18n(
         ["American College of Sofia", "ACS"],
         "bg",
     )
@@ -3750,7 +3759,7 @@ def test_extract_alias_display_name_i18n_prefers_specific_brand_over_acronym():
 
 
 def test_should_prefer_alias_display_name_handles_cross_script_brand_expansion():
-    should_prefer = extractor_module.helpers._should_prefer_alias_display_name(
+    should_prefer = display_naming._should_prefer_alias_display_name(
         {"bg": "ТУТИ 2011"},
         {"bg": "TUTI Kindergarten", "en": "TUTI Kindergarten"},
     )
@@ -3759,7 +3768,7 @@ def test_should_prefer_alias_display_name_handles_cross_script_brand_expansion()
 
 
 def test_extract_display_name_i18n_deterministic_prefers_fuller_alias_over_short_brand():
-    extracted = extractor_module.helpers._extract_display_name_i18n_deterministic(
+    extracted = display_naming._extract_display_name_i18n_deterministic(
         text="![American College Logo](https://example.com/logo.png)",
         registry_name="Американски колеж в София",
         country_code="bg",
@@ -3771,7 +3780,7 @@ def test_extract_display_name_i18n_deterministic_prefers_fuller_alias_over_short
 
 
 def test_extract_display_name_i18n_deterministic_rejects_network_wide_bulgaria_label():
-    extracted = extractor_module.helpers._extract_display_name_i18n_deterministic(
+    extracted = display_naming._extract_display_name_i18n_deterministic(
         text="![Maarif International Education Bulgaria](https://example.com/logo.png)\n* [Училища Маариф в България](https://example.com)",
         registry_name="ЧАСТНА ДЕТСКА ГРАДИНА МААРИФ СОФИЯ",
         country_code="bg",
@@ -3782,7 +3791,7 @@ def test_extract_display_name_i18n_deterministic_rejects_network_wide_bulgaria_l
 
 
 def test_extract_display_name_i18n_deterministic_prefers_alias_over_short_maple_bear():
-    extracted = extractor_module.helpers._extract_display_name_i18n_deterministic(
+    extracted = display_naming._extract_display_name_i18n_deterministic(
         text="## Maple Bear",
         registry_name="ЧАСТНА ДЕТСКА ГРАДИНА КАНАДСКО МЕЧЕ",
         country_code="bg",
@@ -3794,7 +3803,7 @@ def test_extract_display_name_i18n_deterministic_prefers_alias_over_short_maple_
 
 
 def test_extract_display_name_i18n_deterministic_rejects_copyright_network_heading():
-    extracted = extractor_module.helpers._extract_display_name_i18n_deterministic(
+    extracted = display_naming._extract_display_name_i18n_deterministic(
         text="## © 2026 Maple Bear Global Schools Ltd.",
         registry_name="ЧАСТНА ДЕТСКА ГРАДИНА КАНАДСКО МЕЧЕ",
         country_code="bg",
@@ -3806,7 +3815,7 @@ def test_extract_display_name_i18n_deterministic_rejects_copyright_network_headi
 
 
 def test_extract_display_name_i18n_deterministic_ignores_screenshot_asset_name():
-    extracted = extractor_module.helpers._extract_display_name_i18n_deterministic(
+    extracted = display_naming._extract_display_name_i18n_deterministic(
         text=(
             "![Screenshot 2019-01-02 at 17.18.42.png](https://static.wixstatic.com/media/foo.png)\n"
             "### Частна детска градина Албертино\n"
@@ -3820,7 +3829,7 @@ def test_extract_display_name_i18n_deterministic_ignores_screenshot_asset_name()
 
 
 def test_derive_display_name_seed_aliases_from_host_and_registry():
-    aliases = extractor_module.helpers._derive_display_name_seed_aliases(
+    aliases = display_naming._derive_display_name_seed_aliases(
         registry_name='Частна детска градина АВСландия',
         website_url="https://abckinder.org/",
     )
@@ -3829,7 +3838,7 @@ def test_derive_display_name_seed_aliases_from_host_and_registry():
 
 
 def test_extract_display_name_i18n_deterministic_uses_seed_aliases_from_host():
-    extracted = extractor_module.helpers._extract_display_name_i18n_deterministic(
+    extracted = display_naming._extract_display_name_i18n_deterministic(
         text="## Preschool Program",
         registry_name="ЧАСТНА ДЕТСКА ГРАДИНА КАНАДСКО МЕЧЕ",
         country_code="bg",
@@ -3840,7 +3849,7 @@ def test_extract_display_name_i18n_deterministic_uses_seed_aliases_from_host():
 
 
 def test_extract_display_name_i18n_deterministic_uses_seed_aliases_for_mixed_script_brand():
-    extracted = extractor_module.helpers._extract_display_name_i18n_deterministic(
+    extracted = display_naming._extract_display_name_i18n_deterministic(
         text="## Summer School & Courses",
         registry_name='Частна детска градина АВСландия',
         country_code="bg",
@@ -3851,7 +3860,7 @@ def test_extract_display_name_i18n_deterministic_uses_seed_aliases_for_mixed_scr
 
 
 def test_extract_display_name_i18n_deterministic_augments_english_college_name_with_city():
-    extracted = extractor_module.helpers._extract_display_name_i18n_deterministic(
+    extracted = display_naming._extract_display_name_i18n_deterministic(
         text="![American College Logo](https://www.acs.bg/media/img/acs_logo.png)",
         registry_name="АМЕРИКАНСКИ КОЛЕЖ В СОФИЯ",
         country_code="bg",
@@ -4228,7 +4237,7 @@ def _packing_school():
 
 
 def _select_pricing_pages(pages):
-    return extractor_module.helpers._select_pages(
+    return page_selection._select_pages(
         school=_packing_school(),
         pages=pages,
         preferred_categories=["pricing", "admission", "contact"],
@@ -4243,7 +4252,7 @@ def test_oversized_page_cannot_starve_a_smaller_pricing_page(monkeypatch):
     Its privacy policy was categorised `pricing` and filled the entire content budget,
     so the 1.5k page carrying "680 euro" never reached the model.
     """
-    settings = extractor_module.helpers.get_settings()
+    settings = get_settings()
     monkeypatch.setattr(settings, "extraction_max_content_chars", 15000, raising=False)
 
     fee_text = (
@@ -4277,7 +4286,7 @@ def test_oversized_page_cannot_starve_a_smaller_pricing_page(monkeypatch):
 
 def test_single_long_pricing_page_keeps_effectively_the_whole_budget(monkeypatch):
     """Guard: the fair-budget rule must not gut a school whose fees really are one long page."""
-    settings = extractor_module.helpers.get_settings()
+    settings = get_settings()
     monkeypatch.setattr(settings, "extraction_max_content_chars", 15000, raising=False)
 
     long_fees = "Такси за обучение\n" + ("Клас и такса за учебната 2026/2027 година. " * 340)
@@ -4298,7 +4307,7 @@ def test_single_long_pricing_page_keeps_effectively_the_whole_budget(monkeypatch
 
 def test_long_pricing_page_keeps_most_of_the_budget_beside_small_pages(monkeypatch):
     """A long genuine fee page loses only the modest reserve held for the pages behind it."""
-    settings = extractor_module.helpers.get_settings()
+    settings = get_settings()
     monkeypatch.setattr(settings, "extraction_max_content_chars", 15000, raising=False)
 
     pages = [
@@ -4328,7 +4337,7 @@ def test_complete_short_fee_page_is_not_dropped_as_a_fragment(monkeypatch):
     page drops terse fee pages ("Tuition EUR 680") behind an oversized page, recreating
     the starvation this packing rule exists to prevent.
     """
-    settings = extractor_module.helpers.get_settings()
+    settings = get_settings()
     monkeypatch.setattr(settings, "extraction_max_content_chars", 15000, raising=False)
 
     pages = [
@@ -4363,7 +4372,7 @@ def test_complete_short_fee_page_is_not_dropped_as_a_fragment(monkeypatch):
     ],
 )
 def test_glued_bulgarian_currency_word_is_spaced_for_the_prompt(raw, expected):
-    assert extractor_module.helpers._space_glued_currency_words(raw) == expected
+    assert price_lines._space_glued_currency_words(raw) == expected
 
 
 @pytest.mark.parametrize(
@@ -4386,7 +4395,7 @@ def test_glued_bulgarian_currency_word_is_spaced_for_the_prompt(raw, expected):
     ],
 )
 def test_prompt_normalization_leaves_other_text_alone(unchanged):
-    assert extractor_module.helpers._space_glued_currency_words(unchanged) == unchanged
+    assert price_lines._space_glued_currency_words(unchanged) == unchanged
 
 
 @pytest.mark.asyncio
@@ -4422,11 +4431,10 @@ async def test_only_the_llm_prompt_sees_spaced_currency_words(
             1, 1, 0.0,
         )
     )
-    helpers = extractor_module.helpers
     with patch("app.scrapers.extractor._run_typed_agent", new=llm), patch.object(
-        helpers, "_extract_prices_deterministic", wraps=helpers._extract_prices_deterministic
+        price_lines, "_extract_prices_deterministic", wraps=price_lines._extract_prices_deterministic
     ) as deterministic, patch.object(
-        helpers, "_filter_model_prices", wraps=helpers._filter_model_prices
+        fee_lines, "_filter_model_prices", wraps=fee_lines._filter_model_prices
     ) as support:
         await extractor_module._extract_prices(
             db_session, school, list(pages), 20.0, extractor_module.ExtractionLLMStats()
@@ -4644,7 +4652,7 @@ def test_pricing_selection_counts_url_spellings_of_one_page_once():
 
 
 def test_long_pricing_page_is_cut_to_its_fee_section_not_its_head(monkeypatch):
-    settings = extractor_module.helpers.get_settings()
+    settings = get_settings()
     monkeypatch.setattr(settings, "extraction_max_content_chars", 4000, raising=False)
     fees = "Такса обучение I - IV клас 7000 евро\nТакса обучение V - VII клас 7500 евро\n"
     pages = [
@@ -4681,14 +4689,14 @@ def test_model_row_keeps_its_category_under_an_unrelated_heading():
         _model_price(category="tuition", amount=7500, period="yearly", plan_name="Ученици от 4 до 7 клас"),
     ]  # fmt: skip
 
-    refined = extractor_module.helpers._filter_model_prices(rows, text)
+    refined = fee_lines._filter_model_prices(rows, text)
 
     assert [(row.category, row.amount, row.period) for row in refined] == [
         ("tuition", 6750, "yearly"),
         ("tuition", 7500, "yearly"),
     ]
     # The keyword extractor's rows still take the heading's category.
-    by_keywords = extractor_module.helpers._filter_supported_prices(rows, text)
+    by_keywords = price_rows._filter_supported_prices(rows, text)
     assert {row.category for row in by_keywords} == {"registration"}
 
 
@@ -4708,7 +4716,7 @@ def test_model_row_needs_no_fee_word_near_its_amount():
         _model_price(category="tuition", amount=9999, period="yearly", plan_name="Гимназия"),
     ]  # fmt: skip
 
-    refined = extractor_module.helpers._filter_model_prices(rows, text)
+    refined = fee_lines._filter_model_prices(rows, text)
 
     # Both amounts on the page are kept with the year the page names; the period the
     # page does not state is cleared; an amount that is not on the page is dropped.
@@ -4716,7 +4724,7 @@ def test_model_row_needs_no_fee_word_near_its_amount():
         (6540, None, "2026/2027"),
         (6740, None, "2026-2027"),
     ]
-    assert extractor_module.helpers._filter_supported_prices(rows, text) == []
+    assert price_rows._filter_supported_prices(rows, text) == []
 
 
 def test_model_row_in_a_table_of_several_prices_per_line():
@@ -4734,7 +4742,7 @@ def test_model_row_in_a_table_of_several_prices_per_line():
         for amount, band in ((7880, "Подготвителна група"), (8580, "Първи клас"), (8800, "2-7 клас"))
     ]  # fmt: skip
 
-    refined = extractor_module.helpers._filter_model_prices(rows, text)
+    refined = fee_lines._filter_model_prices(rows, text)
 
     assert [(row.amount, row.academic_year) for row in refined] == [
         (7880, "2026/2027"),
@@ -4754,7 +4762,7 @@ def test_model_row_in_a_table_takes_period_and_year_from_the_header():
     )
     row = _model_price(category="tuition", amount=6700, age_group="VIII - XII клас")
 
-    refined = extractor_module.helpers._filter_model_prices([row], text)
+    refined = fee_lines._filter_model_prices([row], text)
 
     assert [(r.amount, r.period, r.academic_year) for r in refined] == [(6700, "yearly", "2026/2027")]
 
@@ -4766,7 +4774,7 @@ def test_model_row_year_and_period_come_from_the_page():
         _model_price(category="transport", amount=90, period="monthly"),
     ]  # fmt: skip
 
-    refined = extractor_module.helpers._filter_model_prices(rows, text)
+    refined = fee_lines._filter_model_prices(rows, text)
 
     # A year the page does not name is not kept; a row without one takes the only year
     # the page names. The period is the one written next to the amount, or none.
@@ -4800,7 +4808,7 @@ def test_model_row_year_and_period_come_from_the_page():
 def test_model_row_the_page_does_not_bear_out_is_dropped(text, row):
     text = f"--- SOURCE: https://school.test/fees ---\n{text}"
 
-    assert extractor_module.helpers._filter_model_prices([row], text) == []
+    assert fee_lines._filter_model_prices([row], text) == []
 
 
 def test_pricing_selection_keeps_the_priced_spelling_from_one_crawl():
@@ -4885,7 +4893,7 @@ def test_model_row_table_period_comes_from_its_own_column():
         _model_price(category="food", amount=150, plan_name="1-4 клас"),
     ]
 
-    refined = extractor_module.helpers._filter_model_prices(rows, text)
+    refined = fee_lines._filter_model_prices(rows, text)
 
     assert [(row.amount, row.period) for row in refined] == [(7000, "yearly"), (150, None)]
 
@@ -4894,9 +4902,8 @@ def test_model_row_is_not_supported_by_a_number_in_a_table_that_is_not_about_fee
     text = "--- SOURCE: https://school.test/classes ---\nКлас | Ученици | Паралелки\n1 клас | 24 | 2\n"
     fee_table = "--- SOURCE: https://school.test/fees ---\nКлас | Такса (EUR)\n1 клас | 7000\n"
 
-    helpers = extractor_module.helpers
-    assert helpers._filter_model_prices([_model_price(category="materials", amount=24)], text) == []
-    assert len(helpers._filter_model_prices([_model_price(category="tuition", amount=7000)], fee_table)) == 1
+    assert fee_lines._filter_model_prices([_model_price(category="materials", amount=24)], text) == []
+    assert len(fee_lines._filter_model_prices([_model_price(category="tuition", amount=7000)], fee_table)) == 1
 
 
 @pytest.mark.asyncio
@@ -4936,18 +4943,17 @@ async def test_prices_only_extraction_failure_leaves_the_status(db_session, samp
 def test_bare_table_cell_takes_its_currency_from_its_own_column():
     """A model row must not move a number from the EUR column into BGN."""
     text = "--- SOURCE: https://school.test/fees ---\nПлан | EUR | BGN\n1-4 клас | 7000 | 13690\n"
-    helpers = extractor_module.helpers
 
     def kept(amount, currency):
         row = ExtractedPrice(category="tuition", amount=amount, currency=currency, confidence=0.9)
-        return len(helpers._filter_model_prices([row], text))
+        return len(fee_lines._filter_model_prices([row], text))
 
     assert (kept(7000, "EUR"), kept(13690, "BGN")) == (1, 1)
     assert (kept(7000, "BGN"), kept(13690, "EUR")) == (0, 0)
     # Two currencies named, but not per column: the cell is evidence for neither.
     unnamed = "--- SOURCE: https://school.test/fees ---\nТакси в EUR и BGN | A | B\n1-4 клас | 7000 | 13690\n"
     row = ExtractedPrice(category="tuition", amount=7000, currency="EUR", confidence=0.9)
-    assert helpers._filter_model_prices([row], unnamed) == []
+    assert fee_lines._filter_model_prices([row], unnamed) == []
 
 
 def test_extraction_reads_only_the_freshest_copy_of_a_page():
@@ -4984,7 +4990,7 @@ def test_model_row_period_must_fit_its_category():
         _model_price(category="food", amount=345),
     ]
 
-    refined = extractor_module.helpers._filter_model_prices(rows, text)
+    refined = fee_lines._filter_model_prices(rows, text)
 
     assert [(row.category, row.amount, row.period) for row in refined] == [
         ("tuition", 7000, None),
@@ -5012,26 +5018,25 @@ def test_pricing_selection_counts_bare_table_cells_as_prices():
 
 
 def test_model_rows_for_a_past_year_a_weekly_fee_or_a_guessed_lev_are_dropped():
-    helpers = extractor_module.helpers
     old = "--- SOURCE: https://school.test/fees ---\nТакси за учебната 2024/2025 г.\nПГ и I клас 4 300 евро\n"
     row = _model_price(category="tuition", amount=4300, academic_year="2024/2025")
-    assert helpers._filter_model_prices([row], old) == []
-    assert helpers._academic_year_is_over("2025/2026", today=datetime.date(2026, 10, 9)) is False
-    assert helpers._academic_year_is_over("2025/2026", today=datetime.date(2027, 9, 1)) is True
+    assert fee_lines._filter_model_prices([row], old) == []
+    assert fee_lines._academic_year_is_over("2025/2026", today=datetime.date(2026, 10, 9)) is False
+    assert fee_lines._academic_year_is_over("2025/2026", today=datetime.date(2027, 9, 1)) is True
 
     weekly = "--- SOURCE: https://school.test/fees ---\nЦелодневно: 690 евро на месец\n\nДруги услуги\nГост\nПрограма\nСедмично: 190 евро\n"
     rows = [
         _model_price(category="tuition", amount=190, plan_name="Седмично"),
         _model_price(category="tuition", amount=690, plan_name="Целодневно"),
     ]
-    assert [r.amount for r in helpers._filter_model_prices(rows, weekly)] == [690]
+    assert [r.amount for r in fee_lines._filter_model_prices(rows, weekly)] == [690]
 
     # A fee table that names no currency is in euro: a row calling its cell leva is a guess.
     table = "--- SOURCE: https://school.test/fees ---\nКлас | Такса\nПодготвителен клас | 7 400\n"
     lev = ExtractedPrice(category="tuition", amount=7400, currency="BGN", confidence=0.9)
     euro = ExtractedPrice(category="tuition", amount=7400, currency="EUR", confidence=0.9)
-    assert helpers._filter_model_prices([lev], table) == []
-    assert len(helpers._filter_model_prices([euro], table)) == 1
+    assert fee_lines._filter_model_prices([lev], table) == []
+    assert len(fee_lines._filter_model_prices([euro], table)) == 1
 
 
 def _line(label, amount, **fields):
@@ -5056,7 +5061,7 @@ def test_fee_lines_become_rows_with_plans_and_discounts_under_their_full_price()
         _line("Изпит Cambridge", 120, kind="exam"),
     ]
 
-    rows = extractor_module.helpers._prices_from_fee_lines(lines)
+    rows = fee_lines._prices_from_fee_lines(lines)
 
     assert [(r.category, r.amount, r.currency, r.period) for r in rows] == [
         ("tuition", 6750, "EUR", "yearly"),
@@ -5078,7 +5083,7 @@ def test_a_plans_yearly_total_is_the_price_where_no_full_price_is_stated():
         _line("1-4 клас / месечна вноска", 700, role="plan", per="month"),
     ]
 
-    rows = extractor_module.helpers._prices_from_fee_lines(lines)
+    rows = fee_lines._prices_from_fee_lines(lines)
 
     assert [(r.amount, r.period) for r in rows] == [(7000, "yearly")]
 
@@ -5154,7 +5159,7 @@ def test_fee_lines_in_euro_and_leva_are_one_fee_and_the_level_part_of_a_label_is
         _line(f"{long_heading} / Grade 11", 18250),
     ]
 
-    rows = extractor_module.helpers._prices_from_fee_lines(lines)
+    rows = fee_lines._prices_from_fee_lines(lines)
 
     assert [(r.category, r.amount, r.currency) for r in rows] == [
         ("tuition", 4230, "EUR"),
@@ -5255,7 +5260,7 @@ def test_fee_lines_copied_twice_with_the_same_label_are_one_row():
         _line("II GROUP", 10900),
     ]
 
-    rows = extractor_module.helpers._prices_from_fee_lines(lines)
+    rows = fee_lines._prices_from_fee_lines(lines)
 
     assert [(r.amount, r.plan_name, r.period) for r in rows] == [
         (857, "Месечната такса", "monthly"),
@@ -5275,7 +5280,7 @@ def test_a_two_installment_total_is_a_plan_of_the_price_before_it():
         _line("Възможности за плащане на 2 вноски", 7275, role="plan", per="year"),
     ]
 
-    rows = extractor_module.helpers._prices_from_fee_lines(lines)
+    rows = fee_lines._prices_from_fee_lines(lines)
 
     assert [(r.amount, r.plan_name) for r in rows] == [
         (6750, "За ученици от 1 до 3 клас"),
@@ -5285,14 +5290,13 @@ def test_a_two_installment_total_is_a_plan_of_the_price_before_it():
 
 
 def test_installment_wording_decides_only_where_a_whole_price_is_stated():
-    helpers = extractor_module.helpers
     # Copied as a full price after the full price: a plan of it.
-    rows = helpers._prices_from_fee_lines(
+    rows = fee_lines._prices_from_fee_lines(
         [_line("Годишна такса", 5900, per="year"), _line("Плащане на 2 вноски", 6000, per="year")]
     )
     assert [r.amount for r in rows] == [5900]
     # Two bands that are both priced by their plan are two fees.
-    rows = helpers._prices_from_fee_lines(
+    rows = fee_lines._prices_from_fee_lines(
         [
             _line("1-4 клас / 10 вноски", 7000, role="plan", per="year"),
             _line("5-7 клас / 10 вноски", 7500, role="plan", per="year"),
@@ -5300,16 +5304,15 @@ def test_installment_wording_decides_only_where_a_whole_price_is_stated():
     )
     assert [r.amount for r in rows] == [7000, 7500]
     # The only price there is stays, and "1 installment" is the fee paid in one go.
-    rows = helpers._prices_from_fee_lines(
+    rows = fee_lines._prices_from_fee_lines(
         [_line("Месечна такса, 10 вноски", 500, per="month"), _line("Grade 1 / 1 installment", 9000, per="year")]
     )
     assert [r.amount for r in rows] == [500, 9000]
 
 
 def test_a_fee_stated_again_under_a_longer_or_a_bare_label_is_one_row():
-    helpers = extractor_module.helpers
     # 214: the band under its table's title as well.
-    rows = helpers._prices_from_fee_lines(
+    rows = fee_lines._prices_from_fee_lines(
         [
             _line("1. - 4. клас / Годишна такса „Обучение“ / 1. - 4. клас / Плащане на пълна такса", 7950),
             _line("1. - 4. клас / Плащане на две вноски", 4094, role="plan"),
@@ -5323,7 +5326,7 @@ def test_a_fee_stated_again_under_a_longer_or_a_bare_label_is_one_row():
     ]
     assert rows[0].installments == ["1. - 4. клас / Плащане на две вноски: 4094 EUR"]
     # 569: the payment terms repeat the fee without saying whose it is.
-    rows = helpers._prices_from_fee_lines(
+    rows = fee_lines._prices_from_fee_lines(
         [
             _line("ПГУ от 15.09.2026 г. до 31.05.2027 г. / Годишна такса обучение **", 5900),
             _line("1-4 клас от 15.09.2026 г. до 31.05.2027 г. / Годишна такса обучение **", 5900),
@@ -5334,17 +5337,17 @@ def test_a_fee_stated_again_under_a_longer_or_a_bare_label_is_one_row():
     assert [r.plan_name[:8] for r in rows] == ["ПГУ от 1", "1-4 клас"]
     assert rows[0].period == "yearly"
     # Bands at one price stay apart, and so does a longer label that names other grades.
-    rows = helpers._prices_from_fee_lines(
+    rows = fee_lines._prices_from_fee_lines(
         [_line("ПГ", 8950), _line("I - VII клас", 8950), _line("1 клас", 9000), _line("1 - 4 клас", 9000)]
     )
     assert len(rows) == 4
     # 301: two fees at one price whose labels share their words.
     foreign = "Такса за чуждестранни ученици"
     returning = "Такса за български ученици, идващи от чуждестранни училища извън страната"
-    rows = helpers._prices_from_fee_lines([_line(foreign, 22200), _line(returning, 22200)])
+    rows = fee_lines._prices_from_fee_lines([_line(foreign, 22200), _line(returning, 22200)])
     assert [r.plan_name for r in rows] == [foreign, returning]
     # Added words that say which fee make another fee.
-    rows = helpers._prices_from_fee_lines(
+    rows = fee_lines._prices_from_fee_lines(
         [_line("Grade 1 / annual tuition", 9000), _line("Grade 1 / annual tuition / full day", 9000)]
     )
     assert len(rows) == 2
@@ -5369,7 +5372,7 @@ def test_later_amounts_of_one_line_under_one_label_are_left_out():
         _line("Целодневен престой", 950, quote="Целодневен престой – 950 лв."),
     ]
 
-    rows = extractor_module.helpers._prices_from_fee_lines(lines)
+    rows = fee_lines._prices_from_fee_lines(lines)
 
     assert [r.amount for r in rows] == [7965.52, 2550, 1950, 10, 20, 1100, 950]
     assert [r.installments for r in rows if r.installments] == [
@@ -5379,7 +5382,6 @@ def test_later_amounts_of_one_line_under_one_label_are_left_out():
 
 def test_the_slices_of_a_total_are_not_fees_of_their_own():
     """Schools 533 and 633: "Такса обучение" is 2960 of the 7400 a year costs."""
-    helpers = extractor_module.helpers
     columns = {"на 1 вноска годишно": (2960, 740, 7400, "full"), "на 3 вноски годишно": (3040, 760, 7600, "plan")}
     lines = []
     for column, (half, small, total, role) in columns.items():
@@ -5398,7 +5400,7 @@ def test_the_slices_of_a_total_are_not_fees_of_their_own():
         _line("на равни месечни вноски / Общо", 7800, per="year", role="sum", kind="other"),
     ]
 
-    assert [(r.category, r.amount) for r in helpers._prices_from_fee_lines(lines)] == [("materials", 100)]
+    assert [(r.category, r.amount) for r in fee_lines._prices_from_fee_lines(lines)] == [("materials", 100)]
 
     # A total that is mostly tuition leaves its parts as they are.
     lines = [
@@ -5406,7 +5408,7 @@ def test_the_slices_of_a_total_are_not_fees_of_their_own():
         _line("Храна", 1000, per="year", kind="food"),
         _line("Общо", 6000, per="year", role="sum"),
     ]
-    assert [(r.category, r.amount) for r in helpers._prices_from_fee_lines(lines)] == [
+    assert [(r.category, r.amount) for r in fee_lines._prices_from_fee_lines(lines)] == [
         ("tuition", 5000),
         ("food", 1000),
     ]
@@ -5435,7 +5437,7 @@ def test_rows_that_share_a_label_take_the_heading_each_stands_under():
         )
     ]
 
-    rows = extractor_module.helpers._filter_model_prices(prices, text)
+    rows = fee_lines._filter_model_prices(prices, text)
 
     assert [(r.amount, r.plan_name, r.age_group) for r in rows] == [
         (1100, "Целодневен престой", "Месечни такси в Частна Детска Ясла"),
@@ -5447,7 +5449,7 @@ def test_rows_that_share_a_label_take_the_heading_each_stands_under():
 
     # Under one heading there is nothing to tell them apart by: left as copied.
     same = "Такси:\nЦелодневен престой – 1100 лв.\nЦелодневен престой – 950 лв.\n"
-    rows = extractor_module.helpers._filter_model_prices([p.model_copy() for p in prices[:1] + prices[2:3]], same)
+    rows = fee_lines._filter_model_prices([p.model_copy() for p in prices[:1] + prices[2:3]], same)
     assert [(r.plan_name, r.age_group) for r in rows] == [("Целодневен престой", None)] * 2
 
 
@@ -5460,7 +5462,7 @@ def test_last_years_list_goes_once_this_year_states_tuition():
         ExtractedPrice(category="materials", amount=550, currency="EUR", academic_year="2026/2027", confidence=0.9),
     ]
 
-    deduped = extractor_module.helpers._dedupe_price_rows(prices)
+    deduped = price_rows._dedupe_price_rows(prices)
 
     assert [(row.category, row.amount) for row in deduped] == [("tuition", 8950), ("materials", 550)]
 
@@ -5510,13 +5512,13 @@ async def test_a_templates_sample_prices_are_not_read(db_session, sample_school_
 
     assert (result["success"], result["count"]) == (False, 0)
     llm.assert_not_called()
-    assert not extractor_module.helpers._is_template_filler("Lorem Hall, 5 Ipswich Road. Tuition 500 EUR")
+    assert not fee_lines._is_template_filler("Lorem Hall, 5 Ipswich Road. Tuition 500 EUR")
 
 
 def test_a_copied_label_with_a_comma_is_kept_whole():
     """School 542: 'Детска Ясла ,,Йор Кидс“ / Целодневен престой' was cut to its heading."""
     label = "Месечни такси в Частна Детска Ясла ,,Йор Кидс“ / Целодневен престой"
-    (row,) = extractor_module.helpers._prices_from_fee_lines([_line(label, 1100, currency="BGN")])
+    (row,) = fee_lines._prices_from_fee_lines([_line(label, 1100, currency="BGN")])
     assert row.plan_name == label and row.age_group == "Месечни такси в Частна Детска Ясла ,,Йор Кидс“"
     assert extractor_module._normalized_price_fields(row)["plan_name"] == label
     row.plan_name = "N/A"

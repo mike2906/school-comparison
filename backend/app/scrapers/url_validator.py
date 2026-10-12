@@ -18,7 +18,7 @@ import httpx
 from bs4 import BeautifulSoup
 from pydantic import BaseModel
 
-from app.ai.client import calculate_cost, create_agent, extract_provider_cost_usd, get_model
+from app.ai.client import calculate_cost, create_agent, extract_provider_cost_usd, get_model, get_usage
 from app.config import get_settings
 from app.scrapers.school_tokens import extract_school_name_tokens
 from app.services.provider_costs import execute_billable_request
@@ -1023,14 +1023,12 @@ Be strict:
             timeout=self.llm_timeout,
         )
         try:
-            from app.scrapers import extractor_helpers
-
             usage_method = getattr(result, "usage", None)
             if inspect.iscoroutinefunction(usage_method):
                 input_tokens = output_tokens = 0
                 token_cost_usd = 0.0
             else:
-                input_tokens, output_tokens = extractor_helpers._get_usage(result)
+                input_tokens, output_tokens = get_usage(result)
                 token_cost_usd = extract_provider_cost_usd(result) or calculate_cost(
                     tier, input_tokens, output_tokens  # type: ignore[arg-type]
                 )
