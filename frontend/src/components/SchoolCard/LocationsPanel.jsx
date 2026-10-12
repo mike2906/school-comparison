@@ -4,7 +4,8 @@ import { getAddress } from '../../utils/i18n'
 import { getFocusEmoji } from '../../utils/locationFocus'
 import { orderAgeGroups } from '../../utils/ageGroupOrder'
 import { parseCoordinate } from '../../utils/coordinates'
-import { getAgeGroupShifts, getLocationAgeGroups, getLocationTags } from './cardHelpers'
+import { getLocationAgeGroups } from './cardHelpers'
+import { getAgeGroupShifts, getLocationTags } from '../../utils/schoolLocation'
 
 /** The card's open "locations / age groups and shifts" panel. */
 function LocationsPanel({

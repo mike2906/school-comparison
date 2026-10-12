@@ -44,7 +44,7 @@ There are three independent lanes. Within a lane, order matters. Across lanes, P
 |---|---|---|---|---|
 | P1a | **Move the duplicated helpers into `src/utils/`, with tests in the same PR.** Tests for the admission and NVO helpers are required. They can't come first, because the in-component copies aren't exported, so they become testable only by moving. | Refactor and tests, 2-3 PRs | nothing | Done (#223, #225) |
 | P1b | **Fix the `SchoolCard` currency display and the locale drift.** | Behaviour change, 1 PR | P1a | Done (#226-#229) |
-| P1c | **Split the big components.** | Refactor, 3 PRs | P1a | In progress: `SchoolCard` (#265), `ComparePage` (#266) and `SearchPage` (#267, #268, #269) done; `SchoolMap` left |
+| P1c | **Split the big components.** | Refactor, 3 PRs | P1a | Done: `SchoolCard` (#265), `ComparePage` (#266), `SearchPage` (#267, #268, #269), `SchoolMap` (#270). Still open: `SchoolMap`'s type colours differ from `SchoolCard`'s |
 
 ### Lane C: decisions that are not code moves
 

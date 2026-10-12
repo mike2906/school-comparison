@@ -32,10 +32,10 @@ import {
   getNvoDetail,
   getPrimaryFeature,
   getScheduleLine,
-  getShiftForAgeGroup,
   hexToRgba,
   typeColors,
 } from './cardHelpers'
+import { getShiftForAgeGroup } from '../../utils/schoolLocation'
 import { parseCoordinate } from '../../utils/coordinates'
 import LocationsPanel from './LocationsPanel'
 import NvoDetailTable from './NvoDetailTable'
