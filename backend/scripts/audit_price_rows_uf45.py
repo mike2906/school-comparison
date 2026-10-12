@@ -29,6 +29,7 @@ from typing import Any, Iterable, Optional
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from app.scrapers.price_evidence import (
+    RULE_OFFER_ENDS,
     PriceRow,
     check_price_row,
     label_spans,
@@ -55,6 +56,7 @@ def audit_price_row(
     return [
         Hit(school_id, row_id, f.rule, f.detail, f.snippet)
         for f in check_price_row(row, page_text, school_family)
+        if f.rule != RULE_OFFER_ENDS  # a running offer is not a fault
     ]
 
 

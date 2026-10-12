@@ -18,11 +18,11 @@ from app.scrapers.price_evidence import (
     PriceRow,
     amount_spans,
     check_price_row,
-    expired_offer,
     fee_number_starts,
     heading_period,
     label_is_another_institutions,
     normalize_text,
+    offer_end,
     page_is_another_institutions,
     period_families,
     replacement_regressions,
@@ -344,8 +344,7 @@ def test_offer_deadline_reads_every_month_name(name, month):
         context = f"Early bird price, offer valid until 15 {name} 2026\n5500 EUR"
     else:
         context = f"Цени за договори, сключени до 15 {name} 2026\n5500 €"
-    # Five days after the deadline: expired on the 15th of that same month.
-    assert expired_offer(context, datetime.date(2026, month, 20)) == datetime.date(2026, month, 15)
+    assert offer_end(context) == datetime.date(2026, month, 15)
 
 
 def test_years_in_a_fee_table_are_not_read_as_bare_prices():

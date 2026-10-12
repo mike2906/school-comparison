@@ -36,6 +36,7 @@ from app.scrapers.price_evidence import (
     RULE_EXPIRED,
     RULE_INSTALLMENT,
     RULE_LEVEL,
+    RULE_OFFER_ENDS,
     RULE_PERIOD_CONFLICT,
     RULE_PERIOD_MISSING,
     RULE_PERIOD_UNREPRESENTABLE,
@@ -490,9 +491,14 @@ async def _check_price_evidence(
         if not text:
             continue
         row_prefix = f"pricing[{row.id}]"
+        offer_ends = None
         for finding in check_price_row(
             PriceRow.from_pricing(row), text, family, scope.grades, scope.own_name, scope.shares_site
         ):
+            if finding.offer_ends is not None:
+                offer_ends = finding.offer_ends
+            if finding.rule == RULE_OFFER_ENDS:
+                continue
             if finding.rule == RULE_PERIOD_MISSING:
                 if not period_fits_category(getattr(row.category, "value", row.category), finding.period):
                     continue  # extraction left it empty on purpose
@@ -522,6 +528,7 @@ async def _check_price_evidence(
                     field_path=row_prefix,
                     message=f"{finding.detail}: {finding.snippet[:160]}",
                 )
+        pricing_checks.store_offer_end(row, offer_ends)
 
 
 async def _check_display_name(

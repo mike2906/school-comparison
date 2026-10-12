@@ -337,12 +337,38 @@ def _linked_evidence_is_valid(row: Any) -> bool:
     return _pricing_row_value(source_page, "is_valid") is True
 
 
+# Set on a row's ``pricing_context`` by validation when the page offers its price only
+# until a date (an early-enrolment tier); the row is withheld from the day after.
+OFFER_ENDS_KEY = "offer_ends_on"
+# The offer's day is a Bulgarian one and the server runs on UTC. Eastern European
+# standard time is never ahead of Sofia, so a row is never withheld before its last day
+# is over there (in summer, up to an hour after).
+_BG_STANDARD_TIME = datetime.timezone(datetime.timedelta(hours=2))
+
+
+def offer_has_ended(pricing_context: Any) -> bool:
+    """True once the day after the row's stored offer end date has come.
+
+    An end date that does not parse withholds the row: it was written by validation, so
+    a bad one means something is wrong with the row.
+    """
+    ends_on = pricing_context.get(OFFER_ENDS_KEY) if isinstance(pricing_context, Mapping) else None
+    if ends_on is None:
+        return False
+    try:
+        ends = datetime.date.fromisoformat(str(ends_on))
+    except ValueError:
+        return True
+    return ends < datetime.datetime.now(_BG_STANDARD_TIME).date()
+
+
 def pricing_row_is_publishable(row: Any) -> bool:
     """Fail-closed launch gate shared by API serialization and the scoreboard.
 
     Trust comes from evidence, not from a human sign-off: the row must still be backed by
     a valid source page, and any academic year it carries must be a real one. A year that
-    does not normalize is withheld rather than guessed at.
+    does not normalize is withheld rather than guessed at. An offer that ends on a date
+    stops being published the day after, without waiting for the next validation run.
     """
     source_url = _pricing_row_value(row, "source_url")
     pricing_context = _pricing_row_value(row, "pricing_context")
@@ -352,6 +378,7 @@ def pricing_row_is_publishable(row: Any) -> bool:
 
     return (
         passes_pricing_gate(source_url, pricing_context)
+        and not offer_has_ended(pricing_context)
         and _linked_evidence_is_valid(row)
         and academic_year_is_resolvable(_pricing_row_value(row, "academic_year"))
         and _valid_price_shape(row)
