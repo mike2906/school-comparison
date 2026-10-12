@@ -518,6 +518,10 @@ will need to be repeated.
       a hard `published_without_report` count. Registry-only and explicitly withheld payloads
       are excluded from that denominator. Pipeline snapshots and CLI output share the same
       definitions; launch requires 100% eligible coverage and zero published-without-report.
+      **Superseded (tech-debt plan, Lane C):** the publish gate already refuses website data
+      without a current report, so that coverage could only read 100%. The scoreboard now
+      reports `withheld_website_data` instead: schools with stored website data that the gate
+      keeps hidden, with the reason for each.
 
 ## Phase 2 — User-facing correctness bugs
 

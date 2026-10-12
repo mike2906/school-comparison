@@ -38,7 +38,11 @@ from app.utils.display_gating import (  # noqa: F401
 )
 from app.utils.i18n_resolver import resolve_display_name_i18n, resolve_name_i18n
 from app.utils.school_attributes import build_display_attributes
-from app.utils.website_data import attributes_for_publication, website_data_is_publishable
+from app.utils.website_data import (
+    attributes_for_publication,
+    website_data_is_publishable,
+    website_data_withheld_reasons,
+)
 
 # Precision used to group coordinates when detecting shared/duplicate points.
 _COORD_ROUNDING = 5
@@ -72,14 +76,6 @@ def _has_meaningful_value(value: Any) -> bool:
     if isinstance(value, (list, tuple, set)):
         return any(_has_meaningful_value(item) for item in value)
     return bool(value)
-
-
-def _report_is_current(report: dict[str, Any]) -> bool:
-    version = report.get("_schema_version", report.get("schema_version"))
-    try:
-        return int(version) == 1
-    except (TypeError, ValueError):
-        return False
 
 
 def _validation_ok(schools: list[School]) -> dict[str, Any]:
@@ -154,13 +150,18 @@ def _curated_identity_promotions(schools: list[School]) -> dict[str, Any]:
     }
 
 
-def _website_validation_coverage(
-    schools: list[School],
-) -> dict[str, Any]:
-    """Coverage for schools whose website-derived data is currently publishable."""
-    eligible = 0
-    with_report = 0
-    ok = 0
+def _withheld_website_data(schools: list[School]) -> dict[str, Any]:
+    """Schools with stored website data that the publish gate keeps from parents.
+
+    The gate already refuses data without a current validation report, so "published
+    without a report" can't happen. The useful number is the data we hold but don't
+    show, and why. A school can be withheld for more than one reason.
+    """
+    with_data = 0
+    published = 0
+    published_ok = 0
+    reasons = {"no_current_report": 0, "withheld_marker": 0, "status_not_publishable": 0}
+    withheld_school_ids: list[int] = []
     for school in schools:
         attrs = _as_dict(school.attributes)
         website_only_attrs = {
@@ -178,21 +179,27 @@ def _website_validation_coverage(
                 and _has_meaningful_value(school.summary_i18n),
             )
         )
-        if not has_website_data or not website_data_is_publishable(attrs, school.scrape_status):
+        if not has_website_data:
             continue
-        eligible += 1
-        report = _as_dict(attrs.get("data_validation"))
-        if _report_is_current(report):
-            with_report += 1
-            if report.get("status") == "ok":
-                ok += 1
+        with_data += 1
+        withheld_because = website_data_withheld_reasons(attrs, school.scrape_status)
+        if not withheld_because:
+            published += 1
+            if _as_dict(attrs.get("data_validation")).get("status") == "ok":
+                published_ok += 1
+            continue
+        withheld_school_ids.append(school.id)
+        for reason in withheld_because:
+            reasons[reason] += 1
     return {
-        "eligible": eligible,
-        "with_report": with_report,
-        "coverage_pct": _pct(with_report, eligible),
-        "ok": ok,
-        "ok_pct": _pct(ok, eligible),
-        "published_without_report": eligible - with_report,
+        "with_data": with_data,
+        "published": published,
+        "published_ok": published_ok,
+        "published_ok_pct": _pct(published_ok, published),
+        "withheld": len(withheld_school_ids),
+        "withheld_pct": _pct(len(withheld_school_ids), with_data),
+        "reasons": reasons,
+        "withheld_school_ids": sorted(withheld_school_ids),
     }
 
 
@@ -327,7 +334,7 @@ async def compute_quality_metrics(
     return {
         "schools_in_scope": len(school_ids),
         "validation_ok": _validation_ok(schools),
-        "website_validation_coverage": _website_validation_coverage(schools),
+        "withheld_website_data": _withheld_website_data(schools),
         "duplicate_coordinate_groups": duplicate_groups,
         "location_precision_exact": precision_metric,
         "display_name_overrides": _display_name_overrides(schools),

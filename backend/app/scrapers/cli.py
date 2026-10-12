@@ -787,12 +787,17 @@ async def _show_data_quality(city, country, runs):
             _pct(v["coverage_pct"]),
             f"{v['with_report']}/{v['total']} schools",
         )
-        w = metrics["website_validation_coverage"]
+        w = metrics["withheld_website_data"]
+        reasons = ", ".join(f"{name.replace('_', ' ')} {count}" for name, count in w["reasons"].items())
         table.add_row(
-            "Publishable website-data coverage",
-            _pct(w["coverage_pct"]),
-            f"{w['with_report']}/{w['eligible']} eligible; "
-            f"{w['published_without_report']} published without report",
+            "Website data withheld",
+            _pct(w["withheld_pct"]),
+            f"{w['withheld']}/{w['with_data']} schools with website data; {reasons}",
+        )
+        table.add_row(
+            "Published website data validated OK",
+            _pct(w["published_ok_pct"]),
+            f"{w['published_ok']}/{w['published']} published",
         )
         table.add_row("Duplicate coordinate groups", str(metrics["duplicate_coordinate_groups"]), "points shared by ≥2 schools")
         p = metrics["location_precision_exact"]
@@ -831,6 +836,8 @@ async def _show_data_quality(city, country, runs):
         g = metrics["pricing_rows_failing_gates"]
         table.add_row("Pricing rows failing gates", _pct(g["pct"]), f"{g['failing']}/{g['total']} scraped rows")
         console.print(table)
+        if w["withheld_school_ids"]:
+            console.print(f"Website data withheld for school ids: {w['withheld_school_ids']}")
 
         if runs > 0:
             runs_query = select(PipelineRun).where(PipelineRun.country_code == country)

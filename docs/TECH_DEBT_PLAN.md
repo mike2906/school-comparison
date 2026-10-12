@@ -48,7 +48,7 @@ There are three independent lanes. Within a lane, order matters. Across lanes, P
 
 ### Lane C: decisions that are not code moves
 
-- **The data-quality scoreboard metric needs redefining.** The test audit found that `_website_validation_coverage` can only ever report 0 published without a report and 100% coverage. That is a product question about what the metric should mean, not a refactor. It is parked until Mike decides, and its five constant-asserting tests are left alone until then.
+- **The data-quality scoreboard metric needed redefining.** The test audit found that `_website_validation_coverage` could only ever report 0 published without a report and 100% coverage, because the publish gate already refuses data without a current report. On 2026-10-12 it was replaced, as recommended to Mike, with `withheld_website_data`: schools with stored website data that parents can't see, counted by reason (no current report, the withheld marker, status not publishable), with their ids. Done.
 
 ### Relation to `docs/GO_LIVE_PLAN.md` Phase 4
 
@@ -244,4 +244,4 @@ Mike asked for the work to go ahead without waiting for him, so these defaults w
 3. **`audit_price_rows_uf45.py` and `refresh_prices.py` stay.** They are still price tooling, and `price_evidence.py` cites the audit.
 4. **`app/utils/education.py` is deleted with its tests.** The admission calculator gets written test-first when that work starts.
 5. **Kept on purpose:** `merge_kindergarten_buildings.py` (needed again if kg.sofia.bg is re-imported), `import_sofia_municipal_points.py` (the geocoding write gate references it), `pilot_identity_adjudication.py` with its service, which needs its own review before deletion, and `backfill_nvo_pupil_counts.py`, because `cli run --stage nvo` can't replace it while io.mon.bg blocks automated requests.
-6. **Still open for Mike:** what the data-quality scoreboard's website-validation coverage should measure (lane C).
+6. **Settled (2026-10-12):** the scoreboard's website-validation coverage is replaced by `withheld_website_data` (lane C).

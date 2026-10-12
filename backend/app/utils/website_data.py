@@ -95,28 +95,35 @@ def record_validation_failure(
     return attrs
 
 
-def website_data_is_publishable(attributes: Any, scrape_status: Any) -> bool:
-    """Return whether stored website-derived data may cross the API boundary.
+def website_data_withheld_reasons(attributes: Any, scrape_status: Any) -> list[str]:
+    """Why stored website data may not cross the API boundary; empty when it may.
 
     URL validation can fail before a replacement extraction is available.  A
     persistent marker keeps the old payload withheld across that gap and is cleared
     only after extraction and deterministic validation succeed in one transaction.
+    The marker is also set by re-extraction, failed validation and the shared-site check.
     """
     attrs = attributes if isinstance(attributes, Mapping) else {}
     status = str(scrape_status or "").strip().lower()
     report = attrs.get("data_validation")
-    if not isinstance(report, Mapping):
-        return False
-    version = report.get("_schema_version", report.get("schema_version"))
+    version = report.get("_schema_version", report.get("schema_version")) if isinstance(report, Mapping) else None
     try:
         report_is_current = int(version) == 1
     except (TypeError, ValueError):
         report_is_current = False
-    return (
-        status in WEBSITE_PUBLISHABLE_STATUSES
-        and not bool(attrs.get(WEBSITE_DATA_WITHHELD_KEY))
-        and report_is_current
-    )
+    reasons = []
+    if not report_is_current:
+        reasons.append("no_current_report")
+    if bool(attrs.get(WEBSITE_DATA_WITHHELD_KEY)):
+        reasons.append("withheld_marker")
+    if status not in WEBSITE_PUBLISHABLE_STATUSES:
+        reasons.append("status_not_publishable")
+    return reasons
+
+
+def website_data_is_publishable(attributes: Any, scrape_status: Any) -> bool:
+    """Return whether stored website data may cross the API boundary."""
+    return not website_data_withheld_reasons(attributes, scrape_status)
 
 
 def attributes_for_publication(attributes: Any, scrape_status: Any) -> dict[str, Any]:

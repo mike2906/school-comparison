@@ -188,13 +188,15 @@ async def test_metrics_cover_all_six(quality_fixture):
         "with_report": 2,
         "coverage_pct": 100.0,
     }
-    assert m["website_validation_coverage"] == {
-        "eligible": 2,
-        "with_report": 2,
-        "coverage_pct": 100.0,
-        "ok": 1,
-        "ok_pct": 50.0,
-        "published_without_report": 0,
+    assert m["withheld_website_data"] == {
+        "with_data": 2,
+        "published": 2,
+        "published_ok": 1,
+        "published_ok_pct": 50.0,
+        "withheld": 0,
+        "withheld_pct": 0.0,
+        "reasons": {"no_current_report": 0, "withheld_marker": 0, "status_not_publishable": 0},
+        "withheld_school_ids": [],
     }
     assert m["duplicate_coordinate_groups"] == 1
     assert m["location_precision_exact"] == {
@@ -272,9 +274,7 @@ async def test_missing_reports_and_precision_count_against_coverage(db_session):
     }
 
 
-async def test_website_validation_coverage_excludes_registry_only_and_withheld_data(db_session):
-    # All three carry a current report, so only the registry-only status and the withheld
-    # marker can keep the last two out.
+async def test_withheld_website_data_counts_each_reason(db_session):
     report = {"_schema_version": 1, "status": "ok", "issues": []}
     await _make_school(
         db_session,
@@ -282,12 +282,18 @@ async def test_website_validation_coverage_excludes_registry_only_and_withheld_d
         website_url="https://publishable.bg",
         attributes={"extracted": {"programs": ["STEM"]}, "data_validation": report},
     )
-    await _make_school(
+    no_report = await _make_school(
+        db_session,
+        scrape_status="extracted",
+        website_url="https://no-report.bg",
+        attributes={"extracted": {"programs": ["Arts"]}},
+    )
+    registry_only = await _make_school(
         db_session,
         scrape_status="no_official_website",
         attributes={"extracted": {"programs": ["Legacy"]}, "data_validation": report},
     )
-    await _make_school(
+    withheld = await _make_school(
         db_session,
         scrape_status="extracted",
         website_url="https://withheld.bg",
@@ -297,17 +303,29 @@ async def test_website_validation_coverage_excludes_registry_only_and_withheld_d
             "data_validation": report,
         },
     )
+    stale_and_registry_only = await _make_school(
+        db_session,
+        scrape_status="no_official_website",
+        attributes={"extracted": {"programs": ["Old"]}, "data_validation": {"_schema_version": 0, "status": "ok"}},
+    )
+    # No website data at all: not counted either way.
+    await _make_school(db_session, scrape_status="extracted", attributes={"data_validation": report})
     await db_session.commit()
 
     metrics = await compute_quality_metrics(db_session, country="bg", city="sofia")
 
-    assert metrics["website_validation_coverage"] == {
-        "eligible": 1,
-        "with_report": 1,
-        "coverage_pct": 100.0,
-        "ok": 1,
-        "ok_pct": 100.0,
-        "published_without_report": 0,
+    assert metrics["withheld_website_data"] == {
+        "with_data": 5,
+        "published": 1,
+        "published_ok": 1,
+        "published_ok_pct": 100.0,
+        "withheld": 4,
+        "withheld_pct": 80.0,
+        # The stale, registry-only school counts under both of its reasons.
+        "reasons": {"no_current_report": 2, "withheld_marker": 1, "status_not_publishable": 2},
+        "withheld_school_ids": sorted(
+            [no_report.id, registry_only.id, withheld.id, stale_and_registry_only.id]
+        ),
     }
 
 
@@ -561,7 +579,7 @@ async def test_scoreboard_counts_validation_blocked_rows_as_failing_like_the_api
     assert metrics["pricing_rows_failing_gates"]["failing"] == 1
 
 
-async def test_scraped_pricing_alone_does_not_make_a_school_eligible_for_validation_coverage(db_session):
+async def test_scraped_pricing_alone_does_not_count_as_website_data(db_session):
     # A current report and published-status school, so only "has website data" decides.
     school = await _make_school(
         db_session,
@@ -583,10 +601,10 @@ async def test_scraped_pricing_alone_does_not_make_a_school_eligible_for_validat
 
     metrics = await compute_quality_metrics(db_session, country="bg", city="sofia")
 
-    assert metrics["website_validation_coverage"]["eligible"] == 0
+    assert metrics["withheld_website_data"]["with_data"] == 0
 
 
-async def test_validation_coverage_tracks_launch_flags_and_public_projection(
+async def test_withheld_website_data_tracks_launch_flags_and_public_projection(
     db_session, monkeypatch
 ):
     from app.config import get_settings
@@ -610,10 +628,10 @@ async def test_validation_coverage_tracks_launch_flags_and_public_projection(
             }
         },
     )
-    await _make_school(
+    no_report = await _make_school(
         db_session,
         scrape_status="extracted",
-        attributes={"extracted": {"contact": {"phone": "+359 2 000 0000"}}},
+        attributes={"extracted": {"programs": ["STEM"]}},
     )
     await db_session.commit()
 
@@ -621,28 +639,21 @@ async def test_validation_coverage_tracks_launch_flags_and_public_projection(
     monkeypatch.setattr(settings, "publish_summaries", False)
     monkeypatch.setattr(settings, "publish_website_admission_fields", False)
     hidden = await compute_quality_metrics(db_session, country="bg", city="sofia")
-    assert hidden["website_validation_coverage"]["eligible"] == 0
+    w = hidden["withheld_website_data"]
+    # Only the programmes are public with both flags off, and they have no report.
+    assert (w["with_data"], w["published"], w["withheld"]) == (1, 0, 1)
+    assert w["withheld_school_ids"] == [no_report.id]
 
     monkeypatch.setattr(settings, "publish_summaries", True)
     summary_enabled = await compute_quality_metrics(db_session, country="bg", city="sofia")
-    assert summary_enabled["website_validation_coverage"] == {
-        "eligible": 1,
-        "with_report": 1,
-        "coverage_pct": 100.0,
-        "ok": 1,
-        "ok_pct": 100.0,
-        "published_without_report": 0,
-    }
+    w = summary_enabled["withheld_website_data"]
+    assert (w["with_data"], w["published"], w["published_ok"], w["withheld"]) == (2, 1, 1, 1)
+
     monkeypatch.setattr(settings, "publish_website_admission_fields", True)
     admissions_enabled = await compute_quality_metrics(db_session, country="bg", city="sofia")
-    assert admissions_enabled["website_validation_coverage"] == {
-        "eligible": 2,
-        "with_report": 2,
-        "coverage_pct": 100.0,
-        "ok": 1,
-        "ok_pct": 50.0,
-        "published_without_report": 0,
-    }
+    w = admissions_enabled["withheld_website_data"]
+    assert (w["with_data"], w["published"], w["published_ok"], w["withheld"]) == (3, 2, 1, 1)
+    assert w["reasons"]["no_current_report"] == 1
 
 
 async def test_website_publication_requires_current_validation_report():
