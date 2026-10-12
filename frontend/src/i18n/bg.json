@@ -275,6 +275,9 @@
       "preschoolTo": "От подготвителна група до {{to}} клас",
       "one": "{{n}} клас",
       "range": "{{from}}–{{to}} клас"
+    },
+    "stages": {
+      "kindergarten": "Детска градина"
     }
   },
   "priceSource": {
@@ -439,7 +442,8 @@
     "levels": {
       "immersion": "Пълна програма",
       "bilingual": "Двуезична програма",
-      "enrichment": "Допълнително обучение"
+      "enrichment": "Допълнително обучение",
+      "language_school": "Езиков профил"
     },
     "options": {
       "english_intensive": "Интензивен английски",

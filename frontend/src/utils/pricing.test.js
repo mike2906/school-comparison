@@ -274,16 +274,18 @@ const EN = {
   'pricing.grades.preschoolTo': 'Preschool to grade {{to}}',
   'pricing.grades.one': 'Grade {{n}}',
   'pricing.grades.range': 'Grades {{from}}–{{to}}',
+  'pricing.stages.kindergarten': 'Kindergarten',
 }
 const tEn = (key, vars = {}) =>
   key in EN ? EN[key].replace(/\{\{(\w+)\}\}/g, (_, name) => String(vars[name])) : key
 
-test('priceAgeGroupLabel: known key translated, grades as our label, other text as written', () => {
+test('priceAgeGroupLabel: known key translated, grades and stages as our label, other text as written', () => {
   assert.equal(priceAgeGroupLabel({ age_group: 'preschool' }, tEn), 'Pre-school')
   assert.equal(priceAgeGroupLabel({ age_group: 'ПК' }, tEn), 'Preschool')
   assert.equal(priceAgeGroupLabel({ age_group: 'VIII - XII клас' }, tEn), 'Grades 8–12')
   assert.equal(priceAgeGroupLabel({ age_group: 'Grade 1', plan_name: 'Grade 10 tuition' }, tEn), 'Grade 1')
-  assert.equal(priceAgeGroupLabel({ age_group: 'Детска градина' }, tEn), 'Детска градина')
+  assert.equal(priceAgeGroupLabel({ age_group: 'Детска градина' }, tEn), 'Kindergarten')
+  assert.equal(priceAgeGroupLabel({ age_group: 'Подготвителен курс' }, tEn), 'Подготвителен курс')
   assert.equal(priceAgeGroupLabel({ age_group: 'Grade 0', plan_name: 'Grade 0 / Plan 1' }, tEn), 'Preschool')
   assert.equal(priceAgeGroupLabel({ age_group: 'preschool', plan_name: 'Preschool fees' }, tEn), 'Pre-school')
   assert.equal(priceAgeGroupLabel({ age_group: 'grade 2 - 4', plan_name: 'Grade 2 - 4 / Plan 1' }, tEn), null)
@@ -313,7 +315,7 @@ test('groupRowsByAgeGroup: one band per age group, in page order, unnamed rows f
     row({ id: 5, age_group: 'Детска градина' }),
   ]
   const bands = groupRowsByAgeGroup(rows, tEn)
-  assert.deepEqual(bands.map(band => band.label), [null, 'Preschool', 'Grades 8–12', 'Детска градина'])
+  assert.deepEqual(bands.map(band => band.label), [null, 'Preschool', 'Grades 8–12', 'Kindergarten'])
   assert.deepEqual(bands.map(band => band.rows.map(r => r.id)), [[4], [1, 3], [2], [5]])
 })
 

@@ -275,6 +275,9 @@
       "preschoolTo": "Preschool to grade {{to}}",
       "one": "Grade {{n}}",
       "range": "Grades {{from}}–{{to}}"
+    },
+    "stages": {
+      "kindergarten": "Kindergarten"
     }
   },
   "priceSource": {
@@ -439,7 +442,8 @@
     "levels": {
       "immersion": "Immersion",
       "bilingual": "Bilingual",
-      "enrichment": "Enrichment"
+      "enrichment": "Enrichment",
+      "language_school": "Language school"
     },
     "options": {
       "english_intensive": "English intensive",
