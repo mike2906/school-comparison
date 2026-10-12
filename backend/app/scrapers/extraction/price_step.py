@@ -21,6 +21,7 @@ from app.models.school import School
 from app.models.source_page import SourcePage
 from app.schemas.extraction import ExtractedPrice, PageFees, PriceExtractionOutput
 from app.scrapers.extraction import fee_lines, llm_results, price_lines, price_rows, text_values
+from app.scrapers.page_content import is_template_filler
 from app.scrapers.price_evidence import (
     PriceRow,
     label_is_another_institutions,
@@ -170,7 +171,7 @@ def _fee_pages_of_this_school(pages: list[SourcePage], scope: Any, family: Any) 
     return [
         page
         for page in pages
-        if not fee_lines._is_template_filler(page.raw_markdown)
+        if not is_template_filler(page.raw_markdown)
         and not page_is_another_institutions(page.source_url, scope.grades, family, scope.shares_site)
     ]
 

@@ -22,6 +22,7 @@ from app.models import School, ScrapeType, SourcePage
 from app.scrapers.base import BaseScraper
 from app.scrapers.fee_image_reader import read_fee_image
 from app.scrapers.fee_pages import fee_http_client, fetch_fee_documents, page_key
+from app.scrapers.page_content import is_parked_domain, is_template_filler
 from app.scrapers.price_evidence import _PRICE_RE, currency_price_starts
 from app.scrapers.shared_site_check import level_family
 from app.scrapers.url_validator import URLValidator
@@ -670,6 +671,10 @@ class WebsiteNavigator:
             return False
         if self._is_bot_protection_content(text):
             return False
+        # Not the school's words: a lapsed domain's for-sale page (551) or a theme's sample
+        # page with lorem ipsum and "$1,800/mo" (590).
+        if is_parked_domain(text) or is_template_filler(text):
+            return False
         return True
 
     def _host_key(self, url: str) -> str:
@@ -1004,7 +1009,12 @@ async def _persist_navigation_result(
             existing_page.raw_markdown = None
             invalidated += 1
             continue
-        if navigator._is_bot_challenge_url(existing_page.source_url) or navigator._is_bot_protection_content(text):
+        if (
+            navigator._is_bot_challenge_url(existing_page.source_url)
+            or navigator._is_bot_protection_content(text)
+            or is_parked_domain(text)
+            or is_template_filler(text)
+        ):
             existing_page.is_valid = False
             existing_page.raw_markdown = None
             invalidated += 1
@@ -1012,7 +1022,10 @@ async def _persist_navigation_result(
     # The site asks not to be crawled: stop using the pages fetched before and withhold the
     # data extracted from them. Only a later extraction plus validation clears the marker.
     robots_blocked = not pages and await navigator.robots_disallows(normalized_url)
-    if robots_blocked:
+    # The domain lapsed and a broker's page stands in its place: nothing from it is the
+    # school's any more, the data extracted before included.
+    parked = bool(pages) and contentful_pages == 0 and any(is_parked_domain(page.markdown) for page in pages)
+    if robots_blocked or parked:
         for existing_page in existing_pages:
             if existing_page.is_valid:
                 existing_page.is_valid = False
@@ -1031,7 +1044,13 @@ async def _persist_navigation_result(
         return {
             "school_id": school_id,
             "success": False,
-            "reason": "Disallowed by robots.txt" if robots_blocked else "No extractable page content",
+            "reason": (
+                "Disallowed by robots.txt"
+                if robots_blocked
+                else "Parked domain"
+                if parked
+                else "No extractable page content"
+            ),
             "pages_found": len(pages),
             "pages_with_content": 0,
             "created": created,

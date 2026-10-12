@@ -752,3 +752,92 @@ def test_a_second_fee_card_keeps_the_lines_it_repeats():
     assert school_card.startswith("€\n7880\n/\nгодина\n8100 €\n– при разсрочено плащане на 2 вноски\n")
     # Wording away from a price is still stored once.
     assert text.count("В таксата не е включена храна") == 1 and text.count("Отстъпки") == 1
+
+
+def _school_with_a_page(markdown: str) -> tuple[School, SourcePage]:
+    school = School(
+        name_i18n={"bg": "Тестово училище"},
+        country_code="bg",
+        school_type="private",
+        education_level="primary",
+        city="sofia",
+        website_url="https://school.bg",
+        scrape_status="extracted",
+        attributes={"extracted": {"class_size": "20"}},
+    )
+    page = SourcePage(
+        scrape_type=ScrapeType.WEBSITE,
+        source_url="https://school.bg/",
+        content_hash="hash-old",
+        raw_markdown=markdown,
+        is_valid=True,
+    )
+    return school, page
+
+
+async def _navigate(db_session, school, page, crawled):
+    from app.utils.website_data import WEBSITE_DATA_WITHHELD_KEY
+
+    db_session.add(school)
+    await db_session.commit()
+    page.school_id = school.id
+    db_session.add(page)
+    await db_session.commit()
+
+    async def fake_discover_pages(self, website_url: str):
+        return website_url, crawled
+
+    async def not_blocked(self, url: str):
+        return False
+
+    with (
+        patch("app.scrapers.navigator.WebsiteNavigator.discover_pages", new=fake_discover_pages),
+        patch("app.scrapers.navigator.WebsiteNavigator.robots_disallows", new=not_blocked),
+    ):
+        result = await navigate_school(db=db_session, school_id=school.id, country_code="bg")
+    pages = (await db_session.execute(select(SourcePage).where(SourcePage.school_id == school.id))).scalars().all()
+    await db_session.refresh(school)
+    return result, {p.source_url: p.is_valid for p in pages}, bool(school.attributes.get(WEBSITE_DATA_WITHHELD_KEY))
+
+
+@pytest.mark.asyncio
+async def test_a_parked_domain_withholds_the_schools_website_data(db_session):
+    """551: meridian22.com lapsed and HugeDomains offers it for sale."""
+    school, page = _school_with_a_page("Частно училище Меридиан 22. Такса 5000 EUR")
+    parked = "meridian22.com is for sale | HugeDomains. Buy this domain. Price: $2,795"
+    crawled = [NavigatedPage(url="https://school.bg/", category="about", markdown=parked, content_hash="hash-parked")]
+
+    result, valid, withheld = await _navigate(db_session, school, page, crawled)
+
+    assert result["success"] is False and result["reason"] == "Parked domain"
+    assert valid == {"https://school.bg/": False}
+    assert withheld
+
+
+@pytest.mark.asyncio
+async def test_a_template_page_is_not_the_schools_but_its_real_pages_are(db_session):
+    """590: the home page is a theme's sample with lorem ipsum and "$1,800/mo"."""
+    filler = "Our Programs\nLorem ipsum dolor sit amet, consectetur adipiscing elit.\n$1,800/mo"
+    school, page = _school_with_a_page(filler)
+    crawled = [
+        NavigatedPage(url="https://school.bg/", category="about", markdown=filler, content_hash="hash-home"),
+        NavigatedPage(url="https://school.bg/priem", category="admission", markdown="Прием в 1. клас", content_hash="h2"),
+    ]
+
+    result, valid, withheld = await _navigate(db_session, school, page, crawled)
+
+    assert result["success"] is True
+    assert valid == {"https://school.bg/": False, "https://school.bg/priem": True}
+    assert not withheld
+
+
+def test_photo_captions_do_not_make_a_real_page_a_template():
+    """506's aas-sofia.org captions its photos "Lorem Ipsum Dolor" on real pages."""
+    from pathlib import Path
+
+    from app.scrapers.page_content import is_template_filler
+
+    home = Path(__file__).parent / "golden_corpus/cases/506-anglo-amerikansko-uchilishte-v-s/page01.md"
+    assert "Lorem Ipsum" in home.read_text(encoding="utf-8")
+    assert not is_template_filler(home.read_text(encoding="utf-8"))
+    assert is_template_filler("Lorem ipsum dolor sit amet, consectetur adipiscing elit.")

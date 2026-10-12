@@ -35,6 +35,7 @@ from app.scrapers.extraction import (
     price_step,
     summary_sources,
 )
+from app.scrapers.page_content import is_template_filler
 from app.services.geocoding.write_gate import OFFICIAL_COORDS_TAG
 
 # Fee pages in these tests name academic years such as 2025/2026; pin the date they are read on.
@@ -5513,7 +5514,7 @@ async def test_a_templates_sample_prices_are_not_read(db_session, sample_school_
 
     assert (result["success"], result["count"]) == (False, 0)
     llm.assert_not_called()
-    assert not fee_lines._is_template_filler("Lorem Hall, 5 Ipswich Road. Tuition 500 EUR")
+    assert not is_template_filler("Lorem Hall, 5 Ipswich Road. Tuition 500 EUR")
 
 
 def test_a_copied_label_with_a_comma_is_kept_whole():
