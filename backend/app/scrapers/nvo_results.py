@@ -604,6 +604,8 @@ async def _upsert_resource_rows(
     city_filter: Optional[str],
     allowed_school_ids: Optional[set[int]],
     touched_school_ids: set[int],
+    metric: str = "average_score",
+    label: str = "NVO",
 ) -> dict[str, int]:
     matched_entries: dict[tuple[int, int, str, str, str], ParsedExamResult] = {}
     skipped_rows = 0
@@ -644,7 +646,7 @@ async def _upsert_resource_rows(
             continue
 
         touched_school_ids.add(school_id)
-        key = (school_id, entry.year, entry.exam_type, entry.subject, "average_score")
+        key = (school_id, entry.year, entry.exam_type, entry.subject, metric)
         matched_entries[key] = entry
 
     # Named only for a whole-city run: with explicit school ids the index holds just those
@@ -652,7 +654,8 @@ async def _upsert_resource_rows(
     if unmatched_schools and allowed_school_ids is None:
         names = sorted(unmatched_schools)
         logger.warning(
-            "NVO %s %s: no school in the DB for %s%s",
+            "%s %s %s: no school in the DB for %s%s",
+            label,
             resource.exam_type,
             resource.year,
             "; ".join(names[:20]),
@@ -674,7 +677,7 @@ async def _upsert_resource_rows(
             ExamResult.school_id.in_(school_ids),
             ExamResult.year == resource.year,
             ExamResult.exam_type == resource.exam_type,
-            ExamResult.metric == "average_score",
+            ExamResult.metric == metric,
         )
     )
     existing_map = {
@@ -695,7 +698,7 @@ async def _upsert_resource_rows(
                     year=entry.year,
                     exam_type=entry.exam_type,
                     subject=entry.subject,
-                    metric="average_score",
+                    metric=metric,
                     value=entry.value,
                     pupil_count=entry.sat_count,
                     source_url=entry.source_url,

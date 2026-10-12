@@ -28,6 +28,7 @@ import {
   getExamTypeLabel,
 } from './helpers'
 import KeyFacts from './KeyFacts'
+import DziResults from './DziResults'
 import LocationMap, { directionsUrl } from './LocationMap'
 import PricingSection from './PricingSection'
 import { formatAmount } from '../../utils/format'
@@ -743,6 +744,9 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
             </div>
           )
         })()}
+
+        {/* ДЗИ (matura) results: grades, kept apart from NVO points */}
+        <DziResults examResults={school.exam_results} examAverages={examAverages} />
 
         {/* Languages & Teaching Approach */}
         {(hasLanguageInfo || hasTeachingApproach) && (

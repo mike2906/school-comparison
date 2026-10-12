@@ -1,6 +1,6 @@
 ---
 name: common-tasks
-description: Step-by-step recipes for routine dev tasks in this repo — add a route/column/translation, seed, run the app, import NVO, print the data-quality scoreboard, publish data to production. Use when performing one of these tasks.
+description: Step-by-step recipes for routine dev tasks in this repo — add a route/column/translation, seed, run the app, import NVO or ДЗИ, print the data-quality scoreboard, publish data to production. Use when performing one of these tasks.
 ---
 
 # Common Tasks Skill
@@ -70,6 +70,25 @@ Optional filters:
 - `--school-id 123` for a targeted import
 
 NVO import is independent of the website pipeline — it is not part of `all`.
+
+## Import official ДЗИ (matura) results
+```bash
+cd backend
+uv run python -m app.scrapers.cli run --stage dzi --sync --city sofia --country bg
+```
+
+Imports the mandatory May–June session per year from data.egov.bg (dataset
+`066b4b04-…`) as `exam_type="dzi"`, `metric="average_grade"` (2–6 scale), one subject per
+row (`bulgarian_oop`, `math_pp`, `english_b2_pp`, …). Same filters as NVO except
+`--exam-type`. Like NVO it is not part of `all`.
+
+Check the output before publishing:
+- `Slice failures` names any year whose layout did not parse; the importer refuses a
+  year rather than guess (e.g. grades outside 2–6).
+- `Subjects not imported (unknown abbreviation)` lists header codes with no mapping in
+  `_SUBJECT_PATTERNS` (`app/scrapers/dzi_results.py`); add them there and re-run.
+- The portal keeps only about ten sessions and drops the oldest; imported years stay in
+  the DB, so import each new year when it appears.
 
 ## Publish data to production
 

@@ -428,7 +428,12 @@ class SchoolListResponse(SchoolPricingMixin):
     @field_validator("exam_results", mode="before")
     @classmethod
     def withhold_thin_exam_results(cls, value: Any) -> Any:
-        return _publishable_exam_results(value)
+        rows = _publishable_exam_results(value)
+        if not isinstance(rows, list):
+            return rows
+        # The cards read NVO only; ДЗИ rows (a dozen subjects a year) stay on the detail
+        # and compare responses.
+        return [row for row in rows if getattr(row, "exam_type", None) != "dzi"]
 
     @computed_field(return_type=dict[str, str])
     @property
