@@ -97,6 +97,15 @@ test('a school page preloads the school, the averages and the country', () => {
   assert.deepEqual(preloaded('/en/schools/12'), expected)
 })
 
+test('the A–Z list preloads the listed schools and the country', () => {
+  const expected = requested(() => {
+    fetchCountryConfig('bg')
+    fetchSchools()
+  })
+  assert.deepEqual(preloaded('/schools'), expected)
+  assert.deepEqual(preloaded('/en/schools'), expected)
+})
+
 test('other pages preload only the country config', () => {
   assert.deepEqual(preloaded('/about'), ['/api/countries/bg'])
   assert.deepEqual(preloaded('/schools/school-404'), ['/api/countries/bg'])

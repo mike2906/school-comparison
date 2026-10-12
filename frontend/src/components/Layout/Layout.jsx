@@ -86,6 +86,16 @@ function Layout({ children, hideNavOnMobile = false, compactNavOnMobile = false,
                   <span className="rounded-full bg-primary-100 px-1.5 text-xs text-primary-700">{compareList.length}</span>
                 </NavLink>
               )}
+              {/* Shown from md up; below that the row has no room, but the link stays in the
+                  page so crawlers reach the A–Z list from every page, the search page included. */}
+              <NavLink
+                to="/schools"
+                className={({ isActive }) => `hidden md:inline-flex h-9 items-center whitespace-nowrap rounded-lg px-3 text-sm font-medium ${
+                  isActive ? 'bg-primary-50 text-primary-800' : 'text-neutral-700 hover:bg-neutral-100'
+                }`}
+              >
+                {t('nav.allSchools')}
+              </NavLink>
               <NavLink
                 to="/about"
                 className={({ isActive }) => `inline-flex h-9 items-center whitespace-nowrap rounded-lg px-2 sm:px-3 text-sm font-medium ${

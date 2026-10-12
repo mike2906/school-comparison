@@ -1,17 +1,21 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
-import { fetchSchools } from '../../api/schools'
+import { fetchSchools, peekSchools } from '../../api/schools'
 import { useCountry } from '../../context/CountryContext'
 import { schoolLevelLabel, schoolTypeLabel } from '../../utils/levelLabel'
 import { directorySections } from '../../utils/schoolDirectory'
 import Layout from '../Layout/Layout'
 
-/** Every listed school by name, so parents (and crawlers) can reach any school page. */
+/**
+ * Every listed school by name, so parents (and crawlers) can reach any school page. Thin
+ * pages are listed too: they are `noindex`, but a parent may still want them.
+ */
 function DirectoryPage() {
   const { t, i18n } = useTranslation()
   const { config: countryConfig } = useCountry()
-  const [schools, setSchools] = useState(null)
+  // Coming from the search page, the list is usually loaded already.
+  const [schools, setSchools] = useState(() => peekSchools() ?? null)
   const [failed, setFailed] = useState(false)
 
   useEffect(() => {
