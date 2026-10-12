@@ -1,4 +1,4 @@
-import { gradesInText, rowGradeBand } from './gradeBand.js'
+import { gradesNamedIn, rowGradeBand } from './gradeBand.js'
 
 /**
  * Facts a price row states in its own words: how often it is paid and which age groups it
@@ -28,9 +28,18 @@ export function periodFromLabel(text) {
   return found.length === 1 ? found[0] : null
 }
 
-/** How often a row is paid: its stored period, else the one its own name states, else null. */
+// The whole fee paid at once: "Плащане на 1 вноска", "една вноска", "in one payment".
+export const ONE_PAYMENT_RE = /(?<![\p{L}\p{N}-])(?:1|една|еднократна)\s+вноска(?![\p{L}])|in (?:one|1|a single) (?:payment|instal+ment)|single payment/iu
+
+/**
+ * How often a row is paid: its stored period, else the one its own name states, else null.
+ * Tuition paid "на 1 вноска" (in one payment) is the year's fee.
+ */
 export function pricePeriod(row) {
-  return row?.period || periodFromLabel(row?.plan_name) || null
+  const named = periodFromLabel(row?.plan_name)
+  if (row?.period || named) return row?.period || named
+  if (row?.category === 'tuition' && ONE_PAYMENT_RE.test(row?.plan_name || '')) return 'yearly'
+  return null
 }
 
 // Kindergarten group words: "Първа и Втора група", "Първа - трета група", "3-та група",
@@ -120,7 +129,7 @@ function gradeKeys(band) {
 export function rowAgeGroupKeys(row) {
   const keys = new Set()
   if (AGE_GROUP_KEYS.has(row?.age_group?.trim())) keys.add(row.age_group.trim())
-  const band = rowGradeBand(row) || gradesInText(row?.age_group) || gradesInText(row?.plan_name)
+  const band = rowGradeBand(row) || gradesNamedIn(row?.age_group) || gradesNamedIn(row?.plan_name)
   for (const key of gradeKeys(band)) keys.add(key)
   for (const key of groupKeys(`${row?.age_group || ''} / ${row?.plan_name || ''}`)) keys.add(key)
   return keys

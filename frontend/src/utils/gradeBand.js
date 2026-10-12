@@ -88,12 +88,37 @@ export function gradeRangeInText(text) {
 
 // Grades named inside free text: "8. клас", "от 4 до 7 клас", "1-4 клас", "Grade 1",
 // "Grades 2 to 4". A number counts only beside a grade word.
-const GRADE_ITEM = '(\\d{1,2}|[ivx]{1,4})\\.?'
+// An ordinal ending is allowed: "от 1-ви до 7-ми клас", "1st grade".
+const GRADE_ITEM = '(\\d{1,2}|[ivx]{1,4})(?:\\.|-?(?:ви|ри|ти|ми|ст|st|nd|rd|th)(?![\\p{L}]))?'
 const GRADES_IN_TEXT_RES = [
   new RegExp(`(?<![\\p{L}\\p{N}.])(?:от\\s+)?${GRADE_ITEM}\\s*(?:-|до)\\s*${GRADE_ITEM}\\s*(?:клас|кл(?!\\p{L}))`, 'gu'),
   new RegExp(`(?<![\\p{L}\\p{N}.])${GRADE_ITEM}\\s*(?:клас|кл(?!\\p{L}))`, 'gu'),
   new RegExp(`(?<![\\p{L}])grades?\\s+${GRADE_ITEM}(?:\\s*(?:-|to)\\s*${GRADE_ITEM})?(?![\\p{L}\\p{N}])`, 'gu'),
+  new RegExp(`(?<![\\p{L}\\p{N}])(\\d{1,2})(?:st|nd|rd|th)\\s+grade(?![\\p{L}])`, 'gu'),
 ]
+
+// School stages by name: "Начален и Прогимназиален етап" is grades 1-7, "Гимназия" 8-12.
+const STAGES = [
+  [/предучилищ/u, 0, 0],
+  [/(?<![\p{L}])начал(?:ен|но|ния)(?![\p{L}])|primary school|elementary/u, 1, 4],
+  [/прогимназ|middle school/u, 5, 7],
+  [/(?<![\p{L}])гимназ|high school/u, 8, 12],
+]
+
+function widen(found, range) {
+  if (!range) return found
+  return found ? { from: Math.min(found.from, range.from), to: Math.max(found.to, range.to) } : range
+}
+
+/** The grades free text names, by number beside a grade word or by school stage, or null. */
+export function gradesNamedIn(text) {
+  const normalized = normalize(text)
+  let found = gradesInText(text)
+  for (const [re, from, to] of STAGES) {
+    if (re.test(normalized)) found = widen(found, { from, to })
+  }
+  return found
+}
 
 /** Every grade free text names beside a grade word, as one widest span, or null. */
 export function gradesInText(text) {
@@ -101,11 +126,7 @@ export function gradesInText(text) {
   let found = gradeRangeInText(text)
   for (const re of GRADES_IN_TEXT_RES) {
     for (const match of normalized.matchAll(re)) {
-      const range = band(match[1], match[2])
-      if (!range) continue
-      found = found
-        ? { from: Math.min(found.from, range.from), to: Math.max(found.to, range.to) }
-        : range
+      found = widen(found, band(match[1], match[2]))
     }
   }
   return found
