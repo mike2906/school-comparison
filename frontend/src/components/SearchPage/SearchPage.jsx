@@ -26,9 +26,9 @@ import SchoolNameSearch from './SchoolNameSearch'
 import LocationControl from './LocationControl'
 import { ActiveFilterChips, AdvancedFilters } from './AdvancedFilters'
 import { useAdvancedFilterOptions } from './advancedFilterOptions'
+import { useUserLocation } from './useUserLocation'
 import { useSchools } from '../../hooks/useSchools'
 import { calculateDistance } from '../../utils/distance'
-import { geocodeAddress, reverseGeocode, cancelGeocode } from '../../utils/geocoding'
 import { compareSchoolNames, getSchoolName, schoolMatchesQuery } from '../../utils/i18n'
 import { foldSamePlace } from '../../utils/samePlace'
 import { useCompare } from '../../context/CompareContext'
@@ -56,18 +56,6 @@ import {
   closedDetailSchoolId,
 } from '../../utils/searchViewState'
 import { LANGUAGE_SWITCH_EVENT, languageSwitchArrival } from '../../utils/languageSwitch'
-
-function readStoredUserLocation(fallbackAddress) {
-  try {
-    const parsed = JSON.parse(localStorage.getItem('userLocation') || 'null')
-    if (typeof parsed?.lat === 'number' && typeof parsed?.lng === 'number') {
-      return { lat: parsed.lat, lng: parsed.lng, address: parsed.address || fallbackAddress }
-    }
-  } catch {
-    // Corrupt or blocked storage: start without a location.
-  }
-  return null
-}
 
 const TYPE_SORT_ORDER = {
   state: 0,
@@ -120,11 +108,19 @@ function SearchPage() {
   const [mobileTab, setMobileTab] = useState(initialView.tab) // 'list' or 'map'
   const [isFiltersOpen, setIsFiltersOpen] = useState(false) // For tablet/mobile drawer
   const filtersDrawerRef = useRef(null)
-  const [userLocation, setUserLocation] = useState(() => readStoredUserLocation(t('location.currentLocation')))
-  const [addressInput, setAddressInput] = useState('')
-  const [locationError, setLocationError] = useState(null)
-  const [isLocating, setIsLocating] = useState(false)
-  const [isGeocoding, setIsGeocoding] = useState(false)
+  const {
+    userLocation,
+    addressInput,
+    locationError,
+    isLocating,
+    isGeocoding,
+    changeAddressInput,
+    clearLocationError,
+    locateMe,
+    searchAddress,
+    clearLocation,
+    setLocationFromMap,
+  } = useUserLocation({ t, geocodingConfig })
   const [isPickingLocation, setIsPickingLocation] = useState(false)
   const [distanceFilter, setDistanceFilter] = useState(initialView.within)
   // With a saved location, nearest-first is the default, as it was before sort lived in the URL.
@@ -166,7 +162,6 @@ function SearchPage() {
   locationRef.current = location
   const previousViewModeRef = useRef(null)
   const previousMobileTabRef = useRef(null)
-  const errorTimeoutRef = useRef(null)
   const toastTimeoutRef = useRef(null)
   const latestMapBoundsRef = useRef(null)
   const scrollOnSelectRef = useRef(false)
@@ -440,15 +435,6 @@ function SearchPage() {
     previousLocationRef.current = userLocation
   }, [userLocation, sortBy])
 
-  useEffect(() => {
-    return () => {
-      if (errorTimeoutRef.current) {
-        clearTimeout(errorTimeoutRef.current)
-      }
-      cancelGeocode()
-    }
-  }, [])
-
   const handleSchoolSelect = (school, { source = 'list' } = {}) => {
     if (!school) return
     if (locationOverlay.schoolId && locationOverlay.schoolId !== school.id) {
@@ -598,18 +584,6 @@ function SearchPage() {
     setSelectedSchoolId(schoolId)
   })
 
-  const showLocationError = (message, { temporary = false } = {}) => {
-    if (errorTimeoutRef.current) {
-      clearTimeout(errorTimeoutRef.current)
-    }
-    setLocationError(message)
-    if (temporary) {
-      errorTimeoutRef.current = setTimeout(() => {
-        setLocationError(null)
-      }, 1500)
-    }
-  }
-
   const showLocationToast = (message) => {
     if (toastTimeoutRef.current) {
       clearTimeout(toastTimeoutRef.current)
@@ -620,110 +594,27 @@ function SearchPage() {
     }, 1800)
   }
 
-  const persistLocation = (location) => {
-    localStorage.setItem('userLocation', JSON.stringify(location))
-  }
-
-  // Each way of setting a location takes a token; a slower earlier request (GPS or an
-  // address lookup) must not overwrite a location the parent has since set another way.
-  const locationRequestRef = useRef(0)
-  const startLocationRequest = () => {
-    locationRequestRef.current += 1
-    return locationRequestRef.current
-  }
-
   const handleUseMyLocation = () => {
-    const request = startLocationRequest()
-    setLocationError(null)
     setIsPickingLocation(false)
-    setIsGeocoding(false)
-
-    if (!navigator.geolocation) {
-      showLocationError(t('location.errorUnavailable'))
-      return
-    }
-
-    setIsLocating(true)
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        if (request !== locationRequestRef.current) return
-        const newLocation = {
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
-          address: t('location.currentLocation'),
-        }
-        setUserLocation(newLocation)
-        setAddressInput('')
-        persistLocation(newLocation)
-        setIsLocating(false)
-      },
-      (err) => {
-        if (request !== locationRequestRef.current) return
-        if (err.code === 1) {
-          showLocationError(t('location.errorDenied'))
-        } else {
-          showLocationError(t('location.errorUnavailable'))
-        }
-        setIsLocating(false)
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 300000,
-      }
-    )
+    locateMe()
   }
 
-  const handleAddressSearch = async () => {
-    const trimmedAddress = addressInput.trim()
-    if (!trimmedAddress) return
-
-    const request = startLocationRequest()
-    setIsLocating(false)
-    setIsGeocoding(true)
-    setLocationError(null)
+  const handleAddressSearch = () => {
+    if (!addressInput.trim()) return
     setIsPickingLocation(false)
-
-    try {
-      const result = await geocodeAddress(trimmedAddress, geocodingConfig)
-      if (request !== locationRequestRef.current) return
-      const newLocation = {
-        lat: result.lat,
-        lng: result.lng,
-        address: result.address,
-      }
-      setUserLocation(newLocation)
-      persistLocation(newLocation)
-    } catch (err) {
-      if (err?.code === 'CANCELED' || request !== locationRequestRef.current) return
-      if (err?.code === 'NO_RESULTS') {
-        showLocationError(t('location.errorNotFound'))
-      } else if (err?.code === 'RATE_LIMIT') {
-        showLocationError(t('location.errorRateLimited'))
-      } else if (err?.code === 'TOO_FAST') {
-        showLocationError(t('location.errorPleaseWait'), { temporary: true })
-      } else if (err?.code !== 'EMPTY') {
-        showLocationError(t('location.errorUnableToGeocode'))
-      }
-    } finally {
-      if (request === locationRequestRef.current) setIsGeocoding(false)
-    }
+    searchAddress()
   }
 
   const handleClearLocation = () => {
-    startLocationRequest()
-    setIsLocating(false)
-    setIsGeocoding(false)
+    // Page state first: clearLocation removes the saved location, which throws when
+    // storage is blocked.
     setIsPickingLocation(false)
-    setUserLocation(null)
-    setAddressInput('')
-    setLocationError(null)
     setDistanceFilter('any')
-    localStorage.removeItem('userLocation')
+    clearLocation()
   }
 
   const handleStartMapPick = () => {
-    setLocationError(null)
+    clearLocationError()
     setIsPickingLocation(prev => {
       const next = !prev
       if (next) {
@@ -750,18 +641,7 @@ function SearchPage() {
 
   const handleMapPickLocation = useStableCallback(({ lat, lng }) => {
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) return
-    startLocationRequest()
-    setIsLocating(false)
-    setIsGeocoding(false)
-    const newLocation = {
-      lat,
-      lng,
-      address: t('location.selectedOnMap'),
-    }
-    setUserLocation(newLocation)
-    setAddressInput('')
-    setLocationError(null)
-    persistLocation(newLocation)
+    setLocationFromMap(lat, lng)
     setIsPickingLocation(false)
     if (window.innerWidth < 1024) {
       setViewMode('list-map')
@@ -776,21 +656,6 @@ function SearchPage() {
     }
     previousViewModeRef.current = null
     previousMobileTabRef.current = null
-
-    reverseGeocode(lat, lng, geocodingConfig)
-      .then((result) => {
-        if (!result?.address) return
-        setUserLocation(prev => {
-          if (!prev) return prev
-          if (prev.lat !== lat || prev.lng !== lng) return prev
-          const updated = { ...prev, address: result.address }
-          persistLocation(updated)
-          return updated
-        })
-      })
-      .catch(() => {
-        // Silent fallback to "Selected on map" when reverse geocoding fails.
-      })
   })
 
   const handleFilterChange = (newFilters) => {
@@ -1509,10 +1374,7 @@ function SearchPage() {
                 <LocationControl
                   userLocation={userLocation}
                   addressInput={addressInput}
-                  onAddressInputChange={(value) => {
-                    setAddressInput(value)
-                    setLocationError(null)
-                  }}
+                  onAddressInputChange={changeAddressInput}
                   onUseMyLocation={handleUseMyLocation}
                   onAddressSearch={handleAddressSearch}
                   onStartMapPick={handleStartMapPick}
