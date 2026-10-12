@@ -1,0 +1,114 @@
+[
+ {
+  "id": 3695,
+  "category": "TUITION",
+  "amount": 530.0,
+  "amount_min": null,
+  "amount_max": null,
+  "currency": "EUR",
+  "period": "MONTHLY",
+  "plan_name": "Месечна такса",
+  "age_group": null,
+  "academic_year": null,
+  "source_url": "https://erichkaestner.bg/storage/2025/08/pricelist_2025_desk.png",
+  "source_page_id": 29235,
+  "pricing_context": {
+   "notes": null,
+   "confidence": 0.9,
+   "discounts": [],
+   "installments": [],
+   "includes": [],
+   "excludes": []
+  }
+ },
+ {
+  "id": 3696,
+  "category": "FOOD",
+  "amount": 160.0,
+  "amount_min": null,
+  "amount_max": null,
+  "currency": "EUR",
+  "period": null,
+  "plan_name": "Изхранване",
+  "age_group": null,
+  "academic_year": null,
+  "source_url": "https://erichkaestner.bg/storage/2025/08/pricelist_2025_desk.png",
+  "source_page_id": 29235,
+  "pricing_context": {
+   "notes": null,
+   "confidence": 0.9,
+   "discounts": [],
+   "installments": [],
+   "includes": [],
+   "excludes": []
+  }
+ },
+ {
+  "id": 3697,
+  "category": "REGISTRATION",
+  "amount": 300.0,
+  "amount_min": null,
+  "amount_max": null,
+  "currency": "EUR",
+  "period": null,
+  "plan_name": "Депозит за запазване на място",
+  "age_group": null,
+  "academic_year": null,
+  "source_url": "https://erichkaestner.bg/storage/2025/08/pricelist_2025_desk.png",
+  "source_page_id": 29235,
+  "pricing_context": {
+   "notes": null,
+   "confidence": 0.9,
+   "discounts": [],
+   "installments": [],
+   "includes": [],
+   "excludes": []
+  }
+ },
+ {
+  "id": 3698,
+  "category": "REGISTRATION",
+  "amount": 300.0,
+  "amount_min": null,
+  "amount_max": null,
+  "currency": "EUR",
+  "period": null,
+  "plan_name": "Депозит при записване",
+  "age_group": null,
+  "academic_year": null,
+  "source_url": "https://erichkaestner.bg/storage/2025/08/pricelist_2025_desk.png",
+  "source_page_id": 29235,
+  "pricing_context": {
+   "notes": null,
+   "confidence": 0.9,
+   "discounts": [],
+   "installments": [],
+   "includes": [],
+   "excludes": []
+  }
+ },
+ {
+  "id": 3699,
+  "category": "MATERIALS",
+  "amount": 120.0,
+  "amount_min": null,
+  "amount_max": null,
+  "currency": "EUR",
+  "period": "YEARLY",
+  "plan_name": "Такса учебни материали",
+  "age_group": null,
+  "academic_year": null,
+  "source_url": "https://erichkaestner.bg/storage/2025/08/pricelist_2025_mobile.png",
+  "source_page_id": 29234,
+  "pricing_context": {
+   "notes": null,
+   "confidence": 0.9,
+   "discounts": [],
+   "installments": [],
+   "includes": [],
+   "excludes": []
+  },
+  "period_as_extracted": "MONTHLY",
+  "note": "period set to YEARLY by hand after extraction"
+ }
+]

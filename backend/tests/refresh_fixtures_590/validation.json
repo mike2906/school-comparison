@@ -1,0 +1,42 @@
+[
+ {
+  "data_validation": {
+   "_schema_version": 1,
+   "validated_at": "2026-10-12T11:05:56.768393+00:00",
+   "status": "ok",
+   "issue_counts": {
+    "error": 0,
+    "warning": 0
+   },
+   "issues": [],
+   "auto_fixes": [],
+   "spot_check": {
+    "has_discrepancy": true,
+    "discrepancies": [
+     {
+      "field_path": "attributes.extracted.programs",
+      "kind": "contradiction",
+      "issue": "Conflicting programs information",
+      "evidence": "обучението и възпитанието се провеждат в съответствие с държавните образователни стандарти на МОН – по програма „Чуден свят“.",
+      "cheap_value": "Чуден свят",
+      "capable_value": "Български език и литература, Математика, Конструиране и технологии, Околен свят, Изобразително изкуство, Музика, Физическа култура",
+      "confidence": 0.5
+     }
+    ],
+    "summary": null,
+    "checked_at": "2026-10-12T10:56:36.071890+00:00",
+    "model_tier": "capable",
+    "quality_scope": "core_fields_only",
+    "kind_counts": {
+     "contradiction": 1,
+     "omission": 0,
+     "unsupported": 0
+    },
+    "input_tokens": 4395,
+    "output_tokens": 163,
+    "token_cost_usd": 0.000757,
+    "model": "openrouter/openai/gpt-4o-mini"
+   }
+  }
+ }
+]

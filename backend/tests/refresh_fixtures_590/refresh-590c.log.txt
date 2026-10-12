@@ -1,0 +1,19 @@
+/home/mike2906/sofiaschoolcomparison/backend/app/scrapers/extractor.py:533: PydanticAIDeprecationWarning: `Agent(output_retries=...)` is deprecated and will be removed in v2.0. Use `retries={'output': ...}` (or `retries=<int>` to set the same budget for both tool and output retries) instead.
+  agent = Agent(
+/home/mike2906/sofiaschoolcomparison/backend/app/ai/client.py:139: PydanticAIDeprecationWarning: `AgentRunResult.usage` is no longer a method; access it as a property (drop the parentheses).
+  usage_obj = result.usage() if callable(getattr(result, "usage", None)) else getattr(result, "usage", None)
+/home/mike2906/sofiaschoolcomparison/backend/.venv/lib/python3.12/site-packages/sqlalchemy/sql/schema.py:3624: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return util.wrap_callable(lambda ctx: fn(), fn)  # type: ignore
+database: sofia_schools
+
+== school 590: Extracted 5 pricing rows; Validation completed before commit (ok)
+  - food 160.00 EUR no period no year [Изхранване / Закуска, междинно хранене, обяд и следобедна закуска] https://erichkaestner.bg/storage/2025/08/pricelist_2025_desk.png
+  - materials 120.00 EUR monthly no year [Такса учебни материали / Заплаща се в началото на всяка учебна година или при записване] https://erichkaestner.bg/storage/2025/08/pricelist_2025_mobile.png
+  - registration 300.00 EUR no period no year [Депозит за запазване на място / Приспада се от таксата за първия месец; Не се възстановява при отказ] https://erichkaestner.bg/storage/2025/08/pricelist_2025_desk.png
+  - registration 300.00 EUR no period no year [Депозит при записване / Приспада се от последната месечна такса] https://erichkaestner.bg/storage/2025/08/pricelist_2025_desk.png
+  - tuition 530.00 EUR monthly no year [Месечна такса / Отглеждане, възпитание, обучение и преподаване на английски език] https://erichkaestner.bg/storage/2025/08/pricelist_2025_desk.png
+  + food 160.00 EUR no period no year [Изхранване] https://erichkaestner.bg/storage/2025/08/pricelist_2025_desk.png
+  + materials 120.00 EUR monthly no year [Такса учебни материали] https://erichkaestner.bg/storage/2025/08/pricelist_2025_mobile.png
+  + registration 300.00 EUR no period no year [Депозит за запазване на място] https://erichkaestner.bg/storage/2025/08/pricelist_2025_desk.png
+  + registration 300.00 EUR no period no year [Депозит при записване] https://erichkaestner.bg/storage/2025/08/pricelist_2025_desk.png
+  + tuition 530.00 EUR monthly no year [Месечна такса] https://erichkaestner.bg/storage/2025/08/pricelist_2025_desk.png
