@@ -177,6 +177,7 @@ summary shows the school count before and after.
 A publish dispatched while another release runs or waits is never cancelled: it waits for
 the runs that started before it, and a code release pushed after it waits for the publish.
 (Pushes still replace each other while waiting, since the newest carries the same code.)
+To retry a failed deploy run, use **Re-run all jobs**: "Re-run failed jobs" skips that wait.
 
 It refuses to run when the API is behind the commit (a failed or rolled-back release): run
 a full release first. If the site build fails after the data was loaded, the new data

@@ -46,7 +46,8 @@ jobs:
   changes:
     name: What to release
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    # Long enough for a few releases queued ahead of this one.
+    timeout-minutes: 240
     permissions:
       contents: read
       actions: read
@@ -60,18 +61,36 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Check the inputs
+        env:
+          SNAPSHOT: ${{ inputs.snapshot }}
+        run: |
+          if [ -n "$SNAPSHOT" ] && ! [[ "$SNAPSHOT" =~ ^[A-Za-z0-9._-]+\.dump$ ]]; then
+            echo "::error::snapshot must be the name of a .dump object in the backups bucket"
+            exit 1
+          fi
+          if [ "$GITHUB_REF" != refs/heads/main ]; then
+            echo "::error::Only main is deployed"
+            exit 1
+          fi
+
       # Every job that touches production needs this one, so a run starts releasing only
       # when the runs that started before it have finished, and Decide sees what they left.
+      # An API error counts as "still waiting", never as "nothing to wait for".
       - name: Wait for earlier releases
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          me="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" --jq '.run_started_at // .created_at')"
+          until me="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" --jq '.run_started_at // .created_at')" && [ -n "$me" ]; do
+            sleep 20
+          done
           while :; do
-            earlier="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/deploy.yml/runs?per_page=100" \
-              | jq -r --arg me "$me" --argjson id "$GITHUB_RUN_ID" '[.workflow_runs[] | select(.status != "completed" and .id != $id)
-                | select((.run_started_at // .created_at) as $t | $t < $me or ($t == $me and .id < $id))
-                | .run_number] | join(" ")')"
+            if ! earlier="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/deploy.yml/runs?per_page=100" --jq \
+              "[.workflow_runs[] | select(.status != \"completed\" and .id != $GITHUB_RUN_ID)
+                | select((.run_started_at // .created_at) as \$t | \$t < \"$me\" or (\$t == \"$me\" and .id < $GITHUB_RUN_ID))
+                | .run_number] | join(\" \")")"; then
+              earlier="(could not list runs)"
+            fi
             [ -z "$earlier" ] && break
             echo "Waiting for earlier runs: $earlier"
             sleep 20
@@ -83,14 +102,6 @@ jobs:
           FRONTEND_ONLY: ${{ inputs.frontend_only }}
           SNAPSHOT: ${{ inputs.snapshot }}
         run: |
-          if [ -n "$SNAPSHOT" ] && ! [[ "$SNAPSHOT" =~ ^[A-Za-z0-9._-]+\.dump$ ]]; then
-            echo "::error::snapshot must be the name of a .dump object in the backups bucket"
-            exit 1
-          fi
-          if [ "$GITHUB_REF" != refs/heads/main ]; then
-            echo "::error::Only main is deployed"
-            exit 1
-          fi
           release=true
           api=true
           # Compare with the commit the live site was built from, not with the previous
