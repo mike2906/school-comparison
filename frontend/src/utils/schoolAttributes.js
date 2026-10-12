@@ -234,9 +234,11 @@ export function getOptionLabel(option, t) {
   // Scraped text that is a known option in other clothes ("Montessori", "Computer lab").
   const normalized = String(option).trim().toLowerCase().replace(/[\s-]+/g, '_')
   if (normalized !== option && isTagKey(normalized)) {
-    const normalizedKey = `advancedFilters.options.${normalized}`
-    const label = t(normalizedKey, { nsSeparator: false })
-    if (label !== normalizedKey) return label
+    for (const namespace of ['options', 'levels']) {
+      const normalizedKey = `advancedFilters.${namespace}.${normalized}`
+      const label = t(normalizedKey, { nsSeparator: false })
+      if (label !== normalizedKey) return label
+    }
   }
   // Free text scraped from a website: tidy it, but never Title-Case a sentence.
   return humanizeTag(option)

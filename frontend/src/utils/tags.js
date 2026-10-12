@@ -48,9 +48,9 @@ export function humanizeTag(value) {
   if (!text) return ''
   // Keys, and any other text joined by underscores ("First_language_(language_a)"), which
   // would otherwise be one unbreakable word.
-  const readable = isTagKey(text) || (text.includes('_') && !/\s/.test(text))
-    ? text.replace(/_+/g, ' ')
-    : toSentenceCase(text)
+  const readable = isTagKey(text)
+    ? text.replace(/_/g, ' ')
+    : toSentenceCase(text.includes('_') && !/\s/.test(text) ? text.replace(/_+/g, ' ').trim() : text)
   return readable.charAt(0).toUpperCase() + readable.slice(1)
 }
 
