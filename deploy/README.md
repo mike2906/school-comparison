@@ -174,6 +174,10 @@ API is down for about a minute. If the load, the migration or the readiness chec
 the host puts the backup back and the run fails. The run then rebuilds the site, and its
 summary shows the school count before and after.
 
+A publish dispatched while another release runs or waits is never cancelled: it waits for
+the runs that started before it, and a code release pushed after it waits for the publish.
+(Pushes still replace each other while waiting, since the newest carries the same code.)
+
 It refuses to run when the API is behind the commit (a failed or rolled-back release): run
 a full release first. If the site build fails after the data was loaded, the new data
 stays; rerun with `frontend_only`.
