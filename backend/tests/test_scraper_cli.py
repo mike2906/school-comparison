@@ -12,7 +12,11 @@ from sqlalchemy import select
 
 from app.models import School, SchoolLocation, SchoolLocationAgeGroupShift, SourcePage
 from app.models.scrape_log import ScrapeType
-from app.scrapers import cli as scraper_cli
+from app.scrapers.repairs import age_groups as age_group_repair
+from app.scrapers.repairs import geocodes as geocode_repair
+from app.scrapers.repairs import i18n as i18n_repair
+from app.scrapers.repairs import locations as location_repair
+from app.scrapers.repairs import websites as website_repair
 from app.scrapers.stages import extract as extract_stage
 from app.scrapers.stages import navigate as navigate_stage
 from app.scrapers.stages import website as website_stage
@@ -40,7 +44,7 @@ async def test_load_moe_lookup_maps_tolerates_non_json_response():
             return MockResponse()
 
     with patch("httpx.AsyncClient", return_value=MockClient()):
-        assert await scraper_cli._load_moe_lookup_maps() == ({}, {}, {})
+        assert await geocode_repair._load_moe_lookup_maps() == ({}, {}, {})
 
 
 def test_select_brand_aliases_for_school_accepts_host_aligned_brand():
@@ -52,7 +56,7 @@ def test_select_brand_aliases_for_school_accepts_host_aligned_brand():
         website_url="https://britanica-parkschool.bg/",
     )
 
-    aliases = scraper_cli._select_brand_aliases_for_school(
+    aliases = website_repair._select_brand_aliases_for_school(
         {"bg": "BRITANICA Park School", "en": "BRITANICA Park School"},
         "https://britanica-parkschool.bg/",
         school,
@@ -82,7 +86,7 @@ def test_out_of_bounds_repair_address_candidates_prefer_extracted_contact():
         address_i18n={"bg": 'ж. к. Слатина, ул. "Гео Милев" № 158, ВТУ "Т. Каблешков", корпус 6'},
     )
 
-    candidates = scraper_cli._out_of_bounds_repair_address_candidates(school, location)
+    candidates = geocode_repair._out_of_bounds_repair_address_candidates(school, location)
 
     assert candidates[0] == "ул. Гео Милев 158"
     assert "ул. 6 септември №16, София, България" in candidates
@@ -98,7 +102,7 @@ def test_select_brand_aliases_for_school_rejects_noisy_aliases():
         website_url="https://espa.bg/",
     )
 
-    aliases = scraper_cli._select_brand_aliases_for_school(
+    aliases = website_repair._select_brand_aliases_for_school(
         {"bg": "ЕСПА", "en": "Google Reference School"},
         "https://espa.bg/",
         school,
@@ -116,7 +120,7 @@ def test_select_brand_aliases_for_school_skips_state_schools():
         website_url="https://142ou.com/",
     )
 
-    aliases = scraper_cli._select_brand_aliases_for_school(
+    aliases = website_repair._select_brand_aliases_for_school(
         {"bg": "142 ОУ", "en": "142 School"},
         "https://142ou.com/",
         school,
@@ -157,7 +161,7 @@ def test_infer_age_group_evidence_from_source_pages_detects_all_through_school_s
         ),
     ]
 
-    evidence = scraper_cli._infer_age_group_evidence_from_source_pages(pages)
+    evidence = age_group_repair._infer_age_group_evidence_from_source_pages(pages)
 
     assert set(evidence) == {"preschool", "grade_1_4", "grade_5_7", "grade_8_12"}
 
@@ -195,7 +199,7 @@ def test_infer_age_group_evidence_ignores_preschool_mentions_that_are_not_an_off
         raw_markdown=text,
     )
 
-    assert "preschool" not in scraper_cli._infer_age_group_evidence_from_source_pages([page])
+    assert "preschool" not in age_group_repair._infer_age_group_evidence_from_source_pages([page])
 
 
 @pytest.mark.parametrize(
@@ -222,7 +226,7 @@ def test_infer_age_group_evidence_keeps_preschool_offers(text):
         raw_markdown=text,
     )
 
-    assert "preschool" in scraper_cli._infer_age_group_evidence_from_source_pages([page])
+    assert "preschool" in age_group_repair._infer_age_group_evidence_from_source_pages([page])
 
 
 def test_should_refresh_age_group_navigation_for_upper_secondary_missing_primary_stages():
@@ -245,7 +249,7 @@ def test_should_refresh_age_group_navigation_for_upper_secondary_missing_primary
         )
     ]
 
-    assert scraper_cli._should_refresh_age_group_navigation(school) is True
+    assert age_group_repair._should_refresh_age_group_navigation(school) is True
 
 
 def test_should_refresh_age_group_navigation_skips_complete_all_through_school():
@@ -270,7 +274,7 @@ def test_should_refresh_age_group_navigation_skips_complete_all_through_school()
         )
     ]
 
-    assert scraper_cli._should_refresh_age_group_navigation(school) is False
+    assert age_group_repair._should_refresh_age_group_navigation(school) is False
 
 
 def test_allowed_age_group_repairs_for_kindergarten_excludes_school_grades():
@@ -283,7 +287,7 @@ def test_allowed_age_group_repairs_for_kindergarten_excludes_school_grades():
         website_url="https://meridian22.bg",
     )
 
-    assert scraper_cli._allowed_age_group_repairs_for_school(school) == {"preschool"}
+    assert age_group_repair._allowed_age_group_repairs_for_school(school) == {"preschool"}
 
 
 def test_allowed_age_group_repairs_for_gymnasium_excludes_preschool_and_primary():
@@ -298,10 +302,10 @@ def test_allowed_age_group_repairs_for_gymnasium_excludes_preschool_and_primary(
         attributes={"moe_detailed_type": 125},
     )
 
-    assert scraper_cli._allowed_age_group_repairs_for_school(school) == {"grade_5_7", "grade_8_12"}
+    assert age_group_repair._allowed_age_group_repairs_for_school(school) == {"grade_5_7", "grade_8_12"}
 
     school.attributes = {"moe_detailed_type": 124}  # средно училище, grades 1-12
-    assert "preschool" in scraper_cli._allowed_age_group_repairs_for_school(school)
+    assert "preschool" in age_group_repair._allowed_age_group_repairs_for_school(school)
 
 
 def test_allowed_age_group_repairs_for_lower_secondary_excludes_grade_8_12():
@@ -314,7 +318,7 @@ def test_allowed_age_group_repairs_for_lower_secondary_excludes_grade_8_12():
         website_url="https://124-ou.com",
     )
 
-    assert scraper_cli._allowed_age_group_repairs_for_school(school) == {
+    assert age_group_repair._allowed_age_group_repairs_for_school(school) == {
         "preschool",
         "grade_1_4",
         "grade_5_7",
@@ -378,7 +382,7 @@ async def test_repair_age_groups_command_adds_missing_groups_from_source_pages(d
             return False
 
     with patch("app.database.async_session_maker", return_value=SessionCtx()):
-        await scraper_cli._repair_age_groups_command(
+        await age_group_repair.repair_age_groups_command(
             school_name=None,
             school_id=school.id,
             city="sofia",
@@ -446,7 +450,7 @@ async def test_repair_age_groups_command_ignores_disallowed_kindergarten_school_
             return False
 
     with patch("app.database.async_session_maker", return_value=SessionCtx()):
-        await scraper_cli._repair_age_groups_command(
+        await age_group_repair.repair_age_groups_command(
             school_name=None,
             school_id=school.id,
             city="sofia",
@@ -515,7 +519,7 @@ async def test_repair_age_groups_command_ignores_disallowed_lower_secondary_grad
             return False
 
     with patch("app.database.async_session_maker", return_value=SessionCtx()):
-        await scraper_cli._repair_age_groups_command(
+        await age_group_repair.repair_age_groups_command(
             school_name=None,
             school_id=school.id,
             city="sofia",
@@ -599,7 +603,7 @@ async def test_repair_age_groups_refresh_navigation_only_targets_likely_candidat
         patch("app.database.async_session_maker", return_value=SessionCtx()),
         patch.object(navigate_stage, "run_navigate_batch", new=navigate_mock),
     ):
-        await scraper_cli._repair_age_groups_command(
+        await age_group_repair.repair_age_groups_command(
             school_name=None,
             school_id=None,
             city="sofia",
@@ -780,7 +784,7 @@ async def test_repair_i18n_command_clears_synthetic_values_and_reextracts_eligib
         patch("app.database.async_session_maker", return_value=SessionCtx()),
         patch.object(extract_stage, "run_extract_batch", new=extract_batch_mock),
     ):
-        await scraper_cli._repair_i18n_command(
+        await i18n_repair.repair_i18n_command(
             school_name=None,
             school_id=None,
             city="sofia",
@@ -818,7 +822,7 @@ async def test_location_repair_reasons_for_school_detects_office_like_and_missin
         )
     ]
 
-    reasons = scraper_cli._location_repair_reasons_for_school(school)
+    reasons = location_repair._location_repair_reasons_for_school(school)
 
     assert reasons == ["office-like-address", "missing-coords", "geojson-coords"]
 
@@ -881,7 +885,7 @@ async def test_repair_locations_command_targets_candidates_and_runs_navigate_and
         patch.object(navigate_stage, "run_navigate_batch", new=navigate_batch_mock),
         patch.object(extract_stage, "run_extract_batch", new=extract_batch_mock),
     ):
-        await scraper_cli._repair_locations_command(
+        await location_repair.repair_locations_command(
             school_name=None,
             school_id=None,
             city="sofia",
@@ -937,7 +941,7 @@ async def test_repair_out_of_bounds_geocodes_checks_contact_email_only_before_ge
         patch("app.config.get_settings", return_value=placeholder_settings),
         patch("app.services.geocoding.nominatim.NominatimProvider") as provider_cls,
     ):
-        command = scraper_cli._repair_out_of_bounds_geocodes_command(
+        command = geocode_repair.repair_out_of_bounds_geocodes_command(
             school_name=None,
             school_id=school.id,
             city="sofia",

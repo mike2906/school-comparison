@@ -95,3 +95,15 @@ async def find_school_by_name(db, name: str, country: str) -> Optional[int]:
     console.print(table)
     console.print("[yellow]Use --school-id to specify which school[/yellow]")
     return None
+
+
+def school_label(school) -> str:
+    name_i18n = school.name_i18n or {}
+    return name_i18n.get("bg") or name_i18n.get("en") or f"School {school.id}"
+
+
+def primary_location_for_school(school):
+    locations = builtins.list(school.locations or [])
+    if not locations:
+        return None
+    return sorted(locations, key=lambda loc: (not bool(loc.is_primary), loc.id or 0))[0]

@@ -564,7 +564,7 @@ async def test_withhold_clears_site_derived_locations_but_keeps_officially_confi
 async def test_repair_websites_runs_recovered_urls_through_the_check(db_session):
     from unittest.mock import AsyncMock, patch
 
-    from app.scrapers import cli as scraper_cli
+    from app.scrapers.repairs import websites as website_repair
     from app.scrapers.stages import website as website_stage
 
     school = School(
@@ -586,7 +586,7 @@ async def test_repair_websites_runs_recovered_urls_through_the_check(db_session)
         patch.object(website_stage, "run_recover_failed_school", new=AsyncMock()),
         patch.object(website_stage, "check_shared_sites", new=AsyncMock()) as check_mock,
     ):
-        await scraper_cli._repair_websites_command(
+        await website_repair.repair_websites_command(
             school_name=None, school_id=school.id, city="sofia", country="bg", limit=None,
             include_state=False, dry_run=False, recover_failed=True, run_extract=False,
         )

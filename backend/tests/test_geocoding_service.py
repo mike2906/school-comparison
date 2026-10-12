@@ -5,7 +5,7 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import School, SchoolLocation
-from app.scrapers.cli import _oblast_fallback_query_specs
+from app.scrapers.repairs.geocodes import _oblast_fallback_query_specs
 from app.services.geocoding.base import GeocodingResult
 from app.services.geocoding.nominatim import (
     AREA_LEVEL_MATCH_ERROR,
