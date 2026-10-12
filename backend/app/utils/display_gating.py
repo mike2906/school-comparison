@@ -65,7 +65,9 @@ _ACTIONABLE_DISCREPANCY_KINDS = {"contradiction", "unsupported"}
 # (`test_display_gating`) fails if a mapped key falls outside that core set, keeping the
 # gate's coverage and the spot-check's scope in lockstep.
 _FIELD_PATH_DISPLAY_FIELDS: dict[str, tuple[str, ...]] = {
-    "attributes.extracted.languages": ("language_focus", "languages_of_instruction"),
+    # languages_of_instruction is not scraped (school type or curated data), so a
+    # rejected scraped language list blanks only the focus.
+    "attributes.extracted.languages": ("language_focus",),
     "attributes.extracted.facilities": ("facilities",),
     "attributes.extracted.programs": ("special_programs",),
     "attributes.extracted.accreditations": ("special_programs",),

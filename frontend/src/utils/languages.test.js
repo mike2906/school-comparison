@@ -15,7 +15,8 @@ test('languageLabel translates known languages and keeps unknown values', () => 
   const t = (key) => `T:${key}`
   assert.equal(languageLabel('Bulgarian', t), 'T:languages.bulgarian')
   assert.equal(languageLabel('немски', t), 'T:languages.german')
-  assert.equal(languageLabel('latin', t), 'Latin')
+  assert.equal(languageLabel('латински', t), 'T:languages.latin')
+  assert.equal(languageLabel('esperanto', t), 'Esperanto')
   assert.equal(languageLabel('', t), '')
 })
 

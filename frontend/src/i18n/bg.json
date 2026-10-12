@@ -171,6 +171,7 @@
     "academicPerformance": "Академични резултати",
     "languagesPrograms": "Езици и програми",
     "languagesOfInstruction": "Езици на обучение",
+    "languageFocus": "Езикова насоченост",
     "teachingApproach": "Педагогически подход",
     "amenitiesFacilities": "Удобства и съоръжения",
     "additionalFacilities": "Допълнителни съоръжения",
@@ -690,7 +691,15 @@
     "romanian": "Румънски",
     "hebrew": "Иврит",
     "danish": "Датски",
-    "norwegian": "Норвежки"
+    "norwegian": "Норвежки",
+    "latin": "Латински",
+    "portuguese": "Португалски",
+    "polish": "Полски",
+    "czech": "Чешки",
+    "serbian": "Сръбски",
+    "ukrainian": "Украински",
+    "dutch": "Нидерландски",
+    "swedish": "Шведски"
   },
   "notFound": {
     "title": "Страницата не е намерена",

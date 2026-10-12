@@ -101,14 +101,16 @@ function KeyFacts({ school, examAverages, nvoExamType, ageGroup = null }) {
     )
   }
 
+  // Languages taught in come first; a language focus is not a language of instruction,
+  // so the fact carries the general "Languages" label.
   const languages = [
-    ...normalizeLanguageFocus(attributes.language_focus).map(item => item.language),
     ...(attributes.languages_of_instruction || []),
+    ...normalizeLanguageFocus(attributes.language_focus).map(item => item.language),
   ]
   const languageLabels = [...new Set(languages.filter(Boolean).map(lang => getLanguageLabel(lang, t)))]
   if (languageLabels.length > 0) {
     facts.languages = (
-      <Fact key="languages" label={t('schools.languagesOfInstruction')} value={listValue(languageLabels)} />
+      <Fact key="languages" label={t('schools.languages')} value={listValue(languageLabels)} />
     )
   }
 

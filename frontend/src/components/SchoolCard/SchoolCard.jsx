@@ -270,10 +270,11 @@ function buildExpandedSections({
   const languageFocus = normalizeLanguageFocus(attributes?.language_focus)
   const languagesOfInstruction = attributes?.languages_of_instruction || []
 
-  const primaryLanguage = languageFocus[0]?.language || languagesOfInstruction[0]
+  // Only a language of instruction is the primary language; a language focus is offered.
+  const primaryLanguage = languagesOfInstruction[0]
   const extraLanguages = [...new Set([
-    ...languageFocus.map(item => item.language),
     ...languagesOfInstruction,
+    ...languageFocus.map(item => item.language),
   ])].filter(Boolean)
 
   const programItems = new Set()
@@ -286,13 +287,12 @@ function buildExpandedSections({
     if (primaryLanguage) {
       lines.push(`${t('schoolCard.labels.primaryLanguage')}: ${getLanguageLabel(primaryLanguage, t)}`)
     }
-    if (extraLanguages.length > 1) {
-      const others = extraLanguages
-        .filter(language => language !== primaryLanguage)
-        .map(language => getLanguageLabel(language, t))
-      if (others.length > 0) {
-        lines.push(`${t('schoolCard.labels.alsoOffered')}: ${others.join(', ')}`)
-      }
+    const others = extraLanguages
+      .filter(language => language !== primaryLanguage)
+      .map(language => getLanguageLabel(language, t))
+    if (others.length > 0) {
+      const label = primaryLanguage ? t('schoolCard.labels.alsoOffered') : t('schoolCard.sections.languages')
+      lines.push(`${label}: ${others.join(', ')}`)
     }
     if (programItems.size > 0) {
       lines.push(`${t('schoolCard.labels.specialPrograms')}: ${[...programItems].join(', ')}`)

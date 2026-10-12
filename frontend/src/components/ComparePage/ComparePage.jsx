@@ -491,11 +491,11 @@ function ComparePage() {
       const attributes = school.attributes || {}
       const focus = normalizeLanguageFocus(attributes.language_focus)
       const languages = new Set()
-      focus.forEach(item => {
-        if (item?.language) languages.add(getLanguageLabel(item.language, t))
-      })
       ;(attributes.languages_of_instruction || []).forEach(lang => {
         if (lang) languages.add(getLanguageLabel(lang, t))
+      })
+      focus.forEach(item => {
+        if (item?.language) languages.add(getLanguageLabel(item.language, t))
       })
       return [...languages]
     }

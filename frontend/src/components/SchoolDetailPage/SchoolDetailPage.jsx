@@ -754,31 +754,42 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
             <h2 className="text-2xl font-bold text-neutral-900 mb-6">{t('schools.languagesPrograms')}</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {hasLanguageInfo && (
-                <div>
-                  <h3 className="text-sm font-semibold text-neutral-500 uppercase tracking-wide mb-3">
-                    {t('schools.languagesOfInstruction')}
-                  </h3>
-                  <ul className="space-y-2">
-                    {normalizeLanguageFocus(attributes.language_focus).map((item, idx) => (
-                      <li key={idx} className="flex items-center gap-2 text-neutral-700">
-                        <span className="text-base">•</span>
-                        <span>
-                          {getLanguageLabel(item.language, t)}
-                          {item.level && item.level !== 'standard' && (
-                            <span className="ml-2 text-sm text-neutral-500">({getOptionLabel(item.level, t)})</span>
-                          )}
-                        </span>
-                      </li>
-                    ))}
-                    {(attributes.languages_of_instruction || [])
-                      .filter(lang => !normalizeLanguageFocus(attributes.language_focus).some(item => item.language === lang))
-                      .map((lang, idx) => (
-                        <li key={`inst-${idx}`} className="flex items-center gap-2 text-neutral-700">
-                          <span className="text-base">•</span>
-                          <span>{getLanguageLabel(lang, t)}</span>
-                        </li>
-                      ))}
-                  </ul>
+                <div className="space-y-6">
+                  {(attributes.languages_of_instruction || []).length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-neutral-500 uppercase tracking-wide mb-3">
+                        {t('schools.languagesOfInstruction')}
+                      </h3>
+                      <ul className="space-y-2">
+                        {attributes.languages_of_instruction.map((lang, idx) => (
+                          <li key={idx} className="flex items-center gap-2 text-neutral-700">
+                            <span className="text-base">•</span>
+                            <span>{getLanguageLabel(lang, t)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {normalizeLanguageFocus(attributes.language_focus).length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-neutral-500 uppercase tracking-wide mb-3">
+                        {t('schools.languageFocus')}
+                      </h3>
+                      <ul className="space-y-2">
+                        {normalizeLanguageFocus(attributes.language_focus).map((item, idx) => (
+                          <li key={idx} className="flex items-center gap-2 text-neutral-700">
+                            <span className="text-base">•</span>
+                            <span>
+                              {getLanguageLabel(item.language, t)}
+                              {item.level && item.level !== 'standard' && (
+                                <span className="ml-2 text-sm text-neutral-500">({getOptionLabel(item.level, t)})</span>
+                              )}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
               )}
 

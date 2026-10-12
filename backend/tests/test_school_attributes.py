@@ -474,7 +474,106 @@ class TestLocalizedProjection:
     def test_language_focus_is_structured(self):
         localized = build_localized_attributes(INTERNAL_ATTRIBUTES, "en")
         assert localized["language_focus"] == [{"language": "English", "level": "intensive"}]
-        assert localized["languages_of_instruction"] == ["English"]
+        # A taught language is not the language of instruction.
+        assert localized["languages_of_instruction"] == []
+
+    def test_state_school_teaches_in_bulgarian(self):
+        # KG31 Lyulin showed "Languages of instruction: English" (site review F).
+        attrs = {
+            "extracted": {
+                "languages": [
+                    {"language": "английски език", "level": None},
+                    {"language": "Bulgarian", "level": None},
+                    {"language": "немски", "level": "intensive"},
+                ]
+            }
+        }
+        localized = build_localized_attributes(attrs, "en", "state")
+        assert localized["languages_of_instruction"] == ["Bulgarian"]
+        assert localized["language_focus"] == [
+            {"language": "English", "level": None},
+            {"language": "German", "level": "intensive"},
+        ]
+
+    def test_private_school_uses_curated_instruction_languages_only(self):
+        attrs = {
+            "languages_of_instruction": ["bg", "английски"],
+            "extracted": {"languages": [{"language": "German", "level": None}]},
+        }
+        localized = build_localized_attributes(attrs, "bg", "private")
+        assert localized["languages_of_instruction"] == ["Bulgarian", "English"]
+        assert localized["language_focus"] == [{"language": "German", "level": None}]
+
+    def test_language_focus_drops_values_that_are_not_languages(self):
+        attrs = {
+            "extracted": {
+                "languages": [
+                    {"language": "Information Technologies", "level": None},
+                    {"language": "втори чужд език", "level": None},
+                    {"language": "Испански език", "level": None},
+                ]
+            }
+        }
+        localized = build_localized_attributes(attrs, "bg")
+        assert localized["language_focus"] == [{"language": "Spanish", "level": None}]
+
+    def test_keeps_a_levelled_focus_on_an_instruction_language(self):
+        # A bilingual private school keeps "English: immersion" in its focus and filter.
+        attrs = {
+            "languages_of_instruction": ["bulgarian", "english"],
+            "language_focus": [{"language": "english", "level": "immersion"}],
+        }
+        localized = build_localized_attributes(attrs, "bg", "private")
+        assert localized["language_focus"] == [{"language": "English", "level": "immersion"}]
+        filterable = build_filterable_attributes(attrs, "private")
+        assert filterable["language_focus"] == [{"language": "English", "level": "immersion"}]
+
+    def test_language_with_qualifier_and_ambiguous_codes(self):
+        attrs = {
+            "extracted": {
+                "languages": [
+                    {"language": "Английски език (интензивно)", "level": None},
+                    {"language": "IT", "level": None},
+                ]
+            }
+        }
+        localized = build_localized_attributes(attrs, "bg")
+        assert localized["language_focus"] == [{"language": "English", "level": None}]
+
+    @pytest.mark.parametrize(
+        "item",
+        [
+            "Национална програма на МОН „Заедно в изкуствата и спорта“",
+            "НП „Иновации в училище“ на МОН",
+            "Проект „Подкрепа за успех“ на Министерството на образованието",
+            "Шахматен турнир",
+            "Фолклорен фестивал",
+            "Български празник и обичаи",
+        ],
+    )
+    def test_keeps_named_programmes_and_clubs(self, item):
+        localized = build_localized_attributes(
+            {"extracted": {"programs": [item], "extracurricular": [item]}}, "bg"
+        )
+        assert localized["special_programs"] == [item]
+        assert localized["activities_offered"] == [item]
+
+    def test_drops_register_metadata_and_events_from_lists(self):
+        # Site review G: "МОН лиценз" showed as a programme on 50 schools.
+        attrs = {
+            "extracted": {
+                "programs": ["STEM", "МОН лиценз", "Montessori"],
+                "accreditations": ["МОН", "Cambridge", "Licensed"],
+                "extracurricular": ["Футбол", "Волейболен турнир между ученици и учители",
+                                    "Седмица на бащата"],
+                "facilities": ["Concert hall", "Библиотека"],
+            }
+        }
+        localized = build_localized_attributes(attrs, "bg")
+        assert localized["special_programs"] == ["STEM", "Montessori", "Cambridge"]
+        assert localized["activities_offered"] == ["Футбол"]
+        # The event rule is for programmes and activities: a concert hall is a facility.
+        assert localized["facilities"] == ["Concert hall", "Библиотека"]
 
     def test_merges_top_level_with_extracted(self):
         localized = build_localized_attributes(
@@ -702,10 +801,8 @@ class TestFilterableProjection:
         filterable = build_filterable_attributes(INTERNAL_ATTRIBUTES)
         assert filterable["facilities"] == ["library"]
         assert filterable["special_programs"] == ["meals_provided", "sports_program"]
-        assert {entry["language"] for entry in filterable["language_focus"]} == {
-            "Английски",
-            "English",
-        }
+        # "Английски" and "English" are one language.
+        assert {entry["language"] for entry in filterable["language_focus"]} == {"English"}
 
     def test_preserves_canonical_top_level_values(self):
         filterable = build_filterable_attributes({"facilities": ["cafeteria"], "teaching_approach": ["montessori"]})

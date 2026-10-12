@@ -29,6 +29,11 @@ from app.utils.display_gating import (
     admission_value_is_semantically_valid,
     blocked_display_fields,
 )
+from app.utils.display_lists import (
+    canonical_language,
+    instruction_languages,
+    is_list_noise,
+)
 from app.utils.facility_vocabulary import (
     APPROACH_VOCAB,
     FACILITY_VOCAB,
@@ -358,11 +363,13 @@ def _localized_extracted(attributes: Mapping[str, Any], locale: str) -> dict[str
 def build_localized_attributes(
     attributes: Mapping[str, Any] | None,
     locale: str,
+    school_type: Optional[str] = None,
 ) -> dict[str, Any]:
     """Resolve the free-text display fields for a single locale.
 
     Fields flagged by the current validation report (P1.7) are emitted empty so a
-    validator-rejected value never reaches the browser.
+    validator-rejected value never reaches the browser. ``school_type`` decides the
+    language of instruction (see ``app.utils.display_lists``).
     """
     attrs = _as_mapping(attributes)
     extracted = _localized_extracted(attrs, locale)
@@ -371,10 +378,20 @@ def build_localized_attributes(
     admission = _as_mapping(extracted.get("admission"))
     operations = _as_mapping(extracted.get("operations"))
 
-    focus = _normalize_focus_entries(
-        _normalize_focus_entries(attrs.get("language_focus"))
-        + _normalize_focus_entries(extracted.get("languages"))
+    instruction = instruction_languages(
+        _as_list(attrs.get("languages_of_instruction")), school_type
     )
+    focus = _normalize_focus_entries([
+        {**entry, "language": language}
+        for entry in _normalize_focus_entries(
+            _normalize_focus_entries(attrs.get("language_focus"))
+            + _normalize_focus_entries(extracted.get("languages"))
+        )
+        # A plain "Bulgarian" at a school taught in Bulgarian says nothing; a focus with a
+        # level ("English: immersion" at a bilingual school) is kept.
+        if (language := canonical_language(entry["language"]))
+        and (entry.get("level") or language not in instruction)
+    ])
 
     def admission_values(field_name: str) -> list[str]:
         return [
@@ -388,10 +405,7 @@ def build_localized_attributes(
 
     resolved = {
         "language_focus": focus,
-        "languages_of_instruction": _merged_list(
-            attrs.get("languages_of_instruction"),
-            extracted.get("languages"),
-        ),
+        "languages_of_instruction": instruction,
         "facilities": _merged_list(attrs.get("facilities"), extracted.get("facilities")),
         "special_programs": _merged_list(
             attrs.get("special_programs"),
@@ -431,6 +445,8 @@ def build_localized_attributes(
             for value in values
             if (text := publishable_display_text(value)) is not None
         ]
+    for field in ("facilities", "special_programs", "activities_offered"):
+        resolved[field] = [text for text in resolved[field] if not is_list_noise(text, field)]
     return resolved
 
 
@@ -583,16 +599,21 @@ def build_base_attributes(attributes: Mapping[str, Any] | None) -> dict[str, Any
 
 def build_display_attributes(
     attributes: Mapping[str, Any] | None,
+    school_type: Optional[str] = None,
 ) -> tuple[dict[str, Any], dict[str, dict[str, Any]]]:
     """Project raw `attributes` into `(base, {locale: localized})` for the API."""
     return (
         build_base_attributes(attributes),
-        {locale: build_localized_attributes(attributes, locale) for locale in DISPLAY_LOCALES},
+        {
+            locale: build_localized_attributes(attributes, locale, school_type)
+            for locale in DISPLAY_LOCALES
+        },
     )
 
 
 def build_filterable_attributes(
     attributes: Mapping[str, Any] | None,
+    school_type: Optional[str] = None,
 ) -> dict[str, Any]:
     """Flatten the display projection into the shape filters match against.
 
@@ -606,7 +627,9 @@ def build_filterable_attributes(
     ``/schools`` matcher and ``/schools/filters`` both read this projection, so they
     agree on the vocabulary.
     """
-    localized = [build_localized_attributes(attributes, locale) for locale in DISPLAY_LOCALES]
+    localized = [
+        build_localized_attributes(attributes, locale, school_type) for locale in DISPLAY_LOCALES
+    ]
 
     def _union(field: str) -> list[str]:
         return _dedupe_strings(value for values in localized for value in values[field])

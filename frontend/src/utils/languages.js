@@ -21,6 +21,14 @@ const ALIASES = {
   hebrew: 'hebrew', he: 'hebrew', иврит: 'hebrew',
   danish: 'danish', da: 'danish', датски: 'danish',
   norwegian: 'norwegian', no: 'norwegian', норвежки: 'norwegian',
+  latin: 'latin', la: 'latin', латински: 'latin',
+  portuguese: 'portuguese', pt: 'portuguese', португалски: 'portuguese',
+  polish: 'polish', pl: 'polish', полски: 'polish',
+  czech: 'czech', cs: 'czech', чешки: 'czech',
+  serbian: 'serbian', sr: 'serbian', сръбски: 'serbian',
+  ukrainian: 'ukrainian', uk: 'ukrainian', украински: 'ukrainian',
+  dutch: 'dutch', nl: 'dutch', нидерландски: 'dutch', холандски: 'dutch',
+  swedish: 'swedish', sv: 'swedish', шведски: 'swedish',
 }
 
 /** The canonical key for a language value, or null when it is not a known language. */
