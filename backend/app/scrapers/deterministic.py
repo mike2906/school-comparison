@@ -20,12 +20,12 @@ from typing import Any
 from app.models.school import School
 from app.models.source_page import SourcePage
 from app.scrapers import extractor
-from app.scrapers import extractor_helpers as helpers
+from app.scrapers.extraction import contact_details, general_fields, page_selection, price_lines
 
 
 def deterministic_pricing_rows(school: School, pages: list[SourcePage]) -> list[dict[str, Any]]:
     """Deterministic pricing rows as normalized field dicts (enums -> ``.value``)."""
-    selected_text, _source_urls = helpers._select_pages(
+    selected_text, _source_urls = page_selection._select_pages(
         school=school,
         pages=pages,
         preferred_categories=extractor.PRICING_PAGE_CATEGORIES,
@@ -34,7 +34,7 @@ def deterministic_pricing_rows(school: School, pages: list[SourcePage]) -> list[
     if not selected_text:
         return []
 
-    deterministic = helpers._extract_prices_deterministic(selected_text)
+    deterministic = price_lines._extract_prices_deterministic(selected_text)
     supported = extractor._supported_price_rows(deterministic.prices, selected_text)
 
     rows: list[dict[str, Any]] = []
@@ -57,7 +57,7 @@ def deterministic_general_info(
 ) -> tuple[dict[str, Any], dict[str, Any] | None, dict[str, str] | None]:
     """Deterministic ``(extracted, extracted_i18n, display_name_i18n)`` projection."""
     all_page_text = "\n".join((p.raw_markdown or "") for p in pages)
-    narrative_text, _ = helpers._select_pages(
+    narrative_text, _ = page_selection._select_pages(
         school=school,
         pages=pages,
         preferred_categories=extractor.SUMMARY_SOURCE_PAGE_CATEGORIES,
@@ -79,10 +79,10 @@ def deterministic_general_info(
         website_url=school.website_url,
         known_aliases=known_aliases,
     )
-    normalized, extracted_i18n, display_name_i18n = helpers._normalize_general_info_output(
+    normalized, extracted_i18n, display_name_i18n = general_fields._normalize_general_info_output(
         parsed, school.country_code
     )
-    contact_info = helpers._extract_contact_info_deterministic(all_page_text)
+    contact_info = contact_details._extract_contact_info_deterministic(all_page_text)
     extracted = extractor._build_extracted_attributes(normalized, contact_info)
     return extracted, extracted_i18n, display_name_i18n
 

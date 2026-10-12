@@ -2,7 +2,7 @@
 
 import pytest
 
-from app.scrapers.extractor_helpers import _is_low_quality_display_name, _normalize_display_name_i18n
+from app.scrapers.extraction.display_naming import _is_low_quality_display_name, _normalize_display_name_i18n
 
 JUNK = [
     "Ръководство на частно средно училище”Джани РоДари",

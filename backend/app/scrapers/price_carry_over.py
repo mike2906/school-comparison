@@ -6,7 +6,7 @@ from app.models.field_source import FieldSource
 from app.models.pricing import Pricing
 from app.models.school import School
 from app.models.source_page import SourcePage
-from app.scrapers.extractor_helpers import _normalize_academic_year
+from app.scrapers.extraction.price_lines import _normalize_academic_year
 from app.scrapers.price_evidence import period_fits_category, states_another_unit
 from app.utils.display_gating import blocked_pricing_row_ids, pricing_row_is_publishable
 

@@ -24,7 +24,7 @@ from app.ai.summariser import (
     validate_summary_i18n,
 )
 from app.models import School, SchoolLocation
-from app.scrapers.extractor_helpers import _is_low_quality_display_name
+from app.scrapers.extraction.display_naming import _is_low_quality_display_name
 from app.services.geocoding.bounds import get_city_bounds
 from app.utils.display_gating import exam_result_is_publishable, iter_blocking_field_paths
 from app.utils.i18n_resolver import (

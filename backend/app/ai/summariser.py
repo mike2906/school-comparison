@@ -351,9 +351,9 @@ async def generate_school_summary(summary_input: SummaryInput, *, school_id: int
                 summary_input,
                 lang,
             )
-        from app.scrapers import extractor_helpers as helpers
+        from app.scrapers.extraction import llm_results
 
-        input_tokens, output_tokens = helpers._get_usage(result)
+        input_tokens, output_tokens = llm_results._get_usage(result)
         token_cost_usd = calculate_cost(SUMMARY_MODEL_TIER, input_tokens, output_tokens)
         return {
             "summary_i18n": summary_i18n,

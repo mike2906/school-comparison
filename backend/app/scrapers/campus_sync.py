@@ -221,18 +221,18 @@ def _is_contact_page(page: SitePage) -> bool:
 
 
 def _label(before: Sequence[str]) -> str:
-    from app.scrapers import extractor_helpers as helpers
+    from app.scrapers.extraction import contact_details
 
     for line in reversed(before):
-        if re.search(r"[^\W\d_]{3}", line) and not helpers._looks_like_contact_address(
-            helpers._normalize_contact_address_candidate(line)
+        if re.search(r"[^\W\d_]{3}", line) and not contact_details._looks_like_contact_address(
+            contact_details._normalize_contact_address_candidate(line)
         ):
             return line.strip(" :")
     return ""
 
 
 def _campus_candidates(pages: Sequence[SitePage], *, city: str, family: str) -> tuple[list[dict], list[dict]]:
-    from app.scrapers import extractor_helpers as helpers
+    from app.scrapers.extraction import contact_details
 
     other_family = "school" if family == "kindergarten" else "kindergarten"
     # Only an entrance attached to another numbered street address on the same line
@@ -251,8 +251,8 @@ def _campus_candidates(pages: Sequence[SitePage], *, city: str, family: str) -> 
             continue
         lines = [line.strip() for line in (page.text or "").splitlines() if line.strip()]
         for index, line in enumerate(lines):
-            address = helpers._normalize_contact_address_candidate(line)
-            if not helpers._looks_like_contact_address(address):
+            address = contact_details._normalize_contact_address_candidate(line)
+            if not contact_details._looks_like_contact_address(address):
                 continue
             before = lines[max(0, index - CONTEXT_BEFORE) : index]
             after = lines[index + 1 : index + 1 + CONTEXT_AFTER]

@@ -32,12 +32,12 @@ from app.schemas.validation import (
     ValidationIssue,
     ValidationReport,
 )
-from app.scrapers import extractor_helpers as extraction_helpers
 from app.scrapers.campus_sync import (
     apply_campus_sync,
     geocode_campus_locations,
     remove_website_campus_data,
 )
+from app.scrapers.extraction import general_fields, llm_results, summary_sources
 from app.scrapers.price_evidence import (
     RULE_AMOUNT_NEAR_LABEL,
     RULE_DEPOSIT,
@@ -348,10 +348,10 @@ def _normalize_summary_source(
     programs: list[str] | None = None,
 ) -> dict[str, Any]:
     parsed = SummarySourceExtractionOutput.model_validate(value or {})
-    language_candidates = extraction_helpers._normalize_languages(
+    language_candidates = general_fields._normalize_languages(
         [ExtractedLanguageFocus.model_validate(item) for item in (languages or [])]
     )
-    normalized_model = extraction_helpers._normalize_summary_source_output(
+    normalized_model = summary_sources._normalize_summary_source_output(
         parsed,
         language_candidates=language_candidates,
         program_candidates=_normalize_text_list(programs or []),
@@ -398,7 +398,7 @@ def _normalize_summary_source(
         ):
             normalized[key] = []
 
-    normalized["canonical_tags"] = extraction_helpers._derive_summary_source_canonical_tags(
+    normalized["canonical_tags"] = summary_sources._derive_summary_source_canonical_tags(
         positioning=normalized.get("positioning"),
         teaching_approach=_normalize_text_list(normalized.get("teaching_approach")),
         student_experience=_normalize_text_list(normalized.get("student_experience")),
@@ -1631,7 +1631,7 @@ async def run_spot_check_for_school(
             ),
             timeout=max(5.0, float(settings.validation_spot_check_timeout_seconds)),
         )
-        input_tokens, output_tokens = extraction_helpers._get_usage(raw_result)
+        input_tokens, output_tokens = llm_results._get_usage(raw_result)
         token_cost_usd = extract_provider_cost_usd(raw_result) or calculate_cost(
             "capable", input_tokens, output_tokens
         )

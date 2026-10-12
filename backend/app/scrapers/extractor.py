@@ -39,6 +39,18 @@ from app.schemas.extraction import (
     ServicesExtractionOutput,
     SummarySourceExtractionOutput,
 )
+from app.scrapers.extraction import (
+    contact_details,
+    display_naming,
+    fee_lines,
+    general_fields,
+    llm_results,
+    page_selection,
+    price_lines,
+    price_rows,
+    summary_sources,
+    text_values,
+)
 from app.scrapers.llm_record import record_answer
 from app.scrapers.price_carry_over import carry_over_periods
 from app.scrapers.price_evidence import (
@@ -65,13 +77,12 @@ from app.services.geocoding.write_gate import (
 )
 from app.services.provider_costs import execute_billable_request
 from app.utils.display_gating import blocked_pricing_row_ids, pricing_row_is_publishable
+from app.utils.transliteration import transliterate_bulgarian
 from app.utils.website_data import (
     WEBSITE_DATA_WITHHELD_KEY,
     prepare_validation_rollover,
     website_data_is_publishable,
 )
-
-from . import extractor_helpers as helpers
 
 logger = logging.getLogger(__name__)
 
@@ -408,7 +419,7 @@ async def _sync_primary_location_from_contact_address(
     school: School,
     contact_info: dict[str, Any] | None,
 ) -> dict[str, Any] | None:
-    website_address = helpers._normalize_contact_address_candidate((contact_info or {}).get("address") or "")
+    website_address = contact_details._normalize_contact_address_candidate((contact_info or {}).get("address") or "")
     coordinates = (contact_info or {}).get("coordinates")
     coord_lat = coordinates.get("lat") if isinstance(coordinates, dict) else None
     coord_lng = coordinates.get("lng") if isinstance(coordinates, dict) else None
@@ -427,7 +438,7 @@ async def _sync_primary_location_from_contact_address(
 
     primary_location = locations[0]
     address_i18n = dict(primary_location.address_i18n or {})
-    current_bg = helpers._normalize_contact_address_candidate(address_i18n.get("bg") or "")
+    current_bg = contact_details._normalize_contact_address_candidate(address_i18n.get("bg") or "")
     existing_tags = list(primary_location.location_tags or [])
     coord_tags = [tag for tag in existing_tags if str(tag).startswith("coords_source=")]
     tags = [
@@ -614,14 +625,14 @@ async def _run_typed_agent(
             parsed=parsed,
             school_id=school_id,
         )
-        input_tokens, output_tokens = helpers._get_usage(result)
+        input_tokens, output_tokens = llm_results._get_usage(result)
         token_cost_usd = _extract_openrouter_cost_usd(result)
         return parsed, input_tokens, output_tokens, token_cost_usd
 
     def _record_failure(exc: Exception, *, final: bool) -> None:
-        if helpers._is_output_validation_error(exc):
+        if llm_results._is_output_validation_error(exc):
             llm_stats.typed_validation_failures += 1
-        if helpers._is_model_or_provider_error(exc):
+        if llm_results._is_model_or_provider_error(exc):
             llm_stats.provider_failures += 1
         if final:
             llm_stats.hard_failures += 1
@@ -654,8 +665,8 @@ def _has_display_name_signal(text: str) -> bool:
     )
     for pattern in patterns:
         for match in re.finditer(pattern, snippet, flags=re.IGNORECASE):
-            candidate = helpers._refine_display_name_label(match.group(1))
-            if not candidate or helpers._is_low_quality_display_name(candidate):
+            candidate = display_naming._refine_display_name_label(match.group(1))
+            if not candidate or display_naming._is_low_quality_display_name(candidate):
                 continue
             lowered = candidate.casefold()
             if lowered in {
@@ -673,7 +684,7 @@ def _has_display_name_signal(text: str) -> bool:
                 continue
             if any(noise in lowered for noise in ("cookie", "consent", "blog", "reference school")):
                 continue
-            if helpers._display_name_tokens(candidate):
+            if display_naming._display_name_tokens(candidate):
                 return True
     return False
 
@@ -708,7 +719,7 @@ async def _extract_display_name_capable_fallback(
     )
     if parsed is None:
         return None, input_tokens, output_tokens, token_cost_usd
-    normalized = helpers._normalize_display_name_i18n(parsed.display_name_i18n, country_code)
+    normalized = display_naming._normalize_display_name_i18n(parsed.display_name_i18n, country_code)
     return normalized, input_tokens, output_tokens, token_cost_usd
 
 
@@ -720,7 +731,7 @@ def _promote_repeated_display_name_candidate(
 ) -> tuple[GeneralInfoExtractionOutput, str | None]:
     from app.scrapers.display_name_audit import audit_school_display_name
 
-    current_display = helpers._normalize_display_name_i18n(parsed.display_name_i18n, school.country_code) or {}
+    current_display = display_naming._normalize_display_name_i18n(parsed.display_name_i18n, school.country_code) or {}
     finding = audit_school_display_name(
         {
             "id": school.id,
@@ -740,8 +751,8 @@ def _promote_repeated_display_name_candidate(
     if finding is None:
         return parsed, None
 
-    bucket = helpers._text_lang_bucket(finding.candidate_name)
-    candidate_i18n = helpers._normalize_display_name_i18n(
+    bucket = text_values._text_lang_bucket(finding.candidate_name)
+    candidate_i18n = display_naming._normalize_display_name_i18n(
         {"en": finding.candidate_name} if bucket == "en" else {"bg": finding.candidate_name},
         school.country_code,
     )
@@ -762,7 +773,7 @@ def _promote_repeated_display_name_candidate(
     # If we already have a display name, require the promoted candidate to be
     # clearly better. When the current display is empty, strong repeated page
     # evidence is allowed to seed it.
-    if current_display and not helpers._should_prefer_alias_display_name(current_display, candidate_i18n):
+    if current_display and not display_naming._should_prefer_alias_display_name(current_display, candidate_i18n):
         return parsed, None
     if current_display == candidate_i18n:
         return parsed, None
@@ -785,23 +796,23 @@ def _labels_match(left: str | None, right: str | None) -> bool:
         "school",
     }
     generic_tokens = set().union(
-        *(helpers._display_name_match_tokens(label) for label in generic_labels)
+        *(display_naming._display_name_match_tokens(label) for label in generic_labels)
     )
-    left_tokens = helpers._display_name_match_tokens(left) - generic_tokens
-    right_tokens = helpers._display_name_match_tokens(right) - generic_tokens
+    left_tokens = display_naming._display_name_match_tokens(left) - generic_tokens
+    right_tokens = display_naming._display_name_match_tokens(right) - generic_tokens
     return bool(left_tokens and right_tokens and left_tokens & right_tokens)
 
 
 def _refine_display_identity_label(value: str | None) -> str | None:
-    label = helpers._sanitize_label(str(value or ""), max_len=200)
+    label = text_values._sanitize_label(str(value or ""), max_len=200)
     if not label:
         return None
     label = re.sub(r"^(?:лого|logo)\s+", "", label, flags=re.IGNORECASE).strip()
     lowered = label.lower()
-    if lowered.startswith(helpers._DISPLAY_NAME_ROLE_PREFIXES):
+    if lowered.startswith(display_naming._DISPLAY_NAME_ROLE_PREFIXES):
         return None
 
-    stripped = helpers._DISPLAY_NAME_BG_STRIP_PREFIX.sub("", label).strip(" -,\"'“”„")
+    stripped = display_naming._DISPLAY_NAME_BG_STRIP_PREFIX.sub("", label).strip(" -,\"'“”„")
     stripped = re.sub(
         (
             r"^(?:с\s+ранно\s+чуждоезиково\s+обучение|с\s+немски\s+език|немска\s+гимназия|"
@@ -812,12 +823,12 @@ def _refine_display_identity_label(value: str | None) -> str | None:
         flags=re.IGNORECASE,
     ).strip(" -,\"'“”„")
     stripped = re.sub(r"\s+софия\s+\d+$", "", stripped, flags=re.IGNORECASE).strip()
-    if stripped and stripped != label and helpers._display_name_tokens(stripped):
-        label = helpers._normalize_display_name_case(stripped) or stripped
+    if stripped and stripped != label and display_naming._display_name_tokens(stripped):
+        label = display_naming._normalize_display_name_case(stripped) or stripped
 
-    stripped = helpers._DISPLAY_NAME_EN_STRIP_PREFIX.sub("", label).strip(" -,\"'“”„")
-    if stripped and stripped != label and helpers._display_name_tokens(stripped):
-        label = helpers._normalize_display_name_case(stripped) or stripped
+    stripped = display_naming._DISPLAY_NAME_EN_STRIP_PREFIX.sub("", label).strip(" -,\"'“”„")
+    if stripped and stripped != label and display_naming._display_name_tokens(stripped):
+        label = display_naming._normalize_display_name_case(stripped) or stripped
 
     return label
 
@@ -828,7 +839,7 @@ def _display_identity_key(value: str | None) -> str | None:
         return None
     label = label.replace("’", "'").replace("“", '"').replace("”", '"')
     label = re.sub(r"\s*&\s*", " and ", label)
-    label = helpers.transliterate_bulgarian(label) if re.search(r"[А-Яа-я]", label) else label
+    label = transliterate_bulgarian(label) if re.search(r"[А-Яа-я]", label) else label
     label = re.sub(r"[^a-z0-9]+", " ", label.casefold())
     label = re.sub(r"\s+", " ", label).strip()
     return label or None
@@ -846,8 +857,8 @@ def _display_name_has_domain_alias_match(
     host_parts = _HOST_SUFFIX_EXTRACTOR(host)
     owned_host_url = f"https://{host_parts.domain}" if host_parts.domain else None
 
-    aliases = helpers._extract_host_seed_aliases(owned_host_url)
-    host_aligned = helpers._extract_host_aligned_display_name(
+    aliases = display_naming._extract_host_seed_aliases(owned_host_url)
+    host_aligned = display_naming._extract_host_aligned_display_name(
         registry_name,
         owned_host_url,
     )
@@ -1133,11 +1144,11 @@ def _supported_price_rows(
     if not prices:
         return []
     supported = (
-        helpers._filter_model_prices(prices, selected_text)
+        fee_lines._filter_model_prices(prices, selected_text)
         if model_rows
-        else helpers._filter_supported_prices(prices, selected_text)
+        else price_rows._filter_supported_prices(prices, selected_text)
     )
-    return helpers._dedupe_price_rows(supported)
+    return price_rows._dedupe_price_rows(supported)
 
 
 def _normalized_price_fields(extracted: ExtractedPrice) -> dict[str, Any] | None:
@@ -1147,11 +1158,11 @@ def _normalized_price_fields(extracted: ExtractedPrice) -> dict[str, Any] | None
     no amount). Shared by ``_extract_prices`` row assembly and the golden-corpus
     harness so coercion stays identical between production and the regression suite.
     """
-    category = helpers._coerce_price_category(extracted.category)
-    period = helpers._coerce_price_period(extracted.period)
-    amount = helpers._to_optional_float(extracted.amount)
-    amount_min = helpers._to_optional_float(extracted.amount_min)
-    amount_max = helpers._to_optional_float(extracted.amount_max)
+    category = llm_results._coerce_price_category(extracted.category)
+    period = llm_results._coerce_price_period(extracted.period)
+    amount = text_values._to_optional_float(extracted.amount)
+    amount_min = text_values._to_optional_float(extracted.amount_min)
+    amount_max = text_values._to_optional_float(extracted.amount_max)
     if category is None or (extracted.period is not None and period is None):
         return None
     if amount is None and amount_min is None and amount_max is None:
@@ -1163,9 +1174,9 @@ def _normalized_price_fields(extracted: ExtractedPrice) -> dict[str, Any] | None
         "amount_min": amount_min,
         "amount_max": amount_max,
         "currency": (extracted.currency or "BGN")[:3].upper(),
-        "plan_name": helpers._fee_label(extracted.plan_name, 100),
-        "academic_year": helpers._normalize_scalar_text(extracted.academic_year, max_len=20),
-        "age_group": helpers._fee_label(extracted.age_group, 50),
+        "plan_name": fee_lines._fee_label(extracted.plan_name, 100),
+        "academic_year": text_values._normalize_scalar_text(extracted.academic_year, max_len=20),
+        "age_group": fee_lines._fee_label(extracted.age_group, 50),
     }
 
 
@@ -1209,7 +1220,7 @@ def _retention_year_key(value: str | None) -> tuple[bool, str]:
     raw = str(value or "").strip()
     if not raw:
         return (False, "")
-    canonical = helpers._normalize_academic_year(raw)
+    canonical = price_lines._normalize_academic_year(raw)
     return (True, canonical) if canonical else (False, raw)
 
 
@@ -1274,10 +1285,10 @@ async def _extract_prices(
     pages = [
         page
         for page in pages
-        if not helpers._is_template_filler(page.raw_markdown)
+        if not fee_lines._is_template_filler(page.raw_markdown)
         and not page_is_another_institutions(page.source_url, scope.grades, family, scope.shares_site)
     ]
-    selected_text, _source_urls = helpers._select_pages(
+    selected_text, _source_urls = page_selection._select_pages(
         school=school,
         pages=pages,
         preferred_categories=PRICING_PAGE_CATEGORIES,
@@ -1308,8 +1319,8 @@ async def _extract_prices(
     )
     # Only the prompt gets glued currency words spaced; deterministic extraction and the
     # evidence checks below keep the original page text.
-    user_prompt = helpers._space_glued_currency_words(selected_text)
-    deterministic_pricing = helpers._extract_prices_deterministic(selected_text)
+    user_prompt = price_lines._space_glued_currency_words(selected_text)
+    deterministic_pricing = price_lines._extract_prices_deterministic(selected_text)
     used_deterministic_pricing = False
 
     parsed, input_tokens, output_tokens, token_cost_usd = await _run_typed_agent(
@@ -1327,11 +1338,11 @@ async def _extract_prices(
     listed_under_a_fee: list[tuple[str, float]] = []
     if isinstance(parsed, PageFees):
         listed_under_a_fee = [
-            (helpers._FEE_KIND_CATEGORY.get(line.kind, "other"), line.amount)
+            (fee_lines._FEE_KIND_CATEGORY.get(line.kind, "other"), line.amount)
             for line in parsed.lines
             if line.role in ("discounted", "plan")
         ]
-        prices = helpers._prices_from_fee_lines(parsed.lines)
+        prices = fee_lines._prices_from_fee_lines(parsed.lines)
         parsed = PriceExtractionOutput(prices=prices, has_pricing_info=bool(prices))
 
     if parsed is None:
@@ -1420,11 +1431,11 @@ async def _extract_prices(
         amount_min = fields["amount_min"]
         amount_max = fields["amount_max"]
 
-        normalized_discounts = helpers._normalize_text_list(extracted.discounts)
-        normalized_installments = helpers._normalize_text_list(extracted.installments)
-        normalized_includes = helpers._normalize_text_list(extracted.includes)
-        normalized_excludes = helpers._normalize_text_list(extracted.excludes)
-        row_source_url = helpers._find_supporting_price_source_url(
+        normalized_discounts = text_values._normalize_text_list(extracted.discounts)
+        normalized_installments = text_values._normalize_text_list(extracted.installments)
+        normalized_includes = text_values._normalize_text_list(extracted.includes)
+        normalized_excludes = text_values._normalize_text_list(extracted.excludes)
+        row_source_url = fee_lines._find_supporting_price_source_url(
             school, pages, extracted, model_rows=not used_deterministic_pricing
         )
         if not row_source_url:
@@ -1437,7 +1448,7 @@ async def _extract_prices(
         # copy) resolves to the first page that states the amount; there its label is
         # not to be found, unlike that of a second band with the same price.
         fee_key = (category, amount, fields["currency"])
-        if fee_key in seen_fees and not helpers._label_is_on_page(
+        if fee_key in seen_fees and not fee_lines._label_is_on_page(
             fields["plan_name"], supporting_page.raw_markdown if supporting_page else None
         ):
             continue
@@ -1445,7 +1456,7 @@ async def _extract_prices(
         if (
             not fields["academic_year"]
             and supporting_page is not None
-            and helpers._yearless_pricing_text_is_stale(supporting_page.raw_markdown or "")
+            and price_lines._yearless_pricing_text_is_stale(supporting_page.raw_markdown or "")
         ):
             continue
 
@@ -1480,7 +1491,7 @@ async def _extract_prices(
                 school_id=school.id,
                 category="pricing",
                 field_key=f"pricing.{category.value}.{period.value if period else 'unstated'}",
-                value_text=helpers._format_price_value_text(
+                value_text=llm_results._format_price_value_text(
                     amount,
                     amount_min,
                     amount_max,
@@ -1488,7 +1499,7 @@ async def _extract_prices(
                 ),
                 source_type=SourceType.SCRAPED_WEBSITE,
                 source_url=row_source_url,
-                scraped_at=helpers._utcnow_naive(),
+                scraped_at=text_values._utcnow_naive(),
                 confidence=SourceConfidence.HIGH if (extracted.confidence or 0) >= 0.8 else SourceConfidence.MEDIUM,
                 confidence_score=extracted.confidence,
             )
@@ -1553,7 +1564,7 @@ async def _extract_prices(
     attrs = dict(school.attributes) if isinstance(school.attributes, dict) else {}
     if regressions:
         attrs[PRICING_HOLD_KEY] = {
-            "held_at": helpers._utcnow_naive().isoformat(),
+            "held_at": text_values._utcnow_naive().isoformat(),
             "reasons": regressions,
             "proposed_rows": len(pricing_rows),
         }
@@ -1610,14 +1621,14 @@ async def _extract_general_info(
 ) -> dict[str, Any]:
     settings = get_settings()
     all_page_text = "\n".join((p.raw_markdown or "") for p in pages)
-    selected_text, source_urls = helpers._select_pages(
+    selected_text, source_urls = page_selection._select_pages(
         school=school,
         pages=pages,
         preferred_categories=GENERAL_INFO_PAGE_CATEGORIES,
         use_case="general_info",
         include_tokens=GENERAL_INFO_HINT_TOKENS,
     )
-    narrative_text, _ = helpers._select_pages(
+    narrative_text, _ = page_selection._select_pages(
         school=school,
         pages=pages,
         preferred_categories=SUMMARY_SOURCE_PAGE_CATEGORIES,
@@ -1686,7 +1697,7 @@ async def _extract_general_info(
             known_aliases=known_aliases,
         )
         min_quality_score = max(0, int(settings.extraction_general_info_min_quality_score))
-        current_quality = helpers._score_general_info_output(parsed)
+        current_quality = llm_results._score_general_info_output(parsed)
         if current_quality < min_quality_score:
             recovery_prompt = (
                 "Extract additional concrete school facts that are explicitly present. "
@@ -1721,7 +1732,7 @@ async def _extract_general_info(
                     website_url=school.website_url,
                     known_aliases=known_aliases,
                 )
-                recovered_quality = helpers._score_general_info_output(recovered_augmented)
+                recovered_quality = llm_results._score_general_info_output(recovered_augmented)
                 if recovered_quality >= current_quality:
                     parsed = recovered_augmented
                     detail_note = (
@@ -1771,13 +1782,13 @@ async def _extract_general_info(
                 else promoted_display_name_note
             )
 
-    normalized, extracted_i18n, display_name_i18n = helpers._normalize_general_info_output(parsed, school.country_code)
+    normalized, extracted_i18n, display_name_i18n = general_fields._normalize_general_info_output(parsed, school.country_code)
     display_name_evidence = _build_display_name_evidence(
         display_name_i18n,
         school=school,
         pages=pages,
     )
-    contact_info = helpers._extract_contact_info_deterministic(all_page_text)
+    contact_info = contact_details._extract_contact_info_deterministic(all_page_text)
     await _adopt_stated_address(db, school, all_page_text)
     location_address_update = await _sync_primary_location_from_contact_address(db, school, contact_info)
 
@@ -1857,7 +1868,7 @@ async def _extract_general_info(
                 value_text=value_text,
                 source_type=SourceType.SCRAPED_WEBSITE,
                 source_url=source_url,
-                scraped_at=helpers._utcnow_naive(),
+                scraped_at=text_values._utcnow_naive(),
                 confidence=SourceConfidence.MEDIUM,
                 confidence_score=0.7,
             )
@@ -1897,7 +1908,7 @@ async def _extract_general_info(
                 value_text=location_address_update["address"],
                 source_type=SourceType.SCRAPED_WEBSITE,
                 source_url=source_url,
-                scraped_at=helpers._utcnow_naive(),
+                scraped_at=text_values._utcnow_naive(),
                 confidence=SourceConfidence.HIGH,
                 confidence_score=0.85,
                 notes=(
@@ -1948,17 +1959,17 @@ def _merge_admission_info(
     deterministic: AdmissionExtractionOutput,
 ) -> AdmissionExtractionOutput:
     merged = AdmissionExtractionOutput(
-        deadlines=helpers._merge_text_values(llm.deadlines, deterministic.deadlines),
-        required_documents=helpers._merge_text_values(
+        deadlines=text_values._merge_text_values(llm.deadlines, deterministic.deadlines),
+        required_documents=text_values._merge_text_values(
             llm.required_documents, deterministic.required_documents
         ),
-        application_steps=helpers._merge_text_values(
+        application_steps=text_values._merge_text_values(
             llm.application_steps, deterministic.application_steps
         ),
-        entrance_requirements=helpers._merge_text_values(
+        entrance_requirements=text_values._merge_text_values(
             llm.entrance_requirements, deterministic.entrance_requirements
         ),
-        available_spots=helpers._merge_text_values(llm.available_spots, deterministic.available_spots),
+        available_spots=text_values._merge_text_values(llm.available_spots, deterministic.available_spots),
         has_useful_info=False,
     )
     merged.has_useful_info = any(
@@ -1979,11 +1990,11 @@ def _merge_operations_info(
 ) -> OperationsExtractionOutput:
     merged = OperationsExtractionOutput(
         working_hours=llm.working_hours or deterministic.working_hours,
-        day_options=helpers._merge_text_values(llm.day_options, deterministic.day_options),
-        daily_schedule=helpers._merge_text_values(llm.daily_schedule, deterministic.daily_schedule),
-        meals=helpers._merge_text_values(llm.meals, deterministic.meals),
-        transport=helpers._merge_text_values(llm.transport, deterministic.transport),
-        uniforms=helpers._merge_text_values(llm.uniforms, deterministic.uniforms),
+        day_options=text_values._merge_text_values(llm.day_options, deterministic.day_options),
+        daily_schedule=text_values._merge_text_values(llm.daily_schedule, deterministic.daily_schedule),
+        meals=text_values._merge_text_values(llm.meals, deterministic.meals),
+        transport=text_values._merge_text_values(llm.transport, deterministic.transport),
+        uniforms=text_values._merge_text_values(llm.uniforms, deterministic.uniforms),
         has_useful_info=False,
     )
     merged.has_useful_info = any(
@@ -2004,10 +2015,10 @@ def _merge_services_info(
     deterministic: ServicesExtractionOutput,
 ) -> ServicesExtractionOutput:
     merged = ServicesExtractionOutput(
-        support_services=helpers._merge_text_values(
+        support_services=text_values._merge_text_values(
             llm.support_services, deterministic.support_services
         ),
-        safety_features=helpers._merge_text_values(llm.safety_features, deterministic.safety_features),
+        safety_features=text_values._merge_text_values(llm.safety_features, deterministic.safety_features),
         has_useful_info=False,
     )
     merged.has_useful_info = any((merged.support_services, merged.safety_features))
@@ -2019,19 +2030,19 @@ def _merge_pricing_terms_info(
     deterministic: PricingTermsExtractionOutput,
 ) -> PricingTermsExtractionOutput:
     merged = PricingTermsExtractionOutput(
-        discounts=helpers._merge_text_values(llm.discounts, deterministic.discounts),
-        installments=helpers._merge_text_values(llm.installments, deterministic.installments),
-        included_items=helpers._merge_text_values(
+        discounts=text_values._merge_text_values(llm.discounts, deterministic.discounts),
+        installments=text_values._merge_text_values(llm.installments, deterministic.installments),
+        included_items=text_values._merge_text_values(
             llm.included_items, deterministic.included_items
         ),
-        excluded_items=helpers._merge_text_values(
+        excluded_items=text_values._merge_text_values(
             llm.excluded_items, deterministic.excluded_items
         ),
-        deposits=helpers._merge_text_values(llm.deposits, deterministic.deposits),
-        application_fees=helpers._merge_text_values(
+        deposits=text_values._merge_text_values(llm.deposits, deterministic.deposits),
+        application_fees=text_values._merge_text_values(
             llm.application_fees, deterministic.application_fees
         ),
-        registration_fees=helpers._merge_text_values(
+        registration_fees=text_values._merge_text_values(
             llm.registration_fees, deterministic.registration_fees
         ),
         has_useful_info=False,
@@ -2056,19 +2067,19 @@ def _merge_summary_source_info(
 ) -> SummarySourceExtractionOutput:
     merged = SummarySourceExtractionOutput(
         positioning=llm.positioning or deterministic.positioning,
-        teaching_approach=helpers._merge_text_values(
+        teaching_approach=text_values._merge_text_values(
             llm.teaching_approach, deterministic.teaching_approach
         ),
-        student_experience=helpers._merge_text_values(
+        student_experience=text_values._merge_text_values(
             llm.student_experience, deterministic.student_experience
         ),
-        community_signals=helpers._merge_text_values(
+        community_signals=text_values._merge_text_values(
             llm.community_signals, deterministic.community_signals
         ),
-        differentiators=helpers._merge_text_values(
+        differentiators=text_values._merge_text_values(
             llm.differentiators, deterministic.differentiators
         ),
-        canonical_tags=helpers._merge_text_values(
+        canonical_tags=text_values._merge_text_values(
             llm.canonical_tags, deterministic.canonical_tags
         ),
         has_useful_info=False,
@@ -2095,39 +2106,39 @@ def _augment_general_info_with_deterministic(
     website_url: str | None,
     known_aliases: list[str] | None,
 ) -> GeneralInfoExtractionOutput:
-    deterministic_display_name = helpers._extract_display_name_i18n_deterministic(
+    deterministic_display_name = display_naming._extract_display_name_i18n_deterministic(
         all_page_text,
         registry_name=registry_name,
         country_code=country_code,
         website_url=website_url,
         known_aliases=known_aliases,
     )
-    deterministic_languages = helpers._extract_languages_deterministic(all_page_text)
-    deterministic_founded_year = helpers._extract_founded_year_deterministic(all_page_text)
-    deterministic_class_size = helpers._extract_class_size_deterministic(all_page_text)
-    deterministic_accreditations = helpers._extract_accreditations_deterministic(all_page_text)
-    deterministic_admission = helpers._extract_admission_info_deterministic(all_page_text)
-    deterministic_operations = helpers._extract_operations_info_deterministic(all_page_text)
-    deterministic_services = helpers._extract_services_info_deterministic(all_page_text)
-    deterministic_pricing_terms = helpers._extract_pricing_terms_deterministic(all_page_text)
-    deterministic_summary_source = helpers._extract_summary_source_deterministic(
+    deterministic_languages = general_fields._extract_languages_deterministic(all_page_text)
+    deterministic_founded_year = general_fields._extract_founded_year_deterministic(all_page_text)
+    deterministic_class_size = general_fields._extract_class_size_deterministic(all_page_text)
+    deterministic_accreditations = general_fields._extract_accreditations_deterministic(all_page_text)
+    deterministic_admission = general_fields._extract_admission_info_deterministic(all_page_text)
+    deterministic_operations = general_fields._extract_operations_info_deterministic(all_page_text)
+    deterministic_services = general_fields._extract_services_info_deterministic(all_page_text)
+    deterministic_pricing_terms = general_fields._extract_pricing_terms_deterministic(all_page_text)
+    deterministic_summary_source = summary_sources._extract_summary_source_deterministic(
         narrative_text or all_page_text
     )
 
     merged = GeneralInfoExtractionOutput(
-        display_name_i18n=helpers._merge_display_name_i18n(
+        display_name_i18n=display_naming._merge_display_name_i18n(
             llm_output.display_name_i18n,
             deterministic_display_name,
             country_code,
         )
         or {},
-        languages=helpers._merge_language_candidates(llm_output.languages, deterministic_languages),
+        languages=general_fields._merge_language_candidates(llm_output.languages, deterministic_languages),
         facilities=llm_output.facilities,
         programs=llm_output.programs,
         extracurricular=llm_output.extracurricular,
-        class_size=helpers._merge_class_size(llm_output.class_size, deterministic_class_size),
-        founded_year=helpers._merge_founded_year(llm_output.founded_year, deterministic_founded_year),
-        accreditations=helpers._merge_text_values(
+        class_size=general_fields._merge_class_size(llm_output.class_size, deterministic_class_size),
+        founded_year=general_fields._merge_founded_year(llm_output.founded_year, deterministic_founded_year),
+        accreditations=text_values._merge_text_values(
             llm_output.accreditations, deterministic_accreditations
         ),
         admission=_merge_admission_info(llm_output.admission, deterministic_admission),
@@ -2139,7 +2150,7 @@ def _augment_general_info_with_deterministic(
         ),
         has_useful_info=False,
     )
-    merged.has_useful_info = helpers._score_general_info_output(merged) > 0
+    merged.has_useful_info = llm_results._score_general_info_output(merged) > 0
     return merged
 
 

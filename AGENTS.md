@@ -178,12 +178,13 @@ you hit a real problem.
 - Treat existing implementation work as sunk cost when a simpler design is available.
 - Prefer what libraries already do (Leaflet distance, not a custom haversine) and simple
   retries (1-2-3, not backoff with jitter). No caching/queues before a real performance problem.
-- Large files (`app/scrapers/extractor_helpers.py`, `extractor.py`, `cli.py` are
-  2,000–5,000 lines): locate code with `grep -n` and read only the needed line ranges.
+- Large files (`app/scrapers/extractor.py`, `validator.py` are 1,700–2,400 lines): locate
+  code with `grep -n` and read only the needed line ranges.
 - **Don't grow the giant files.** New functions do not go into `app/scrapers/cli.py`,
-  `app/scrapers/extractor_helpers.py`, `app/scrapers/extractor.py`, `app/scrapers/validator.py`
-  or `frontend/src/components/SearchPage/SearchPage.jsx`. Put new logic in a focused module
-  (a service, a stage module, a `src/utils/` file) and call it from there; a CLI command
+  `app/scrapers/extractor.py`, `app/scrapers/validator.py` or
+  `frontend/src/components/SearchPage/SearchPage.jsx`. Put new logic in a focused module
+  (a service, a stage module under `app/scrapers/stages/`, the matching extraction module
+  under `app/scrapers/extraction/`, a `src/utils/` file) and call it from there; a CLI command
   stays a thin wrapper. Fixing existing code in place is fine. The plan for breaking these
   files up is in `docs/TECH_DEBT_PLAN.md`.
 

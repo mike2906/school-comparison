@@ -1023,14 +1023,14 @@ Be strict:
             timeout=self.llm_timeout,
         )
         try:
-            from app.scrapers import extractor_helpers
+            from app.scrapers.extraction import llm_results
 
             usage_method = getattr(result, "usage", None)
             if inspect.iscoroutinefunction(usage_method):
                 input_tokens = output_tokens = 0
                 token_cost_usd = 0.0
             else:
-                input_tokens, output_tokens = extractor_helpers._get_usage(result)
+                input_tokens, output_tokens = llm_results._get_usage(result)
                 token_cost_usd = extract_provider_cost_usd(result) or calculate_cost(
                     tier, input_tokens, output_tokens  # type: ignore[arg-type]
                 )

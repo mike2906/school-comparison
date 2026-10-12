@@ -10,11 +10,11 @@ from sqlalchemy.orm import selectinload
 from app.database import async_session_maker
 from app.models import School, SourcePage
 from app.models.scrape_log import ScrapeType
-from app.scrapers.extractor_helpers import transliterate_bulgarian
 from app.services.identity_adjudication import _registrable_domain
 from app.services.school_relations import brand, shared_brand_key
 from app.services.school_relations import brand_key as key
 from app.utils.i18n_resolver import resolve_display_name_i18n
+from app.utils.transliteration import transliterate_bulgarian
 
 
 def addr_key(value):

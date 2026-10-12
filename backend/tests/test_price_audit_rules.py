@@ -10,7 +10,7 @@ from decimal import Decimal
 
 import pytest
 
-from app.scrapers import extractor_helpers as helpers
+from app.scrapers.extraction import price_lines, text_values
 from app.scrapers.price_evidence import (
     RULE_EXPIRED,
     RULE_LEVEL,
@@ -275,7 +275,8 @@ def test_expired_offers(page, amount, category, expired):
 
 
 def test_517_extraction_reads_the_heading_when_the_word_beside_the_amount_cannot_fit():
-    from app.scrapers.extractor_helpers import ExtractedPrice, _filter_model_prices
+    from app.schemas.extraction import ExtractedPrice
+    from app.scrapers.extraction.fee_lines import _filter_model_prices
 
     page = (
         "--- SOURCE: https://school.test/fees ---\n"
@@ -299,7 +300,7 @@ def test_517_extraction_reads_the_heading_when_the_word_beside_the_amount_cannot
     ],
 )
 def test_text_list_keeps_decimal_commas(raw, expected):
-    assert helpers._normalize_text_list([raw]) == expected
+    assert text_values._normalize_text_list([raw]) == expected
 
 
 # ---------------------------------------------------------------------------
@@ -326,7 +327,7 @@ def test_text_list_keeps_decimal_commas(raw, expected):
     ],
 )
 def test_price_line_amount_and_currency(text, expected):
-    assert helpers._extract_price_amount_currency(text) == expected
+    assert price_lines._extract_price_amount_currency(text) == expected
 
 
 @pytest.mark.parametrize(
