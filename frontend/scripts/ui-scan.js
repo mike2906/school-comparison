@@ -13,7 +13,7 @@
  * Writes report.md, report.json and a screenshot per page with findings; exits 1 when
  * anything was found.
  */
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { appendFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { chromium } from 'playwright'
 
@@ -25,6 +25,10 @@ const LIMIT = Number(process.env.SCAN_LIMIT) || Infinity
 const CONCURRENCY = Number(process.env.SCAN_CONCURRENCY) || 4
 const OUT = path.resolve(process.env.SCAN_OUT || 'ui-scan-report')
 const VIEWPORT = { width: 390, height: 844 }
+// Signs of a transient outage (a deploy, an API restart), not of a bug in the page.
+const isTransient = finding =>
+  finding.check === 'page-load' ||
+  (finding.check === 'request-failed' && /net::ERR_|HTTP 5\d\d/.test(finding.text))
 const LANGUAGE_PREFIX = { bg: '', en: '/en' }
 
 async function fetchJson(url) {
@@ -228,16 +232,37 @@ async function main() {
   await Promise.all(Array.from({ length: CONCURRENCY }, async () => {
     while (next < pages.length) {
       const page = pages[next++]
-      const result = await scanPage(context, page, index)
+      let result = await scanPage(context, page, index)
+      // A deploy or a brief API hiccup fails every request for a few seconds; scan such a
+      // page once more before reporting it.
+      if (result.findings.some(isTransient)) {
+        const firstScreenshot = result.screenshot
+        await new Promise(resolve => setTimeout(resolve, 10_000))
+        result = await scanPage(context, page, index)
+        if (firstScreenshot && !result.screenshot) await rm(path.join(OUT, firstScreenshot), { force: true })
+      }
       results.push(result)
-      if (result.findings.length) console.log(`${result.findings.length} finding(s): ${result.url}`)
+      if (result.findings.length) {
+        console.log(`${result.findings.length} finding(s): ${result.url}`)
+        for (const finding of result.findings) console.log(`  ${finding.check}: ${finding.text.replace(/\n/g, ' ')}`)
+      }
     }
   }))
   await browser.close()
 
   results.sort((a, b) => a.url.localeCompare(b.url))
   await writeFile(path.join(OUT, 'report.json'), JSON.stringify(results, null, 2))
-  await writeFile(path.join(OUT, 'report.md'), markdownReport(results, startedAt))
+  const report = markdownReport(results, startedAt)
+  await writeFile(path.join(OUT, 'report.md'), report)
+  // On GitHub Actions, show the report on the run's page too (the summary is capped at 1 MiB).
+  if (process.env.GITHUB_STEP_SUMMARY) {
+    // The cap is in bytes, and Cyrillic takes two per character.
+    const limit = 900_000
+    const summary = Buffer.byteLength(report) > limit
+      ? `${Buffer.from(report).subarray(0, limit).toString().replace(/\uFFFD$/, '')}\n\n…truncated; the full report is in the run's artifact.\n`
+      : report
+    await appendFile(process.env.GITHUB_STEP_SUMMARY, summary)
+  }
   const total = results.reduce((sum, result) => sum + result.findings.length, 0)
   console.log(`${total} finding(s) on ${results.filter(r => r.findings.length).length} of ${results.length} pages. Report: ${path.join(OUT, 'report.md')}`)
   process.exitCode = total ? 1 : 0
