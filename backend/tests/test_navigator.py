@@ -829,3 +829,15 @@ async def test_a_template_page_is_not_the_schools_but_its_real_pages_are(db_sess
     assert result["success"] is True
     assert valid == {"https://school.bg/": False, "https://school.bg/priem": True}
     assert not withheld
+
+
+def test_photo_captions_do_not_make_a_real_page_a_template():
+    """506's aas-sofia.org captions its photos "Lorem Ipsum Dolor" on real pages."""
+    from pathlib import Path
+
+    from app.scrapers.page_content import is_template_filler
+
+    home = Path(__file__).parent / "golden_corpus/cases/506-anglo-amerikansko-uchilishte-v-s/page01.md"
+    assert "Lorem Ipsum" in home.read_text(encoding="utf-8")
+    assert not is_template_filler(home.read_text(encoding="utf-8"))
+    assert is_template_filler("Lorem ipsum dolor sit amet, consectetur adipiscing elit.")

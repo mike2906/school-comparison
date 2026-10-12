@@ -19,8 +19,14 @@ _PARKED_DOMAIN_RE = re.compile(
 )
 
 
+# An image or link's text is not the page's: aas-sofia.org (506) captions its photos
+# "Lorem Ipsum Dolor" on real pages.
+_MARKUP_TEXT_RE = re.compile(r"!?\[[^\]]*\]\([^)]*\)")
+
+
 def is_template_filler(text: str | None) -> bool:
-    return len({word.casefold() for word in _TEMPLATE_FILLER_RE.findall(text or "")}) >= 2
+    words = _TEMPLATE_FILLER_RE.findall(_MARKUP_TEXT_RE.sub(" ", text or ""))
+    return len({word.casefold() for word in words}) >= 2
 
 
 def is_parked_domain(text: str | None) -> bool:
