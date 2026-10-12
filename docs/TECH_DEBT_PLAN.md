@@ -42,9 +42,9 @@ There are three independent lanes. Within a lane, order matters. Across lanes, P
 
 | # | Step | Kind | Depends on | Can start |
 |---|---|---|---|---|
-| P1a | **Move the duplicated helpers into `src/utils/`, with tests in the same PR.** Tests for the admission and NVO helpers are required. They can't come first, because the in-component copies aren't exported, so they become testable only by moving. | Refactor and tests, 2-3 PRs | nothing | In progress (#223 merged) |
-| P1b | **Fix the `SchoolCard` currency display and the locale drift.** | Behaviour change, 1 PR | P1a | After P1a |
-| P1c | **Split the big components.** | Refactor, 3 PRs | P1a | After P1a |
+| P1a | **Move the duplicated helpers into `src/utils/`, with tests in the same PR.** Tests for the admission and NVO helpers are required. They can't come first, because the in-component copies aren't exported, so they become testable only by moving. | Refactor and tests, 2-3 PRs | nothing | Done (#223, #225) |
+| P1b | **Fix the `SchoolCard` currency display and the locale drift.** | Behaviour change, 1 PR | P1a | Done (#226-#229) |
+| P1c | **Split the big components.** | Refactor, 3 PRs | P1a | In progress: `SchoolCard` (#265), `ComparePage` (#266) and `SearchPage` (#267, #268, #269) done; `SchoolMap` left |
 
 ### Lane C: decisions that are not code moves
 
@@ -179,6 +179,7 @@ Every step below follows the same ground rules:
 6. **Split the big components one PR each, with no behaviour change.**
    - `ComparePage`: move the row and section components into files.
    - `SearchPage`: extract `useUrlFilters`, a `useUserLocation` hook and an `AdvancedFilters` component.
+     - Done as `AdvancedFilters`, `useUserLocation`, and `useUrlFilters`/`useFilterData` with the pure filter logic in `utils/searchFilters.js`. The view-state URL sync (sort, distance, view, tab, selection) stays in `SearchPage`. Its two effects depend on running in order and share refs with the detail panel, so moving them would add parameters without making them simpler.
    - `SchoolMap`: move the inner components out.
    - Each is checked in the running app (screenshots before and after) as well as with lint and build.
 
