@@ -513,7 +513,7 @@ test('isInstallmentPlan: the whole fee paid in one payment is not an instalment'
     assert.equal(isInstallmentPlan({ plan_name: name }), false, name)
   }
   // A numbered first instalment is still one instalment.
-  for (const name of ['Такса 1 вноска до 15.09', 'Плащане на 2 вноски: 1 вноска до 15 септември', '10 вноски, 1 вноска = 500']) {
+  for (const name of ['Такса 1 вноска до 15.09', 'Цена 1 вноска до 15.09', 'Размер на 1 вноска', 'на 1 вноска от 10', 'Плащане на 2 вноски: 1 вноска до 15 септември', '10 вноски, 1 вноска = 500']) {
     assert.equal(isInstallmentPlan({ plan_name: name }), true, name)
   }
 })

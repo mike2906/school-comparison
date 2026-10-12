@@ -30,7 +30,7 @@ export function periodFromLabel(text) {
 
 // The whole fee paid at once: "Плащане на 1 вноска", "на една вноска", "in one payment";
 // not "1 вноска до 15.09" or "10 вноски, 1 вноска = 500", which are one instalment.
-const ONE_PAYMENT_RE = /(?:на|в)\s+(?:1|една)\s+вноска(?![\p{L}])|еднократна\s+вноска|in (?:one|1|a single) (?:payment|instal+ment)|single payment/iu
+const ONE_PAYMENT_RE = /(?<![\p{L}])(?<!(?:размер|сума|цена|стойност)\s)(?:на|в)\s+(?:1|една)\s+вноска(?![\p{L}])(?!\s+от\s)|еднократна\s+вноска|in (?:one|1|a single) (?:payment|instal+ment)|single payment/iu
 const SEVERAL_INSTALMENTS_RE = /(?<![\p{L}\p{N}])(?:[2-9]|\d{2,}|две|три|четири|пет|шест|седем|осем|девет|десет)\s+вноски|общо|instal+ments/iu
 
 /** True when a fee name says the whole fee is paid in one payment. */
