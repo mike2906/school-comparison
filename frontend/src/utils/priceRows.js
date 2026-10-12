@@ -49,6 +49,14 @@ export function pricePeriod(row) {
   return null
 }
 
+// Registration and application fees are paid once by nature, so a missing period is no news.
+const ONE_OFF_CATEGORIES = new Set(['registration'])
+
+/** True when a row's period is unknown and a parent could misread how often it is paid. */
+export function periodUnknown(row) {
+  return !pricePeriod(row) && !ONE_OFF_CATEGORIES.has(row?.category)
+}
+
 // Kindergarten group words: "Първа и Втора група", "Първа - трета група", "3-та група",
 // "Third group". The fourth group is the preschool year.
 const GROUP_ORDER = ['first', 'second', 'third', 'preschool']

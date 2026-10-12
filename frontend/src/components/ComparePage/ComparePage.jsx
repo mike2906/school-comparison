@@ -6,6 +6,7 @@ import { useCompare } from '../../context/CompareContext'
 import { getLastSearchUrl } from '../../utils/searchViewState'
 import { schoolLevelLabel, schoolTypeLabel } from '../../utils/levelLabel'
 import { useCountry } from '../../context/CountryContext'
+import { orderAgeGroups } from '../../utils/ageGroupOrder'
 import { languageLabel } from '../../utils/languages'
 import TagList from '../SchoolDetailPage/TagList'
 import PhoneLinks from '../SchoolDetailPage/PhoneLinks'
@@ -49,7 +50,8 @@ import {
   getTrendTooltip,
 } from '../../utils/nvoDisplay'
 import { formatCurrency, formatPriceLabel, groupPricingByAcademicYear, priceAgeGroupLabel, sortByCategory, statedTuition, tuitionSortValue, YEAR_STATUS } from '../../utils/pricing'
-import { pricePeriod } from '../../utils/priceRows'
+import { pricePeriod, periodUnknown } from '../../utils/priceRows'
+import { safeSourceUrl, sourceSiteName } from '../../utils/priceSources'
 
 const SOURCE_BADGE_STYLES = {
   official: 'bg-emerald-50 text-emerald-700',
@@ -118,22 +120,11 @@ function stateAdmissionHint(school, t, ageGroup) {
 }
 
 /** " / month", " (one-time)" or " · period not stated", after a price. */
-function periodSuffix(period, t) {
-  if (!period) return ` · ${t('pricing.periodNotStated')}`
+function periodSuffix(price, t) {
+  const period = pricePeriod(price)
+  if (!period) return periodUnknown(price) ? ` · ${t('pricing.periodNotStated')}` : ''
   if (period === 'one_time') return ` (${t('pricing.one_time')})`
   return ` / ${t(`pricing.per.${period}`)}`
-}
-
-function shortenUrl(url) {
-  if (!url) return null
-  try {
-    const parsed = new URL(url)
-    const parts = parsed.pathname.split('/').filter(Boolean)
-    const suffix = parts.length > 0 ? `/${parts[0]}` : ''
-    return `${parsed.hostname}${suffix}`
-  } catch {
-    return url
-  }
 }
 
 const STATUS_BADGE_CLASSES = {
@@ -185,9 +176,11 @@ function normalizeCompareValue(value) {
 }
 
 function InlineSource({ badgeKey, badgeLabel, url, displayUrl, dateLabel, t }) {
-  if (!badgeLabel && !url && !dateLabel) return null
+  const href = safeSourceUrl(url)
+  if (!badgeLabel && !href && !dateLabel) return null
 
-  const finalDisplay = displayUrl || shortenUrl(url)
+  // The site only: a full, percent-encoded path doesn't wrap and runs into the next column.
+  const finalDisplay = href ? (displayUrl || sourceSiteName(href)) : null
   return (
     <div className="mt-1 flex flex-wrap items-center gap-1 text-[12px] text-neutral-500">
       {badgeLabel && (
@@ -198,10 +191,10 @@ function InlineSource({ badgeKey, badgeLabel, url, displayUrl, dateLabel, t }) {
       {dateLabel && <span>{dateLabel}</span>}
       {finalDisplay && (
         <a
-          href={url}
+          href={href}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 text-teal-700 hover:text-teal-800 underline"
+          className="inline-flex min-w-0 items-center gap-1 break-all text-teal-700 hover:text-teal-800 underline"
           aria-label={t('compare.opensInNewWindow')}
         >
           {finalDisplay}
@@ -539,7 +532,7 @@ function ComparePage() {
             const formatted = (fee) => (fee.min === fee.max
               ? formatCurrency(fee.min, i18n.language, fee.currency)
               : `${formatCurrency(fee.min, i18n.language, fee.currency)}–${formatCurrency(fee.max, i18n.language, fee.currency)}`
-            ) + periodSuffix(fee.period, t)
+            ) + periodSuffix({ period: fee.period, category: 'tuition' }, t)
             // As the school states it, never annualised (schools bill over 9–12 months).
             // Next year's fee leads when families now enrol for it; this year's follows.
             const current = pricingRange.currentYear
@@ -940,9 +933,9 @@ function ComparePage() {
       {
         label: t('compare.labels.eligibleAgeGroups'),
         getValue: (school) => {
-          const ageGroups = [...new Set((school.locations || [])
+          const ageGroups = orderAgeGroups([...new Set((school.locations || [])
             .flatMap(location => (Array.isArray(location.age_groups) ? location.age_groups : [location.age_group]))
-            .filter(Boolean))]
+            .filter(Boolean))], countryConfig)
           if (ageGroups.length === 0) return renderPlaceholder()
           // The age group the parent searched for is highlighted.
           return (
@@ -1000,7 +993,7 @@ function ComparePage() {
                       </div>
                       <div className="text-sm text-neutral-700">
                         {formatPriceLabel(price, i18n.language, t)}
-                        {periodSuffix(pricePeriod(price), t)}
+                        {periodSuffix(price, t)}
                       </div>
                       <InlineSource
                         badgeKey={price.source}
@@ -1035,8 +1028,8 @@ function ComparePage() {
                 return (
                   <div key={`${location.id || idx}`} className="text-sm text-neutral-700">
                     <div className="font-medium text-neutral-900">
-                      {(Array.isArray(location.age_groups) ? location.age_groups : [location.age_group])
-                        .filter(Boolean)
+                      {orderAgeGroups((Array.isArray(location.age_groups) ? location.age_groups : [location.age_group])
+                        .filter(Boolean), countryConfig)
                         .map(group => t(`ageGroups.${group}`))
                         .join(', ')}
                     </div>
@@ -1076,7 +1069,7 @@ function ComparePage() {
             rel="noopener noreferrer"
             className="text-primary-600 hover:text-primary-700 text-sm underline"
           >
-            {shortenUrl(school.website_url)}
+            {sourceSiteName(school.website_url) || school.website_url}
           </a>
         ) : renderPlaceholder(),
         getCompare: (school) => school.website_url || null,

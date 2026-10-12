@@ -2040,6 +2040,12 @@ the session scratchpad only.
       ("от 1-ви до 7-ми клас"), so 630 shows 6,150 for grades 1–4, not 6,150–6,640. Tuition
       paid "на 1 вноска" is the yearly fee, not one instalment, so 610 gets a headline again.
       Buditel's whole-sentence age group shows as "Grade 8".
+- [x] **UF51 Compare source links, one-off fees, card phones, NVO "last year", group order
+      (live-site review 2026-10-12, items D, E, I, J and the group-order note).** Compare
+      shows a source as its site, not a percent-encoded URL that covered the next column.
+      Registration fees with no period no longer get "Period not stated". Search-card phones
+      are normalised as on the school page. The NVO badge names the year when the year before
+      is missing. Age groups are listed youngest first, in the country config's order.
 
 ## Phase 3 — Go live
 
