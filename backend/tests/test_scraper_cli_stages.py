@@ -1076,7 +1076,7 @@ async def test_run_summarize_batch_aggregates_usage_for_all_results(db_session):
     with (
         patch("app.config.get_settings", return_value=settings),
         patch("app.database.async_session_maker", return_value=SessionCtx()),
-        patch("app.scrapers.summarizer.summarize_school", new=summarize_mock),
+        patch("app.scrapers.summary_pipeline.summarize_school", new=summarize_mock),
     ):
         summary = await summarize_stage.run_summarize_batch(
             db=db_session,

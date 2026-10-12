@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Optional
 
 from pydantic_ai.exceptions import ModelAPIError, ModelHTTPError, UnexpectedModelBehavior
 
@@ -16,23 +16,6 @@ from app.scrapers.extraction.text_values import (
     _normalize_key,
 )
 from app.scrapers.extraction_rules import base as rules
-
-
-def _get_usage(result: Any) -> tuple[int, int]:
-    """Extract input/output tokens from pydantic-ai result."""
-    usage_obj = result.usage() if callable(getattr(result, "usage", None)) else getattr(result, "usage", None)
-    if usage_obj is None:
-        return 0, 0
-
-    input_tokens = getattr(usage_obj, "input_tokens", None)
-    if input_tokens is None:
-        input_tokens = getattr(usage_obj, "request_tokens", 0)
-
-    output_tokens = getattr(usage_obj, "output_tokens", None)
-    if output_tokens is None:
-        output_tokens = getattr(usage_obj, "response_tokens", 0)
-
-    return int(input_tokens or 0), int(output_tokens or 0)
 
 
 def _is_model_or_provider_error(exc: Exception) -> bool:

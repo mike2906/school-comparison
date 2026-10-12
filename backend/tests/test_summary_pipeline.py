@@ -14,7 +14,7 @@ from app.ai import summariser as ai_summariser
 from app.models import School, SchoolLocation
 from app.models.exam_results import ExamResult
 from app.schemas.llm_outputs import SchoolSummaryStrict
-from app.scrapers import summarizer as summarizer_module
+from app.scrapers import summary_pipeline as summarizer_module
 
 
 def _validation_payload(status: str = "ok", issues: list[dict] | None = None, spot_check: dict | None = None) -> dict:
@@ -433,7 +433,7 @@ async def test_summarize_school_persists_summary_and_status(db_session):
         "model": "openrouter/google/gemini-2.5-flash-lite",
     }
 
-    with patch("app.scrapers.summarizer.generate_school_summary", new=AsyncMock(return_value=fake_result)):
+    with patch("app.scrapers.summary_pipeline.generate_school_summary", new=AsyncMock(return_value=fake_result)):
         result = await summarizer_module.summarize_school(db_session, school.id, "bg")
 
     assert result["status"] == "summarized"
@@ -489,7 +489,7 @@ async def test_summarize_school_skips_when_summary_is_current(db_session):
     db_session.add(school)
     await db_session.commit()
 
-    with patch("app.scrapers.summarizer.generate_school_summary", new=AsyncMock()) as summarize_mock:
+    with patch("app.scrapers.summary_pipeline.generate_school_summary", new=AsyncMock()) as summarize_mock:
         result = await summarizer_module.summarize_school(db_session, school.id, "bg")
 
     assert result["status"] == "skipped"
@@ -1194,7 +1194,7 @@ async def test_summarize_school_fails_closed_when_generated_summary_is_semantica
         "generation_mode": "llm",
     }
 
-    with patch("app.scrapers.summarizer.generate_school_summary", new=AsyncMock(return_value=invalid_result)):
+    with patch("app.scrapers.summary_pipeline.generate_school_summary", new=AsyncMock(return_value=invalid_result)):
         result = await summarizer_module.summarize_school(db_session, school.id, "bg")
 
     assert result["status"] == "summary_failed"

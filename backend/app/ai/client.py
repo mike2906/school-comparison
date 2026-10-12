@@ -134,6 +134,23 @@ def extract_provider_cost_usd(result: Any) -> float:
     return 0.0
 
 
+def get_usage(result: Any) -> tuple[int, int]:
+    """Extract input/output tokens from pydantic-ai result."""
+    usage_obj = result.usage() if callable(getattr(result, "usage", None)) else getattr(result, "usage", None)
+    if usage_obj is None:
+        return 0, 0
+
+    input_tokens = getattr(usage_obj, "input_tokens", None)
+    if input_tokens is None:
+        input_tokens = getattr(usage_obj, "request_tokens", 0)
+
+    output_tokens = getattr(usage_obj, "output_tokens", None)
+    if output_tokens is None:
+        output_tokens = getattr(usage_obj, "response_tokens", 0)
+
+    return int(input_tokens or 0), int(output_tokens or 0)
+
+
 def get_openrouter_model(tier: ModelTier) -> OpenRouterModel:
     """Build the native OpenRouter model required for exact usage metadata."""
     settings = get_settings()

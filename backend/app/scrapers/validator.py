@@ -18,7 +18,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import flag_modified
 
-from app.ai.client import calculate_cost, create_agent, extract_provider_cost_usd, get_model
+from app.ai.client import calculate_cost, create_agent, extract_provider_cost_usd, get_model, get_usage
 from app.config import get_settings
 from app.models.field_source import FieldSource, SourceType
 from app.models.pricing import PricePeriod, PriceSource, Pricing
@@ -37,7 +37,7 @@ from app.scrapers.campus_sync import (
     geocode_campus_locations,
     remove_website_campus_data,
 )
-from app.scrapers.extraction import general_fields, llm_results, summary_sources
+from app.scrapers.extraction import general_fields, summary_sources
 from app.scrapers.price_evidence import (
     RULE_AMOUNT_NEAR_LABEL,
     RULE_DEPOSIT,
@@ -57,7 +57,7 @@ from app.scrapers.price_evidence import (
     taught_grades,
 )
 from app.scrapers.shared_site_check import level_family, site_group_key
-from app.scrapers.summarizer import clear_summary_state
+from app.scrapers.summary_pipeline import clear_summary_state
 from app.services.provider_costs import execute_billable_request
 from app.utils.academic_year import normalize_academic_year
 from app.utils.display_gating import DISPLAY_NAME_FIELD_PATH, admission_value_is_semantically_valid
@@ -1631,7 +1631,7 @@ async def run_spot_check_for_school(
             ),
             timeout=max(5.0, float(settings.validation_spot_check_timeout_seconds)),
         )
-        input_tokens, output_tokens = llm_results._get_usage(raw_result)
+        input_tokens, output_tokens = get_usage(raw_result)
         token_cost_usd = extract_provider_cost_usd(raw_result) or calculate_cost(
             "capable", input_tokens, output_tokens
         )

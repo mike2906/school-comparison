@@ -18,7 +18,7 @@ console = Console()
 
 async def run_summarize_school(db, school_id: int, country: str):
     """Run Stage 7 summarization for one school."""
-    from app.scrapers.summarizer import summarize_school
+    from app.scrapers.summary_pipeline import summarize_school
 
     console.print(f"  Summarizing school {school_id}...")
     result = await summarize_school(db=db, school_id=school_id, country_code=country)
@@ -47,7 +47,7 @@ async def run_summarize_batch(
     """Run Stage 7 summarization in batch mode."""
     from app.config import get_settings as _get_settings
     from app.database import async_session_maker
-    from app.scrapers.summarizer import get_schools_requiring_summary, summarize_school
+    from app.scrapers.summary_pipeline import get_schools_requiring_summary, summarize_school
 
     settings = _get_settings()
     if school_ids is None:

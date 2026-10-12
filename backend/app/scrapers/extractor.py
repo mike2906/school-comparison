@@ -21,7 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy.orm.attributes import flag_modified
 
-from app.ai.client import get_model
+from app.ai.client import get_model, get_usage
 from app.config import get_settings
 from app.models.field_source import FieldSource, SourceConfidence, SourceType
 from app.models.pricing import PriceSource, Pricing
@@ -66,7 +66,7 @@ from app.scrapers.shared_site_check import (
     level_family,
     stated_address_for,
 )
-from app.scrapers.summarizer import clear_summary_state
+from app.scrapers.summary_pipeline import clear_summary_state
 from app.scrapers.validator import school_fee_scope, validate_school_data
 from app.services.geocoding.base import GeocodingResult
 from app.services.geocoding.bg.address_match import same_building
@@ -625,7 +625,7 @@ async def _run_typed_agent(
             parsed=parsed,
             school_id=school_id,
         )
-        input_tokens, output_tokens = llm_results._get_usage(result)
+        input_tokens, output_tokens = get_usage(result)
         token_cost_usd = _extract_openrouter_cost_usd(result)
         return parsed, input_tokens, output_tokens, token_cost_usd
 

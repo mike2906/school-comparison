@@ -26,12 +26,12 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.ai.client import calculate_cost, create_agent, extract_provider_cost_usd, get_model
+from app.ai.client import calculate_cost, create_agent, extract_provider_cost_usd, get_model, get_usage
 from app.models import School, SourcePage
 from app.models.scrape_log import ScrapeType
 from app.scrapers import extractor
 from app.scrapers.display_name_audit import _clean_candidate_text, _page_bonus
-from app.scrapers.extraction import display_naming, llm_results
+from app.scrapers.extraction import display_naming
 from app.services.identity_curation import _normalized_host, _source_page_key
 from app.services.provider_costs import execute_billable_request
 
@@ -684,7 +684,7 @@ def _parse_verdict(raw_result: Any) -> IdentityAdjudicationVerdict | None:
 
 def _usage(raw_result: Any) -> tuple[int, int]:
     try:
-        return llm_results._get_usage(raw_result)
+        return get_usage(raw_result)
     except Exception:
         return 0, 0
 
