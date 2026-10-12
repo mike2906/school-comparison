@@ -172,3 +172,12 @@ test('buildRobots allows search and AI answers, opts out of training, and names 
   assert.doesNotMatch(robots, /Disallow/)
   assert.match(robots, /^Sitemap: https:\/\/example\.test\/sitemap\.xml$/m)
 })
+
+test('the search page links every school it is given, in that language, escaped', () => {
+  const links = [{ routePath: '/schools/12', name: 'School <One>' }, { routePath: '/schools/7', name: 'Second' }]
+  const search = (language) => fixedPages(translator(language), language, links).find((page) => page.routePath === '/search')
+  assert.match(search('en').body, /<h2[^>]*>All schools and kindergartens<\/h2>/)
+  assert.match(search('en').body, /<li><a href="\/en\/schools\/12">School &lt;One&gt;<\/a><\/li><li><a href="\/en\/schools\/7">Second<\/a><\/li>/)
+  assert.match(search('bg').body, /<a href="\/schools\/12">/)
+  assert.doesNotMatch(fixedPages(t, 'en').find((page) => page.routePath === '/search').body, /<ul>/)
+})

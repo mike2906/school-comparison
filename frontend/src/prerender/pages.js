@@ -140,14 +140,34 @@ function paragraph(text) {
   return text ? `<p>${escapeHtml(text)}</p>` : ''
 }
 
-/** The pages that exist without school data, including the two aliases of `/search`. */
-export function fixedPages(t, language) {
+/**
+ * A link to every indexable school. The app's list shows a few dozen cards at a time and
+ * crawlers do not scroll, so without this most school pages are reachable only from the
+ * sitemap, and search engines treat such orphan pages as unimportant.
+ */
+function schoolDirectory(schoolLinks, t, language) {
+  if (schoolLinks.length === 0) return ''
+  const items = schoolLinks
+    .map(({ routePath, name }) => `<li><a href="${escapeHtml(languagePath(routePath, language))}">${escapeHtml(name)}</a></li>`)
+    .join('')
+  return `<section><h2 class="font-semibold">${escapeHtml(t('seo.allSchools'))}</h2><ul>${items}</ul></section>`
+}
+
+/**
+ * The pages that exist without school data, including the two aliases of `/search`.
+ * `schoolLinks` (`{ routePath, name }`, in display order) are listed on the search page.
+ */
+export function fixedPages(t, language, schoolLinks = []) {
   const siteName = t('nav.title')
   const search = {
     title: t('seo.searchTitle'),
     description: t('seo.searchDescription'),
     canonicalPath: '/search',
-    body: mainBlock([heading(t('seo.searchTitle')), paragraph(t('seo.searchDescription'))]),
+    body: mainBlock([
+      heading(t('seo.searchTitle')),
+      paragraph(t('seo.searchDescription')),
+      schoolDirectory(schoolLinks, t, language),
+    ]),
   }
   const searchLink = `<p><a href="${escapeHtml(languagePath('/search', language))}">${escapeHtml(t('notFound.cta'))}</a></p>`
   return [
@@ -221,6 +241,7 @@ export function schoolPage(school, t, language, { listed = true } = {}) {
 
   return {
     routePath: `/schools/${school.id}`,
+    name,
     title: `${name} · ${t('nav.title')}`,
     description: truncate(description),
     canonicalPath: `/schools/${school.id}`,
