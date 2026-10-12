@@ -661,6 +661,110 @@ async def test_run_spot_check_for_school_persists_payload(db_session, monkeypatc
     assert result["token_cost_usd"] == 0.0123
 
 
+@pytest.mark.asyncio
+async def test_run_spot_check_without_report_skips_and_stays_unpublishable(db_session, monkeypatch):
+    """A spot check must not create the report that lets website data publish (R1)."""
+    school = School(
+        name_i18n={"bg": "Spotcheck Без доклад"},
+        country_code="bg",
+        school_type="private",
+        education_level="primary",
+        city="sofia",
+        scrape_status="extracted",
+        attributes={"extracted": {"languages": [{"language": "English", "level": None}]}},
+    )
+    db_session.add(school)
+    await db_session.flush()
+    db_session.add(
+        SourcePage(
+            school_id=school.id,
+            source_url="https://example.test/about",
+            page_category="about",
+            scrape_type=ScrapeType.WEBSITE,
+            is_valid=True,
+            raw_markdown="English language classes are available.",
+            content_hash="hash-spotcheck-no-report",
+            last_scraped_at=datetime.datetime.now(datetime.timezone.utc),
+        )
+    )
+    await db_session.commit()
+    assert not website_data_is_publishable(school.attributes, school.scrape_status)
+
+    def _no_agent(**_kwargs):
+        raise AssertionError("spot check must not call the model without a report")
+
+    monkeypatch.setattr(validator_module, "create_agent", _no_agent)
+
+    result = await validator_module.run_spot_check_for_school(db_session, school.id, "bg")
+    assert result == {"school_id": school.id, "status": "skipped", "reason": "No validation report"}
+
+    await db_session.refresh(school)
+    assert "data_validation" not in (school.attributes or {})
+
+
+@pytest.mark.asyncio
+async def test_run_spot_check_skips_when_report_cleared_during_model_call(db_session, monkeypatch):
+    """URL validation can clear the report mid-call; the spot check must not recreate it."""
+    school = School(
+        name_i18n={"bg": "Spotcheck Изчистен"},
+        country_code="bg",
+        school_type="private",
+        education_level="primary",
+        city="sofia",
+        scrape_status="extracted",
+        attributes={
+            "extracted": {"languages": [{"language": "English", "level": None}]},
+            "data_validation": {
+                "_schema_version": 1,
+                "validated_at": "2026-07-13T09:00:00+00:00",
+                "status": "ok",
+                "issue_counts": {"error": 0, "warning": 0},
+                "issues": [],
+                "auto_fixes": [],
+            },
+        },
+    )
+    db_session.add(school)
+    await db_session.flush()
+    db_session.add(
+        SourcePage(
+            school_id=school.id,
+            source_url="https://example.test/about",
+            page_category="about",
+            scrape_type=ScrapeType.WEBSITE,
+            is_valid=True,
+            raw_markdown="English language classes are available.",
+            content_hash="hash-spotcheck-cleared",
+            last_scraped_at=datetime.datetime.now(datetime.timezone.utc),
+        )
+    )
+    await db_session.commit()
+
+    class ClearingAgent:
+        def output_validator(self, fn):
+            return fn
+
+        async def run(self, _prompt):
+            attrs = dict(school.attributes)
+            attrs.pop("data_validation")
+            school.attributes = attrs
+            return SimpleNamespace(
+                output=SpotCheckOutput(has_discrepancy=False, discrepancies=[], summary="ok"),
+                usage=lambda: SimpleNamespace(input_tokens=10, output_tokens=2),
+                all_messages=lambda: [],
+            )
+
+    monkeypatch.setattr(validator_module, "create_agent", lambda **_kwargs: ClearingAgent())
+
+    result = await validator_module.run_spot_check_for_school(db_session, school.id, "bg")
+    assert result["status"] == "skipped"
+    assert result["reason"] == "Validation report changed"
+
+    await db_session.refresh(school)
+    assert "data_validation" not in (school.attributes or {})
+    assert not website_data_is_publishable(school.attributes, school.scrape_status)
+
+
 def test_normalize_spot_check_output_derives_direction_and_requires_evidence():
     parsed = SpotCheckOutput(
         has_discrepancy=True,

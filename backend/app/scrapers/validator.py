@@ -710,6 +710,11 @@ async def run_spot_check_for_school(
     extracted = attrs.get("extracted")
     if not isinstance(extracted, dict) or not _has_meaningful_payload(extracted):
         return {"school_id": school_id, "status": "skipped", "reason": "No extracted payload"}
+    # A spot check annotates the current validation report; it must never create one,
+    # since a report is what lets website data cross the publish boundary.
+    if not has_current_validation_report(attrs):
+        return {"school_id": school_id, "status": "skipped", "reason": "No validation report"}
+    checked_report_at = attrs["data_validation"].get("validated_at")
 
     pages_result = await db.execute(
         select(SourcePage)
@@ -856,18 +861,19 @@ async def run_spot_check_for_school(
                 return {"school_id": school_id, "status": "skipped", "reason": "School not found"}
 
             attrs = dict(school.attributes) if isinstance(school.attributes, dict) else {}
-            validation_payload = (
-                dict(attrs.get("data_validation"))
-                if isinstance(attrs.get("data_validation"), dict)
-                else {
-                    "_schema_version": 1,
-                    "validated_at": _now_iso(),
-                    "status": "ok",
-                    "issue_counts": {"error": 0, "warning": 0},
-                    "issues": [],
-                    "auto_fixes": [],
+            current_report = attrs.get("data_validation")
+            # Re-validation or URL validation may have replaced or cleared the report
+            # during the model call; findings about the old payload don't belong on it.
+            if not isinstance(current_report, dict) or current_report.get("validated_at") != checked_report_at:
+                return {
+                    "school_id": school_id,
+                    "status": "skipped",
+                    "reason": "Validation report changed",
+                    "input_tokens": input_tokens,
+                    "output_tokens": output_tokens,
+                    "token_cost_usd": round(float(token_cost_usd), 6),
                 }
-            )
+            validation_payload = dict(current_report)
             validation_payload["spot_check"] = payload
             attrs["data_validation"] = validation_payload
             school.attributes = attrs
