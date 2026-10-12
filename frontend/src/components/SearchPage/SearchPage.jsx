@@ -27,24 +27,20 @@ import LocationControl from './LocationControl'
 import { ActiveFilterChips, AdvancedFilters } from './AdvancedFilters'
 import { useAdvancedFilterOptions } from './advancedFilterOptions'
 import { useUserLocation } from './useUserLocation'
+import { useFilterData, useUrlFilters } from './useSearchFilters'
 import { useSchools } from '../../hooks/useSchools'
 import { calculateDistance } from '../../utils/distance'
 import { compareSchoolNames, getSchoolName, schoolMatchesQuery } from '../../utils/i18n'
 import { foldSamePlace } from '../../utils/samePlace'
 import { useCompare } from '../../context/CompareContext'
 import { useCountry } from '../../context/CountryContext'
-import { fetchAvailableFilters, fetchExamAverages } from '../../api/schools'
 import { getAgeGroupKeys, getExclusiveAgeGroups } from '../../utils/countryConfig'
 import { AGE_GROUP_KEYS } from '../../utils/education'
 import { matchesAdvancedFilters, matchesSchoolType } from '../../utils/advancedFilters'
 import { examGradeLabel, getNvoDetail, rankingExamType } from '../../utils/nvo'
 import { isSchoolInBounds } from '../../utils/mapFit'
 import { LIST_PAGE_SIZE, windowForIndex, scrollTopToCenter } from '../../utils/listWindow'
-import { canonicalLanguagePair, languageKey } from '../../utils/languages'
 
-const uniqueCanonical = (values, canonical) => (
-  [...new Set((values || []).map(canonical).filter(Boolean))]
-)
 import { tuitionSortValue } from '../../utils/pricing'
 import {
   readViewParams,
@@ -171,50 +167,8 @@ function SearchPage() {
   const entrySchoolIdRef = useRef(searchParams.get('selected_school_id'))
   const rawSchoolType = searchParams.get('school_type')
 
-  // Filters are read from the URL, and re-read whenever it changes: the page has its own
-  // history entries (the detail panel), so Back can bring back an older filter set.
-  const readFiltersFromUrl = (params) => {
-    const getParamList = (key) => {
-      const values = params.getAll(key)
-      if (values.length > 0) return values
-      const csv = params.get(key)
-      return csv ? csv.split(',').map(value => value.trim()).filter(Boolean) : []
-    }
-    const type = params.get('school_type')
-    const targetYearParam = params.get('target_year')
-    return {
-      ageGroup: params.get('age_group'),
-      targetYear: targetYearParam ? parseInt(targetYearParam) : new Date().getFullYear() + 1,
-      birthYear: Number.parseInt(params.get('birth_year') || '', 10) || null,
-      schoolType: type === 'international' ? 'private' : type,
-      educationLevel: params.get('education_level'),
-      includeCrossover: params.get('include_crossover') === 'true',
-      // Canonical, so links saved with older spellings ('English:intensive') still match.
-      languageFocus: uniqueCanonical(getParamList('language_focus'), canonicalLanguagePair),
-      specialPrograms: getParamList('special_programs'),
-      facilities: getParamList('facilities'),
-      teachingApproach: getParamList('teaching_approach'),
-    }
-  }
-
-  const [filters, setFilters] = useState(() => readFiltersFromUrl(searchParams))
-
-  useEffect(() => {
-    const fromUrl = readFiltersFromUrl(new URLSearchParams(location.search))
-    setFilters(prev => (JSON.stringify(prev) === JSON.stringify(fromUrl) ? prev : fromUrl))
-  }, [location.search])
-
-
-
-  const [availableFilters, setAvailableFilters] = useState({
-    language_focus_pairs: [],
-    language_focus_languages: [],
-    language_focus_levels: [],
-    special_programs: [],
-    facilities: [],
-    teaching_approach: [],
-  })
-  const [examAverages, setExamAverages] = useState(null)
+  const { filters, handleFilterChange } = useUrlFilters({ searchParams, locationSearch: location.search, navigate })
+  const { availableFilters, examAverages } = useFilterData(countryCode)
 
   const effectiveEducationLevel =
     filters.ageGroup === 'preschool' && !filters.includeCrossover
@@ -249,54 +203,7 @@ function SearchPage() {
     [baseSchools, filters]
   )
 
-  useEffect(() => {
-    let isMounted = true
-    fetchAvailableFilters({ countryCode })
-      .then((data) => {
-        if (!isMounted) return
-        setAvailableFilters({
-          // Canonical keys, so "English" / "английски" / "Английски език" are one option.
-          language_focus_pairs: uniqueCanonical(data.language_focus_pairs, canonicalLanguagePair),
-          language_focus_languages: uniqueCanonical(data.language_focus_languages, languageKey),
-          language_focus_levels: data.language_focus_levels || [],
-          special_programs: data.special_programs || [],
-          facilities: data.facilities || [],
-          teaching_approach: data.teaching_approach || [],
-        })
-      })
-      .catch(() => {
-        if (!isMounted) return
-        setAvailableFilters({
-          language_focus_pairs: [],
-          language_focus_languages: [],
-          language_focus_levels: [],
-          special_programs: [],
-          facilities: [],
-          teaching_approach: [],
-        })
-      })
-    return () => {
-      isMounted = false
-    }
-  }, [countryCode])
 
-  useEffect(() => {
-    let isMounted = true
-
-    fetchExamAverages({ countryCode })
-      .then((data) => {
-        if (!isMounted) return
-        setExamAverages(data)
-      })
-      .catch(() => {
-        if (!isMounted) return
-        setExamAverages(null)
-      })
-
-    return () => {
-      isMounted = false
-    }
-  }, [countryCode])
 
   // A URL change we did not write (logo link, Back/Forward) carries its own view state.
   // Runs before the state-to-URL sync below, which then skips this commit: it would
@@ -658,82 +565,6 @@ function SearchPage() {
     previousMobileTabRef.current = null
   })
 
-  const handleFilterChange = (newFilters) => {
-    const nextFilters = { ...filters, ...newFilters }
-    if (newFilters.ageGroup !== undefined) {
-      if (nextFilters.ageGroup !== 'preschool') {
-        nextFilters.educationLevel = null
-        nextFilters.includeCrossover = false
-      } else if (nextFilters.includeCrossover) {
-        nextFilters.educationLevel = null
-      }
-    }
-    if (newFilters.includeCrossover !== undefined && nextFilters.includeCrossover) {
-      nextFilters.educationLevel = null
-    }
-
-    setFilters(nextFilters)
-
-    // Update URL when filters change
-    const params = new URLSearchParams(searchParams)
-    if (newFilters.ageGroup !== undefined) {
-      if (newFilters.ageGroup) {
-        params.set('age_group', newFilters.ageGroup)
-      } else {
-        params.delete('age_group')
-      }
-    }
-    if (newFilters.schoolType !== undefined) {
-      if (newFilters.schoolType) {
-        params.set('school_type', newFilters.schoolType)
-      } else {
-        params.delete('school_type')
-      }
-    }
-    if (newFilters.targetYear !== undefined) {
-      if (newFilters.targetYear) {
-        params.set('target_year', String(newFilters.targetYear))
-      } else {
-        params.delete('target_year')
-      }
-    }
-    if (newFilters.birthYear !== undefined) {
-      if (newFilters.birthYear) {
-        params.set('birth_year', String(newFilters.birthYear))
-      } else {
-        params.delete('birth_year')
-      }
-    }
-    if (newFilters.includeCrossover !== undefined) {
-      if (newFilters.includeCrossover) {
-        params.set('include_crossover', 'true')
-      } else {
-        params.delete('include_crossover')
-      }
-    }
-    if (nextFilters.ageGroup === 'preschool' && !nextFilters.includeCrossover && nextFilters.educationLevel) {
-      params.set('education_level', nextFilters.educationLevel)
-    } else {
-      params.delete('education_level')
-    }
-    if (newFilters.languageFocus !== undefined) {
-      params.delete('language_focus')
-      newFilters.languageFocus.forEach(value => params.append('language_focus', value))
-    }
-    if (newFilters.specialPrograms !== undefined) {
-      params.delete('special_programs')
-      newFilters.specialPrograms.forEach(value => params.append('special_programs', value))
-    }
-    if (newFilters.facilities !== undefined) {
-      params.delete('facilities')
-      newFilters.facilities.forEach(value => params.append('facilities', value))
-    }
-    if (newFilters.teachingApproach !== undefined) {
-      params.delete('teaching_approach')
-      newFilters.teachingApproach.forEach(value => params.append('teaching_approach', value))
-    }
-    navigate(`/search?${params.toString()}`, { replace: true })
-  }
 
   useEffect(() => {
     if (rawSchoolType !== 'international') return
