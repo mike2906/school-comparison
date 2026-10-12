@@ -459,3 +459,17 @@ def test_every_school_year_is_yearly_only_when_nothing_else_says(text, families)
     from app.scrapers.price_evidence import period_families
 
     assert period_families(text.casefold())[0] == families
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Целодневна група\n650 лв.\nЦените се актуализират всяка година.",
+        "Full day: 650 EUR (reviewed every year)",
+        "Такса за кръжок 40 лв., записване всяка година",
+    ],
+)
+def test_a_note_that_prices_change_every_year_names_no_period(text):
+    from app.scrapers.price_evidence import period_families
+
+    assert period_families(text.casefold())[0] == set()

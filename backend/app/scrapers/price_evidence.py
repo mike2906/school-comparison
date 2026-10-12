@@ -390,8 +390,12 @@ def period_fits_category(category: str | None, period: str | None) -> bool:
 
 # "Заплаща се в началото на всяка учебна година" (590's materials fee) is paid once a year,
 # but only says so when nothing else does: "еднократно в началото на всяка учебна година"
-# is one-time (510), and "месечно ... every school year" monthly.
-_EVERY_YEAR_RE = re.compile(r"\bвсяка (?:учебна )?година\b|\b(?:every|each) (?:school |academic )?year\b")
+# is one-time (510), and "месечно ... every school year" monthly. It must be a payment:
+# "цените се актуализират всяка година" says nothing about how often a fee is paid.
+_EVERY_YEAR_RE = re.compile(
+    r"(?:плаща|плати|внася)\w*[^.\n]{0,40}?\bвсяка (?:учебна )?година\b"
+    r"|\b(?:paid|payable|due)\b[^.\n]{0,40}?\b(?:every|each) (?:school |academic )?year\b"
+)
 
 
 def period_families(context: str) -> tuple[set[str], bool]:
