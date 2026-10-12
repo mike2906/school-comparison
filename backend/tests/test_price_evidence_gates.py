@@ -482,8 +482,37 @@ def test_offer_has_ended(monkeypatch, context, ended):
     assert display_gating.offer_has_ended(context) is ended
 
 
-@pytest.mark.parametrize("hour,ended", [(21, False), (22, True)])
-def test_offer_ends_by_the_bulgarian_day_not_the_servers(monkeypatch, hour, ended):
-    # 22:00 UTC on the 15th is already the 16th in Sofia (EET, UTC+2).
-    monkeypatch.setattr(display_gating, "datetime", _clock_on(datetime.date(2026, 10, 15), hour))
-    assert display_gating.offer_has_ended({OFFER_ENDS_KEY: "2026-10-15"}) is ended
+@pytest.mark.parametrize(
+    "day,hour,ended",
+    [
+        # 15 October 2026 is summer time (UTC+3): Sofia's 16th starts at 21:00 UTC.
+        (datetime.date(2026, 10, 15), 20, False),
+        (datetime.date(2026, 10, 15), 21, True),
+        # 15 December is winter time (UTC+2): it starts at 22:00 UTC.
+        (datetime.date(2026, 12, 15), 21, False),
+        (datetime.date(2026, 12, 15), 22, True),
+    ],
+)
+def test_offer_ends_by_the_bulgarian_day_not_the_servers(monkeypatch, day, hour, ended):
+    monkeypatch.setattr(display_gating, "datetime", _clock_on(day, hour))
+    assert display_gating.offer_has_ended({OFFER_ENDS_KEY: day.isoformat()}) is ended
+
+
+@pytest.mark.parametrize(
+    "moment,sofia_day",
+    [
+        # 2026: summer time from 29 March 01:00 UTC to 25 October 01:00 UTC.
+        (datetime.datetime(2026, 3, 28, 21, 30), datetime.date(2026, 3, 28)),  # 23:30, UTC+2
+        (datetime.datetime(2026, 3, 29, 21, 30), datetime.date(2026, 3, 30)),  # 00:30, UTC+3
+        (datetime.datetime(2026, 10, 24, 21, 30), datetime.date(2026, 10, 25)),  # 00:30, UTC+3
+        (datetime.datetime(2026, 10, 25, 21, 30), datetime.date(2026, 10, 25)),  # 23:30, UTC+2
+    ],
+)
+def test_sofia_today_follows_eu_summer_time(monkeypatch, moment, sofia_day):
+    class _DateTime(datetime.datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return cls(*moment.timetuple()[:6], tzinfo=datetime.timezone.utc)
+
+    monkeypatch.setattr(display_gating, "datetime", types.SimpleNamespace(**{**vars(datetime), "datetime": _DateTime}))
+    assert display_gating._sofia_today() == sofia_day

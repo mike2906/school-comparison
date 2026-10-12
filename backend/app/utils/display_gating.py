@@ -340,10 +340,23 @@ def _linked_evidence_is_valid(row: Any) -> bool:
 # Set on a row's ``pricing_context`` by validation when the page offers its price only
 # until a date (an early-enrolment tier); the row is withheld from the day after.
 OFFER_ENDS_KEY = "offer_ends_on"
-# The offer's day is a Bulgarian one and the server runs on UTC. Eastern European
-# standard time is never ahead of Sofia, so a row is never withheld before its last day
-# is over there (in summer, up to an hour after).
-_BG_STANDARD_TIME = datetime.timezone(datetime.timedelta(hours=2))
+
+
+def _sofia_today() -> datetime.date:
+    """Today in Sofia. The offer's day is a Bulgarian one, and the server runs on UTC.
+
+    EU summer time (UTC+3) runs from 01:00 UTC on the last Sunday of March to 01:00 UTC
+    on the last Sunday of October; the rest of the year is UTC+2. Written out rather than
+    read from the system's time-zone database, which the slim API image may not carry.
+    """
+    now = datetime.datetime.now(datetime.timezone.utc)
+
+    def last_sunday_0100(month: int) -> datetime.datetime:
+        last_day = datetime.datetime(now.year, month, 31, 1, tzinfo=datetime.timezone.utc)
+        return last_day - datetime.timedelta(days=(last_day.weekday() + 1) % 7)
+
+    summer = last_sunday_0100(3) <= now < last_sunday_0100(10)
+    return (now + datetime.timedelta(hours=3 if summer else 2)).date()
 
 
 def offer_has_ended(pricing_context: Any) -> bool:
@@ -359,7 +372,7 @@ def offer_has_ended(pricing_context: Any) -> bool:
         ends = datetime.date.fromisoformat(str(ends_on))
     except ValueError:
         return True
-    return ends < datetime.datetime.now(_BG_STANDARD_TIME).date()
+    return ends < _sofia_today()
 
 
 def pricing_row_is_publishable(row: Any) -> bool:
