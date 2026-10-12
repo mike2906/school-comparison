@@ -6,11 +6,18 @@ import pytest
 
 from app.utils import list_translations
 from app.utils.list_translations import is_untranslated, translate_items
-from app.utils.school_attributes import build_localized_attributes
+from app.utils.school_attributes import (
+    build_filterable_attributes,
+    build_localized_attributes,
+    compute_filter_tags,
+)
 
 GLOSSARY = {
     "bg_to_en": {"Физкултурен салон": "Gym", "Библиотека": "Library"},
-    "en_to_bg": {"Suggestopedic method of teaching": "Сугестопедичен метод на обучение"},
+    "en_to_bg": {
+        "Suggestopedic method of teaching": "Сугестопедичен метод на обучение",
+        "Artificial turf football field": "Футболно игрище с изкуствена трева",
+    },
 }
 
 
@@ -58,6 +65,20 @@ class TestTranslateItems:
         ]
         mixed = {"extracted": {"facilities": ["Library", "Библиотека"]}}
         assert build_localized_attributes(mixed, "en")["facilities"] == ["Library"]
+
+
+@pytest.mark.usefixtures("glossary")
+def test_translation_does_not_change_filter_tags(monkeypatch):
+    # "изкуствена" (artificial) would match the arts vocabulary; filters read the
+    # untranslated items, so the glossary cannot add a tag.
+    attrs = {"extracted": {"facilities": ["Artificial turf football field"]}}
+    translated = build_localized_attributes(attrs, "bg")["facilities"]
+    assert translated == ["Футболно игрище с изкуствена трева"]
+    tags = compute_filter_tags(attrs)
+    filterable = build_filterable_attributes(attrs)
+    monkeypatch.setattr(list_translations, "_glossary", lambda: {})
+    assert compute_filter_tags(attrs) == tags
+    assert build_filterable_attributes(attrs) == filterable
 
 
 def test_glossary_file_is_well_formed():
