@@ -35,12 +35,17 @@ _PARKED_DOMAIN_RE = re.compile(
 # slug "24-lorem-ipsum").
 _NOT_PAGE_TEXT_RE = re.compile(r"!?\[[^\]]*\]\([^)]*\)|\S*[/\\]\S*")
 _WORD_RE = re.compile(r"[^\W\d_]+")
+# A dollar price: Sofia schools charge in leva or euro, a theme's sample cards in dollars
+# ("$1,800/mo" on 590's home and /programa, 95 and 20 words, both under the share).
+_DOLLAR_PRICE_RE = re.compile(r"\$\s?\d|\d\s?\$")
 
 
 def is_template_filler(text: str | None) -> bool:
     """A theme's sample page (590), not a real page that kept some sample text."""
     words = _WORD_RE.findall(_NOT_PAGE_TEXT_RE.sub(" ", text or ""))
     filler = sum(word.casefold() in _FILLER_WORDS for word in words)
+    if filler >= 2 and _DOLLAR_PRICE_RE.search(text or ""):
+        return True
     return filler >= _MIN_FILLER_WORDS and filler >= _FILLER_SHARE * len(words)
 
 

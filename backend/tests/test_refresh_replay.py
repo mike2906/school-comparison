@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.models.pricing import PriceCategory
+from app.models.pricing import PriceCategory, PricePeriod
 from app.scrapers.price_evidence import RULE_EXPIRED, PriceRow, check_price_row
 from tests.refresh_replay import replay
 
@@ -97,3 +97,13 @@ async def test_581_a_course_length_is_not_a_nursery_age(db_session):
     (materials,) = [row for row in rows if row.category == PriceCategory.MATERIALS and float(row.amount) == 738.0]
     # Stage 6 does not read the course length on the amount's own line as a nursery age.
     assert check_price_row(PriceRow.from_pricing(materials), materials.source_page.raw_markdown, "school") == []
+
+
+@pytest.mark.asyncio
+async def test_590_a_fee_paid_at_the_start_of_each_school_year_is_yearly(db_session):
+    result, rows = await replay(db_session, 590, education_level="kindergarten")
+
+    by_category = {(row.category.value, float(row.amount)): row.period for row in rows}
+    assert by_category[("materials", 120.0)] == PricePeriod.YEARLY
+    assert by_category[("tuition", 530.0)] == PricePeriod.MONTHLY
+    assert all(row.currency == "EUR" for row in rows)

@@ -879,3 +879,19 @@ def test_a_themes_sample_page_is_a_template():
         "Welcome\nLorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor "
         "incididunt ut labore et dolore magna aliqua.\nHalf Days $1,800/mo\nFull Days $2,300/mo"
     )
+
+
+def test_sample_text_beside_dollar_prices_is_a_template():
+    """590's home and /programa: sample cards with "$1,800/mo", too short a share of the page."""
+    from app.scrapers.page_content import is_template_filler
+
+    page = (
+        "Welcome to Erich Kästner School\nOur kindergarten and school offer bilingual German and "
+        "Bulgarian education in a caring environment with experienced teachers, small groups, "
+        "music, sports, art, a garden and healthy meals prepared every day in our own kitchen.\n"
+        "Programs\nHalf Days\nEu vestibulum praesent amet.\n8:30 - 12:00\n$1,800/mo\n"
+        "Full Days\n$2,300/mo\nContact us to arrange a visit and meet the team in person."
+    )
+    assert is_template_filler(page)
+    assert not is_template_filler(page.replace("$1,800/mo", "€ 530").replace("$2,300/mo", "€ 600"))
+    assert not is_template_filler("Tuition for international students: $12,000 a year. Lorem Hall.")

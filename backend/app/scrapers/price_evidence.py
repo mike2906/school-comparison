@@ -322,10 +322,13 @@ PERIOD_KEYWORDS: dict[str, re.Pattern[str]] = {
         r"|\b(?:всеки|предходния|предишния|предидущия|текущия|следващия) месец"
     ),
     # "Total tuition fees (year)" heads a yearly table. "Плащане на 1 вноска" (610) is the
-    # year's fee paid in one go, beside its 2- and 10-instalment plans.
+    # year's fee paid in one go, beside its 2- and 10-instalment plans. "Заплаща се в
+    # началото на всяка учебна година" (590's materials fee) is paid once a year.
     "YEARLY": re.compile(
         r"(?<!полу)годиш|\bна година|/\s*год|per year|/\s*year|\bannual|\byearly\b|a year\b|\(\s*year\s*\)"
         r"|\b(?:на|в)\s+(?:1|една)\s+вноска\b|\b(?:in\s+)?(?:one|1|a single)\s+instal?lment\b"
+        r"|\bв началото на (?:всяка|учебната) (?:учебна )?година\b|\b(?:every|each) (?:school |academic )?year\b"
+        r"|\bat the (?:start|beginning) of (?:each|every|the) (?:school |academic )?year\b"
     ),
     "ONE_TIME": re.compile(r"еднократ|one[- ]time|one[- ]off|\bonce\b"),
     "QUARTER": re.compile(r"тримесеч|quarterly|per quarter"),
