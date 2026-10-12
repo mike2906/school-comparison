@@ -94,4 +94,6 @@ async def test_581_a_course_length_is_not_a_nursery_age(db_session):
         (16858.0, "yearly"), (17227.0, "yearly"), (17227.0, "yearly"),
         (17596.0, "yearly"), (17596.0, "yearly"), (19688.0, None),
     ]  # fmt: skip
-    assert 738.0 in {float(row.amount) for row in rows if row.category == PriceCategory.MATERIALS}
+    (materials,) = [row for row in rows if row.category == PriceCategory.MATERIALS and float(row.amount) == 738.0]
+    # Stage 6 does not read the course length on the amount's own line as a nursery age.
+    assert check_price_row(PriceRow.from_pricing(materials), materials.source_page.raw_markdown, "school") == []

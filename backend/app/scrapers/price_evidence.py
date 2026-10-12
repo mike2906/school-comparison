@@ -549,8 +549,9 @@ _PRESCHOOL_LABEL_RE = re.compile(
 _KINDERGARTEN_LABEL_RE = re.compile(
     r"детска\s+градина|\bградина\b|ясл|kindergar[td]en|nursery|toddler|maternelle|ранно детско"
     # An age is one or two digits; "2026/2027 г." is a year, "за 10 месеца" a payment span,
-    # and "IGCSE 2 years in 1" (581) a course's length; "3 години за 10 месеца" stays an age.
-    r"|(?<![\d/.-])\d{1,2}\s*(?:г\.|г\b|годиш|години\b|years?\b|yrs?\b|y\.?o\b)(?!\s*(?:in|за)\s+1[ \t]*(?:$|\n|\())"
+    # and "IGCSE 2 years in 1" (581) a course's length, also before its price ("in 1 – €738");
+    # "3 години за 10 месеца" and "за 1-2 месеца" stay ages.
+    r"|(?<![\d/.-])\d{1,2}\s*(?:г\.|г\b|годиш|години\b|years?\b|yrs?\b|y\.?o\b)(?!\s*(?:in|за)\s+1[ \t]*(?:$|\n|\(|:|[–—-](?![ \t]*\d)))"
 )
 
 
