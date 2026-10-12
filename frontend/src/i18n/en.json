@@ -315,6 +315,7 @@
     "tooltipTrendDown": "Latest result {{latest}} points is {{diff}} points below the school's recent average ({{average}}).",
     "tooltipTrendFlat": "Latest result {{latest}} points is close to the school's recent average ({{average}}), within {{diff}} points.",
     "vsLastYear": "Last year",
+    "inYear": "In {{year}}",
     "excellent": "Excellent",
     "good": "Good",
     "needsImprovement": "Needs Improvement",

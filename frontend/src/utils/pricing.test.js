@@ -509,7 +509,7 @@ test('priceAgeGroupLabel: grades inside a whole-sentence age group (595)', () =>
 })
 
 test('isInstallmentPlan: the whole fee paid in one payment is not an instalment', () => {
-  for (const name of ['Плащане на 1 вноска', 'Годишна такса / Плащане на една вноска', 'Payment in one instalment']) {
+  for (const name of ['Плащане на 1 вноска', 'Годишна такса / Плащане на една вноска', 'Payment in one instalment', '1 installment', 'Single installment']) {
     assert.equal(isInstallmentPlan({ plan_name: name }), false, name)
   }
   // A numbered first instalment is still one instalment.

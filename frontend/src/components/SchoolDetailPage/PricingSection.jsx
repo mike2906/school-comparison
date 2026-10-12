@@ -4,7 +4,7 @@ import { sharedPriceSource } from '../../utils/priceSources'
 import { groupPricingByCategory } from './helpers'
 import { formatAmount } from '../../utils/format'
 import PriceSource from './PriceSource'
-import { pricePeriod } from '../../utils/priceRows'
+import { pricePeriod, periodUnknown } from '../../utils/priceRows'
 
 /**
  * Every published price, grouped by academic year, then by category, then by the age
@@ -45,9 +45,11 @@ function PricingSection({ pricing }) {
         <div className="flex flex-wrap items-baseline gap-x-2 sm:block sm:text-right sm:shrink-0">
           <div className="text-lg font-bold text-neutral-900 whitespace-nowrap">{amountText}</div>
           {/* A fee with no period stands out, so it is not read as the monthly fee beside it. */}
-          <div className={`text-sm ${pricePeriod(price) ? 'text-neutral-500' : 'text-amber-700'}`}>
-            {pricePeriod(price) ? t(`pricing.${pricePeriod(price)}`) : t('pricing.periodNotStated')}
-          </div>
+          {pricePeriod(price) ? (
+            <div className="text-sm text-neutral-500">{t(`pricing.${pricePeriod(price)}`)}</div>
+          ) : periodUnknown(price) && (
+            <div className="text-sm text-amber-700">{t('pricing.periodNotStated')}</div>
+          )}
         </div>
       </div>
     )

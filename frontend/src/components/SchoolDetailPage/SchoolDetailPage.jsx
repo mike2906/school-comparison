@@ -16,6 +16,7 @@ import {
 } from '../../utils/admission'
 import { schoolLevelLabel, schoolTypeLabel } from '../../utils/levelLabel'
 import { useCountry } from '../../context/CountryContext'
+import { orderAgeGroups } from '../../utils/ageGroupOrder'
 import { useCompare } from '../../context/CompareContext'
 import {
   parseCoordinate,
@@ -555,7 +556,7 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
                     <div className="flex items-start justify-between gap-4 mb-3">
                       <div>
                         <h3 className="font-semibold text-lg text-neutral-900 mb-1">
-                          {validAgeGroups.map(group => t(`ageGroups.${group}`)).join(', ')}
+                          {orderAgeGroups(validAgeGroups, countryConfig).map(group => t(`ageGroups.${group}`)).join(', ')}
                         </h3>
                         {location.is_primary && (
                           <span className="inline-block px-2 py-0.5 bg-primary-100 text-primary-700 text-xs font-medium rounded mb-2">

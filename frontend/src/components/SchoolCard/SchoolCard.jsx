@@ -32,6 +32,8 @@ import {
   YEAR_STATUS,
 } from '../../utils/pricing'
 import { pricePeriod } from '../../utils/priceRows'
+import { parsePhones } from '../../utils/phone'
+import { orderAgeGroups } from '../../utils/ageGroupOrder'
 
 const typeColors = {
   state: 'bg-teal-700 text-white',
@@ -380,8 +382,10 @@ function buildExpandedSections({
 
   const contactParts = []
   const primaryLocation = locations.find(loc => loc.is_primary) || locations[0]
-  if (primaryLocation?.phone) {
-    contactParts.push(`${t('schools.phone')}: ${primaryLocation.phone}`)
+  // Normalised as on the school page: the register glues an area code to mobiles ("02/0898…").
+  const phones = parsePhones(primaryLocation?.phone).map(phone => phone.display)
+  if (phones.length > 0) {
+    contactParts.push(`${t('schools.phone')}: ${phones.join(', ')}`)
   }
   if (school.website_url) {
     contactParts.push(`${t('schools.website')}: ${school.website_url}`)
@@ -1020,7 +1024,7 @@ const SchoolCard = memo(function SchoolCard({
               const locationKey = locationItem.id ?? `${school.id}-${idx}`
               const isFocused = focusedLocationId === locationItem.id
               const addressLabel = getAddress(locationItem, i18n.language)
-              const locationGroups = getLocationAgeGroups(locationItem)
+              const locationGroups = orderAgeGroups(getLocationAgeGroups(locationItem), countryConfig)
               const shiftEntries = getAgeGroupShifts(locationItem)
               const shiftByGroup = new Map(shiftEntries.map(entry => [entry.age_group, entry]))
               const locationTags = getLocationTags(locationItem)

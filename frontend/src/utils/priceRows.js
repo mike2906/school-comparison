@@ -30,7 +30,7 @@ export function periodFromLabel(text) {
 
 // The whole fee paid at once: "Плащане на 1 вноска", "на една вноска", "in one payment";
 // not "1 вноска до 15.09" or "10 вноски, 1 вноска = 500", which are one instalment.
-const ONE_PAYMENT_RE = /(?<![\p{L}])(?<!(?:размер|сума|цена|стойност)\s)(?:на|в)\s+(?:1|една)\s+вноска(?![\p{L}])(?!\s+от\s)|еднократна\s+вноска|in (?:one|1|a single) (?:payment|instal+ment)|single payment/iu
+const ONE_PAYMENT_RE = /(?<![\p{L}])(?<!(?:размер|сума|цена|стойност)\s)(?:на|в)\s+(?:1|една)\s+вноска(?![\p{L}])(?!\s+от\s)|еднократна\s+вноска|in (?:one|1|a single) (?:payment|instal+ment)|(?<![\p{L}\p{N}-])(?:1|one|single) instal+ment(?![\p{L}])|single payment/iu
 const SEVERAL_INSTALMENTS_RE = /(?<![\p{L}\p{N}])(?:[2-9]|\d{2,}|две|три|четири|пет|шест|седем|осем|девет|десет)\s+вноски|общо|instal+ments/iu
 
 /** True when a fee name says the whole fee is paid in one payment. */
@@ -47,6 +47,14 @@ export function pricePeriod(row) {
   if (row?.period || named) return row?.period || named
   if (row?.category === 'tuition' && isOnePayment(row?.plan_name)) return 'yearly'
   return null
+}
+
+// Registration and application fees are paid once by nature, so a missing period is no news.
+const ONE_OFF_CATEGORIES = new Set(['registration'])
+
+/** True when a row's period is unknown and a parent could misread how often it is paid. */
+export function periodUnknown(row) {
+  return !pricePeriod(row) && !ONE_OFF_CATEGORIES.has(row?.category)
 }
 
 // Kindergarten group words: "Първа и Втора група", "Първа - трета група", "3-та група",

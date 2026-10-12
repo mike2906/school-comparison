@@ -324,7 +324,8 @@ function YearOverYearBadge({ subject, data, dataKey, color }) {
   }
 
   const latest = data[data.length - 1]
-  const previous = data[data.length - 2]
+  // The last earlier year with this subject's result; other subjects may have one between.
+  const previous = data.slice(0, -1).reverse().find(entry => entry[dataKey] != null) || data[data.length - 2]
 
   const currentValue = latest[dataKey]
   const previousValue = previous[dataKey]
@@ -354,7 +355,8 @@ function YearOverYearBadge({ subject, data, dataKey, color }) {
         </span>
       </div>
       <p className="text-xs text-neutral-500 mt-1">
-        {t('academicPerformance.vsLastYear')}: {t('academicPerformance.pointsValue', { value: previousValue.toFixed(1) })}
+        {/* The previous result can be two or more years back when a year is missing. */}
+        {previous.year === latest.year - 1 ? t('academicPerformance.vsLastYear') : t('academicPerformance.inYear', { year: previous.year })}: {t('academicPerformance.pointsValue', { value: previousValue.toFixed(1) })}
         {benchmarkInfo && (
           <> • {t('academicPerformance.nationalBenchmarkValue', { value: benchmarkInfo.benchmarkValue.toFixed(1) })}</>
         )}

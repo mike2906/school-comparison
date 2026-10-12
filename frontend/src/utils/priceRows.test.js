@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { periodFromLabel, pricePeriod, rowAgeGroupKeys, rowsForAgeGroup } from './priceRows.js'
+import { periodFromLabel, periodUnknown, pricePeriod, rowAgeGroupKeys, rowsForAgeGroup } from './priceRows.js'
 
 test('periodFromLabel: the period a fee name states', () => {
   const cases = {
@@ -123,4 +123,10 @@ test('rowAgeGroupKeys: a school named "гимназия", "начално пла
   assert.deepEqual(keys(null, 'Начално плащане при записване'), [])
   assert.deepEqual(keys(null, 'Гимназия / 8 – 10. клас / Плащане на 1 вноска'), ['grade_8_12'])
   assert.deepEqual(keys(null, 'ПГУ от 15.09.2026г. / Годишна такса'), ['preschool'])
+})
+
+test('periodUnknown: not for registration fees, which are paid once by nature', () => {
+  assert.equal(periodUnknown({ category: 'registration', plan_name: 'такса кандидатстване', period: null }), false)
+  assert.equal(periodUnknown({ category: 'food', plan_name: 'Храна обяд', period: null }), true)
+  assert.equal(periodUnknown({ category: 'food', plan_name: 'Месечна такса храна', period: null }), false)
 })
