@@ -129,3 +129,17 @@ jobs:
 
       - name: Run tests
         run: npm test
+
+      - name: Cache Playwright browser
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
+
+      - name: Install Playwright browser
+        # Downloads only on a cache miss; the system libraries are installed every time.
+        run: npx playwright install --with-deps chromium
+
+      - name: Run browser journeys
+        # Search-page history journeys against the build above, with recorded API answers.
+        run: npm run test:journeys

@@ -1,0 +1,3097 @@
+{
+  "/schools/filters?country_code=bg&city=sofia": {
+    "language_focus_pairs": [
+      "English:bilingual",
+      "English:immersion"
+    ],
+    "language_focus_languages": [
+      "English"
+    ],
+    "language_focus_levels": [
+      "bilingual",
+      "immersion"
+    ],
+    "special_programs": [
+      "arts_program",
+      "extended_day",
+      "meals_provided",
+      "music_program",
+      "sports_program"
+    ],
+    "facilities": [
+      "cafeteria",
+      "computer_lab",
+      "library",
+      "sports_facilities"
+    ],
+    "teaching_approach": [
+      "ib_program",
+      "montessori",
+      "project_based"
+    ]
+  },
+  "/schools/exam-averages?country_code=bg&city=sofia": {
+    "by_year": {
+      "nvo_10": {
+        "2022": {
+          "Bulgarian Language": 83,
+          "Mathematics": 79.1
+        },
+        "2023": {
+          "Bulgarian Language": 84.8,
+          "Mathematics": 81
+        },
+        "2024": {
+          "Bulgarian Language": 85.7,
+          "Mathematics": 81.7
+        }
+      },
+      "nvo_4": {
+        "2020": {
+          "Bulgarian Language": 74.1,
+          "Mathematics": 71.5
+        },
+        "2021": {
+          "Bulgarian Language": 75.5,
+          "Mathematics": 72.9
+        },
+        "2022": {
+          "Bulgarian Language": 76.9,
+          "Mathematics": 74.5
+        },
+        "2023": {
+          "Bulgarian Language": 78,
+          "Mathematics": 75.5
+        },
+        "2024": {
+          "Bulgarian Language": 78.9,
+          "Mathematics": 76.4
+        }
+      },
+      "nvo_7": {
+        "2020": {
+          "Bulgarian Language": 82.3,
+          "Mathematics": 77.9
+        },
+        "2021": {
+          "Bulgarian Language": 83.7,
+          "Mathematics": 79.3
+        },
+        "2022": {
+          "Bulgarian Language": 85.1,
+          "Mathematics": 80.9
+        },
+        "2023": {
+          "Bulgarian Language": 86.2,
+          "Mathematics": 81.9
+        },
+        "2024": {
+          "Bulgarian Language": 87.1,
+          "Mathematics": 82.8
+        }
+      }
+    },
+    "overall": {
+      "nvo_10": 82.5,
+      "nvo_4": 75.4,
+      "nvo_7": 82.7
+    }
+  },
+  "/countries/bg": {
+    "code": "bg",
+    "name_i18n": {
+      "bg": "България",
+      "en": "Bulgaria"
+    },
+    "education_config": {
+      "education_levels": [
+        {
+          "key": "nursery",
+          "label_i18n": {
+            "bg": "Ясла",
+            "en": "Nursery"
+          }
+        },
+        {
+          "key": "kindergarten",
+          "label_i18n": {
+            "bg": "Детска градина",
+            "en": "Kindergarten"
+          }
+        },
+        {
+          "key": "primary",
+          "label_i18n": {
+            "bg": "Начален етап",
+            "en": "Primary"
+          }
+        },
+        {
+          "key": "lower_secondary",
+          "label_i18n": {
+            "bg": "Прогимназия",
+            "en": "Lower secondary"
+          }
+        },
+        {
+          "key": "upper_secondary",
+          "label_i18n": {
+            "bg": "Гимназия",
+            "en": "Upper secondary"
+          }
+        }
+      ],
+      "age_groups": [
+        {
+          "key": "nursery",
+          "label_i18n": {
+            "bg": "Ясла",
+            "en": "Nursery"
+          },
+          "category": "kindergarten",
+          "min_diff": 0,
+          "max_diff": 2
+        },
+        {
+          "key": "first",
+          "label_i18n": {
+            "bg": "I група",
+            "en": "First group"
+          },
+          "category": "kindergarten",
+          "min_diff": 3,
+          "max_diff": 3
+        },
+        {
+          "key": "second",
+          "label_i18n": {
+            "bg": "II група",
+            "en": "Second group"
+          },
+          "category": "kindergarten",
+          "min_diff": 4,
+          "max_diff": 4
+        },
+        {
+          "key": "third",
+          "label_i18n": {
+            "bg": "III група",
+            "en": "Third group"
+          },
+          "category": "kindergarten",
+          "min_diff": 5,
+          "max_diff": 5
+        },
+        {
+          "key": "preschool",
+          "label_i18n": {
+            "bg": "Подготвителна",
+            "en": "Preschool"
+          },
+          "category": [
+            "kindergarten",
+            "school"
+          ],
+          "min_diff": 6,
+          "max_diff": 6
+        },
+        {
+          "key": "grade_1_4",
+          "label_i18n": {
+            "bg": "1-4 клас",
+            "en": "Grades 1-4"
+          },
+          "category": "school",
+          "min_diff": 7,
+          "max_diff": 10
+        },
+        {
+          "key": "grade_5_7",
+          "label_i18n": {
+            "bg": "5-7 клас",
+            "en": "Grades 5-7"
+          },
+          "category": "school",
+          "min_diff": 11,
+          "max_diff": 13
+        },
+        {
+          "key": "grade_8_12",
+          "label_i18n": {
+            "bg": "8-12 клас",
+            "en": "Grades 8-12"
+          },
+          "category": "school",
+          "min_diff": 14,
+          "max_diff": 18
+        }
+      ],
+      "school_types": [
+        {
+          "key": "state",
+          "label_i18n": {
+            "bg": "Държавно",
+            "en": "State"
+          }
+        },
+        {
+          "key": "private",
+          "label_i18n": {
+            "bg": "Частно",
+            "en": "Private"
+          }
+        },
+        {
+          "key": "international",
+          "label_i18n": {
+            "bg": "Международно",
+            "en": "International"
+          }
+        }
+      ],
+      "shifts": [
+        {
+          "key": "morning",
+          "label_i18n": {
+            "bg": "Сутрешна смяна",
+            "en": "Morning"
+          }
+        },
+        {
+          "key": "afternoon",
+          "label_i18n": {
+            "bg": "Следобедна смяна",
+            "en": "Afternoon"
+          }
+        },
+        {
+          "key": "full_day",
+          "label_i18n": {
+            "bg": "Целодневна",
+            "en": "Full day"
+          }
+        }
+      ]
+    },
+    "map_config": {
+      "center": [
+        42.6977,
+        23.3219
+      ],
+      "zoom": 12
+    },
+    "supported_languages": [
+      "bg",
+      "en"
+    ],
+    "default_language": "bg",
+    "default_currency": "BGN",
+    "created_at": "2026-10-12T14:39:19.870338Z",
+    "updated_at": "2026-10-12T14:39:19.870347Z"
+  },
+  "/schools?country_code=bg&city=sofia": [
+    {
+      "id": 1,
+      "country_code": "bg",
+      "name_i18n": {
+        "bg": "ЧДГ Златно зрънце",
+        "en": "PKG Zlatno zrantse"
+      },
+      "school_type": "private",
+      "education_level": "kindergarten",
+      "locations": [
+        {
+          "age_groups": [
+            "nursery",
+            "first",
+            "second"
+          ],
+          "age_group_shifts": [
+            {
+              "age_group": "nursery",
+              "shift": "full_day",
+              "has_organised_groups": false
+            },
+            {
+              "age_group": "first",
+              "shift": "full_day",
+              "has_organised_groups": false
+            },
+            {
+              "age_group": "second",
+              "shift": "full_day",
+              "has_organised_groups": false
+            }
+          ],
+          "address_i18n": {
+            "bg": "ул. Кричим 25, Лозенец, София",
+            "en": "ul. Krichim 25, Lozenets, Sofiya"
+          },
+          "lat": 42.6735,
+          "lng": 23.3355,
+          "phone": "+359 88 123 4567",
+          "is_primary": true,
+          "id": 1,
+          "school_id": 1,
+          "coordinates_approximate": false,
+          "location_tags": [],
+          "resolved_address_i18n": {
+            "bg": "ул. Кричим 25, Лозенец, София",
+            "en": "ul. Krichim 25, Lozenets, Sofiya"
+          }
+        }
+      ],
+      "exam_results": [],
+      "same_place": [],
+      "attributes": {
+        "class_size": null,
+        "has_canteen": true,
+        "uniform_required": null,
+        "special_focus": null,
+        "teaching_approach": [
+          "montessori"
+        ],
+        "teacher_student_ratio": null,
+        "school_hours": null,
+        "established_year": null,
+        "filter_tags": {
+          "facilities": [
+            "cafeteria",
+            "library",
+            "sports_facilities"
+          ],
+          "special_programs": [
+            "arts_program",
+            "extended_day",
+            "meals_provided",
+            "music_program",
+            "sports_program"
+          ],
+          "teaching_approach": [
+            "montessori"
+          ]
+        }
+      },
+      "attributes_i18n": {
+        "bg": {
+          "language_focus": [
+            {
+              "language": "English",
+              "level": "immersion"
+            },
+            {
+              "language": "English",
+              "level": "bilingual"
+            }
+          ],
+          "languages_of_instruction": [
+            "Bulgarian",
+            "English"
+          ],
+          "facilities": [
+            "Столова",
+            "Библиотека",
+            "sports_facilities"
+          ],
+          "special_programs": [
+            "music_program",
+            "extended_day",
+            "meals_provided"
+          ],
+          "activities_offered": [
+            "Английски",
+            "Изкуство",
+            "Музика",
+            "Спорт"
+          ],
+          "entry_requirements": [],
+          "application_deadlines": [],
+          "available_spots": [],
+          "daily_schedule": []
+        },
+        "en": {
+          "language_focus": [
+            {
+              "language": "English",
+              "level": "immersion"
+            },
+            {
+              "language": "English",
+              "level": "bilingual"
+            }
+          ],
+          "languages_of_instruction": [
+            "Bulgarian",
+            "English"
+          ],
+          "facilities": [
+            "cafeteria",
+            "library",
+            "sports_facilities"
+          ],
+          "special_programs": [
+            "music_program",
+            "extended_day",
+            "meals_provided"
+          ],
+          "activities_offered": [
+            "english",
+            "art",
+            "music",
+            "sport"
+          ],
+          "entry_requirements": [],
+          "application_deadlines": [],
+          "available_spots": [],
+          "daily_schedule": []
+        }
+      },
+      "admission_info": null,
+      "pricing": [],
+      "resolved_name_i18n": {
+        "bg": "ЧДГ Златно зрънце",
+        "en": "PKG Zlatno zrantse"
+      }
+    },
+    {
+      "id": 2,
+      "country_code": "bg",
+      "name_i18n": {
+        "bg": "ЧДГ Детски свят",
+        "en": "PKG Detski svyat"
+      },
+      "school_type": "private",
+      "education_level": "kindergarten",
+      "locations": [
+        {
+          "age_groups": [
+            "first",
+            "second",
+            "third"
+          ],
+          "age_group_shifts": [
+            {
+              "age_group": "first",
+              "shift": "full_day",
+              "has_organised_groups": null
+            },
+            {
+              "age_group": "second",
+              "shift": "full_day",
+              "has_organised_groups": null
+            },
+            {
+              "age_group": "third",
+              "shift": "full_day",
+              "has_organised_groups": null
+            }
+          ],
+          "address_i18n": {
+            "bg": "ул. Цар Иван Асен II 42, Център, София",
+            "en": "ul. Tsar Ivan Asen II 42, Tsentar, Sofiya"
+          },
+          "lat": 42.6977,
+          "lng": 23.3219,
+          "phone": null,
+          "is_primary": true,
+          "id": 2,
+          "school_id": 2,
+          "coordinates_approximate": false,
+          "location_tags": [],
+          "resolved_address_i18n": {
+            "bg": "ул. Цар Иван Асен II 42, Център, София",
+            "en": "ul. Tsar Ivan Asen II 42, Tsentar, Sofiya"
+          }
+        }
+      ],
+      "exam_results": [],
+      "same_place": [],
+      "attributes": {
+        "class_size": null,
+        "has_canteen": true,
+        "uniform_required": null,
+        "special_focus": null,
+        "teaching_approach": [],
+        "teacher_student_ratio": null,
+        "school_hours": null,
+        "established_year": null,
+        "filter_tags": {
+          "facilities": [
+            "cafeteria",
+            "sports_facilities"
+          ],
+          "special_programs": [
+            "extended_day",
+            "meals_provided",
+            "sports_program"
+          ],
+          "teaching_approach": []
+        }
+      },
+      "attributes_i18n": {
+        "bg": {
+          "language_focus": [
+            {
+              "language": "English",
+              "level": "immersion"
+            }
+          ],
+          "languages_of_instruction": [
+            "Bulgarian",
+            "English"
+          ],
+          "facilities": [
+            "sports_facilities",
+            "Столова"
+          ],
+          "special_programs": [
+            "sports_program",
+            "extended_day",
+            "meals_provided"
+          ],
+          "activities_offered": [],
+          "entry_requirements": [],
+          "application_deadlines": [],
+          "available_spots": [],
+          "daily_schedule": []
+        },
+        "en": {
+          "language_focus": [
+            {
+              "language": "English",
+              "level": "immersion"
+            }
+          ],
+          "languages_of_instruction": [
+            "Bulgarian",
+            "English"
+          ],
+          "facilities": [
+            "sports_facilities",
+            "cafeteria"
+          ],
+          "special_programs": [
+            "sports_program",
+            "extended_day",
+            "meals_provided"
+          ],
+          "activities_offered": [],
+          "entry_requirements": [],
+          "application_deadlines": [],
+          "available_spots": [],
+          "daily_schedule": []
+        }
+      },
+      "admission_info": null,
+      "pricing": [],
+      "resolved_name_i18n": {
+        "bg": "ЧДГ Детски свят",
+        "en": "PKG Detski svyat"
+      }
+    },
+    {
+      "id": 3,
+      "country_code": "bg",
+      "name_i18n": {
+        "bg": "ЧДГ Слънчев ден",
+        "en": "PKG Slanchev den"
+      },
+      "school_type": "private",
+      "education_level": "kindergarten",
+      "locations": [
+        {
+          "age_groups": [
+            "first",
+            "second",
+            "third"
+          ],
+          "age_group_shifts": [
+            {
+              "age_group": "first",
+              "shift": "full_day",
+              "has_organised_groups": null
+            },
+            {
+              "age_group": "second",
+              "shift": "full_day",
+              "has_organised_groups": null
+            },
+            {
+              "age_group": "third",
+              "shift": "full_day",
+              "has_organised_groups": null
+            }
+          ],
+          "address_i18n": {
+            "bg": "кв. Младост, София",
+            "en": "kv. Mladost, Sofiya"
+          },
+          "lat": 42.645,
+          "lng": 23.375,
+          "phone": null,
+          "is_primary": true,
+          "id": 3,
+          "school_id": 3,
+          "coordinates_approximate": false,
+          "location_tags": [],
+          "resolved_address_i18n": {
+            "bg": "кв. Младост, София",
+            "en": "kv. Mladost, Sofiya"
+          }
+        }
+      ],
+      "exam_results": [],
+      "same_place": [],
+      "attributes": {
+        "class_size": null,
+        "has_canteen": true,
+        "uniform_required": null,
+        "special_focus": null,
+        "teaching_approach": [],
+        "teacher_student_ratio": null,
+        "school_hours": null,
+        "established_year": null,
+        "filter_tags": {
+          "facilities": [
+            "cafeteria"
+          ],
+          "special_programs": [
+            "extended_day",
+            "meals_provided"
+          ],
+          "teaching_approach": []
+        }
+      },
+      "attributes_i18n": {
+        "bg": {
+          "language_focus": [],
+          "languages_of_instruction": [
+            "Bulgarian"
+          ],
+          "facilities": [
+            "Столова"
+          ],
+          "special_programs": [
+            "extended_day",
+            "meals_provided"
+          ],
+          "activities_offered": [],
+          "entry_requirements": [],
+          "application_deadlines": [],
+          "available_spots": [],
+          "daily_schedule": []
+        },
+        "en": {
+          "language_focus": [],
+          "languages_of_instruction": [
+            "Bulgarian"
+          ],
+          "facilities": [
+            "cafeteria"
+          ],
+          "special_programs": [
+            "extended_day",
+            "meals_provided"
+          ],
+          "activities_offered": [],
+          "entry_requirements": [],
+          "application_deadlines": [],
+          "available_spots": [],
+          "daily_schedule": []
+        }
+      },
+      "admission_info": null,
+      "pricing": [],
+      "resolved_name_i18n": {
+        "bg": "ЧДГ Слънчев ден",
+        "en": "PKG Slanchev den"
+      }
+    },
+    {
+      "id": 21,
+      "country_code": "bg",
+      "name_i18n": {
+        "bg": "ДГ № 78 \"Слънчев ден\"",
+        "en": "KG № 78 \"Slanchev den\""
+      },
+      "school_type": "state",
+      "education_level": "kindergarten",
+      "locations": [
+        {
+          "age_groups": [
+            "first",
+            "second"
+          ],
+          "age_group_shifts": [
+            {
+              "age_group": "first",
+              "shift": "full_day",
+              "has_organised_groups": null
+            },
+            {
+              "age_group": "second",
+              "shift": "full_day",
+              "has_organised_groups": null
+            }
+          ],
+          "address_i18n": {
+            "bg": "кв. Красно село, София",
+            "en": "kv. Krasno selo, Sofiya"
+          },
+          "lat": 42.6805,
+          "lng": 23.289,
+          "phone": null,
+          "is_primary": true,
+          "id": 22,
+          "school_id": 21,
+          "coordinates_approximate": false,
+          "location_tags": [],
+          "resolved_address_i18n": {
+            "bg": "кв. Красно село, София",
+            "en": "kv. Krasno selo, Sofiya"
+          }
+        }
+      ],
+      "exam_results": [],
+      "same_place": [],
+      "attributes": {
+        "class_size": null,
+        "has_canteen": true,
+        "uniform_required": null,
+        "special_focus": null,
+        "teaching_approach": [],
+        "teacher_student_ratio": null,
+        "school_hours": null,
+        "established_year": null,
+        "filter_tags": {
+          "facilities": [],
+          "special_programs": [],
+          "teaching_approach": []
+        }
+      },
+      "attributes_i18n": {
+        "bg": {
+          "language_focus": [],
+          "languages_of_instruction": [
+            "Bulgarian"
+          ],
+          "facilities": [],
+          "special_programs": [],
+          "activities_offered": [],
+          "entry_requirements": [],
+          "application_deadlines": [],
+          "available_spots": [],
+          "daily_schedule": []
+        },
+        "en": {
+          "language_focus": [],
+          "languages_of_instruction": [
+            "Bulgarian"
+          ],
+          "facilities": [],
+          "special_programs": [],
+          "activities_offered": [],
+          "entry_requirements": [],
+          "application_deadlines": [],
+          "available_spots": [],
+          "daily_schedule": []
+        }
+      },
+      "admission_info": {
+        "system": "points",
+        "status": "accepting",
+        "platform_url": "https://kg.sofia.bg",
+        "historical_thresholds": [
+          {
+            "year": 2024,
+            "age_group": "first",
+            "rounds": [
+              {
+                "round": 1,
+                "last_admitted_points": 8,
+                "admitted_count": 35
+              },
+              {
+                "round": 2,
+                "last_admitted_points": 6,
+                "admitted_count": 12
+              },
+              {
+                "round": 3,
+                "last_admitted_points": 4,
+                "admitted_count": 5
+              }
+            ]
+          }
+        ]
+      },
+      "pricing": [],
+      "resolved_name_i18n": {
+        "bg": "ДГ № 78 „Слънчев ден“",
+        "en": "KG № 78 \"Slanchev den\""
+      }
+    },
+    {
+      "id": 22,
+      "country_code": "bg",
+      "name_i18n": {
+        "bg": "ДГ № 45 \"Радост\"",
+        "en": "KG № 45 \"Radost\""
+      },
+      "school_type": "state",
+      "education_level": "kindergarten",
+      "locations": [
+        {
+          "age_groups": [
+            "first",
+            "second"
+          ],
+          "age_group_shifts": [
+            {
+              "age_group": "first",
+              "shift": "full_day",
+              "has_organised_groups": null
+            },
+            {
+              "age_group": "second",
+              "shift": "full_day",
+              "has_organised_groups": null
+            }
+          ],
+          "address_i18n": {
+            "bg": "кв. Лозенец, София",
+            "en": "kv. Lozenets, Sofiya"
+          },
+          "lat": 42.6795,
+          "lng": 23.3345,
+          "phone": null,
+          "is_primary": true,
+          "id": 23,
+          "school_id": 22,
+          "coordinates_approximate": false,
+          "location_tags": [],
+          "resolved_address_i18n": {
+            "bg": "кв. Лозенец, София",
+            "en": "kv. Lozenets, Sofiya"
+          }
+        }
+      ],
+      "exam_results": [],
+      "same_place": [],
+      "attributes": {
+        "class_size": null,
+        "has_canteen": true,
+        "uniform_required": null,
+        "special_focus": null,
+        "teaching_approach": [],
+        "teacher_student_ratio": null,
+        "school_hours": null,
+        "established_year": null,
+        "filter_tags": {
+          "facilities": [],
+          "special_programs": [],
+          "teaching_approach": []
+        }
+      },
+      "attributes_i18n": {
+        "bg": {
+          "language_focus": [],
+          "languages_of_instruction": [
+            "Bulgarian"
+          ],
+          "facilities": [],
+          "special_programs": [],
+          "activities_offered": [],
+          "entry_requirements": [],
+          "application_deadlines": [],
+          "available_spots": [],
+          "daily_schedule": []
+        },
+        "en": {
+          "language_focus": [],
+          "languages_of_instruction": [
+            "Bulgarian"
+          ],
+          "facilities": [],
+          "special_programs": [],
+          "activities_offered": [],
+          "entry_requirements": [],
+          "application_deadlines": [],
+          "available_spots": [],
+          "daily_schedule": []
+        }
+      },
+      "admission_info": {
+        "system": "points",
+        "status": "waitlist",
+        "platform_url": "https://kg.sofia.bg",
+        "historical_thresholds": [
+          {
+            "year": 2024,
+            "age_group": "first",
+            "rounds": [
+              {
+                "round": 1,
+                "last_admitted_points": 11,
+                "admitted_count": 35
+              },
+              {
+                "round": 2,
+                "last_admitted_points": 9,
+                "admitted_count": 12
+              },
+              {
+                "round": 3,
+                "last_admitted_points": 7,
+                "admitted_count": 5
+              }
+            ]
+          }
+        ]
+      },
+      "pricing": [],
+      "resolved_name_i18n": {
+        "bg": "ДГ № 45 „Радост“",
+        "en": "KG № 45 \"Radost\""
+      }
+    },
+    {
+      "id": 39,
+      "country_code": "bg",
+      "name_i18n": {
+        "bg": "Британско училище в София",
+        "en": "British School of Sofia"
+      },
+      "school_type": "private",
+      "education_level": "primary",
+      "locations": [
+        {
+          "age_groups": [
+            "preschool"
+          ],
+          "age_group_shifts": [
+            {
+              "age_group": "preschool",
+              "shift": "full_day",
+              "has_organised_groups": null
+            }
+          ],
+          "address_i18n": {
+            "bg": "ул. Панайот Волов 27, Лозенец, София",
+            "en": "ul. Panayot Volov 27, Lozenets, Sofiya"
+          },
+          "lat": 42.6725,
+          "lng": 23.3365,
+          "phone": null,
+          "is_primary": true,
+          "id": 40,
+          "school_id": 39,
+          "coordinates_approximate": false,
+          "location_tags": [],
+          "resolved_address_i18n": {
+            "bg": "ул. Панайот Волов 27, Лозенец, София",
+            "en": "ul. Panayot Volov 27, Lozenets, Sofiya"
+          }
+        },
+        {
+          "age_groups": [
+            "grade_1_4"
+          ],
+          "age_group_shifts": [
+            {
+              "age_group": "grade_1_4",
+              "shift": "full_day",
+              "has_organised_groups": null
+            }
+          ],
+          "address_i18n": {
+            "bg": "ул. Чипровци 1, Лозенец, София",
+            "en": "ul. Chiprovtsi 1, Lozenets, Sofiya"
+          },
+          "lat": 42.6701,
+          "lng": 23.3388,
+          "phone": null,
+          "is_primary": false,
+          "id": 41,
+          "school_id": 39,
+          "coordinates_approximate": false,
+          "location_tags": [],
+          "resolved_address_i18n": {
+            "bg": "ул. Чипровци 1, Лозенец, София",
+            "en": "ul. Chiprovtsi 1, Lozenets, Sofiya"
+          }
+        }
+      ],
+      "exam_results": [],
+      "same_place": [],
+      "attributes": {
+        "class_size": null,
+        "has_canteen": true,
+        "uniform_required": true,
+        "special_focus": null,
+        "teaching_approach": [],
+        "teacher_student_ratio": null,
+        "school_hours": null,
+        "established_year": null,
+        "filter_tags": {
+          "facilities": [],
+          "special_programs": [],
+          "teaching_approach": []
+        }
+      },
+      "attributes_i18n": {
+        "bg": {
+          "language_focus": [
+            {
+              "language": "English",
+              "level": "immersion"
+            }
+          ],
+          "languages_of_instruction": [
+            "English"
+          ],
+          "facilities": [],
+          "special_programs": [],
+          "activities_offered": [],
+          "entry_requirements": [],
+          "application_deadlines": [],
+          "available_spots": [],
+          "daily_schedule": []
+        },
+        "en": {
+          "language_focus": [
+            {
+              "language": "English",
+              "level": "immersion"
+            }
+          ],
+          "languages_of_instruction": [
+            "English"
+          ],
+          "facilities": [],
+          "special_programs": [],
+          "activities_offered": [],
+          "entry_requirements": [],
+          "application_deadlines": [],
+          "available_spots": [],
+          "daily_schedule": []
+        }
+      },
+      "admission_info": null,
+      "pricing": [],
+      "resolved_name_i18n": {
+        "bg": "Британско училище в София",
+        "en": "British School of Sofia"
+      }
+    },
+    {
+      "id": 40,
+      "country_code": "bg",
+      "name_i18n": {
+        "bg": "ЧУ Свети Паисий",
+        "en": "PS Sveti Paisiy"
+      },
+      "school_type": "private",
+      "education_level": "primary",
+      "locations": [
+        {
+          "age_groups": [
+            "grade_1_4",
+            "grade_5_7"
+          ],
+          "age_group_shifts": [
+            {
+              "age_group": "grade_1_4",
+              "shift": "morning",
+              "has_organised_groups": true
+            },
+            {
+              "age_group": "grade_5_7",
+              "shift": "afternoon",
+              "has_organised_groups": false
+            }
+          ],
+          "address_i18n": {
+            "bg": "ул. Ген. Гурко 18, Център, София",
+            "en": "ul. Gen. Gurko 18, Tsentar, Sofiya"
+          },
+          "lat": 42.6942,
+          "lng": 23.3275,
+          "phone": null,
+          "is_primary": true,
+          "id": 42,
+          "school_id": 40,
+          "coordinates_approximate": false,
+          "location_tags": [],
+          "resolved_address_i18n": {
+            "bg": "ул. Ген. Гурко 18, Център, София",
+            "en": "ul. Gen. Gurko 18, Tsentar, Sofiya"
+          }
+        }
+      ],
+      "exam_results": [],
+      "same_place": [],
+      "attributes": {
+        "class_size": null,
+        "has_canteen": true,
+        "uniform_required": null,
+        "special_focus": null,
+        "teaching_approach": [],
+        "teacher_student_ratio": null,
+        "school_hours": null,
+        "established_year": null,
+        "filter_tags": {
+          "facilities": [
+            "cafeteria",
+            "sports_facilities"
+          ],
+          "special_programs": [
+            "extended_day",
+            "meals_provided"
+          ],
+          "teaching_approach": []
+        }
+      },
+      "attributes_i18n": {
+        "bg": {
+          "language_focus": [],
+          "languages_of_instruction": [
+            "Bulgarian",
+            "English"
+          ],
+          "facilities": [
+            "Столова",
+            "sports_facilities"
+          ],
+          "special_programs": [
+            "extended_day",
+            "meals_provided"
+          ],
+          "activities_offered": [],
+          "entry_requirements": [],
+          "application_deadlines": [],
+          "available_spots": [],
+          "daily_schedule": []
+        },
+        "en": {
+          "language_focus": [],
+          "languages_of_instruction": [
+            "Bulgarian",
+            "English"
+          ],
+          "facilities": [
+            "cafeteria",
+            "sports_facilities"
+          ],
+          "special_programs": [
+            "extended_day",
+            "meals_provided"
+          ],
+          "activities_offered": [],
+          "entry_requirements": [],
+          "application_deadlines": [],
+          "available_spots": [],
+          "daily_schedule": []
+        }
+      },
+      "admission_info": null,
+      "pricing": [],
+      "resolved_name_i18n": {
+        "bg": "ЧУ Свети Паисий",
+        "en": "PS Sveti Paisiy"
+      }
+    },
+    {
+      "id": 56,
+      "country_code": "bg",
+      "name_i18n": {
+        "bg": "Sofia International Academy",
+        "en": "Sofia International Academy"
+      },
+      "school_type": "international",
+      "education_level": "primary",
+      "locations": [
+        {
+          "age_groups": [
+            "grade_1_4"
+          ],
+          "age_group_shifts": [
+            {
+              "age_group": "grade_1_4",
+              "shift": "full_day",
+              "has_organised_groups": null
+            }
+          ],
+          "address_i18n": {
+            "bg": "ул. Николай Хайтов 12, Дианабад, София",
+            "en": "ul. Nikolay Haytov 12, Dianabad, Sofiya"
+          },
+          "lat": 42.6758,
+          "lng": 23.3535,
+          "phone": null,
+          "is_primary": true,
+          "id": 61,
+          "school_id": 56,
+          "coordinates_approximate": false,
+          "location_tags": [],
+          "resolved_address_i18n": {
+            "bg": "ул. Николай Хайтов 12, Дианабад, София",
+            "en": "ul. Nikolay Haytov 12, Dianabad, Sofiya"
+          }
+        }
+      ],
+      "exam_results": [],
+      "same_place": [],
+      "attributes": {
+        "class_size": null,
+        "has_canteen": null,
+        "uniform_required": null,
+        "special_focus": null,
+        "teaching_approach": [
+          "project_based"
+        ],
+        "teacher_student_ratio": null,
+        "school_hours": null,
+        "established_year": null,
+        "filter_tags": {
+          "facilities": [
+            "cafeteria",
+            "library",
+            "sports_facilities"
+          ],
+          "special_programs": [
+            "extended_day",
+            "meals_provided"
+          ],
+          "teaching_approach": [
+            "project_based"
+          ]
+        }
+      },
+      "attributes_i18n": {
+        "bg": {
+          "language_focus": [
+            {
+              "language": "English",
+              "level": "immersion"
+            }
+          ],
+          "languages_of_instruction": [
+            "English"
+          ],
+          "facilities": [
+            "Библиотека",
+            "sports_facilities",
+            "Столова"
+          ],
+          "special_programs": [
+            "extended_day",
+            "meals_provided"
+          ],
+          "activities_offered": [],
+          "entry_requirements": [],
+          "application_deadlines": [],
+          "available_spots": [],
+          "daily_schedule": []
+        },
+        "en": {
+          "language_focus": [
+            {
+              "language": "English",
+              "level": "immersion"
+            }
+          ],
+          "languages_of_instruction": [
+            "English"
+          ],
+          "facilities": [
+            "library",
+            "sports_facilities",
+            "cafeteria"
+          ],
+          "special_programs": [
+            "extended_day",
+            "meals_provided"
+          ],
+          "activities_offered": [],
+          "entry_requirements": [],
+          "application_deadlines": [],
+          "available_spots": [],
+          "daily_schedule": []
+        }
+      },
+      "admission_info": {
+        "status": "accepting",
+        "requirements": "interview"
+      },
+      "pricing": [],
+      "resolved_name_i18n": {
+        "bg": "Sofia International Academy",
+        "en": "Sofia International Academy"
+      }
+    },
+    {
+      "id": 61,
+      "country_code": "bg",
+      "name_i18n": {
+        "bg": "73 СУ \"Владислав Граматик\"",
+        "en": "73 SU \"Vladislav Gramatik\""
+      },
+      "school_type": "state",
+      "education_level": "primary",
+      "locations": [
+        {
+          "age_groups": [
+            "grade_1_4",
+            "grade_5_7"
+          ],
+          "age_group_shifts": [
+            {
+              "age_group": "grade_1_4",
+              "shift": "morning",
+              "has_organised_groups": true
+            },
+            {
+              "age_group": "grade_5_7",
+              "shift": "afternoon",
+              "has_organised_groups": false
+            }
+          ],
+          "address_i18n": {
+            "bg": "кв. Дружба 2, София",
+            "en": "kv. Druzhba 2, Sofiya"
+          },
+          "lat": 42.6525,
+          "lng": 23.398,
+          "phone": null,
+          "is_primary": true,
+          "id": 66,
+          "school_id": 61,
+          "coordinates_approximate": false,
+          "location_tags": [],
+          "resolved_address_i18n": {
+            "bg": "кв. Дружба 2, София",
+            "en": "kv. Druzhba 2, Sofiya"
+          }
+        }
+      ],
+      "exam_results": [
+        {
+          "year": 2020,
+          "exam_type": "nvo_4",
+          "subject": "Bulgarian Language",
+          "metric": "average_score",
+          "value": 75.7
+        },
+        {
+          "year": 2020,
+          "exam_type": "nvo_4",
+          "subject": "Mathematics",
+          "metric": "average_score",
+          "value": 73
+        },
+        {
+          "year": 2021,
+          "exam_type": "nvo_4",
+          "subject": "Bulgarian Language",
+          "metric": "average_score",
+          "value": 77.1
+        },
+        {
+          "year": 2021,
+          "exam_type": "nvo_4",
+          "subject": "Mathematics",
+          "metric": "average_score",
+          "value": 74.4
+        },
+        {
+          "year": 2022,
+          "exam_type": "nvo_4",
+          "subject": "Bulgarian Language",
+          "metric": "average_score",
+          "value": 78.5
+        },
+        {
+          "year": 2022,
+          "exam_type": "nvo_4",
+          "subject": "Mathematics",
+          "metric": "average_score",
+          "value": 76
+        },
+        {
+          "year": 2023,
+          "exam_type": "nvo_4",
+          "subject": "Bulgarian Language",
+          "metric": "average_score",
+          "value": 79.6
+        },
+        {
+          "year": 2023,
+          "exam_type": "nvo_4",
+          "subject": "Mathematics",
+          "metric": "average_score",
+          "value": 77
+        },
+        {
+          "year": 2024,
+          "exam_type": "nvo_4",
+          "subject": "Bulgarian Language",
+          "metric": "average_score",
+          "value": 80.5
+        },
+        {
+          "year": 2024,
+          "exam_type": "nvo_4",
+          "subject": "Mathematics",
+          "metric": "average_score",
+          "value": 77.9
+        }
+      ],
+      "same_place": [],
+      "attributes": {
+        "class_size": null,
+        "has_canteen": true,
+        "uniform_required": null,
+        "special_focus": null,
+        "teaching_approach": [],
+        "teacher_student_ratio": null,
+        "school_hours": null,
+        "established_year": null,
+        "filter_tags": {
+          "facilities": [],
+          "special_programs": [],
+          "teaching_approach": []
+        }
+      },
+      "attributes_i18n": {
+        "bg": {
+          "language_focus": [],
+          "languages_of_instruction": [
+            "Bulgarian"
+          ],
+          "facilities": [],
+          "special_programs": [],
+          "activities_offered": [],
+          "entry_requirements": [],
+          "application_deadlines": [],
+          "available_spots": [],
+          "daily_schedule": []
+        },
+        "en": {
+          "language_focus": [],
+          "languages_of_instruction": [
+            "Bulgarian"
+          ],
+          "facilities": [],
+          "special_programs": [],
+          "activities_offered": [],
+          "entry_requirements": [],
+          "application_deadlines": [],
+          "available_spots": [],
+          "daily_schedule": []
+        }
+      },
+      "admission_info": null,
+      "pricing": [],
+      "resolved_name_i18n": {
+        "bg": "73 СУ „Владислав Граматик“",
+        "en": "73 SU \"Vladislav Gramatik\""
+      }
+    },
+    {
+      "id": 62,
+      "country_code": "bg",
+      "name_i18n": {
+        "bg": "119 СОУ \"Акад. Михаил Арнаудов\"",
+        "en": "119 SOU \"Akad. Mihail Arnaudov\""
+      },
+      "school_type": "state",
+      "education_level": "primary",
+      "locations": [
+        {
+          "age_groups": [
+            "grade_1_4",
+            "grade_5_7"
+          ],
+          "age_group_shifts": [
+            {
+              "age_group": "grade_1_4",
+              "shift": "morning",
+              "has_organised_groups": true
+            },
+            {
+              "age_group": "grade_5_7",
+              "shift": "afternoon",
+              "has_organised_groups": false
+            }
+          ],
+          "address_i18n": {
+            "bg": "кв. Студентски град, София",
+            "en": "kv. Studentski grad, Sofiya"
+          },
+          "lat": 42.658,
+          "lng": 23.365,
+          "phone": null,
+          "is_primary": true,
+          "id": 67,
+          "school_id": 62,
+          "coordinates_approximate": false,
+          "location_tags": [],
+          "resolved_address_i18n": {
+            "bg": "кв. Студентски град, София",
+            "en": "kv. Studentski grad, Sofiya"
+          }
+        }
+      ],
+      "exam_results": [
+        {
+          "year": 2020,
+          "exam_type": "nvo_4",
+          "subject": "Bulgarian Language",
+          "metric": "average_score",
+          "value": 72.4
+        },
+        {
+          "year": 2020,
+          "exam_type": "nvo_4",
+          "subject": "Mathematics",
+          "metric": "average_score",
+          "value": 70.6
+        },
+        {
+          "year": 2021,
+          "exam_type": "nvo_4",
+          "subject": "Bulgarian Language",
+          "metric": "average_score",
+          "value": 73.8
+        },
+        {
+          "year": 2021,
+          "exam_type": "nvo_4",
+          "subject": "Mathematics",
+          "metric": "average_score",
+          "value": 72
+        },
+        {
+          "year": 2022,
+          "exam_type": "nvo_4",
+          "subject": "Bulgarian Language",
+          "metric": "average_score",
+          "value": 75.2
+        },
+        {
+          "year": 2022,
+          "exam_type": "nvo_4",
+          "subject": "Mathematics",
+          "metric": "average_score",
+          "value": 73.6
+        },
+        {
+          "year": 2023,
+          "exam_type": "nvo_4",
+          "subject": "Bulgarian Language",
+          "metric": "average_score",
+          "value": 76.3
+        },
+        {
+          "year": 2023,
+          "exam_type": "nvo_4",
+          "subject": "Mathematics",
+          "metric": "average_score",
+          "value": 74.6
+        },
+        {
+          "year": 2024,
+          "exam_type": "nvo_4",
+          "subject": "Bulgarian Language",
+          "metric": "average_score",
+          "value": 77.2
+        },
+        {
+          "year": 2024,
+          "exam_type": "nvo_4",
+          "subject": "Mathematics",
+          "metric": "average_score",
+          "value": 75.5
+        }
+      ],
+      "same_place": [],
+      "attributes": {
+        "class_size": null,
+        "has_canteen": true,
+        "uniform_required": null,
+        "special_focus": null,
+        "teaching_approach": [],
+        "teacher_student_ratio": null,
+        "school_hours": null,
+        "established_year": null,
+        "filter_tags": {
+          "facilities": [],
+          "special_programs": [],
+          "teaching_approach": []
+        }
+      },
+      "attributes_i18n": {
+        "bg": {
+          "language_focus": [],
+          "languages_of_instruction": [
+            "Bulgarian"
+          ],
+          "facilities": [],
+          "special_programs": [],
+          "activities_offered": [],
+          "entry_requirements": [],
+          "application_deadlines": [],
+          "available_spots": [],
+          "daily_schedule": []
+        },
+        "en": {
+          "language_focus": [],
+          "languages_of_instruction": [
+            "Bulgarian"
+          ],
+          "facilities": [],
+          "special_programs": [],
+          "activities_offered": [],
+          "entry_requirements": [],
+          "application_deadlines": [],
+          "available_spots": [],
+          "daily_schedule": []
+        }
+      },
+      "admission_info": null,
+      "pricing": [],
+      "resolved_name_i18n": {
+        "bg": "119 СОУ „Акад. Михаил Арнаудов“",
+        "en": "119 SOU \"Akad. Mihail Arnaudov\""
+      }
+    },
+    {
+      "id": 69,
+      "country_code": "bg",
+      "name_i18n": {
+        "bg": "22 ОУ \"П. Р. Славейков\"",
+        "en": "22 PS \"P. R. Slaveykov\""
+      },
+      "school_type": "state",
+      "education_level": "primary",
+      "locations": [
+        {
+          "age_groups": [
+            "grade_1_4",
+            "grade_5_7"
+          ],
+          "age_group_shifts": [
+            {
+              "age_group": "grade_1_4",
+              "shift": "morning",
+              "has_organised_groups": true
+            },
+            {
+              "age_group": "grade_5_7",
+              "shift": "afternoon",
+              "has_organised_groups": false
+            }
+          ],
+          "address_i18n": {
+            "bg": "ул. Симеоновско шосе 12, Симеоново, София",
+            "en": "ul. Simeonovsko shose 12, Simeonovo, Sofiya"
+          },
+          "lat": 42.6285,
+          "lng": 23.3345,
+          "phone": null,
+          "is_primary": true,
+          "id": 74,
+          "school_id": 69,
+          "coordinates_approximate": false,
+          "location_tags": [],
+          "resolved_address_i18n": {
+            "bg": "ул. Симеоновско шосе 12, Симеоново, София",
+            "en": "ul. Simeonovsko shose 12, Simeonovo, Sofiya"
+          }
+        },
+        {
+          "age_groups": [
+            "grade_1_4",
+            "grade_5_7"
+          ],
+          "age_group_shifts": [
+            {
+              "age_group": "grade_1_4",
+              "shift": "morning",
+              "has_organised_groups": true
+            },
+            {
+              "age_group": "grade_5_7",
+              "shift": "afternoon",
+              "has_organised_groups": false
+            }
+          ],
+          "address_i18n": {
+            "bg": "бул. Черни връх 61, Симеоново, София",
+            "en": "bul. Cherni vrah 61, Simeonovo, Sofiya"
+          },
+          "lat": 42.6225,
+          "lng": 23.329,
+          "phone": null,
+          "is_primary": false,
+          "id": 75,
+          "school_id": 69,
+          "coordinates_approximate": false,
+          "location_tags": [],
+          "resolved_address_i18n": {
+            "bg": "бул. Черни връх 61, Симеоново, София",
+            "en": "bul. Cherni vrah 61, Simeonovo, Sofiya"
+          }
+        }
+      ],
+      "exam_results": [
+        {
+          "year": 2020,
+          "exam_type": "nvo_4",
+          "subject": "Bulgarian Language",
+          "metric": "average_score",
+          "value": 74.1
+        },
+        {
+          "year": 2020,
+          "exam_type": "nvo_4",
+          "subject": "Mathematics",
+          "metric": "average_score",
+          "value": 70.8
+        },
+        {
+          "year": 2021,
+          "exam_type": "nvo_4",
+          "subject": "Bulgarian Language",
+          "metric": "average_score",
+          "value": 75.5
+        },
+        {
+          "year": 2021,
+          "exam_type": "nvo_4",
+          "subject": "Mathematics",
+          "metric": "average_score",
+          "value": 72.2
+        },
+        {
+          "year": 2022,
+          "exam_type": "nvo_4",
+          "subject": "Bulgarian Language",
+          "metric": "average_score",
+          "value": 76.9
+        },
+        {
+          "year": 2022,
+          "exam_type": "nvo_4",
+          "subject": "Mathematics",
+          "metric": "average_score",
+          "value": 73.8
+        },
+        {
+          "year": 2023,
+          "exam_type": "nvo_4",
+          "subject": "Bulgarian Language",
+          "metric": "average_score",
+          "value": 78
+        },
+        {
+          "year": 2023,
+          "exam_type": "nvo_4",
+          "subject": "Mathematics",
+          "metric": "average_score",
+          "value": 74.8
+        },
+        {
+          "year": 2024,
+          "exam_type": "nvo_4",
+          "subject": "Bulgarian Language",
+          "metric": "average_score",
+          "value": 78.9
+        },
+        {
+          "year": 2024,
+          "exam_type": "nvo_4",
+          "subject": "Mathematics",
+          "metric": "average_score",
+          "value": 75.7
+        }
+      ],
+      "same_place": [],
+      "attributes": {
+        "class_size": null,
+        "has_canteen": true,
+        "uniform_required": null,
+        "special_focus": null,
+        "teaching_approach": [],
+        "teacher_student_ratio": null,
+        "school_hours": null,
+        "established_year": null,
+        "filter_tags": {
+          "facilities": [],
+          "special_programs": [],
+          "teaching_approach": []
+        }
+      },
+      "attributes_i18n": {
+        "bg": {
+          "language_focus": [],
+          "languages_of_instruction": [
+            "Bulgarian"
+          ],
+          "facilities": [],
+          "special_programs": [],
+          "activities_offered": [],
+          "entry_requirements": [],
+          "application_deadlines": [],
+          "available_spots": [],
+          "daily_schedule": []
+        },
+        "en": {
+          "language_focus": [],
+          "languages_of_instruction": [
+            "Bulgarian"
+          ],
+          "facilities": [],
+          "special_programs": [],
+          "activities_offered": [],
+          "entry_requirements": [],
+          "application_deadlines": [],
+          "available_spots": [],
+          "daily_schedule": []
+        }
+      },
+      "admission_info": null,
+      "pricing": [],
+      "resolved_name_i18n": {
+        "bg": "22 ОУ „П. Р. Славейков“",
+        "en": "22 PS \"P. R. Slaveykov\""
+      }
+    },
+    {
+      "id": 75,
+      "country_code": "bg",
+      "name_i18n": {
+        "bg": "60 ОУ \"Св. Св. Кирил и Методий\"",
+        "en": "60 PS \"Sv. Sv. Kiril i Metodiy\""
+      },
+      "school_type": "state",
+      "education_level": "lower_secondary",
+      "locations": [
+        {
+          "age_groups": [
+            "grade_5_7"
+          ],
+          "age_group_shifts": [
+            {
+              "age_group": "grade_5_7",
+              "shift": "morning",
+              "has_organised_groups": false
+            }
+          ],
+          "address_i18n": {
+            "bg": "кв. Надежда, София",
+            "en": "kv. Nadezhda, Sofiya"
+          },
+          "lat": 42.731,
+          "lng": 23.32,
+          "phone": null,
+          "is_primary": true,
+          "id": 81,
+          "school_id": 75,
+          "coordinates_approximate": false,
+          "location_tags": [],
+          "resolved_address_i18n": {
+            "bg": "кв. Надежда, София",
+            "en": "kv. Nadezhda, Sofiya"
+          }
+        }
+      ],
+      "exam_results": [
+        {
+          "year": 2020,
+          "exam_type": "nvo_7",
+          "subject": "Bulgarian Language",
+          "metric": "average_score",
+          "value": 71.7
+        },
+        {
+          "year": 2020,
+          "exam_type": "nvo_7",
+          "subject": "Mathematics",
+          "metric": "average_score",
+          "value": 68
+        },
+        {
+          "year": 2021,
+          "exam_type": "nvo_7",
+          "subject": "Bulgarian Language",
+          "metric": "average_score",
+          "value": 73.1
+        },
+        {
+          "year": 2021,
+          "exam_type": "nvo_7",
+          "subject": "Mathematics",
+          "metric": "average_score",
+          "value": 69.4
+        },
+        {
+          "year": 2022,
+          "exam_type": "nvo_7",
+          "subject": "Bulgarian Language",
+          "metric": "average_score",
+          "value": 74.5
+        },
+        {
+          "year": 2022,
+          "exam_type": "nvo_7",
+          "subject": "Mathematics",
+          "metric": "average_score",
+          "value": 71
+        },
+        {
+          "year": 2023,
+          "exam_type": "nvo_7",
+          "subject": "Bulgarian Language",
+          "metric": "average_score",
+          "value": 75.6
+        },
+        {
+          "year": 2023,
+          "exam_type": "nvo_7",
+          "subject": "Mathematics",
+          "metric": "average_score",
+          "value": 72
+        },
+        {
+          "year": 2024,
+          "exam_type": "nvo_7",
+          "subject": "Bulgarian Language",
+          "metric": "average_score",
+          "value": 76.5
+        },
+        {
+          "year": 2024,
+          "exam_type": "nvo_7",
+          "subject": "Mathematics",
+          "metric": "average_score",
+          "value": 72.9
+        }
+      ],
+      "same_place": [],
+      "attributes": {
+        "class_size": null,
+        "has_canteen": true,
+        "uniform_required": null,
+        "special_focus": null,
+        "teaching_approach": [],
+        "teacher_student_ratio": null,
+        "school_hours": null,
+        "established_year": null,
+        "filter_tags": {
+          "facilities": [
+            "library",
+            "sports_facilities"
+          ],
+          "special_programs": [
+            "extended_day",
+            "meals_provided"
+          ],
+          "teaching_approach": []
+        }
+      },
+      "attributes_i18n": {
+        "bg": {
+          "language_focus": [],
+          "languages_of_instruction": [
+            "Bulgarian"
+          ],
+          "facilities": [
+            "Библиотека",
+            "sports_facilities"
+          ],
+          "special_programs": [
+            "extended_day",
+            "meals_provided"
+          ],
+          "activities_offered": [],
+          "entry_requirements": [],
+          "application_deadlines": [],
+          "available_spots": [],
+          "daily_schedule": []
+        },
+        "en": {
+          "language_focus": [],
+          "languages_of_instruction": [
+            "Bulgarian"
+          ],
+          "facilities": [
+            "library",
+            "sports_facilities"
+          ],
+          "special_programs": [
+            "extended_day",
+            "meals_provided"
+          ],
+          "activities_offered": [],
+          "entry_requirements": [],
+          "application_deadlines": [],
+          "available_spots": [],
+          "daily_schedule": []
+        }
+      },
+      "admission_info": null,
+      "pricing": [],
+      "resolved_name_i18n": {
+        "bg": "60 ОУ „Св. Св. Кирил и Методий“",
+        "en": "60 PS \"Sv. Sv. Kiril i Metodiy\""
+      }
+    },
+    {
+      "id": 87,
+      "country_code": "bg",
+      "name_i18n": {
+        "bg": "Американски колеж в София",
+        "en": "American College of Sofia"
+      },
+      "school_type": "private",
+      "education_level": "upper_secondary",
+      "locations": [
+        {
+          "age_groups": [
+            "grade_8_12"
+          ],
+          "age_group_shifts": [
+            {
+              "age_group": "grade_8_12",
+              "shift": "full_day",
+              "has_organised_groups": null
+            }
+          ],
+          "address_i18n": {
+            "bg": "ул. Коста Лулчев 13, Симеоново, София",
+            "en": "ul. Kosta Lulchev 13, Simeonovo, Sofiya"
+          },
+          "lat": 42.632,
+          "lng": 23.3445,
+          "phone": null,
+          "is_primary": true,
+          "id": 93,
+          "school_id": 87,
+          "coordinates_approximate": false,
+          "location_tags": [],
+          "resolved_address_i18n": {
+            "bg": "ул. Коста Лулчев 13, Симеоново, София",
+            "en": "ul. Kosta Lulchev 13, Simeonovo, Sofiya"
+          }
+        }
+      ],
+      "exam_results": [],
+      "same_place": [],
+      "attributes": {
+        "class_size": null,
+        "has_canteen": null,
+        "uniform_required": null,
+        "special_focus": "IB Diploma",
+        "teaching_approach": [
+          "ib_program"
+        ],
+        "teacher_student_ratio": null,
+        "school_hours": null,
+        "established_year": null,
+        "filter_tags": {
+          "facilities": [
+            "computer_lab",
+            "library"
+          ],
+          "special_programs": [
+            "extended_day"
+          ],
+          "teaching_approach": [
+            "ib_program"
+          ]
+        }
+      },
+      "attributes_i18n": {
+        "bg": {
+          "language_focus": [
+            {
+              "language": "English",
+              "level": "immersion"
+            }
+          ],
+          "languages_of_instruction": [
+            "English"
+          ],
+          "facilities": [
+            "Библиотека",
+            "computer_lab"
+          ],
+          "special_programs": [
+            "extended_day"
+          ],
+          "activities_offered": [],
+          "entry_requirements": [],
+          "application_deadlines": [],
+          "available_spots": [],
+          "daily_schedule": []
+        },
+        "en": {
+          "language_focus": [
+            {
+              "language": "English",
+              "level": "immersion"
+            }
+          ],
+          "languages_of_instruction": [
+            "English"
+          ],
+          "facilities": [
+            "library",
+            "computer_lab"
+          ],
+          "special_programs": [
+            "extended_day"
+          ],
+          "activities_offered": [],
+          "entry_requirements": [],
+          "application_deadlines": [],
+          "available_spots": [],
+          "daily_schedule": []
+        }
+      },
+      "admission_info": {
+        "status": "waitlist",
+        "requirements": "test"
+      },
+      "pricing": [],
+      "resolved_name_i18n": {
+        "bg": "Американски колеж в София",
+        "en": "American College of Sofia"
+      }
+    },
+    {
+      "id": 94,
+      "country_code": "bg",
+      "name_i18n": {
+        "bg": "51 СУ \"Елисавета Багряна\"",
+        "en": "51 SU \"Elisaveta Bagryana\""
+      },
+      "school_type": "state",
+      "education_level": "upper_secondary",
+      "locations": [
+        {
+          "age_groups": [
+            "grade_8_12"
+          ],
+          "age_group_shifts": [
+            {
+              "age_group": "grade_8_12",
+              "shift": "morning",
+              "has_organised_groups": null
+            }
+          ],
+          "address_i18n": {
+            "bg": "кв. Център, София",
+            "en": "kv. Tsentar, Sofiya"
+          },
+          "lat": 42.6915,
+          "lng": 23.336,
+          "phone": null,
+          "is_primary": true,
+          "id": 100,
+          "school_id": 94,
+          "coordinates_approximate": false,
+          "location_tags": [],
+          "resolved_address_i18n": {
+            "bg": "кв. Център, София",
+            "en": "kv. Tsentar, Sofiya"
+          }
+        }
+      ],
+      "exam_results": [
+        {
+          "year": 2020,
+          "exam_type": "nvo_7",
+          "subject": "Bulgarian Language",
+          "metric": "average_score",
+          "value": 89.5
+        },
+        {
+          "year": 2020,
+          "exam_type": "nvo_7",
+          "subject": "Mathematics",
+          "metric": "average_score",
+          "value": 86.5
+        },
+        {
+          "year": 2021,
+          "exam_type": "nvo_7",
+          "subject": "Bulgarian Language",
+          "metric": "average_score",
+          "value": 90.9
+        },
+        {
+          "year": 2021,
+          "exam_type": "nvo_7",
+          "subject": "Mathematics",
+          "metric": "average_score",
+          "value": 87.9
+        },
+        {
+          "year": 2022,
+          "exam_type": "nvo_7",
+          "subject": "Bulgarian Language",
+          "metric": "average_score",
+          "value": 92.3
+        },
+        {
+          "year": 2022,
+          "exam_type": "nvo_7",
+          "subject": "Mathematics",
+          "metric": "average_score",
+          "value": 89.5
+        },
+        {
+          "year": 2023,
+          "exam_type": "nvo_7",
+          "subject": "Bulgarian Language",
+          "metric": "average_score",
+          "value": 93.4
+        },
+        {
+          "year": 2023,
+          "exam_type": "nvo_7",
+          "subject": "Mathematics",
+          "metric": "average_score",
+          "value": 90.5
+        },
+        {
+          "year": 2024,
+          "exam_type": "nvo_7",
+          "subject": "Bulgarian Language",
+          "metric": "average_score",
+          "value": 94.3
+        },
+        {
+          "year": 2024,
+          "exam_type": "nvo_7",
+          "subject": "Mathematics",
+          "metric": "average_score",
+          "value": 91.4
+        },
+        {
+          "year": 2022,
+          "exam_type": "nvo_10",
+          "subject": "Bulgarian Language",
+          "metric": "average_score",
+          "value": 84.9
+        },
+        {
+          "year": 2022,
+          "exam_type": "nvo_10",
+          "subject": "Mathematics",
+          "metric": "average_score",
+          "value": 82.8
+        },
+        {
+          "year": 2023,
+          "exam_type": "nvo_10",
+          "subject": "Bulgarian Language",
+          "metric": "average_score",
+          "value": 86.7
+        },
+        {
+          "year": 2023,
+          "exam_type": "nvo_10",
+          "subject": "Mathematics",
+          "metric": "average_score",
+          "value": 84.7
+        },
+        {
+          "year": 2024,
+          "exam_type": "nvo_10",
+          "subject": "Bulgarian Language",
+          "metric": "average_score",
+          "value": 87.6
+        },
+        {
+          "year": 2024,
+          "exam_type": "nvo_10",
+          "subject": "Mathematics",
+          "metric": "average_score",
+          "value": 85.4
+        }
+      ],
+      "same_place": [],
+      "attributes": {
+        "class_size": null,
+        "has_canteen": null,
+        "uniform_required": null,
+        "special_focus": "mathematics",
+        "teaching_approach": [],
+        "teacher_student_ratio": null,
+        "school_hours": null,
+        "established_year": null,
+        "filter_tags": {
+          "facilities": [],
+          "special_programs": [],
+          "teaching_approach": []
+        }
+      },
+      "attributes_i18n": {
+        "bg": {
+          "language_focus": [],
+          "languages_of_instruction": [
+            "Bulgarian"
+          ],
+          "facilities": [],
+          "special_programs": [],
+          "activities_offered": [],
+          "entry_requirements": [],
+          "application_deadlines": [],
+          "available_spots": [],
+          "daily_schedule": []
+        },
+        "en": {
+          "language_focus": [],
+          "languages_of_instruction": [
+            "Bulgarian"
+          ],
+          "facilities": [],
+          "special_programs": [],
+          "activities_offered": [],
+          "entry_requirements": [],
+          "application_deadlines": [],
+          "available_spots": [],
+          "daily_schedule": []
+        }
+      },
+      "admission_info": {
+        "system": "nvo_score",
+        "historical_min_scores": [
+          {
+            "year": 2024,
+            "min_score": 196.5
+          }
+        ]
+      },
+      "pricing": [],
+      "resolved_name_i18n": {
+        "bg": "51 СУ „Елисавета Багряна“",
+        "en": "51 SU \"Elisaveta Bagryana\""
+      }
+    },
+    {
+      "id": 95,
+      "country_code": "bg",
+      "name_i18n": {
+        "bg": "18 СУ \"Уилям Гладстон\"",
+        "en": "18 SU \"Uilyam Gladston\""
+      },
+      "school_type": "state",
+      "education_level": "upper_secondary",
+      "locations": [
+        {
+          "age_groups": [
+            "grade_8_12"
+          ],
+          "age_group_shifts": [
+            {
+              "age_group": "grade_8_12",
+              "shift": "morning",
+              "has_organised_groups": null
+            }
+          ],
+          "address_i18n": {
+            "bg": "кв. Център, София",
+            "en": "kv. Tsentar, Sofiya"
+          },
+          "lat": 42.696,
+          "lng": 23.331,
+          "phone": null,
+          "is_primary": true,
+          "id": 101,
+          "school_id": 95,
+          "coordinates_approximate": false,
+          "location_tags": [],
+          "resolved_address_i18n": {
+            "bg": "кв. Център, София",
+            "en": "kv. Tsentar, Sofiya"
+          }
+        }
+      ],
+      "exam_results": [
+        {
+          "year": 2020,
+          "exam_type": "nvo_7",
+          "subject": "Bulgarian Language",
+          "metric": "average_score",
+          "value": 85.7
+        },
+        {
+          "year": 2020,
+          "exam_type": "nvo_7",
+          "subject": "Mathematics",
+          "metric": "average_score",
+          "value": 79.1
+        },
+        {
+          "year": 2021,
+          "exam_type": "nvo_7",
+          "subject": "Bulgarian Language",
+          "metric": "average_score",
+          "value": 87.1
+        },
+        {
+          "year": 2021,
+          "exam_type": "nvo_7",
+          "subject": "Mathematics",
+          "metric": "average_score",
+          "value": 80.5
+        },
+        {
+          "year": 2022,
+          "exam_type": "nvo_7",
+          "subject": "Bulgarian Language",
+          "metric": "average_score",
+          "value": 88.5
+        },
+        {
+          "year": 2022,
+          "exam_type": "nvo_7",
+          "subject": "Mathematics",
+          "metric": "average_score",
+          "value": 82.1
+        },
+        {
+          "year": 2023,
+          "exam_type": "nvo_7",
+          "subject": "Bulgarian Language",
+          "metric": "average_score",
+          "value": 89.6
+        },
+        {
+          "year": 2023,
+          "exam_type": "nvo_7",
+          "subject": "Mathematics",
+          "metric": "average_score",
+          "value": 83.1
+        },
+        {
+          "year": 2024,
+          "exam_type": "nvo_7",
+          "subject": "Bulgarian Language",
+          "metric": "average_score",
+          "value": 90.5
+        },
+        {
+          "year": 2024,
+          "exam_type": "nvo_7",
+          "subject": "Mathematics",
+          "metric": "average_score",
+          "value": 84
+        },
+        {
+          "year": 2022,
+          "exam_type": "nvo_10",
+          "subject": "Bulgarian Language",
+          "metric": "average_score",
+          "value": 81.1
+        },
+        {
+          "year": 2022,
+          "exam_type": "nvo_10",
+          "subject": "Mathematics",
+          "metric": "average_score",
+          "value": 75.4
+        },
+        {
+          "year": 2023,
+          "exam_type": "nvo_10",
+          "subject": "Bulgarian Language",
+          "metric": "average_score",
+          "value": 82.9
+        },
+        {
+          "year": 2023,
+          "exam_type": "nvo_10",
+          "subject": "Mathematics",
+          "metric": "average_score",
+          "value": 77.3
+        },
+        {
+          "year": 2024,
+          "exam_type": "nvo_10",
+          "subject": "Bulgarian Language",
+          "metric": "average_score",
+          "value": 83.8
+        },
+        {
+          "year": 2024,
+          "exam_type": "nvo_10",
+          "subject": "Mathematics",
+          "metric": "average_score",
+          "value": 78
+        }
+      ],
+      "same_place": [],
+      "attributes": {
+        "class_size": null,
+        "has_canteen": null,
+        "uniform_required": null,
+        "special_focus": "foreign_languages",
+        "teaching_approach": [],
+        "teacher_student_ratio": null,
+        "school_hours": null,
+        "established_year": null,
+        "filter_tags": {
+          "facilities": [],
+          "special_programs": [],
+          "teaching_approach": []
+        }
+      },
+      "attributes_i18n": {
+        "bg": {
+          "language_focus": [],
+          "languages_of_instruction": [
+            "Bulgarian"
+          ],
+          "facilities": [],
+          "special_programs": [],
+          "activities_offered": [],
+          "entry_requirements": [],
+          "application_deadlines": [],
+          "available_spots": [],
+          "daily_schedule": []
+        },
+        "en": {
+          "language_focus": [],
+          "languages_of_instruction": [
+            "Bulgarian"
+          ],
+          "facilities": [],
+          "special_programs": [],
+          "activities_offered": [],
+          "entry_requirements": [],
+          "application_deadlines": [],
+          "available_spots": [],
+          "daily_schedule": []
+        }
+      },
+      "admission_info": {
+        "system": "nvo_score",
+        "historical_min_scores": [
+          {
+            "year": 2024,
+            "min_score": 189.2
+          }
+        ]
+      },
+      "pricing": [],
+      "resolved_name_i18n": {
+        "bg": "18 СУ „Уилям Гладстон“",
+        "en": "18 SU \"Uilyam Gladston\""
+      }
+    }
+  ],
+  "/schools/95": {
+    "country_code": "bg",
+    "name_i18n": {
+      "bg": "18 СУ \"Уилям Гладстон\"",
+      "en": "18 SU \"Uilyam Gladston\""
+    },
+    "school_type": "state",
+    "education_level": "upper_secondary",
+    "source_url": null,
+    "website_url": null,
+    "num_pupils": 750,
+    "id": 95,
+    "created_at": "2026-10-12T14:39:19.928823Z",
+    "updated_at": "2026-10-12T14:39:19.928824Z",
+    "locations": [
+      {
+        "age_groups": [
+          "grade_8_12"
+        ],
+        "age_group_shifts": [
+          {
+            "age_group": "grade_8_12",
+            "shift": "morning",
+            "has_organised_groups": null
+          }
+        ],
+        "address_i18n": {
+          "bg": "кв. Център, София",
+          "en": "kv. Tsentar, Sofiya"
+        },
+        "lat": 42.696,
+        "lng": 23.331,
+        "phone": null,
+        "is_primary": true,
+        "id": 101,
+        "school_id": 95,
+        "coordinates_approximate": false,
+        "location_tags": [],
+        "resolved_address_i18n": {
+          "bg": "кв. Център, София",
+          "en": "kv. Tsentar, Sofiya"
+        }
+      }
+    ],
+    "exam_results": [
+      {
+        "id": 413,
+        "school_id": 95,
+        "year": 2020,
+        "exam_type": "nvo_7",
+        "subject": "Bulgarian Language",
+        "metric": "average_score",
+        "value": 85.7,
+        "source_url": "https://nvo.mon.bg"
+      },
+      {
+        "id": 414,
+        "school_id": 95,
+        "year": 2020,
+        "exam_type": "nvo_7",
+        "subject": "Mathematics",
+        "metric": "average_score",
+        "value": 79.1,
+        "source_url": "https://nvo.mon.bg"
+      },
+      {
+        "id": 415,
+        "school_id": 95,
+        "year": 2021,
+        "exam_type": "nvo_7",
+        "subject": "Bulgarian Language",
+        "metric": "average_score",
+        "value": 87.1,
+        "source_url": "https://nvo.mon.bg"
+      },
+      {
+        "id": 416,
+        "school_id": 95,
+        "year": 2021,
+        "exam_type": "nvo_7",
+        "subject": "Mathematics",
+        "metric": "average_score",
+        "value": 80.5,
+        "source_url": "https://nvo.mon.bg"
+      },
+      {
+        "id": 417,
+        "school_id": 95,
+        "year": 2022,
+        "exam_type": "nvo_7",
+        "subject": "Bulgarian Language",
+        "metric": "average_score",
+        "value": 88.5,
+        "source_url": "https://nvo.mon.bg"
+      },
+      {
+        "id": 418,
+        "school_id": 95,
+        "year": 2022,
+        "exam_type": "nvo_7",
+        "subject": "Mathematics",
+        "metric": "average_score",
+        "value": 82.1,
+        "source_url": "https://nvo.mon.bg"
+      },
+      {
+        "id": 419,
+        "school_id": 95,
+        "year": 2023,
+        "exam_type": "nvo_7",
+        "subject": "Bulgarian Language",
+        "metric": "average_score",
+        "value": 89.6,
+        "source_url": "https://nvo.mon.bg"
+      },
+      {
+        "id": 420,
+        "school_id": 95,
+        "year": 2023,
+        "exam_type": "nvo_7",
+        "subject": "Mathematics",
+        "metric": "average_score",
+        "value": 83.1,
+        "source_url": "https://nvo.mon.bg"
+      },
+      {
+        "id": 421,
+        "school_id": 95,
+        "year": 2024,
+        "exam_type": "nvo_7",
+        "subject": "Bulgarian Language",
+        "metric": "average_score",
+        "value": 90.5,
+        "source_url": "https://nvo.mon.bg"
+      },
+      {
+        "id": 422,
+        "school_id": 95,
+        "year": 2024,
+        "exam_type": "nvo_7",
+        "subject": "Mathematics",
+        "metric": "average_score",
+        "value": 84,
+        "source_url": "https://nvo.mon.bg"
+      },
+      {
+        "id": 423,
+        "school_id": 95,
+        "year": 2022,
+        "exam_type": "nvo_10",
+        "subject": "Bulgarian Language",
+        "metric": "average_score",
+        "value": 81.1,
+        "source_url": "https://nvo.mon.bg"
+      },
+      {
+        "id": 424,
+        "school_id": 95,
+        "year": 2022,
+        "exam_type": "nvo_10",
+        "subject": "Mathematics",
+        "metric": "average_score",
+        "value": 75.4,
+        "source_url": "https://nvo.mon.bg"
+      },
+      {
+        "id": 425,
+        "school_id": 95,
+        "year": 2023,
+        "exam_type": "nvo_10",
+        "subject": "Bulgarian Language",
+        "metric": "average_score",
+        "value": 82.9,
+        "source_url": "https://nvo.mon.bg"
+      },
+      {
+        "id": 426,
+        "school_id": 95,
+        "year": 2023,
+        "exam_type": "nvo_10",
+        "subject": "Mathematics",
+        "metric": "average_score",
+        "value": 77.3,
+        "source_url": "https://nvo.mon.bg"
+      },
+      {
+        "id": 427,
+        "school_id": 95,
+        "year": 2024,
+        "exam_type": "nvo_10",
+        "subject": "Bulgarian Language",
+        "metric": "average_score",
+        "value": 83.8,
+        "source_url": "https://nvo.mon.bg"
+      },
+      {
+        "id": 428,
+        "school_id": 95,
+        "year": 2024,
+        "exam_type": "nvo_10",
+        "subject": "Mathematics",
+        "metric": "average_score",
+        "value": 78,
+        "source_url": "https://nvo.mon.bg"
+      }
+    ],
+    "continues_to": null,
+    "continued_from": [],
+    "same_place": [],
+    "attributes": {
+      "class_size": null,
+      "has_canteen": null,
+      "uniform_required": null,
+      "special_focus": "foreign_languages",
+      "teaching_approach": [],
+      "teacher_student_ratio": null,
+      "school_hours": null,
+      "established_year": null,
+      "filter_tags": {
+        "facilities": [],
+        "special_programs": [],
+        "teaching_approach": []
+      }
+    },
+    "attributes_i18n": {
+      "bg": {
+        "language_focus": [],
+        "languages_of_instruction": [
+          "Bulgarian"
+        ],
+        "facilities": [],
+        "special_programs": [],
+        "activities_offered": [],
+        "entry_requirements": [],
+        "application_deadlines": [],
+        "available_spots": [],
+        "daily_schedule": []
+      },
+      "en": {
+        "language_focus": [],
+        "languages_of_instruction": [
+          "Bulgarian"
+        ],
+        "facilities": [],
+        "special_programs": [],
+        "activities_offered": [],
+        "entry_requirements": [],
+        "application_deadlines": [],
+        "available_spots": [],
+        "daily_schedule": []
+      }
+    },
+    "admission_info": {
+      "system": "nvo_score",
+      "historical_min_scores": [
+        {
+          "year": 2024,
+          "min_score": 189.2
+        }
+      ]
+    },
+    "pricing": [],
+    "summary_i18n": null,
+    "resolved_name_i18n": {
+      "bg": "18 СУ „Уилям Гладстон“",
+      "en": "18 SU \"Uilyam Gladston\""
+    },
+    "field_sources": [
+      {
+        "source_type": "government",
+        "source_url": "https://nvo.mon.bg",
+        "last_verified": null,
+        "confidence": "high"
+      },
+      {
+        "source_type": "government",
+        "source_url": "https://nvo.mon.bg",
+        "last_verified": null,
+        "confidence": "high"
+      },
+      {
+        "source_type": "government",
+        "source_url": "https://nvo.mon.bg",
+        "last_verified": null,
+        "confidence": "high"
+      },
+      {
+        "source_type": "government",
+        "source_url": "https://nvo.mon.bg",
+        "last_verified": null,
+        "confidence": "high"
+      }
+    ]
+  },
+  "/schools/search?q=%D0%A1%D0%BB%D0%B0%D0%B2%D0%B5%D0%B9%D0%BA%D0%BE%D0%B2&country_code=bg&city=sofia": [
+    {
+      "id": 69,
+      "country_code": "bg",
+      "name_i18n": {
+        "bg": "22 ОУ \"П. Р. Славейков\"",
+        "en": "22 PS \"P. R. Slaveykov\""
+      },
+      "school_type": "state",
+      "education_level": "primary",
+      "locations": [
+        {
+          "age_groups": [
+            "grade_1_4",
+            "grade_5_7"
+          ],
+          "age_group_shifts": [
+            {
+              "age_group": "grade_1_4",
+              "shift": "morning",
+              "has_organised_groups": true
+            },
+            {
+              "age_group": "grade_5_7",
+              "shift": "afternoon",
+              "has_organised_groups": false
+            }
+          ],
+          "address_i18n": {
+            "bg": "ул. Симеоновско шосе 12, Симеоново, София",
+            "en": "ul. Simeonovsko shose 12, Simeonovo, Sofiya"
+          },
+          "lat": 42.6285,
+          "lng": 23.3345,
+          "phone": null,
+          "is_primary": true,
+          "id": 74,
+          "school_id": 69,
+          "coordinates_approximate": false,
+          "location_tags": [],
+          "resolved_address_i18n": {
+            "bg": "ул. Симеоновско шосе 12, Симеоново, София",
+            "en": "ul. Simeonovsko shose 12, Simeonovo, Sofiya"
+          }
+        },
+        {
+          "age_groups": [
+            "grade_1_4",
+            "grade_5_7"
+          ],
+          "age_group_shifts": [
+            {
+              "age_group": "grade_1_4",
+              "shift": "morning",
+              "has_organised_groups": true
+            },
+            {
+              "age_group": "grade_5_7",
+              "shift": "afternoon",
+              "has_organised_groups": false
+            }
+          ],
+          "address_i18n": {
+            "bg": "бул. Черни връх 61, Симеоново, София",
+            "en": "bul. Cherni vrah 61, Simeonovo, Sofiya"
+          },
+          "lat": 42.6225,
+          "lng": 23.329,
+          "phone": null,
+          "is_primary": false,
+          "id": 75,
+          "school_id": 69,
+          "coordinates_approximate": false,
+          "location_tags": [],
+          "resolved_address_i18n": {
+            "bg": "бул. Черни връх 61, Симеоново, София",
+            "en": "bul. Cherni vrah 61, Simeonovo, Sofiya"
+          }
+        }
+      ],
+      "exam_results": [
+        {
+          "year": 2020,
+          "exam_type": "nvo_4",
+          "subject": "Bulgarian Language",
+          "metric": "average_score",
+          "value": 74.1
+        },
+        {
+          "year": 2020,
+          "exam_type": "nvo_4",
+          "subject": "Mathematics",
+          "metric": "average_score",
+          "value": 70.8
+        },
+        {
+          "year": 2021,
+          "exam_type": "nvo_4",
+          "subject": "Bulgarian Language",
+          "metric": "average_score",
+          "value": 75.5
+        },
+        {
+          "year": 2021,
+          "exam_type": "nvo_4",
+          "subject": "Mathematics",
+          "metric": "average_score",
+          "value": 72.2
+        },
+        {
+          "year": 2022,
+          "exam_type": "nvo_4",
+          "subject": "Bulgarian Language",
+          "metric": "average_score",
+          "value": 76.9
+        },
+        {
+          "year": 2022,
+          "exam_type": "nvo_4",
+          "subject": "Mathematics",
+          "metric": "average_score",
+          "value": 73.8
+        },
+        {
+          "year": 2023,
+          "exam_type": "nvo_4",
+          "subject": "Bulgarian Language",
+          "metric": "average_score",
+          "value": 78
+        },
+        {
+          "year": 2023,
+          "exam_type": "nvo_4",
+          "subject": "Mathematics",
+          "metric": "average_score",
+          "value": 74.8
+        },
+        {
+          "year": 2024,
+          "exam_type": "nvo_4",
+          "subject": "Bulgarian Language",
+          "metric": "average_score",
+          "value": 78.9
+        },
+        {
+          "year": 2024,
+          "exam_type": "nvo_4",
+          "subject": "Mathematics",
+          "metric": "average_score",
+          "value": 75.7
+        }
+      ],
+      "same_place": [],
+      "attributes": {
+        "class_size": null,
+        "has_canteen": true,
+        "uniform_required": null,
+        "special_focus": null,
+        "teaching_approach": [],
+        "teacher_student_ratio": null,
+        "school_hours": null,
+        "established_year": null,
+        "filter_tags": {
+          "facilities": [],
+          "special_programs": [],
+          "teaching_approach": []
+        }
+      },
+      "attributes_i18n": {
+        "bg": {
+          "language_focus": [],
+          "languages_of_instruction": [
+            "Bulgarian"
+          ],
+          "facilities": [],
+          "special_programs": [],
+          "activities_offered": [],
+          "entry_requirements": [],
+          "application_deadlines": [],
+          "available_spots": [],
+          "daily_schedule": []
+        },
+        "en": {
+          "language_focus": [],
+          "languages_of_instruction": [
+            "Bulgarian"
+          ],
+          "facilities": [],
+          "special_programs": [],
+          "activities_offered": [],
+          "entry_requirements": [],
+          "application_deadlines": [],
+          "available_spots": [],
+          "daily_schedule": []
+        }
+      },
+      "admission_info": null,
+      "pricing": [],
+      "resolved_name_i18n": {
+        "bg": "22 ОУ „П. Р. Славейков“",
+        "en": "22 PS \"P. R. Slaveykov\""
+      }
+    }
+  ]
+}
