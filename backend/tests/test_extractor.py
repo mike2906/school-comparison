@@ -17,6 +17,7 @@ from app.models.source_page import SourcePage
 from app.schemas.extraction import (
     ExtractedLanguageFocus,
     ExtractedPrice,
+    FeeLine,
     GeneralInfoExtractionOutput,
     PageFees,
     PriceExtractionOutput,
@@ -27,6 +28,14 @@ from app.services.geocoding.write_gate import OFFICIAL_COORDS_TAG
 
 # Fee pages in these tests name academic years such as 2025/2026; pin the date they are read on.
 pytestmark = pytest.mark.usefixtures("frozen_today")
+
+
+def _fee_line(label, amount, *, currency="BGN", per="month", kind="tuition", role="full", academic_year=None, quote=None):
+    """A price the model copied off a page, as the price call answers with it."""
+    return FeeLine(
+        label=label, amount=amount, currency=currency, per=per, kind=kind, role=role,
+        academic_year=academic_year, quote=quote or label,
+    )  # fmt: skip
 
 
 @pytest.fixture
@@ -75,17 +84,8 @@ async def test_extract_school_persists_pricing_and_general_info(db_session, samp
     school.attributes = {"website_data_withheld": True}
     await db_session.commit()
 
-    mock_price = PriceExtractionOutput(
-        prices=[
-            ExtractedPrice(
-                category="tuition",
-                amount=1000.0,
-                currency="BGN",
-                period="monthly",
-                confidence=0.9,
-            )
-        ],
-        has_pricing_info=True,
+    mock_price = PageFees(
+        lines=[_fee_line("Tuition", 1000.0, quote="Tuition for 2024 is 1000 BGN monthly.")]
     )
     mock_general = GeneralInfoExtractionOutput(
         display_name_i18n={"en": "Fusion School"},
@@ -162,17 +162,8 @@ async def test_extract_school_does_not_promote_fallback_when_llm_call_fails(
     school.attributes = {"website_data_withheld": True}
     await db_session.commit()
 
-    mock_price = PriceExtractionOutput(
-        prices=[
-            ExtractedPrice(
-                category="tuition",
-                amount=1000.0,
-                currency="BGN",
-                period="monthly",
-                confidence=0.9,
-            )
-        ],
-        has_pricing_info=True,
+    mock_price = PageFees(
+        lines=[_fee_line("Tuition", 1000.0, quote="Tuition for 2024 is 1000 BGN monthly.")]
     )
     calls = iter([(mock_price, 100, 10, 0.001)])
 
@@ -342,6 +333,9 @@ async def test_extract_school_pricing_drops_oversized_text_fields(
 ):
     school = sample_school_for_extraction
 
+    # Not converted to PageFees (tech-debt T5): _prices_from_fee_lines cuts a label over 100
+    # characters to 100 (_fee_label(cut=True)) instead of dropping it, so an oversized plan_name
+    # cannot be produced through a FeeLine. The legacy answer still reaches the oversized-field guard.
     mock_price = PriceExtractionOutput(
         prices=[
             ExtractedPrice(
@@ -388,7 +382,7 @@ async def test_extract_school_augments_general_info_with_deterministic_signals(
 ):
     school = sample_school_for_extraction
 
-    mock_price = PriceExtractionOutput(prices=[], has_pricing_info=False)
+    mock_price = PageFees(lines=[])
     llm_general = GeneralInfoExtractionOutput(
         languages=[],
         facilities=["pool"],
@@ -444,7 +438,7 @@ async def test_extract_school_recovers_display_name_with_targeted_capable_fallba
     db_session.add(page)
     await db_session.commit()
 
-    mock_price = PriceExtractionOutput(prices=[], has_pricing_info=False)
+    mock_price = PageFees(lines=[])
     mock_general = GeneralInfoExtractionOutput(
         languages=[ExtractedLanguageFocus(language="English")],
         facilities=["pool"],
@@ -526,7 +520,7 @@ async def test_extract_school_promotes_repeated_fuller_display_name_from_page_ev
     db_session.add_all(pages)
     await db_session.commit()
 
-    mock_price = PriceExtractionOutput(prices=[], has_pricing_info=False)
+    mock_price = PageFees(lines=[])
     mock_general = GeneralInfoExtractionOutput(
         display_name_i18n={"en": "Montessori House"},
         languages=[ExtractedLanguageFocus(language="English")],
@@ -591,7 +585,7 @@ async def test_extract_school_does_not_promote_footer_network_name(db_session):
     db_session.add_all(pages)
     await db_session.commit()
 
-    mock_price = PriceExtractionOutput(prices=[], has_pricing_info=False)
+    mock_price = PageFees(lines=[])
     mock_general = GeneralInfoExtractionOutput(
         display_name_i18n={"en": "Maple Bear Sofia"},
         languages=[ExtractedLanguageFocus(language="English")],
@@ -1257,7 +1251,7 @@ async def test_extract_school_clears_stale_summary_metadata_on_success(db_sessio
     db_session.add(school)
     await db_session.commit()
 
-    mock_price = PriceExtractionOutput(prices=[], has_pricing_info=False)
+    mock_price = PageFees(lines=[])
     mock_general = GeneralInfoExtractionOutput(
         languages=[ExtractedLanguageFocus(language="English")],
         facilities=["pool"],
@@ -1344,7 +1338,7 @@ async def test_extract_school_replaces_office_like_registry_address_with_website
     db_session.add(contact_page)
     await db_session.commit()
 
-    mock_price = PriceExtractionOutput(prices=[], has_pricing_info=False)
+    mock_price = PageFees(lines=[])
     mock_general = GeneralInfoExtractionOutput(
         facilities=["pool"],
         has_useful_info=True,
@@ -1408,7 +1402,7 @@ async def test_extract_school_refreshes_coords_from_website_map_link_when_addres
     db_session.add(contact_page)
     await db_session.commit()
 
-    mock_price = PriceExtractionOutput(prices=[], has_pricing_info=False)
+    mock_price = PageFees(lines=[])
     mock_general = GeneralInfoExtractionOutput(
         facilities=["pool"],
         has_useful_info=True,
@@ -1622,7 +1616,7 @@ async def test_extract_school_does_not_replace_with_office_like_website_contact_
     db_session.add(contact_page)
     await db_session.commit()
 
-    mock_price = PriceExtractionOutput(prices=[], has_pricing_info=False)
+    mock_price = PageFees(lines=[])
     mock_general = GeneralInfoExtractionOutput(
         facilities=["pool"],
         has_useful_info=True,
@@ -1676,7 +1670,7 @@ async def test_extract_school_keeps_existing_coords_when_contact_address_changes
     db_session.add(contact_page)
     await db_session.commit()
 
-    mock_price = PriceExtractionOutput(prices=[], has_pricing_info=False)
+    mock_price = PageFees(lines=[])
     mock_general = GeneralInfoExtractionOutput(
         facilities=["pool"],
         has_useful_info=True,
@@ -3143,7 +3137,7 @@ async def test_extract_school_keeps_the_models_answer_of_no_pricing(
     """
     await db_session.commit()
 
-    mock_price = PriceExtractionOutput(prices=[], has_pricing_info=False)
+    mock_price = PageFees(lines=[])
     mock_general = GeneralInfoExtractionOutput(
         facilities=["pool"],
         programs=["STEM"],
@@ -3187,17 +3181,8 @@ async def test_extract_school_discards_unsupported_llm_pricing_rows(db_session, 
     pricing_page.raw_markdown = "Monthly tuition EUR 750"
     await db_session.commit()
 
-    mock_price = PriceExtractionOutput(
-        prices=[
-            ExtractedPrice(
-                category="tuition",
-                amount=750,
-                currency="EUR",
-                period="monthly",
-                confidence=0.9,
-            )
-        ],
-        has_pricing_info=True,
+    mock_price = PageFees(
+        lines=[_fee_line("Monthly tuition", 750, currency="EUR", quote="Monthly tuition EUR 750")]
     )
     mock_general = GeneralInfoExtractionOutput(
         facilities=["pool"],
@@ -3262,7 +3247,7 @@ async def test_successful_no_price_refresh_preserves_historical_scraped_rows(
     )
     await db_session.commit()
 
-    no_prices = PriceExtractionOutput(prices=[], has_pricing_info=False)
+    no_prices = PageFees(lines=[])
     pages = (
         await db_session.execute(select(SourcePage).where(SourcePage.school_id == school.id))
     ).scalars().all()
@@ -3932,17 +3917,8 @@ async def test_extracted_pricing_links_to_its_evidence_page(
 ):
     """Each new row records the page it came from, which is what makes it publishable."""
     school = sample_school_for_extraction
-    priced = PriceExtractionOutput(
-        prices=[
-            ExtractedPrice(
-                category="tuition",
-                amount=1000.0,
-                currency="BGN",
-                period="monthly",
-                confidence=0.9,
-            )
-        ],
-        has_pricing_info=True,
+    priced = PageFees(
+        lines=[_fee_line("Tuition", 1000.0, quote="Tuition for 2024 is 1000 BGN monthly.")]
     )
     pages = (
         await db_session.execute(select(SourcePage).where(SourcePage.school_id == school.id))
@@ -4004,18 +3980,13 @@ async def test_extraction_replaces_only_the_academic_year_it_writes(
     )
     await db_session.commit()
 
-    priced = PriceExtractionOutput(
-        prices=[
-            ExtractedPrice(
-                category="tuition",
-                amount=1000.0,
-                currency="BGN",
-                period="monthly",
-                academic_year="2026/2027",
-                confidence=0.9,
+    priced = PageFees(
+        lines=[
+            _fee_line(
+                "Tuition", 1000.0, academic_year="2026/2027",
+                quote="Tuition for 2026/2027 is 1000 BGN monthly.",
             )
-        ],
-        has_pricing_info=True,
+        ]
     )
     pages = (
         await db_session.execute(select(SourcePage).where(SourcePage.school_id == school.id))
@@ -4075,17 +4046,8 @@ async def test_extraction_preserves_rows_whose_year_is_unrecognised(
     )
     await db_session.commit()
 
-    priced = PriceExtractionOutput(
-        prices=[
-            ExtractedPrice(
-                category="tuition",
-                amount=1000.0,
-                currency="BGN",
-                period="monthly",
-                confidence=0.9,
-            )
-        ],
-        has_pricing_info=True,
+    priced = PageFees(
+        lines=[_fee_line("Tuition", 1000.0, quote="Tuition for 2024 is 1000 BGN monthly.")]
     )
     pages = (
         await db_session.execute(select(SourcePage).where(SourcePage.school_id == school.id))
@@ -4149,7 +4111,7 @@ async def test_no_pricing_found_preserves_historical_rows_and_evidence_links(
     pricing_page.raw_markdown = "Contact the school for current pricing."
     await db_session.commit()
 
-    no_prices = PriceExtractionOutput(prices=[], has_pricing_info=False)
+    no_prices = PageFees(lines=[])
     with patch(
         "app.scrapers.extractor._run_typed_agent",
         new=AsyncMock(return_value=(no_prices, 10, 2, 0.001)),
@@ -4224,18 +4186,13 @@ async def test_newer_year_extraction_keeps_the_previous_year_alongside_it(
     pricing_page.raw_markdown = "Tuition for 2026/2027 is 1000 BGN monthly."
     await db_session.commit()
 
-    priced = PriceExtractionOutput(
-        prices=[
-            ExtractedPrice(
-                category="tuition",
-                amount=1000.0,
-                currency="BGN",
-                period="monthly",
-                academic_year="2026/2027",
-                confidence=0.9,
+    priced = PageFees(
+        lines=[
+            _fee_line(
+                "Tuition", 1000.0, academic_year="2026/2027",
+                quote="Tuition for 2026/2027 is 1000 BGN monthly.",
             )
-        ],
-        has_pricing_info=True,
+        ]
     )
     with patch(
         "app.scrapers.extractor._run_typed_agent",
@@ -4455,14 +4412,12 @@ async def test_only_the_llm_prompt_sees_spaced_currency_words(
     # the check below would pass without testing anything.
     llm = AsyncMock(
         return_value=(
-            PriceExtractionOutput(
-                prices=[
-                    ExtractedPrice(
-                        category="tuition", amount=500.0, currency="EUR",
-                        period="monthly", confidence=0.9,
+            PageFees(
+                lines=[
+                    _fee_line(
+                        "Целодневна", 500.0, currency="EUR", quote="#### Целодневна – 500евро"
                     )
-                ],
-                has_pricing_info=True,
+                ]
             ),
             1, 1, 0.0,
         )
@@ -4496,7 +4451,7 @@ async def test_extract_school_pins_campus_locations_after_its_commit(db_session,
     """UF42(b): validation inside extraction creates campus rows; they are geocoded once committed."""
     school = sample_school_for_extraction
     school_id = school.id
-    mock_price = PriceExtractionOutput(prices=[], has_pricing_info=False)
+    mock_price = PageFees(lines=[])
     mock_general = GeneralInfoExtractionOutput(
         languages=[ExtractedLanguageFocus(language="English")], has_useful_info=True
     )
@@ -4552,13 +4507,18 @@ async def _published_rows_and_page(db_session, school, rows):
 
 
 async def _run_prices(db_session, school, pages, prices):
-    output = PriceExtractionOutput(
-        prices=[
-            ExtractedPrice(category=category, amount=amount, currency="EUR", period=period, confidence=1.0)
+    # The page's own wording for each amount; an amount the page does not show gets a bare label.
+    page_labels = {530.0: "Целодневно гледане", 350.0: "Половин ден с включен обяд", 265.0: "Депозит за запазване на място"}
+    per_of_period = {"monthly": "month", "one_time": "one_time", None: "unstated"}
+    output = PageFees(
+        lines=[
+            _fee_line(
+                page_labels.get(float(amount), "Такса"), amount, currency="EUR", per=per_of_period[period],
+                kind=category,
+            )
             for category, amount, period in prices
-        ],
-        has_pricing_info=True,
-    )
+        ]
+    )  # fmt: skip
     with patch(
         "app.scrapers.extractor._run_typed_agent",
         new=AsyncMock(return_value=(output, 10, 2, 0.001)),
@@ -4867,10 +4827,7 @@ async def test_prices_only_extraction_rereads_fees_and_leaves_the_rest(
     school.summary_i18n = {"bg": "Обобщение"}
     await _published_rows_and_page(db_session, school, [])
     await db_session.commit()
-    output = PriceExtractionOutput(
-        prices=[ExtractedPrice(category="tuition", amount=530.0, currency="EUR", period="monthly", confidence=1.0)],
-        has_pricing_info=True,
-    )  # fmt: skip
+    output = PageFees(lines=[_fee_line("Целодневно гледане", 530.0, currency="EUR", quote="€ 530 | 1037 лв.")])
     llm = AsyncMock(return_value=(output, 10, 2, 0.001))
 
     with patch("app.scrapers.extractor._run_typed_agent", new=llm), patch(
@@ -4901,12 +4858,11 @@ async def test_kindergarten_does_not_take_school_grade_fees(
         "Такси\nДетска градина | 600 евро месечно\n8 клас | 8000 евро годишно\n"
     )
     await db_session.flush()
-    output = PriceExtractionOutput(
-        prices=[
-            ExtractedPrice(category="tuition", amount=600.0, currency="EUR", plan_name="Детска градина", confidence=1.0),
-            ExtractedPrice(category="tuition", amount=8000.0, currency="EUR", plan_name="8 клас", confidence=1.0),
-        ],
-        has_pricing_info=True,
+    output = PageFees(
+        lines=[
+            _fee_line("Детска градина", 600.0, currency="EUR", quote="Детска градина | 600 евро месечно"),
+            _fee_line("8 клас", 8000.0, currency="EUR", per="year", quote="8 клас | 8000 евро годишно"),
+        ]
     )  # fmt: skip
     llm = AsyncMock(return_value=(output, 10, 2, 0.001))
 

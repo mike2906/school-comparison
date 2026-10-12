@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import ast
-import contextvars
 import datetime
 import json
 import re
@@ -28,7 +27,7 @@ from app.schemas.extraction import (
     ServicesExtractionOutput,
     SummarySourceExtractionOutput,
 )
-from app.scrapers.extraction_rules import get_rules
+from app.scrapers.extraction_rules import base as rules
 from app.scrapers.fee_pages import page_key
 from app.scrapers.price_evidence import (
     _NUMBER_ONLY_LINE_RE,
@@ -54,11 +53,6 @@ from app.scrapers.school_tokens import extract_school_name_tokens
 from app.utils.academic_year import normalize_academic_year
 from app.utils.i18n_resolver import is_generic_numbered_display_label
 from app.utils.transliteration import transliterate_bulgarian
-
-_ACTIVE_RULES: contextvars.ContextVar[Any] = contextvars.ContextVar(
-    "extraction_rules_module",
-    default=get_rules(None),  # noqa: B039  (a module, not a mutable container)
-)
 
 _DISPLAY_NAME_LOCATION_TOKENS = {"софия", "sofia", "град", "grad", "city"}
 _DISPLAY_NAME_GENERIC_PREFIXES = (
@@ -430,9 +424,6 @@ _SUMMARY_SOURCE_CANONICAL_TAG_PATTERNS: tuple[tuple[str, tuple[str, ...]], ...] 
     ("Spanish-focused", ("spanish-focused", "испански език", "espanol")),
 )
 
-def _rules() -> Any:
-    return _ACTIVE_RULES.get()
-
 def _extract_languages_deterministic(text: str) -> list[ExtractedLanguageFocus]:
     if not text:
         return []
@@ -445,8 +436,8 @@ def _extract_languages_deterministic(text: str) -> list[ExtractedLanguageFocus]:
         lowered_fragment = fragment.lower().strip()
         if not lowered_fragment:
             continue
-        has_context = any(marker in lowered_fragment for marker in _rules()._LANGUAGE_CONTEXT_MARKERS)
-        for label, variants in _rules()._DETERMINISTIC_LANGUAGE_PATTERNS:
+        has_context = any(marker in lowered_fragment for marker in rules._LANGUAGE_CONTEXT_MARKERS)
+        for label, variants in rules._DETERMINISTIC_LANGUAGE_PATTERNS:
             if label.lower() in seen:
                 continue
             for variant in variants:
@@ -1017,10 +1008,10 @@ def _extract_accreditations_deterministic(text: str) -> list[str]:
     seen: set[str] = set()
 
     for fragment in fragments:
-        has_context = any(marker in fragment for marker in _rules()._ACCREDITATION_CONTEXT_MARKERS)
+        has_context = any(marker in fragment for marker in rules._ACCREDITATION_CONTEXT_MARKERS)
         if not has_context:
             continue
-        for label, keywords in _rules()._ACCREDITATION_KEYWORDS:
+        for label, keywords in rules._ACCREDITATION_KEYWORDS:
             if label in seen:
                 continue
             if any(keyword in fragment for keyword in keywords):
@@ -1031,32 +1022,32 @@ def _extract_accreditations_deterministic(text: str) -> list[str]:
 def _extract_admission_info_deterministic(text: str) -> AdmissionExtractionOutput:
     deadlines = _collect_matching_lines(
         text,
-        _rules()._ADMISSION_DEADLINE_PATTERNS,
-        require_patterns=_rules()._ADMISSION_DEADLINE_REQUIRE_PATTERNS,
-        exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+        rules._ADMISSION_DEADLINE_PATTERNS,
+        require_patterns=rules._ADMISSION_DEADLINE_REQUIRE_PATTERNS,
+        exclude_patterns=rules._SECTION_DEFAULT_EXCLUDE_PATTERNS,
     )
     required_documents = _collect_matching_lines(
         text,
-        _rules()._ADMISSION_DOCUMENT_PATTERNS,
-        require_patterns=_rules()._ADMISSION_REQUIRED_DOCUMENTS_REQUIRE_PATTERNS,
-        exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+        rules._ADMISSION_DOCUMENT_PATTERNS,
+        require_patterns=rules._ADMISSION_REQUIRED_DOCUMENTS_REQUIRE_PATTERNS,
+        exclude_patterns=rules._SECTION_DEFAULT_EXCLUDE_PATTERNS,
     )
     application_steps = _collect_matching_lines(
         text,
-        _rules()._ADMISSION_STEPS_PATTERNS,
-        require_patterns=_rules()._ADMISSION_APPLICATION_STEPS_REQUIRE_PATTERNS,
-        exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+        rules._ADMISSION_STEPS_PATTERNS,
+        require_patterns=rules._ADMISSION_APPLICATION_STEPS_REQUIRE_PATTERNS,
+        exclude_patterns=rules._SECTION_DEFAULT_EXCLUDE_PATTERNS,
     )
     entrance_requirements = _collect_matching_lines(
         text,
-        _rules()._ADMISSION_ENTRANCE_PATTERNS,
-        exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+        rules._ADMISSION_ENTRANCE_PATTERNS,
+        exclude_patterns=rules._SECTION_DEFAULT_EXCLUDE_PATTERNS,
     )
     available_spots = _collect_matching_lines(
         text,
-        _rules()._ADMISSION_SPOTS_PATTERNS,
-        require_patterns=_rules()._ADMISSION_AVAILABLE_SPOTS_REQUIRE_PATTERNS,
-        exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+        rules._ADMISSION_SPOTS_PATTERNS,
+        require_patterns=rules._ADMISSION_AVAILABLE_SPOTS_REQUIRE_PATTERNS,
+        exclude_patterns=rules._SECTION_DEFAULT_EXCLUDE_PATTERNS,
     )
 
     parsed = AdmissionExtractionOutput(
@@ -1082,30 +1073,30 @@ def _extract_operations_info_deterministic(text: str) -> OperationsExtractionOut
     working_hours = _extract_working_hours_value(text)
     day_options = _collect_matching_lines(
         text,
-        _rules()._OPERATIONS_DAY_OPTIONS_PATTERNS,
-        exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+        rules._OPERATIONS_DAY_OPTIONS_PATTERNS,
+        exclude_patterns=rules._SECTION_DEFAULT_EXCLUDE_PATTERNS,
     )
     daily_schedule = _collect_matching_lines(
         text,
-        _rules()._OPERATIONS_DAILY_SCHEDULE_PATTERNS,
-        require_patterns=_rules()._OPERATIONS_DAILY_SCHEDULE_REQUIRE_PATTERNS,
-        exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+        rules._OPERATIONS_DAILY_SCHEDULE_PATTERNS,
+        require_patterns=rules._OPERATIONS_DAILY_SCHEDULE_REQUIRE_PATTERNS,
+        exclude_patterns=rules._SECTION_DEFAULT_EXCLUDE_PATTERNS,
     )
     meals = _collect_matching_lines(
         text,
-        _rules()._OPERATIONS_MEALS_PATTERNS,
-        require_patterns=_rules()._OPERATIONS_MEALS_REQUIRE_PATTERNS,
-        exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+        rules._OPERATIONS_MEALS_PATTERNS,
+        require_patterns=rules._OPERATIONS_MEALS_REQUIRE_PATTERNS,
+        exclude_patterns=rules._SECTION_DEFAULT_EXCLUDE_PATTERNS,
     )
     transport = _collect_matching_lines(
         text,
-        _rules()._OPERATIONS_TRANSPORT_PATTERNS,
-        exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+        rules._OPERATIONS_TRANSPORT_PATTERNS,
+        exclude_patterns=rules._SECTION_DEFAULT_EXCLUDE_PATTERNS,
     )
     uniforms = _collect_matching_lines(
         text,
-        _rules()._OPERATIONS_UNIFORMS_PATTERNS,
-        exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+        rules._OPERATIONS_UNIFORMS_PATTERNS,
+        exclude_patterns=rules._SECTION_DEFAULT_EXCLUDE_PATTERNS,
     )
 
     parsed = OperationsExtractionOutput(
@@ -1132,15 +1123,15 @@ def _extract_operations_info_deterministic(text: str) -> OperationsExtractionOut
 def _extract_services_info_deterministic(text: str) -> ServicesExtractionOutput:
     support_services = _collect_matching_lines(
         text,
-        _rules()._SERVICES_SUPPORT_PATTERNS,
-        require_patterns=_rules()._SERVICES_SUPPORT_REQUIRE_PATTERNS,
-        exclude_patterns=(*_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS, *_rules()._SERVICES_SUPPORT_EXCLUDE_PATTERNS),
+        rules._SERVICES_SUPPORT_PATTERNS,
+        require_patterns=rules._SERVICES_SUPPORT_REQUIRE_PATTERNS,
+        exclude_patterns=(*rules._SECTION_DEFAULT_EXCLUDE_PATTERNS, *rules._SERVICES_SUPPORT_EXCLUDE_PATTERNS),
     )
     safety_features = _collect_matching_lines(
         text,
-        _rules()._SERVICES_SAFETY_PATTERNS,
-        require_patterns=_rules()._SERVICES_SAFETY_REQUIRE_PATTERNS,
-        exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+        rules._SERVICES_SAFETY_PATTERNS,
+        require_patterns=rules._SERVICES_SAFETY_REQUIRE_PATTERNS,
+        exclude_patterns=rules._SECTION_DEFAULT_EXCLUDE_PATTERNS,
     )
     parsed = ServicesExtractionOutput(
         support_services=support_services,
@@ -1153,45 +1144,45 @@ def _extract_services_info_deterministic(text: str) -> ServicesExtractionOutput:
 def _extract_pricing_terms_deterministic(text: str) -> PricingTermsExtractionOutput:
     discounts = _collect_matching_lines(
         text,
-        _rules()._PRICING_TERMS_DISCOUNT_PATTERNS,
-        require_patterns=_rules()._PRICING_TERMS_DISCOUNTS_REQUIRE_PATTERNS,
-        exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+        rules._PRICING_TERMS_DISCOUNT_PATTERNS,
+        require_patterns=rules._PRICING_TERMS_DISCOUNTS_REQUIRE_PATTERNS,
+        exclude_patterns=rules._SECTION_DEFAULT_EXCLUDE_PATTERNS,
     )
     installments = _collect_matching_lines(
         text,
-        _rules()._PRICING_TERMS_INSTALLMENTS_PATTERNS,
-        require_patterns=_rules()._PRICING_TERMS_INSTALLMENTS_REQUIRE_PATTERNS,
-        exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+        rules._PRICING_TERMS_INSTALLMENTS_PATTERNS,
+        require_patterns=rules._PRICING_TERMS_INSTALLMENTS_REQUIRE_PATTERNS,
+        exclude_patterns=rules._SECTION_DEFAULT_EXCLUDE_PATTERNS,
     )
     included_items = _collect_matching_lines(
         text,
-        _rules()._PRICING_TERMS_INCLUDED_PATTERNS,
-        require_patterns=_rules()._PRICING_TERMS_INCLUDED_REQUIRE_PATTERNS,
-        exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+        rules._PRICING_TERMS_INCLUDED_PATTERNS,
+        require_patterns=rules._PRICING_TERMS_INCLUDED_REQUIRE_PATTERNS,
+        exclude_patterns=rules._SECTION_DEFAULT_EXCLUDE_PATTERNS,
     )
     excluded_items = _collect_matching_lines(
         text,
-        _rules()._PRICING_TERMS_EXCLUDED_PATTERNS,
-        require_patterns=_rules()._PRICING_TERMS_EXCLUDED_REQUIRE_PATTERNS,
-        exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+        rules._PRICING_TERMS_EXCLUDED_PATTERNS,
+        require_patterns=rules._PRICING_TERMS_EXCLUDED_REQUIRE_PATTERNS,
+        exclude_patterns=rules._SECTION_DEFAULT_EXCLUDE_PATTERNS,
     )
     deposits = _collect_matching_lines(
         text,
-        _rules()._PRICING_TERMS_DEPOSIT_PATTERNS,
-        require_patterns=_rules()._PRICING_TERMS_DEPOSIT_REQUIRE_PATTERNS,
-        exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+        rules._PRICING_TERMS_DEPOSIT_PATTERNS,
+        require_patterns=rules._PRICING_TERMS_DEPOSIT_REQUIRE_PATTERNS,
+        exclude_patterns=rules._SECTION_DEFAULT_EXCLUDE_PATTERNS,
     )
     application_fees = _collect_matching_lines(
         text,
-        _rules()._PRICING_TERMS_APPLICATION_FEE_PATTERNS,
-        require_patterns=_rules()._PRICING_TERMS_APPLICATION_FEE_REQUIRE_PATTERNS,
-        exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+        rules._PRICING_TERMS_APPLICATION_FEE_PATTERNS,
+        require_patterns=rules._PRICING_TERMS_APPLICATION_FEE_REQUIRE_PATTERNS,
+        exclude_patterns=rules._SECTION_DEFAULT_EXCLUDE_PATTERNS,
     )
     registration_fees = _collect_matching_lines(
         text,
-        _rules()._PRICING_TERMS_REGISTRATION_FEE_PATTERNS,
-        require_patterns=_rules()._PRICING_TERMS_REGISTRATION_FEE_REQUIRE_PATTERNS,
-        exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+        rules._PRICING_TERMS_REGISTRATION_FEE_PATTERNS,
+        require_patterns=rules._PRICING_TERMS_REGISTRATION_FEE_REQUIRE_PATTERNS,
+        exclude_patterns=rules._SECTION_DEFAULT_EXCLUDE_PATTERNS,
     )
     parsed = PricingTermsExtractionOutput(
         discounts=discounts,
@@ -3000,7 +2991,7 @@ def _reconcile_pricing_include_exclude(
     moved_to_excluded: list[str] = []
     cleaned_includes: list[str] = []
     for value in include_values:
-        if _line_matches_any_pattern(value.lower(), _rules()._PRICING_NEGATED_INCLUDE_PATTERNS):
+        if _line_matches_any_pattern(value.lower(), rules._PRICING_NEGATED_INCLUDE_PATTERNS):
             moved_to_excluded.append(value)
         else:
             cleaned_includes.append(value)
@@ -3013,14 +3004,14 @@ def _is_probable_section_noise_line(text: str) -> bool:
         return True
 
     lowered = text.lower()
-    if _line_matches_any_pattern(lowered, _rules()._SECTION_REGULATORY_NOISE_PATTERNS):
+    if _line_matches_any_pattern(lowered, rules._SECTION_REGULATORY_NOISE_PATTERNS):
         return True
-    if _line_matches_any_pattern(lowered, _rules()._MENU_BREADCRUMB_NOISE_PATTERNS):
+    if _line_matches_any_pattern(lowered, rules._MENU_BREADCRUMB_NOISE_PATTERNS):
         return True
 
     nav_hits = sum(
         1
-        for pattern in _rules()._SECTION_NAV_NOISE_PATTERNS
+        for pattern in rules._SECTION_NAV_NOISE_PATTERNS
         if re.search(pattern, lowered, flags=re.IGNORECASE)
     )
     if nav_hits >= 2:
@@ -3036,8 +3027,8 @@ def _extract_working_hours_value(text: str) -> str | None:
         return None
     snippets = _collect_matching_lines(
         text,
-        _rules()._OPERATIONS_WORKING_HOURS_PATTERNS,
-        exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+        rules._OPERATIONS_WORKING_HOURS_PATTERNS,
+        exclude_patterns=rules._SECTION_DEFAULT_EXCLUDE_PATTERNS,
         max_items=1,
     )
     if snippets:
@@ -3045,7 +3036,7 @@ def _extract_working_hours_value(text: str) -> str | None:
     time_match = re.search(r"\b([01]?\d|2[0-3])[:.][0-5]\d\b\s*[-–]\s*\b([01]?\d|2[0-3])[:.][0-5]\d\b", text)
     if not time_match:
         return None
-    return _sanitize_label(time_match.group(0), max_len=_rules()._GENERAL_INFO_ITEM_MAX_LEN)
+    return _sanitize_label(time_match.group(0), max_len=rules._GENERAL_INFO_ITEM_MAX_LEN)
 
 def _extract_contact_info_deterministic(text: str) -> dict[str, Any] | None:
     """Extract phone numbers, email addresses, and postal addresses from page text.
@@ -3061,7 +3052,7 @@ def _extract_contact_info_deterministic(text: str) -> dict[str, Any] | None:
     # Extract phone numbers
     phones: list[str] = []
     seen_phones: set[str] = set()
-    for match in _rules()._PHONE_PATTERN.finditer(text):
+    for match in rules._PHONE_PATTERN.finditer(text):
         raw = match.group(0).strip()
         # Normalize: collapse internal whitespace and separators
         normalized = re.sub(r"[\s./\-]+", "", raw)
@@ -3080,13 +3071,13 @@ def _extract_contact_info_deterministic(text: str) -> dict[str, Any] | None:
     # Extract email addresses
     emails: list[str] = []
     seen_emails: set[str] = set()
-    for match in _rules()._EMAIL_PATTERN.finditer(text):
+    for match in rules._EMAIL_PATTERN.finditer(text):
         raw = match.group(0).strip()
         # Normalize [at] / [ a t ] → @, collapse spaces around @
         normalized = re.sub(r"\s*\[\s*a\s*t\s*\]\s*", "@", raw, flags=re.IGNORECASE)
         normalized = re.sub(r"\s+", "", normalized).lower()
         # Filter obvious placeholder/noise emails
-        if any(noise in normalized for noise in _rules()._CONTACT_NOISE_TOKENS):
+        if any(noise in normalized for noise in rules._CONTACT_NOISE_TOKENS):
             continue
         if normalized in seen_emails:
             continue
@@ -3711,7 +3702,7 @@ def _normalize_general_info_output(
     programs = _normalize_text_list(parsed.programs)
     extracurricular = _normalize_text_list(parsed.extracurricular)
     accreditations = _normalize_text_list(parsed.accreditations)
-    class_size = _normalize_scalar_text(parsed.class_size, _rules()._GENERAL_INFO_CLASS_SIZE_MAX_LEN)
+    class_size = _normalize_scalar_text(parsed.class_size, rules._GENERAL_INFO_CLASS_SIZE_MAX_LEN)
     founded_year = _normalize_founded_year(parsed.founded_year)
     admission = _normalize_admission_output(parsed.admission)
     operations = _normalize_operations_output(parsed.operations)
@@ -4050,28 +4041,28 @@ def _normalize_admission_output(value: AdmissionExtractionOutput) -> AdmissionEx
     normalized = AdmissionExtractionOutput(
         deadlines=_filter_section_values(
             value.deadlines,
-            require_patterns=_rules()._ADMISSION_DEADLINE_REQUIRE_PATTERNS,
-            exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+            require_patterns=rules._ADMISSION_DEADLINE_REQUIRE_PATTERNS,
+            exclude_patterns=rules._SECTION_DEFAULT_EXCLUDE_PATTERNS,
         ),
         required_documents=_filter_section_values(
             value.required_documents,
-            require_patterns=_rules()._ADMISSION_REQUIRED_DOCUMENTS_REQUIRE_PATTERNS,
-            exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
-            heading_only_markers=_rules()._ADMISSION_REQUIRED_DOCUMENTS_HEADING_MARKERS,
+            require_patterns=rules._ADMISSION_REQUIRED_DOCUMENTS_REQUIRE_PATTERNS,
+            exclude_patterns=rules._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+            heading_only_markers=rules._ADMISSION_REQUIRED_DOCUMENTS_HEADING_MARKERS,
         ),
         application_steps=_filter_section_values(
             value.application_steps,
-            require_patterns=_rules()._ADMISSION_APPLICATION_STEPS_REQUIRE_PATTERNS,
-            exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+            require_patterns=rules._ADMISSION_APPLICATION_STEPS_REQUIRE_PATTERNS,
+            exclude_patterns=rules._SECTION_DEFAULT_EXCLUDE_PATTERNS,
         ),
         entrance_requirements=_filter_section_values(
             value.entrance_requirements,
-            exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+            exclude_patterns=rules._SECTION_DEFAULT_EXCLUDE_PATTERNS,
         ),
         available_spots=_filter_section_values(
             value.available_spots,
-            require_patterns=_rules()._ADMISSION_AVAILABLE_SPOTS_REQUIRE_PATTERNS,
-            exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+            require_patterns=rules._ADMISSION_AVAILABLE_SPOTS_REQUIRE_PATTERNS,
+            exclude_patterns=rules._SECTION_DEFAULT_EXCLUDE_PATTERNS,
         ),
         has_useful_info=False,
     )
@@ -4087,16 +4078,16 @@ def _normalize_admission_output(value: AdmissionExtractionOutput) -> AdmissionEx
     return normalized
 
 def _normalize_operations_output(value: OperationsExtractionOutput) -> OperationsExtractionOutput:
-    working_hours = _normalize_scalar_text(value.working_hours, _rules()._GENERAL_INFO_ITEM_MAX_LEN)
+    working_hours = _normalize_scalar_text(value.working_hours, rules._GENERAL_INFO_ITEM_MAX_LEN)
     if working_hours:
         lowered_working_hours = working_hours.lower()
-        if _line_matches_any_pattern(lowered_working_hours, _rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS):
+        if _line_matches_any_pattern(lowered_working_hours, rules._SECTION_DEFAULT_EXCLUDE_PATTERNS):
             working_hours = None
         elif _is_probable_section_noise_line(lowered_working_hours):
             working_hours = None
         elif not (
-            _line_matches_any_pattern(lowered_working_hours, _rules()._OPERATIONS_WORKING_HOURS_PATTERNS)
-            or _rules()._WORKING_HOURS_TIME_PATTERN.search(working_hours)
+            _line_matches_any_pattern(lowered_working_hours, rules._OPERATIONS_WORKING_HOURS_PATTERNS)
+            or rules._WORKING_HOURS_TIME_PATTERN.search(working_hours)
         ):
             working_hours = None
 
@@ -4104,26 +4095,26 @@ def _normalize_operations_output(value: OperationsExtractionOutput) -> Operation
         working_hours=working_hours,
         day_options=_filter_section_values(
             value.day_options,
-            exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+            exclude_patterns=rules._SECTION_DEFAULT_EXCLUDE_PATTERNS,
         ),
         daily_schedule=_filter_section_values(
             value.daily_schedule,
-            require_patterns=_rules()._OPERATIONS_DAILY_SCHEDULE_REQUIRE_PATTERNS,
-            exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+            require_patterns=rules._OPERATIONS_DAILY_SCHEDULE_REQUIRE_PATTERNS,
+            exclude_patterns=rules._SECTION_DEFAULT_EXCLUDE_PATTERNS,
         ),
         meals=_filter_section_values(
             value.meals,
-            require_patterns=_rules()._OPERATIONS_MEALS_REQUIRE_PATTERNS,
-            exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
-            heading_only_markers=_rules()._OPERATIONS_MEALS_HEADING_MARKERS,
+            require_patterns=rules._OPERATIONS_MEALS_REQUIRE_PATTERNS,
+            exclude_patterns=rules._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+            heading_only_markers=rules._OPERATIONS_MEALS_HEADING_MARKERS,
         ),
         transport=_filter_section_values(
             value.transport,
-            exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+            exclude_patterns=rules._SECTION_DEFAULT_EXCLUDE_PATTERNS,
         ),
         uniforms=_filter_section_values(
             value.uniforms,
-            exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+            exclude_patterns=rules._SECTION_DEFAULT_EXCLUDE_PATTERNS,
         ),
         has_useful_info=False,
     )
@@ -4143,13 +4134,13 @@ def _normalize_services_output(value: ServicesExtractionOutput) -> ServicesExtra
     normalized = ServicesExtractionOutput(
         support_services=_filter_section_values(
             value.support_services,
-            require_patterns=_rules()._SERVICES_SUPPORT_REQUIRE_PATTERNS,
-            exclude_patterns=(*_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS, *_rules()._SERVICES_SUPPORT_EXCLUDE_PATTERNS),
+            require_patterns=rules._SERVICES_SUPPORT_REQUIRE_PATTERNS,
+            exclude_patterns=(*rules._SECTION_DEFAULT_EXCLUDE_PATTERNS, *rules._SERVICES_SUPPORT_EXCLUDE_PATTERNS),
         ),
         safety_features=_filter_section_values(
             value.safety_features,
-            require_patterns=_rules()._SERVICES_SAFETY_REQUIRE_PATTERNS,
-            exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+            require_patterns=rules._SERVICES_SAFETY_REQUIRE_PATTERNS,
+            exclude_patterns=rules._SECTION_DEFAULT_EXCLUDE_PATTERNS,
         ),
         has_useful_info=False,
     )
@@ -4159,13 +4150,13 @@ def _normalize_services_output(value: ServicesExtractionOutput) -> ServicesExtra
 def _normalize_pricing_terms_output(value: PricingTermsExtractionOutput) -> PricingTermsExtractionOutput:
     included_items = _filter_section_values(
         value.included_items,
-        require_patterns=_rules()._PRICING_TERMS_INCLUDED_REQUIRE_PATTERNS,
-        exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+        require_patterns=rules._PRICING_TERMS_INCLUDED_REQUIRE_PATTERNS,
+        exclude_patterns=rules._SECTION_DEFAULT_EXCLUDE_PATTERNS,
     )
     excluded_items = _filter_section_values(
         value.excluded_items,
-        require_patterns=_rules()._PRICING_TERMS_EXCLUDED_REQUIRE_PATTERNS,
-        exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+        require_patterns=rules._PRICING_TERMS_EXCLUDED_REQUIRE_PATTERNS,
+        exclude_patterns=rules._SECTION_DEFAULT_EXCLUDE_PATTERNS,
     )
     included_items, excluded_items = _reconcile_pricing_include_exclude(
         included_items,
@@ -4175,30 +4166,30 @@ def _normalize_pricing_terms_output(value: PricingTermsExtractionOutput) -> Pric
     normalized = PricingTermsExtractionOutput(
         discounts=_filter_section_values(
             value.discounts,
-            require_patterns=_rules()._PRICING_TERMS_DISCOUNTS_REQUIRE_PATTERNS,
-            exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+            require_patterns=rules._PRICING_TERMS_DISCOUNTS_REQUIRE_PATTERNS,
+            exclude_patterns=rules._SECTION_DEFAULT_EXCLUDE_PATTERNS,
         ),
         installments=_filter_section_values(
             value.installments,
-            require_patterns=_rules()._PRICING_TERMS_INSTALLMENTS_REQUIRE_PATTERNS,
-            exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+            require_patterns=rules._PRICING_TERMS_INSTALLMENTS_REQUIRE_PATTERNS,
+            exclude_patterns=rules._SECTION_DEFAULT_EXCLUDE_PATTERNS,
         ),
         included_items=included_items,
         excluded_items=excluded_items,
         deposits=_filter_section_values(
             value.deposits,
-            require_patterns=_rules()._PRICING_TERMS_DEPOSIT_REQUIRE_PATTERNS,
-            exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+            require_patterns=rules._PRICING_TERMS_DEPOSIT_REQUIRE_PATTERNS,
+            exclude_patterns=rules._SECTION_DEFAULT_EXCLUDE_PATTERNS,
         ),
         application_fees=_filter_section_values(
             value.application_fees,
-            require_patterns=_rules()._PRICING_TERMS_APPLICATION_FEE_REQUIRE_PATTERNS,
-            exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+            require_patterns=rules._PRICING_TERMS_APPLICATION_FEE_REQUIRE_PATTERNS,
+            exclude_patterns=rules._SECTION_DEFAULT_EXCLUDE_PATTERNS,
         ),
         registration_fees=_filter_section_values(
             value.registration_fees,
-            require_patterns=_rules()._PRICING_TERMS_REGISTRATION_FEE_REQUIRE_PATTERNS,
-            exclude_patterns=_rules()._SECTION_DEFAULT_EXCLUDE_PATTERNS,
+            require_patterns=rules._PRICING_TERMS_REGISTRATION_FEE_REQUIRE_PATTERNS,
+            exclude_patterns=rules._SECTION_DEFAULT_EXCLUDE_PATTERNS,
         ),
         has_useful_info=False,
     )
@@ -4243,7 +4234,7 @@ def _normalize_languages(values: list[ExtractedLanguageFocus]) -> list[Extracted
                     level=level_text or None,
                 )
             )
-            if len(cleaned) >= _rules()._GENERAL_INFO_LIST_MAX_ITEMS:
+            if len(cleaned) >= rules._GENERAL_INFO_LIST_MAX_ITEMS:
                 return cleaned
     return cleaned
 
@@ -4261,7 +4252,7 @@ def _normalize_text_list(values: list[str]) -> list[str]:
                 continue
             seen.add(key)
             cleaned.append(label)
-            if len(cleaned) >= _rules()._GENERAL_INFO_LIST_MAX_ITEMS:
+            if len(cleaned) >= rules._GENERAL_INFO_LIST_MAX_ITEMS:
                 return cleaned
     return cleaned
 
@@ -4573,7 +4564,7 @@ def _filter_section_values(
                 continue
             seen.add(key)
             filtered.append(label)
-            if len(filtered) >= _rules()._GENERAL_INFO_LIST_MAX_ITEMS:
+            if len(filtered) >= rules._GENERAL_INFO_LIST_MAX_ITEMS:
                 return filtered
     return filtered
 
@@ -4644,7 +4635,7 @@ def _flatten_structured_values(value: Any) -> list[str]:
         return [value.strip()] if value.strip() else []
     if isinstance(value, dict):
         preferred: list[str] = []
-        for key in _rules()._GENERAL_INFO_TEXT_KEYS:
+        for key in rules._GENERAL_INFO_TEXT_KEYS:
             if key in value:
                 preferred.extend(_flatten_structured_values(value.get(key)))
         if preferred:
@@ -4664,7 +4655,7 @@ def _flatten_structured_values(value: Any) -> list[str]:
 
 def _sanitize_label(raw_text: str, max_len: int | None = None) -> str | None:
     if max_len is None:
-        max_len = _rules()._GENERAL_INFO_ITEM_MAX_LEN
+        max_len = rules._GENERAL_INFO_ITEM_MAX_LEN
 
     text = str(raw_text).replace("\x00", "").strip()
     if not text:
@@ -4676,7 +4667,7 @@ def _sanitize_label(raw_text: str, max_len: int | None = None) -> str | None:
         return None
 
     lowered = text.lower()
-    if lowered in _rules()._GENERAL_INFO_JUNK_VALUES:
+    if lowered in rules._GENERAL_INFO_JUNK_VALUES:
         return None
     if (text.startswith("{") and text.endswith("}")) or (text.startswith("[") and text.endswith("]")):
         return None
@@ -4790,7 +4781,7 @@ def _is_model_or_provider_error(exc: Exception) -> bool:
     if isinstance(exc, (ModelHTTPError, ModelAPIError)):
         return True
     message = str(exc).lower()
-    return any(marker in message for marker in _rules()._PROVIDER_ERROR_MARKERS)
+    return any(marker in message for marker in rules._PROVIDER_ERROR_MARKERS)
 
 def _is_output_validation_error(exc: Exception) -> bool:
     stack = [exc]
@@ -4804,7 +4795,7 @@ def _is_output_validation_error(exc: Exception) -> bool:
         seen.add(current_id)
 
         message = str(current).lower()
-        if any(marker in message for marker in _rules()._OUTPUT_VALIDATION_ERROR_MARKERS):
+        if any(marker in message for marker in rules._OUTPUT_VALIDATION_ERROR_MARKERS):
             return True
         if isinstance(current, UnexpectedModelBehavior) and "retry" in message and "validation" in message:
             return True
@@ -4894,10 +4885,10 @@ def _coerce_price_category(raw: Optional[str | PriceCategory]) -> Optional[Price
     if isinstance(raw, str) and "." in raw:
         tail = raw.split(".")[-1]
         normalized_tail = _normalize_key(tail)
-        if normalized_tail in _rules()._CATEGORY_ALIASES:
-            return _rules()._CATEGORY_ALIASES[normalized_tail]
+        if normalized_tail in rules._CATEGORY_ALIASES:
+            return rules._CATEGORY_ALIASES[normalized_tail]
     normalized = _normalize_key(raw)
-    return _rules()._CATEGORY_ALIASES.get(normalized)
+    return rules._CATEGORY_ALIASES.get(normalized)
 
 def _coerce_price_period(raw: Optional[str | PricePeriod]) -> Optional[PricePeriod]:
     if raw is None:
@@ -4907,10 +4898,10 @@ def _coerce_price_period(raw: Optional[str | PricePeriod]) -> Optional[PricePeri
     if isinstance(raw, str) and "." in raw:
         tail = raw.split(".")[-1]
         normalized_tail = _normalize_key(tail)
-        if normalized_tail in _rules()._PERIOD_ALIASES:
-            return _rules()._PERIOD_ALIASES[normalized_tail]
+        if normalized_tail in rules._PERIOD_ALIASES:
+            return rules._PERIOD_ALIASES[normalized_tail]
     normalized = _normalize_key(raw)
-    return _rules()._PERIOD_ALIASES.get(normalized)
+    return rules._PERIOD_ALIASES.get(normalized)
 
 def _to_optional_float(raw: Any) -> Optional[float]:
     if raw is None:

@@ -31,7 +31,7 @@ There are three independent lanes. Within a lane, order matters. Across lanes, P
 | T3 | **Pin the unprotected behaviour** found by mutation testing: the `display_gating` monthly multiplier, peer median, January-June admission cycle and `NVO_MIN_PUPILS` boundary; the `{subject: value}` asserts in the three NVO import tests; the year-in-fee-table filter and the month and ordinal tables in `price_evidence`. | Test only, 1-2 PRs | nothing | Done (#221) |
 | T4 | **Write the price-parsing and BGN tests as one shared table.** It covers mixed separators, `6.200 лв.` and BGN detection, and runs against *both* amount parsers (`extractor_helpers._parse_price_amount_token` and `price_evidence`'s). | Test only, 1 PR | nothing | Done (#221) |
 | P0 | **Delete dead code together with its ~150 dead tests:** Celery, the finished scripts, `education.py` if Mike agrees, and the no-ops. Also add the AGENTS.md "no new code in giant files" rule. | Deletion, 2-3 PRs | nothing | Done (#219, #220; the rule is in #224) |
-| T5 | **Switch the 28 price-LLM mocks** from `PriceExtractionOutput` to `PageFees`, so `_prices_from_fee_lines` is actually exercised. | Test only, 1 PR | nothing, but it edits `test_extractor.py` | After Monday, since #212/#217 just touched this area |
+| T5 | **Switch the 28 price-LLM mocks** from `PriceExtractionOutput` to `PageFees`, so `_prices_from_fee_lines` is actually exercised. | Test only, 1 PR | nothing, but it edits `test_extractor.py` | Done (#252); one oversized-field test stays on the legacy type, with the reason in a comment |
 | T0 | **Record LLM answers (before Monday).** An opt-in `EXTRACTION_LLM_RECORD_DIR` setting saves each successful extraction LLM answer to disk, keyed by a hash of the prompts, output type and tier. It is off by default, so behaviour is unchanged. With it set during Monday's run, the schools re-extracted then can later be replayed for free. It only covers those schools; a full LLM baseline would need a full recorded extraction run. | Code, 1 small PR | nothing | Done (#222) |
 | T6 | **Offline extraction diff, added after the Monday question.** A small script runs `app/scrapers/deterministic.run_deterministic_extraction` over every school's stored pages in the launch DB and writes one JSON line per school. It needs no network, LLM or DB writes. It runs once on the code before a refactor and once after, and any difference blocks the PR. This covers the deterministic layer for all schools; the 20-case golden corpus already covers it for a sample in CI. **It does not cover the LLM half.** Raw LLM answers were not stored, so re-running the LLM steps meant paying for new calls. T0 starts recording them, and T6 adds a replay mode for the recorded answers. Schools without a recording are covered only by the unit tests, which is why T5 matters. | Script, 1 PR | nothing | After Monday (it reads the launch DB on Mike's PC) |
 | P2 | **Untangle `cli.py`.** Every move PR retargets the patches on the moved functions (see the ground rules). | Refactor, 3-4 PRs | P0 (Celery gone, so stage logic exists only once), T2 (the CLI usage-total tests fixed) | Done (#248, #249): stage runners in `app/scrapers/stages/`, repair commands in `app/scrapers/repairs/`, `cli.py` down to 928 lines. Steps 8 and the dispatch table were dropped; see Phase 2 |
@@ -96,7 +96,7 @@ The copy has already drifted from the CLI. Its website-discovery cohort differs,
   - `price_evidence` handles `$`, `£`, USD and GBP. The helpers don't.
 - **There are about eight "normalise text for comparison" functions** across `price_evidence`, `extractor_helpers`, `validator`, `school_attributes` and `extractor`.
 - **Class size is parsed twice.** `school_attributes.py` checks plausibility and `extractor_helpers.py:486` doesn't.
-- **The per-country rules indirection is unused.** The `_ACTIVE_RULES` ContextVar (`extractor_helpers.py:57`) is never set, and `extraction_rules/bg.py` just re-exports `base`. Yet there are 122 `_rules()._X` call sites routing through it.
+- **The per-country rules indirection is unused** (removed in #252). The `_ACTIVE_RULES` ContextVar (`extractor_helpers.py:57`) is never set, and `extraction_rules/bg.py` just re-exports `base`. Yet there are 122 `_rules()._X` call sites routing through it.
 - **Two modules have near-identical names.** `app/scrapers/summarizer.py` (pipeline/DB) and `app/ai/summariser.py` (LLM) differ only by z/s.
 
 ### 4. Tangled imports
@@ -198,7 +198,7 @@ The patch-retargeting rule above matters most here. The `_run_all_stages_batch` 
 ### Phase 3: split `extractor_helpers.py` (after Monday; it is the code PRs #212 and #217 just changed)
 
 Prerequisites from the test audit (test-only PRs, done before step 10):
-- **Fix the price LLM mocks.** 28 test calls mock the price LLM with the old `PriceExtractionOutput` type. Only 3 use the real `PageFees`, so `_prices_from_fee_lines` is barely exercised. Switch the mocks to `PageFees`.
+- **Fix the price LLM mocks** (done, #252). 28 test calls mock the price LLM with the old `PriceExtractionOutput` type. Only 3 use the real `PageFees`, so `_prices_from_fee_lines` is barely exercised. Switch the mocks to `PageFees`.
 - **Add the missing price tests.** These are the price-parsing, BGN and monthly-multiplier tests listed in the test audit's section 3. Without them, step 13 (merging the two price parsers) is a behaviour change with only one of the two parsers under test.
 
 10. **Turn it into a package by cluster.** This is a pure move with a shim that re-exports everything. Suggested modules:
@@ -206,7 +206,7 @@ Prerequisites from the test audit (test-only PRs, done before step 10):
     - `contacts.py`, `page_selection.py`, `section_text.py`
     - `summary_source.py`, `llm_usage.py`
     - Promote the cross-module "private" functions to public names (`get_usage`, `normalize_display_name_i18n`).
-11. **Remove the unused `_ACTIVE_RULES` indirection.** Call the rules module directly, replacing 122 call sites. If multi-country extraction comes, it can be reintroduced at the one place it is needed.
+11. **Remove the unused `_ACTIVE_RULES` indirection.** Call the rules module directly, replacing 122 call sites. If multi-country extraction comes, it can be reintroduced at the one place it is needed. *Done (2026-10-12): `get_rules` and `bg.py` are gone too.*
 12. **Dedupe the text normalisers into one `app/utils/text.py`, each with a test.** This covers text-list dedupe, the comparison key, markdown-link stripping and `_now_iso`. It changes behaviour subtly, so it is one PR per helper, with the differing behaviours pinned in tests first.
 13. **Make the price helpers use `price_evidence` for currency and period.** This deletes the helpers' own sets and regex chains. It is a behaviour change (`$` and `£` become recognised). Run it with the price-audit evidence rows (kept outside the repo, on Mike's PC) as a regression check.
 14. **Define the founded-year and class-size rules once each,** in `school_attributes`, with the validator and extractor calling them.
