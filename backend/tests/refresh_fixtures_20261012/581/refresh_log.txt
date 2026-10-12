@@ -1,0 +1,20 @@
+/home/mike2906/sofiaschoolcomparison/backend/app/scrapers/navigator.py:276: DeprecationWarning: PruningContentFilter (BeautifulSoup-based) is deprecated in favor of PruningContentFilterLXML, an lxml reimplementation that is ~10x faster with identical output. Switch to PruningContentFilterLXML now. In an upcoming release PruningContentFilter will become an alias for the lxml implementation, and PruningContentFilterLXML will be kept as a legacy alias.
+  content_filter=PruningContentFilter(threshold=0.45),
+/home/mike2906/sofiaschoolcomparison/backend/app/scrapers/extractor.py:534: PydanticAIDeprecationWarning: `Agent(output_retries=...)` is deprecated and will be removed in v2.0. Use `retries={'output': ...}` (or `retries=<int>` to set the same budget for both tool and output retries) instead.
+  agent = Agent(
+/home/mike2906/sofiaschoolcomparison/backend/app/scrapers/extractor_helpers.py:4774: PydanticAIDeprecationWarning: `AgentRunResult.usage` is no longer a method; access it as a property (drop the parentheses).
+  usage_obj = result.usage() if callable(getattr(result, "usage", None)) else getattr(result, "usage", None)
+/home/mike2906/sofiaschoolcomparison/backend/.venv/lib/python3.12/site-packages/sqlalchemy/sql/schema.py:3624: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return util.wrap_callable(lambda ctx: fn(), fn)  # type: ignore
+database: sofia_schools
+
+== school 581: Extracted 9 pricing rows; Validation completed before commit (ok)
+  + materials 246.00 EUR no period 2026/2027 [Textbook and/or study materials price for A2] https://darbicollege.com/en/admissions/tuition-fees/
+  + materials 631.00 EUR no period 2026/2027 [Textbook and/or study materials price for IGCSE 1st year] https://darbicollege.com/en/admissions/tuition-fees/
+  + materials 781.00 EUR no period 2026/2027 [Textbook and/or study materials price for AS] https://darbicollege.com/en/admissions/tuition-fees/
+  + materials 803.00 EUR no period 2026/2027 [Textbook and/or study materials price] https://darbicollege.com/en/admissions/tuition-fees/
+  + tuition 16858.00 EUR no period 2026/2027 [Reception year / Reception year] https://darbicollege.com/en/admissions/tuition-fees/
+  + tuition 17227.00 EUR no period 2026/2027 [IGCSE first year] https://darbicollege.com/en/admissions/tuition-fees/
+  + tuition 17227.00 EUR no period 2026/2027 [IGCSE second year] https://darbicollege.com/en/admissions/tuition-fees/
+  + tuition 17596.00 EUR no period 2026/2027 [First year A Level] https://darbicollege.com/en/admissions/tuition-fees/
+  + tuition 17596.00 EUR no period 2026/2027 [Second year A Level] https://darbicollege.com/en/admissions/tuition-fees/

@@ -425,3 +425,12 @@ def test_rule_6_a_listed_amount_accounts_only_for_its_own_category():
     assert replacement_regressions(published, proposed, "school", accounted_for=[("tuition", 500.0)]) == [
         "loses the YEARLY period of TUITION 500.00"
     ]
+
+
+def test_a_course_length_is_not_an_age():
+    """581's "IGCSE 2 years in 1" is the gymnasium's, not a nursery group's."""
+    assert not label_is_another_institutions("IGCSE 2 years in 1", "school", set(range(8, 13)))
+    assert not label_is_another_institutions("IGCSE 2 години за 1 (5 предмета)", "school", set(range(8, 13)))
+    assert label_is_another_institutions("Група 2 години", "school", set(range(8, 13)))
+    for nursery in ("деца на 3 години за 10 месеца", "2 години за 1 месец", "група 3 years in 2026", "2 г. за 1 месец", "2 години за 1 мес.", "3 years in 1 term"):
+        assert label_is_another_institutions(nursery, "school", set(range(8, 13))), nursery

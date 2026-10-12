@@ -1,0 +1,200 @@
+[
+ {
+  "id": 3667,
+  "category": "TUITION",
+  "amount": 16858.0,
+  "amount_min": null,
+  "amount_max": null,
+  "currency": "EUR",
+  "period": "YEARLY",
+  "plan_name": "Reception year",
+  "age_group": "Reception year",
+  "academic_year": "2026/2027",
+  "source_url": "https://darbicollege.com/en/admissions/tuition-fees/",
+  "source_page_id": 29223,
+  "pricing_context": {
+   "notes": null,
+   "confidence": 0.9,
+   "discounts": [],
+   "installments": [],
+   "includes": [],
+   "excludes": []
+  }
+ },
+ {
+  "id": 3668,
+  "category": "MATERIALS",
+  "amount": 803.0,
+  "amount_min": null,
+  "amount_max": null,
+  "currency": "EUR",
+  "period": null,
+  "plan_name": "Textbook and/or study materials price",
+  "age_group": null,
+  "academic_year": "2026/2027",
+  "source_url": "https://darbicollege.com/en/admissions/tuition-fees/",
+  "source_page_id": 29223,
+  "pricing_context": {
+   "notes": null,
+   "confidence": 0.9,
+   "discounts": [],
+   "installments": [],
+   "includes": [],
+   "excludes": []
+  }
+ },
+ {
+  "id": 3669,
+  "category": "MATERIALS",
+  "amount": 631.0,
+  "amount_min": null,
+  "amount_max": null,
+  "currency": "EUR",
+  "period": null,
+  "plan_name": "Textbook and/or study materials price for IGCSE 1st year",
+  "age_group": null,
+  "academic_year": "2026/2027",
+  "source_url": "https://darbicollege.com/en/admissions/tuition-fees/",
+  "source_page_id": 29223,
+  "pricing_context": {
+   "notes": null,
+   "confidence": 0.9,
+   "discounts": [],
+   "installments": [],
+   "includes": [],
+   "excludes": []
+  }
+ },
+ {
+  "id": 3670,
+  "category": "MATERIALS",
+  "amount": 781.0,
+  "amount_min": null,
+  "amount_max": null,
+  "currency": "EUR",
+  "period": null,
+  "plan_name": "Textbook and/or study materials price for AS",
+  "age_group": null,
+  "academic_year": "2026/2027",
+  "source_url": "https://darbicollege.com/en/admissions/tuition-fees/",
+  "source_page_id": 29223,
+  "pricing_context": {
+   "notes": null,
+   "confidence": 0.9,
+   "discounts": [],
+   "installments": [],
+   "includes": [],
+   "excludes": []
+  }
+ },
+ {
+  "id": 3671,
+  "category": "MATERIALS",
+  "amount": 246.0,
+  "amount_min": null,
+  "amount_max": null,
+  "currency": "EUR",
+  "period": null,
+  "plan_name": "Textbook and/or study materials price for A2",
+  "age_group": null,
+  "academic_year": "2026/2027",
+  "source_url": "https://darbicollege.com/en/admissions/tuition-fees/",
+  "source_page_id": 29223,
+  "pricing_context": {
+   "notes": null,
+   "confidence": 0.9,
+   "discounts": [],
+   "installments": [],
+   "includes": [],
+   "excludes": []
+  }
+ },
+ {
+  "id": 3672,
+  "category": "TUITION",
+  "amount": 17227.0,
+  "amount_min": null,
+  "amount_max": null,
+  "currency": "EUR",
+  "period": "YEARLY",
+  "plan_name": "IGCSE first year",
+  "age_group": null,
+  "academic_year": "2026/2027",
+  "source_url": "https://darbicollege.com/en/admissions/tuition-fees/",
+  "source_page_id": 29223,
+  "pricing_context": {
+   "notes": null,
+   "confidence": 0.9,
+   "discounts": [],
+   "installments": [],
+   "includes": [],
+   "excludes": []
+  }
+ },
+ {
+  "id": 3673,
+  "category": "TUITION",
+  "amount": 17227.0,
+  "amount_min": null,
+  "amount_max": null,
+  "currency": "EUR",
+  "period": "YEARLY",
+  "plan_name": "IGCSE second year",
+  "age_group": null,
+  "academic_year": "2026/2027",
+  "source_url": "https://darbicollege.com/en/admissions/tuition-fees/",
+  "source_page_id": 29223,
+  "pricing_context": {
+   "notes": null,
+   "confidence": 0.9,
+   "discounts": [],
+   "installments": [],
+   "includes": [],
+   "excludes": []
+  }
+ },
+ {
+  "id": 3674,
+  "category": "TUITION",
+  "amount": 17596.0,
+  "amount_min": null,
+  "amount_max": null,
+  "currency": "EUR",
+  "period": "YEARLY",
+  "plan_name": "First year A Level",
+  "age_group": null,
+  "academic_year": "2026/2027",
+  "source_url": "https://darbicollege.com/en/admissions/tuition-fees/",
+  "source_page_id": 29223,
+  "pricing_context": {
+   "notes": null,
+   "confidence": 0.9,
+   "discounts": [],
+   "installments": [],
+   "includes": [],
+   "excludes": []
+  }
+ },
+ {
+  "id": 3675,
+  "category": "TUITION",
+  "amount": 17596.0,
+  "amount_min": null,
+  "amount_max": null,
+  "currency": "EUR",
+  "period": "YEARLY",
+  "plan_name": "Second year A Level",
+  "age_group": null,
+  "academic_year": "2026/2027",
+  "source_url": "https://darbicollege.com/en/admissions/tuition-fees/",
+  "source_page_id": 29223,
+  "pricing_context": {
+   "notes": null,
+   "confidence": 0.9,
+   "discounts": [],
+   "installments": [],
+   "includes": [],
+   "excludes": []
+  }
+ }
+]
