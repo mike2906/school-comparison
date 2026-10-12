@@ -174,17 +174,25 @@ def admission_value_is_semantically_valid(
     return True
 
 
+# Evidence errors found on price rows a failed extraction kept published, against the
+# pages' current text (``app.scrapers.validation.kept_prices``). Kept beside the report's
+# own issues, not among them: they are replaced on every failed run and dropped with the
+# report by the next validation, and they leave its status and summary alone.
+KEPT_PRICE_ISSUES_KEY = "kept_price_issues"
+
+
 def iter_blocking_field_paths(report: Mapping[str, Any] | None) -> Iterator[str]:
     """Yield the ``field_path`` of every entry that should withhold its target.
 
-    That is, error-level issues plus actionable spot-check discrepancies in a
-    ``data_validation`` report mapping. Shared by the API display gate and the
+    That is, error-level issues (the report's own and its kept-price ones) plus
+    actionable spot-check discrepancies in a ``data_validation`` report mapping. Shared by the API display gate and the
     summarizer's section gate so the two can't diverge on what "blocking" means.
     """
     if not isinstance(report, Mapping):
         return
 
-    for issue in report.get("issues", []) or []:
+    issues = [*(report.get("issues", []) or []), *(report.get(KEPT_PRICE_ISSUES_KEY, []) or [])]
+    for issue in issues:
         if isinstance(issue, Mapping) and str(issue.get("severity") or "").lower() == "error":
             yield str(issue.get("field_path") or "")
 
