@@ -73,7 +73,7 @@ use `pip install` or `requirements.txt`.
 │   │   ├── schemas/      # Pydantic request/response models
 │   │   ├── routers/      # FastAPI routes (schools.py, compare.py, countries.py)
 │   │   ├── services/     # Business logic (incl. geocoding/)
-│   │   ├── scrapers/     # Scraping pipeline + CLI (cli.py; stage runners in stages/, repairs in repairs/)
+│   │   ├── scrapers/     # Scraping pipeline + CLI (cli.py; stage runners in stages/, repairs in repairs/, validation sections in validation/)
 │   │   ├── utils/        # Incl. publish-boundary gates (display_gating.py, website_data.py)
 │   │   ├── config.py     # Settings (get_settings() factory)
 │   │   ├── database.py   # DB engine, session

@@ -220,7 +220,7 @@ Prerequisites from the test audit (test-only PRs, done before step 10):
 ### Phase 4: long functions
 
 16. **Split `validate_school_data`** (582 lines) into per-section validators.
-    *Done (2026-10-12).* It is now a ~110-line orchestrator over private `_check_*` / `_persist_*` helpers in `validator.py`, moved verbatim.
+    *Done (2026-10-12).* It is now a ~110-line orchestrator in `validator.py`. The section helpers live in `app/scrapers/validation/` (`pricing_checks`, `field_checks`, `persistence`, `report_entries`), moved verbatim. `validator.py` is down from 1,734 to about 910 lines.
 17. **Split `_extract_general_info` and `_extract_prices`** into named steps, replacing the nested closures.
 
 These come last because they are the riskiest, and they get easier once phases 2 and 3 have made the helpers they call importable and testable on their own.

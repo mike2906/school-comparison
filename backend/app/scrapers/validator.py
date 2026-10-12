@@ -9,35 +9,27 @@ import json
 import logging
 import re
 from dataclasses import dataclass
-from decimal import Decimal
-from typing import Any, Literal
+from typing import Any
 from urllib.parse import urldefrag
 
 from pydantic_ai import ModelRetry
-from sqlalchemy import delete, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import flag_modified
 
 from app.ai.client import calculate_cost, create_agent, extract_provider_cost_usd, get_model, get_usage
 from app.config import get_settings
-from app.models.field_source import FieldSource, SourceType
 from app.models.pricing import PricePeriod, PriceSource, Pricing
 from app.models.school import School, SchoolLocation, SchoolLocationAgeGroupShift
 from app.models.scrape_log import ScrapeType
 from app.models.source_page import SourcePage
-from app.schemas.extraction import ExtractedLanguageFocus, SummarySourceExtractionOutput
 from app.schemas.validation import (
     SpotCheckOutput,
-    ValidationAutoFix,
-    ValidationIssue,
     ValidationReport,
 )
 from app.scrapers.campus_sync import (
-    apply_campus_sync,
     geocode_campus_locations,
-    remove_website_campus_data,
 )
-from app.scrapers.extraction import general_fields, summary_sources
 from app.scrapers.price_evidence import (
     RULE_AMOUNT_NEAR_LABEL,
     RULE_DEPOSIT,
@@ -57,15 +49,14 @@ from app.scrapers.price_evidence import (
     taught_grades,
 )
 from app.scrapers.shared_site_check import level_family, site_group_key
-from app.scrapers.summary_pipeline import clear_summary_state
+from app.scrapers.validation import field_checks, persistence, pricing_checks
+from app.scrapers.validation.report_entries import _add_fix, _add_issue, _now_iso, _to_json_value
 from app.services.provider_costs import execute_billable_request
 from app.utils.academic_year import normalize_academic_year
-from app.utils.display_gating import DISPLAY_NAME_FIELD_PATH, admission_value_is_semantically_valid
+from app.utils.display_gating import DISPLAY_NAME_FIELD_PATH
 from app.utils.i18n_resolver import resolve_display_name_i18n, resolve_name_i18n
 from app.utils.website_data import (
     attributes_for_publication,
-    promote_validation_report,
-    record_validation_failure,
 )
 
 logger = logging.getLogger(__name__)
@@ -99,327 +90,6 @@ _SPOT_CONTRADICTION_RE = re.compile(
     r"\b(inconsistent|mismatch|conflict|contradict|different|incorrect|wrong|vs)\b",
     re.IGNORECASE,
 )
-
-
-def _now_iso() -> str:
-    return datetime.datetime.now(datetime.timezone.utc).isoformat()
-
-
-def _to_json_value(value: Any) -> Any:
-    if isinstance(value, Decimal):
-        return float(value)
-    if isinstance(value, datetime.datetime):
-        return value.isoformat()
-    if isinstance(value, list):
-        return [_to_json_value(item) for item in value]
-    if isinstance(value, dict):
-        return {str(k): _to_json_value(v) for k, v in value.items()}
-    return value
-
-
-def _add_issue(
-    report: ValidationReport,
-    *,
-    code: str,
-    severity: Literal["error", "warning"],
-    field_path: str,
-    message: str,
-    auto_fixed: bool = False,
-) -> None:
-    report.issues.append(
-        ValidationIssue(
-            code=code,
-            severity=severity,
-            field_path=field_path,
-            message=message,
-            auto_fixed=auto_fixed,
-        )
-    )
-    report.issue_counts[severity] = int(report.issue_counts.get(severity, 0)) + 1
-
-
-def _add_fix(
-    report: ValidationReport,
-    *,
-    code: str,
-    field_path: str,
-    original_value: Any,
-    fixed_value: Any,
-    reason: str,
-) -> None:
-    report.auto_fixes.append(
-        ValidationAutoFix(
-            code=code,
-            field_path=field_path,
-            original_value=_to_json_value(original_value),
-            fixed_value=_to_json_value(fixed_value),
-            reason=reason,
-        )
-    )
-
-
-def _normalize_text_list(value: Any) -> list[str]:
-    if not isinstance(value, list):
-        return []
-    out: list[str] = []
-    seen: set[str] = set()
-    for item in value:
-        if item is None:
-            continue
-        text = str(item).strip()
-        if not text:
-            continue
-        key = text.casefold()
-        if key in seen:
-            continue
-        seen.add(key)
-        out.append(text)
-    return out
-
-
-def _normalize_extracted_languages(value: Any) -> list[dict[str, Any]]:
-    if not isinstance(value, list):
-        return []
-    out: list[dict[str, Any]] = []
-    seen: set[tuple[str, str]] = set()
-    for item in value:
-        language = ""
-        level: str | None = None
-        if isinstance(item, dict):
-            language = str(item.get("language") or "").strip()
-            raw_level = item.get("level")
-            level = str(raw_level).strip() if raw_level is not None else None
-            if level == "":
-                level = None
-        elif isinstance(item, str):
-            language = item.strip()
-        if not language:
-            continue
-        key = (language.casefold(), (level or "").casefold())
-        if key in seen:
-            continue
-        seen.add(key)
-        out.append({"language": language, "level": level})
-    return out
-
-
-def _normalize_founded_year(value: Any) -> str | None:
-    if value is None:
-        return None
-    if isinstance(value, int):
-        text = str(value)
-    elif isinstance(value, float):
-        if not value.is_integer():
-            return None
-        text = str(int(value))
-    else:
-        text = str(value).strip()
-        if text.endswith(".0"):
-            head = text[:-2]
-            if head.isdigit():
-                text = head
-    if len(text) != 4 or not text.isdigit():
-        return None
-    year = int(text)
-    current_year = datetime.datetime.now(datetime.timezone.utc).year
-    if year < 1800 or year > current_year:
-        return None
-    return str(year)
-
-
-_LANGUAGE_ALIASES: dict[str, set[str]] = {
-    "english": {"english", "английски"},
-    "bulgarian": {"bulgarian", "български"},
-    "german": {"german", "deutsch", "немски"},
-    "french": {"french", "français", "френски"},
-    "spanish": {"spanish", "español", "испански"},
-    "italian": {"italian", "италиянски"},
-    "russian": {"russian", "руски"},
-    "turkish": {"turkish", "турски"},
-    "chinese": {"chinese", "китайски"},
-}
-
-
-def _language_terms(value: str) -> set[str]:
-    text = (value or "").strip().casefold()
-    if not text:
-        return set()
-    terms = {text}
-    for canonical, aliases in _LANGUAGE_ALIASES.items():
-        alias_set = {canonical, *aliases}
-        if text in alias_set:
-            terms.update(alias_set)
-            break
-    return {term.casefold() for term in terms if term}
-
-
-def _source_mentions_language(source_text: str, language: str) -> bool:
-    source = source_text.casefold()
-    for term in _language_terms(language):
-        pattern = rf"(?<![\w-]){re.escape(term)}(?![\w-])"
-        if re.search(pattern, source):
-            return True
-    return False
-
-
-def _source_mentions_founded_year(source_text: str, founded_year: str) -> bool:
-    if not founded_year:
-        return False
-    return re.search(rf"(?<!\d){re.escape(founded_year)}(?!\d)", source_text.casefold()) is not None
-
-
-def _source_mentions_class_size(source_text: str, class_size: str) -> bool:
-    if not class_size:
-        return False
-    source = source_text.casefold()
-    numbers = {m.group(0) for m in re.finditer(r"\b\d{1,2}\b", str(class_size))}
-    if not numbers:
-        return False
-    people = r"(?:деца|ученици|students|children)"
-    container = r"(?:клас|класа|класове|група|групи|class|classes|group|groups)"
-    for number in numbers:
-        escaped = re.escape(number)
-        # A pupil count on its own can be a news item, and ``9. клас`` is a grade,
-        # not nine pupils per class. Require the number, pupil noun, and class/group
-        # noun to participate in the same short size statement.
-        if re.search(
-            rf"(?<!\d){escaped}(?!\d)[^\n]{{0,18}}{people}[^\n]{{0,18}}{container}",
-            source,
-        ):
-            return True
-        if re.search(
-            rf"{container}[^\n]{{0,25}}(?<!\d){escaped}(?!\d)[^\n]{{0,12}}{people}",
-            source,
-        ):
-            return True
-        if re.search(
-            rf"{container}[^\n]{{0,18}}(?:size|capacity|размер|капацитет)"
-            rf"[^\n]{{0,12}}(?<!\d){escaped}(?!\d)",
-            source,
-        ):
-            return True
-    return False
-
-
-def _admission_value_is_semantically_valid(
-    field_name: str,
-    value: str,
-    *,
-    today: datetime.date | None = None,
-) -> bool:
-    return admission_value_is_semantically_valid(field_name, value, today=today)
-
-
-def _normalize_match_text(value: str) -> str:
-    return re.sub(r"\s+", " ", (value or "").casefold()).strip()
-
-
-def _source_mentions_text_value(source_text: str, value: str) -> bool:
-    normalized_value = _normalize_match_text(value)
-    if not normalized_value:
-        return False
-    normalized_source = _normalize_match_text(source_text)
-    if not normalized_source:
-        return False
-    if len(normalized_value) >= 6 and normalized_value in normalized_source:
-        return True
-    tokens = re.findall(r"[a-zа-я0-9]+", normalized_value, flags=re.IGNORECASE)
-    if not tokens:
-        return False
-    if len(tokens) == 1:
-        token = tokens[0]
-        return re.search(rf"(?<![\w-]){re.escape(token)}(?![\w-])", normalized_source) is not None
-    for idx in range(len(tokens) - 1):
-        bigram = f"{tokens[idx]} {tokens[idx + 1]}"
-        if bigram in normalized_source:
-            return True
-    return False
-
-
-def _filter_values_by_source_evidence(source_text: str, values: list[str]) -> list[str]:
-    return [value for value in values if _source_mentions_text_value(source_text, value)]
-
-
-def _normalize_summary_source(
-    value: Any,
-    source_text: str,
-    *,
-    languages: list[dict[str, Any]] | list[Any] | None = None,
-    programs: list[str] | None = None,
-) -> dict[str, Any]:
-    parsed = SummarySourceExtractionOutput.model_validate(value or {})
-    language_candidates = general_fields._normalize_languages(
-        [ExtractedLanguageFocus.model_validate(item) for item in (languages or [])]
-    )
-    normalized_model = summary_sources._normalize_summary_source_output(
-        parsed,
-        language_candidates=language_candidates,
-        program_candidates=_normalize_text_list(programs or []),
-    )
-    normalized = normalized_model.model_dump()
-
-    if source_text:
-        normalized_source = _normalize_match_text(source_text)
-
-        def has_summary_source_evidence(text: str) -> bool:
-            if _source_mentions_text_value(source_text, text):
-                return True
-            tokens = [
-                token
-                for token in re.findall(r"[a-zа-я0-9]+", _normalize_match_text(text), flags=re.IGNORECASE)
-                if len(token) >= 4
-            ]
-            if len(tokens) < 2:
-                return False
-            return sum(1 for token in set(tokens) if token in normalized_source) >= 2
-
-        positioning = normalized.get("positioning")
-        if positioning and not has_summary_source_evidence(positioning):
-            normalized["positioning"] = None
-
-        for key in (
-            "teaching_approach",
-            "student_experience",
-            "community_signals",
-            "differentiators",
-        ):
-            normalized[key] = [
-                item
-                for item in _normalize_text_list(normalized.get(key))
-                if has_summary_source_evidence(item)
-            ]
-    else:
-        normalized["positioning"] = None
-        for key in (
-            "teaching_approach",
-            "student_experience",
-            "community_signals",
-            "differentiators",
-        ):
-            normalized[key] = []
-
-    normalized["canonical_tags"] = summary_sources._derive_summary_source_canonical_tags(
-        positioning=normalized.get("positioning"),
-        teaching_approach=_normalize_text_list(normalized.get("teaching_approach")),
-        student_experience=_normalize_text_list(normalized.get("student_experience")),
-        community_signals=_normalize_text_list(normalized.get("community_signals")),
-        differentiators=_normalize_text_list(normalized.get("differentiators")),
-        language_candidates=language_candidates,
-        program_candidates=_normalize_text_list(programs or []),
-        explicit_tags=_normalize_text_list(normalized.get("canonical_tags")),
-    )
-
-    normalized["has_useful_info"] = any(
-        (
-            normalized.get("positioning"),
-            normalized.get("teaching_approach"),
-            normalized.get("student_experience"),
-            normalized.get("community_signals"),
-            normalized.get("differentiators"),
-            normalized.get("canonical_tags"),
-        )
-    )
-    return normalized
 
 
 # Bare keys a spot-check may report under `extracted`; used to re-root a discrepancy
@@ -694,25 +364,6 @@ def has_current_validation_report(attributes: Any, schema_version: int = 1) -> b
         return False
 
 
-def _pricing_signature(row: Pricing) -> tuple[Any, ...]:
-    context_json = json.dumps(_to_json_value(row.pricing_context or {}), sort_keys=True, ensure_ascii=True)
-    return (
-        row.school_id,
-        row.age_group,
-        row.category.value if hasattr(row.category, "value") else row.category,
-        row.academic_year,
-        row.amount,
-        row.amount_min,
-        row.amount_max,
-        row.currency,
-        row.period.value if hasattr(row.period, "value") else row.period,
-        row.plan_name,
-        row.source.value if hasattr(row.source, "value") else row.source,
-        row.source_url,
-        context_json,
-    )
-
-
 def _parse_spot_check_output(result: Any) -> SpotCheckOutput | None:
     output = getattr(result, "output", None)
     if isinstance(output, SpotCheckOutput):
@@ -927,564 +578,6 @@ def _tx_context(db: AsyncSession):
     return db.begin_nested() if db.in_transaction() else db.begin()
 
 
-def _normalize_pricing_currency(report: ValidationReport, row: Pricing, row_prefix: str) -> None:
-    normalized_currency = (row.currency or "").strip().upper()
-    if len(normalized_currency) != 3 or not normalized_currency.isalpha():
-        normalized_currency = "BGN"
-    if row.currency != normalized_currency:
-        _add_fix(
-            report,
-            code="pricing_currency_normalized",
-            field_path=f"{row_prefix}.currency",
-            original_value=row.currency,
-            fixed_value=normalized_currency,
-            reason="Currency codes must be 3-letter uppercase alphabetic values.",
-        )
-        row.currency = normalized_currency
-
-def _check_pricing_amounts(report: ValidationReport, row: Pricing, row_prefix: str) -> None:
-    for field_name in ("amount", "amount_min", "amount_max"):
-        raw_value = getattr(row, field_name)
-        if raw_value is None:
-            continue
-        try:
-            numeric_value = float(raw_value)
-        except (TypeError, ValueError):
-            _add_issue(
-                report,
-                code="invalid_numeric_price_value",
-                severity="error",
-                field_path=f"{row_prefix}.{field_name}",
-                message=f"{field_name} must be numeric when present.",
-            )
-            continue
-        if numeric_value < 0:
-            _add_issue(
-                report,
-                code="negative_price_amount",
-                severity="error",
-                field_path=f"{row_prefix}.{field_name}",
-                message=f"{field_name} cannot be negative.",
-            )
-
-def _fix_swapped_pricing_range(report: ValidationReport, row: Pricing, row_prefix: str) -> None:
-    if row.amount_min is not None and row.amount_max is not None:
-        try:
-            amount_min = float(row.amount_min)
-            amount_max = float(row.amount_max)
-        except (TypeError, ValueError):
-            amount_min = None
-            amount_max = None
-        if amount_min is not None and amount_max is not None and amount_min > amount_max:
-            original = {"amount_min": row.amount_min, "amount_max": row.amount_max}
-            row.amount_min, row.amount_max = row.amount_max, row.amount_min
-            _add_fix(
-                report,
-                code="pricing_range_swapped",
-                field_path=row_prefix,
-                original_value=original,
-                fixed_value={"amount_min": row.amount_min, "amount_max": row.amount_max},
-                reason="amount_min was greater than amount_max.",
-            )
-
-def _check_amount_within_range(report: ValidationReport, row: Pricing, row_prefix: str) -> None:
-    if row.amount is not None and row.amount_min is not None and row.amount_max is not None:
-        try:
-            amount = float(row.amount)
-            amount_min = float(row.amount_min)
-            amount_max = float(row.amount_max)
-        except (TypeError, ValueError):
-            amount = None
-            amount_min = None
-            amount_max = None
-        if amount is not None and amount_min is not None and amount_max is not None:
-            if amount < amount_min or amount > amount_max:
-                _add_issue(
-                    report,
-                    code="amount_outside_range",
-                    severity="warning",
-                    field_path=f"{row_prefix}.amount",
-                    message="amount is outside the row's amount_min/amount_max range.",
-                )
-
-def _check_pricing_source_url(report: ValidationReport, row: Pricing, row_prefix: str) -> None:
-    if not (row.source_url or "").strip():
-        _add_issue(
-            report,
-            code="missing_pricing_source_url",
-            severity="warning",
-            field_path=f"{row_prefix}.source_url",
-            message="Scraped pricing row is missing source_url.",
-        )
-
-def _check_pricing_rows(report: ValidationReport, pricing_rows: list[Pricing]) -> None:
-    for row in pricing_rows:
-        row_prefix = f"pricing[{row.id}]"
-        _normalize_pricing_currency(report, row, row_prefix)
-        _check_pricing_amounts(report, row, row_prefix)
-        _fix_swapped_pricing_range(report, row, row_prefix)
-        _check_amount_within_range(report, row, row_prefix)
-        _check_pricing_source_url(report, row, row_prefix)
-
-
-async def _remove_duplicate_pricing_rows(
-    db: AsyncSession, report: ValidationReport, pricing_rows: list[Pricing]
-) -> None:
-    seen_signatures: dict[tuple[Any, ...], int] = {}
-    duplicate_ids: list[tuple[int, int]] = []
-    for row in pricing_rows:
-        signature = _pricing_signature(row)
-        existing = seen_signatures.get(signature)
-        if existing is None:
-            seen_signatures[signature] = row.id
-            continue
-        duplicate_ids.append((row.id, existing))
-
-    if duplicate_ids:
-        duplicate_id_set = {dup_id for dup_id, _ in duplicate_ids}
-        duplicate_prefixes = tuple(f"pricing[{dup_id}]" for dup_id in duplicate_id_set)
-        # Keep report trace focused on surviving rows plus explicit duplicate-removal entries.
-        report.auto_fixes = [
-            fix for fix in report.auto_fixes if not fix.field_path.startswith(duplicate_prefixes)
-        ]
-        report.issues = [
-            issue for issue in report.issues if not issue.field_path.startswith(duplicate_prefixes)
-        ]
-        report.issue_counts = {
-            severity: sum(1 for issue in report.issues if issue.severity == severity)
-            for severity in ("error", "warning")
-        }
-        await db.execute(
-            delete(Pricing).where(Pricing.id.in_([dup_id for dup_id, _ in duplicate_ids]))
-        )
-        for duplicate_id, keep_id in duplicate_ids:
-            _add_fix(
-                report,
-                code="duplicate_pricing_row_removed",
-                field_path=f"pricing[{duplicate_id}]",
-                original_value={"id": duplicate_id, "duplicate_of": keep_id},
-                fixed_value=None,
-                reason="Removed exact duplicate scraped pricing row.",
-            )
-
-async def _load_evidence_source_text(
-    db: AsyncSession, school: School, extracted_dict: dict[str, Any]
-) -> str:
-    source_text = ""
-    needs_evidence_checks = any(
-        extracted_dict.get(key)
-        for key in (
-            "languages",
-            "class_size",
-            "founded_year",
-            "programs",
-            "admission",
-            "operations",
-            "summary_source",
-        )
-    )
-    if needs_evidence_checks:
-        pages_result = await db.execute(
-            select(SourcePage.raw_markdown)
-            .where(
-                SourcePage.school_id == school.id,
-                SourcePage.scrape_type == ScrapeType.WEBSITE,
-                SourcePage.is_valid.is_(True),
-                SourcePage.raw_markdown.isnot(None),
-            )
-            .order_by(SourcePage.id)
-        )
-        source_text = "\n\n".join(
-            (row[0] or "").strip() for row in pages_result.all() if (row[0] or "").strip()
-        )
-    return source_text
-
-
-def _normalize_extracted_lists(report: ValidationReport, extracted_dict: dict[str, Any]) -> None:
-    for list_key in ("facilities", "programs", "extracurricular", "accreditations"):
-        original_list = extracted_dict.get(list_key)
-        normalized_list = _normalize_text_list(original_list)
-        if original_list != normalized_list:
-            _add_fix(
-                report,
-                code=f"normalized_{list_key}",
-                field_path=f"attributes.extracted.{list_key}",
-                original_value=original_list,
-                fixed_value=normalized_list,
-                reason="Removed empty/duplicate values and trimmed whitespace.",
-            )
-            extracted_dict[list_key] = normalized_list
-
-def _check_extracted_programs(
-    report: ValidationReport, extracted_dict: dict[str, Any], source_text: str
-) -> None:
-    normalized_programs = extracted_dict.get("programs")
-    if not isinstance(normalized_programs, list):
-        # Defensive fallback for legacy payloads.
-        normalized_programs = _normalize_text_list(normalized_programs)
-        extracted_dict["programs"] = normalized_programs
-    if source_text and normalized_programs:
-        evidence_programs = _filter_values_by_source_evidence(source_text, normalized_programs)
-        if evidence_programs != normalized_programs:
-            _add_fix(
-                report,
-                code="programs_missing_evidence",
-                field_path="attributes.extracted.programs",
-                original_value=normalized_programs,
-                fixed_value=evidence_programs,
-                reason="Dropped program entries not explicitly supported by source text.",
-            )
-            normalized_programs = evidence_programs
-            extracted_dict["programs"] = normalized_programs
-
-def _check_extracted_languages(
-    report: ValidationReport, extracted_dict: dict[str, Any], source_text: str
-) -> None:
-    original_languages = extracted_dict.get("languages")
-    normalized_languages = _normalize_extracted_languages(original_languages)
-    if original_languages != normalized_languages:
-        _add_fix(
-            report,
-            code="normalized_languages",
-            field_path="attributes.extracted.languages",
-            original_value=original_languages,
-            fixed_value=normalized_languages,
-            reason="Normalized languages list and removed empty/duplicate entries.",
-        )
-        extracted_dict["languages"] = normalized_languages
-    if source_text and normalized_languages:
-        evidence_languages = [
-            item
-            for item in normalized_languages
-            if _source_mentions_language(source_text, str(item.get("language") or ""))
-        ]
-        if evidence_languages != normalized_languages:
-            _add_fix(
-                report,
-                code="languages_missing_evidence",
-                field_path="attributes.extracted.languages",
-                original_value=normalized_languages,
-                fixed_value=evidence_languages,
-                reason="Dropped language entries not explicitly supported by source text.",
-            )
-            normalized_languages = evidence_languages
-            extracted_dict["languages"] = normalized_languages
-
-def _check_extracted_founded_year(
-    report: ValidationReport, extracted_dict: dict[str, Any], source_text: str
-) -> None:
-    original_founded_year = extracted_dict.get("founded_year")
-    normalized_founded_year = _normalize_founded_year(original_founded_year)
-    if original_founded_year != normalized_founded_year:
-        _add_fix(
-            report,
-            code="normalized_founded_year",
-            field_path="attributes.extracted.founded_year",
-            original_value=original_founded_year,
-            fixed_value=normalized_founded_year,
-            reason="Founded year must be a 4-digit year between 1800 and current year.",
-        )
-        extracted_dict["founded_year"] = normalized_founded_year
-    if source_text and normalized_founded_year and not _source_mentions_founded_year(source_text, normalized_founded_year):
-        _add_fix(
-            report,
-            code="founded_year_missing_evidence",
-            field_path="attributes.extracted.founded_year",
-            original_value=normalized_founded_year,
-            fixed_value=None,
-            reason="Cleared founded_year because the year is not explicitly present in source text.",
-        )
-        normalized_founded_year = None
-        extracted_dict["founded_year"] = None
-
-def _check_extracted_class_size(
-    report: ValidationReport, extracted_dict: dict[str, Any], source_text: str
-) -> None:
-    original_class_size = extracted_dict.get("class_size")
-    normalized_class_size = str(original_class_size).strip() if original_class_size is not None else None
-    if normalized_class_size == "":
-        normalized_class_size = None
-    if original_class_size != normalized_class_size:
-        _add_fix(
-            report,
-            code="normalized_class_size",
-            field_path="attributes.extracted.class_size",
-            original_value=original_class_size,
-            fixed_value=normalized_class_size,
-            reason="Normalized class_size whitespace/empty values.",
-        )
-        extracted_dict["class_size"] = normalized_class_size
-    if source_text and normalized_class_size and not _source_mentions_class_size(source_text, normalized_class_size):
-        _add_fix(
-            report,
-            code="class_size_missing_evidence",
-            field_path="attributes.extracted.class_size",
-            original_value=normalized_class_size,
-            fixed_value=None,
-            reason="Cleared class_size because no explicit numeric evidence exists in source text.",
-        )
-        extracted_dict["class_size"] = None
-
-def _check_extracted_admission(
-    report: ValidationReport,
-    extracted_dict: dict[str, Any],
-    admission_info: dict[str, Any],
-    source_text: str,
-) -> None:
-    extracted_admission = (
-        extracted_dict.get("admission") if isinstance(extracted_dict.get("admission"), dict) else {}
-    )
-    if source_text and extracted_admission:
-        admission_keys = (
-            "deadlines",
-            "required_documents",
-            "application_steps",
-            "entrance_requirements",
-            "available_spots",
-        )
-        normalized_admission = dict(extracted_admission)
-        for admission_key in admission_keys:
-            original_values = extracted_admission.get(admission_key)
-            normalized_values = _normalize_text_list(original_values)
-            if normalized_values:
-                evidence_values = _filter_values_by_source_evidence(source_text, normalized_values)
-            else:
-                evidence_values = normalized_values
-            if evidence_values != normalized_values:
-                _add_fix(
-                    report,
-                    code=f"admission_{admission_key}_missing_evidence",
-                    field_path=f"attributes.extracted.admission.{admission_key}",
-                    original_value=normalized_values,
-                    fixed_value=evidence_values,
-                    reason="Dropped admission entries not explicitly supported by source text.",
-                )
-            semantic_values = [
-                value
-                for value in evidence_values
-                if _admission_value_is_semantically_valid(admission_key, value)
-            ]
-            if semantic_values != evidence_values:
-                _add_fix(
-                    report,
-                    code=f"admission_{admission_key}_semantically_invalid",
-                    field_path=f"attributes.extracted.admission.{admission_key}",
-                    original_value=evidence_values,
-                    fixed_value=semantic_values,
-                    reason=(
-                        "Dropped stale, fragmentary, procurement, or navigation "
-                        "content that is not a publishable admission fact."
-                    ),
-                )
-            normalized_admission[admission_key] = semantic_values
-        has_useful_info = any(normalized_admission.get(k) for k in admission_keys)
-        if bool(normalized_admission.get("has_useful_info")) != has_useful_info:
-            _add_fix(
-                report,
-                code="admission_has_useful_info_normalized",
-                field_path="attributes.extracted.admission.has_useful_info",
-                original_value=normalized_admission.get("has_useful_info"),
-                fixed_value=has_useful_info,
-                reason="Aligned has_useful_info with non-empty evidence-backed admission fields.",
-            )
-        normalized_admission["has_useful_info"] = has_useful_info
-        extracted_admission = normalized_admission
-        extracted_dict["admission"] = normalized_admission
-    if bool(extracted_admission.get("has_useful_info")):
-        if admission_info.get("website_extracted") != extracted_admission:
-            _add_fix(
-                report,
-                code="admission_sync",
-                field_path="admission_info.website_extracted",
-                original_value=admission_info.get("website_extracted"),
-                fixed_value=extracted_admission,
-                reason=(
-                    "Synced admission_info.website_extracted with "
-                    "attributes.extracted.admission."
-                ),
-            )
-            admission_info["website_extracted"] = extracted_admission
-    elif "website_extracted" in admission_info:
-        original_website_admission = admission_info.get("website_extracted")
-        admission_info.pop("website_extracted", None)
-        _add_fix(
-            report,
-            code="admission_sync_removed",
-            field_path="admission_info.website_extracted",
-            original_value=original_website_admission,
-            fixed_value=None,
-            reason=(
-                "Removed admission_info.website_extracted because extracted admission "
-                "has_useful_info is false."
-            ),
-        )
-
-def _check_extracted_operations(
-    report: ValidationReport, extracted_dict: dict[str, Any], source_text: str
-) -> None:
-    extracted_operations = (
-        extracted_dict.get("operations")
-        if isinstance(extracted_dict.get("operations"), dict)
-        else {}
-    )
-    if source_text and extracted_operations:
-        normalized_operations = dict(extracted_operations)
-        original_working_hours = extracted_operations.get("working_hours")
-        working_hours = (
-            str(original_working_hours).strip()
-            if original_working_hours is not None
-            else None
-        )
-        if not working_hours or not _source_mentions_text_value(
-            source_text, working_hours
-        ):
-            working_hours = None
-        if working_hours != original_working_hours:
-            _add_fix(
-                report,
-                code="operations_working_hours_missing_evidence",
-                field_path="attributes.extracted.operations.working_hours",
-                original_value=original_working_hours,
-                fixed_value=working_hours,
-                reason=(
-                    "Cleared working_hours because no explicit supporting "
-                    "text exists in the scraped source pages."
-                ),
-            )
-        normalized_operations["working_hours"] = working_hours
-
-        original_daily_schedule = extracted_operations.get("daily_schedule")
-        daily_schedule = _normalize_text_list(original_daily_schedule)
-        evidence_daily_schedule = _filter_values_by_source_evidence(
-            source_text, daily_schedule
-        )
-        if evidence_daily_schedule != original_daily_schedule:
-            _add_fix(
-                report,
-                code="operations_daily_schedule_missing_evidence",
-                field_path="attributes.extracted.operations.daily_schedule",
-                original_value=original_daily_schedule,
-                fixed_value=evidence_daily_schedule,
-                reason=(
-                    "Dropped daily_schedule entries not explicitly supported "
-                    "by scraped source text."
-                ),
-            )
-        normalized_operations["daily_schedule"] = evidence_daily_schedule
-        operation_value_keys = (
-            "working_hours",
-            "day_options",
-            "daily_schedule",
-            "meals",
-            "transport",
-            "uniforms",
-        )
-        normalized_operations["has_useful_info"] = any(
-            normalized_operations.get(key) for key in operation_value_keys
-        )
-        extracted_dict["operations"] = normalized_operations
-
-def _check_extracted_summary_source(
-    report: ValidationReport, extracted_dict: dict[str, Any], source_text: str
-) -> None:
-    original_summary_source = extracted_dict.get("summary_source")
-    if original_summary_source is not None:
-        normalized_summary_source = _normalize_summary_source(
-            original_summary_source,
-            source_text,
-            languages=extracted_dict.get("languages"),
-            programs=extracted_dict.get("programs"),
-        )
-        if original_summary_source != normalized_summary_source:
-            _add_fix(
-                report,
-                code="normalized_summary_source",
-                field_path="attributes.extracted.summary_source",
-                original_value=original_summary_source,
-                fixed_value=normalized_summary_source,
-                reason="Removed empty, generic, duplicate, or unsupported summary-source entries.",
-            )
-            extracted_dict["summary_source"] = normalized_summary_source
-
-async def _check_field_source_provenance(
-    db: AsyncSession, report: ValidationReport, school: School
-) -> None:
-    field_source_result = await db.execute(
-        select(FieldSource.id)
-        .where(
-            FieldSource.school_id == school.id,
-            FieldSource.source_type == SourceType.SCRAPED_WEBSITE,
-            FieldSource.category.in_(["general_info", "pricing"]),
-        )
-        .limit(1)
-    )
-    if field_source_result.scalar_one_or_none() is None:
-        _add_issue(
-            report,
-            code="missing_field_source_provenance",
-            severity="warning",
-            field_path="attributes.extracted",
-            message=(
-                "Extracted payload has no scraped-website FieldSource provenance rows."
-            ),
-        )
-
-async def _persist_validation_report(
-    db: AsyncSession,
-    report: ValidationReport,
-    school: School,
-    attrs: dict[str, Any],
-    admission_info: dict[str, Any],
-    prior_validation: dict[str, Any],
-) -> None:
-    report.status = "needs_review" if report.issue_counts.get("error", 0) > 0 else "ok"
-    report.validated_at = _now_iso()
-
-    validation_payload = report.model_dump(mode="json", by_alias=True)
-    # An unsampled deterministic rerun is not evidence that a capable-model
-    # finding was resolved. Preserve the prior audit (and therefore its
-    # actionable publish gates); only a new explicit spot check supersedes it.
-    prior_spot_check = prior_validation.get("spot_check")
-    if isinstance(prior_spot_check, dict):
-        validation_payload["spot_check"] = prior_spot_check
-    attrs = promote_validation_report(attrs, validation_payload)
-
-    school.attributes = attrs
-    school.admission_info = admission_info
-    # UF42(b): campuses and stated age groups are created only as the marker
-    # clears, in this transaction (apply_campus_sync re-checks the site).
-    await apply_campus_sync(db, school)
-    if report.auto_fixes:
-        clear_summary_state(school, downgrade_status=True)
-    school.updated_at = datetime.datetime.now(datetime.timezone.utc)
-    flag_modified(school, "attributes")
-    flag_modified(school, "admission_info")
-    db.add(school)
-
-async def _persist_validation_failure(
-    db: AsyncSession, school_id: int, country_code: str, exc: Exception
-) -> None:
-    if db.in_transaction():
-        await db.rollback()
-    try:
-        failed_school = await db.get(School, school_id)
-        if failed_school is not None and failed_school.country_code == country_code:
-            failed_school.attributes = record_validation_failure(
-                failed_school.attributes,
-                error=str(exc),
-            )
-            # The marker is set again: website-derived campuses stop publishing.
-            await remove_website_campus_data(db, school_id)
-            failed_school.updated_at = datetime.datetime.now(datetime.timezone.utc)
-            flag_modified(failed_school, "attributes")
-            db.add(failed_school)
-            await db.commit()
-    except Exception:
-        logger.exception("Failed to persist validation-failure withholding for school %s", school_id)
-        if db.in_transaction():
-            await db.rollback()
-
-
 async def validate_school_data(
     db: AsyncSession,
     school_id: int,
@@ -1531,13 +624,13 @@ async def validate_school_data(
             )
             pricing_rows = pricing_result.scalars().all()
 
-            _check_pricing_rows(report, pricing_rows)
+            pricing_checks._check_pricing_rows(report, pricing_rows)
 
             # Before the duplicate pass: a period filled from the page can make two rows
             # identical, and the copy must go in this run, not the next one.
             await _check_price_evidence(db, report, school, pricing_rows)
 
-            await _remove_duplicate_pricing_rows(db, report, pricing_rows)
+            await pricing_checks._remove_duplicate_pricing_rows(db, report, pricing_rows)
 
             extracted = attrs.get("extracted")
             extracted_dict = dict(extracted) if isinstance(extracted, dict) else None
@@ -1546,24 +639,24 @@ async def validate_school_data(
 
             if extracted_dict is not None:
                 extracted_has_meaningful_payload = _has_meaningful_payload(extracted_dict)
-                source_text = await _load_evidence_source_text(db, school, extracted_dict)
-                _normalize_extracted_lists(report, extracted_dict)
-                _check_extracted_programs(report, extracted_dict, source_text)
-                _check_extracted_languages(report, extracted_dict, source_text)
-                _check_extracted_founded_year(report, extracted_dict, source_text)
-                _check_extracted_class_size(report, extracted_dict, source_text)
-                _check_extracted_admission(report, extracted_dict, admission_info, source_text)
-                _check_extracted_operations(report, extracted_dict, source_text)
-                _check_extracted_summary_source(report, extracted_dict, source_text)
+                source_text = await field_checks._load_evidence_source_text(db, school, extracted_dict)
+                field_checks._normalize_extracted_lists(report, extracted_dict)
+                field_checks._check_extracted_programs(report, extracted_dict, source_text)
+                field_checks._check_extracted_languages(report, extracted_dict, source_text)
+                field_checks._check_extracted_founded_year(report, extracted_dict, source_text)
+                field_checks._check_extracted_class_size(report, extracted_dict, source_text)
+                field_checks._check_extracted_admission(report, extracted_dict, admission_info, source_text)
+                field_checks._check_extracted_operations(report, extracted_dict, source_text)
+                field_checks._check_extracted_summary_source(report, extracted_dict, source_text)
 
                 attrs["extracted"] = extracted_dict
 
             if extracted_has_meaningful_payload:
-                await _check_field_source_provenance(db, report, school)
+                await field_checks._check_field_source_provenance(db, report, school)
 
             await _check_display_name(db, report, school, attrs)
 
-            await _persist_validation_report(
+            await persistence._persist_validation_report(
                 db, report, school, attrs, admission_info, prior_validation
             )
 
@@ -1576,7 +669,7 @@ async def validate_school_data(
         }
     except Exception as exc:
         logger.exception("Validation failed for school %s: %s", school_id, exc)
-        await _persist_validation_failure(db, school_id, country_code, exc)
+        await persistence._persist_validation_failure(db, school_id, country_code, exc)
         return {
             "school_id": school_id,
             "status": "validation_failed",
