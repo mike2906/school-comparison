@@ -10,7 +10,9 @@ reports two rates:
 
 A row matches a reference fee when the category agrees, the amount agrees within 1 %
 (BGN at the fixed 1.95583 to the euro), and the period agrees or the row has none (those
-are counted separately: a fee shown without its period can still mislead). Read-only.
+are counted separately: a fee shown without its period can still mislead). Schools the
+reviewer could not read (``"unreachable": true``) are left out of the rates and listed.
+Read-only.
 
 Run from ``backend/`` against the launch DB::
 
@@ -95,9 +97,13 @@ async def main(reference_path: Path) -> None:
     totals = {"published": 0, "published_wrong": 0, "matched": 0, "matched_withheld": 0, "no_period": 0}
     fees_total = fees_published = 0
     lines = []
+    skipped = []
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://report") as client:
         for school in reference["schools"]:
             school_id = school["school_id"]
+            if school.get("unreachable"):
+                skipped.append(school_id)
+                continue
             fees = school.get("prices") or []
             async with async_session_maker() as db:
                 stored = [
@@ -111,8 +117,11 @@ async def main(reference_path: Path) -> None:
                     ).scalars()
                 ]
             response = await client.get(f"/schools/{school_id}")
-            response.raise_for_status()
-            published_ids = {row["id"] for row in response.json().get("pricing") or []}
+            if response.status_code == 404:  # not listed at all: nothing of it is published
+                published_ids = set()
+            else:
+                response.raise_for_status()
+                published_ids = {row["id"] for row in response.json().get("pricing") or []}
 
             wrong = []
             for row in stored:
@@ -145,7 +154,7 @@ async def main(reference_path: Path) -> None:
 
     print("\n".join(lines))
     print()
-    print(f"schools: {len(reference['schools'])}")
+    print(f"schools: {len(reference['schools']) - len(skipped)} compared, unreadable and left out: {skipped}")
     print(f"published and wrong: {rate(totals['published_wrong'], totals['published'])} of published rows")
     print(f"correct but withheld: {rate(totals['matched_withheld'], totals['matched'])} of rows matching the site")
     print(f"published without a period the site states: {totals['no_period']}")
