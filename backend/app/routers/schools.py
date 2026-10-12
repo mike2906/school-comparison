@@ -20,6 +20,7 @@ from app.schemas.school import (
     SchoolDetailResponse,
     SchoolListResponse,
 )
+from app.scrapers.shared_site_check import level_family
 from app.services.country_service import get_valid_keys
 from app.services.school_relations import continued_from, continues_to, same_place_by_school
 from app.services.school_service import SchoolService
@@ -111,10 +112,39 @@ async def _build_list_body(db: AsyncSession, **filters) -> bytes:
         # Optional grouping: the list still works without it.
         logger.warning("same_place failed for the list", exc_info=True)
         same_place = {}
+    if _school_side_preschool(filters):
+        # A school's preschool groups are often registered under its own kindergarten
+        # next door (Д-р Петър Берон, Светлина): to a parent that is the school's preschool.
+        kindergartens = await SchoolService(db).list_schools_filtered(**{**filters, "education_level": "kindergarten"})
+        # The pin the school shares must be the one with the preschool groups, not
+        # another branch of the kindergarten.
+        schools = list(schools) + [
+            kindergarten for kindergarten in kindergartens
+            if any(
+                level_family(other["education_level"]) == "school"
+                and other["location_id"] in _preschool_location_ids(kindergarten)
+                for other in same_place.get(kindergarten.id, [])
+            )
+        ]
     for school in schools:
         school.same_place = same_place.get(school.id, [])
     # Seconds of CPU: run it in a thread so other requests are still answered meanwhile.
     return await asyncio.to_thread(_serialize_list, schools)
+
+
+def _preschool_location_ids(school) -> set[int]:
+    return {
+        location.id for location in school.locations
+        if any(row.age_group == "preschool" for row in location.age_group_shifts)
+    }
+
+
+def _school_side_preschool(filters) -> bool:
+    return (
+        filters.get("age_group") == "preschool"
+        and filters.get("education_level") == "primary"
+        and not filters.get("include_crossover")
+    )
 
 
 def _list_key(country_code, city, age_group, school_type, education_level, include_crossover) -> tuple:
