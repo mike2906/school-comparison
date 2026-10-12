@@ -3,7 +3,7 @@ import { MapContainer, TileLayer, CircleMarker, Tooltip } from 'react-leaflet'
 import { useTranslation } from 'react-i18next'
 import 'leaflet/dist/leaflet.css'
 import { getAddress } from '../../utils/i18n'
-import { parseCoordinate } from './helpers'
+import { parseCoordinate } from '../../utils/coordinates'
 
 // Same CARTO tiles and key handling as the search map (see Map/SchoolMap.jsx).
 const CARTO_API_KEY = import.meta.env.VITE_CARTO_API_KEY
