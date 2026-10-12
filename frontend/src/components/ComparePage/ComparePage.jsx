@@ -332,9 +332,9 @@ function ComparePage() {
       const distance = userLocation && primaryLocation?.lat && primaryLocation?.lng
         ? calculateDistance(userLocation.lat, userLocation.lng, primaryLocation.lat, primaryLocation.lng)
         : null
-      const pricingRange = statedTuition(school.pricing)
+      const pricingRange = statedTuition(school.pricing, { ageGroup: selectedAgeGroup })
       // State schools charge no tuition, so they sort as the cheapest, matching "Безплатно".
-      const priceSort = tuitionSortValue(school.pricing) ?? (school.school_type === 'state' ? 0 : null)
+      const priceSort = tuitionSortValue(school.pricing, { ageGroup: selectedAgeGroup }) ?? (school.school_type === 'state' ? 0 : null)
       const nvoDetail = nvoNotApplicable(school) ? null : getNvoDetail(school, t, nvoExamType)
       const overallLatest = nvoDetail?.latestCombined ?? null
       const overallAvg = nvoDetail?.schoolAverageCombined ?? null
@@ -350,7 +350,7 @@ function ComparePage() {
       })
     })
     return map
-  }, [localizedSchools, t, userLocation, nvoExamType])
+  }, [localizedSchools, t, userLocation, nvoExamType, selectedAgeGroup])
 
   const sortedSchools = useMemo(() => {
     const list = [...localizedSchools]

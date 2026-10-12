@@ -474,3 +474,57 @@ test('price sort falls back to this year when next year\'s fee has no monthly fi
   const pricing = [thisYear({ period: 'monthly', amount: 700 }), nextYear({ period: 'semester' })]
   assert.equal(tuitionSortValue(pricing, { today: OCTOBER }), 700)
 })
+
+test('statedTuition: tuition paid "на 1 вноска" is the yearly fee, by stage name (610, 630)', () => {
+  const today = new Date('2026-06-01')
+  const otkrivatel = [
+    current({ id: 1, age_group: 'Подготвителен клас', plan_name: 'Подготвителен клас / ПУК 1 / Плащане на 1 вноска', amount: 7400, period: null }),
+    current({ id: 2, age_group: 'Начален и Прогимназиален етап', plan_name: 'Начален и Прогимназиален етап / ПЪК 2 – 1 – 7. клас / Плащане на 1 вноска', amount: 7650, period: null }),
+    current({ id: 3, age_group: 'Гимназия', plan_name: 'Гимназия / 8 – 10. клас / Плащане на 1 вноска', amount: 7400, period: null }),
+    current({ id: 4, age_group: '11 – 12. клас', plan_name: 'Дипломна програма / 11 – 12. клас / Плащане на 1 вноска', amount: 7800, period: null }),
+  ]
+  const headline = (rows, ageGroup) => {
+    const stated = statedTuition(rows, { ageGroup, today })
+    return stated && [stated.min, stated.max, stated.period]
+  }
+  assert.deepEqual(headline(otkrivatel, null), [7400, 7800, 'yearly'])
+  assert.deepEqual(headline(otkrivatel, 'grade_1_4'), [7650, 7650, 'yearly'])
+  assert.deepEqual(headline(otkrivatel, 'preschool'), [7400, 7400, 'yearly'])
+  assert.deepEqual(groupRowsByAgeGroup(otkrivatel, tEn).map(band => band.label), ['Preschool', 'Grades 1–7', 'Grades 8–10', 'Grades 11–12'])
+
+  const raynov = [
+    row({ id: 1, plan_name: 'Предучилищен и от 1-ви до 7-ми клас', amount: 6150 }),
+    row({ id: 2, plan_name: 'Гимназия', amount: 6640 }),
+  ]
+  assert.deepEqual(headline(raynov, 'grade_1_4'), [6150, 6150, 'yearly'])
+  assert.deepEqual(headline(raynov, 'grade_8_12'), [6640, 6640, 'yearly'])
+})
+
+test('priceAgeGroupLabel: grades inside a whole-sentence age group (595)', () => {
+  const price = {
+    age_group: 'Годишна такса за 8. клас за учебната 2026/2027 год',
+    plan_name: 'Годишна такса за 8. клас за учебната 2026/2027 година',
+  }
+  assert.equal(priceAgeGroupLabel(price, tEn), 'Grade 8')
+})
+
+test('isInstallmentPlan: the whole fee paid in one payment is not an instalment', () => {
+  for (const name of ['Плащане на 1 вноска', 'Годишна такса / Плащане на една вноска', 'Payment in one instalment']) {
+    assert.equal(isInstallmentPlan({ plan_name: name }), false, name)
+  }
+  // A numbered first instalment is still one instalment.
+  for (const name of ['Такса 1 вноска до 15.09', 'Цена 1 вноска до 15.09', 'Размер на 1 вноска', 'на 1 вноска от 10', 'Плащане на 2 вноски: 1 вноска до 15 септември', '10 вноски, 1 вноска = 500']) {
+    assert.equal(isInstallmentPlan({ plan_name: name }), true, name)
+  }
+})
+
+test('statedTuition: a ПГУ (preschool group at school) fee is not a grades 1–4 price (569)', () => {
+  const rows = [
+    row({ id: 1, plan_name: 'ПГУ от 15. 09.2026 г. до 31.05.2027 г. / Годишна такса обучение **', amount: 5900, period: null }),
+    row({ id: 2, plan_name: 'ПГУ от 15.09.2026г. до 14.09.2027 г. / Годишна такса обучение **', amount: 8000, period: null }),
+    row({ id: 3, age_group: '1-4 клас от 15.09.2026 г. до 31.05.2027 г.', plan_name: '1-4 клас от 15.09.2026 г. до 31.05.2027 г. / Годишна такса обучение **', amount: 5900, period: null }),
+  ]
+  const stated = statedTuition(rows, { ageGroup: 'grade_1_4', today: new Date('2026-06-01') })
+  assert.deepEqual([stated.min, stated.max, stated.period], [5900, 5900, 'yearly'])
+  assert.equal(statedTuition(rows, { ageGroup: 'preschool', today: new Date('2026-06-01') }).max, 8000)
+})
