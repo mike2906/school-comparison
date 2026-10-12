@@ -70,3 +70,7 @@ test('findRawKeys ignores domains and e-mail addresses', () => {
 test('euroAmounts reads the non-breaking spaces Intl uses in bg-BG', () => {
   assert.deepEqual(euroAmounts(new Intl.NumberFormat('bg-BG', { style: 'currency', currency: 'EUR' }).format(12345.5)), [12345.5])
 })
+
+test('findWrongLanguage skips text the page marks as the other language', () => {
+  assert.deepEqual(findWrongLanguage(['Такси'], 'en', index.foreignStrings, new Set(['Такси'])), [])
+})

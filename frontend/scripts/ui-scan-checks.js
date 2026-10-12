@@ -112,19 +112,24 @@ export function findMissingPrice(texts, schoolPayload) {
   return [{ check: 'price-not-shown', text: `${rows.length} pricing row(s) in the API response, no euro amount on the page` }]
 }
 
-/** A UI label that only the other language uses, e.g. "Такса" on an English page. */
-export function findWrongLanguage(texts, lang, foreignStrings) {
+/**
+ * A UI label that only the other language uses, e.g. "Такса" on an English page. Text the
+ * page marks with another `lang` (a school's own Bulgarian tags) is shown that way on purpose.
+ */
+export function findWrongLanguage(texts, lang, foreignStrings, otherLanguageTexts = new Set()) {
   const foreign = foreignStrings[lang] || new Set()
-  return texts.filter(text => foreign.has(text.trim())).map(text => ({ check: 'wrong-language', text }))
+  return texts
+    .filter(text => foreign.has(text.trim()) && !otherLanguageTexts.has(text))
+    .map(text => ({ check: 'wrong-language', text }))
 }
 
-export function textFindings(texts, { lang, index, schoolPayload }) {
+export function textFindings(texts, { lang, index, schoolPayload, otherLanguageTexts }) {
   return [
     ...findRawKeys(texts, index.namespaces),
     ...findJunk(texts),
     ...findLev(texts),
     ...findImplausiblePrices(texts),
-    ...findWrongLanguage(texts, lang, index.foreignStrings),
+    ...findWrongLanguage(texts, lang, index.foreignStrings, otherLanguageTexts),
     ...(schoolPayload ? findMissingPrice(texts, schoolPayload) : []),
   ]
 }

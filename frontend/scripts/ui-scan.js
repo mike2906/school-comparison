@@ -37,8 +37,8 @@ async function pageList() {
   const schools = (await fetchJson(`${API}/schools?country_code=bg&city=all`)).slice(0, LIMIT)
   const paths = [{ path: '/search' }, { path: '/about' }]
   for (const school of schools) paths.push({ path: `/schools/${school.id}`, schoolId: school.id })
-  // Private schools three at a time: the compare page is where fees sit side by side.
-  const privateIds = schools.filter(school => school.school_type === 'private').map(school => school.id)
+  // Private and international schools three at a time: the compare page is where fees sit side by side.
+  const privateIds = schools.filter(school => ['private', 'international'].includes(school.school_type)).map(school => school.id)
   for (let i = 0; i < privateIds.length; i += 3) paths.push({ path: `/compare?ids=${privateIds.slice(i, i + 3).join(',')}` })
   return Object.keys(LANGUAGE_PREFIX).flatMap(lang =>
     paths.map(page => ({ ...page, lang, url: `${SITE}${LANGUAGE_PREFIX[lang]}${page.path}` })),
@@ -54,6 +54,9 @@ function inspectPage() {
   const SKIP = 'script, style, noscript, svg, .leaflet-container'
   const viewport = document.documentElement.clientWidth
   const texts = []
+  // Text the page marks as another language on purpose (TagList's "In Bulgarian" tags).
+  const otherLanguageTexts = []
+  const pageLang = document.documentElement.lang
   const overflow = []
 
   const describe = el => {
@@ -93,6 +96,8 @@ function inspectPage() {
     const parent = node.parentElement
     if (!text || !parent || parent.closest(SKIP) || !visible(parent)) continue
     texts.push(text)
+    const marked = parent.closest('[lang]')
+    if (marked && marked !== document.documentElement && marked.lang !== pageLang) otherLanguageTexts.push(text)
 
     const range = document.createRange()
     range.selectNodeContents(node)
@@ -113,7 +118,7 @@ function inspectPage() {
       if (value) texts.push(value)
     }
   }
-  return { texts, overflow, pageWidth: document.documentElement.scrollWidth, viewport }
+  return { texts, otherLanguageTexts, overflow, pageWidth: document.documentElement.scrollWidth, viewport }
 }
 
 /** One line per host and reason: a map that fails to load is one finding, not forty. */
@@ -168,7 +173,9 @@ async function scanPage(context, page, index) {
 
   const result = await tab.evaluate(inspectPage)
   collapseRequestFailures(findings)
-  findings.push(...textFindings([...new Set(result.texts)], { lang: page.lang, index, schoolPayload }))
+  findings.push(...textFindings([...new Set(result.texts)], {
+    lang: page.lang, index, schoolPayload, otherLanguageTexts: new Set(result.otherLanguageTexts),
+  }))
   for (const item of result.overflow) {
     findings.push({ check: 'text-overflow', text: `${item.text} (${item.by}px past ${item.where})` })
   }
