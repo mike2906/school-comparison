@@ -15,11 +15,12 @@ from app.models.scrape_log import ScrapeType
 from app.models.source_page import SourcePage
 from app.schemas.validation import SpotCheckDiscrepancy, SpotCheckOutput
 from app.scrapers import validator as validator_module
+from app.scrapers.validation import field_checks
 from app.utils.website_data import prepare_validation_rollover, website_data_is_publishable
 
 
 def test_normalize_summary_source_clears_narrative_fields_without_source_text():
-    normalized = validator_module._normalize_summary_source(
+    normalized = field_checks._normalize_summary_source(
         {
             "positioning": "Licensed private school for preschool through grade 7.",
             "teaching_approach": ["project-based learning"],
@@ -51,7 +52,7 @@ def test_normalize_summary_source_clears_narrative_fields_without_source_text():
     ],
 )
 def test_class_size_evidence_rejects_grade_and_news_counts(source_text):
-    assert validator_module._source_mentions_class_size(source_text, "9 students") is False
+    assert field_checks._source_mentions_class_size(source_text, "9 students") is False
 
 
 @pytest.mark.parametrize(
@@ -64,7 +65,7 @@ def test_class_size_evidence_rejects_grade_and_news_counts(source_text):
     ],
 )
 def test_class_size_evidence_requires_size_relationship(source_text, class_size):
-    assert validator_module._source_mentions_class_size(source_text, class_size) is True
+    assert field_checks._source_mentions_class_size(source_text, class_size) is True
 
 
 @pytest.mark.parametrize(
@@ -82,7 +83,7 @@ def test_class_size_evidence_requires_size_relationship(source_text, class_size)
 )
 def test_admission_semantics_reject_pilot_garbage(field_name, value):
     assert (
-        validator_module._admission_value_is_semantically_valid(
+        field_checks._admission_value_is_semantically_valid(
             field_name,
             value,
             today=datetime.date(2026, 7, 14),
@@ -101,7 +102,7 @@ def test_admission_semantics_reject_pilot_garbage(field_name, value):
     ],
 )
 def test_admission_semantics_keeps_complete_current_facts(field_name, value):
-    assert validator_module._admission_value_is_semantically_valid(
+    assert field_checks._admission_value_is_semantically_valid(
         field_name,
         value,
         today=datetime.date(2026, 7, 14),
@@ -389,7 +390,7 @@ async def test_validation_rollover_explicit_failure_withholds_and_retains_curren
     db_session.add(school)
     await db_session.commit()
     monkeypatch.setattr(
-        validator_module,
+        field_checks,
         "_normalize_extracted_languages",
         lambda _value: (_ for _ in ()).throw(RuntimeError("deterministic validation crashed")),
     )
@@ -543,7 +544,7 @@ async def test_validate_school_data_rolls_back_all_changes_on_error(db_session, 
     school_id = school.id
 
     monkeypatch.setattr(
-        validator_module,
+        field_checks,
         "_normalize_extracted_languages",
         lambda _value: (_ for _ in ()).throw(RuntimeError("boom")),
     )

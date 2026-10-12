@@ -73,7 +73,7 @@ use `pip install` or `requirements.txt`.
 │   │   ├── schemas/      # Pydantic request/response models
 │   │   ├── routers/      # FastAPI routes (schools.py, compare.py, countries.py)
 │   │   ├── services/     # Business logic (incl. geocoding/)
-│   │   ├── scrapers/     # Scraping pipeline + CLI (cli.py; stage runners in stages/, repairs in repairs/)
+│   │   ├── scrapers/     # Scraping pipeline + CLI (cli.py; stage runners in stages/, repairs in repairs/, validation sections in validation/)
 │   │   ├── utils/        # Incl. publish-boundary gates (display_gating.py, website_data.py)
 │   │   ├── config.py     # Settings (get_settings() factory)
 │   │   ├── database.py   # DB engine, session
@@ -178,7 +178,7 @@ you hit a real problem.
 - Treat existing implementation work as sunk cost when a simpler design is available.
 - Prefer what libraries already do (Leaflet distance, not a custom haversine) and simple
   retries (1-2-3, not backoff with jitter). No caching/queues before a real performance problem.
-- Large files (`app/scrapers/extractor.py`, `validator.py` are 1,700–2,400 lines): locate
+- Large files (`app/scrapers/extractor.py` is ~2,400 lines): locate
   code with `grep -n` and read only the needed line ranges.
 - **Don't grow the giant files.** New functions do not go into `app/scrapers/cli.py`,
   `app/scrapers/extractor.py`, `app/scrapers/validator.py` or
