@@ -1,6 +1,18 @@
-import { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
+import {
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+} from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link, useSearchParams, useNavigate, useNavigationType, useLocation } from 'react-router-dom'
+import {
+  Link,
+  useSearchParams,
+  useNavigate,
+  useNavigationType,
+  useLocation,
+} from 'react-router-dom'
 import debounce from 'lodash.debounce'
 import { useStableCallback } from '../../hooks/useStableCallback'
 import Layout from '../Layout/Layout'
@@ -12,6 +24,8 @@ import SchoolDetailPanel from './SchoolDetailPanel'
 import AgePicker from './AgePicker'
 import SchoolNameSearch from './SchoolNameSearch'
 import LocationControl from './LocationControl'
+import { ActiveFilterChips, AdvancedFilters } from './AdvancedFilters'
+import { useAdvancedFilterOptions } from './advancedFilterOptions'
 import { useSchools } from '../../hooks/useSchools'
 import { calculateDistance } from '../../utils/distance'
 import { geocodeAddress, reverseGeocode, cancelGeocode } from '../../utils/geocoding'
@@ -22,12 +36,11 @@ import { useCountry } from '../../context/CountryContext'
 import { fetchAvailableFilters, fetchExamAverages } from '../../api/schools'
 import { getAgeGroupKeys, getExclusiveAgeGroups } from '../../utils/countryConfig'
 import { AGE_GROUP_KEYS } from '../../utils/education'
-import { getLanguageFocusPairs } from '../../utils/schoolAttributes'
 import { matchesAdvancedFilters, matchesSchoolType } from '../../utils/advancedFilters'
 import { examGradeLabel, getNvoDetail, rankingExamType } from '../../utils/nvo'
 import { isSchoolInBounds } from '../../utils/mapFit'
 import { LIST_PAGE_SIZE, windowForIndex, scrollTopToCenter } from '../../utils/listWindow'
-import { canonicalLanguagePair, languageKey, languageLabel } from '../../utils/languages'
+import { canonicalLanguagePair, languageKey } from '../../utils/languages'
 
 const uniqueCanonical = (values, canonical) => (
   [...new Set((values || []).map(canonical).filter(Boolean))]
@@ -65,13 +78,6 @@ const TYPE_SORT_ORDER = {
 const EMPTY_LIST = []
 // Bulgaria, until the country config has loaded.
 const FALLBACK_KINDERGARTEN_ONLY_GROUPS = ['nursery', 'first', 'second', 'third']
-
-const DEFAULT_ADVANCED_OPTIONS = {
-  language_focus_levels: ['immersion', 'bilingual', 'enrichment'],
-  special_programs: ['music_program', 'sports_program', 'arts_program', 'extended_day', 'meals_provided'],
-  facilities: ['sports_facilities', 'cafeteria', 'library', 'computer_lab', 'transportation'],
-  teaching_approach: ['montessori', 'waldorf', 'ib_program', 'project_based'],
-}
 
 function SearchPage() {
   const { t, i18n } = useTranslation()
@@ -1330,432 +1336,21 @@ function SearchPage() {
     </div>
   )
 
-  const formatAdvancedLabel = (key) => t(`advancedFilters.options.${key}`, { defaultValue: key.replace(/_/g, ' ') })
-  const formatLanguageLabel = (key) => languageLabel(key, t)
-  const formatLanguageLevelLabel = (key) => t(`advancedFilters.levels.${key}`, { defaultValue: key.replace(/_/g, ' ') })
-
-  const advancedCounts = useMemo(() => {
-    const IGNORE_KEY = {
-      language_focus: 'languageFocus',
-      special_programs: 'specialPrograms',
-      facilities: 'facilities',
-      teaching_approach: 'teachingApproach',
-    }
-    const matchesSelected = (school, groupToIgnore) => (
-      matchesAdvancedFilters(school, filters, IGNORE_KEY[groupToIgnore])
-    )
-
-    const counts = {
-      language_focus_pairs: {},
-      special_programs: {},
-      facilities: {},
-      teaching_approach: {},
-    }
-
-    const languageOptions = Array.from(new Set([
-      ...(availableFilters.language_focus_pairs || []),
-    ]))
-
-    languageOptions.forEach(option => {
-      counts.language_focus_pairs[option] = baseSchools.filter(school => {
-        if (!matchesSelected(school, 'language_focus')) return false
-        return getLanguageFocusPairs(school).has(option)
-      }).length
-    })
-
-    Object.keys(counts)
-      .filter(key => key !== 'language_focus_pairs')
-      .forEach(groupKey => {
-        const options = Array.from(new Set([
-          ...(DEFAULT_ADVANCED_OPTIONS[groupKey] || []),
-          ...(availableFilters[groupKey] || []),
-        ]))
-
-        options.forEach(option => {
-          counts[groupKey][option] = baseSchools.filter(school => {
-            if (!matchesSelected(school, groupKey)) return false
-            const values = school.attributes?.filter_tags?.[groupKey] || []
-            return values.includes(option)
-          }).length
-        })
-      })
-
-    return counts
-  }, [baseSchools, availableFilters, filters])
-
-  // Scans every school, so compute once per data change rather than on every render
-  const languageFilterOptions = useMemo(() => {
-    const derivedLanguages = new Set()
-    const derivedLevels = new Set()
-    const derivedPairs = new Set()
-
-    baseSchools.forEach(school => {
-      getLanguageFocusPairs(school).forEach(pair => {
-        derivedPairs.add(pair)
-        if (pair.includes(':')) {
-          const [language, level] = pair.split(':')
-          if (language) derivedLanguages.add(language)
-          if (level) derivedLevels.add(level)
-        }
-      })
-    })
-
-    const languages = Array.from(new Set([
-      ...(availableFilters.language_focus_languages || []),
-      ...derivedLanguages,
-    ]))
-
-    const levels = Array.from(new Set([
-      ...(DEFAULT_ADVANCED_OPTIONS.language_focus_levels || []),
-      ...(availableFilters.language_focus_levels || []),
-      ...derivedLevels,
-    ]))
-
-    const pairs = [
-      ...(availableFilters.language_focus_pairs || []),
-      ...derivedPairs,
-    ]
-    const byLanguage = new Map()
-
-    pairs.forEach(pair => {
-      const [language, level] = pair.split(':')
-      if (!language || !level) return
-      if (!byLanguage.has(language)) {
-        byLanguage.set(language, new Set())
-      }
-      byLanguage.get(language).add(level)
-    })
-
-    languages.forEach(language => {
-      const existingLevels = byLanguage.get(language) || new Set()
-      const combined = new Set([...levels, ...existingLevels])
-      byLanguage.set(language, combined)
-    })
-
-    return { languages, levels, byLanguage }
-  }, [baseSchools, availableFilters])
-
-  const renderAdvancedFilters = () => {
-    const buildOptions = (key) => {
-      const serverOptions = availableFilters[key] || []
-      const defaults = DEFAULT_ADVANCED_OPTIONS[key] || []
-      return Array.from(new Set([...defaults, ...serverOptions]))
-    }
-
-    const renderLanguageFocusGroup = () => {
-      const { languages, levels, byLanguage } = languageFilterOptions
-      if (languages.length === 0) return null
-
-      return (
-        <details className="rounded-lg border border-neutral-200 bg-white px-3 py-2">
-          <summary className="cursor-pointer text-sm font-medium text-neutral-700 flex items-center justify-between">
-            <span className="flex items-center gap-2">
-              <svg className="w-4 h-4 text-neutral-500" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.7a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" />
-              </svg>
-              {t('advancedFilters.languageFocus')}
-            </span>
-            {filters.languageFocus.length > 0 && (
-              <span className="text-xs text-primary-700 bg-primary-50 px-2 py-0.5 rounded-full">
-                {filters.languageFocus.length}
-              </span>
-            )}
-          </summary>
-          <div className="space-y-3 mt-3">
-            {languages.map(language => {
-              const availableLevels = Array.from(byLanguage.get(language) || new Set(levels))
-              const selectedForLanguage = filters.languageFocus.filter(value => value.startsWith(`${language}:`))
-              const allLevelKeys = availableLevels.map(level => `${language}:${level}`)
-              const isLanguageChecked = selectedForLanguage.length === allLevelKeys.length && allLevelKeys.length > 0
-              const languageCount = allLevelKeys.reduce((sum, key) => {
-                return sum + (advancedCounts.language_focus_pairs?.[key] ?? 0)
-              }, 0)
-              // Languages no listed school offers are noise; keep one if it is selected.
-              if (languageCount === 0 && selectedForLanguage.length === 0) return null
-
-              return (
-                <details key={language} className="rounded-md border border-neutral-200 bg-neutral-50 px-3 py-2">
-                  <summary className="cursor-pointer text-sm font-medium text-neutral-700 flex items-center justify-between">
-                    <span className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={isLanguageChecked}
-                        onChange={(event) => {
-                          const next = isLanguageChecked
-                            ? filters.languageFocus.filter(value => !value.startsWith(`${language}:`))
-                            : Array.from(new Set([...filters.languageFocus, ...allLevelKeys]))
-                          handleFilterChange({ languageFocus: next })
-                          const details = event.currentTarget.closest('details')
-                          if (details) details.open = true
-                        }}
-                        className="text-primary-600 focus:ring-primary-500"
-                      />
-                      {formatLanguageLabel(language)}
-                    </span>
-                    <span className="flex items-center gap-2">
-                      <span className="text-xs text-neutral-400">({languageCount})</span>
-                      {selectedForLanguage.length > 0 && (
-                        <span className="text-xs text-primary-700 bg-white px-2 py-0.5 rounded-full border border-primary-200">
-                          {selectedForLanguage.length}
-                        </span>
-                      )}
-                    </span>
-                  </summary>
-                  <div className="space-y-2 mt-3">
-                    {availableLevels.map(level => {
-                      const option = `${language}:${level}`
-                      const isChecked = filters.languageFocus.includes(option)
-                      const count = advancedCounts.language_focus_pairs?.[option] ?? 0
-                      const isDisabled = count === 0 && !isChecked
-                      return (
-                        <label
-                          key={option}
-                          className={`flex items-center gap-2 text-sm ${
-                            isDisabled ? 'text-neutral-400' : 'text-neutral-600'
-                          }`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            disabled={isDisabled}
-                            onChange={() => {
-                              if (isDisabled) return
-                              const next = isChecked
-                                ? filters.languageFocus.filter(value => value !== option)
-                                : [...filters.languageFocus, option]
-                              handleFilterChange({ languageFocus: next })
-                            }}
-                            className="text-primary-600 focus:ring-primary-500 disabled:cursor-not-allowed"
-                          />
-                          <span className="flex-1">{formatLanguageLevelLabel(level)}</span>
-                          <span className="text-xs text-neutral-400">({count})</span>
-                        </label>
-                      )
-                    })}
-                  </div>
-                </details>
-              )
-            })}
-          </div>
-        </details>
-      )
-    }
-
-    const renderGroup = (groupKey, titleKey, selectedValues) => {
-      const options = buildOptions(groupKey)
-      if (options.length === 0) return null
-
-      const selectedCount = selectedValues.length
-
-      return (
-        <details className="rounded-lg border border-neutral-200 bg-white px-3 py-2">
-          <summary className="cursor-pointer text-sm font-medium text-neutral-700 flex items-center justify-between">
-            <span className="flex items-center gap-2">
-              <svg className="w-4 h-4 text-neutral-500" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.7a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" />
-              </svg>
-              {t(titleKey)}
-            </span>
-            {selectedCount > 0 && (
-              <span className="text-xs text-primary-700 bg-primary-50 px-2 py-0.5 rounded-full">
-                {selectedCount}
-              </span>
-            )}
-          </summary>
-          <div className="space-y-2 mt-3">
-            {options.map(option => {
-              const isChecked = selectedValues.includes(option)
-              const count = advancedCounts[groupKey]?.[option] ?? 0
-              const isDisabled = count === 0 && !isChecked
-              return (
-                <label
-                  key={option}
-                  className={`flex items-center gap-2 text-sm ${
-                    isDisabled ? 'text-neutral-400' : 'text-neutral-600'
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={isChecked}
-                    disabled={isDisabled}
-                    onChange={() => {
-                      if (isDisabled) return
-                      const next = isChecked
-                        ? selectedValues.filter(value => value !== option)
-                        : [...selectedValues, option]
-                      const update = {
-                        [groupKey === 'language_focus' ? 'languageFocus'
-                          : groupKey === 'special_programs' ? 'specialPrograms'
-                          : groupKey === 'facilities' ? 'facilities'
-                          : 'teachingApproach']: next,
-                      }
-                      handleFilterChange(update)
-                    }}
-                    className="text-primary-600 focus:ring-primary-500 disabled:cursor-not-allowed"
-                  />
-                  <span className="flex-1">{formatAdvancedLabel(option)}</span>
-                  <span className="text-xs text-neutral-400">({count})</span>
-                </label>
-              )
-            })}
-          </div>
-        </details>
-      )
-    }
-
-    return (
-      <details open className="rounded-xl border border-neutral-200 bg-white p-4">
-        <summary className="cursor-pointer text-sm font-semibold text-neutral-800">
-          {t('advancedFilters.title')}
-        </summary>
-        <div className="mt-4 space-y-4">
-          {renderLanguageFocusGroup()}
-          {renderGroup('special_programs', 'advancedFilters.specialPrograms', filters.specialPrograms)}
-          {renderGroup('facilities', 'advancedFilters.facilities', filters.facilities)}
-          {renderGroup('teaching_approach', 'advancedFilters.teachingApproach', filters.teachingApproach)}
-          <div>
-            <button
-              type="button"
-              onClick={() => handleFilterChange({
-                languageFocus: [],
-                specialPrograms: [],
-                facilities: [],
-                teachingApproach: [],
-              })}
-              className="text-sm text-neutral-600 hover:text-neutral-800 hover:underline"
-            >
-              {t('advancedFilters.clear')}
-            </button>
-          </div>
-        </div>
-      </details>
-    )
-  }
-
-  // Chips for the selected advanced filters (age and school type have their own controls).
-  const renderActiveFilters = () => {
-    const advancedFilters = []
-    const advancedByLanguage = new Map()
-
-    const addAdvancedChips = (values, groupKey) => {
-      values.forEach(value => {
-        if (groupKey === 'languageFocus') {
-          const [language, level] = value.split(':')
-          if (language && level) {
-            if (!advancedByLanguage.has(language)) {
-              advancedByLanguage.set(language, [])
-            }
-            advancedByLanguage.get(language).push(level)
-          } else if (language) {
-            if (!advancedByLanguage.has(language)) {
-              advancedByLanguage.set(language, [])
-            }
-          }
-        }
-        const label = groupKey === 'languageFocus'
-          ? (() => {
-              const [language, level] = value.split(':')
-              if (language && level) {
-                return `${formatLanguageLabel(language)} · ${formatLanguageLevelLabel(level)}`
-              }
-              return formatLanguageLabel(language || value)
-            })()
-          : formatAdvancedLabel(value)
-        advancedFilters.push({
-          key: `${groupKey}-${value}`,
-          label,
-          onRemove: () => {
-            const next = values.filter(item => item !== value)
-            if (groupKey === 'languageFocus') {
-              handleFilterChange({ languageFocus: next })
-            } else if (groupKey === 'specialPrograms') {
-              handleFilterChange({ specialPrograms: next })
-            } else if (groupKey === 'facilities') {
-              handleFilterChange({ facilities: next })
-            } else {
-              handleFilterChange({ teachingApproach: next })
-            }
-          },
-        })
-      })
-    }
-
-    addAdvancedChips(filters.languageFocus, 'languageFocus')
-    addAdvancedChips(filters.specialPrograms, 'specialPrograms')
-    addAdvancedChips(filters.facilities, 'facilities')
-    addAdvancedChips(filters.teachingApproach, 'teachingApproach')
-
-    if (advancedFilters.length === 0) return null
-    return (
-      <div className="flex items-center gap-3">
-        <span className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
-          {t('search.activeFilters')}
-        </span>
-        <div className="flex-1 overflow-x-auto">
-          <div className="flex items-center gap-2 min-w-max py-1">
-            {[...advancedByLanguage.entries()].map(([language, levels]) => (
-              <span
-                key={`lang-${language}`}
-                className="inline-flex items-center gap-2 bg-primary-700 text-white text-xs px-2.5 py-1 rounded-full"
-              >
-                <span>{formatLanguageLabel(language)}:</span>
-                <span className="flex items-center gap-1">
-                  {levels.map(level => (
-                    <span key={`${language}-${level}`} className="inline-flex items-center gap-1 bg-white/15 px-2 py-0.5 rounded-full">
-                      {formatLanguageLevelLabel(level)}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const option = `${language}:${level}`
-                          handleFilterChange({
-                            languageFocus: filters.languageFocus.filter(value => value !== option),
-                          })
-                        }}
-                        className="w-4 h-4 rounded-full flex items-center justify-center text-white hover:bg-white/20"
-                        aria-label={t('common.close')}
-                      >
-                        ×
-                      </button>
-                    </span>
-                  ))}
-                </span>
-              </span>
-            ))}
-            {advancedFilters.filter(filter => !filter.key.startsWith('languageFocus-')).map(filter => (
-              <span
-                key={filter.key}
-                className="inline-flex items-center gap-2 bg-primary-700 text-white text-xs px-2.5 py-1 rounded-full"
-              >
-                {filter.label}
-                <button
-                  type="button"
-                  onClick={filter.onRemove}
-                  className="w-6 h-6 -my-1 -mr-1 rounded-full flex items-center justify-center text-white hover:bg-primary-800 transition-colors"
-                  aria-label={t('common.close')}
-                >
-                  ×
-                </button>
-              </span>
-            ))}
-            {advancedFilters.length > 0 && (
-              <button
-                type="button"
-                onClick={() => handleFilterChange({
-                  languageFocus: [],
-                  specialPrograms: [],
-                  facilities: [],
-                  teachingApproach: [],
-                })}
-                className="text-xs text-neutral-500 hover:text-neutral-700 hover:underline whitespace-nowrap"
-              >
-                {t('advancedFilters.clear')}
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-    )
-  }
+  const { advancedCounts, languageFilterOptions } = useAdvancedFilterOptions({
+    baseSchools,
+    availableFilters,
+    filters,
+  })
+  const advancedFiltersPanel = (
+    <AdvancedFilters
+      filters={filters}
+      availableFilters={availableFilters}
+      advancedCounts={advancedCounts}
+      languageFilterOptions={languageFilterOptions}
+      onFilterChange={handleFilterChange}
+    />
+  )
+  const activeFilterChips = <ActiveFilterChips filters={filters} onFilterChange={handleFilterChange} />
 
   return (
     <Layout hideNavOnMobile hideFooter>
@@ -1846,7 +1441,7 @@ function SearchPage() {
           />
 
           <div className="flex-1">
-            {renderActiveFilters()}
+            {activeFilterChips}
           </div>
 
           <div className="flex items-center gap-2 bg-neutral-100 rounded-lg p-1">
@@ -1896,7 +1491,7 @@ function SearchPage() {
           <aside className={`hidden ${panelBesideMap ? '' : 'lg:block'} w-80 flex-shrink-0 border-r border-neutral-200 bg-white overflow-y-auto`}>
             <div className="p-5 space-y-6">
               {renderMapBoundsFilter()}
-              {renderAdvancedFilters()}
+              {advancedFiltersPanel}
             </div>
           </aside>
 
@@ -1946,7 +1541,7 @@ function SearchPage() {
                   </div>
                 </div>
                 <div className="lg:hidden">
-                  {renderActiveFilters()}
+                  {activeFilterChips}
                 </div>
                 <div className="flex items-center justify-between gap-2">
                   {renderSchoolTypeChips()}
@@ -2167,7 +1762,7 @@ function SearchPage() {
                 <div className="space-y-6">
                   {/* Map-area filter where the map is visible, or while it is on so it can be turned off. */}
                   {(mobileTab === 'map' || searchInBounds) && renderMapBoundsFilter()}
-                  {renderAdvancedFilters()}
+                  {advancedFiltersPanel}
                   <Link to="/about" className="inline-block text-sm text-primary-700 underline">
                     {t('nav.about')}
                   </Link>
