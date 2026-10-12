@@ -1,0 +1,8 @@
+== school 564: Re-extracted pricing held for review (kept published rows): drops TUITION 724.00, which the page still shows; drops TUITION 762.00, which the page still shows; drops TUITION 827.00, which the page still shows; loses the YEARLY period of TUITION 7580.00; Validation completed before commit (needs_review)
+    tuition 6640.00 EUR yearly 2026-2027 [8. - 10. клас] https://pitagor-school.eu/taksi/
+    tuition 6990.00 EUR yearly 2026-2027 [5. - 7. клас] https://pitagor-school.eu/taksi/
+    tuition 724.00 EUR monthly 2026-2027 [8. - 10. клас] https://pitagor-school.eu/taksi/
+    tuition 7580.00 EUR yearly 2026-2027 [PG - 4. клас] https://pitagor-school.eu/taksi/
+    tuition 762.00 EUR monthly 2026-2027 [5. - 7. клас] https://pitagor-school.eu/taksi/
+    tuition 827.00 EUR monthly 2026-2027 [PG - 4. клас] https://pitagor-school.eu/taksi/
+
