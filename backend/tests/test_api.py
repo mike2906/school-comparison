@@ -129,6 +129,19 @@ class TestSchoolsEndpoint:
         assert "field_sources" not in school
 
     @pytest.mark.asyncio
+    async def test_state_schools_are_taught_in_bulgarian(self, seeded_client):
+        """The responses carry the school type into the language projection (review F)."""
+        data = (await seeded_client.get("/schools")).json()
+        by_type = {school["school_type"]: school for school in data}
+        state = by_type["state"]["attributes_i18n"]
+        assert state["en"]["languages_of_instruction"] == ["Bulgarian"]
+        assert state["bg"]["languages_of_instruction"] == ["Bulgarian"]
+        detail = (await seeded_client.get(f"/schools/{by_type['state']['id']}")).json()
+        assert detail["attributes_i18n"]["en"]["languages_of_instruction"] == ["Bulgarian"]
+        private = by_type["private"]["attributes_i18n"]
+        assert "Bulgarian" not in private["en"]["languages_of_instruction"]
+
+    @pytest.mark.asyncio
     async def test_list_schools_reuses_cached_body_until_ttl(self, seeded_client, monkeypatch):
         """A repeat request is served from the cache."""
         from app.services.school_service import SchoolService

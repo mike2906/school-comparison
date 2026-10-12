@@ -171,6 +171,7 @@
     "academicPerformance": "Academic Performance",
     "languagesPrograms": "Languages & Programs",
     "languagesOfInstruction": "Languages of Instruction",
+    "languageFocus": "Language Focus",
     "teachingApproach": "Teaching Approach",
     "amenitiesFacilities": "Amenities & Facilities",
     "additionalFacilities": "Additional Facilities",
@@ -690,7 +691,15 @@
     "romanian": "Romanian",
     "hebrew": "Hebrew",
     "danish": "Danish",
-    "norwegian": "Norwegian"
+    "norwegian": "Norwegian",
+    "latin": "Latin",
+    "portuguese": "Portuguese",
+    "polish": "Polish",
+    "czech": "Czech",
+    "serbian": "Serbian",
+    "ukrainian": "Ukrainian",
+    "dutch": "Dutch",
+    "swedish": "Swedish"
   },
   "notFound": {
     "title": "Page not found",

@@ -237,7 +237,8 @@ class SchoolService:
             # Match against the same projection the API serves, not the raw JSONB:
             # facilities/programs/languages only exist nested inside `attributes.extracted`.
             attributes = build_filterable_attributes(
-                attributes_for_publication(school.attributes, school.scrape_status)
+                attributes_for_publication(school.attributes, school.scrape_status),
+                school.school_type,
             )
 
             if language_focus:
@@ -282,7 +283,7 @@ class SchoolService:
         city: Optional[str] = "sofia",
     ) -> dict[str, list[str]]:
         query = (
-            select(School.attributes, School.scrape_status)
+            select(School.attributes, School.scrape_status, School.school_type)
             .where(School.country_code == country_code)
             .where(self._has_listable_location(city))
         )
@@ -309,11 +310,11 @@ class SchoolService:
         # against, so emitted options can never diverge from what actually matches.
         # facilities/special_programs/teaching_approach are already mapped onto the
         # controlled vocabulary there (P1.9), so only canonical tags are surfaced.
-        for attrs, scrape_status in rows:
+        for attrs, scrape_status, school_type in rows:
             if not attrs:
                 continue
             filterable = build_filterable_attributes(
-                attributes_for_publication(attrs, scrape_status)
+                attributes_for_publication(attrs, scrape_status), school_type
             )
 
             for value in filterable.get("language_focus") or []:

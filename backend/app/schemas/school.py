@@ -142,7 +142,9 @@ class SchoolAttributesMixin(BaseModel):
     def display_projection(self) -> tuple[dict[str, Any], dict[str, dict[str, Any]]]:
         # Shared by `attributes` and `attributes_i18n`: the projection is the most
         # expensive part of serializing a school, so build it once per response object.
-        return build_display_attributes(self.public_attributes_input)
+        return build_display_attributes(
+            self.public_attributes_input, getattr(self, "school_type", None)
+        )
 
     @computed_field(return_type=SchoolDisplayAttributes)
     @property
