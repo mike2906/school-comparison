@@ -25,6 +25,7 @@ const LIMIT = Number(process.env.SCAN_LIMIT) || Infinity
 const CONCURRENCY = Number(process.env.SCAN_CONCURRENCY) || 4
 const OUT = path.resolve(process.env.SCAN_OUT || 'ui-scan-report')
 const VIEWPORT = { width: 390, height: 844 }
+const NETWORK_CHECKS = new Set(['request-failed', 'page-load', 'console-error'])
 const LANGUAGE_PREFIX = { bg: '', en: '/en' }
 
 async function fetchJson(url) {
@@ -228,7 +229,13 @@ async function main() {
   await Promise.all(Array.from({ length: CONCURRENCY }, async () => {
     while (next < pages.length) {
       const page = pages[next++]
-      const result = await scanPage(context, page, index)
+      let result = await scanPage(context, page, index)
+      // A deploy or a brief API hiccup fails every request for a few seconds; scan such a
+      // page once more before reporting it.
+      if (result.findings.some(finding => NETWORK_CHECKS.has(finding.check))) {
+        await new Promise(resolve => setTimeout(resolve, 10_000))
+        result = await scanPage(context, page, index)
+      }
       results.push(result)
       if (result.findings.length) {
         console.log(`${result.findings.length} finding(s): ${result.url}`)

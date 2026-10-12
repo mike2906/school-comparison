@@ -288,8 +288,8 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
                 role="img"
               />
             )}
-            <div className="flex-1">
-              <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-neutral-900 leading-tight">{schoolName}</h1>
+            <div className="flex-1 min-w-0">
+              <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-neutral-900 leading-tight break-words">{schoolName}</h1>
             </div>
           </div>
 

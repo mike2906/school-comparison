@@ -1,5 +1,5 @@
 import { canonicalLanguagePair } from './languages.js'
-import { humanizeTag } from './tags.js'
+import { humanizeTag, isTagKey } from './tags.js'
 /**
  * Resolves the locale-specific view of a school's display attributes.
  *
@@ -231,6 +231,13 @@ export function getOptionLabel(option, t) {
   const levelKey = `advancedFilters.levels.${option}`
   const level = t(levelKey, { nsSeparator: false })
   if (level !== levelKey) return level
+  // Scraped text that is a known option in other clothes ("Montessori", "Computer lab").
+  const normalized = String(option).trim().toLowerCase().replace(/[\s-]+/g, '_')
+  if (normalized !== option && isTagKey(normalized)) {
+    const normalizedKey = `advancedFilters.options.${normalized}`
+    const label = t(normalizedKey, { nsSeparator: false })
+    if (label !== normalizedKey) return label
+  }
   // Free text scraped from a website: tidy it, but never Title-Case a sentence.
   return humanizeTag(option)
 }

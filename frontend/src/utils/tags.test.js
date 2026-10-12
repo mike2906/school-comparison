@@ -24,6 +24,7 @@ test('humanizeTag reads keys and free text without Title-Casing sentences', () =
   assert.equal(humanizeTag('Excursions And Extracurricular Activities'), 'Excursions and extracurricular activities')
   assert.equal(humanizeTag('обновена материална база'), 'Обновена материална база')
   assert.equal(humanizeTag('  '), '')
+  assert.equal(humanizeTag('First_language_(language_a:_language_and_literature)_–_hl'), 'First language (language a: language and literature) – hl')
 })
 
 test('isCyrillicTag detects Bulgarian text', () => {

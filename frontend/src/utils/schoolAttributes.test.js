@@ -324,3 +324,13 @@ test('getOptionLabel translates language-focus levels', async () => {
   await i18n.init({ lng: 'bg', resources: { bg: { translation: { advancedFilters: { options: {}, levels: { immersion: 'Пълна програма' } } } } } })
   assert.equal(getOptionLabel('immersion', i18n.t.bind(i18n)), 'Пълна програма')
 })
+
+test('getOptionLabel translates scraped text that matches a known option', async () => {
+  const { default: i18next } = await import('i18next')
+  const i18n = i18next.createInstance()
+  await i18n.init({ lng: 'bg', resources: { bg: { translation: { advancedFilters: { options: { montessori: 'Монтесори', computer_lab: 'Компютърен кабинет' }, levels: {} } } } } })
+  const t = i18n.t.bind(i18n)
+  assert.equal(getOptionLabel('Montessori', t), 'Монтесори')
+  assert.equal(getOptionLabel('Computer lab', t), 'Компютърен кабинет')
+  assert.equal(getOptionLabel('Cambridge English', t), 'Cambridge English')
+})
