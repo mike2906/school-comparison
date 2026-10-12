@@ -28,41 +28,50 @@ from app.models.school import School
 from app.models.scrape_log import ScrapeType
 from app.models.source_page import SourcePage
 from app.scrapers.deterministic import run_deterministic_extraction
+from app.scrapers.extractor import _freshest_url_variants
+
+_WEBSITE_PAGE_FILTER = (
+    SourcePage.scrape_type == ScrapeType.WEBSITE,
+    SourcePage.is_valid.is_(True),
+    SourcePage.raw_markdown.isnot(None),
+)
 
 
 async def dump(out_path: Path, session_maker=async_session_maker) -> None:
     async with session_maker() as session:
         if session.bind.dialect.name == "postgresql":
             await session.execute(text("SET TRANSACTION READ ONLY"))
-        pages = (
+        school_ids = (
             await session.execute(
-                select(SourcePage)
-                .where(
-                    SourcePage.scrape_type == ScrapeType.WEBSITE,
-                    SourcePage.is_valid.is_(True),
-                    SourcePage.raw_markdown.isnot(None),
-                )
-                .order_by(SourcePage.school_id, SourcePage.id)
+                select(SourcePage.school_id)
+                .where(*_WEBSITE_PAGE_FILTER)
+                .distinct()
+                .order_by(SourcePage.school_id)
             )
-        ).scalars().all()
-        by_school: dict[int, list[SourcePage]] = {}
-        for page in pages:
-            by_school.setdefault(page.school_id, []).append(page)
-        schools = (
-            await session.execute(select(School).where(School.id.in_(by_school)).order_by(School.id))
         ).scalars().all()
         failed = 0
         with out_path.open("w", encoding="utf-8") as out:
-            for school in schools:
+            for school_id in school_ids:
+                school = await session.get(School, school_id)
+                pages = (
+                    await session.execute(
+                        select(SourcePage)
+                        .where(SourcePage.school_id == school_id, *_WEBSITE_PAGE_FILTER)
+                        .order_by(SourcePage.id)
+                    )
+                ).scalars().all()
+                # The same page selection extract_school makes before extracting.
+                pages = [p for p in _freshest_url_variants(pages) if (p.raw_markdown or "").strip()]
                 try:
-                    result = run_deterministic_extraction(school, by_school[school.id])
+                    result = run_deterministic_extraction(school, pages)
                 except Exception as exc:  # recorded, so a new crash shows up as a difference
                     failed += 1
                     result = {"error": f"{type(exc).__name__}: {exc}"}
-                line = {"school_id": school.id, "result": result}
+                line = {"school_id": school_id, "result": result}
                 out.write(json.dumps(line, ensure_ascii=False, sort_keys=True, default=str) + "\n")
+                session.expunge_all()
         await session.rollback()
-    print(f"{len(schools)} schools written to {out_path} ({failed} raised)")
+    print(f"{len(school_ids)} schools written to {out_path} ({failed} raised)")
 
 
 def _load(path: Path) -> dict[int, dict]:
@@ -89,6 +98,10 @@ def compare(before_path: Path, after_path: Path) -> int:
                 print(f"school {school_id} [{key}]")
                 print(f"  before: {json.dumps(old.get(key), ensure_ascii=False, sort_keys=True)}")
                 print(f"  after:  {json.dumps(new.get(key), ensure_ascii=False, sort_keys=True)}")
+    for name, rows in (("before", before), ("after", after)):
+        errors = sorted(school_id for school_id, result in rows.items() if "error" in result)
+        if errors:
+            print(f"{name}: extraction raised for schools {errors}")
     print(f"{changed} of {len(set(before) | set(after))} schools differ")
     return 1 if changed else 0
 
