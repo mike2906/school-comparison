@@ -97,3 +97,30 @@ test('rowsForAgeGroup: only the chosen group, plus rows naming none', () => {
   // No row names a group: nothing to choose by.
   assert.deepEqual(rowsForAgeGroup([general], 'third'), [general])
 })
+
+test('pricePeriod: tuition paid in one payment is yearly; other fees are not', () => {
+  assert.equal(pricePeriod({ category: 'tuition', plan_name: 'Гимназия / Плащане на 1 вноска', period: null }), 'yearly')
+  assert.equal(pricePeriod({ category: 'registration', plan_name: 'Плащане на 1 вноска', period: null }), null)
+  assert.equal(pricePeriod({ category: 'tuition', plan_name: 'Месечна такса / Плащане на една вноска', period: null }), 'monthly')
+})
+
+test('rowAgeGroupKeys: school stages and ordinal grades in a name', () => {
+  const keys = (age_group, plan_name) => [...rowAgeGroupKeys({ age_group, plan_name })].sort()
+  assert.deepEqual(keys(null, 'Гимназия'), ['grade_8_12'])
+  assert.deepEqual(keys('Начален и Прогимназиален етап', null), ['grade_1_4', 'grade_5_7'])
+  assert.deepEqual(keys(null, 'Прогимназиален етап'), ['grade_5_7'])
+  assert.deepEqual(keys(null, 'Предучилищен и от 1-ви до 7-ми клас'), ['grade_1_4', 'grade_5_7', 'preschool'])
+  assert.deepEqual(keys(null, 'Такса 5-ти клас'), ['grade_5_7'])
+  assert.deepEqual(keys(null, '1st grade'), ['grade_1_4'])
+})
+
+test('rowAgeGroupKeys: a school named "гимназия", "начално плащане" or "предучилищно образование" names no group', () => {
+  const keys = (age_group, plan_name) => [...rowAgeGroupKeys({ age_group, plan_name })].sort()
+  assert.deepEqual(keys(null, 'Частна гимназия "Св. Климент" — годишна такса'), [])
+  assert.deepEqual(keys('СУ и гимназия', null), [])
+  assert.deepEqual(keys('Частна профилирана гимназия', null), [])
+  assert.deepEqual(keys(null, 'Месечна такса за предучилищно образование'), [])
+  assert.deepEqual(keys(null, 'Начално плащане при записване'), [])
+  assert.deepEqual(keys(null, 'Гимназия / 8 – 10. клас / Плащане на 1 вноска'), ['grade_8_12'])
+  assert.deepEqual(keys(null, 'ПГУ от 15.09.2026г. / Годишна такса'), ['preschool'])
+})

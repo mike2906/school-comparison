@@ -2033,6 +2033,13 @@ the session scratchpad only.
       so 700 or 1,620 isn't read as monthly beside a monthly fee. Compare lists tuition first.
       Not done: one aligned row per category in compare (waits for the ComparePage split),
       and English names for Bulgarian fee names (needs the extractor to store them).
+- [x] **UF50 Headline tuition still mixes groups on compare and when only the fee name says
+      the group (live-site review 2026-10-12, items A, B, C, part of I).** Compare's headline
+      and price sort now use the chosen age group. A row's grades are also read from school
+      stages ("Гимназия" 8–12, "Начален и Прогимназиален етап" 1–7) and ordinal grades
+      ("от 1-ви до 7-ми клас"), so 630 shows 6,150 for grades 1–4, not 6,150–6,640. Tuition
+      paid "на 1 вноска" is the yearly fee, not one instalment, so 610 gets a headline again.
+      Buditel's whole-sentence age group shows as "Grade 8".
 
 ## Phase 3 — Go live
 

@@ -1,4 +1,4 @@
-import { gradesInText, rowGradeBand } from './gradeBand.js'
+import { gradesNamedIn, rowGradeBand } from './gradeBand.js'
 
 /**
  * Facts a price row states in its own words: how often it is paid and which age groups it
@@ -28,9 +28,25 @@ export function periodFromLabel(text) {
   return found.length === 1 ? found[0] : null
 }
 
-/** How often a row is paid: its stored period, else the one its own name states, else null. */
+// The whole fee paid at once: "Плащане на 1 вноска", "на една вноска", "in one payment";
+// not "1 вноска до 15.09" or "10 вноски, 1 вноска = 500", which are one instalment.
+const ONE_PAYMENT_RE = /(?<![\p{L}])(?<!(?:размер|сума|цена|стойност)\s)(?:на|в)\s+(?:1|една)\s+вноска(?![\p{L}])(?!\s+от\s)|еднократна\s+вноска|in (?:one|1|a single) (?:payment|instal+ment)|single payment/iu
+const SEVERAL_INSTALMENTS_RE = /(?<![\p{L}\p{N}])(?:[2-9]|\d{2,}|две|три|четири|пет|шест|седем|осем|девет|десет)\s+вноски|общо|instal+ments/iu
+
+/** True when a fee name says the whole fee is paid in one payment. */
+export function isOnePayment(name) {
+  return ONE_PAYMENT_RE.test(name || '') && !SEVERAL_INSTALMENTS_RE.test(name || '')
+}
+
+/**
+ * How often a row is paid: its stored period, else the one its own name states, else null.
+ * Tuition paid "на 1 вноска" (in one payment) is the year's fee.
+ */
 export function pricePeriod(row) {
-  return row?.period || periodFromLabel(row?.plan_name) || null
+  const named = periodFromLabel(row?.plan_name)
+  if (row?.period || named) return row?.period || named
+  if (row?.category === 'tuition' && isOnePayment(row?.plan_name)) return 'yearly'
+  return null
 }
 
 // Kindergarten group words: "Първа и Втора група", "Първа - трета група", "3-та група",
@@ -51,7 +67,7 @@ const ORDINAL_TOKEN_RE = new RegExp(`(?<![\\p{L}\\p{N}])(${ORDINAL})(?![\\p{L}\\
 // "Ясла", "Яслена група"; but "ДГ и ясла" or "Детска ясла и градина" name both, so neither.
 const NURSERY_RE = /яслен|nursery|cr[eè]che|(?<![\p{L}])ясл(?:а|и|ата)(?![\p{L}])/u
 const BOTH_RE = /ясл(?:а|и)\s*(?:и|\/|,)\s*(?:детск[аи] )?(?:градин|дг(?![\p{L}]))|(?:градин[аи]|(?<![\p{L}])дг)\s*(?:и|\/|,)\s*(?:детска )?ясл|яслена и градинска/u
-const PRESCHOOL_NAME_RE = /подготвителн[аи] груп|предучилищн[аи] груп|подготвителен клас|(?<![\p{L}])п[гк](?![\p{L}])|pre-?school/u
+const PRESCHOOL_NAME_RE = /подготвителн[аи] груп|предучилищн[аи] груп|подготвителен клас|(?<![\p{L}])п[гк]у?(?![\p{L}])|pre-?school/u
 
 const AGE_GROUP_KEYS = new Set([
   'nursery', 'first', 'second', 'third', 'preschool', 'grade_1_4', 'grade_5_7', 'grade_8_12',
@@ -120,7 +136,7 @@ function gradeKeys(band) {
 export function rowAgeGroupKeys(row) {
   const keys = new Set()
   if (AGE_GROUP_KEYS.has(row?.age_group?.trim())) keys.add(row.age_group.trim())
-  const band = rowGradeBand(row) || gradesInText(row?.age_group) || gradesInText(row?.plan_name)
+  const band = rowGradeBand(row) || gradesNamedIn(row?.age_group) || gradesNamedIn(row?.plan_name)
   for (const key of gradeKeys(band)) keys.add(key)
   for (const key of groupKeys(`${row?.age_group || ''} / ${row?.plan_name || ''}`)) keys.add(key)
   return keys
