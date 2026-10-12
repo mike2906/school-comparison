@@ -13,6 +13,7 @@ import {
   isThinSchool,
   outputFile,
   renderPage,
+  schoolLinks,
   schoolPage,
 } from './pages.js'
 
@@ -171,4 +172,27 @@ test('buildRobots allows search and AI answers, opts out of training, and names 
   assert.match(robots, /^Allow: \/$/m)
   assert.doesNotMatch(robots, /Disallow/)
   assert.match(robots, /^Sitemap: https:\/\/example\.test\/sitemap\.xml$/m)
+})
+
+test('the search page links every school it is given, in that language, escaped', () => {
+  const links = [{ routePath: '/schools/12', name: 'School <One>' }, { routePath: '/schools/7', name: 'Second' }]
+  const search = (language) => fixedPages(translator(language), language, links).find((page) => page.routePath === '/search')
+  assert.match(search('en').body, /<h2[^>]*>All schools and kindergartens<\/h2>/)
+  assert.match(search('en').body, /<li><a href="\/en\/schools\/12">School &lt;One&gt;<\/a><\/li><li><a href="\/en\/schools\/7">Second<\/a><\/li>/)
+  assert.match(search('bg').body, /<a href="\/schools\/12">/)
+  assert.doesNotMatch(fixedPages(t, 'en').find((page) => page.routePath === '/search').body, /<ul>/)
+})
+
+test('schoolLinks keeps only sitemap schools with a name, sorted as the app sorts names', () => {
+  const pages = [
+    schoolPage({ ...withNvo, id: 3, resolved_name_i18n: { en: '10th School' } }, t, 'en'),
+    schoolPage({ ...withNvo, id: 4, resolved_name_i18n: { en: '„2nd School“' } }, t, 'en'),
+    schoolPage({ ...withNvo, id: 5, resolved_name_i18n: { en: 'Unlisted' } }, t, 'en', { listed: false }),
+    schoolPage(school({ id: 6 }), t, 'en'),
+    { ...schoolPage({ ...withNvo, id: 7 }, t, 'en'), name: '' },
+  ]
+  assert.deepEqual(schoolLinks(pages, 'en'), [
+    { routePath: '/schools/4', name: '„2nd School“' },
+    { routePath: '/schools/3', name: '10th School' },
+  ])
 })

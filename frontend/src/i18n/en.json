@@ -718,6 +718,7 @@
     "reportSubject": "Data error report"
   },
   "seo": {
+    "allSchools": "All schools and kindergartens",
     "searchTitle": "Schools and kindergartens in Sofia: map and comparison",
     "searchDescription": "Find and compare kindergartens and schools in Sofia: map, official NVO exam results, private school fees and admissions.",
     "schoolFacts": "{{type}} · {{level}}",
