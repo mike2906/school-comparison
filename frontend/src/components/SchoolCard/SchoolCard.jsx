@@ -31,6 +31,7 @@ import {
   statedTuition,
   YEAR_STATUS,
 } from '../../utils/pricing'
+import { planNameLabel } from '../../utils/priceLabels'
 import { pricePeriod } from '../../utils/priceRows'
 import { parsePhones } from '../../utils/phone'
 import { orderAgeGroups } from '../../utils/ageGroupOrder'
@@ -360,7 +361,8 @@ function buildExpandedSections({
       const category = t(`pricing.${item.category}`)
       const period = pricePeriod(item)
       const periodKey = period ? t(`pricing.${period}`) : t('pricing.periodNotStated')
-      const plan = item.plan_name ? `${t('pricing.plan')}: ${item.plan_name}` : ''
+      const planName = planNameLabel(item, t)
+      const plan = planName ? `${t('pricing.plan')}: ${planName}` : ''
       const year = item.academic_year ? `${t('pricing.academicYear')}: ${item.academic_year}` : ''
       const meta = [plan, year].filter(Boolean).join(' • ')
       const source = item.source ? t(`priceSource.${item.source}`) : ''

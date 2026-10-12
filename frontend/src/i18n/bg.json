@@ -440,7 +440,8 @@
     "levels": {
       "immersion": "Пълна програма",
       "bilingual": "Двуезична програма",
-      "enrichment": "Допълнително обучение"
+      "enrichment": "Допълнително обучение",
+      "language_school": "Езиков профил"
     },
     "options": {
       "english_intensive": "Интензивен английски",

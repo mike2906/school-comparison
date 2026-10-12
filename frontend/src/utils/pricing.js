@@ -1,6 +1,8 @@
 import { intlLocale } from './format.js'
 import { gradeBandLabel, gradeRangeInText, gradesInText, gradesNamedIn, rowGradeBand } from './gradeBand.js'
 import { isOnePayment, pricePeriod, rowAgeGroupKeys, rowsForAgeGroup } from './priceRows.js'
+import { stageLabel } from './priceLabels.js'
+
 /**
  * Academic-year cohort helpers for pricing display.
  *
@@ -287,6 +289,8 @@ function ageGroupName(price, t) {
   const key = `ageGroups.${raw}`
   const translated = t(key)
   if (translated && translated !== key) return translated
+  const stage = stageLabel(raw, t)
+  if (stage) return stage
   // Grades named in free text too: "Гимназия", or Buditel's whole sentence "Годишна такса за
   // 8. клас за учебната …".
   const band = rowGradeBand(price) || namedBand(raw, price.plan_name)

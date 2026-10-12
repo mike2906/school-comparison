@@ -5,6 +5,7 @@ import { groupPricingByCategory } from './helpers'
 import { formatAmount } from '../../utils/format'
 import PriceSource from './PriceSource'
 import { pricePeriod, periodUnknown } from '../../utils/priceRows'
+import { planNameBeside, textLang } from '../../utils/priceLabels'
 
 /**
  * Every published price, grouped by academic year, then by category, then by the age
@@ -16,7 +17,7 @@ function PricingSection({ pricing }) {
 
   const formatNumber = (value) => formatAmount(value, i18n.language)
 
-  const renderRow = (price, { showAgeGroup, showSource }) => {
+  const renderRow = (price, { showAgeGroup, showSource, bandLabel }) => {
     const { currency } = displayPrice(null, price.currency)
     const formatShown = (value) => formatNumber(displayPrice(value, price.currency).value)
     const amountText = price.amount_min != null || price.amount_max != null
@@ -26,17 +27,18 @@ function PricingSection({ pricing }) {
       : t('pricing.priceOnRequest')
 
     const ageGroupLabel = showAgeGroup ? priceAgeGroupLabel(price, t) : null
+    const planName = planNameBeside(price, t, bandLabel || ageGroupLabel)
 
     return (
       // Stacked on phones: beside the price, a long fee name was squeezed into a column a
       // few letters wide and broke mid-word.
       <div key={price.id} className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 p-4 bg-neutral-50 rounded-lg border border-neutral-200">
         <div className="flex-1 min-w-0 space-y-1">
-          <div className="font-medium text-neutral-900 break-words">
-            {price.plan_name || t(`pricing.${price.category}`)}
+          <div className="font-medium text-neutral-900 break-words" lang={textLang(planName, i18n.language)}>
+            {planName || t(`pricing.${price.category}`)}
           </div>
           {ageGroupLabel && (
-            <div className="text-sm text-neutral-500 break-words">{ageGroupLabel}</div>
+            <div className="text-sm text-neutral-500 break-words" lang={textLang(ageGroupLabel, i18n.language)}>{ageGroupLabel}</div>
           )}
           {showSource && (
             <PriceSource source={price.source} url={price.source_url} checkedAt={price.scraped_at} />
@@ -102,10 +104,11 @@ function PricingSection({ pricing }) {
                         {groupRowsByAgeGroup(items, t).map(band => (
                           <div key={band.label || ''} className="space-y-3">
                             {band.label && (
-                              <h4 className="text-sm font-medium text-neutral-700 break-words">{band.label}</h4>
+                              <h4 className="text-sm font-medium text-neutral-700 break-words" lang={textLang(band.label, i18n.language)}>{band.label}</h4>
                             )}
                             {band.rows.map(price => renderRow(price, {
                               showAgeGroup: !band.label,
+                              bandLabel: band.label,
                               showSource: !shared,
                             }))}
                           </div>
