@@ -13,7 +13,7 @@
  * Writes report.md, report.json and a screenshot per page with findings; exits 1 when
  * anything was found.
  */
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { chromium } from 'playwright'
 
@@ -230,14 +230,24 @@ async function main() {
       const page = pages[next++]
       const result = await scanPage(context, page, index)
       results.push(result)
-      if (result.findings.length) console.log(`${result.findings.length} finding(s): ${result.url}`)
+      if (result.findings.length) {
+        console.log(`${result.findings.length} finding(s): ${result.url}`)
+        for (const finding of result.findings) console.log(`  ${finding.check}: ${finding.text.replace(/\n/g, ' ')}`)
+      }
     }
   }))
   await browser.close()
 
   results.sort((a, b) => a.url.localeCompare(b.url))
   await writeFile(path.join(OUT, 'report.json'), JSON.stringify(results, null, 2))
-  await writeFile(path.join(OUT, 'report.md'), markdownReport(results, startedAt))
+  const report = markdownReport(results, startedAt)
+  await writeFile(path.join(OUT, 'report.md'), report)
+  // On GitHub Actions, show the report on the run's page too (the summary is capped at 1 MiB).
+  if (process.env.GITHUB_STEP_SUMMARY) {
+    const limit = 900_000
+    const summary = report.length > limit ? `${report.slice(0, limit)}\n\n…truncated; the full report is in the run's artifact.\n` : report
+    await appendFile(process.env.GITHUB_STEP_SUMMARY, summary)
+  }
   const total = results.reduce((sum, result) => sum + result.findings.length, 0)
   console.log(`${total} finding(s) on ${results.filter(r => r.findings.length).length} of ${results.length} pages. Report: ${path.join(OUT, 'report.md')}`)
   process.exitCode = total ? 1 : 0
