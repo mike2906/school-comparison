@@ -815,8 +815,8 @@ async def test_a_parked_domain_withholds_the_schools_website_data(db_session):
 
 
 @pytest.mark.asyncio
-async def test_a_template_page_is_not_the_schools_but_its_real_pages_are(db_session):
-    """590: the home page is a theme's sample with lorem ipsum and "$1,800/mo"."""
+async def test_sample_text_does_not_make_the_navigator_drop_a_page(db_session):
+    """A real page may keep a theme's lorem block (15 sites do); only the price step skips templates."""
     filler = (
         "Our Programs\nLorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor.\n"
         "Half Days\nEu vestibulum praesent pretium platea fusce amet lobortis.\n$1,800/mo"
@@ -830,7 +830,7 @@ async def test_a_template_page_is_not_the_schools_but_its_real_pages_are(db_sess
     result, valid, withheld = await _navigate(db_session, school, page, crawled)
 
     assert result["success"] is True
-    assert valid == {"https://school.bg/": False, "https://school.bg/priem": True}
+    assert valid == {"https://school.bg/": True, "https://school.bg/priem": True}
     assert not withheld
 
 
