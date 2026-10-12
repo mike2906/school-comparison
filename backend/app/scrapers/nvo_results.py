@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import csv
 import io
 import logging
@@ -35,6 +36,7 @@ KNOWN_NVO_DATASET_URLS = {
 SUPPORTED_EXAM_TYPES = ("nvo_4", "nvo_7", "nvo_10")
 REQUIRED_SUBJECTS = ("bulgarian", "math")
 DEFAULT_HISTORY_YEARS = 5
+FETCH_ATTEMPTS = 5
 
 _INDEX_LABEL_TO_EXAM_TYPE = {
     "нво 4 клас": "nvo_4",
@@ -758,7 +760,18 @@ async def _download_resource_csv(
 
 
 async def _fetch_text(client: httpx.AsyncClient, url: str) -> str:
-    response = await client.get(url)
+    # data.egov.bg sits behind several backends and one at a time can fail the TLS
+    # handshake (an expired certificate in 2026-10), so a request that fails to connect
+    # is retried; verification stays on. HTTP errors are not retried.
+    for attempt in range(1, FETCH_ATTEMPTS + 1):
+        try:
+            response = await client.get(url)
+            break
+        except (httpx.ConnectError, httpx.ConnectTimeout) as exc:
+            if attempt == FETCH_ATTEMPTS:
+                raise
+            logger.warning("Fetching %s failed (%s); retrying (%d/%d)", url, exc, attempt, FETCH_ATTEMPTS - 1)
+            await asyncio.sleep(attempt)
     response.raise_for_status()
     return response.content.decode("utf-8-sig")
 

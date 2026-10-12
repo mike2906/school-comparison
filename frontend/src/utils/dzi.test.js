@@ -15,7 +15,7 @@ test('parseDziSubject reads the level and curriculum and rejects unknown subject
   assert.deepEqual(parseDziSubject('english_b2_pp'), { base: 'english', cefr: 'B2', curriculum: 'pp' })
   assert.deepEqual(parseDziSubject('english_b11_oop'), { base: 'english', cefr: 'B1.1', curriculum: 'oop' })
   assert.deepEqual(parseDziSubject('bulgarian'), { base: 'bulgarian', cefr: null, curriculum: null })
-  assert.equal(parseDziSubject('music_pp'), null)
+  assert.equal(parseDziSubject('law_pp'), null)
 })
 
 test('dziSubjectLabel names the subject, level and curriculum', () => {
@@ -45,7 +45,7 @@ test('getDziTable keeps the newest years, orders subjects and adds the latest be
     dzi(2024, 'bulgarian_oop', 4.6),
     dzi(2023, 'bulgarian_oop', 4.5),
     dzi(2025, 'english_b2_pp', 5.4),
-    dzi(2026, 'music_pp', 5.9),
+    dzi(2026, 'law_pp', 5.9),
     { exam_type: 'nvo_10', metric: 'average_score', year: 2026, subject: 'bulgarian', value: 60 },
   ]
   const averages = { by_year: { dzi: { 2026: { bulgarian_oop: 4.31 } } } }

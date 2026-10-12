@@ -9,6 +9,7 @@ const DZI_METRIC = 'average_grade'
 const SUBJECT_ORDER = [
   'bulgarian', 'math', 'english', 'german', 'french', 'spanish', 'italian', 'russian',
   'history', 'geography', 'philosophy', 'biology', 'physics', 'chemistry', 'informatics', 'it',
+  'music',
 ]
 const CURRICULUM_ORDER = { oop: 0, pp: 1 }
 

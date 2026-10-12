@@ -7,11 +7,11 @@ who sat it ("Бр.") and their average grade ("Ср.усп.", the 2–6 scale), 
 
 Grades are not NVO points: the two never share a row, a sort or a benchmark.
 
-Unverified (data.egov.bg is unreachable from where this was written): the layouts below
-come from a third-party parser that reads these files (atanasster/electionsbg,
-``scripts/schools/build_index.ts``), not from the files themselves. The parser fails a
-year loudly rather than guess when a layout does not fit:
-- 2022–2025, 2026: one header row with "Бр. БЕЛ(ООП) З" / "Ср.усп. БЕЛ(ООП) З" pairs
+Layouts seen (first read from atanasster/electionsbg's parser, then confirmed by the
+first import on 2026-10-12). The parser fails a year loudly rather than guess when a
+layout does not fit:
+- one header row of "Бр. <subject>" / "Ср.усп. <subject>" pairs, e.g. "БЕЛ(ООП) З";
+  since 2024 language exams carry their level and a "-З" tag: "АЕ(ПП) B1.1-З"
   (2026 has line breaks inside the quoted header cells);
 - 2023: a three-row header (subject, then "З", then "Бр." / "Ср.усп.");
 - 2022–2023 name the code column "Код по Админ", later years "Код по НЕИСПУО".
@@ -70,34 +70,41 @@ _MARKER_FIRST_RE = re.compile(rf"^{_MARKER}\s+(?P<label>.+)$", re.IGNORECASE)
 _MARKER_LAST_RE = re.compile(rf"^(?P<label>.+?)\s+{_MARKER}$", re.IGNORECASE)
 _CURRICULUM_RE = re.compile(r"\((ооп|пп)\)", re.IGNORECASE)
 # CEFR level of a language exam ("B1", "B2", "B1.1"); МОН may type the letter in Cyrillic.
-_CEFR_RE = re.compile(r"(?<![^\s(])([AaBbАаВв][12](?:\.\d)?)(?![^\s()])")
+_CEFR_RE = re.compile(r"(?<![^\s()])([AaBbАаВв][12](?:\.\d)?)(?![^\s()])")
 _CYRILLIC_TO_LATIN = str.maketrans({"А": "A", "а": "a", "В": "B", "в": "b"})
 
-# Subject abbreviations in the file headers → our subject keys. Only "БЕЛ" and "Мат"
-# are confirmed; the rest are МОН's usual short forms and unverified. A subject that
-# matches none is not imported and is listed in the summary, so a new one is added here
-# rather than shown under a made-up name.
+# Subject abbreviations in the file headers → our subject keys. A subject that matches
+# none is not imported and is listed in the summary, so a new one is added here rather
+# than shown under a made-up name. The 2023–2026 files (first import, 2026-10-12) use
+# e.g. БЕЛ, Мат, АЕ, БЗО, ГИ, ИсЕ, ИтЕ, ФА, ХООС, МУЗ; the long forms are kept for
+# other years. "ИИ" is left unmapped: it may be Изобразително изкуство rather than
+# history, so it waits for a look at the file.
 _SUBJECT_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = tuple(
     (re.compile(pattern, re.IGNORECASE), key)
     for pattern, key in (
         (r"^бел", "bulgarian"),
         (r"^мат", "math"),
         (r"^ист", "history"),
-        (r"^геогр?", "geography"),
+        (r"^(геогр?|ги$)", "geography"),
         (r"^фил", "philosophy"),
-        (r"^био", "biology"),
-        (r"^физ", "physics"),
-        (r"^хим", "chemistry"),
+        (r"^(био|бзо$)", "biology"),
+        (r"^(физ|фа$)", "physics"),
+        (r"^(хим|хоос$)", "chemistry"),
+        (r"^муз", "music"),
         (r"^инф", "informatics"),
         (r"^ит$", "it"),
         (r"^(ае|англ)", "english"),
         (r"^(не|нем)", "german"),
         (r"^(фе|фр)", "french"),
-        (r"^(ие|исп)", "spanish"),
+        (r"^(ие|исп|исе)", "spanish"),
         (r"^(ите|итал)", "italian"),
         (r"^(ре|рус)", "russian"),
     )
 )
+
+
+# State exams for a vocational qualification (ДИППК) share the files but are not ДЗИ.
+_NOT_DZI_RE = re.compile(r"^диппк", re.IGNORECASE)
 
 
 class DziSliceError(NvoSliceError):
@@ -150,7 +157,7 @@ def _parse_session_year(title: str) -> Optional[int]:
 
 
 def subject_key(label: str) -> Optional[str]:
-    """``"БЕЛ(ООП) З"`` → ``"bulgarian_oop"``, ``"АЕ B2(ПП)"`` → ``"english_b2_pp"``.
+    """``"БЕЛ(ООП)"`` → ``"bulgarian_oop"``, ``"АЕ(ПП) B2"`` → ``"english_b2_pp"``.
 
     None when the abbreviation is not one we know.
     """
@@ -176,8 +183,9 @@ def _subject_label(cell: str) -> Optional[tuple[str, str]]:
     if not match:
         return None
     marker = "count" if match.group("marker").lower().startswith("бр") else "grade"
-    # A trailing one-letter session tag ("З" for задължителен) is not part of the subject.
-    label = re.sub(r"\s+[А-Яа-я]$", "", _collapse_ws(match.group("label")))
+    # A trailing one-letter session tag ("З" for задължителен, as " З" or "-З") is not
+    # part of the subject.
+    label = re.sub(r"[\s-]+[А-Яа-я]$", "", _collapse_ws(match.group("label")))
     return marker, label
 
 
@@ -246,18 +254,24 @@ def parse_dzi_csv(resource: NvoResource, csv_text: str) -> tuple[list[ParsedExam
 
     subjects: list[tuple[str, int, int]] = []
     unknown_subjects: list[str] = []
+    labels_by_key: dict[str, list[str]] = {}
     for label, cols in pairs.items():
-        if "count" not in cols or "grade" not in cols:
+        if "count" not in cols or "grade" not in cols or _NOT_DZI_RE.match(label):
             continue
         key = subject_key(label)
         if key is None:
             unknown_subjects.append(label)
             continue
+        labels_by_key.setdefault(key, []).append(label)
         subjects.append((key, cols["count"], cols["grade"]))
     if not subjects:
         raise DziSliceError(f"{name}: no subject column pairs (Бр. / Ср.усп.) found")
-    if len({key for key, _, _ in subjects}) != len(subjects):
-        raise DziSliceError(f"{name}: two subject columns map to the same subject")
+    clashes = {key: labels for key, labels in labels_by_key.items() if len(labels) > 1}
+    if clashes:
+        raise DziSliceError(
+            f"{name}: subject columns map to the same subject: "
+            + "; ".join(f"{key} ← {', '.join(labels)}" for key, labels in sorted(clashes.items()))
+        )
 
     stats = {
         "rows_seen": 0,
@@ -266,6 +280,8 @@ def parse_dzi_csv(resource: NvoResource, csv_text: str) -> tuple[list[ParsedExam
         "missing_counts": 0,
         "out_of_range_values": 0,
         "unknown_subjects": sorted(unknown_subjects),
+        # Header label → stored subject, so a run shows how each column was read.
+        "subject_labels": {labels[0]: key for key, labels in labels_by_key.items()},
     }
     entries: list[ParsedExamResult] = []
     grades_seen = 0
@@ -372,6 +388,7 @@ async def import_dzi_results(
         "unmatched_rows": 0,
         "missing_counts": 0,
         "unknown_subjects": [],
+        "subject_labels": {},
         "slice_failures": [],
         "errors": [],
     }
@@ -434,6 +451,7 @@ async def import_dzi_results(
             summary["unmatched_rows"] += resource_summary["unmatched_rows"]
             summary["missing_counts"] += parse_stats["missing_counts"]
             unknown_subjects.update(parse_stats["unknown_subjects"])
+            summary["subject_labels"].update(parse_stats["subject_labels"])
             if resource_summary["imported_rows"] > 0:
                 summary["years_imported"].append(resource.year)
 

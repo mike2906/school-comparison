@@ -1252,6 +1252,10 @@ async def _run_dzi_import(
     console.print(f"  Skipped rows: {summary.get('skipped_rows', 0)}")
     console.print(f"  Unmatched rows: {summary.get('unmatched_rows', 0)}")
     console.print(f"  Grades without a pupil count (withheld): {summary.get('missing_counts', 0)}")
+    if summary.get("subject_labels"):
+        console.print("  Subjects read (file header → stored as):")
+        for label, key in sorted(summary["subject_labels"].items(), key=lambda item: item[1]):
+            console.print(f"    {label} → {key}")
     if summary.get("unknown_subjects"):
         console.print(f"[yellow]  Subjects not imported (unknown abbreviation): {', '.join(summary['unknown_subjects'])}[/yellow]")
     console.print(f"  Source URL: {summary.get('source_url')}")
