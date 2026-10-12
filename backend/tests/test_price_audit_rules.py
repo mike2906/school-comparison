@@ -432,3 +432,5 @@ def test_a_course_length_is_not_an_age():
     assert not label_is_another_institutions("IGCSE 2 years in 1", "school", set(range(8, 13)))
     assert not label_is_another_institutions("IGCSE 2 години за 1 (5 предмета)", "school", set(range(8, 13)))
     assert label_is_another_institutions("Група 2 години", "school", set(range(8, 13)))
+    for nursery in ("деца на 3 години за 10 месеца", "2 години за 1 месец", "група 3 years in 2026", "2 г. за 1 месец"):
+        assert label_is_another_institutions(nursery, "school", set(range(8, 13))), nursery
