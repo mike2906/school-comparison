@@ -13,6 +13,9 @@ from sqlalchemy import select
 from app.models import School, SchoolLocation, SchoolLocationAgeGroupShift, SourcePage
 from app.models.scrape_log import ScrapeType
 from app.scrapers import cli as scraper_cli
+from app.scrapers.stages import extract as extract_stage
+from app.scrapers.stages import navigate as navigate_stage
+from app.scrapers.stages import website as website_stage
 from app.scrapers.url_validator import ValidationResult
 from app.utils.transliteration import transliterate_address, transliterate_bulgarian
 
@@ -594,7 +597,7 @@ async def test_repair_age_groups_refresh_navigation_only_targets_likely_candidat
 
     with (
         patch("app.database.async_session_maker", return_value=SessionCtx()),
-        patch.object(scraper_cli, "_run_navigate_batch", new=navigate_mock),
+        patch.object(navigate_stage, "run_navigate_batch", new=navigate_mock),
     ):
         await scraper_cli._repair_age_groups_command(
             school_name=None,
@@ -634,7 +637,7 @@ async def test_run_recover_failed_school_delegates_to_discoverer_public_api(db_s
         "app.scrapers.website_discovery.WebsiteDiscoverer.recover_failed_school",
         new=AsyncMock(return_value=expected),
     ) as recover_mock:
-        out = await scraper_cli._run_recover_failed_school(db_session, school.id, "bg")
+        out = await website_stage.run_recover_failed_school(db_session, school.id, "bg")
 
     assert out == expected
     recover_mock.assert_awaited_once()
@@ -668,9 +671,9 @@ async def test_run_validate_urls_batch_caps_configured_concurrency(db_session):
             "app.scrapers.url_validator.validate_school_url",
             new=AsyncMock(return_value=(ValidationResult.VALID, "https://test-school.bg", "ok")),
         ),
-        patch("app.scrapers.cli.asyncio.Semaphore", side_effect=semaphore_spy),
+        patch("app.scrapers.stages.website.asyncio.Semaphore", side_effect=semaphore_spy),
     ):
-        await scraper_cli._run_validate_urls_batch(
+        await website_stage.run_validate_urls_batch(
             db=db_session,
             country="bg",
             city="sofia",
@@ -714,10 +717,10 @@ async def test_run_recover_failed_urls_batch_uses_isolated_session_helper(db_ses
 
     with (
         patch("app.config.get_settings", return_value=settings),
-        patch("app.scrapers.cli._recover_failed_school_with_new_session", new=recover_mock),
-        patch("app.scrapers.cli.asyncio.Semaphore", side_effect=semaphore_spy),
+        patch("app.scrapers.stages.website.recover_failed_school_with_new_session", new=recover_mock),
+        patch("app.scrapers.stages.website.asyncio.Semaphore", side_effect=semaphore_spy),
     ):
-        await scraper_cli._run_recover_failed_urls_batch(
+        await website_stage.run_recover_failed_urls_batch(
             db=db_session,
             country="bg",
             city="sofia",
@@ -775,7 +778,7 @@ async def test_repair_i18n_command_clears_synthetic_values_and_reextracts_eligib
 
     with (
         patch("app.database.async_session_maker", return_value=SessionCtx()),
-        patch.object(scraper_cli, "_run_extract_batch", new=extract_batch_mock),
+        patch.object(extract_stage, "run_extract_batch", new=extract_batch_mock),
     ):
         await scraper_cli._repair_i18n_command(
             school_name=None,
@@ -875,8 +878,8 @@ async def test_repair_locations_command_targets_candidates_and_runs_navigate_and
 
     with (
         patch("app.database.async_session_maker", return_value=SessionCtx()),
-        patch.object(scraper_cli, "_run_navigate_batch", new=navigate_batch_mock),
-        patch.object(scraper_cli, "_run_extract_batch", new=extract_batch_mock),
+        patch.object(navigate_stage, "run_navigate_batch", new=navigate_batch_mock),
+        patch.object(extract_stage, "run_extract_batch", new=extract_batch_mock),
     ):
         await scraper_cli._repair_locations_command(
             school_name=None,
@@ -972,6 +975,6 @@ async def test_run_recover_failed_school_loads_the_address_discovery_reads(db_se
         return {"school_id": school.id, "locations": len(school.locations)}
 
     with patch("app.scrapers.website_discovery.WebsiteDiscoverer.recover_failed_school", new=fake_recover):
-        out = await scraper_cli._run_recover_failed_school(db_session, school_id, "bg")
+        out = await website_stage.run_recover_failed_school(db_session, school_id, "bg")
 
     assert out == {"school_id": school_id, "locations": 0}
