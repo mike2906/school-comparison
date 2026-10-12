@@ -50,7 +50,7 @@ return <h1>{t('welcome')}</h1>;
 **Distances** — use Leaflet's built-in `distanceTo` (see `src/utils/distance.js`), not a
 custom haversine.
 
-**Map tiles** (CARTO Voyager, `TILE_URL` in `src/components/Map/SchoolMap.jsx`): CARTO
+**Map tiles** (CARTO Voyager, `TILE_URL` in `src/components/Map/mapView.js`): CARTO
 basemaps need an API key, passed as `?key=` from `VITE_CARTO_API_KEY` (see
 `frontend/.env.example`). Without it every tile carries an "API KEY REQUIRED" watermark.
 The key ships in the browser bundle, so it is not a secret: restrict it to our domains in
