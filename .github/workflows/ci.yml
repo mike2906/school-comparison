@@ -17,21 +17,28 @@ jobs:
     defaults:
       run:
         working-directory: backend
-    services:
-      postgres:
-        image: public.ecr.aws/docker/library/postgres:16-alpine  # Docker Hub mirror; avoids its anonymous pull rate limit
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: schooldecider_migrations
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
+
+      - name: Start PostgreSQL
+        # Started here rather than as a service container so the pull can be retried:
+        # the ECR mirror sometimes answers "toomanyrequests" when runners share an IP.
+        run: |
+          image=public.ecr.aws/docker/library/postgres:16-alpine  # Docker Hub mirror; avoids its anonymous pull rate limit
+          for attempt in 1 2 3; do
+            docker pull "$image" && break
+            if [ "$attempt" = 3 ]; then exit 1; fi
+            sleep $((attempt * 20))
+          done
+          docker run -d --name postgres -p 5432:5432 \
+            -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=schooldecider_migrations \
+            "$image"
+          for i in $(seq 30); do
+            docker exec postgres pg_isready -h 127.0.0.1 -U postgres -d schooldecider_migrations && exit 0
+            sleep 2
+          done
+          exit 1
 
       - name: Install uv
         uses: astral-sh/setup-uv@v8.3.2
@@ -53,7 +60,7 @@ jobs:
       - name: PostgreSQL clean install and populated alignment reapplication
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/schooldecider_migrations
-          POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+          POSTGRES_CONTAINER: postgres
         run: |
           uv run alembic upgrade head --sql > "$RUNNER_TEMP/migrations.sql"
           uv run alembic upgrade head
@@ -75,7 +82,7 @@ jobs:
 
       - name: Verify PostgreSQL backup restore
         env:
-          POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+          POSTGRES_CONTAINER: postgres
         run: |
           docker exec "$POSTGRES_CONTAINER" pg_dump -U postgres -d schooldecider_migrations -Fc > "$RUNNER_TEMP/migrations.dump"
           docker exec -i "$POSTGRES_CONTAINER" pg_restore --list < "$RUNNER_TEMP/migrations.dump" > /dev/null
