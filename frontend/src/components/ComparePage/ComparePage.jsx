@@ -1062,9 +1062,9 @@ function ComparePage() {
     const contactRows = [
       {
         label: t('schools.website'),
-        getValue: (school) => school.website_url ? (
+        getValue: (school) => safeSourceUrl(school.website_url) ? (
           <a
-            href={school.website_url}
+            href={safeSourceUrl(school.website_url)}
             target="_blank"
             rel="noopener noreferrer"
             className="text-primary-600 hover:text-primary-700 text-sm underline"
@@ -1102,7 +1102,7 @@ function ComparePage() {
       { key: 'locations', title: t('compare.sections.locations'), rows: locationRows },
       { key: 'contact', title: t('compare.sections.contact'), rows: contactRows },
     ]
-  }, [t, i18n.language, metricsById, userLocation, schools, selectedAgeGroup, examAverages, nvoGrade])
+  }, [t, i18n.language, metricsById, userLocation, schools, selectedAgeGroup, examAverages, nvoGrade, countryConfig])
 
   const visibleSections = useMemo(() => sections
     .map(section => ({
