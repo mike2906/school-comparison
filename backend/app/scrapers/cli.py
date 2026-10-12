@@ -788,14 +788,11 @@ async def _show_data_quality(city, country, runs):
             f"{v['with_report']}/{v['total']} schools",
         )
         w = metrics["withheld_website_data"]
-        r = w["reasons"]
+        reasons = ", ".join(f"{name.replace('_', ' ')} {count}" for name, count in w["reasons"].items())
         table.add_row(
             "Website data withheld",
             _pct(w["withheld_pct"]),
-            f"{w['withheld']}/{w['with_data']} schools with website data; "
-            f"no current report {r['no_current_report']}, "
-            f"withheld after URL check {r['withheld_after_url_check']}, "
-            f"status not publishable {r['status_not_publishable']}",
+            f"{w['withheld']}/{w['with_data']} schools with website data; {reasons}",
         )
         table.add_row(
             "Published website data validated OK",
@@ -839,6 +836,8 @@ async def _show_data_quality(city, country, runs):
         g = metrics["pricing_rows_failing_gates"]
         table.add_row("Pricing rows failing gates", _pct(g["pct"]), f"{g['failing']}/{g['total']} scraped rows")
         console.print(table)
+        if w["withheld_school_ids"]:
+            console.print(f"Website data withheld for school ids: {w['withheld_school_ids']}")
 
         if runs > 0:
             runs_query = select(PipelineRun).where(PipelineRun.country_code == country)

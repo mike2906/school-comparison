@@ -195,7 +195,7 @@ async def test_metrics_cover_all_six(quality_fixture):
         "published_ok_pct": 50.0,
         "withheld": 0,
         "withheld_pct": 0.0,
-        "reasons": {"no_current_report": 0, "withheld_after_url_check": 0, "status_not_publishable": 0},
+        "reasons": {"no_current_report": 0, "withheld_marker": 0, "status_not_publishable": 0},
         "withheld_school_ids": [],
     }
     assert m["duplicate_coordinate_groups"] == 1
@@ -303,6 +303,11 @@ async def test_withheld_website_data_counts_each_reason(db_session):
             "data_validation": report,
         },
     )
+    stale_and_registry_only = await _make_school(
+        db_session,
+        scrape_status="no_official_website",
+        attributes={"extracted": {"programs": ["Old"]}, "data_validation": {"_schema_version": 0, "status": "ok"}},
+    )
     # No website data at all: not counted either way.
     await _make_school(db_session, scrape_status="extracted", attributes={"data_validation": report})
     await db_session.commit()
@@ -310,14 +315,17 @@ async def test_withheld_website_data_counts_each_reason(db_session):
     metrics = await compute_quality_metrics(db_session, country="bg", city="sofia")
 
     assert metrics["withheld_website_data"] == {
-        "with_data": 4,
+        "with_data": 5,
         "published": 1,
         "published_ok": 1,
         "published_ok_pct": 100.0,
-        "withheld": 3,
-        "withheld_pct": 75.0,
-        "reasons": {"no_current_report": 1, "withheld_after_url_check": 1, "status_not_publishable": 1},
-        "withheld_school_ids": sorted([no_report.id, registry_only.id, withheld.id]),
+        "withheld": 4,
+        "withheld_pct": 80.0,
+        # The stale, registry-only school counts under both of its reasons.
+        "reasons": {"no_current_report": 2, "withheld_marker": 1, "status_not_publishable": 2},
+        "withheld_school_ids": sorted(
+            [no_report.id, registry_only.id, withheld.id, stale_and_registry_only.id]
+        ),
     }
 
 

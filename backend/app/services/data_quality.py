@@ -39,10 +39,9 @@ from app.utils.display_gating import (  # noqa: F401
 from app.utils.i18n_resolver import resolve_display_name_i18n, resolve_name_i18n
 from app.utils.school_attributes import build_display_attributes
 from app.utils.website_data import (
-    WEBSITE_DATA_WITHHELD_KEY,
-    WEBSITE_PUBLISHABLE_STATUSES,
     attributes_for_publication,
     website_data_is_publishable,
+    website_data_withheld_reasons,
 )
 
 # Precision used to group coordinates when detecting shared/duplicate points.
@@ -77,14 +76,6 @@ def _has_meaningful_value(value: Any) -> bool:
     if isinstance(value, (list, tuple, set)):
         return any(_has_meaningful_value(item) for item in value)
     return bool(value)
-
-
-def _report_is_current(report: dict[str, Any]) -> bool:
-    version = report.get("_schema_version", report.get("schema_version"))
-    try:
-        return int(version) == 1
-    except (TypeError, ValueError):
-        return False
 
 
 def _validation_ok(schools: list[School]) -> dict[str, Any]:
@@ -169,7 +160,7 @@ def _withheld_website_data(schools: list[School]) -> dict[str, Any]:
     with_data = 0
     published = 0
     published_ok = 0
-    reasons = {"no_current_report": 0, "withheld_after_url_check": 0, "status_not_publishable": 0}
+    reasons = {"no_current_report": 0, "withheld_marker": 0, "status_not_publishable": 0}
     withheld_school_ids: list[int] = []
     for school in schools:
         attrs = _as_dict(school.attributes)
@@ -191,19 +182,15 @@ def _withheld_website_data(schools: list[School]) -> dict[str, Any]:
         if not has_website_data:
             continue
         with_data += 1
-        report = _as_dict(attrs.get("data_validation"))
-        if website_data_is_publishable(attrs, school.scrape_status):
+        withheld_because = website_data_withheld_reasons(attrs, school.scrape_status)
+        if not withheld_because:
             published += 1
-            if report.get("status") == "ok":
+            if _as_dict(attrs.get("data_validation")).get("status") == "ok":
                 published_ok += 1
             continue
         withheld_school_ids.append(school.id)
-        if not _report_is_current(report):
-            reasons["no_current_report"] += 1
-        if attrs.get(WEBSITE_DATA_WITHHELD_KEY):
-            reasons["withheld_after_url_check"] += 1
-        if str(school.scrape_status or "").strip().lower() not in WEBSITE_PUBLISHABLE_STATUSES:
-            reasons["status_not_publishable"] += 1
+        for reason in withheld_because:
+            reasons[reason] += 1
     return {
         "with_data": with_data,
         "published": published,
