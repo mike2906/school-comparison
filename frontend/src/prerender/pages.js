@@ -3,7 +3,7 @@
  * block inside `#root` that React replaces on mount (hidden until then, see index.html).
  * Pure builders; the file and network work lives in `scripts/prerender.js`.
  */
-import { getAddress, getSchoolName } from '../utils/i18n.js'
+import { compareSchoolNames, getAddress, getSchoolName } from '../utils/i18n.js'
 import { URL_LANGUAGES, alternateLinks, canonicalUrl, languagePath } from '../utils/languageUrl.js'
 import { schoolLevelLabel, schoolTypeLabel } from '../utils/levelLabel.js'
 import {
@@ -145,19 +145,27 @@ function paragraph(text) {
  * crawlers do not scroll, so without this most school pages are reachable only from the
  * sitemap, and search engines treat such orphan pages as unimportant.
  */
-function schoolDirectory(schoolLinks, t, language) {
-  if (schoolLinks.length === 0) return ''
-  const items = schoolLinks
+function schoolDirectory(links, t, language) {
+  if (links.length === 0) return ''
+  const items = links
     .map(({ routePath, name }) => `<li><a href="${escapeHtml(languagePath(routePath, language))}">${escapeHtml(name)}</a></li>`)
     .join('')
   return `<section><h2 class="font-semibold">${escapeHtml(t('seo.allSchools'))}</h2><ul>${items}</ul></section>`
 }
 
+/** The school pages the search page links: those in the sitemap, by name as the app sorts. */
+export function schoolLinks(schoolPages, language) {
+  return schoolPages
+    .filter((page) => page.sitemap && page.name)
+    .map(({ routePath, name }) => ({ routePath, name }))
+    .sort((a, b) => compareSchoolNames(a.name, b.name, language))
+}
+
 /**
  * The pages that exist without school data, including the two aliases of `/search`.
- * `schoolLinks` (`{ routePath, name }`, in display order) are listed on the search page.
+ * `links` (from `schoolLinks`) are listed on the search page.
  */
-export function fixedPages(t, language, schoolLinks = []) {
+export function fixedPages(t, language, links = []) {
   const siteName = t('nav.title')
   const search = {
     title: t('seo.searchTitle'),
@@ -166,7 +174,7 @@ export function fixedPages(t, language, schoolLinks = []) {
     body: mainBlock([
       heading(t('seo.searchTitle')),
       paragraph(t('seo.searchDescription')),
-      schoolDirectory(schoolLinks, t, language),
+      schoolDirectory(links, t, language),
     ]),
   }
   const searchLink = `<p><a href="${escapeHtml(languagePath('/search', language))}">${escapeHtml(t('notFound.cta'))}</a></p>`

@@ -13,6 +13,7 @@ import {
   isThinSchool,
   outputFile,
   renderPage,
+  schoolLinks,
   schoolPage,
 } from './pages.js'
 
@@ -180,4 +181,18 @@ test('the search page links every school it is given, in that language, escaped'
   assert.match(search('en').body, /<li><a href="\/en\/schools\/12">School &lt;One&gt;<\/a><\/li><li><a href="\/en\/schools\/7">Second<\/a><\/li>/)
   assert.match(search('bg').body, /<a href="\/schools\/12">/)
   assert.doesNotMatch(fixedPages(t, 'en').find((page) => page.routePath === '/search').body, /<ul>/)
+})
+
+test('schoolLinks keeps only sitemap schools with a name, sorted as the app sorts names', () => {
+  const pages = [
+    schoolPage({ ...withNvo, id: 3, resolved_name_i18n: { en: '10th School' } }, t, 'en'),
+    schoolPage({ ...withNvo, id: 4, resolved_name_i18n: { en: '„2nd School“' } }, t, 'en'),
+    schoolPage({ ...withNvo, id: 5, resolved_name_i18n: { en: 'Unlisted' } }, t, 'en', { listed: false }),
+    schoolPage(school({ id: 6 }), t, 'en'),
+    { ...schoolPage({ ...withNvo, id: 7 }, t, 'en'), name: '' },
+  ]
+  assert.deepEqual(schoolLinks(pages, 'en'), [
+    { routePath: '/schools/4', name: '„2nd School“' },
+    { routePath: '/schools/3', name: '10th School' },
+  ])
 })
