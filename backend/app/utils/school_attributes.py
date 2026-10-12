@@ -40,6 +40,7 @@ from app.utils.facility_vocabulary import (
     PROGRAM_VOCAB,
     canonical_tags,
 )
+from app.utils.list_translations import translate_items
 
 DISPLAY_LOCALES: tuple[str, ...] = ("bg", "en")
 
@@ -446,7 +447,8 @@ def build_localized_attributes(
             if (text := publishable_display_text(value)) is not None
         ]
     for field in ("facilities", "special_programs", "activities_offered"):
-        resolved[field] = [text for text in resolved[field] if not is_list_noise(text, field)]
+        kept = [text for text in resolved[field] if not is_list_noise(text, field)]
+        resolved[field] = _dedupe_strings(translate_items(kept, locale))
     return resolved
 
 
