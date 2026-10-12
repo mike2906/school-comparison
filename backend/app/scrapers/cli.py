@@ -787,12 +787,20 @@ async def _show_data_quality(city, country, runs):
             _pct(v["coverage_pct"]),
             f"{v['with_report']}/{v['total']} schools",
         )
-        w = metrics["website_validation_coverage"]
+        w = metrics["withheld_website_data"]
+        r = w["reasons"]
         table.add_row(
-            "Publishable website-data coverage",
-            _pct(w["coverage_pct"]),
-            f"{w['with_report']}/{w['eligible']} eligible; "
-            f"{w['published_without_report']} published without report",
+            "Website data withheld",
+            _pct(w["withheld_pct"]),
+            f"{w['withheld']}/{w['with_data']} schools with website data; "
+            f"no current report {r['no_current_report']}, "
+            f"withheld after URL check {r['withheld_after_url_check']}, "
+            f"status not publishable {r['status_not_publishable']}",
+        )
+        table.add_row(
+            "Published website data validated OK",
+            _pct(w["published_ok_pct"]),
+            f"{w['published_ok']}/{w['published']} published",
         )
         table.add_row("Duplicate coordinate groups", str(metrics["duplicate_coordinate_groups"]), "points shared by ≥2 schools")
         p = metrics["location_precision_exact"]

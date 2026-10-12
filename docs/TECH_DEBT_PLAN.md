@@ -48,7 +48,7 @@ There are three independent lanes. Within a lane, order matters. Across lanes, P
 
 ### Lane C: decisions that are not code moves
 
-- **The data-quality scoreboard metric needs redefining.** The test audit found that `_website_validation_coverage` can only ever report 0 published without a report and 100% coverage. That is a product question about what the metric should mean, not a refactor. It is parked until Mike decides, and its five constant-asserting tests are left alone until then.
+- **The data-quality scoreboard metric needed redefining.** The test audit found that `_website_validation_coverage` could only ever report 0 published without a report and 100% coverage, because the publish gate already refuses data without a current report. On 2026-10-12 it was replaced, as recommended to Mike, with `withheld_website_data`: schools with stored website data that parents can't see, counted by reason (no current report, withheld after a URL check, status not publishable), with their ids. Done.
 
 ### Relation to `docs/GO_LIVE_PLAN.md` Phase 4
 
