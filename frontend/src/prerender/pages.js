@@ -5,7 +5,7 @@
  */
 import { getAddress, getSchoolName } from '../utils/i18n.js'
 import { URL_LANGUAGES, alternateLinks, canonicalUrl, languagePath } from '../utils/languageUrl.js'
-import { schoolLevelLabel } from '../utils/levelLabel.js'
+import { schoolLevelLabel, schoolTypeLabel } from '../utils/levelLabel.js'
 import {
   getAvailableExamTypes,
   getExamTypeForEducationLevel,
@@ -89,7 +89,8 @@ function nvoLine(result, t) {
 }
 
 function tuitionLine(school, t) {
-  const tuition = statedTuition(school?.pricing)
+  // This year's fee, not next year's: the description has no room to label the year.
+  const tuition = statedTuition(school?.pricing, { intake: false })
   // Euro only, in the period the school states (never annualised), and never an older
   // year's fee, which the description has no room to label as such.
   if (!tuition || tuition.currency !== 'EUR' || !tuition.period || tuition.yearStatus === 'dated_other') return ''
@@ -188,7 +189,7 @@ export function fixedPages(t, language) {
 export function schoolPage(school, t, language, { listed = true } = {}) {
   const name = getSchoolName(school, language)
   const facts = t('seo.schoolFacts', {
-    type: t(`schoolTypes.${school.school_type}`),
+    type: schoolTypeLabel(school, t),
     level: schoolLevelLabel(school, t),
   })
   const locations = Array.isArray(school.locations) ? school.locations : []

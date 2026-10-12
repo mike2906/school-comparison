@@ -2,32 +2,41 @@ import { memo, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { isDesktopViewport, isPlainLeftClick } from '../../utils/searchViewState'
-import { schoolLevelLabel } from '../../utils/levelLabel'
+import { schoolLevelLabel, schoolTypeLabel } from '../../utils/levelLabel'
 import { useCountry } from '../../context/CountryContext'
 import { languageLabel } from '../../utils/languages'
 import { useCompare } from '../../context/CompareContext'
 import { getSchoolName, getAddress } from '../../utils/i18n'
-import { formatDistance } from '../../utils/distance'
+import { formatAmount, formatDistance, intlLocale } from '../../utils/format'
 import { getFocusEmoji } from '../../utils/locationFocus'
-import { getBenchmarkComparison, getNvoDetail as getSharedNvoDetail } from '../../utils/nvo'
-import { getAdmissionStatusKey, getCanonicalAmenityFlags } from '../../utils/schoolAttributes'
-import { classifyAdmissionRequirement, curatedRequirement, usesSofiaKindergartenSystem } from '../../utils/admission'
+import { getNvoDetail as getSharedNvoDetail } from '../../utils/nvo'
+import { getCanonicalAmenityFlags, getOptionLabel, getStatusInfo, normalizeLanguageFocus } from '../../utils/schoolAttributes'
 import {
+  curatedRequirement,
+  getAdmissionRequirement,
+  getLastAdmittedPoints,
+  getMinNvoScore,
+  usesSofiaKindergartenSystem,
+} from '../../utils/admission'
+import {
+  formatPercent,
+  getBenchmarkTooltip,
+  getNvoValueStyle,
+  getTrendInfo,
+  getTrendTooltip,
+} from '../../utils/nvoDisplay'
+import {
+  formatPriceLabel,
   selectPricingCohort,
   statedTuition,
   YEAR_STATUS,
 } from '../../utils/pricing'
+import { pricePeriod } from '../../utils/priceRows'
 
 const typeColors = {
   state: 'bg-teal-700 text-white',
   private: 'bg-violet-600 text-white',
   international: 'bg-blue-700 text-white',
-}
-
-const STATUS_COLORS = {
-  accepting: '#10b981',
-  waitlist: '#f59e0b',
-  full: '#ef4444',
 }
 
 const SHIFT_ICONS = {
@@ -88,48 +97,6 @@ function getLanguageCode(language) {
   if (!language) return ''
   const lower = language.toLowerCase()
   return LANGUAGE_CODES[lower] || lower.slice(0, 2).toUpperCase()
-}
-
-function getOptionLabel(option, t) {
-  if (!option) return ''
-  const key = `advancedFilters.options.${option}`
-  const translated = t(key)
-  if (translated !== key) return translated
-  return option.replace(/_/g, ' ').replace(/\b\w/g, char => char.toUpperCase())
-}
-
-function normalizeLanguageFocus(languageFocus = []) {
-  const normalized = []
-  const items = Array.isArray(languageFocus) ? languageFocus : [languageFocus]
-  items.forEach((item) => {
-    if (!item) return
-    if (typeof item === 'string') {
-      const [language, level] = item.split(':')
-      normalized.push({ language, level })
-      return
-    }
-    if (typeof item === 'object') {
-      normalized.push({
-        language: item.language,
-        level: item.level,
-      })
-    }
-  })
-  return normalized.filter(item => item.language)
-}
-
-function getStatusInfo(school, t) {
-  const statusKey = getAdmissionStatusKey(school.admission_info?.status)
-  if (statusKey === 'accepting') {
-    return { key: 'accepting', color: STATUS_COLORS.accepting, label: t('schoolCard.status.accepting') }
-  }
-  if (statusKey === 'waitlist') {
-    return { key: 'waitlist', color: STATUS_COLORS.waitlist, label: t('schoolCard.status.waitlist') }
-  }
-  if (statusKey === 'full') {
-    return { key: 'full', color: STATUS_COLORS.full, label: t('schoolCard.status.full') }
-  }
-  return null
 }
 
 function getPrimaryFeature(attributes, t) {
@@ -208,153 +175,6 @@ function getPrimaryFeature(attributes, t) {
   }
 
   return null
-}
-
-function formatCurrency(amount, locale) {
-  if (amount == null || Number.isNaN(amount)) return null
-  return new Intl.NumberFormat(locale, {
-    maximumFractionDigits: 0,
-  }).format(amount)
-}
-
-function getAdmissionRequirement(rawRequirement, t) {
-  const requirement = classifyAdmissionRequirement(rawRequirement)
-  if (!requirement) return null
-  if (requirement.kind === 'interview') {
-    return { icon: '📝', text: t('schoolCard.admissions.interviewRequired') }
-  }
-  if (requirement.kind === 'test') {
-    return { icon: '📋', text: t('schoolCard.admissions.testRequired') }
-  }
-  if (requirement.kind === 'none') {
-    return { icon: '✅', text: t('schoolCard.admissions.noEntranceExam') }
-  }
-  return { icon: 'ℹ️', text: requirement.text }
-}
-
-function getLastAdmittedPoints(admissionInfo, ageGroup) {
-  const thresholds = admissionInfo?.historical_thresholds || []
-  if (thresholds.length === 0) return null
-
-  const relevant = ageGroup
-    ? thresholds.filter(item => item.age_group === ageGroup)
-    : thresholds
-
-  if (relevant.length === 0) return null
-
-  const latest = relevant.reduce((acc, item) => (item.year > acc.year ? item : acc), relevant[0])
-  const rounds = latest.rounds || []
-  if (rounds.length === 0) return null
-
-  const lastRound = rounds.reduce((acc, item) => (item.round > acc.round ? item : acc), rounds[0])
-
-  return {
-    points: lastRound.last_admitted_points,
-    year: latest.year,
-  }
-}
-
-function getMinNvoScore(admissionInfo) {
-  const scores = admissionInfo?.historical_min_scores || []
-  if (scores.length === 0) return null
-  const latest = scores.reduce((acc, item) => (item.year > acc.year ? item : acc), scores[0])
-  return {
-    score: latest.min_score,
-    year: latest.year,
-  }
-}
-
-function formatPercent(value, decimals = 1) {
-  if (value == null || Number.isNaN(value)) return null
-  return Number(value).toFixed(decimals)
-}
-
-function getPerformanceStyle(value) {
-  if (value >= 75) return { text: 'text-emerald-500' }
-  if (value >= 60) return { text: 'text-amber-500' }
-  return { text: 'text-red-500' }
-}
-
-function getNvoValueStyle({ value, examType, year, subjectKey, examAverages }) {
-  const benchmark = getBenchmarkComparison({
-    examType,
-    year,
-    subjectKey,
-    value,
-    examAverages,
-  })
-
-  if (benchmark) {
-    return { text: benchmark.textClass, benchmark }
-  }
-
-  return { text: getPerformanceStyle(value).text, benchmark: null }
-}
-
-function getBenchmarkTooltip(value, benchmark, t) {
-  if (value == null || !benchmark) return null
-
-  const diff = Math.abs(benchmark.diff).toFixed(1)
-  const valueText = formatPercent(value, 1)
-  const benchmarkText = formatPercent(benchmark.benchmarkValue, 1)
-
-  if (benchmark.tone === 'above') {
-    return t('academicPerformance.tooltipBenchmarkAbove', {
-      value: valueText,
-      diff,
-      benchmark: benchmarkText,
-    })
-  }
-  if (benchmark.tone === 'below') {
-    return t('academicPerformance.tooltipBenchmarkBelow', {
-      value: valueText,
-      diff,
-      benchmark: benchmarkText,
-    })
-  }
-
-  return t('academicPerformance.tooltipBenchmarkNear', {
-    value: valueText,
-    diff,
-    benchmark: benchmarkText,
-  })
-}
-
-function getTrendTooltip(latest, average, trend, t) {
-  if (latest == null || average == null || !trend) return null
-
-  const diff = Math.abs(trend.diff).toFixed(1)
-  const latestText = formatPercent(latest, 1)
-  const averageText = formatPercent(average, 1)
-
-  if (trend.arrow === '↑') {
-    return t('academicPerformance.tooltipTrendUp', {
-      latest: latestText,
-      average: averageText,
-      diff,
-    })
-  }
-  if (trend.arrow === '↓') {
-    return t('academicPerformance.tooltipTrendDown', {
-      latest: latestText,
-      average: averageText,
-      diff,
-    })
-  }
-
-  return t('academicPerformance.tooltipTrendFlat', {
-    latest: latestText,
-    average: averageText,
-    diff,
-  })
-}
-
-function getTrendInfo(latest, average) {
-  if (latest == null || average == null) return null
-  const diff = latest - average
-  if (diff >= 2) return { arrow: '↑', className: 'text-emerald-500', diff }
-  if (diff <= -2) return { arrow: '↓', className: 'text-red-500', diff }
-  return { arrow: '→', className: 'text-neutral-400', diff }
 }
 
 function hexToRgba(hex, alpha) {
@@ -535,20 +355,15 @@ function buildExpandedSections({
 
   if (pricing.length > 0 && school.school_type !== 'state') {
     const pricingLines = pricing.map(item => {
-      const amountMin = item.amount_min != null ? formatCurrency(item.amount_min, locale) : null
-      const amountMax = item.amount_max != null ? formatCurrency(item.amount_max, locale) : null
-      const amount = item.amount != null ? formatCurrency(item.amount, locale) : null
       const category = t(`pricing.${item.category}`)
-      const periodKey = item.period ? t(`pricing.${item.period}`) : t('pricing.periodNotStated')
+      const period = pricePeriod(item)
+      const periodKey = period ? t(`pricing.${period}`) : t('pricing.periodNotStated')
       const plan = item.plan_name ? `${t('pricing.plan')}: ${item.plan_name}` : ''
       const year = item.academic_year ? `${t('pricing.academicYear')}: ${item.academic_year}` : ''
       const meta = [plan, year].filter(Boolean).join(' • ')
       const source = item.source ? t(`priceSource.${item.source}`) : ''
-      const priceLabel = amountMin && amountMax
-        ? `${amountMin}–${amountMax} ${item.currency || 'EUR'}`
-        : amount
-          ? `${amount} ${item.currency || 'EUR'}`
-          : t('pricing.priceOnRequest')
+      // BGN rows are converted to euro, as on the detail and compare pages.
+      const priceLabel = formatPriceLabel(item, locale, t)
       const periodLabel = periodKey ? ` (${periodKey})` : ''
       const metaLabel = meta ? ` • ${meta}` : ''
       const sourceLabel = source ? ` • ${source}` : ''
@@ -687,7 +502,10 @@ const SchoolCard = memo(function SchoolCard({
   )
   // Badge and headline price must come from the same cohort, or a current-year label
   // can end up above a previous year's fee.
-  const pricingCohort = useMemo(() => selectPricingCohort(pricing), [pricing])
+  const pricingCohort = useMemo(
+    () => selectPricingCohort(pricing, { ageGroup: activeAgeGroup }),
+    [pricing, activeAgeGroup]
+  )
   const pricingYearLabel = useMemo(() => {
     if (!pricingCohort) return null
     if (pricingCohort.yearStatus === YEAR_STATUS.NOT_STATED) {
@@ -695,25 +513,26 @@ const SchoolCard = memo(function SchoolCard({
     }
     return pricingCohort.academicYear
   }, [pricingCohort, t])
-  // Only a current-year price wears the highlighted badge, so an older fee is never
-  // styled as though it were this year's.
+  // Only a current-year price, or next year's for families enrolling now, wears the
+  // highlighted badge, so an older fee is never styled as though it were this year's.
   const pricingYearBadgeClass =
-    pricingCohort?.yearStatus === YEAR_STATUS.CURRENT
+    pricingCohort?.yearStatus === YEAR_STATUS.CURRENT || pricingCohort?.yearStatus === YEAR_STATUS.NEXT
       ? 'text-teal-700 bg-teal-50 border-teal-200'
       : 'text-neutral-600 bg-neutral-100 border-neutral-300'
 
   const admissionsInfo = useMemo(() => {
-    const locale = i18n.language?.startsWith('bg') ? 'bg-BG' : 'en-US'
+    const locale = intlLocale(i18n.language)
     const isPrivate = school.school_type === 'private' || school.school_type === 'international'
     const admissionInfo = school.admission_info || {}
 
     if (isPrivate) {
       // The fee as the school states it, in euro: never annualised, since schools bill
       // over 9, 10 or 12 months (the detail page and compare show it the same way).
-      const tuition = statedTuition(pricing)
-      const price = tuition && (formatCurrency(tuition.min, locale) === formatCurrency(tuition.max, locale)
-        ? formatCurrency(tuition.min, locale)
-        : `${formatCurrency(tuition.min, locale)}–${formatCurrency(tuition.max, locale)}`)
+      // The chosen age group's fee, never another group's.
+      const tuition = statedTuition(pricing, { ageGroup: activeAgeGroup })
+      const price = tuition && (formatAmount(tuition.min, locale) === formatAmount(tuition.max, locale)
+        ? formatAmount(tuition.min, locale)
+        : `${formatAmount(tuition.min, locale)}–${formatAmount(tuition.max, locale)}`)
       const priceLabel = !tuition
         ? null
         : tuition.period
@@ -766,7 +585,7 @@ const SchoolCard = memo(function SchoolCard({
     }
 
     return null
-  }, [school, pricing, attributes, i18n.language, t, primaryLocation])
+  }, [school, pricing, attributes, i18n.language, t, primaryLocation, activeAgeGroup])
 
   const nvoDetail = useMemo(() => {
     // Sorted by NVO: only the exam the list is ranked by, so no card shows a score from a
@@ -840,7 +659,7 @@ const SchoolCard = memo(function SchoolCard({
     locations,
     pricing,
     t,
-    locale: i18n.language?.startsWith('bg') ? 'bg-BG' : 'en-US',
+    locale: intlLocale(i18n.language),
   }), [school, attributes, locations, pricing, t, i18n.language])
 
   const hasExpandedContent = expandedSections.length > 0 || Boolean(nvoDetail)
@@ -849,7 +668,7 @@ const SchoolCard = memo(function SchoolCard({
   const distanceValue = typeof school.distance === 'number' ? school.distance : null
   // Only a known distance is shown; the list header prompts for a location once instead.
   const distanceLabel = distanceValue != null
-    ? formatDistance(distanceValue, { approximate: school.distanceApproximate })
+    ? formatDistance(distanceValue, { approximate: school.distanceApproximate, language: i18n.language, t })
     : null
   const distanceStyle = distanceValue == null
     ? { backgroundColor: '#f3f4f6', color: '#6b7280' }
@@ -952,7 +771,7 @@ const SchoolCard = memo(function SchoolCard({
             style={distanceStyle}
             aria-label={t(
               school.distanceApproximate ? 'schoolCard.aria.distanceApprox' : 'schoolCard.aria.distance',
-              { distance: formatDistance(distanceValue) },
+              { distance: formatDistance(distanceValue, { language: i18n.language, t }) },
             )}
           >
             📍 {distanceLabel}
@@ -962,7 +781,7 @@ const SchoolCard = memo(function SchoolCard({
 
       <div className="mt-1.5 flex flex-wrap items-center gap-2">
         <span className={`inline-flex items-center px-2.5 py-1 rounded text-[11px] font-semibold uppercase tracking-[0.08em] ${colors}`}>
-          {t(`schoolTypes.${displayType}`)}
+          {schoolTypeLabel(school, t, displayType)}
         </span>
         <span className="text-xs text-neutral-600">
           {schoolLevelLabel(school, t, countryConfig)}

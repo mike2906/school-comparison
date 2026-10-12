@@ -7,14 +7,14 @@ import {
   parseSavedLocation,
 } from '../../utils/keyFacts'
 import { calculateDistance } from '../../utils/distance'
+import { formatAmount, formatKm, intlLocale } from '../../utils/format'
 import { statedTuition, YEAR_STATUS } from '../../utils/pricing'
+import { getLastAdmittedPoints, getMinNvoScore } from '../../utils/admission'
 import {
-  getLastAdmittedPoints,
-  getMinNvoScore,
   getLanguageLabel,
-  normalizeLanguageFocus,
   getExamTypeLabel,
 } from './helpers'
+import { normalizeLanguageFocus } from '../../utils/schoolAttributes'
 import { getMappableLocations } from './LocationMap'
 import { usesSofiaKindergartenSystem } from '../../utils/admission'
 
@@ -26,12 +26,13 @@ function readSavedLocation() {
   }
 }
 
-function Fact({ label, value, detail, detailClass = 'text-neutral-500' }) {
+function Fact({ label, value, detail, note, detailClass = 'text-neutral-500' }) {
   return (
     <div className="min-w-0 rounded-xl border border-neutral-200 bg-white px-4 py-3">
       <div className="text-balance text-xs font-medium uppercase tracking-wide text-neutral-500">{label}</div>
       <div className="mt-1 text-base sm:text-lg font-bold leading-snug text-neutral-900 break-words">{value}</div>
       {detail && <div className={`mt-0.5 text-xs ${detailClass}`}>{detail}</div>}
+      {note && <div className="mt-1 text-xs text-neutral-600">{note}</div>}
     </div>
   )
 }
@@ -48,13 +49,12 @@ const listValue = (items) => items.map((item, index) => (
  * the school type (price first for private schools, NVO / admission for state ones), and
  * facts a school does not have are left out rather than shown as "unavailable".
  */
-function KeyFacts({ school, examAverages, nvoExamType }) {
+function KeyFacts({ school, examAverages, nvoExamType, ageGroup = null }) {
   const { t, i18n } = useTranslation()
-  const locale = i18n.language?.startsWith('bg') ? 'bg-BG' : 'en-GB'
+  const locale = intlLocale(i18n.language)
   const savedLocation = useMemo(readSavedLocation, [])
 
-  const formatNumber = (value, digits = 0) =>
-    new Intl.NumberFormat(locale, { maximumFractionDigits: digits }).format(value)
+  const formatNumber = (value, digits = 0) => formatAmount(value, locale, digits)
 
   const attributes = school.attributes || {}
   const locations = school.locations || []
@@ -63,26 +63,40 @@ function KeyFacts({ school, examAverages, nvoExamType }) {
 
   const facts = {}
 
-  const tuition = isPrivate ? statedTuition(school.pricing) : null
+  // The searched age group's fee when the parent came from a search for one.
+  const tuition = isPrivate ? statedTuition(school.pricing, { ageGroup }) : null
   if (tuition) {
     const yearDetail = tuition.yearStatus === YEAR_STATUS.NOT_STATED
       ? t('pricing.yearNotStated')
       : tuition.yearStatus === YEAR_STATUS.DATED_OTHER
         ? `${tuition.academicYear} · ${t('pricing.notCurrentYear')}`
-        : tuition.academicYear
-    const price = formatNumber(tuition.min) === formatNumber(tuition.max)
-      ? formatNumber(tuition.min)
-      : `${formatNumber(tuition.min)}–${formatNumber(tuition.max)}`
+        : tuition.yearStatus === YEAR_STATUS.NEXT
+          ? `${tuition.academicYear} · ${t('pricing.nextYear')}`
+          : tuition.academicYear
     // The fee in the period the school states it in: never annualised, since schools
     // bill over 9, 10 or 12 months.
+    const priceText = (fee) => {
+      const price = formatNumber(fee.min) === formatNumber(fee.max)
+        ? formatNumber(fee.min)
+        : `${formatNumber(fee.min)}–${formatNumber(fee.max)}`
+      return fee.period
+        ? t('pricing.pricePerPeriod', { price, currency: fee.currency, period: t(`pricing.per.${fee.period}`) })
+        : t('pricing.priceOnly', { price, currency: fee.currency })
+    }
+    // Next year's fee leads (it is what a family enrolling now pays); this year's follows.
+    const currentYear = tuition.currentYear
+      ? [
+          t('pricing.yearPrice', { year: tuition.currentYear.academicYear, price: priceText(tuition.currentYear) }),
+          tuition.currentYear.period ? null : t('pricing.periodNotStated'),
+        ].filter(Boolean).join(' · ')
+      : null
     facts.tuition = (
       <Fact
         key="tuition"
         label={t('pricing.tuition')}
-        value={tuition.period
-          ? t('pricing.pricePerPeriod', { price, currency: tuition.currency, period: t(`pricing.per.${tuition.period}`) })
-          : t('pricing.priceOnly', { price, currency: tuition.currency })}
+        value={priceText(tuition)}
         detail={[tuition.period ? null : t('pricing.periodNotStated'), yearDetail].filter(Boolean).join(' · ')}
+        note={currentYear}
       />
     )
   }
@@ -187,7 +201,7 @@ function KeyFacts({ school, examAverages, nvoExamType }) {
           label={t('schoolDetail.distance')}
           value={t(
             nearest.approximate ? 'schoolDetail.distanceValueApprox' : 'schoolDetail.distanceValue',
-            { km: formatNumber(nearest.km, 1) },
+            { km: formatKm(nearest.km, i18n.language) },
           )}
         />
       )

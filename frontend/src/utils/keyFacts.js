@@ -8,7 +8,7 @@ import { getBenchmarkToneClasses, getNvoSubjectKey, isAverageMetric } from './nv
 
 /**
  * The latest year's combined (Bulgarian + maths) NVO result for one exam, with the
- * national average for the same subjects and year when it is known.
+ * Sofia schools' average for the same subjects and year when it is known.
  *
  * Returns `{ examType, year, value, national, diff, tone, textClass, badgeClass }`
  * (`national`/`diff`/`tone` null without a benchmark) or null without results.

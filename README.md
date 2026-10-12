@@ -32,13 +32,13 @@ Browser ──> Cloudflare Pages   static site: React 18 + Vite, prerendered per
 |---|---|---|
 | API | FastAPI (async), SQLAlchemy 2.0, Alembic, Pydantic v2 | `backend/app/` |
 | Frontend | React 18, Vite, Leaflet, i18next, Tailwind | `frontend/` |
-| Scraping pipeline | Click CLI, Celery, Crawl4AI, pydantic-ai | `backend/app/scrapers/` |
+| Scraping pipeline | Click CLI, Crawl4AI, pydantic-ai | `backend/app/scrapers/` |
 | Production stack | Docker Compose: Caddy, API, Postgres on one VPS | `docker-compose.prod.yml`, `deploy/` |
 | Cloud config | Terraform for Cloudflare: DNS, TLS, Origin CA certificate, Pages | `infra/` |
 | CI and CD | GitHub Actions | `.github/workflows/` |
 
-Production serves a published snapshot of the data. The scraping pipeline, Redis and
-Celery run offline and are not part of the production stack. The host firewall accepts
+Production serves a published snapshot of the data. The scraping pipeline runs
+offline and is not part of the production stack. The host firewall accepts
 HTTPS only from Cloudflare's address ranges.
 
 ### Continuous deployment
@@ -126,7 +126,7 @@ went wrong along the way and how it was fixed.
 ## Local development
 
 ```bash
-docker compose up -d                              # PostgreSQL, Redis, SearXNG
+docker compose up -d                              # PostgreSQL, SearXNG
 docker compose exec -T postgres createdb -U postgres sofia_schools_demo
 
 cd backend

@@ -15,7 +15,6 @@ from app.models import School, SchoolLocation
 from app.models.exam_results import ExamResult
 from app.schemas.llm_outputs import SchoolSummaryStrict
 from app.scrapers import summarizer as summarizer_module
-from tasks import scrape_tasks
 
 
 def _validation_payload(status: str = "ok", issues: list[dict] | None = None, spot_check: dict | None = None) -> dict:
@@ -607,102 +606,6 @@ async def test_get_schools_requiring_summary_applies_limit_after_eligibility_fil
 
     assert len(schools) == 1
     assert schools[0].id == eligible.id
-
-
-@pytest.mark.asyncio
-async def test_task_selectors_include_summarized_school_states(db_session):
-    summarized_for_validation = School(
-        name_i18n={"bg": "Сумирано училище"},
-        country_code="bg",
-        school_type="private",
-        education_level="primary",
-        city="sofia",
-        scrape_status="summarized",
-        attributes={
-            "extracted": {"programs": ["STEM"]},
-        },
-    )
-    summarized_for_summarization = School(
-        name_i18n={"bg": "Сумирано за Stage 7"},
-        country_code="bg",
-        school_type="private",
-        education_level="primary",
-        city="sofia",
-        scrape_status="summarized",
-        attributes={
-            "extracted": {"programs": ["STEM"]},
-            "data_validation": _validation_payload(),
-        },
-    )
-    fresh_summary_school = School(
-        name_i18n={"bg": "Свежо сумирано"},
-        country_code="bg",
-        school_type="private",
-        education_level="primary",
-        city="sofia",
-        scrape_status="summarized",
-        summary_i18n={"bg": {"short": "fresh", "long": "fresh"}, "en": {"short": "fresh", "long": "fresh"}},
-        attributes={
-            "extracted": {"programs": ["Arts"]},
-            "data_validation": _validation_payload(),
-        },
-    )
-    db_session.add_all([summarized_for_validation, summarized_for_summarization, fresh_summary_school])
-    await db_session.commit()
-
-    summarized_for_summarization = (
-        await db_session.execute(
-            select(School).options(
-                selectinload(School.locations),
-                selectinload(School.pricing),
-                selectinload(School.exam_results),
-            ).where(School.id == summarized_for_summarization.id)
-        )
-    ).scalar_one()
-    stale_prepared = summarizer_module.prepare_summary_candidate(summarized_for_summarization)
-    summarized_for_summarization.attributes = {
-        **(summarized_for_summarization.attributes or {}),
-        "summary_generation": {
-            "_schema_version": 1,
-            "input_fingerprint": f"{stale_prepared.fingerprint}-stale",
-        },
-    }
-    db_session.add(summarized_for_summarization)
-
-    fresh_summary_school = (
-        await db_session.execute(
-            select(School).options(
-                selectinload(School.locations),
-                selectinload(School.pricing),
-                selectinload(School.exam_results),
-            ).where(School.id == fresh_summary_school.id)
-        )
-    ).scalar_one()
-    fresh_prepared = summarizer_module.prepare_summary_candidate(fresh_summary_school)
-    fresh_summary_school.attributes = {
-        **(fresh_summary_school.attributes or {}),
-        "summary_generation": {
-            "_schema_version": summarizer_module.SUMMARY_GENERATION_SCHEMA_VERSION,
-            "input_fingerprint": fresh_prepared.fingerprint,
-        },
-    }
-    db_session.add(fresh_summary_school)
-    await db_session.commit()
-
-    class SessionCtx:
-        async def __aenter__(self):
-            return db_session
-
-        async def __aexit__(self, exc_type, exc, tb):
-            return False
-
-    with patch("app.database.async_session_maker", return_value=SessionCtx()):
-        validation_ids = await scrape_tasks._get_schools_for_validation("bg", "sofia", None, False)
-        summarization_ids = await scrape_tasks._get_schools_for_summarization("bg", "sofia", None)
-
-    assert summarized_for_validation.id in validation_ids
-    assert summarized_for_summarization.id in summarization_ids
-    assert fresh_summary_school.id not in summarization_ids
 
 
 def test_fallback_summary_prefers_raw_bg_and_clean_en_name():

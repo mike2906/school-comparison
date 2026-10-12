@@ -1,4 +1,5 @@
 import { canonicalLanguagePair } from './languages.js'
+import { humanizeTag } from './tags.js'
 /**
  * Resolves the locale-specific view of a school's display attributes.
  *
@@ -138,13 +139,20 @@ export function getLocationDisplayEvidence(location, address = null, distance = 
   }
 }
 
+const STATUS_KEYS = new Set(['accepting', 'waitlist', 'full'])
+
+/**
+ * Curated data uses the exact keys. Free text is matched only on clear phrases, so
+ * "Not specified" stays unknown and "Accepting, no waitlist" stays accepting.
+ */
 export function getAdmissionStatusKey(rawStatus) {
   const status = String(rawStatus || '').trim().toLowerCase()
-  if (status.includes('accept') || status.includes('open') || status.includes('available')) {
-    return 'accepting'
+  if (STATUS_KEYS.has(status)) return status
+  if (/\b(no|not)\s+(places|spots|vacanc|accepting|open)|\bclosed\b|\bfully booked\b|(?<!\b(?:not|yet)\s)\bfull\b(?![- ]day)/.test(status)) {
+    return 'full'
   }
-  if (status.includes('wait')) return 'waitlist'
-  if (status.includes('full') || status.includes('closed')) return 'full'
+  if (/\bwait(ing)?[- ]?list/.test(status) && !/\bno\s+wait/.test(status)) return 'waitlist'
+  if (/\baccept|\bopen\b|\bavailable\b/.test(status)) return 'accepting'
   return null
 }
 
@@ -197,4 +205,50 @@ export function getLanguageFocusPairs(school) {
 
   if (cacheable) languageFocusPairsBySchool.set(school, pairs)
   return pairs
+}
+
+const STATUS_COLORS = {
+  accepting: '#10b981',
+  waitlist: '#f59e0b',
+  full: '#ef4444',
+}
+
+/** Admission status for display: `{key, color (hex), label}`, or null when unknown. */
+export function getStatusInfo(school, t) {
+  const key = getAdmissionStatusKey(school?.admission_info?.status)
+  if (!key || !STATUS_COLORS[key]) return null
+  return { key, color: STATUS_COLORS[key], label: t(`schoolCard.status.${key}`) }
+}
+
+/** Label for a filter option or scraped tag: the translation if there is one, else tidied text. */
+export function getOptionLabel(option, t) {
+  if (!option) return ''
+  const key = `advancedFilters.options.${option}`
+  // nsSeparator off: scraped text with a colon ("Clubs: English") is not a namespace.
+  const translated = t(key, { nsSeparator: false })
+  if (translated !== key) return translated
+  // Language-focus levels ("immersion", "bilingual") have their own keys.
+  const levelKey = `advancedFilters.levels.${option}`
+  const level = t(levelKey, { nsSeparator: false })
+  if (level !== levelKey) return level
+  // Free text scraped from a website: tidy it, but never Title-Case a sentence.
+  return humanizeTag(option)
+}
+
+/** `language_focus` as `[{language, level}]`; accepts strings like "english:intensive" or objects. */
+export function normalizeLanguageFocus(languageFocus = []) {
+  const items = Array.isArray(languageFocus) ? languageFocus : [languageFocus]
+  const normalized = []
+  items.forEach((item) => {
+    if (!item) return
+    if (typeof item === 'string') {
+      const [language, level] = item.split(':')
+      normalized.push({ language, level })
+      return
+    }
+    if (typeof item === 'object') {
+      normalized.push({ language: item.language, level: item.level })
+    }
+  })
+  return normalized.filter(item => item.language)
 }

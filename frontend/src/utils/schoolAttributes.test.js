@@ -6,6 +6,9 @@ import {
   getAfterSchoolEvidence,
   getCanonicalAmenityEvidence,
   getCanonicalAmenityFlags,
+  getOptionLabel,
+  getStatusInfo,
+  normalizeLanguageFocus,
   getFilterTags,
   getLanguageFocusPairs,
   getLocationDisplayEvidence,
@@ -210,6 +213,21 @@ test('admission status omits unknown and unrecognized values', () => {
   assert.equal(getAdmissionStatusKey('Accepting applications'), 'accepting')
   assert.equal(getAdmissionStatusKey('waitlist'), 'waitlist')
   assert.equal(getAdmissionStatusKey('closed'), 'full')
+  assert.equal(getAdmissionStatusKey('waitlist open'), 'waitlist')
+  assert.equal(getAdmissionStatusKey('Not accepting applications'), 'full')
+  assert.equal(getAdmissionStatusKey('No places available'), 'full')
+  assert.equal(getAdmissionStatusKey('Places available'), 'accepting')
+  assert.equal(getAdmissionStatusKey('Open'), 'accepting')
+  assert.equal(getAdmissionStatusKey('full'), 'full')
+  assert.equal(getAdmissionStatusKey('Not specified'), null)
+  assert.equal(getAdmissionStatusKey('No information'), null)
+  assert.equal(getAdmissionStatusKey('Accepting applications, no waitlist'), 'accepting')
+  assert.equal(getAdmissionStatusKey('Accepting, full-day programme'), 'accepting')
+  assert.equal(getAdmissionStatusKey('Open - no entrance exam'), 'accepting')
+  assert.equal(getAdmissionStatusKey('Waiting list'), 'waitlist')
+  assert.equal(getAdmissionStatusKey('Currently full'), 'full')
+  assert.equal(getAdmissionStatusKey('Not full'), null)
+  assert.equal(getAdmissionStatusKey('Not yet full'), null)
 })
 
 test('display evidence treats explicit false as evidence but empty values as absent', () => {
@@ -262,4 +280,47 @@ test('getLanguageFocusPairs computes once per school object', () => {
   // A reloaded list is new objects, so it is read afresh.
   assert.notEqual(getLanguageFocusPairs({ ...school }), first)
   assert.equal(getLanguageFocusPairs(null).size, 0)
+})
+
+const fakeT = (key) => (key === 'advancedFilters.options.montessori' ? 'Монтесори' : key.startsWith('schoolCard.status.') ? `label:${key.split('.').pop()}` : key)
+
+test('getStatusInfo maps known statuses to key, hex colour and label', () => {
+  assert.deepEqual(getStatusInfo({ admission_info: { status: 'accepting' } }, fakeT), {
+    key: 'accepting', color: '#10b981', label: 'label:accepting',
+  })
+  assert.equal(getStatusInfo({ admission_info: { status: 'full' } }, fakeT).color, '#ef4444')
+  assert.equal(getStatusInfo({ admission_info: {} }, fakeT), null)
+  assert.equal(getStatusInfo({}, fakeT), null)
+})
+
+test('getOptionLabel prefers the translation and sentence-cases the fallback', () => {
+  assert.equal(getOptionLabel('montessori', fakeT), 'Монтесори')
+  assert.equal(getOptionLabel('bilingual_program', fakeT), 'Bilingual program')
+  assert.equal(getOptionLabel('', fakeT), '')
+  assert.equal(getOptionLabel(null, fakeT), '')
+})
+
+test('normalizeLanguageFocus accepts strings, objects and a single value', () => {
+  assert.deepEqual(normalizeLanguageFocus(['english:intensive', { language: 'german', level: 'basic' }, null, { level: 'x' }]), [
+    { language: 'english', level: 'intensive' },
+    { language: 'german', level: 'basic' },
+  ])
+  assert.deepEqual(normalizeLanguageFocus('french'), [{ language: 'french', level: undefined }])
+  assert.deepEqual(normalizeLanguageFocus(undefined), [])
+})
+
+test('getOptionLabel does not treat a colon in scraped text as an i18next namespace', async () => {
+  const { default: i18next } = await import('i18next')
+  const i18n = i18next.createInstance()
+  await i18n.init({ lng: 'en', resources: { en: { translation: { advancedFilters: { options: { montessori: 'Montessori' } } } } } })
+  const t = i18n.t.bind(i18n)
+  assert.equal(getOptionLabel('montessori', t), 'Montessori')
+  assert.equal(getOptionLabel('Speaking clubs: English, German', t), 'Speaking clubs: English, German')
+})
+
+test('getOptionLabel translates language-focus levels', async () => {
+  const { default: i18next } = await import('i18next')
+  const i18n = i18next.createInstance()
+  await i18n.init({ lng: 'bg', resources: { bg: { translation: { advancedFilters: { options: {}, levels: { immersion: 'Пълна програма' } } } } } })
+  assert.equal(getOptionLabel('immersion', i18n.t.bind(i18n)), 'Пълна програма')
 })

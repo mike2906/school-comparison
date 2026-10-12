@@ -7,27 +7,6 @@ class DummyAdapter(BaseSourceAdapter):
         return []
 
 
-def test_ensure_i18n_fallbacks_does_not_add_synthetic_english():
-    school = DiscoveredSchool(
-        country_code="bg",
-        city="sofia",
-        name_i18n={"bg": "Частно основно училище Фюжън ЕООД"},
-        school_type="private",
-        education_level="primary",
-        locations=[
-            DiscoveredLocation(
-                address_i18n={"bg": "ул. Иван Вазов 15, София"},
-                age_groups=["grade_1_4"],
-            )
-        ],
-    )
-
-    DummyAdapter(db=None)._ensure_i18n_fallbacks(school)
-
-    assert school.name_i18n == {"bg": "Частно основно училище Фюжън ЕООД"}
-    assert school.locations[0].address_i18n == {"bg": "ул. Иван Вазов 15, София"}
-
-
 async def test_registry_rerun_keeps_pinned_locations(db_session):
     """Recreating a school's locations must not lose official or hand-corrected points."""
     from sqlalchemy import select

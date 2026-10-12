@@ -12,7 +12,7 @@ const nvo = (year, subject, value, examType = 'nvo_7') => ({
   exam_type: examType, metric: 'average_score', year, subject, value,
 })
 
-test('latest NVO fact compares the latest combined score to the national average', () => {
+test('latest NVO fact compares the latest combined score to the Sofia schools average', () => {
   const averages = { by_year: { nvo_7: { 2025: { bulgarian: 60, math: 50 } } } }
   const fact = getLatestNvoFact(
     [nvo(2024, 'math', 10), nvo(2025, 'math', 70), nvo(2025, 'bulgarian', 80), nvo(2025, 'math', 1, 'nvo_4')],

@@ -89,9 +89,10 @@ export function fetchCountryConfig(code) {
   return cachedJson(`${API_BASE}/countries/${code}`, 'Failed to fetch country config')
 }
 
-export function fetchExamAverages({ countryCode = 'bg' } = {}) {
+export function fetchExamAverages({ countryCode = 'bg', city = 'sofia' } = {}) {
   const params = new URLSearchParams()
   params.set('country_code', countryCode)
+  params.set('city', city)
   return cachedJson(`${API_BASE}/schools/exam-averages?${params.toString()}`, 'Failed to fetch exam averages')
 }
 

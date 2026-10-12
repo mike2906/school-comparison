@@ -135,7 +135,8 @@ async def test_525_deposit_is_withheld_and_stated_period_is_filled(db_session, c
 
     response = await client.get(f"/schools/{school.id}")
     published = {row["id"]: row["period"] for row in response.json()["pricing"]}
-    assert published == {full_day.id: "monthly", half_day.id: None}
+    # €350 with no period would read as the whole cost: the floor withholds it.
+    assert published == {full_day.id: "monthly"}
 
 
 @pytest.mark.asyncio
@@ -360,3 +361,49 @@ async def test_a_gymnasium_keeps_the_fee_that_names_it_and_not_its_siblings_page
     assert _issue_codes(gymnasium, last_year) == {"pricing_label_names_other_level"}
     response = await client.get(f"/schools/{gymnasium.id}")
     assert [row["id"] for row in response.json()["pricing"]] == [own.id]
+
+
+@pytest.mark.asyncio
+async def test_a_kindergarten_and_a_school_on_one_site_keep_their_own_fees(db_session, client):
+    """Price audit 2026-10-09: Druzhba's school (522) stored the kindergarten's 5-6 year
+    group price, its kindergarten (587) the school's homework club, and Svetlina's
+    kindergarten (510) read the school's page."""
+    from tests.test_price_audit_rules import DRUZHBA
+
+    site = "https://druzhba.test"
+    kindergarten, kindergarten_page = await _school_with_page(
+        db_session, level="kindergarten", website_url=site, page_text=DRUZHBA + "Занималня\n700 евро на срок\n"
+    )
+    school, school_page = await _school_with_page(
+        db_session, level="upper_secondary", website_url=site, page_text=DRUZHBA
+    )
+    schools_section = SourcePage(
+        school_id=kindergarten.id,
+        scrape_type=ScrapeType.WEBSITE,
+        source_url=f"{site}/school/",
+        content_hash="y",
+        page_category="pricing",
+        is_valid=True,
+        raw_markdown="Регистрационна такса\n450 евро",
+    )
+    db_session.add(schools_section)
+    await db_session.flush()
+    kindergartens_own = _row(kindergarten, kindergarten_page, "tuition", 7865, "yearly", "Трета и Четвърта група")
+    homework_club = _row(kindergarten, kindergarten_page, "extended_day", 700, "term", "Занималня")
+    from_school_page = _row(kindergarten, schools_section, "registration", 450, "one_time", "Регистрационна такса")
+    schools_own = _row(school, school_page, "tuition", 7150, "yearly", "1 - 12 клас")
+    kindergartens_price = _row(school, school_page, "tuition", 7865, "yearly", "1 - 12 клас")
+    db_session.add_all([kindergartens_own, homework_club, from_school_page, schools_own, kindergartens_price])
+    await db_session.commit()
+
+    for institution in (kindergarten, school):
+        await validator_module.validate_school_data(db_session, institution.id, "bg")
+        await db_session.refresh(institution)
+
+    assert _issue_codes(kindergarten, kindergartens_own) == set()
+    assert _issue_codes(kindergarten, homework_club) == {"pricing_label_names_other_level"}
+    assert _issue_codes(kindergarten, from_school_page) == {"pricing_label_names_other_level"}
+    assert _issue_codes(school, schools_own) == set()
+    assert _issue_codes(school, kindergartens_price) == {"pricing_label_names_other_level"}
+    response = await client.get(f"/schools/{school.id}")
+    assert [row["id"] for row in response.json()["pricing"]] == [schools_own.id]

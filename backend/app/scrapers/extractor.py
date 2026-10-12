@@ -38,6 +38,7 @@ from app.schemas.extraction import (
     ServicesExtractionOutput,
     SummarySourceExtractionOutput,
 )
+from app.scrapers.llm_record import record_answer
 from app.scrapers.price_evidence import (
     PriceRow,
     label_is_another_institutions,
@@ -600,6 +601,17 @@ async def _run_typed_agent(
                 )
         llm_stats.model_retries += retries_state["count"]
         parsed = _parse_agent_output(result, result_type)
+        record_answer(
+            settings.extraction_llm_record_dir,
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            result_type=result_type,
+            tier=tier,
+            model=get_model(tier),
+            temperature=settings.extraction_temperature,
+            parsed=parsed,
+            school_id=school_id,
+        )
         input_tokens, output_tokens = helpers._get_usage(result)
         token_cost_usd = _extract_openrouter_cost_usd(result)
         return parsed, input_tokens, output_tokens, token_cost_usd
@@ -1252,13 +1264,14 @@ async def _extract_prices(
     llm_stats: ExtractionLLMStats,
 ) -> dict[str, Any]:
     scope = await school_fee_scope(db, school)
+    family = level_family(school.education_level)
     # Not fee pages of this school: a site template's sample text (590's "$1,800/mo"
     # between lines of lorem ipsum), and a sibling school's section of a shared site.
     pages = [
         page
         for page in pages
         if not helpers._is_template_filler(page.raw_markdown)
-        and not page_is_another_institutions(page.source_url, scope.grades)
+        and not page_is_another_institutions(page.source_url, scope.grades, family, scope.shares_site)
     ]
     selected_text, _source_urls = helpers._select_pages(
         school=school,
@@ -1291,7 +1304,6 @@ async def _extract_prices(
     )
     # Only the prompt gets glued currency words spaced; deterministic extraction and the
     # evidence checks below keep the original page text.
-    family = level_family(school.education_level)
     user_prompt = helpers._space_glued_currency_words(selected_text)
     deterministic_pricing = helpers._extract_prices_deterministic(selected_text)
     used_deterministic_pricing = False
@@ -1336,6 +1348,7 @@ async def _extract_prices(
                 family,
                 set(scope.grades),
                 scope.own_name,
+                scope.shares_site,
             )
         ]
 

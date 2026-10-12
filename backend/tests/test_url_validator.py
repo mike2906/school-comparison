@@ -233,24 +233,33 @@ class TestURLValidatorHeuristics:
         assert final_url is None
         assert "Blocked domain" in reason
 
-    async def test_validate_url_timeout(self):
-        """Timeout errors are handled."""
+    @pytest.mark.parametrize(
+        "error,reason",
+        [
+            (httpx.ReadTimeout("timed out"), "Connection timeout"),
+            # Anything unexpected is caught too, so one page cannot abort the batch.
+            (ValueError("bad markup"), "Validation error: bad markup"),
+        ],
+    )
+    async def test_validate_url_errors_are_reported_not_raised(self, error, reason):
+        """Timeouts and unexpected errors return INVALID with a reason."""
         validator = URLValidator("bg")
 
         with patch("httpx.AsyncClient") as mock_client_class:
             mock_client = AsyncMock()
             mock_client.__aenter__.return_value = mock_client
             mock_client.__aexit__.return_value = None
-            mock_client.get.side_effect = Exception("Timeout")
+            mock_client.get.side_effect = error
             mock_client_class.return_value = mock_client
 
-            result, final_url, reason = await validator.validate_url(
+            result, final_url, got_reason = await validator.validate_url(
                 "https://slow-site.bg",
                 use_llm_fallback=False,
             )
 
             assert result == ValidationResult.INVALID
             assert final_url is None
+            assert got_reason == reason
 
     async def test_validate_url_strong_keywords(self):
         """URLs with 3+ keywords are validated without LLM."""

@@ -60,7 +60,7 @@ class BaseSourceAdapter(ABC):
     COUNTRY_CODE: str = "bg"
     CITY: Optional[str] = None  # e.g., "sofia" - None means country-wide
     DESCRIPTION: str = "Base adapter (override in subclass)"
-    RATE_LIMIT: str = "2/m"  # Celery rate limit (e.g., "2/m" = 2 requests per minute)
+    RATE_LIMIT: str = "2/m"  # Informational only; nothing enforces it (e.g., "2/m" = 2 requests per minute)
     SCRAPE_TYPE: Optional[ScrapeType] = None  # Override to set explicit scrape type (REGISTRY or DISCOVERY)
     # If True, existing records are treated as authoritative for core identity/classification
     # fields and this adapter only enriches supplemental fields.
@@ -132,8 +132,6 @@ class BaseSourceAdapter(ABC):
 
         for disc in discovered_schools:
             try:
-                self._ensure_i18n_fallbacks(disc)
-
                 # Step 1: Try to find existing school
                 existing_school = None
 
@@ -439,10 +437,6 @@ class BaseSourceAdapter(ABC):
 
         logger.info(f"Discovery complete: created={created}, updated={updated}, skipped={skipped}")
         return {"created": created, "updated": updated, "skipped": skipped}
-
-    def _ensure_i18n_fallbacks(self, disc: DiscoveredSchool) -> None:
-        """Keep discovery data source-backed; synthetic EN fallbacks are added at display time only."""
-        return None
 
     async def _sync_source_location(self, row, incoming) -> None:
         """Update a source-owned location's source fields; never its coordinates."""

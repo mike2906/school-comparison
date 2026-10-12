@@ -968,7 +968,7 @@ function SearchPage() {
         // Private schools by their headline-year tuition per month, cheapest first; then
         // those without a fee that converts to a month; state schools last.
         const rank = new Map(list.map((school) => {
-          const value = school.school_type === 'state' ? null : tuitionSortValue(school.pricing)
+          const value = school.school_type === 'state' ? null : tuitionSortValue(school.pricing, { ageGroup: filters.ageGroup })
           return [school.id, school.school_type === 'state' ? [2, 0] : [value == null ? 1 : 0, value ?? 0]]
         }))
         list.sort((a, b) => {

@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { gradeRanges, schoolLevelLabel } from './levelLabel.js'
+import { gradeRanges, schoolLevelLabel, schoolTypeLabel } from './levelLabel.js'
 
 const t = (key, vars) => (vars ? `${key}(${Object.values(vars).join('|')})` : key)
 const school = (groups, level = 'upper_secondary') => ({
@@ -42,4 +42,15 @@ test('schoolLevelLabel uses the country config for groups and grade numbers', ()
   assert.equal(schoolLevelLabel(school(['kita']), t, config), 'educationLevels.kindergarten')
   // Bulgarian keys mean nothing in this config: fall back to the stored level.
   assert.equal(schoolLevelLabel(school(['grade_1_4']), t, config), 'educationLevels.upper_secondary')
+})
+
+test('schoolTypeLabel uses kindergarten forms for kindergartens', () => {
+  assert.equal(schoolTypeLabel({ school_type: 'state', education_level: 'kindergarten' }, t), 'schoolTypesKindergarten.state')
+  assert.equal(schoolTypeLabel({ school_type: 'state', education_level: 'primary' }, t), 'schoolTypes.state')
+  assert.equal(schoolTypeLabel({ school_type: 'international', education_level: 'kindergarten' }, t, 'private'), 'schoolTypesKindergarten.private')
+  assert.equal(schoolTypeLabel({}, t), '')
+})
+
+test('schoolTypeLabel treats nurseries like kindergartens', () => {
+  assert.equal(schoolTypeLabel({ school_type: 'state', education_level: 'nursery' }, t), 'schoolTypesKindergarten.state')
 })

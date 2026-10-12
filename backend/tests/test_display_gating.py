@@ -8,7 +8,7 @@ rather than only on hand-written report payloads.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 import pytest
 from sqlalchemy import select
@@ -23,6 +23,7 @@ from app.scrapers.validator import _spot_check_path_is_core
 from app.utils.display_gating import (
     _FIELD_PATH_DISPLAY_FIELDS,
     NVO_MIN_PUPILS,
+    admission_value_is_semantically_valid,
     blocked_display_fields,
     exam_result_is_publishable,
     implausible_tuition_row_ids,
@@ -462,6 +463,45 @@ def test_bgn_tuition_is_converted_before_comparison():
     assert implausible_tuition_row_ids([_tuition_row(1, 1500, "monthly", "BGN")]) == set()
 
 
+def test_monthly_tuition_annualizes_twelve_times_against_both_yearly_bounds():
+    # 80/month is 960 a year, under the 1,000 floor; 90/month is 1,080, over it.
+    assert implausible_tuition_row_ids([_tuition_row(1, 80)]) == {1}
+    assert implausible_tuition_row_ids([_tuition_row(1, 90)]) == set()
+    # 4,000/month is 48,000 a year, under the 50,000 ceiling; 4,200/month is 50,400.
+    assert implausible_tuition_row_ids([_tuition_row(1, 4000)]) == set()
+    assert implausible_tuition_row_ids([_tuition_row(1, 4200)]) == {1}
+    # Both bounds are inclusive.
+    assert implausible_tuition_row_ids([_tuition_row(1, 1000, "yearly")]) == set()
+    assert implausible_tuition_row_ids([_tuition_row(1, 50000, "yearly")]) == set()
+
+
+def test_peer_floor_uses_the_middle_two_rows_when_a_school_has_an_even_number():
+    # Median of 4,000 and 5,000 is 4,500, so the peer floor is 1,125 a year.
+    rows = [_tuition_row(i, a, "yearly") for i, a in enumerate([1100, 4000, 5000, 6000], 1)]
+    assert implausible_tuition_row_ids(rows) == {1}
+    rows = [_tuition_row(i, a, "yearly") for i, a in enumerate([1150, 4000, 5000, 6000], 1)]
+    assert implausible_tuition_row_ids(rows) == set()
+
+
+@pytest.mark.parametrize(
+    "today,text,valid",
+    [
+        # Before July the admission cycle in progress is the one that started last autumn.
+        (date(2027, 3, 10), "Прием за 2026/2027 учебна година с тест и интервю.", True),
+        (date(2027, 3, 10), "Прием за 2025/2026 учебна година с тест и интервю.", False),
+        (date(2027, 6, 30), "Прием за 2026/2027 учебна година с тест и интервю.", True),
+        # From 1 July the next cycle has started.
+        (date(2027, 7, 1), "Прием за 2026/2027 учебна година с тест и интервю.", False),
+        (date(2027, 7, 1), "Прием за 2027/2028 учебна година с тест и интервю.", True),
+        # A bare year counts as current when it is the cycle's start year or later.
+        (date(2027, 3, 10), "Приемният изпит се проведе през 2026 г.", True),
+        (date(2027, 3, 10), "Приемният изпит се проведе през 2025 г.", False),
+    ],
+)
+def test_admission_text_is_current_only_for_the_cycle_in_progress(today, text, valid):
+    assert admission_value_is_semantically_valid("entrance_requirements", text, today=today) is valid
+
+
 def test_quarterly_tuition_annualizes_and_ranges_use_the_lower_bound():
     assert implausible_tuition_row_ids([_tuition_row(1, 200, period="quarter")]) == {1}
     ranged = _tuition_row(1, None, period="yearly", amount_min=500, amount_max=5000)
@@ -475,7 +515,6 @@ def test_quarterly_tuition_annualizes_and_ranges_use_the_lower_bound():
         _tuition_row(1, 30, period="semester"),
         _tuition_row(1, 30, period="term"),
         _tuition_row(1, 30, period="one_time"),
-        _tuition_row(1, 30, period=None),
         # Only tuition is checked; a small registration or food fee is normal.
         _curated_pricing_row(id=1, category="registration", amount=30, period="one_time"),
         _curated_pricing_row(id=1, category="food", amount=30, period="monthly"),
@@ -485,6 +524,23 @@ def test_quarterly_tuition_annualizes_and_ranges_use_the_lower_bound():
 )
 def test_rows_that_cannot_be_compared_are_left_alone(row):
     assert implausible_tuition_row_ids([row, _tuition_row(2, 900)]) == set()
+
+
+def test_tuition_with_no_period_is_held_to_the_floors_as_a_yearly_fee():
+    """Price audit 2026-10-09: 13 monthly kindergarten fees were saved with no period
+    (330's "899.68 лв. / 460 €", 601's "Monthly fee 950 €") and read as the whole cost."""
+    assert implausible_tuition_row_ids([_tuition_row(1, "899.68", None, "BGN")]) == {1}
+    assert implausible_tuition_row_ids([_tuition_row(1, 950, None)]) == {1}
+    # Below a quarter of the school's stated tuition: 587's €572 beside its yearly fees.
+    rows = [_tuition_row(1, 7865, "yearly"), _tuition_row(2, 1800, None)]
+    assert implausible_tuition_row_ids(rows) == {2}
+    # A yearly fee whose period sat only in a table heading (517's 5th grade €7,810)
+    # stays, and does not move the median the stated rows set.
+    rows = [_tuition_row(1, 7000, "yearly"), _tuition_row(2, 7810, None), _tuition_row(3, 600)]
+    assert implausible_tuition_row_ids(rows) == set()
+    # Unknown period: not judged against the peer ceiling (it may be a whole course).
+    assert implausible_tuition_row_ids([_tuition_row(1, 400), _tuition_row(2, 9000, None)]) == set()
+    assert implausible_tuition_row_ids([_tuition_row(1, 60000, None)]) == {1}
 
 
 def test_plausible_tuition_spread_publishes_in_full():

@@ -16,19 +16,6 @@ services:
       timeout: 5s
       retries: 5
 
-  redis:
-    image: redis:7-alpine
-    container_name: sofia_schools_redis
-    ports:
-      - "127.0.0.1:6379:6379"
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
   searxng:
     image: searxng/searxng:latest
     container_name: sofia_schools_searxng
@@ -42,10 +29,7 @@ services:
       SEARXNG_LIMITER: "false"
       # Set in local .env (gitignored). Fallback avoids SearXNG default crash loop.
       SEARXNG_SECRET: ${SEARXNG_SECRET:-replace-this-local-searxng-secret}
-    depends_on:
-      - redis
     restart: unless-stopped
 
 volumes:
   postgres_data:
-  redis_data:

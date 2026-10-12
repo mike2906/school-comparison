@@ -6,43 +6,14 @@ import {
   getExamTypeLabel as getSharedExamTypeLabel,
   getLatestScoreForExamType as getSharedLatestScoreForExamType,
 } from '../../utils/nvo'
-import { getAdmissionStatusKey, getCanonicalAmenityFlags } from '../../utils/schoolAttributes'
-import { classifyAdmissionRequirement } from '../../utils/admission'
-import { humanizeTag } from '../../utils/tags'
-
-/**
- * SchoolDetailPage Helper Functions
- * Extracted from SchoolCard.jsx for reuse in detail page
- */
-
-const STATUS_COLORS = {
-  accepting: '#10b981',
-  waitlist: '#f59e0b',
-  full: '#ef4444',
-}
+import { getCanonicalAmenityFlags } from '../../utils/schoolAttributes'
+import { PRICE_CATEGORY_ORDER } from '../../utils/pricing'
 
 const SOURCE_BADGE_COLORS = {
   official: 'bg-emerald-100 text-emerald-700 border-emerald-300',
   scraped_website: 'bg-blue-100 text-blue-700 border-blue-300',
   forum: 'bg-amber-100 text-amber-700 border-amber-300',
   not_found: 'bg-neutral-100 text-neutral-600 border-neutral-300',
-}
-
-/**
- * Get enrollment/admission status information
- */
-export function getStatusInfo(school, t) {
-  const statusKey = getAdmissionStatusKey(school.admission_info?.status)
-  if (statusKey === 'accepting') {
-    return { key: 'accepting', color: STATUS_COLORS.accepting, label: t('schoolCard.status.accepting') }
-  }
-  if (statusKey === 'waitlist') {
-    return { key: 'waitlist', color: STATUS_COLORS.waitlist, label: t('schoolCard.status.waitlist') }
-  }
-  if (statusKey === 'full') {
-    return { key: 'full', color: STATUS_COLORS.full, label: t('schoolCard.status.full') }
-  }
-  return null
 }
 
 /**
@@ -60,91 +31,6 @@ export function parseCoordinate(value) {
 }
 
 /**
- * Get last admitted points for state kindergartens
- */
-export function getLastAdmittedPoints(admissionInfo, ageGroup) {
-  const thresholds = admissionInfo?.historical_thresholds || []
-  if (thresholds.length === 0) return null
-
-  const relevant = ageGroup
-    ? thresholds.filter(item => item.age_group === ageGroup)
-    : thresholds
-
-  if (relevant.length === 0) return null
-
-  const latest = relevant.reduce((acc, item) => (item.year > acc.year ? item : acc), relevant[0])
-  const rounds = latest.rounds || []
-  if (rounds.length === 0) return null
-
-  const lastRound = rounds.reduce((acc, item) => (item.round > acc.round ? item : acc), rounds[0])
-
-  return {
-    points: lastRound.last_admitted_points,
-    year: latest.year,
-    round: lastRound.round,
-  }
-}
-
-/**
- * Get minimum NVO score for state gymnasiums
- */
-export function getMinNvoScore(admissionInfo) {
-  const scores = admissionInfo?.historical_min_scores || []
-  if (scores.length === 0) return null
-  const latest = scores.reduce((acc, item) => (item.year > acc.year ? item : acc), scores[0])
-  return {
-    score: latest.min_score,
-    year: latest.year,
-  }
-}
-
-/**
- * Get admission requirement for private schools
- */
-export function getAdmissionRequirement(rawRequirement, t) {
-  const requirement = classifyAdmissionRequirement(rawRequirement)
-  if (!requirement) return null
-  if (requirement.kind === 'interview') {
-    return { icon: '📝', text: t('schoolCard.admissions.interviewRequired') }
-  }
-  if (requirement.kind === 'test') {
-    return { icon: '📋', text: t('schoolCard.admissions.testRequired') }
-  }
-  if (requirement.kind === 'none') {
-    return { icon: '✅', text: t('schoolCard.admissions.noEntranceExam') }
-  }
-  return { icon: 'ℹ️', text: requirement.text }
-}
-
-/**
- * Format percentage value
- */
-export function formatPercent(value, decimals = 1) {
-  if (value == null || Number.isNaN(value)) return null
-  return Number(value).toFixed(decimals)
-}
-
-/**
- * Get performance style based on score
- */
-export function getPerformanceStyle(value) {
-  if (value >= 75) return { text: 'text-emerald-500', bg: 'bg-emerald-500' }
-  if (value >= 60) return { text: 'text-amber-500', bg: 'bg-amber-500' }
-  return { text: 'text-red-500', bg: 'bg-red-500' }
-}
-
-/**
- * Get trend information
- */
-export function getTrendInfo(latest, average) {
-  if (latest == null || average == null) return null
-  const diff = latest - average
-  if (diff >= 2) return { arrow: '↑', className: 'text-emerald-500', diff }
-  if (diff <= -2) return { arrow: '↓', className: 'text-red-500', diff }
-  return { arrow: '→', className: 'text-neutral-400', diff }
-}
-
-/**
  * Get detailed NVO data for a school
  */
 export function getNvoDetail(school, t, ageGroup = null) {
@@ -152,28 +38,14 @@ export function getNvoDetail(school, t, ageGroup = null) {
 }
 
 /**
- * Group pricing items by category
+ * Group pricing items by category, in display order. Each category keeps its own
+ * heading; only a category the app does not know goes under "other".
  */
 export function groupPricingByCategory(pricing) {
-  const grouped = {
-    tuition: [],
-    food: [],
-    transport: [],
-    activities: [],
-    registration: [],
-    materials: [],
-    other: [],
-  }
-
+  const grouped = Object.fromEntries(PRICE_CATEGORY_ORDER.map(category => [category, []]))
   pricing.forEach(item => {
-    const category = item.category || 'other'
-    if (grouped[category]) {
-      grouped[category].push(item)
-    } else {
-      grouped.other.push(item)
-    }
+    grouped[grouped[item.category] ? item.category : 'other'].push(item)
   })
-
   return grouped
 }
 
@@ -182,16 +54,6 @@ export function groupPricingByCategory(pricing) {
  */
 export function getSourceBadgeColor(source) {
   return SOURCE_BADGE_COLORS[source] || SOURCE_BADGE_COLORS.not_found
-}
-
-/**
- * Format currency amount
- */
-export function formatCurrency(amount, locale) {
-  if (amount == null || Number.isNaN(amount)) return null
-  return new Intl.NumberFormat(locale, {
-    maximumFractionDigits: 0,
-  }).format(amount)
 }
 
 /**
@@ -220,41 +82,6 @@ export function getAmenityFlags(attributes, hasAfterSchool) {
  */
 export function getLanguageLabel(language, t) {
   return languageLabel(language, t)
-}
-
-/**
- * Get option label (generic)
- */
-export function getOptionLabel(option, t) {
-  if (!option) return ''
-  const key = `advancedFilters.options.${option}`
-  const translated = t(key)
-  if (translated !== key) return translated
-  // Free text scraped from a website: tidy it, but never Title-Case a sentence.
-  return humanizeTag(option)
-}
-
-/**
- * Normalize language focus array
- */
-export function normalizeLanguageFocus(languageFocus = []) {
-  const normalized = []
-  const items = Array.isArray(languageFocus) ? languageFocus : [languageFocus]
-  items.forEach((item) => {
-    if (!item) return
-    if (typeof item === 'string') {
-      const [language, level] = item.split(':')
-      normalized.push({ language, level })
-      return
-    }
-    if (typeof item === 'object') {
-      normalized.push({
-        language: item.language,
-        level: item.level,
-      })
-    }
-  })
-  return normalized.filter(item => item.language)
 }
 
 /**

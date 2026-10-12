@@ -521,7 +521,9 @@ will need to be repeated.
 
 ## Phase 2 — User-facing correctness bugs
 
-- [x] **P2.1 diff=2 age-group gap.** `app/utils/education.py:15-24`: nursery covers
+- [x] **P2.1 diff=2 age-group gap.** (`app/utils/education.py` and `tests/test_education.py`
+      were deleted as unused in the tech-debt cleanup; the boundaries are now tested on the
+      seed config in `tests/test_country_seed_age_groups.py`.) `app/utils/education.py:15-24`: nursery covers
       diff 0–1, `first` starts at 3, so 2-year-olds get zero results.
       `tests/test_education.py:111-116` asserts the bug. Extend nursery to `max_diff: 2`
       (confirm against kg.sofia.bg group definitions), fix test, mirror in
@@ -1609,6 +1611,7 @@ the session scratchpad only.
       "+1.5%" deltas next to "+19.7 pp", an unexplained "Trend" column, "(33%)" on tabs,
       "Под ориентира" jargon. One term (national average), deltas in pp everywhere.
       **Done 2026-09-24:** "national average" everywhere (EN/BG), year-on-year change in pp, "vs 5-yr avg" column, tab percentages removed.
+      **Changed 2026-10-09 (#216):** the benchmark is relabelled "Sofia schools' average", since the DB holds only Sofia schools.
 - [x] **UF11 Compare colours NVO on fixed 60/75 % cut-offs,** contradicting the detail
       page's "above national average" green; the row doesn't name the grade and "School
       avg" doesn't say "5-year". Colour relative to the national average; label both.
@@ -1885,7 +1888,7 @@ the session scratchpad only.
       register gives the institution an address none of its locations has (then unchanged:
       1174, 1080); Nominatim pins are exact only for the house number asked for;
       `geocode_locations.py --check-shared-points` (0 pairs after apply). Applied
-      `scripts/geocode_pin_gaps_uf44.py` (dry run `backend/reports/uf44/20260925T104215Z/`,
+      `scripts/geocode_pin_gaps_uf44.py` (deleted once done; see git history) (dry run `backend/reports/uf44/20260925T104215Z/`,
       backup `~/backups/sofia_schools_pre_uf44_20260925_1342.dump`): 42 locations changed.
       Sofia locations without a pin: private 38 → 25, state 8 → 4. 8 wrong name-match pins
       moved to their own address and 2 cleared (1072, 1095); 11 host-building tenants on the
@@ -1995,6 +1998,41 @@ the session scratchpad only.
       Д-р Петър Берон, Никатор, Свети Георги, Проф. Николай Райнов. Left apart: Куест
       (209 m), Малкото школо / Българско школо and Малки стъпки / Азбуки (no shared brand),
       Монтесори (shares a pin with unrelated schools).
+- [x] **UF47 School-page fees are hard to read and can't be checked (Mike, 2026-10-10).**
+      Ryorih (171) showed five tuition rows for two grade bands as one flat list, each
+      with its own source badge and no link. The school page now groups each category's fees by
+      the age group they name (when there are two or more), says once per academic year
+      where the prices came from (badge, link to the stored `source_url` page, the day we
+      checked it), or on each row when rows come from different pages, and shows no link
+      when none is stored. Camp, uniform, extended-day and extracurricular fees get their
+      own headings instead of an untranslated "pricing.other". Not fixed here (data):
+      171's expired early-bird tiers (rule 7 should withhold them on the next
+      validation run and publish), its "ПК" age group on the PK–7 row, and plan names
+      that are English-only in the Bulgarian UI.
+      Follow-up (Mike, 2026-10-10): the age-group headings showed the website's own words
+      ("ПК", "VIII - XII клас") on the English page. Grade texts we can read
+      (`src/utils/gradeBand.js`: ПК/ПГ/PK, Arabic and Roman grades and ranges) now show
+      our label ("Preschool" / "Подготвителна група (ПГ)", "Grades 8–12" / "8–12 клас");
+      anything else stays as written. A plan name that writes out a wider overlapping
+      range widens the band, so 171's "PK–7: …" row reads "Preschool to grade 7" instead
+      of sitting under "Preschool". The compare page's per-row labels use the same code.
+- [x] **UF48 Headline tuition shows another group's fee, or misses one with no stored
+      period (site review 2026-10-10, items 2 and 3).** The search card for a parent who
+      picked "Third group" showed a kindergarten's first- and second-group fees, and 517's
+      headline read €7,000 because its grade 5 row (€7,810, "ГОДИШНА ТАКСА") has no stored
+      period. Computed, not stored (`src/utils/priceRows.js`): a row's period is the stored
+      one, else the one its own name states (годишна / месечна / срок / семестър, never
+      two); a row's age groups are read from its age group and plan name (kindergarten
+      group ordinals, ясла, ПК/ПГ, grade ranges). The search card headline and the price sort
+      use only the chosen group's rows plus rows naming no group, and show no price when the
+      school lists tuition only for other groups. Not fixed here: the validator's period fill
+      still misses table-heading periods like 517's (the root cause, ~125 rows).
+- [x] **UF49 Fee rows are hard to read on phones and in compare (site review 2026-10-10,
+      items 5, 7 and part of 9).** Long fee names broke mid-word beside the price; rows now
+      stack on narrow screens. A fee with no period shows a short amber "Period not stated",
+      so 700 or 1,620 isn't read as monthly beside a monthly fee. Compare lists tuition first.
+      Not done: one aligned row per category in compare (waits for the ComparePage split),
+      and English names for Bulgarian fee names (needs the extractor to store them).
 
 ## Phase 3 — Go live
 
@@ -2269,6 +2307,8 @@ the session scratchpad only.
       E2 ever re-enables summary publication.
 
 ## Phase 4 — Post-live / portfolio polish (parallelizable, low risk)
+
+P4.1 and P4.4 are scheduled in `docs/TECH_DEBT_PLAN.md` (steps 6 and 7-9), and that plan's order and module locations win.
 
 - [ ] **P4.1 Decompose `SearchPage.jsx`** (2,049 lines, ~25 useState) into custom hooks
       (`useUserLocation`, `useSchoolFilters`, `useMapSync`) + subcomponents. Then
