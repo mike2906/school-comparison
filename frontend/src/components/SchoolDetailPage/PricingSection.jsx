@@ -1,11 +1,11 @@
 import { useTranslation } from 'react-i18next'
-import { displayPrice, groupPricingByAcademicYear, pricePlanLabel, groupRowsByAgeGroup, priceAgeGroupLabel, YEAR_STATUS } from '../../utils/pricing'
+import { displayPrice, groupPricingByAcademicYear, groupRowsByAgeGroup, priceAgeGroupLabel, YEAR_STATUS } from '../../utils/pricing'
 import { sharedPriceSource } from '../../utils/priceSources'
 import { groupPricingByCategory } from './helpers'
 import { formatAmount } from '../../utils/format'
 import PriceSource from './PriceSource'
 import { pricePeriod, periodUnknown } from '../../utils/priceRows'
-import { textLang } from '../../utils/priceLabels'
+import { planNameBeside, textLang } from '../../utils/priceLabels'
 
 /**
  * Every published price, grouped by academic year, then by category, then by the age
@@ -17,7 +17,7 @@ function PricingSection({ pricing }) {
 
   const formatNumber = (value) => formatAmount(value, i18n.language)
 
-  const renderRow = (price, { showAgeGroup, showSource }) => {
+  const renderRow = (price, { showAgeGroup, showSource, bandLabel }) => {
     const { currency } = displayPrice(null, price.currency)
     const formatShown = (value) => formatNumber(displayPrice(value, price.currency).value)
     const amountText = price.amount_min != null || price.amount_max != null
@@ -27,7 +27,7 @@ function PricingSection({ pricing }) {
       : t('pricing.priceOnRequest')
 
     const ageGroupLabel = showAgeGroup ? priceAgeGroupLabel(price, t) : null
-    const planName = pricePlanLabel(price, t)
+    const planName = planNameBeside(price, t, bandLabel || ageGroupLabel)
 
     return (
       // Stacked on phones: beside the price, a long fee name was squeezed into a column a
@@ -108,6 +108,7 @@ function PricingSection({ pricing }) {
                             )}
                             {band.rows.map(price => renderRow(price, {
                               showAgeGroup: !band.label,
+                              bandLabel: band.label,
                               showSource: !shared,
                             }))}
                           </div>

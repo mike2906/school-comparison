@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { planNameLabel, stageLabel, textLang } from './priceLabels.js'
+import { planNameBeside, planNameLabel, stageLabel, textLang } from './priceLabels.js'
 
 const STRINGS = {
   en: {
@@ -68,4 +68,12 @@ test('planNameLabel keeps names that only look like grades', () => {
   assert.equal(planNameLabel({ category: 'tuition', plan_name: 'Подготвителен клас' }, t), 'Подготвителен клас')
   // Payment options numbered I, II, IV.
   assert.equal(planNameLabel({ category: 'tuition', plan_name: 'IV' }, t), 'IV')
+})
+
+test('planNameBeside drops the plan name only when it repeats the age group shown beside it', () => {
+  const row = { category: 'tuition', age_group: '5 клас', plan_name: '5. клас' }
+  assert.equal(planNameBeside(row, t, 'Grade 5'), null)
+  // Nothing shown beside it: the grade stays.
+  assert.equal(planNameBeside(row, t, null), 'Grade 5')
+  assert.equal(planNameBeside(row, t, 'Grade 6'), 'Grade 5')
 })

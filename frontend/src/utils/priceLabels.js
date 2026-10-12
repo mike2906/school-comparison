@@ -62,3 +62,12 @@ export function textLang(text, pageLanguage) {
   if (/\p{Script=Latin}/u.test(value)) return pageLanguage === 'en' ? undefined : 'en'
   return undefined
 }
+
+/**
+ * `planNameLabel`, or null when it reads the same as the age-group label shown beside it
+ * ("ПК" under "ПК" would read "Preschool • Preschool").
+ */
+export function planNameBeside(price, t, shownAgeGroup) {
+  const name = planNameLabel(price, t)
+  return name && name === shownAgeGroup ? null : name
+}

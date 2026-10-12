@@ -49,9 +49,9 @@ import {
   getTrendInfo,
   getTrendTooltip,
 } from '../../utils/nvoDisplay'
-import { formatCurrency, formatPriceLabel, groupPricingByAcademicYear, priceAgeGroupLabel, pricePlanLabel, sortByCategory, statedTuition, tuitionSortValue, YEAR_STATUS } from '../../utils/pricing'
+import { formatCurrency, formatPriceLabel, groupPricingByAcademicYear, priceAgeGroupLabel, sortByCategory, statedTuition, tuitionSortValue, YEAR_STATUS } from '../../utils/pricing'
 import { pricePeriod, periodUnknown } from '../../utils/priceRows'
-import { textLang } from '../../utils/priceLabels'
+import { planNameBeside, textLang } from '../../utils/priceLabels'
 import { safeSourceUrl, sourceSiteName } from '../../utils/priceSources'
 
 const SOURCE_BADGE_STYLES = {
@@ -989,7 +989,7 @@ function ComparePage() {
                       <div className="text-sm font-medium text-neutral-900">
                         {t(`pricing.${price.category}`)}
                         {[priceAgeGroupLabel(price, t)].filter(Boolean).map(label => ` • ${label}`)}
-                        {[pricePlanLabel(price, t)].filter(Boolean).map(name => (
+                        {[planNameBeside(price, t, priceAgeGroupLabel(price, t))].filter(Boolean).map(name => (
                           <span key="plan" lang={textLang(name, i18n.language)}>{` • ${name}`}</span>
                         ))}
                         {!group.academicYear && price.academic_year ? ` • ${price.academic_year}` : ''}

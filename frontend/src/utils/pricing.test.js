@@ -13,7 +13,6 @@ import {
   statedTuition,
   tuitionSortValue,
   priceAgeGroupLabel,
-  pricePlanLabel,
   groupRowsByAgeGroup,
   sortByCategory,
   intakeYearStart,
@@ -532,10 +531,3 @@ test('statedTuition: a ПГУ (preschool group at school) fee is not a grades 1�
   assert.equal(statedTuition(rows, { ageGroup: 'preschool', today: new Date('2026-06-01') }).max, 8000)
 })
 
-test('pricePlanLabel drops a plan name that reads the same as its age group', () => {
-  assert.equal(pricePlanLabel({ category: 'tuition', age_group: 'ПК', plan_name: 'ПК' }, tEn), null)
-  assert.equal(pricePlanLabel({ category: 'tuition', age_group: '5 клас', plan_name: '5. клас' }, tEn), null)
-  assert.equal(pricePlanLabel({ category: 'tuition', age_group: '1 клас', plan_name: 'I клас' }, tEn), null)
-  assert.equal(pricePlanLabel({ category: 'tuition', age_group: 'ПК', plan_name: '8. клас' }, tEn), 'Grade 8')
-  assert.equal(pricePlanLabel({ category: 'tuition', plan_name: '8. клас' }, tEn), 'Grade 8')
-})

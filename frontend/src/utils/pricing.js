@@ -1,7 +1,7 @@
 import { intlLocale } from './format.js'
 import { gradeBandLabel, gradeRangeInText, gradesInText, gradesNamedIn, rowGradeBand } from './gradeBand.js'
 import { isOnePayment, pricePeriod, rowAgeGroupKeys, rowsForAgeGroup } from './priceRows.js'
-import { planNameLabel, stageLabel } from './priceLabels.js'
+import { stageLabel } from './priceLabels.js'
 
 /**
  * Academic-year cohort helpers for pricing display.
@@ -295,15 +295,6 @@ function ageGroupName(price, t) {
   // 8. клас за учебната …".
   const band = rowGradeBand(price) || namedBand(raw, price.plan_name)
   return band ? gradeBandLabel(band, t) : raw
-}
-
-/**
- * The plan name to show for a price row (see `planNameLabel`), or null when it is the same
- * label as the row's age group ("ПК" under "ПК" would read "Preschool • Preschool").
- */
-export function pricePlanLabel(price, t) {
-  const name = planNameLabel(price, t)
-  return name && name === ageGroupName(price, t) ? null : name
 }
 
 /**
