@@ -89,13 +89,15 @@ async def _seed_country(db_session):
         ("РЕ(ПП) B1", "russian_b1_pp"),
         ("БЗО(ПП)", "biology_pp"),
         ("ГИ(ПП)", "geography_pp"),
-        ("ИИ(ПП)", None),
+        ("ИИ(ПП)", "fine_arts_pp"),
+        ("Ист(ПП)", "history_pp"),
         ("ИсЕ(ПП) B2", "spanish_b2_pp"),
         ("ИтЕ(ПП) B2", "italian_b2_pp"),
         ("ФА(ПП)", "physics_pp"),
         ("ХООС(ПП)", "chemistry_pp"),
         ("МУЗ(ПП)", "music_pp"),
-        ("Пр(ПП)", None),
+        ("Пр(ПП)", "entrepreneurship_pp"),
+        ("ФВС(ПП)", None),
     ],
 )
 def test_subject_key(label, expected):

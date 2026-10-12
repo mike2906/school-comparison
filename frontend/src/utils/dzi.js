@@ -9,16 +9,19 @@ const DZI_METRIC = 'average_grade'
 const SUBJECT_ORDER = [
   'bulgarian', 'math', 'english', 'german', 'french', 'spanish', 'italian', 'russian',
   'history', 'geography', 'philosophy', 'biology', 'physics', 'chemistry', 'informatics', 'it',
-  'music',
+  'music', 'fine_arts', 'entrepreneurship',
 ]
 const CURRICULUM_ORDER = { oop: 0, pp: 1 }
 
 /** { base, cefr, curriculum } for a stored ДЗИ subject, or null when we have no label for it. */
 export function parseDziSubject(subject) {
-  const parts = String(subject || '').toLowerCase().split('_')
-  const base = parts[0]
-  if (!SUBJECT_ORDER.includes(base)) return null
-  const rest = parts.slice(1)
+  const text = String(subject || '').toLowerCase()
+  // Some subject names contain "_" themselves ("fine_arts"), so match the known name.
+  const base = SUBJECT_ORDER
+    .filter(name => text === name || text.startsWith(`${name}_`))
+    .sort((a, b) => b.length - a.length)[0]
+  if (!base) return null
+  const rest = text.slice(base.length).split('_').filter(Boolean)
   const curriculum = rest.find(part => part in CURRICULUM_ORDER) || null
   const level = rest.find(part => /^[ab][12]\d?$/.test(part))
   // "b11" is stored for B1.1.
