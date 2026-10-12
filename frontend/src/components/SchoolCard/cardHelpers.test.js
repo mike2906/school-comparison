@@ -3,9 +3,7 @@ import assert from 'node:assert/strict'
 
 import {
   getLocationAgeGroups,
-  getLocationTags,
   getScheduleLine,
-  getShiftForAgeGroup,
   hexToRgba,
 } from './cardHelpers.js'
 
@@ -18,26 +16,6 @@ test('getLocationAgeGroups prefers the list, falls back to the single group', ()
   assert.deepEqual(getLocationAgeGroups({ age_groups: ['a', null, 'b'] }), ['a', 'b'])
   assert.deepEqual(getLocationAgeGroups({ age_group: 'c' }), ['c'])
   assert.deepEqual(getLocationAgeGroups(null), [])
-})
-
-test('getLocationTags ignores non-arrays and empty values', () => {
-  assert.deepEqual(getLocationTags({ location_tags: ['x', '', 'y'] }), ['x', 'y'])
-  assert.deepEqual(getLocationTags({ location_tags: 'x' }), [])
-  assert.deepEqual(getLocationTags({}), [])
-})
-
-test('getShiftForAgeGroup matches the group, else the first shift', () => {
-  const location = {
-    age_group_shifts: [
-      { age_group: 'primary', shift: 'morning' },
-      { age_group: 'secondary', shift: 'afternoon' },
-      { shift: 'ignored' },
-    ],
-  }
-  assert.equal(getShiftForAgeGroup(location, 'secondary').shift, 'afternoon')
-  assert.equal(getShiftForAgeGroup(location, 'missing').shift, 'morning')
-  assert.equal(getShiftForAgeGroup(location, null).shift, 'morning')
-  assert.equal(getShiftForAgeGroup({}, 'primary'), null)
 })
 
 test('getScheduleLine returns null without a shift', () => {

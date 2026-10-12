@@ -5,6 +5,7 @@ import { formatPriceLabel } from '../../utils/pricing.js'
 import { planNameLabel } from '../../utils/priceLabels.js'
 import { pricePeriod } from '../../utils/priceRows.js'
 import { parsePhones } from '../../utils/phone.js'
+import { getAgeGroupShifts } from '../../utils/schoolLocation.js'
 
 
 export const typeColors = {
@@ -202,27 +203,6 @@ export function getLocationAgeGroups(location) {
   if (Array.isArray(location.age_groups)) return location.age_groups.filter(Boolean)
   if (location.age_group) return [location.age_group]
   return []
-}
-
-export function getAgeGroupShifts(location) {
-  if (!location?.age_group_shifts) return []
-  return location.age_group_shifts.filter(item => item && item.age_group)
-}
-
-export function getLocationTags(location) {
-  if (!location?.location_tags) return []
-  if (!Array.isArray(location.location_tags)) return []
-  return location.location_tags.filter(Boolean)
-}
-
-export function getShiftForAgeGroup(location, ageGroup) {
-  const shifts = getAgeGroupShifts(location)
-  if (!shifts.length) return null
-  if (ageGroup) {
-    const match = shifts.find(item => item.age_group === ageGroup)
-    if (match) return match
-  }
-  return shifts[0] || null
 }
 
 export function buildExpandedSections({
