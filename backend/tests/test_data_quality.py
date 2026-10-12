@@ -753,9 +753,9 @@ async def test_pipeline_run_all_failures_not_recorded_completed(quality_fixture)
 
 async def test_navigate_summary_converts_results_list():
     """`navigate` keeps returning its list; the dispatch derives real counts from it."""
-    from app.scrapers.cli import _navigate_summary
+    from app.scrapers.stages.common import navigate_summary
 
-    summary = _navigate_summary(
+    summary = navigate_summary(
         [
             {"school_id": 1, "success": True},
             {"school_id": 2, "success": False},
@@ -763,7 +763,7 @@ async def test_navigate_summary_converts_results_list():
         ]
     )
     assert summary == {"processed": 3, "succeeded": 2, "failed": 1, "skipped": 0}
-    assert _navigate_summary(None) == {"processed": 0, "succeeded": 0, "failed": 0, "skipped": 0}
+    assert navigate_summary(None) == {"processed": 0, "succeeded": 0, "failed": 0, "skipped": 0}
 
 
 async def test_recent_run_cost_prefers_usage_metrics_with_legacy_fallback():

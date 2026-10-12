@@ -565,6 +565,7 @@ async def test_repair_websites_runs_recovered_urls_through_the_check(db_session)
     from unittest.mock import AsyncMock, patch
 
     from app.scrapers import cli as scraper_cli
+    from app.scrapers.stages import website as website_stage
 
     school = School(
         name_i18n={"bg": "Възстановен"}, country_code="bg", school_type="private", education_level="kindergarten",
@@ -582,8 +583,8 @@ async def test_repair_websites_runs_recovered_urls_through_the_check(db_session)
 
     with (
         patch("app.database.async_session_maker", side_effect=lambda: SessionContext()),
-        patch.object(scraper_cli, "_run_recover_failed_school", new=AsyncMock()),
-        patch.object(scraper_cli, "_run_shared_site_check", new=AsyncMock()) as check_mock,
+        patch.object(website_stage, "run_recover_failed_school", new=AsyncMock()),
+        patch.object(website_stage, "check_shared_sites", new=AsyncMock()) as check_mock,
     ):
         await scraper_cli._repair_websites_command(
             school_name=None, school_id=school.id, city="sofia", country="bg", limit=None,
@@ -598,7 +599,7 @@ async def test_repair_websites_runs_recovered_urls_through_the_check(db_session)
 async def test_website_discovery_batch_runs_the_check_for_its_schools(db_session):
     from unittest.mock import AsyncMock, patch
 
-    from app.scrapers import cli as scraper_cli
+    from app.scrapers.stages import website as website_stage
 
     school = School(
         name_i18n={"bg": "Нов"}, country_code="bg", school_type="private", education_level="kindergarten",
@@ -608,10 +609,10 @@ async def test_website_discovery_batch_runs_the_check_for_its_schools(db_session
     await db_session.commit()
 
     with (
-        patch.object(scraper_cli, "_run_discover_website", new=AsyncMock(return_value={"found": True})),
-        patch.object(scraper_cli, "_run_shared_site_check", new=AsyncMock()) as check_mock,
+        patch.object(website_stage, "run_discover_website", new=AsyncMock(return_value={"found": True})),
+        patch.object(website_stage, "check_shared_sites", new=AsyncMock()) as check_mock,
     ):
-        await scraper_cli._run_discover_websites_batch(db=db_session, country="bg", city="sofia", limit=None)
+        await website_stage.run_discover_websites_batch(db=db_session, country="bg", city="sofia", limit=None)
 
     check_mock.assert_awaited_once()
     assert check_mock.await_args.kwargs["school_ids"] == [school.id]

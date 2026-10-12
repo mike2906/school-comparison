@@ -11,6 +11,14 @@ from click.testing import CliRunner
 
 from app.models import PipelineRun, PipelineStage, School
 from app.scrapers import cli as scraper_cli
+from app.scrapers.stages import all_stages
+from app.scrapers.stages import exams as exams_stage
+from app.scrapers.stages import extract as extract_stage
+from app.scrapers.stages import navigate as navigate_stage
+from app.scrapers.stages import runner as stage_runner
+from app.scrapers.stages import summarize as summarize_stage
+from app.scrapers.stages import validate_data as validate_data_stage
+from app.scrapers.stages import website as website_stage
 
 
 @pytest.mark.asyncio
@@ -36,13 +44,13 @@ def test_url_recovery_fails_closed_without_provider_cost_cap():
 
     assert result.exit_code == 2
     assert "--provider-cost-cap-usd is required for billable stages" in result.output
-    assert "recover-failed-urls" in scraper_cli.BILLABLE_STAGES
+    assert "recover-failed-urls" in stage_runner.BILLABLE_STAGES
 
 
 @pytest.mark.asyncio
 async def test_sync_url_recovery_cannot_bypass_provider_cost_cap_check():
     with pytest.raises(ValueError, match="provider_cost_cap_usd is required"):
-        await scraper_cli._run_sync(
+        await stage_runner.run_sync(
             school_name=None,
             school_id=None,
             stage="recover-failed-urls",
@@ -137,7 +145,7 @@ async def test_validate_batch_aggregates_spot_check_usage(db_session):
             ),
         ),
     ):
-        summary = await scraper_cli._run_validate_data_batch(
+        summary = await validate_data_stage.run_validate_data_batch(
             db_session,
             country="bg",
             city="sofia",
@@ -166,7 +174,7 @@ async def test_run_discover_batch_counts_crashed_adapter_as_failed(db_session):
         "app.scrapers.sources.get_adapters_for_country",
         return_value=[_BoomAdapter],
     ):
-        summary = await scraper_cli._run_discover_batch(db_session, "bg", "sofia", None, 1.0)
+        summary = await website_stage.run_discover_batch(db_session, "bg", "sofia", None, 1.0)
 
     # A crashed adapter must not record COMPLETED with all-zero counts.
     assert summary["failed"] == 1
@@ -189,14 +197,14 @@ async def test_run_all_stages_routes_to_canonical_handlers(db_session):
     await db_session.commit()
 
     with (
-        patch.object(scraper_cli, "_run_discover_website", new=AsyncMock()) as discover_mock,
-        patch.object(scraper_cli, "_run_validate_url", new=AsyncMock()) as validate_mock,
-        patch.object(scraper_cli, "_run_navigate_school", new=AsyncMock()) as nav_mock,
-        patch.object(scraper_cli, "_run_extract_school", new=AsyncMock()) as extract_mock,
-        patch.object(scraper_cli, "_run_validate_data_school", new=AsyncMock()) as validate_data_mock,
-        patch.object(scraper_cli, "_run_summarize_school", new=AsyncMock()) as summarize_mock,
+        patch.object(website_stage, "run_discover_website", new=AsyncMock()) as discover_mock,
+        patch.object(website_stage, "run_validate_url", new=AsyncMock()) as validate_mock,
+        patch.object(navigate_stage, "run_navigate_school", new=AsyncMock()) as nav_mock,
+        patch.object(extract_stage, "run_extract_school", new=AsyncMock()) as extract_mock,
+        patch.object(validate_data_stage, "run_validate_data_school", new=AsyncMock()) as validate_data_mock,
+        patch.object(summarize_stage, "run_summarize_school", new=AsyncMock()) as summarize_mock,
     ):
-        await scraper_cli._run_all_stages(db_session, school.id, "bg")
+        await all_stages.run_all_stages(db_session, school.id, "bg")
 
     discover_mock.assert_awaited_once()
     validate_mock.assert_awaited_once()
@@ -249,7 +257,7 @@ async def test_select_all_stage_cohort_is_deterministic_and_includes_refresh_row
     db_session.add_all(schools)
     await db_session.commit()
 
-    ordinary_ids = await scraper_cli._select_all_stage_cohort(
+    ordinary_ids = await all_stages.select_all_stage_cohort(
         db_session,
         country="bg",
         city="sofia",
@@ -258,7 +266,7 @@ async def test_select_all_stage_cohort_is_deterministic_and_includes_refresh_row
         include_extracted=False,
         force_validate=False,
     )
-    refresh_ids = await scraper_cli._select_all_stage_cohort(
+    refresh_ids = await all_stages.select_all_stage_cohort(
         db_session,
         country="bg",
         city="sofia",
@@ -267,7 +275,7 @@ async def test_select_all_stage_cohort_is_deterministic_and_includes_refresh_row
         include_extracted=True,
         force_validate=True,
     )
-    explicit_ids = await scraper_cli._select_all_stage_cohort(
+    explicit_ids = await all_stages.select_all_stage_cohort(
         db_session,
         country="bg",
         city="sofia",
@@ -283,7 +291,7 @@ async def test_select_all_stage_cohort_is_deterministic_and_includes_refresh_row
     assert explicit_ids == [schools[0].id, schools[2].id]
 
     with pytest.raises(scraper_cli.click.UsageError, match="outside the requested"):
-        await scraper_cli._select_all_stage_cohort(
+        await all_stages.select_all_stage_cohort(
             db_session,
             country="bg",
             city="sofia",
@@ -313,26 +321,26 @@ async def test_run_all_stages_batch_propagates_one_cohort_to_every_stage(db_sess
     await db_session.commit()
 
     with (
-        patch.object(scraper_cli, "_select_all_stage_cohort", new=AsyncMock(return_value=cohort)),
-        patch.object(scraper_cli, "_run_validate_urls_batch", new=AsyncMock(return_value=url_summary)) as urls_mock,
+        patch.object(all_stages, "select_all_stage_cohort", new=AsyncMock(return_value=cohort)),
+        patch.object(website_stage, "run_validate_urls_batch", new=AsyncMock(return_value=url_summary)) as urls_mock,
         patch.object(
-            scraper_cli,
-            "_run_navigate_batch",
+            navigate_stage,
+            "run_navigate_batch",
             new=AsyncMock(return_value=[{"school_id": school_id, "success": True} for school_id in cohort]),
         ) as navigate_mock,
         patch.object(
-            scraper_cli,
-            "_run_extract_batch",
+            extract_stage,
+            "run_extract_batch",
             new=AsyncMock(return_value=extract_summary),
         ) as extract_mock,
         patch.object(
-            scraper_cli,
-            "_run_validate_data_batch",
+            validate_data_stage,
+            "run_validate_data_batch",
             new=AsyncMock(return_value=validation_summary),
         ) as validate_mock,
-        patch.object(scraper_cli, "_run_summarize_batch", new=AsyncMock(return_value=summary)) as summarize_mock,
+        patch.object(summarize_stage, "run_summarize_batch", new=AsyncMock(return_value=summary)) as summarize_mock,
     ):
-        results = await scraper_cli._run_all_stages_batch(
+        results = await all_stages.run_all_stages_batch(
             db_session,
             country="bg",
             city="sofia",
@@ -360,30 +368,30 @@ async def test_run_all_stages_batch_can_skip_summarization():
     summary = {"processed": 1, "succeeded": 1, "failed": 0, "skipped": 0}
 
     with (
-        patch.object(scraper_cli, "_select_all_stage_cohort", new=AsyncMock(return_value=cohort)),
+        patch.object(all_stages, "select_all_stage_cohort", new=AsyncMock(return_value=cohort)),
         patch.object(
-            scraper_cli,
-            "_run_validate_urls_batch",
+            website_stage,
+            "run_validate_urls_batch",
             new=AsyncMock(return_value={**summary, "validated_school_ids": cohort}),
         ),
         patch.object(
-            scraper_cli,
-            "_run_navigate_batch",
+            navigate_stage,
+            "run_navigate_batch",
             new=AsyncMock(return_value=[{"school_id": 17, "success": True}]),
         ),
         patch.object(
-            scraper_cli,
-            "_run_extract_batch",
+            extract_stage,
+            "run_extract_batch",
             new=AsyncMock(return_value={**summary, "ready_school_ids": cohort}),
         ),
         patch.object(
-            scraper_cli,
-            "_run_validate_data_batch",
+            validate_data_stage,
+            "run_validate_data_batch",
             new=AsyncMock(return_value={**summary, "validated_school_ids": cohort}),
         ),
-        patch.object(scraper_cli, "_run_summarize_batch", new=AsyncMock()) as summarize_mock,
+        patch.object(summarize_stage, "run_summarize_batch", new=AsyncMock()) as summarize_mock,
     ):
-        results = await scraper_cli._run_all_stages_batch(
+        results = await all_stages.run_all_stages_batch(
             object(),
             country="bg",
             city="sofia",
@@ -404,30 +412,30 @@ async def test_run_all_stages_batch_uses_bounded_navigation_chunks():
     summary = {"processed": 1, "succeeded": 1, "failed": 0, "skipped": 0}
 
     with (
-        patch.object(scraper_cli, "_select_all_stage_cohort", new=AsyncMock(return_value=cohort)),
+        patch.object(all_stages, "select_all_stage_cohort", new=AsyncMock(return_value=cohort)),
         patch.object(
-            scraper_cli,
-            "_run_validate_urls_batch",
+            website_stage,
+            "run_validate_urls_batch",
             new=AsyncMock(return_value={**summary, "validated_school_ids": cohort}),
         ),
         patch.object(
-            scraper_cli,
-            "_run_navigate_batch",
+            navigate_stage,
+            "run_navigate_batch",
             new=AsyncMock(return_value=[{"school_id": 17, "success": True}]),
         ) as navigate_mock,
         patch.object(
-            scraper_cli,
-            "_run_extract_batch",
+            extract_stage,
+            "run_extract_batch",
             new=AsyncMock(return_value={**summary, "ready_school_ids": cohort}),
         ),
         patch.object(
-            scraper_cli,
-            "_run_validate_data_batch",
+            validate_data_stage,
+            "run_validate_data_batch",
             new=AsyncMock(return_value={**summary, "validated_school_ids": cohort}),
         ),
-        patch.object(scraper_cli, "_run_summarize_batch", new=AsyncMock()),
+        patch.object(summarize_stage, "run_summarize_batch", new=AsyncMock()),
     ):
-        await scraper_cli._run_all_stages_batch(
+        await all_stages.run_all_stages_batch(
             object(),
             country="bg",
             city="sofia",
@@ -467,22 +475,22 @@ async def test_run_all_stages_batch_narrows_follow_on_stages_to_fresh_successes(
     }
 
     with (
-        patch.object(scraper_cli, "_select_all_stage_cohort", new=AsyncMock(return_value=cohort)),
-        patch.object(scraper_cli, "_run_validate_urls_batch", new=AsyncMock(return_value=url_summary)) as urls_mock,
+        patch.object(all_stages, "select_all_stage_cohort", new=AsyncMock(return_value=cohort)),
+        patch.object(website_stage, "run_validate_urls_batch", new=AsyncMock(return_value=url_summary)) as urls_mock,
         patch.object(
-            scraper_cli,
-            "_run_navigate_batch",
+            navigate_stage,
+            "run_navigate_batch",
             new=AsyncMock(return_value=navigation_results),
         ) as navigate_mock,
-        patch.object(scraper_cli, "_run_extract_batch", new=AsyncMock(return_value=extract_summary)) as extract_mock,
+        patch.object(extract_stage, "run_extract_batch", new=AsyncMock(return_value=extract_summary)) as extract_mock,
         patch.object(
-            scraper_cli,
-            "_run_validate_data_batch",
+            validate_data_stage,
+            "run_validate_data_batch",
             new=AsyncMock(return_value=validation_summary),
         ) as validate_mock,
-        patch.object(scraper_cli, "_run_summarize_batch", new=AsyncMock(return_value=count_summary)) as summarize_mock,
+        patch.object(summarize_stage, "run_summarize_batch", new=AsyncMock(return_value=count_summary)) as summarize_mock,
     ):
-        await scraper_cli._run_all_stages_batch(
+        await all_stages.run_all_stages_batch(
             db_session,
             country="bg",
             city="sofia",
@@ -529,7 +537,7 @@ async def test_validate_urls_batch_aggregates_llm_usage(db_session):
         "app.scrapers.url_validator.validate_school_url",
         new=fake_validate_school_url,
     ):
-        summary = await scraper_cli._run_validate_urls_batch(
+        summary = await website_stage.run_validate_urls_batch(
             db_session,
             "bg",
             "sofia",
@@ -558,10 +566,10 @@ async def test_run_all_stages_batch_preserves_completed_summaries_when_later_sta
     }
 
     with (
-        patch.object(scraper_cli, "_select_all_stage_cohort", new=AsyncMock(return_value=cohort)),
+        patch.object(all_stages, "select_all_stage_cohort", new=AsyncMock(return_value=cohort)),
         patch.object(
-            scraper_cli,
-            "_run_validate_urls_batch",
+            website_stage,
+            "run_validate_urls_batch",
             new=AsyncMock(
                 return_value={
                     "processed": 1,
@@ -573,19 +581,19 @@ async def test_run_all_stages_batch_preserves_completed_summaries_when_later_sta
             ),
         ),
         patch.object(
-            scraper_cli,
-            "_run_navigate_batch",
+            navigate_stage,
+            "run_navigate_batch",
             new=AsyncMock(return_value=[{"school_id": 17, "success": True}]),
         ),
-        patch.object(scraper_cli, "_run_extract_batch", new=AsyncMock(return_value=extraction)),
+        patch.object(extract_stage, "run_extract_batch", new=AsyncMock(return_value=extraction)),
         patch.object(
-            scraper_cli,
-            "_run_validate_data_batch",
+            validate_data_stage,
+            "run_validate_data_batch",
             new=AsyncMock(side_effect=RuntimeError("validation crashed")),
         ),
     ):
         with pytest.raises(RuntimeError, match="validation crashed"):
-            await scraper_cli._run_all_stages_batch(
+            await all_stages.run_all_stages_batch(
                 db_session,
                 country="bg",
                 city="sofia",
@@ -615,10 +623,10 @@ async def test_empty_explicit_cohort_never_falls_back_to_status_selection(db_ses
     await db_session.commit()
 
     with patch("app.scrapers.navigator.navigate_schools_batch", new=AsyncMock()) as navigate_mock:
-        navigation_results = await scraper_cli._run_navigate_batch(
+        navigation_results = await navigate_stage.run_navigate_batch(
             db_session, "bg", "sofia", None, school_ids=[]
         )
-    extraction_summary = await scraper_cli._run_extract_batch(
+    extraction_summary = await extract_stage.run_extract_batch(
         db_session, "bg", "sofia", None, school_ids=[]
     )
 
@@ -639,8 +647,8 @@ async def test_run_sync_routes_nvo_stage_to_import_helper(db_session):
     db_session.add(school)
     await db_session.commit()
 
-    with patch.object(scraper_cli, "_run_nvo_import", new=AsyncMock()) as nvo_mock:
-        await scraper_cli._run_sync(
+    with patch.object(exams_stage, "run_nvo_import", new=AsyncMock()) as nvo_mock:
+        await stage_runner.run_sync(
             school_name=None,
             school_id=school.id,
             stage="nvo",
@@ -716,8 +724,8 @@ async def test_discover_websites_batch_includes_missing_website_rows_beyond_fail
     db_session.add_all([eligible_missing, eligible_pending, terminal_no_site, extraction_failed_with_site, validated])
     await db_session.commit()
 
-    with patch.object(scraper_cli, "_run_discover_website", new=AsyncMock(return_value={"found": False})) as discover_mock:
-        await scraper_cli._run_discover_websites_batch(
+    with patch.object(website_stage, "run_discover_website", new=AsyncMock(return_value={"found": False})) as discover_mock:
+        await website_stage.run_discover_websites_batch(
             db=db_session,
             country="bg",
             city="sofia",
@@ -755,10 +763,10 @@ async def test_run_navigate_batch_rolls_back_and_continues_after_school_error(db
     with (
         patch("app.config.get_settings", return_value=settings),
         patch("app.scrapers.navigator.navigate_schools_batch", new=AsyncMock(side_effect=RuntimeError("boom"))),
-        patch.object(scraper_cli, "_run_navigate_school", new=run_mock),
+        patch.object(navigate_stage, "run_navigate_school", new=run_mock),
         patch.object(db_session, "rollback", new=rollback_spy),
     ):
-        await scraper_cli._run_navigate_batch(
+        await navigate_stage.run_navigate_batch(
             db=db_session,
             country="bg",
             city="sofia",
@@ -797,8 +805,8 @@ async def test_run_navigate_batch_uses_batch_crawler_results(db_session):
         patch("app.config.get_settings", return_value=settings),
         patch("app.scrapers.navigator.navigate_schools_batch", new=AsyncMock(return_value=batch_results)) as batch_mock,
         patch.object(
-            scraper_cli,
-            "_run_navigate_school",
+            navigate_stage,
+            "run_navigate_school",
             new=AsyncMock(
                 side_effect=[
                     {"school_id": schools[0].id, "success": False, "reason": "still timed out"},
@@ -807,7 +815,7 @@ async def test_run_navigate_batch_uses_batch_crawler_results(db_session):
             ),
         ) as single_mock,
     ):
-        await scraper_cli._run_navigate_batch(
+        await navigate_stage.run_navigate_batch(
             db=db_session,
             country="bg",
             city="sofia",
@@ -851,8 +859,8 @@ async def test_run_navigate_batch_skips_timed_out_explicit_chunks(db_session):
         patch("app.scrapers.navigator.navigate_schools_batch", new=batch_mock),
         patch.object(db_session, "rollback", new=rollback_spy),
         patch.object(
-            scraper_cli,
-            "_run_navigate_school",
+            navigate_stage,
+            "run_navigate_school",
             new=AsyncMock(
                 side_effect=[
                     {"school_id": schools[0].id, "success": False, "reason": "still timed out"},
@@ -861,7 +869,7 @@ async def test_run_navigate_batch_skips_timed_out_explicit_chunks(db_session):
             ),
         ) as single_mock,
     ):
-        results = await scraper_cli._run_navigate_batch(
+        results = await navigate_stage.run_navigate_batch(
             db=db_session,
             country="bg",
             city="sofia",
@@ -924,9 +932,9 @@ async def test_navigation_timeout_isolation_fixed_recovery_cohort(db_session):
     with (
         patch("app.config.get_settings", return_value=settings),
         patch("app.scrapers.navigator.navigate_schools_batch", new=batch_mock),
-        patch.object(scraper_cli, "_run_navigate_school", new=isolated_mock),
+        patch.object(navigate_stage, "run_navigate_school", new=isolated_mock),
     ):
-        results = await scraper_cli._run_navigate_batch(
+        results = await navigate_stage.run_navigate_batch(
             db=db_session,
             country="bg",
             city="sofia",
@@ -973,10 +981,10 @@ async def test_run_extract_batch_rolls_back_and_continues_after_school_error(db_
 
     with (
         patch("app.config.get_settings", return_value=settings),
-        patch.object(scraper_cli, "_run_extract_school", new=run_mock),
+        patch.object(extract_stage, "run_extract_school", new=run_mock),
         patch.object(db_session, "rollback", new=rollback_spy),
     ):
-        await scraper_cli._run_extract_batch(
+        await extract_stage.run_extract_batch(
             db=db_session,
             country="bg",
             city="sofia",
@@ -1014,9 +1022,9 @@ async def test_run_extract_batch_with_explicit_school_ids_ignores_status_filter(
 
     with (
         patch("app.config.get_settings", return_value=settings),
-        patch.object(scraper_cli, "_run_extract_school", new=run_mock),
+        patch.object(extract_stage, "run_extract_school", new=run_mock),
     ):
-        summary = await scraper_cli._run_extract_batch(
+        summary = await extract_stage.run_extract_batch(
             db=db_session,
             country="bg",
             city="sofia",
@@ -1070,7 +1078,7 @@ async def test_run_summarize_batch_aggregates_usage_for_all_results(db_session):
         patch("app.database.async_session_maker", return_value=SessionCtx()),
         patch("app.scrapers.summarizer.summarize_school", new=summarize_mock),
     ):
-        summary = await scraper_cli._run_summarize_batch(
+        summary = await summarize_stage.run_summarize_batch(
             db=db_session,
             country="bg",
             city="sofia",
@@ -1122,7 +1130,7 @@ async def test_validate_data_automatic_cohort_includes_summarized_schools(db_ses
         patch("app.database.async_session_maker", side_effect=lambda: SessionContext()),
         patch("app.scrapers.validator.validate_school_data", new=validate),
     ):
-        summary = await scraper_cli._run_validate_data_batch(
+        summary = await validate_data_stage.run_validate_data_batch(
             db_session, country="bg", city="sofia", limit=None
         )
 
@@ -1133,7 +1141,7 @@ async def test_validate_data_automatic_cohort_includes_summarized_schools(db_ses
 
 @pytest.mark.parametrize("extra_args", [[], ["--sync"]])
 def test_run_always_executes_in_process(extra_args):
-    with patch.object(scraper_cli, "_run_sync", new=AsyncMock()) as run_sync:
+    with patch.object(stage_runner, "run_sync", new=AsyncMock()) as run_sync:
         result = CliRunner().invoke(
             scraper_cli.cli,
             ["run", "--stage", "nvo", "--city", "sofia", *extra_args],
