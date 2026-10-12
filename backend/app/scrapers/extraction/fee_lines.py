@@ -152,17 +152,6 @@ _SEVERAL_INSTALLMENTS_RE = re.compile(
 )
 
 
-# Sample text a site template ships with. Two different words of it make a page filler.
-_TEMPLATE_FILLER_RE = re.compile(
-    r"\b(?:lorem|ipsum|pellentesque|vestibulum|scelerisque|consectetur|adipiscing|lobortis|malesuada)\b",
-    re.IGNORECASE,
-)
-
-
-def _is_template_filler(text: str | None) -> bool:
-    return len({word.casefold() for word in _TEMPLATE_FILLER_RE.findall(text or "")}) >= 2
-
-
 _EMPLOYER_RATE_RE = re.compile(r"\bcompan(?:y|ies)\b|\bemployers?\b|работодател|\bфирм[аи]\b|entreprise", re.IGNORECASE)
 
 
