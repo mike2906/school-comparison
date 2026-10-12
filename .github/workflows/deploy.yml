@@ -19,8 +19,12 @@ on:
         type: string
         default: ""
 
+# GitHub keeps one waiting run per group and cancels it when a newer one arrives. A newer
+# push carries the same code, so pushes share a group; a data publish (any dispatch) gets a
+# group of its own, so a push can no longer cancel it while it waits. "Wait for earlier
+# releases" keeps every run in start order, across groups.
 concurrency:
-  group: deploy-production
+  group: ${{ github.event_name == 'workflow_dispatch' && format('deploy-production-dispatch-{0}', github.run_id) || 'deploy-production' }}
   cancel-in-progress: false
 
 permissions: {}
@@ -42,8 +46,11 @@ jobs:
   changes:
     name: What to release
     runs-on: ubuntu-latest
+    # Long enough for a few releases queued ahead of this one.
+    timeout-minutes: 240
     permissions:
       contents: read
+      actions: read
     outputs:
       release: ${{ steps.decide.outputs.release }}
       api: ${{ steps.decide.outputs.api }}
@@ -54,10 +61,8 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Decide
-        id: decide
+      - name: Check the inputs
         env:
-          FRONTEND_ONLY: ${{ inputs.frontend_only }}
           SNAPSHOT: ${{ inputs.snapshot }}
         run: |
           if [ -n "$SNAPSHOT" ] && ! [[ "$SNAPSHOT" =~ ^[A-Za-z0-9._-]+\.dump$ ]]; then
@@ -68,6 +73,35 @@ jobs:
             echo "::error::Only main is deployed"
             exit 1
           fi
+
+      # Every job that touches production needs this one, so a run starts releasing only
+      # when the runs that started before it have finished, and Decide sees what they left.
+      # An API error counts as "still waiting", never as "nothing to wait for".
+      - name: Wait for earlier releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          until me="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" --jq '.run_started_at // .created_at')" && [ -n "$me" ]; do
+            sleep 20
+          done
+          while :; do
+            if ! earlier="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/deploy.yml/runs?per_page=100" --jq \
+              "[.workflow_runs[] | select(.status != \"completed\" and .id != $GITHUB_RUN_ID)
+                | select((.run_started_at // .created_at) as \$t | \$t < \"$me\" or (\$t == \"$me\" and .id < $GITHUB_RUN_ID))
+                | .run_number] | join(\" \")")"; then
+              earlier="(could not list runs)"
+            fi
+            [ -z "$earlier" ] && break
+            echo "Waiting for earlier runs: $earlier"
+            sleep 20
+          done
+
+      - name: Decide
+        id: decide
+        env:
+          FRONTEND_ONLY: ${{ inputs.frontend_only }}
+          SNAPSHOT: ${{ inputs.snapshot }}
+        run: |
           release=true
           api=true
           # Compare with the commit the live site was built from, not with the previous
