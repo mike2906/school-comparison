@@ -6,6 +6,7 @@ import asyncio
 import datetime
 import logging
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import urlparse
@@ -39,6 +40,7 @@ from app.schemas.extraction import (
     SummarySourceExtractionOutput,
 )
 from app.scrapers.llm_record import record_answer
+from app.scrapers.price_carry_over import carry_over_periods
 from app.scrapers.price_evidence import (
     PriceRow,
     label_is_another_institutions,
@@ -1240,6 +1242,7 @@ def _pricing_replacement_regressions(
     pages: list[SourcePage],
     superseded: list[Pricing],
     proposed: list[Pricing],
+    listed_under_a_fee: Iterable[tuple[str, float]] = (),
 ) -> list[str]:
     """Rule 6 over the rows a re-extraction would replace: only rows the API publishes."""
     blocked = blocked_pricing_row_ids(school.attributes if isinstance(school.attributes, dict) else None)
@@ -1253,6 +1256,7 @@ def _pricing_replacement_regressions(
         [(PriceRow.from_pricing(row), texts.get(row.source_page_id)) for row in published],
         [(PriceRow.from_pricing(row), texts.get(row.source_page_id)) for row in proposed],
         level_family(school.education_level),
+        listed_under_a_fee,
     )
 
 
@@ -1318,7 +1322,15 @@ async def _extract_prices(
         preferred_tier="pricing",
         school_id=school.id,
     )
+    # Amounts the model read as a discounted price or a payment plan's part: listed under
+    # a fee, not stored as one, so a re-extraction that leaves them out has not lost them.
+    listed_under_a_fee: list[tuple[str, float]] = []
     if isinstance(parsed, PageFees):
+        listed_under_a_fee = [
+            (helpers._FEE_KIND_CATEGORY.get(line.kind, "other"), line.amount)
+            for line in parsed.lines
+            if line.role in ("discounted", "plan")
+        ]
         prices = helpers._prices_from_fee_lines(parsed.lines)
         parsed = PriceExtractionOutput(prices=prices, has_pricing_info=bool(prices))
 
@@ -1512,16 +1524,32 @@ async def _extract_prices(
         )
         .options(selectinload(Pricing.source_page).load_only(SourcePage.id, SourcePage.is_valid))
     )
+    # An undated row whose fee this run reads with a year from the same page is that fee,
+    # not history: 610's undated "7400" (filed in lev) beside this year's 7400 EUR. The
+    # currency is not compared, since a wrong one is what such a row can carry.
+    dated_fees = {
+        (row.category, float(row.amount), row.source_page_id)
+        for row in pricing_rows
+        if row.amount is not None and row.source_page_id is not None and _retention_year_key(row.academic_year)[0]
+    }
     superseded = [
         existing
         for existing in existing_result.scalars().all()
         if _retention_year_key(existing.academic_year) in written_years
+        or (
+            not str(existing.academic_year or "").strip()
+            and existing.amount is not None
+            and (existing.category, float(existing.amount), existing.source_page_id) in dated_fees
+        )
     ]
     superseded_ids = [existing.id for existing in superseded]
+    carry_over_periods(school, pages, superseded, pricing_rows, source_rows)
 
     # UF45 rule 6: a re-extraction that would lose what the published rows show is held
     # for review; the published rows stay and the proposal is not written.
-    regressions = _pricing_replacement_regressions(school, pages, superseded, pricing_rows)
+    regressions = _pricing_replacement_regressions(
+        school, pages, superseded, pricing_rows, listed_under_a_fee
+    )
     attrs = dict(school.attributes) if isinstance(school.attributes, dict) else {}
     if regressions:
         attrs[PRICING_HOLD_KEY] = {

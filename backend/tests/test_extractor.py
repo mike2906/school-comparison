@@ -2451,6 +2451,14 @@ def test_dedupe_price_rows_drops_currency_and_installment_duplicates():
     assert 15411.94 not in by_amount
 
 
+def test_one_payment_plan_name_is_the_whole_fee_not_an_installment_variant():
+    # Otkrivatel: "Плащане на 1 вноска" is the full yearly fee beside its plans.
+    assert not extractor_module.helpers._is_installment_plan_name("Плащане на 1 вноска")
+    assert not extractor_module.helpers._is_installment_plan_name("1 installment")
+    assert extractor_module.helpers._is_installment_plan_name("Плащане на 2 вноски")
+    assert extractor_module.helpers._is_installment_plan_name("10 monthly installments")
+
+
 def test_dedupe_price_rows_drops_installment_plan_name_variants():
     # Pythagoras pattern: per-grade-band, three rows with the same age_group —
     # one full-pay row (plan_name=None) plus "2 installments" and "10 installments"
@@ -4588,15 +4596,17 @@ async def test_reextraction_dropping_a_fee_the_page_still_shows_is_held(
 
 
 @pytest.mark.asyncio
-async def test_reextraction_losing_a_period_the_page_does_not_state_is_held(
+async def test_reextraction_keeps_a_period_the_page_does_not_state(
     db_session, sample_school_for_extraction
 ):
+    """The published row's period, set where the reader cannot see it (171's by hand),
+    carries over to the same fee read again with none."""
     school = sample_school_for_extraction
     pages = await _published_rows_and_page(db_session, school, [("tuition", 350, "monthly")])
 
     result = await _run_prices(db_session, school, pages, [("tuition", 350.0, None)])
 
-    assert result["held"] is True
+    assert result.get("held") is None
     assert await _stored(db_session, school) == [("tuition", 350.0, "monthly")]
 
 

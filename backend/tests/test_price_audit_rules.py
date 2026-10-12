@@ -24,7 +24,10 @@ from app.scrapers.price_evidence import (
     label_is_another_institutions,
     normalize_text,
     page_is_another_institutions,
+    period_families,
+    replacement_regressions,
     stated_period,
+    states_another_unit,
 )
 
 TODAY = datetime.date(2026, 10, 9)
@@ -347,3 +350,78 @@ def test_offer_deadline_reads_every_month_name(name, month):
 def test_years_in_a_fee_table_are_not_read_as_bare_prices():
     text = "| Клас | Такса |\n|---|---|\n| 2025 | 2026 |\n| 1-4 | 7500 |\n"
     assert [text[start:start + 4] for start in fee_number_starts(text)] == ["7500"]
+
+
+# --- 2026-10-12 refresh (171, 533, 564, 610) ---------------------------------------------
+
+
+def _heading(page, amount):
+    text = normalize_text(page)
+    return heading_period(text, amount_spans(text, amount)[-1])
+
+
+def test_610_a_flattened_plan_header_is_not_the_fees_heading():
+    page = (
+        "Програма\nГрупа/Клас\nПлащане на 1 вноска\nПлащане на 2 вноски\nПлащане на 10 месечни вноски\n"
+        "Подготвителен клас\nПУК 1\n7 400\n2 х 3 900 = 7 800\n"
+    )
+    assert _heading(page, Decimal("7400")) is None
+
+
+def test_610_one_payment_is_yearly():
+    assert period_families("плащане на 1 вноска") == ({"YEARLY"}, False)
+    assert period_families("плащане на 10 месечни вноски") == ({"MONTHLY"}, False)
+    page = "Програма | Плащане на 1 вноска | Плащане на 2 вноски\nГимназия | 7 400 | 2 х 3 900 = 7 800\n"
+    findings = check_price_row(row(7400), page, "school", today=TODAY)
+    assert [(f.rule, f.period) for f in findings] == [(RULE_PERIOD_MISSING, "YEARLY")]
+
+
+def test_564_one_off_payment_under_a_yearly_heading_is_yearly():
+    page = (
+        "Годишна такса обучение и финансови условия\nза ПГ - 4 .клас за 2026-2027 учебна година:\n"
+        "ЕДНОКРАТНО ПЛАЩАНЕ\n-\nПлащане до 31.03.2026 г. - 7580€\n"
+    )
+    findings = check_price_row(row(7580), page, "school", today=TODAY)
+    assert [(f.rule, f.period) for f in findings] == [(RULE_PERIOD_MISSING, "YEARLY")]
+
+
+def test_171_a_tier_whose_enrolment_deadline_passed_two_lines_up_has_expired():
+    page = (
+        "6300 €\nПри записване в срок до 23.01.2026 г.\n"
+        "Заплащане на 2 вноски (I вноска до 23.01.2026 г.; II вноска до 20.11.2026 г.)\n6600 €\n"
+        "При записване след 20.02.2026 г.\nПри 2 вноски (I вноска при сключване на\n"
+        "договор; II вноска до 20.11.2026 г.)\n7 269 €\n"
+    )
+    assert [f.rule for f in check_price_row(row(6600), page, "school", today=TODAY)] == [RULE_EXPIRED]
+    assert check_price_row(row(7269), page, "school", today=TODAY) == []
+
+
+def test_533_a_unit_after_the_amount_that_is_no_period():
+    page = "Зелени училища (приблизително) | ≈ 950 EUR / за всички\nТранспорт | ≈ 200 EUR / месец\n"
+    assert states_another_unit(page, 950)
+    assert not states_another_unit(page, 200)
+
+
+def test_rule_6_accepts_an_amount_listed_under_a_fee():
+    page = "Годишна такса 7580 €\nI вноска 3975 €\n"
+    published = [(row(7580, period="YEARLY"), page), (row(3975, period="YEARLY"), page)]
+    proposed = [(row(7580, period="YEARLY"), page)]
+    assert replacement_regressions(published, proposed, "school")
+    assert replacement_regressions(published, proposed, "school", accounted_for=[("tuition", 3975.0)]) == []
+
+
+def test_rule_6_a_listed_amount_accounts_only_for_its_own_category():
+    """A €500 instalment does not let a €500 registration fee go, nor vouch for a period."""
+    page = "Записване 500 €\nТакса 5000 € годишно\nI вноска 500 €\n"
+    published = [(row(5000, period="YEARLY"), page), (row(500, category="REGISTRATION", period="ONE_TIME"), page)]
+    proposed = [(row(5000, period="YEARLY"), page)]
+    assert replacement_regressions(published, proposed, "school", accounted_for=[("tuition", 500.0)]) == [
+        "drops REGISTRATION 500.00, which the page still shows"
+    ]
+    # The fee that remains at a listed amount still keeps its period.
+    page = "Такса 500 €\nI вноска 500 €\n"
+    published = [(row(500, period="YEARLY"), page), (row(500, period="YEARLY", plan_name="плащане"), page)]
+    proposed = [(row(500), page)]
+    assert replacement_regressions(published, proposed, "school", accounted_for=[("tuition", 500.0)]) == [
+        "loses the YEARLY period of TUITION 500.00"
+    ]

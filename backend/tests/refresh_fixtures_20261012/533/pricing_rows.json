@@ -1,0 +1,134 @@
+[
+ {
+  "id": 3306,
+  "category": "EXTRACURRICULAR",
+  "amount": 10.0,
+  "amount_min": null,
+  "amount_max": null,
+  "currency": "EUR",
+  "period": null,
+  "plan_name": "Допълнителни извънкласни дейности (опционално)",
+  "age_group": null,
+  "academic_year": "2026/2027",
+  "source_url": "https://school3.transform.bg/application-and-admission/finansovi-uslovia/",
+  "source_page_id": 28989,
+  "pricing_context": {
+   "notes": null,
+   "confidence": 0.9,
+   "discounts": [],
+   "installments": [],
+   "includes": [],
+   "excludes": []
+  }
+ },
+ {
+  "id": 3307,
+  "category": "EXTRACURRICULAR",
+  "amount": 20.0,
+  "amount_min": null,
+  "amount_max": null,
+  "currency": "EUR",
+  "period": null,
+  "plan_name": "Допълнителни извънкласни дейности (опционално)",
+  "age_group": null,
+  "academic_year": "2026/2027",
+  "source_url": "https://school3.transform.bg/application-and-admission/finansovi-uslovia/",
+  "source_page_id": 28989,
+  "pricing_context": {
+   "notes": null,
+   "confidence": 0.9,
+   "discounts": [],
+   "installments": [],
+   "includes": [],
+   "excludes": []
+  }
+ },
+ {
+  "id": 3308,
+  "category": "CAMP",
+  "amount": 950.0,
+  "amount_min": null,
+  "amount_max": null,
+  "currency": "EUR",
+  "period": "MONTHLY",
+  "plan_name": "Зелени училища (приблизително)",
+  "age_group": "Зелени училища (приблизително)",
+  "academic_year": "2026/2027",
+  "source_url": "https://school3.transform.bg/application-and-admission/finansovi-uslovia/",
+  "source_page_id": 28989,
+  "pricing_context": {
+   "notes": null,
+   "confidence": 0.9,
+   "discounts": [],
+   "installments": [],
+   "includes": [],
+   "excludes": []
+  }
+ },
+ {
+  "id": 3309,
+  "category": "MATERIALS",
+  "amount": 100.0,
+  "amount_min": null,
+  "amount_max": null,
+  "currency": "EUR",
+  "period": null,
+  "plan_name": "Материали",
+  "age_group": null,
+  "academic_year": "2026/2027",
+  "source_url": "https://school3.transform.bg/application-and-admission/finansovi-uslovia/",
+  "source_page_id": 28989,
+  "pricing_context": {
+   "notes": null,
+   "confidence": 0.9,
+   "discounts": [],
+   "installments": [],
+   "includes": [],
+   "excludes": []
+  }
+ },
+ {
+  "id": 3310,
+  "category": "TRANSPORT",
+  "amount": 200.0,
+  "amount_min": null,
+  "amount_max": null,
+  "currency": "EUR",
+  "period": "MONTHLY",
+  "plan_name": "Транспорт в две посоки (опционално)",
+  "age_group": null,
+  "academic_year": "2026/2027",
+  "source_url": "https://school3.transform.bg/application-and-admission/finansovi-uslovia/",
+  "source_page_id": 28989,
+  "pricing_context": {
+   "notes": null,
+   "confidence": 0.9,
+   "discounts": [],
+   "installments": [],
+   "includes": [],
+   "excludes": []
+  }
+ },
+ {
+  "id": 3311,
+  "category": "REGISTRATION",
+  "amount": 125.0,
+  "amount_min": null,
+  "amount_max": null,
+  "currency": "EUR",
+  "period": "ONE_TIME",
+  "plan_name": "Административна такса за приемна процедура",
+  "age_group": null,
+  "academic_year": "2026/2027",
+  "source_url": "https://school3.transform.bg/application-and-admission/finansovi-uslovia/",
+  "source_page_id": 28989,
+  "pricing_context": {
+   "notes": null,
+   "confidence": 0.9,
+   "discounts": [],
+   "installments": [],
+   "includes": [],
+   "excludes": []
+  }
+ }
+]
