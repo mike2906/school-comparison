@@ -380,6 +380,28 @@ async def test_prices_only_run_that_finds_no_fees_checks_the_kept_ones(
 
 
 @pytest.mark.asyncio
+async def test_prices_only_run_on_emptied_pages_withholds_the_kept_prices(
+    db_session, client, sample_school_for_extraction
+):
+    school = sample_school_for_extraction
+    await _recrawled_school_with_prices(db_session, school, status="extracted")
+    pages = (await db_session.execute(select(SourcePage).where(SourcePage.school_id == school.id))).scalars().all()
+    for page in pages:
+        page.raw_markdown = ""
+    await db_session.commit()
+
+    result = await extractor_module.extract_school(db_session, school.id, "bg", prices_only=True)
+    assert result["status"] == "extraction_failed"
+
+    response = await client.get(f"/schools/{school.id}")
+    assert response.json()["pricing"] == []
+    await db_session.refresh(school)
+    assert {issue["code"] for issue in school.attributes["data_validation"]["kept_price_issues"]} == {
+        "pricing_current_page_empty"
+    }
+
+
+@pytest.mark.asyncio
 async def test_pricing_only_success_does_not_republish_withheld_general_data(
     db_session,
     sample_school_for_extraction,

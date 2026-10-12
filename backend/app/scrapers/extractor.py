@@ -1741,6 +1741,9 @@ async def extract_school(
         if not prices_only:
             school.scrape_status = "extraction_failed"
             await db.commit()
+        else:
+            # The stored fees stay up on the old report; their pages may now be empty.
+            await recheck_after_failed_price_refresh(db, school_id)
         return {
             "school_id": school_id,
             "status": "extraction_failed",

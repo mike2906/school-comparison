@@ -20,6 +20,7 @@ from sqlalchemy.orm.attributes import flag_modified
 
 from app.models import Pricing, School
 from app.models.pricing import PriceSource
+from app.models.source_page import SourcePage
 from app.schemas.validation import ValidationReport
 from app.scrapers.validator import _check_price_evidence
 from app.utils.display_gating import KEPT_PRICE_ISSUES_KEY
@@ -42,6 +43,28 @@ async def _kept_price_issues(db: AsyncSession, school: School) -> list[dict[str,
         scratch = ValidationReport(validated_at="", status="ok", issue_counts={"error": 0, "warning": 0})
         await _check_price_evidence(db, scratch, school, list(rows), apply_fixes=False)
         found = [issue.model_dump(mode="json") for issue in scratch.issues if issue.severity == "error"]
+        # The evidence check skips a row whose page has no text (validation re-extracts it
+        # anyway); here an empty re-crawl is exactly the page no longer showing the price.
+        page_ids = {row.source_page_id for row in rows if row.source_page_id is not None}
+        pages = dict(
+            (
+                await db.execute(
+                    select(SourcePage.id, SourcePage.raw_markdown).where(
+                        SourcePage.id.in_(page_ids), SourcePage.is_valid.is_(True)
+                    )
+                )
+            ).all()
+        ) if page_ids else {}
+        found += [
+            {
+                "code": "pricing_current_page_empty",
+                "severity": "error",
+                "field_path": f"pricing[{row.id}]",
+                "message": "the linked page has no text after the re-crawl",
+            }
+            for row in rows
+            if row.source_page_id in pages and not (pages[row.source_page_id] or "").strip()
+        ]
     except Exception:
         # Fail closed: the rows can't be shown to be on their pages.
         logger.exception("Kept-price check failed for school %s; withholding its scraped prices", school.id)
