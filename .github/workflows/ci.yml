@@ -34,10 +34,11 @@ jobs:
           docker run -d --name postgres -p 5432:5432 \
             -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=schooldecider_migrations \
             "$image"
-          for i in $(seq 30); do
+          for _ in $(seq 30); do
             docker exec postgres pg_isready -h 127.0.0.1 -U postgres -d schooldecider_migrations && exit 0
             sleep 2
           done
+          docker logs postgres
           exit 1
 
       - name: Install uv
