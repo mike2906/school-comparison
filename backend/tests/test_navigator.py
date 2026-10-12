@@ -895,3 +895,21 @@ def test_sample_text_beside_dollar_prices_is_a_template():
     assert is_template_filler(page)
     assert not is_template_filler(page.replace("$1,800/mo", "€ 530").replace("$2,300/mo", "€ 600"))
     assert not is_template_filler("Tuition for international students: $12,000 a year. Lorem Hall.")
+
+
+@pytest.mark.parametrize(
+    "page",
+    [
+        # A real dollar fee list with a theme's footer left on it.
+        "Tuition and Fees 2026-27\nGrade 1-5: $24,500 per year\nCapital Levy $3,000\n\nAdmissions\n"
+        "Apply online\nCampus tours\n\nFooter\nLorem ipsum dolor sit amet",
+        # Leva fees with a foreigners' dollar line and a leftover heading.
+        "Месечна такса 650 лв.\nЗа чуждестранни граждани: $400\nLorem ipsum",
+        # A dollar amount only in an image caption or a link.
+        "Такса учебни материали\nLorem ipsum\n![Отстъпка $50](a.jpg)\n[Плащане](https://pay.bg/x?amt=$1)",
+    ],
+)
+def test_real_dollar_amounts_beside_leftover_sample_text_are_read(page):
+    from app.scrapers.page_content import is_template_filler
+
+    assert not is_template_filler(page)

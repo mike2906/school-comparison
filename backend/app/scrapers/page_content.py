@@ -35,18 +35,36 @@ _PARKED_DOMAIN_RE = re.compile(
 # slug "24-lorem-ipsum").
 _NOT_PAGE_TEXT_RE = re.compile(r"!?\[[^\]]*\]\([^)]*\)|\S*[/\\]\S*")
 _WORD_RE = re.compile(r"[^\W\d_]+")
-# A dollar price: Sofia schools charge in leva or euro, a theme's sample cards in dollars
-# ("$1,800/mo" on 590's home and /programa, 95 and 20 words, both under the share).
+# A dollar price beside sample text on a page with no leva or euro: Sofia schools charge in leva or euro, a
+# theme's sample cards in dollars ("$1,800/mo" on 590's home and /programa, 95 and 20
+# words, both under the share). Link, image and URL text don't count.
 _DOLLAR_PRICE_RE = re.compile(r"\$\s?\d|\d\s?\$")
+_LOCAL_CURRENCY_RE = re.compile(r"лв|лева|евро|€|\beur\b|\bbgn\b", re.IGNORECASE)
+_NEAR_LINES = 3
+_MARKUP_OR_URL_RE = re.compile(r"!?\[[^\]]*\]\([^)]*\)|\S*://\S*")
 
 
 def is_template_filler(text: str | None) -> bool:
     """A theme's sample page (590), not a real page that kept some sample text."""
     words = _WORD_RE.findall(_NOT_PAGE_TEXT_RE.sub(" ", text or ""))
     filler = sum(word.casefold() in _FILLER_WORDS for word in words)
-    if filler >= 2 and _DOLLAR_PRICE_RE.search(text or ""):
+    if filler >= 2 and _dollar_price_among_filler(_MARKUP_OR_URL_RE.sub(" ", text or "")):
         return True
     return filler >= _MIN_FILLER_WORDS and filler >= _FILLER_SHARE * len(words)
+
+
+def _dollar_price_among_filler(prose: str) -> bool:
+    """A dollar price within a few lines of sample text, on a page with no leva or euro."""
+    if _LOCAL_CURRENCY_RE.search(prose):
+        return False
+    lines = prose.split("\n")
+    for index, line in enumerate(lines):
+        if not _DOLLAR_PRICE_RE.search(line):
+            continue
+        nearby = " ".join(lines[max(0, index - _NEAR_LINES): index + _NEAR_LINES + 1])
+        if sum(word.casefold() in _FILLER_WORDS for word in _WORD_RE.findall(nearby)) >= 2:
+            return True
+    return False
 
 
 def is_parked_domain(text: str | None) -> bool:

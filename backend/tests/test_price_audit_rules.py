@@ -441,3 +441,21 @@ def test_a_course_length_is_not_an_age():
     assert label_is_another_institutions("Група 2 години", "school", set(range(8, 13)))
     for nursery in ("деца на 3 години за 10 месеца", "2 години за 1 месец", "група 3 years in 2026", "2 г. за 1 месец", "2 години за 1 мес.", "3 years in 1 term", "деца 2 години за 1-2 месеца", "2 години за 1 – 2 месеца"):
         assert label_is_another_institutions(nursery, "school", set(range(8, 13))), nursery
+
+
+@pytest.mark.parametrize(
+    ("text", "families"),
+    [
+        # 590: the materials fee's note is its only period wording.
+        ("Такса учебни материали | 120 € / 235 лв.\nЗаплаща се в началото на всяка учебна година", {"YEARLY"}),
+        # Another period word on the line wins (510's wording, a monthly fee reviewed each year).
+        ("Учебни материали: 250 € – заплаща се еднократно в началото на всяка учебна година", {"ONE_TIME"}),
+        ("Monthly fee 800 EUR (fees are reviewed every year)", {"MONTHLY"}),
+        # When a first instalment is due is not how often the fee is paid.
+        ("I вноска: 3000 лв. – в началото на учебната година", set()),
+    ],
+)
+def test_every_school_year_is_yearly_only_when_nothing_else_says(text, families):
+    from app.scrapers.price_evidence import period_families
+
+    assert period_families(text.casefold())[0] == families

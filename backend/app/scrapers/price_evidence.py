@@ -322,13 +322,10 @@ PERIOD_KEYWORDS: dict[str, re.Pattern[str]] = {
         r"|\b(?:всеки|предходния|предишния|предидущия|текущия|следващия) месец"
     ),
     # "Total tuition fees (year)" heads a yearly table. "Плащане на 1 вноска" (610) is the
-    # year's fee paid in one go, beside its 2- and 10-instalment plans. "Заплаща се в
-    # началото на всяка учебна година" (590's materials fee) is paid once a year.
+    # year's fee paid in one go, beside its 2- and 10-instalment plans.
     "YEARLY": re.compile(
         r"(?<!полу)годиш|\bна година|/\s*год|per year|/\s*year|\bannual|\byearly\b|a year\b|\(\s*year\s*\)"
         r"|\b(?:на|в)\s+(?:1|една)\s+вноска\b|\b(?:in\s+)?(?:one|1|a single)\s+instal?lment\b"
-        r"|\bв началото на (?:всяка|учебната) (?:учебна )?година\b|\b(?:every|each) (?:school |academic )?year\b"
-        r"|\bat the (?:start|beginning) of (?:each|every|the) (?:school |academic )?year\b"
     ),
     "ONE_TIME": re.compile(r"еднократ|one[- ]time|one[- ]off|\bonce\b"),
     "QUARTER": re.compile(r"тримесеч|quarterly|per quarter"),
@@ -391,11 +388,20 @@ def period_fits_category(category: str | None, period: str | None) -> bool:
     return not (category == "registration" and period not in (None, "one_time"))
 
 
+# "Заплаща се в началото на всяка учебна година" (590's materials fee) is paid once a year,
+# but only says so when nothing else does: "еднократно в началото на всяка учебна година"
+# is one-time (510), and "месечно ... every school year" monthly.
+_EVERY_YEAR_RE = re.compile(r"\bвсяка (?:учебна )?година\b|\b(?:every|each) (?:school |academic )?year\b")
+
+
 def period_families(context: str) -> tuple[set[str], bool]:
     """(representable period families named, whether an unrepresentable one is named)."""
     cleaned = _AGE_RE.sub(" ", _FREQUENCY_RE.sub(" ", context))
     families = {period for period, pattern in PERIOD_KEYWORDS.items() if pattern.search(cleaned)}
-    return families, bool(_UNREPRESENTABLE_RE.search(cleaned))
+    unrepresentable = bool(_UNREPRESENTABLE_RE.search(cleaned))
+    if not families and not unrepresentable and _EVERY_YEAR_RE.search(cleaned):
+        families = {"YEARLY"}
+    return families, unrepresentable
 
 
 def stated_period(text: str, span: tuple[int, int]) -> tuple[set[str], bool]:
