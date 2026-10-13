@@ -61,13 +61,19 @@ Rules:
 - Each fact is one short line in English (fact_en) and Bulgarian (fact_bg), saying only what its quote says.
 - For every fact, copy into "quote" the one page line it comes from, verbatim and in the page's language, and
   the URL from that page's PAGE line. The quote alone must state the fact.
+- Be specific: name the sports, clubs, languages, rooms or hours. "Sports activities are part of the programme"
+  or "pupils are at school for the full day" with nothing more says too little; give the detail the page has
+  (which sports, until what time) or leave the fact out.
 - At most 8 facts, the most useful for choosing a school first, and at most 2 per topic. Fewer is fine. If
   the pages state nothing concrete, return no facts: that is a correct answer, never pad."""
 
 JUDGE_PROMPT = """You check facts written about a school against the website lines they were taken from.
-For each numbered item you get a fact and a quote. Answer yes only if the quote by itself states everything
-the fact says: no part of the fact may come from elsewhere or be inferred, and a mission statement, slogan or
-general claim does not state a concrete fact. Return the numbers of the items that pass."""
+For each numbered item you get a fact (in English) and a quote (usually Bulgarian). Pass an item when the quote
+states what the fact says; translation and plain rewording are fine. A heading, list item or link title that names
+a specialty, subject, club, sport or room is enough for a fact that only says the school offers or has it.
+Fail an item only when the fact adds something the quote does not say (a number, a grade, a scope, a claim), or
+when the quote is a bare label ("Училищен психолог") stretched into a description, or a slogan with nothing
+concrete in it. Return the numbers of the items that pass."""
 
 
 class Fact(BaseModel):

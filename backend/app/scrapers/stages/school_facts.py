@@ -26,7 +26,7 @@ from app.scrapers.extraction import school_facts as facts_rules
 from app.scrapers.extraction.school_facts import Fact, Facts, Supported
 from app.scrapers.fee_pages import fee_http_client
 from app.scrapers.stages import common as stage_common
-from app.scrapers.stages.fees_agent import PageRead, Spend, SpendCapReached, find_pages, reader_text
+from app.scrapers.stages.fees_agent import PageRead, Spend, SpendCapReached, find_pages
 from app.services.pipeline_runs import finalize_pipeline_run, pipeline_run_heartbeat, start_pipeline_run
 from app.services.provider_costs import ProviderCostError, execute_billable_request, provider_cost_scope
 from app.utils.school_facts import ATTRIBUTE_KEY
@@ -37,6 +37,10 @@ STAGE = "school-facts"
 TIER = "pricing"  # the fee reader's model: cheap, and follows quoting rules well
 DEFAULT_MAX_USD = 0.50
 OUTPUT_TOKENS_RESERVE = 4000
+MAX_READ_CHARS = 100_000
+# Each page is cut on its own, so one long page (a staff list of 56,000 characters at 564)
+# cannot push the admissions and activities pages after it out of the read.
+MAX_PAGE_CHARS = 15_000
 
 Finder = Callable[[School], Awaitable[list[PageRead]]]
 Caller = Callable[[str, type, str, int], Awaitable[Any]]
@@ -67,6 +71,13 @@ def _name(school: School) -> str:
     return (school.name_i18n or {}).get("bg") or (school.name_i18n or {}).get("en") or str(school.id)
 
 
+def page_text(pages: list[PageRead]) -> str:
+    """The pages the reader sees, each cut to ``MAX_PAGE_CHARS``, in the format the fees reader uses."""
+    return "\n\n".join(f"=== PAGE {page.url}\n{page.text[:MAX_PAGE_CHARS]}" for page in pages if page.text.strip())[
+        :MAX_READ_CHARS
+    ]
+
+
 def _ordered(kept: list[tuple[Fact, str]]) -> list[tuple[Fact, str]]:
     """At most 2 a topic and ``MAX_FACTS`` in all, cut in the reader's (most useful first)
     order, then put in topic order for display."""
@@ -85,7 +96,7 @@ async def read_school(school: School, pages: list[PageRead], call: Caller) -> di
     report: dict[str, Any] = {"pages": [{"url": p.url, "chars": len(p.text), "note": p.note} for p in pages]}
     if not readable:
         return report | {"outcome": "nothing_read"}
-    text = reader_text([page for page in pages if page.text.strip()])
+    text = page_text(pages)
     read: Facts = await call(
         facts_rules.READER_PROMPT,
         Facts,

@@ -244,3 +244,10 @@ async def test_the_limit_cuts_in_the_readers_order_and_shows_in_topic_order():
     kept = [f["text_i18n"]["en"] for f in report["store"]]
     assert len(kept) == 8 and "first" in kept and kept[-1] == "first"  # admissions shows last
     assert "support" not in kept and kept.count("c0") + kept.count("c1") == 2
+
+
+def test_a_long_page_does_not_push_later_pages_out_of_the_read():
+    long = PageRead("https://school.example/staff", "x" * 60_000, False)
+    later = PageRead("https://school.example/admissions", "Приемът е с тест.", False)
+    text = stage.page_text([long, PAGES[2], later])
+    assert "Приемът е с тест." in text and len(text) < 20_000 and "/gone" not in text

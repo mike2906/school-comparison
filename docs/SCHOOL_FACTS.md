@@ -49,7 +49,10 @@ school (Sofia ~$3). Nothing reaches the site until an `--apply` run is published
 
 ## Before a Sofia-wide `--apply`
 
-- Re-run the 10 trial schools as a dry run with the stage and read the report.
+- Dry run 1 of the stage on the trial schools (2026-10-13): 33 of 41 facts kept, $0.057.
+  Fixed after it: the judge dropped facts its quote did state (headings, listed steps),
+  one 56,000-character staff page pushed later pages out of the read (now 15,000 a page),
+  and vague facts ("sports activities are part of the programme") got through.
 - Top up OpenRouter (about $1.35 left on 2026-10-13).
 - Decide refresh: facts carry `read_at`; a yearly re-read is enough for most topics.
   Runs vary, so a refresh could keep the old fact where the new read only rewords it.
@@ -74,8 +77,10 @@ Gaps to close before deleting stage 4 and 5 code:
 
 1. **Filter fields.** Search filters (language focus, special programmes, facilities,
    teaching approach) and the compare page's yes/no rows (meals, transport, after-school
-   care, accessibility) need values from a fixed vocabulary, not sentences. The facts
-   reader should also return these from the existing vocabulary, each tied to a kept fact.
+   care, accessibility) need values from a fixed vocabulary, not sentences. The API already
+   computes filter tags from free text (`compute_filter_tags` with `canonical_tags` and the
+   `FACILITY_VOCAB` / `PROGRAM_VOCAB` / `APPROACH_VOCAB` lists), so the first thing to try
+   is running the kept facts' text through it, rather than asking the reader for tags.
 2. **Measure it.** Fees switched only after a blind reference set (found 68 % vs 40 %).
    Facts and filter fields need the same: a small hand-checked set of schools scored
    old-vs-agent for found, wrong and missed. The quote checks stop invented facts, not
@@ -88,10 +93,21 @@ Gaps to close before deleting stage 4 and 5 code:
    filter fields need the same rule.
 6. **Blocked sites stay blocked** (robots.txt is respected): about 1 in 5 in the fee sample.
 
-**Contact details** are a separate, small job, not the facts reader: they must be exact
-(a wrong phone is worse than none), are checkable by format, mostly sit on one contact
-page, and the registry already supplies many. Keep `contact_details.py` until a small
-contacts read is measured against it.
+**Contact details** need no model: `_extract_contact_info_deterministic` is pattern
+matching, so it can run over the pages the finder already fetched (the contact page is
+usually among them) instead of the old navigation. They must be exact, a wrong phone is
+worse than none, and most are already stored (Sofia, 2026-10-13: phones for 208 of 214
+state, 60 of 74 private, 296 of 329 kindergartens). So: same crawl, separate step, keep
+the stored value unless the new one passes the same format checks.
+
+**Bad website URLs** surface here: 22seu.org (school 395) is a parked domain that
+redirects to a holding page. A read that finds only a redirect stub should send the
+school back to URL validation rather than just reporting nothing read.
+
+What parents see today (Sofia, 2026-10-13, through the API's gates): 7 schools have a
+summary paragraph; website data is publishable for 173 of 214 state schools, 57 of 74
+private and international, and 97 of 104 kindergartens with a website. So facts are new
+content for nearly every school, not a replacement.
 
 Suggested order: (1) facts on the site (this work); (2) filter fields in the facts reader,
 measured on a reference set, then retire stages 4 and 5 and the summariser; (3) contacts
