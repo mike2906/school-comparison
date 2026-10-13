@@ -263,29 +263,49 @@ def check_fee(fee: AgentFee, page_text: str) -> CheckedFee:
         if not _range_is_joined(evidence, min(amounts), max(amounts)):
             held.append("held: range ends are not joined by a range marker in the evidence")
 
-    options, option_checks = _checked_options(fee, page_numbers("\n".join(lines)))
+    options, option_checks = _checked_options(fee, "\n".join(lines))
     confidence = HELD_CONFIDENCE if held else PUBLISH_CONFIDENCE
     update = {"period": period, "payment_options": options}
     return CheckedFee(fee.model_copy(update=update), confidence, True, checks + option_checks + held)
 
 
 def _without_option_lines(lines: list[str], fee: AgentFee) -> str:
-    """The evidence without the lines that hold only a payment option's numbers."""
+    """The evidence without the lines, or table cells, that hold only a payment option's
+    numbers: in "| € 8.950 | 9 x € 750 monthly |" the word monthly is the option's."""
     own, options = set(fee_amounts(fee)), set(option_amounts(fee))
-    return "\n".join(line for line in lines if not (numbers := page_numbers(line)) & options or numbers & own)
+
+    def option_only(text: str) -> bool:
+        numbers = page_numbers(text)
+        return bool(numbers & options) and not numbers & own
+
+    kept = []
+    for line in lines:
+        cells = [cell for cell in line.split("|") if not option_only(cell)]
+        if "|".join(cells).strip(" |"):
+            kept.append("|".join(cells))
+    return "\n".join(kept)
+
+
+# A count of instalments as the page writes it: "2 x", "9 ×", "10 вноски", "3 installments".
+_COUNT_AFTER_RE = r"\s*(?:[xх×]|вноск|instal|payments|плащания|versements|rates)"
+
+
+def _count_is_printed(payments: int, text: str) -> bool:
+    return re.search(rf"(?<![\d.,]){payments}{_COUNT_AFTER_RE}", text, re.IGNORECASE) is not None
 
 
 def _decimal(value: float) -> Decimal:
     return Decimal(str(value)).normalize()
 
 
-def _checked_options(fee: AgentFee, numbers: set[Decimal]) -> tuple[list[PaymentOption], list[str]]:
+def _checked_options(fee: AgentFee, evidence: str) -> tuple[list[PaymentOption], list[str]]:
     """The fee's payment options whose numbers the evidence prints.
 
     An option with a number the evidence does not hold is dropped; a count of payments the
-    evidence writes only in words is cleared. What is left must say what is paid: a total,
+    evidence does not write as one ("2 x", "10 вноски"; not the 2 of "Grade 2") is cleared. What is left must say what is paid: a total,
     or a count and an instalment. One payment of the whole fee is the fee itself.
     """
+    numbers = page_numbers(evidence)
     kept: list[PaymentOption] = []
     checks: list[str] = []
     for option in fee.payment_options:
@@ -295,7 +315,7 @@ def _checked_options(fee: AgentFee, numbers: set[Decimal]) -> tuple[list[Payment
             checks.append(f"payment option dropped: {missing[0]:g} is not in the evidence")
             continue
         payments = option.payments
-        if payments is not None and (payments < 1 or Decimal(payments) not in numbers):
+        if payments is not None and (payments < 1 or not _count_is_printed(payments, evidence)):
             payments = None
         if payments == 1 and option.first_payment is None:  # "1 x € 8.950": the fee itself
             if option.instalment is not None and fee.amount is not None and option.instalment != fee.amount:

@@ -206,3 +206,21 @@ def test_a_plan_name_with_words_after_it_is_dropped_too():
     assert fees_agent._PAYMENT_PLAN_NAME_RE.match("План 2 – на вноски")
     assert fees_agent._PAYMENT_PLAN_NAME_RE.match("Вариант Б")
     assert not fees_agent._PAYMENT_PLAN_NAME_RE.match("Plan Advanced")
+
+
+def test_a_count_must_be_written_as_a_count_of_payments():
+    line = "Grade 2 | Plan 2 | € 9.150 | € 4.575 each"
+    fee = tuition(amount=9150, evidence=line, payment_options=[PaymentOption(payments=2, instalment=4575)])
+    result = check_fee(fee, line)
+    assert result.fee.payment_options == []  # the 2 is the grade's and the plan's, not a count
+
+
+def test_an_options_cell_does_not_vouch_for_the_fees_period():
+    line = "| Grade 0 | € 8.950 | 1 x € 2.650 + 9 x € 750 monthly |"
+    fee = tuition(
+        period=PricePeriod.MONTHLY,
+        evidence=line,
+        payment_options=[PaymentOption(payments=9, instalment=750, first_payment=2650)],
+    )
+    result = check_fee(fee, line)
+    assert result.fee.period is None and len(result.fee.payment_options) == 1
