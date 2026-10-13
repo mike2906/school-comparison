@@ -135,10 +135,10 @@ _PERIOD_WORDS = {
 # covers fees charged per day or per month too (569's "ДОПЪЛНИТЕЛНИ ТАКСИ ЗА УЧЕБНАТА ГОДИНА").
 _YEAR_ON_AMOUNT_LINE_RE = re.compile(r"(?:учебн\w*|на|за)\s+година")
 _DEPOSIT_RE = re.compile(r"депозит|капаро|deposit")
-_RANGE_MARKER_RE = re.compile(r"[–—-]|\bдо\b|\bto\b")
+# Only a currency and the marker may sit between a range's ends: "550 – 600", "550 EUR to 600".
+_RANGE_JOIN_RE = re.compile(r"(?:eur|€|евро|лв\.?|лева|bgn)?\s*(?:[–—-]|до|to)", re.IGNORECASE)
 _FIRST_INSTALMENT_BEFORE_RE = re.compile(r"(?<!\d)1\s*[xх×]\s*$")  # latin x, cyrillic х, ×
 _PLUS_N_TIMES_AFTER_RE = re.compile(r"\s*(?:eur|€|евро|лв\.?|лева|bgn)?\s*\+\s*\d+\s*[xх×]")
-_RANGE_GAP_CHARS = 30
 
 
 def _normalized(text: str) -> str:
@@ -170,7 +170,7 @@ def _range_is_joined(evidence: str, low: Decimal, high: Decimal) -> bool:
         for second in (s for s in spans if high in s[2]):
             a, b = sorted((first, second), key=lambda span: span[0])
             between = evidence[a[1] : b[0]].strip()
-            if a[0] != b[0] and len(between) <= _RANGE_GAP_CHARS and _RANGE_MARKER_RE.search(between):
+            if a[0] != b[0] and _RANGE_JOIN_RE.fullmatch(between):
                 return True
     return False
 

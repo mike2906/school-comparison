@@ -37,9 +37,11 @@ from app.scrapers.fee_pages import fee_http_client, page_key, pdf_text
 from app.scrapers.price_evidence import _PRICE_RE
 from app.scrapers.shared_site_check import registrable_domain
 from app.scrapers.stages import common as stage_common
+from app.scrapers.validator import validate_school_data
 from app.services.pipeline_runs import finalize_pipeline_run, pipeline_run_heartbeat, start_pipeline_run
 from app.services.provider_costs import ProviderCostCapExceeded, execute_billable_request, provider_cost_scope
 from app.utils.display_gating import pricing_row_is_publishable
+from app.utils.website_data import prepare_validation_rollover
 
 logger = logging.getLogger(__name__)
 
@@ -420,8 +422,12 @@ async def run_school(
     for source in sources:
         source.scraped_at = text_values._utcnow_naive()
     await price_step._write_price_rows(db, school, [row.id for row in superseded], rows, sources)
+    # The new rows stay withheld until Stage 6 has checked them, as after an extraction.
+    school.attributes = prepare_validation_rollover(school.attributes)
     await db.commit()
     report["outcome"] = "written"
+    validation = await validate_school_data(db, school.id, school.country_code, run_spot_check=False)
+    report["validation"] = validation.get("status")
     return report
 
 
@@ -472,41 +478,47 @@ async def run_fees_agent(
     )
     results: list[dict[str, Any]] = []
     error: Optional[str] = None
-    with provider_cost_scope(
-        pipeline_run_id=run.id,
-        stage=STAGE,
-        cap_usd=max_usd,
-        request_reserve_usd=float(settings.provider_request_reserve_usd),
-    ):
-        async with (
-            pipeline_run_heartbeat(
-                run.id,
-                session_factory=async_session_maker,
-                interval_seconds=float(settings.pipeline_heartbeat_interval_seconds),
-            ),
-            AsyncWebCrawler(config=browser) as crawler,
-            fee_http_client() as client,
+    try:  # a failed browser start must still close the run
+        with provider_cost_scope(
+            pipeline_run_id=run.id,
+            stage=STAGE,
+            cap_usd=max_usd,
+            request_reserve_usd=float(settings.provider_request_reserve_usd),
         ):
-            for current_id in school_ids:
-                school = await db.get(School, current_id)
-                try:
-                    results.append(
-                        await run_school(
-                            db,
-                            school,
-                            find=lambda s: find_pages(crawler, run_config, client, s, spend),
-                            read=lambda s, pages: read_fees(s, pages, spend),
-                            apply=apply,
+            async with (
+                pipeline_run_heartbeat(
+                    run.id,
+                    session_factory=async_session_maker,
+                    interval_seconds=float(settings.pipeline_heartbeat_interval_seconds),
+                ),
+                AsyncWebCrawler(config=browser) as crawler,
+                fee_http_client() as client,
+            ):
+                for current_id in school_ids:
+                    school = await db.get(School, current_id)
+                    try:
+                        results.append(
+                            await run_school(
+                                db,
+                                school,
+                                find=lambda s: find_pages(crawler, run_config, client, s, spend),
+                                read=lambda s, pages: read_fees(s, pages, spend),
+                                apply=apply,
+                            )
                         )
-                    )
-                except (SpendCapReached, ProviderCostCapExceeded) as exc:
-                    error = f"stopped before school {current_id}: {exc}"
-                    break
-                except Exception as exc:  # one school's failure leaves its rows as they are
-                    logger.exception("fees-agent failed for school %s", current_id)
-                    if db.in_transaction():
-                        await db.rollback()
-                    results.append({"school_id": current_id, "outcome": "error", "reason": str(exc)[:200]})
+                    except (SpendCapReached, ProviderCostCapExceeded) as exc:
+                        error = f"stopped before school {current_id}: {exc}"
+                        break
+                    except Exception as exc:  # one school's failure leaves its rows as they are
+                        logger.exception("fees-agent failed for school %s", current_id)
+                        if db.in_transaction():
+                            await db.rollback()
+                        results.append({"school_id": current_id, "outcome": "error", "reason": str(exc)[:200]})
+    except Exception as exc:
+        logger.exception("fees-agent run %s stopped", run_id)
+        if db.in_transaction():
+            await db.rollback()
+        error = f"run stopped: {str(exc)[:200]}"
     failed = sum(r["outcome"] == "error" for r in results)
     run = await db.get(PipelineRun, run_id, populate_existing=True)
     await finalize_pipeline_run(
@@ -519,11 +531,13 @@ async def run_fees_agent(
         ],
         error_summary=error,
     )
+    # The ledger also holds a call billed just before the cap stopped the run.
+    spent = max(spend.spent_usd, float(run.total_llm_cost_usd or 0))
     return {
         "apply": apply,
         "pipeline_run_id": run_id,
         "schools": len(results),
-        "spent_usd": round(spend.spent_usd, 6),
+        "spent_usd": round(spent, 6),
         "stopped": error,
         "kept_old_rows": [r["school_id"] for r in results if r["outcome"] == "kept_old_rows"],
         "outcomes": {o: sum(r["outcome"] == o for r in results) for o in {r["outcome"] for r in results}},

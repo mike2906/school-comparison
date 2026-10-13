@@ -132,6 +132,8 @@ it comes after steps 1 to 5 prove the runs are reliable.
    Built 2026-10-13 as an experimental dry-run-by-default command (`fees-agent`, `--apply`
    to write). Not yet wired: fee tables published only as images (`fee_image_reader.py`).
    A dry run still calls the models and records its pipeline run and spend; it writes no fees or pages.
+   `--apply` withholds the school's website data and runs Stage 6 on it straight after
+   writing, as an extraction does; if Stage 6 fails the data stays withheld.
 3. **Validate, then switch over.** First, about 20 schools from the 41 that neither sample
    used get a key read blind. The step-2 stage and today's rows are scored on them with
    `fresh_rescore/rules.md`, frozen as they are now. Score what would be published after every

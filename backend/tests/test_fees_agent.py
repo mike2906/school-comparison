@@ -23,6 +23,7 @@ from app.scrapers.extraction.agent_fees import HELD_CONFIDENCE, PUBLISH_CONFIDEN
 from app.scrapers.stages import fees_agent
 from app.scrapers.stages.fees_agent import PageRead, Spend, SpendCapReached
 from app.utils.display_gating import pricing_row_is_publishable
+from app.utils.website_data import website_data_is_publishable
 
 URL = "https://school.example/fees/"
 HOME = "https://school.example/"
@@ -182,6 +183,12 @@ def test_range_built_from_two_fees_is_not_published():
     assert any("range" in check for check in result.checks)
 
 
+def test_hyphen_inside_a_label_does_not_join_two_fees_into_a_range():
+    page = "Full-day 600 EUR\nHalf-day 550 EUR"
+    result = check_fee(fee(PriceCategory.TUITION, page, amount_min=550, amount_max=600), page)
+    assert result.kept and not published(result)
+
+
 # ---------------------------------------------------------------------------------------
 # Valid fees on the same pages survive
 # ---------------------------------------------------------------------------------------
@@ -222,7 +229,13 @@ def test_deposit_filed_as_registration_publishes():
 
 
 @pytest.mark.parametrize(
-    "line", ["Такса: от 550 до 600 евро месечно", "Такса 550 – 600 EUR месечно", "Fee 550-600 EUR monthly"]
+    "line",
+    [
+        "Такса: от 550 до 600 евро месечно",
+        "Такса 550 – 600 EUR месечно",
+        "Fee 550-600 EUR monthly",
+        "Fee 550 EUR to 600 EUR monthly",
+    ],
 )
 def test_stated_range_publishes(line):
     result = check_fee(
@@ -390,7 +403,9 @@ async def test_apply_writes_rows_and_pages(db_session, pages, frozen_today):
     school = await _school(db_session)
     await db_session.commit()
     report = await fees_agent.run_school(db_session, school, find=_find(pages), read=_read(FEES_STAGE), apply=True)
-    assert report["outcome"] == "written"
+    assert report["outcome"] == "written" and report["validation"] == "ok", report
+    await db_session.refresh(school)
+    assert website_data_is_publishable(school.attributes, school.scrape_status)
     rows = await _rows(db_session, school)
     assert {(r.category, float(r.amount), r.period) for r in rows} == {
         (PriceCategory.TUITION, 700.0, PricePeriod.MONTHLY),
@@ -407,6 +422,18 @@ async def test_apply_writes_rows_and_pages(db_session, pages, frozen_today):
     assert stored[URL].page_category == "pricing" and stored[HOME].page_category is None
     assert len(stored[URL].content_hash) == 64 and stored[URL].is_valid
     assert len((await db_session.execute(select(FieldSource))).scalars().all()) == 2
+
+
+async def test_rows_stay_withheld_when_stage_6_fails(db_session, pages, frozen_today, monkeypatch):
+    async def _failed(db, school_id, *args, **kwargs):
+        return {"school_id": school_id, "status": "validation_failed", "error": "boom"}
+
+    monkeypatch.setattr(fees_agent, "validate_school_data", _failed)
+    school = await _school(db_session)
+    await db_session.commit()
+    report = await fees_agent.run_school(db_session, school, find=_find(pages), read=_read(FEES_STAGE), apply=True)
+    assert report["outcome"] == "written" and report["validation"] == "validation_failed"
+    assert not website_data_is_publishable(school.attributes, school.scrape_status)
 
 
 async def test_apply_replaces_only_the_years_it_read(db_session, pages, frozen_today):
@@ -567,5 +594,30 @@ async def test_a_failed_school_still_finalises_the_run(db_session, monkeypatch):
     monkeypatch.setattr(fees_agent, "run_school", _fail)
     report = await fees_agent.run_fees_agent(db_session, school_id=school.id)
     assert report["outcomes"] == {"error": 1}
+    run = await db_session.get(PipelineRun, report["pipeline_run_id"])
+    assert run.status.value != "running"
+
+
+async def test_a_browser_that_will_not_start_still_finalises_the_run(db_session, monkeypatch):
+    import crawl4ai
+
+    from app.models.pipeline_run import PipelineRun
+
+    school = await _school(db_session)
+    await db_session.commit()
+
+    class _BrokenCrawler:
+        def __init__(self, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            raise RuntimeError("chromium did not launch")
+
+        async def __aexit__(self, *exc):
+            return False
+
+    monkeypatch.setattr(crawl4ai, "AsyncWebCrawler", _BrokenCrawler)
+    report = await fees_agent.run_fees_agent(db_session, school_id=school.id)
+    assert "chromium did not launch" in report["stopped"] and report["schools"] == 0
     run = await db_session.get(PipelineRun, report["pipeline_run_id"])
     assert run.status.value != "running"
