@@ -18,6 +18,7 @@ from decimal import Decimal
 from typing import Any, Optional
 from urllib.parse import unquote, urldefrag, urlparse
 
+from bs4 import BeautifulSoup
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -40,7 +41,12 @@ from app.scrapers.shared_site_check import registrable_domain
 from app.scrapers.stages import common as stage_common
 from app.scrapers.validator import validate_school_data
 from app.services.pipeline_runs import finalize_pipeline_run, pipeline_run_heartbeat, start_pipeline_run
-from app.services.provider_costs import ProviderCostCapExceeded, execute_billable_request, provider_cost_scope
+from app.services.provider_costs import (
+    ProviderCostCapExceeded,
+    ProviderCostError,
+    execute_billable_request,
+    provider_cost_scope,
+)
 from app.utils.display_gating import _BGN_PER_EUR, blocked_pricing_row_ids, pricing_row_is_publishable
 from app.utils.website_data import prepare_validation_rollover
 
@@ -53,6 +59,8 @@ MAX_PICKS = 4
 MAX_FETCHES = 12
 MAX_LINKS_SHOWN = 150
 MAX_READ_CHARS = 120_000
+THIN_PAGE_CHARS = 300
+RETRY_SECONDS = 2.0
 READ_OUTPUT_TOKENS_RESERVE = 6000
 PICK_COST_ESTIMATE_USD = 0.002
 # When the picker returns nothing, follow links whose URL or text names fees or admissions.
@@ -102,8 +110,18 @@ Reader = Callable[[School, list[PageRead]], Awaitable[list[AgentFee]]]
 
 
 def _same_site(url: str, site: str) -> bool:
-    domain = registrable_domain(url)
-    return bool(domain) and domain == registrable_domain(site)
+    """The school's own domain, or the same name under another ending: an umbrella site
+    (meridian22.org) often links each school's pages on its sister domain (meridian22.bg).
+    Only for a school on a domain of its own: a home on sites.google.com or dgN.sofia.bg
+    would otherwise take in every google.* or sofia.* link."""
+    domain, home = registrable_domain(url), registrable_domain(site)
+    if not domain or not home:
+        return False
+    if domain == home:
+        return True
+    host = (urlparse(site).hostname or "").lower().removeprefix("www.")
+    name, home_name = domain.split(".", 1)[0], home.split(".", 1)[0]
+    return host == home and len(home_name) >= 5 and name == home_name
 
 
 async def _fetch(crawler, run_config, client, url: str) -> tuple[str, str, list[tuple[str, str]]]:
@@ -113,14 +131,50 @@ async def _fetch(crawler, run_config, client, url: str) -> tuple[str, str, list[
         if response.status_code != 200:
             return url, "", []
         return str(response.url), await asyncio.to_thread(pdf_text, response.content), []
-    result = await asyncio.wait_for(crawler.arun(url=url, config=run_config), timeout=60)
-    if not getattr(result, "success", False):
+    for attempt in range(2):  # a site that throttles returns an empty page now and then (583)
+        result = await asyncio.wait_for(crawler.arun(url=url, config=run_config), timeout=60)
+        if getattr(result, "success", False):
+            break
+        if attempt == 0:
+            await asyncio.sleep(RETRY_SECONDS)
+    else:
         return url, "", []
     markdown = getattr(result, "markdown", None)
     text = getattr(markdown, "raw_markdown", None) or str(markdown or "")
-    links = (getattr(result, "links", None) or {}).get("internal") or []
+    found = getattr(result, "links", None) or {}
+    links = [*(found.get("internal") or []), *(found.get("external") or [])]
     pairs = [(str(link["href"]), str(link.get("text") or "").strip()[:80]) for link in links if link.get("href")]
     return str(getattr(result, "redirected_url", None) or url), text, pairs
+
+
+def _wordpress_api(url: str) -> tuple[str, dict[str, str]]:
+    parsed = urlparse(url)
+    slug = [part for part in parsed.path.split("/") if part][-1:] or ["home"]
+    return f"{parsed.scheme}://{parsed.netloc}/wp-json/wp/v2/pages", {
+        "slug": unquote(slug[0]),
+        "_fields": "content,link",
+    }
+
+
+async def _wordpress_text(client, url: str) -> Optional[str]:
+    """A page's content from the WordPress REST API, for sites that render it with scripts
+    (606 shows 106 characters to the crawler; its fee table is in the API). None when the
+    site has no such API, so the finder stops asking it."""
+    api, params = _wordpress_api(url)
+    try:
+        response = await client.get(api, params=params, timeout=30)
+        items = response.json() if response.status_code == 200 else None
+    except Exception:
+        return None
+    if not isinstance(items, list):
+        return None
+    # A slug repeats under different parents (/detska-gradina/taksi and /uchilishte/taksi):
+    # only the page at this URL will do.
+    item = next((i for i in items if isinstance(i, dict) and page_key(str(i.get("link") or "")) == page_key(url)), None)
+    if item is None:
+        return ""
+    html = (item.get("content") or {}).get("rendered") or ""
+    return BeautifulSoup(html, "html.parser").get_text("\n", strip=True)
 
 
 async def _pick(school: School, read: list[PageRead], links: list[tuple[str, str]], spend: Spend) -> list[str]:
@@ -149,6 +203,7 @@ async def find_pages(crawler, run_config, client, school: School, spend: Spend) 
     from crawl4ai.utils import RobotsParser  # type: ignore
 
     robots = RobotsParser()
+    wordpress = True  # until the API is found missing
     site = school.website_url
     read: list[PageRead] = []
     seen: set[tuple] = set()
@@ -170,6 +225,16 @@ async def find_pages(crawler, run_config, client, school: School, spend: Spend) 
             if page_key(final) != page_key(url) and page_key(final) in seen:
                 continue  # a second link to a page already read (often a percent-encoded redirect)
             seen.add(page_key(final))
+            is_pdf = unquote(urlparse(final).path).lower().endswith(".pdf")
+            if (
+                wordpress
+                and not is_pdf
+                and len(text.strip()) < THIN_PAGE_CHARS
+                and await robots.can_fetch(_wordpress_api(final)[0], CRAWLER_USER_AGENT)
+            ):
+                api_text = await _wordpress_text(client, final)
+                wordpress = api_text is not None
+                text = api_text or text
             read.append(PageRead(final, text, bool(_PRICE_RE.search(text))))
             for href, label in page_links:
                 href = urldefrag(href)[0]
@@ -180,7 +245,13 @@ async def find_pages(crawler, run_config, client, school: School, spend: Spend) 
         unopened = [(url, label) for url, label in links.items() if page_key(url) not in seen]
         if not unopened:
             break
-        queue = await _pick(school, read, unopened, spend)
+        try:
+            queue = await _pick(school, read, unopened, spend)
+        except (SpendCapReached, ProviderCostError):  # a cap, or a run no longer running
+            raise
+        except Exception as exc:  # a timed-out pick (541) falls back to the keyword links below
+            logger.warning("fees-agent link pick failed for school %s: %s", school.id, exc)
+            queue = []
         if not queue:
             queue = [url for url, label in unopened if _FEE_LINK_RE.search(f"{unquote(url)} {label}")][:MAX_PICKS]
         if not queue:
@@ -563,7 +634,7 @@ async def run_fees_agent(
         page_timeout=30000,
         wait_until="domcontentloaded",
         delay_before_return_html=0.5,
-        exclude_external_links=True,
+        exclude_external_links=False,  # _same_site keeps the school's own and sister domains
         verbose=False,
     )
     results: list[dict[str, Any]] = []
