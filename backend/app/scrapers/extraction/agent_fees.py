@@ -71,9 +71,10 @@ Rules:
 - Paying one fee in parts is not a fee of its own. When the site offers the same fee paid in one go and also in parts (2 instalments, quarterly or monthly instalments, "Plan 1 / Plan 2 / Plan 3", "1 x A + 9 x B"), list one entry: amount is the price paid in one go, and each way of paying in parts goes in payment_options with the numbers the site prints (total, payments, instalment, first_payment). Paying in one go is the entry itself, never an option.
 - If the site prints no price for paying in one go, the entry's amount is the total it prints for one plan; with no total printed, list each instalment amount as its own entry with the plan name.
 - A monthly fee that is the school's ordinary price (a kindergarten's monthly fee) is the entry itself, not an option.
+- List the fees of every page, to the end of the last one: a school often has a fee page per stage (kindergarten, primary, secondary), and each one's fees are listed. Include services billed separately (uniforms, transport, food, extended day, clubs), not only tuition.
 - Skip lines without an amount (a percentage discount, a payment schedule). Never invent an amount, and never compute a total the site does not print.
 - currency as printed (EUR or BGN); if both are printed, the EUR figure.
-- category: the monthly kindergarten fee and school tuition are tuition; an enrolment, exam, application or entry-test fee is registration; a deposit (депозит, капаро) is registration, never tuition; learning support, therapy and similar services are activities; optional classes, clubs and sports charged on top are extracurricular.
+- category: the monthly kindergarten fee and school tuition are tuition; an enrolment, exam, application or entry-test fee is registration; a deposit (депозит, капаро) is registration, never tuition; learning support, therapy and similar services are activities; optional classes, clubs and sports charged on top are extracurricular; transport, food, uniforms and extended day (after-school care) are their own categories.
 - period only when the page states it for THAT amount (per month, per year, per term...); otherwise null. Never guess.
   - "once per school year" or "еднократна такса" for the school year is yearly; a full year's tuition paid in one payment is yearly too.
   - one_time only for a fee charged once ever: enrolment, exam, application, deposit. Never for tuition or materials.
@@ -158,6 +159,9 @@ _PERIOD_WORDS = {  # Bulgarian, English, and the French and German some schools 
     PricePeriod.SEMESTER: r"семест|\bsemester|semestre|halbj[aä]hr",
     PricePeriod.ONE_TIME: r"еднократ|\bonce\b|при записване",
 }
+# English "one-time" names a period only on the amount's own line: 596's "ANNUAL TUITION FEES"
+# heading sits above its "One-time fee for initial enrollment".
+_ONE_TIME_EN_RE = re.compile(r"\bone\s*[-‐‑–—]?\s*time\b")
 # "for the school year" names a period only on the amount's own line: as a heading it often
 # covers fees charged per day or per month too (569's "ДОПЪЛНИТЕЛНИ ТАКСИ ЗА УЧЕБНАТА ГОДИНА").
 _YEAR_ON_AMOUNT_LINE_RE = re.compile(r"(?:учебн\w*|на|за)\s+година|l'année")
@@ -177,16 +181,24 @@ def _names_period(period: PricePeriod, evidence: str, amounts: list[Decimal], ca
     # needs no word for it; a deposit filed as registration is one too. Not when the line
     # calls it recurring and never one-time: "годишна такса за записване" is paid every year.
     # "срок" is left out: "платима в срок до 15 юни" is a deadline, not a term.
+    amount_lines = [line for line in evidence.splitlines() if set(amounts) & page_numbers(line)]
     if period is PricePeriod.ONE_TIME and category is PriceCategory.REGISTRATION:
         if re.search(_PERIOD_WORDS[PricePeriod.ONE_TIME], evidence):
             return True
         recurring = (PricePeriod.MONTHLY, PricePeriod.YEARLY, PricePeriod.QUARTER, PricePeriod.SEMESTER)
+        # "One-time fee of € 800" under an "ANNUAL TUITION FEES" heading (596): the amount's own
+        # line names it, unless that line also calls the fee recurring ("per term" included).
+        if any(
+            _ONE_TIME_EN_RE.search(line)
+            and not any(re.search(_PERIOD_WORDS[other], line) for other in (*recurring, PricePeriod.TERM))
+            for line in amount_lines
+        ):
+            return True
         return not any(re.search(_PERIOD_WORDS[other], evidence) for other in recurring)
     if re.search(_PERIOD_WORDS[period], evidence):
         return True
     if period is not PricePeriod.YEARLY:
         return False
-    amount_lines = [line for line in evidence.splitlines() if set(amounts) & page_numbers(line)]
     return any(_YEAR_ON_AMOUNT_LINE_RE.search(line) for line in amount_lines)
 
 
@@ -235,7 +247,9 @@ def check_fee(fee: AgentFee, page_text: str) -> CheckedFee:
     if not lines:
         return _dropped(fee, "dropped: no evidence line")
     if any(line not in page for line in lines):
-        return _dropped(fee, "dropped: evidence line is not on the page")
+        page_lines = [_normalized(text) for text in page_text.splitlines() if text.strip()]
+        if any(not _line_on_page(line, page, page_lines) for line in lines):
+            return _dropped(fee, "dropped: evidence line is not on the page")
     evidence = "\n".join(lines)
     if not amount_on_page(fee, page_numbers(evidence)):
         return _dropped(fee, "dropped: evidence line does not hold the amount")
@@ -298,6 +312,41 @@ def _count_is_printed(payments: int, text: str) -> bool:
     after = rf"{count}\s*(?:[^\s\d]+\s+)?{_COUNT_WORD_RE}"
     before = rf"(?<![^\W\d_])[xх×]\s*{count}"
     return re.search(rf"{after}|{before}", text, re.IGNORECASE) is not None
+
+
+_LABEL_LINES_AWAY = 3
+# A label names the row ("Grade 8 – 9", "Годишна такса"): it holds no price, so it cannot
+# carry another row's amount, or that amount's "monthly", into the fee's line. A price is a
+# currency or a number of three digits or more.
+_NOT_A_LABEL_RE = re.compile(r"[€$£]|\b(?:eur|euros?|usd|bgn|лв|лева|leva|евро)\b|\d{3}|\d[.,\s]\d{3}", re.IGNORECASE)
+
+
+def _line_on_page(line: str, page: str, page_lines: list[str]) -> bool:
+    """The evidence line is on the page, or is a row's label joined to the row.
+
+    A PDF table's text can put a row's label on another line than its first amount: 596's
+    secondary fees read "Plan 1 – € 9,500" on one line and "Grade 8 – 9 Plan 2 – …" two
+    lines down, and the reader quoted the row as "Grade 8 – 9 Plan 1 – € 9,500". The row
+    must be a whole line of the page and the label the start of a line at most three lines
+    from it, with no price in it, so a label and an amount from unrelated
+    places do not make a line.
+    """
+    if line in page:
+        return True
+    where = {}
+    for index, text in enumerate(page_lines):
+        where.setdefault(text, []).append(index)
+    for cut in range(1, len(line)):
+        if line[cut - 1] != " ":
+            continue
+        label, row = line[:cut].strip(), line[cut:].strip()
+        if not label or row not in where or _NOT_A_LABEL_RE.search(label):
+            continue
+        for index in where[row]:
+            nearby = page_lines[max(0, index - _LABEL_LINES_AWAY) : index + _LABEL_LINES_AWAY + 1]
+            if any(text != row and text.startswith(label) for text in nearby):
+                return True
+    return False
 
 
 def _decimal(value: float) -> Decimal:

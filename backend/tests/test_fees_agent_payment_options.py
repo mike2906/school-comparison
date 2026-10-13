@@ -252,3 +252,95 @@ def test_the_report_shows_each_fees_group_and_payment_options():
     report = fees_agent._fee_report(check_fee(tuition(), PAGE_596), None)
     assert report["age_group"] == "Grade 0"
     assert [option["label"] for option in report["payment_options"]] == ["Plan 2", "Plan 3"]
+
+
+# 596's secondary fee PDF as pdf_text reads it: the grade label sits on the plan 2 line.
+PAGE_596_SECONDARY = """\
+ANNUAL TUITION FEES 2026-2027 · SECONDARY SCHOOL
+REGISTRATION & APPLICATION FEE: A one-time application fee of € 200 is payable
+Grade Payment Plan Plan 1 Plan 2 Plan 3
+Plan 1 – € 9,500
+1 x € 2,950 initial
+Grade 8 – 9 Plan 2 – € 9,700 1 x € 9,500 2 x € 4,850
+9 x € 780 monthly
+Plan 3 – € 9,950
+"""
+
+
+def test_a_row_label_the_pdf_put_on_another_line_may_be_quoted_with_the_row():
+    evidence = (
+        "ANNUAL TUITION FEES 2026-2027 · SECONDARY SCHOOL\nGrade Payment Plan Plan 1 Plan 2 Plan 3\n"
+        "Grade 8 – 9 Plan 1 – € 9,500\n1 x € 2,950 initial\nPlan 2 – € 9,700 1 x € 9,500 2 x € 4,850\n"
+        "9 x € 780 monthly\nPlan 3 – € 9,950"
+    )
+    fee = tuition(
+        amount=9500,
+        age_group="Grade 8 – 9",
+        period=PricePeriod.YEARLY,
+        evidence=evidence,
+        payment_options=[
+            PaymentOption(label="Plan 2", total=9700, payments=2, instalment=4850),
+            PaymentOption(label="Plan 3", total=9950, payments=9, instalment=780, first_payment=2950),
+        ],
+    )
+    result = check_fee(fee, PAGE_596_SECONDARY)
+    assert result.kept and len(result.fee.payment_options) == 2, result.checks
+
+
+def test_a_line_made_of_words_not_on_the_page_is_still_dropped():
+    fee = tuition(amount=9500, evidence="Grade 11 – 12 Plan 1 – € 9,500")
+    assert not check_fee(fee, PAGE_596_SECONDARY).kept
+
+
+def test_one_time_in_english_names_the_period_of_a_registration_fee():
+    line = "ANNUAL TUITION FEES 2026-2027\nOne-time fee for initial enrollment of € 800"
+    fee = tuition(category=PriceCategory.REGISTRATION, amount=800, period=PricePeriod.ONE_TIME, evidence=line)
+    fee = fee.model_copy(update={"payment_options": []})
+    assert check_fee(fee, line).fee.period is PricePeriod.ONE_TIME
+
+
+def test_a_label_quoted_with_a_row_it_does_not_sit_beside_is_dropped():
+    # "Grade 8 – 9" is on the plan 2 line; € 2,950 is the plan 3 first payment two lines up.
+    fee = tuition(amount=2950, evidence="Grade 8 – 9 € 2,950")
+    assert not check_fee(fee, PAGE_596_SECONDARY).kept
+
+
+def test_one_time_in_english_does_not_beat_a_recurring_word_on_the_same_line():
+    line = "Annual re-enrolment fee € 300, payable at one time"
+    fee = tuition(category=PriceCategory.REGISTRATION, amount=300, period=PricePeriod.ONE_TIME, evidence=line)
+    fee = fee.model_copy(update={"payment_options": []})
+    assert check_fee(fee, line).fee.period is not PricePeriod.ONE_TIME
+
+
+@pytest.mark.parametrize(
+    "evidence",
+    [
+        "9 x € 780 monthly Plan 1 – € 9,500",  # another line's period word joined to the row
+        "Grade 8 – 9 Plan 2 – € 9,700 Plan 1 – € 9,500",  # a whole row joined to another row
+    ],
+)
+def test_a_label_holds_no_price_or_period_of_its_own(evidence):
+    fee = tuition(amount=9500, period=PricePeriod.MONTHLY, evidence=evidence)
+    assert not check_fee(fee, PAGE_596_SECONDARY).kept
+
+
+@pytest.mark.parametrize(
+    ("line", "one_time"),
+    [
+        ("One–time fee for initial enrollment of € 800", True),
+        ("Re-enrolment fee € 800 per term, one-time payment", False),
+    ],
+)
+def test_one_time_in_english_with_a_dash_and_beside_a_term(line, one_time):
+    page = f"ANNUAL TUITION FEES 2026-2027\n{line}"
+    fee = tuition(category=PriceCategory.REGISTRATION, amount=800, period=PricePeriod.ONE_TIME, evidence=page)
+    fee = fee.model_copy(update={"payment_options": []})
+    assert (check_fee(fee, page).fee.period is PricePeriod.ONE_TIME) is one_time
+
+
+def test_a_label_may_name_the_fee_but_not_carry_a_bare_price():
+    page = "Годишна такса\nКлас 1 – 4\n9 500 лв.\nPlan 2 – 9,700 1 x 9,500\nPlan 1 – 9,500"
+    named = tuition(amount=9500, period=PricePeriod.YEARLY, evidence="Годишна такса 9 500 лв.")
+    assert check_fee(named, page).kept
+    borrowed = tuition(amount=9500, evidence="Plan 2 – 9,700 Plan 1 – 9,500")
+    assert not check_fee(borrowed, page).kept
