@@ -77,6 +77,9 @@ class Settings(BaseSettings):
     extraction_batch_concurrency: int = 1
     # When true, clear existing scraped pricing rows if extraction finds no pricing info.
     extraction_clear_pricing_on_no_info: bool = False
+    # Fees come from the fees-agent stage (docs/AGENT_FEE_EXTRACTION.md). The old rule-based
+    # fee extraction stays in the code until that plan's step 4; true turns it back on.
+    extraction_pipeline_prices: bool = False
     nav_batch_concurrency: int = 3
     # Per-school hard timeout for CLI batch navigation. Prevents a single hung browser
     # from stalling the entire batch. Set to 0 to disable (not recommended with crawl4ai).

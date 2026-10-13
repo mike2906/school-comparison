@@ -39,7 +39,13 @@ from app.scrapers.page_content import is_template_filler
 from app.services.geocoding.write_gate import OFFICIAL_COORDS_TAG
 
 # Fee pages in these tests name academic years such as 2025/2026; pin the date they are read on.
-pytestmark = pytest.mark.usefixtures("frozen_today")
+pytestmark = pytest.mark.usefixtures("frozen_today", "pipeline_prices")
+
+
+@pytest.fixture
+def pipeline_prices(monkeypatch):
+    """These tests cover the old fee extraction, off by default since fees-agent owns fees."""
+    monkeypatch.setattr(get_settings(), "extraction_pipeline_prices", True)
 
 
 def _fee_line(label, amount, *, currency="BGN", per="month", kind="tuition", role="full", academic_year=None, quote=None):
@@ -91,6 +97,25 @@ async def sample_school_for_extraction(db_session):
 
 
 @pytest.mark.asyncio
+async def test_extract_school_leaves_fees_to_the_fees_agent(db_session, sample_school_for_extraction, monkeypatch):
+    monkeypatch.setattr(get_settings(), "extraction_pipeline_prices", False)
+    school = sample_school_for_extraction
+    db_session.add(
+        Pricing(school_id=school.id, category=PriceCategory.TUITION, amount=700, currency="EUR",
+                period=PricePeriod.MONTHLY, source=PriceSource.SCRAPED_WEBSITE)
+    )  # fmt: skip
+    await db_session.commit()
+    general = GeneralInfoExtractionOutput(display_name_i18n={"en": "Fusion School"}, has_useful_info=True)
+
+    with patch("app.scrapers.extractor._run_typed_agent", new=AsyncMock(return_value=(general, 150, 20, 0.002))) as run:
+        result = await extractor_module.extract_school(db_session, school.id, "bg")
+
+    assert all(call.kwargs.get("result_type") is not PageFees for call in run.await_args_list)
+    assert result["general_info_success"] is True and result["pricing_count"] == 0
+    rows = (await db_session.execute(select(Pricing).where(Pricing.school_id == school.id))).scalars().all()
+    assert [(float(r.amount), r.currency) for r in rows] == [(700.0, "EUR")]
+
+
 async def test_extract_school_persists_pricing_and_general_info(db_session, sample_school_for_extraction):
     school = sample_school_for_extraction
     school.attributes = {"website_data_withheld": True}
