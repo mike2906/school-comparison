@@ -159,9 +159,11 @@ _PERIOD_WORDS = {  # Bulgarian, English, and the French and German some schools 
     PricePeriod.SEMESTER: r"семест|\bsemester|semestre|halbj[aä]hr",
     PricePeriod.ONE_TIME: r"еднократ|\bonce\b|при записване",
 }
+# English "one-time" names a period only on the amount's own line: 596's "ANNUAL TUITION FEES"
+# heading sits above its "One-time fee for initial enrollment".
+_ONE_TIME_EN_RE = re.compile(r"\bone\s*[-–—]?\s*time\b")
 # "for the school year" names a period only on the amount's own line: as a heading it often
 # covers fees charged per day or per month too (569's "ДОПЪЛНИТЕЛНИ ТАКСИ ЗА УЧЕБНАТА ГОДИНА").
-_ONE_TIME_EN_RE = re.compile(r"\bone[- ]time\b")
 _YEAR_ON_AMOUNT_LINE_RE = re.compile(r"(?:учебн\w*|на|за)\s+година|l'année")
 _DEPOSIT_RE = re.compile(r"депозит|капаро|deposit")
 # Only a currency and the marker may sit between a range's ends: "550 – 600", "550 EUR to 600".
@@ -179,15 +181,16 @@ def _names_period(period: PricePeriod, evidence: str, amounts: list[Decimal], ca
     # needs no word for it; a deposit filed as registration is one too. Not when the line
     # calls it recurring and never one-time: "годишна такса за записване" is paid every year.
     # "срок" is left out: "платима в срок до 15 юни" is a deadline, not a term.
+    amount_lines = [line for line in evidence.splitlines() if set(amounts) & page_numbers(line)]
     if period is PricePeriod.ONE_TIME and category is PriceCategory.REGISTRATION:
         if re.search(_PERIOD_WORDS[PricePeriod.ONE_TIME], evidence):
             return True
         recurring = (PricePeriod.MONTHLY, PricePeriod.YEARLY, PricePeriod.QUARTER, PricePeriod.SEMESTER)
         # "One-time fee of € 800" under an "ANNUAL TUITION FEES" heading (596): the amount's own
-        # line names it, unless that line also calls the fee recurring.
-        amount_lines = [line for line in evidence.splitlines() if set(amounts) & page_numbers(line)]
+        # line names it, unless that line also calls the fee recurring ("per term" included).
         if any(
-            _ONE_TIME_EN_RE.search(line) and not any(re.search(_PERIOD_WORDS[other], line) for other in recurring)
+            _ONE_TIME_EN_RE.search(line)
+            and not any(re.search(_PERIOD_WORDS[other], line) for other in (*recurring, PricePeriod.TERM))
             for line in amount_lines
         ):
             return True
@@ -196,7 +199,6 @@ def _names_period(period: PricePeriod, evidence: str, amounts: list[Decimal], ca
         return True
     if period is not PricePeriod.YEARLY:
         return False
-    amount_lines = [line for line in evidence.splitlines() if set(amounts) & page_numbers(line)]
     return any(_YEAR_ON_AMOUNT_LINE_RE.search(line) for line in amount_lines)
 
 
@@ -244,9 +246,10 @@ def check_fee(fee: AgentFee, page_text: str) -> CheckedFee:
     lines = [_normalized(line) for line in fee.evidence.splitlines() if line.strip()]
     if not lines:
         return _dropped(fee, "dropped: no evidence line")
-    page_lines = [_normalized(text) for text in page_text.splitlines() if text.strip()]
-    if any(not _line_on_page(line, page, page_lines) for line in lines):
-        return _dropped(fee, "dropped: evidence line is not on the page")
+    if any(line not in page for line in lines):
+        page_lines = [_normalized(text) for text in page_text.splitlines() if text.strip()]
+        if any(not _line_on_page(line, page, page_lines) for line in lines):
+            return _dropped(fee, "dropped: evidence line is not on the page")
     evidence = "\n".join(lines)
     if not amount_on_page(fee, page_numbers(evidence)):
         return _dropped(fee, "dropped: evidence line does not hold the amount")
@@ -312,6 +315,9 @@ def _count_is_printed(payments: int, text: str) -> bool:
 
 
 _LABEL_LINES_AWAY = 3
+# A label names the row; it holds no price or period of its own, so it cannot carry another
+# row's amount or "monthly" into the fee's line.
+_NOT_A_LABEL_RE = re.compile(rf"[€$£]|\b(?:eur|bgn|лв|лева|евро)\b|{'|'.join(_PERIOD_WORDS.values())}", re.IGNORECASE)
 
 
 def _line_on_page(line: str, page: str, page_lines: list[str]) -> bool:
@@ -321,7 +327,8 @@ def _line_on_page(line: str, page: str, page_lines: list[str]) -> bool:
     secondary fees read "Plan 1 – € 9,500" on one line and "Grade 8 – 9 Plan 2 – …" two
     lines down, and the reader quoted the row as "Grade 8 – 9 Plan 1 – € 9,500". The row
     must be a whole line of the page and the label the start of a line at most three lines
-    from it, so a label and an amount from unrelated places do not make a line.
+    from it, with no price or period word in it, so a label and an amount from unrelated
+    places do not make a line.
     """
     if line in page:
         return True
@@ -332,7 +339,7 @@ def _line_on_page(line: str, page: str, page_lines: list[str]) -> bool:
         if line[cut - 1] != " ":
             continue
         label, row = line[:cut].strip(), line[cut:].strip()
-        if not label or row not in where:
+        if not label or row not in where or _NOT_A_LABEL_RE.search(label):
             continue
         for index in where[row]:
             nearby = page_lines[max(0, index - _LABEL_LINES_AWAY) : index + _LABEL_LINES_AWAY + 1]

@@ -310,3 +310,29 @@ def test_one_time_in_english_does_not_beat_a_recurring_word_on_the_same_line():
     fee = tuition(category=PriceCategory.REGISTRATION, amount=300, period=PricePeriod.ONE_TIME, evidence=line)
     fee = fee.model_copy(update={"payment_options": []})
     assert check_fee(fee, line).fee.period is not PricePeriod.ONE_TIME
+
+
+@pytest.mark.parametrize(
+    "evidence",
+    [
+        "9 x € 780 monthly Plan 1 – € 9,500",  # another line's period word joined to the row
+        "Grade 8 – 9 Plan 2 – € 9,700 Plan 1 – € 9,500",  # a whole row joined to another row
+    ],
+)
+def test_a_label_holds_no_price_or_period_of_its_own(evidence):
+    fee = tuition(amount=9500, period=PricePeriod.MONTHLY, evidence=evidence)
+    assert not check_fee(fee, PAGE_596_SECONDARY).kept
+
+
+@pytest.mark.parametrize(
+    ("line", "one_time"),
+    [
+        ("One–time fee for initial enrollment of € 800", True),
+        ("Re-enrolment fee € 800 per term, one-time payment", False),
+    ],
+)
+def test_one_time_in_english_with_a_dash_and_beside_a_term(line, one_time):
+    page = f"ANNUAL TUITION FEES 2026-2027\n{line}"
+    fee = tuition(category=PriceCategory.REGISTRATION, amount=800, period=PricePeriod.ONE_TIME, evidence=page)
+    fee = fee.model_copy(update={"payment_options": []})
+    assert (check_fee(fee, page).fee.period is PricePeriod.ONE_TIME) is one_time
