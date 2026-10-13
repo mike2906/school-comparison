@@ -14,12 +14,15 @@ import logging
 import re
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from decimal import Decimal
 from typing import Any, Optional
 from urllib.parse import unquote, urldefrag, urlparse
 
+from bs4 import BeautifulSoup
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.ai.client import create_agent, extract_provider_cost_usd, get_model, get_model_costs
 from app.config import CRAWLER_USER_AGENT, get_settings
@@ -34,13 +37,19 @@ from app.schemas.extraction import ExtractedPrice
 from app.scrapers.extraction import llm_results, price_step, text_values
 from app.scrapers.extraction.agent_fees import READER_PROMPT, AgentFee, AgentFees, CheckedFee, check_fee
 from app.scrapers.fee_pages import fee_http_client, page_key, pdf_text
-from app.scrapers.price_evidence import _PRICE_RE
+from app.scrapers.price_evidence import _PRICE_RE, PriceRow, _amount_key
 from app.scrapers.shared_site_check import registrable_domain
 from app.scrapers.stages import common as stage_common
 from app.scrapers.validator import validate_school_data
 from app.services.pipeline_runs import finalize_pipeline_run, pipeline_run_heartbeat, start_pipeline_run
-from app.services.provider_costs import ProviderCostCapExceeded, execute_billable_request, provider_cost_scope
-from app.utils.display_gating import pricing_row_is_publishable
+from app.services.provider_costs import (
+    ProviderCostCapExceeded,
+    ProviderCostError,
+    execute_billable_request,
+    provider_cost_scope,
+)
+from app.utils.academic_year import current_academic_year, normalize_academic_year
+from app.utils.display_gating import _BGN_PER_EUR, blocked_pricing_row_ids, pricing_row_is_publishable
 from app.utils.website_data import prepare_validation_rollover
 
 logger = logging.getLogger(__name__)
@@ -52,6 +61,8 @@ MAX_PICKS = 4
 MAX_FETCHES = 12
 MAX_LINKS_SHOWN = 150
 MAX_READ_CHARS = 120_000
+THIN_PAGE_CHARS = 300
+RETRY_SECONDS = 2.0
 READ_OUTPUT_TOKENS_RESERVE = 6000
 PICK_COST_ESTIMATE_USD = 0.002
 # When the picker returns nothing, follow links whose URL or text names fees or admissions.
@@ -101,8 +112,18 @@ Reader = Callable[[School, list[PageRead]], Awaitable[list[AgentFee]]]
 
 
 def _same_site(url: str, site: str) -> bool:
-    domain = registrable_domain(url)
-    return bool(domain) and domain == registrable_domain(site)
+    """The school's own domain, or the same name under another ending: an umbrella site
+    (meridian22.org) often links each school's pages on its sister domain (meridian22.bg).
+    Only for a school on a domain of its own: a home on sites.google.com or dgN.sofia.bg
+    would otherwise take in every google.* or sofia.* link."""
+    domain, home = registrable_domain(url), registrable_domain(site)
+    if not domain or not home:
+        return False
+    if domain == home:
+        return True
+    host = (urlparse(site).hostname or "").lower().removeprefix("www.")
+    name, home_name = domain.split(".", 1)[0], home.split(".", 1)[0]
+    return host == home and len(home_name) >= 5 and name == home_name
 
 
 async def _fetch(crawler, run_config, client, url: str) -> tuple[str, str, list[tuple[str, str]]]:
@@ -112,14 +133,52 @@ async def _fetch(crawler, run_config, client, url: str) -> tuple[str, str, list[
         if response.status_code != 200:
             return url, "", []
         return str(response.url), await asyncio.to_thread(pdf_text, response.content), []
-    result = await asyncio.wait_for(crawler.arun(url=url, config=run_config), timeout=60)
-    if not getattr(result, "success", False):
+    for attempt in range(2):  # a site that throttles returns an empty page now and then (583)
+        result = await asyncio.wait_for(crawler.arun(url=url, config=run_config), timeout=60)
+        if getattr(result, "success", False):
+            break
+        if attempt == 0:
+            await asyncio.sleep(RETRY_SECONDS)
+    else:
         return url, "", []
     markdown = getattr(result, "markdown", None)
     text = getattr(markdown, "raw_markdown", None) or str(markdown or "")
-    links = (getattr(result, "links", None) or {}).get("internal") or []
+    found = getattr(result, "links", None) or {}
+    links = [*(found.get("internal") or []), *(found.get("external") or [])]
     pairs = [(str(link["href"]), str(link.get("text") or "").strip()[:80]) for link in links if link.get("href")]
     return str(getattr(result, "redirected_url", None) or url), text, pairs
+
+
+def _wordpress_api(url: str) -> tuple[str, dict[str, str]]:
+    parsed = urlparse(url)
+    slug = [part for part in parsed.path.split("/") if part][-1:] or ["home"]
+    return f"{parsed.scheme}://{parsed.netloc}/wp-json/wp/v2/pages", {
+        "slug": unquote(slug[0]),
+        "_fields": "content,link",
+    }
+
+
+async def _wordpress_text(client, url: str) -> Optional[str]:
+    """A page's content from the WordPress REST API, for sites that render it with scripts
+    (606 shows 106 characters to the crawler; its fee table is in the API). None when the
+    site has no such API, so the finder stops asking it."""
+    api, params = _wordpress_api(url)
+    try:
+        response = await client.get(api, params=params, timeout=30)
+        if response.status_code >= 500:
+            return ""  # throttled or down for a moment: ask again for the next page
+        items = response.json() if response.status_code == 200 else None
+    except Exception:
+        return ""
+    if not isinstance(items, list):
+        return None
+    # A slug repeats under different parents (/detska-gradina/taksi and /uchilishte/taksi):
+    # only the page at this URL will do.
+    item = next((i for i in items if isinstance(i, dict) and page_key(str(i.get("link") or "")) == page_key(url)), None)
+    if item is None:
+        return ""
+    html = (item.get("content") or {}).get("rendered") or ""
+    return BeautifulSoup(html, "html.parser").get_text("\n", strip=True)
 
 
 async def _pick(school: School, read: list[PageRead], links: list[tuple[str, str]], spend: Spend) -> list[str]:
@@ -148,6 +207,7 @@ async def find_pages(crawler, run_config, client, school: School, spend: Spend) 
     from crawl4ai.utils import RobotsParser  # type: ignore
 
     robots = RobotsParser()
+    wordpress = True  # until the API is found missing
     site = school.website_url
     read: list[PageRead] = []
     seen: set[tuple] = set()
@@ -169,6 +229,16 @@ async def find_pages(crawler, run_config, client, school: School, spend: Spend) 
             if page_key(final) != page_key(url) and page_key(final) in seen:
                 continue  # a second link to a page already read (often a percent-encoded redirect)
             seen.add(page_key(final))
+            is_pdf = unquote(urlparse(final).path).lower().endswith(".pdf")
+            if (
+                wordpress
+                and not is_pdf
+                and len(text.strip()) < THIN_PAGE_CHARS
+                and await robots.can_fetch(_wordpress_api(final)[0], CRAWLER_USER_AGENT)
+            ):
+                api_text = await _wordpress_text(client, final)
+                wordpress = api_text is not None
+                text = api_text or text
             read.append(PageRead(final, text, bool(_PRICE_RE.search(text))))
             for href, label in page_links:
                 href = urldefrag(href)[0]
@@ -179,7 +249,13 @@ async def find_pages(crawler, run_config, client, school: School, spend: Spend) 
         unopened = [(url, label) for url, label in links.items() if page_key(url) not in seen]
         if not unopened:
             break
-        queue = await _pick(school, read, unopened, spend)
+        try:
+            queue = await _pick(school, read, unopened, spend)
+        except (SpendCapReached, ProviderCostError):  # a cap, or a run no longer running
+            raise
+        except Exception as exc:  # a timed-out pick (541) falls back to the keyword links below
+            logger.warning("fees-agent link pick failed for school %s: %s", school.id, exc)
+            queue = []
         if not queue:
             queue = [url for url, label in unopened if _FEE_LINK_RE.search(f"{unquote(url)} {label}")][:MAX_PICKS]
         if not queue:
@@ -249,7 +325,7 @@ def _build_rows(
 ) -> tuple[list[Pricing], list[FieldSource]]:
     rows: list[Pricing] = []
     sources: list[FieldSource] = []
-    seen: set[tuple] = set()
+    built = []
     for result, page in checked:
         fee = result.fee
         fields = price_step._normalized_price_fields(
@@ -266,12 +342,23 @@ def _build_rows(
                 confidence=result.confidence,
             )
         )
-        if fields is None:
+        if fields is not None:
+            built.append((result, page, fields, " ".join(fee.label.split()).casefold()))
+    # The same fee on two pages is one row (564 lists its fees on three). On one page a
+    # second fee with the same fields but its own label is a fee of its own: two grade
+    # tiers at one price when the reader left their groups empty. So each set of fields
+    # comes from the one page that lists it most often, once per label.
+    labels: dict[tuple, dict[Any, set[str]]] = {}
+    for _, page, fields, label in built:
+        labels.setdefault(tuple(fields.values()), {}).setdefault(page.id, set()).add(label)
+    taken: set[tuple] = set()
+    for result, page, fields, label in built:
+        key = tuple(fields.values())
+        by_page = labels[key]
+        if page.id != max(by_page, key=lambda page_id: len(by_page[page_id])) or (key, label) in taken:
             continue
-        key = (*fields.values(), fee.label.casefold(), page.source_url)
-        if key in seen:  # the same fee read twice from one page
-            continue
-        seen.add(key)
+        taken.add((key, label))
+        fee = result.fee
         rows.append(
             Pricing(
                 school_id=school.id,
@@ -325,6 +412,109 @@ async def _upsert_pages(db: AsyncSession, pages: dict[str, SourcePage], stored: 
         existing.page_category = new.page_category or existing.page_category
         pages[url] = existing
     await db.flush()
+
+
+EURO_TOLERANCE = Decimal("0.005")  # a site's own conversion is often rounded: 1369 лв. for 700 €
+
+
+def _amount_group(row: Any) -> tuple[str, ...]:
+    return _amount_key(PriceRow.from_pricing(row))
+
+
+class _InEuro:
+    """An old BGN row seen at the EUR amounts the read gives for it, so rule 6 checks its
+    period, plan and count like any other row (330's 899.68 BGN is 460 EUR)."""
+
+    def __init__(self, row: Pricing, amounts: tuple[Any, Any, Any]):
+        self._row = row
+        self.currency = "EUR"
+        self.amount, self.amount_min, self.amount_max = amounts
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._row, name)
+
+
+def _in_euro(row: Pricing, proposed: list[Pricing]) -> Optional[_InEuro]:
+    if (row.currency or "").upper() != "BGN":
+        return None
+    euro = [  # the same kind of fee: 200 лв. of meals is not a 102 € bus fee
+        Decimal(str(value))
+        for new in proposed
+        if (new.currency or "").upper() == "EUR" and new.category == row.category
+        for value in (new.amount, new.amount_min, new.amount_max)
+        if value is not None
+    ]
+    converted = []
+    for value in (row.amount, row.amount_min, row.amount_max):
+        if value is None:
+            converted.append(None)
+            continue
+        target = Decimal(str(value)) / _BGN_PER_EUR
+        match = next((amount for amount in euro if abs(amount - target) <= target * EURO_TOLERANCE), None)
+        if match is None:
+            return None
+        converted.append(match)
+    return _InEuro(row, tuple(converted))
+
+
+async def _superseded_rows(db: AsyncSession, school: School, rows: list[Pricing]) -> list[Pricing]:
+    """The stored website rows the read replaces: the years it produced (as the pipeline
+    does), and a row dated this school year whose fee the read gives with no year. The
+    pipeline already treats an undated old row as the fee its dated re-read names; this is
+    the other way round. At 170 the read gave 4500, 4700, 5100 and 4000 EUR with no year
+    and the rows stored under 2026-2027 stayed beside them."""
+    replaced = await price_step._find_superseded_rows(db, school, rows)
+    undated_fees = {
+        (row.category, float(row.amount), (row.currency or "").upper())
+        for row in rows
+        if row.amount is not None and not str(row.academic_year or "").strip()
+    }
+    if not undated_fees:
+        return replaced
+    current = current_academic_year()
+    stored = await db.execute(
+        select(Pricing)
+        .where(Pricing.school_id == school.id, Pricing.source == PriceSource.SCRAPED_WEBSITE)
+        .options(selectinload(Pricing.source_page).load_only(SourcePage.id, SourcePage.is_valid))
+    )
+    ids = {row.id for row in replaced}
+    replaced.extend(
+        row
+        for row in stored.scalars().all()
+        if row.id not in ids
+        and row.amount is not None
+        and normalize_academic_year(row.academic_year) == current
+        and (row.category, float(row.amount), (row.currency or "").upper()) in undated_fees
+    )
+    return replaced
+
+
+def _rows_to_keep(
+    school: School, pages: list[SourcePage], superseded: list[Pricing], proposed: list[Pricing]
+) -> tuple[list[Pricing], set[tuple[str, ...]], list[str]]:
+    """The superseded rows rule 6 says replacing would lose, the amounts they hold, and why.
+
+    Checked one amount at a time, so a fee the read missed keeps its own row and does not
+    hold back the rest of the school's fees.
+    """
+    blocked = blocked_pricing_row_ids(school.attributes if isinstance(school.attributes, dict) else None)
+    groups: dict[tuple[str, ...], list[Any]] = {}
+    for row in superseded:
+        seen_as = _in_euro(row, proposed) or row
+        groups.setdefault(_amount_group(seen_as), []).append(seen_as)
+    kept: list[Pricing] = []
+    keys: set[tuple[str, ...]] = set()
+    reasons: list[str] = []
+    for key, olds in groups.items():
+        lost = price_step._pricing_replacement_regressions(school, pages, olds, proposed)
+        if lost:  # only what rule 6 protects: a withheld or blocked row at that amount still goes
+            rows = [old._row if isinstance(old, _InEuro) else old for old in olds]
+            protected = [row for row in rows if row.id not in blocked and pricing_row_is_publishable(row)]
+            if protected:
+                kept.extend(protected)
+                keys.add(key)
+                reasons.extend(lost)
+    return kept, keys, reasons
 
 
 def _fee_report(result: CheckedFee, page: Optional[PageRead]) -> dict[str, Any]:
@@ -384,7 +574,7 @@ async def run_school(
 
     rows, sources = _build_rows(school, checked)
     publishable = [row for row in rows if pricing_row_is_publishable(row)]
-    superseded = await price_step._find_superseded_rows(db, school, rows)
+    superseded = await _superseded_rows(db, school, rows)
     published_before = [row for row in superseded if pricing_row_is_publishable(row)]
     report |= {
         "rows_new": len(rows),
@@ -402,17 +592,29 @@ async def run_school(
         )
         return report
 
-    regressions = price_step._pricing_replacement_regressions(
+    # Old rows the read would lose (a fee it missed, a period it dropped) stay, instead of
+    # holding the whole school; new rows at those amounts give way to them.
+    kept, kept_amounts, regressions = _rows_to_keep(
         school, [*stored_pages, *source_pages.values()], superseded, publishable
     )
+    if kept:  # by amount alone: a refiled category or currency is still the same fee
+        superseded = [row for row in superseded if row not in kept]
+        pairs = [(row, source) for row, source in zip(rows, sources) if _amount_group(row) not in kept_amounts]
+        report["rows_new_dropped"] = len(rows) - len(pairs)
+        rows, sources = [row for row, _ in pairs], [source for _, source in pairs]
     report["regressions"] = regressions
+    report["rows_old_kept"] = len(kept)
+    if not rows and not superseded:
+        report["outcome"] = "kept_old_rows"
+        report["reason"] = "every fee read is already stored"
+        if apply:  # an earlier run's hold no longer applies
+            price_step._update_pricing_hold(school, [], 0)
+            await db.commit()
+        return report
     if not apply:
-        report["outcome"] = "would_hold" if regressions else "would_write"
+        report["outcome"] = "would_write"
         return report
-    if price_step._update_pricing_hold(school, regressions, len(rows)):
-        report["outcome"] = "held"
-        await db.commit()
-        return report
+    price_step._update_pricing_hold(school, [], len(rows))  # clears a hold an earlier run left
 
     await _upsert_pages(db, source_pages, stored)
     for row in rows:  # rows were built against the placeholder pages
@@ -478,7 +680,7 @@ async def run_fees_agent(
         page_timeout=30000,
         wait_until="domcontentloaded",
         delay_before_return_html=0.5,
-        exclude_external_links=True,
+        exclude_external_links=False,  # _same_site keeps the school's own and sister domains
         verbose=False,
     )
     results: list[dict[str, Any]] = []
