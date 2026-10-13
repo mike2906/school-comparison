@@ -773,11 +773,61 @@ async def test_numbers_in_a_page_url_are_not_shown_amounts(db_session, frozen_to
     assert await fees_agent._missed_amounts(db_session, school, pages, []) == []
 
 
-def test_amounts_past_the_reader_limit_are_not_missed(monkeypatch):
+async def test_amounts_past_the_reader_limit_are_not_missed(db_session, frozen_today, monkeypatch):
+    school = await _school(db_session)
+    await _old_rows(db_session, school, "2026/2027", [700, 90])
+    await db_session.commit()
     monkeypatch.setattr(fees_agent, "MAX_READ_CHARS", len(f"=== PAGE {URL}\n") + 30)
     pages = [PageRead(URL, "Месечна такса: 700 евро\n" + "x" * 50 + "\nХрана: 90 евро", True)]
-    shown = fees_agent.page_numbers(fees_agent.reader_text(pages))
-    assert Decimal("700") in shown and Decimal("90") not in shown
+    assert await fees_agent._missed_amounts(db_session, school, pages, []) == [Decimal("700")]
+
+
+async def test_a_lev_row_is_missed_unless_its_euro_twin_is_the_same_kind_of_fee(db_session, frozen_today):
+    page_text = "Храна: 200 лв.\nТранспорт: 102.26 евро"
+    school = await _school(db_session)
+    await _old_rows(db_session, school, None, [200])
+    meals = (await _rows(db_session, school))[0]
+    meals.currency, meals.category = "BGN", PriceCategory.FOOD
+    await db_session.commit()
+    bus = [fee(PriceCategory.TRANSPORT, "Транспорт: 102.26 евро", amount=102.26)]
+    pages = [PageRead(URL, page_text, True)]
+    assert await fees_agent._missed_amounts(db_session, school, pages, bus) == [Decimal("200")]
+
+
+async def test_a_second_read_does_not_add_the_lev_column(db_session, frozen_today):
+    page_text = "Месечна такса: 700 евро | 1369.08 лв.\nХрана: 90 евро | 176.02 лв."
+    school = await _school(db_session)
+    await _old_rows(db_session, school, "2026/2027", [700, 90])
+    await db_session.commit()
+    tuition = fee(
+        PriceCategory.TUITION,
+        "Месечна такса: 700 евро | 1369.08 лв.",
+        amount=700,
+        period=PricePeriod.MONTHLY,
+        academic_year="2026/2027",
+    )
+    food = fee(
+        PriceCategory.FOOD,
+        "Храна: 90 евро | 176.02 лв.",
+        amount=90,
+        period=PricePeriod.MONTHLY,
+        academic_year="2026/2027",
+    )
+    lev = [
+        fee(
+            PriceCategory.TUITION, "Месечна такса: 700 евро | 1369.08 лв.", amount=1369.08, period=PricePeriod.MONTHLY
+        ).model_copy(update={"currency": "BGN"}),
+        fee(PriceCategory.FOOD, "Храна: 90 евро | 176.02 лв.", amount=176.02, period=PricePeriod.MONTHLY).model_copy(
+            update={"currency": "BGN"}
+        ),
+    ]
+
+    async def read(school, pages, missed):
+        return [tuition, food, *lev] if missed else [tuition]
+
+    pages = [PageRead(URL, page_text, True)]
+    report = await fees_agent.run_school(db_session, school, find=_find(pages), read=read)
+    assert report["reread"]["added"] == 1, report  # food 90 €; neither lev twin
 
 
 async def test_no_second_read_when_nothing_published_was_missed(db_session, pages, frozen_today):

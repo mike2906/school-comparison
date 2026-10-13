@@ -288,7 +288,7 @@ async def read_fees(school: School, pages: list[PageRead], spend: Spend, missed:
         text += (
             "\n\nAn earlier read of these pages left out amounts that the school's stored fees have and "
             f"the pages still show: {', '.join(format(amount, 'f') for amount in missed)}. Read the pages again "
-            "in full and list every fee, including every row and column of each fee table. Some of these "
+            "in full and list every fee, including every row of each fee table. Some of these "
             "amounts may be from an older year or not be fees: the rules above still decide."
         )
     in_price, out_price = get_model_costs("pricing")
@@ -554,7 +554,7 @@ async def _missed_amounts(
     blocked = blocked_pricing_row_ids(school.attributes if isinstance(school.attributes, dict) else None)
     current = current_academic_year()
     read = {amount for fee in fees for amount in fee_amounts(fee)}
-    euro = {amount for fee in fees if (fee.currency or "").upper() == "EUR" for amount in fee_amounts(fee)}
+    euro = _euro_amounts(fees)
     published = set()
     for row in stored.scalars().all():
         year = normalize_academic_year(row.academic_year)
@@ -563,12 +563,29 @@ async def _missed_amounts(
         amount = Decimal(str(row.amount)).normalize()
         if (row.currency or "").upper() == "BGN":
             target = amount / _BGN_PER_EUR
-            if any(abs(value - target) <= target * EURO_TOLERANCE for value in euro):
+            if any(abs(value - target) <= target * EURO_TOLERANCE for value in euro.get(row.category.value, ())):
                 continue
         published.add(amount)
     # What the reader can see (not what was cut off), without the page headers' URLs.
     shown = page_numbers(re.sub(r"^=== PAGE .*$", "", reader_text(pages), flags=re.MULTILINE))
     return sorted((published & shown) - read)
+
+
+def _euro_amounts(fees: list[AgentFee]) -> dict[str, set[Decimal]]:
+    """The euro amounts read, by category: 200 лв. of meals is not a 102 € bus fee."""
+    euro: dict[str, set[Decimal]] = {}
+    for fee in fees:
+        if (fee.currency or "").upper() == "EUR":
+            euro.setdefault(fee.category.value, set()).update(fee_amounts(fee))
+    return euro
+
+
+def _lev_twin(fee: AgentFee, euro: dict[str, set[Decimal]]) -> bool:
+    if (fee.currency or "").upper() != "BGN":
+        return False
+    targets = [amount / _BGN_PER_EUR for amount in fee_amounts(fee)]
+    values = euro.get(fee.category.value, ())
+    return bool(targets) and all(any(abs(v - t) <= t * EURO_TOLERANCE for v in values) for t in targets)
 
 
 def _fee_report(result: CheckedFee, page: Optional[PageRead]) -> dict[str, Any]:
@@ -637,6 +654,9 @@ async def run_school(
             again = []
         first = {amount for fee in fees for amount in fee_amounts(fee)}
         added = [fee for fee in again if fee_amounts(fee) and not set(fee_amounts(fee)) <= first]
+        # A page that prints both currencies: the lev twin of a euro fee is not a fee of its own.
+        euro = _euro_amounts([*fees, *added])
+        added = [fee for fee in added if not _lev_twin(fee, euro)]
         fees = [*fees, *added]
         report["reread"]["added"] = len(added)
     checked: list[tuple[CheckedFee, SourcePage]] = []
