@@ -94,11 +94,17 @@ async def test_read_keeps_facts_on_the_page_that_the_judge_confirms():
     assert "Обяд" not in judged and judged.count("Quote:") == 3
 
 
+LINES = [PageRead(HOME, "\n".join(f"Ред номер {n} е достатъчно дълъг." for n in range(12)), False)]
+
+
+def _line(n):
+    return f"Ред номер {n} е достатъчно дълъг."
+
+
 @pytest.mark.asyncio
 async def test_at_most_two_facts_a_topic():
-    quote = "Учебният ден започва в 08:00 часа и приключва в 14:00 часа."
-    facts = [_fact("school_day", quote, en=f"Fact {n}.") for n in range(3)]
-    report = await stage.read_school(_school(), PAGES, _Calls(facts, passed=[1, 2, 3]))
+    facts = [_fact("school_day", _line(n), en=f"Fact {n}.") for n in range(3)]
+    report = await stage.read_school(_school(), LINES, _Calls(facts, passed=[1, 2, 3]))
     assert len(report["store"]) == 2
     assert report["facts"][2]["dropped"] == "over the topic or total limit"
 
@@ -212,7 +218,9 @@ async def _detail(client, db_session, **attrs):
 @pytest.mark.asyncio
 async def test_detail_response_shows_facts_without_quotes(client, db_session):
     body = await _detail(
-        client, db_session, school_facts={"_schema_version": 1, "read_at": "t", "website_url": HOME, "facts": [_fact_row()]}
+        client,
+        db_session,
+        school_facts={"_schema_version": 1, "read_at": "t", "website_url": HOME, "facts": [_fact_row()]},
     )
     assert body["school_facts"]["facts"] == [
         {"topic": "meals", "text_i18n": {"bg": "Обяд.", "en": "Lunch."}, "source_url": HOME}
@@ -237,13 +245,13 @@ def test_facts_show_only_for_the_site_they_were_read_from():
 
 @pytest.mark.asyncio
 async def test_the_limit_cuts_in_the_readers_order_and_shows_in_topic_order():
-    quote = "Учебният ден започва в 08:00 часа и приключва в 14:00 часа."
-    facts = [_fact("admissions", quote, en="first")] + [_fact("curriculum", quote, en=f"c{n}") for n in range(3)]
-    facts += [_fact(topic, quote, en=topic) for topic in ("languages", "meals", "transport", "activities", "facilities", "support")]
-    report = await stage.read_school(_school(), PAGES, _Calls(facts, passed=list(range(1, 11))))
+    facts = [_fact("admissions", _line(0), en="first")] + [_fact("curriculum", _line(n), en=f"c{n}") for n in (1, 2, 3)]
+    topics = ("languages", "meals", "transport", "activities", "facilities", "support")
+    facts += [_fact(topic, _line(n), en=topic) for n, topic in enumerate(topics, 4)]
+    report = await stage.read_school(_school(), LINES, _Calls(facts, passed=list(range(1, 11))))
     kept = [f["text_i18n"]["en"] for f in report["store"]]
     assert len(kept) == 8 and "first" in kept and kept[-1] == "first"  # admissions shows last
-    assert "support" not in kept and kept.count("c0") + kept.count("c1") == 2
+    assert "support" not in kept and kept.count("c1") + kept.count("c2") == 2 and "c3" not in kept
 
 
 def test_a_long_page_does_not_push_later_pages_out_of_the_read():
@@ -251,3 +259,28 @@ def test_a_long_page_does_not_push_later_pages_out_of_the_read():
     later = PageRead("https://school.example/admissions", "Приемът е с тест.", False)
     text = stage.page_text([long, PAGES[2], later])
     assert "Приемът е с тест." in text and len(text) < 20_000 and "/gone" not in text
+
+
+@pytest.mark.asyncio
+async def test_one_line_split_into_several_facts_keeps_the_first():
+    facts = [_fact("school_day", _line(1), en="a"), _fact("languages", _line(1), en="b")]
+    report = await stage.read_school(_school(), LINES, _Calls(facts, passed=[1]))
+    assert [f["dropped"] for f in report["facts"]] == [None, "same quote as an earlier fact"]
+
+
+def test_a_short_quote_must_be_a_whole_line():
+    page = [(HOME, "### [Таекуондо](https://school.example/taekwondo/)\nТаекуондо клубът е затворен. , ок")]
+    assert quote_on_page(_fact("activities", "### [Таекуондо](https://school.example/taekwondo/)"), page) == HOME
+    assert quote_on_page(_fact("activities", "клубът"), page) is None
+
+
+def test_a_space_before_a_comma_does_not_break_the_match():
+    page = [(HOME, "Образование , което съчетава подготовка с интензивен английски.")]
+    assert quote_on_page(_fact("languages", "Образование, което съчетава подготовка"), page) == HOME
+
+
+def test_the_menu_every_page_repeats_is_left_out_of_the_read():
+    menu = "Начало\nЗа нас\nКонтакти"
+    pages = [PageRead(f"https://school.example/{n}", f"{menu}\nСтраница {n} има свой текст.", False) for n in range(4)]
+    text = stage.page_text(pages)
+    assert "Контакти" not in text and all(f"Страница {n}" in text for n in range(4))

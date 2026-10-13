@@ -59,11 +59,13 @@ Rules:
 - Only what the pages state about this institution. If a page covers a sister school or kindergarten,
   leave its facts out unless they plainly apply to this one.
 - Each fact is one short line in English (fact_en) and Bulgarian (fact_bg), saying only what its quote says.
-- For every fact, copy into "quote" the one page line it comes from, verbatim and in the page's language, and
-  the URL from that page's PAGE line. The quote alone must state the fact.
+- For every fact, copy into "quote" the page line it comes from (or up to three adjacent lines when one line
+  is not enough), verbatim and in the page's language, and the URL from that page's PAGE line. The quote alone
+  must state the fact. Each fact has its own quote: do not split one line into several facts.
 - Be specific: name the sports, clubs, languages, rooms or hours. "Sports activities are part of the programme"
   or "pupils are at school for the full day" with nothing more says too little; give the detail the page has
-  (which sports, until what time) or leave the fact out.
+  (which sports, until what time) or leave the fact out. The subjects every school teaches under the state
+  programme are not worth a fact.
 - At most 8 facts, the most useful for choosing a school first, and at most 2 per topic. Fewer is fine. If
   the pages state nothing concrete, return no facts: that is a correct answer, never pad."""
 
@@ -80,7 +82,7 @@ class Fact(BaseModel):
     topic: Topic
     fact_en: str
     fact_bg: str
-    quote: str = Field(description="The one page line the fact comes from, copied verbatim")
+    quote: str = Field(description="The page line (or up to three adjacent lines) the fact comes from, verbatim")
     source_url: str = Field(description="The URL from the PAGE line of the page the quote is on")
 
 
@@ -99,6 +101,7 @@ def _normalise(text: str) -> str:
     text = re.sub(r"[*_#>|`\\]+", " ", text)
     text = text.replace("“", '"').replace("”", '"').replace("„", '"').replace("’", "'")
     text = text.replace("–", "-").replace("—", "-")
+    text = re.sub(r"\s+([,.;:!?])", r"\1", text)  # "образование , което" as the reader tidies it
     return " ".join(text.casefold().split())
 
 
@@ -108,13 +111,21 @@ def quote_on_page(fact: Fact, pages: Sequence[tuple[str, str]]) -> Optional[str]
     The page the fact names is tried first; a quote found on another page read is credited
     to that page, since the reader sometimes copies the wrong PAGE line."""
     quote = _normalise(fact.quote).strip(" .…;:-")
-    if len(quote) < 12:
+    if not quote:
         return None
     named = [p for p in pages if page_key(p[0]) == page_key(fact.source_url)]
     for url, text in [*named, *(p for p in pages if p not in named)]:
-        if quote in _normalise(text):
+        # A short quote (a heading such as "Таекуондо") must be a whole line, not part of one.
+        if len(quote) >= 12:
+            if quote in _normalise(text):
+                return url
+        elif any(_normalise(line).strip(" .…;:-") == quote for line in text.splitlines()):
             return url
     return None
+
+
+def quote_key(fact: Fact) -> str:
+    return _normalise(fact.quote).strip(" .…;:-")
 
 
 def judge_message(facts: Sequence[Fact]) -> str:

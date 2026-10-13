@@ -53,6 +53,13 @@ school (Sofia ~$3). Nothing reaches the site until an `--apply` run is published
   Fixed after it: the judge dropped facts its quote did state (headings, listed steps),
   one 56,000-character staff page pushed later pages out of the read (now 15,000 a page),
   and vague facts ("sports activities are part of the programme") got through.
+- Dry run 2: 40 of 45 kept, $0.064 for 8 schools. Fixed after it: a space before a comma
+  on the page broke the quote match; one-word headings ("Таекуондо") were rejected as too
+  short (now a short quote must be a whole line); one line split into three facts (now one
+  fact per quote); the menu and footer repeated on every page used up the read limit, so
+  later pages were cut (now left out); standard state subjects listed as facts.
+- Note for runs: the cost guard reserves $0.10 per call, so `--max-usd` needs about $0.10
+  headroom above the expected spend.
 - Top up OpenRouter (about $1.35 left on 2026-10-13).
 - Decide refresh: facts carry `read_at`; a yearly re-read is enough for most topics.
   Runs vary, so a refresh could keep the old fact where the new read only rewords it.

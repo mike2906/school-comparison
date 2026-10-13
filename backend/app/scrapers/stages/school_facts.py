@@ -71,11 +71,27 @@ def _name(school: School) -> str:
     return (school.name_i18n or {}).get("bg") or (school.name_i18n or {}).get("en") or str(school.id)
 
 
+def _site_chrome(pages: list[PageRead]) -> set[str]:
+    """Lines on at least half of three or more pages: the site's menu and footer."""
+    if len(pages) < 3:
+        return set()
+    counts: dict[str, int] = {}
+    for page in pages:
+        for line in {line.strip() for line in page.text.splitlines() if line.strip()}:
+            counts[line] = counts.get(line, 0) + 1
+    return {line for line, count in counts.items() if count * 2 >= len(pages)}
+
+
 def page_text(pages: list[PageRead]) -> str:
-    """The pages the reader sees, each cut to ``MAX_PAGE_CHARS``, in the format the fees reader uses."""
-    return "\n\n".join(f"=== PAGE {page.url}\n{page.text[:MAX_PAGE_CHARS]}" for page in pages if page.text.strip())[
-        :MAX_READ_CHARS
-    ]
+    """The pages the reader sees, without the menu and footer every page repeats, each cut
+    to ``MAX_PAGE_CHARS``, in the format the fees reader uses."""
+    readable = [page for page in pages if page.text.strip()]
+    chrome = _site_chrome(readable)
+    parts = []
+    for page in readable:
+        body = "\n".join(line for line in page.text.splitlines() if line.strip() not in chrome)
+        parts.append(f"=== PAGE {page.url}\n{body[:MAX_PAGE_CHARS]}")
+    return "\n\n".join(parts)[:MAX_READ_CHARS]
 
 
 def _ordered(kept: list[tuple[Fact, str]]) -> list[tuple[Fact, str]]:
@@ -105,6 +121,14 @@ async def read_school(school: School, pages: list[PageRead], call: Caller) -> di
     )
     on_page = [(fact, facts_rules.quote_on_page(fact, readable)) for fact in read.facts]
     quoted = [(fact, url) for fact, url in on_page if url]
+    seen_quotes: set[str] = set()
+    repeats: list[Fact] = []
+    for fact, _ in quoted:  # one line split into several facts keeps the first
+        key = facts_rules.quote_key(fact)
+        if key in seen_quotes:
+            repeats.append(fact)
+        seen_quotes.add(key)
+    quoted = [(fact, url) for fact, url in quoted if all(fact is not repeat for repeat in repeats)]
     supported: set[int] = set()
     if quoted:
         verdict: Supported = await call(
@@ -113,6 +137,7 @@ async def read_school(school: School, pages: list[PageRead], call: Caller) -> di
         supported = set(verdict.passed)
     kept = _ordered([item for n, item in enumerate(quoted, 1) if n in supported])
     status = {id(fact): "quote not on page" for fact in read.facts}
+    status |= {id(fact): "same quote as an earlier fact" for fact in repeats}
     status |= {id(fact): "quote does not state it" for fact, _ in quoted}
     status |= {id(fact): "over the topic or total limit" for n, (fact, _) in enumerate(quoted, 1) if n in supported}
     status |= {id(fact): None for fact, _ in kept}
