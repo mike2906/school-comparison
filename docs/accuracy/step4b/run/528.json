@@ -1,0 +1,86 @@
+{
+ "apply": true,
+ "pipeline_run_id": "df09530a-1f8f-47ef-8c84-1d391a338765",
+ "schools": 1,
+ "spent_usd": 0.000866,
+ "stopped": null,
+ "kept_old_rows": [
+  528
+ ],
+ "outcomes": {
+  "kept_old_rows": 1
+ },
+ "results": [
+  {
+   "school_id": 528,
+   "outcome": "kept_old_rows",
+   "pages": [
+    {
+     "url": "https://tzarsimeon.bg/dgrosica/home",
+     "chars": 12544,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://tzarsimeon.bg/dgrosica/priem",
+     "chars": 8886,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://tzarsimeon.bg/dgrosica/%D0%BE%D0%B1%D1%83%D1%87%D0%B5%D0%BD%D0%B8%D0%B5",
+     "chars": 13622,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://tzarsimeon.bg/dgrosica/za-nas",
+     "chars": 5886,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://tzarsimeon.bg/dgrosica/contact",
+     "chars": 7995,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://tzarsimeon.bg/dgrosica/ivanyane",
+     "chars": 12958,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://tzarsimeon.bg/dgrosica/boyana",
+     "chars": 12774,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://tzarsimeon.bg/dgrosica/malinova",
+     "chars": 13066,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://tzarsimeon.bg/tzarsimeon/home",
+     "chars": 16806,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://tzarsimeon.bg/asen-yordanov/home",
+     "chars": 9681,
+     "prices": true,
+     "note": null
+    }
+   ],
+   "fees": [],
+   "rows_new": 0,
+   "rows_new_publishable": 0,
+   "rows_old_published": 0,
+   "reason": "nothing publishable read"
+  }
+ ]
+}

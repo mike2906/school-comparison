@@ -1,0 +1,69 @@
+{
+ "apply": true,
+ "pipeline_run_id": "99cae9ab-18b8-4a17-a543-c0d423a234f4",
+ "schools": 1,
+ "spent_usd": 0.000465,
+ "stopped": null,
+ "kept_old_rows": [],
+ "outcomes": {
+  "written": 1
+ },
+ "results": [
+  {
+   "school_id": 183,
+   "outcome": "written",
+   "pages": [
+    {
+     "url": "https://www.sianie-bg.com/",
+     "chars": 3921,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://www.sianie-bg.com/?pg=ceni",
+     "chars": 1672,
+     "prices": true,
+     "note": null
+    }
+   ],
+   "fees": [
+    {
+     "category": "tuition",
+     "amount": 675.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "monthly",
+     "label": "Детска градина - целодневно пребиваване",
+     "academic_year": null,
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://www.sianie-bg.com/?pg=ceni",
+     "evidence": "**Целодневно пребиваване:**\nДетска градина - 675 EUR\nТаксите се внасят месец за месец"
+    },
+    {
+     "category": "registration",
+     "amount": 450.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "one_time",
+     "label": "Депозит",
+     "academic_year": null,
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://www.sianie-bg.com/?pg=ceni",
+     "evidence": "**Депозит** : 450 EUR"
+    }
+   ],
+   "rows_new": 2,
+   "rows_new_publishable": 2,
+   "rows_old_published": 2,
+   "regressions": [],
+   "rows_old_kept": 0,
+   "validation": "ok"
+  }
+ ]
+}

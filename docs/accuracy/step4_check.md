@@ -68,3 +68,23 @@ kept. The bar passes in every view.
   were not read.
 
 Small sample: 13 schools with rows, 77 fees, 2 of them near what the fixes were tuned on.
+
+## Re-run on the merged code (step 4b)
+
+The review fixes (#286, #287, #289) changed behaviour, so the same 24 schools were run again on
+merged main (2208893) on a copy of the launch DB: $0.0247, 10 schools written, 14 kept their old
+rows. Output is in `step4b/run/`. Published rows that match a step 4 candidate (same fields,
+year and label) take its verdict (`step4b/inherit.py`); the rest were judged by hand against the
+same key (`step4b/score.py`, result in `step4b/score.out`).
+
+| After every gate | Step 4 | Step 4b |
+|---|---|---|
+| Wrong | 7/59 (12 %) | 6/47 (13 %) |
+| Found (of 77) | 52 (68 %) | 40 (52 %) |
+| Found, without 170 (of 63) | 39 (62 %) | 37 (59 %) |
+
+Wrong is still below today's 18 %, and the #289 fixes removed 170's old-row and one_time
+errors. Found misses the 55 % bar, and the whole drop is 170: the reader returned 5 of the 14
+fees on the same page it read fully in step 4 (same pages, same text length), none of them
+publishable, so the old rows were kept. That is run-to-run variance of the reader on a long
+price table, not a change in the code it runs.
