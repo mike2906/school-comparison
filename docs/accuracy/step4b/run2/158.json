@@ -1,0 +1,201 @@
+{
+ "apply": true,
+ "pipeline_run_id": "983286a3-6d5c-4195-8aa3-079ea6f5b2cd",
+ "schools": 1,
+ "spent_usd": 0.001855,
+ "stopped": null,
+ "kept_old_rows": [],
+ "outcomes": {
+  "written": 1
+ },
+ "results": [
+  {
+   "school_id": 158,
+   "outcome": "written",
+   "pages": [
+    {
+     "url": "https://www.brambazak.bg/fees-en/",
+     "chars": 6414,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://www.brambazak.bg/fees/",
+     "chars": 9462,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://www.brambazak.bg/wp-content/themes/twentyseventeen/str/documents/Cenova_lista_English.pdf",
+     "chars": 1123,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://www.brambazak.bg/wp-content/themes/twentyseventeen/str/documents/202x/bacho-kiro/%D0%91%D0%B0%D1%87%D0%BE_%D0%9A%D0%B8%D1%80%D0%BE_%D0%A6%D0%B5%D0%BD%D0%BE%D0%B2%D0%B0_%D0%BB%D0%B8%D1%81%D1%82%D0%B0_01.26.pdf",
+     "chars": 576,
+     "prices": true,
+     "note": null
+    },
+    {
+     "url": "https://www.brambazak.bg/wp-content/themes/twentyseventeen/str/documents/202x/oborishte/%D0%9E%D0%B1%D0%BE%D1%80%D0%B8%D1%89%D0%B5_%D0%A6%D0%B5%D0%BD%D0%BE%D0%B2%D0%B0_%D0%BB%D0%B8%D1%81%D1%82%D0%B0_01.26.pdf",
+     "chars": 557,
+     "prices": true,
+     "note": null
+    },
+    {
+     "url": "https://www.brambazak.bg/wp-content/themes/twentyseventeen/str/documents/Dogovor_obuchenie_celodneven_ENG.pdf",
+     "chars": 15000,
+     "prices": true,
+     "note": null
+    },
+    {
+     "url": "https://www.brambazak.bg/wp-content/themes/twentyseventeen/str/documents/Dogovor_obuchenie_poludneven_ENG.pdf",
+     "chars": 15000,
+     "prices": true,
+     "note": null
+    },
+    {
+     "url": "https://www.brambazak.bg/wp-content/themes/twentyseventeen/str/documents/202x/bacho-kiro/%D0%91%D0%B0%D1%87%D0%BE_%D0%9A%D0%B8%D1%80%D0%BE_%D0%94%D0%BE%D0%B3%D0%BE%D0%B2%D0%BE%D1%80_%D1%86%D0%B5%D0%BB%D0%BE%D0%B4%D0%BD%D0%B5%D0%B2%D0%B5%D0%BD_01.26.pdf",
+     "chars": 13675,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://www.brambazak.bg/wp-content/themes/twentyseventeen/str/documents/202x/oborishte/%D0%9E%D0%B1%D0%BE%D1%80%D0%B8%D1%89%D0%B5_%D0%94%D0%BE%D0%B3%D0%BE%D0%B2%D0%BE%D1%80_%D1%86%D0%B5%D0%BB%D0%BE%D0%B4%D0%BD%D0%B5%D0%B2%D0%B5%D0%BD_01.26.pdf",
+     "chars": 13495,
+     "prices": false,
+     "note": null
+    }
+   ],
+   "fees": [
+    {
+     "category": "tuition",
+     "amount": 590.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "monthly",
+     "label": "Целодневна месечна такса",
+     "academic_year": null,
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://www.brambazak.bg/wp-content/themes/twentyseventeen/str/documents/202x/bacho-kiro/%D0%91%D0%B0%D1%87%D0%BE_%D0%9A%D0%B8%D1%80%D0%BE_%D0%A6%D0%B5%D0%BD%D0%BE%D0%B2%D0%B0_%D0%BB%D0%B8%D1%81%D1%82%D0%B0_01.26.pdf",
+     "evidence": "# Услуга Цена Описание\n1 Целодневна месечна такса 590 евро грижа, обучение, възпитание и храна;"
+    },
+    {
+     "category": "tuition",
+     "amount": 400.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "monthly",
+     "label": "Полудневна месечна такса",
+     "academic_year": null,
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://www.brambazak.bg/wp-content/themes/twentyseventeen/str/documents/202x/bacho-kiro/%D0%91%D0%B0%D1%87%D0%BE_%D0%9A%D0%B8%D1%80%D0%BE_%D0%A6%D0%B5%D0%BD%D0%BE%D0%B2%D0%B0_%D0%BB%D0%B8%D1%81%D1%82%D0%B0_01.26.pdf",
+     "evidence": "# Услуга Цена Описание\n2 Полудневна месечна такса 400 евро грижа, обучение,възпитание, две закуски и обяд;"
+    },
+    {
+     "category": "registration",
+     "amount": 350.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "one_time",
+     "label": "Депозит за запазване на място",
+     "academic_year": null,
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://www.brambazak.bg/wp-content/themes/twentyseventeen/str/documents/202x/bacho-kiro/%D0%91%D0%B0%D1%87%D0%BE_%D0%9A%D0%B8%D1%80%D0%BE_%D0%A6%D0%B5%D0%BD%D0%BE%D0%B2%D0%B0_%D0%BB%D0%B8%D1%81%D1%82%D0%B0_01.26.pdf",
+     "evidence": "# Услуга Цена Описание\n3 Депозит за запазване на място 350 евро приспада се от таксата за първия месец; Не се\nвъзстановява при отказ;"
+    },
+    {
+     "category": "materials",
+     "amount": 130.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "yearly",
+     "label": "Годишна такса учебни материали",
+     "academic_year": null,
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://www.brambazak.bg/wp-content/themes/twentyseventeen/str/documents/202x/bacho-kiro/%D0%91%D0%B0%D1%87%D0%BE_%D0%9A%D0%B8%D1%80%D0%BE_%D0%A6%D0%B5%D0%BD%D0%BE%D0%B2%D0%B0_%D0%BB%D0%B8%D1%81%D1%82%D0%B0_01.26.pdf",
+     "evidence": "# Услуга Цена Описание\n4 Годишна такса учебни 130 евро годишна такса при подписване и преподписване на\nматериали договор."
+    },
+    {
+     "category": "tuition",
+     "amount": 660.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "monthly",
+     "label": "Целодневна месечна такса",
+     "academic_year": null,
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://www.brambazak.bg/wp-content/themes/twentyseventeen/str/documents/202x/oborishte/%D0%9E%D0%B1%D0%BE%D1%80%D0%B8%D1%89%D0%B5_%D0%A6%D0%B5%D0%BD%D0%BE%D0%B2%D0%B0_%D0%BB%D0%B8%D1%81%D1%82%D0%B0_01.26.pdf",
+     "evidence": "# Услуга Цена Описание\n1 Целодневна месечна такса 660 евро грижа, възпитание и храна;"
+    },
+    {
+     "category": "tuition",
+     "amount": 440.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "monthly",
+     "label": "Полудневна месечна такса",
+     "academic_year": null,
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://www.brambazak.bg/wp-content/themes/twentyseventeen/str/documents/202x/oborishte/%D0%9E%D0%B1%D0%BE%D1%80%D0%B8%D1%89%D0%B5_%D0%A6%D0%B5%D0%BD%D0%BE%D0%B2%D0%B0_%D0%BB%D0%B8%D1%81%D1%82%D0%B0_01.26.pdf",
+     "evidence": "# Услуга Цена Описание\n2 Полудневна месечна такса 440 евро грижа, възпитание, две закуски и обяд;"
+    },
+    {
+     "category": "registration",
+     "amount": 350.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "one_time",
+     "label": "Депозит за запазване на място",
+     "academic_year": null,
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://www.brambazak.bg/wp-content/themes/twentyseventeen/str/documents/202x/oborishte/%D0%9E%D0%B1%D0%BE%D1%80%D0%B8%D1%89%D0%B5_%D0%A6%D0%B5%D0%BD%D0%BE%D0%B2%D0%B0_%D0%BB%D0%B8%D1%81%D1%82%D0%B0_01.26.pdf",
+     "evidence": "# Услуга Цена Описание\n3 Депозит за запазване на място 350 евро приспада се от таксата за първия месец; Не се\nвъзстановява при отказ;"
+    },
+    {
+     "category": "materials",
+     "amount": 130.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "yearly",
+     "label": "Годишна такса учебни материали",
+     "academic_year": null,
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://www.brambazak.bg/wp-content/themes/twentyseventeen/str/documents/202x/oborishte/%D0%9E%D0%B1%D0%BE%D1%80%D0%B8%D1%89%D0%B5_%D0%A6%D0%B5%D0%BD%D0%BE%D0%B2%D0%B0_%D0%BB%D0%B8%D1%81%D1%82%D0%B0_01.26.pdf",
+     "evidence": "# Услуга Цена Описание\n4 Годишна такса учебни 130 евро годишна такса при подписване и преподписване на\nматериали договор."
+    }
+   ],
+   "rows_new": 6,
+   "rows_new_publishable": 6,
+   "rows_old_published": 6,
+   "regressions": [],
+   "rows_old_kept": 0,
+   "validation": "ok"
+  }
+ ]
+}

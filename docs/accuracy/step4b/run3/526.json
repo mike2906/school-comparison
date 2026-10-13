@@ -1,0 +1,108 @@
+{
+ "apply": true,
+ "pipeline_run_id": "e4deffa0-f577-4f25-9c43-854f8ef8792e",
+ "schools": 1,
+ "spent_usd": 0.002051,
+ "stopped": null,
+ "kept_old_rows": [],
+ "outcomes": {
+  "written": 1
+ },
+ "results": [
+  {
+   "school_id": 526,
+   "outcome": "written",
+   "pages": [
+    {
+     "url": "https://meridian22.bg/",
+     "chars": 4045,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://meridian22.bg/bg/kindergarten",
+     "chars": 15170,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://meridian22.bg/bg/junior-high-school",
+     "chars": 62727,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://meridian22.bg/bg/high-school",
+     "chars": 53344,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://meridian22.bg/priem-osnovno-uchilishte",
+     "chars": 10303,
+     "prices": true,
+     "note": null
+    },
+    {
+     "url": "https://meridian22.bg/podgotvitelna-grupa",
+     "chars": 10078,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://meridian22.bg/dokumenti-detska-gradina",
+     "chars": 6548,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://meridian22.bg/dokumenti",
+     "chars": 13850,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://meridian22.bg/priem-1",
+     "chars": 4822,
+     "prices": true,
+     "note": null
+    },
+    {
+     "url": "https://meridian22.bg/priem-2",
+     "chars": 2294,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://meridian22.bg/za-ucilishheto-2",
+     "chars": 10738,
+     "prices": false,
+     "note": null
+    }
+   ],
+   "fees": [
+    {
+     "category": "tuition",
+     "amount": 650.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "monthly",
+     "label": "месечна такса",
+     "academic_year": null,
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://meridian22.bg/priem-1",
+     "evidence": "### Обучението и възпитанието на децата от двегодишна до шестгодишна възраст се осъществява в отделни възрастови групи или в сборна група в зависимост от броя на приетите деца.\nЦена: 650 € месечна такса"
+    }
+   ],
+   "rows_new": 1,
+   "rows_new_publishable": 1,
+   "rows_old_published": 0,
+   "regressions": [],
+   "rows_old_kept": 0,
+   "validation": "needs_review"
+  }
+ ]
+}

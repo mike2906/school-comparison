@@ -1,0 +1,29 @@
+{
+ "apply": true,
+ "pipeline_run_id": "8e389730-984c-466b-8c81-4fbb0cbcabba",
+ "schools": 1,
+ "spent_usd": 0.0,
+ "stopped": null,
+ "kept_old_rows": [
+  183
+ ],
+ "outcomes": {
+  "kept_old_rows": 1
+ },
+ "results": [
+  {
+   "school_id": 183,
+   "outcome": "kept_old_rows",
+   "pages": [
+    {
+     "url": "https://www.sianie-bg.com/",
+     "chars": 0,
+     "prices": false,
+     "note": null
+    }
+   ],
+   "fees": [],
+   "reason": "no page showing prices"
+  }
+ ]
+}

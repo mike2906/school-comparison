@@ -1,0 +1,2 @@
+Applied: 1 schools, $0.0003 spent, outcomes {'written': 1}
+Report: /tmp/step4c/docs/accuracy/step4b/run2/183.json

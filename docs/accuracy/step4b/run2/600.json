@@ -1,0 +1,71 @@
+{
+ "apply": true,
+ "pipeline_run_id": "9039fce5-118d-4f05-9645-6f676d6c9373",
+ "schools": 1,
+ "spent_usd": 0.00026,
+ "stopped": null,
+ "kept_old_rows": [
+  600
+ ],
+ "outcomes": {
+  "kept_old_rows": 1
+ },
+ "results": [
+  {
+   "school_id": 600,
+   "outcome": "kept_old_rows",
+   "pages": [
+    {
+     "url": "https://stremezh-education.com/",
+     "chars": 13799,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://stremezh-education.com/kandidatstvane/",
+     "chars": 6904,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://stremezh-education.com/hranene/",
+     "chars": 6130,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://stremezh-education.com/contact/",
+     "chars": 5508,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://stremezh-education.com/kursove-dopalnitelni/",
+     "chars": 7230,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://stremezh-education.com/izvanklasni-deynosti/",
+     "chars": 6553,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://stremezh-education.com/detska-gradina-izvanklasni-deynosti/",
+     "chars": 6867,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://stremezh-education.com/obshti-uslovia/",
+     "chars": 7328,
+     "prices": false,
+     "note": null
+    }
+   ],
+   "fees": [],
+   "reason": "no page showing prices"
+  }
+ ]
+}
