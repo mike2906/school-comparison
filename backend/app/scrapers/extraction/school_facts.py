@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Sequence
+from functools import lru_cache
 from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
@@ -101,6 +102,7 @@ class Supported(BaseModel):
     passed: list[int] = Field(description="The numbers of the items whose quote states the fact")
 
 
+@lru_cache(maxsize=512)  # each page is matched against every quote part
 def _normalise(text: str) -> str:
     text = re.sub(r"!\[[^\]]*\]\([^)]*\)", " ", text)  # markdown images
     text = re.sub(r"\[([^\]]*)\]\([^)]*\)", r"\1", text)  # markdown links keep their text

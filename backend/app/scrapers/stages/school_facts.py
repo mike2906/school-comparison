@@ -41,6 +41,9 @@ MAX_READ_CHARS = 100_000
 # Each page is cut on its own, so one long page (a staff list of 56,000 characters at 564)
 # cannot push the admissions and activities pages after it out of the read.
 MAX_PAGE_CHARS = 15_000
+# A read of this many pages that keeps no fact replaces the stored facts; fewer pages read
+# is treated as a partial crawl and keeps them.
+FULL_READ_PAGES = 4
 
 Finder = Callable[[School], Awaitable[list[PageRead]]]
 Caller = Callable[[str, type, str, int], Awaitable[Any]]
@@ -57,7 +60,7 @@ def model_caller(spend: Spend) -> Caller:
     async def call(prompt: str, schema: type, message: str, school_id: int) -> Any:
         if not spend.allows(_estimate_usd(message)):
             raise SpendCapReached(f"spent ${spend.spent_usd:.4f} of ${spend.cap_usd}")
-        agent = create_agent(TIER, prompt, schema, retries=1, model_settings={"temperature": 0})
+        agent = create_agent(TIER, prompt, schema, retries=1, model_settings={"temperature": get_settings().extraction_temperature})
         result = await execute_billable_request(
             lambda: agent.run(message), model=get_model(TIER), school_id=school_id, stage=STAGE, timeout_seconds=150
         )
@@ -72,14 +75,14 @@ def _name(school: School) -> str:
 
 
 def _site_chrome(pages: list[PageRead]) -> set[str]:
-    """Lines on at least half of three or more pages: the site's menu and footer."""
-    if len(pages) < 3:
+    """Lines on at least half the pages, and on three or more: the site's menu and footer."""
+    if len(pages) < 4:
         return set()
     counts: dict[str, int] = {}
     for page in pages:
         for line in {line.strip() for line in page.text.splitlines() if line.strip()}:
             counts[line] = counts.get(line, 0) + 1
-    return {line for line, count in counts.items() if count * 2 >= len(pages)}
+    return {line for line, count in counts.items() if count >= 3 and count * 2 >= len(pages)}
 
 
 def page_text(pages: list[PageRead]) -> str:
@@ -114,6 +117,7 @@ async def read_school(school: School, pages: list[PageRead], call: Caller) -> di
         return report | {"outcome": "nothing_read"}
     text = page_text(pages)
     report["read_chars"] = len(text)  # after the menu is left out and each page is cut
+    report["pages_read"] = len(readable)
     read: Facts = await call(
         facts_rules.READER_PROMPT,
         Facts,
@@ -137,11 +141,21 @@ async def read_school(school: School, pages: list[PageRead], call: Caller) -> di
         )
         supported = set(verdict.passed)
     kept = _ordered([item for n, item in enumerate(quoted, 1) if n in supported])
-    status = {id(fact): "quote not on page" for fact in read.facts}
-    status |= {id(fact): "same quote as an earlier fact" for fact in repeats}
-    status |= {id(fact): "quote does not state it" for fact, _ in quoted}
-    status |= {id(fact): "over the topic or total limit" for n, (fact, _) in enumerate(quoted, 1) if n in supported}
-    status |= {id(fact): None for fact, _ in kept}
+    kept_ids = {id(fact) for fact, _ in kept}
+    quoted_ids = {id(fact) for fact, _ in quoted}
+    passed_ids = {id(fact) for n, (fact, _) in enumerate(quoted, 1) if n in supported}
+    repeat_ids = {id(fact) for fact in repeats}
+
+    def dropped(fact: Fact) -> Optional[str]:
+        if id(fact) in kept_ids:
+            return None
+        if id(fact) in repeat_ids:
+            return "same quote as an earlier fact"
+        if id(fact) not in quoted_ids:
+            return "quote not on page"
+        return "over the topic or total limit" if id(fact) in passed_ids else "quote does not state it"
+
+    status = {id(fact): dropped(fact) for fact in read.facts}
     report["facts"] = [
         fact.model_dump() | {"kept": status[id(fact)] is None, "dropped": status[id(fact)]} for fact in read.facts
     ]
@@ -169,10 +183,11 @@ async def run_school(db: AsyncSession, school: School, *, find: Finder, call: Ca
     report |= await read_school(school, await find(school), call)
     facts = report.pop("store", None)
     stored = ((school.attributes or {}).get(ATTRIBUTE_KEY) or {}).get("facts")
-    # A site not read, or read with no fact kept (often a partial crawl: a thin home page
-    # and the rest timed out), keeps the facts stored before. A read that keeps facts
-    # replaces them. The API only shows facts read from the school's current website.
-    if facts is None or (not facts and stored):
+    # A site not read, or read with no fact kept from only a few pages (often a partial
+    # crawl: a thin home page and the rest timed out), keeps the facts stored before. A read
+    # that keeps facts, or reads the site in full and keeps none, replaces them. The API
+    # only shows facts read from the school's current website.
+    if facts is None or (not facts and stored and report.get("pages_read", 0) < FULL_READ_PAGES):
         report["kept_stored_facts"] = bool(stored)
     elif apply:
         block = facts_block(facts, get_model(TIER), school.website_url)

@@ -6,7 +6,7 @@ import { calculateDistance } from '../../utils/distance'
 import { formatDistance } from '../../utils/format'
 import { getAddress, getSummary } from '../../utils/i18n'
 import { hasAnySchoolSummary } from './summaryVisibility'
-import { factTopicsIn, getSchoolFacts } from '../../utils/schoolFacts'
+import { FACT_TOPICS, getSchoolFacts } from '../../utils/schoolFacts'
 import {
   getAfterSchoolEvidence,
   getCanonicalAmenityEvidence,
@@ -706,7 +706,8 @@ export function buildCompareSections({
     // One row per topic any compared school has a fact for; facts link their page.
     const factsBySchool = new Map(schools.map(school => [school.id, getSchoolFacts(school, language)]))
     const topicFacts = (school, topic) => (factsBySchool.get(school.id) || []).filter(fact => fact.topic === topic)
-    const factRows = factTopicsIn(schools, language).map(topic => ({
+    const factTopics = new Set([...factsBySchool.values()].flat().map(fact => fact.topic))
+    const factRows = FACT_TOPICS.filter(topic => factTopics.has(topic)).map(topic => ({
       label: t(`schoolFacts.topics.${topic}`),
       getValue: (school) => {
         const facts = topicFacts(school, topic)

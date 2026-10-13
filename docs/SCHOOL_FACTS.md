@@ -32,8 +32,9 @@ some picks were trivia, yearly counts go stale, the paragraph only restated the 
    ignored). A second call on the same tier confirms each quote states the whole fact.
 4. **Store** (`--apply` only): `attributes["school_facts"]` =
    `{_schema_version, read_at, website_url, model, facts: [{topic, text_i18n, source_url, quote}]}`.
-   A read that keeps facts replaces the stored ones. A site not read, or read with no fact
-   kept (often a partial crawl), keeps the stored facts.
+   A read that keeps facts replaces the stored ones, and so does a read of 4 or more pages
+   that keeps none. A site not read, or read from fewer pages with no fact kept (often a
+   partial crawl), keeps the stored facts.
 
 **Shown to parents** (`school_facts` on the detail and compare responses; the quote stays
 internal): a "From the school's website" box on the school page, one line per fact with
@@ -41,7 +42,13 @@ its topic and a link to its page, and the date it was read; and a compare-page s
 with one row per topic any compared school has. A school with none shows nothing. Facts
 carry their own checks, so they do not wait for a Stage 6 report, but a website-data
 withholding marker (failed URL check, shared site) hides them, and so does a change of
-website: facts show only while `website_url` is the site they were read from.
+website (host and path) or a scrape status that rejects the site (`failed_validate`,
+`no_official_website`): facts show only while `website_url` is the site they were read from.
+
+Known gap: the compare page's Practical rows (meals, transport, after-school care) come from
+the old extraction, so a school can show "Not available" there and a meals fact in the
+facts section. Those rows should read the facts once filter fields come from them (gap 1
+below).
 
 Running it: `uv run python -m app.scrapers.cli school-facts --school-id N [--school-id M]
 [--city sofia --limit 20] [--apply] --out report.json`. Dry run by default. About $0.006 a

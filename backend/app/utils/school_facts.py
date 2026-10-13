@@ -30,9 +30,17 @@ TOPICS = (
 )
 
 
-def _host(url: Any) -> str:
-    host = (urlparse(url).hostname or "") if isinstance(url, str) else ""
-    return host.lower().removeprefix("www.")
+# Scrape statuses that say the stored website is not the school's (or there is none).
+SITE_REJECTED_STATUSES = frozenset({"failed_validate", "no_official_website"})
+
+
+def _site(url: Any) -> str:
+    """Host without www, and path, for telling a moved website from the same one."""
+    if not isinstance(url, str):
+        return ""
+    parsed = urlparse(url)
+    host = (parsed.hostname or "").lower().removeprefix("www.")
+    return f"{host}{parsed.path.rstrip('/').lower()}" if host else ""
 
 
 def publishable_school_facts(attributes: Any, website_url: Optional[str]) -> Optional[dict[str, Any]]:
@@ -43,7 +51,7 @@ def publishable_school_facts(attributes: Any, website_url: Optional[str]) -> Opt
     block = attributes.get(ATTRIBUTE_KEY) if isinstance(attributes, Mapping) else None
     if not isinstance(block, Mapping) or block.get("_schema_version") != SCHEMA_VERSION:
         return None
-    if not _host(website_url) or _host(block.get("website_url")) != _host(website_url):
+    if not _site(website_url) or _site(block.get("website_url")) != _site(website_url):
         return None
     facts = []
     for fact in block.get("facts") or []:

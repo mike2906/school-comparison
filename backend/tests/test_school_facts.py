@@ -237,7 +237,7 @@ async def test_withheld_website_data_hides_the_facts(client, db_session):
 
 def test_facts_show_only_for_the_site_they_were_read_from():
     block = {"_schema_version": 1, "read_at": "t", "website_url": HOME, "facts": [_fact_row()]}
-    assert publishable_school_facts({"school_facts": block}, "https://www.school.example/bg/") is not None
+    assert publishable_school_facts({"school_facts": block}, "https://www.school.example") is not None
     assert publishable_school_facts({"school_facts": block}, "https://other.example/") is None
     assert publishable_school_facts({"school_facts": block}, None) is None
     assert publishable_school_facts({"school_facts": block | {"website_url": None}}, HOME) is None
@@ -301,3 +301,42 @@ def test_a_list_quote_matches_row_by_row():
 def test_the_judge_sees_the_page_of_each_quote():
     message = judge_message([(_fact("languages", "ниво B2"), "https://school.example/anglijski-ezik/")])
     assert "Page: https://school.example/anglijski-ezik/" in message
+
+
+@pytest.mark.asyncio
+async def test_a_full_read_with_no_fact_kept_replaces_the_stored_facts():
+    old = {"_schema_version": 1, "facts": [{"topic": "meals"}]}
+    pages = [PageRead(f"https://school.example/{n}", f"Страница {n} без конкретни факти.", False) for n in range(4)]
+    school = _school(school_facts=old)
+    await stage.run_school(_Db(), school, find=await _find(pages), call=_Calls([], passed=[]), apply=True)
+    assert school.attributes["school_facts"]["facts"] == []
+
+
+def test_a_moved_website_on_the_same_host_hides_the_facts():
+    block = {
+        "_schema_version": 1,
+        "read_at": "t",
+        "website_url": "https://example.bg/school-a/",
+        "facts": [_fact_row()],
+    }
+    assert publishable_school_facts({"school_facts": block}, "https://www.example.bg/school-a") is not None
+    assert publishable_school_facts({"school_facts": block}, "https://example.bg/school-b/") is None
+
+
+@pytest.mark.asyncio
+async def test_a_rejected_website_hides_the_facts(client, db_session):
+    block = {"_schema_version": 1, "read_at": "t", "website_url": HOME, "facts": [_fact_row()]}
+    school = School(
+        name_i18n={"bg": "Училище", "en": "School"},
+        country_code="bg",
+        school_type="private",
+        education_level="primary",
+        city="sofia",
+        website_url=HOME,
+        scrape_status="failed_validate",
+        attributes={"school_facts": block},
+    )
+    db_session.add(school)
+    await db_session.commit()
+    body = (await client.get(f"/schools/{school.id}")).json()
+    assert body["school_facts"] is None
