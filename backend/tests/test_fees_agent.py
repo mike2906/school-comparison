@@ -611,6 +611,43 @@ async def test_a_failed_school_still_finalises_the_run(db_session, monkeypatch):
     assert run.status.value != "running"
 
 
+async def test_a_run_reports_each_school_as_it_goes_and_can_start_after_one(db_session, monkeypatch):
+    """A killed Sofia dry run (2026-10-13) lost every read: the report was written only at the end."""
+    import contextlib
+
+    import crawl4ai
+
+    first, second, third = [await _school(db_session) for _ in range(3)]
+    await db_session.commit()
+
+    class _Crawler:
+        def __init__(self, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *exc):
+            return False
+
+    async def _read(db, school, **kwargs):
+        return {"school_id": school.id, "outcome": "would_write"}
+
+    @contextlib.asynccontextmanager
+    async def _nothing(*args, **kwargs):
+        yield None
+
+    monkeypatch.setattr(crawl4ai, "AsyncWebCrawler", _Crawler)
+    monkeypatch.setattr(fees_agent, "fee_http_client", _nothing)
+    monkeypatch.setattr(fees_agent, "pipeline_run_heartbeat", _nothing)
+    monkeypatch.setattr(fees_agent, "run_school", _read)
+    seen = []
+    report = await fees_agent.run_fees_agent(
+        db_session, city="sofia", after_id=first.id, on_school=lambda result: seen.append(result["school_id"])
+    )
+    assert seen == [second.id, third.id] == [result["school_id"] for result in report["results"]]
+
+
 async def test_a_browser_that_will_not_start_still_finalises_the_run(db_session, monkeypatch):
     import crawl4ai
 

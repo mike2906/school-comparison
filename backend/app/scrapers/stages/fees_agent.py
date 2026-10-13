@@ -902,8 +902,14 @@ async def run_fees_agent(
     limit: Optional[int] = None,
     max_usd: float = DEFAULT_MAX_USD,
     apply: bool = False,
+    after_id: Optional[int] = None,
+    on_school: Optional[Callable[[dict[str, Any]], None]] = None,
 ) -> dict[str, Any]:
-    """Run the agent over private and international schools with a website; returns the report."""
+    """Run the agent over private and international schools with a website; returns the report.
+
+    ``after_id`` starts after that school, to carry on a run that stopped; ``on_school`` gets
+    each school's report as soon as it is done, so a killed run keeps what it read.
+    """
     from crawl4ai import AsyncWebCrawler, BrowserConfig, CacheMode, CrawlerRunConfig  # type: ignore
 
     query = select(School).where(School.country_code == country, School.website_url.isnot(None))
@@ -914,6 +920,8 @@ async def run_fees_agent(
     )
     if city:
         query = query.where(School.city == city)
+    if after_id is not None:
+        query = query.where(School.id > after_id)
     # Ids, not objects: a rollback after one school's failure expires every loaded object.
     school_ids = (await db.execute(query.with_only_columns(School.id).order_by(School.id).limit(limit))).scalars().all()
 
@@ -972,6 +980,8 @@ async def run_fees_agent(
                         if db.in_transaction():
                             await db.rollback()
                         results.append({"school_id": current_id, "outcome": "error", "reason": str(exc)[:200]})
+                    if on_school is not None:
+                        on_school(results[-1])
     except Exception as exc:
         logger.exception("fees-agent run %s stopped", run_id)
         if db.in_transaction():
