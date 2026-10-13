@@ -1767,7 +1767,11 @@ async def extract_school(
         "llm_stats": llm_stats.as_dict(),
     }
 
-    should_extract_prices = school.school_type in {"private", "international"}
+    # The fees-agent stage owns website fees, so a pipeline run no longer overwrites its rows.
+    should_extract_prices = settings.extraction_pipeline_prices and school.school_type in {
+        "private",
+        "international",
+    }
 
     if should_extract_prices:
         price_result = await _extract_prices(

@@ -3,6 +3,8 @@
 General information, status and summaries are left alone. For each school the rows the
 API would publish before and after are printed, so a run can be read school by school.
 Try it on a copy of the database first (``DATABASE_URL``); the run commits.
+This is the old rule-based fee extraction: fees now come from ``fees-agent``, so the script
+only runs with ``EXTRACTION_PIPELINE_PRICES=true``.
 
 Run from ``backend/``::
 
@@ -19,6 +21,7 @@ from pathlib import Path
 from sqlalchemy import select, text
 from sqlalchemy.orm import selectinload
 
+from app.config import get_settings
 from app.database import async_session_maker
 from app.models import Pricing, School
 from app.scrapers.extractor import extract_school
@@ -118,6 +121,8 @@ def main() -> None:
         school_ids += [int(part) for part in args.cohort_file.read_text().replace(",", " ").split()]
     if not school_ids:
         parser.error("give --school-id or --cohort-file")
+    if not get_settings().extraction_pipeline_prices:
+        parser.error("fees come from fees-agent; set EXTRACTION_PIPELINE_PRICES=true to use the old extraction")
     asyncio.run(refresh(list(dict.fromkeys(school_ids)), navigate=not args.skip_navigation, country=args.country))
 
 
