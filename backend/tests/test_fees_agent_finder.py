@@ -68,7 +68,7 @@ def _school():
 
 
 def _picks(urls=None, error=None):
-    async def pick(school, read, links, spend):
+    async def pick(school, read, links, spend, prompt=None):
         if error:
             raise error
         return urls or []

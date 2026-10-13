@@ -31,6 +31,7 @@ import KeyFacts from './KeyFacts'
 import DziResults from './DziResults'
 import LocationMap, { directionsUrl } from './LocationMap'
 import PricingSection from './PricingSection'
+import WebsiteFacts from './WebsiteFacts'
 import { formatAmount } from '../../utils/format'
 import { parseCoordinate } from '../../utils/coordinates'
 import SchoolActions from './SchoolActions'
@@ -419,6 +420,8 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
 
         {/* Price is what a private-school parent decides on first. */}
         {hasPricing && <PricingSection pricing={pricing} />}
+
+        <WebsiteFacts school={school} />
 
         {/* At a Glance Section */}
         {hasAtAGlance && (

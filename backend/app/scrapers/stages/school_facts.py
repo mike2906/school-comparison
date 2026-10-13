@@ -1,0 +1,247 @@
+"""School-facts stage: read a school's own pages and keep the concrete facts they state.
+
+Finds pages with the fees agent's finder (its own link prompt), lists facts by topic in one
+call, keeps a fact only when its quote is on a page read and a second call confirms the
+quote states it, and stores the kept facts in ``attributes["school_facts"]``. The default
+is a dry run that writes nothing; the report lists every fact and why it was dropped.
+Not part of ``all``. Prompts and checks: ``app/scrapers/extraction/school_facts.py``.
+"""
+
+from __future__ import annotations
+
+import datetime
+import logging
+from collections.abc import Awaitable, Callable, Sequence
+from typing import Any, Optional
+
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.ai.client import create_agent, extract_provider_cost_usd, get_model, get_model_costs
+from app.config import CRAWLER_USER_AGENT, get_settings
+from app.database import async_session_maker
+from app.models import School
+from app.models.pipeline_run import PipelineRun
+from app.scrapers.extraction import school_facts as facts_rules
+from app.scrapers.extraction.school_facts import Fact, Facts, Supported
+from app.scrapers.fee_pages import fee_http_client
+from app.scrapers.stages import common as stage_common
+from app.scrapers.stages.fees_agent import PageRead, Spend, SpendCapReached, find_pages
+from app.services.pipeline_runs import finalize_pipeline_run, pipeline_run_heartbeat, start_pipeline_run
+from app.services.provider_costs import ProviderCostCapExceeded, execute_billable_request, provider_cost_scope
+from app.utils.school_facts import ATTRIBUTE_KEY
+
+logger = logging.getLogger(__name__)
+
+STAGE = "school-facts"
+TIER = "pricing"  # the fee reader's model: cheap, and follows quoting rules well
+DEFAULT_MAX_USD = 0.50
+MAX_READ_CHARS = 100_000
+OUTPUT_TOKENS_RESERVE = 4000
+
+Finder = Callable[[School], Awaitable[list[PageRead]]]
+Caller = Callable[[str, type, str, int], Awaitable[Any]]
+
+
+def _estimate_usd(message: str) -> float:
+    in_price, out_price = get_model_costs(TIER)
+    return (len(message) / 3 * in_price + OUTPUT_TOKENS_RESERVE * out_price) / 1_000_000
+
+
+def model_caller(spend: Spend) -> Caller:
+    """One structured call on the stage's tier, within the run's spend cap."""
+
+    async def call(prompt: str, schema: type, message: str, school_id: int) -> Any:
+        if not spend.allows(_estimate_usd(message)):
+            raise SpendCapReached(f"spent ${spend.spent_usd:.4f} of ${spend.cap_usd}")
+        agent = create_agent(TIER, prompt, schema, retries=1, model_settings={"temperature": 0})
+        result = await execute_billable_request(
+            lambda: agent.run(message), model=get_model(TIER), school_id=school_id, stage=STAGE, timeout_seconds=150
+        )
+        spend.spent_usd += extract_provider_cost_usd(result)
+        return result.output
+
+    return call
+
+
+def _name(school: School) -> str:
+    return (school.name_i18n or {}).get("bg") or (school.name_i18n or {}).get("en") or str(school.id)
+
+
+def _ordered(kept: list[tuple[Fact, str]]) -> list[tuple[Fact, str]]:
+    """Topic order, at most 2 a topic and ``MAX_FACTS`` in all, the reader's order within a topic."""
+    per_topic: dict[str, int] = {}
+    out: list[tuple[Fact, str]] = []
+    for item in sorted(kept, key=lambda item: facts_rules.TOPICS.index(item[0].topic)):
+        if per_topic.get(item[0].topic, 0) < 2 and len(out) < facts_rules.MAX_FACTS:
+            per_topic[item[0].topic] = per_topic.get(item[0].topic, 0) + 1
+            out.append(item)
+    return out
+
+
+async def read_school(school: School, pages: list[PageRead], call: Caller) -> dict[str, Any]:
+    """Read, check and judge; returns the report with the facts to store under ``store``."""
+    readable = [(page.url, page.text) for page in pages if page.text.strip()]
+    report: dict[str, Any] = {"pages": [{"url": p.url, "chars": len(p.text), "note": p.note} for p in pages]}
+    if not readable:
+        return report | {"outcome": "nothing_read"}
+    text = "\n\n".join(f"=== PAGE {url}\n{body}" for url, body in readable)[:MAX_READ_CHARS]
+    read: Facts = await call(
+        facts_rules.READER_PROMPT,
+        Facts,
+        f"Institution: {_name(school)} ({school.school_type} {school.education_level})\n\n{text}",
+        school.id,
+    )
+    on_page = [(fact, facts_rules.quote_on_page(fact, readable)) for fact in read.facts]
+    quoted = [(fact, url) for fact, url in on_page if url]
+    supported: set[int] = set()
+    if quoted:
+        verdict: Supported = await call(
+            facts_rules.JUDGE_PROMPT, Supported, facts_rules.judge_message([f for f, _ in quoted]), school.id
+        )
+        supported = set(verdict.passed)
+    kept = _ordered([item for n, item in enumerate(quoted, 1) if n in supported])
+    status = {id(fact): "quote not on page" for fact in read.facts}
+    status |= {id(fact): "quote does not state it" for fact, _ in quoted}
+    status |= {id(fact): "over the topic or total limit" for n, (fact, _) in enumerate(quoted, 1) if n in supported}
+    status |= {id(fact): None for fact, _ in kept}
+    report["facts"] = [
+        fact.model_dump() | {"kept": status[id(fact)] is None, "dropped": status[id(fact)]} for fact in read.facts
+    ]
+    report["store"] = [facts_rules.stored_fact(fact, url) for fact, url in kept]
+    return report | {"outcome": f"{len(kept)} of {len(read.facts)} kept"}
+
+
+def facts_block(facts: list[dict], model: str) -> dict[str, Any]:
+    return {
+        "_schema_version": facts_rules.SCHEMA_VERSION,
+        "read_at": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
+        "model": model,
+        "facts": facts,
+    }
+
+
+async def run_school(db: AsyncSession, school: School, *, find: Finder, call: Caller, apply: bool) -> dict[str, Any]:
+    report = {
+        "school_id": school.id,
+        "name": _name(school),
+        "type": f"{school.school_type} {school.education_level}",
+        "website": school.website_url,
+    }
+    report |= await read_school(school, await find(school), call)
+    facts = report.pop("store", None)
+    # A site that could not be read keeps its stored facts; one read in full replaces them,
+    # with none when it states nothing concrete.
+    if apply and facts is not None:
+        school.attributes = {**(school.attributes or {}), ATTRIBUTE_KEY: facts_block(facts, get_model(TIER))}
+        await db.commit()
+        report["stored"] = len(facts)
+    return report
+
+
+async def run_school_facts(
+    db: AsyncSession,
+    *,
+    country: str = "bg",
+    city: Optional[str] = None,
+    school_ids: Sequence[int] = (),
+    limit: Optional[int] = None,
+    max_usd: float = DEFAULT_MAX_USD,
+    apply: bool = False,
+) -> dict[str, Any]:
+    """Run over schools with a website (all types, or the given ids); returns the report."""
+    from crawl4ai import AsyncWebCrawler, BrowserConfig, CacheMode, CrawlerRunConfig  # type: ignore
+
+    query = select(School.id).where(School.country_code == country, School.website_url.isnot(None))
+    if school_ids:
+        query = query.where(School.id.in_(list(school_ids)))
+    if city:
+        query = query.where(func.lower(School.city) == city.lower())
+    ids = (await db.execute(query.order_by(School.id).limit(limit))).scalars().all()
+
+    spend = Spend(max_usd)
+    run = await start_pipeline_run(
+        db, country=country, city=city, cli_stage=STAGE, config={"provider_cost_cap_usd": max_usd, "apply": apply}
+    )
+    run_id = run.id
+    settings = get_settings()
+    browser = BrowserConfig(headless=True, verbose=False, ignore_https_errors=True, user_agent=CRAWLER_USER_AGENT)
+    run_config = CrawlerRunConfig(
+        cache_mode=CacheMode.BYPASS,
+        check_robots_txt=True,
+        page_timeout=30000,
+        wait_until="domcontentloaded",
+        delay_before_return_html=0.5,
+        exclude_external_links=False,
+        verbose=False,
+    )
+    call = model_caller(spend)
+    results: list[dict[str, Any]] = []
+    error: Optional[str] = None
+    try:
+        with provider_cost_scope(
+            pipeline_run_id=run.id,
+            stage=STAGE,
+            cap_usd=max_usd,
+            request_reserve_usd=float(settings.provider_request_reserve_usd),
+        ):
+            async with (
+                pipeline_run_heartbeat(
+                    run.id,
+                    session_factory=async_session_maker,
+                    interval_seconds=float(settings.pipeline_heartbeat_interval_seconds),
+                ),
+                AsyncWebCrawler(config=browser) as crawler,
+                fee_http_client() as client,
+            ):
+
+                async def find(school: School) -> list[PageRead]:
+                    return await find_pages(
+                        crawler,
+                        run_config,
+                        client,
+                        school,
+                        spend,
+                        pick_prompt=facts_rules.PICK_PROMPT,
+                        fallback_links=facts_rules.FALLBACK_LINK_RE,
+                    )
+
+                for current_id in ids:
+                    school = await db.get(School, current_id)
+                    try:
+                        results.append(await run_school(db, school, find=find, call=call, apply=apply))
+                    except (SpendCapReached, ProviderCostCapExceeded) as exc:
+                        error = f"stopped before school {current_id}: {exc}"
+                        break
+                    except Exception as exc:  # one school's failure leaves its stored facts as they are
+                        logger.exception("school-facts failed for school %s", current_id)
+                        if db.in_transaction():
+                            await db.rollback()
+                        results.append({"school_id": current_id, "outcome": "error", "reason": str(exc)[:200]})
+    except Exception as exc:
+        logger.exception("school-facts run %s stopped", run_id)
+        if db.in_transaction():
+            await db.rollback()
+        error = f"run stopped: {str(exc)[:200]}"
+    failed = sum(r["outcome"] == "error" for r in results)
+    run = await db.get(PipelineRun, run_id, populate_existing=True)
+    await finalize_pipeline_run(
+        db,
+        run,
+        country=country,
+        city=city,
+        stage_summaries=[
+            stage_common.stage_summary(processed=len(results), succeeded=len(results) - failed, failed=failed)
+        ],
+        error_summary=error,
+    )
+    spent = max(spend.spent_usd, float(run.total_llm_cost_usd or 0))
+    return {
+        "apply": apply,
+        "pipeline_run_id": run_id,
+        "model": get_model(TIER),
+        "schools": len(results),
+        "spent_usd": round(spent, 6),
+        "stopped": error,
+        "results": results,
+    }
