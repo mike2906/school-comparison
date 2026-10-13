@@ -1,0 +1,47 @@
+{
+ "apply": true,
+ "pipeline_run_id": "06daf281-d1e8-4cdf-bbea-24a92e66d0aa",
+ "schools": 1,
+ "spent_usd": 0.000233,
+ "stopped": null,
+ "kept_old_rows": [
+  631
+ ],
+ "outcomes": {
+  "kept_old_rows": 1
+ },
+ "results": [
+  {
+   "school_id": 631,
+   "outcome": "kept_old_rows",
+   "pages": [
+    {
+     "url": "https://happyhouse-bg.com/",
+     "chars": 18216,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://happyhouse-bg.com/priem/",
+     "chars": 18503,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://happyhouse-bg.com/uslugi/",
+     "chars": 13944,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://happyhouse-bg.com/kontakti/",
+     "chars": 4172,
+     "prices": false,
+     "note": null
+    }
+   ],
+   "fees": [],
+   "reason": "no page showing prices"
+  }
+ ]
+}

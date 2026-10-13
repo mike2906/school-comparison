@@ -1,0 +1,41 @@
+{
+ "apply": true,
+ "pipeline_run_id": "5ecc4c10-5373-4df1-be88-5a62f6c71452",
+ "schools": 1,
+ "spent_usd": 0.000201,
+ "stopped": null,
+ "kept_old_rows": [
+  516
+ ],
+ "outcomes": {
+  "kept_old_rows": 1
+ },
+ "results": [
+  {
+   "school_id": 516,
+   "outcome": "kept_old_rows",
+   "pages": [
+    {
+     "url": "https://svetilnik.bg/",
+     "chars": 16930,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://svetilnik.bg/priem/",
+     "chars": 370,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://svetilnik.bg/payments/",
+     "chars": 370,
+     "prices": false,
+     "note": null
+    }
+   ],
+   "fees": [],
+   "reason": "no page showing prices"
+  }
+ ]
+}

@@ -1,0 +1,98 @@
+{
+ "school_id": 568,
+ "website_url": "http://doristenedi.com/",
+ "pages_read": [
+  "https://doristenedi.com/",
+  "https://doristenedi.com/fee.html"
+ ],
+ "fetch_failed": [],
+ "blocked": false,
+ "site_states_no_fees": false,
+ "site_fees": [
+  {
+   "fid": "f1",
+   "category": "tuition",
+   "amount": 8950,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "ПГ",
+   "plan": null,
+   "year": "2026/2027",
+   "url": "https://doristenedi.com/fee.html",
+   "quote": "ПГ | EUR 8950 (Годишна такса за учебната 2026/2027 г.)"
+  },
+  {
+   "fid": "f2",
+   "category": "tuition",
+   "amount": 9300,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "ПГ",
+   "plan": "разсрочено плащане",
+   "year": "2026/2027",
+   "url": "https://doristenedi.com/fee.html",
+   "quote": "ПГ ... EUR 9300 (Годишна такса при разсрочено плащане за учебната 2026/2027 г.)"
+  },
+  {
+   "fid": "f3",
+   "category": "tuition",
+   "amount": 8950,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "I - VIІ клас",
+   "plan": null,
+   "year": "2026/2027",
+   "url": "https://doristenedi.com/fee.html",
+   "quote": "I - VIІ клас | EUR 8950"
+  },
+  {
+   "fid": "f4",
+   "category": "tuition",
+   "amount": 9300,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "I - VIІ клас",
+   "plan": "разсрочено плащане",
+   "year": "2026/2027",
+   "url": "https://doristenedi.com/fee.html",
+   "quote": "I - VIІ клас ... EUR 9300 (Годишна такса при разсрочено плащане)"
+  },
+  {
+   "fid": "f5",
+   "category": "tuition",
+   "amount": 6700,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "VIII - XII клас",
+   "plan": null,
+   "year": "2026/2027",
+   "url": "https://doristenedi.com/fee.html",
+   "quote": "VIII - XII клас | EUR 6700"
+  },
+  {
+   "fid": "f6",
+   "category": "tuition",
+   "amount": 7050,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "VIII - XII клас",
+   "plan": "разсрочено плащане",
+   "year": "2026/2027",
+   "url": "https://doristenedi.com/fee.html",
+   "quote": "VIII - XII клас ... EUR 7050 (Годишна такса при разсрочено плащане)"
+  }
+ ],
+ "notes": "Annual fee includes meals, textbooks etc. for I-VII. Transport charged extra, no amount. Instalment count/dates not stated."
+}

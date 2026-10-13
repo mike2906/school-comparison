@@ -1,0 +1,35 @@
+{
+ "apply": true,
+ "pipeline_run_id": "cd7f7f84-14d3-4104-8e76-0afd43976c64",
+ "schools": 1,
+ "spent_usd": 0.000134,
+ "stopped": null,
+ "kept_old_rows": [
+  528
+ ],
+ "outcomes": {
+  "kept_old_rows": 1
+ },
+ "results": [
+  {
+   "school_id": 528,
+   "outcome": "kept_old_rows",
+   "pages": [
+    {
+     "url": "https://tzarsimeon.bg/dgrosica/home",
+     "chars": 12544,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://tzarsimeon.bg/dgrosica/priem",
+     "chars": 8826,
+     "prices": false,
+     "note": null
+    }
+   ],
+   "fees": [],
+   "reason": "no page showing prices"
+  }
+ ]
+}

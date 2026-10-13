@@ -1,0 +1,6 @@
+{"school_id": 615, "website_url": "https://growers.bg/", "pages_read": ["https://growers.bg/", "https://growers.bg/taksi/", "https://growers.bg/priem/", "https://growers.bg/uslugi/"], "fetch_failed": [], "blocked": false, "site_states_no_fees": false,
+ "site_fees": [
+  {"fid": "f1", "category": "tuition", "amount": 500, "amount_min": null, "amount_max": null, "currency": "EUR", "period": "monthly", "group": null, "plan": "Целодневна", "year": null, "url": "https://growers.bg/taksi/", "quote": "Целодневна – 500евро Месечна такса"},
+  {"fid": "f2", "category": "food", "amount": 88, "amount_min": null, "amount_max": null, "currency": "EUR", "period": "monthly", "group": null, "plan": null, "year": null, "url": "https://growers.bg/taksi/", "quote": "Такса храна - 88евро Месечна такса"}
+ ],
+ "notes": "Fees page shows only these two. Services page mentions half-day care (08-12) and ясла 1.6-3г / градина 3-5г but no separate prices. No year stated."}

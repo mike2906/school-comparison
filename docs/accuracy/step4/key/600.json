@@ -1,0 +1,3 @@
+{"school_id": 600, "website_url": "https://stremezh-education.com/", "pages_read": ["https://stremezh-education.com/", "https://stremezh-education.com/kandidatstvane/", "https://stremezh-education.com/kursove-dopalnitelni/", "https://stremezh-education.com/hranene/"], "fetch_failed": ["https://stremezh-education.com/montessori/kandidatstvane/"], "blocked": false, "site_states_no_fees": false,
+ "site_fees": [],
+ "notes": "No fee amounts found. Admissions page gives director contacts (school and kindergarten) for enquiries. Site also serves a sibling 'Детски образователен център' (kindergarten); not relevant as nothing priced. Courses page (open to all children) has no prices. The 'КАНДИДАТСТВАЙТЕ' link (/montessori/kandidatstvane/) failed to fetch twice."}

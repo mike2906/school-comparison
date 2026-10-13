@@ -1,0 +1,42 @@
+{
+ "school_id": 526,
+ "pages_read": [
+  "https://meridian22.bg/priem-1",
+  "https://meridian22.bg/priem-osnovno-uchilishte"
+ ],
+ "fetch_failed": [],
+ "site_states_no_fees": false,
+ "site_fees": [
+  {
+   "fid": "f1",
+   "category": "tuition",
+   "amount": 650,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": null,
+   "plan": null,
+   "year": null,
+   "url": "https://meridian22.bg/priem-1",
+   "quote": "Цена: 650 € месечна такса"
+  }
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "verdict": "correct",
+   "fid": "f1",
+   "reason": "650 EUR monthly kindergarten fee",
+   "group_unstated": false
+  },
+  {
+   "oid": "o2",
+   "verdict": "wrong_group_plan_year",
+   "fid": null,
+   "reason": "8540 EUR is the sibling primary school's (Основно училище) preparatory-group fee, not this kindergarten's",
+   "group_unstated": false
+  }
+ ],
+ "notes": "priem-osnovno-uchilishte confirmed as the sibling primary school's fee page (8540/8700/8990/9300 EUR, 2026/27)."
+}

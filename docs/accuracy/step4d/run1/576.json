@@ -1,0 +1,95 @@
+{
+ "apply": true,
+ "pipeline_run_id": "112f50b9-e2e8-430e-9985-251435f58cb0",
+ "schools": 1,
+ "spent_usd": 0.000428,
+ "stopped": null,
+ "kept_old_rows": [
+  576
+ ],
+ "outcomes": {
+  "kept_old_rows": 1
+ },
+ "results": [
+  {
+   "school_id": 576,
+   "outcome": "kept_old_rows",
+   "pages": [
+    {
+     "url": "https://littlesteps.bg/",
+     "chars": 11516,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://littlesteps.bg/musagenitsa/musagenitsa-admission/",
+     "chars": 10469,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://littlesteps.bg/simeonovo/admission/",
+     "chars": 11222,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://littlesteps.bg/musagenitsa/musagenitsa-for-the-parents/",
+     "chars": 11110,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://littlesteps.bg/simeonovo/for-the-parents/",
+     "chars": 9954,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://littlesteps.bg/musagenitsa/musagenitsa-meals/",
+     "chars": 10606,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://littlesteps.bg/simeonovo/meals/",
+     "chars": 10026,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://littlesteps.bg/musagenitsa/musagenitsa-daily-regime/",
+     "chars": 10571,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://littlesteps.bg/en/simeonovo/",
+     "chars": 11553,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://littlesteps.bg/musagenitsa/",
+     "chars": 12203,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://littlesteps.bg/simeonovo/",
+     "chars": 11882,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://littlesteps.bg/en/musagenica/",
+     "chars": 12125,
+     "prices": false,
+     "note": null
+    }
+   ],
+   "fees": [],
+   "reason": "no page showing prices"
+  }
+ ]
+}

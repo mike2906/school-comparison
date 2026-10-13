@@ -1,0 +1,74 @@
+{
+ "apply": true,
+ "pipeline_run_id": "0a07e30d-352e-46eb-887a-8be02fdd75fa",
+ "schools": 1,
+ "spent_usd": 0.000945,
+ "stopped": null,
+ "kept_old_rows": [
+  523
+ ],
+ "outcomes": {
+  "kept_old_rows": 1
+ },
+ "results": [
+  {
+   "school_id": 523,
+   "outcome": "kept_old_rows",
+   "pages": [
+    {
+     "url": "https://denisdiderot.bg/en-us/",
+     "chars": 10660,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://denisdiderot.bg/en-us/admission",
+     "chars": 9612,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://denisdiderot.bg/en-us/education/school-transport",
+     "chars": 11317,
+     "prices": true,
+     "note": null
+    },
+    {
+     "url": "https://system.denisdiderot.bg/auth",
+     "chars": 259,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://denisdiderot.bg/en-us/contacts",
+     "chars": 6206,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://denisdiderot.bg/bg-bg/%D0%BF%D1%80%D0%B8%D0%B5%D0%BC",
+     "chars": 15959,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://denisdiderot.bg/bg-bg/%D0%BE%D0%B1%D1%83%D1%87%D0%B5%D0%BD%D0%B8%D0%B5/%D0%B4%D0%BE%D0%BA%D1%83%D0%BC%D0%B5%D0%BD%D1%82%D0%B8",
+     "chars": 13740,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://denisdiderot.bg/Portals/0/Transport%20rules.pdf?timestamp=1762977251666&ver=M9zlLKpR5Ceahc5_nEclqQ%3D%3D",
+     "chars": 4659,
+     "prices": false,
+     "note": null
+    }
+   ],
+   "fees": [],
+   "rows_new": 0,
+   "rows_new_publishable": 0,
+   "rows_old_published": 0,
+   "reason": "nothing publishable read"
+  }
+ ]
+}

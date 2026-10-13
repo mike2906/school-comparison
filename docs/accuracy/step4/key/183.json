@@ -1,0 +1,43 @@
+{
+ "school_id": 183,
+ "website_url": "https://www.sianie-bg.com/",
+ "pages_read": [
+  "https://www.sianie-bg.com/",
+  "https://www.sianie-bg.com/?pg=ceni",
+  "https://www.sianie-bg.com/?pg=uslugi"
+ ],
+ "fetch_failed": [],
+ "blocked": false,
+ "site_states_no_fees": false,
+ "site_fees": [
+  {
+   "fid": "f1",
+   "category": "tuition",
+   "amount": 675,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": "Детска градина",
+   "plan": "Целодневно пребиваване",
+   "year": null,
+   "url": "https://www.sianie-bg.com/?pg=ceni",
+   "quote": "Целодневно пребиваване: Детска градина - 675 EUR"
+  },
+  {
+   "fid": "f2",
+   "category": "registration",
+   "amount": 450,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "group": null,
+   "plan": null,
+   "year": null,
+   "url": "https://www.sianie-bg.com/?pg=ceni",
+   "quote": "Депозит: 450 EUR"
+  }
+ ],
+ "notes": "Page says 'Таксите се внасят месец за месец' (monthly). Second sibling 10% off. Yoga, taekwondo, sports animation and dance included in the fee. Site also has nursery groups (яслени групи) but no nursery price is listed. Deposit has no stated frequency; filed one_time as a deposit (could arguably be period null). No academic year stated."
+}

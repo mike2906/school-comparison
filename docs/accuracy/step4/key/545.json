@@ -1,0 +1,16 @@
+{
+ "school_id": 545,
+ "website_url": "https://gradina-rai.com/",
+ "pages_read": [
+  "https://gradina-rai.com/",
+  "https://gradina-rai.com/priem-na-deca",
+  "https://gradina-rai.com/normativniadministrativni-dokumenti",
+  "https://gradina-rai.com/hranene",
+  "https://gradina-rai.com/obuchenie-za-deca"
+ ],
+ "fetch_failed": [],
+ "blocked": false,
+ "site_states_no_fees": false,
+ "site_fees": [],
+ "notes": "No fee amounts anywhere on the pages read; no fee PDFs linked."
+}

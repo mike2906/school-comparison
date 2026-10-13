@@ -1,0 +1,15 @@
+{
+ "school_id": 528,
+ "website_url": "https://tzarsimeon.bg/dgrosica/home",
+ "pages_read": [
+  "https://tzarsimeon.bg/dgrosica/home",
+  "https://tzarsimeon.bg/dgrosica/priem",
+  "https://tzarsimeon.bg/dgrosica/obshti-usloviq",
+  "https://tzarsimeon.bg/dgrosica/boyana"
+ ],
+ "fetch_failed": [],
+ "blocked": false,
+ "site_states_no_fees": false,
+ "site_fees": [],
+ "notes": "No amounts on site. Прием page only lists 'Платена такса за предстоящият месец.' as a required document (no amount). Domain also hosts sibling schools (ЧОУ Цар Симеон Велики, ЧГПНП Асен Йорданов) - not read."
+}

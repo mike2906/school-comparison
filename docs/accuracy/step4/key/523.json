@@ -1,0 +1,20 @@
+{
+ "school_id": 523,
+ "website_url": "https://denisdiderot.bg/en-us/",
+ "pages_read": [
+  "https://denisdiderot.bg/en-us/",
+  "https://denisdiderot.bg/en-us/admission",
+  "https://denisdiderot.bg/bg-bg/",
+  "https://denisdiderot.bg/bg-bg/прием",
+  "https://denisdiderot.bg/bg-bg/обучение/документи",
+  "https://denisdiderot.bg/bg-bg/обучение/училищен-транспорт",
+  "https://denisdiderot.bg/Portals/0/%D0%9F%D1%80%D0%B0%D0%B2%D0%B8%D0%BB%D0%B0%20%D1%82%D1%80%D0%B0%D0%BD%D1%81%D0%BF%D0%BE%D1%80%D1%82.pdf"
+ ],
+ "fetch_failed": [
+  "https://denisdiderot.bg/Portals/0/Правилник за дейността на Училище Дени Дидро_2025-2026 - Актуализиран 2026.pdf (URL too long for fetch proxy)"
+ ],
+ "blocked": false,
+ "site_states_no_fees": false,
+ "site_fees": [],
+ "notes": "No fee/tuition amounts on admission, documents, or transport pages (transport page has an empty payment form). Admission process mentions contract signing without fees. School rules PDF could not be fetched (URL too long); stop-map PDF not read. Food ordering is behind a login (system.denisdiderot.bg)."
+}

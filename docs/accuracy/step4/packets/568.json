@@ -1,0 +1,83 @@
+{
+ "school_id": 568,
+ "candidates": [
+  {
+   "oid": "o1",
+   "category": "registration",
+   "amount": 60.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "label": "таксата за явяване на изпит",
+   "year": null,
+   "group": null,
+   "url": "http://doristenedi.com/admission2.html"
+  },
+  {
+   "oid": "o2",
+   "category": "tuition",
+   "amount": 8950.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "Годишна такса",
+   "year": "2026/2027",
+   "group": "PG",
+   "url": "http://doristenedi.com/fee.html"
+  },
+  {
+   "oid": "o3",
+   "category": "tuition",
+   "amount": 6700.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "Годишна такса",
+   "year": "2026/2027",
+   "group": "VIII - XII клас",
+   "url": "http://doristenedi.com/fee.html"
+  },
+  {
+   "oid": "o4",
+   "category": "tuition",
+   "amount": 8950.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "Годишна такса",
+   "year": "2026/2027",
+   "group": "I - VII клас",
+   "url": "http://doristenedi.com/fee.html"
+  },
+  {
+   "oid": "o5",
+   "category": "tuition",
+   "amount": 7050.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "Годишна такса при разсрочено плащане",
+   "year": "2026/2027",
+   "group": null,
+   "url": "http://doristenedi.com/fee.html"
+  },
+  {
+   "oid": "o6",
+   "category": "tuition",
+   "amount": 6700.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "Годишна такса",
+   "year": "2026/2027",
+   "group": null,
+   "url": "http://doristenedi.com/fee.html"
+  }
+ ]
+}

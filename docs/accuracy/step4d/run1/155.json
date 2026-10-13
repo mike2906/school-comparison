@@ -1,0 +1,69 @@
+{
+ "apply": true,
+ "pipeline_run_id": "41287fa2-0927-46c0-ac93-6562f0e5669d",
+ "schools": 1,
+ "spent_usd": 0.000365,
+ "stopped": null,
+ "kept_old_rows": [],
+ "outcomes": {
+  "written": 1
+ },
+ "results": [
+  {
+   "school_id": 155,
+   "outcome": "written",
+   "pages": [
+    {
+     "url": "https://bobche-topche.bg/",
+     "chars": 12143,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://bobche-topche.bg/priem-bobche-topche/",
+     "chars": 7725,
+     "prices": true,
+     "note": null
+    }
+   ],
+   "fees": [
+    {
+     "category": "tuition",
+     "amount": 857.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "monthly",
+     "label": "Месечна такса",
+     "academic_year": null,
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://bobche-topche.bg/priem-bobche-topche/",
+     "evidence": "#### Месечна такса – **857 € / 1676,15 лв**"
+    },
+    {
+     "category": "registration",
+     "amount": 615.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "one_time",
+     "label": "Еднократна такса при първо записване, включваща Авторска програма за Адаптация",
+     "academic_year": null,
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://bobche-topche.bg/priem-bobche-topche/",
+     "evidence": "#### Еднократна такса при първо записване, включваща Авторска програма за Адаптация : 615€ / 1202,84 лв"
+    }
+   ],
+   "rows_new": 2,
+   "rows_new_publishable": 2,
+   "rows_old_published": 2,
+   "regressions": [],
+   "rows_old_kept": 0,
+   "validation": "ok"
+  }
+ ]
+}

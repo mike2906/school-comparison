@@ -1,0 +1,57 @@
+{
+ "school_id": 183,
+ "candidates": [
+  {
+   "oid": "o1",
+   "category": "tuition",
+   "amount": 675.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "Целодневно пребиваване",
+   "year": null,
+   "group": null,
+   "url": "https://www.sianie-bg.com/?pg=ceni"
+  },
+  {
+   "oid": "o2",
+   "category": "tuition",
+   "amount": 675.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "Детска градина - целодневно пребиваване",
+   "year": null,
+   "group": null,
+   "url": "https://www.sianie-bg.com/?pg=ceni"
+  },
+  {
+   "oid": "o3",
+   "category": "registration",
+   "amount": 450.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "label": null,
+   "year": null,
+   "group": null,
+   "url": "https://www.sianie-bg.com/?pg=ceni"
+  },
+  {
+   "oid": "o4",
+   "category": "registration",
+   "amount": 450.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "label": "Депозит",
+   "year": null,
+   "group": null,
+   "url": "https://www.sianie-bg.com/?pg=ceni"
+  }
+ ]
+}

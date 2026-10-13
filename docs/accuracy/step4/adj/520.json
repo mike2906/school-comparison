@@ -1,0 +1,246 @@
+{
+ "school_id": 520,
+ "pages_read": [
+  "https://school.fusion.bg/priem/grafik-i-tseni/",
+  "https://school.fusion.bg/informatsionna-sreshta-2026-2027"
+ ],
+ "fetch_failed": [],
+ "site_states_no_fees": false,
+ "site_fees": [
+  {
+   "fid": "f1",
+   "category": "tuition",
+   "amount": 7300,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "Предучилищна",
+   "plan": "1 вноска",
+   "year": "2026-2027",
+   "url": "https://school.fusion.bg/priem/grafik-i-tseni/",
+   "quote": "За 1 вноска: €7300"
+  },
+  {
+   "fid": "f2",
+   "category": "tuition",
+   "amount": 3850,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "group": "Предучилищна",
+   "plan": "2 вноски",
+   "year": "2026-2027",
+   "url": "https://school.fusion.bg/priem/grafik-i-tseni/",
+   "quote": "На 2 вноски: 2 вноски по €3850"
+  },
+  {
+   "fid": "f3",
+   "category": "tuition",
+   "amount": 1950,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "group": "Предучилищна",
+   "plan": "4 вноски",
+   "year": "2026-2027",
+   "url": "https://school.fusion.bg/priem/grafik-i-tseni/",
+   "quote": "На 4 вноски: 4 вноски по €1950"
+  },
+  {
+   "fid": "f4",
+   "category": "tuition",
+   "amount": 894,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "group": "Предучилищна",
+   "plan": "9 вноски",
+   "year": "2026-2027",
+   "url": "https://school.fusion.bg/priem/grafik-i-tseni/",
+   "quote": "На 9 вноски: 9 вноски по €894"
+  },
+  {
+   "fid": "f5",
+   "category": "tuition",
+   "amount": 7900,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "1-7 клас",
+   "plan": "1 вноска",
+   "year": "2026-2027",
+   "url": "https://school.fusion.bg/priem/grafik-i-tseni/",
+   "quote": "За 1 вноска: €7900"
+  },
+  {
+   "fid": "f6",
+   "category": "tuition",
+   "amount": 4150,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "group": "1-7 клас",
+   "plan": "2 вноски",
+   "year": "2026-2027",
+   "url": "https://school.fusion.bg/priem/grafik-i-tseni/",
+   "quote": "На 2 вноски: 2 вноски по €4150"
+  },
+  {
+   "fid": "f7",
+   "category": "tuition",
+   "amount": 2113,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "group": "1-7 клас",
+   "plan": "4 вноски",
+   "year": "2026-2027",
+   "url": "https://school.fusion.bg/priem/grafik-i-tseni/",
+   "quote": "На 4 вноски: 4 вноски по €2113"
+  },
+  {
+   "fid": "f8",
+   "category": "tuition",
+   "amount": 966,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "group": "1-7 клас",
+   "plan": "9 вноски",
+   "year": "2026-2027",
+   "url": "https://school.fusion.bg/priem/grafik-i-tseni/",
+   "quote": "На 9 вноски: 9 вноски по €966"
+  },
+  {
+   "fid": "f9",
+   "category": "materials",
+   "amount": 595,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "group": null,
+   "plan": null,
+   "year": null,
+   "url": "https://school.fusion.bg/priem/grafik-i-tseni/",
+   "quote": "Учебници и всички необходими консумативи – €595"
+  },
+  {
+   "fid": "f10",
+   "category": "registration",
+   "amount": 90,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "group": "ПУК (Предучилищна)",
+   "plan": "задание и пробен ден",
+   "year": "2026-2027",
+   "url": "https://school.fusion.bg/informatsionna-sreshta-2026-2027",
+   "quote": "таксата за кандидатстване за заданието и пробния ден на 3.04 е 90 EUR",
+   "changed": "key missed: application fee on admissions info page"
+  }
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "verdict": "stale",
+   "fid": null,
+   "reason": "6650 preschool labelled 2025-2026; site now shows 2026-2027 preschool fees",
+   "group_unstated": false
+  },
+  {
+   "oid": "o2",
+   "verdict": "correct",
+   "fid": "f9",
+   "reason": "materials 595",
+   "group_unstated": true
+  },
+  {
+   "oid": "o3",
+   "verdict": "wrong_amount",
+   "fid": null,
+   "reason": "no 70 EUR fee on current pages (only 90 EUR ПУК application fee)",
+   "group_unstated": true
+  },
+  {
+   "oid": "o4",
+   "verdict": "missing_period",
+   "fid": "f10",
+   "reason": "90 EUR application+trial-day fee is one_time; label date 20.02 differs from page's 3.04",
+   "group_unstated": true
+  },
+  {
+   "oid": "o5",
+   "verdict": "correct",
+   "fid": "f7",
+   "reason": "2113 = 1-7 клас 4 вноски, no period",
+   "group_unstated": true
+  },
+  {
+   "oid": "o6",
+   "verdict": "missing_period",
+   "fid": "f5",
+   "reason": "7900 = 1-7 клас за 1 вноска -> yearly",
+   "group_unstated": false
+  },
+  {
+   "oid": "o7",
+   "verdict": "correct",
+   "fid": "f6",
+   "reason": "4150 = 1-7 клас 2 вноски",
+   "group_unstated": true
+  },
+  {
+   "oid": "o8",
+   "verdict": "stale",
+   "fid": null,
+   "reason": "545 materials labelled 2025-2026; site now states 595",
+   "group_unstated": false
+  },
+  {
+   "oid": "o9",
+   "verdict": "duplicate",
+   "fid": "f5",
+   "reason": "same fee as o6",
+   "group_unstated": false
+  },
+  {
+   "oid": "o10",
+   "verdict": "missing_period",
+   "fid": "f1",
+   "reason": "7300 Предучилищна 1 вноска -> yearly",
+   "group_unstated": false
+  },
+  {
+   "oid": "o11",
+   "verdict": "duplicate",
+   "fid": "f9",
+   "reason": "same fee as o2",
+   "group_unstated": false
+  },
+  {
+   "oid": "o12",
+   "verdict": "correct",
+   "fid": "f8",
+   "reason": "966 = 1-7 клас 9 вноски",
+   "group_unstated": true
+  },
+  {
+   "oid": "o13",
+   "verdict": "stale",
+   "fid": null,
+   "reason": "7150 1-7 labelled 2025-2026; site now shows 2026-2027",
+   "group_unstated": false
+  }
+ ],
+ "notes": "Grafik i tseni page lists only 2026-2027 fees. Added 90 EUR ПУК application/trial-day fee from informatsionna-sreshta-2026-2027 (no fee stated for 2-7 клас); 70 EUR not found anywhere now, likely from an older version of that page (the 20.02 date in o4 also suggests an older version)."
+}

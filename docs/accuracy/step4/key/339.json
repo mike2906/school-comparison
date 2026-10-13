@@ -1,0 +1,13 @@
+{
+ "school_id": 339,
+ "website_url": "https://edisonschool.eu/",
+ "pages_read": [
+  "https://edisonschool.eu/",
+  "https://edisonschool.eu/#admission"
+ ],
+ "fetch_failed": [],
+ "blocked": false,
+ "site_states_no_fees": false,
+ "site_fees": [],
+ "notes": "One-page site. No amounts. Mentions a one-time contract fee ('еднократната такса по него') and an admission exam payment (bank details) without figures; tuition on request at info@edisonschool.eu. Links a Google Drive documents folder (off-domain, not read). Sibling kindergarten ЧДГ '101Защо' (101dg.org) not included."
+}

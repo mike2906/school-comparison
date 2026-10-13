@@ -1,0 +1,256 @@
+{
+ "apply": true,
+ "pipeline_run_id": "16552d3b-aee4-4eb4-8a70-36379841c58b",
+ "schools": 1,
+ "spent_usd": 0.002779,
+ "stopped": null,
+ "kept_old_rows": [],
+ "outcomes": {
+  "written": 1
+ },
+ "results": [
+  {
+   "school_id": 170,
+   "outcome": "written",
+   "pages": [
+    {
+     "url": "https://www.svetinaum.net/",
+     "chars": 13005,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://www.svetinaum.net/c/bg/ceni/",
+     "chars": 4246,
+     "prices": true,
+     "note": null
+    },
+    {
+     "url": "https://www.svetinaum.net/c/bg/ceni/taksi-za-obuchenie/",
+     "chars": 4398,
+     "prices": true,
+     "note": null
+    }
+   ],
+   "fees": [
+    {
+     "category": "tuition",
+     "amount": 4000.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Такси за обучение",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [
+      "period yearly cleared: the evidence does not name it"
+     ],
+     "source_url": "https://www.svetinaum.net/c/bg/ceni/taksi-za-obuchenie/",
+     "evidence": "Такси за 2026-2027 учебна година:\n|  **Клас**  |  **Еднократно плащане**  |  **На два пъти**  |  **На осем вноски**  |\n|  7, 8, 9, 10, 11, 12 клас  |  4000 Евро  |  4200 Евро  |  4500 Евро  |"
+    },
+    {
+     "category": "tuition",
+     "amount": 4200.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Такси за обучение",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://www.svetinaum.net/c/bg/ceni/taksi-za-obuchenie/",
+     "evidence": "Такси за 2026-2027 учебна година:\n|  **Клас**  |  **Еднократно плащане**  |  **На два пъти**  |  **На осем вноски**  |\n|  7, 8, 9, 10, 11, 12 клас  |  4000 Евро  |  4200 Евро  |  4500 Евро  |"
+    },
+    {
+     "category": "tuition",
+     "amount": 4500.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Такси за обучение",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://www.svetinaum.net/c/bg/ceni/taksi-za-obuchenie/",
+     "evidence": "Такси за 2026-2027 учебна година:\n|  **Клас**  |  **Еднократно плащане**  |  **На два пъти**  |  **На осем вноски**  |\n|  7, 8, 9, 10, 11, 12 клас  |  4000 Евро  |  4200 Евро  |  4500 Евро  |"
+    },
+    {
+     "category": "transport",
+     "amount": 2000.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Транспорт в две посоки",
+     "academic_year": null,
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://www.svetinaum.net/c/bg/ceni/taksi-za-obuchenie/",
+     "evidence": "|   |  **Еднократно плащане**  |  **На два пъти**  |\n|  **Транспорт в две посоки**  |  2000 Евро  |  2500 Евро  |"
+    },
+    {
+     "category": "transport",
+     "amount": 2500.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Транспорт в две посоки",
+     "academic_year": null,
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://www.svetinaum.net/c/bg/ceni/taksi-za-obuchenie/",
+     "evidence": "|   |  **Еднократно плащане**  |  **На два пъти**  |\n|  **Транспорт в две посоки**  |  2000 Евро  |  2500 Евро  |"
+    },
+    {
+     "category": "tuition",
+     "amount": 4600.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Такса за обучение",
+     "academic_year": "2026-2027 учебна година",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://www.svetinaum.net/c/bg/ceni/taksi-za-obuchenie/",
+     "evidence": "Такси за 2026-2027 учебна година:\n|  **Клас**  |  **Еднократно плащане**  |  **На два пъти**  |  **На осем вноски**  |\n|  Подготвителен  |  4500 Евро  |  4600 Евро  |  5300 Евро  |"
+    },
+    {
+     "category": "tuition",
+     "amount": 5300.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Такса за обучение",
+     "academic_year": "2026-2027 учебна година",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://www.svetinaum.net/c/bg/ceni/taksi-za-obuchenie/",
+     "evidence": "Такси за 2026-2027 учебна година:\n|  **Клас**  |  **Еднократно плащане**  |  **На два пъти**  |  **На осем вноски**  |\n|  Подготвителен  |  4500 Евро  |  4600 Евро  |  5300 Евро  |"
+    },
+    {
+     "category": "tuition",
+     "amount": 4700.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Такса за обучение",
+     "academic_year": "2026-2027 учебна година",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [
+      "period yearly cleared: the evidence does not name it"
+     ],
+     "source_url": "https://www.svetinaum.net/c/bg/ceni/taksi-za-obuchenie/",
+     "evidence": "Такси за 2026-2027 учебна година:\n|  **Клас**  |  **Еднократно плащане**  |  **На два пъти**  |  **На осем вноски**  |\n|  1, 2, 3 клас  |  4700 Евро  |  5000 Евро  |  5400 Евро  |"
+    },
+    {
+     "category": "tuition",
+     "amount": 5000.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Такса за обучение",
+     "academic_year": "2026-2027 учебна година",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://www.svetinaum.net/c/bg/ceni/taksi-za-obuchenie/",
+     "evidence": "Такси за 2026-2027 учебна година:\n|  **Клас**  |  **Еднократно плащане**  |  **На два пъти**  |  **На осем вноски**  |\n|  1, 2, 3 клас  |  4700 Евро  |  5000 Евро  |  5400 Евро  |"
+    },
+    {
+     "category": "tuition",
+     "amount": 5400.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Такса за обучение",
+     "academic_year": "2026-2027 учебна година",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://www.svetinaum.net/c/bg/ceni/taksi-za-obuchenie/",
+     "evidence": "Такси за 2026-2027 учебна година:\n|  **Клас**  |  **Еднократно плащане**  |  **На два пъти**  |  **На осем вноски**  |\n|  1, 2, 3 клас  |  4700 Евро  |  5000 Евро  |  5400 Евро  |"
+    },
+    {
+     "category": "tuition",
+     "amount": 5100.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Такса за обучение",
+     "academic_year": "2026-2027 учебна година",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [
+      "period yearly cleared: the evidence does not name it"
+     ],
+     "source_url": "https://www.svetinaum.net/c/bg/ceni/taksi-za-obuchenie/",
+     "evidence": "Такси за 2026-2027 учебна година:\n|  **Клас**  |  **Еднократно плащане**  |  **На два пъти**  |  **На осем вноски**  |\n|  4, 5, 6, 7 клас  |  5100 Евро  |  5300 Евро  |  5700 Евро  |"
+    },
+    {
+     "category": "tuition",
+     "amount": 5300.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Такса за обучение",
+     "academic_year": "2026-2027 учебна година",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://www.svetinaum.net/c/bg/ceni/taksi-za-obuchenie/",
+     "evidence": "Такси за 2026-2027 учебна година:\n|  **Клас**  |  **Еднократно плащане**  |  **На два пъти**  |  **На осем вноски**  |\n|  4, 5, 6, 7 клас  |  5100 Евро  |  5300 Евро  |  5700 Евро  |"
+    },
+    {
+     "category": "tuition",
+     "amount": 5700.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Такса за обучение",
+     "academic_year": "2026-2027 учебна година",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://www.svetinaum.net/c/bg/ceni/taksi-za-obuchenie/",
+     "evidence": "Такси за 2026-2027 учебна година:\n|  **Клас**  |  **Еднократно плащане**  |  **На два пъти**  |  **На осем вноски**  |\n|  4, 5, 6, 7 клас  |  5100 Евро  |  5300 Евро  |  5700 Евро  |"
+    }
+   ],
+   "reread": {
+    "missed": [
+     "4700",
+     "5100"
+    ],
+    "added": 8
+   },
+   "rows_new": 13,
+   "rows_new_publishable": 13,
+   "rows_old_published": 4,
+   "rows_new_dropped": 1,
+   "regressions": [
+    "loses the ONE_TIME period of TUITION 4500.00"
+   ],
+   "rows_old_kept": 1,
+   "validation": "ok"
+  }
+ ]
+}

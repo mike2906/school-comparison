@@ -1,0 +1,128 @@
+{
+ "apply": true,
+ "pipeline_run_id": "1e3f6066-d7c0-4d30-b5fa-e69f834f5180",
+ "schools": 1,
+ "spent_usd": 0.002517,
+ "stopped": null,
+ "kept_old_rows": [],
+ "outcomes": {
+  "written": 1
+ },
+ "results": [
+  {
+   "school_id": 568,
+   "outcome": "written",
+   "pages": [
+    {
+     "url": "http://doristenedi.com/",
+     "chars": 25583,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "http://doristenedi.com/fee.html",
+     "chars": 4704,
+     "prices": true,
+     "note": null
+    },
+    {
+     "url": "http://doristenedi.com/admission.html",
+     "chars": 5031,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "http://doristenedi.com/documents.html",
+     "chars": 4973,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "http://doristenedi.com/fee_en.html",
+     "chars": 4767,
+     "prices": true,
+     "note": null
+    },
+    {
+     "url": "http://doristenedi.com/admission1.html",
+     "chars": 5394,
+     "prices": true,
+     "note": null
+    },
+    {
+     "url": "http://doristenedi.com/admission2.html",
+     "chars": 5020,
+     "prices": true,
+     "note": null
+    },
+    {
+     "url": "http://doristenedi.com/admission3.html",
+     "chars": 5100,
+     "prices": true,
+     "note": null
+    },
+    {
+     "url": "http://doristenedi.com/admission1_en.html",
+     "chars": 4146,
+     "prices": false,
+     "note": null
+    }
+   ],
+   "fees": [
+    {
+     "category": "tuition",
+     "amount": 6700.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "yearly",
+     "label": "Годишна такса",
+     "academic_year": "2026/2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "http://doristenedi.com/fee.html",
+     "evidence": "|  Етап на обучение   |  Годишна такса за учебната 2026/2027 г.   |  Годишна такса при разсрочено плащане за учебната 2026/2027 г.   |  \n|  VIII - XII клас   |  EUR 6700   |  EUR 7050   |"
+    },
+    {
+     "category": "tuition",
+     "amount": 7050.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "yearly",
+     "label": "Годишна такса при разсрочено плащане",
+     "academic_year": "2026/2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "http://doristenedi.com/fee.html",
+     "evidence": "|  Етап на обучение   |  Годишна такса за учебната 2026/2027 г.   |  Годишна такса при разсрочено плащане за учебната 2026/2027 г.   |  \n|  VIII - XII клас   |  EUR 6700   |  EUR 7050   |"
+    },
+    {
+     "category": "registration",
+     "amount": 60.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "one_time",
+     "label": "таксата за явяване на изпит",
+     "academic_year": null,
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "http://doristenedi.com/admission2.html",
+     "evidence": "В рамките на три работни дни след уговаряне на датата е необходимо да заплатите таксата за явяване на изпит (60 евро) по сметка:"
+    }
+   ],
+   "rows_new": 3,
+   "rows_new_publishable": 3,
+   "rows_old_published": 3,
+   "regressions": [
+    "drops 2 of 2 rows at 8950.00 (TUITION 8950.00, TUITION 8950.00), which the page still shows"
+   ],
+   "rows_old_kept": 2,
+   "validation": "ok"
+  }
+ ]
+}

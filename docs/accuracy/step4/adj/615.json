@@ -1,0 +1,69 @@
+{
+ "school_id": 615,
+ "pages_read": [
+  "https://growers.bg/taksi/"
+ ],
+ "fetch_failed": [],
+ "site_states_no_fees": false,
+ "site_fees": [
+  {
+   "fid": "f1",
+   "category": "tuition",
+   "amount": 500,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": null,
+   "plan": "Целодневна",
+   "year": null,
+   "url": "https://growers.bg/taksi/",
+   "quote": "Целодневна – 500евро Месечна такса"
+  },
+  {
+   "fid": "f2",
+   "category": "food",
+   "amount": 88,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": null,
+   "plan": null,
+   "year": null,
+   "url": "https://growers.bg/taksi/",
+   "quote": "Такса храна - 88евро Месечна такса"
+  }
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "verdict": "correct",
+   "fid": "f1",
+   "reason": "500 EUR full-day monthly",
+   "group_unstated": false
+  },
+  {
+   "oid": "o2",
+   "verdict": "correct",
+   "fid": "f2",
+   "reason": "88 EUR food monthly",
+   "group_unstated": true
+  },
+  {
+   "oid": "o3",
+   "verdict": "duplicate",
+   "fid": "f1",
+   "reason": "same 500 EUR fee as o1",
+   "group_unstated": false
+  },
+  {
+   "oid": "o4",
+   "verdict": "duplicate",
+   "fid": "f2",
+   "reason": "same 88 EUR food fee as o2",
+   "group_unstated": false
+  }
+ ],
+ "notes": "Fees page re-fetched: only 500 EUR full-day and 88 EUR food, both monthly, no year."
+}

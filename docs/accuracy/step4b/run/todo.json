@@ -1,0 +1,70 @@
+{
+ "151": [
+  {
+   "id": 3701,
+   "category": "tuition",
+   "amount": 11860.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "academic_year": "2026/2027",
+   "age_group": "5 - 7 grade",
+   "plan_name": null,
+   "source_url": "https://zlatarskischool.org/admissions/school-fees/",
+   "extractor": "agent",
+   "evidence": "| TUITION FEES FOR THE ACADEMIC 2026/2027 YEAR  |\n| 5 - 7 grade  | € 9690: Students from Bulgarian schools\n€ 11860: International students  |",
+   "published": true
+  },
+  {
+   "id": 3702,
+   "category": "registration",
+   "amount": 200.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "academic_year": "2026/2027",
+   "age_group": null,
+   "plan_name": null,
+   "source_url": "https://zlatarskischool.org/admissions/school-fees/",
+   "extractor": "agent",
+   "evidence": "|    \n  \n | Registration fee (for all candidates): € 200   \nSchool Transport (optional): € 2500 (in two installments)  \nCafeteria Meals (optional): € 345 (per quarter)  |",
+   "published": true
+  },
+  {
+   "id": 3704,
+   "category": "food",
+   "amount": 345.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "quarter",
+   "academic_year": "2026/2027",
+   "age_group": null,
+   "plan_name": null,
+   "source_url": "https://zlatarskischool.org/admissions/school-fees/",
+   "extractor": "agent",
+   "evidence": "|    \n  \n | Registration fee (for all candidates): € 200   \nSchool Transport (optional): € 2500 (in two installments)  \nCafeteria Meals (optional): € 345 (per quarter)  |",
+   "published": true
+  }
+ ],
+ "520": [
+  {
+   "id": 3719,
+   "category": "materials",
+   "amount": 595.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "academic_year": "2026-2027",
+   "age_group": null,
+   "plan_name": null,
+   "source_url": "https://school.fusion.bg/priem/grafik-i-tseni/",
+   "extractor": "agent",
+   "evidence": "## Учебници и всички необходими консумативи – €595",
+   "published": true
+  }
+ ]
+}

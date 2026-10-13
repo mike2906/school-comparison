@@ -1,0 +1,87 @@
+{
+ "apply": true,
+ "pipeline_run_id": "42009b06-abf3-4daa-b1de-75645f792a68",
+ "schools": 1,
+ "spent_usd": 0.000385,
+ "stopped": null,
+ "kept_old_rows": [],
+ "outcomes": {
+  "written": 1
+ },
+ "results": [
+  {
+   "school_id": 615,
+   "outcome": "written",
+   "pages": [
+    {
+     "url": "https://growers.bg/",
+     "chars": 4975,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://growers.bg/taksi/",
+     "chars": 3387,
+     "prices": true,
+     "note": null
+    },
+    {
+     "url": "https://growers.bg/priem/",
+     "chars": 3618,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://growers.bg/uslugi/",
+     "chars": 4856,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://growers.bg/en/fees/",
+     "chars": 3286,
+     "prices": true,
+     "note": null
+    }
+   ],
+   "fees": [
+    {
+     "category": "tuition",
+     "amount": 500.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "monthly",
+     "label": "Целодневна",
+     "academic_year": null,
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://growers.bg/taksi/",
+     "evidence": "#### Целодневна – 500евро\nМесечна такса"
+    },
+    {
+     "category": "food",
+     "amount": 88.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "monthly",
+     "label": "Такса храна",
+     "academic_year": null,
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://growers.bg/taksi/",
+     "evidence": "#### Такса храна - 88евро\nМесечна такса"
+    }
+   ],
+   "rows_new": 2,
+   "rows_new_publishable": 2,
+   "rows_old_published": 2,
+   "regressions": [],
+   "rows_old_kept": 0,
+   "validation": "ok"
+  }
+ ]
+}

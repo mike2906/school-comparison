@@ -1,0 +1,29 @@
+{
+ "apply": true,
+ "pipeline_run_id": "aa8643b6-404b-45df-96ff-9bd04e1d9abd",
+ "schools": 1,
+ "spent_usd": 0.0,
+ "stopped": null,
+ "kept_old_rows": [
+  339
+ ],
+ "outcomes": {
+  "kept_old_rows": 1
+ },
+ "results": [
+  {
+   "school_id": 339,
+   "outcome": "kept_old_rows",
+   "pages": [
+    {
+     "url": "https://edisonschool.eu/",
+     "chars": 26274,
+     "prices": false,
+     "note": null
+    }
+   ],
+   "fees": [],
+   "reason": "no page showing prices"
+  }
+ ]
+}
