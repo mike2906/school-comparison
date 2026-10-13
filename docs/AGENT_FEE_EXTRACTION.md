@@ -150,8 +150,9 @@ it comes after steps 1 to 5 prove the runs are reliable.
    held the agent finds 42 %. Next step waits on Mike.
    Re-run 2026-10-13 after #286 and #287 on the 24 untouched schools left
    (`docs/accuracy/step4_check.md`): **go**. Wrong 12 % after every gate against 18 % today,
-   68 % of site fees found against 40 %. The remaining wrong rows are old rows kept from a
-   previous year or a sibling school, and one_time filled in by Stage 6.
+   68 % of site fees found against 40 %. The remaining wrong rows are last year's fees kept as
+   history, old rows the rule-6 keep holds (a sibling's, a number still on the page), and old
+   rows an undated read did not replace (fixed in #289).
 4. **Delete the unused extraction code** that step 3 leaves behind (`extraction/price_*.py`,
    `fee_lines.py` and whatever only they import). Validation's `price_evidence.py`,
    `price_carry_over.py`, `fee_pages.py` and `fee_image_reader.py` stay unless nothing uses

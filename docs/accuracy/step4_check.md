@@ -50,13 +50,14 @@ kept. The bar passes in every view.
 
 ## What is still wrong
 
-- **Old rows kept from a previous year (520, 4 rows).** The read missed the preschool tuition,
-  so rule 6 kept the old rows at those amounts. Three of them are 2025-2026 fees the site has
-  since replaced. The fourth, 70 EUR, is on no current page. Rule 6 only asks whether the page
-  still shows the number, and 2025-26 and 2026-27 tables share a page.
-- **One-time on a single payment (170, 2 rows).** "Еднократно плащане" for a year's tuition
-  or transport means yearly. The agent read both with no period; Stage 6 filled one_time into the
-  new 2000 EUR transport row, and the old 4500 EUR row with the same error was kept.
+- **Last year's fees (520, 3 rows).** The 2025-2026 rows are not replaced by a 2026-2027 read:
+  older years stay as fee history, and the API publishes them marked as a previous year. The
+  frozen rules count them stale. A fourth old row, 70 EUR, was kept by rule 6 because the number
+  is still on the page, though no current fee is 70 EUR.
+- **Old rows left beside an undated read (170, 2 rows).** Rows were replaced by year, so the
+  agent's undated read left the 4 old 2026-2027 rows in place, one of them a one_time tuition
+  row. Stage 6 also filled one_time into the new 2000 EUR transport row ("Еднократно плащане",
+  a year of transport paid at once). Both fixed in #289.
 - **A sibling's fee kept (526, 1 row).** An old 8540 EUR row belongs to the sister primary
   school. It is kept because the page still shows the number.
 - **The agent's own errors (158, 4 rows):** fees from the sister nursery's price list on the
