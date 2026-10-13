@@ -226,17 +226,18 @@ def _page_for(fee: AgentFee, pages: list[PageRead]) -> Optional[PageRead]:
     return by_key.get(page_key(fee.source_url)) or (pages[0] if len(pages) == 1 else None)
 
 
-def _new_source_page(school: School, page: PageRead, page_id: int) -> SourcePage:
+def _new_source_page(school: School, page: PageRead, stored: Optional[SourcePage], new_id: int) -> SourcePage:
+    """A stand-in for the page; a stored page keeps its id and its validity verdict."""
     now = text_values._utcnow_naive()
     return SourcePage(
-        id=page_id,
+        id=stored.id if stored else new_id,
         school_id=school.id,
         scrape_type=ScrapeType.WEBSITE,
         source_url=page.url,
         content_hash=hashlib.sha256(page.text.encode()).hexdigest(),
         page_category="pricing" if page.prices else None,
         raw_markdown=page.text,
-        is_valid=True,
+        is_valid=stored.is_valid if stored else True,  # an unsettled verdict keeps its rows withheld
         last_scraped_at=now,
         last_changed_at=now,
         scrape_count=1,
@@ -369,9 +370,7 @@ async def run_school(
         report["reason"] = f"page ruled invalid by an earlier stage: {ruled_out[0]}"
         return report
     source_pages = {
-        page.url: _new_source_page(
-            school, page, stored[page_key(page.url)].id if page_key(page.url) in stored else -(index + 1)
-        )
+        page.url: _new_source_page(school, page, stored.get(page_key(page.url)), -(index + 1))
         for index, page in enumerate(pages)
         if page.text.strip()
     }
@@ -426,8 +425,14 @@ async def run_school(
     school.attributes = prepare_validation_rollover(school.attributes)
     await db.commit()
     report["outcome"] = "written"
-    validation = await validate_school_data(db, school.id, school.country_code, run_spot_check=False)
-    report["validation"] = validation.get("status")
+    try:  # the rows are written; if Stage 6 breaks they stay withheld until it next runs
+        validation = await validate_school_data(db, school.id, school.country_code, run_spot_check=False)
+        report["validation"] = validation.get("status")
+    except Exception as exc:
+        logger.exception("Stage 6 failed after fees-agent wrote school %s", school.id)
+        if db.in_transaction():
+            await db.rollback()
+        report["validation"] = f"failed: {str(exc)[:200]}"
     return report
 
 

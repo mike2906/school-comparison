@@ -464,6 +464,18 @@ async def test_page_another_stage_ruled_invalid_keeps_the_old_rows(db_session, p
     assert page.is_valid is False
 
 
+async def test_page_with_an_unsettled_verdict_keeps_the_published_rows(db_session, pages, frozen_today):
+    school = await _school(db_session)
+    await _old_rows(db_session, school, "2026/2027", [700])
+    page = (await db_session.execute(select(SourcePage))).scalar_one()
+    old_rows = await _rows(db_session, school)
+    page.is_valid = None  # URL validation was ambiguous; rows on it are withheld
+    await db_session.commit()
+    report = await fees_agent.run_school(db_session, school, find=_find(pages), read=_read(FEES_STAGE), apply=True)
+    assert report["outcome"] == "kept_old_rows", report
+    assert [r.id for r in await _rows(db_session, school)] == [r.id for r in old_rows]
+
+
 async def test_stored_page_spelled_differently_is_updated_in_place(db_session, pages, frozen_today):
     school = await _school(db_session)
     await _old_rows(db_session, school, "2026/2027", [700], page_url=URL.rstrip("/"))
