@@ -1,3 +1,5 @@
 run   rows 48  wrong 6/47 (13%)  dup 0  unresolved 1  found 41/77 (53%)  without 170: 38/63 (60%)
 run2  rows 51  wrong 6/50 (12%)  dup 0  unresolved 1  found 44/77 (57%)  without 170: 38/63 (60%)
 run3  rows 55  wrong 6/52 (12%)  dup 2  unresolved 1  found 46/77 (60%)  without 170: 40/63 (63%)
+../step4d/run1 rows 60  wrong 6/59 (10%)  dup 0  unresolved 1  found 53/77 (69%)  without 170: 41/63 (65%)
+../step4d/run2 rows 64  wrong 6/61 (10%)  dup 2  unresolved 1  found 55/77 (71%)  without 170: 43/63 (68%)

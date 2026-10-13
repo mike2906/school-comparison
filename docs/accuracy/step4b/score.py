@@ -18,6 +18,20 @@ HAND = {  # (school, category, amount, label) -> (verdict, fid)
     (170, "transport", 2000.0, "Еднократно плащане"): ("missing_period", "f13"),
     (170, "transport", 2500.0, "На два пъти"): ("correct", "f14"),
     (568, "tuition", 9300.0, "Разсрочено плащане"): ("correct", "f2"),
+    # step 4d (#290's second read)
+    (568, "tuition", 9300.0, "разсрочено плащане"): ("correct", "f2"),
+    (170, "tuition", 5000.0, "На два пъти"): ("correct", "f5"),
+    (170, "tuition", 5400.0, "На осем вноски"): ("correct", "f6"),
+    (170, "tuition", 5300.0, "На два пъти"): ("correct", "f8"),
+    (170, "tuition", 5300.0, "На осем вноски"): ("correct", "f3"),
+    (170, "tuition", 5700.0, "На осем вноски"): ("correct", "f9"),
+    (170, "tuition", 4600.0, "На два пъти"): ("correct", "f2"),
+    (170, "tuition", 5100.0, "Еднократно плащане"): ("missing_period", "f7"),
+    (170, "tuition", 4700.0, "Еднократно плащане"): ("missing_period", "f4"),
+    (520, "materials", 595.0, "1, 2, 3, 4, 5, 6 и 7 клас"): ("correct", "f9"),
+    (520, "tuition", 7300.0, "За 1 вноска"): ("missing_period", "f1"),
+    (520, "tuition", 3850.0, "На 2 вноски"): ("correct", "f2"),
+    (520, "tuition", 1950.0, "На 4 вноски"): ("correct", "f3"),
 }
 def own(sid, r, fid):
     f = next(f for f in site[sid] if f["fid"] == fid)

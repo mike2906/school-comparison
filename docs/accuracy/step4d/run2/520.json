@@ -1,0 +1,398 @@
+{
+ "apply": true,
+ "pipeline_run_id": "b7317560-df32-47ec-8a57-4e2c3b3f5437",
+ "schools": 1,
+ "spent_usd": 0.004742,
+ "stopped": null,
+ "kept_old_rows": [],
+ "outcomes": {
+  "written": 1
+ },
+ "results": [
+  {
+   "school_id": 520,
+   "outcome": "written",
+   "pages": [
+    {
+     "url": "https://school.fusion.bg/",
+     "chars": 9567,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://school.fusion.bg/priem/grafik-i-tseni/",
+     "chars": 6357,
+     "prices": true,
+     "note": null
+    },
+    {
+     "url": "https://school.fusion.bg/za-roditeli/",
+     "chars": 7313,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://school.fusion.bg/dokumenti/",
+     "chars": 8779,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://school.fusion.bg/wp-content/uploads/sites/6/2026/09/PDU_CHOU-2026-2027_.pdf",
+     "chars": 0,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://school.fusion.bg/wp-content/uploads/sites/6/2026/08/Usloviya-i-red-za-bezplatno-obuchenie_CHOU_2026-2027.pdf",
+     "chars": 2697,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://school.fusion.bg/priem/",
+     "chars": 6074,
+     "prices": false,
+     "note": null
+    }
+   ],
+   "fees": [
+    {
+     "category": "tuition",
+     "amount": 7900.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Стандартна такса – обучение",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [
+      "period yearly cleared: the evidence does not name it"
+     ],
+     "source_url": "https://school.fusion.bg/priem/grafik-i-tseni/",
+     "evidence": "## Такси „Обучение“ за 1, 2, 3, 4, 5, 6 и 7 клас – учебна 2026-2027 година\n###  **Стандартна****такса:**\n**За 1 вноска: €7900**"
+    },
+    {
+     "category": "tuition",
+     "amount": 4150.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Стандартна такса – обучение",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://school.fusion.bg/priem/grafik-i-tseni/",
+     "evidence": "## Такси „Обучение“ за 1, 2, 3, 4, 5, 6 и 7 клас – учебна 2026-2027 година\n###  **Стандартна****такса:**\nНа 2 вноски: 2 вноски по €4150"
+    },
+    {
+     "category": "tuition",
+     "amount": 2113.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Стандартна такса – обучение",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://school.fusion.bg/priem/grafik-i-tseni/",
+     "evidence": "## Такси „Обучение“ за 1, 2, 3, 4, 5, 6 и 7 клас – учебна 2026-2027 година\n###  **Стандартна****такса:**\nНа 4 вноски: 4 вноски по €2113"
+    },
+    {
+     "category": "tuition",
+     "amount": 966.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Стандартна такса – обучение",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://school.fusion.bg/priem/grafik-i-tseni/",
+     "evidence": "## Такси „Обучение“ за 1, 2, 3, 4, 5, 6 и 7 клас – учебна 2026-2027 година\n###  **Стандартна****такса:**\nНа 9 вноски: 9 вноски по €966"
+    },
+    {
+     "category": "materials",
+     "amount": 595.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Учебници и всички необходими консумативи",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://school.fusion.bg/priem/grafik-i-tseni/",
+     "evidence": "## Учебници и всички необходими консумативи – €595"
+    },
+    {
+     "category": "tuition",
+     "amount": 7300.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Такси „Обучение“ – Стандартна такса",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [
+      "period yearly cleared: the evidence does not name it"
+     ],
+     "source_url": "https://school.fusion.bg/priem/grafik-i-tseni/",
+     "evidence": "## Такси „Обучение“ за Предучилищна – учебна 2026-2027 година\n### **Стандартна такса:**\n**За 1 вноска: €7300**"
+    },
+    {
+     "category": "tuition",
+     "amount": 3850.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Такси „Обучение“ – Стандартна такса",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://school.fusion.bg/priem/grafik-i-tseni/",
+     "evidence": "## Такси „Обучение“ за Предучилищна – учебна 2026-2027 година\n### **Стандартна такса:**\nНа 2 вноски: 2 вноски по €3850"
+    },
+    {
+     "category": "tuition",
+     "amount": 3850.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Такси „Обучение“ – Стандартна такса",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://school.fusion.bg/priem/grafik-i-tseni/",
+     "evidence": "## Такси „Обучение“ за Предучилищна – учебна 2026-2027 година\n### **Стандартна такса:**\nНа 2 вноски: 2 вноски по €3850"
+    },
+    {
+     "category": "tuition",
+     "amount": 1950.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Такси „Обучение“ – Стандартна такса",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://school.fusion.bg/priem/grafik-i-tseni/",
+     "evidence": "## Такси „Обучение“ за Предучилищна – учебна 2026-2027 година\n### **Стандартна такса:**\nНа 4 вноски: 4 вноски по €1950"
+    },
+    {
+     "category": "tuition",
+     "amount": 1950.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Такси „Обучение“ – Стандартна такса",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://school.fusion.bg/priem/grafik-i-tseni/",
+     "evidence": "## Такси „Обучение“ за Предучилищна – учебна 2026-2027 година\n### **Стандартна такса:**\nНа 4 вноски: 4 вноски по €1950"
+    },
+    {
+     "category": "tuition",
+     "amount": 1950.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Такси „Обучение“ – Стандартна такса",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://school.fusion.bg/priem/grafik-i-tseni/",
+     "evidence": "## Такси „Обучение“ за Предучилищна – учебна 2026-2027 година\n### **Стандартна такса:**\nНа 4 вноски: 4 вноски по €1950"
+    },
+    {
+     "category": "tuition",
+     "amount": 1950.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Такси „Обучение“ – Стандартна такса",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://school.fusion.bg/priem/grafik-i-tseni/",
+     "evidence": "## Такси „Обучение“ за Предучилищна – учебна 2026-2027 година\n### **Стандартна такса:**\nНа 4 вноски: 4 вноски по €1950"
+    },
+    {
+     "category": "tuition",
+     "amount": 894.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Такси „Обучение“ – Стандартна такса",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://school.fusion.bg/priem/grafik-i-tseni/",
+     "evidence": "## Такси „Обучение“ за Предучилищна – учебна 2026-2027 година\n### **Стандартна такса:**\nНа 9 вноски: 9 вноски по €894"
+    },
+    {
+     "category": "tuition",
+     "amount": 894.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Такси „Обучение“ – Стандартна такса",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://school.fusion.bg/priem/grafik-i-tseni/",
+     "evidence": "## Такси „Обучение“ за Предучилищна – учебна 2026-2027 година\n### **Стандартна такса:**\nНа 9 вноски: 9 вноски по €894"
+    },
+    {
+     "category": "tuition",
+     "amount": 894.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Такси „Обучение“ – Стандартна такса",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://school.fusion.bg/priem/grafik-i-tseni/",
+     "evidence": "## Такси „Обучение“ за Предучилищна – учебна 2026-2027 година\n### **Стандартна такса:**\nНа 9 вноски: 9 вноски по €894"
+    },
+    {
+     "category": "tuition",
+     "amount": 894.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Такси „Обучение“ – Стандартна такса",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://school.fusion.bg/priem/grafik-i-tseni/",
+     "evidence": "## Такси „Обучение“ за Предучилищна – учебна 2026-2027 година\n### **Стандартна такса:**\nНа 9 вноски: 9 вноски по €894"
+    },
+    {
+     "category": "tuition",
+     "amount": 894.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Такси „Обучение“ – Стандартна такса",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://school.fusion.bg/priem/grafik-i-tseni/",
+     "evidence": "## Такси „Обучение“ за Предучилищна – учебна 2026-2027 година\n### **Стандартна такса:**\nНа 9 вноски: 9 вноски по €894"
+    },
+    {
+     "category": "tuition",
+     "amount": 894.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Такси „Обучение“ – Стандартна такса",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://school.fusion.bg/priem/grafik-i-tseni/",
+     "evidence": "## Такси „Обучение“ за Предучилищна – учебна 2026-2027 година\n### **Стандартна такса:**\nНа 9 вноски: 9 вноски по €894"
+    },
+    {
+     "category": "tuition",
+     "amount": 894.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Такси „Обучение“ – Стандартна такса",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://school.fusion.bg/priem/grafik-i-tseni/",
+     "evidence": "## Такси „Обучение“ за Предучилищна – учебна 2026-2027 година\n### **Стандартна такса:**\nНа 9 вноски: 9 вноски по €894"
+    },
+    {
+     "category": "tuition",
+     "amount": 894.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Такси „Обучение“ – Стандартна такса",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://school.fusion.bg/priem/grafik-i-tseni/",
+     "evidence": "## Такси „Обучение“ за Предучилищна – учебна 2026-2027 година\n### **Стандартна такса:**\nНа 9 вноски: 9 вноски по €894"
+    },
+    {
+     "category": "tuition",
+     "amount": 894.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Такси „Обучение“ – Стандартна такса",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://school.fusion.bg/priem/grafik-i-tseni/",
+     "evidence": "## Такси „Обучение“ за Предучилищна – учебна 2026-2027 година\n### **Стандартна такса:**\nНа 9 вноски: 9 вноски по €894"
+    }
+   ],
+   "reread": {
+    "missed": [
+     "7300"
+    ],
+    "added": 16
+   },
+   "rows_new": 9,
+   "rows_new_publishable": 9,
+   "rows_old_published": 5,
+   "rows_new_dropped": 0,
+   "regressions": [
+    "drops REGISTRATION 90.00, which the page still shows",
+    "drops REGISTRATION 70.00, which the page still shows"
+   ],
+   "rows_old_kept": 2,
+   "validation": "ok"
+  }
+ ]
+}

@@ -92,3 +92,21 @@ several points and one run cannot tell a small fix from noise.
 
 These 24 schools have now been looked at and tuned on (the #289 fixes, and any fix for 170's
 read), so they are no longer a fair final test. All 44 untouched Sofia schools are used up.
+
+## With the second read (#290, step 4d)
+
+#290 reads a page again when it still shows published amounts the first read left out, and
+adds the fees at amounts the first read did not give. Two runs of the 24 schools on its head
+(b8da715), each on a fresh copy of the launch DB ($0.027 and $0.026). Output is in `step4d/`;
+new rows were judged by hand against the same key (`step4b/score.py`).
+
+| After every gate | Merged main (3 runs) | #290 run 1 | #290 run 2 |
+|---|---|---|---|
+| Wrong | 12–13 % | 10 % | 10 % |
+| Found (of 77) | 53–60 % | 69 % | 71 % |
+| Found, without 170 (of 63) | 60–63 % | 65 % | 68 % |
+
+The second read fired at 170 (4700, 5100 missed; 8 fees added in both runs), 520 (7300;
+the preschool table added in run 2 only), 526 (8540, the sibling's fee; nothing added) and 568
+(once). It added no wrong rows. 170 is the school the change was designed around, and all 24
+schools have been tuned on, so this is a regression check, not a fresh validation.

@@ -1,0 +1,53 @@
+{
+ "apply": true,
+ "pipeline_run_id": "fc066f11-48b1-4dfd-a33f-37c52d1cd01e",
+ "schools": 1,
+ "spent_usd": 0.000115,
+ "stopped": null,
+ "kept_old_rows": [
+  545
+ ],
+ "outcomes": {
+  "kept_old_rows": 1
+ },
+ "results": [
+  {
+   "school_id": 545,
+   "outcome": "kept_old_rows",
+   "pages": [
+    {
+     "url": "https://gradina-rai.com/",
+     "chars": 11103,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://gradina-rai.com/priem-na-deca",
+     "chars": 7124,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://gradina-rai.com/obuchenie-za-deca",
+     "chars": 9019,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://app.gradina-rai.com/login",
+     "chars": 221,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://gradina-rai.com/normativniadministrativni-dokumenti",
+     "chars": 18843,
+     "prices": false,
+     "note": null
+    }
+   ],
+   "fees": [],
+   "reason": "no page showing prices"
+  }
+ ]
+}
