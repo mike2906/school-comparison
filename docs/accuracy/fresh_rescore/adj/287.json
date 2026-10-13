@@ -1,0 +1,62 @@
+{
+ "school_id": 287,
+ "pages_read": [
+  "https://www.wonderhouse-bg.com/taksi-i-zapisvania/"
+ ],
+ "fetch_failed": [],
+ "site_states_no_fees": false,
+ "site_fees": [
+  {
+   "fid": "f1",
+   "category": "tuition",
+   "amount": 580,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": "Деца до 3 години",
+   "plan": null,
+   "year": "2026/2027 (page header: open intake)",
+   "url": "https://www.wonderhouse-bg.com/taksi-i-zapisvania/",
+   "quote": "Деца до 3 години 580евро на месец"
+  },
+  {
+   "fid": "f2",
+   "category": "tuition",
+   "amount": 580,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": "Деца НАД 3 години",
+   "plan": null,
+   "year": "2026/2027 (page header: open intake)",
+   "url": "https://www.wonderhouse-bg.com/taksi-i-zapisvania/",
+   "quote": "Деца НАД 3 години 580евро на месец"
+  }
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "verdict": "correct",
+   "fid": "f2",
+   "reason": "580 EUR monthly for children over 3 matches table",
+   "group_unstated": false
+  },
+  {
+   "oid": "o2",
+   "verdict": "correct",
+   "fid": "f1",
+   "reason": "580 EUR monthly for children under 3 matches table",
+   "group_unstated": false
+  },
+  {
+   "oid": "o3",
+   "verdict": "duplicate",
+   "fid": "f1",
+   "reason": "Same under-3 fee as o2",
+   "group_unstated": false
+  }
+ ],
+ "notes": "Both age groups print the same 580 EUR monthly fee; fee includes food. Sibling discounts 10%/30%, no amounts."
+}

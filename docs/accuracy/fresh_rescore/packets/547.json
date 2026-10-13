@@ -1,0 +1,50 @@
+{
+ "school_id": 547,
+ "name": "ЧАСТНА ДЕТСКА ГРАДИНА МЕЧО ПУХ",
+ "website": "https://mechopuh.bg/",
+ "pages_the_crawler_visited": [
+  "https://mechopuh.bg/",
+  "https://mechopuh.bg/obuchenie/",
+  "https://mechopuh.bg/iasla/",
+  "https://mechopuh.bg/priem/",
+  "https://mechopuh.bg/priem/DogovorMechoPuh.pdf"
+ ],
+ "pages_where_an_earlier_reader_found_fees": [
+  "https://mechopuh.bg/priem/DogovorMechoPuh.pdf"
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "category": "tuition",
+   "amount": 600.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "целодневен престой",
+   "note": "Целодневното посещение е отбелязано в договора."
+  },
+  {
+   "oid": "o2",
+   "category": "tuition",
+   "amount": 550.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "полудневен престой",
+   "note": ""
+  },
+  {
+   "oid": "o3",
+   "category": "registration",
+   "amount": null,
+   "amount_min": 550.0,
+   "amount_max": 600.0,
+   "currency": "EUR",
+   "period": "one_time",
+   "label": "еднократна такса за записване",
+   "note": "Равна на една месечна такса за обучение."
+  }
+ ]
+}

@@ -1,0 +1,91 @@
+{
+ "school_id": 351,
+ "pages_read": [
+  "https://slanchogledi.bg/",
+  "https://slanchogledi.bg/admission/"
+ ],
+ "fetch_failed": [],
+ "site_states_no_fees": false,
+ "site_fees": [
+  {
+   "fid": "f1",
+   "category": "tuition",
+   "amount": 800,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": null,
+   "plan": null,
+   "year": "септември – юли",
+   "url": "https://slanchogledi.bg/admission/",
+   "quote": "Месечната такса е в размер на 800€ за месеците от септември до юли"
+  },
+  {
+   "fid": "f2",
+   "category": "tuition",
+   "amount": 600,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": null,
+   "plan": null,
+   "year": "16-31 август",
+   "url": "https://slanchogledi.bg/admission/",
+   "quote": "Месечната такса е в размер на ... 600€ за периода 16-31 август"
+  },
+  {
+   "fid": "f3",
+   "category": "registration",
+   "amount": 600,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "group": null,
+   "plan": "Първоначален Депозит",
+   "year": null,
+   "url": "https://slanchogledi.bg/admission/",
+   "quote": "Първоначален Депозит в размер на 600€ се заплаща при подписване на Договора"
+  }
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "verdict": "correct",
+   "fid": "f1",
+   "reason": "800 EUR monthly Sept-July",
+   "group_unstated": false
+  },
+  {
+   "oid": "o2",
+   "verdict": "missing_period",
+   "fid": "f3",
+   "reason": "600 EUR deposit paid once at contract signing; row period null",
+   "group_unstated": false
+  },
+  {
+   "oid": "o3",
+   "verdict": "missing_period",
+   "fid": "f2",
+   "reason": "600 EUR monthly fee for 16-31 August; site calls it the monthly fee, row period null",
+   "group_unstated": false
+  },
+  {
+   "oid": "o4",
+   "verdict": "duplicate",
+   "fid": "f1",
+   "reason": "Same as o1",
+   "group_unstated": false
+  },
+  {
+   "oid": "o5",
+   "verdict": "duplicate",
+   "fid": "f3",
+   "reason": "Same deposit as o2",
+   "group_unstated": false
+  }
+ ],
+ "notes": "3% discount for annual lump-sum payment; no discounted amount printed. f2 period debatable (half-month period, called 'месечната такса'). Fee includes food, materials, English."
+}

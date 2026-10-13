@@ -1,0 +1,118 @@
+{
+ "school_id": 530,
+ "pages_read": [
+  "https://detski-sviat.info/ceni-i-taksi/"
+ ],
+ "fetch_failed": [],
+ "site_states_no_fees": false,
+ "site_fees": [
+  {
+   "fid": "f1",
+   "category": "tuition",
+   "amount": 750,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": "Целодневен престой",
+   "plan": null,
+   "year": null,
+   "url": "https://detski-sviat.info/ceni-i-taksi/",
+   "quote": "Целодневен престой Месечна такса € 750"
+  },
+  {
+   "fid": "f2",
+   "category": "tuition",
+   "amount": 550,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": "Полудневен престой с обяд",
+   "plan": null,
+   "year": null,
+   "url": "https://detski-sviat.info/ceni-i-taksi/",
+   "quote": "Полудневен престой с обяд Месечна такса € 550"
+  },
+  {
+   "fid": "f3",
+   "category": "registration",
+   "amount": 200,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "group": "ново дете",
+   "plan": null,
+   "year": null,
+   "url": "https://detski-sviat.info/ceni-i-taksi/",
+   "quote": "Заплаща се Депозит за запазване на място – € 200 за ново дете."
+  },
+  {
+   "fid": "f4",
+   "category": "registration",
+   "amount": 150,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "group": "следващата учебна година",
+   "plan": null,
+   "year": null,
+   "url": "https://detski-sviat.info/ceni-i-taksi/",
+   "quote": "Депозит за запазване на място за следващата учебна година – € 150, които се приспадат от таксата за месец септември"
+  }
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "verdict": "correct",
+   "fid": "f1",
+   "reason": "750 EUR monthly tuition; no label",
+   "group_unstated": true
+  },
+  {
+   "oid": "o2",
+   "verdict": "correct",
+   "fid": "f3",
+   "reason": "200 EUR deposit for new child, one_time; no label",
+   "group_unstated": true
+  },
+  {
+   "oid": "o3",
+   "verdict": "duplicate",
+   "fid": "f1",
+   "reason": "Same 750 monthly fee as earlier o1 (equally correct)",
+   "group_unstated": false
+  },
+  {
+   "oid": "o4",
+   "verdict": "correct",
+   "fid": "f2",
+   "reason": "550 EUR monthly half-day with lunch",
+   "group_unstated": false
+  },
+  {
+   "oid": "o5",
+   "verdict": "missing_period",
+   "fid": "f4",
+   "reason": "150 EUR next-year place deposit; deposit is one_time per rules, row null",
+   "group_unstated": false
+  },
+  {
+   "oid": "o6",
+   "verdict": "correct",
+   "fid": "f4",
+   "reason": "150 EUR deposit one_time; no label",
+   "group_unstated": true
+  },
+  {
+   "oid": "o7",
+   "verdict": "duplicate",
+   "fid": "f3",
+   "reason": "Same 200 EUR deposit as o2, which has the period",
+   "group_unstated": false
+  }
+ ],
+ "notes": "No academic year stated. 150 deposit is paid each spring for the following year (could be read as yearly); classified one_time per rules' deposit rule. Extra activities (speech therapy, folk dance, sports, English, maths) charged monthly but no amounts. 5% discount for full-year prepayment, 10% sibling discount."
+}

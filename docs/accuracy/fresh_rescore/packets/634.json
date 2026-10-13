@@ -1,0 +1,118 @@
+{
+ "school_id": 634,
+ "name": "ЧАСТНА НЕМСКА ДЕТСКА ГРАДИНА УВЕКИНД",
+ "website": "https://uwekind.com/",
+ "pages_the_crawler_visited": [
+  "https://uwekind.com/",
+  "https://uwekind.com/admission/fees/",
+  "https://uwekind.com/%d1%84%d0%b8%d0%bd%d0%b0%d0%bd%d1%81%d0%b8%d1%80%d0%b0%d0%bd%d0%b5/",
+  "https://uwekind.com/en/admission/academic-fees/",
+  "https://uwekind.com/admission/procedure/",
+  "https://uwekind.com/admission/faq/",
+  "https://uwekind.com/en/admission/application-procedure/"
+ ],
+ "pages_where_an_earlier_reader_found_fees": [
+  "https://uwekind.com/admission/fees/"
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "category": "transport",
+   "amount": 1950.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "Транспорт – в една посока",
+   "note": "За децата от детската градина; сумата е for one school year"
+  },
+  {
+   "oid": "o2",
+   "category": "tuition",
+   "amount": 7400.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "Такса „Образователни услуги“ (Детска градина)",
+   "note": "При разсрочено плащане на 10 вноски"
+  },
+  {
+   "oid": "o3",
+   "category": "registration",
+   "amount": 500.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "label": "Административна такса за обработка на документи при постъпване",
+   "note": "Само за новопостъпили деца"
+  },
+  {
+   "oid": "o4",
+   "category": "food",
+   "amount": 1410.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "Храна обяд, сутрешна и следобедна закуска (Детска градина и предучилищен клас)",
+   "note": "Задължителна услуга; amount is for kindergarten and preschool class"
+  },
+  {
+   "oid": "o5",
+   "category": "transport",
+   "amount": 2800.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "Транспорт – в две посоки",
+   "note": "За децата от детската градина; сумата е for one school year"
+  },
+  {
+   "oid": "o6",
+   "category": "materials",
+   "amount": 450.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "Такса „Образователни ресурси и учебни практики“ (Детска градина)",
+   "note": "Задължителна годишна такса"
+  },
+  {
+   "oid": "o7",
+   "category": "tuition",
+   "amount": 6820.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "Такса „Образователни услуги“ (Детска градина)",
+   "note": ""
+  },
+  {
+   "oid": "o8",
+   "category": "tuition",
+   "amount": 7000.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "Такса „Образователни услуги“ (Детска градина)",
+   "note": "При разсрочено плащане на 2 вноски"
+  },
+  {
+   "oid": "o9",
+   "category": "registration",
+   "amount": 100.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "label": "Такса кандидатстване (детска градина)",
+   "note": "Само за новопостъпили деца; невъзстановима"
+  }
+ ]
+}

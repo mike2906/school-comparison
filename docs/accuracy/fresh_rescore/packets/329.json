@@ -1,0 +1,105 @@
+{
+ "school_id": 329,
+ "name": "Първа частна английска гимназия Уилям Шекспир",
+ "website": "https://www.fpels.ws/",
+ "pages_the_crawler_visited": [
+  "https://www.fpels.ws/",
+  "https://www.fpels.ws/prices/",
+  "https://www.fpels.ws/profiles/digital-arts-and-entrepreneurship/",
+  "https://www.fpels.ws/clubs/teatralna-akademia-scenichen-angliiski-ezik/",
+  "https://www.fpels.ws/apply/"
+ ],
+ "pages_where_an_earlier_reader_found_fees": [
+  "https://www.fpels.ws/prices/"
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "category": "tuition",
+   "amount": "6600.00",
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "Стандартна такса",
+   "note": ""
+  },
+  {
+   "oid": "o2",
+   "category": "tuition",
+   "amount": 7200.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "Плащане с 4 вноски",
+   "note": "Учебна 2026–2027 г."
+  },
+  {
+   "oid": "o3",
+   "category": "registration",
+   "amount": "70.00",
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "",
+   "note": ""
+  },
+  {
+   "oid": "o4",
+   "category": "extracurricular",
+   "amount": "123.00",
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "",
+   "note": ""
+  },
+  {
+   "oid": "o5",
+   "category": "registration",
+   "amount": 70.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "Такса кандидатстване",
+   "note": ""
+  },
+  {
+   "oid": "o6",
+   "category": "tuition",
+   "amount": 6900.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "Плащане с 2 вноски",
+   "note": "Учебна 2026–2027 г."
+  },
+  {
+   "oid": "o7",
+   "category": "extracurricular",
+   "amount": 123.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "Театрална академия – сценичен английски език",
+   "note": "Курсът е януари–септември 2026."
+  },
+  {
+   "oid": "o8",
+   "category": "tuition",
+   "amount": 6600.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "Стандартна такса",
+   "note": "Учебна 2026–2027 г.; плащане с 1 вноска."
+  }
+ ]
+}

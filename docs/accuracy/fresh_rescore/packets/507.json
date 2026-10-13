@@ -1,0 +1,58 @@
+{
+ "school_id": 507,
+ "name": "Частна детска градина Куест",
+ "website": "https://questjunior.bg/",
+ "pages_the_crawler_visited": [
+  "https://questjunior.bg/",
+  "https://questjunior.bg/priem/taksi"
+ ],
+ "pages_where_an_earlier_reader_found_fees": [
+  "https://questjunior.bg/priem/taksi"
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "category": "tuition",
+   "amount": "800.00",
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "обучение",
+   "note": ""
+  },
+  {
+   "oid": "o2",
+   "category": "materials",
+   "amount": 150.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "Годишна такса за учебни, творчески материали и консумативи",
+   "note": "Платима до 1 септември."
+  },
+  {
+   "oid": "o3",
+   "category": "tuition",
+   "amount": 800.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "Месечна такса обучение, изхранване и грижа",
+   "note": ""
+  },
+  {
+   "oid": "o4",
+   "category": "materials",
+   "amount": "150.00",
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "учебни",
+   "note": ""
+  }
+ ]
+}

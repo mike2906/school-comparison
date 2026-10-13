@@ -1,0 +1,15 @@
+{
+ "school_id": 602,
+ "name": "Частна детска градина Алиса",
+ "website": "https://alissa-bg.com/",
+ "pages_the_crawler_visited": [
+  "https://alissa-bg.com/",
+  "https://alissa-bg.com/priem/",
+  "https://alissa-bg.com/roditeli/",
+  "https://alissa-bg.com/obuchenie/",
+  "https://alissa-bg.com/dneven-rezhim/",
+  "https://alissa-bg.com/dopalnitelni-deynosti/"
+ ],
+ "pages_where_an_earlier_reader_found_fees": [],
+ "candidates": []
+}

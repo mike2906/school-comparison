@@ -1,0 +1,64 @@
+/tmp/lane-d-trial/backend/app/ai/client.py:139: PydanticAIDeprecationWarning: `AgentRunResult.usage` is no longer a method; access it as a property (drop the parentheses).
+  usage_obj = result.usage() if callable(getattr(result, "usage", None)) else getattr(result, "usage", None)
+/tmp/lane-d-trial/backend/app/ai/client.py:139: PydanticAIDeprecationWarning: `AgentRunResult.usage` is no longer a method; access it as a property (drop the parentheses).
+  usage_obj = result.usage() if callable(getattr(result, "usage", None)) else getattr(result, "usage", None)
+pick model openrouter/google/gemini-2.5-flash-lite, read model openrouter/openai/gpt-6-luna, 42 schools, cap $0.3
+school 171: 3 pages opened, 1 with prices, 5 fees read, $0.0016
+school 172: 4 pages opened, 1 with prices, 9 fees read, $0.0017
+school 213: 7 pages opened, 0 with prices, 0 fees read, $0.0008
+school 220: 2 pages opened, 1 with prices, 10 fees read, $0.0016
+school 271: 2 pages opened, 1 with prices, 3 fees read, $0.0009
+school 286: 6 pages opened, 1 with prices, 10 fees read, $0.0031
+school 287: 2 pages opened, 1 with prices, 2 fees read, $0.0004
+school 302: 2 pages opened, 2 with prices, 2 fees read, $0.0007
+school 305: 8 pages opened, 0 with prices, 0 fees read, $0.0012
+school 329: 5 pages opened, 2 with prices, 5 fees read, $0.0016
+school 350: 6 pages opened, 3 with prices, 6 fees read, $0.0016
+school 351: 2 pages opened, 1 with prices, 3 fees read, $0.0009
+school 381: 10 pages opened, 5 with prices, 3 fees read, $0.0062
+school 393: 6 pages opened, 1 with prices, 1 fees read, $0.0008
+school 405: 3 pages opened, 1 with prices, 1 fees read, $0.0009
+school 507: 2 pages opened, 1 with prices, 2 fees read, $0.0004
+school 511: 3 pages opened, 2 with prices, 4 fees read, $0.0011
+school 515: 4 pages opened, 2 with prices, 18 fees read, $0.0034
+school 517: 6 pages opened, 2 with prices, 7 fees read, $0.0027
+school 518: 6 pages opened, 0 with prices, 0 fees read, $0.0006
+school 525: 3 pages opened, 1 with prices, 8 fees read, $0.0007
+school 527: 2 pages opened, 1 with prices, 3 fees read, $0.0006
+school 529: 9 pages opened, 2 with prices, 4 fees read, $0.0019
+school 530: 3 pages opened, 1 with prices, 4 fees read, $0.0008
+school 531: 2 pages opened, 1 with prices, 4 fees read, $0.0008
+school 532: 4 pages opened, 0 with prices, 0 fees read, $0.0003
+school 537: 8 pages opened, 0 with prices, 0 fees read, $0.0005
+school 539: 1 pages opened, 1 with prices, 0 fees read, $0.0015
+school 542: 2 pages opened, 1 with prices, 4 fees read, $0.0006
+school 547: 5 pages opened, 1 with prices, 3 fees read, $0.0009
+school 548: 4 pages opened, 0 with prices, 0 fees read, $0.0001
+school 561: 8 pages opened, 1 with prices, 1 fees read, $0.0016
+school 569: 8 pages opened, 2 with prices, 8 fees read, $0.0022
+school 574: 5 pages opened, 3 with prices, 2 fees read, $0.0028
+school 585: 4 pages opened, 3 with prices, 2 fees read, $0.0062
+school 595: 10 pages opened, 2 with prices, 4 fees read, $0.0039
+school 598: 3 pages opened, 1 with prices, 2 fees read, $0.0006
+school 601: 3 pages opened, 2 with prices, 6 fees read, $0.0012
+school 602: 6 pages opened, 0 with prices, 0 fees read, $0.0002
+school 629: 3 pages opened, 0 with prices, 0 fees read, $0.0003
+school 632: 2 pages opened, 1 with prices, 3 fees read, $0.0009
+school 634: 7 pages opened, 2 with prices, 9 fees read, $0.0021
+
+scoring: strict categories
+schools: 42, spent $0.0630 ($0.0015 per school)
+finder + reader: right 120/156 (77%) of its fees; found 122/149 (82%) of the site's fees
+published today: right 64/72 (89%) of published rows; found 67/149 (45%) of the site's fees
+fees read at schools whose reviewer found none (2), to check by hand:
+  school 585: tuition 7900.0 EUR yearly [Годишна такса за обучение]
+  school 585: registration 200.0 EUR one_time [Такса кандидатстване]
+
+scoring: activities and extracurricular merged
+schools: 42, spent $0.0630 ($0.0015 per school)
+finder + reader: right 120/156 (77%) of its fees; found 122/149 (82%) of the site's fees
+published today: right 64/72 (89%) of published rows; found 67/149 (45%) of the site's fees
+fees read at schools whose reviewer found none (2), to check by hand:
+  school 585: tuition 7900.0 EUR yearly [Годишна такса за обучение]
+  school 585: registration 200.0 EUR one_time [Такса кандидатстване]
+exit=0

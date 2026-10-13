@@ -1,0 +1,69 @@
+{
+ "school_id": 507,
+ "pages_read": [
+  "https://questjunior.bg/priem/taksi"
+ ],
+ "fetch_failed": [],
+ "site_states_no_fees": false,
+ "site_fees": [
+  {
+   "fid": "f1",
+   "category": "tuition",
+   "amount": 800,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": null,
+   "plan": null,
+   "year": null,
+   "url": "https://questjunior.bg/priem/taksi",
+   "quote": "Месечна такса обучение, изхранване и грижа: 800 евро."
+  },
+  {
+   "fid": "f2",
+   "category": "materials",
+   "amount": 150,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": null,
+   "plan": null,
+   "year": null,
+   "url": "https://questjunior.bg/priem/taksi",
+   "quote": "Годишна такса за учебни, творчески материали и консумативи: 150 евро –, платима до 1 септември."
+  }
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "verdict": "correct",
+   "fid": "f1",
+   "reason": "800 EUR monthly tuition matches.",
+   "group_unstated": false
+  },
+  {
+   "oid": "o2",
+   "verdict": "correct",
+   "fid": "f2",
+   "reason": "150 EUR annual materials fee matches.",
+   "group_unstated": false
+  },
+  {
+   "oid": "o3",
+   "verdict": "duplicate",
+   "fid": "f1",
+   "reason": "Same 800 EUR monthly fee as o1.",
+   "group_unstated": false
+  },
+  {
+   "oid": "o4",
+   "verdict": "duplicate",
+   "fid": "f2",
+   "reason": "Same 150 EUR yearly materials fee as o2.",
+   "group_unstated": false
+  }
+ ],
+ "notes": "Site states no group or academic year. Also a 7 EUR/day absence deduction (not a fee)."
+}

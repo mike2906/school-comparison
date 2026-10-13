@@ -1,0 +1,5882 @@
+[
+  {
+    "school_id": 171,
+    "pages": [
+      {
+        "url": "https://roerich-school.org/",
+        "hop": 0,
+        "prices": false,
+        "chars": 9383
+      },
+      {
+        "url": "https://roerich-school.org/admissions-2025-2026/",
+        "hop": 1,
+        "prices": false,
+        "chars": 12236
+      },
+      {
+        "url": "https://roerich-school.org/%d1%82%d0%b0%d0%ba%d1%81%d0%b8-%d0%b8-%d1%84%d0%b8%d0%bd%d0%b0%d0%bd%d1%81%d0%be%d0%b2%d0%b8-%d1%83%d1%81%d0%bb%d0%be%d0%b2%d0%b8%d1%8f/",
+        "hop": 2,
+        "prices": true,
+        "chars": 8963
+      }
+    ],
+    "cost_usd": 0.00156455,
+    "reader_fees": [
+      {
+        "category": "tuition",
+        "amount": 4250.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "VIII–XII клас — такса обучение",
+        "note": "2026/27; коледна отстъпка, записване до 19.12.2025; за първите 5 договора"
+      },
+      {
+        "category": "tuition",
+        "amount": 4500.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "VIII–XII клас — такса обучение",
+        "note": "2026/27; записване до 23.01.2026"
+      },
+      {
+        "category": "tuition",
+        "amount": 4725.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "VIII–XII клас — такса обучение",
+        "note": "2026/27; записване до 20.02.2026"
+      },
+      {
+        "category": "tuition",
+        "amount": 4950.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "VIII–XII клас — такса обучение",
+        "note": "2026/27; записване след 20.02.2026"
+      },
+      {
+        "category": "tuition",
+        "amount": 5555.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "Ученици със СОП — такса обучение",
+        "note": "2026/27; краен срок за записване 20.02.2026; includes specialized pedagogical assessment, individual plan and program, and additional psychological care and support"
+      }
+    ],
+    "reference_fees": [
+      {
+        "category": "tuition",
+        "amount": 6300,
+        "currency": "EUR",
+        "period": null,
+        "label": "PK–VII клас, целодневна програма — до 19.12.2025",
+        "source_url": "https://roerich-school.org/%d1%82%d0%b0%d0%ba%d1%81%d0%b8-%d0%b8-%d1%84%d0%b8%d0%bd%d0%b0%d0%bd%d1%81%d0%be%d0%b2%d0%b8-%d1%83%d1%81%d0%bb%d0%be%d0%b2%d0%b8%d1%8f/",
+        "note": "2026/27; Christmas discount, first 7 contracts; total for the year"
+      },
+      {
+        "category": "tuition",
+        "amount": 6600,
+        "currency": "EUR",
+        "period": null,
+        "label": "PK–VII клас — записване до 23.01.2026",
+        "source_url": "https://roerich-school.org/%d1%82%d0%b0%d0%ba%d1%81%d0%b8-%d0%b8-%d1%84%d0%b8%d0%bd%d0%b0%d0%bd%d1%81%d0%be%d0%b2%d0%b8-%d1%83%d1%81%d0%bb%d0%be%d0%b2%d0%b8%d1%8f/",
+        "note": "2026/27 total; payable 2 x 3490 EUR"
+      },
+      {
+        "category": "tuition",
+        "amount": 6969,
+        "currency": "EUR",
+        "period": null,
+        "label": "PK–VII клас — записване до 20.02.2026",
+        "source_url": "https://roerich-school.org/%d1%82%d0%b0%d0%ba%d1%81%d0%b8-%d0%b8-%d1%84%d0%b8%d0%bd%d0%b0%d0%bd%d1%81%d0%be%d0%b2%d0%b8-%d1%83%d1%81%d0%bb%d0%be%d0%b2%d0%b8%d1%8f/",
+        "note": "2026/27 total; payable 2 x 3656 EUR"
+      },
+      {
+        "category": "tuition",
+        "amount": 7269,
+        "currency": "EUR",
+        "period": null,
+        "label": "PK–VII клас — след 20.02.2026",
+        "source_url": "https://roerich-school.org/%d1%82%d0%b0%d0%ba%d1%81%d0%b8-%d0%b8-%d1%84%d0%b8%d0%bd%d0%b0%d0%bd%d1%81%d0%be%d0%b2%d0%b8-%d1%83%d1%81%d0%bb%d0%be%d0%b2%d0%b8%d1%8f/",
+        "note": "2026/27 total; payable 2 x 3815 EUR. 5% sibling discount, 5% bring-a-friend"
+      },
+      {
+        "category": "tuition",
+        "amount": 4250,
+        "currency": "EUR",
+        "period": null,
+        "label": "VIII–XII клас — до 19.12.2025",
+        "source_url": "https://roerich-school.org/%d1%82%d0%b0%d0%ba%d1%81%d0%b8-%d0%b8-%d1%84%d0%b8%d0%bd%d0%b0%d0%bd%d1%81%d0%be%d0%b2%d0%b8-%d1%83%d1%81%d0%bb%d0%be%d0%b2%d0%b8%d1%8f/",
+        "note": "Christmas discount, first 5 contracts"
+      },
+      {
+        "category": "tuition",
+        "amount": 4500,
+        "currency": "EUR",
+        "period": null,
+        "label": "VIII–XII клас — записване до 23.01.2026",
+        "source_url": "https://roerich-school.org/%d1%82%d0%b0%d0%ba%d1%81%d0%b8-%d0%b8-%d1%84%d0%b8%d0%bd%d0%b0%d0%bd%d1%81%d0%be%d0%b2%d0%b8-%d1%83%d1%81%d0%bb%d0%be%d0%b2%d0%b8%d1%8f/",
+        "note": "payable 2 x 2360 EUR"
+      },
+      {
+        "category": "tuition",
+        "amount": 4725,
+        "currency": "EUR",
+        "period": null,
+        "label": "VIII–XII клас — записване до 20.02.2026",
+        "source_url": "https://roerich-school.org/%d1%82%d0%b0%d0%ba%d1%81%d0%b8-%d0%b8-%d1%84%d0%b8%d0%bd%d0%b0%d0%bd%d1%81%d0%be%d0%b2%d0%b8-%d1%83%d1%81%d0%bb%d0%be%d0%b2%d0%b8%d1%8f/",
+        "note": "payable 2 x 2480 EUR"
+      },
+      {
+        "category": "tuition",
+        "amount": 4950,
+        "currency": "EUR",
+        "period": null,
+        "label": "VIII–XII клас — след 20.02.2026",
+        "source_url": "https://roerich-school.org/%d1%82%d0%b0%d0%ba%d1%81%d0%b8-%d0%b8-%d1%84%d0%b8%d0%bd%d0%b0%d0%bd%d1%81%d0%be%d0%b2%d0%b8-%d1%83%d1%81%d0%bb%d0%be%d0%b2%d0%b8%d1%8f/",
+        "note": "payable 2 x 2600 EUR; 5% sibling, 5% bring-a-friend"
+      },
+      {
+        "category": "tuition",
+        "amount": 5555,
+        "currency": "EUR",
+        "period": null,
+        "label": "Ученици със СОП — до 20.02.2026",
+        "source_url": "https://roerich-school.org/%d1%82%d0%b0%d0%ba%d1%81%d0%b8-%d0%b8-%d1%84%d0%b8%d0%bd%d0%b0%d0%bd%d1%81%d0%be%d0%b2%d0%b8-%d1%83%d1%81%d0%bb%d0%be%d0%b2%d0%b8%d1%8f/",
+        "note": "payable 2 x 2915 EUR"
+      }
+    ],
+    "no_fees_on_site": false,
+    "stored_rows": [
+      {
+        "id": 2576,
+        "category": "food",
+        "amount": "2725.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "semester",
+        "label": "",
+        "published": false
+      },
+      {
+        "id": 2575,
+        "category": "food",
+        "amount": "5190.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "term",
+        "label": "",
+        "published": false
+      },
+      {
+        "id": 2574,
+        "category": "tuition",
+        "amount": "3990.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "",
+        "published": false
+      },
+      {
+        "id": 2573,
+        "category": "tuition",
+        "amount": "3550.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "",
+        "published": false
+      },
+      {
+        "id": 2572,
+        "category": "tuition",
+        "amount": "2300.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "semester",
+        "label": "",
+        "published": false
+      },
+      {
+        "id": 2571,
+        "category": "tuition",
+        "amount": "4390.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "semester",
+        "label": "",
+        "published": false
+      },
+      {
+        "id": 2570,
+        "category": "tuition",
+        "amount": "2130.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "semester",
+        "label": "",
+        "published": false
+      },
+      {
+        "id": 2569,
+        "category": "tuition",
+        "amount": "4066.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "semester",
+        "label": "",
+        "published": false
+      },
+      {
+        "id": 2568,
+        "category": "tuition",
+        "amount": "2090.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "semester",
+        "label": "",
+        "published": false
+      },
+      {
+        "id": 2567,
+        "category": "tuition",
+        "amount": "3555.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "semester",
+        "label": "",
+        "published": false
+      },
+      {
+        "id": 2566,
+        "category": "tuition",
+        "amount": "6776.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "semester",
+        "label": "",
+        "published": false
+      },
+      {
+        "id": 2565,
+        "category": "tuition",
+        "amount": "3480.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "semester",
+        "label": "",
+        "published": false
+      },
+      {
+        "id": 2564,
+        "category": "tuition",
+        "amount": "3300.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "semester",
+        "label": "",
+        "published": false
+      },
+      {
+        "id": 2563,
+        "category": "tuition",
+        "amount": "6633.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "term",
+        "label": "",
+        "published": false
+      },
+      {
+        "id": 2562,
+        "category": "tuition",
+        "amount": "6333.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "term",
+        "label": "",
+        "published": false
+      },
+      {
+        "id": 2561,
+        "category": "tuition",
+        "amount": "6000.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "term",
+        "label": "",
+        "published": false
+      },
+      {
+        "id": 3631,
+        "category": "tuition",
+        "amount": "6600.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "ПК, I-VII клас /целодневно обучение/ / ПК, I-VII клас /целодневно обучение/ / Такса обучение / При записване в срок до 23.01.2026 г.",
+        "published": false
+      },
+      {
+        "id": 3632,
+        "category": "tuition",
+        "amount": "6969.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "ПК, I-VII клас /целодневно обучение/ / ПК, I-VII клас /целодневно обучение/ / Такса обучение / При записване в срок до 20.02.2026 г.",
+        "published": false
+      },
+      {
+        "id": 3633,
+        "category": "tuition",
+        "amount": "7269.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "ПК, I-VII клас /целодневно обучение/ / ПК, I-VII клас /целодневно обучение/ / Такса обучение / При записване след 20.02.2026 г.",
+        "published": true
+      },
+      {
+        "id": 3634,
+        "category": "tuition",
+        "amount": "4500.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "VIII - XII клас / VIII - XII клас / Такса обучение / При записване в срок до 23.01.2026 г.",
+        "published": false
+      },
+      {
+        "id": 3635,
+        "category": "tuition",
+        "amount": "4725.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "VIII - XII клас / VIII - XII клас / Такса обучение / При записване в срок до 20.02.2026 г.",
+        "published": false
+      },
+      {
+        "id": 3636,
+        "category": "tuition",
+        "amount": "4950.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "VIII - XII клас / VIII - XII клас / Такса обучение / При записване след 20.02.2026 г.",
+        "published": true
+      },
+      {
+        "id": 3637,
+        "category": "tuition",
+        "amount": "5555.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "Ученици със СОП / Краен срок за записване до 20.02.2026 г.",
+        "published": true
+      }
+    ]
+  },
+  {
+    "school_id": 172,
+    "pages": [
+      {
+        "url": "https://www.svetasofia.com/",
+        "hop": 0,
+        "prices": false,
+        "chars": 15181
+      },
+      {
+        "url": "https://www.svetasofia.com/finansovi-uslovia/",
+        "hop": 1,
+        "prices": true,
+        "chars": 7310
+      },
+      {
+        "url": "https://www.svetasofia.com/25-%d0%b3%d0%be%d0%b4%d0%b8%d0%bd%d0%b8-%d0%bf%d0%b8%d0%b0%d0%bd%d0%be-%d1%81%d1%86%d0%b5%d0%bd%d0%b0-%d0%b8-%d1%86%d0%b2%d0%b5%d1%82%d1%8f-%d0%ba%d0%be%d0%b8%d1%82%d0%be-%d0%bd%d0%b5-%d1%83%d0%b2/",
+        "hop": 2,
+        "prices": false,
+        "chars": 7871
+      },
+      {
+        "url": "https://www.svetasofia.com/zashto-da-izberete-nas/",
+        "hop": 2,
+        "prices": false,
+        "chars": 8929
+      }
+    ],
+    "cost_usd": 0.0016856150000000001,
+    "reader_fees": [
+      {
+        "category": "tuition",
+        "amount": 8900.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "ПУК – III клас, обучение и храна (1 х)",
+        "note": null
+      },
+      {
+        "category": "tuition",
+        "amount": 4450.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "ПУК – III клас, обучение и храна (2 х)",
+        "note": "Възможност за плащане на две вноски."
+      },
+      {
+        "category": "transport",
+        "amount": 1750.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "ПУК – III клас, такса транспорт (1 х)",
+        "note": null
+      },
+      {
+        "category": "transport",
+        "amount": 875.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "ПУК – III клас, такса транспорт (2 х)",
+        "note": "Възможност за плащане на две вноски."
+      },
+      {
+        "category": "tuition",
+        "amount": 9400.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "IV – VII клас, обучение и храна (1 х)",
+        "note": null
+      },
+      {
+        "category": "tuition",
+        "amount": 4700.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "IV – VII клас, обучение и храна (2 х)",
+        "note": "Възможност за плащане на две вноски."
+      },
+      {
+        "category": "transport",
+        "amount": 1820.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "IV – VII клас, такса транспорт (1 х)",
+        "note": null
+      },
+      {
+        "category": "transport",
+        "amount": 910.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "IV – VII клас, такса транспорт (2 х)",
+        "note": "Възможност за плащане на две вноски."
+      },
+      {
+        "category": "registration",
+        "amount": 40.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "Такса правоучастие за прием в предучилищен клас и 1-ви клас",
+        "note": null
+      }
+    ],
+    "reference_fees": [
+      {
+        "category": "tuition",
+        "amount": 8900,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "ПУК – III клас, годишна такса (обучение и храна)",
+        "source_url": "https://www.svetasofia.com/finansovi-uslovia/",
+        "note": "2026/27; includes food; or 2 x 4450 EUR; 10% for third child"
+      },
+      {
+        "category": "transport",
+        "amount": 1750,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "Транспорт ПУК – III клас",
+        "source_url": "https://www.svetasofia.com/finansovi-uslovia/",
+        "note": "or 2 x 875 EUR"
+      },
+      {
+        "category": "tuition",
+        "amount": 9400,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "IV – VII клас, годишна такса (обучение и храна)",
+        "source_url": "https://www.svetasofia.com/finansovi-uslovia/",
+        "note": "2026/27; includes food; or 2 x 4700 EUR"
+      },
+      {
+        "category": "transport",
+        "amount": 1820,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "Транспорт IV – VII клас",
+        "source_url": "https://www.svetasofia.com/finansovi-uslovia/",
+        "note": "or 2 x 910 EUR"
+      },
+      {
+        "category": "registration",
+        "amount": 40,
+        "currency": "EUR",
+        "period": null,
+        "label": "Такса за участие в приема (ПУК и I клас)",
+        "source_url": "https://www.svetasofia.com/finansovi-uslovia/",
+        "note": null
+      }
+    ],
+    "no_fees_on_site": false,
+    "stored_rows": [
+      {
+        "id": 3208,
+        "category": "tuition",
+        "amount": "8900.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "ПУК – III клас / ПУК – III клас / годишна такса обучение и храна",
+        "published": true
+      },
+      {
+        "id": 3209,
+        "category": "transport",
+        "amount": "1750.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "ПУК – III клас / ПУК – III клас / такса транспорт",
+        "published": true
+      },
+      {
+        "id": 3210,
+        "category": "tuition",
+        "amount": "9400.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "IV – VII клас / IV – VII клас / годишна такса обучение и храна",
+        "published": true
+      },
+      {
+        "id": 3211,
+        "category": "transport",
+        "amount": "1820.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "IV – VII клас / IV – VII клас / такса транспорт",
+        "published": true
+      },
+      {
+        "id": 3212,
+        "category": "registration",
+        "amount": "40.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "Такса правоучастие за прием в предучилищен клас и / Такса правоучастие за прием в предучилищен клас и 1-ви клас",
+        "published": true
+      }
+    ]
+  },
+  {
+    "school_id": 213,
+    "pages": [
+      {
+        "url": "https://www.ezikovsviat.com/",
+        "hop": 0,
+        "prices": false,
+        "chars": 8901
+      },
+      {
+        "url": "https://www.ezikovsviat.com/%d0%bf%d1%80%d0%b8%d0%b5%d0%bc",
+        "hop": 1,
+        "prices": false,
+        "chars": 7661
+      },
+      {
+        "url": "https://www.ezikovsviat.com/%d0%b4%d0%be%d0%ba%d1%83%d0%bc%d0%b5%d0%bd%d1%82%d0%b8",
+        "hop": 1,
+        "prices": false,
+        "chars": 15677
+      },
+      {
+        "url": "https://www.ezikovsviat.com/%d1%87%d0%bf%d0%b3-%d0%b5%d0%b7%d0%b8%d0%ba%d0%be%d0%b2-%d1%81%d0%b2%d1%8f%d1%82",
+        "hop": 2,
+        "prices": false,
+        "chars": 12926
+      },
+      {
+        "url": "https://www.ezikovsviat.com/%d0%be%d0%b1%d1%83%d1%87%d0%b5%d0%bd%d0%b8%d0%b5",
+        "hop": 2,
+        "prices": false,
+        "chars": 10421
+      },
+      {
+        "url": "https://www.ezikovsviat.com/%d0%bd%d0%b0-%d0%b2%d0%bd%d0%b8%d0%bc%d0%b0%d0%bd%d0%b8%d0%b5%d1%82%d0%be-%d0%bd%d0%b0-%d1%80%d0%be%d0%b4%d0%b8%d1%82%d0%b5%d0%bb%d0%b8%d1%82%d0%b5",
+        "hop": 2,
+        "prices": false,
+        "chars": 7184
+      },
+      {
+        "url": "http://www.ezikovsviat.com/%D1%87%D0%BE%D1%83-%D0%B5%D0%B7%D0%B8%D0%BA%D0%BE%D0%B2-%D1%81%D0%B2%D1%8F%D1%82",
+        "hop": 3,
+        "prices": false,
+        "chars": 11547
+      }
+    ],
+    "cost_usd": 0.0008183,
+    "reader_fees": [],
+    "reference_fees": [],
+    "no_fees_on_site": true,
+    "stored_rows": []
+  },
+  {
+    "school_id": 220,
+    "pages": [
+      {
+        "url": "https://toddlersacademy.eu/bg/",
+        "hop": 0,
+        "prices": false,
+        "chars": 22128
+      },
+      {
+        "url": "https://toddlersacademy.eu/bg/admission.html",
+        "hop": 1,
+        "prices": true,
+        "chars": 17760
+      }
+    ],
+    "cost_usd": 0.0016058000000000001,
+    "reader_fees": [
+      {
+        "category": "tuition",
+        "amount": 8580.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "Обща такса за обучение",
+        "note": "За учебната 2026/2027 година."
+      },
+      {
+        "category": "tuition",
+        "amount": 780.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Опция 1",
+        "note": "11 равни месечни вноски."
+      },
+      {
+        "category": "tuition",
+        "amount": 2310.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "quarter",
+        "label": "I вноска (септ–ноем)",
+        "note": "Опция 2; тримесечни вноски с отстъпка EUR 110 при плащане на четири вноски."
+      },
+      {
+        "category": "tuition",
+        "amount": 2310.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "quarter",
+        "label": "II вноска (дек–фев)",
+        "note": "Опция 2; тримесечни вноски с отстъпка EUR 110 при плащане на четири вноски."
+      },
+      {
+        "category": "tuition",
+        "amount": 2310.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "quarter",
+        "label": "III вноска (март–май)",
+        "note": "Опция 2; тримесечни вноски с отстъпка EUR 110 при плащане на четири вноски."
+      },
+      {
+        "category": "tuition",
+        "amount": 1540.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "quarter",
+        "label": "IV вноска (юни–юли)",
+        "note": "Опция 2; тримесечни вноски с отстъпка EUR 110 при плащане на четири вноски."
+      },
+      {
+        "category": "tuition",
+        "amount": 8330.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "one_time",
+        "label": "Опция 3",
+        "note": "Еднократно плащане при подписване на договор; включва отстъпка EUR 250."
+      },
+      {
+        "category": "tuition",
+        "amount": 770.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "Депозит",
+        "note": "Платим при подписване на договор; приспада се от последната вноска, освен ако договорът не е прекратен предсрочно."
+      },
+      {
+        "category": "materials",
+        "amount": 150.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "one_time",
+        "label": "Такса за учебници и тетрадки",
+        "note": null
+      },
+      {
+        "category": "registration",
+        "amount": 200.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "one_time",
+        "label": "Такса за регистрация",
+        "note": "Само при първо постъпване."
+      }
+    ],
+    "reference_fees": [
+      {
+        "category": "tuition",
+        "amount": 8580,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "Обща такса за обучение (образователни услуги и храна)",
+        "source_url": "https://toddlersacademy.eu/bg/admission.html",
+        "note": "2026/27 (01.09.2026–31.07.2027); includes food; quarterly option 2310/2310/2310/1540 = 8470 (110 off)"
+      },
+      {
+        "category": "tuition",
+        "amount": 780,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Вариант 1: 11 равни месечни вноски",
+        "source_url": "https://toddlersacademy.eu/bg/admission.html",
+        "note": null
+      },
+      {
+        "category": "tuition",
+        "amount": 8330,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "Вариант 3: еднократно плащане при подписване",
+        "source_url": "https://toddlersacademy.eu/bg/admission.html",
+        "note": "250 EUR discount for paying in full at signing"
+      },
+      {
+        "category": "registration",
+        "amount": 770,
+        "currency": "EUR",
+        "period": "one_time",
+        "label": "Депозит (оборудване, консумативи, комунални)",
+        "source_url": "https://toddlersacademy.eu/bg/admission.html",
+        "note": "deposit; deducted from the last installment"
+      },
+      {
+        "category": "materials",
+        "amount": 150,
+        "currency": "EUR",
+        "period": "one_time",
+        "label": "Учебници и тетрадки",
+        "source_url": "https://toddlersacademy.eu/bg/admission.html",
+        "note": null
+      },
+      {
+        "category": "registration",
+        "amount": 200,
+        "currency": "EUR",
+        "period": "one_time",
+        "label": "Регистрация (само при първо записване)",
+        "source_url": "https://toddlersacademy.eu/bg/admission.html",
+        "note": null
+      }
+    ],
+    "no_fees_on_site": false,
+    "stored_rows": []
+  },
+  {
+    "school_id": 271,
+    "pages": [
+      {
+        "url": "https://bgshkolo.com/",
+        "hop": 0,
+        "prices": false,
+        "chars": 17900
+      },
+      {
+        "url": "https://bgshkolo.com/pricing-plans/",
+        "hop": 1,
+        "prices": true,
+        "chars": 9845
+      }
+    ],
+    "cost_usd": 0.000946175,
+    "reader_fees": [
+      {
+        "category": "tuition",
+        "amount": 7200.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "7-ми до 12-ти клас",
+        "note": null
+      },
+      {
+        "category": "materials",
+        "amount": 250.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "Такса за учебни помагала",
+        "note": null
+      },
+      {
+        "category": "registration",
+        "amount": 500.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "one_time",
+        "label": "Такса за постъпване в учебния комплекс",
+        "note": "За новопостъпващи семейства."
+      }
+    ],
+    "reference_fees": [
+      {
+        "category": "tuition",
+        "amount": 7200,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "1-ви до 6-ти клас",
+        "source_url": "https://bgshkolo.com/pricing-plans/",
+        "note": "2026/27; also 14 082 лв.; 5% sibling discount"
+      },
+      {
+        "category": "tuition",
+        "amount": 7200,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "7-ми до 12-ти клас",
+        "source_url": "https://bgshkolo.com/pricing-plans/",
+        "note": "2026/27; also 14 082 лв."
+      },
+      {
+        "category": "materials",
+        "amount": 250,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "Такса за учебни помагала",
+        "source_url": "https://bgshkolo.com/pricing-plans/",
+        "note": "applies across complex"
+      },
+      {
+        "category": "registration",
+        "amount": 500,
+        "currency": "EUR",
+        "period": "one_time",
+        "label": "Такса за постъпване",
+        "source_url": "https://bgshkolo.com/pricing-plans/",
+        "note": "new families only; applies across complex"
+      }
+    ],
+    "no_fees_on_site": false,
+    "stored_rows": [
+      {
+        "id": 2912,
+        "category": "tuition",
+        "amount": "14082.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "BGN",
+        "period": "yearly",
+        "label": "Standard",
+        "published": true
+      },
+      {
+        "id": 2911,
+        "category": "tuition",
+        "amount": "15549.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "BGN",
+        "period": "yearly",
+        "label": "",
+        "published": true
+      }
+    ]
+  },
+  {
+    "school_id": 286,
+    "pages": [
+      {
+        "url": "https://www.slaveikov-school.org/",
+        "hop": 0,
+        "prices": false,
+        "chars": 16905
+      },
+      {
+        "url": "https://www.slaveikov-school.org/10551056104810451052-2026-2027.html",
+        "hop": 1,
+        "prices": true,
+        "chars": 21594
+      },
+      {
+        "url": "https://www.slaveikov-school.org/1055108810801077108410851086-10741088107710841077-10851072-109110951080109010771083108010901077.html",
+        "hop": 1,
+        "prices": false,
+        "chars": 14284
+      },
+      {
+        "url": "https://www.slaveikov-school.org/104111021076107810771090.html",
+        "hop": 2,
+        "prices": false,
+        "chars": 35422
+      },
+      {
+        "url": "https://www.slaveikov-school.org/uploads/4/8/2/4/4824354/1_%D0%93%D0%A0%D0%90%D0%A4%D0%98%D0%9A_%D0%9F%D0%A0%D0%98%D0%95%D0%9C%D0%9D%D0%9E_%D0%92%D0%A0%D0%95%D0%9C%D0%95.pdf",
+        "hop": 2,
+        "prices": false,
+        "chars": 2
+      },
+      {
+        "url": "https://www.slaveikov-school.org/uploads/4/8/2/4/4824354/0815c543fe259c240139.pdf",
+        "hop": 2,
+        "prices": false,
+        "chars": 2
+      }
+    ],
+    "cost_usd": 0.0030916750000000003,
+    "reader_fees": [
+      {
+        "category": "tuition",
+        "amount": 4700.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "Годишна учебна такса",
+        "note": "За едно дете."
+      },
+      {
+        "category": "tuition",
+        "amount": 3525.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "Годишна учебна такса",
+        "note": "За второ дете от семейството с отстъпка."
+      },
+      {
+        "category": "tuition",
+        "amount": 4700.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "Учебна такса за предучилищна група",
+        "note": "За едно дете целодневно."
+      },
+      {
+        "category": "tuition",
+        "amount": 3225.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "Учебна такса за предучилищна група",
+        "note": "До 13:00 часа."
+      },
+      {
+        "category": "tuition",
+        "amount": 4465.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "Авансово на една вноска",
+        "note": "Учебна такса с 5% отстъпка."
+      },
+      {
+        "category": "tuition",
+        "amount": 2350.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "На две равни вноски",
+        "note": "Всяка вноска; две вноски."
+      },
+      {
+        "category": "tuition",
+        "amount": 4935.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "При изплащане на 4 вноски",
+        "note": "Учебна такса с 5% оскъпяване."
+      },
+      {
+        "category": "tuition",
+        "amount": 517.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Разсрочено плащане на 10 равни вноски",
+        "note": "На месец; учебна такса с 10% оскъпяване."
+      },
+      {
+        "category": "registration",
+        "amount": 80.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "изпитна такса",
+        "note": "При кандидатстване на нови ученици."
+      },
+      {
+        "category": "registration",
+        "amount": 265.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "административна такса",
+        "note": "За всяка учебна година; запазва мястото в съответния клас."
+      }
+    ],
+    "reference_fees": [
+      {
+        "category": "tuition",
+        "amount": 4700,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "Годишна учебна такса (едно дете)",
+        "source_url": "https://www.slaveikov-school.org/10551056104810451052-2026-2027.html",
+        "note": "2026/27; also 9192.40 лв.; 2 x 2350 EUR option"
+      },
+      {
+        "category": "tuition",
+        "amount": 3525,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "Второ дете от семейството",
+        "source_url": "https://www.slaveikov-school.org/10551056104810451052-2026-2027.html",
+        "note": "sibling discount price"
+      },
+      {
+        "category": "tuition",
+        "amount": 4465,
+        "currency": "EUR",
+        "period": null,
+        "label": "Еднократно авансово плащане с 5% отстъпка",
+        "source_url": "https://www.slaveikov-school.org/10551056104810451052-2026-2027.html",
+        "note": "due by 30 June"
+      },
+      {
+        "category": "tuition",
+        "amount": 4935,
+        "currency": "EUR",
+        "period": null,
+        "label": "Четири вноски с 5% увеличение (общо)",
+        "source_url": "https://www.slaveikov-school.org/10551056104810451052-2026-2027.html",
+        "note": null
+      },
+      {
+        "category": "tuition",
+        "amount": 517,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "10 месечни вноски с 10% увеличение",
+        "source_url": "https://www.slaveikov-school.org/10551056104810451052-2026-2027.html",
+        "note": null
+      },
+      {
+        "category": "tuition",
+        "amount": 4700,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "Предучилищна група — целодневно",
+        "source_url": "https://www.slaveikov-school.org/10551056104810451052-2026-2027.html",
+        "note": null
+      },
+      {
+        "category": "tuition",
+        "amount": 3225,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "Предучилищна група — до 13:00",
+        "source_url": "https://www.slaveikov-school.org/10551056104810451052-2026-2027.html",
+        "note": null
+      },
+      {
+        "category": "registration",
+        "amount": 80,
+        "currency": "EUR",
+        "period": "one_time",
+        "label": "Изпитна такса",
+        "source_url": "https://www.slaveikov-school.org/10551056104810451052-2026-2027.html",
+        "note": "per applicant"
+      },
+      {
+        "category": "registration",
+        "amount": 265,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "Административна такса",
+        "source_url": "https://www.slaveikov-school.org/10551056104810451052-2026-2027.html",
+        "note": "non-refundable, reserves place, per school year"
+      },
+      {
+        "category": "registration",
+        "amount": 265,
+        "currency": "EUR",
+        "period": null,
+        "label": "Регистрационна такса — 8 клас езикова гимназия",
+        "source_url": "https://www.slaveikov-school.org/10551056104810451052-2026-2027.html",
+        "note": "may be the same as the administrative fee; unclear"
+      }
+    ],
+    "no_fees_on_site": false,
+    "stored_rows": []
+  },
+  {
+    "school_id": 287,
+    "pages": [
+      {
+        "url": "https://www.wonderhouse-bg.com/",
+        "hop": 0,
+        "prices": false,
+        "chars": 5216
+      },
+      {
+        "url": "https://www.wonderhouse-bg.com/taksi-i-zapisvania/",
+        "hop": 1,
+        "prices": true,
+        "chars": 3887
+      }
+    ],
+    "cost_usd": 0.000377225,
+    "reader_fees": [
+      {
+        "category": "tuition",
+        "amount": 580.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Деца до 3 години",
+        "note": null
+      },
+      {
+        "category": "tuition",
+        "amount": 580.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Деца НАД 3 години",
+        "note": null
+      }
+    ],
+    "reference_fees": [
+      {
+        "category": "tuition",
+        "amount": 580,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Деца под 3 години (ясла)",
+        "source_url": "https://www.wonderhouse-bg.com/taksi-i-zapisvania/",
+        "note": "2026/27; includes food, materials, English, music, dance; 10% 2nd child, 30% 3rd child"
+      },
+      {
+        "category": "tuition",
+        "amount": 580,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Деца над 3 години (градина)",
+        "source_url": "https://www.wonderhouse-bg.com/taksi-i-zapisvania/",
+        "note": "same inclusions"
+      }
+    ],
+    "no_fees_on_site": false,
+    "stored_rows": [
+      {
+        "id": 3227,
+        "category": "tuition",
+        "amount": "580.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Деца до 3 години / Деца до 3 години",
+        "published": true
+      }
+    ]
+  },
+  {
+    "school_id": 302,
+    "pages": [
+      {
+        "url": "https://www.ecodara.com/",
+        "hop": 0,
+        "prices": true,
+        "chars": 4358
+      },
+      {
+        "url": "https://www.ecodara.com/content/taksa-za-detska-gradina.php",
+        "hop": 1,
+        "prices": true,
+        "chars": 3731
+      }
+    ],
+    "cost_usd": 0.0006688999999999999,
+    "reader_fees": [
+      {
+        "category": "tuition",
+        "amount": 680.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Месечна такса за яслена група /2-годишни деца/",
+        "note": "За учебната 2025/2026г."
+      },
+      {
+        "category": "tuition",
+        "amount": 650.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Месечна такса за детска градина /от 3 до 7-годишни деца/",
+        "note": null
+      }
+    ],
+    "reference_fees": [
+      {
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Месечна такса за яслена група /2-годишни деца/ 2025/2026",
+        "source_url": "https://www.ecodara.com/content/taksa-za-detska-gradina.php",
+        "note": "Includes 4 meals/day and core curriculum, music, art, PE. Discounts: -10% second child, -3% paying 3 months, -5% paying annual fee.",
+        "amount": 680
+      },
+      {
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Месечна такса за детска градина /от 3 до 7-годишни деца/",
+        "source_url": "https://www.ecodara.com/content/taksa-za-detska-gradina.php",
+        "note": "No school year stated next to this line. Same discounts as above.",
+        "amount": 650
+      },
+      {
+        "category": "activities",
+        "currency": "BGN",
+        "period": null,
+        "label": "Консултация с детски психолог",
+        "source_url": "https://www.ecodara.com/content/taksa-za-detska-gradina.php",
+        "note": "Per consultation, monthly by appointment; no school year stated.",
+        "amount": 30
+      }
+    ],
+    "no_fees_on_site": false,
+    "stored_rows": [
+      {
+        "id": 2737,
+        "category": "tuition",
+        "amount": "30.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "BGN",
+        "period": "monthly",
+        "label": "",
+        "published": false
+      },
+      {
+        "id": 2914,
+        "category": "tuition",
+        "amount": "650.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "",
+        "published": true
+      },
+      {
+        "id": 2913,
+        "category": "tuition",
+        "amount": "680.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "",
+        "published": true
+      }
+    ]
+  },
+  {
+    "school_id": 305,
+    "pages": [
+      {
+        "url": "https://djanirodari.org/",
+        "hop": 0,
+        "prices": false,
+        "chars": 7749
+      },
+      {
+        "url": "https://djanirodari.org/fees-jani-rodari/",
+        "hop": 1,
+        "prices": false,
+        "chars": 4929
+      },
+      {
+        "url": "https://djanirodari.org/%d1%80%d0%b5%d0%b3%d0%b8%d1%81%d1%82%d1%80%d0%b0%d1%86%d0%b8%d1%8f-%d0%b7%d0%b0-%d1%83%d1%87%d0%b5%d0%b1%d0%bd%d0%b0%d1%82%d0%b0-%d0%b3%d0%be%d0%b4%d0%b8%d0%bd%d0%b0/",
+        "hop": 2,
+        "prices": false,
+        "chars": 5757
+      },
+      {
+        "url": "https://djanirodari.org/priem-2026-2027/",
+        "hop": 2,
+        "prices": false,
+        "chars": 10571
+      },
+      {
+        "url": "https://djanirodari.org/%d1%82%d1%80%d0%b0%d0%bd%d1%81%d0%bf%d0%be%d1%80%d1%82/",
+        "hop": 3,
+        "prices": false,
+        "chars": 9320
+      },
+      {
+        "url": "https://djanirodari.org/%d0%bd%d0%b0%d1%88%d0%b0%d1%82%d0%b0-%d0%ba%d1%83%d1%85%d0%bd%d1%8f/",
+        "hop": 3,
+        "prices": false,
+        "chars": 9765
+      },
+      {
+        "url": "https://djanirodari.org/za-vas-roditeli/",
+        "hop": 3,
+        "prices": false,
+        "chars": 18276
+      },
+      {
+        "url": "https://djanirodari.org/%d0%b7%d0%b0-%d0%bd%d0%b0%d1%81/",
+        "hop": 3,
+        "prices": false,
+        "chars": 9551
+      }
+    ],
+    "cost_usd": 0.00117222,
+    "reader_fees": [],
+    "reference_fees": [
+      {
+        "category": "tuition",
+        "currency": "EUR",
+        "period": null,
+        "label": "Детска ясла – плащане такса наведнъж 2026/2027",
+        "source_url": "https://djanirodari.org/gradina/%d1%82%d0%b0%d0%ba%d1%81%d0%b8/",
+        "note": "Lump-sum payment; BGN 8801.24 also printed.",
+        "amount": 4500
+      },
+      {
+        "category": "tuition",
+        "currency": "EUR",
+        "period": null,
+        "label": "Детска ясла – плащане на две вноски (2x2375) 2026/2027",
+        "source_url": "https://djanirodari.org/gradina/%d1%82%d0%b0%d0%ba%d1%81%d0%b8/",
+        "note": null,
+        "amount": 4750
+      },
+      {
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Детска ясла – плащане на месец 2026/2027",
+        "source_url": "https://djanirodari.org/gradina/%d1%82%d0%b0%d0%ba%d1%81%d0%b8/",
+        "note": null,
+        "amount": 500
+      },
+      {
+        "category": "tuition",
+        "currency": "EUR",
+        "period": null,
+        "label": "Първа група – плащане наведнъж 2026/2027",
+        "source_url": "https://djanirodari.org/gradina/%d1%82%d0%b0%d0%ba%d1%81%d0%b8/",
+        "note": null,
+        "amount": 4050
+      },
+      {
+        "category": "tuition",
+        "currency": "EUR",
+        "period": null,
+        "label": "Първа група – две вноски (2x2140) 2026/2027",
+        "source_url": "https://djanirodari.org/gradina/%d1%82%d0%b0%d0%ba%d1%81%d0%b8/",
+        "note": null,
+        "amount": 4280
+      },
+      {
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Първа група – плащане на месец 2026/2027",
+        "source_url": "https://djanirodari.org/gradina/%d1%82%d0%b0%d0%ba%d1%81%d0%b8/",
+        "note": null,
+        "amount": 450
+      },
+      {
+        "category": "tuition",
+        "currency": "EUR",
+        "period": null,
+        "label": "Втора и трета група – плащане наведнъж 2026/2027",
+        "source_url": "https://djanirodari.org/gradina/%d1%82%d0%b0%d0%ba%d1%81%d0%b8/",
+        "note": null,
+        "amount": 3700
+      },
+      {
+        "category": "tuition",
+        "currency": "EUR",
+        "period": null,
+        "label": "Втора и трета група – две вноски (2x1950) 2026/2027",
+        "source_url": "https://djanirodari.org/gradina/%d1%82%d0%b0%d0%ba%d1%81%d0%b8/",
+        "note": null,
+        "amount": 3900
+      },
+      {
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Втора и трета група – плащане на месец 2026/2027",
+        "source_url": "https://djanirodari.org/gradina/%d1%82%d0%b0%d0%ba%d1%81%d0%b8/",
+        "note": null,
+        "amount": 410
+      },
+      {
+        "category": "tuition",
+        "currency": "EUR",
+        "period": null,
+        "label": "Четвърта група (ПК) – плащане наведнъж 2026/2027",
+        "source_url": "https://djanirodari.org/gradina/%d1%82%d0%b0%d0%ba%d1%81%d0%b8/",
+        "note": null,
+        "amount": 4230
+      },
+      {
+        "category": "tuition",
+        "currency": "EUR",
+        "period": null,
+        "label": "Четвърта група (ПК) – две вноски (2x2240) 2026/2027",
+        "source_url": "https://djanirodari.org/gradina/%d1%82%d0%b0%d0%ba%d1%81%d0%b8/",
+        "note": null,
+        "amount": 4480
+      },
+      {
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Четвърта група (ПК) – плащане на месец 2026/2027",
+        "source_url": "https://djanirodari.org/gradina/%d1%82%d0%b0%d0%ba%d1%81%d0%b8/",
+        "note": "Monthly plan totals 5450 EUR: 750 EUR капаро (deposit) + 470 EUR/month.",
+        "amount": 470
+      }
+    ],
+    "no_fees_on_site": false,
+    "stored_rows": []
+  },
+  {
+    "school_id": 329,
+    "pages": [
+      {
+        "url": "https://www.fpels.ws/",
+        "hop": 0,
+        "prices": false,
+        "chars": 16611
+      },
+      {
+        "url": "https://www.fpels.ws/prices/",
+        "hop": 1,
+        "prices": true,
+        "chars": 5263
+      },
+      {
+        "url": "https://www.fpels.ws/profiles/digital-arts-and-entrepreneurship/",
+        "hop": 2,
+        "prices": false,
+        "chars": 18109
+      },
+      {
+        "url": "https://www.fpels.ws/clubs/teatralna-akademia-scenichen-angliiski-ezik/",
+        "hop": 2,
+        "prices": true,
+        "chars": 9343
+      },
+      {
+        "url": "https://www.fpels.ws/apply/",
+        "hop": 3,
+        "prices": false,
+        "chars": 10207
+      }
+    ],
+    "cost_usd": 0.001646575,
+    "reader_fees": [
+      {
+        "category": "tuition",
+        "amount": 6600.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "Стандартна такса",
+        "note": "Учебна 2026–2027 г.; плащане с 1 вноска."
+      },
+      {
+        "category": "tuition",
+        "amount": 6900.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "Плащане с 2 вноски",
+        "note": "Учебна 2026–2027 г."
+      },
+      {
+        "category": "tuition",
+        "amount": 7200.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "Плащане с 4 вноски",
+        "note": "Учебна 2026–2027 г."
+      },
+      {
+        "category": "registration",
+        "amount": 70.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "Такса кандидатстване",
+        "note": null
+      },
+      {
+        "category": "extracurricular",
+        "amount": 123.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "Театрална академия – сценичен английски език",
+        "note": "Курсът е януари–септември 2026."
+      }
+    ],
+    "reference_fees": [
+      {
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "Стандартна такса 2026-2027 – 1 плащане",
+        "source_url": "https://www.fpels.ws/prices/",
+        "note": "Paid at contract signing.",
+        "amount": 6600
+      },
+      {
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "2026-2027 – 2 плащания (2x3450)",
+        "source_url": "https://www.fpels.ws/prices/",
+        "note": "Installment 2 due 13.12.2026.",
+        "amount": 6900
+      },
+      {
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "2026-2027 – 4 плащания (2400+3x1600)",
+        "source_url": "https://www.fpels.ws/prices/",
+        "note": "Due at signing, 13.11.2026, 13.01.2027, 13.03.2027.",
+        "amount": 7200
+      },
+      {
+        "category": "registration",
+        "currency": "EUR",
+        "period": null,
+        "label": "Такса кандидатстване",
+        "source_url": "https://www.fpels.ws/prices/",
+        "note": "Paid with the application by bank transfer.",
+        "amount": 70
+      }
+    ],
+    "no_fees_on_site": false,
+    "stored_rows": [
+      {
+        "id": 2577,
+        "category": "registration",
+        "amount": "60.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "one_time",
+        "label": "",
+        "published": false
+      },
+      {
+        "id": 2997,
+        "category": "registration",
+        "amount": "70.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "",
+        "published": true
+      },
+      {
+        "id": 2998,
+        "category": "extracurricular",
+        "amount": "123.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "",
+        "published": true
+      },
+      {
+        "id": 2999,
+        "category": "tuition",
+        "amount": "6600.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "Стандартна такса",
+        "published": true
+      }
+    ]
+  },
+  {
+    "school_id": 350,
+    "pages": [
+      {
+        "url": "https://izgrevou.com/",
+        "hop": 0,
+        "prices": false,
+        "chars": 15631
+      },
+      {
+        "url": "https://izgrevou.com/uchilishche/taksi/",
+        "hop": 1,
+        "prices": true,
+        "chars": 6890
+      },
+      {
+        "url": "https://izgrevou.com/priem/",
+        "hop": 1,
+        "prices": true,
+        "chars": 9027
+      },
+      {
+        "url": "https://izgrevou.com/uchilishche/hranene/",
+        "hop": 2,
+        "prices": false,
+        "chars": 5709
+      },
+      {
+        "url": "https://izgrevou.com/uchilishche/transport/",
+        "hop": 2,
+        "prices": false,
+        "chars": 5345
+      },
+      {
+        "url": "https://izgrevou.com/kategorii/priem/",
+        "hop": 3,
+        "prices": true,
+        "chars": 5155
+      }
+    ],
+    "cost_usd": 0.00162875,
+    "reader_fees": [
+      {
+        "category": "registration",
+        "amount": 100.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "one_time",
+        "label": "Такса прием и записване",
+        "note": "За деца от детска школа „Изгрев“ няма такса."
+      },
+      {
+        "category": "materials",
+        "amount": 100.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "Такса материали",
+        "note": null
+      },
+      {
+        "category": "tuition",
+        "amount": 7160.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "Подготвителен клас, начален етап и прогимназиален",
+        "note": "За 2026/27 учебна година."
+      },
+      {
+        "category": "transport",
+        "amount": 199.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Транспорт – в двете посоки",
+        "note": "По желание; за 2026/27."
+      },
+      {
+        "category": "transport",
+        "amount": 99.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Транспорт – в едната посока",
+        "note": "По желание; за 2026/27."
+      },
+      {
+        "category": "food",
+        "amount": null,
+        "amount_min": 4.5,
+        "amount_max": 7.5,
+        "currency": "EUR",
+        "period": null,
+        "label": "Обедно меню",
+        "note": "По желание; вегетариански кетъринг."
+      }
+    ],
+    "reference_fees": [
+      {
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "Обучение 2026/27 – подготвителен клас, начален и прогимназиален етап",
+        "source_url": "https://izgrevou.com/priem/",
+        "note": "5% off for new students paying in one payment by 30.05.2026; 5% off for children from the school's kindergarten. 2027/28 tuition 7490 EUR also stated (out of window). Payable in 1, 2, 9 or 12 installments.",
+        "amount": 7160
+      },
+      {
+        "category": "registration",
+        "currency": "EUR",
+        "period": "one_time",
+        "label": "Такса прием и записване",
+        "source_url": "https://izgrevou.com/uchilishche/taksi/",
+        "note": "Non-refundable; children from Детска школа Изгрев exempt.",
+        "amount": 100
+      },
+      {
+        "category": "materials",
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "Такса материали",
+        "source_url": "https://izgrevou.com/priem/",
+        "note": "Payable at start of year or in two term installments.",
+        "amount": 100
+      },
+      {
+        "category": "transport",
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Транспорт 2026/27 – в двете посоки",
+        "source_url": "https://izgrevou.com/priem/",
+        "note": "Optional. 2027/28: 220 EUR.",
+        "amount": 199
+      },
+      {
+        "category": "transport",
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Транспорт 2026/27 – в едната посока",
+        "source_url": "https://izgrevou.com/priem/",
+        "note": "Optional. 2027/28: 110 EUR.",
+        "amount": 99
+      },
+      {
+        "category": "food",
+        "currency": "EUR",
+        "period": null,
+        "label": "Обедно меню",
+        "source_url": "https://izgrevou.com/priem/",
+        "note": "Optional; range per meal not stated as period.",
+        "amount_min": 4.5,
+        "amount_max": 7.5
+      }
+    ],
+    "no_fees_on_site": false,
+    "stored_rows": [
+      {
+        "id": 3231,
+        "category": "registration",
+        "amount": "100.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "one_time",
+        "label": "Такса прием и записване",
+        "published": true
+      },
+      {
+        "id": 3232,
+        "category": "materials",
+        "amount": "100.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "Такса материали",
+        "published": true
+      },
+      {
+        "id": 3233,
+        "category": "tuition",
+        "amount": "7160.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "Подготвителен клас / Подготвителен клас",
+        "published": true
+      },
+      {
+        "id": 2635,
+        "category": "tuition",
+        "amount": "100.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "BGN",
+        "period": "one_time",
+        "label": "Такса прием и записване",
+        "published": false
+      },
+      {
+        "id": 2636,
+        "category": "tuition",
+        "amount": "12300.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "BGN",
+        "period": "yearly",
+        "label": "Подготвителен клас",
+        "published": false
+      }
+    ]
+  },
+  {
+    "school_id": 351,
+    "pages": [
+      {
+        "url": "https://slanchogledi.bg/",
+        "hop": 0,
+        "prices": false,
+        "chars": 9473
+      },
+      {
+        "url": "https://slanchogledi.bg/admission/",
+        "hop": 1,
+        "prices": true,
+        "chars": 9617
+      }
+    ],
+    "cost_usd": 0.0008516999999999999,
+    "reader_fees": [
+      {
+        "category": "tuition",
+        "amount": 800.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Месечната такса (септември – юли)",
+        "note": null
+      },
+      {
+        "category": "tuition",
+        "amount": 600.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "Месечната такса за периода 16–31 август",
+        "note": null
+      },
+      {
+        "category": "registration",
+        "amount": 600.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "Първоначален Депозит",
+        "note": "Заплаща се при подписване на Договора."
+      }
+    ],
+    "reference_fees": [
+      {
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Месечна такса (септември – юли)",
+        "source_url": "https://slanchogledi.bg/admission/",
+        "note": "3% discount when paying the annual fee at once by 1 September. Paid 20th-25th of previous month.",
+        "amount": 800
+      },
+      {
+        "category": "tuition",
+        "currency": "EUR",
+        "period": null,
+        "label": "Такса за периода 16-31 август",
+        "source_url": "https://slanchogledi.bg/admission/",
+        "note": null,
+        "amount": 600
+      },
+      {
+        "category": "registration",
+        "currency": "EUR",
+        "period": null,
+        "label": "Първоначален депозит при подписване на договора",
+        "source_url": "https://slanchogledi.bg/admission/",
+        "note": null,
+        "amount": 600
+      }
+    ],
+    "no_fees_on_site": false,
+    "stored_rows": [
+      {
+        "id": 3234,
+        "category": "tuition",
+        "amount": "800.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Месечната такса",
+        "published": true
+      },
+      {
+        "id": 3235,
+        "category": "tuition",
+        "amount": "600.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "Месечната такса",
+        "published": false
+      },
+      {
+        "id": 3236,
+        "category": "registration",
+        "amount": "600.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "Първоначален Депозит",
+        "published": true
+      }
+    ]
+  },
+  {
+    "school_id": 381,
+    "pages": [
+      {
+        "url": "https://eduteh.eu/",
+        "hop": 0,
+        "prices": false,
+        "chars": 37067
+      },
+      {
+        "url": "https://eduteh.eu/chastno-osnovno-uchilishte/price-and-admission-chou",
+        "hop": 1,
+        "prices": false,
+        "chars": 17706
+      },
+      {
+        "url": "https://eduteh.eu/chastno-osnovno-uchilishte/price-and-admission-chou/priem-parvoklasnici",
+        "hop": 1,
+        "prices": true,
+        "chars": 20182
+      },
+      {
+        "url": "https://eduteh.eu/chastno-osnovno-uchilishte/price-and-admission-chou/priem-petoklasnici",
+        "hop": 1,
+        "prices": true,
+        "chars": 25014
+      },
+      {
+        "url": "https://eduteh.eu/chastna-profilirana-gimnazia/admission",
+        "hop": 1,
+        "prices": true,
+        "chars": 19383
+      },
+      {
+        "url": "https://eduteh.eu/chastno-osnovno-uchilishte/price-and-admission-chou/dni-otvoreni-vrati-chou",
+        "hop": 2,
+        "prices": true,
+        "chars": 19848
+      },
+      {
+        "url": "https://eduteh.eu/articles/nova-biling-paralelka",
+        "hop": 2,
+        "prices": false,
+        "chars": 23021
+      },
+      {
+        "url": "https://eduteh.eu/chastna-profilirana-gimnazia/profiles/predpriemacheski",
+        "hop": 2,
+        "prices": false,
+        "chars": 20906
+      },
+      {
+        "url": "https://eduteh.eu/chastna-profilirana-gimnazia/admission/dni-otvoreni-vrati",
+        "hop": 2,
+        "prices": true,
+        "chars": 19751
+      },
+      {
+        "url": "https://eduteh.eu/chastno-osnovno-uchilishte/education-process-organization/transport",
+        "hop": 3,
+        "prices": false,
+        "chars": 18044
+      }
+    ],
+    "cost_usd": 0.0062471,
+    "reader_fees": [
+      {
+        "category": "registration",
+        "amount": 100.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "Административна такса за кандидатстване",
+        "note": "Учебна 2026/2027 година; includes admission tests and assessment."
+      },
+      {
+        "category": "tuition",
+        "amount": 8110.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "Такса за обучение",
+        "note": "For the 2026/2027 school year."
+      },
+      {
+        "category": "food",
+        "amount": 174.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Такса за храна",
+        "note": "For the 2025/2026 school year."
+      }
+    ],
+    "reference_fees": [
+      {
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "Такса за обучение 2026/2027",
+        "source_url": "https://eduteh.eu/chastno-osnovno-uchilishte/price-and-admission-chou/priem-petoklasnici",
+        "note": "Stated on both 1st-grade and 5th-grade admission pages; payable in 1, 2 or 3 installments. 7th grade is 10% higher than base.",
+        "amount": 8110
+      },
+      {
+        "category": "food",
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Такса за храна (учебна 2025/2026)",
+        "source_url": "https://eduteh.eu/chastno-osnovno-uchilishte/price-and-admission-chou/priem-petoklasnici",
+        "note": "Prepaid two months ahead; page labels it 2025/2026.",
+        "amount": 174
+      },
+      {
+        "category": "registration",
+        "currency": "EUR",
+        "period": null,
+        "label": "Административна такса за кандидатстване 2026/2027",
+        "source_url": "https://eduteh.eu/chastno-osnovno-uchilishte/price-and-admission-chou/priem-parvoklasnici",
+        "note": "Covers entrance exams/tests.",
+        "amount": 100
+      }
+    ],
+    "no_fees_on_site": false,
+    "stored_rows": [
+      {
+        "id": 3237,
+        "category": "registration",
+        "amount": "100.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "Административната такса за кандидатстване",
+        "published": true
+      },
+      {
+        "id": 3238,
+        "category": "registration",
+        "amount": "200.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "BGN",
+        "period": null,
+        "label": "Административната такса за кандидатстване",
+        "published": true
+      },
+      {
+        "id": 3239,
+        "category": "tuition",
+        "amount": "8110.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "Таксата за обучение",
+        "published": true
+      },
+      {
+        "id": 3240,
+        "category": "food",
+        "amount": "174.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Таксата за храна",
+        "published": true
+      }
+    ]
+  },
+  {
+    "school_id": 393,
+    "pages": [
+      {
+        "url": "https://www.montessori-bulgaria.com/en",
+        "hop": 0,
+        "prices": false,
+        "chars": 13106
+      },
+      {
+        "url": "https://www.montessori-bulgaria.com/en/admission",
+        "hop": 1,
+        "prices": true,
+        "chars": 6331
+      },
+      {
+        "url": "https://www.montessori-bulgaria.com/en/the-method/food",
+        "hop": 1,
+        "prices": false,
+        "chars": 7927
+      },
+      {
+        "url": "https://www.montessori-bulgaria.com/en/faq",
+        "hop": 1,
+        "prices": false,
+        "chars": 15188
+      },
+      {
+        "url": "https://www.montessori-bulgaria.com/en/admission/request-a-meeting",
+        "hop": 2,
+        "prices": false,
+        "chars": 4200
+      },
+      {
+        "url": "https://www.montessori-bulgaria.com/en/admission/documents-and-steps-for-enrollment",
+        "hop": 2,
+        "prices": false,
+        "chars": 5740
+      }
+    ],
+    "cost_usd": 0.0007797500000000001,
+    "reader_fees": [
+      {
+        "category": "registration",
+        "amount": 600.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "BGN",
+        "period": null,
+        "label": "admission fee",
+        "note": "Non-refundable."
+      }
+    ],
+    "reference_fees": [
+      {
+        "category": "registration",
+        "currency": "BGN",
+        "period": null,
+        "label": "Non-refundable admission fee",
+        "source_url": "https://www.montessori-bulgaria.com/en/admission",
+        "note": "No school year stated. Tuition payable monthly (with two deposits) or yearly with 5% discount; no tuition amounts given.",
+        "amount": 600
+      }
+    ],
+    "no_fees_on_site": false,
+    "stored_rows": [
+      {
+        "id": 3241,
+        "category": "registration",
+        "amount": "600.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "BGN",
+        "period": null,
+        "label": "non-refundable admission fee",
+        "published": true
+      }
+    ]
+  },
+  {
+    "school_id": 405,
+    "pages": [
+      {
+        "url": "https://mmagdalena-bg.com/",
+        "hop": 0,
+        "prices": false,
+        "chars": 22597
+      },
+      {
+        "url": "https://mmagdalena-bg.com/priem/",
+        "hop": 1,
+        "prices": true,
+        "chars": 8184
+      },
+      {
+        "url": "https://mmagdalena-bg.com/%d0%b8%d0%b7%d0%b8%d1%81%d0%ba%d0%b2%d0%b0%d0%bd%d0%b8%d1%8f-%d0%bf%d1%80%d0%b8%d0%b5%d0%bc/",
+        "hop": 1,
+        "prices": false,
+        "chars": 18643
+      }
+    ],
+    "cost_usd": 0.000945,
+    "reader_fees": [
+      {
+        "category": "tuition",
+        "amount": 765.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Месечна такса",
+        "note": "Прием на деца 2026/2027"
+      }
+    ],
+    "reference_fees": [
+      {
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Месечна такса (прием 2026/2027)",
+        "source_url": "https://mmagdalena-bg.com/priem/",
+        "note": "Includes 4 meals/day, English, music, folk dance, sport, insurance.",
+        "amount": 765
+      }
+    ],
+    "no_fees_on_site": false,
+    "stored_rows": []
+  },
+  {
+    "school_id": 507,
+    "pages": [
+      {
+        "url": "https://questjunior.bg/",
+        "hop": 0,
+        "prices": false,
+        "chars": 6881
+      },
+      {
+        "url": "https://questjunior.bg/priem/taksi",
+        "hop": 1,
+        "prices": true,
+        "chars": 2489
+      }
+    ],
+    "cost_usd": 0.00039610000000000003,
+    "reader_fees": [
+      {
+        "category": "tuition",
+        "amount": 800.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Месечна такса обучение, изхранване и грижа",
+        "note": null
+      },
+      {
+        "category": "materials",
+        "amount": 150.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "Годишна такса за учебни, творчески материали и консумативи",
+        "note": "Платима до 1 септември."
+      }
+    ],
+    "reference_fees": [
+      {
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Месечна такса обучение, изхранване и грижа",
+        "source_url": "https://questjunior.bg/priem/taksi",
+        "note": "Includes food; 7 EUR per day of medical absence deducted.",
+        "amount": 800
+      },
+      {
+        "category": "materials",
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "Годишна такса за учебни, творчески материали и консумативи",
+        "source_url": "https://questjunior.bg/priem/taksi",
+        "note": "Due by 1 September.",
+        "amount": 150
+      }
+    ],
+    "no_fees_on_site": false,
+    "stored_rows": [
+      {
+        "id": 2930,
+        "category": "materials",
+        "amount": "150.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "учебни",
+        "published": true
+      },
+      {
+        "id": 2929,
+        "category": "tuition",
+        "amount": "7.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "отсъствие на дете по медицински причини",
+        "published": false
+      },
+      {
+        "id": 2928,
+        "category": "tuition",
+        "amount": "800.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "обучение",
+        "published": true
+      }
+    ]
+  },
+  {
+    "school_id": 511,
+    "pages": [
+      {
+        "url": "https://www.arty.bg/",
+        "hop": 0,
+        "prices": false,
+        "chars": 2073
+      },
+      {
+        "url": "https://www.arty.bg/bg/pages/charges.html?PHPSESSID=b91e074d7c495052e0b8e2444dfa89ec",
+        "hop": 1,
+        "prices": true,
+        "chars": 3966
+      },
+      {
+        "url": "https://www.arty.bg/bg/pages/charges.html",
+        "hop": 2,
+        "prices": true,
+        "chars": 3966
+      }
+    ],
+    "cost_usd": 0.00105165,
+    "reader_fees": [
+      {
+        "category": "tuition",
+        "amount": 700.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "За Оборище — Месечната такса за целодневно посещение, обучение и грижи",
+        "note": null
+      },
+      {
+        "category": "food",
+        "amount": 140.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "Такса Храна (четири пъти дневно)",
+        "note": "За Оборище"
+      },
+      {
+        "category": "tuition",
+        "amount": 600.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "За Кукуш — Месечната такса за целодневно посещение, обучение и грижи",
+        "note": null
+      },
+      {
+        "category": "food",
+        "amount": 140.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "Такса Храна (четири пъти дневно)",
+        "note": "За Кукуш"
+      }
+    ],
+    "reference_fees": [
+      {
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Оборище – месечна такса за целодневно посещение",
+        "source_url": "https://www.arty.bg/bg/pages/charges.html",
+        "note": null,
+        "amount": 700
+      },
+      {
+        "category": "food",
+        "currency": "EUR",
+        "period": null,
+        "label": "Оборище – такса храна (четири пъти дневно)",
+        "source_url": "https://www.arty.bg/bg/pages/charges.html",
+        "note": null,
+        "amount": 140
+      },
+      {
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Кукуш – месечна такса за целодневно посещение",
+        "source_url": "https://www.arty.bg/bg/pages/charges.html",
+        "note": null,
+        "amount": 600
+      },
+      {
+        "category": "food",
+        "currency": "EUR",
+        "period": null,
+        "label": "Кукуш – такса храна (четири пъти дневно)",
+        "source_url": "https://www.arty.bg/bg/pages/charges.html",
+        "note": null,
+        "amount": 140
+      }
+    ],
+    "no_fees_on_site": false,
+    "stored_rows": [
+      {
+        "id": 3603,
+        "category": "tuition",
+        "amount": "700.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "За Оборище / Месечната такса за целодневно посещение, обучение и грижи",
+        "published": true
+      },
+      {
+        "id": 3604,
+        "category": "tuition",
+        "amount": "600.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "За Кукуш / Месечната такса за целодневно посещение, обучение и грижи",
+        "published": true
+      }
+    ]
+  },
+  {
+    "school_id": 515,
+    "pages": [
+      {
+        "url": "https://britanica-parkschool.bg/",
+        "hop": 0,
+        "prices": false,
+        "chars": 17972
+      },
+      {
+        "url": "https://britanica-parkschool.bg/priem/",
+        "hop": 1,
+        "prices": true,
+        "chars": 28623
+      },
+      {
+        "url": "https://britanica-parkschool.bg/detska-gradina/",
+        "hop": 1,
+        "prices": false,
+        "chars": 20242
+      },
+      {
+        "url": "https://britanica-parkschool.bg/en/admission/",
+        "hop": 2,
+        "prices": true,
+        "chars": 28134
+      }
+    ],
+    "cost_usd": 0.003398125,
+    "reader_fees": [
+      {
+        "category": "registration",
+        "amount": 240.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "one_time",
+        "label": "Административна такса",
+        "note": "Kindergarten admission; non-refundable."
+      },
+      {
+        "category": "tuition",
+        "amount": 11400.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "Първа група — Пълно плащане",
+        "note": "2026/2027 school year."
+      },
+      {
+        "category": "tuition",
+        "amount": 5700.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "Първа група — Две вноски",
+        "note": "2 installments of EUR 5,700."
+      },
+      {
+        "category": "tuition",
+        "amount": 2992.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Първа група — Месечно плащане",
+        "note": "Initial installment (1 payment)."
+      },
+      {
+        "category": "tuition",
+        "amount": 1051.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Първа група — Месечно плащане",
+        "note": "Each of the remaining 8 installments."
+      },
+      {
+        "category": "tuition",
+        "amount": 11400.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "Втора група — Пълно плащане",
+        "note": "2026/2027 school year."
+      },
+      {
+        "category": "tuition",
+        "amount": 5700.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "Втора група — Две вноски",
+        "note": "2 installments of EUR 5,700."
+      },
+      {
+        "category": "tuition",
+        "amount": 2992.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Втора група — Месечно плащане",
+        "note": "Initial installment (1 payment)."
+      },
+      {
+        "category": "tuition",
+        "amount": 1051.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Втора група — Месечно плащане",
+        "note": "Each of the remaining 8 installments."
+      },
+      {
+        "category": "tuition",
+        "amount": 11800.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "Трета група — Пълно плащане",
+        "note": "2026/2027 school year."
+      },
+      {
+        "category": "tuition",
+        "amount": 5900.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "Трета група — Две вноски",
+        "note": "2 installments of EUR 5,900."
+      },
+      {
+        "category": "tuition",
+        "amount": 2904.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Трета група — Месечно плащане",
+        "note": "Initial installment (1 payment)."
+      },
+      {
+        "category": "tuition",
+        "amount": 1112.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Трета група — Месечно плащане",
+        "note": "Each of the remaining 8 installments."
+      },
+      {
+        "category": "tuition",
+        "amount": 12900.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "Подготвителна група — Пълно плащане",
+        "note": "2026/2027 school year."
+      },
+      {
+        "category": "tuition",
+        "amount": 6450.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "Подготвителна група — Две вноски",
+        "note": "2 installments of EUR 6,450."
+      },
+      {
+        "category": "tuition",
+        "amount": 2828.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Подготвителна група — Месечно плащане",
+        "note": "Initial installment (1 payment)."
+      },
+      {
+        "category": "tuition",
+        "amount": 1259.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Подготвителна група — Месечно плащане",
+        "note": "Each of the remaining 8 installments."
+      },
+      {
+        "category": "materials",
+        "amount": 550.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "Такса за учебни ресурси",
+        "note": "Paid once for the whole 2026/2027 school year."
+      }
+    ],
+    "reference_fees": [
+      {
+        "category": "registration",
+        "currency": "EUR",
+        "period": "one_time",
+        "label": "Административна такса (детска градина)",
+        "source_url": "https://britanica-parkschool.bg/priem/",
+        "note": "Non-refundable, paid before trial days; school section states the same 240 EUR for the school",
+        "amount": 240
+      }
+    ],
+    "no_fees_on_site": false,
+    "stored_rows": [
+      {
+        "id": 3276,
+        "category": "registration",
+        "amount": "240.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "Кандидатстване за прием в детска градина / Кандидатстване за прием в детска градина / административна такса",
+        "published": true
+      }
+    ]
+  },
+  {
+    "school_id": 517,
+    "pages": [
+      {
+        "url": "https://www.parvamatematicheska.com/",
+        "hop": 0,
+        "prices": false,
+        "chars": 16087
+      },
+      {
+        "url": "https://www.parvamatematicheska.com/pchmg/finansovi-uslovija/",
+        "hop": 1,
+        "prices": true,
+        "chars": 13767
+      },
+      {
+        "url": "https://www.parvamatematicheska.com/pchmg/priem/",
+        "hop": 1,
+        "prices": false,
+        "chars": 17676
+      },
+      {
+        "url": "https://www.parvamatematicheska.com/wp-content/uploads/2024/03/%D0%9F%D0%A0%D0%90%D0%92%D0%98%D0%9B%D0%90-%D0%98-%D0%9F%D0%A0%D0%9E%D0%A6%D0%95%D0%94%D0%A3%D0%A0%D0%90-%D0%BF%D1%80%D0%B8%D0%B5%D0%BC-2024-2025-5-%D0%BA%D0%BB%D0%B0%D1%81.pdf",
+        "hop": 2,
+        "prices": false,
+        "chars": 2507
+      },
+      {
+        "url": "https://www.parvamatematicheska.com/wp-content/uploads/2024/03/%D0%9F%D0%A0%D0%90%D0%92%D0%98%D0%9B%D0%90-%D0%98-%D0%9F%D0%A0%D0%9E%D0%A6%D0%95%D0%94%D0%A3%D0%A0%D0%90-%D0%BF%D1%80%D0%B8%D0%B5%D0%BC-2024-2025-8-%D0%BA%D0%BB%D0%B0%D1%81.pdf",
+        "hop": 2,
+        "prices": false,
+        "chars": 3872
+      },
+      {
+        "url": "https://www.parvamatematicheska.com/%d0%b7%d0%b0%d0%bf%d0%b8%d1%81%d0%b2%d0%b0%d0%bd%d0%b5-%d0%b7%d0%b0-%d1%82%d1%80%d0%b5%d1%82%d0%b8-%d0%bf%d1%80%d0%b8%d0%b5%d0%bc%d0%b5%d0%bd-%d0%b8%d0%b7%d0%bf%d0%b8%d1%82-%d0%bd%d0%b0-%d0%bf%d1%87/",
+        "hop": 3,
+        "prices": true,
+        "chars": 12296
+      }
+    ],
+    "cost_usd": 0.00272545,
+    "reader_fees": [
+      {
+        "category": "tuition",
+        "amount": 7810.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "Годишна такса — 5. клас",
+        "note": null
+      },
+      {
+        "category": "tuition",
+        "amount": 4022.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "На две вноски — 5. клас",
+        "note": "2 installments of €4,022 each."
+      },
+      {
+        "category": "tuition",
+        "amount": 1045.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "На осем месечни вноски — 5. клас",
+        "note": "8 installments of €1,045 each; first payment is the deposit."
+      },
+      {
+        "category": "tuition",
+        "amount": 7000.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "Годишна такса — 8. клас",
+        "note": null
+      },
+      {
+        "category": "tuition",
+        "amount": 3605.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "На две вноски — 8. клас",
+        "note": "2 installments of €3,605 each."
+      },
+      {
+        "category": "tuition",
+        "amount": 938.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "На осем месечни вноски — 8. клас",
+        "note": "8 installments of €938 each; first payment is the deposit."
+      },
+      {
+        "category": "registration",
+        "amount": 35.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "Такса за участие в Трети приемен изпит",
+        "note": "Entrance exam for students in grades 4 and 7."
+      }
+    ],
+    "reference_fees": [
+      {
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "5 клас 2026/2027, еднократно плащане",
+        "source_url": "https://www.parvamatematicheska.com/pchmg/finansovi-uslovija/",
+        "note": "Deposit (капаро) 1045 EUR deducted from last installment; 5% second child, 10% third child off annual tuition; scholarships for 20% of new 5th graders",
+        "amount": 7810
+      },
+      {
+        "category": "tuition",
+        "currency": "EUR",
+        "period": null,
+        "label": "5 клас 2026/2027, 2 х 4022 евро",
+        "source_url": "https://www.parvamatematicheska.com/pchmg/finansovi-uslovija/",
+        "note": "Two installments (by 09.07.2026 and 05.02.2027)",
+        "amount": 4022
+      },
+      {
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "5 клас 2026/2027, 8 х 1045 евро",
+        "source_url": "https://www.parvamatematicheska.com/pchmg/finansovi-uslovija/",
+        "note": "Eight installments: first at contract signing (капаро), then monthly Sept-March",
+        "amount": 1045
+      },
+      {
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "8 клас 2026/2027, еднократно плащане",
+        "source_url": "https://www.parvamatematicheska.com/pchmg/finansovi-uslovija/",
+        "note": "Deposit (капаро) 938 EUR deducted from last installment; 5% second child, 10% third child off annual tuition; scholarships for 20% of new 8th graders",
+        "amount": 7000
+      },
+      {
+        "category": "tuition",
+        "currency": "EUR",
+        "period": null,
+        "label": "8 клас 2026/2027, 2 х 3605 евро",
+        "source_url": "https://www.parvamatematicheska.com/pchmg/finansovi-uslovija/",
+        "note": "Two installments (by 22.07.2026 and 05.02.2027)",
+        "amount": 3605
+      },
+      {
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "8 клас 2026/2027, 8 х 938 евро",
+        "source_url": "https://www.parvamatematicheska.com/pchmg/finansovi-uslovija/",
+        "note": "Eight installments: first at contract signing (капаро), then monthly Sept-March",
+        "amount": 938
+      }
+    ],
+    "no_fees_on_site": false,
+    "stored_rows": [
+      {
+        "id": 2728,
+        "category": "registration",
+        "amount": "30.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "one_time",
+        "label": "2.",
+        "published": false
+      },
+      {
+        "id": 3115,
+        "category": "tuition",
+        "amount": "7810.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "5. клас / ГОДИШНА ТАКСА",
+        "published": true
+      },
+      {
+        "id": 3116,
+        "category": "tuition",
+        "amount": "7000.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "8. клас / ГОДИШНА ТАКСА",
+        "published": true
+      }
+    ]
+  },
+  {
+    "school_id": 518,
+    "pages": [
+      {
+        "url": "https://doverie-bg.net/",
+        "hop": 0,
+        "prices": false,
+        "chars": 12727
+      },
+      {
+        "url": "https://doverie-bg.net/wp-content/uploads/2025/06/%D0%9F%D0%A0%D0%90%D0%92%D0%98%D0%9B%D0%9D%D0%98%D0%9A-%D0%97%D0%90-%D0%94%D0%95%D0%99%D0%9D%D0%9E%D0%A1%D0%A2%D0%A2%D0%90-%D0%A7%D0%94%D0%93-%D0%94%D0%BE%D0%B2%D0%B5%D1%80%D0%B8%D0%B5.pdf",
+        "hop": 1,
+        "prices": false,
+        "chars": 59107
+      },
+      {
+        "url": "https://doverie-bg.net/za-nas/",
+        "hop": 2,
+        "prices": false,
+        "chars": 6922
+      },
+      {
+        "url": "https://doverie-bg.net/legoznaiko/",
+        "hop": 3,
+        "prices": false,
+        "chars": 5649
+      },
+      {
+        "url": "https://doverie-bg.net/kontakti/",
+        "hop": 3,
+        "prices": false,
+        "chars": 2664
+      },
+      {
+        "url": "https://doverie-bg.net/%d0%b3%d0%be%d1%80%d1%81%d0%ba%d0%b0%d1%82%d0%b0-%d0%b4%d0%b5%d1%82%d1%81%d0%ba%d0%b0-%d0%b3%d1%80%d0%b0%d0%b4%d0%b8%d0%bd%d0%b0/",
+        "hop": 3,
+        "prices": false,
+        "chars": 4758
+      }
+    ],
+    "cost_usd": 0.0006011,
+    "reader_fees": [],
+    "reference_fees": [],
+    "no_fees_on_site": true,
+    "stored_rows": []
+  },
+  {
+    "school_id": 525,
+    "pages": [
+      {
+        "url": "https://slaveiche.com/",
+        "hop": 0,
+        "prices": false,
+        "chars": 4622
+      },
+      {
+        "url": "https://slaveiche.com/taksi/",
+        "hop": 1,
+        "prices": true,
+        "chars": 2057
+      },
+      {
+        "url": "https://slaveiche.com/priem/",
+        "hop": 2,
+        "prices": false,
+        "chars": 1766
+      }
+    ],
+    "cost_usd": 0.0006812000000000001,
+    "reader_fees": [
+      {
+        "category": "tuition",
+        "amount": 560.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "целодневно гледане",
+        "note": "ежемесечно заплащане"
+      },
+      {
+        "category": "tuition",
+        "amount": 350.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "половин ден с включен обяд",
+        "note": null
+      },
+      {
+        "category": "registration",
+        "amount": 280.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "депозит за запазване на място",
+        "note": null
+      },
+      {
+        "category": "tuition",
+        "amount": 540.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "при предплащане за 3 месеца",
+        "note": "Отстъпка при предплащане на целодневна такса"
+      },
+      {
+        "category": "tuition",
+        "amount": 520.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "при предплащане над 6 месеца",
+        "note": "Отстъпка при предплащане на целодневна такса"
+      },
+      {
+        "category": "extracurricular",
+        "amount": 20.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "обучение по английски език",
+        "note": "3 пъти седмично"
+      },
+      {
+        "category": "extracurricular",
+        "amount": 25.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "йога за деца",
+        "note": "1 път седмично"
+      },
+      {
+        "category": "extracurricular",
+        "amount": 25.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "модерни танци",
+        "note": "2 пъти седмично"
+      }
+    ],
+    "reference_fees": [
+      {
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Целодневно гледане",
+        "source_url": "https://slaveiche.com/taksi/",
+        "note": "Includes food, medical care, textbooks/supplies; 10% extra discount for second child",
+        "amount": 560
+      },
+      {
+        "category": "tuition",
+        "currency": "EUR",
+        "period": null,
+        "label": "Целодневно - при предплащане за 3 месеца",
+        "source_url": "https://slaveiche.com/taksi/",
+        "note": "Discounted prepayment price",
+        "amount": 540
+      },
+      {
+        "category": "tuition",
+        "currency": "EUR",
+        "period": null,
+        "label": "Целодневно - при предплащане над 6 месеца",
+        "source_url": "https://slaveiche.com/taksi/",
+        "note": "Discounted prepayment price",
+        "amount": 520
+      },
+      {
+        "category": "tuition",
+        "currency": "EUR",
+        "period": null,
+        "label": "Половин ден с включен обяд",
+        "source_url": "https://slaveiche.com/taksi/",
+        "note": "7.30-12.30 or 12.00-19.00",
+        "amount": 350
+      },
+      {
+        "category": "registration",
+        "currency": "EUR",
+        "period": null,
+        "label": "Депозит за запазване на място",
+        "source_url": "https://slaveiche.com/taksi/",
+        "note": "Prием page: reservation equals half a monthly fee",
+        "amount": 280
+      },
+      {
+        "category": "extracurricular",
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Английски език, 3 пъти седмично",
+        "source_url": "https://slaveiche.com/taksi/",
+        "note": null,
+        "amount": 20
+      },
+      {
+        "category": "extracurricular",
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Детска йога, 1 път седмично",
+        "source_url": "https://slaveiche.com/taksi/",
+        "note": null,
+        "amount": 25
+      },
+      {
+        "category": "extracurricular",
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Модерни танци, 2 пъти седмично",
+        "source_url": "https://slaveiche.com/taksi/",
+        "note": null,
+        "amount": 25
+      }
+    ],
+    "no_fees_on_site": false,
+    "stored_rows": [
+      {
+        "id": 3291,
+        "category": "tuition",
+        "amount": "560.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "целодневно гледане",
+        "published": true
+      },
+      {
+        "id": 3292,
+        "category": "tuition",
+        "amount": "350.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "половин ден с включен обяд",
+        "published": false
+      },
+      {
+        "id": 3293,
+        "category": "registration",
+        "amount": "280.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "депозит за запазване на място",
+        "published": true
+      },
+      {
+        "id": 3294,
+        "category": "extracurricular",
+        "amount": "20.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "обучение по английски език / месечна такса",
+        "published": true
+      },
+      {
+        "id": 3295,
+        "category": "extracurricular",
+        "amount": "25.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "йога за деца",
+        "published": true
+      }
+    ]
+  },
+  {
+    "school_id": 527,
+    "pages": [
+      {
+        "url": "https://under1roof.bg/",
+        "hop": 0,
+        "prices": false,
+        "chars": 11065
+      },
+      {
+        "url": "https://under1roof.bg/price-table/",
+        "hop": 1,
+        "prices": true,
+        "chars": 4102
+      }
+    ],
+    "cost_usd": 0.000631375,
+    "reader_fees": [
+      {
+        "category": "tuition",
+        "amount": 550.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Детска градина Целодневна",
+        "note": null
+      },
+      {
+        "category": "tuition",
+        "amount": 540.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "BGN",
+        "period": "monthly",
+        "label": "Детска градина Полудневна",
+        "note": null
+      },
+      {
+        "category": "transport",
+        "amount": 280.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "BGN",
+        "period": "monthly",
+        "label": "Транспорт от врата до врата",
+        "note": "Базова цена; цените се определят в зависимост от района на местоживеене."
+      }
+    ],
+    "reference_fees": [
+      {
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Детска градина Целодневна",
+        "source_url": "https://under1roof.bg/price-table/",
+        "note": "Undated; discounts 5/10/15/20% for prepaying 3/6/9/12 months; 10% second child, 15% third child",
+        "amount": 550
+      },
+      {
+        "category": "tuition",
+        "currency": "BGN",
+        "period": "monthly",
+        "label": "Детска градина Полудневна",
+        "source_url": "https://under1roof.bg/price-table/",
+        "note": "Undated; printed in лв.",
+        "amount": 540
+      },
+      {
+        "category": "transport",
+        "currency": "BGN",
+        "period": "monthly",
+        "label": "Транспорт от врата до врата, базова цена в двете посоки",
+        "source_url": "https://under1roof.bg/price-table/",
+        "note": "Price depends on district",
+        "amount": 280
+      }
+    ],
+    "no_fees_on_site": false,
+    "stored_rows": []
+  },
+  {
+    "school_id": 529,
+    "pages": [
+      {
+        "url": "https://www.ds-sofia.bg/",
+        "hop": 0,
+        "prices": false,
+        "chars": 11899
+      },
+      {
+        "url": "https://www.ds-sofia.bg/%D1%83%D1%87%D0%B5%D0%B1%D0%BD%D0%B8-%D1%82%D0%B0%D0%BA%D1%81%D0%B8",
+        "hop": 1,
+        "prices": true,
+        "chars": 6857
+      },
+      {
+        "url": "https://www.ds-sofia.bg/%D1%85%D1%80%D0%B0%D0%BD%D0%B5%D0%BD%D0%B5-%D0%B2-%D1%83%D1%87%D0%B8%D0%BB%D0%B8%D1%89%D0%B5",
+        "hop": 1,
+        "prices": false,
+        "chars": 6671
+      },
+      {
+        "url": "https://www.ds-sofia.bg/%D0%BF%D1%80%D0%B8%D0%B5%D0%BC-%D0%BD%D0%B0-%D1%83%D1%87%D0%B5%D0%BD%D0%B8%D1%86%D0%B8",
+        "hop": 1,
+        "prices": false,
+        "chars": 6653
+      },
+      {
+        "url": "https://www.ds-sofia.bg/%D0%BA%D0%B0%D0%BD%D0%B4%D0%B8%D0%B4%D0%B0%D1%82%D1%81%D1%82%D0%B2%D0%B0%D0%BD%D0%B5",
+        "hop": 1,
+        "prices": false,
+        "chars": 8924
+      },
+      {
+        "url": "https://28213091-9851-4a7a-bf35-a142488d88e8.filesusr.com/ugd/3a4b7a_19260668942e4a169cec7e4f70a2981b.pdf",
+        "hop": 2,
+        "prices": true,
+        "chars": 11500
+      },
+      {
+        "url": "https://www.ds-sofia.bg/%D0%BA%D1%80%D0%B8%D1%82%D0%B5%D1%80%D0%B8%D0%B8-%D0%B7%D0%B0-%D0%BF%D1%80%D0%B8%D0%B5%D0%BC",
+        "hop": 3,
+        "prices": false,
+        "chars": 7550
+      },
+      {
+        "url": "https://www.ds-sofia.bg/%D0%BA%D1%80%D0%B8%D1%82%D0%B5%D1%80%D0%B8%D0%B8-%D0%B7%D0%B0-%D0%BF%D1%80%D0%B8%D0%B5%D0%BC-%D0%BD%D0%B0%D1%87%D0%B0%D0%BB%D0%BD%D0%BE-%D1%83%D1%87%D0%B8%D0%BB%D0%B8%D1%89%D0%B5",
+        "hop": 3,
+        "prices": false,
+        "chars": 7304
+      },
+      {
+        "url": "https://www.ds-sofia.bg/%D0%BA%D1%80%D0%B8%D1%82%D0%B5%D1%80%D0%B8%D0%B8-%D0%B7%D0%B0-%D0%BF%D1%80%D0%B8%D0%B5%D0%BC-%D0%BF%D1%8A%D1%80%D0%B2%D0%B0-%D0%B3%D0%B8%D0%BC%D0%BD%D0%B0%D0%B7%D0%B8%D0%B0%D0%BB%D0%BD%D0%B0",
+        "hop": 3,
+        "prices": false,
+        "chars": 6597
+      }
+    ],
+    "cost_usd": 0.001920425,
+    "reader_fees": [
+      {
+        "category": "registration",
+        "amount": 2000.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "one_time",
+        "label": "Такса за прием",
+        "note": "За новоприети ученици."
+      },
+      {
+        "category": "tuition",
+        "amount": 6740.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "Гимназия — Една вноска годишно",
+        "note": "Учебна 2026/2027 година."
+      },
+      {
+        "category": "tuition",
+        "amount": 7414.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "Гимназия — Две равни вноски годишно",
+        "note": "Учебна 2026/2027 година."
+      },
+      {
+        "category": "tuition",
+        "amount": 80.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "Гост-ученик — на ден",
+        "note": "Дневна такса за гост-ученици."
+      }
+    ],
+    "reference_fees": [
+      {
+        "category": "registration",
+        "currency": "EUR",
+        "period": "one_time",
+        "label": "Такса прием за новоприетите ученици",
+        "source_url": "https://www.ds-sofia.bg/учебни-такси",
+        "note": "2026/2027; non-refundable",
+        "amount": 2000
+      },
+      {
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "Предучилище, еднократна годишна вноска",
+        "source_url": "https://www.ds-sofia.bg/учебни-такси",
+        "note": "2026/2027; sibling discount 10% second, 15% each further child",
+        "amount": 6540
+      },
+      {
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "Предучилище, две равни вноски",
+        "source_url": "https://www.ds-sofia.bg/учебни-такси",
+        "note": "2026/2027; total annual amount when paid in two installments",
+        "amount": 7194
+      },
+      {
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "Начално училище, еднократна годишна вноска",
+        "source_url": "https://www.ds-sofia.bg/учебни-такси",
+        "note": "2026/2027",
+        "amount": 6580
+      },
+      {
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "Начално училище, две равни вноски",
+        "source_url": "https://www.ds-sofia.bg/учебни-такси",
+        "note": "2026/2027; total annual amount",
+        "amount": 7238
+      },
+      {
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "Гимназия, еднократна годишна вноска",
+        "source_url": "https://www.ds-sofia.bg/учебни-такси",
+        "note": "2026/2027",
+        "amount": 6740
+      },
+      {
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "Гимназия, две равни вноски",
+        "source_url": "https://www.ds-sofia.bg/учебни-такси",
+        "note": "2026/2027; total annual amount",
+        "amount": 7414
+      },
+      {
+        "category": "tuition",
+        "currency": "EUR",
+        "period": null,
+        "label": "Гост-ученици, за всеки учебен ден",
+        "source_url": "https://www.ds-sofia.bg/учебни-такси",
+        "note": "Per school day",
+        "amount": 80
+      }
+    ],
+    "no_fees_on_site": false,
+    "stored_rows": [
+      {
+        "id": 3300,
+        "category": "registration",
+        "amount": "2000.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "one_time",
+        "label": "Такса прием (еднократна) за новоприетите ученици",
+        "published": true
+      },
+      {
+        "id": 3301,
+        "category": "tuition",
+        "amount": "6540.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "Предучилищна / Предучилищна / Сума при еднократна годишна вноска",
+        "published": true
+      },
+      {
+        "id": 3302,
+        "category": "tuition",
+        "amount": "6580.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "Начално училище / Начално училище / Сума при еднократна годишна вноска",
+        "published": true
+      },
+      {
+        "id": 3303,
+        "category": "tuition",
+        "amount": "6740.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "Гимназия / Гимназия / Сума при еднократна годишна вноска",
+        "published": true
+      }
+    ]
+  },
+  {
+    "school_id": 530,
+    "pages": [
+      {
+        "url": "https://detski-sviat.info/",
+        "hop": 0,
+        "prices": false,
+        "chars": 10734
+      },
+      {
+        "url": "https://detski-sviat.info/ceni-i-taksi/",
+        "hop": 1,
+        "prices": true,
+        "chars": 6673
+      },
+      {
+        "url": "https://detski-sviat.info/priem/",
+        "hop": 2,
+        "prices": false,
+        "chars": 7963
+      }
+    ],
+    "cost_usd": 0.000785775,
+    "reader_fees": [
+      {
+        "category": "tuition",
+        "amount": 750.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Целодневен престой",
+        "note": "Месечна такса"
+      },
+      {
+        "category": "tuition",
+        "amount": 550.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Полудневен престой с обяд",
+        "note": "Месечна такса"
+      },
+      {
+        "category": "registration",
+        "amount": 200.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "Депозит за запазване на място",
+        "note": "За ново дете"
+      },
+      {
+        "category": "registration",
+        "amount": 150.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "Депозит за запазване на място за следващата учебна година",
+        "note": "Приспада се от таксата за месец септември; заплаща се от 1-ви март до 15-ти април"
+      }
+    ],
+    "reference_fees": [
+      {
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Целодневен престой",
+        "source_url": "https://detski-sviat.info/ceni-i-taksi/",
+        "note": "Includes meals; 5% off for full-year payment; 10% off second and further child",
+        "amount": 750
+      },
+      {
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Полудневен престой с обяд",
+        "source_url": "https://detski-sviat.info/ceni-i-taksi/",
+        "note": null,
+        "amount": 550
+      },
+      {
+        "category": "registration",
+        "currency": "EUR",
+        "period": "one_time",
+        "label": "Депозит за запазване на място (ново дете)",
+        "source_url": "https://detski-sviat.info/ceni-i-taksi/",
+        "note": null,
+        "amount": 200
+      },
+      {
+        "category": "registration",
+        "currency": "EUR",
+        "period": null,
+        "label": "Депозит за запазване на място за следващата учебна година",
+        "source_url": "https://detski-sviat.info/ceni-i-taksi/",
+        "note": "Deducted from September fee; paid 1 March - 15 April",
+        "amount": 150
+      }
+    ],
+    "no_fees_on_site": false,
+    "stored_rows": [
+      {
+        "id": 2943,
+        "category": "tuition",
+        "amount": "750.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "",
+        "published": true
+      },
+      {
+        "id": 2942,
+        "category": "registration",
+        "amount": "150.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "one_time",
+        "label": "",
+        "published": true
+      },
+      {
+        "id": 2941,
+        "category": "registration",
+        "amount": "200.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "one_time",
+        "label": "",
+        "published": true
+      },
+      {
+        "id": 2944,
+        "category": "tuition",
+        "amount": "550.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "Полудневен престой с обяд",
+        "published": false
+      }
+    ]
+  },
+  {
+    "school_id": 531,
+    "pages": [
+      {
+        "url": "https://www.montessori-high.com/bg",
+        "hop": 0,
+        "prices": false,
+        "chars": 10730
+      },
+      {
+        "url": "https://montessori-high.com/bg/priem",
+        "hop": 1,
+        "prices": true,
+        "chars": 9085
+      }
+    ],
+    "cost_usd": 0.000823625,
+    "reader_fees": [
+      {
+        "category": "tuition",
+        "amount": 970.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Месечна Такса група 0-3",
+        "note": null
+      },
+      {
+        "category": "materials",
+        "amount": 390.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "one_time",
+        "label": "осигуряване на образователна среда и ресурси",
+        "note": "The page describes this as 390 euros annually and as a one-time fee."
+      },
+      {
+        "category": "tuition",
+        "amount": 970.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Месечна такса група 3-6 г.",
+        "note": null
+      },
+      {
+        "category": "materials",
+        "amount": 390.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "one_time",
+        "label": "осигуряване на образователна среда и ресурси",
+        "note": "The page describes this as 390 euros annually and as a one-time fee."
+      }
+    ],
+    "reference_fees": [
+      {
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Група 0-3",
+        "source_url": "https://montessori-high.com/bg/priem",
+        "note": "Includes four organic meals",
+        "amount": 970
+      },
+      {
+        "category": "materials",
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "Група 0-3, еднократна такса - образователна среда и ресурси",
+        "source_url": "https://montessori-high.com/bg/priem",
+        "note": null,
+        "amount": 390
+      },
+      {
+        "category": "tuition",
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Група 3-6",
+        "source_url": "https://montessori-high.com/bg/priem",
+        "note": "Includes meals, English, yoga, music etc.",
+        "amount": 970
+      },
+      {
+        "category": "materials",
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "Група 3-6, еднократна такса - образователна среда и ресурси",
+        "source_url": "https://montessori-high.com/bg/priem",
+        "note": null,
+        "amount": 390
+      }
+    ],
+    "no_fees_on_site": false,
+    "stored_rows": [
+      {
+        "id": 2946,
+        "category": "food",
+        "amount": "390.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "0-3",
+        "published": false
+      },
+      {
+        "id": 2945,
+        "category": "tuition",
+        "amount": "970.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "0-3",
+        "published": true
+      }
+    ]
+  },
+  {
+    "school_id": 532,
+    "pages": [
+      {
+        "url": "https://palavitemalchugani.bg/",
+        "hop": 0,
+        "prices": false,
+        "chars": 5116
+      },
+      {
+        "url": "https://palavitemalchugani.bg/priem/",
+        "hop": 1,
+        "prices": false,
+        "chars": 5880
+      },
+      {
+        "url": "https://palavitemalchugani.bg/en/apply/",
+        "hop": 2,
+        "prices": false,
+        "chars": 4843
+      },
+      {
+        "url": "https://palavitemalchugani.bg/wp-content/uploads/2024/03/%D0%97%D0%B0%D1%8F%D0%B2%D0%BB%D0%B5%D0%BD%D0%B8%D0%B5-%D0%BF%D1%80%D0%B8%D0%B5%D0%BC.pdf",
+        "hop": 3,
+        "prices": false,
+        "chars": 3482
+      }
+    ],
+    "cost_usd": 0.0002619,
+    "reader_fees": [],
+    "reference_fees": [],
+    "no_fees_on_site": true,
+    "stored_rows": [
+      {
+        "id": 3304,
+        "category": "extracurricular",
+        "amount": "200.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "BGN",
+        "period": null,
+        "label": "Цената за 8 групови (до 5 деца) посещения",
+        "published": true
+      }
+    ]
+  },
+  {
+    "school_id": 537,
+    "pages": [
+      {
+        "url": "https://pberon.com/",
+        "hop": 0,
+        "prices": false,
+        "chars": 17425
+      },
+      {
+        "url": "https://pberon.com/onlajn-kandidatstvane/",
+        "hop": 1,
+        "prices": false,
+        "chars": 10803
+      },
+      {
+        "url": "https://pberon.com/za-chou-d-r-petar-beron/",
+        "hop": 1,
+        "prices": false,
+        "chars": 10745
+      },
+      {
+        "url": "https://pberon.com/obsthi-usloviya/",
+        "hop": 1,
+        "prices": false,
+        "note": "robots.txt",
+        "chars": 0
+      },
+      {
+        "url": "https://pberon.com/detska-gradina/",
+        "hop": 2,
+        "prices": false,
+        "chars": 9886
+      },
+      {
+        "url": "https://pberon.com/preduchilisthna-podgotovka/",
+        "hop": 2,
+        "prices": false,
+        "chars": 10722
+      },
+      {
+        "url": "https://pberon.com/documents/",
+        "hop": 2,
+        "prices": false,
+        "chars": 14565
+      },
+      {
+        "url": "https://pberon.com/usloviya-za-kandidatstvane/",
+        "hop": 2,
+        "prices": false,
+        "chars": 11361
+      }
+    ],
+    "cost_usd": 0.0004735,
+    "reader_fees": [],
+    "reference_fees": [],
+    "no_fees_on_site": true,
+    "stored_rows": []
+  },
+  {
+    "school_id": 539,
+    "pages": [
+      {
+        "url": "https://www.albertino.bg/",
+        "hop": 0,
+        "prices": true,
+        "chars": 26155
+      }
+    ],
+    "cost_usd": 0.001535275,
+    "reader_fees": [],
+    "reference_fees": [],
+    "no_fees_on_site": true,
+    "stored_rows": []
+  },
+  {
+    "school_id": 542,
+    "pages": [
+      {
+        "url": "https://yourkidsbg.com/",
+        "hop": 0,
+        "prices": false,
+        "chars": 6951
+      },
+      {
+        "url": "https://yourkidsbg.com/priem-i-taksi/",
+        "hop": 1,
+        "prices": true,
+        "chars": 5541
+      }
+    ],
+    "cost_usd": 0.000613875,
+    "reader_fees": [
+      {
+        "category": "tuition",
+        "amount": 950.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "BGN",
+        "period": "monthly",
+        "label": "Целодневен престой",
+        "note": "Частна Детска Градина „Йор Кидс“"
+      },
+      {
+        "category": "tuition",
+        "amount": 750.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "BGN",
+        "period": "monthly",
+        "label": "Полудневен престой",
+        "note": "Частна Детска Градина „Йор Кидс“"
+      },
+      {
+        "category": "registration",
+        "amount": 400.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "BGN",
+        "period": null,
+        "label": "Депозит за запазване на място при продължително отсъствие",
+        "note": "При отсъствие на един месец и повече."
+      },
+      {
+        "category": "materials",
+        "amount": 150.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "BGN",
+        "period": "yearly",
+        "label": "Годишна такса за учебни материали",
+        "note": null
+      }
+    ],
+    "reference_fees": [
+      {
+        "category": "tuition",
+        "amount": 950,
+        "currency": "BGN",
+        "period": "monthly",
+        "label": "Частна детска градина – Целодневен престой",
+        "source_url": "https://yourkidsbg.com/priem-i-taksi/",
+        "note": "School year not stated. Discounts: 10% for one calendar year prepaid, 5% for six months prepaid, 10% for second child."
+      },
+      {
+        "category": "tuition",
+        "amount": 750,
+        "currency": "BGN",
+        "period": "monthly",
+        "label": "Частна детска градина – Полудневен престой",
+        "source_url": "https://yourkidsbg.com/priem-i-taksi/",
+        "note": "Same discounts as full-day."
+      },
+      {
+        "category": "materials",
+        "amount": 150,
+        "currency": "BGN",
+        "period": "yearly",
+        "label": "Годишна такса за учебни материали",
+        "source_url": "https://yourkidsbg.com/priem-i-taksi/",
+        "note": null
+      },
+      {
+        "category": "registration",
+        "amount": 400,
+        "currency": "BGN",
+        "period": null,
+        "label": "Депозит за запазване на място при продължително отсъствие",
+        "source_url": "https://yourkidsbg.com/priem-i-taksi/",
+        "note": "Place-holding deposit during absence of a month or more; not an enrolment fee strictly - categorised as registration for lack of better fit."
+      }
+    ],
+    "no_fees_on_site": false,
+    "stored_rows": [
+      {
+        "id": 3607,
+        "category": "tuition",
+        "amount": "1100.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "BGN",
+        "period": "monthly",
+        "label": "Частна Детска Ясла ,,Йор Кидс“ / Частна Детска Ясла ,,Йор Кидс“ / Целодневен престой",
+        "published": true
+      },
+      {
+        "id": 3609,
+        "category": "tuition",
+        "amount": "950.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "BGN",
+        "period": "monthly",
+        "label": "Частна Детска Градина ,,Йор Кидс“ / Частна Детска Градина ,,Йор Кидс“ / Целодневен престой",
+        "published": true
+      },
+      {
+        "id": 3611,
+        "category": "registration",
+        "amount": "400.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "BGN",
+        "period": null,
+        "label": "Депозит за запазване на място при продължително отсъствие",
+        "published": true
+      },
+      {
+        "id": 3612,
+        "category": "materials",
+        "amount": "150.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "BGN",
+        "period": "yearly",
+        "label": "Годишна такса за учебни материали",
+        "published": true
+      },
+      {
+        "id": 3608,
+        "category": "tuition",
+        "amount": "800.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "BGN",
+        "period": "monthly",
+        "label": "Частна Детска Ясла ,,Йор Кидс“ / Частна Детска Ясла ,,Йор Кидс“ / Полудневен престой",
+        "published": true
+      },
+      {
+        "id": 3610,
+        "category": "tuition",
+        "amount": "750.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "BGN",
+        "period": "monthly",
+        "label": "Частна Детска Градина ,,Йор Кидс“ / Частна Детска Градина ,,Йор Кидс“ / Полудневен престой",
+        "published": true
+      }
+    ]
+  },
+  {
+    "school_id": 547,
+    "pages": [
+      {
+        "url": "https://mechopuh.bg/",
+        "hop": 0,
+        "prices": false,
+        "chars": 5896
+      },
+      {
+        "url": "https://mechopuh.bg/obuchenie/",
+        "hop": 1,
+        "prices": false,
+        "chars": 2539
+      },
+      {
+        "url": "https://mechopuh.bg/iasla/",
+        "hop": 1,
+        "prices": false,
+        "chars": 4611
+      },
+      {
+        "url": "https://mechopuh.bg/priem/",
+        "hop": 1,
+        "prices": false,
+        "chars": 3561
+      },
+      {
+        "url": "https://mechopuh.bg/priem/DogovorMechoPuh.pdf",
+        "hop": 2,
+        "prices": true,
+        "chars": 10306
+      }
+    ],
+    "cost_usd": 0.0008866,
+    "reader_fees": [
+      {
+        "category": "tuition",
+        "amount": 600.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "целодневен престой",
+        "note": "Целодневното посещение е отбелязано в договора."
+      },
+      {
+        "category": "tuition",
+        "amount": 550.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "полудневен престой",
+        "note": null
+      },
+      {
+        "category": "registration",
+        "amount": null,
+        "amount_min": 550.0,
+        "amount_max": 600.0,
+        "currency": "EUR",
+        "period": "one_time",
+        "label": "еднократна такса за записване",
+        "note": "Равна на една месечна такса за обучение."
+      }
+    ],
+    "reference_fees": [
+      {
+        "category": "tuition",
+        "amount": 600,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Месечна такса – целодневен престой",
+        "source_url": "https://mechopuh.bg/priem/DogovorMechoPuh.pdf",
+        "note": "Contract Чл. 8 (also 1173,50 лв.); contract runs to 31.08.2027. Includes meals (Чл. 7)."
+      },
+      {
+        "category": "tuition",
+        "amount": 550,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Месечна такса – полудневен престой",
+        "source_url": "https://mechopuh.bg/priem/DogovorMechoPuh.pdf",
+        "note": "Contract Чл. 8 (also 1075,71 лв.)."
+      }
+    ],
+    "no_fees_on_site": false,
+    "stored_rows": []
+  },
+  {
+    "school_id": 548,
+    "pages": [
+      {
+        "url": "https://mechtatel.bg/",
+        "hop": 0,
+        "prices": false,
+        "chars": 6516
+      },
+      {
+        "url": "https://mechtatel.bg/uslugi/",
+        "hop": 1,
+        "prices": false,
+        "chars": 5208
+      },
+      {
+        "url": "https://mechtatel.bg/kontakti/",
+        "hop": 2,
+        "prices": false,
+        "chars": 3509
+      },
+      {
+        "url": "https://mechtatel.bg/za-nas/",
+        "hop": 3,
+        "prices": false,
+        "chars": 5381
+      }
+    ],
+    "cost_usd": 0.0001193,
+    "reader_fees": [],
+    "reference_fees": [],
+    "no_fees_on_site": true,
+    "stored_rows": []
+  },
+  {
+    "school_id": 561,
+    "pages": [
+      {
+        "url": "https://azbuki-school.bg/",
+        "hop": 0,
+        "prices": false,
+        "chars": 7330
+      },
+      {
+        "url": "https://azbuki-school.bg/priem/",
+        "hop": 1,
+        "prices": true,
+        "chars": 13554
+      },
+      {
+        "url": "https://azbuki-school.bg/en/admissions/",
+        "hop": 2,
+        "prices": false,
+        "chars": 8385
+      },
+      {
+        "url": "https://azbuki-school.bg/timeline/24-%d0%b8-25-%d1%8f%d0%bd%d1%83%d0%b0%d1%80%d0%b8-%d0%bf%d1%80%d0%be%d0%b2%d0%b5%d0%b6%d0%b4%d0%b0%d0%bd%d0%b5-%d0%bd%d0%b0-%d0%bf%d1%80%d0%b8%d0%b5%d0%bc%d0%bd%d0%b8-%d0%b8%d0%b7%d0%bf%d0%b8%d1%82/",
+        "hop": 2,
+        "prices": false,
+        "chars": 8317
+      },
+      {
+        "url": "https://azbuki-school.bg/timeline/%d0%bf%d1%80%d0%be%d0%b2%d0%b5%d0%b6%d0%b4%d0%b0%d0%bd%d0%b5-%d0%bd%d0%b0-%d0%bf%d1%80%d0%b8%d0%b5%d0%bc%d0%bd%d0%b8-%d0%b8%d0%b7%d0%bf%d0%b8%d1%82%d0%b8/",
+        "hop": 2,
+        "prices": false,
+        "chars": 7635
+      },
+      {
+        "url": "https://azbuki-school.bg/timeline/%d0%be%d1%82-28-%d0%b4%d0%be-29-%d0%b0%d0%bf%d1%80%d0%b8%d0%bb-%d0%bf%d1%80%d0%be%d0%b2%d0%b5%d0%b6%d0%b4%d0%b0%d0%bd%d0%b5-%d0%bd%d0%b0-%d0%bf%d1%80%d0%b8%d0%b5%d0%bc%d0%bd%d0%b8-%d0%b8%d0%b7%d0%bf/",
+        "hop": 2,
+        "prices": false,
+        "chars": 8183
+      },
+      {
+        "url": "https://azbuki-school.bg/daily-schedule-and-eating/",
+        "hop": 3,
+        "prices": false,
+        "chars": 8822
+      },
+      {
+        "url": "https://azbuki-school.bg/en/daily-schedule-and-nutrition/",
+        "hop": 3,
+        "prices": false,
+        "chars": 9061
+      }
+    ],
+    "cost_usd": 0.001617125,
+    "reader_fees": [
+      {
+        "category": "tuition",
+        "amount": 8950.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "Таксата за следващата учебна година (2026/2027)",
+        "note": null
+      }
+    ],
+    "reference_fees": [
+      {
+        "category": "tuition",
+        "amount": 8950,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "Таксата за следващата учебна година (2026/2027)",
+        "source_url": "https://azbuki-school.bg/priem/",
+        "note": "Extracurricular activities, food and transport paid extra (no amounts)."
+      }
+    ],
+    "no_fees_on_site": false,
+    "stored_rows": []
+  },
+  {
+    "school_id": 569,
+    "pages": [
+      {
+        "url": "https://busy-school.com/",
+        "hop": 0,
+        "prices": false,
+        "chars": 8638
+      },
+      {
+        "url": "https://busy-school.com/%d1%82%d0%b0%d0%ba%d1%81%d0%b8/",
+        "hop": 1,
+        "prices": true,
+        "chars": 6174
+      },
+      {
+        "url": "https://busy-school.com/%d0%b7%d0%b0%d0%bf%d0%b8%d1%81%d0%b2%d0%b0%d0%bd%d0%b5-%d0%b2-%d1%87%d0%bd%d1%83-%d0%b1%d0%b8%d0%b7%d0%b8/",
+        "hop": 1,
+        "prices": true,
+        "chars": 11877
+      },
+      {
+        "url": "https://busy-school.com/%d0%bf%d1%80%d0%b8%d0%b5%d0%bc/",
+        "hop": 1,
+        "prices": false,
+        "chars": 9971
+      },
+      {
+        "url": "https://busy-school.com/documents/",
+        "hop": 1,
+        "prices": false,
+        "chars": 11725
+      },
+      {
+        "url": "https://busy-school.com/%D0%B7%D0%B0%D1%8F%D0%B2%D0%BB%D0%B5%D0%BD%D0%B8%D0%B5-%D0%B7%D0%B0-%D0%BF%D1%80%D0%B8%D0%B5%D0%BC/",
+        "hop": 2,
+        "prices": false,
+        "chars": 7270
+      },
+      {
+        "url": "https://busy-school.com/admissions/",
+        "hop": 2,
+        "prices": false,
+        "chars": 19365
+      },
+      {
+        "url": "https://busy-school.com/%d0%bf%d1%80%d0%b8%d0%b5%d0%bc-%d0%bf%d1%80%d0%b5%d0%b4%d1%83%d1%87%d0%b8%d0%bb%d0%b8%d1%89%d0%bd%d0%b8-%d0%b3%d1%80%d1%83%d0%bf%d0%b8/",
+        "hop": 2,
+        "prices": false,
+        "chars": 11057
+      }
+    ],
+    "cost_usd": 0.0022359249999999997,
+    "reader_fees": [
+      {
+        "category": "tuition",
+        "amount": 5900.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "ПГУ, 15.09.2026–31.05.2027",
+        "note": null
+      },
+      {
+        "category": "tuition",
+        "amount": 8000.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "ПГУ, 15.09.2026–14.09.2027",
+        "note": null
+      },
+      {
+        "category": "tuition",
+        "amount": 5900.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "1–4 клас, 15.09.2026–31.05.2027",
+        "note": null
+      },
+      {
+        "category": "registration",
+        "amount": 70.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "one_time",
+        "label": "Гаранционна такса записване",
+        "note": "За 1–4 клас."
+      },
+      {
+        "category": "camp",
+        "amount": 640.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Летен дневен лагер",
+        "note": null
+      },
+      {
+        "category": "food",
+        "amount": 8.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "Храна",
+        "note": "За присъствен ден."
+      },
+      {
+        "category": "transport",
+        "amount": 179.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Транспорт в посока",
+        "note": "За една посока."
+      },
+      {
+        "category": "materials",
+        "amount": 155.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "Учебни материали",
+        "note": null
+      }
+    ],
+    "reference_fees": [
+      {
+        "category": "tuition",
+        "amount": 5900,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "ПГУ от 15.09.2026 г. до 31.05.2027 г.",
+        "source_url": "https://busy-school.com/%d1%82%d0%b0%d0%ba%d1%81%d0%b8/",
+        "note": "Payable once or in 2 instalments of 3 000 EUR (at contract, by 15.01.2027). Discounts: 5% second child, 5% twins, 10% third child. Assessment: no fee; registration guarantee: no fee."
+      },
+      {
+        "category": "tuition",
+        "amount": 8000,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "ПГУ от 15.09.2026 г. до 14.09.2027 г.",
+        "source_url": "https://busy-school.com/%d1%82%d0%b0%d0%ba%d1%81%d0%b8/",
+        "note": "Full-year (incl. summer) preschool plan. Sibling discounts apply."
+      },
+      {
+        "category": "tuition",
+        "amount": 5900,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "1-4 клас от 15.09.2026 г. до 31.05.2027 г.",
+        "source_url": "https://busy-school.com/%d1%82%d0%b0%d0%ba%d1%81%d0%b8/",
+        "note": "Payable once or 2 x 3 000 EUR. Sibling discounts apply."
+      },
+      {
+        "category": "registration",
+        "amount": 70,
+        "currency": "EUR",
+        "period": "one_time",
+        "label": "Гаранционна такса записване – 1-4 клас",
+        "source_url": "https://busy-school.com/%d1%82%d0%b0%d0%ba%d1%81%d0%b8/",
+        "note": "Paid once at contract; waived if annual fee paid in one payment. 'Без такса' for ПГУ."
+      },
+      {
+        "category": "camp",
+        "amount": 640,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Летен дневен лагер",
+        "source_url": "https://busy-school.com/%d1%82%d0%b0%d0%ba%d1%81%d0%b8/",
+        "note": null
+      },
+      {
+        "category": "food",
+        "amount": 8,
+        "currency": "EUR",
+        "period": null,
+        "label": "Храна",
+        "source_url": "https://busy-school.com/%d1%82%d0%b0%d0%ba%d1%81%d0%b8/",
+        "note": "8 EUR per attendance day (за присъствен ден)."
+      },
+      {
+        "category": "transport",
+        "amount": 179,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Транспорт в посока",
+        "source_url": "https://busy-school.com/%d1%82%d0%b0%d0%ba%d1%81%d0%b8/",
+        "note": "One direction, per month."
+      },
+      {
+        "category": "materials",
+        "amount": 155,
+        "currency": "EUR",
+        "period": null,
+        "label": "Учебни материали",
+        "source_url": "https://busy-school.com/%d1%82%d0%b0%d0%ba%d1%81%d0%b8/",
+        "note": null
+      }
+    ],
+    "no_fees_on_site": false,
+    "stored_rows": [
+      {
+        "id": 3346,
+        "category": "tuition",
+        "amount": "5900.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "ПГУ от 15. 09.2026 г. до 31.05.2027 г. / Годишна такса обучение **",
+        "published": true
+      },
+      {
+        "id": 3347,
+        "category": "tuition",
+        "amount": "8000.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "ПГУ от 15.09.2026г. до 14.09.2027 г. / Годишна такса обучение **",
+        "published": true
+      },
+      {
+        "id": 3349,
+        "category": "registration",
+        "amount": "70.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "1-4 клас от 15.09.2026 г. до 31.05.2027 г. / 1-4 клас от 15.09.2026 г. до 31.05.2027 г. / Гаранционна такса записване",
+        "published": true
+      },
+      {
+        "id": 3350,
+        "category": "tuition",
+        "amount": "5900.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "1-4 клас от 15.09.2026 г. до 31.05.2027 г. / 1-4 клас от 15.09.2026 г. до 31.05.2027 г. / Годишна такса обучение **",
+        "published": true
+      },
+      {
+        "id": 3351,
+        "category": "camp",
+        "amount": "640.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Летен дневен лагер",
+        "published": true
+      },
+      {
+        "id": 3353,
+        "category": "transport",
+        "amount": "179.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "Транспорт в посока",
+        "published": true
+      },
+      {
+        "id": 3354,
+        "category": "materials",
+        "amount": "155.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "Учебни материли",
+        "published": true
+      }
+    ]
+  },
+  {
+    "school_id": 574,
+    "pages": [
+      {
+        "url": "https://novigradini.com/#dipipopup-27586290#popup_on_load",
+        "hop": 0,
+        "prices": true,
+        "chars": 19165
+      },
+      {
+        "url": "https://novigradini.com/anika/",
+        "hop": 1,
+        "prices": true,
+        "chars": 19082
+      },
+      {
+        "url": "https://novigradini.com/anika/ceni/",
+        "hop": 2,
+        "prices": true,
+        "chars": 15653
+      },
+      {
+        "url": "https://novigradini.com/anika/priem/",
+        "hop": 2,
+        "prices": false,
+        "chars": 22751
+      },
+      {
+        "url": "https://novigradini.com/anika/hrana/",
+        "hop": 3,
+        "prices": false,
+        "chars": 16223
+      }
+    ],
+    "cost_usd": 0.00275945,
+    "reader_fees": [
+      {
+        "category": "tuition",
+        "amount": 475.5,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "месечната такса",
+        "note": "От септември 2025 г.; включва целодневна грижа, образователна програма и музикално обучение."
+      },
+      {
+        "category": "registration",
+        "amount": 475.5,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "one_time",
+        "label": "депозит",
+        "note": "Заплаща се при записване; приспада се от последната месечна такса при спазено предизвестие."
+      }
+    ],
+    "reference_fees": [
+      {
+        "category": "tuition",
+        "amount": 475.5,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Месечна такса за обучение и грижа",
+        "source_url": "https://novigradini.com/anika/",
+        "note": "From September 2025 (930 лв.); described as reduced. Music (piano, singing) included. State compensation up to 281 EUR/month mentioned (subsidy, not a fee)."
+      }
+    ],
+    "no_fees_on_site": false,
+    "stored_rows": [
+      {
+        "id": 3356,
+        "category": "registration",
+        "amount": "475.50",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "one_time",
+        "label": "депозит",
+        "published": true
+      },
+      {
+        "id": 3355,
+        "category": "tuition",
+        "amount": "475.50",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "месечната такса",
+        "published": false
+      },
+      {
+        "id": 3357,
+        "category": "tuition",
+        "amount": "475.50",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Месечната такса в ЧДГ „Аника“",
+        "published": true
+      }
+    ]
+  },
+  {
+    "school_id": 585,
+    "pages": [
+      {
+        "url": "https://artisbg.com/",
+        "hop": 0,
+        "prices": false,
+        "chars": 68779
+      },
+      {
+        "url": "https://artisbg.com/primary-education/",
+        "hop": 1,
+        "prices": true,
+        "chars": 76540
+      },
+      {
+        "url": "https://artisbg.com/junior-high-school/",
+        "hop": 1,
+        "prices": true,
+        "chars": 74103
+      },
+      {
+        "url": "https://artisbg.com/high-school-3/",
+        "hop": 1,
+        "prices": true,
+        "chars": 75764
+      }
+    ],
+    "cost_usd": 0.00620915,
+    "reader_fees": [
+      {
+        "category": "tuition",
+        "amount": 7900.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "Годишна такса за обучение",
+        "note": "€7,900 when paid in full at enrollment; the site also states four installments of €2,050."
+      },
+      {
+        "category": "registration",
+        "amount": 200.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "one_time",
+        "label": "Такса кандидатстване",
+        "note": "Non-refundable; the site says it is paid once."
+      }
+    ],
+    "reference_fees": [],
+    "no_fees_on_site": true,
+    "stored_rows": []
+  },
+  {
+    "school_id": 595,
+    "pages": [
+      {
+        "url": "https://buditel.softuni.bg/",
+        "hop": 0,
+        "prices": true,
+        "chars": 45789
+      },
+      {
+        "url": "https://buditel.softuni.bg/fees/",
+        "hop": 1,
+        "prices": true,
+        "chars": 27056
+      },
+      {
+        "url": "https://buditel.softuni.bg/application-process/",
+        "hop": 2,
+        "prices": false,
+        "chars": 28545
+      },
+      {
+        "url": "https://buditel.softuni.bg/priem-sled-8-i-9-klas/",
+        "hop": 2,
+        "prices": false,
+        "chars": 18914
+      },
+      {
+        "url": "https://buditel.softuni.bg/stipendii/",
+        "hop": 2,
+        "prices": false,
+        "chars": 18948
+      },
+      {
+        "url": "https://buditel.softuni.bg/frequently-asked-questions/",
+        "hop": 2,
+        "prices": false,
+        "chars": 26882
+      },
+      {
+        "url": "https://buditel.softuni.bg/parents/",
+        "hop": 3,
+        "prices": false,
+        "chars": 25961
+      },
+      {
+        "url": "https://buditel.softuni.bg/apply/",
+        "hop": 3,
+        "prices": false,
+        "chars": 23833
+      },
+      {
+        "url": "https://buditel.softuni.bg/majors/",
+        "hop": 3,
+        "prices": false,
+        "chars": 21524
+      },
+      {
+        "url": "https://buditel.softuni.bg/dokumenti/",
+        "hop": 3,
+        "prices": false,
+        "chars": 26445
+      }
+    ],
+    "cost_usd": 0.003879025,
+    "reader_fees": [
+      {
+        "category": "tuition",
+        "amount": 8320.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "Годишна такса за 8. клас — плащане на една вноска",
+        "note": "Учебна 2026/2027 година."
+      },
+      {
+        "category": "tuition",
+        "amount": 2920.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "Годишна такса за 8. клас — плащане на 3 вноски",
+        "note": "На вноска; учебна 2026/2027 година."
+      },
+      {
+        "category": "registration",
+        "amount": 490.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "one_time",
+        "label": "такса регистрация",
+        "note": "За нов ученик; договори, сключени до 31.01.2026 г., са освободени от таксата."
+      },
+      {
+        "category": "registration",
+        "amount": 100.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "такса кандидатстване",
+        "note": "Приемни изпити след 01.06.2026 г., при наличие на свободни места."
+      }
+    ],
+    "reference_fees": [
+      {
+        "category": "tuition",
+        "amount": 8320,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "Годишна такса за 8. клас 2026/2027 – плащане на една вноска",
+        "source_url": "https://buditel.softuni.bg/",
+        "note": "5% discount for second child from the family."
+      },
+      {
+        "category": "tuition",
+        "amount": 2920,
+        "currency": "EUR",
+        "period": null,
+        "label": "Годишна такса за 8. клас 2026/2027 – плащане на 3 вноски (на вноска)",
+        "source_url": "https://buditel.softuni.bg/",
+        "note": "Per installment, 3 installments."
+      },
+      {
+        "category": "registration",
+        "amount": 490,
+        "currency": "EUR",
+        "period": "one_time",
+        "label": "Еднократна такса регистрация (нов ученик)",
+        "source_url": "https://buditel.softuni.bg/",
+        "note": "Waived for contracts signed by 31.01.2026 (FAQ) / banner says preferential terms until 31.01.2027."
+      },
+      {
+        "category": "registration",
+        "amount": 100,
+        "currency": "EUR",
+        "period": "one_time",
+        "label": "Такса за кандидатстване (приемни изпити след 01.06.2026)",
+        "source_url": "https://buditel.softuni.bg/",
+        "note": "No application fee for candidates who sat the exam by 24.05.2026."
+      }
+    ],
+    "no_fees_on_site": false,
+    "stored_rows": [
+      {
+        "id": 3410,
+        "category": "tuition",
+        "amount": "8900.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "Годишна такса за 8. клас за учебната 2027/2028 год / Годишна такса за 8. клас за учебната 2027/2028 година / Плащане на една вноска",
+        "published": true
+      },
+      {
+        "id": 3411,
+        "category": "registration",
+        "amount": "100.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "one_time",
+        "label": "такса кандидатстване",
+        "published": true
+      },
+      {
+        "id": 3412,
+        "category": "registration",
+        "amount": "490.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "one_time",
+        "label": "такса регистрация",
+        "published": true
+      },
+      {
+        "id": 3413,
+        "category": "tuition",
+        "amount": "8320.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "Годишна такса за 8. клас за учебната 2026/2027 год / Годишна такса за 8. клас за учебната 2026/2027 година",
+        "published": true
+      }
+    ]
+  },
+  {
+    "school_id": 598,
+    "pages": [
+      {
+        "url": "https://yagodina.bg/",
+        "hop": 0,
+        "prices": false,
+        "chars": 12880
+      },
+      {
+        "url": "https://yagodina.bg/prices/",
+        "hop": 1,
+        "prices": true,
+        "chars": 8658
+      },
+      {
+        "url": "https://yagodina.bg/admission/",
+        "hop": 1,
+        "prices": false,
+        "chars": 8960
+      }
+    ],
+    "cost_usd": 0.0006285749999999999,
+    "reader_fees": [
+      {
+        "category": "tuition",
+        "amount": 785.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Целодневно обучение",
+        "note": "Таксата включва храна, образователни материали и организиране на събития, празници и екскурзии, свързани с образователния процес."
+      },
+      {
+        "category": "tuition",
+        "amount": 550.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Полудневно обучение",
+        "note": "Таксата включва храна, образователни материали и организиране на събития, празници и екскурзии, свързани с образователния процес."
+      }
+    ],
+    "reference_fees": [
+      {
+        "category": "tuition",
+        "amount": 785,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Целодневно обучение",
+        "source_url": "https://yagodina.bg/prices/",
+        "note": "Includes meals, materials, events."
+      },
+      {
+        "category": "tuition",
+        "amount": 550,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Полудневно обучение",
+        "source_url": "https://yagodina.bg/prices/",
+        "note": "Includes meals, materials, events."
+      }
+    ],
+    "no_fees_on_site": false,
+    "stored_rows": [
+      {
+        "id": 3665,
+        "category": "tuition",
+        "amount": "785.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Целодневно обучение",
+        "published": true
+      },
+      {
+        "id": 3666,
+        "category": "tuition",
+        "amount": "550.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Полудневно обучение",
+        "published": true
+      }
+    ]
+  },
+  {
+    "school_id": 601,
+    "pages": [
+      {
+        "url": "https://kidsville.space/",
+        "hop": 0,
+        "prices": false,
+        "chars": 8092
+      },
+      {
+        "url": "https://kidsville.space/%d1%86%d0%b5%d0%bd%d0%b8/",
+        "hop": 1,
+        "prices": true,
+        "chars": 3435
+      },
+      {
+        "url": "https://kidsville.space/en/fees/",
+        "hop": 2,
+        "prices": true,
+        "chars": 2528
+      }
+    ],
+    "cost_usd": 0.0011795500000000001,
+    "reader_fees": [
+      {
+        "category": "tuition",
+        "amount": 900.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Average monthly fee for 1 instalment subscription",
+        "note": "Full-day base, 08:00–18:00; period 01.06–31.05 (12 months)."
+      },
+      {
+        "category": "tuition",
+        "amount": 925.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Average monthly fee for 2 instalments subscription",
+        "note": "Full-day base, 08:00–18:00; period 01.06–31.05 (12 months)."
+      },
+      {
+        "category": "tuition",
+        "amount": 950.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Monthly fee",
+        "note": "Full-day base, 08:00–18:00; period 01.06–31.05 (12 months)."
+      },
+      {
+        "category": "food",
+        "amount": 100.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Food",
+        "note": "Breakfast, snacks and lunch; not included in the payment plans."
+      },
+      {
+        "category": "materials",
+        "amount": 350.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "Educational resources fee",
+        "note": "For the academic year."
+      },
+      {
+        "category": "registration",
+        "amount": 200.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "Administrative fee",
+        "note": "Payable for new children."
+      }
+    ],
+    "reference_fees": [
+      {
+        "category": "tuition",
+        "amount": 900,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Средномесечна такса при абонамент на 1 вноска (A1)",
+        "source_url": "https://kidsville.space/%d1%86%d0%b5%d0%bd%d0%b8/",
+        "note": "Full day 08:00-18:00, 12-month period; 5% off for second child, 10% twins; 50% reduction for July/August absence."
+      },
+      {
+        "category": "tuition",
+        "amount": 925,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Средномесечна такса при абонамент на 2 вноски (A2)",
+        "source_url": "https://kidsville.space/%d1%86%d0%b5%d0%bd%d0%b8/",
+        "note": "Same discounts as A1."
+      },
+      {
+        "category": "tuition",
+        "amount": 950,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Ежемесечно заплащане (A3)",
+        "source_url": "https://kidsville.space/%d1%86%d0%b5%d0%bd%d0%b8/",
+        "note": "Same discounts as A1."
+      },
+      {
+        "category": "food",
+        "amount": 100,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Храна (закуска, междинна закуска, обяд, следобедна закуска)",
+        "source_url": "https://kidsville.space/%d1%86%d0%b5%d0%bd%d0%b8/",
+        "note": "Page says plans A1-A3 exclude food (meta description contradicts)."
+      },
+      {
+        "category": "materials",
+        "amount": 350,
+        "currency": "EUR",
+        "period": "one_time",
+        "label": "Еднократна образователна такса (за учебната година)",
+        "source_url": "https://kidsville.space/%d1%86%d0%b5%d0%bd%d0%b8/",
+        "note": "Per school year."
+      },
+      {
+        "category": "registration",
+        "amount": 200,
+        "currency": "EUR",
+        "period": null,
+        "label": "Административна такса (новозаписани деца)",
+        "source_url": "https://kidsville.space/%d1%86%d0%b5%d0%bd%d0%b8/",
+        "note": null
+      }
+    ],
+    "no_fees_on_site": false,
+    "stored_rows": [
+      {
+        "id": 3445,
+        "category": "tuition",
+        "amount": "950.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Monthly fee",
+        "published": true
+      },
+      {
+        "id": 3444,
+        "category": "tuition",
+        "amount": "950.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "Ежемесечно заплащане",
+        "published": false
+      },
+      {
+        "id": 3446,
+        "category": "food",
+        "amount": "100.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Закуска",
+        "published": true
+      },
+      {
+        "id": 3447,
+        "category": "registration",
+        "amount": "200.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "административна такса",
+        "published": true
+      },
+      {
+        "id": 3448,
+        "category": "registration",
+        "amount": "200.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "administrative fee",
+        "published": true
+      },
+      {
+        "id": 3449,
+        "category": "materials",
+        "amount": "350.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "one_time",
+        "label": "Educational resources fee for the academic year",
+        "published": true
+      }
+    ]
+  },
+  {
+    "school_id": 602,
+    "pages": [
+      {
+        "url": "https://alissa-bg.com/",
+        "hop": 0,
+        "prices": false,
+        "chars": 6120
+      },
+      {
+        "url": "https://alissa-bg.com/priem/",
+        "hop": 1,
+        "prices": false,
+        "chars": 6733
+      },
+      {
+        "url": "https://alissa-bg.com/roditeli/",
+        "hop": 1,
+        "prices": false,
+        "chars": 3801
+      },
+      {
+        "url": "https://alissa-bg.com/obuchenie/",
+        "hop": 2,
+        "prices": false,
+        "chars": 4764
+      },
+      {
+        "url": "https://alissa-bg.com/dneven-rezhim/",
+        "hop": 2,
+        "prices": false,
+        "chars": 4996
+      },
+      {
+        "url": "https://alissa-bg.com/dopalnitelni-deynosti/",
+        "hop": 2,
+        "prices": false,
+        "chars": 6055
+      }
+    ],
+    "cost_usd": 0.0002012,
+    "reader_fees": [],
+    "reference_fees": [],
+    "no_fees_on_site": true,
+    "stored_rows": []
+  },
+  {
+    "school_id": 629,
+    "pages": [
+      {
+        "url": "https://saintkliment.com/",
+        "hop": 0,
+        "prices": false,
+        "chars": 13045
+      },
+      {
+        "url": "https://saintkliment.com/za-roditeli/",
+        "hop": 1,
+        "prices": false,
+        "chars": 19880
+      },
+      {
+        "url": "https://saintkliment.com/priem/",
+        "hop": 1,
+        "prices": false,
+        "chars": 6685
+      }
+    ],
+    "cost_usd": 0.0002949,
+    "reader_fees": [],
+    "reference_fees": [],
+    "no_fees_on_site": true,
+    "stored_rows": []
+  },
+  {
+    "school_id": 632,
+    "pages": [
+      {
+        "url": "https://acatamus.bg/",
+        "hop": 0,
+        "prices": false,
+        "chars": 14102
+      },
+      {
+        "url": "https://acatamus.bg/priem/",
+        "hop": 1,
+        "prices": true,
+        "chars": 9670
+      }
+    ],
+    "cost_usd": 0.000910475,
+    "reader_fees": [
+      {
+        "category": "tuition",
+        "amount": 700.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Месечна такса за обучение",
+        "note": null
+      },
+      {
+        "category": "tuition",
+        "amount": 7000.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "one_time",
+        "label": "пълната сума",
+        "note": "10% discount when paid at once."
+      },
+      {
+        "category": "activities",
+        "amount": 150.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "уъркшопи, семинари, театрални представления, учебни материали и ресурси, срочни и годишни концерти и други събития извън учебната програма",
+        "note": null
+      }
+    ],
+    "reference_fees": [
+      {
+        "category": "tuition",
+        "amount": 700,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Месечна такса за обучение 2026/2027",
+        "source_url": "https://acatamus.bg/priem/",
+        "note": "Printed as '7 00 евро' (typo); full-sum figure €7 000 implies 700/month x10. 10% discount when full sum (€7 000) paid at once."
+      },
+      {
+        "category": "activities",
+        "amount": 150,
+        "currency": "EUR",
+        "period": "monthly",
+        "label": "Допълнително всеки ученик заплаща (уъркшопи, семинари, театър, учебни материали, концерти)",
+        "source_url": "https://acatamus.bg/priem/",
+        "note": null
+      }
+    ],
+    "no_fees_on_site": false,
+    "stored_rows": [
+      {
+        "id": 3461,
+        "category": "tuition",
+        "amount": "10000.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "BGN",
+        "period": "monthly",
+        "label": "Таксата за година",
+        "published": false
+      }
+    ]
+  },
+  {
+    "school_id": 634,
+    "pages": [
+      {
+        "url": "https://uwekind.com/",
+        "hop": 0,
+        "prices": false,
+        "chars": 10410
+      },
+      {
+        "url": "https://uwekind.com/admission/fees/",
+        "hop": 1,
+        "prices": true,
+        "chars": 13217
+      },
+      {
+        "url": "https://uwekind.com/%d1%84%d0%b8%d0%bd%d0%b0%d0%bd%d1%81%d0%b8%d1%80%d0%b0%d0%bd%d0%b5/",
+        "hop": 2,
+        "prices": false,
+        "chars": 12408
+      },
+      {
+        "url": "https://uwekind.com/en/admission/academic-fees/",
+        "hop": 2,
+        "prices": true,
+        "chars": 9768
+      },
+      {
+        "url": "https://uwekind.com/admission/procedure/",
+        "hop": 3,
+        "prices": false,
+        "chars": 11957
+      },
+      {
+        "url": "https://uwekind.com/admission/faq/",
+        "hop": 3,
+        "prices": false,
+        "chars": 9425
+      },
+      {
+        "url": "https://uwekind.com/en/admission/application-procedure/",
+        "hop": 3,
+        "prices": false,
+        "chars": 15598
+      }
+    ],
+    "cost_usd": 0.00211265,
+    "reader_fees": [
+      {
+        "category": "tuition",
+        "amount": 6820.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "Такса „Образователни услуги“ (Детска градина)",
+        "note": null
+      },
+      {
+        "category": "tuition",
+        "amount": 7000.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "Такса „Образователни услуги“ (Детска градина)",
+        "note": "При разсрочено плащане на 2 вноски"
+      },
+      {
+        "category": "tuition",
+        "amount": 7400.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "Такса „Образователни услуги“ (Детска градина)",
+        "note": "При разсрочено плащане на 10 вноски"
+      },
+      {
+        "category": "materials",
+        "amount": 450.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "Такса „Образователни ресурси и учебни практики“ (Детска градина)",
+        "note": "Задължителна годишна такса"
+      },
+      {
+        "category": "food",
+        "amount": 1410.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "Храна обяд, сутрешна и следобедна закуска (Детска градина и предучилищен клас)",
+        "note": "Задължителна услуга; amount is for kindergarten and preschool class"
+      },
+      {
+        "category": "transport",
+        "amount": 2800.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "Транспорт – в две посоки",
+        "note": "За децата от детската градина; сумата е for one school year"
+      },
+      {
+        "category": "transport",
+        "amount": 1950.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "Транспорт – в една посока",
+        "note": "За децата от детската градина; сумата е for one school year"
+      },
+      {
+        "category": "registration",
+        "amount": 100.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "one_time",
+        "label": "Такса кандидатстване (детска градина)",
+        "note": "Само за новопостъпили деца; невъзстановима"
+      },
+      {
+        "category": "registration",
+        "amount": 500.0,
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "one_time",
+        "label": "Административна такса за обработка на документи при постъпване",
+        "note": "Само за новопостъпили деца"
+      }
+    ],
+    "reference_fees": [
+      {
+        "category": "tuition",
+        "amount": 6820,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "Такса Образователни услуги – Детска градина (€6820/година)",
+        "source_url": "https://uwekind.com/admission/fees/",
+        "note": "Food not included. Sibling discount 5% 2nd, 10% 3rd child."
+      },
+      {
+        "category": "tuition",
+        "amount": 7000,
+        "currency": "EUR",
+        "period": null,
+        "label": "Детска градина – при разсрочено плащане на 2 вноски",
+        "source_url": "https://uwekind.com/admission/fees/",
+        "note": "Total for the year in 2 installments."
+      },
+      {
+        "category": "tuition",
+        "amount": 7400,
+        "currency": "EUR",
+        "period": null,
+        "label": "Детска градина – при разсрочено плащане на 10 вноски",
+        "source_url": "https://uwekind.com/admission/fees/",
+        "note": "Total for the year in 10 installments."
+      },
+      {
+        "category": "materials",
+        "amount": 450,
+        "currency": "EUR",
+        "period": null,
+        "label": "Такса Образователни ресурси и учебни практики (Детска градина)",
+        "source_url": "https://uwekind.com/admission/fees/",
+        "note": "Mandatory."
+      },
+      {
+        "category": "extracurricular",
+        "amount": 450,
+        "currency": "EUR",
+        "period": null,
+        "label": "Клубове по интереси – задължителен избор на едно занимание",
+        "source_url": "https://uwekind.com/admission/fees/",
+        "note": "General line (not kindergarten-specific); extra clubs charged separately."
+      },
+      {
+        "category": "registration",
+        "amount": 100,
+        "currency": "EUR",
+        "period": "one_time",
+        "label": "Такса кандидатстване (детска градина)",
+        "source_url": "https://uwekind.com/admission/fees/",
+        "note": "Non-refundable, new children only."
+      },
+      {
+        "category": "registration",
+        "amount": 500,
+        "currency": "EUR",
+        "period": "one_time",
+        "label": "Административна такса (новопостъпили ученици и деца)",
+        "source_url": "https://uwekind.com/admission/fees/",
+        "note": "Pairing of 500 EUR with heading inferred from layout; likely document-processing fee on enrolment."
+      },
+      {
+        "category": "food",
+        "amount": 1410,
+        "currency": "EUR",
+        "period": null,
+        "label": "Храна обяд, сутрешна и следобедна закуска (ДГ и ПК)",
+        "source_url": "https://uwekind.com/admission/fees/",
+        "note": "Mandatory for kindergarten; paid in 1 or 2 installments."
+      },
+      {
+        "category": "transport",
+        "amount": 2800,
+        "currency": "EUR",
+        "period": null,
+        "label": "Транспорт – в две посоки",
+        "source_url": "https://uwekind.com/admission/fees/",
+        "note": "Lozen students and kindergarten children."
+      },
+      {
+        "category": "transport",
+        "amount": 1950,
+        "currency": "EUR",
+        "period": null,
+        "label": "Транспорт – в една посока",
+        "source_url": "https://uwekind.com/admission/fees/",
+        "note": "Lozen students and kindergarten children."
+      }
+    ],
+    "no_fees_on_site": false,
+    "stored_rows": [
+      {
+        "id": 3479,
+        "category": "registration",
+        "amount": "500.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "Административна такса за обработка на документи при постъпване",
+        "published": false
+      },
+      {
+        "id": 3467,
+        "category": "tuition",
+        "amount": "6820.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "yearly",
+        "label": "Детска градина / Такса \"Образователни услуги\" / Детска градина",
+        "published": false
+      },
+      {
+        "id": 3468,
+        "category": "tuition",
+        "amount": "7880.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "Предучилищен клас / Такса \"Образователни услуги\" / Предучилищен клас",
+        "published": false
+      },
+      {
+        "id": 3469,
+        "category": "materials",
+        "amount": "450.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "„Образователни ресурси и учебни практики“ (Детска / „Образователни ресурси и учебни практики“ (Детска градина)",
+        "published": false
+      },
+      {
+        "id": 3470,
+        "category": "materials",
+        "amount": "600.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "„Образователни ресурси и учебни практики“ (ПК / „Образователни ресурси и учебни практики“ (ПК",
+        "published": false
+      },
+      {
+        "id": 3471,
+        "category": "food",
+        "amount": "1410.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "Детска градина и предучилищен клас / Храна / Детска градина и предучилищен клас / Храна обяд",
+        "published": false
+      },
+      {
+        "id": 3472,
+        "category": "food",
+        "amount": "1620.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "Храна / Ученици в Лозен / Храна обяд",
+        "published": false
+      },
+      {
+        "id": 3473,
+        "category": "food",
+        "amount": "610.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "Храна / Ученици в Лозен / Храна – сутрешна и следобедна закуска",
+        "published": false
+      },
+      {
+        "id": 3474,
+        "category": "food",
+        "amount": "1650.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "Food fee / Vladayska",
+        "published": false
+      },
+      {
+        "id": 3475,
+        "category": "transport",
+        "amount": "2800.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "Транспорт / в две посоки",
+        "published": false
+      },
+      {
+        "id": 3476,
+        "category": "transport",
+        "amount": "1950.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "Транспорт / в една посока",
+        "published": false
+      },
+      {
+        "id": 3477,
+        "category": "registration",
+        "amount": "150.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": null,
+        "label": "ПК – 12. клас / Такса кандидатстване / ПК – 12. клас",
+        "published": false
+      },
+      {
+        "id": 3478,
+        "category": "registration",
+        "amount": "100.00",
+        "amount_min": null,
+        "amount_max": null,
+        "currency": "EUR",
+        "period": "one_time",
+        "label": "детска градина / Такса кандидатстване / детска градина",
+        "published": false
+      }
+    ]
+  }
+]

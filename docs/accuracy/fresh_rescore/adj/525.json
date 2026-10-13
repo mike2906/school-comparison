@@ -1,0 +1,209 @@
+{
+ "school_id": 525,
+ "pages_read": [
+  "https://slaveiche.com/taksi/"
+ ],
+ "fetch_failed": [],
+ "site_states_no_fees": false,
+ "site_fees": [
+  {
+   "fid": "f1",
+   "category": "tuition",
+   "amount": 560,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": "целодневно гледане",
+   "plan": null,
+   "year": null,
+   "url": "https://slaveiche.com/taksi/",
+   "quote": "560 € – целодневно гледане, ежемесечно заплащане"
+  },
+  {
+   "fid": "f2",
+   "category": "tuition",
+   "amount": 350,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "group": "половин ден с включен обяд",
+   "plan": null,
+   "year": null,
+   "url": "https://slaveiche.com/taksi/",
+   "quote": "350 € – половин ден с включен обяд"
+  },
+  {
+   "fid": "f3",
+   "category": "registration",
+   "amount": 280,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "group": null,
+   "plan": "депозит за запазване на място",
+   "year": null,
+   "url": "https://slaveiche.com/taksi/",
+   "quote": "280 € – депозит за запазване на място"
+  },
+  {
+   "fid": "f4",
+   "category": "tuition",
+   "amount": 540,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "group": "целодневно",
+   "plan": "при предплащане за 3 месеца",
+   "year": null,
+   "url": "https://slaveiche.com/taksi/",
+   "quote": "540 € – при предплащане за 3 месеца"
+  },
+  {
+   "fid": "f5",
+   "category": "tuition",
+   "amount": 520,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "group": "целодневно",
+   "plan": "при предплащане над 6 месеца",
+   "year": null,
+   "url": "https://slaveiche.com/taksi/",
+   "quote": "520 € – при предплащане над 6 месеца"
+  },
+  {
+   "fid": "f6",
+   "category": "extracurricular",
+   "amount": 20,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": "обучение по английски език",
+   "plan": null,
+   "year": null,
+   "url": "https://slaveiche.com/taksi/",
+   "quote": "обучение по английски език - 3 пъти седмично - 20 € месечна такса"
+  },
+  {
+   "fid": "f7",
+   "category": "extracurricular",
+   "amount": 25,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": "йога за деца",
+   "plan": null,
+   "year": null,
+   "url": "https://slaveiche.com/taksi/",
+   "quote": "йога за деца - 1 път седмично - 25 € месечна такса"
+  },
+  {
+   "fid": "f8",
+   "category": "extracurricular",
+   "amount": 25,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": "модерни танци",
+   "plan": null,
+   "year": null,
+   "url": "https://slaveiche.com/taksi/",
+   "quote": "модерни танци - 2 пъти седмично - 25 € месечна такса"
+  }
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "verdict": "correct",
+   "fid": "f6",
+   "reason": "20 EUR monthly English",
+   "group_unstated": false
+  },
+  {
+   "oid": "o2",
+   "verdict": "missing_period",
+   "fid": "f3",
+   "reason": "280 EUR place deposit is one-off; row period null",
+   "group_unstated": false
+  },
+  {
+   "oid": "o3",
+   "verdict": "duplicate",
+   "fid": "f6",
+   "reason": "Same English fee as o1",
+   "group_unstated": false
+  },
+  {
+   "oid": "o4",
+   "verdict": "correct",
+   "fid": "f2",
+   "reason": "350 EUR half day, site states no frequency",
+   "group_unstated": false
+  },
+  {
+   "oid": "o5",
+   "verdict": "correct",
+   "fid": "f1",
+   "reason": "560 EUR monthly full day",
+   "group_unstated": false
+  },
+  {
+   "oid": "o6",
+   "verdict": "correct",
+   "fid": "f8",
+   "reason": "25 EUR monthly modern dance",
+   "group_unstated": false
+  },
+  {
+   "oid": "o7",
+   "verdict": "duplicate",
+   "fid": "f1",
+   "reason": "Same as o5",
+   "group_unstated": false
+  },
+  {
+   "oid": "o8",
+   "verdict": "correct",
+   "fid": "f7",
+   "reason": "25 EUR monthly yoga",
+   "group_unstated": false
+  },
+  {
+   "oid": "o9",
+   "verdict": "duplicate",
+   "fid": "f7",
+   "reason": "Same yoga fee as o8",
+   "group_unstated": false
+  },
+  {
+   "oid": "o10",
+   "verdict": "duplicate",
+   "fid": "f3",
+   "reason": "Same deposit as o2",
+   "group_unstated": false
+  },
+  {
+   "oid": "o11",
+   "verdict": "correct",
+   "fid": "f5",
+   "reason": "520 EUR prepay >6 months, no frequency stated",
+   "group_unstated": false
+  },
+  {
+   "oid": "o12",
+   "verdict": "correct",
+   "fid": "f4",
+   "reason": "540 EUR prepay 3 months, no frequency stated",
+   "group_unstated": false
+  }
+ ],
+ "notes": "No academic year on page. 350/540/520 are implicitly monthly rates but no frequency is printed beside them. 10% sibling discount. Deposit period taken as one_time."
+}

@@ -1,0 +1,69 @@
+{
+ "school_id": 598,
+ "pages_read": [
+  "https://yagodina.bg/prices/"
+ ],
+ "fetch_failed": [],
+ "site_states_no_fees": false,
+ "site_fees": [
+  {
+   "fid": "f1",
+   "category": "tuition",
+   "amount": 785,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": "Целодневно обучение",
+   "plan": null,
+   "year": null,
+   "url": "https://yagodina.bg/prices/",
+   "quote": "Целодневно обучение 785 euro/месец"
+  },
+  {
+   "fid": "f2",
+   "category": "tuition",
+   "amount": 550,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": "Полудневно обучение",
+   "plan": null,
+   "year": null,
+   "url": "https://yagodina.bg/prices/",
+   "quote": "Полудневно обучение 550 euro/месец"
+  }
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "verdict": "correct",
+   "fid": "f2",
+   "reason": "550 EUR monthly half-day",
+   "group_unstated": false
+  },
+  {
+   "oid": "o2",
+   "verdict": "correct",
+   "fid": "f1",
+   "reason": "785 EUR monthly full-day",
+   "group_unstated": false
+  },
+  {
+   "oid": "o3",
+   "verdict": "duplicate",
+   "fid": "f1",
+   "reason": "Same 785 fee as o2",
+   "group_unstated": false
+  },
+  {
+   "oid": "o4",
+   "verdict": "duplicate",
+   "fid": "f2",
+   "reason": "Same 550 fee as o1",
+   "group_unstated": false
+  }
+ ],
+ "notes": "Fees include food, materials, events. No year or deposit stated."
+}

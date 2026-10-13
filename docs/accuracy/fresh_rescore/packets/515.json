@@ -1,0 +1,225 @@
+{
+ "school_id": 515,
+ "name": "ЧАСТНА ДЕТСКА ГРАДИНА БРИТАНИКА",
+ "website": "https://britanica-parkschool.bg/",
+ "pages_the_crawler_visited": [
+  "https://britanica-parkschool.bg/",
+  "https://britanica-parkschool.bg/priem/",
+  "https://britanica-parkschool.bg/detska-gradina/",
+  "https://britanica-parkschool.bg/en/admission/"
+ ],
+ "pages_where_an_earlier_reader_found_fees": [
+  "https://britanica-parkschool.bg/priem/"
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "category": "tuition",
+   "amount": 1051.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "Втора група — Месечно плащане",
+   "note": "Each of the remaining 8 installments."
+  },
+  {
+   "oid": "o2",
+   "category": "tuition",
+   "amount": 11800.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "Трета група — Пълно плащане",
+   "note": "2026/2027 school year."
+  },
+  {
+   "oid": "o3",
+   "category": "tuition",
+   "amount": 5700.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "Втора група — Две вноски",
+   "note": "2 installments of EUR 5,700."
+  },
+  {
+   "oid": "o4",
+   "category": "tuition",
+   "amount": 5700.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "Първа група — Две вноски",
+   "note": "2 installments of EUR 5,700."
+  },
+  {
+   "oid": "o5",
+   "category": "tuition",
+   "amount": 2992.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "Първа група — Месечно плащане",
+   "note": "Initial installment (1 payment)."
+  },
+  {
+   "oid": "o6",
+   "category": "registration",
+   "amount": "240.00",
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "Кандидатстване за прием в детска градина / Кандидатстване за прием в детска градина / административна такса",
+   "note": ""
+  },
+  {
+   "oid": "o7",
+   "category": "tuition",
+   "amount": 11400.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "Втора група — Пълно плащане",
+   "note": "2026/2027 school year."
+  },
+  {
+   "oid": "o8",
+   "category": "materials",
+   "amount": 550.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "Такса за учебни ресурси",
+   "note": "Paid once for the whole 2026/2027 school year."
+  },
+  {
+   "oid": "o9",
+   "category": "registration",
+   "amount": 240.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "label": "Административна такса",
+   "note": "Kindergarten admission; non-refundable."
+  },
+  {
+   "oid": "o10",
+   "category": "tuition",
+   "amount": 1112.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "Трета група — Месечно плащане",
+   "note": "Each of the remaining 8 installments."
+  },
+  {
+   "oid": "o11",
+   "category": "tuition",
+   "amount": 2992.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "Втора група — Месечно плащане",
+   "note": "Initial installment (1 payment)."
+  },
+  {
+   "oid": "o12",
+   "category": "tuition",
+   "amount": 1051.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "Първа група — Месечно плащане",
+   "note": "Each of the remaining 8 installments."
+  },
+  {
+   "oid": "o13",
+   "category": "tuition",
+   "amount": 1259.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "Подготвителна група — Месечно плащане",
+   "note": "Each of the remaining 8 installments."
+  },
+  {
+   "oid": "o14",
+   "category": "tuition",
+   "amount": 12900.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "Подготвителна група — Пълно плащане",
+   "note": "2026/2027 school year."
+  },
+  {
+   "oid": "o15",
+   "category": "tuition",
+   "amount": 11400.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "Първа група — Пълно плащане",
+   "note": "2026/2027 school year."
+  },
+  {
+   "oid": "o16",
+   "category": "tuition",
+   "amount": 6450.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "Подготвителна група — Две вноски",
+   "note": "2 installments of EUR 6,450."
+  },
+  {
+   "oid": "o17",
+   "category": "tuition",
+   "amount": 2828.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "Подготвителна група — Месечно плащане",
+   "note": "Initial installment (1 payment)."
+  },
+  {
+   "oid": "o18",
+   "category": "tuition",
+   "amount": 2904.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "Трета група — Месечно плащане",
+   "note": "Initial installment (1 payment)."
+  },
+  {
+   "oid": "o19",
+   "category": "tuition",
+   "amount": 5900.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "Трета група — Две вноски",
+   "note": "2 installments of EUR 5,900."
+  }
+ ]
+}

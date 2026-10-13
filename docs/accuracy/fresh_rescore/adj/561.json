@@ -1,0 +1,34 @@
+{
+ "school_id": 561,
+ "pages_read": [
+  "https://azbuki-school.bg/priem/"
+ ],
+ "fetch_failed": [],
+ "site_states_no_fees": false,
+ "site_fees": [
+  {
+   "fid": "f1",
+   "category": "tuition",
+   "amount": 8950,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": null,
+   "plan": null,
+   "year": "2026/2027",
+   "url": "https://azbuki-school.bg/priem/",
+   "quote": "Таксата за следващата учебна година (2026/2027) е 8950 евро"
+  }
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "verdict": "correct",
+   "fid": "f1",
+   "reason": "8950 EUR for school year 2026/2027",
+   "group_unstated": false
+  }
+ ],
+ "notes": "Food, transport, extracurricular charged extra; no amounts given."
+}

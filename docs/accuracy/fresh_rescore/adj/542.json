@@ -1,0 +1,167 @@
+{
+ "school_id": 542,
+ "pages_read": [
+  "https://yourkidsbg.com/priem-i-taksi/"
+ ],
+ "fetch_failed": [],
+ "site_states_no_fees": false,
+ "site_fees": [
+  {
+   "fid": "f1",
+   "category": "tuition",
+   "amount": 1100,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "BGN",
+   "period": "monthly",
+   "group": "Частна Детска Ясла „Йор Кидс“",
+   "plan": "Целодневен престой",
+   "year": null,
+   "url": "https://yourkidsbg.com/priem-i-taksi/",
+   "quote": "Месечни такси ... Ясла ,,Йор Кидс“: Целодневен престой – 1100 лв."
+  },
+  {
+   "fid": "f2",
+   "category": "tuition",
+   "amount": 800,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "BGN",
+   "period": "monthly",
+   "group": "Частна Детска Ясла „Йор Кидс“",
+   "plan": "Полудневен престой",
+   "year": null,
+   "url": "https://yourkidsbg.com/priem-i-taksi/",
+   "quote": "Полудневен престой – 800 лв."
+  },
+  {
+   "fid": "f3",
+   "category": "tuition",
+   "amount": 950,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "BGN",
+   "period": "monthly",
+   "group": "Частна Детска Градина „Йор Кидс“",
+   "plan": "Целодневен престой",
+   "year": null,
+   "url": "https://yourkidsbg.com/priem-i-taksi/",
+   "quote": "Месечни такси ... Градина ,,Йор Кидс“: Целодневен престой – 950 лв."
+  },
+  {
+   "fid": "f4",
+   "category": "tuition",
+   "amount": 750,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "BGN",
+   "period": "monthly",
+   "group": "Частна Детска Градина „Йор Кидс“",
+   "plan": "Полудневен престой",
+   "year": null,
+   "url": "https://yourkidsbg.com/priem-i-taksi/",
+   "quote": "Полудневен престой – 750 лв."
+  },
+  {
+   "fid": "f5",
+   "category": "registration",
+   "amount": 400,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "BGN",
+   "period": null,
+   "group": null,
+   "plan": "депозит при продължително отсъствие",
+   "year": null,
+   "url": "https://yourkidsbg.com/priem-i-taksi/",
+   "quote": "Депозит за запазване на място при продължително отсъствие – 400лв."
+  },
+  {
+   "fid": "f6",
+   "category": "materials",
+   "amount": 150,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "BGN",
+   "period": "yearly",
+   "group": null,
+   "plan": null,
+   "year": null,
+   "url": "https://yourkidsbg.com/priem-i-taksi/",
+   "quote": "Годишна такса за учебни материали – 150лв"
+  }
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "verdict": "correct",
+   "fid": "f1",
+   "reason": "1100 BGN monthly nursery full-day.",
+   "group_unstated": false
+  },
+  {
+   "oid": "o2",
+   "verdict": "correct",
+   "fid": "f3",
+   "reason": "950 BGN monthly kindergarten full-day.",
+   "group_unstated": false
+  },
+  {
+   "oid": "o3",
+   "verdict": "correct",
+   "fid": "f6",
+   "reason": "150 BGN yearly materials.",
+   "group_unstated": false
+  },
+  {
+   "oid": "o4",
+   "verdict": "correct",
+   "fid": "f4",
+   "reason": "750 BGN monthly kindergarten half-day.",
+   "group_unstated": false
+  },
+  {
+   "oid": "o5",
+   "verdict": "duplicate",
+   "fid": "f4",
+   "reason": "Same as earlier o4.",
+   "group_unstated": false
+  },
+  {
+   "oid": "o6",
+   "verdict": "correct",
+   "fid": "f5",
+   "reason": "400 BGN deposit as registration; site states no frequency, row null.",
+   "group_unstated": false
+  },
+  {
+   "oid": "o7",
+   "verdict": "correct",
+   "fid": "f2",
+   "reason": "800 BGN monthly nursery half-day.",
+   "group_unstated": false
+  },
+  {
+   "oid": "o8",
+   "verdict": "duplicate",
+   "fid": "f5",
+   "reason": "Same deposit as earlier o6.",
+   "group_unstated": false
+  },
+  {
+   "oid": "o9",
+   "verdict": "duplicate",
+   "fid": "f6",
+   "reason": "Same as earlier o3.",
+   "group_unstated": false
+  },
+  {
+   "oid": "o10",
+   "verdict": "duplicate",
+   "fid": "f3",
+   "reason": "Same as earlier o2.",
+   "group_unstated": false
+  }
+ ],
+ "notes": "Prices still in leva only, no academic year shown. Deposit is conditional (absence of a month or more), not a once-ever charge, so period kept null (no frequency stated); if the rubric forces deposits to one_time, o6/o8 become missing_period."
+}

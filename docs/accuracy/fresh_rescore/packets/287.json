@@ -1,0 +1,47 @@
+{
+ "school_id": 287,
+ "name": "Частна детска градина Чудната къщичка",
+ "website": "https://www.wonderhouse-bg.com/",
+ "pages_the_crawler_visited": [
+  "https://www.wonderhouse-bg.com/",
+  "https://www.wonderhouse-bg.com/taksi-i-zapisvania/"
+ ],
+ "pages_where_an_earlier_reader_found_fees": [
+  "https://www.wonderhouse-bg.com/taksi-i-zapisvania/"
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "category": "tuition",
+   "amount": 580.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "Деца НАД 3 години",
+   "note": ""
+  },
+  {
+   "oid": "o2",
+   "category": "tuition",
+   "amount": "580.00",
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "Деца до 3 години / Деца до 3 години",
+   "note": ""
+  },
+  {
+   "oid": "o3",
+   "category": "tuition",
+   "amount": 580.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "Деца до 3 години",
+   "note": ""
+  }
+ ]
+}

@@ -1,0 +1,69 @@
+{
+ "school_id": 351,
+ "name": "ЧАСТНА ДЕТСКА ГРАДИНА СЛЪНЧОГЛЕДИ",
+ "website": "https://slanchogledi.bg/",
+ "pages_the_crawler_visited": [
+  "https://slanchogledi.bg/",
+  "https://slanchogledi.bg/admission/"
+ ],
+ "pages_where_an_earlier_reader_found_fees": [
+  "https://slanchogledi.bg/admission/"
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "category": "tuition",
+   "amount": 800.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "Месечната такса (септември – юли)",
+   "note": ""
+  },
+  {
+   "oid": "o2",
+   "category": "registration",
+   "amount": 600.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "Първоначален Депозит",
+   "note": "Заплаща се при подписване на Договора."
+  },
+  {
+   "oid": "o3",
+   "category": "tuition",
+   "amount": 600.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "Месечната такса за периода 16–31 август",
+   "note": ""
+  },
+  {
+   "oid": "o4",
+   "category": "tuition",
+   "amount": "800.00",
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "Месечната такса",
+   "note": ""
+  },
+  {
+   "oid": "o5",
+   "category": "registration",
+   "amount": "600.00",
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "Първоначален Депозит",
+   "note": ""
+  }
+ ]
+}

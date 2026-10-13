@@ -1,0 +1,103 @@
+{
+ "school_id": 171,
+ "name": "ЧАСТНО СРЕДНО УЧИЛИЩЕ РЬОРИХ",
+ "website": "https://roerich-school.org/",
+ "pages_the_crawler_visited": [
+  "https://roerich-school.org/",
+  "https://roerich-school.org/admissions-2025-2026/",
+  "https://roerich-school.org/%d1%82%d0%b0%d0%ba%d1%81%d0%b8-%d0%b8-%d1%84%d0%b8%d0%bd%d0%b0%d0%bd%d1%81%d0%be%d0%b2%d0%b8-%d1%83%d1%81%d0%bb%d0%be%d0%b2%d0%b8%d1%8f/"
+ ],
+ "pages_where_an_earlier_reader_found_fees": [
+  "https://roerich-school.org/%d1%82%d0%b0%d0%ba%d1%81%d0%b8-%d0%b8-%d1%84%d0%b8%d0%bd%d0%b0%d0%bd%d1%81%d0%be%d0%b2%d0%b8-%d1%83%d1%81%d0%bb%d0%be%d0%b2%d0%b8%d1%8f/"
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "category": "tuition",
+   "amount": "4950.00",
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "VIII - XII клас / VIII - XII клас / Такса обучение / При записване след 20.02.2026 г.",
+   "note": ""
+  },
+  {
+   "oid": "o2",
+   "category": "tuition",
+   "amount": "5555.00",
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "Ученици със СОП / Краен срок за записване до 20.02.2026 г.",
+   "note": ""
+  },
+  {
+   "oid": "o3",
+   "category": "tuition",
+   "amount": 4725.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "VIII–XII клас — такса обучение",
+   "note": "2026/27; записване до 20.02.2026"
+  },
+  {
+   "oid": "o4",
+   "category": "tuition",
+   "amount": 5555.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "Ученици със СОП — такса обучение",
+   "note": "2026/27; краен срок за записване 20.02.2026; includes specialized pedagogical assessment, individual plan and program, and additional psychological care and support"
+  },
+  {
+   "oid": "o5",
+   "category": "tuition",
+   "amount": 4250.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "VIII–XII клас — такса обучение",
+   "note": "2026/27; коледна отстъпка, записване до 19.12.2025; за първите 5 договора"
+  },
+  {
+   "oid": "o6",
+   "category": "tuition",
+   "amount": 4950.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "VIII–XII клас — такса обучение",
+   "note": "2026/27; записване след 20.02.2026"
+  },
+  {
+   "oid": "o7",
+   "category": "tuition",
+   "amount": 4500.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "VIII–XII клас — такса обучение",
+   "note": "2026/27; записване до 23.01.2026"
+  },
+  {
+   "oid": "o8",
+   "category": "tuition",
+   "amount": "7269.00",
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "ПК, I-VII клас /целодневно обучение/ / ПК, I-VII клас /целодневно обучение/ / Такса обучение / При записване след 20.02.2026 г.",
+   "note": ""
+  }
+ ]
+}

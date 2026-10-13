@@ -1,0 +1,223 @@
+{
+ "school_id": 220,
+ "pages_read": [
+  "https://toddlersacademy.eu/bg/admission.html"
+ ],
+ "fetch_failed": [],
+ "site_states_no_fees": false,
+ "site_fees": [
+  {
+   "fid": "f1",
+   "category": "tuition",
+   "amount": 8580,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": null,
+   "plan": "Обща такса за обучение",
+   "year": "2026/2027",
+   "url": "https://toddlersacademy.eu/bg/admission.html",
+   "quote": "Обща такса за обучение EUR 8 580"
+  },
+  {
+   "fid": "f2",
+   "category": "tuition",
+   "amount": 780,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": null,
+   "plan": "Опция 1: 11 равни месечни вноски",
+   "year": "2026/2027",
+   "url": "https://toddlersacademy.eu/bg/admission.html",
+   "quote": "Опция 1: 11 равни месечни вноски, платими до 5-то число на всеки месец EUR 780"
+  },
+  {
+   "fid": "f3",
+   "category": "tuition",
+   "amount": 2310,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "quarter",
+   "group": null,
+   "plan": "Опция 2: I вноска (септ–ноем)",
+   "year": "2026/2027",
+   "url": "https://toddlersacademy.eu/bg/admission.html",
+   "quote": "I вноска: EUR 2 310 (септ–ноем)"
+  },
+  {
+   "fid": "f4",
+   "category": "tuition",
+   "amount": 2310,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "quarter",
+   "group": null,
+   "plan": "Опция 2: II вноска (дек–фев)",
+   "year": "2026/2027",
+   "url": "https://toddlersacademy.eu/bg/admission.html",
+   "quote": "II вноска: EUR 2 310 (дек–фев)"
+  },
+  {
+   "fid": "f5",
+   "category": "tuition",
+   "amount": 2310,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "quarter",
+   "group": null,
+   "plan": "Опция 2: III вноска (март–май)",
+   "year": "2026/2027",
+   "url": "https://toddlersacademy.eu/bg/admission.html",
+   "quote": "III вноска: EUR 2 310 (март–май)"
+  },
+  {
+   "fid": "f6",
+   "category": "tuition",
+   "amount": 1540,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "group": null,
+   "plan": "Опция 2: IV вноска (юни–юли)",
+   "year": "2026/2027",
+   "url": "https://toddlersacademy.eu/bg/admission.html",
+   "quote": "IV вноска: EUR 1 540 (юни–юли)"
+  },
+  {
+   "fid": "f7",
+   "category": "tuition",
+   "amount": 8330,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": null,
+   "plan": "Опция 3: Еднократно плащане",
+   "year": "2026/2027",
+   "url": "https://toddlersacademy.eu/bg/admission.html",
+   "quote": "Опция 3: Еднократно плащане (отстъпка EUR 250 при еднократно плащане при подписване на договор) EUR 8 330"
+  },
+  {
+   "fid": "f8",
+   "category": "registration",
+   "amount": 770,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "group": null,
+   "plan": "Депозит",
+   "year": "2026/2027",
+   "url": "https://toddlersacademy.eu/bg/admission.html",
+   "quote": "Депозитът е платим при подписване на договор ... EUR 770"
+  },
+  {
+   "fid": "f9",
+   "category": "materials",
+   "amount": 150,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": null,
+   "plan": "Еднократна такса за учебници и тетрадки",
+   "year": "2026/2027",
+   "url": "https://toddlersacademy.eu/bg/admission.html",
+   "quote": "Еднократна такса за учебници и тетрадки: EUR 150"
+  },
+  {
+   "fid": "f10",
+   "category": "registration",
+   "amount": 200,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "group": null,
+   "plan": "само при първо постъпване",
+   "year": "2026/2027",
+   "url": "https://toddlersacademy.eu/bg/admission.html",
+   "quote": "Еднократна такса за регистрация: EUR 200 (само при първо постъпване)"
+  }
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "verdict": "wrong_category",
+   "fid": "f8",
+   "reason": "Deposit 770 filed as tuition; deposit is registration",
+   "group_unstated": false
+  },
+  {
+   "oid": "o2",
+   "verdict": "wrong_period",
+   "fid": "f9",
+   "reason": "Textbook fee is an 'еднократна такса' within the 2026/2027 fee schedule = once per school year (yearly), not one_time",
+   "group_unstated": false
+  },
+  {
+   "oid": "o3",
+   "verdict": "correct",
+   "fid": "f3",
+   "reason": "Option 2 I instalment 2310 quarterly",
+   "group_unstated": false
+  },
+  {
+   "oid": "o4",
+   "verdict": "correct",
+   "fid": "f10",
+   "reason": "Registration 200 one_time, first enrolment only",
+   "group_unstated": false
+  },
+  {
+   "oid": "o5",
+   "verdict": "correct",
+   "fid": "f5",
+   "reason": "Option 2 III instalment 2310 quarterly",
+   "group_unstated": false
+  },
+  {
+   "oid": "o6",
+   "verdict": "wrong_period",
+   "fid": "f7",
+   "reason": "Option 3 single payment of full year's tuition is yearly, not one_time",
+   "group_unstated": false
+  },
+  {
+   "oid": "o7",
+   "verdict": "wrong_period",
+   "fid": "f6",
+   "reason": "IV instalment 1540 (June-July) differs from the regular quarterly 2310; one-off last instalment has null period",
+   "group_unstated": false
+  },
+  {
+   "oid": "o8",
+   "verdict": "correct",
+   "fid": "f4",
+   "reason": "Option 2 II instalment 2310 quarterly",
+   "group_unstated": false
+  },
+  {
+   "oid": "o9",
+   "verdict": "correct",
+   "fid": "f2",
+   "reason": "Option 1 780 x 11 monthly",
+   "group_unstated": false
+  },
+  {
+   "oid": "o10",
+   "verdict": "correct",
+   "fid": "f1",
+   "reason": "Total 8580 printed for 2026/2027",
+   "group_unstated": false
+  }
+ ],
+ "notes": "Deposit 770 deducted from last instalment. Textbook fee period yearly is a judgement call ('Еднократна' in an annual schedule). Tuition includes food. Homepage not refetched (admission page holds all fees)."
+}

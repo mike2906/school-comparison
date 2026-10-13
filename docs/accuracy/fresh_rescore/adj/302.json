@@ -1,0 +1,97 @@
+{
+ "school_id": 302,
+ "pages_read": [
+  "https://www.ecodara.com/content/taksa-za-detska-gradina.php"
+ ],
+ "fetch_failed": [],
+ "site_states_no_fees": false,
+ "site_fees": [
+  {
+   "fid": "f1",
+   "category": "tuition",
+   "amount": 680,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": "яслена група /2-годишни деца/",
+   "plan": null,
+   "year": "2025/2026",
+   "url": "https://www.ecodara.com/content/taksa-za-detska-gradina.php",
+   "quote": "Месечна такса за яслена група /2-годишни деца/ за учебната 2025/2026г. е 680 euro"
+  },
+  {
+   "fid": "f2",
+   "category": "tuition",
+   "amount": 650,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": "детска градина /от 3 до 7-годишни деца/",
+   "plan": null,
+   "year": null,
+   "url": "https://www.ecodara.com/content/taksa-za-detska-gradina.php",
+   "quote": "Месечна такса за детска градина /от 3 до 7-годишни деца/ ... е 650 euro"
+  },
+  {
+   "fid": "f3",
+   "category": "tuition",
+   "amount": 960,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "BGN",
+   "period": null,
+   "group": null,
+   "plan": null,
+   "year": null,
+   "url": "https://www.ecodara.com/content/taksa-za-detska-gradina.php",
+   "quote": "е 960 лева"
+  },
+  {
+   "fid": "f4",
+   "category": "extracurricular",
+   "amount": 30,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "BGN",
+   "period": null,
+   "group": "psychologist consultation",
+   "plan": null,
+   "year": null,
+   "url": "https://www.ecodara.com/content/taksa-za-detska-gradina.php",
+   "quote": "Цена на консултация: 30 лв."
+  }
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "verdict": "correct",
+   "fid": "f2",
+   "reason": "650 EUR monthly kindergarten 3-7.",
+   "group_unstated": false
+  },
+  {
+   "oid": "o2",
+   "verdict": "correct",
+   "fid": "f1",
+   "reason": "680 EUR monthly, unlabelled.",
+   "group_unstated": true
+  },
+  {
+   "oid": "o3",
+   "verdict": "duplicate",
+   "fid": "f1",
+   "reason": "Same 680 EUR monthly nursery fee as earlier o2 (equally correct).",
+   "group_unstated": false
+  },
+  {
+   "oid": "o4",
+   "verdict": "duplicate",
+   "fid": "f2",
+   "reason": "Same 650 EUR monthly fee as earlier labelled o1.",
+   "group_unstated": false
+  }
+ ],
+ "notes": "Site still shows academic year 2025/2026 (only stated on the nursery line). Unlabelled '960 лева' follows the 650 EUR line; likely a leftover leva figure, ambiguous. Psychologist consultation 30 лв listed as f4 (category best fit). o2/o3 duplicate choice follows the 'earlier candidate' rule literally; o3 has the better label."
+}

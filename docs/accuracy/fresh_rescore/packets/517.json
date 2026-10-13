@@ -1,0 +1,117 @@
+{
+ "school_id": 517,
+ "name": "ПЪРВА ЧАСТНА МАТЕМАТИЧЕСКА ГИМНАЗИЯ",
+ "website": "https://www.parvamatematicheska.com/",
+ "pages_the_crawler_visited": [
+  "https://www.parvamatematicheska.com/",
+  "https://www.parvamatematicheska.com/pchmg/finansovi-uslovija/",
+  "https://www.parvamatematicheska.com/pchmg/priem/",
+  "https://www.parvamatematicheska.com/wp-content/uploads/2024/03/%D0%9F%D0%A0%D0%90%D0%92%D0%98%D0%9B%D0%90-%D0%98-%D0%9F%D0%A0%D0%9E%D0%A6%D0%95%D0%94%D0%A3%D0%A0%D0%90-%D0%BF%D1%80%D0%B8%D0%B5%D0%BC-2024-2025-5-%D0%BA%D0%BB%D0%B0%D1%81.pdf",
+  "https://www.parvamatematicheska.com/wp-content/uploads/2024/03/%D0%9F%D0%A0%D0%90%D0%92%D0%98%D0%9B%D0%90-%D0%98-%D0%9F%D0%A0%D0%9E%D0%A6%D0%95%D0%94%D0%A3%D0%A0%D0%90-%D0%BF%D1%80%D0%B8%D0%B5%D0%BC-2024-2025-8-%D0%BA%D0%BB%D0%B0%D1%81.pdf",
+  "https://www.parvamatematicheska.com/%d0%b7%d0%b0%d0%bf%d0%b8%d1%81%d0%b2%d0%b0%d0%bd%d0%b5-%d0%b7%d0%b0-%d1%82%d1%80%d0%b5%d1%82%d0%b8-%d0%bf%d1%80%d0%b8%d0%b5%d0%bc%d0%b5%d0%bd-%d0%b8%d0%b7%d0%bf%d0%b8%d1%82-%d0%bd%d0%b0-%d0%bf%d1%87/"
+ ],
+ "pages_where_an_earlier_reader_found_fees": [
+  "https://www.parvamatematicheska.com/pchmg/finansovi-uslovija/"
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "category": "tuition",
+   "amount": "7000.00",
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "8. клас / ГОДИШНА ТАКСА",
+   "note": ""
+  },
+  {
+   "oid": "o2",
+   "category": "registration",
+   "amount": 35.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "Такса за участие в Трети приемен изпит",
+   "note": "Entrance exam for students in grades 4 and 7."
+  },
+  {
+   "oid": "o3",
+   "category": "tuition",
+   "amount": 3605.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "На две вноски — 8. клас",
+   "note": "2 installments of €3,605 each."
+  },
+  {
+   "oid": "o4",
+   "category": "tuition",
+   "amount": "7810.00",
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "5. клас / ГОДИШНА ТАКСА",
+   "note": ""
+  },
+  {
+   "oid": "o5",
+   "category": "tuition",
+   "amount": 4022.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "На две вноски — 5. клас",
+   "note": "2 installments of €4,022 each."
+  },
+  {
+   "oid": "o6",
+   "category": "tuition",
+   "amount": 1045.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "На осем месечни вноски — 5. клас",
+   "note": "8 installments of €1,045 each; first payment is the deposit."
+  },
+  {
+   "oid": "o7",
+   "category": "tuition",
+   "amount": 7000.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "Годишна такса — 8. клас",
+   "note": ""
+  },
+  {
+   "oid": "o8",
+   "category": "tuition",
+   "amount": 7810.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "Годишна такса — 5. клас",
+   "note": ""
+  },
+  {
+   "oid": "o9",
+   "category": "tuition",
+   "amount": 938.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "На осем месечни вноски — 8. клас",
+   "note": "8 installments of €938 each; first payment is the deposit."
+  }
+ ]
+}

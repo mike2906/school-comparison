@@ -1,0 +1,70 @@
+{
+ "school_id": 574,
+ "pages_read": [
+  "https://novigradini.com/anika/",
+  "https://novigradini.com/anika/ceni/"
+ ],
+ "fetch_failed": [],
+ "site_states_no_fees": false,
+ "site_fees": [
+  {
+   "fid": "f1",
+   "category": "tuition",
+   "amount": 475.5,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": null,
+   "plan": null,
+   "year": "от септември 2025 г.",
+   "url": "https://novigradini.com/anika/ceni/",
+   "quote": "От септември 2025 г. месечната такса е 475,50 € (930 лв.)"
+  },
+  {
+   "fid": "f2",
+   "category": "registration",
+   "amount": 475.5,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "group": null,
+   "plan": "депозит при записване",
+   "year": null,
+   "url": "https://novigradini.com/anika/ceni/",
+   "quote": "При записване се заплаща еднократен депозит от 475,50 € (930 лв.)"
+  }
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "verdict": "correct",
+   "fid": "f2",
+   "reason": "475.50 EUR one-time deposit at enrolment",
+   "group_unstated": false
+  },
+  {
+   "oid": "o2",
+   "verdict": "duplicate",
+   "fid": "f2",
+   "reason": "Same deposit as o1",
+   "group_unstated": false
+  },
+  {
+   "oid": "o3",
+   "verdict": "correct",
+   "fid": "f1",
+   "reason": "475.50 EUR monthly fee",
+   "group_unstated": false
+  },
+  {
+   "oid": "o4",
+   "verdict": "duplicate",
+   "fid": "f1",
+   "reason": "Same monthly fee as o3",
+   "group_unstated": false
+  }
+ ],
+ "notes": "State compensation up to 281.21 EUR/month is a subsidy, not a fee. Meals billed per attended day, no amount printed."
+}

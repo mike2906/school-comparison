@@ -1,0 +1,63 @@
+{
+ "school_id": 547,
+ "pages_read": [
+  "https://mechopuh.bg/priem/",
+  "https://mechopuh.bg/priem/DogovorMechoPuh.pdf"
+ ],
+ "fetch_failed": [],
+ "site_states_no_fees": false,
+ "site_fees": [
+  {
+   "fid": "f1",
+   "category": "tuition",
+   "amount": 600,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": "целодневен престой",
+   "plan": null,
+   "year": null,
+   "url": "https://mechopuh.bg/priem/DogovorMechoPuh.pdf",
+   "quote": "Месечната такса за едно дете е в размер на: 600 (шестстотин) евро (1173,50 лв.) за целодневен престой"
+  },
+  {
+   "fid": "f2",
+   "category": "tuition",
+   "amount": 550,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": "полудневен престой",
+   "plan": null,
+   "year": null,
+   "url": "https://mechopuh.bg/priem/DogovorMechoPuh.pdf",
+   "quote": "550 (петстотин и петдесет) евро (1075,71 лв.) за полудневен престой."
+  }
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "verdict": "correct",
+   "fid": "f1",
+   "reason": "600 EUR monthly full day",
+   "group_unstated": false
+  },
+  {
+   "oid": "o2",
+   "verdict": "correct",
+   "fid": "f2",
+   "reason": "550 EUR monthly half day",
+   "group_unstated": false
+  },
+  {
+   "oid": "o3",
+   "verdict": "wrong_amount",
+   "fid": null,
+   "reason": "Site states enrolment fee equals one monthly fee but prints no amount; 550-600 range built from two different fees",
+   "group_unstated": false
+  }
+ ],
+ "notes": "Contract Чл.10: 'еднократна такса за записване в размер на една месечна такса за обучение' - no amount printed, so not listed as a site fee. Contract also prints BGN equivalents."
+}

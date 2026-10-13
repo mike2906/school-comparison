@@ -1,0 +1,176 @@
+{
+ "school_id": 517,
+ "pages_read": [
+  "https://www.parvamatematicheska.com/pchmg/finansovi-uslovija/",
+  "https://www.parvamatematicheska.com/pchmg/priem/",
+  "https://www.parvamatematicheska.com/%d0%b7%d0%b0%d0%bf%d0%b8%d1%81%d0%b2%d0%b0%d0%bd%d0%b5-%d0%b7%d0%b0-%d1%82%d1%80%d0%b5%d1%82%d0%b8-%d0%bf%d1%80%d0%b8%d0%b5%d0%bc%d0%b5%d0%bd-%d0%b8%d0%b7%d0%bf%d0%b8%d1%82-%d0%bd%d0%b0-%d0%bf%d1%87/"
+ ],
+ "fetch_failed": [],
+ "site_states_no_fees": false,
+ "site_fees": [
+  {
+   "fid": "f1",
+   "category": "tuition",
+   "amount": 7810,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "5. клас",
+   "plan": "Еднократно плащане",
+   "year": "2026-2027",
+   "url": "https://www.parvamatematicheska.com/pchmg/finansovi-uslovija/",
+   "quote": "5 клас ... Еднократно плащане: 7810 евро"
+  },
+  {
+   "fid": "f2",
+   "category": "tuition",
+   "amount": 4022,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "semester",
+   "group": "5. клас",
+   "plan": "На две вноски",
+   "year": "2026-2027",
+   "url": "https://www.parvamatematicheska.com/pchmg/finansovi-uslovija/",
+   "quote": "На две вноски: 2 х 4022 евро"
+  },
+  {
+   "fid": "f3",
+   "category": "tuition",
+   "amount": 1045,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": "5. клас",
+   "plan": "На осем месечни вноски",
+   "year": "2026-2027",
+   "url": "https://www.parvamatematicheska.com/pchmg/finansovi-uslovija/",
+   "quote": "На осем месечни вноски ... Първа вноска при подписване на договора (капаро) ... капаро в размер на 1045 евро"
+  },
+  {
+   "fid": "f4",
+   "category": "tuition",
+   "amount": 7000,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "8. клас",
+   "plan": "Еднократно плащане",
+   "year": "2026-2027",
+   "url": "https://www.parvamatematicheska.com/pchmg/finansovi-uslovija/",
+   "quote": "8 клас ... Еднократно плащане: 7000 евро"
+  },
+  {
+   "fid": "f5",
+   "category": "tuition",
+   "amount": 3605,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "semester",
+   "group": "8. клас",
+   "plan": "На две вноски",
+   "year": "2026-2027",
+   "url": "https://www.parvamatematicheska.com/pchmg/finansovi-uslovija/",
+   "quote": "На две вноски: 2 х 3605 евро"
+  },
+  {
+   "fid": "f6",
+   "category": "tuition",
+   "amount": 938,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": "8. клас",
+   "plan": "На осем месечни вноски",
+   "year": "2026-2027",
+   "url": "https://www.parvamatematicheska.com/pchmg/finansovi-uslovija/",
+   "quote": "На осем месечни вноски ... капаро в размер на 938 евро"
+  },
+  {
+   "fid": "f7",
+   "category": "registration",
+   "amount": 35,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "group": "4. и 7. клас (кандидати за 5. и 8. клас)",
+   "plan": "Трети приемен изпит",
+   "year": "2026",
+   "url": "https://www.parvamatematicheska.com/%d0%b7%d0%b0%d0%bf%d0%b8%d1%81%d0%b2%d0%b0%d0%bd%d0%b5-%d0%b7%d0%b0-%d1%82%d1%80%d0%b5%d1%82%d0%b8-%d0%bf%d1%80%d0%b8%d0%b5%d0%bc%d0%b5%d0%bd-%d0%b8%d0%b7%d0%bf%d0%b8%d1%82-%d0%bd%d0%b0-%d0%bf%d1%87/",
+   "quote": "Таксата за участие е 35 евро (68,45 лв.)."
+  }
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "verdict": "correct",
+   "fid": "f4",
+   "reason": "7000 EUR yearly, grade 8",
+   "group_unstated": false
+  },
+  {
+   "oid": "o2",
+   "verdict": "missing_period",
+   "fid": "f7",
+   "reason": "35 EUR entrance exam fee; exam fee is one_time, row null",
+   "group_unstated": false
+  },
+  {
+   "oid": "o3",
+   "verdict": "missing_period",
+   "fid": "f5",
+   "reason": "3605 EUR is one of 2 instalments (Jul/Feb, 2 per year -> semester); row null",
+   "group_unstated": false
+  },
+  {
+   "oid": "o4",
+   "verdict": "correct",
+   "fid": "f1",
+   "reason": "7810 EUR yearly, grade 5",
+   "group_unstated": false
+  },
+  {
+   "oid": "o5",
+   "verdict": "missing_period",
+   "fid": "f2",
+   "reason": "4022 EUR 2-instalment amount (semester); row null",
+   "group_unstated": false
+  },
+  {
+   "oid": "o6",
+   "verdict": "correct",
+   "fid": "f3",
+   "reason": "1045 EUR eight monthly instalments, grade 5",
+   "group_unstated": false
+  },
+  {
+   "oid": "o7",
+   "verdict": "duplicate",
+   "fid": "f4",
+   "reason": "Same 7000 fee as o1",
+   "group_unstated": false
+  },
+  {
+   "oid": "o8",
+   "verdict": "duplicate",
+   "fid": "f1",
+   "reason": "Same 7810 fee as o4",
+   "group_unstated": false
+  },
+  {
+   "oid": "o9",
+   "verdict": "correct",
+   "fid": "f6",
+   "reason": "938 EUR eight monthly instalments, grade 8",
+   "group_unstated": false
+  }
+ ],
+ "notes": "Two-instalment dates: by 9/22 July 2026 and by 5 Feb 2027 (semester). 8-instalment plan: 1st instalment = капаро at signing, deducted from last payable instalment; 2-8 by 5th of month Sep-Mar; all printed amounts equal so treated as monthly, no separate deposit fee listed. Instalment totals exceed yearly fee (8x1045=8360, 2x4022=8044 > 7810). Quotes for f1/f4 partly reconstructed from headings. Sibling discounts 5%/10%."
+}

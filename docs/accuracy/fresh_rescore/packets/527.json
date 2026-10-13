@@ -1,0 +1,47 @@
+{
+ "school_id": 527,
+ "name": "Частна детска градина ПОД 1 ПОКРИВ",
+ "website": "https://under1roof.bg/",
+ "pages_the_crawler_visited": [
+  "https://under1roof.bg/",
+  "https://under1roof.bg/price-table/"
+ ],
+ "pages_where_an_earlier_reader_found_fees": [
+  "https://under1roof.bg/price-table/"
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "category": "tuition",
+   "amount": 550.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "Детска градина Целодневна",
+   "note": ""
+  },
+  {
+   "oid": "o2",
+   "category": "tuition",
+   "amount": 540.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "BGN",
+   "period": "monthly",
+   "label": "Детска градина Полудневна",
+   "note": ""
+  },
+  {
+   "oid": "o3",
+   "category": "transport",
+   "amount": 280.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "BGN",
+   "period": "monthly",
+   "label": "Транспорт от врата до врата",
+   "note": "Базова цена; цените се определят в зависимост от района на местоживеене."
+  }
+ ]
+}

@@ -1,0 +1,111 @@
+{
+ "school_id": 511,
+ "pages_read": [
+  "https://www.arty.bg/bg/pages/charges.html"
+ ],
+ "fetch_failed": [],
+ "site_states_no_fees": false,
+ "site_fees": [
+  {
+   "fid": "f1",
+   "category": "tuition",
+   "amount": 700,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": "Оборище",
+   "plan": null,
+   "year": null,
+   "url": "https://www.arty.bg/bg/pages/charges.html",
+   "quote": "Месечната такса за целодневно посещение, обучение и грижи 700.00 евро."
+  },
+  {
+   "fid": "f2",
+   "category": "food",
+   "amount": 140,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "group": "Оборище",
+   "plan": null,
+   "year": null,
+   "url": "https://www.arty.bg/bg/pages/charges.html",
+   "quote": "Такса Храна (четири пъти дневно) - 140.00 евро;"
+  },
+  {
+   "fid": "f3",
+   "category": "tuition",
+   "amount": 600,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": "Кукуш",
+   "plan": null,
+   "year": null,
+   "url": "https://www.arty.bg/bg/pages/charges.html",
+   "quote": "Месечната такса за целодневно посещение, обучение и грижи 600.00 евро."
+  },
+  {
+   "fid": "f4",
+   "category": "food",
+   "amount": 140,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "group": "Кукуш",
+   "plan": null,
+   "year": null,
+   "url": "https://www.arty.bg/bg/pages/charges.html",
+   "quote": "Такса Храна (четири пъти дневно) - 140.00 евро;"
+  }
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "verdict": "correct",
+   "fid": "f3",
+   "reason": "600 EUR monthly, Кукуш.",
+   "group_unstated": false
+  },
+  {
+   "oid": "o2",
+   "verdict": "correct",
+   "fid": "f2",
+   "reason": "140 EUR food, Оборище; site gives no frequency so null is correct.",
+   "group_unstated": false
+  },
+  {
+   "oid": "o3",
+   "verdict": "duplicate",
+   "fid": "f3",
+   "reason": "Same as o1.",
+   "group_unstated": false
+  },
+  {
+   "oid": "o4",
+   "verdict": "correct",
+   "fid": "f1",
+   "reason": "700 EUR monthly, Оборище.",
+   "group_unstated": false
+  },
+  {
+   "oid": "o5",
+   "verdict": "duplicate",
+   "fid": "f1",
+   "reason": "Same as o4.",
+   "group_unstated": false
+  },
+  {
+   "oid": "o6",
+   "verdict": "correct",
+   "fid": "f4",
+   "reason": "140 EUR food, Кукуш; no frequency stated.",
+   "group_unstated": false
+  }
+ ],
+ "notes": "Food fee has no stated frequency (likely monthly in practice, but not printed). No academic year stated."
+}

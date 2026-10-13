@@ -1,0 +1,58 @@
+{
+ "school_id": 302,
+ "name": "ЧАСТНА ДЕТСКА ГРАДИНА ЕКО ДАРА",
+ "website": "https://www.ecodara.com/",
+ "pages_the_crawler_visited": [
+  "https://www.ecodara.com/",
+  "https://www.ecodara.com/content/taksa-za-detska-gradina.php"
+ ],
+ "pages_where_an_earlier_reader_found_fees": [
+  "https://www.ecodara.com/content/taksa-za-detska-gradina.php"
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "category": "tuition",
+   "amount": 650.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "Месечна такса за детска градина /от 3 до 7-годишни деца/",
+   "note": ""
+  },
+  {
+   "oid": "o2",
+   "category": "tuition",
+   "amount": "680.00",
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "",
+   "note": ""
+  },
+  {
+   "oid": "o3",
+   "category": "tuition",
+   "amount": 680.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "Месечна такса за яслена група /2-годишни деца/",
+   "note": "За учебната 2025/2026г."
+  },
+  {
+   "oid": "o4",
+   "category": "tuition",
+   "amount": "650.00",
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "",
+   "note": ""
+  }
+ ]
+}

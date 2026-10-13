@@ -1,0 +1,293 @@
+{
+ "school_id": 171,
+ "pages_read": [
+  "https://roerich-school.org/%d1%82%d0%b0%d0%ba%d1%81%d0%b8-%d0%b8-%d1%84%d0%b8%d0%bd%d0%b0%d0%bd%d1%81%d0%be%d0%b2%d0%b8-%d1%83%d1%81%d0%bb%d0%be%d0%b2%d0%b8%d1%8f/"
+ ],
+ "fetch_failed": [],
+ "site_states_no_fees": false,
+ "site_fees": [
+  {
+   "fid": "f1",
+   "category": "tuition",
+   "amount": 6300,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "ПК, I-VII клас (целодневно обучение)",
+   "plan": "записване до 19.12.2025 (Коледна отстъпка, първите 7 договора)",
+   "year": "2026-2027",
+   "url": "https://roerich-school.org/%d1%82%d0%b0%d0%ba%d1%81%d0%b8-%d0%b8-%d1%84%d0%b8%d0%bd%d0%b0%d0%bd%d1%81%d0%be%d0%b2%d0%b8-%d1%83%d1%81%d0%bb%d0%be%d0%b2%d0%b8%d1%8f/",
+   "quote": "6300 € При записване в срок до 19.12.2025 г."
+  },
+  {
+   "fid": "f2",
+   "category": "tuition",
+   "amount": 6600,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "ПК, I-VII клас (целодневно обучение)",
+   "plan": "записване до 23.01.2026",
+   "year": "2026-2027",
+   "url": "https://roerich-school.org/%d1%82%d0%b0%d0%ba%d1%81%d0%b8-%d0%b8-%d1%84%d0%b8%d0%bd%d0%b0%d0%bd%d1%81%d0%be%d0%b2%d0%b8-%d1%83%d1%81%d0%bb%d0%be%d0%b2%d0%b8%d1%8f/",
+   "quote": "6600 € При записване в срок до 23.01.2026 г."
+  },
+  {
+   "fid": "f3",
+   "category": "tuition",
+   "amount": 3490,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "semester",
+   "group": "ПК, I-VII клас (целодневно обучение)",
+   "plan": "записване до 23.01.2026, 2 вноски",
+   "year": "2026-2027",
+   "url": "https://roerich-school.org/%d1%82%d0%b0%d0%ba%d1%81%d0%b8-%d0%b8-%d1%84%d0%b8%d0%bd%d0%b0%d0%bd%d1%81%d0%be%d0%b2%d0%b8-%d1%83%d1%81%d0%bb%d0%be%d0%b2%d0%b8%d1%8f/",
+   "quote": "2 x 3490 € Заплащане на 2 вноски (I вноска до 23.01.2026 г.; II вноска до 20.11.2026 г.)"
+  },
+  {
+   "fid": "f4",
+   "category": "tuition",
+   "amount": 6969,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "ПК, I-VII клас (целодневно обучение)",
+   "plan": "записване до 20.02.2026",
+   "year": "2026-2027",
+   "url": "https://roerich-school.org/%d1%82%d0%b0%d0%ba%d1%81%d0%b8-%d0%b8-%d1%84%d0%b8%d0%bd%d0%b0%d0%bd%d1%81%d0%be%d0%b2%d0%b8-%d1%83%d1%81%d0%bb%d0%be%d0%b2%d0%b8%d1%8f/",
+   "quote": "6 969 € При записване в срок до 20.02.2026 г."
+  },
+  {
+   "fid": "f5",
+   "category": "tuition",
+   "amount": 3656,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "semester",
+   "group": "ПК, I-VII клас (целодневно обучение)",
+   "plan": "записване до 20.02.2026, 2 вноски",
+   "year": "2026-2027",
+   "url": "https://roerich-school.org/%d1%82%d0%b0%d0%ba%d1%81%d0%b8-%d0%b8-%d1%84%d0%b8%d0%bd%d0%b0%d0%bd%d1%81%d0%be%d0%b2%d0%b8-%d1%83%d1%81%d0%bb%d0%be%d0%b2%d0%b8%d1%8f/",
+   "quote": "2 x 3 656 € Заплащане на 2 вноски"
+  },
+  {
+   "fid": "f6",
+   "category": "tuition",
+   "amount": 7269,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "ПК, I-VII клас (целодневно обучение)",
+   "plan": "записване след 20.02.2026",
+   "year": "2026-2027",
+   "url": "https://roerich-school.org/%d1%82%d0%b0%d0%ba%d1%81%d0%b8-%d0%b8-%d1%84%d0%b8%d0%bd%d0%b0%d0%bd%d1%81%d0%be%d0%b2%d0%b8-%d1%83%d1%81%d0%bb%d0%be%d0%b2%d0%b8%d1%8f/",
+   "quote": "7 269 € При записване след 20.02.2026 г."
+  },
+  {
+   "fid": "f7",
+   "category": "tuition",
+   "amount": 3815,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "semester",
+   "group": "ПК, I-VII клас (целодневно обучение)",
+   "plan": "записване след 20.02.2026, 2 вноски",
+   "year": "2026-2027",
+   "url": "https://roerich-school.org/%d1%82%d0%b0%d0%ba%d1%81%d0%b8-%d0%b8-%d1%84%d0%b8%d0%bd%d0%b0%d0%bd%d1%81%d0%be%d0%b2%d0%b8-%d1%83%d1%81%d0%bb%d0%be%d0%b2%d0%b8%d1%8f/",
+   "quote": "2 х 3 815 € При 2 вноски (I вноска при сключване на договор; II вноска до 20.11.2026 г.)"
+  },
+  {
+   "fid": "f8",
+   "category": "tuition",
+   "amount": 4250,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "VIII-XII клас",
+   "plan": "записване до 19.12.2025 (Коледна отстъпка, първите 5 договора)",
+   "year": "2026-2027",
+   "url": "https://roerich-school.org/%d1%82%d0%b0%d0%ba%d1%81%d0%b8-%d0%b8-%d1%84%d0%b8%d0%bd%d0%b0%d0%bd%d1%81%d0%be%d0%b2%d0%b8-%d1%83%d1%81%d0%bb%d0%be%d0%b2%d0%b8%d1%8f/",
+   "quote": "4 250 € При записване в срок до 19.12.2025 г."
+  },
+  {
+   "fid": "f9",
+   "category": "tuition",
+   "amount": 4500,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "VIII-XII клас",
+   "plan": "записване до 23.01.2026",
+   "year": "2026-2027",
+   "url": "https://roerich-school.org/%d1%82%d0%b0%d0%ba%d1%81%d0%b8-%d0%b8-%d1%84%d0%b8%d0%bd%d0%b0%d0%bd%d1%81%d0%be%d0%b2%d0%b8-%d1%83%d1%81%d0%bb%d0%be%d0%b2%d0%b8%d1%8f/",
+   "quote": "4 500 € При записване в срок до 23.01.2026 г."
+  },
+  {
+   "fid": "f10",
+   "category": "tuition",
+   "amount": 2360,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "semester",
+   "group": "VIII-XII клас",
+   "plan": "записване до 23.01.2026, 2 вноски",
+   "year": "2026-2027",
+   "url": "https://roerich-school.org/%d1%82%d0%b0%d0%ba%d1%81%d0%b8-%d0%b8-%d1%84%d0%b8%d0%bd%d0%b0%d0%bd%d1%81%d0%be%d0%b2%d0%b8-%d1%83%d1%81%d0%bb%d0%be%d0%b2%d0%b8%d1%8f/",
+   "quote": "2 х 2 360 € Заплащане на 2 вноски"
+  },
+  {
+   "fid": "f11",
+   "category": "tuition",
+   "amount": 4725,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "VIII-XII клас",
+   "plan": "записване до 20.02.2026",
+   "year": "2026-2027",
+   "url": "https://roerich-school.org/%d1%82%d0%b0%d0%ba%d1%81%d0%b8-%d0%b8-%d1%84%d0%b8%d0%bd%d0%b0%d0%bd%d1%81%d0%be%d0%b2%d0%b8-%d1%83%d1%81%d0%bb%d0%be%d0%b2%d0%b8%d1%8f/",
+   "quote": "4 725 € При записване в срок до 20.02.2026 г."
+  },
+  {
+   "fid": "f12",
+   "category": "tuition",
+   "amount": 2480,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "semester",
+   "group": "VIII-XII клас",
+   "plan": "записване до 20.02.2026, 2 вноски",
+   "year": "2026-2027",
+   "url": "https://roerich-school.org/%d1%82%d0%b0%d0%ba%d1%81%d0%b8-%d0%b8-%d1%84%d0%b8%d0%bd%d0%b0%d0%bd%d1%81%d0%be%d0%b2%d0%b8-%d1%83%d1%81%d0%bb%d0%be%d0%b2%d0%b8%d1%8f/",
+   "quote": "2 х 2 480 € Заплащане на 2 вноски"
+  },
+  {
+   "fid": "f13",
+   "category": "tuition",
+   "amount": 4950,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "VIII-XII клас",
+   "plan": "записване след 20.02.2026",
+   "year": "2026-2027",
+   "url": "https://roerich-school.org/%d1%82%d0%b0%d0%ba%d1%81%d0%b8-%d0%b8-%d1%84%d0%b8%d0%bd%d0%b0%d0%bd%d1%81%d0%be%d0%b2%d0%b8-%d1%83%d1%81%d0%bb%d0%be%d0%b2%d0%b8%d1%8f/",
+   "quote": "4 950 € При записване след 20.02.2026 г."
+  },
+  {
+   "fid": "f14",
+   "category": "tuition",
+   "amount": 2600,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "semester",
+   "group": "VIII-XII клас",
+   "plan": "записване след 20.02.2026, 2 вноски",
+   "year": "2026-2027",
+   "url": "https://roerich-school.org/%d1%82%d0%b0%d0%ba%d1%81%d0%b8-%d0%b8-%d1%84%d0%b8%d0%bd%d0%b0%d0%bd%d1%81%d0%be%d0%b2%d0%b8-%d1%83%d1%81%d0%bb%d0%be%d0%b2%d0%b8%d1%8f/",
+   "quote": "2 х 2 600 € При 2 вноски (I вноска при сключване на договор; II вноска до 20.11.2026 г.)"
+  },
+  {
+   "fid": "f15",
+   "category": "tuition",
+   "amount": 5555,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "Ученици със СОП",
+   "plan": "краен срок за записване до 20.02.2026",
+   "year": "2026-2027",
+   "url": "https://roerich-school.org/%d1%82%d0%b0%d0%ba%d1%81%d0%b8-%d0%b8-%d1%84%d0%b8%d0%bd%d0%b0%d0%bd%d1%81%d0%be%d0%b2%d0%b8-%d1%83%d1%81%d0%bb%d0%be%d0%b2%d0%b8%d1%8f/",
+   "quote": "5555 € Краен срок за записване до 20.02.2026 г."
+  },
+  {
+   "fid": "f16",
+   "category": "tuition",
+   "amount": 2915,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "semester",
+   "group": "Ученици със СОП",
+   "plan": "2 вноски",
+   "year": "2026-2027",
+   "url": "https://roerich-school.org/%d1%82%d0%b0%d0%ba%d1%81%d0%b8-%d0%b8-%d1%84%d0%b8%d0%bd%d0%b0%d0%bd%d1%81%d0%be%d0%b2%d0%b8-%d1%83%d1%81%d0%bb%d0%be%d0%b2%d0%b8%d1%8f/",
+   "quote": "2 х 2915 € Заплащане на 2 вноски (I вноска до 20.02.2026 г.; II вноска до 20.11.2026 г.)"
+  }
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "verdict": "correct",
+   "fid": "f13",
+   "reason": "VIII-XII, enrolment after 20.02.2026, 4950 EUR yearly",
+   "group_unstated": false
+  },
+  {
+   "oid": "o2",
+   "verdict": "correct",
+   "fid": "f15",
+   "reason": "СОП 5555 EUR, deadline 20.02.2026",
+   "group_unstated": false
+  },
+  {
+   "oid": "o3",
+   "verdict": "correct",
+   "fid": "f11",
+   "reason": "VIII-XII, enrolment by 20.02.2026, 4725 EUR",
+   "group_unstated": false
+  },
+  {
+   "oid": "o4",
+   "verdict": "duplicate",
+   "fid": "f15",
+   "reason": "Same СОП 5555 fee as o2",
+   "group_unstated": false
+  },
+  {
+   "oid": "o5",
+   "verdict": "correct",
+   "fid": "f8",
+   "reason": "VIII-XII Christmas discount by 19.12.2025, first 5 contracts, 4250 EUR",
+   "group_unstated": false
+  },
+  {
+   "oid": "o6",
+   "verdict": "duplicate",
+   "fid": "f13",
+   "reason": "Same 4950 fee as o1",
+   "group_unstated": false
+  },
+  {
+   "oid": "o7",
+   "verdict": "correct",
+   "fid": "f9",
+   "reason": "VIII-XII, enrolment by 23.01.2026, 4500 EUR",
+   "group_unstated": false
+  },
+  {
+   "oid": "o8",
+   "verdict": "correct",
+   "fid": "f6",
+   "reason": "PK, I-VII full-day, enrolment after 20.02.2026, 7269 EUR",
+   "group_unstated": false
+  }
+ ],
+ "notes": "Fees are 2026-2027 tiers by enrolment deadline. Instalment pairs (2 x N) are dated Jan/Feb and 20.11.2026, treated as semester per '2 per year' rule; note 2 x instalment sums exceed the single-payment totals (e.g. 2x2360=4720 vs 4500). Year totals treated as yearly (annual tuition for the school year). Page lists 'Прием' at /registration/ but no other fee pages or PDFs. Admissions page /admissions-2025-2026/ not refetched."
+}

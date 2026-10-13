@@ -1,0 +1,69 @@
+{
+ "school_id": 531,
+ "name": "ЧАСТНА ДЕТСКА ГРАДИНА МОНТЕСОРИ ХАЙ",
+ "website": "https://www.montessori-high.com/bg",
+ "pages_the_crawler_visited": [
+  "https://www.montessori-high.com/bg",
+  "https://montessori-high.com/bg/priem"
+ ],
+ "pages_where_an_earlier_reader_found_fees": [
+  "https://montessori-high.com/bg/priem"
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "category": "materials",
+   "amount": 390.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "label": "осигуряване на образователна среда и ресурси",
+   "note": "The page describes this as 390 euros annually and as a one-time fee."
+  },
+  {
+   "oid": "o2",
+   "category": "tuition",
+   "amount": 970.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "Месечна такса група 3-6 г.",
+   "note": ""
+  },
+  {
+   "oid": "o3",
+   "category": "tuition",
+   "amount": 970.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "Месечна Такса група 0-3",
+   "note": ""
+  },
+  {
+   "oid": "o4",
+   "category": "tuition",
+   "amount": "970.00",
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "0-3",
+   "note": ""
+  },
+  {
+   "oid": "o5",
+   "category": "materials",
+   "amount": 390.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "label": "осигуряване на образователна среда и ресурси",
+   "note": "The page describes this as 390 euros annually and as a one-time fee."
+  }
+ ]
+}

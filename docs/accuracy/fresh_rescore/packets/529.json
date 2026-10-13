@@ -1,0 +1,109 @@
+{
+ "school_id": 529,
+ "name": "Немско-българско училище за среща на културите София",
+ "website": "https://www.ds-sofia.bg/",
+ "pages_the_crawler_visited": [
+  "https://www.ds-sofia.bg/",
+  "https://www.ds-sofia.bg/%D1%83%D1%87%D0%B5%D0%B1%D0%BD%D0%B8-%D1%82%D0%B0%D0%BA%D1%81%D0%B8",
+  "https://www.ds-sofia.bg/%D1%85%D1%80%D0%B0%D0%BD%D0%B5%D0%BD%D0%B5-%D0%B2-%D1%83%D1%87%D0%B8%D0%BB%D0%B8%D1%89%D0%B5",
+  "https://www.ds-sofia.bg/%D0%BF%D1%80%D0%B8%D0%B5%D0%BC-%D0%BD%D0%B0-%D1%83%D1%87%D0%B5%D0%BD%D0%B8%D1%86%D0%B8",
+  "https://www.ds-sofia.bg/%D0%BA%D0%B0%D0%BD%D0%B4%D0%B8%D0%B4%D0%B0%D1%82%D1%81%D1%82%D0%B2%D0%B0%D0%BD%D0%B5",
+  "https://28213091-9851-4a7a-bf35-a142488d88e8.filesusr.com/ugd/3a4b7a_19260668942e4a169cec7e4f70a2981b.pdf",
+  "https://www.ds-sofia.bg/%D0%BA%D1%80%D0%B8%D1%82%D0%B5%D1%80%D0%B8%D0%B8-%D0%B7%D0%B0-%D0%BF%D1%80%D0%B8%D0%B5%D0%BC",
+  "https://www.ds-sofia.bg/%D0%BA%D1%80%D0%B8%D1%82%D0%B5%D1%80%D0%B8%D0%B8-%D0%B7%D0%B0-%D0%BF%D1%80%D0%B8%D0%B5%D0%BC-%D0%BD%D0%B0%D1%87%D0%B0%D0%BB%D0%BD%D0%BE-%D1%83%D1%87%D0%B8%D0%BB%D0%B8%D1%89%D0%B5",
+  "https://www.ds-sofia.bg/%D0%BA%D1%80%D0%B8%D1%82%D0%B5%D1%80%D0%B8%D0%B8-%D0%B7%D0%B0-%D0%BF%D1%80%D0%B8%D0%B5%D0%BC-%D0%BF%D1%8A%D1%80%D0%B2%D0%B0-%D0%B3%D0%B8%D0%BC%D0%BD%D0%B0%D0%B7%D0%B8%D0%B0%D0%BB%D0%BD%D0%B0"
+ ],
+ "pages_where_an_earlier_reader_found_fees": [
+  "https://www.ds-sofia.bg/учебни-такси"
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "category": "registration",
+   "amount": 2000.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "label": "Такса за прием",
+   "note": "За новоприети ученици."
+  },
+  {
+   "oid": "o2",
+   "category": "tuition",
+   "amount": 6740.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "Гимназия — Една вноска годишно",
+   "note": "Учебна 2026/2027 година."
+  },
+  {
+   "oid": "o3",
+   "category": "tuition",
+   "amount": "6540.00",
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "Предучилищна / Предучилищна / Сума при еднократна годишна вноска",
+   "note": ""
+  },
+  {
+   "oid": "o4",
+   "category": "tuition",
+   "amount": "6740.00",
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "Гимназия / Гимназия / Сума при еднократна годишна вноска",
+   "note": ""
+  },
+  {
+   "oid": "o5",
+   "category": "registration",
+   "amount": "2000.00",
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "label": "Такса прием (еднократна) за новоприетите ученици",
+   "note": ""
+  },
+  {
+   "oid": "o6",
+   "category": "tuition",
+   "amount": 80.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "Гост-ученик — на ден",
+   "note": "Дневна такса за гост-ученици."
+  },
+  {
+   "oid": "o7",
+   "category": "tuition",
+   "amount": "6580.00",
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "Начално училище / Начално училище / Сума при еднократна годишна вноска",
+   "note": ""
+  },
+  {
+   "oid": "o8",
+   "category": "tuition",
+   "amount": 7414.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "Гимназия — Две равни вноски годишно",
+   "note": "Учебна 2026/2027 година."
+  }
+ ]
+}

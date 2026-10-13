@@ -1,0 +1,130 @@
+
+== school 172: ['https://www.svetasofia.com/finansovi-uslovia/']
+  tuition 8900.0 EUR yearly [ПУК – III клас, обучение и храна (1 х)] on page: True
+  tuition 4450.0 EUR None [ПУК – III клас, обучение и храна (2 х)] on page: True
+  transport 1750.0 EUR yearly [ПУК – III клас, такса транспорт (1 х)] on page: True
+  transport 875.0 EUR None [ПУК – III клас, такса транспорт (2 х)] on page: True
+  tuition 9400.0 EUR yearly [IV – VII клас, обучение и храна (1 х)] on page: True
+  tuition 4700.0 EUR None [IV – VII клас, обучение и храна (2 х)] on page: True
+  transport 1820.0 EUR yearly [IV – VII клас, такса транспорт (1 х)] on page: True
+  transport 910.0 EUR None [IV – VII клас, такса транспорт (2 х)] on page: True
+  registration 40.0 EUR None [Такса правоучастие за прием в предучилищен клас и 1-ви клас] on page: True
+    | ##### 1 х 8900
+    | ##### 2 х 4450
+    | ##### 1 х 1750
+    | ##### 2 х 875
+    | ##### 1 х 9400
+    | ##### 2 х 4700
+    | ##### 1 х 1820
+    | ##### 2 х 910
+    | ##### Годишната такса за обучение покрива всички разходи в рамките на учебния ден ( от 8:40 до 16:45 часа), свързани с:
+    | ##### Такса правоучастие за [прием](http://www.svetasofia.com/zashto-da-izberete-nas/) в предучилищен клас и 1-ви клас: **40 евро**
+
+== school 220: ['https://toddlersacademy.eu/bg/admission.html']
+  tuition 8580.0 EUR yearly [Обща такса за обучение] on page: True
+  tuition 780.0 EUR monthly [Опция 1] on page: True
+  tuition 2310.0 EUR quarter [I вноска (септ–ноем)] on page: True
+  tuition 2310.0 EUR quarter [II вноска (дек–фев)] on page: True
+  tuition 2310.0 EUR quarter [III вноска (март–май)] on page: True
+  tuition 1540.0 EUR quarter [IV вноска (юни–юли)] on page: True
+  tuition 8330.0 EUR one_time [Опция 3] on page: True
+  tuition 770.0 EUR None [Депозит] on page: True
+  materials 150.0 EUR one_time [Такса за учебници и тетрадки] on page: True
+  registration 200.0 EUR one_time [Такса за регистрация] on page: True
+    | | **Опции за плащане**  | **Обща такса за обучение**  | EUR 8 580  |
+    | |  **Опция 1:** 11 равни месечни вноски, платими до 5-то число на всеки месец  | EUR 780  |
+    | |  **Опция 2:** Тримесечни вноски (отстъпка EUR 110 при плащане на 4 тримесечни вноски, платими до 5-то число на всеки период)  |  I вноска: EUR 2 310 (септ–ноем)
+    | II вноска: EUR 2 310 (дек–фев)
+    | III вноска: EUR 2 310 (март–май)
+    | IV вноска: EUR 1 540 (юни–юли)   |
+    | |  **Опция 3:** Еднократно плащане (отстъпка EUR 250 при еднократно плащане при подписване на договор)  | EUR 8 330  |
+    | | Депозитът е платим при подписване на договор (за оборудване, консумативи, режийни разходи); приспада се от последната вноска, освен ако договорът не е прекратен предсрочно  | EUR 770  |
+    | | **Допълнителни такси**  |  Еднократна такса за учебници и тетрадки: EUR 150
+    | Еднократна такса за регистрация: EUR 200 (само при първо постъпване)   |
+
+== school 515: ['https://britanica-parkschool.bg/priem/', 'https://britanica-parkschool.bg/en/admission/']
+  registration 240.0 EUR one_time [Административна такса] on page: True
+  tuition 11400.0 EUR yearly [Първа група — Пълно плащане] on page: True
+  tuition 5700.0 EUR None [Първа група — Две вноски] on page: True
+  tuition 2992.0 EUR monthly [Първа група — Месечно плащане] on page: True
+  tuition 1051.0 EUR monthly [Първа група — Месечно плащане] on page: True
+  tuition 11400.0 EUR yearly [Втора група — Пълно плащане] on page: True
+  tuition 5700.0 EUR None [Втора група — Две вноски] on page: True
+  tuition 2992.0 EUR monthly [Втора група — Месечно плащане] on page: True
+  tuition 1051.0 EUR monthly [Втора група — Месечно плащане] on page: True
+  tuition 11800.0 EUR yearly [Трета група — Пълно плащане] on page: True
+  tuition 5900.0 EUR None [Трета група — Две вноски] on page: True
+  tuition 2904.0 EUR monthly [Трета група — Месечно плащане] on page: True
+  tuition 1112.0 EUR monthly [Трета група — Месечно плащане] on page: True
+  tuition 12900.0 EUR yearly [Подготвителна група — Пълно плащане] on page: True
+  tuition 6450.0 EUR None [Подготвителна група — Две вноски] on page: True
+  tuition 2828.0 EUR monthly [Подготвителна група — Месечно плащане] on page: True
+  tuition 1259.0 EUR monthly [Подготвителна група — Месечно плащане] on page: True
+  materials 550.0 EUR yearly [Такса за учебни ресурси] on page: True
+    | Административната такса се заплаща еднократно и не подлежи на възстановяване. Тя покрива разглеждането на документите за кандидатстване, тестовете, интервютата и свързаната административна работа. Зап
+    | 3. 3. Пробен ден/дни с бъдещия ученик след заплащане на административна такса от 240 евро.
+    | 4. 4. Интервю с детето през декември след заплащане на административна такса от 240 евро.
+    | Административната такса се заплаща еднократно и не подлежи на възстановяване. Тя покрива разглеждането на документите за кандидатстване, тестовете, интервютата и свързаната административна работа. Зап
+    | | 5.-7. клас  | 15.09 – 15.06/30.06  | 13 100 EUR  | 2 x 6 550 EUR  | 1 x 2 700 EUR + 8 x 1 300 EUR  |
+    | | 8.-12. клас  | 15.09 – 30.06  | 11 400 EUR  | 2 x 5 700 EUR  | 1 x 2 680 EUR + 8 x 1 090 EUR  |
+    | Таксата се определя за всяка учебна година. За учебната 2026/2027 година таксата за учебни ресурси е 550 евро.
+    | Административната такса се заплаща еднократно и не подлежи на възстановяване. Тя покрива разглеждането на документите, свързаната с тях административна работа и процедурата по прием на детето, включит
+    | | Първа група  | 3-4 години  | 9 месеца  | 11 400 EUR  | 2 x 5 700 EUR  | 1 x 2 992 EUR + 8 x 1 051 EUR  |
+    | | Втора група  | 4-5 години  | 9 месеца  | 11 400 EUR  | 2 x 5 700 EUR  | 1 x 2 992 EUR + 8 x 1 051 EUR  |
+    | | Трета група  | 5-6 години  | 9 месеца  | 11 800 EUR  | 2 x 5 900 EUR  | 1 x 2 904 EUR + 8 x 1 112 EUR  |
+    | | Подготвителна група  | 6-7 години  | 9 месеца  | 12 900 EUR  | 2 x 6 450 EUR  | 1 x 2 828 EUR + 8 x 1 259 EUR  |
+    | Таксата за учебни ресурси се заплаща еднократно за цялата учебна година. Тя включва стойността на учебните материали съгласно българските образователни изисквания, книги и комплект за обучение по англ
+    | The administrative fee is paid once and is non-refundable. It covers the review of application documents, testing, interviews, and the related administrative work that follows. It is paid before the c
+    | 3. 3. Trial day/days with the prospective student after paying an administrative fee of 240 euros.
+    | 4. 4. Interview with the child in December after paying an administrative fee of 240 euros.
+    | The administrative fee is paid once and is non-refundable. It covers the review of application documents, testing, interviews, and the related administrative work that follows. It is paid before the c
+    | The fee is determined for each school year. For the 2026/2027 school year, the Learning Resources fee is EUR 550.
+    | | Grades 5-7  | 15.09 – 15.06/30.06  | 13 100 EUR  | 2 x 6 550 EUR  | 1 x 2 700 EUR + 8 x 1 300 EUR  |
+    | | Grades 8-12  | 15.09 – 30.06  | 11 400 EUR  | 2 x 5 700 EUR  | 1 x 2 680 EUR + 8 x 1 090 EUR  |
+    | The administrative fee is paid once and is non-refundable. It covers the review of documents, administrative work related to them, and the child’s admission procedure, including open days, participati
+    | The Learning Resources fee is paid once for the whole school year. It includes the value of learning materials according to Bulgarian educational requirements, books, and an English learning set. It a
+    | | First group  | 3-4 years  | 9 months  | 11 400 EUR  | 2 x 5 700 EUR  | 1 x 2 992 EUR + 8 x 1 051 EUR  |
+    | | Second group  | 4-5 years  | 9 months  | 11 400 EUR  | 2 x 5 700 EUR  | 1 x 2 992 EUR + 8 x 1 051 EUR  |
+    | | Third group  | 5-6 years  | 9 months  | 11 800 EUR  | 2 x 5 900 EUR  | 1 x 2 904 EUR + 8 x 1 112 EUR  |
+    | | Preparatory group  | 6-7 years  | 9 months  | 12 900 EUR  | 2 x 6 450 EUR  | 1 x 2 828 EUR + 8 x 1 259 EUR  |
+
+== school 547: ['https://mechopuh.bg/priem/DogovorMechoPuh.pdf']
+  tuition 600.0 EUR monthly [целодневен престой] on page: True
+  tuition 550.0 EUR monthly [полудневен престой] on page: True
+  registration (550.0, 600.0) EUR one_time [еднократна такса за записване] on page: True
+    |  600 (шестстотин) евро (1173,50 лв.) за целодневен престой;
+    |  550 (петстотин и петдесет) евро (1075,71 лв.) за полудневен престой.
+
+== school 574: ['https://novigradini.com/#dipipopup-27586290#popup_on_load', 'https://novigradini.com/anika/', 'https://novigradini.com/anika/ceni/']
+  tuition 475.5 EUR monthly [месечната такса] on page: True
+  registration 475.5 EUR one_time [депозит] on page: True
+    | Месечната такса за обучение и грижа е **намалена** на **475,50 €** (930 лв.) от септември 2025 г. Лицензът ни от МОН Ви дава право на държавна компенсация до **281 €** (~550 лв.) месечно, което прави 
+    | От септември 2025 г. месечната такса е **475,50 €** (930 лв.) Тази сума включва всичко, което сме вложили в създаването на среда, която вдъхновява детството – от професионалния ни екип, през програмат
+    | При записване се заплаща еднократен **депозит от 475,50 € (930 лв.),** който не е допълнителна такса, а се приспада от последния месец на посещение, при спазено предизвестие за напускане.
+    | Месечната такса в ЧДГ „Аника“ от септември 2025 г. е 475.50 € (930 лв.) и включва целодневна грижа от 08:00 до 18:30 ч., лицензиранa програма по МОН, музикално обучение по пиано и пеене, достъп до вси
+    | Като лицензирана детска градина ЧДГ „Аника“ дава право на родителите да кандидатстват за общинска компенсация, която при изпълнение на условията може да достигне до около 281.21 € (550 лв.) месечно. Т
+    | При записване в ЧДГ „Аника“ се заплаща еднократен депозит в размер на една месечна такса – 475.50 € (930 лв.). Той не е допълнителен разход, а се приспада изцяло от последната месечна такса при спазен
+
+== school 585: ['https://artisbg.com/primary-education/', 'https://artisbg.com/junior-high-school/', 'https://artisbg.com/high-school-3/']
+  tuition 7900.0 EUR yearly [Годишна такса за обучение] on page: True
+  registration 200.0 EUR one_time [Такса кандидатстване] on page: True
+    | 7900 €
+    | 200 €
+    | Надя Тимчева винаги е мечтала за театър, но мечтите й са надминати, когато “я открива” педагогиката. И така е и до днес – тя съвместява двете си любови- към децата и към театъра, с поставени цели 48 п
+    | От 2001 до 2005г. е програмист в ПИСТ към министерство на транспорта От 2005г. до настоящ момент работи в БТВ Медиа Груп като видео монтажист, графичен дизайнер и Vizrt оператор на 3D графики, аугмент
+    | 1996 Амстердам, 2005 Нетуно- Италия, 2016 Барселона, 2017 Богота-Колумбия.
+    | 7900 €
+    | 200 €
+    | Надя Тимчева винаги е мечтала за театър, но мечтите й са надминати, когато “я открива” педагогиката. И така е и до днес – тя съвместява двете си любови- към децата и към театъра, с поставени цели 48 п
+    | От 2001 до 2005г. е програмист в ПИСТ към министерство на транспорта От 2005г. до настоящ момент работи в БТВ Медиа Груп като видео монтажист, графичен дизайнер и Vizrt оператор на 3D графики, аугмент
+    | 1996 Амстердам, 2005 Нетуно- Италия, 2016 Барселона, 2017 Богота-Колумбия.
+    | 7900 €
+    | 200 €
+    | Надя Тимчева винаги е мечтала за театър, но мечтите й са надминати, когато “я открива” педагогиката. И така е и до днес – тя съвместява двете си любови- към децата и към театъра, с поставени цели 48 п
+    | От 2001 до 2005г. е програмист в ПИСТ към министерство на транспорта От 2005г. до настоящ момент работи в БТВ Медиа Груп като видео монтажист, графичен дизайнер и Vizrt оператор на 3D графики, аугмент
+    | 1996 Амстердам, 2005 Нетуно- Италия, 2016 Барселона, 2017 Богота-Колумбия.
+
+without the amount check: right 120/156 (77%) of its fees; found 122/149 (82%) of the site's fees
+with the amount check:    right 119/155 (77%) of its fees; found 121/149 (81%) of the site's fees
+fees the check drops (1):
+  school 286: tuition 4465.0 EUR None [Авансово на една вноска]

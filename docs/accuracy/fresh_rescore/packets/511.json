@@ -1,0 +1,81 @@
+{
+ "school_id": 511,
+ "name": "Частна детска градина Арти",
+ "website": "https://www.arty.bg/",
+ "pages_the_crawler_visited": [
+  "https://www.arty.bg/",
+  "https://www.arty.bg/bg/pages/charges.html?PHPSESSID=b91e074d7c495052e0b8e2444dfa89ec",
+  "https://www.arty.bg/bg/pages/charges.html"
+ ],
+ "pages_where_an_earlier_reader_found_fees": [
+  "https://www.arty.bg/bg/pages/charges.html"
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "category": "tuition",
+   "amount": "600.00",
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "За Кукуш / Месечната такса за целодневно посещение, обучение и грижи",
+   "note": ""
+  },
+  {
+   "oid": "o2",
+   "category": "food",
+   "amount": 140.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "Такса Храна (четири пъти дневно)",
+   "note": "За Оборище"
+  },
+  {
+   "oid": "o3",
+   "category": "tuition",
+   "amount": 600.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "За Кукуш — Месечната такса за целодневно посещение, обучение и грижи",
+   "note": ""
+  },
+  {
+   "oid": "o4",
+   "category": "tuition",
+   "amount": "700.00",
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "За Оборище / Месечната такса за целодневно посещение, обучение и грижи",
+   "note": ""
+  },
+  {
+   "oid": "o5",
+   "category": "tuition",
+   "amount": 700.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "За Оборище — Месечната такса за целодневно посещение, обучение и грижи",
+   "note": ""
+  },
+  {
+   "oid": "o6",
+   "category": "food",
+   "amount": 140.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "Такса Храна (четири пъти дневно)",
+   "note": "За Кукуш"
+  }
+ ]
+}

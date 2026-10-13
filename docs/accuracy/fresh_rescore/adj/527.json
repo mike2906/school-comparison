@@ -1,0 +1,90 @@
+{
+ "school_id": 527,
+ "pages_read": [
+  "https://under1roof.bg/price-table/"
+ ],
+ "fetch_failed": [],
+ "site_states_no_fees": false,
+ "site_fees": [
+  {
+   "fid": "f1",
+   "category": "tuition",
+   "amount": 450,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "group": null,
+   "plan": "Специална такса (-20%)",
+   "year": "2020/2021",
+   "url": "https://under1roof.bg/price-table/",
+   "quote": "Специална такса за 2020/2021 г. (-20%): 450 EUR/ 880 лв."
+  },
+  {
+   "fid": "f2",
+   "category": "tuition",
+   "amount": 550,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": "Детска градина Целодневна",
+   "plan": null,
+   "year": null,
+   "url": "https://under1roof.bg/price-table/",
+   "quote": "550€ на месец"
+  },
+  {
+   "fid": "f3",
+   "category": "tuition",
+   "amount": 540,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "BGN",
+   "period": "monthly",
+   "group": "Детска градина Полудневна",
+   "plan": null,
+   "year": null,
+   "url": "https://under1roof.bg/price-table/",
+   "quote": "540лв. на месец"
+  },
+  {
+   "fid": "f4",
+   "category": "transport",
+   "amount": 280,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "BGN",
+   "period": "monthly",
+   "group": null,
+   "plan": "Транспорт от врата до врата",
+   "year": null,
+   "url": "https://under1roof.bg/price-table/",
+   "quote": "Базова цена: 280лв. месечно в двете посоки."
+  }
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "verdict": "correct",
+   "fid": "f2",
+   "reason": "Full-day 550 EUR per month",
+   "group_unstated": false
+  },
+  {
+   "oid": "o2",
+   "verdict": "correct",
+   "fid": "f3",
+   "reason": "Half-day 540 BGN per month",
+   "group_unstated": false
+  },
+  {
+   "oid": "o3",
+   "verdict": "correct",
+   "fid": "f4",
+   "reason": "Door-to-door transport base price 280 BGN monthly",
+   "group_unstated": false
+  }
+ ],
+ "notes": "Page mixes EUR (full-day) and BGN (half-day, transport). Stale intro line 'Специална такса за 2020/2021' 450 EUR/880 лв not tied to a tier. No current year stated for the main fees. Excursions/ski school unpriced."
+}

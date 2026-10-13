@@ -1,0 +1,206 @@
+{
+ "school_id": 350,
+ "pages_read": [
+  "https://izgrevou.com/",
+  "https://izgrevou.com/uchilishche/taksi/",
+  "https://izgrevou.com/priem/",
+  "https://izgrevou.com/uchilishche/transport/",
+  "https://izgrevou.com/uchilishche/hranene/"
+ ],
+ "fetch_failed": [],
+ "site_states_no_fees": false,
+ "site_fees": [
+  {
+   "fid": "f1",
+   "category": "registration",
+   "amount": 100,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "group": null,
+   "plan": null,
+   "year": "2026/2027",
+   "url": "https://izgrevou.com/uchilishche/taksi/",
+   "quote": "Такса прием и записване: 100 €. Таксата е еднократна за целия период на обучение"
+  },
+  {
+   "fid": "f2",
+   "category": "materials",
+   "amount": 100,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": null,
+   "plan": null,
+   "year": "2026/2027",
+   "url": "https://izgrevou.com/priem/",
+   "quote": "Материали: 100 € на година."
+  },
+  {
+   "fid": "f3",
+   "category": "tuition",
+   "amount": 7160,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "Подготвителен клас, начален етап и прогимназиален",
+   "plan": null,
+   "year": "2026/27",
+   "url": "https://izgrevou.com/uchilishche/taksi/",
+   "quote": "Подготвителен клас, начален етап и прогимназиален: 7 160 €. годишно за учебна година"
+  },
+  {
+   "fid": "f4",
+   "category": "tuition",
+   "amount": 7490,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": null,
+   "plan": null,
+   "year": "2027/28",
+   "url": "https://izgrevou.com/priem/",
+   "quote": "Обучение за 2027/28: 7 490 € на година."
+  },
+  {
+   "fid": "f5",
+   "category": "transport",
+   "amount": 199,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": "в двете посоки",
+   "plan": null,
+   "year": "2026/27",
+   "url": "https://izgrevou.com/priem/",
+   "quote": "За 2026/27: 199 € на месец в двете посоки и 99 € в едната."
+  },
+  {
+   "fid": "f6",
+   "category": "transport",
+   "amount": 99,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": "в едната посока",
+   "plan": null,
+   "year": "2026/27",
+   "url": "https://izgrevou.com/priem/",
+   "quote": "За 2026/27: 199 € на месец в двете посоки и 99 € в едната."
+  },
+  {
+   "fid": "f7",
+   "category": "transport",
+   "amount": 220,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": "в двете посоки",
+   "plan": null,
+   "year": "2027/28",
+   "url": "https://izgrevou.com/priem/",
+   "quote": "За 2027/28: 220 € и 110 €."
+  },
+  {
+   "fid": "f8",
+   "category": "transport",
+   "amount": 110,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": "в едната посока",
+   "plan": null,
+   "year": "2027/28",
+   "url": "https://izgrevou.com/priem/",
+   "quote": "За 2027/28: 220 € и 110 €."
+  },
+  {
+   "fid": "f9",
+   "category": "food",
+   "amount": null,
+   "amount_min": 4.5,
+   "amount_max": 7.5,
+   "currency": "EUR",
+   "period": null,
+   "group": "обедно меню (вегетариански кетъринг, по желание)",
+   "plan": null,
+   "year": null,
+   "url": "https://izgrevou.com/priem/",
+   "quote": "с обедно меню от 4,50 до 7,50 €."
+  }
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "verdict": "correct",
+   "fid": "f1",
+   "reason": "100 EUR one-time admission fee",
+   "group_unstated": false
+  },
+  {
+   "oid": "o2",
+   "verdict": "correct",
+   "fid": "f5",
+   "reason": "199 EUR monthly both directions 2026/27",
+   "group_unstated": false
+  },
+  {
+   "oid": "o3",
+   "verdict": "duplicate",
+   "fid": "f1",
+   "reason": "Same admission fee as o1",
+   "group_unstated": false
+  },
+  {
+   "oid": "o4",
+   "verdict": "correct",
+   "fid": "f6",
+   "reason": "99 EUR monthly one direction 2026/27",
+   "group_unstated": false
+  },
+  {
+   "oid": "o5",
+   "verdict": "correct",
+   "fid": "f3",
+   "reason": "7160 EUR yearly tuition, prep class (group covers prep/primary/lower secondary)",
+   "group_unstated": false
+  },
+  {
+   "oid": "o6",
+   "verdict": "correct",
+   "fid": "f2",
+   "reason": "100 EUR materials per year",
+   "group_unstated": false
+  },
+  {
+   "oid": "o7",
+   "verdict": "duplicate",
+   "fid": "f3",
+   "reason": "Same tuition as o5",
+   "group_unstated": false
+  },
+  {
+   "oid": "o8",
+   "verdict": "correct",
+   "fid": "f9",
+   "reason": "4.50-7.50 EUR lunch menu range, no period stated",
+   "group_unstated": false
+  },
+  {
+   "oid": "o9",
+   "verdict": "duplicate",
+   "fid": "f2",
+   "reason": "Same materials fee as o6 (and period null although site says на година)",
+   "group_unstated": false
+  }
+ ],
+ "notes": "Taksi page says materials payable at year start or in two term instalments (no instalment amount printed). Tuition payment options (one-off with 5% discount, 2, 9 or 12 instalments) print no instalment amounts. 'Свалете PDF' button on /priem/ has no resolvable link. 2027/28 tuition and transport have no candidates."
+}
