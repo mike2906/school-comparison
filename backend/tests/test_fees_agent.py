@@ -955,7 +955,7 @@ def test_the_same_fee_read_from_two_pages_is_one_row():
     assert len(rows) == len(sources) == 1
 
 
-async def test_a_kept_old_row_is_not_doubled_by_the_same_amount_in_another_category(db_session, frozen_today):
+async def test_an_amount_read_as_another_kind_of_fee_replaces_the_old_row(db_session, frozen_today):
     page_text = "Месечна такса: 700 евро\nЕднократна такса за записване: 200 евро.\nХрана: 90 евро"
     school = await _school(db_session)
     await _old_rows(db_session, school, "2026/2027", [700, 90])  # 90 monthly: a period the read loses
@@ -968,9 +968,82 @@ async def test_a_kept_old_row_is_not_doubled_by_the_same_amount_in_another_categ
         read=_read([*FEES_STAGE, refiled]),
         apply=True,
     )
+    assert report["outcome"] == "written" and report["rows_old_kept"] == 0, report
+    rows = await _rows(db_session, school)
+    assert [(float(r.amount), r.category) for r in rows if float(r.amount) == 90] == [
+        (90.0, PriceCategory.EXTRACURRICULAR)
+    ]
+
+
+async def test_an_amount_read_as_the_same_fee_without_its_period_keeps_the_old_row(db_session, frozen_today):
+    page_text = "Месечна такса: 700 евро\nЕднократна такса за записване: 200 евро.\nЗанималня: 90 евро"
+    school = await _school(db_session)
+    await _old_rows(db_session, school, "2026/2027", [700, 90])  # 90 monthly tuition
+    await db_session.commit()
+    same = fee(PriceCategory.TUITION, "Занималня: 90 евро", amount=90, academic_year="2026/2027")
+    report = await fees_agent.run_school(
+        db_session,
+        school,
+        find=_find([PageRead(URL, page_text, True)]),
+        read=_read([*FEES_STAGE, same]),
+        apply=True,
+    )
     assert report["outcome"] == "written" and report["rows_old_kept"] == 1, report
     rows = await _rows(db_session, school)
-    assert [(float(r.amount), r.category) for r in rows if float(r.amount) == 90] == [(90.0, PriceCategory.TUITION)]
+    assert [(float(r.amount), r.period) for r in rows if float(r.amount) == 90] == [(90.0, PricePeriod.MONTHLY)]
+
+
+async def _refile_run(db_session, school, read_90, page_text="Месечна такса: 700 евро\nХрана: 90 евро\nКлуб: 90 евро"):
+    return await fees_agent.run_school(
+        db_session,
+        school,
+        find=_find([PageRead(URL, page_text, True)]),
+        read=_read([*FEES_STAGE, *read_90]),
+        apply=True,
+    )
+
+
+async def test_a_missed_fee_sharing_its_amount_with_another_fee_keeps_its_row(db_session, frozen_today):
+    school = await _school(db_session)
+    await _old_rows(db_session, school, "2026/2027", [90])
+    (await _rows(db_session, school))[0].category = PriceCategory.FOOD  # the read misses the meals
+    await db_session.commit()
+    club = fee(PriceCategory.EXTRACURRICULAR, "Клуб: 90 евро", amount=90, academic_year="2026/2027")
+    report = await _refile_run(db_session, school, [club])
+    assert report["rows_old_kept"] == 1, report
+    rows = await _rows(db_session, school)
+    assert PriceCategory.FOOD in {r.category for r in rows if float(r.amount) == 90}
+
+
+async def test_an_amount_in_another_currency_is_not_a_refiled_fee(db_session, frozen_today):
+    school = await _school(db_session)
+    await _old_rows(db_session, school, "2026/2027", [90])
+    (await _rows(db_session, school))[0].currency = "BGN"
+    await db_session.commit()
+    bus = fee(PriceCategory.TRANSPORT, "Транспорт: 90 евро", amount=90, academic_year="2026/2027")
+    report = await _refile_run(db_session, school, [bus])
+    assert report["rows_old_kept"] == 1, report
+
+
+async def test_two_read_fees_at_the_old_amount_keep_the_old_row(db_session, frozen_today):
+    school = await _school(db_session)
+    await _old_rows(db_session, school, "2026/2027", [90])
+    await db_session.commit()
+    read = [
+        fee(PriceCategory.EXTRACURRICULAR, "Клуб: 90 евро", amount=90, label="Клуб", academic_year="2026/2027"),
+        fee(PriceCategory.FOOD, "Храна: 90 евро", amount=90, label="Храна", academic_year="2026/2027"),
+    ]
+    report = await _refile_run(db_session, school, read)
+    assert report["rows_old_kept"] == 1, report
+
+
+async def test_a_fee_read_for_another_year_is_not_a_refiled_fee(db_session, frozen_today):
+    school = await _school(db_session)
+    await _old_rows(db_session, school, "2026/2027", [90])
+    await db_session.commit()
+    club = fee(PriceCategory.EXTRACURRICULAR, "Клуб: 90 евро", amount=90, academic_year="2025/2026")
+    report = await _refile_run(db_session, school, [club])
+    assert report["rows_old_kept"] == 1, report
 
 
 async def test_an_old_bgn_row_rounded_to_the_lev_gives_way_to_the_euro_fee(db_session, frozen_today):
