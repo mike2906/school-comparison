@@ -353,6 +353,11 @@ _SINGLE_PAYMENT_RE = re.compile(r"^\s*1\s*[xх×]\s*(?:€|eur|лв\.?)?\s*[\d\s
 _PAYMENT_PLAN_NAME_RE = re.compile(r"^\s*(?:plan|план|option|опция|вариант)\s*(?:\d+|[a-zа-я]|[ivx]+)\b", re.IGNORECASE)
 
 
+def _band(row: Pricing) -> tuple[str, str]:
+    """A row's kind of fee and the group it is for, as the site writes the group."""
+    return (getattr(row.category, "value", row.category), " ".join(str(row.age_group or "").split()).casefold())
+
+
 def _single_payment(fee: AgentFee) -> bool:
     """The fee is written as one payment of its whole amount: "1 x € 8.950"."""
     return any(_SINGLE_PAYMENT_RE.match(text) for text in [fee.label, *fee.installments])
@@ -778,10 +783,18 @@ async def run_school(
         if result.confidence >= PUBLISH_CONFIDENCE
         for amount in option_amounts(result.fee)
     }
+    # An old row named for a payment plan ("Plan 3") of a group whose new fee carries its
+    # payment options is one of that fee's instalments, even at an amount the read left out:
+    # kept, it would sit beside the fee as a fee of its own again (596's re-read kept 25).
+    scheduled = {_band(row) for row in publishable if (row.pricing_context or {}).get("payment_options")}
+    planned = [
+        row for row in superseded if _band(row) in scheduled and _PAYMENT_PLAN_NAME_RE.match(row.plan_name or "")
+    ]
     published_before = [
         row
         for row in superseded
         if pricing_row_is_publishable(row)
+        and row not in planned
         and (
             row.amount is None
             or (row.category.value, (row.currency or "").upper(), Decimal(str(row.amount)).normalize()) not in listed
@@ -808,7 +821,7 @@ async def run_school(
     kept, kept_amounts, regressions = _rows_to_keep(
         school,
         [*stored_pages, *source_pages.values()],
-        superseded,
+        [row for row in superseded if row not in planned],
         publishable,
         [(category, amount) for category, _, amount in listed],
     )

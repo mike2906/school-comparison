@@ -106,7 +106,7 @@ def test_a_name_that_is_not_a_payment_plan_stays():
     assert rows[0].plan_name == "Full day"
 
 
-async def test_old_instalment_rows_give_way_to_one_fee_with_its_options(db_session, frozen_today):
+async def _run_596(db_session, read_fee, extra=(), page_text=PAGE_596):
     school = School(
         name_i18n={"bg": "Частно училище"},
         country_code="bg",
@@ -125,13 +125,13 @@ async def test_old_instalment_rows_give_way_to_one_fee_with_its_options(db_sessi
         content_hash="old",
         page_category="pricing",
         is_valid=True,
-        raw_markdown=PAGE_596,
+        raw_markdown=page_text,
     )
     db_session.add(page)
     await db_session.flush()
     # What 596 published: each plan total and each instalment a row of its own.
     old = [(8950, PricePeriod.YEARLY), (9150, PricePeriod.YEARLY), (4575, None), (9400, PricePeriod.YEARLY)]
-    old += [(2650, None), (750, PricePeriod.MONTHLY)]
+    old += [(2650, None), (750, PricePeriod.MONTHLY), *extra]
     for amount, period in old:
         db_session.add(
             Pricing(
@@ -152,13 +152,12 @@ async def test_old_instalment_rows_give_way_to_one_fee_with_its_options(db_sessi
     await db_session.commit()
 
     async def find(_school):
-        return [PageRead(URL, PAGE_596, True)]
+        return [PageRead(URL, page_text, True)]
 
     async def read(_school, _pages, _missed):
-        return [tuition(period=PricePeriod.YEARLY, evidence="Annual Tuition Fees 2026-2027\n" + EVIDENCE_596)]
+        return [read_fee]
 
     report = await fees_agent.run_school(db_session, school, find=find, read=read, apply=True)
-    assert report["outcome"] == "written" and report["rows_old_kept"] == 0, report
     rows = (
         (
             await db_session.execute(
@@ -168,7 +167,23 @@ async def test_old_instalment_rows_give_way_to_one_fee_with_its_options(db_sessi
         .scalars()
         .all()
     )
+    return report, rows
+
+
+async def test_old_instalment_rows_give_way_to_one_fee_with_its_options(db_session, frozen_today):
+    fee = tuition(period=PricePeriod.YEARLY, evidence="Annual Tuition Fees 2026-2027\n" + EVIDENCE_596)
+    report, rows = await _run_596(db_session, fee)
+    assert report["outcome"] == "written" and report["rows_old_kept"] == 0, report
     assert [(float(r.amount), len(r.pricing_context["payment_options"])) for r in rows] == [(8950.0, 2)]
+
+
+async def test_an_old_plan_row_the_read_missed_goes_once_its_group_has_options(db_session, frozen_today):
+    # 596's re-read missed plan amounts, and rule 6 kept 25 old "Plan N" rows beside the fees.
+    page = PAGE_596 + "Plan 4 € 9.990 3 x € 3.330\n"
+    fee = tuition(period=PricePeriod.YEARLY, evidence="Annual Tuition Fees 2026-2027\n" + EVIDENCE_596)
+    report, rows = await _run_596(db_session, fee, extra=[(9990, PricePeriod.YEARLY), (3330, None)], page_text=page)
+    assert report["outcome"] == "written" and report["rows_old_kept"] == 0, report
+    assert [float(r.amount) for r in rows] == [8950.0]
 
 
 def test_an_options_line_does_not_vouch_for_the_fees_own_period():
