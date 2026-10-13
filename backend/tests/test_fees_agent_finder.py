@@ -93,6 +93,41 @@ def test_a_short_name_on_another_ending_is_not_the_same_site():
     assert fees_agent._same_site("https://abc.bg/", "https://abc.org/") is False
 
 
+@pytest.mark.parametrize(
+    ("url", "home"),
+    [
+        ("https://www.google.bg/maps", "https://sites.google.com/view/dg-slunce"),
+        ("https://sofia.org/", "https://dg42.sofia.bg/"),
+    ],
+)
+def test_a_home_on_a_shared_domain_takes_no_sister_domains(url, home):
+    assert fees_agent._same_site(url, home) is False
+
+
+async def test_a_pdf_is_never_looked_up_in_the_wordpress_api(monkeypatch):
+    pdf = "https://meridian22.org/taksi.pdf"
+    crawler = _Crawler({HOME: [("Начало " + "x" * 300, [(pdf, "Такси")])]})
+    client = _Client()
+
+    async def get(url, params=None, timeout=None, **kw):
+        client.gets.append((url, params or {}))
+        return SimpleNamespace(status_code=404, url=url, content=b"")
+
+    client.get = get
+    monkeypatch.setattr(fees_agent, "_pick", _picks([pdf]))
+    await fees_agent.find_pages(crawler, None, client, _school(), Spend(0.05))
+    assert client.gets == [(pdf, {})]
+
+
+async def test_a_run_that_stopped_still_stops_the_school(monkeypatch):
+    from app.services.provider_costs import ProviderAttributionUncertain
+
+    crawler = _Crawler({HOME: [("Начало " + "x" * 300, [("https://meridian22.org/taksi/", "Такси")])]})
+    monkeypatch.setattr(fees_agent, "_pick", _picks(error=ProviderAttributionUncertain("run is no longer running")))
+    with pytest.raises(ProviderAttributionUncertain):
+        await fees_agent.find_pages(crawler, None, _Client(), _school(), Spend(0.05))
+
+
 async def test_the_finder_follows_fee_links_onto_the_sister_domain(monkeypatch):
     crawler = _Crawler({
         HOME: [("Добре дошли", [("https://meridian22.bg/taksi", "Такси")])],
@@ -115,13 +150,21 @@ async def test_a_thin_page_is_read_from_the_wordpress_api(monkeypatch):
     fees = "https://meridian22.org/taksi/"
     crawler = _Crawler({HOME: [("Начало " + "x" * 300, [(fees, "Такси")])], fees: [("Зареждане…", [])]})
     client = _Client(
-        {"taksi": [{"content": {"rendered": "<table><tr><td>Месечна такса</td><td>700 евро</td></tr></table>"}}]}
+        {
+            "taksi": [
+                {"link": "https://meridian22.org/uchilishte/taksi/", "content": {"rendered": "<p>Такса 900 евро</p>"}},
+                {
+                    "link": fees,
+                    "content": {"rendered": "<table><tr><td>Месечна такса</td><td>700 евро</td></tr></table>"},
+                },
+            ]
+        }
     )
     monkeypatch.setattr(fees_agent, "_pick", _picks([fees]))
     read = await fees_agent.find_pages(crawler, None, client, _school(), Spend(0.05))
     page = next(p for p in read if p.url == fees)
-    assert "700 евро" in page.text and page.prices
-    assert client.gets == [("https://meridian22.org/wp-json/wp/v2/pages", {"slug": "taksi", "_fields": "content"})]
+    assert "700 евро" in page.text and "900" not in page.text and page.prices  # the page at this URL, not its namesake
+    assert client.gets == [("https://meridian22.org/wp-json/wp/v2/pages", {"slug": "taksi", "_fields": "content,link"})]
 
 
 async def test_a_thin_page_without_wordpress_keeps_its_own_text(monkeypatch):

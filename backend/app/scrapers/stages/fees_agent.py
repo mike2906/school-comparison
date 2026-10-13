@@ -41,7 +41,12 @@ from app.scrapers.shared_site_check import registrable_domain
 from app.scrapers.stages import common as stage_common
 from app.scrapers.validator import validate_school_data
 from app.services.pipeline_runs import finalize_pipeline_run, pipeline_run_heartbeat, start_pipeline_run
-from app.services.provider_costs import ProviderCostCapExceeded, execute_billable_request, provider_cost_scope
+from app.services.provider_costs import (
+    ProviderCostCapExceeded,
+    ProviderCostError,
+    execute_billable_request,
+    provider_cost_scope,
+)
 from app.utils.display_gating import _BGN_PER_EUR, blocked_pricing_row_ids, pricing_row_is_publishable
 from app.utils.website_data import prepare_validation_rollover
 
@@ -106,12 +111,17 @@ Reader = Callable[[School, list[PageRead]], Awaitable[list[AgentFee]]]
 
 def _same_site(url: str, site: str) -> bool:
     """The school's own domain, or the same name under another ending: an umbrella site
-    (meridian22.org) often links each school's pages on its sister domain (meridian22.bg)."""
+    (meridian22.org) often links each school's pages on its sister domain (meridian22.bg).
+    Only for a school on a domain of its own: a home on sites.google.com or dgN.sofia.bg
+    would otherwise take in every google.* or sofia.* link."""
     domain, home = registrable_domain(url), registrable_domain(site)
     if not domain or not home:
         return False
+    if domain == home:
+        return True
+    host = (urlparse(site).hostname or "").lower().removeprefix("www.")
     name, home_name = domain.split(".", 1)[0], home.split(".", 1)[0]
-    return domain == home or (len(home_name) >= 5 and name == home_name)
+    return host == home and len(home_name) >= 5 and name == home_name
 
 
 async def _fetch(crawler, run_config, client, url: str) -> tuple[str, str, list[tuple[str, str]]]:
@@ -140,7 +150,10 @@ async def _fetch(crawler, run_config, client, url: str) -> tuple[str, str, list[
 def _wordpress_api(url: str) -> tuple[str, dict[str, str]]:
     parsed = urlparse(url)
     slug = [part for part in parsed.path.split("/") if part][-1:] or ["home"]
-    return f"{parsed.scheme}://{parsed.netloc}/wp-json/wp/v2/pages", {"slug": unquote(slug[0]), "_fields": "content"}
+    return f"{parsed.scheme}://{parsed.netloc}/wp-json/wp/v2/pages", {
+        "slug": unquote(slug[0]),
+        "_fields": "content,link",
+    }
 
 
 async def _wordpress_text(client, url: str) -> str:
@@ -152,9 +165,14 @@ async def _wordpress_text(client, url: str) -> str:
         items = response.json() if response.status_code == 200 else []
     except Exception:
         return ""
-    if not isinstance(items, list) or not items:
+    if not isinstance(items, list):
         return ""
-    html = ((items[0] or {}).get("content") or {}).get("rendered") or ""
+    # A slug repeats under different parents (/detska-gradina/taksi and /uchilishte/taksi):
+    # only the page at this URL will do.
+    item = next((i for i in items if isinstance(i, dict) and page_key(str(i.get("link") or "")) == page_key(url)), None)
+    if item is None:
+        return ""
+    html = (item.get("content") or {}).get("rendered") or ""
     return BeautifulSoup(html, "html.parser").get_text("\n", strip=True)
 
 
@@ -205,8 +223,11 @@ async def find_pages(crawler, run_config, client, school: School, spend: Spend) 
             if page_key(final) != page_key(url) and page_key(final) in seen:
                 continue  # a second link to a page already read (often a percent-encoded redirect)
             seen.add(page_key(final))
-            if len(text.strip()) < THIN_PAGE_CHARS and await robots.can_fetch(
-                _wordpress_api(final)[0], CRAWLER_USER_AGENT
+            is_pdf = unquote(urlparse(final).path).lower().endswith(".pdf")
+            if (
+                not is_pdf
+                and len(text.strip()) < THIN_PAGE_CHARS
+                and await robots.can_fetch(_wordpress_api(final)[0], CRAWLER_USER_AGENT)
             ):
                 text = await _wordpress_text(client, final) or text
             read.append(PageRead(final, text, bool(_PRICE_RE.search(text))))
@@ -221,7 +242,7 @@ async def find_pages(crawler, run_config, client, school: School, spend: Spend) 
             break
         try:
             queue = await _pick(school, read, unopened, spend)
-        except (SpendCapReached, ProviderCostCapExceeded):
+        except (SpendCapReached, ProviderCostError):  # a cap, or a run no longer running
             raise
         except Exception as exc:  # a timed-out pick (541) falls back to the keyword links below
             logger.warning("fees-agent link pick failed for school %s: %s", school.id, exc)
