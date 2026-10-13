@@ -632,6 +632,7 @@ def test_period_fits_category():
     from app.scrapers.price_evidence import period_fits_category
 
     assert not period_fits_category("tuition", "ONE_TIME")
+    assert not period_fits_category("transport", "one_time")  # 170: a year of transport paid at once
     assert not period_fits_category("REGISTRATION", "yearly")
     assert period_fits_category("registration", "one_time")
     assert period_fits_category("tuition", "yearly") and period_fits_category("food", None)

@@ -827,3 +827,89 @@ async def test_a_withheld_row_at_a_kept_amount_still_goes(db_session, frozen_tod
     )
     assert report["rows_old_kept"] == 1, report
     assert withheld.id not in [r.id for r in await _rows(db_session, school)]
+
+
+async def test_an_undated_read_replaces_this_years_rows_and_keeps_older_years(db_session, pages, frozen_today):
+    school = await _school(db_session)
+    await _old_rows(db_session, school, "2026-2027", [700])  # 170: stored dated, read undated
+    await _old_rows(db_session, school, "2025/2026", [650])  # history
+    await db_session.commit()
+    undated = [fee.model_copy(update={"academic_year": None}) for fee in FEES_STAGE]
+    report = await fees_agent.run_school(db_session, school, find=_find(pages), read=_read(undated), apply=True)
+    assert report["outcome"] == "written" and report["rows_old_kept"] == 0, report
+    rows = await _rows(db_session, school)
+    assert sorted((float(r.amount), r.academic_year) for r in rows) == [
+        (200.0, None),
+        (650.0, "2025/2026"),
+        (700.0, None),
+    ]
+
+
+async def test_a_read_of_next_year_keeps_this_years_rows(db_session, pages, frozen_today):
+    school = await _school(db_session)
+    await _old_rows(db_session, school, "2026/2027", [650])  # still in force
+    await db_session.commit()
+    next_year = [fee.model_copy(update={"academic_year": "2027/2028"}) for fee in FEES_STAGE]
+    report = await fees_agent.run_school(db_session, school, find=_find(pages), read=_read(next_year), apply=True)
+    assert report["outcome"] == "written", report
+    rows = await _rows(db_session, school)
+    assert (650.0, "2026/2027") in [(float(r.amount), r.academic_year) for r in rows]
+
+
+async def test_an_unpublished_row_on_a_page_the_read_never_opened_stays(db_session, pages, frozen_today):
+    school = await _school(db_session)
+    await _old_rows(db_session, school, None, [480], page_url="https://school.example/kindergarten.pdf")
+    old = (await _rows(db_session, school))[0]
+    old.pricing_context = {"confidence": 0.5}  # below the publish floor, waiting for review
+    await db_session.commit()
+    report = await fees_agent.run_school(db_session, school, find=_find(pages), read=_read(FEES_STAGE), apply=True)
+    assert report["outcome"] == "written", report
+    assert 480.0 in [float(r.amount) for r in await _rows(db_session, school)]
+
+
+async def test_an_undated_fee_beside_next_years_fees_leaves_this_years_rows(db_session, pages, frozen_today):
+    school = await _school(db_session)
+    await _old_rows(db_session, school, "2026/2027", [650])  # this year's tuition, still in force
+    await db_session.commit()
+    read = [
+        FEES_STAGE[0].model_copy(update={"academic_year": "2027/2028"}),
+        FEES_STAGE[1].model_copy(update={"academic_year": None}),  # registration: rarely dated
+    ]
+    report = await fees_agent.run_school(db_session, school, find=_find(pages), read=_read(read), apply=True)
+    assert report["outcome"] == "written", report
+    assert (650.0, "2026/2027") in [(float(r.amount), r.academic_year) for r in await _rows(db_session, school)]
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "Такса при записване 300 лв., платима в срок до 15 юни",  # a deadline, not a term
+        "Записване 300 лв. еднократно; месечна такса 500 лв.",  # a neighbour's period
+    ],
+)
+def test_a_registration_fee_stays_one_time_beside_other_words(line):
+    result = check_fee(fee(PriceCategory.REGISTRATION, line, amount=300, period=PricePeriod.ONE_TIME), line)
+    assert result.fee.period is PricePeriod.ONE_TIME
+
+
+def test_tiers_on_one_page_survive_the_same_fee_read_first_elsewhere():
+    school = School(id=1, name_i18n={}, country_code="bg", school_type="private", education_level="primary")
+    home = SourcePage(id=-2, school_id=1, scrape_type=ScrapeType.WEBSITE, source_url=HOME)
+    fees_page = SourcePage(id=-1, school_id=1, scrape_type=ScrapeType.WEBSITE, source_url=URL)
+    text = "1-4 клас: 700 евро\n5-7 клас: 700 евро"
+    once = check_fee(fee(PriceCategory.TUITION, "1-4 клас: 700 евро", amount=700, label="Такса"), text)
+    low = check_fee(fee(PriceCategory.TUITION, "1-4 клас: 700 евро", amount=700, label="1-4 клас"), text)
+    high = check_fee(fee(PriceCategory.TUITION, "5-7 клас: 700 евро", amount=700, label="5-7 клас"), text)
+    rows, _ = fees_agent._build_rows(school, [(once, home), (low, fees_page), (high, fees_page)])
+    assert len(rows) == 2
+
+
+async def test_an_undated_read_leaves_the_same_number_in_another_currency(db_session, pages, frozen_today):
+    school = await _school(db_session)
+    await _old_rows(db_session, school, "2026/2027", [700])
+    old = (await _rows(db_session, school))[0]
+    old.currency = "BGN"  # 700 лв. is another fee than 700 €
+    await db_session.commit()
+    undated = [f.model_copy(update={"academic_year": None}) for f in FEES_STAGE]
+    await fees_agent.run_school(db_session, school, find=_find(pages), read=_read(undated), apply=True)
+    assert (700.0, "BGN") in [(float(r.amount), r.currency) for r in await _rows(db_session, school)]

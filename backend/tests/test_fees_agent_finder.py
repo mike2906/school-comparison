@@ -201,3 +201,20 @@ async def test_a_site_without_the_wordpress_api_is_asked_once(monkeypatch):
     monkeypatch.setattr(fees_agent, "_pick", _picks([fees, prices]))
     await fees_agent.find_pages(crawler, None, client, _school(), Spend(0.05))
     assert len(client.gets) == 1
+
+
+async def test_a_wordpress_api_that_is_down_for_a_moment_is_asked_again(monkeypatch):
+    fees, prices = "https://meridian22.org/taksi/", "https://meridian22.org/tseni/"
+    crawler = _Crawler(
+        {HOME: [("Начало", [(fees, "Такси"), (prices, "Цени")])], fees: [("…", [])], prices: [("…", [])]}
+    )
+    client = _Client()
+
+    async def get(url, params=None, timeout=None, **kw):
+        client.gets.append((url, params or {}))
+        return SimpleNamespace(status_code=503, json=lambda: None)
+
+    client.get = get
+    monkeypatch.setattr(fees_agent, "_pick", _picks([fees, prices]))
+    await fees_agent.find_pages(crawler, None, client, _school(), Spend(0.05))
+    assert len(client.gets) == 3
