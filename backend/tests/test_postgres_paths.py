@@ -16,6 +16,7 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.config import get_settings
 from app.models import Pricing, School
 from app.models.country import Country
 from app.models.field_source import FieldSource, SourceConfidence, SourceType
@@ -223,7 +224,9 @@ async def _failed_llm_call(**kwargs):
     return None, 0, 0, 0.0
 
 
-async def test_failed_extraction_rolls_back_and_keeps_published_data(db_session, async_engine):
+async def test_failed_extraction_rolls_back_and_keeps_published_data(db_session, async_engine, monkeypatch):
+    # The rows to roll back come from the old fee extraction, off by default since fees-agent owns fees.
+    monkeypatch.setattr(get_settings(), "extraction_pipeline_prices", True)
     school, row = await _published_school_with_pages(db_session)
     school_id, row_id = school.id, row.id  # the rollback expires the session's objects
     before = (await _fresh_read(async_engine, School, school_id)).attributes
