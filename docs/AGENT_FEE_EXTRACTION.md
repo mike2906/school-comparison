@@ -159,12 +159,24 @@ it comes after steps 1 to 5 prove the runs are reliable.
    tuned on, so these are regression checks, not a fresh validation.
    Mike chose to switch over on these numbers (2026-10-13). The extract stage no longer reads
    fees (`EXTRACTION_PIPELINE_PRICES=false` by default; `true` turns the old extraction back
-   on, and `scripts/refresh_prices.py` needs it). The Sofia run into the launch DB is next.
+   on, and `scripts/refresh_prices.py` needs it).
+   Sofia run into the launch DB, 2026-10-13 (138 schools, $0.34, backup taken first): fee rows
+   the API publishes 278 at 71 schools -> 587 at 85; site fees published on the reference set
+   35 % -> 61 %. Published to production the same day (`sofia_schools-20261013-175611.dump`). 4 schools
+   failed twice on a reply without its cost and kept their old rows. `accuracy_report.py` says
+   21 % wrong, but 22 of its 28 wrong rows are instalments and printed new/returning totals
+   (596, 506) that `reference_set.json` leaves out and `fresh_rescore/rules.md` counts as site
+   fees. The 6 really wrong rows are old rows the read kept (506's learning-support fees as
+   tuition, 538's last-year prices on an old page). A plan price also given as "1 x" the same
+   amount (596) was stored twice; #292 stops that for later runs, and 596's rows stay doubled
+   until it is re-read with `--apply` and published again.
 4. **Delete the unused extraction code** that step 3 leaves behind (`extraction/price_*.py`,
    `fee_lines.py` and whatever only they import). Validation's `price_evidence.py`,
    `price_carry_over.py`, `fee_pages.py` and `fee_image_reader.py` stay unless nothing uses
    them. Big PR. Waits until Mike is sure of the agent's results.
-5. **Schedule.** Add the monthly and summer-weekly run.
+5. **Schedule.** Add the monthly and summer-weekly run. Read several schools at once first:
+   one at a time takes about 35 s a school (a Sofia run is over an hour), nearly all of it
+   waiting on sites and the model.
 6. **Publish automatically** behind the checks above, once Mike picks where the job runs.
 
 ## Not covered

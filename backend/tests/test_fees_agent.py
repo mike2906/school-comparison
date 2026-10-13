@@ -956,6 +956,43 @@ def test_two_tiers_at_one_price_on_one_page_are_two_rows():
     assert len(rows) == 2
 
 
+def _rows_for(*fees):
+    school = School(id=1, name_i18n={}, country_code="bg", school_type="private", education_level="primary")
+    page = SourcePage(id=-1, school_id=1, scrape_type=ScrapeType.WEBSITE, source_url=URL)
+    text = " ".join(f.evidence for f in fees)
+    rows, _ = fees_agent._build_rows(school, [(check_fee(f, text), page) for f in fees])
+    return rows
+
+
+def test_a_plan_paid_once_is_one_row_with_its_annual_price():
+    plan = {"age_group": "Grade 0", "plan_name": "Plan 1", "period": PricePeriod.YEARLY}
+    annual = fee(PriceCategory.TUITION, "Annual tuition fee € 8.950", amount=8950, label="Annual tuition fee", **plan)
+    once = fee(PriceCategory.TUITION, "Plan 1: 1 x € 8.950", amount=8950, label="Tuition payment", **plan)
+    once.installments = ["1 x € 8.950"]
+    rows = _rows_for(annual, once)
+    assert [row.pricing_context["label"] for row in rows] == ["Annual tuition fee"]
+
+
+def test_two_single_payment_rows_of_one_plan_are_one_row():
+    plan = {"age_group": "Grade 8 – 9", "plan_name": "Plan 1", "period": PricePeriod.YEARLY}
+    named = fee(PriceCategory.TUITION, "Plan 1 1 x € 9,500", amount=9500, label="Plan 1", **plan)
+    named.installments = ["1 x € 9,500"]
+    bare = fee(PriceCategory.TUITION, "Plan 1 1 x € 9,500", amount=9500, label="1 x € 9,500", **plan)
+    assert len(_rows_for(named, bare)) == 1
+
+
+def test_two_activities_at_one_price_in_one_group_are_two_rows():
+    group = {"age_group": "Grades 1-4", "period": PricePeriod.MONTHLY}
+    football = fee(PriceCategory.EXTRACURRICULAR, "Football 60 €", amount=60, label="Football", **group)
+    chess = fee(PriceCategory.EXTRACURRICULAR, "Chess 60 €", amount=60, label="Chess", **group)
+    assert len(_rows_for(football, chess)) == 2
+
+
+def test_an_initial_payment_is_not_a_single_payment():
+    initial = fee(PriceCategory.TUITION, "1 x € 2.650 initial", amount=2650, label="1 x € 2.650 initial")
+    assert not fees_agent._single_payment(initial)
+
+
 def test_an_old_bgn_row_is_matched_only_to_a_euro_fee_of_its_kind():
     old = Pricing(category=PriceCategory.FOOD, amount=200, currency="BGN")
     bus = Pricing(category=PriceCategory.TRANSPORT, amount=102.26, currency="EUR")
