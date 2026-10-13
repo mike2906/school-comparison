@@ -129,9 +129,9 @@ _PERIOD_WORDS = {  # Bulgarian, English, and the French and German some schools 
         # "За цялата учебна година" (300) and a "(l'année)" column (505) name the year for
         # what they head; a bare "for the school year" heading does not (_YEAR_ON_AMOUNT_LINE_RE).
         r"(?<!полу)(?<!дву)годиш|\b(?:year(?:ly)?|annual)\b|цялата учебна година"
-        r"|annuel|\(l'année\)|par an\b|(?<!halb)jährlich|pro jahr"
+        r"|annuel|\(l'année\)|par an\b|(?<![a-zäöü])jährlich|pro jahr"
     ),
-    PricePeriod.QUARTER: r"тримесеч|\bquarter",
+    PricePeriod.QUARTER: r"тримесеч|\bquarter|vierteljährlich",
     PricePeriod.TERM: r"срок|\bterm\b",
     PricePeriod.SEMESTER: r"семест|\bsemester|semestre|halbj[aä]hr",
     PricePeriod.ONE_TIME: r"еднократ|\bonce\b|при записване",

@@ -802,3 +802,28 @@ async def test_a_read_with_nothing_new_writes_nothing(db_session, frozen_today):
     )
     assert report["outcome"] == "kept_old_rows" and report["reason"] == "every fee read is already stored", report
     assert [(float(r.amount), r.period) for r in await _rows(db_session, school)] == [(700.0, PricePeriod.MONTHLY)]
+
+
+def test_quarterly_in_german_is_not_yearly():
+    line = "Schulgeld vierteljährlich 1.500 €"
+    assert check_fee(fee(PriceCategory.TUITION, line, amount=1500, period=PricePeriod.YEARLY), line).fee.period is None
+    kept = check_fee(fee(PriceCategory.TUITION, line, amount=1500, period=PricePeriod.QUARTER), line)
+    assert kept.fee.period is PricePeriod.QUARTER
+
+
+async def test_a_withheld_row_at_a_kept_amount_still_goes(db_session, frozen_today):
+    page_text = "Такса: 700 евро"
+    school = await _school(db_session)
+    await _old_rows(db_session, school, "2026/2027", [700, 700])  # monthly: a period the read loses
+    withheld = (await _rows(db_session, school))[1]
+    withheld.pricing_context = {"confidence": 0.5}
+    await db_session.commit()
+    read = [
+        fee(PriceCategory.TUITION, page_text, amount=700, academic_year="2026/2027"),
+        fee(PriceCategory.REGISTRATION, page_text, amount=700, label="other", academic_year="2026/2027"),
+    ]
+    report = await fees_agent.run_school(
+        db_session, school, find=_find([PageRead(URL, page_text, True)]), read=_read(read), apply=True
+    )
+    assert report["rows_old_kept"] == 1, report
+    assert withheld.id not in [r.id for r in await _rows(db_session, school)]

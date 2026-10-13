@@ -41,7 +41,7 @@ from app.scrapers.stages import common as stage_common
 from app.scrapers.validator import validate_school_data
 from app.services.pipeline_runs import finalize_pipeline_run, pipeline_run_heartbeat, start_pipeline_run
 from app.services.provider_costs import ProviderCostCapExceeded, execute_billable_request, provider_cost_scope
-from app.utils.display_gating import _BGN_PER_EUR, pricing_row_is_publishable
+from app.utils.display_gating import _BGN_PER_EUR, blocked_pricing_row_ids, pricing_row_is_publishable
 from app.utils.website_data import prepare_validation_rollover
 
 logger = logging.getLogger(__name__)
@@ -383,6 +383,7 @@ def _rows_to_keep(
     Checked one amount at a time, so a fee the read missed keeps its own row and does not
     hold back the rest of the school's fees.
     """
+    blocked = blocked_pricing_row_ids(school.attributes if isinstance(school.attributes, dict) else None)
     groups: dict[tuple[str, ...], list[Any]] = {}
     for row in superseded:
         seen_as = _in_euro(row, proposed) or row
@@ -392,10 +393,13 @@ def _rows_to_keep(
     reasons: list[str] = []
     for key, olds in groups.items():
         lost = price_step._pricing_replacement_regressions(school, pages, olds, proposed)
-        if lost:
-            kept.extend(old._row if isinstance(old, _InEuro) else old for old in olds)
-            keys.add(key)
-            reasons.extend(lost)
+        if lost:  # only what rule 6 protects: a withheld or blocked row at that amount still goes
+            rows = [old._row if isinstance(old, _InEuro) else old for old in olds]
+            protected = [row for row in rows if row.id not in blocked and pricing_row_is_publishable(row)]
+            if protected:
+                kept.extend(protected)
+                keys.add(key)
+                reasons.extend(lost)
     return kept, keys, reasons
 
 
