@@ -1,0 +1,42 @@
+{
+ "school_id": 155,
+ "website_url": "https://bobche-topche.bg/",
+ "pages_read": [
+  "https://bobche-topche.bg/",
+  "https://bobche-topche.bg/priem-bobche-topche/"
+ ],
+ "fetch_failed": [],
+ "blocked": false,
+ "site_states_no_fees": false,
+ "site_fees": [
+  {
+   "fid": "f1",
+   "category": "tuition",
+   "amount": 857,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": null,
+   "plan": null,
+   "year": null,
+   "url": "https://bobche-topche.bg/priem-bobche-topche/",
+   "quote": "Месечната такса е 857 € / 1676,15 лв като се подписва договор за обучение."
+  },
+  {
+   "fid": "f2",
+   "category": "registration",
+   "amount": 615,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "group": null,
+   "plan": null,
+   "year": null,
+   "url": "https://bobche-topche.bg/priem-bobche-topche/",
+   "quote": "Еднократна такса при първо записване : 615€ / 1202,84"
+  }
+ ],
+ "notes": "Amounts also given in BGN (1676,15 лв; 1202,84). One-time fee covers place reservation plus an adaptation programme (videos, PDFs, workshop). Half-day attendance does not change the monthly fee; food included. Additional activities priced per parent's choice, no amount. No academic year stated. Summer programme page not checked for prices."
+}

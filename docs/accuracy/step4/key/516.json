@@ -1,0 +1,17 @@
+{
+ "school_id": 516,
+ "website_url": "https://svetilnik.bg/",
+ "pages_read": [
+  "https://svetilnik.bg/"
+ ],
+ "fetch_failed": [
+  "https://svetilnik.bg/priem",
+  "https://svetilnik.bg/taksi",
+  "https://svetilnik.bg/sitemap.xml",
+  "https://www.svetilnik.bg/"
+ ],
+ "blocked": true,
+ "site_states_no_fees": false,
+ "site_fees": [],
+ "notes": "Homepage readable but showed no link URLs and no amounts; every subpage tried was refused with ROBOTS_DISALLOWED, so fee/admission pages could not be found or read. Treat as unreadable."
+}

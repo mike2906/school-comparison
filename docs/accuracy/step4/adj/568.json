@@ -1,0 +1,155 @@
+{
+ "school_id": 568,
+ "pages_read": [
+  "https://doristenedi.com/fee.html",
+  "https://doristenedi.com/admission2.html"
+ ],
+ "fetch_failed": [],
+ "site_states_no_fees": false,
+ "site_fees": [
+  {
+   "fid": "f1",
+   "category": "tuition",
+   "amount": 8950,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "ПГ",
+   "plan": null,
+   "year": "2026/2027",
+   "url": "https://doristenedi.com/fee.html",
+   "quote": "ПГ | EUR 8950 (Годишна такса за учебната 2026/2027 г.)"
+  },
+  {
+   "fid": "f2",
+   "category": "tuition",
+   "amount": 9300,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "ПГ",
+   "plan": "разсрочено плащане",
+   "year": "2026/2027",
+   "url": "https://doristenedi.com/fee.html",
+   "quote": "ПГ ... EUR 9300 (Годишна такса при разсрочено плащане за учебната 2026/2027 г.)"
+  },
+  {
+   "fid": "f3",
+   "category": "tuition",
+   "amount": 8950,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "I - VIІ клас",
+   "plan": null,
+   "year": "2026/2027",
+   "url": "https://doristenedi.com/fee.html",
+   "quote": "I - VIІ клас | EUR 8950"
+  },
+  {
+   "fid": "f4",
+   "category": "tuition",
+   "amount": 9300,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "I - VIІ клас",
+   "plan": "разсрочено плащане",
+   "year": "2026/2027",
+   "url": "https://doristenedi.com/fee.html",
+   "quote": "I - VIІ клас ... EUR 9300 (Годишна такса при разсрочено плащане)"
+  },
+  {
+   "fid": "f5",
+   "category": "tuition",
+   "amount": 6700,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "VIII - XII клас",
+   "plan": null,
+   "year": "2026/2027",
+   "url": "https://doristenedi.com/fee.html",
+   "quote": "VIII - XII клас | EUR 6700"
+  },
+  {
+   "fid": "f6",
+   "category": "tuition",
+   "amount": 7050,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "VIII - XII клас",
+   "plan": "разсрочено плащане",
+   "year": "2026/2027",
+   "url": "https://doristenedi.com/fee.html",
+   "quote": "VIII - XII клас ... EUR 7050 (Годишна такса при разсрочено плащане)"
+  },
+  {
+   "fid": "f7",
+   "category": "registration",
+   "amount": 60,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "group": "8 клас (прием)",
+   "plan": null,
+   "year": null,
+   "url": "https://doristenedi.com/admission2.html",
+   "quote": "таксата за явяване на изпит (60 евро)",
+   "changed": "added: entrance-exam fee on the school's own 8th-grade admission page, missed by key"
+  }
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "verdict": "correct",
+   "fid": "f7",
+   "reason": "60 EUR entrance exam fee, one-time registration",
+   "group_unstated": false
+  },
+  {
+   "oid": "o2",
+   "verdict": "correct",
+   "fid": "f1",
+   "reason": "8950 EUR yearly PG 2026/27",
+   "group_unstated": false
+  },
+  {
+   "oid": "o3",
+   "verdict": "correct",
+   "fid": "f5",
+   "reason": "6700 EUR yearly VIII-XII 2026/27",
+   "group_unstated": false
+  },
+  {
+   "oid": "o4",
+   "verdict": "correct",
+   "fid": "f3",
+   "reason": "8950 EUR yearly I-VII 2026/27",
+   "group_unstated": false
+  },
+  {
+   "oid": "o5",
+   "verdict": "correct",
+   "fid": "f6",
+   "reason": "7050 EUR yearly instalment plan (only VIII-XII has it); group not stated",
+   "group_unstated": true
+  },
+  {
+   "oid": "o6",
+   "verdict": "duplicate",
+   "fid": "f5",
+   "reason": "6700 again without group; o3 matches better",
+   "group_unstated": false
+  }
+ ],
+ "notes": "Added f7 (exam fee) from admission2.html, same school (Езиково училище Дорис Тенеди)."
+}

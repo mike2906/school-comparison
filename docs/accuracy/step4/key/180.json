@@ -1,0 +1,15 @@
+{
+ "school_id": 180,
+ "website_url": "https://www.casadeibambini.bg/",
+ "pages_read": [
+  "https://www.casadeibambini.bg/",
+  "https://www.casadeibambini.bg/priem",
+  "https://www.casadeibambini.bg/bilingual-montessori-preschool-casa-dei-bambini-sofia",
+  "https://www.casadeibambini.bg/obuchenie/zdrave-i-khranene"
+ ],
+ "fetch_failed": [],
+ "blocked": false,
+ "site_states_no_fees": true,
+ "site_fees": [],
+ "notes": "No fee amounts anywhere read. Admissions page (Прием) says conditions and prices ('условията и цените') are presented at an information meeting; prices available by phone/email only. No fees page or PDF linked."
+}

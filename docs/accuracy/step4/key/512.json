@@ -1,0 +1,14 @@
+{
+ "school_id": 512,
+ "website_url": "https://busy-land.com/",
+ "pages_read": [
+  "https://busy-land.com/",
+  "https://busy-land.com/about-us/",
+  "https://busy-land.com/%d0%ba%d0%be%d0%bd%d1%82%d0%b0%d0%ba%d1%82%d0%b8/"
+ ],
+ "fetch_failed": [],
+ "blocked": false,
+ "site_states_no_fees": false,
+ "site_fees": [],
+ "notes": "Small WordPress site (Home, Gallery, Contacts, About). No fee/price page and no amounts anywhere; only phone/email contact. Gallery and license PDF not read."
+}

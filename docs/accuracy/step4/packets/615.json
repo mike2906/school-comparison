@@ -1,0 +1,57 @@
+{
+ "school_id": 615,
+ "candidates": [
+  {
+   "oid": "o1",
+   "category": "tuition",
+   "amount": 500.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "Целодневна",
+   "year": null,
+   "group": null,
+   "url": "https://growers.bg/taksi/"
+  },
+  {
+   "oid": "o2",
+   "category": "food",
+   "amount": 88.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": null,
+   "year": null,
+   "group": null,
+   "url": "https://growers.bg/taksi/"
+  },
+  {
+   "oid": "o3",
+   "category": "tuition",
+   "amount": 500.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": null,
+   "year": null,
+   "group": null,
+   "url": "https://growers.bg/taksi/"
+  },
+  {
+   "oid": "o4",
+   "category": "food",
+   "amount": 88.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "Такса храна",
+   "year": null,
+   "group": null,
+   "url": "https://growers.bg/taksi/"
+  }
+ ]
+}

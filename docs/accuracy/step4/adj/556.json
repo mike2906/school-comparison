@@ -1,0 +1,195 @@
+{
+ "school_id": 556,
+ "pages_read": [
+  "https://sofia-kindergarten.maplebear.bg/admissions/"
+ ],
+ "fetch_failed": [],
+ "site_states_no_fees": false,
+ "site_fees": [
+  {
+   "fid": "f1",
+   "category": "tuition",
+   "amount": 9200,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": null,
+   "plan": "One installment",
+   "year": null,
+   "url": "https://sofia-kindergarten.maplebear.bg/admissions/",
+   "quote": "Tuition Fee ... Euro 9 200 (One installment)"
+  },
+  {
+   "fid": "f2",
+   "category": "tuition",
+   "amount": 9300,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": null,
+   "plan": "At 2 installments",
+   "year": null,
+   "url": "https://sofia-kindergarten.maplebear.bg/admissions/",
+   "quote": "Euro 9 300 ... At 2 installments"
+  },
+  {
+   "fid": "f3",
+   "category": "tuition",
+   "amount": 9400,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": null,
+   "plan": "At 10 installments",
+   "year": null,
+   "url": "https://sofia-kindergarten.maplebear.bg/admissions/",
+   "quote": "Euro 9 400 ... At 10 installments"
+  },
+  {
+   "fid": "f4",
+   "category": "registration",
+   "amount": 850,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "group": null,
+   "plan": null,
+   "year": null,
+   "url": "https://sofia-kindergarten.maplebear.bg/admissions/",
+   "quote": "Registration Fee | Euro 850 | One time fee"
+  },
+  {
+   "fid": "f5",
+   "category": "materials",
+   "amount": 400,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "Age 2-4",
+   "plan": null,
+   "year": null,
+   "url": "https://sofia-kindergarten.maplebear.bg/admissions/",
+   "quote": "Euro 400 (Age 2-4) ... One time yearly fee for educational materials"
+  },
+  {
+   "fid": "f6",
+   "category": "materials",
+   "amount": 550,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "Age 4-7",
+   "plan": null,
+   "year": null,
+   "url": "https://sofia-kindergarten.maplebear.bg/admissions/",
+   "quote": "Euro 550 (Age 4-7) ... One time yearly fee for educational materials"
+  },
+  {
+   "fid": "f7",
+   "category": "food",
+   "amount": 181.44,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": null,
+   "plan": null,
+   "year": null,
+   "url": "https://sofia-kindergarten.maplebear.bg/admissions/",
+   "quote": "School Meals ... 181,44 euro/ month"
+  }
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "verdict": "correct",
+   "fid": "f5",
+   "reason": "400 EUR yearly materials; label generic, group not stated",
+   "group_unstated": true
+  },
+  {
+   "oid": "o2",
+   "verdict": "correct",
+   "fid": "f2",
+   "reason": "9300 EUR yearly, 2-installment plan",
+   "group_unstated": false
+  },
+  {
+   "oid": "o3",
+   "verdict": "correct",
+   "fid": "f7",
+   "reason": "181.44 EUR monthly meals",
+   "group_unstated": false
+  },
+  {
+   "oid": "o4",
+   "verdict": "correct",
+   "fid": "f4",
+   "reason": "850 EUR one-time registration",
+   "group_unstated": false
+  },
+  {
+   "oid": "o5",
+   "verdict": "missing_period",
+   "fid": "f1",
+   "reason": "9200 tuition, site states one-installment yearly; period null",
+   "group_unstated": true
+  },
+  {
+   "oid": "o6",
+   "verdict": "wrong_period",
+   "fid": "f5",
+   "reason": "site says 'One time yearly fee' -> yearly, not one_time",
+   "group_unstated": false
+  },
+  {
+   "oid": "o7",
+   "verdict": "duplicate",
+   "fid": "f2",
+   "reason": "9300 again, period null; o2 matches better",
+   "group_unstated": false
+  },
+  {
+   "oid": "o8",
+   "verdict": "missing_period",
+   "fid": "f6",
+   "reason": "550 Age 4-7 materials, site states yearly; period null",
+   "group_unstated": false
+  },
+  {
+   "oid": "o9",
+   "verdict": "missing_period",
+   "fid": "f3",
+   "reason": "9400 tuition (10 installments), site gives yearly total; period null",
+   "group_unstated": true
+  },
+  {
+   "oid": "o10",
+   "verdict": "duplicate",
+   "fid": "f7",
+   "reason": "same meals fee as o3",
+   "group_unstated": false
+  },
+  {
+   "oid": "o11",
+   "verdict": "correct",
+   "fid": "f1",
+   "reason": "9200 EUR yearly tuition (one installment)",
+   "group_unstated": true
+  },
+  {
+   "oid": "o12",
+   "verdict": "correct",
+   "fid": "f6",
+   "reason": "550 EUR yearly materials; group not stated",
+   "group_unstated": true
+  }
+ ],
+ "notes": "Key confirmed on re-fetch. No academic year named. Uniforms/ECA/camp/annual meals: no amounts on page."
+}

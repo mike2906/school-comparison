@@ -1,0 +1,19 @@
+{
+ "school_id": 516,
+ "pages_read": [],
+ "fetch_failed": [
+  "https://svetilnik.bg/proletna-vakantsionna-programa/"
+ ],
+ "site_states_no_fees": false,
+ "site_fees": [],
+ "candidates": [
+  {
+   "oid": "o1",
+   "verdict": "unresolved",
+   "fid": null,
+   "reason": "camp page fetch refused (ROBOTS_DISALLOWED); cannot verify 350 BGN",
+   "group_unstated": true
+  }
+ ],
+ "notes": "robots.txt blocks subpage fetches; site fees could not be read."
+}

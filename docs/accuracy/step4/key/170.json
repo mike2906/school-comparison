@@ -1,0 +1,19 @@
+{
+ "school_id": 170,
+ "website_url": "https://www.svetinaum.net/",
+ "pages_read": [
+  "https://www.svetinaum.net/"
+ ],
+ "fetch_failed": [
+  "https://www.svetinaum.net/c/bg/ceni/",
+  "https://svetinaum.net/c/bg/ceni/",
+  "https://www.svetinaum.net/c/bg/ceni",
+  "https://www.svetinaum.net/c/bg/administrativni-uslugi/",
+  "https://www.svetinaum.net/bg/",
+  "https://www.svetinaum.net/c/bg/ucheben-plan/"
+ ],
+ "blocked": true,
+ "site_states_no_fees": false,
+ "site_fees": [],
+ "notes": "Homepage loads and links a 'Цени' page (/c/bg/ceni/), but every subpage fetch failed with a client error (repeated attempts). Fees could not be read; not evidence that the site has no fees."
+}

@@ -1,0 +1,132 @@
+{
+ "school_id": 151,
+ "pages_read": [
+  "https://zlatarskischool.org/admissions/school-fees/"
+ ],
+ "fetch_failed": [],
+ "site_states_no_fees": false,
+ "site_fees": [
+  {
+   "fid": "f1",
+   "category": "tuition",
+   "amount": 9690,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "5-7 grade",
+   "plan": "Students from Bulgarian schools",
+   "year": "2026/2027",
+   "url": "https://zlatarskischool.org/admissions/school-fees/",
+   "quote": "€ 9690: Students from Bulgarian schools"
+  },
+  {
+   "fid": "f2",
+   "category": "tuition",
+   "amount": 11860,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "5-7 grade",
+   "plan": "International students",
+   "year": "2026/2027",
+   "url": "https://zlatarskischool.org/admissions/school-fees/",
+   "quote": "€ 11860: International students"
+  },
+  {
+   "fid": "f3",
+   "category": "registration",
+   "amount": 200,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "group": "all candidates",
+   "plan": null,
+   "year": "2026/2027",
+   "url": "https://zlatarskischool.org/admissions/school-fees/",
+   "quote": "Registration fee (for all candidates): € 200"
+  },
+  {
+   "fid": "f4",
+   "category": "transport",
+   "amount": 2500,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "group": null,
+   "plan": "in two installments",
+   "year": "2026/2027",
+   "url": "https://zlatarskischool.org/admissions/school-fees/",
+   "quote": "School Transport (optional): € 2500 (in two installments)"
+  },
+  {
+   "fid": "f5",
+   "category": "food",
+   "amount": 345,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "quarter",
+   "group": null,
+   "plan": null,
+   "year": "2026/2027",
+   "url": "https://zlatarskischool.org/admissions/school-fees/",
+   "quote": "Cafeteria Meals (optional): € 345 (per quarter)"
+  }
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "verdict": "correct",
+   "fid": "f4",
+   "reason": "transport 2500 in two installments, period null",
+   "group_unstated": false
+  },
+  {
+   "oid": "o2",
+   "verdict": "duplicate",
+   "fid": "f4",
+   "reason": "same as o1",
+   "group_unstated": true
+  },
+  {
+   "oid": "o3",
+   "verdict": "missing_period",
+   "fid": "f1",
+   "reason": "9690 5-7 Bulgarian schools; annual tuition -> yearly",
+   "group_unstated": false
+  },
+  {
+   "oid": "o4",
+   "verdict": "correct",
+   "fid": "f3",
+   "reason": "registration 200 one_time",
+   "group_unstated": false
+  },
+  {
+   "oid": "o5",
+   "verdict": "correct",
+   "fid": "f1",
+   "reason": "9690 yearly",
+   "group_unstated": true
+  },
+  {
+   "oid": "o6",
+   "verdict": "correct",
+   "fid": "f5",
+   "reason": "meals 345 per quarter",
+   "group_unstated": false
+  },
+  {
+   "oid": "o7",
+   "verdict": "missing_period",
+   "fid": "f2",
+   "reason": "11860 5-7 international; annual -> yearly",
+   "group_unstated": false
+  }
+ ],
+ "notes": "Re-fetched; matches key. Grade 8-12 fees belong to the sibling secondary school."
+}

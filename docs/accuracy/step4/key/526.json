@@ -1,0 +1,29 @@
+{
+ "school_id": 526,
+ "website_url": "https://meridian22.bg/",
+ "pages_read": [
+  "https://meridian22.bg/",
+  "https://meridian22.bg/bg/kindergarten",
+  "https://meridian22.bg/priem-1"
+ ],
+ "fetch_failed": [],
+ "blocked": false,
+ "site_states_no_fees": false,
+ "site_fees": [
+  {
+   "fid": "f1",
+   "category": "tuition",
+   "amount": 650,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": null,
+   "plan": null,
+   "year": null,
+   "url": "https://meridian22.bg/priem-1",
+   "quote": "Цена: 650 € месечна такса"
+  }
+ ],
+ "notes": "Site also serves sibling institutions (Основно училище, Английска гимназия); their pages not used/fees left out. Kindergarten Прием page states 650 EUR monthly fee incl. food (two breakfasts and lunch); no academic year named."
+}

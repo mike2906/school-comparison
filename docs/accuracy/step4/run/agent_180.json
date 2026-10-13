@@ -1,0 +1,44 @@
+{
+ "apply": true,
+ "pipeline_run_id": "46889749-b7ad-4cff-8064-020f6a1ca24e",
+ "schools": 1,
+ "spent_usd": 0.000942,
+ "stopped": null,
+ "kept_old_rows": [
+  180
+ ],
+ "outcomes": {
+  "kept_old_rows": 1
+ },
+ "results": [
+  {
+   "school_id": 180,
+   "outcome": "kept_old_rows",
+   "pages": [
+    {
+     "url": "https://www.casadeibambini.bg/",
+     "chars": 10223,
+     "prices": true,
+     "note": null
+    },
+    {
+     "url": "https://www.casadeibambini.bg/priem",
+     "chars": 5374,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://www.casadeibambini.bg/dokumenti-koito-se-predostavyat-pri-zapisvane-na-deteto-v-montesori-detska-gradina-kscha-na-decata",
+     "chars": 4058,
+     "prices": false,
+     "note": null
+    }
+   ],
+   "fees": [],
+   "rows_new": 0,
+   "rows_new_publishable": 0,
+   "rows_old_published": 0,
+   "reason": "nothing publishable read"
+  }
+ ]
+}

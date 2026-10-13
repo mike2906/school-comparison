@@ -1,0 +1,57 @@
+{
+ "school_id": 155,
+ "candidates": [
+  {
+   "oid": "o1",
+   "category": "registration",
+   "amount": 615.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "label": "Еднократна такса при първо записване",
+   "year": null,
+   "group": null,
+   "url": "https://bobche-topche.bg/priem-bobche-topche/"
+  },
+  {
+   "oid": "o2",
+   "category": "registration",
+   "amount": 615.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "label": "Еднократна такса при първо записване, включваща Авторска програма за Адаптация",
+   "year": null,
+   "group": null,
+   "url": "https://bobche-topche.bg/priem-bobche-topche/"
+  },
+  {
+   "oid": "o3",
+   "category": "tuition",
+   "amount": 857.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "Месечна такса",
+   "year": null,
+   "group": null,
+   "url": "https://bobche-topche.bg/priem-bobche-topche/"
+  },
+  {
+   "oid": "o4",
+   "category": "tuition",
+   "amount": 857.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "Месечната такса",
+   "year": null,
+   "group": null,
+   "url": "https://bobche-topche.bg/priem-bobche-topche/"
+  }
+ ]
+}

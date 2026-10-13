@@ -1,0 +1,364 @@
+{
+ "school_id": 170,
+ "pages_read": [
+  "https://www.svetinaum.net/",
+  "https://www.svetinaum.net/c/bg/ceni/?x=1",
+  "https://www.svetinaum.net/c/bg/ceni/taksi-za-obuchenie/?x=1"
+ ],
+ "fetch_failed": [
+  "https://www.svetinaum.net/c/bg/ceni/",
+  "https://www.svetinaum.net/c/bg/ceni/taksi-za-obuchenie/",
+  "https://svetinaum.net/c/bg/ceni/taksi-za-obuchenie/",
+  "http://www.svetinaum.net/c/bg/ceni/taksi-za-obuchenie",
+  "https://www.svetinaum.net/c/en/"
+ ],
+ "site_states_no_fees": false,
+ "site_fees": [
+  {
+   "fid": "f1",
+   "category": "tuition",
+   "amount": 4500,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "Подготвителен",
+   "plan": "Еднократно плащане",
+   "year": "2026-2027",
+   "url": "https://www.svetinaum.net/c/bg/ceni/taksi-za-obuchenie/",
+   "quote": "Подготвителен | Еднократно плащане: 4500 Евро",
+   "changed": "key fetch failed"
+  },
+  {
+   "fid": "f2",
+   "category": "tuition",
+   "amount": 4600,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "group": "Подготвителен",
+   "plan": "На два пъти",
+   "year": "2026-2027",
+   "url": "https://www.svetinaum.net/c/bg/ceni/taksi-za-obuchenie/",
+   "quote": "Подготвителен | На два пъти: 4600 Евро",
+   "changed": "key fetch failed"
+  },
+  {
+   "fid": "f3",
+   "category": "tuition",
+   "amount": 5300,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "group": "Подготвителен",
+   "plan": "На осем вноски",
+   "year": "2026-2027",
+   "url": "https://www.svetinaum.net/c/bg/ceni/taksi-za-obuchenie/",
+   "quote": "Подготвителен | На осем вноски: 5300 Евро",
+   "changed": "key fetch failed"
+  },
+  {
+   "fid": "f4",
+   "category": "tuition",
+   "amount": 4700,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "1-3 клас",
+   "plan": "Еднократно плащане",
+   "year": "2026-2027",
+   "url": "https://www.svetinaum.net/c/bg/ceni/taksi-za-obuchenie/",
+   "quote": "1-3 клас | Еднократно плащане: 4700 Евро",
+   "changed": "key fetch failed"
+  },
+  {
+   "fid": "f5",
+   "category": "tuition",
+   "amount": 5000,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "group": "1-3 клас",
+   "plan": "На два пъти",
+   "year": "2026-2027",
+   "url": "https://www.svetinaum.net/c/bg/ceni/taksi-za-obuchenie/",
+   "quote": "1-3 клас | На два пъти: 5000 Евро",
+   "changed": "key fetch failed"
+  },
+  {
+   "fid": "f6",
+   "category": "tuition",
+   "amount": 5400,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "group": "1-3 клас",
+   "plan": "На осем вноски",
+   "year": "2026-2027",
+   "url": "https://www.svetinaum.net/c/bg/ceni/taksi-za-obuchenie/",
+   "quote": "1-3 клас | На осем вноски: 5400 Евро",
+   "changed": "key fetch failed"
+  },
+  {
+   "fid": "f7",
+   "category": "tuition",
+   "amount": 5100,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "4-7 клас",
+   "plan": "Еднократно плащане",
+   "year": "2026-2027",
+   "url": "https://www.svetinaum.net/c/bg/ceni/taksi-za-obuchenie/",
+   "quote": "4-7 клас | Еднократно плащане: 5100 Евро",
+   "changed": "key fetch failed"
+  },
+  {
+   "fid": "f8",
+   "category": "tuition",
+   "amount": 5300,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "group": "4-7 клас",
+   "plan": "На два пъти",
+   "year": "2026-2027",
+   "url": "https://www.svetinaum.net/c/bg/ceni/taksi-za-obuchenie/",
+   "quote": "4-7 клас | На два пъти: 5300 Евро",
+   "changed": "key fetch failed"
+  },
+  {
+   "fid": "f9",
+   "category": "tuition",
+   "amount": 5700,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "group": "4-7 клас",
+   "plan": "На осем вноски",
+   "year": "2026-2027",
+   "url": "https://www.svetinaum.net/c/bg/ceni/taksi-za-obuchenie/",
+   "quote": "4-7 клас | На осем вноски: 5700 Евро",
+   "changed": "key fetch failed"
+  },
+  {
+   "fid": "f10",
+   "category": "tuition",
+   "amount": 4000,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "7-12 клас (полудневно)",
+   "plan": "Еднократно плащане",
+   "year": "2026-2027",
+   "url": "https://www.svetinaum.net/c/bg/ceni/taksi-za-obuchenie/",
+   "quote": "7-12 клас (полудневно) | Еднократно плащане: 4000 Евро",
+   "changed": "key fetch failed"
+  },
+  {
+   "fid": "f11",
+   "category": "tuition",
+   "amount": 4200,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "group": "7-12 клас (полудневно)",
+   "plan": "На два пъти",
+   "year": "2026-2027",
+   "url": "https://www.svetinaum.net/c/bg/ceni/taksi-za-obuchenie/",
+   "quote": "7-12 клас (полудневно) | На два пъти: 4200 Евро",
+   "changed": "key fetch failed"
+  },
+  {
+   "fid": "f12",
+   "category": "tuition",
+   "amount": 4500,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "group": "7-12 клас (полудневно)",
+   "plan": "На осем вноски",
+   "year": "2026-2027",
+   "url": "https://www.svetinaum.net/c/bg/ceni/taksi-za-obuchenie/",
+   "quote": "7-12 клас (полудневно) | На осем вноски: 4500 Евро",
+   "changed": "key fetch failed"
+  },
+  {
+   "fid": "f13",
+   "category": "transport",
+   "amount": 2000,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": null,
+   "plan": "Еднократно плащане",
+   "year": "2026-2027",
+   "url": "https://www.svetinaum.net/c/bg/ceni/taksi-za-obuchenie/",
+   "quote": "Транспорт в две посоки | 2000 Евро | 2500 Евро",
+   "changed": "key fetch failed"
+  },
+  {
+   "fid": "f14",
+   "category": "transport",
+   "amount": 2500,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "group": null,
+   "plan": "На два пъти",
+   "year": "2026-2027",
+   "url": "https://www.svetinaum.net/c/bg/ceni/taksi-za-obuchenie/",
+   "quote": "Транспорт в две посоки | 2000 Евро | 2500 Евро",
+   "changed": "key fetch failed"
+  }
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "verdict": "correct",
+   "fid": "f6",
+   "reason": "5400 = 1-3 клас На осем вноски, no period stated",
+   "group_unstated": true
+  },
+  {
+   "oid": "o2",
+   "verdict": "wrong_period",
+   "fid": "f13",
+   "reason": "transport 2000 is Еднократно плащане per school year -> yearly, not one_time",
+   "group_unstated": false
+  },
+  {
+   "oid": "o3",
+   "verdict": "missing_period",
+   "fid": "f7",
+   "reason": "5100 = 4-7 клас single payment (yearly); group 4 within 4-7",
+   "group_unstated": false
+  },
+  {
+   "oid": "o4",
+   "verdict": "correct",
+   "fid": "f5",
+   "reason": "5000 = 1-3 клас На два пъти",
+   "group_unstated": true
+  },
+  {
+   "oid": "o5",
+   "verdict": "correct",
+   "fid": "f3",
+   "reason": "5300 = Подготвителен На осем вноски (also 4-7 На два пъти, matched by o8)",
+   "group_unstated": true
+  },
+  {
+   "oid": "o6",
+   "verdict": "wrong_period",
+   "fid": "f1",
+   "reason": "4500 Подготвителен Еднократно плащане is yearly, not one_time",
+   "group_unstated": false
+  },
+  {
+   "oid": "o7",
+   "verdict": "correct",
+   "fid": "f9",
+   "reason": "5700 = 4-7 клас На осем вноски",
+   "group_unstated": true
+  },
+  {
+   "oid": "o8",
+   "verdict": "correct",
+   "fid": "f8",
+   "reason": "5300 = 4-7 клас На два пъти",
+   "group_unstated": true
+  },
+  {
+   "oid": "o9",
+   "verdict": "missing_period",
+   "fid": "f10",
+   "reason": "4000 = 7-12 полудневно single payment, yearly",
+   "group_unstated": true
+  },
+  {
+   "oid": "o10",
+   "verdict": "duplicate",
+   "fid": "f10",
+   "reason": "same fee as o9 (both missing_period)",
+   "group_unstated": false
+  },
+  {
+   "oid": "o11",
+   "verdict": "correct",
+   "fid": "f11",
+   "reason": "4200 = 7-12 На два пъти",
+   "group_unstated": true
+  },
+  {
+   "oid": "o12",
+   "verdict": "missing_period",
+   "fid": "f13",
+   "reason": "transport 2000 single payment, yearly",
+   "group_unstated": true
+  },
+  {
+   "oid": "o13",
+   "verdict": "correct",
+   "fid": "f12",
+   "reason": "4500 = 7-12 На осем вноски",
+   "group_unstated": true
+  },
+  {
+   "oid": "o14",
+   "verdict": "missing_period",
+   "fid": "f1",
+   "reason": "4500 = Подготвителен single payment, yearly (o6 matched it with wrong period)",
+   "group_unstated": true
+  },
+  {
+   "oid": "o15",
+   "verdict": "duplicate",
+   "fid": "f7",
+   "reason": "same fee as o3",
+   "group_unstated": false
+  },
+  {
+   "oid": "o16",
+   "verdict": "missing_period",
+   "fid": "f4",
+   "reason": "4700 = 1-3 клас single payment, yearly; group 1 within 1-3",
+   "group_unstated": false
+  },
+  {
+   "oid": "o17",
+   "verdict": "correct",
+   "fid": "f2",
+   "reason": "4600 = Подготвителен На два пъти",
+   "group_unstated": true
+  },
+  {
+   "oid": "o18",
+   "verdict": "correct",
+   "fid": "f14",
+   "reason": "transport 2500 На два пъти",
+   "group_unstated": false
+  },
+  {
+   "oid": "o19",
+   "verdict": "duplicate",
+   "fid": "f4",
+   "reason": "same fee as o16",
+   "group_unstated": false
+  }
+ ],
+ "notes": "Plain URLs fail in WebFetch; adding ?x=1 loaded them. Year heading 'Такси за 2026-2027 учебна година:'. Columns 'Еднократно плащане' / 'На два пъти' / 'На осем вноски'; the latter two amounts are higher totals for the plan with no stated frequency -> period null. Grade 7 appears in both full-day 4-7 and half-day 7-12 tables. Textbook/supplies fee mandatory but amount computed at year start (no amount)."
+}

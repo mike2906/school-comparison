@@ -1,0 +1,242 @@
+{
+ "school_id": 158,
+ "pages_read": [
+  "https://www.brambazak.bg/fees",
+  "https://www.brambazak.bg/fees-en/",
+  "https://www.brambazak.bg/wp-content/themes/twentyseventeen/str/documents/202x/bacho-kiro/Бачо_Киро_Ценова_листа_01.26.pdf",
+  "https://www.brambazak.bg/wp-content/themes/twentyseventeen/str/documents/202x/oborishte/Оборище_Ценова_листа_01.26.pdf",
+  "https://www.brambazak.bg/wp-content/themes/twentyseventeen/str/documents/Cenova_lista_English.pdf"
+ ],
+ "fetch_failed": [],
+ "site_states_no_fees": false,
+ "site_fees": [
+  {
+   "fid": "f1",
+   "category": "tuition",
+   "amount": 590,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": "Бачо Киро (детска градина)",
+   "plan": "Целодневна месечна такса",
+   "year": "януари 2026",
+   "url": "https://www.brambazak.bg/wp-content/themes/twentyseventeen/str/documents/202x/bacho-kiro/Бачо_Киро_Ценова_листа_01.26.pdf",
+   "quote": "Целодневна месечна такса 590 евро"
+  },
+  {
+   "fid": "f2",
+   "category": "tuition",
+   "amount": 400,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": "Бачо Киро (детска градина)",
+   "plan": "Полудневна месечна такса",
+   "year": "януари 2026",
+   "url": "https://www.brambazak.bg/wp-content/themes/twentyseventeen/str/documents/202x/bacho-kiro/Бачо_Киро_Ценова_листа_01.26.pdf",
+   "quote": "Полудневна месечна такса 400 евро"
+  },
+  {
+   "fid": "f3",
+   "category": "registration",
+   "amount": 350,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "group": "Бачо Киро (детска градина)",
+   "plan": null,
+   "year": "януари 2026",
+   "url": "https://www.brambazak.bg/wp-content/themes/twentyseventeen/str/documents/202x/bacho-kiro/Бачо_Киро_Ценова_листа_01.26.pdf",
+   "quote": "Депозит за запазване на място 350 евро"
+  },
+  {
+   "fid": "f4",
+   "category": "materials",
+   "amount": 130,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "Бачо Киро (детска градина)",
+   "plan": null,
+   "year": "януари 2026",
+   "url": "https://www.brambazak.bg/wp-content/themes/twentyseventeen/str/documents/202x/bacho-kiro/Бачо_Киро_Ценова_листа_01.26.pdf",
+   "quote": "Годишна такса учебни материали 130 евро"
+  },
+  {
+   "fid": "f5",
+   "category": "tuition",
+   "amount": 600,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "BGN",
+   "period": "monthly",
+   "group": null,
+   "plan": "Full-day",
+   "year": "2017-2018",
+   "url": "https://www.brambazak.bg/wp-content/themes/twentyseventeen/str/documents/Cenova_lista_English.pdf",
+   "quote": "Full-day monthly fee 600 lv."
+  },
+  {
+   "fid": "f6",
+   "category": "tuition",
+   "amount": 400,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "BGN",
+   "period": "monthly",
+   "group": null,
+   "plan": "Part-day",
+   "year": "2017-2018",
+   "url": "https://www.brambazak.bg/wp-content/themes/twentyseventeen/str/documents/Cenova_lista_English.pdf",
+   "quote": "Part-day monthly fee 400 lv."
+  },
+  {
+   "fid": "f7",
+   "category": "tuition",
+   "amount": 600,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "BGN",
+   "period": "monthly",
+   "group": null,
+   "plan": "Adaptation",
+   "year": "2017-2018",
+   "url": "https://www.brambazak.bg/wp-content/themes/twentyseventeen/str/documents/Cenova_lista_English.pdf",
+   "quote": "Monthly fee “Adaptation” 600 lv."
+  },
+  {
+   "fid": "f8",
+   "category": "tuition",
+   "amount": 36,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "BGN",
+   "period": null,
+   "group": null,
+   "plan": "One day",
+   "year": "2017-2018",
+   "url": "https://www.brambazak.bg/wp-content/themes/twentyseventeen/str/documents/Cenova_lista_English.pdf",
+   "quote": "One day fee 36 lv. education, food, english language"
+  },
+  {
+   "fid": "f9",
+   "category": "tuition",
+   "amount": 21,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "BGN",
+   "period": null,
+   "group": null,
+   "plan": "Half day",
+   "year": "2017-2018",
+   "url": "https://www.brambazak.bg/wp-content/themes/twentyseventeen/str/documents/Cenova_lista_English.pdf",
+   "quote": "Half day fee 21 lv. education, breakfast, snack, lunch, english language"
+  },
+  {
+   "fid": "f10",
+   "category": "registration",
+   "amount": 300,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "BGN",
+   "period": "one_time",
+   "group": null,
+   "plan": null,
+   "year": "2017-2018",
+   "url": "https://www.brambazak.bg/wp-content/themes/twentyseventeen/str/documents/Cenova_lista_English.pdf",
+   "quote": "Deposit for keeping a place for your kid 300 lv. Deducted from the fee for the first month"
+  },
+  {
+   "fid": "f11",
+   "category": "registration",
+   "amount": 220,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "BGN",
+   "period": "monthly",
+   "group": null,
+   "plan": "long absence",
+   "year": "2017-2018",
+   "url": "https://www.brambazak.bg/wp-content/themes/twentyseventeen/str/documents/Cenova_lista_English.pdf",
+   "quote": "Deposit for keeping a place during a long absence 220 lv. per month",
+   "changed": "PDF re-read: 220 lv. is charged per month of absence, so period monthly (key had null)"
+  },
+  {
+   "fid": "f12",
+   "category": "materials",
+   "amount": 140,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "BGN",
+   "period": "yearly",
+   "group": null,
+   "plan": null,
+   "year": "2017-2018",
+   "url": "https://www.brambazak.bg/wp-content/themes/twentyseventeen/str/documents/Cenova_lista_English.pdf",
+   "quote": "Annual fee for tuition materials 140 lv. Once a year"
+  }
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "verdict": "correct",
+   "fid": "f3",
+   "reason": "350 EUR place deposit, one_time, Бачо Киро Jan 2026 list",
+   "group_unstated": true
+  },
+  {
+   "oid": "o2",
+   "verdict": "correct",
+   "fid": "f1",
+   "reason": "590 EUR full-day monthly, Бачо Киро Jan 2026 list",
+   "group_unstated": true
+  },
+  {
+   "oid": "o3",
+   "verdict": "wrong_group_plan_year",
+   "fid": null,
+   "reason": "440 EUR half-day is the Оборище nursery fee (sibling site), not this kindergarten",
+   "group_unstated": false
+  },
+  {
+   "oid": "o4",
+   "verdict": "correct",
+   "fid": "f2",
+   "reason": "400 EUR half-day monthly, Бачо Киро Jan 2026 list",
+   "group_unstated": true
+  },
+  {
+   "oid": "o5",
+   "verdict": "wrong_group_plan_year",
+   "fid": "f4",
+   "reason": "130 EUR materials taken from the Оборище nursery list (sibling); same amount as Бачо Киро f4, which o7 matches",
+   "group_unstated": false
+  },
+  {
+   "oid": "o6",
+   "verdict": "wrong_group_plan_year",
+   "fid": null,
+   "reason": "660 EUR full-day is the Оборище nursery fee (sibling site)",
+   "group_unstated": false
+  },
+  {
+   "oid": "o7",
+   "verdict": "correct",
+   "fid": "f4",
+   "reason": "130 EUR annual materials fee, Бачо Киро Jan 2026 list",
+   "group_unstated": true
+  },
+  {
+   "oid": "o8",
+   "verdict": "wrong_group_plan_year",
+   "fid": "f3",
+   "reason": "350 EUR deposit taken from the Оборище nursery list (sibling); same amount as f3, which o1 matches",
+   "group_unstated": false
+  }
+ ],
+ "notes": "Oborishte (nursery, ages 1-3.5) kept out as sibling institution per key, though the site presents both sites under one name 'Частна детска ясла и градина Бръмбазък' - debatable. Candidates sourced from the Оборище PDF judged wrong_group_plan_year, including o5/o8 whose amounts coincide with Бачо Киро fees. Stale call: the 2017-2018 BGN list (still linked from /fees-en/) is older than the January 2026 EUR list (2025/26), but under the revised rule older-year fees are left out only when the site states that category for 2026/27 or later; the Jan 2026 list is 2025/26, so f5-f12 are kept as site fees, labelled year 2017-2018. Any candidate matching them would be stale; none did (all candidates are EUR). f11 period corrected to monthly ('220 lv. per month')."
+}

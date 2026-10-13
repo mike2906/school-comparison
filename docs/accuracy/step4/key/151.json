@@ -1,0 +1,84 @@
+{
+ "school_id": 151,
+ "website_url": "https://zlatarskischool.org/",
+ "pages_read": [
+  "https://zlatarskischool.org/",
+  "https://zlatarskischool.org/admissions/school-fees/"
+ ],
+ "fetch_failed": [],
+ "blocked": false,
+ "site_states_no_fees": false,
+ "site_fees": [
+  {
+   "fid": "f1",
+   "category": "tuition",
+   "amount": 9690,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "5-7 grade",
+   "plan": "Students from Bulgarian schools",
+   "year": "2026/2027",
+   "url": "https://zlatarskischool.org/admissions/school-fees/",
+   "quote": "€ 9690: Students from Bulgarian schools"
+  },
+  {
+   "fid": "f2",
+   "category": "tuition",
+   "amount": 11860,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "5-7 grade",
+   "plan": "International students",
+   "year": "2026/2027",
+   "url": "https://zlatarskischool.org/admissions/school-fees/",
+   "quote": "€ 11860: International students"
+  },
+  {
+   "fid": "f3",
+   "category": "registration",
+   "amount": 200,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "group": "all candidates",
+   "plan": null,
+   "year": "2026/2027",
+   "url": "https://zlatarskischool.org/admissions/school-fees/",
+   "quote": "Registration fee (for all candidates): € 200"
+  },
+  {
+   "fid": "f4",
+   "category": "transport",
+   "amount": 2500,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "group": null,
+   "plan": "in two installments",
+   "year": "2026/2027",
+   "url": "https://zlatarskischool.org/admissions/school-fees/",
+   "quote": "School Transport (optional): € 2500 (in two installments)"
+  },
+  {
+   "fid": "f5",
+   "category": "food",
+   "amount": 345,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "quarter",
+   "group": null,
+   "plan": null,
+   "year": "2026/2027",
+   "url": "https://zlatarskischool.org/admissions/school-fees/",
+   "quote": "Cafeteria Meals (optional): € 345 (per quarter)"
+  }
+ ],
+ "notes": "Fees page heading 'TUITION FEES FOR THE ACADEMIC 2026/2027 YEAR'; page refers to 'annual tuition fees'. Site serves both the private primary school (grades 5-7, this legal entity, separate IBAN) and the sibling private secondary school (grades 8-12); grade 8, 9-10 and 11-12 tuition (e.g. 9780/11960, 10020/11020/12200, 10540/11630/12720, 13810-18480) left out as the sibling's. Registration/transport/meals are 'additional services' (paid to Interstudies 2005 Ltd) applying to all candidates, kept. Transport is a total paid in two instalments, no frequency stated -> period null. Outside admission dates tuition equals the international fee. Read via WebFetch quotes (English site); Bulgarian site not checked."
+}

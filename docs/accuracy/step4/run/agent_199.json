@@ -1,0 +1,35 @@
+{
+ "apply": true,
+ "pipeline_run_id": "aad6d98a-ce06-4940-b7eb-e84ab5df96ce",
+ "schools": 1,
+ "spent_usd": 0.001135,
+ "stopped": null,
+ "kept_old_rows": [
+  199
+ ],
+ "outcomes": {
+  "kept_old_rows": 1
+ },
+ "results": [
+  {
+   "school_id": 199,
+   "outcome": "kept_old_rows",
+   "pages": [
+    {
+     "url": "https://arlekino.info/",
+     "chars": 9475,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://arlekino.info/taksi/",
+     "chars": 3293,
+     "prices": true,
+     "note": null
+    }
+   ],
+   "fees": [],
+   "reason": "page ruled invalid by an earlier stage: https://arlekino.info/taksi/"
+  }
+ ]
+}

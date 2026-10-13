@@ -1,0 +1,65 @@
+{
+ "apply": true,
+ "pipeline_run_id": "3f27fb85-4401-4683-9f3f-194d64cc6e44",
+ "schools": 1,
+ "spent_usd": 0.000323,
+ "stopped": null,
+ "kept_old_rows": [
+  544
+ ],
+ "outcomes": {
+  "kept_old_rows": 1
+ },
+ "results": [
+  {
+   "school_id": 544,
+   "outcome": "kept_old_rows",
+   "pages": [
+    {
+     "url": "https://www.dg-lidi.com/",
+     "chars": 5136,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://www.dg-lidi.com/?page_id=10",
+     "chars": 5538,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://www.dg-lidi.com/?page_id=607",
+     "chars": 6627,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://www.dg-lidi.com/?page_id=176",
+     "chars": 5028,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://www.dg-lidi.com/?page_id=181",
+     "chars": 6342,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://www.dg-lidi.com/?page_id=69",
+     "chars": 5412,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://www.dg-lidi.com/?page_id=14",
+     "chars": 4084,
+     "prices": false,
+     "note": null
+    }
+   ],
+   "fees": [],
+   "reason": "no page showing prices"
+  }
+ ]
+}

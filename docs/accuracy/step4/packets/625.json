@@ -1,0 +1,122 @@
+{
+ "school_id": 625,
+ "candidates": [
+  {
+   "oid": "o1",
+   "category": "tuition",
+   "amount": 680.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "целодневно гледане",
+   "year": null,
+   "group": null,
+   "url": "https://dgsofia.com/"
+  },
+  {
+   "oid": "o2",
+   "category": "tuition",
+   "amount": 646.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "Еднократно плащане за 6 месеца",
+   "year": null,
+   "group": null,
+   "url": "https://dgsofia.com/"
+  },
+  {
+   "oid": "o3",
+   "category": "tuition",
+   "amount": 550.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "BGN",
+   "period": "monthly",
+   "label": "промоционална месечна такса",
+   "year": null,
+   "group": null,
+   "url": "https://dgsofia.com/"
+  },
+  {
+   "oid": "o4",
+   "category": "tuition",
+   "amount": 454.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "половин ден",
+   "year": null,
+   "group": null,
+   "url": "https://dgsofia.com/"
+  },
+  {
+   "oid": "o5",
+   "category": "tuition",
+   "amount": 612.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "Еднократно плащане за цяла година",
+   "year": null,
+   "group": null,
+   "url": "https://dgsofia.com/"
+  },
+  {
+   "oid": "o6",
+   "category": "tuition",
+   "amount": 680.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "Месечно целодневно гледане",
+   "year": null,
+   "group": null,
+   "url": "https://dgsofia.com/"
+  },
+  {
+   "oid": "o7",
+   "category": "tuition",
+   "amount": 646.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "плащане за 6 месеца",
+   "year": null,
+   "group": null,
+   "url": "https://dgsofia.com/"
+  },
+  {
+   "oid": "o8",
+   "category": "tuition",
+   "amount": 612.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "плащане за цяла година",
+   "year": null,
+   "group": null,
+   "url": "https://dgsofia.com/"
+  },
+  {
+   "oid": "o9",
+   "category": "tuition",
+   "amount": 454.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "Месечно половин ден",
+   "year": null,
+   "group": null,
+   "url": "https://dgsofia.com/"
+  }
+ ]
+}

@@ -1,0 +1,18 @@
+{
+ "school_id": 516,
+ "candidates": [
+  {
+   "oid": "o1",
+   "category": "camp",
+   "amount": 350.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "BGN",
+   "period": null,
+   "label": "Цена за целия период (4 дни) / стандартна цена",
+   "year": null,
+   "group": null,
+   "url": "https://svetilnik.bg/proletna-vakantsionna-programa/"
+  }
+ ]
+}

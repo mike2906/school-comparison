@@ -1,0 +1,70 @@
+{
+ "school_id": 199,
+ "candidates": [
+  {
+   "oid": "o1",
+   "category": "tuition",
+   "amount": 6792.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "Starter / Такса / годишно плащане",
+   "year": null,
+   "group": null,
+   "url": "https://arlekino.info/taksi/"
+  },
+  {
+   "oid": "o2",
+   "category": "tuition",
+   "amount": 6792.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "Nursery one / Такса / годишно плащане",
+   "year": null,
+   "group": "Nursery one",
+   "url": "https://arlekino.info/taksi/"
+  },
+  {
+   "oid": "o3",
+   "category": "tuition",
+   "amount": 6792.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "Nursery two / Такса / годишно плащане",
+   "year": null,
+   "group": "Nursery two",
+   "url": "https://arlekino.info/taksi/"
+  },
+  {
+   "oid": "o4",
+   "category": "tuition",
+   "amount": 4702.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "Book / Такса / годишно плащане",
+   "year": null,
+   "group": null,
+   "url": "https://arlekino.info/taksi/"
+  },
+  {
+   "oid": "o5",
+   "category": "tuition",
+   "amount": 4702.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "Preschool / Такса / годишно плащане",
+   "year": null,
+   "group": "Preschool",
+   "url": "https://arlekino.info/taksi/"
+  }
+ ]
+}

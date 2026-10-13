@@ -1,0 +1,69 @@
+{
+ "school_id": 155,
+ "pages_read": [
+  "https://bobche-topche.bg/priem-bobche-topche/"
+ ],
+ "fetch_failed": [],
+ "site_states_no_fees": false,
+ "site_fees": [
+  {
+   "fid": "f1",
+   "category": "tuition",
+   "amount": 857,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": null,
+   "plan": null,
+   "year": null,
+   "url": "https://bobche-topche.bg/priem-bobche-topche/",
+   "quote": "Месечната такса е 857 € / 1676,15 лв като се подписва договор за обучение."
+  },
+  {
+   "fid": "f2",
+   "category": "registration",
+   "amount": 615,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "group": null,
+   "plan": null,
+   "year": null,
+   "url": "https://bobche-topche.bg/priem-bobche-topche/",
+   "quote": "Еднократна такса при първо записване : 615€ / 1202,84"
+  }
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "verdict": "correct",
+   "fid": "f2",
+   "reason": "615 EUR one-time enrolment fee",
+   "group_unstated": false
+  },
+  {
+   "oid": "o2",
+   "verdict": "duplicate",
+   "fid": "f2",
+   "reason": "same as o1",
+   "group_unstated": false
+  },
+  {
+   "oid": "o3",
+   "verdict": "correct",
+   "fid": "f1",
+   "reason": "857 EUR monthly",
+   "group_unstated": false
+  },
+  {
+   "oid": "o4",
+   "verdict": "duplicate",
+   "fid": "f1",
+   "reason": "same as o3",
+   "group_unstated": false
+  }
+ ],
+ "notes": "Re-fetched; matches key. No year stated."
+}

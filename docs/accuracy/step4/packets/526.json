@@ -1,0 +1,31 @@
+{
+ "school_id": 526,
+ "candidates": [
+  {
+   "oid": "o1",
+   "category": "tuition",
+   "amount": 650.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "месечна такса",
+   "year": null,
+   "group": null,
+   "url": "https://meridian22.bg/priem-1"
+  },
+  {
+   "oid": "o2",
+   "category": "tuition",
+   "amount": 8540.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "Подоготвителна група / Годишна такса за обучение",
+   "year": "2026/2027",
+   "group": null,
+   "url": "https://meridian22.bg/priem-osnovno-uchilishte"
+  }
+ ]
+}

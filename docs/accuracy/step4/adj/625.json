@@ -1,0 +1,146 @@
+{
+ "school_id": 625,
+ "pages_read": [
+  "https://dgsofia.com/"
+ ],
+ "fetch_failed": [],
+ "site_states_no_fees": false,
+ "site_fees": [
+  {
+   "fid": "f1",
+   "category": "tuition",
+   "amount": 454,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": null,
+   "plan": "Месечно - половин ден",
+   "year": null,
+   "url": "https://dgsofia.com/",
+   "quote": "Месечно половин ден 888лв 454 € на месец"
+  },
+  {
+   "fid": "f2",
+   "category": "tuition",
+   "amount": 680,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": null,
+   "plan": "Месечно - целодневно гледане",
+   "year": null,
+   "url": "https://dgsofia.com/",
+   "quote": "Месечно целодневно гледане 1330лв 680 € на месец"
+  },
+  {
+   "fid": "f3",
+   "category": "tuition",
+   "amount": 646,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": null,
+   "plan": "Еднократно плащане за 6 месеца",
+   "year": null,
+   "url": "https://dgsofia.com/",
+   "quote": "Еднократно плащане за 6 месеца 1263лв 646 € на месец"
+  },
+  {
+   "fid": "f4",
+   "category": "tuition",
+   "amount": 612,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": null,
+   "plan": "Еднократно плащане за цяла година",
+   "year": null,
+   "url": "https://dgsofia.com/",
+   "quote": "Еднократно плащане за цяла година 1197лв 612 € на месец"
+  },
+  {
+   "fid": "f5",
+   "category": "tuition",
+   "amount": 550,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "BGN",
+   "period": "monthly",
+   "group": null,
+   "plan": "Промоция (първите 3 месеца, записване до 15 октомври)",
+   "year": null,
+   "url": "https://dgsofia.com/",
+   "quote": "промоционална месечна такса в размер на 550 лв. за първите 3 месеца"
+  }
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "verdict": "correct",
+   "fid": "f2",
+   "reason": "680 EUR monthly full-day",
+   "group_unstated": false
+  },
+  {
+   "oid": "o2",
+   "verdict": "correct",
+   "fid": "f3",
+   "reason": "646 EUR per month, 6-month prepay plan",
+   "group_unstated": false
+  },
+  {
+   "oid": "o3",
+   "verdict": "correct",
+   "fid": "f5",
+   "reason": "550 BGN promo monthly for first 3 months",
+   "group_unstated": false
+  },
+  {
+   "oid": "o4",
+   "verdict": "correct",
+   "fid": "f1",
+   "reason": "454 EUR monthly half-day",
+   "group_unstated": false
+  },
+  {
+   "oid": "o5",
+   "verdict": "correct",
+   "fid": "f4",
+   "reason": "612 EUR per month, full-year prepay plan",
+   "group_unstated": false
+  },
+  {
+   "oid": "o6",
+   "verdict": "duplicate",
+   "fid": "f2",
+   "reason": "same as o1",
+   "group_unstated": false
+  },
+  {
+   "oid": "o7",
+   "verdict": "duplicate",
+   "fid": "f3",
+   "reason": "same as o2",
+   "group_unstated": false
+  },
+  {
+   "oid": "o8",
+   "verdict": "duplicate",
+   "fid": "f4",
+   "reason": "same as o5",
+   "group_unstated": false
+  },
+  {
+   "oid": "o9",
+   "verdict": "duplicate",
+   "fid": "f1",
+   "reason": "same as o4",
+   "group_unstated": false
+  }
+ ],
+ "notes": "Key confirmed on re-fetch; each fee printed in BGN and EUR."
+}

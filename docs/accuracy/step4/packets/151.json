@@ -1,0 +1,96 @@
+{
+ "school_id": 151,
+ "candidates": [
+  {
+   "oid": "o1",
+   "category": "transport",
+   "amount": 2500.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "School Transport (optional)",
+   "year": null,
+   "group": null,
+   "url": "https://zlatarskischool.org/admissions/school-fees/"
+  },
+  {
+   "oid": "o2",
+   "category": "transport",
+   "amount": 2500.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": null,
+   "year": "2026/2027",
+   "group": null,
+   "url": "https://zlatarskischool.org/admissions/school-fees/"
+  },
+  {
+   "oid": "o3",
+   "category": "tuition",
+   "amount": 9690.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "Students from Bulgarian schools",
+   "year": "2026/2027",
+   "group": "5 - 7 grade",
+   "url": "https://zlatarskischool.org/admissions/school-fees/"
+  },
+  {
+   "oid": "o4",
+   "category": "registration",
+   "amount": 200.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "label": "Registration fee",
+   "year": null,
+   "group": null,
+   "url": "https://zlatarskischool.org/admissions/school-fees/"
+  },
+  {
+   "oid": "o5",
+   "category": "tuition",
+   "amount": 9690.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "Tuition fees",
+   "year": "2026/2027",
+   "group": null,
+   "url": "https://zlatarskischool.org/admissions/school-fees/"
+  },
+  {
+   "oid": "o6",
+   "category": "food",
+   "amount": 345.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "quarter",
+   "label": "Cafeteria Meals (optional)",
+   "year": null,
+   "group": null,
+   "url": "https://zlatarskischool.org/admissions/school-fees/"
+  },
+  {
+   "oid": "o7",
+   "category": "tuition",
+   "amount": 11860.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "International students",
+   "year": "2026/2027",
+   "group": "5 - 7 grade",
+   "url": "https://zlatarskischool.org/admissions/school-fees/"
+  }
+ ]
+}

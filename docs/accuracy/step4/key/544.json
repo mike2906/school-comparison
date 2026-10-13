@@ -1,0 +1,15 @@
+{
+ "school_id": 544,
+ "website_url": "https://www.dg-lidi.com/",
+ "pages_read": [
+  "https://www.dg-lidi.com/",
+  "https://www.dg-lidi.com/?page_id=10",
+  "https://www.dg-lidi.com/?page_id=14",
+  "https://www.dg-lidi.com/?page_id=607"
+ ],
+ "fetch_failed": [],
+ "blocked": false,
+ "site_states_no_fees": false,
+ "site_fees": [],
+ "notes": "Прием page gives no amounts: 'Свържете се с нас, за актуална информация за месечните такси.' Only discounts (10% annual prepayment, 5% six-month prepayment, 10% siblings) and optional paid services (logoped, ski, swimming, dances, ballet) without prices."
+}

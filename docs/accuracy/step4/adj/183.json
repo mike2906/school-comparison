@@ -1,0 +1,69 @@
+{
+ "school_id": 183,
+ "pages_read": [
+  "https://www.sianie-bg.com/?pg=ceni"
+ ],
+ "fetch_failed": [],
+ "site_states_no_fees": false,
+ "site_fees": [
+  {
+   "fid": "f1",
+   "category": "tuition",
+   "amount": 675,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": "Детска градина",
+   "plan": "Целодневно пребиваване",
+   "year": null,
+   "url": "https://www.sianie-bg.com/?pg=ceni",
+   "quote": "Целодневно пребиваване: Детска градина - 675 EUR"
+  },
+  {
+   "fid": "f2",
+   "category": "registration",
+   "amount": 450,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "group": null,
+   "plan": null,
+   "year": null,
+   "url": "https://www.sianie-bg.com/?pg=ceni",
+   "quote": "Депозит: 450 EUR"
+  }
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "verdict": "correct",
+   "fid": "f1",
+   "reason": "675 EUR full-day kindergarten, paid month by month",
+   "group_unstated": false
+  },
+  {
+   "oid": "o2",
+   "verdict": "duplicate",
+   "fid": "f1",
+   "reason": "same 675 EUR fee as o1",
+   "group_unstated": false
+  },
+  {
+   "oid": "o3",
+   "verdict": "correct",
+   "fid": "f2",
+   "reason": "450 EUR deposit, registration one_time",
+   "group_unstated": true
+  },
+  {
+   "oid": "o4",
+   "verdict": "duplicate",
+   "fid": "f2",
+   "reason": "same 450 EUR deposit as o3",
+   "group_unstated": false
+  }
+ ],
+ "notes": "Deposit has no stated frequency; kept one_time as a deposit per rules (deposit = registration, one_time). No year stated."
+}

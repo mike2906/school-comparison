@@ -1,0 +1,17 @@
+site fees: 76 (excluding [526])
+today  rows  38  right 21/37 (57%)  blank period 10  wrong 6/37 (16%)  dup 0  unresolved 1  found 31/76 (41%)  fully right found 21/76 (28%)
+agent  rows  52  right 40/52 (77%)  blank period 8  wrong 4/52 (8%)  dup 0  unresolved 0  found 48/76 (63%)  fully right found 40/76 (53%)
+post   rows  61  right 42/57 (74%)  blank period 9  wrong 6/57 (11%)  dup 3  unresolved 1  found 51/76 (67%)  fully right found 42/76 (55%)
+per school (site fees found):
+   {'school': 151, 'site_fees': 5, 'today': 3, 'agent': 4, 'post': 5}
+   {'school': 155, 'site_fees': 2, 'today': 2, 'agent': 2, 'post': 2}
+   {'school': 158, 'site_fees': 12, 'today': 0, 'agent': 4, 'post': 0}
+   {'school': 170, 'site_fees': 14, 'today': 3, 'agent': 14, 'post': 13}
+   {'school': 183, 'site_fees': 2, 'today': 2, 'agent': 2, 'post': 2}
+   {'school': 199, 'site_fees': 10, 'today': 5, 'agent': 0, 'post': 5}
+   {'school': 516, 'site_fees': 0, 'today': 0, 'agent': 0, 'post': 0}
+   {'school': 520, 'site_fees': 10, 'today': 4, 'agent': 5, 'post': 6}
+   {'school': 556, 'site_fees': 7, 'today': 3, 'agent': 7, 'post': 6}
+   {'school': 568, 'site_fees': 7, 'today': 3, 'agent': 3, 'post': 5}
+   {'school': 615, 'site_fees': 2, 'today': 2, 'agent': 2, 'post': 2}
+   {'school': 625, 'site_fees': 5, 'today': 4, 'agent': 5, 'post': 5}

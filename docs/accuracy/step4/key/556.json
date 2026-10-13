@@ -1,0 +1,115 @@
+{
+ "school_id": 556,
+ "website_url": "https://sofia-kindergarten.maplebear.bg/",
+ "pages_read": [
+  "https://sofia-kindergarten.maplebear.bg/",
+  "https://sofia-kindergarten.maplebear.bg/admissions/",
+  "https://sofia-kindergarten.maplebear.bg/summer-camp/"
+ ],
+ "fetch_failed": [
+  "https://sofia-kindergarten.maplebear.bg/extracurricular-activities/"
+ ],
+ "blocked": false,
+ "site_states_no_fees": false,
+ "site_fees": [
+  {
+   "fid": "f1",
+   "category": "tuition",
+   "amount": 9200,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": null,
+   "plan": "One installment",
+   "year": null,
+   "url": "https://sofia-kindergarten.maplebear.bg/admissions/",
+   "quote": "Tuition Fee ... Euro 9 200 (One installment)"
+  },
+  {
+   "fid": "f2",
+   "category": "tuition",
+   "amount": 9300,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": null,
+   "plan": "At 2 installments",
+   "year": null,
+   "url": "https://sofia-kindergarten.maplebear.bg/admissions/",
+   "quote": "Euro 9 300 ... At 2 installments"
+  },
+  {
+   "fid": "f3",
+   "category": "tuition",
+   "amount": 9400,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": null,
+   "plan": "At 10 installments",
+   "year": null,
+   "url": "https://sofia-kindergarten.maplebear.bg/admissions/",
+   "quote": "Euro 9 400 ... At 10 installments"
+  },
+  {
+   "fid": "f4",
+   "category": "registration",
+   "amount": 850,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "group": null,
+   "plan": null,
+   "year": null,
+   "url": "https://sofia-kindergarten.maplebear.bg/admissions/",
+   "quote": "Registration Fee | Euro 850 | One time fee"
+  },
+  {
+   "fid": "f5",
+   "category": "materials",
+   "amount": 400,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "Age 2-4",
+   "plan": null,
+   "year": null,
+   "url": "https://sofia-kindergarten.maplebear.bg/admissions/",
+   "quote": "Euro 400 (Age 2-4) ... One time yearly fee for educational materials"
+  },
+  {
+   "fid": "f6",
+   "category": "materials",
+   "amount": 550,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "Age 4-7",
+   "plan": null,
+   "year": null,
+   "url": "https://sofia-kindergarten.maplebear.bg/admissions/",
+   "quote": "Euro 550 (Age 4-7) ... One time yearly fee for educational materials"
+  },
+  {
+   "fid": "f7",
+   "category": "food",
+   "amount": 181.44,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": null,
+   "plan": null,
+   "year": null,
+   "url": "https://sofia-kindergarten.maplebear.bg/admissions/",
+   "quote": "School Meals ... 181,44 euro/ month"
+  }
+ ],
+ "notes": "Academic year not named ('tuition fees for the academic year'). 9300/9400 are printed annual tuition totals under the 2- and 10-installment plans (per-instalment amounts not printed), recorded as yearly. Uniforms, ECA, summer camp: no amounts (refer elsewhere). Annual meals fee referred to Furisto website, not read. Extracurricular page fetch failed."
+}
