@@ -258,6 +258,9 @@
     "nextYear": "следващата учебна година",
     "yearPrice": "{{year}}: {{price}}",
     "periodNotStated": "Периодът не е посочен",
+    "payInParts": "Или на части:",
+    "paymentOptionTotal": "общо {{total}}",
+    "paymentOptionInParts": "{{total}} на вноски",
     "per": {
       "monthly": "месец",
       "quarter": "тримесечие",

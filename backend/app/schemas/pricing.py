@@ -7,6 +7,19 @@ from app.models.pricing import PriceCategory, PricePeriod, PriceSource
 from app.utils.academic_year import academic_year_status, normalize_academic_year
 
 
+class PaymentOptionResponse(BaseModel):
+    """Another way to pay a fee, in parts, with the numbers the site prints (see
+    ``agent_fees.PaymentOption``). The total is null when the site prints none."""
+
+    label: Optional[str] = None
+    total: Optional[float] = None
+    payments: Optional[int] = None
+    instalment: Optional[float] = None
+    first_payment: Optional[float] = None
+
+    model_config = ConfigDict(extra="ignore")
+
+
 class PricingContextResponse(BaseModel):
     """Explicit public projection of the internal pricing context JSON."""
 
@@ -14,6 +27,7 @@ class PricingContextResponse(BaseModel):
     confidence: Optional[float] = None
     discounts: list[str] = Field(default_factory=list)
     installments: list[str] = Field(default_factory=list)
+    payment_options: list[PaymentOptionResponse] = Field(default_factory=list)
     includes: list[str] = Field(default_factory=list)
     excludes: list[str] = Field(default_factory=list)
 
