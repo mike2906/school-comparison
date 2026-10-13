@@ -6,6 +6,7 @@ import { calculateDistance } from '../../utils/distance'
 import { formatDistance } from '../../utils/format'
 import { getAddress, getSummary } from '../../utils/i18n'
 import { hasAnySchoolSummary } from './summaryVisibility'
+import { FACT_TOPICS, getSchoolFacts } from '../../utils/schoolFacts'
 import {
   getAfterSchoolEvidence,
   getCanonicalAmenityEvidence,
@@ -702,10 +703,35 @@ export function buildCompareSections({
       },
     ]
 
+    // One row per topic any compared school has a fact for; facts link their page.
+    const factsBySchool = new Map(schools.map(school => [school.id, getSchoolFacts(school, language)]))
+    const topicFacts = (school, topic) => (factsBySchool.get(school.id) || []).filter(fact => fact.topic === topic)
+    const factTopics = new Set([...factsBySchool.values()].flat().map(fact => fact.topic))
+    const factRows = FACT_TOPICS.filter(topic => factTopics.has(topic)).map(topic => ({
+      label: t(`schoolFacts.topics.${topic}`),
+      getValue: (school) => {
+        const facts = topicFacts(school, topic)
+        return facts.length > 0 ? (
+          <ul className="space-y-1">
+            {facts.map((fact, index) => (
+              <li key={index} className="text-sm text-neutral-700">
+                {fact.text}{' '}
+                <a href={fact.sourceUrl} target="_blank" rel="noopener noreferrer nofollow" className="text-primary-700 underline underline-offset-2">
+                  {t('schoolFacts.source')}
+                </a>
+              </li>
+            ))}
+          </ul>
+        ) : renderPlaceholder()
+      },
+      getCompare: (school) => topicFacts(school, topic).map(fact => fact.text).join('|') || null,
+    }))
+
     return [
       { key: 'overview', title: t('compare.sections.quickOverview'), rows: overviewRows },
       { key: 'academic', title: t('compare.sections.academicPerformance'), rows: academicRows },
       { key: 'practical', title: t('compare.sections.practicalDetails'), rows: practicalRows },
+      { key: 'websiteFacts', title: t('schoolFacts.title'), rows: factRows },
       { key: 'admission', title: t('compare.sections.admissionEnrollment'), rows: admissionRows },
       { key: 'pricing', title: t('compare.sections.pricing'), rows: pricingRows },
       { key: 'locations', title: t('compare.sections.locations'), rows: locationRows },
