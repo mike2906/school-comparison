@@ -633,3 +633,74 @@ async def test_a_browser_that_will_not_start_still_finalises_the_run(db_session,
     assert "chromium did not launch" in report["stopped"] and report["schools"] == 0
     run = await db_session.get(PipelineRun, report["pipeline_run_id"])
     assert run.status.value != "running"
+
+
+@pytest.mark.parametrize(
+    ("category", "evidence", "amount", "period"),
+    [
+        # Step 3 (docs/accuracy/step3_check.md): periods the page states that were cleared.
+        (PriceCategory.REGISTRATION, "* Таксата за явяване на изпит е в размер на 75 € и се заплаща по банков път.", 75, PricePeriod.ONE_TIME),
+        (PriceCategory.TUITION, "LYCÉE\nTotal droits scolaires (l'année) 1er versement\n1er enfant 8 032,81 EUR 3 213,12 EUR", 8032.81, PricePeriod.YEARLY),
+        (PriceCategory.EXTRACURRICULAR, "Discipline Tarif annuel\nOption Danse 300,00 EUR", 300, PricePeriod.YEARLY),
+        (PriceCategory.TUITION, "За цялата учебна година Подготвителна група\nпри плащане в срок до 8800", 8800, PricePeriod.YEARLY),
+    ],
+)  # fmt: skip
+def test_periods_stated_in_other_words_are_kept(category, evidence, amount, period):
+    result = check_fee(fee(category, evidence, amount=amount, period=period), evidence)
+    assert published(result) and result.fee.period is period, result.checks
+
+
+def test_one_time_still_needs_a_word_outside_registration():
+    line = "Учебни материали 120 евро"
+    result = check_fee(fee(PriceCategory.MATERIALS, line, amount=120, period=PricePeriod.ONE_TIME), line)
+    assert result.fee.period is None
+
+
+async def test_a_fee_the_read_missed_keeps_its_row_and_the_rest_is_written(db_session, pages, frozen_today):
+    school = await _school(db_session)
+    await _old_rows(db_session, school, "2026/2027", [700, 90])  # the page still shows 90 (food)
+    await db_session.commit()
+    report = await fees_agent.run_school(db_session, school, find=_find(pages), read=_read(FEES_STAGE), apply=True)
+    assert report["outcome"] == "written" and report["rows_old_kept"] == 1, report
+    rows = await _rows(db_session, school)
+    assert [(float(r.amount), (r.pricing_context or {}).get("extractor")) for r in rows] == [
+        (90.0, None),  # kept
+        (200.0, "agent"),
+        (700.0, "agent"),
+    ]
+    assert "pricing_hold" not in (school.attributes or {})
+
+
+async def test_a_period_the_read_drops_but_the_page_states_is_filled_back(db_session, pages, frozen_today):
+    school = await _school(db_session)
+    await _old_rows(db_session, school, "2026/2027", [700])  # monthly, as the page says
+    await db_session.commit()
+    no_period = [FEES_STAGE[0].model_copy(update={"period": None}), FEES_STAGE[1]]
+    report = await fees_agent.run_school(db_session, school, find=_find(pages), read=_read(no_period), apply=True)
+    assert report["outcome"] == "written" and report["rows_old_kept"] == 0, report
+    rows = await _rows(db_session, school)
+    assert [(float(r.amount), r.period) for r in rows] == [(200.0, PricePeriod.ONE_TIME), (700.0, PricePeriod.MONTHLY)]
+
+
+async def test_an_old_bgn_row_gives_way_to_the_same_fee_in_euro(db_session, frozen_today):
+    page_text = "Месечна такса: 700 евро (1369.08 лв.)"
+    school = await _school(db_session)
+    await _old_rows(db_session, school, "2026/2027", [1369.08])
+    old = (await _rows(db_session, school))[0]
+    old.currency = "BGN"
+    await db_session.commit()
+    read = [fee(PriceCategory.TUITION, page_text, amount=700, period=PricePeriod.MONTHLY, academic_year="2026/2027")]
+    pages = [PageRead(URL, page_text, True)]
+    report = await fees_agent.run_school(db_session, school, find=_find(pages), read=_read(read), apply=True)
+    assert report["outcome"] == "written" and report["rows_old_kept"] == 0, report
+    assert [(float(r.amount), r.currency) for r in await _rows(db_session, school)] == [(700.0, "EUR")]
+
+
+def test_the_same_fee_read_from_two_pages_is_one_row():
+    school = School(id=1, name_i18n={}, country_code="bg", school_type="private", education_level="primary")
+    page = SourcePage(id=-1, school_id=1, scrape_type=ScrapeType.WEBSITE, source_url=URL)
+    other = SourcePage(id=-2, school_id=1, scrape_type=ScrapeType.WEBSITE, source_url=HOME)
+    tuition = check_fee(FEES_STAGE[0], PAGE_STAGE)
+    relabelled = check_fee(FEES_STAGE[0].model_copy(update={"label": "Такса"}), PAGE_STAGE)
+    rows, sources = fees_agent._build_rows(school, [(tuition, page), (relabelled, other)])
+    assert len(rows) == len(sources) == 1

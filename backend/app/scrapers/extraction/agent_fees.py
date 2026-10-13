@@ -123,13 +123,16 @@ def amount_on_page(fee: AgentFee, numbers: set[Decimal]) -> bool:
 # What the evidence line names
 # ---------------------------------------------------------------------------
 
-_PERIOD_WORDS = {
-    PricePeriod.MONTHLY: r"(?<!три)месеч|(?:на|за|/)\s*месец|\bmonth(?:ly)?\b",
-    PricePeriod.YEARLY: r"(?<!полу)(?<!дву)годиш|\b(?:year(?:ly)?|annual)\b",
+_PERIOD_WORDS = {  # Bulgarian, English, and the French and German some schools publish in
+    PricePeriod.MONTHLY: r"(?<!три)месеч|(?:на|за|/)\s*месец|\bmonth(?:ly)?\b|mensuel|par mois|monatlich|pro monat",
+    PricePeriod.YEARLY: (
+        r"(?<!полу)(?<!дву)годиш|\b(?:year(?:ly)?|annual)\b|цялата учебна година"
+        r"|annuel|l'année|par an\b|jährlich|pro jahr"
+    ),
     PricePeriod.QUARTER: r"тримесеч|\bquarter",
     PricePeriod.TERM: r"срок|\bterm\b",
-    PricePeriod.SEMESTER: r"семест|\bsemester",
-    PricePeriod.ONE_TIME: r"еднократ|\bonce\b|при записване",
+    PricePeriod.SEMESTER: r"семест|\bsemester|semestre|halbjahr",
+    PricePeriod.ONE_TIME: r"еднократ|\bonce\b|при записване|inscription|einmalig",
 }
 # "for the school year" names a period only on the amount's own line: as a heading it often
 # covers fees charged per day or per month too (569's "ДОПЪЛНИТЕЛНИ ТАКСИ ЗА УЧЕБНАТА ГОДИНА").
@@ -145,7 +148,11 @@ def _normalized(text: str) -> str:
     return " ".join(text.split()).casefold()
 
 
-def _names_period(period: PricePeriod, evidence: str, amounts: list[Decimal]) -> bool:
+def _names_period(period: PricePeriod, evidence: str, amounts: list[Decimal], category: PriceCategory) -> bool:
+    # An enrolment, exam or application fee is charged once by what it is (rules.md), so it
+    # needs no word for it; a deposit filed as registration is one too.
+    if period is PricePeriod.ONE_TIME and category is PriceCategory.REGISTRATION:
+        return True
     if re.search(_PERIOD_WORDS[period], evidence):
         return True
     if period is not PricePeriod.YEARLY:
@@ -208,7 +215,7 @@ def check_fee(fee: AgentFee, page_text: str) -> CheckedFee:
 
     checks: list[str] = []
     period = fee.period
-    if period is not None and not _names_period(period, evidence, _amounts(fee)):
+    if period is not None and not _names_period(period, evidence, _amounts(fee), fee.category):
         checks.append(f"period {period.value} cleared: the evidence does not name it")
         period = None
     if period is PricePeriod.ONE_TIME and fee.category is not PriceCategory.REGISTRATION:

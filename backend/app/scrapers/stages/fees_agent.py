@@ -14,6 +14,7 @@ import logging
 import re
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from decimal import Decimal
 from typing import Any, Optional
 from urllib.parse import unquote, urldefrag, urlparse
 
@@ -34,7 +35,7 @@ from app.schemas.extraction import ExtractedPrice
 from app.scrapers.extraction import llm_results, price_step, text_values
 from app.scrapers.extraction.agent_fees import READER_PROMPT, AgentFee, AgentFees, CheckedFee, check_fee
 from app.scrapers.fee_pages import fee_http_client, page_key, pdf_text
-from app.scrapers.price_evidence import _PRICE_RE
+from app.scrapers.price_evidence import _PRICE_RE, PriceRow, _amount_key
 from app.scrapers.shared_site_check import registrable_domain
 from app.scrapers.stages import common as stage_common
 from app.scrapers.validator import validate_school_data
@@ -268,8 +269,8 @@ def _build_rows(
         )
         if fields is None:
             continue
-        key = (*fields.values(), fee.label.casefold(), page.source_url)
-        if key in seen:  # the same fee read twice from one page
+        key = tuple(fields.values())
+        if key in seen:  # the same fee read twice, from one page or two
             continue
         seen.add(key)
         rows.append(
@@ -325,6 +326,46 @@ async def _upsert_pages(db: AsyncSession, pages: dict[str, SourcePage], stored: 
         existing.page_category = new.page_category or existing.page_category
         pages[url] = existing
     await db.flush()
+
+
+BGN_PER_EUR = Decimal("1.95583")
+
+
+def _row_key(row: Pricing) -> tuple[str, tuple[str, ...]]:
+    return str(row.category.value if hasattr(row.category, "value") else row.category), _amount_key(
+        PriceRow.from_pricing(row)
+    )
+
+
+def _same_fee_in_euro(old: Pricing, new: Pricing) -> bool:
+    """An old BGN row the read now gives in EUR (330's 899.68 BGN is 460 EUR)."""
+    if (old.currency or "").upper() != "BGN" or (new.currency or "").upper() != "EUR":
+        return False
+    if old.category != new.category or old.amount is None or new.amount is None:
+        return False
+    return abs(Decimal(str(old.amount)) / BGN_PER_EUR - Decimal(str(new.amount))) <= Decimal("0.01")
+
+
+def _rows_to_keep(
+    school: School, pages: list[SourcePage], superseded: list[Pricing], proposed: list[Pricing]
+) -> tuple[list[Pricing], list[str]]:
+    """The superseded rows that rule 6 says replacing would lose, and why.
+
+    Checked one amount at a time, so a fee the read missed keeps its own row and does not
+    hold back the rest of the school's fees.
+    """
+    groups: dict[tuple, list[Pricing]] = {}
+    for row in superseded:
+        if not any(_same_fee_in_euro(row, new) for new in proposed):
+            groups.setdefault(_amount_key(PriceRow.from_pricing(row)), []).append(row)
+    kept: list[Pricing] = []
+    reasons: list[str] = []
+    for olds in groups.values():
+        lost = price_step._pricing_replacement_regressions(school, pages, olds, proposed)
+        if lost:
+            kept.extend(olds)
+            reasons.extend(lost)
+    return kept, reasons
 
 
 def _fee_report(result: CheckedFee, page: Optional[PageRead]) -> dict[str, Any]:
@@ -402,17 +443,20 @@ async def run_school(
         )
         return report
 
-    regressions = price_step._pricing_replacement_regressions(
-        school, [*stored_pages, *source_pages.values()], superseded, publishable
-    )
+    # Old rows the read would lose (a fee it missed, a period it dropped) stay, instead of
+    # holding the whole school; new rows at those amounts give way to them.
+    kept, regressions = _rows_to_keep(school, [*stored_pages, *source_pages.values()], superseded, publishable)
+    if kept:
+        superseded = [row for row in superseded if row not in kept]
+        kept_keys = {_row_key(row) for row in kept}
+        pairs = [(row, source) for row, source in zip(rows, sources) if _row_key(row) not in kept_keys]
+        rows, sources = [row for row, _ in pairs], [source for _, source in pairs]
     report["regressions"] = regressions
+    report["rows_old_kept"] = len(kept)
     if not apply:
-        report["outcome"] = "would_hold" if regressions else "would_write"
+        report["outcome"] = "would_write"
         return report
-    if price_step._update_pricing_hold(school, regressions, len(rows)):
-        report["outcome"] = "held"
-        await db.commit()
-        return report
+    price_step._update_pricing_hold(school, [], len(rows))  # clears a hold an earlier run left
 
     await _upsert_pages(db, source_pages, stored)
     for row in rows:  # rows were built against the placeholder pages
