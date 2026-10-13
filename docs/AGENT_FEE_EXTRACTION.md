@@ -91,7 +91,7 @@ it comes after steps 1 to 5 prove the runs are reliable.
 
 ## Steps (one PR each)
 
-1. **Fresh-sample check** (read-only). Draw a new seeded sample of about 20 schools with
+1. **Fresh-sample check** (read-only). Done 2026-10-13: see `docs/accuracy/fresh_check.md`. Draw a new seeded sample of about 20 schools with
    fees, outside the R4 sample. Agents read the sites blind, as for R4. Then score the agent
    and today's published rows the same way, with strict categories. Go on only if the agent
    is at least as accurate as today and finds at least 55 % of the site fees. Otherwise stop
