@@ -1,0 +1,1155 @@
+{
+  "spent_usd": 0.057509925,
+  "credit_before": {
+    "credits": {
+      "total_credits": 25,
+      "total_usage": 23.592575308
+    },
+    "key": {
+      "label": "[redacted]",
+      "is_management_key": false,
+      "is_provisioning_key": false,
+      "limit": null,
+      "limit_reset": null,
+      "limit_remaining": null,
+      "include_byok_in_limit": false,
+      "budgets": [],
+      "effective_budget": null,
+      "usage": 20.662483968,
+      "usage_daily": 0.651616295,
+      "usage_weekly": 0.810371485,
+      "usage_monthly": 9.776877478,
+      "byok_usage": 0,
+      "byok_usage_daily": 0,
+      "byok_usage_weekly": 0,
+      "byok_usage_monthly": 0,
+      "is_free_tier": false,
+      "expires_at": null,
+      "creator_user_id": "[redacted]",
+      "organization_id": null,
+      "workspace_id": "[redacted]",
+      "allowed_data_regions": [
+        "global"
+      ],
+      "free_model_daily_requests": {
+        "used": 0,
+        "limit": 1000,
+        "remaining": 1000
+      },
+      "rate_limit": {
+        "requests": -1,
+        "interval": "10s",
+        "note": "This field is deprecated and safe to ignore."
+      }
+    }
+  },
+  "credit_after": {
+    "credits": {
+      "total_credits": 25,
+      "total_usage": 23.653532408
+    },
+    "key": {
+      "label": "[redacted]",
+      "is_management_key": false,
+      "is_provisioning_key": false,
+      "limit": null,
+      "limit_reset": null,
+      "limit_remaining": null,
+      "include_byok_in_limit": false,
+      "budgets": [],
+      "effective_budget": null,
+      "usage": 20.723441068,
+      "usage_daily": 0.712573395,
+      "usage_weekly": 0.871328585,
+      "usage_monthly": 9.837834578,
+      "byok_usage": 0,
+      "byok_usage_daily": 0,
+      "byok_usage_weekly": 0,
+      "byok_usage_monthly": 0,
+      "is_free_tier": false,
+      "expires_at": null,
+      "creator_user_id": "[redacted]",
+      "organization_id": null,
+      "workspace_id": "[redacted]",
+      "allowed_data_regions": [
+        "global"
+      ],
+      "free_model_daily_requests": {
+        "used": 0,
+        "limit": 1000,
+        "remaining": 1000
+      },
+      "rate_limit": {
+        "requests": -1,
+        "interval": "10s",
+        "note": "This field is deprecated and safe to ignore."
+      }
+    }
+  },
+  "reader_model": "openrouter/openai/gpt-6-luna",
+  "schools": [
+    {
+      "school_id": 395,
+      "name": "22 Средно езиково училище  \"Георги Стойков Раковски\"",
+      "name_en": null,
+      "type": "state upper_secondary",
+      "website": "https://22seu.org/",
+      "pages": [
+        {
+          "url": "https://22seu.org/lander",
+          "chars": 259,
+          "note": null
+        }
+      ],
+      "facts": [],
+      "outcome": "0 of 0 facts kept",
+      "cost_usd": 7.4e-05,
+      "old_summary": {
+        "mode": "llm",
+        "en": {
+          "short": "22nd Language School \"Georgi Stoykov Rakovski\" is a state school in Sofia.",
+          "long": "22nd Language School \"Georgi Stoykov Rakovski\" is located in the Triaditsa district of Sofia and offers upper secondary education. The school follows standard admission procedures and provides full-day educational organization. The curriculum includes preparation in foreign languages, covering a wide array of examination formats."
+        },
+        "cost_usd": 0.000433
+      }
+    },
+    {
+      "school_id": 346,
+      "name": "200 Основно училище \"Отец Паисий\"",
+      "name_en": null,
+      "type": "state lower_secondary",
+      "website": "https://200ou.org/",
+      "pages": [
+        {
+          "url": "https://200ou.org/",
+          "chars": 17271,
+          "note": null
+        },
+        {
+          "url": "https://200ou.org/%d0%bd%d0%b0%d1%88%d0%b8%d1%8f%d1%82-%d0%b5%d0%ba%d0%b8%d0%bf/",
+          "chars": 15568,
+          "note": null
+        },
+        {
+          "url": "https://200ou.org/%d0%b8%d1%81%d1%82%d0%be%d1%80%d0%b8%d1%8f/",
+          "chars": 17156,
+          "note": null
+        },
+        {
+          "url": "https://200ou.org/category/%d0%b7%d0%b0-%d0%bd%d0%b0%d1%81/%d0%bf%d1%80%d0%be%d0%b5%d0%ba%d1%82%d0%b8/",
+          "chars": 14312,
+          "note": null
+        },
+        {
+          "url": "https://200ou.org/category/%d0%b7%d0%b0-%d0%bd%d0%b0%d1%81/%d0%bd%d0%b0%d1%81%d1%82%d0%be%d1%8f%d1%82%d0%b5%d0%bb%d1%81%d1%82%d0%b2%d0%be/",
+          "chars": 11599,
+          "note": null
+        },
+        {
+          "url": "https://200ou.org/category/%d0%b7%d0%b0-%d0%bd%d0%b0%d1%81/%d0%be%d0%b1%d1%89%d0%b5%d1%81%d1%82%d0%b2%d0%b5%d0%bd-%d1%81%d1%8a%d0%b2%d0%b5%d1%82/",
+          "chars": 14855,
+          "note": null
+        },
+        {
+          "url": "https://200ou.org/category/%d0%b7%d0%b0-%d0%bd%d0%b0%d1%81/%d0%bd%d0%be%d0%b2%d0%b8%d0%bd%d0%b8-%d0%b8-%d1%81%d1%8a%d0%be%d0%b1%d1%89%d0%b5%d0%bd%d0%b8%d1%8f/",
+          "chars": 17191,
+          "note": null
+        },
+        {
+          "url": "https://200ou.org/category/%d1%83%d1%87%d0%b5%d0%b1%d0%b5%d0%bd-%d0%bf%d1%80%d0%be%d1%86%d0%b5%d1%81/%d1%80%d0%b0%d0%b7%d0%bf%d0%b8%d1%81%d0%b0%d0%bd%d0%b8%d1%8f-%d0%b3%d1%80%d0%b0%d1%84%d0%b8%d1%86%d0%b8-%d0%b8-%d0%bf%d1%80%d0%be%d0%b3%d1%80%d0%b0%d0%bc%d0%b8/",
+          "chars": 16627,
+          "note": null
+        },
+        {
+          "url": "https://200ou.org/category/%d1%83%d1%87%d0%b5%d0%b1%d0%b5%d0%bd-%d0%bf%d1%80%d0%be%d1%86%d0%b5%d1%81/%d1%83%d1%87%d0%b5%d0%b1%d0%bd%d0%b8-%d0%bf%d0%bb%d0%b0%d0%bd%d0%be%d0%b2%d0%b5/",
+          "chars": 15847,
+          "note": null
+        },
+        {
+          "url": "https://200ou.org/category/%d1%86%d0%b5%d0%bb%d0%be%d0%b4%d0%bd%d0%b5%d0%b2%d0%bd%d0%b0-%d0%be%d1%80%d0%b3%d0%b0%d0%bd%d0%b8%d0%b7%d0%b0%d1%86%d0%b8%d1%8f-%d0%bd%d0%b0-%d1%83%d1%87-%d0%b4%d0%b5%d0%bd/%d1%86%d0%b4%d0%be-1%d0%b2%d0%b8-%d0%ba%d0%bb%d0%b0%d1%81/",
+          "chars": 12975,
+          "note": null
+        },
+        {
+          "url": "https://200ou.org/category/%d1%86%d0%b5%d0%bb%d0%be%d0%b4%d0%bd%d0%b5%d0%b2%d0%bd%d0%b0-%d0%be%d1%80%d0%b3%d0%b0%d0%bd%d0%b8%d0%b7%d0%b0%d1%86%d0%b8%d1%8f-%d0%bd%d0%b0-%d1%83%d1%87-%d0%b4%d0%b5%d0%bd/%d1%86%d0%b4%d0%be-2%d1%80%d0%b8-%d0%ba%d0%bb%d0%b0%d1%81/",
+          "chars": 12931,
+          "note": null
+        }
+      ],
+      "facts": [
+        {
+          "topic": "Languages",
+          "fact_en": "The school teaches English, Spanish, Russian, Italian and German.",
+          "fact_bg": "В училището се изучават английски, испански, руски, италиански и немски език.",
+          "quote": "В нашето училище се изучават: английски език, испански език, руски език, италиански език и немски език.",
+          "source_url": "https://200ou.org/",
+          "quote_found": true
+        },
+        {
+          "topic": "Sports",
+          "fact_en": "Students take part in volleyball, football, basketball and mountain hiking.",
+          "fact_bg": "Учениците практикуват волейбол, футбол, баскетбол и планински туризъм.",
+          "quote": "Волейбол, футбол, баскетбол, планински туризъм – само част от всички спортни дейности, които нашите ученици практикуват!",
+          "source_url": "https://200ou.org/",
+          "quote_found": true
+        },
+        {
+          "topic": "Technology",
+          "fact_en": "Classrooms have interactive teaching displays, and a computer room supports computer modelling and programming lessons.",
+          "fact_bg": "Класните стаи разполагат с интерактивни обучителни дисплеи, а в компютърен кабинет учениците изучават компютърно моделиране и програмиране.",
+          "quote": "Класните ни стаи са оборудвани с интерактивни обучителни дисплеи, които работят с едни от най- полезните и практични учебни програми. Разполагаме с компютърен кабинет, в който учениците ни изучават компютърно моделиране, програмиране и работа с различни онлайн ресурси.",
+          "source_url": "https://200ou.org/",
+          "quote_found": true
+        },
+        {
+          "topic": "Mathematics",
+          "fact_en": "Students can take mental-arithmetic lessons and join a “Fun Mathematics” club.",
+          "fact_bg": "Учениците могат да се обучават по ментална аритметика и да посещават кръжок „Забавна математика“.",
+          "quote": "Учениците ни имат възможност да се обучават по един от най-древните, но и най-популярни методи за пресмятане на аритметически изчисления наум. Заниманията в кръжока по „Забавна математика“ са друг начин за трениране на логическо и математическо мислене.",
+          "source_url": "https://200ou.org/",
+          "quote_found": false
+        },
+        {
+          "topic": "Full-day care",
+          "fact_en": "The site lists full-day study arrangements for grades 1, 2, 3–4 and 5 and 7.",
+          "fact_bg": "Сайтът посочва целодневна организация на учебния ден за 1., 2., 3.–4., както и 5. и 7. клас.",
+          "quote": "* [ЦОУД](https://200ou.org/ \"Целодневна организация на учебния ден\")\n    * [1ви клас](https://200ou.org/category/%d1%86%d0%b5%d0%bb%d0%be%d0%b4%d0%bd%d0%b5%d0%b2%d0%bd%d0%b0-%d0%be%d1%80%d0%b3%d0%b0%d0%bd%d0%b8%d0%b7%d0%b0%d1%86%d0%b8%d1%8f-%d0%bd%d0%b0-%d1%83%d1%87-%d0%b4%d0%b5%d0%bd/%d1%86%d0%b4%d0%be-1%d0%b2%d0%b8-%d0%ba%d0%bb%d0%b0%d1%81/ \"Ръководител – Ивет Николова\")\n    * [2ри клас](https://200ou.org/category/%d1%86%d0%b5%d0%bb%d0%be%d0%b4%d0%bd%d0%b5%d0%b2%d0%bd%d0%b0-%d0%be%d1%80%d0%b3%d0%b0%d0%bd%d0%b8%d0%b7%d0%b0%d1%86%d0%b8%d1%8f-%d0%bd%d0%b0-%d1%83%d1%87-%d0%b4%d0%b5%d0%bd/%d1%86%d0%b4%d0%be-2%d1%80%d0%b8-%d0%ba%d0%bb%d0%b0%d1%81/)\n    * [3ти и 4ти клас](https://200ou.org/category/%d1%86%d0%b5%d0%bb%d0%be%d0%b4%d0%bd%d0%b5%d0%b2%d0%bd%d0%b0-%d0%be%d1%80%d0%b3%d0%b0%d0%bd%d0%b8%d0%b7%d0%b0%d1%86%d0%b8%d1%8f-%d0%bd%d0%b0-%d1%83%d1%87-%d0%b4%d0%b5%d0%bd/%d1%86%d0%b4%d0%be-3%d1%82%d0%b8-%d0%b8-4%d1%82%d0%b8-%d0%ba%d0%bb%d0%b0%d1%81/)\n    * [5ти и 7ми клас](https://200ou.org/category/%d1%86%d0%b5%d0%bb%d0%be%d0%b4%d0%bd%d0%b5%d0%b2%d0%bd%d0%b0-%d0%be%d1%80%d0%b3%d0%b0%d0%bd%d0%b8%d0%b7%d0%b0%d1%86%d0%b8%d1%8f-%d0%bd%d0%b0-%d1%83%d1%87-%d0%b4%d0%b5%d0%bd/%d1%86%d0%b4%d0%be-5%d1%82%d0%b8-%d0%b8-7%d0%bc%d0%b8-%d0%ba%d0%bb%d0%b0%d1%81/)",
+          "source_url": "https://200ou.org/",
+          "quote_found": true
+        }
+      ],
+      "outcome": "4 of 5 facts kept",
+      "paragraph": {
+        "en": "200th Primary School “Otets Paisiy” teaches five languages: English, Spanish, Russian, Italian and German. Students take part in volleyball, football, basketball and mountain hiking; classrooms have interactive teaching displays, and a computer room supports computer modelling and programming lessons. Full-day study arrangements are listed for grades 1, 2, 3–4 and 5 and 7.",
+        "bg": "В 200. основно училище „Отец Паисий“ се изучават пет езика: английски, испански, руски, италиански и немски. Учениците участват във волейбол, футбол, баскетбол и планински преходи; класните стаи разполагат с интерактивни дисплеи, а компютърен кабинет се използва за уроци по компютърно моделиране и програмиране. Посочени са целодневни форми на обучение за 1., 2., 3.–4., 5. и 7. клас."
+      },
+      "cost_usd": 0.010364,
+      "old_summary": {
+        "mode": "llm",
+        "en": {
+          "short": "200th Primary School \"Otets Paisiy\" offers full-day schooling and a variety of extracurricular activities.",
+          "long": "200th Primary School \"Otets Paisiy\" is located in Lozen and serves students in the lower secondary education level. The school provides various extracurricular activities, including fun mathematics classes for younger and older grades, as well as ethnography for students in grades 5 and 7. The school operates on a full-day schedule, ensuring different learning and meal options."
+        },
+        "cost_usd": 0.000307
+      }
+    },
+    {
+      "school_id": 245,
+      "name": "Софийска гимназия  по хлебни и сладкарски технологии",
+      "name_en": null,
+      "type": "state upper_secondary",
+      "website": "https://www.sghst.com",
+      "pages": [
+        {
+          "url": "https://www.sghst.com/",
+          "chars": 18878,
+          "note": null
+        },
+        {
+          "url": "https://www.sghst.com/%d0%b7%d0%b0-%d0%b3%d0%b8%d0%bc%d0%bd%d0%b0%d0%b7%d0%b8%d1%8f%d1%82%d0%b0/",
+          "chars": 18208,
+          "note": null
+        },
+        {
+          "url": "https://www.sghst.com/%d0%b3%d1%80%d0%b0%d1%84%d0%b8%d0%ba-%d0%bd%d0%b0-%d1%83%d1%87%d0%b5%d0%b1%d0%bd%d0%b8%d1%8f-%d0%bf%d1%80%d0%be%d1%86%d0%b5%d1%81/",
+          "chars": 16510,
+          "note": null
+        },
+        {
+          "url": "https://www.sghst.com/%d1%83%d1%87%d0%b8%d0%bb%d0%b8%d1%89%d0%bd%d0%b8-%d1%83%d1%87%d0%b5%d0%b1%d0%bd%d0%b8-%d0%bf%d0%bb%d0%b0%d0%bd%d0%be%d0%b2%d0%b5/",
+          "chars": 18350,
+          "note": null
+        },
+        {
+          "url": "https://www.sghst.com/%d0%bf%d1%80%d0%be%d0%b3%d1%80%d0%b0%d0%bc%d0%b0-%d0%b7%d0%b0-%d0%bf%d1%80%d0%b5%d0%b4%d0%be%d1%81%d1%82%d0%b0%d0%b2%d1%8f%d0%bd%d0%b5-%d0%bd%d0%b0-%d1%80%d0%b0%d0%b2%d0%bd%d0%b8-%d0%b2%d1%8a%d0%b7/",
+          "chars": 17179,
+          "note": null
+        },
+        {
+          "url": "https://www.sghst.com/%d0%be%d0%b1%d1%89%d0%b5%d1%81%d1%82%d0%b2%d0%b5%d0%bd-%d1%81%d1%8a%d0%b2%d0%b5%d1%82/",
+          "chars": 15768,
+          "note": null
+        },
+        {
+          "url": "https://www.sghst.com/%d0%bf%d1%80%d0%b0%d0%b2%d0%b8%d0%bb%d0%bd%d0%b8%d0%ba-%d0%b7%d0%b0-%d0%b4%d0%b5%d0%b9%d0%bd%d0%be%d1%81%d1%82%d1%82%d0%b0-%d0%bd%d0%b0-%d1%83%d1%87%d0%b8%d0%bb%d0%b8%d1%89%d0%b5%d1%82%d0%be/",
+          "chars": 17311,
+          "note": null
+        },
+        {
+          "url": "https://www.sghst.com/%d0%bd%d0%b0%d0%b9-%d0%b2%d0%b0%d0%b6%d0%bd%d0%be%d1%82%d0%be-%d0%b7%d0%b0-%d1%81%d0%b3%d1%85%d1%81%d1%82-%d0%b2-%d0%b4%d0%b5%d1%81%d0%b5%d1%82-%d0%b8%d0%b7%d1%80%d0%b5%d1%87%d0%b5%d0%bd%d0%b8%d1%8f/",
+          "chars": 18569,
+          "note": null
+        },
+        {
+          "url": "https://www.sghst.com/%d0%b3%d1%80%d0%b0%d1%84%d0%b8%d0%ba/",
+          "chars": 15642,
+          "note": null
+        },
+        {
+          "url": "https://www.sghst.com/category/school/",
+          "chars": 15652,
+          "note": null
+        },
+        {
+          "url": "https://www.sghst.com/%d1%83%d1%87%d0%b8%d0%bb%d0%b8%d1%89%d0%bd%d0%b0-%d0%b4%d0%be%d0%ba%d1%83%d0%bc%d0%b5%d0%bd%d1%82%d0%b0%d1%86%d0%b8%d1%8f/",
+          "chars": 18298,
+          "note": null
+        },
+        {
+          "url": "https://www.sghst.com/%d0%bf%d1%80%d0%be%d0%b3%d1%80%d0%b0%d0%bc%d0%b0-%d0%b7%d0%b0-%d0%bf%d1%80%d0%b5%d0%b2%d0%b5%d0%bd%d1%86%d0%b8%d1%8f-%d0%bd%d0%b0-%d1%80%d0%b0%d0%bd%d0%bd%d0%be%d1%82%d0%be-%d0%bd%d0%b0%d0%bf%d1%83/",
+          "chars": 17381,
+          "note": null
+        }
+      ],
+      "facts": [
+        {
+          "topic": "bread",
+          "fact_en": "Specialty: production of bread, bakery and confectionery products.",
+          "fact_bg": "Специалност: производство на хляб, хлебни и сладкарски изделия.",
+          "quote": "Производство на хляб, хлебни и сладкарски изделия",
+          "source_url": "https://www.sghst.com/",
+          "quote_found": true
+        },
+        {
+          "topic": "decoration",
+          "fact_en": "Specialty: decorating confectionery products.",
+          "fact_bg": "Специалност: декорация на сладкарски изделия.",
+          "quote": "Декорация на сладкарски изделия",
+          "source_url": "https://www.sghst.com/",
+          "quote_found": true
+        },
+        {
+          "topic": "confectionery",
+          "fact_en": "Specialty: production of confectionery products.",
+          "fact_bg": "Специалност: производство на сладкарски изделия.",
+          "quote": "Производство на сладкарски изделия",
+          "source_url": "https://www.sghst.com/",
+          "quote_found": true
+        },
+        {
+          "topic": "baking",
+          "fact_en": "Specialty: confectionery and baking.",
+          "fact_bg": "Специалност: сладкарство и пекарство.",
+          "quote": "Сладкарство и пекарство",
+          "source_url": "https://www.sghst.com/",
+          "quote_found": true
+        },
+        {
+          "topic": "English",
+          "fact_en": "The programme includes extended English-language study.",
+          "fact_bg": "Обучението включва разширено изучаване на английски език.",
+          "quote": "Обучението, с разширено изучаване на английски език, повишава интереса на ученици, родители, работодатели и отговаря адекватно на потребностите на българския и европейския пазар на труда.",
+          "source_url": "https://www.sghst.com/%d0%b7%d0%b0-%d0%b3%d0%b8%d0%bc%d0%bd%d0%b0%d0%b7%d0%b8%d1%8f%d1%82%d0%b0/",
+          "quote_found": true
+        },
+        {
+          "topic": "qualification",
+          "fact_en": "Graduates receive a vocational qualification certificate recognized in all EU countries.",
+          "fact_bg": "Завършилите получават свидетелство за професионална квалификация, признато във всички страни от ЕС.",
+          "quote": "Успешно завършилите получават Свидетелство за професионална квалификация, признато във всички страни на Европейския съюз!",
+          "source_url": "https://www.sghst.com/%d0%b7%d0%b0-%d0%b3%d0%b8%d0%bc%d0%bd%d0%b0%d0%b7%d0%b8%d1%8f%d1%82%d0%b0/",
+          "quote_found": true
+        }
+      ],
+      "outcome": "6 of 6 facts kept",
+      "paragraph": {
+        "en": "Its specialties cover the production of bread, bakery and confectionery products, confectionery decoration, and confectionery and baking. The programme includes extended English-language study, and graduates receive a vocational qualification certificate recognized in all EU countries.",
+        "bg": "Специалностите обхващат производство на хляб, хлебни и сладкарски изделия, декориране на сладкарски изделия, както и сладкарство и хлебарство. Обучението включва разширено изучаване на английски език, а завършилите получават свидетелство за професионална квалификация, признато във всички държави от ЕС."
+      },
+      "cost_usd": 0.009628,
+      "old_summary": {
+        "mode": "llm",
+        "en": {
+          "short": "Sofia High School of Bread and Confectionery Technology offers specialized education in the fields of baking and confectionery.",
+          "long": "Sofia High School of Bread and Confectionery Technology, located in Krasna Polyana, is a state upper secondary school. It provides programs and courses in bread production, confectionery production, decoration, and catering. Founded in 1954, the school also offers extracurricular activities such as clubs and participation in projects and programs."
+        },
+        "cost_usd": 0.000281
+      }
+    },
+    {
+      "school_id": 383,
+      "name": "7. СРЕДНО УЧИЛИЩЕ  \"СВ. СЕДМОЧИСЛЕНИЦИ\"",
+      "name_en": null,
+      "type": "state upper_secondary",
+      "website": "https://7-mo.com/",
+      "pages": [
+        {
+          "url": "https://7-mo.com/",
+          "chars": 17533,
+          "note": null
+        },
+        {
+          "url": "https://7-mo.com/za-uchilishteto/istoriya/",
+          "chars": 12598,
+          "note": null
+        },
+        {
+          "url": "https://7-mo.com/za-uchilishteto/uchilishtna-baza/",
+          "chars": 17281,
+          "note": null
+        },
+        {
+          "url": "https://7-mo.com/uchilishtna-dejnost/za_roditelite-2/",
+          "chars": 13279,
+          "note": null
+        },
+        {
+          "url": "https://7-mo.com/uchilishtna-dejnost/uchebni-planove-v-nachalen-etap/",
+          "chars": 22084,
+          "note": null
+        },
+        {
+          "url": "https://7-mo.com/uchilishtna-dejnost/uchebni-planove-v-progimnaziya/",
+          "chars": 18727,
+          "note": null
+        },
+        {
+          "url": "https://7-mo.com/uchilishtna-dejnost/uchebni-planove-v-gimnaziya/",
+          "chars": 30647,
+          "note": null
+        },
+        {
+          "url": "https://7-mo.com/za-uchilishteto/aktualna-informacia/programi-proekti/",
+          "chars": 29051,
+          "note": null
+        },
+        {
+          "url": "https://7-mo.com/priem/",
+          "chars": 9909,
+          "note": null
+        },
+        {
+          "url": "https://7-mo.com/uchilishtna-dejnost/sedmichno-razpisanie/",
+          "chars": 13696,
+          "note": null
+        },
+        {
+          "url": "https://7-mo.com/wp-content/uploads/2020/07/nrdb4_30.11.2015_ucheben_plan-8.pdf",
+          "chars": 3072,
+          "note": null
+        }
+      ],
+      "facts": [
+        {
+          "topic": "Grades",
+          "fact_en": "The school’s computer labs serve pupils from grades I to XII.",
+          "fact_bg": "Компютърните кабинети се използват от ученици от I до XII клас.",
+          "quote": "Най-голяма гордост за училището са компютърните кабинети – 5 на брой, с над 70 компютърни конфигурации, включени в мрежа, в които се учат ученици от І до ХІІ клас.",
+          "source_url": "https://7-mo.com/za-uchilishteto/uchilishtna-baza/",
+          "quote_found": true
+        },
+        {
+          "topic": "Classes",
+          "fact_en": "The school reports 49 classes taught in two shifts.",
+          "fact_bg": "Училището посочва 49 паралелки, които учат на две смени.",
+          "quote": "Класните стаи, в които на две смени се учат ученици от 49 паралелки са оборудвани с подходящи за възрастта на учащите се чинове, бюра и маси.",
+          "source_url": "https://7-mo.com/za-uchilishteto/uchilishtna-baza/",
+          "quote_found": true
+        },
+        {
+          "topic": "Facilities",
+          "fact_en": "The building has 33 classrooms, 14 subject rooms, a cinema hall, a library, a canteen, a medical room and a sports section.",
+          "fact_bg": "Сградата разполага с 33 класни стаи, 14 кабинета, кинозала, библиотека, стол, медицински кабинет и физкултурен сектор.",
+          "quote": "В масивната четириетажна сграда на училището са разположени 33 класни стаи, 14 кабинети, кинозала, лекционна и заседателна зала, библиотека, стол, медицински кабинет, администрация, физкултурен сектор, сервизни и помощни помещения.",
+          "source_url": "https://7-mo.com/za-uchilishteto/uchilishtna-baza/",
+          "quote_found": true
+        },
+        {
+          "topic": "Computers",
+          "fact_en": "There are 5 networked computer rooms with over 70 computers and internet access.",
+          "fact_bg": "Има 5 компютърни кабинета с над 70 компютърни конфигурации в мрежа и достъп до интернет.",
+          "quote": "Най-голяма гордост за училището са компютърните кабинети – 5 на брой, с над 70 компютърни конфигурации, включени в мрежа, в които се учат ученици от І до ХІІ клас.",
+          "source_url": "https://7-mo.com/za-uchilishteto/uchilishtna-baza/",
+          "quote_found": true
+        },
+        {
+          "topic": "After-school",
+          "fact_en": "Three classrooms are used as study rooms for pupils in semi-boarding groups.",
+          "fact_bg": "Три класни стаи са обособени като занимални за учениците от полуинтернатните групи.",
+          "quote": "За нуждите на най-малките 3 класни стаи са обособени като занимални, в които учениците от полуинтернатните групи подготвят уроците си за следващия учебен ден.",
+          "source_url": "https://7-mo.com/za-uchilishteto/uchilishtna-baza/",
+          "quote_found": true
+        },
+        {
+          "topic": "Sports",
+          "fact_en": "The sports section has 3 gyms across more than 400 m², plus a fitness room.",
+          "fact_bg": "Физкултурният сектор разполага с 3 салона с обща площ над 400 кв. м и фитнес зала.",
+          "quote": "Физкултурният сектор разполага с 3 салона на обща площ от повече от 400 кв.м., всички с подменена подова настилка – дървено дюшеме и новобоядисани стени и таван.",
+          "source_url": "https://7-mo.com/za-uchilishteto/uchilishtna-baza/",
+          "quote_found": true
+        },
+        {
+          "topic": "Meals",
+          "fact_en": "The canteen serves more than 300 children; pupils in grades I–IV are offered lunch and two snacks.",
+          "fact_bg": "В стола се хранят повече от 300 деца; на учениците от I–IV клас се предлагат обяд и две закуски.",
+          "quote": "В него се хранят повече от 300 деца. На учениците от І-ІV клас се дава, както обяд, така и две закуски – сутрешна и следобедна.",
+          "source_url": "https://7-mo.com/za-uchilishteto/uchilishtna-baza/",
+          "quote_found": true
+        }
+      ],
+      "outcome": "7 of 7 facts kept",
+      "paragraph": {
+        "en": "The school’s facilities include 5 networked computer rooms with over 70 computers and internet access, serving pupils in grades I–XII. Its sports section has 3 gyms across more than 400 m² and a fitness room; the school reports 49 classes taught in two shifts.",
+        "bg": "Училищната база включва 5 компютърни кабинета с над 70 компютъра и интернет, използвани от ученици от I до XII клас. Спортната част разполага с 3 физкултурни салона с обща площ над 400 м² и фитнес зала; училището съобщава за 49 паралелки, обучавани в две смени."
+      },
+      "cost_usd": 0.007305,
+      "old_summary": {
+        "mode": "llm",
+        "en": {
+          "short": "7th Secondary School \"St. Sedmochislenitsi\" provides education in upper secondary level in Sofia.",
+          "long": "7th Secondary School \"St. Sedmochislenitsi\" is a state school located in Sofia, offering education for students at the upper secondary level. The curriculum involves various types of exams, and there are no minimum admission thresholds. The school has available spots, and its pricing information includes the 'Steps Together' program, which has engaged several schools."
+        },
+        "cost_usd": 0.000272
+      }
+    },
+    {
+      "school_id": 290,
+      "name": "81. Средно училище  \"Виктор Юго\"",
+      "name_en": null,
+      "type": "state upper_secondary",
+      "website": "https://www.81su.eu",
+      "pages": [
+        {
+          "url": "https://www.81su.eu",
+          "chars": 0,
+          "note": "robots.txt"
+        }
+      ],
+      "outcome": "no readable pages",
+      "cost_usd": 0.0,
+      "old_summary": {
+        "mode": "llm",
+        "en": {
+          "short": "81st Secondary School \"Viktor Yugo\" offers a variety of extracurricular activities and good infrastructure.",
+          "long": "81st Secondary School \"Viktor Yugo\" is located in the Mladost district of Sofia and provides upper secondary education. The school features a library and sports facilities, along with opportunities for involvement in a student newspaper and clubs. The program includes full-day organization of the educational process and provision of meal services."
+        },
+        "cost_usd": 0.000278
+      }
+    },
+    {
+      "school_id": 569,
+      "name": "\"ЧАСТНО НАЧАЛНО УЧИЛИЩЕ \"БИЗИ\" ЕООД",
+      "name_en": null,
+      "type": "private primary",
+      "website": "https://busy-school.com/",
+      "pages": [
+        {
+          "url": "https://busy-school.com/",
+          "chars": 12769,
+          "note": null
+        },
+        {
+          "url": "https://busy-school.com/%d0%b7%d0%b0-%d0%bd%d0%b0%d1%81/",
+          "chars": 10180,
+          "note": null
+        },
+        {
+          "url": "https://busy-school.com/%d0%b5%d0%ba%d0%b8%d0%bf/",
+          "chars": 11173,
+          "note": null
+        },
+        {
+          "url": "https://busy-school.com/%d0%bf%d1%80%d0%b8%d0%b5%d0%bc/",
+          "chars": 10795,
+          "note": null
+        },
+        {
+          "url": "https://busy-school.com/%d0%bf%d1%80%d0%b8%d0%b5%d0%bc-%d0%bf%d1%80%d0%b5%d0%b4%d1%83%d1%87%d0%b8%d0%bb%d0%b8%d1%89%d0%bd%d0%b8-%d0%b3%d1%80%d1%83%d0%bf%d0%b8/",
+          "chars": 11881,
+          "note": null
+        },
+        {
+          "url": "https://busy-school.com/%d0%b7%d0%b0%d0%bf%d0%b8%d1%81%d0%b2%d0%b0%d0%bd%d0%b5-%d0%b2-%d1%87%d0%bd%d1%83-%d0%b1%d0%b8%d0%b7%d0%b8/",
+          "chars": 12701,
+          "note": null
+        },
+        {
+          "url": "https://busy-school.com/%d0%bf%d1%80%d0%b5%d0%b4%d1%83%d1%87%d0%b8%d0%bb%d0%b8%d1%89%d0%bd%d0%b8-%d0%b3%d1%80%d1%83%d0%bf%d0%b8-2/",
+          "chars": 13877,
+          "note": null
+        },
+        {
+          "url": "https://busy-school.com/admissions/",
+          "chars": 20333,
+          "note": null
+        },
+        {
+          "url": "https://busy-school.com/%d0%b7%d0%b0%d1%8f%d0%b2%d0%bb%d0%b5%d0%bd%d0%b8%d0%b5-%d0%b7%d0%b0-%d0%bf%d1%80%d0%b8%d0%b5%d0%bc/",
+          "chars": 11401,
+          "note": null
+        },
+        {
+          "url": "https://busy-school.com/%d1%80%d0%be%d0%b4%d0%b8%d1%82%d0%b5%d0%bb%d0%b8/",
+          "chars": 11432,
+          "note": null
+        },
+        {
+          "url": "https://busy-school.com/courses/",
+          "chars": 17337,
+          "note": null
+        },
+        {
+          "url": "https://busy-school.com/2023/04/28/hello-world/",
+          "chars": 4990,
+          "note": null
+        }
+      ],
+      "facts": [
+        {
+          "topic": "School day",
+          "fact_en": "Offers full-day education.",
+          "fact_bg": "Предлага целодневно обучение.",
+          "quote": "– Целодневно обучение;",
+          "source_url": "https://busy-school.com/",
+          "quote_found": true
+        },
+        {
+          "topic": "Languages",
+          "fact_en": "Foreign languages are studied in an expanded programme; the school does not specify the languages or weekly hours here.",
+          "fact_bg": "Чуждите езици се изучават разширено; тук училището не посочва кои езици или колко часа седмично.",
+          "quote": "– Разширено изучаване на чужди езици;",
+          "source_url": "https://busy-school.com/",
+          "quote_found": true
+        },
+        {
+          "topic": "Subjects",
+          "fact_en": "The programme includes mathematics and natural sciences.",
+          "fact_bg": "Програмата включва математика и природни науки.",
+          "quote": "– Забавно изучаване на математика и природни науки;",
+          "source_url": "https://busy-school.com/",
+          "quote_found": true
+        },
+        {
+          "topic": "Activities",
+          "fact_en": "Offers sports, choreography in different styles, and music and arts workshops.",
+          "fact_bg": "Предлага спорт, хореография в различни стилове и музикални и арт ателиета.",
+          "quote": "– Спортни занимания;\n– Хореография в различни стилове;\n– Музикални и арт ателиета;",
+          "source_url": "https://busy-school.com/",
+          "quote_found": true
+        },
+        {
+          "topic": "Support",
+          "fact_en": "The programme includes work with a speech therapist and psychologist; the school also lists medical and dietetic staff.",
+          "fact_bg": "Програмата включва работа с логопед и психолог; училището посочва и медицински специалисти и диетолози.",
+          "quote": "– Работа с логопед и психолог;",
+          "source_url": "https://busy-school.com/",
+          "quote_found": true
+        },
+        {
+          "topic": "Cambridge",
+          "fact_en": "Pupils may take exams for an international certificate from Cambridge University.",
+          "fact_bg": "Учениците могат да се явят на изпити за международен сертификат от Cambridge University.",
+          "quote": "– Възможност за явяване на олимпиади, състезания, международни конкурси, изпити за получаване на международен сертификат от Cambridge University.",
+          "source_url": "https://busy-school.com/",
+          "quote_found": true
+        }
+      ],
+      "outcome": "6 of 6 facts kept",
+      "paragraph": {
+        "en": "Pupils may take exams for an international certificate from Cambridge University. The private primary school offers full-day education, with an expanded foreign-language programme and a curriculum that includes mathematics and natural sciences. Its programme also includes work with a speech therapist and psychologist, and offers sports, choreography in different styles, music and arts workshops; medical and dietetic staff are listed.",
+        "bg": "Учениците могат да се явяват на изпити за международен сертификат от Cambridge University. Частното начално училище предлага целодневно обучение, разширено изучаване на чужди езици и програма, която включва математика и природни науки. В програмата има и работа с логопед и психолог, както и спорт, хореография в различни стилове, музикални и художествени работилници; посочени са медицински и диетични специалисти."
+      },
+      "cost_usd": 0.006303,
+      "old_summary": {
+        "mode": "llm",
+        "en": {
+          "short": "Bizi Private Primary School offers educational programs in visual and applied arts.",
+          "long": "Bizi Private Primary School, located in Sofia, provides private lessons for children in visual and applied arts. The school emphasizes theatrical mastery and amateur creativity, with teacher Boriana Georgieva being an experienced choreographer with over 20 years of experience. Students have the option for full-day education and can access services from speech therapists and psychologists."
+        },
+        "cost_usd": 0.000311
+      }
+    },
+    {
+      "school_id": 537,
+      "name": "\"ЧАСТНО ОСНОВНО УЧИЛИЩЕ \"Д-Р ПЕТЪР БЕРОН\" ЕООД",
+      "name_en": null,
+      "type": "private lower_secondary",
+      "website": "https://pberon.com/",
+      "pages": [
+        {
+          "url": "https://pberon.com/",
+          "chars": 19051,
+          "note": null
+        },
+        {
+          "url": "https://pberon.com/za-chou-d-r-petar-beron/",
+          "chars": 12371,
+          "note": null
+        },
+        {
+          "url": "https://pberon.com/misiya-viziya-czennosti/",
+          "chars": 14499,
+          "note": null
+        },
+        {
+          "url": "https://pberon.com/obsthnost/",
+          "chars": 11541,
+          "note": null
+        },
+        {
+          "url": "https://pberon.com/obuchenie/",
+          "chars": 10963,
+          "note": null
+        },
+        {
+          "url": "https://pberon.com/materialna-baza/",
+          "chars": 12142,
+          "note": null
+        },
+        {
+          "url": "https://pberon.com/podkrepa/",
+          "chars": 12638,
+          "note": null
+        },
+        {
+          "url": "https://pberon.com/detska-gradina/",
+          "chars": 11512,
+          "note": null
+        },
+        {
+          "url": "https://pberon.com/balgarski-ezik-i-literatura/",
+          "chars": 13341,
+          "note": null
+        },
+        {
+          "url": "https://pberon.com/anglijski-ezik/",
+          "chars": 15396,
+          "note": null
+        },
+        {
+          "url": "https://pberon.com/matematika/",
+          "chars": 13285,
+          "note": null
+        },
+        {
+          "url": "https://pberon.com/prirodni-nauki/",
+          "chars": 13311,
+          "note": null
+        }
+      ],
+      "facts": [
+        {
+          "topic": "languages",
+          "fact_en": "The school describes its programme as including intensive English-language instruction.",
+          "fact_bg": "Училището посочва, че програмата включва интензивно обучение по английски език.",
+          "quote": "Мисията на Частно основно училище „Д-р Петър Берон“ е да предостави на учениците **цялостно образование** , което съчетава отлична академична подготовка с интензивно чуждоезиково обучение по английски език.",
+          "source_url": "https://pberon.com/misiya-viziya-czennosti/",
+          "quote_found": true
+        },
+        {
+          "topic": "admissions",
+          "fact_en": "Admission includes document submission, an individual meeting with the family and student, and a test to assess the candidate’s preparation.",
+          "fact_bg": "Приемът включва подаване на документи, индивидуална среща със семейството и ученика и тест за оценка на подготовката на кандидата.",
+          "quote": "Кандидатите подават необходимите документи при психолога на училището в обявените срокове. Провежда се индивидуална среща с цел опознаване на мотивацията и очакванията на семейството и ученика. Провежда тест за определяне на нивото на подготовка на кандидата.",
+          "source_url": "https://pberon.com/",
+          "quote_found": false
+        },
+        {
+          "topic": "facilities",
+          "fact_en": "Facilities include science and computer rooms, a library, and dedicated arts and creative spaces.",
+          "fact_bg": "Базата включва кабинети по природни науки и компютри, библиотека и специализирани пространства за изкуства и творчество.",
+          "quote": "Учебната база включва **просторни** и светли класни стаи, снабдени със съвременни технологии, които подпомагат интерактивното и ангажиращо обучение. Освен това училището разполага с **научни** и **компютърни кабинети** , библиотека и специализирани зони за изкуства и творчество.",
+          "source_url": "https://pberon.com/materialna-baza/",
+          "quote_found": true
+        },
+        {
+          "topic": "sports",
+          "fact_en": "The school has a gym and outdoor sports courts; listed activities include tennis, taekwondo, ski school, and football.",
+          "fact_bg": "Училището разполага с физкултурен салон и открити спортни игрища; посочените дейности включват тенис, таекуондо, ски училище и футбол.",
+          "quote": "За нас **физическото развитие** на учениците е също толкова важно, затова училището предлага модерни спортни съоръжения – физкултурен салон, открити спортни игрища и зони за активен отдих. Учениците имат достъп до разнообразни **спортни дейности** като тенис на корт, таекуондо, ски училище и футбол.",
+          "source_url": "https://pberon.com/materialna-baza/",
+          "quote_found": true
+        },
+        {
+          "topic": "school day",
+          "fact_en": "The school states that its facilities support full-day education and extracurricular activities.",
+          "fact_bg": "Училището посочва, че базата му осигурява условия за целодневно обучение и извънкласни дейности.",
+          "quote": "Базата на училището създава **отлични условия** за целодневно обучение и извънкласни дейности, подпомагайки **развитието** на учениците в академичен, творчески и спортен план.",
+          "source_url": "https://pberon.com/materialna-baza/",
+          "quote_found": true
+        },
+        {
+          "topic": "psychologist",
+          "fact_en": "A school psychologist holds individual conversations with students and runs group activities and games focused on expression and communication skills.",
+          "fact_bg": "Училищният психолог провежда индивидуални разговори с ученици и групови занимания и игри за изразяване и развитие на умения за общуване.",
+          "quote": "В ежедневната си работа водя **индивидуални разговори** с деца, когато имат нужда от подкрепа или внимание. Провеждам групови занимания и игри, които помагат на децата да изразяват чувствата си, да се свързват с другите и да развиват умения за общуване.",
+          "source_url": "https://pberon.com/podkrepa/",
+          "quote_found": true
+        },
+        {
+          "topic": "summer school",
+          "fact_en": "The school says it runs a summer school annually from June 1 to July 31.",
+          "fact_bg": "Училището посочва, че всяка година организира лятно училище от 1 юни до 31 юли.",
+          "quote": "В училище „Д-р Петър Берон“ всяка година организираме лятно училище, което се провежда в периода от 1 юни до 31 юли.",
+          "source_url": "https://pberon.com/",
+          "quote_found": true
+        }
+      ],
+      "outcome": "6 of 7 facts kept",
+      "paragraph": {
+        "en": "The school describes its programme as including intensive English-language instruction. Its facilities support full-day education and extracurricular activities, with science and computer rooms, a library, arts and creative spaces, a gym and outdoor sports courts; listed activities include tennis, taekwondo, ski school and football. A school psychologist holds individual conversations and runs group activities and games focused on expression and communication skills, and the school runs a summer school annually from June 1 to July 31.",
+        "bg": "Училището описва програмата си като включваща интензивно обучение по английски език. Базата му е предназначена за целодневно обучение и извънкласни дейности и включва кабинети по природни науки и компютри, библиотека, пространства за изкуства и творчество, физкултурен салон и външни спортни игрища; сред посочените занимания са тенис, таекуондо, ски училище и футбол. Училищен психолог провежда индивидуални разговори и групови дейности и игри, насочени към уменията за изразяване и общуване, а училището организира лятно училище всяка година от 1 юни до 31 юли."
+      },
+      "cost_usd": 0.006165,
+      "old_summary": {
+        "mode": "llm",
+        "en": {
+          "short": "Dr. Petar Beron is a private school in Sofia offering intensive foreign language education.",
+          "long": "Located in the district of Lozenets, Dr. Petar Beron is a private school that provides full-day education and extracurricular activities. The school emphasizes care and education for children from early ages and aims to develop thinking and creative individuals. The curriculum includes intensive foreign language training."
+        },
+        "cost_usd": 0.000422
+      }
+    },
+    {
+      "school_id": 329,
+      "name": "Първа частна английска гимназия \"Уилям Шекспир-Интелект Инвест\" ООД",
+      "name_en": null,
+      "type": "private upper_secondary",
+      "website": "https://www.fpels.ws/",
+      "pages": [
+        {
+          "url": "https://www.fpels.ws/",
+          "chars": 17039,
+          "note": null
+        },
+        {
+          "url": "https://www.fpels.ws/about/",
+          "chars": 10478,
+          "note": null
+        },
+        {
+          "url": "https://www.fpels.ws/profiles/",
+          "chars": 8602,
+          "note": null
+        },
+        {
+          "url": "https://www.fpels.ws/clubs/",
+          "chars": 5038,
+          "note": null
+        },
+        {
+          "url": "https://www.fpels.ws/facility/",
+          "chars": 12614,
+          "note": null
+        },
+        {
+          "url": "https://www.fpels.ws/apply/",
+          "chars": 10823,
+          "note": null
+        },
+        {
+          "url": "https://www.fpels.ws/schedule/",
+          "chars": 8504,
+          "note": null
+        },
+        {
+          "url": "https://www.fpels.ws/foreign-languages/",
+          "chars": 4878,
+          "note": null
+        },
+        {
+          "url": "https://www.fpels.ws/profiles/digital-arts-and-entrepreneurship/",
+          "chars": 18537,
+          "note": null
+        },
+        {
+          "url": "https://www.fpels.ws/profiles/bulgarian-language-and-history/",
+          "chars": 12462,
+          "note": null
+        },
+        {
+          "url": "https://www.fpels.ws/profiles/chemistry-and-biology/",
+          "chars": 15000,
+          "note": null
+        },
+        {
+          "url": "https://www.fpels.ws/foreign-languages/english-language/",
+          "chars": 10120,
+          "note": null
+        }
+      ],
+      "facts": [
+        {
+          "topic": "languages",
+          "fact_en": "The school’s foreign-languages profile has intensive English and a choice of Spanish, German or Russian as the second foreign language.",
+          "fact_bg": "Профилът „Чужди езици“ е с интензивно изучаване на английски и избор на испански, немски или руски като втори чужд език.",
+          "quote": "Първа частна английска гимназия “Уилям Шекспир” е гимназия с профил „Чужди езици“ с интензивно изучаване на английски език и втори чужд език по избор: испански, немски или руски език.",
+          "source_url": "https://www.fpels.ws/profiles/",
+          "quote_found": true
+        },
+        {
+          "topic": "English",
+          "fact_en": "Conversational English is taught in grade 8; Business English is taught in grades 9 and 10.",
+          "fact_bg": "Разговорен английски се изучава в 8. клас, а бизнес английски — в 9. и 10. клас.",
+          "quote": "Изучава се „Разговорен английски език“ – в VІІІ клас и „Бизнес английски език“ в ІХ и Х клас.",
+          "source_url": "https://www.fpels.ws/profiles/",
+          "quote_found": true
+        },
+        {
+          "topic": "profiles",
+          "fact_en": "The third and fourth profile subjects are chosen from the offered options and studied in grades 11–12; an option is formed with at least 6 interested students.",
+          "fact_bg": "Третият и четвъртият профилиращ предмет се избират от предлаганите варианти и се изучават в 11.–12. клас; даден вариант се сформира при минимум 6 желаещи ученици.",
+          "quote": "Задължителните трети и четвърти профилиращ предмет могат да се избират от обявените варианти и се изучават във втори гимназиален етап (11 и 12 клас), като профилиращите предмети са едни и същи за 11 и 12 клас и не могат да бъдат променяни.",
+          "source_url": "https://www.fpels.ws/profiles/",
+          "quote_found": true
+        },
+        {
+          "topic": "profile groups",
+          "fact_en": "A profile-subject option is formed when at least 6 students request it.",
+          "fact_bg": "Вариант за профилиращи предмети се сформира при заявено желание от минимум 6 ученици.",
+          "quote": "Вариантите за профилиращи предмети се сформират при минимум 6 ученици, заявили желание за изучаване на съответния вариант.",
+          "source_url": "https://www.fpels.ws/profiles/",
+          "quote_found": true
+        },
+        {
+          "topic": "admissions",
+          "fact_en": "For 2026–2027, grade-7 graduates may apply to grade 8; the school also accepts transfer applicants in grades 9–12 and students from other countries in all grades.",
+          "fact_bg": "За 2026–2027 г. кандидатстват завършили 7. клас за 8. клас; приемат се и ученици от други училища в 9.–12. клас, както и ученици от други държави във всички класове.",
+          "quote": "Приемът за учебната 2026-2027 г. е отворен за:\n1. Учeници, завършили VІІ клас се приемат в паралелки с интензивно изучаване на английски език в VІІІ клас – профил “Чужди езици”.\n2. Ученици в ІХ, Х, ХІ, ХІІ клас от други училища в България.\n3. Ученици от други държави във всички класове.",
+          "source_url": "https://www.fpels.ws/apply/",
+          "quote_found": true
+        },
+        {
+          "topic": "entry tests",
+          "fact_en": "Grade-8 applicants take a Bulgarian language and literature test and essay, plus an English placement test.",
+          "fact_bg": "Кандидатите за 8. клас полагат тест и пишат съчинение по български език и литература, както и тест за определяне на нивото по английски език.",
+          "quote": "**При постъпване в VІІІ клас с интензивно изучаване на английски език:**\n  * ![](https://www.fpels.ws/wp-content/uploads/2023/03/feather_lp.svg)Български език и литература: тест и съчинение по избрана тема от дадени възможни\n  * ![](https://www.fpels.ws/wp-content/uploads/2023/03/feather_lp.svg)Английски език: Placement English test – за установяване нивото на език",
+          "source_url": "https://www.fpels.ws/apply/",
+          "quote_found": true
+        },
+        {
+          "topic": "facilities",
+          "fact_en": "Facilities include a chemistry laboratory, music room, library and reading room, computer and interactive rooms with internet access, a gymnasium, fitness room and medical office.",
+          "fact_bg": "Базата включва химическа лаборатория, музикална зала, библиотека и читалня, компютърни и интерактивни зали с интернет, физкултурен салон, фитнес зала и лекарски кабинет.",
+          "quote": "Гимназията разполага с подходяща учебна база: просторни учебни помещения, химическа лаборатория, музикална зала, библиотека и читалня, обновени компютърни и интерактивни зали с достъп до Интернет, модерно обзаведен физкултурен салон и фитнес зала, лекарски кабинет.",
+          "source_url": "https://www.fpels.ws/facility/",
+          "quote_found": true
+        },
+        {
+          "topic": "clubs",
+          "fact_en": "Listed clubs include Debate, Arts, Digital Studio (design and printing), Fashion Design and a theatre academy for stage English.",
+          "fact_bg": "Сред посочените клубове са „Дебати“, „Изкуства“, „Дигитално студио“ (дизайн и печат), „Моден дизайн“ и театрална академия по сценичен английски.",
+          "quote": "[ Клуб \"Дебати\"  \n  \nНаучи повече ](https://www.fpels.ws/clubs/club-debati/)\n[ Клуб \"Дигитално студио\" - дизайн и печат Научи повече ](https://www.fpels.ws/clubs/klub-digitalno-studio-design-i-pechat/)\n[ Клуб \"Изкуства\"  \n  \nНаучи повече ](https://www.fpels.ws/clubs/klub-izkustva/)\n[ Клуб \"Моден Дизайн\" - първо ниво Научи повече ](https://www.fpels.ws/clubs/klub-moden-design-parvo-nivo/)\n[ Театрална академия - сценичен английски език Научи повече ](https://www.fpels.ws/clubs/teatralna-akademia-scenichen-angliiski-ezik/)",
+          "source_url": "https://www.fpels.ws/clubs/",
+          "quote_found": true
+        }
+      ],
+      "outcome": "8 of 8 facts kept",
+      "paragraph": {
+        "en": "The foreign-languages profile combines intensive English with a choice of Spanish, German or Russian as a second foreign language. Conversational English is taught in grade 8 and Business English in grades 9 and 10; students choose third and fourth profile subjects from the available options in grades 11–12, with an option formed when at least 6 students request it.",
+        "bg": "Езиковият профил включва интензивно изучаване на английски и избор между испански, немски или руски като втори чужд език. В 8. клас се изучава разговорен английски, а в 9. и 10. клас — бизнес английски; учениците избират третия и четвъртия профилиращ предмет измежду предлаганите възможности за 11.–12. клас, като дадена опция се формира при заявка от поне 6 ученици."
+      },
+      "cost_usd": 0.006617,
+      "old_summary": {
+        "mode": "llm",
+        "en": {
+          "short": "Uilyam Shekspir-Intelekt Invest is a private high school in Sofia with English language focus.",
+          "long": "Uilyam Shekspir-Intelekt Invest is a private high school situated in the Oborishte district of Sofia. The school offers an English language program and is accredited by the Ministry of Education. It features facilities such as a chemistry lab, music room, library, and various modern spaces. Founded in 1994, it follows the teaching approach of \"Kiril and Metodiy.\""
+        },
+        "cost_usd": 0.000477
+      }
+    },
+    {
+      "school_id": 564,
+      "name": "\"ЧАСТНО СРЕДНО УЧИЛИЩЕ ПИТАГОР\" ООД",
+      "name_en": null,
+      "type": "private upper_secondary",
+      "website": "https://pitagor-school.eu/",
+      "pages": [
+        {
+          "url": "https://pitagor-school.eu/",
+          "chars": 18377,
+          "note": null
+        },
+        {
+          "url": "https://pitagor-school.eu/edin-den-v-uchilishte/",
+          "chars": 15832,
+          "note": null
+        },
+        {
+          "url": "https://pitagor-school.eu/izvunklasni-deinosti/",
+          "chars": 46690,
+          "note": null
+        },
+        {
+          "url": "https://pitagor-school.eu/rakovodstvo-i-uchiteli/",
+          "chars": 56257,
+          "note": null
+        },
+        {
+          "url": "https://pitagor-school.eu/priem/",
+          "chars": 12825,
+          "note": null
+        },
+        {
+          "url": "https://pitagor-school.eu/sport/",
+          "chars": 17468,
+          "note": null
+        },
+        {
+          "url": "https://pitagor-school.eu/izkustva/",
+          "chars": 27464,
+          "note": null
+        },
+        {
+          "url": "https://pitagor-school.eu/hranene/",
+          "chars": 13790,
+          "note": null
+        },
+        {
+          "url": "https://pitagor-school.eu/chujdi-ezitzi/",
+          "chars": 18257,
+          "note": null
+        }
+      ],
+      "facts": [
+        {
+          "topic": "School day",
+          "fact_en": "Pupils spend the full day at school; the schedule includes self-study, daily English, elective core-subject lessons and additional activities.",
+          "fact_bg": "Учениците са в училище цял ден; програмата включва самоподготовка, ежедневни занимания по английски, избираеми часове по основните предмети и допълнителни дейности.",
+          "quote": "При нас децата са в училище цял ден. Учебните занятия са разпределени по задължителен учебен план според държавните образователни изисквания, но включват също и самоподготовка, ежедневни занимания по английски език, избираеми часове по основните предмети и допълнителни дейности.",
+          "source_url": "https://pitagor-school.eu/edin-den-v-uchilishte/",
+          "quote_found": true
+        },
+        {
+          "topic": "Activities",
+          "fact_en": "The school lists extracurricular activities for lower-secondary and high-school students.",
+          "fact_bg": "Училището предлага извънкласни дейности за ученици от прогимназиален и гимназиален етап.",
+          "quote": "## Извънкласни дейности за ученици от прогимназия и гимназия",
+          "source_url": "https://pitagor-school.eu/izvunklasni-deinosti/",
+          "quote_found": true
+        },
+        {
+          "topic": "Math support",
+          "fact_en": "An extracurricular intensive-mathematics activity is described for pupils who need extra support and practice.",
+          "fact_bg": "Описана е извънкласна дейност „Интензивна математика“ за ученици, които имат нужда от допълнителна подкрепа и упражнения.",
+          "quote": "Извънкласната дейност „Интензивна математика“ е насочена към ученици, които срещат затруднения при усвояването на математическите знания и умения и имат нужда от допълнителна подкрепа и повече време за упражнение и затвърдяване на учебния материал.",
+          "source_url": "https://pitagor-school.eu/izvunklasni-deinosti/",
+          "quote_found": true
+        }
+      ],
+      "outcome": "3 of 3 facts kept",
+      "paragraph": {
+        "en": "Pupils spend the full day at school, with self-study, daily English, elective lessons in core subjects and additional activities in the schedule. The school lists extracurricular activities for lower-secondary and high-school students, including intensive mathematics for pupils who need extra support and practice.",
+        "bg": "Учениците прекарват целия ден в училище, като програмата включва самоподготовка, ежедневен английски език, избираеми часове по основни предмети и допълнителни дейности. Училището предлага извънкласни дейности за ученици от прогимназиален и гимназиален етап, включително интензивна математика за ученици, които се нуждаят от допълнителна подкрепа и упражнения."
+      },
+      "cost_usd": 0.006045,
+      "old_summary": {
+        "mode": "llm",
+        "en": {
+          "short": "Private school \"Pitagor\" in Sofia offers an educational program focused on mathematics.",
+          "long": "Private school \"Pitagor\" is located in Krasna Poliana and provides upper secondary education. The school specializes in mathematical training, emphasizing logical and mathematical thinking among students. It also offers extracurricular activities, including a dance group, taekwondo, and a mathematics school."
+        },
+        "cost_usd": 0.00036
+      }
+    },
+    {
+      "school_id": 613,
+      "name": "\"ЧАСТНО ОСНОВНО УЧИЛИЩЕ МИЛЕА\" Сдружение",
+      "name_en": null,
+      "type": "private lower_secondary",
+      "website": "https://milea.bg/",
+      "pages": [
+        {
+          "url": "https://milea.bg/",
+          "chars": 456,
+          "note": null
+        },
+        {
+          "url": "https://milea.bg/%d1%83%d1%87%d0%b8%d0%bb%d0%b8%d1%89%d0%b5/",
+          "chars": 8234,
+          "note": null
+        },
+        {
+          "url": "https://milea.bg/%d1%83%d1%87%d0%b8%d0%bb%d0%b8%d1%89%d0%b5/%d0%bf%d1%80%d0%be%d0%b3%d1%80%d0%b0%d0%bc%d0%b0/",
+          "chars": 6300,
+          "note": null
+        },
+        {
+          "url": "https://milea.bg/%d1%83%d1%87%d0%b8%d0%bb%d0%b8%d1%89%d0%b5/%d0%b7%d0%b0-%d0%bd%d0%b0%d1%81/",
+          "chars": 6867,
+          "note": null
+        },
+        {
+          "url": "https://milea.bg/%d1%83%d1%87%d0%b8%d0%bb%d0%b8%d1%89%d0%b5/%d0%bf%d1%80%d0%b8%d0%b5%d0%bc/",
+          "chars": 4529,
+          "note": null
+        },
+        {
+          "url": "https://milea.bg/%d1%83%d1%87%d0%b8%d0%bb%d0%b8%d1%89%d0%b5/%d0%b5%d0%ba%d0%b8%d0%bf/",
+          "chars": 8356,
+          "note": null
+        },
+        {
+          "url": "https://milea.bg/%d1%83%d1%87%d0%b8%d0%bb%d0%b8%d1%89%d0%b5/%d0%bf%d1%80%d0%b8%d0%b5%d0%bc/%d0%bf%d1%80%d0%b8%d0%b5%d0%bc-%d0%b2-%d1%87%d0%bd%d1%83-%d0%bc%d0%b8%d0%bb%d0%b5%d0%b0/",
+          "chars": 6183,
+          "note": null
+        }
+      ],
+      "facts": [
+        {
+          "topic": "curriculum",
+          "fact_en": "The school programme follows Bulgarian state educational requirements and standards and uses a sensory-based approach.",
+          "fact_bg": "Училищната програма следва държавните образователни изисквания и стандарти и използва сензорно-базиран подход.",
+          "quote": "Програмата на училище „Милеа“ е базирана на държавните образователни изисквания и стандарти и на сензорно-базирания подход. Основните предмети включват:",
+          "source_url": "https://milea.bg/%d1%83%d1%87%d0%b8%d0%bb%d0%b8%d1%89%d0%b5/%d0%bf%d1%80%d0%be%d0%b3%d1%80%d0%b0%d0%bc%d0%b0/",
+          "quote_found": true
+        },
+        {
+          "topic": "subjects",
+          "fact_en": "Grades 1–2 include Bulgarian language and literature, mathematics, world around us, technology and entrepreneurship, music, visual arts, physical education and play.",
+          "fact_bg": "В I–II клас се изучават български език и литература, математика, околен свят, технологии и предприемачество, музика, изобразително изкуство, физическо възпитание и игра.",
+          "quote": "За първи и втори клас – Български език и литература, Математика, Околен свят, Технологии и предприемачество, Музика,Изобразително изкуство, Физическо възпитание и Игра",
+          "source_url": "https://milea.bg/%d1%83%d1%87%d0%b8%d0%bb%d0%b8%d1%89%d0%b5/%d0%bf%d1%80%d0%be%d0%b3%d1%80%d0%b0%d0%bc%d0%b0/",
+          "quote_found": true
+        },
+        {
+          "topic": "languages",
+          "fact_en": "English is included in the listed subjects for grades 3–4.",
+          "fact_bg": "Английски език е сред посочените предмети за III–IV клас.",
+          "quote": "За трети и четвърти клас – Български език и литература, Математика, Английски език, Човекът и обществото, Човекът и природата, Музика, Изобразително изкуство, Информационни технологии, Физическо възпитание и Игра.",
+          "source_url": "https://milea.bg/%d1%83%d1%87%d0%b8%d0%bb%d0%b8%d1%89%d0%b5/%d0%bf%d1%80%d0%be%d0%b3%d1%80%d0%b0%d0%bc%d0%b0/",
+          "quote_found": true
+        },
+        {
+          "topic": "school day",
+          "fact_en": "The school day runs from 08:00 to 14:00.",
+          "fact_bg": "Учебният ден е от 08:00 до 14:00 часа.",
+          "quote": "Учебният ден започва в 08:00 часа и приключва в 14:00 часа.",
+          "source_url": "https://milea.bg/%d1%83%d1%87%d0%b8%d0%bb%d0%b8%d1%89%d0%b5/%d0%bf%d1%80%d0%be%d0%b3%d1%80%d0%b0%d0%bc%d0%b0/",
+          "quote_found": true
+        },
+        {
+          "topic": "SEN support",
+          "fact_en": "Children with special educational needs receive an individual learning plan, which may have a different time frame.",
+          "fact_bg": "За деца със специални образователни потребности се изготвя индивидуален обучителен план, който може да е с различна времева рамка.",
+          "quote": "За деца със специални образователни потребности се изготвя индивидуален обучителен план, който може да е с различна времева рамка.",
+          "source_url": "https://milea.bg/%d1%83%d1%87%d0%b8%d0%bb%d0%b8%d1%89%d0%b5/%d0%bf%d1%80%d0%be%d0%b3%d1%80%d0%b0%d0%bc%d0%b0/",
+          "quote_found": true
+        },
+        {
+          "topic": "facilities",
+          "fact_en": "The school has a specially equipped room for sensory therapy and occupational therapy.",
+          "fact_bg": "Училището разполага със специално оборудвана зала за сензорна терапия и ерготерапия.",
+          "quote": "Специално оборудвана зала за сензорна терапия и ерготерапия",
+          "source_url": "https://milea.bg/%d1%83%d1%87%d0%b8%d0%bb%d0%b8%d1%89%d0%b5/%d0%b7%d0%b0-%d0%bd%d0%b0%d1%81/",
+          "quote_found": true
+        }
+      ],
+      "outcome": "6 of 6 facts kept",
+      "paragraph": {
+        "en": "ЧАСТНО ОСНОВНО УЧИЛИЩЕ МИЛЕА follows Bulgarian state educational requirements and standards and uses a sensory-based approach, with a specially equipped room for sensory therapy and occupational therapy. The school day is 08:00–14:00; children with special educational needs receive an individual learning plan, which may have a different time frame.",
+        "bg": "ЧАСТНО ОСНОВНО УЧИЛИЩЕ МИЛЕА следва държавните образователни изисквания и стандарти на България и използва сензорно-базиран подход, като разполага със специално оборудвана стая за сензорна терапия и ерготерапия. Учебният ден е от 08:00 до 14:00 ч.; децата със специални образователни потребности получават индивидуален учебен план, който може да е с различна времева рамка."
+      },
+      "cost_usd": 0.005009,
+      "old_summary": {
+        "mode": "llm",
+        "en": {
+          "short": "Milea provides lower secondary education and is located in Sofia.",
+          "long": "Private School Milea is located at zh.k. Borovo, ul. \"Debar\" No. 30 in Sofia. It offers lower secondary education and is committed to a unique approach, organizing educational visits under the project \"Learning through Experience for Every Child.\" Students have the opportunity to participate in an annual concert that celebrates their hard work and talents."
+        },
+        "cost_usd": 0.000254
+      }
+    }
+  ]
+}
