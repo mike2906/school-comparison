@@ -704,3 +704,57 @@ def test_the_same_fee_read_from_two_pages_is_one_row():
     relabelled = check_fee(FEES_STAGE[0].model_copy(update={"label": "Такса"}), PAGE_STAGE)
     rows, sources = fees_agent._build_rows(school, [(tuition, page), (relabelled, other)])
     assert len(rows) == len(sources) == 1
+
+
+async def test_a_kept_old_row_is_not_doubled_by_the_same_amount_in_another_category(db_session, frozen_today):
+    page_text = "Месечна такса: 700 евро\nЕднократна такса за записване: 200 евро.\nХрана: 90 евро"
+    school = await _school(db_session)
+    await _old_rows(db_session, school, "2026/2027", [700, 90])  # 90 monthly: a period the read loses
+    await db_session.commit()
+    refiled = fee(PriceCategory.EXTRACURRICULAR, "Храна: 90 евро", amount=90, academic_year="2026/2027")
+    report = await fees_agent.run_school(
+        db_session,
+        school,
+        find=_find([PageRead(URL, page_text, True)]),
+        read=_read([*FEES_STAGE, refiled]),
+        apply=True,
+    )
+    assert report["outcome"] == "written" and report["rows_old_kept"] == 1, report
+    rows = await _rows(db_session, school)
+    assert [(float(r.amount), r.category) for r in rows if float(r.amount) == 90] == [(90.0, PriceCategory.TUITION)]
+
+
+async def test_an_old_bgn_row_rounded_to_the_lev_gives_way_to_the_euro_fee(db_session, frozen_today):
+    page_text = "Месечна такса: 700 € (1369 лв.)"
+    school = await _school(db_session)
+    await _old_rows(db_session, school, "2026/2027", [1369])
+    old = (await _rows(db_session, school))[0]
+    old.currency = "BGN"
+    await db_session.commit()
+    read = [fee(PriceCategory.TUITION, page_text, amount=700, period=PricePeriod.MONTHLY, academic_year="2026/2027")]
+    report = await fees_agent.run_school(
+        db_session, school, find=_find([PageRead(URL, page_text, True)]), read=_read(read), apply=True
+    )
+    assert report["outcome"] == "written" and report["rows_old_kept"] == 0, report
+    assert [(float(r.amount), r.currency) for r in await _rows(db_session, school)] == [(700.0, "EUR")]
+
+
+async def test_an_old_bgn_range_gives_way_to_the_same_range_in_euro(db_session, frozen_today):
+    page_text = "Месечна такса: 500 – 600 евро (978 – 1174 лв.)"
+    school = await _school(db_session)
+    await _old_rows(db_session, school, "2026/2027", [978])
+    old = (await _rows(db_session, school))[0]
+    old.currency, old.amount, old.amount_min, old.amount_max = "BGN", None, 978, 1174
+    await db_session.commit()
+    read = [
+        fee(
+            PriceCategory.TUITION, page_text, amount_min=500, amount_max=600,
+            period=PricePeriod.MONTHLY, academic_year="2026/2027",
+        )
+    ]  # fmt: skip
+    report = await fees_agent.run_school(
+        db_session, school, find=_find([PageRead(URL, page_text, True)]), read=_read(read), apply=True
+    )
+    assert report["outcome"] == "written" and report["rows_old_kept"] == 0, report
+    rows = await _rows(db_session, school)
+    assert [(float(r.amount_min), float(r.amount_max), r.currency) for r in rows] == [(500.0, 600.0, "EUR")]

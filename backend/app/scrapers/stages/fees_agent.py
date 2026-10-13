@@ -329,43 +329,71 @@ async def _upsert_pages(db: AsyncSession, pages: dict[str, SourcePage], stored: 
 
 
 BGN_PER_EUR = Decimal("1.95583")
+EURO_TOLERANCE = Decimal("0.005")  # a site's own conversion is often rounded: 1369 лв. for 700 €
 
 
-def _row_key(row: Pricing) -> tuple[str, tuple[str, ...]]:
-    return str(row.category.value if hasattr(row.category, "value") else row.category), _amount_key(
-        PriceRow.from_pricing(row)
-    )
+def _amount_group(row: Any) -> tuple[str, ...]:
+    return _amount_key(PriceRow.from_pricing(row))
 
 
-def _same_fee_in_euro(old: Pricing, new: Pricing) -> bool:
-    """An old BGN row the read now gives in EUR (330's 899.68 BGN is 460 EUR)."""
-    if (old.currency or "").upper() != "BGN" or (new.currency or "").upper() != "EUR":
-        return False
-    if old.category != new.category or old.amount is None or new.amount is None:
-        return False
-    return abs(Decimal(str(old.amount)) / BGN_PER_EUR - Decimal(str(new.amount))) <= Decimal("0.01")
+class _InEuro:
+    """An old BGN row seen at the EUR amounts the read gives for it, so rule 6 checks its
+    period, plan and count like any other row (330's 899.68 BGN is 460 EUR)."""
+
+    def __init__(self, row: Pricing, amounts: tuple[Any, Any, Any]):
+        self._row = row
+        self.currency = "EUR"
+        self.amount, self.amount_min, self.amount_max = amounts
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._row, name)
+
+
+def _in_euro(row: Pricing, proposed: list[Pricing]) -> Optional[_InEuro]:
+    if (row.currency or "").upper() != "BGN":
+        return None
+    euro = [
+        Decimal(str(value))
+        for new in proposed
+        if (new.currency or "").upper() == "EUR"
+        for value in (new.amount, new.amount_min, new.amount_max)
+        if value is not None
+    ]
+    converted = []
+    for value in (row.amount, row.amount_min, row.amount_max):
+        if value is None:
+            converted.append(None)
+            continue
+        target = Decimal(str(value)) / BGN_PER_EUR
+        match = next((amount for amount in euro if abs(amount - target) <= target * EURO_TOLERANCE), None)
+        if match is None:
+            return None
+        converted.append(match)
+    return _InEuro(row, tuple(converted))
 
 
 def _rows_to_keep(
     school: School, pages: list[SourcePage], superseded: list[Pricing], proposed: list[Pricing]
-) -> tuple[list[Pricing], list[str]]:
-    """The superseded rows that rule 6 says replacing would lose, and why.
+) -> tuple[list[Pricing], set[tuple[str, ...]], list[str]]:
+    """The superseded rows rule 6 says replacing would lose, the amounts they hold, and why.
 
     Checked one amount at a time, so a fee the read missed keeps its own row and does not
     hold back the rest of the school's fees.
     """
-    groups: dict[tuple, list[Pricing]] = {}
+    groups: dict[tuple[str, ...], list[Any]] = {}
     for row in superseded:
-        if not any(_same_fee_in_euro(row, new) for new in proposed):
-            groups.setdefault(_amount_key(PriceRow.from_pricing(row)), []).append(row)
+        seen_as = _in_euro(row, proposed) or row
+        groups.setdefault(_amount_group(seen_as), []).append(seen_as)
     kept: list[Pricing] = []
+    keys: set[tuple[str, ...]] = set()
     reasons: list[str] = []
-    for olds in groups.values():
+    for key, olds in groups.items():
         lost = price_step._pricing_replacement_regressions(school, pages, olds, proposed)
         if lost:
-            kept.extend(olds)
+            kept.extend(old._row if isinstance(old, _InEuro) else old for old in olds)
+            keys.add(key)
             reasons.extend(lost)
-    return kept, reasons
+    return kept, keys, reasons
 
 
 def _fee_report(result: CheckedFee, page: Optional[PageRead]) -> dict[str, Any]:
@@ -445,11 +473,12 @@ async def run_school(
 
     # Old rows the read would lose (a fee it missed, a period it dropped) stay, instead of
     # holding the whole school; new rows at those amounts give way to them.
-    kept, regressions = _rows_to_keep(school, [*stored_pages, *source_pages.values()], superseded, publishable)
-    if kept:
+    kept, kept_amounts, regressions = _rows_to_keep(
+        school, [*stored_pages, *source_pages.values()], superseded, publishable
+    )
+    if kept:  # by amount alone: a refiled category or currency is still the same fee
         superseded = [row for row in superseded if row not in kept]
-        kept_keys = {_row_key(row) for row in kept}
-        pairs = [(row, source) for row, source in zip(rows, sources) if _row_key(row) not in kept_keys]
+        pairs = [(row, source) for row, source in zip(rows, sources) if _amount_group(row) not in kept_amounts]
         rows, sources = [row for row, _ in pairs], [source for _, source in pairs]
     report["regressions"] = regressions
     report["rows_old_kept"] = len(kept)
