@@ -1,0 +1,531 @@
+"""Fees-agent stage (R6 step 2): find a school's fee pages, read them once, check, store.
+
+Plan: ``docs/AGENT_FEE_EXTRACTION.md``. Experimental until step 3 passes, so it is not part
+of ``all``. The default is a dry run: nothing is written, the report says what would be.
+Page-line checks live in ``extraction/agent_fees.py``; row replacement reuses the rules of
+``extraction/price_step.py``.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import hashlib
+import logging
+import re
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
+from typing import Any, Optional
+from urllib.parse import unquote, urldefrag, urlparse
+
+from pydantic import BaseModel, Field
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.ai.client import create_agent, extract_provider_cost_usd, get_model, get_model_costs
+from app.config import CRAWLER_USER_AGENT, get_settings
+from app.database import async_session_maker
+from app.models import Pricing, School
+from app.models.field_source import FieldSource, SourceConfidence, SourceType
+from app.models.pipeline_run import PipelineRun
+from app.models.pricing import PriceSource
+from app.models.scrape_log import ScrapeType
+from app.models.source_page import SourcePage
+from app.schemas.extraction import ExtractedPrice
+from app.scrapers.extraction import llm_results, price_step, text_values
+from app.scrapers.extraction.agent_fees import READER_PROMPT, AgentFee, AgentFees, CheckedFee, check_fee
+from app.scrapers.fee_pages import fee_http_client, page_key, pdf_text
+from app.scrapers.price_evidence import _PRICE_RE
+from app.scrapers.shared_site_check import registrable_domain
+from app.scrapers.stages import common as stage_common
+from app.services.pipeline_runs import finalize_pipeline_run, pipeline_run_heartbeat, start_pipeline_run
+from app.services.provider_costs import ProviderCostCapExceeded, execute_billable_request, provider_cost_scope
+from app.utils.display_gating import pricing_row_is_publishable
+
+logger = logging.getLogger(__name__)
+
+STAGE = "fees-agent"
+DEFAULT_MAX_USD = 0.50
+MAX_HOPS = 3
+MAX_PICKS = 4
+MAX_FETCHES = 12
+MAX_LINKS_SHOWN = 150
+MAX_READ_CHARS = 120_000
+READ_OUTPUT_TOKENS_RESERVE = 6000
+PICK_COST_ESTIMATE_USD = 0.002
+# When the picker returns nothing, follow links whose URL or text names fees or admissions.
+_FEE_LINK_RE = re.compile(r"такс|цени|цена|прием|fee|tuition|pric|admission", re.IGNORECASE)
+_SKIPPED = (".jpg", ".jpeg", ".png", ".gif", ".svg", ".webp", ".css", ".js", ".zip", ".mp4", ".mp3", ".doc", ".docx")
+
+PICK_PROMPT = """You help find the pages of a school website that state its fees (tuition, monthly fee,
+registration, food, transport, price lists, fee PDFs). You get the institution's name, the pages read so far
+(with whether they already show prices), and the same-site links not yet opened, as "URL | link text".
+Return up to 4 URLs, copied exactly from the list, most likely first, that are likely to state this
+institution's fees or lead to them (admissions or "for parents" pages often do). Return none if nothing fits."""
+
+
+class SpendCapReached(RuntimeError):
+    """The next model call could take the run past its spend cap."""
+
+
+class Spend:
+    def __init__(self, cap_usd: float):
+        self.cap_usd = cap_usd
+        self.spent_usd = 0.0
+
+    def allows(self, estimate_usd: float) -> bool:
+        return self.spent_usd + estimate_usd <= self.cap_usd
+
+
+class Picks(BaseModel):
+    # Required: with a default the cheap model calls the output tool with no URLs at all.
+    urls: list[str] = Field(description="Up to 4 URLs copied exactly from the list; empty if none fits")
+
+
+@dataclass
+class PageRead:
+    url: str
+    text: str
+    prices: bool
+    note: Optional[str] = None
+
+
+Finder = Callable[[School], Awaitable[list[PageRead]]]
+Reader = Callable[[School, list[PageRead]], Awaitable[list[AgentFee]]]
+
+
+# ---------------------------------------------------------------------------
+# Find: the home page, then the links a cheap model (or the keyword fallback) picks
+# ---------------------------------------------------------------------------
+
+
+def _same_site(url: str, site: str) -> bool:
+    domain = registrable_domain(url)
+    return bool(domain) and domain == registrable_domain(site)
+
+
+async def _fetch(crawler, run_config, client, url: str) -> tuple[str, str, list[tuple[str, str]]]:
+    """(final URL, text, same-site links). PDFs are read with pdfplumber, pages rendered."""
+    if unquote(urlparse(url).path).lower().endswith(".pdf"):
+        response = await client.get(url, follow_redirects=True, timeout=30)
+        if response.status_code != 200:
+            return url, "", []
+        return str(response.url), await asyncio.to_thread(pdf_text, response.content), []
+    result = await asyncio.wait_for(crawler.arun(url=url, config=run_config), timeout=60)
+    if not getattr(result, "success", False):
+        return url, "", []
+    markdown = getattr(result, "markdown", None)
+    text = getattr(markdown, "raw_markdown", None) or str(markdown or "")
+    links = (getattr(result, "links", None) or {}).get("internal") or []
+    pairs = [(str(link["href"]), str(link.get("text") or "").strip()[:80]) for link in links if link.get("href")]
+    return str(getattr(result, "redirected_url", None) or url), text, pairs
+
+
+async def _pick(school: School, read: list[PageRead], links: list[tuple[str, str]], spend: Spend) -> list[str]:
+    if not spend.allows(PICK_COST_ESTIMATE_USD):
+        raise SpendCapReached(f"spent ${spend.spent_usd:.4f} of ${spend.cap_usd}")
+    agent = create_agent(
+        "cheap", PICK_PROMPT, Picks, retries=1, model_settings={"temperature": get_settings().extraction_temperature}
+    )
+    name = (school.name_i18n or {}).get("bg") or (school.name_i18n or {}).get("en")
+    pages = "\n".join(f"- {page.url} ({'shows prices' if page.prices else 'no prices'})" for page in read)
+    shown = "\n".join(f"{url} | {text}" for url, text in links[:MAX_LINKS_SHOWN])
+    result = await execute_billable_request(
+        lambda: agent.run(f"Institution: {name}\n\nRead so far:\n{pages}\n\nLinks:\n{shown}"),
+        model=get_model("cheap"),
+        school_id=school.id,
+        stage=STAGE,
+        timeout_seconds=60,
+    )
+    spend.spent_usd += extract_provider_cost_usd(result)
+    allowed = {url for url, _ in links}
+    return [url for url in result.output.urls if url in allowed][:MAX_PICKS]
+
+
+async def find_pages(crawler, run_config, client, school: School, spend: Spend) -> list[PageRead]:
+    """Up to 3 hops and 12 pages from the home page; robots.txt is respected."""
+    from crawl4ai.utils import RobotsParser  # type: ignore
+
+    robots = RobotsParser()
+    site = school.website_url
+    read: list[PageRead] = []
+    seen: set[tuple] = set()
+    links: dict[str, str] = {}
+    queue = [site]
+    for hop in range(MAX_HOPS + 1):
+        for url in queue:
+            if page_key(url) in seen or len(read) >= MAX_FETCHES:
+                continue
+            seen.add(page_key(url))
+            if not await robots.can_fetch(url, CRAWLER_USER_AGENT):
+                read.append(PageRead(url, "", False, "robots.txt"))
+                continue
+            try:
+                final, text, page_links = await _fetch(crawler, run_config, client, url)
+            except Exception as exc:  # a failed page is recorded and skipped
+                read.append(PageRead(url, "", False, str(exc)[:120]))
+                continue
+            if page_key(final) != page_key(url) and page_key(final) in seen:
+                continue  # a second link to a page already read (often a percent-encoded redirect)
+            seen.add(page_key(final))
+            read.append(PageRead(final, text, bool(_PRICE_RE.search(text))))
+            for href, label in page_links:
+                href = urldefrag(href)[0]
+                if _same_site(href, site) and not unquote(href).lower().endswith(_SKIPPED):
+                    links.setdefault(href, label)
+        if hop == MAX_HOPS or len(read) >= MAX_FETCHES:
+            break
+        unopened = [(url, label) for url, label in links.items() if page_key(url) not in seen]
+        if not unopened:
+            break
+        queue = await _pick(school, read, unopened, spend)
+        if not queue:
+            queue = [url for url, label in unopened if _FEE_LINK_RE.search(f"{unquote(url)} {label}")][:MAX_PICKS]
+        if not queue:
+            break
+    return read
+
+
+# ---------------------------------------------------------------------------
+# Read: one pricing-tier call over every page that shows a price
+# ---------------------------------------------------------------------------
+
+
+async def read_fees(school: School, pages: list[PageRead], spend: Spend) -> list[AgentFee]:
+    text = "\n\n".join(f"=== PAGE {page.url}\n{page.text}" for page in pages)[:MAX_READ_CHARS]
+    in_price, out_price = get_model_costs("pricing")
+    if not spend.allows((len(text) / 3 * in_price + READ_OUTPUT_TOKENS_RESERVE * out_price) / 1_000_000):
+        raise SpendCapReached(f"spent ${spend.spent_usd:.4f} of ${spend.cap_usd}")
+    agent = create_agent(
+        "pricing",
+        READER_PROMPT,
+        AgentFees,
+        retries=1,
+        model_settings={"temperature": get_settings().extraction_temperature},
+    )
+    name = (school.name_i18n or {}).get("bg") or (school.name_i18n or {}).get("en")
+    result = await execute_billable_request(
+        lambda: agent.run(f"Institution: {name} ({school.school_type} {school.education_level})\n\n{text}"),
+        model=get_model("pricing"),
+        school_id=school.id,
+        stage=STAGE,
+        timeout_seconds=120,
+    )
+    spend.spent_usd += extract_provider_cost_usd(result)
+    return result.output.fees
+
+
+# ---------------------------------------------------------------------------
+# Check, build rows, replace
+# ---------------------------------------------------------------------------
+
+
+def _page_for(fee: AgentFee, pages: list[PageRead]) -> Optional[PageRead]:
+    by_key = {page_key(page.url): page for page in pages}
+    return by_key.get(page_key(fee.source_url)) or (pages[0] if len(pages) == 1 else None)
+
+
+def _new_source_page(school: School, page: PageRead, page_id: int) -> SourcePage:
+    now = text_values._utcnow_naive()
+    return SourcePage(
+        id=page_id,
+        school_id=school.id,
+        scrape_type=ScrapeType.WEBSITE,
+        source_url=page.url,
+        content_hash=hashlib.sha256(page.text.encode()).hexdigest(),
+        page_category="pricing" if page.prices else None,
+        raw_markdown=page.text,
+        is_valid=True,
+        last_scraped_at=now,
+        last_changed_at=now,
+        scrape_count=1,
+    )
+
+
+def _build_rows(
+    school: School, checked: list[tuple[CheckedFee, SourcePage]]
+) -> tuple[list[Pricing], list[FieldSource]]:
+    rows: list[Pricing] = []
+    sources: list[FieldSource] = []
+    seen: set[tuple] = set()
+    for result, page in checked:
+        fee = result.fee
+        fields = price_step._normalized_price_fields(
+            ExtractedPrice(
+                category=fee.category.value,
+                amount=fee.amount,
+                currency=fee.currency,
+                period=fee.period.value if fee.period else None,
+                amount_min=fee.amount_min,
+                amount_max=fee.amount_max,
+                plan_name=fee.plan_name,
+                academic_year=fee.academic_year,
+                age_group=fee.age_group,
+                confidence=result.confidence,
+            )
+        )
+        if fields is None:
+            continue
+        key = (*fields.values(), fee.label.casefold(), page.source_url)
+        if key in seen:  # the same fee read twice from one page
+            continue
+        seen.add(key)
+        rows.append(
+            Pricing(
+                school_id=school.id,
+                **fields,
+                source=PriceSource.SCRAPED_WEBSITE,
+                source_url=page.source_url,
+                source_page_id=page.id,
+                source_page=page,
+                pricing_context={
+                    "extractor": "agent",
+                    "confidence": result.confidence,
+                    "checks": result.checks,
+                    "evidence": fee.evidence,
+                    "label": fee.label,
+                    "installments": fee.installments,
+                    "notes": fee.notes,
+                },
+            )
+        )
+        sources.append(
+            FieldSource(
+                school_id=school.id,
+                category="pricing",
+                field_key=f"pricing.{fields['category'].value}.{fields['period'].value if fields['period'] else 'unstated'}",
+                value_text=llm_results._format_price_value_text(
+                    fields["amount"], fields["amount_min"], fields["amount_max"], fields["currency"]
+                ),
+                source_type=SourceType.SCRAPED_WEBSITE,
+                source_url=page.source_url,
+                scraped_at=text_values._utcnow_naive(),
+                confidence=SourceConfidence.HIGH if result.confidence >= 0.8 else SourceConfidence.MEDIUM,
+                confidence_score=result.confidence,
+            )
+        )
+    return rows, sources
+
+
+async def _upsert_pages(db: AsyncSession, pages: dict[str, SourcePage], stored: dict[tuple, SourcePage]) -> None:
+    """Write each page read as a ``source_pages`` row (in place when the page is known)."""
+    for url, new in pages.items():
+        existing = stored.get(page_key(url))
+        if existing is None:
+            new.id = None
+            db.add(new)
+            continue
+        if existing.content_hash != new.content_hash:
+            existing.content_hash, existing.last_changed_at = new.content_hash, new.last_changed_at
+        # Validity stays as other stages set it; run_school skips pages they ruled out.
+        existing.raw_markdown, existing.last_scraped_at = new.raw_markdown, new.last_scraped_at
+        existing.scrape_count = (existing.scrape_count or 0) + 1
+        existing.page_category = new.page_category or existing.page_category
+        pages[url] = existing
+    await db.flush()
+
+
+def _fee_report(result: CheckedFee, page: Optional[PageRead]) -> dict[str, Any]:
+    fee = result.fee
+    return {
+        "category": fee.category.value,
+        "amount": fee.amount,
+        "amount_min": fee.amount_min,
+        "amount_max": fee.amount_max,
+        "currency": fee.currency,
+        "period": fee.period.value if fee.period else None,
+        "label": fee.label,
+        "academic_year": fee.academic_year,
+        "kept": result.kept,
+        "confidence": result.confidence,
+        "checks": result.checks,
+        "source_url": page.url if page else fee.source_url,
+        "evidence": fee.evidence,
+    }
+
+
+async def run_school(
+    db: AsyncSession, school: School, *, find: Finder, read: Reader, apply: bool = False
+) -> dict[str, Any]:
+    """Find, read, check and (with ``apply``) store one school's fees. Returns its report."""
+    report: dict[str, Any] = {"school_id": school.id, "outcome": None, "pages": [], "fees": []}
+    pages = await find(school)
+    report["pages"] = [{"url": p.url, "chars": len(p.text), "prices": p.prices, "note": p.note} for p in pages]
+    priced = [page for page in pages if page.prices]
+    if not priced:
+        report["outcome"] = "kept_old_rows"
+        report["reason"] = "no page showing prices"
+        return report
+
+    fees = await read(school, priced)
+    # A known page keeps its id; a new one gets a negative placeholder until ``apply`` stores it.
+    stored_pages = (await db.execute(select(SourcePage).where(SourcePage.school_id == school.id))).scalars().all()
+    # Matched by page_key so a trailing slash or encoding difference finds the stored page.
+    stored = {page_key(page.source_url): page for page in stored_pages if page.scrape_type == ScrapeType.WEBSITE}
+    ruled_out = [page.url for page in priced if getattr(stored.get(page_key(page.url)), "is_valid", None) is False]
+    if ruled_out:
+        report["outcome"] = "kept_old_rows"
+        report["reason"] = f"page ruled invalid by an earlier stage: {ruled_out[0]}"
+        return report
+    source_pages = {
+        page.url: _new_source_page(
+            school, page, stored[page_key(page.url)].id if page_key(page.url) in stored else -(index + 1)
+        )
+        for index, page in enumerate(pages)
+        if page.text.strip()
+    }
+    checked: list[tuple[CheckedFee, SourcePage]] = []
+    for fee in fees:
+        page = _page_for(fee, priced)
+        result = check_fee(fee, page.text) if page else CheckedFee(fee, 0.0, False, ["dropped: not on a page read"])
+        report["fees"].append(_fee_report(result, page))
+        if result.kept and page:
+            checked.append((result, source_pages[page.url]))
+
+    rows, sources = _build_rows(school, checked)
+    publishable = [row for row in rows if pricing_row_is_publishable(row)]
+    superseded = await price_step._find_superseded_rows(db, school, rows)
+    published_before = [row for row in superseded if pricing_row_is_publishable(row)]
+    report |= {
+        "rows_new": len(rows),
+        "rows_new_publishable": len(publishable),
+        "rows_old_published": len(published_before),
+    }
+
+    # A thin or failed read must not wipe good prices or make them flicker.
+    if not publishable or 2 * len(publishable) < len(published_before):
+        report["outcome"] = "kept_old_rows"
+        report["reason"] = (
+            "nothing publishable read"
+            if not publishable
+            else f"{len(publishable)} publishable rows against {len(published_before)} published"
+        )
+        return report
+
+    regressions = price_step._pricing_replacement_regressions(
+        school, [*stored_pages, *source_pages.values()], superseded, publishable
+    )
+    report["regressions"] = regressions
+    if not apply:
+        report["outcome"] = "would_hold" if regressions else "would_write"
+        return report
+    if price_step._update_pricing_hold(school, regressions, len(rows)):
+        report["outcome"] = "held"
+        await db.commit()
+        return report
+
+    await _upsert_pages(db, source_pages, stored)
+    for row in rows:  # rows were built against the placeholder pages
+        row.source_page = source_pages[row.source_url]
+        row.source_page_id = row.source_page.id
+    for source in sources:
+        source.scraped_at = text_values._utcnow_naive()
+    await price_step._write_price_rows(db, school, [row.id for row in superseded], rows, sources)
+    await db.commit()
+    report["outcome"] = "written"
+    return report
+
+
+# ---------------------------------------------------------------------------
+# Batch
+# ---------------------------------------------------------------------------
+
+
+async def run_fees_agent(
+    db: AsyncSession,
+    *,
+    country: str = "bg",
+    city: Optional[str] = None,
+    school_id: Optional[int] = None,
+    limit: Optional[int] = None,
+    max_usd: float = DEFAULT_MAX_USD,
+    apply: bool = False,
+) -> dict[str, Any]:
+    """Run the agent over private and international schools with a website; returns the report."""
+    from crawl4ai import AsyncWebCrawler, BrowserConfig, CacheMode, CrawlerRunConfig  # type: ignore
+
+    query = select(School).where(School.country_code == country, School.website_url.isnot(None))
+    query = (
+        query.where(School.id == school_id)
+        if school_id
+        else query.where(School.school_type.in_(["private", "international"]))
+    )
+    if city:
+        query = query.where(School.city == city)
+    # Ids, not objects: a rollback after one school's failure expires every loaded object.
+    school_ids = (await db.execute(query.with_only_columns(School.id).order_by(School.id).limit(limit))).scalars().all()
+
+    spend = Spend(max_usd)
+    run = await start_pipeline_run(
+        db, country=country, city=city, cli_stage=STAGE, config={"provider_cost_cap_usd": max_usd, "apply": apply}
+    )
+    run_id = run.id  # a rollback after a failed school expires ``run``
+    settings = get_settings()
+    browser = BrowserConfig(headless=True, verbose=False, ignore_https_errors=True, user_agent=CRAWLER_USER_AGENT)
+    run_config = CrawlerRunConfig(
+        cache_mode=CacheMode.BYPASS,
+        check_robots_txt=True,
+        page_timeout=30000,
+        wait_until="domcontentloaded",
+        delay_before_return_html=0.5,
+        exclude_external_links=True,
+        verbose=False,
+    )
+    results: list[dict[str, Any]] = []
+    error: Optional[str] = None
+    with provider_cost_scope(
+        pipeline_run_id=run.id,
+        stage=STAGE,
+        cap_usd=max_usd,
+        request_reserve_usd=float(settings.provider_request_reserve_usd),
+    ):
+        async with (
+            pipeline_run_heartbeat(
+                run.id,
+                session_factory=async_session_maker,
+                interval_seconds=float(settings.pipeline_heartbeat_interval_seconds),
+            ),
+            AsyncWebCrawler(config=browser) as crawler,
+            fee_http_client() as client,
+        ):
+            for current_id in school_ids:
+                school = await db.get(School, current_id)
+                try:
+                    results.append(
+                        await run_school(
+                            db,
+                            school,
+                            find=lambda s: find_pages(crawler, run_config, client, s, spend),
+                            read=lambda s, pages: read_fees(s, pages, spend),
+                            apply=apply,
+                        )
+                    )
+                except (SpendCapReached, ProviderCostCapExceeded) as exc:
+                    error = f"stopped before school {current_id}: {exc}"
+                    break
+                except Exception as exc:  # one school's failure leaves its rows as they are
+                    logger.exception("fees-agent failed for school %s", current_id)
+                    if db.in_transaction():
+                        await db.rollback()
+                    results.append({"school_id": current_id, "outcome": "error", "reason": str(exc)[:200]})
+    failed = sum(r["outcome"] == "error" for r in results)
+    run = await db.get(PipelineRun, run_id, populate_existing=True)
+    await finalize_pipeline_run(
+        db,
+        run,
+        country=country,
+        city=city,
+        stage_summaries=[
+            stage_common.stage_summary(processed=len(results), succeeded=len(results) - failed, failed=failed)
+        ],
+        error_summary=error,
+    )
+    return {
+        "apply": apply,
+        "pipeline_run_id": run_id,
+        "schools": len(results),
+        "spent_usd": round(spend.spent_usd, 6),
+        "stopped": error,
+        "kept_old_rows": [r["school_id"] for r in results if r["outcome"] == "kept_old_rows"],
+        "outcomes": {o: sum(r["outcome"] == o for r in results) for o in {r["outcome"] for r in results}},
+        "results": results,
+    }

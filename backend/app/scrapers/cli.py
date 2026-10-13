@@ -391,6 +391,53 @@ async def _shared_site_check_command(*, school_ids, city, country, dry_run, repo
         console.print(f"Report: {report_path}")
 
 
+@cli.command("fees-agent")
+@click.option("--school-id", type=int, default=None, help="Run one school (any school type)")
+@click.option("--city", default=None, help="Only schools in this city")
+@click.option("--country", default="bg", show_default=True, help="Country code")
+@click.option("--limit", type=int, default=None, help="Maximum schools")
+@click.option("--max-usd", type=float, default=0.50, show_default=True, help="Spend cap for the run")
+@click.option("--apply", "apply_changes", is_flag=True, help="Write rows (default is a dry run that writes nothing)")
+@click.option("--out", "report_path", type=click.Path(dir_okay=False, path_type=Path), help="Write the JSON report")
+def fees_agent_command(school_id, city, country, limit, max_usd, apply_changes, report_path):
+    """Read private and international schools' fee pages with the fee agent (experimental, not in `all`)."""
+    asyncio.run(
+        _fees_agent_command(
+            school_id=school_id,
+            city=city,
+            country=country,
+            limit=limit,
+            max_usd=max_usd,
+            apply=apply_changes,
+            report_path=report_path,
+        )
+    )
+
+
+async def _fees_agent_command(*, school_id, city, country, limit, max_usd, apply, report_path):
+    import json
+
+    from app.database import async_session_maker
+    from app.scrapers.stages import fees_agent as fees_agent_stage
+
+    async with async_session_maker() as db:
+        report = await fees_agent_stage.run_fees_agent(
+            db, country=country, city=city, school_id=school_id, limit=limit, max_usd=max_usd, apply=apply
+        )
+    console.print(
+        f"{'Applied' if apply else 'Dry run'}: {report['schools']} schools, ${report['spent_usd']:.4f} spent, "
+        f"outcomes {report['outcomes']}"
+    )
+    if report["stopped"]:
+        console.print(f"[yellow]{report['stopped']}[/yellow]")
+    if report["kept_old_rows"]:
+        console.print(f"Kept old rows: {report['kept_old_rows']}")
+    if report_path is not None:
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(json.dumps(report, ensure_ascii=False, indent=1, default=str), encoding="utf-8")
+        console.print(f"Report: {report_path}")
+
+
 @cli.command("promote-curated-identities")
 @click.option(
     "--school-id",

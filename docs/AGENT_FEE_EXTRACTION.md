@@ -85,10 +85,10 @@ no new column, table or migration.
 
 **Replacing rows.** This reuses today's supersede rule (`price_step._find_superseded_rows`):
 a run replaces only the academic years it read, so earlier years stay as history. Because
-the agent's reads vary from run to run, a school whose new read has fewer than half as many
-publishable fees as its current published rows keeps its old rows, and the run summary lists
-it. A school where the agent reads nothing also keeps its rows. A failed or partial crawl
-must not wipe good prices or make them flicker.
+the agent's reads vary from run to run, a school whose new read has, for the academic years
+it replaces, fewer than half as many publishable fees as its current published rows keeps
+its old rows, and the run summary lists it. A school where the agent reads nothing also
+keeps its rows. A failed or partial crawl must not wipe good prices or make them flicker.
 
 **Freshness.** Fees change about once a year, for the new school year. Run monthly, and
 weekly from June to September. One run over Sofia's 175 private and international schools
@@ -129,6 +129,9 @@ it comes after steps 1 to 5 prove the runs are reliable.
    in `docs/accuracy/fresh_check.md` as regression cases, and valid fees from the same pages
    that the rules must not clear or withhold. Big PR (it changes what the API publishes):
    one `@codex review`. Experimental until step 3 passes: nothing calls it from `all`.
+   Built 2026-10-13 as an experimental dry-run-by-default command (`fees-agent`, `--apply`
+   to write). Not yet wired: fee tables published only as images (`fee_image_reader.py`).
+   A dry run still calls the models and records its pipeline run and spend; it writes no fees or pages.
 3. **Validate, then switch over.** First, about 20 schools from the 41 that neither sample
    used get a key read blind. The step-2 stage and today's rows are scored on them with
    `fresh_rescore/rules.md`, frozen as they are now. Score what would be published after every
