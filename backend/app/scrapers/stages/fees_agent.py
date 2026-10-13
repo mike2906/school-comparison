@@ -541,20 +541,33 @@ def _rows_to_keep(
 async def _missed_amounts(
     db: AsyncSession, school: School, pages: list[PageRead], fees: list[AgentFee]
 ) -> list[Decimal]:
-    """Amounts of the school's published website rows that the pages show and the read left out."""
+    """Amounts of the school's published website rows that the pages show and the read left out.
+
+    Only rows of this school year or later, or undated: an older year's table still on the
+    page is history, not a missed fee. A lev amount the read gives in euro is not missed.
+    """
     stored = await db.execute(
         select(Pricing)
         .where(Pricing.school_id == school.id, Pricing.source == PriceSource.SCRAPED_WEBSITE)
-        .options(selectinload(Pricing.source_page))
+        .options(selectinload(Pricing.source_page).load_only(SourcePage.id, SourcePage.is_valid))
     )
     blocked = blocked_pricing_row_ids(school.attributes if isinstance(school.attributes, dict) else None)
-    published = {
-        Decimal(str(row.amount)).normalize()
-        for row in stored.scalars().all()
-        if row.amount is not None and row.id not in blocked and pricing_row_is_publishable(row)
-    }
-    shown = page_numbers(reader_text(pages))  # what the reader can see, not what was cut off
+    current = current_academic_year()
     read = {amount for fee in fees for amount in fee_amounts(fee)}
+    euro = {amount for fee in fees if (fee.currency or "").upper() == "EUR" for amount in fee_amounts(fee)}
+    published = set()
+    for row in stored.scalars().all():
+        year = normalize_academic_year(row.academic_year)
+        if row.amount is None or row.id in blocked or (year and year < current) or not pricing_row_is_publishable(row):
+            continue
+        amount = Decimal(str(row.amount)).normalize()
+        if (row.currency or "").upper() == "BGN":
+            target = amount / _BGN_PER_EUR
+            if any(abs(value - target) <= target * EURO_TOLERANCE for value in euro):
+                continue
+        published.add(amount)
+    # What the reader can see (not what was cut off), without the page headers' URLs.
+    shown = page_numbers(re.sub(r"^=== PAGE .*$", "", reader_text(pages), flags=re.MULTILINE))
     return sorted((published & shown) - read)
 
 
@@ -614,7 +627,13 @@ async def run_school(
         try:
             again = await read(school, priced, missed)
         except (SpendCapReached, ProviderCostCapExceeded) as exc:  # the first read is paid for: use it
-            report["reread"]["error"] = str(exc)
+            report["reread"]["error"] = str(exc)  # the next school's first read stops the run
+            again = []
+        except ProviderCostError:  # the run is no longer running: write nothing
+            raise
+        except Exception as exc:  # a timed-out or malformed second read: the first still stands
+            logger.warning("fees-agent second read failed for school %s: %s", school.id, exc)
+            report["reread"]["error"] = str(exc)[:200]
             again = []
         first = {amount for fee in fees for amount in fee_amounts(fee)}
         added = [fee for fee in again if fee_amounts(fee) and not set(fee_amounts(fee)) <= first]

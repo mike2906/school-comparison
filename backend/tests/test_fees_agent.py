@@ -737,6 +737,42 @@ async def test_a_spend_cap_on_the_second_read_keeps_the_first(db_session, pages,
     assert report["outcome"] == "written" and report["rows_old_kept"] == 1, report
 
 
+async def test_a_failed_second_read_keeps_the_first(db_session, pages, frozen_today):
+    school = await _school(db_session)
+    await _old_rows(db_session, school, "2026/2027", [700, 90])
+    await db_session.commit()
+
+    async def read(school, pages, missed):
+        if missed:
+            raise TimeoutError("read timed out")
+        return FEES_STAGE
+
+    report = await fees_agent.run_school(db_session, school, find=_find(pages), read=read, apply=True)
+    assert report["reread"]["error"] == "read timed out"
+    assert report["outcome"] == "written" and report["rows_old_kept"] == 1, report
+
+
+async def test_an_older_year_or_a_lev_twin_is_not_missed(db_session, frozen_today):
+    page_text = "Месечна такса: 700 евро (1369.08 лв.)\nМинала година: 650 евро"
+    school = await _school(db_session)
+    await _old_rows(db_session, school, "2025/2026", [650])  # last year's table, still on the page
+    await _old_rows(db_session, school, None, [1369.08])
+    lev = next(r for r in await _rows(db_session, school) if float(r.amount) == 1369.08)
+    lev.currency = "BGN"
+    await db_session.commit()
+    read = [fee(PriceCategory.TUITION, page_text, amount=700, period=PricePeriod.MONTHLY, academic_year="2026/2027")]
+    pages = [PageRead(URL, page_text, True)]
+    assert await fees_agent._missed_amounts(db_session, school, pages, read) == []
+
+
+async def test_numbers_in_a_page_url_are_not_shown_amounts(db_session, frozen_today):
+    school = await _school(db_session)
+    await _old_rows(db_session, school, "2026/2027", [700])
+    await db_session.commit()
+    pages = [PageRead("https://school.example/?page_id=700", "Храна: 90 евро", True)]
+    assert await fees_agent._missed_amounts(db_session, school, pages, []) == []
+
+
 def test_amounts_past_the_reader_limit_are_not_missed(monkeypatch):
     monkeypatch.setattr(fees_agent, "MAX_READ_CHARS", len(f"=== PAGE {URL}\n") + 30)
     pages = [PageRead(URL, "Месечна такса: 700 евро\n" + "x" * 50 + "\nХрана: 90 евро", True)]
