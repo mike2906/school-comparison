@@ -53,8 +53,23 @@ a failed crawl must not wipe good prices.
 
 **Freshness.** Fees change about once a year, for the new school year. Run monthly, and
 weekly from June to September. One run over Sofia's 175 private and international schools
-costs about $0.20, inside the $0.50-a-run cap. Production still needs a publish after a
-run (AGENTS.md invariant 3); automating that is out of scope here.
+costs about $0.20, inside the $0.50-a-run cap.
+
+**Publishing without a person.** A run changes only the launch DB; production sees it
+after a publish (AGENTS.md invariant 3). A scheduled run that waits for someone to publish
+is a recurring human task, so step 6 makes publishing automatic, behind checks that hold
+the publish and report instead:
+
+- the agent's accuracy on the reference set (`accuracy_report.py`, about $0.03) stays at
+  90 % or higher;
+- published fee rows drop by no more than 10 % overall, and no school loses all of its
+  fees;
+- the backup succeeds before the upload.
+
+What blocks it today: the launch DB lives on Mike's PC, and the off-site backup there needs
+him to run or allow it. So step 6 needs either a scheduled job on that PC that is allowed
+to back up and publish, or the launch DB moved to a host that can. That is Mike's call, and
+it comes after steps 1 to 5 prove the runs are reliable.
 
 ## Steps (one PR each)
 
@@ -71,6 +86,7 @@ run (AGENTS.md invariant 3); automating that is out of scope here.
 4. **Retire the rule-based price extraction.** Stop calling `_extract_prices` from the
    extract stage, then delete the price-only code it leaves unused. Big PR.
 5. **Schedule.** Add the monthly and summer-weekly run.
+6. **Publish automatically** behind the checks above, once Mike picks where the job runs.
 
 ## Not covered
 
