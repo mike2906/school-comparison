@@ -1,0 +1,286 @@
+{
+ "apply": true,
+ "pipeline_run_id": "24c67f2c-433c-4adb-9251-bb8be609d50d",
+ "schools": 1,
+ "spent_usd": 0.003916,
+ "stopped": null,
+ "kept_old_rows": [],
+ "outcomes": {
+  "held": 1
+ },
+ "results": [
+  {
+   "school_id": 533,
+   "outcome": "held",
+   "pages": [
+    {
+     "url": "https://school3.transform.bg/",
+     "chars": 11152,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://school3.transform.bg/application-and-admission/finansovi-uslovia/",
+     "chars": 13425,
+     "prices": true,
+     "note": null
+    },
+    {
+     "url": "https://school3.transform.bg/application-and-admission/apply/",
+     "chars": 12764,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://school3.transform.bg/application-and-admission/applications/",
+     "chars": 16084,
+     "prices": true,
+     "note": null
+    },
+    {
+     "url": "http://school1.transform.bg/wp-content/uploads/2019/12/zaiavlenie-za-priem-2020-2021.pdf",
+     "chars": 0,
+     "prices": false,
+     "note": null
+    }
+   ],
+   "fees": [
+    {
+     "category": "tuition",
+     "amount": 2960.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "yearly",
+     "label": "Такса обучение",
+     "academic_year": "2026/2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://school3.transform.bg/application-and-admission/finansovi-uslovia/",
+     "evidence": "Такси и други разходи за 2026/2027 учебна година (в евро):\n|   |  Такса в евро на 1 вноска годишно  |  Такса в евро на 3 вноски  годишно  |  Такса в евро на равни месечни вноски   |\n| Такса обучение  | € 2960  | € 3040  | € 3120  |"
+    },
+    {
+     "category": "tuition",
+     "amount": 3040.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "yearly",
+     "label": "Такса обучение",
+     "academic_year": "2026/2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://school3.transform.bg/application-and-admission/finansovi-uslovia/",
+     "evidence": "Такси и други разходи за 2026/2027 учебна година (в евро):\n|   |  Такса в евро на 1 вноска годишно  |  Такса в евро на 3 вноски  годишно  |  Такса в евро на равни месечни вноски   |\n| Такса обучение  | € 2960  | € 3040  | € 3120  |"
+    },
+    {
+     "category": "tuition",
+     "amount": 3120.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "yearly",
+     "label": "Такса обучение",
+     "academic_year": "2026/2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://school3.transform.bg/application-and-admission/finansovi-uslovia/",
+     "evidence": "Такси и други разходи за 2026/2027 учебна година (в евро):\n|   |  Такса в евро на 1 вноска годишно  |  Такса в евро на 3 вноски  годишно  |  Такса в евро на равни месечни вноски   |\n| Такса обучение  | € 2960  | € 3040  | € 3120  |"
+    },
+    {
+     "category": "activities",
+     "amount": 2960.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "yearly",
+     "label": "Извънкласни дейности / Изследователска програма",
+     "academic_year": "2026/2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://school3.transform.bg/application-and-admission/finansovi-uslovia/",
+     "evidence": "Такси и други разходи за 2026/2027 учебна година (в евро):\n|   |  Такса в евро на 1 вноска годишно  |  Такса в евро на 3 вноски  годишно  |  Такса в евро на равни месечни вноски   |\n| Извънкласни дейности / Изследователска програма  | € 2960  | € 3040  | € 3120  |"
+    },
+    {
+     "category": "activities",
+     "amount": 3040.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "yearly",
+     "label": "Извънкласни дейности / Изследователска програма",
+     "academic_year": "2026/2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://school3.transform.bg/application-and-admission/finansovi-uslovia/",
+     "evidence": "Такси и други разходи за 2026/2027 учебна година (в евро):\n|   |  Такса в евро на 1 вноска годишно  |  Такса в евро на 3 вноски  годишно  |  Такса в евро на равни месечни вноски   |\n| Извънкласни дейности / Изследователска програма  | € 2960  | € 3040  | € 3120  |"
+    },
+    {
+     "category": "activities",
+     "amount": 3120.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "yearly",
+     "label": "Извънкласни дейности / Изследователска програма",
+     "academic_year": "2026/2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://school3.transform.bg/application-and-admission/finansovi-uslovia/",
+     "evidence": "Такси и други разходи за 2026/2027 учебна година (в евро):\n|   |  Такса в евро на 1 вноска годишно  |  Такса в евро на 3 вноски  годишно  |  Такса в евро на равни месечни вноски   |\n| Извънкласни дейности / Изследователска програма  | € 2960  | € 3040  | € 3120  |"
+    },
+    {
+     "category": "activities",
+     "amount": 740.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "yearly",
+     "label": "Летни въвеждащи и завършващи дейности – септември/юни",
+     "academic_year": "2026/2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://school3.transform.bg/application-and-admission/finansovi-uslovia/",
+     "evidence": "Такси и други разходи за 2026/2027 учебна година (в евро):\n|   |  Такса в евро на 1 вноска годишно  |  Такса в евро на 3 вноски  годишно  |  Такса в евро на равни месечни вноски   |\n| Летни въвеждащи и завършващи дейности – септември/юни  | € 740  | € 760  | € 780  |"
+    },
+    {
+     "category": "activities",
+     "amount": 760.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "yearly",
+     "label": "Летни въвеждащи и завършващи дейности – септември/юни",
+     "academic_year": "2026/2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://school3.transform.bg/application-and-admission/finansovi-uslovia/",
+     "evidence": "Такси и други разходи за 2026/2027 учебна година (в евро):\n|   |  Такса в евро на 1 вноска годишно  |  Такса в евро на 3 вноски  годишно  |  Такса в евро на равни месечни вноски   |\n| Летни въвеждащи и завършващи дейности – септември/юни  | € 740  | € 760  | € 780  |"
+    },
+    {
+     "category": "activities",
+     "amount": 780.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "yearly",
+     "label": "Летни въвеждащи и завършващи дейности – септември/юни",
+     "academic_year": "2026/2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://school3.transform.bg/application-and-admission/finansovi-uslovia/",
+     "evidence": "Такси и други разходи за 2026/2027 учебна година (в евро):\n|   |  Такса в евро на 1 вноска годишно  |  Такса в евро на 3 вноски  годишно  |  Такса в евро на равни месечни вноски   |\n| Летни въвеждащи и завършващи дейности – септември/юни  | € 740  | € 760  | € 780  |"
+    },
+    {
+     "category": "food",
+     "amount": 7.5,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Храна (опционално)",
+     "academic_year": "2026/2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://school3.transform.bg/application-and-admission/finansovi-uslovia/",
+     "evidence": "| Храна (опционално)  |  **≈ 7.5 ЕUR /** ден  |"
+    },
+    {
+     "category": "camp",
+     "amount": 950.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Зелени училища (приблизително)",
+     "academic_year": "2026/2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://school3.transform.bg/application-and-admission/finansovi-uslovia/",
+     "evidence": "| Зелени училища (приблизително)  |  **≈ 950 EUR /** за всички  |"
+    },
+    {
+     "category": "extracurricular",
+     "amount": null,
+     "amount_min": 10.0,
+     "amount_max": 20.0,
+     "currency": "EUR",
+     "period": null,
+     "label": "Допълнителни извънкласни дейности (опционално)",
+     "academic_year": "2026/2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://school3.transform.bg/application-and-admission/finansovi-uslovia/",
+     "evidence": "| Допълнителни извънкласни дейности (опционално)  |  **от 10 до 20 EUR** / за едно занимание  |"
+    },
+    {
+     "category": "materials",
+     "amount": 100.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Материали",
+     "academic_year": "2026/2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://school3.transform.bg/application-and-admission/finansovi-uslovia/",
+     "evidence": "| Материали  |  **100 EUR** / за 10 месеца  |"
+    },
+    {
+     "category": "transport",
+     "amount": 200.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "monthly",
+     "label": "Транспорт в две посоки (опционално)",
+     "academic_year": "2026/2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://school3.transform.bg/application-and-admission/finansovi-uslovia/",
+     "evidence": "| Транспорт в две посоки (опционално)  |  **≈ 200 EUR** / месец  |"
+    },
+    {
+     "category": "registration",
+     "amount": 125.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Административна такса за приемна процедура",
+     "academic_year": "2026/2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [
+      "period one_time cleared: the evidence does not name it"
+     ],
+     "source_url": "https://school3.transform.bg/application-and-admission/applications/",
+     "evidence": "Административна такса за приемна процедура – 125 евро. Тя включва администриране, организация и комуникация по време на приемната процедура. Таксата се заплаща при подаване на заявление за прием."
+    }
+   ],
+   "rows_new": 15,
+   "rows_new_publishable": 15,
+   "rows_old_published": 6,
+   "regressions": [
+    "drops EXTRACURRICULAR 10.00, which the page still shows",
+    "drops EXTRACURRICULAR 20.00, which the page still shows",
+    "loses the ONE_TIME period of REGISTRATION 125.00"
+   ]
+  }
+ ]
+}

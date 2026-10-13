@@ -1,0 +1,41 @@
+{
+ "apply": true,
+ "pipeline_run_id": "4b6b243a-b36c-4afd-97aa-912f3a228c33",
+ "schools": 1,
+ "spent_usd": 0.000191,
+ "stopped": null,
+ "kept_old_rows": [
+  573
+ ],
+ "outcomes": {
+  "kept_old_rows": 1
+ },
+ "results": [
+  {
+   "school_id": 573,
+   "outcome": "kept_old_rows",
+   "pages": [
+    {
+     "url": "https://lauderschool.bg/",
+     "chars": 5925,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://lauderschool.bg/admission-3/",
+     "chars": 3409,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://lauderschool.bg/docs/",
+     "chars": 6988,
+     "prices": false,
+     "note": null
+    }
+   ],
+   "fees": [],
+   "reason": "no page showing prices"
+  }
+ ]
+}

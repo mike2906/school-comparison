@@ -1,0 +1,112 @@
+{
+ "apply": true,
+ "pipeline_run_id": "38c5acef-e8d7-41bf-87e1-eb89810e398e",
+ "schools": 1,
+ "spent_usd": 0.003255,
+ "stopped": null,
+ "kept_old_rows": [],
+ "outcomes": {
+  "held": 1
+ },
+ "results": [
+  {
+   "school_id": 562,
+   "outcome": "held",
+   "pages": [
+    {
+     "url": "https://ivanapostolov.bg/",
+     "chars": 15435,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://ivanapostolov.bg/taksi/",
+     "chars": 10279,
+     "prices": true,
+     "note": null
+    },
+    {
+     "url": "https://ivanapostolov.bg/admission/",
+     "chars": 15486,
+     "prices": true,
+     "note": null
+    },
+    {
+     "url": "https://ivanapostolov.bg/admissions-upper-grades/",
+     "chars": 11612,
+     "prices": true,
+     "note": null
+    },
+    {
+     "url": "https://ivanapostolov.bg/programs/predpriemacheski-profil/",
+     "chars": 15943,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://ivanapostolov.bg/programs/",
+     "chars": 12104,
+     "prices": false,
+     "note": null
+    }
+   ],
+   "fees": [
+    {
+     "category": "tuition",
+     "amount": 8965.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "yearly",
+     "label": "Таксата за следващата учебна година",
+     "academic_year": "2026/2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://ivanapostolov.bg/taksi/",
+     "evidence": "#### Таксата за следващата учебна година (2026/2027) е 8965 евро."
+    },
+    {
+     "category": "registration",
+     "amount": 75.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Таксата за явяване на изпит",
+     "academic_year": "2026/2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [
+      "period one_time cleared: the evidence does not name it"
+     ],
+     "source_url": "https://ivanapostolov.bg/admission/",
+     "evidence": "  * Таксата за явяване на изпит е в размер на 75 € и се заплаща по банков път."
+    },
+    {
+     "category": "registration",
+     "amount": 75.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "такса",
+     "academic_year": null,
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [
+      "period one_time cleared: the evidence does not name it"
+     ],
+     "source_url": "https://ivanapostolov.bg/admissions-upper-grades/",
+     "evidence": "  2. Документ за платена такса – 75 € (таксата може да се плати по банков път или в деня на изпита)."
+    }
+   ],
+   "rows_new": 3,
+   "rows_new_publishable": 3,
+   "rows_old_published": 2,
+   "regressions": [
+    "loses the ONE_TIME period of REGISTRATION 75.00"
+   ]
+  }
+ ]
+}

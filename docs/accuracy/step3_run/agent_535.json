@@ -1,0 +1,89 @@
+{
+ "apply": true,
+ "pipeline_run_id": "9a6885c8-3bb0-44e3-aeb5-f9cfca2833fe",
+ "schools": 1,
+ "spent_usd": 0.000587,
+ "stopped": null,
+ "kept_old_rows": [
+  535
+ ],
+ "outcomes": {
+  "kept_old_rows": 1
+ },
+ "results": [
+  {
+   "school_id": 535,
+   "outcome": "kept_old_rows",
+   "pages": [
+    {
+     "url": "https://www.orfei.net/",
+     "chars": 6202,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://www.orfei.net/uchilishte",
+     "chars": 5010,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://www.orfei.net/podgotvitelna-grupa",
+     "chars": 5162,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://www.orfei.net/dokumenti/administrativni-uslugi",
+     "chars": 2793,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://www.orfei.net/dokumenti/dokumenti",
+     "chars": 7388,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://www.orfei.net/zayavlenie",
+     "chars": 2704,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://www.orfei.net/zayavlenie2",
+     "chars": 5142,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://www.orfei.net/static/uploads/documents/b5a19659f8fc4c53975bb0ae7e37241d.pdf",
+     "chars": 5440,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://www.orfei.net/static/uploads/documents/b557270377b541beb5555f162aecac9d.pdf",
+     "chars": 782,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://www.orfei.net/static/uploads/documents/3f11e7167a8c4d92b8ca2c552789f7cf.pdf",
+     "chars": 12516,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://www.orfei.net/static/uploads/documents/cae6a52b9ff9495dae8c4681643a8ef1.pdf",
+     "chars": 5018,
+     "prices": false,
+     "note": null
+    }
+   ],
+   "fees": [],
+   "reason": "no page showing prices"
+  }
+ ]
+}

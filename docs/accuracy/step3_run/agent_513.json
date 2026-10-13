@@ -1,0 +1,29 @@
+{
+ "apply": true,
+ "pipeline_run_id": "fb4f0793-2902-4906-a633-1ff8d71f81ec",
+ "schools": 1,
+ "spent_usd": 2.4e-05,
+ "stopped": null,
+ "kept_old_rows": [
+  513
+ ],
+ "outcomes": {
+  "kept_old_rows": 1
+ },
+ "results": [
+  {
+   "school_id": 513,
+   "outcome": "kept_old_rows",
+   "pages": [
+    {
+     "url": "https://www.ecomalchovci.com/",
+     "chars": 8238,
+     "prices": false,
+     "note": null
+    }
+   ],
+   "fees": [],
+   "reason": "no page showing prices"
+  }
+ ]
+}
