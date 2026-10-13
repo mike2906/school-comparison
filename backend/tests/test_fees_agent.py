@@ -9,6 +9,7 @@ fetches are stubbed in the stage tests.
 
 from __future__ import annotations
 
+import json
 from decimal import Decimal
 
 import httpx
@@ -609,6 +610,44 @@ async def test_a_failed_school_still_finalises_the_run(db_session, monkeypatch):
     assert report["outcomes"] == {"error": 1}
     run = await db_session.get(PipelineRun, report["pipeline_run_id"])
     assert run.status.value != "running"
+
+
+async def test_a_run_reports_each_school_as_it_goes_and_can_start_after_one(db_session, monkeypatch, tmp_path):
+    """A killed Sofia dry run (2026-10-13) lost every read: the report was written only at the end."""
+    import contextlib
+
+    import crawl4ai
+
+    first, second, third = [await _school(db_session) for _ in range(3)]
+    await db_session.commit()
+
+    class _Crawler:
+        def __init__(self, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *exc):
+            return False
+
+    async def _read(db, school, **kwargs):
+        return {"school_id": school.id, "outcome": "would_write"}
+
+    @contextlib.asynccontextmanager
+    async def _nothing(*args, **kwargs):
+        yield None
+
+    monkeypatch.setattr(crawl4ai, "AsyncWebCrawler", _Crawler)
+    monkeypatch.setattr(fees_agent, "fee_http_client", _nothing)
+    monkeypatch.setattr(fees_agent, "pipeline_run_heartbeat", _nothing)
+    monkeypatch.setattr(fees_agent, "run_school", _read)
+    lines = tmp_path / "run.schools.jsonl"
+    lines.write_text('{"school_id": 0, "outcome": "would_write"}\n', encoding="utf-8")  # the stopped run's
+    report = await fees_agent.run_fees_agent(db_session, city="sofia", after_id=first.id, lines_path=lines)
+    written = [json.loads(line)["school_id"] for line in lines.read_text(encoding="utf-8").splitlines()]
+    assert written == [0, second.id, third.id]
+    assert [result["school_id"] for result in report["results"]] == [second.id, third.id]
 
 
 async def test_a_browser_that_will_not_start_still_finalises_the_run(db_session, monkeypatch):

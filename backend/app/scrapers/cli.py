@@ -399,7 +399,8 @@ async def _shared_site_check_command(*, school_ids, city, country, dry_run, repo
 @click.option("--max-usd", type=float, default=0.50, show_default=True, help="Spend cap for the run")
 @click.option("--apply", "apply_changes", is_flag=True, help="Write rows (default is a dry run that writes nothing)")
 @click.option("--out", "report_path", type=click.Path(dir_okay=False, path_type=Path), help="Write the JSON report")
-def fees_agent_command(school_id, city, country, limit, max_usd, apply_changes, report_path):
+@click.option("--after-id", type=int, default=None, help="Start after this school id (carry on a stopped run)")
+def fees_agent_command(school_id, city, country, limit, max_usd, apply_changes, report_path, after_id):
     """Read private and international schools' fee pages with the fee agent (experimental, not in `all`)."""
     asyncio.run(
         _fees_agent_command(
@@ -410,19 +411,33 @@ def fees_agent_command(school_id, city, country, limit, max_usd, apply_changes, 
             max_usd=max_usd,
             apply=apply_changes,
             report_path=report_path,
+            after_id=after_id,
         )
     )
 
 
-async def _fees_agent_command(*, school_id, city, country, limit, max_usd, apply, report_path):
+async def _fees_agent_command(*, school_id, city, country, limit, max_usd, apply, report_path, after_id):
     import json
 
     from app.database import async_session_maker
     from app.scrapers.stages import fees_agent as fees_agent_stage
 
+    lines_path = None
+    if report_path is not None:  # each school's line is appended as it finishes (never emptied)
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        lines_path = report_path.with_name(f"{report_path.stem}.schools.jsonl")
+        console.print(f"Per-school lines: {lines_path}")
     async with async_session_maker() as db:
         report = await fees_agent_stage.run_fees_agent(
-            db, country=country, city=city, school_id=school_id, limit=limit, max_usd=max_usd, apply=apply
+            db,
+            country=country,
+            city=city,
+            school_id=school_id,
+            limit=limit,
+            max_usd=max_usd,
+            apply=apply,
+            after_id=after_id,
+            lines_path=lines_path,
         )
     console.print(
         f"{'Applied' if apply else 'Dry run'}: {report['schools']} schools, ${report['spent_usd']:.4f} spent, "

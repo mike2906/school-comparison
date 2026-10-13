@@ -10,11 +10,13 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import json
 import logging
 import re
 from collections.abc import Awaitable, Callable, Iterable, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
+from pathlib import Path
 from typing import Any, Optional
 from urllib.parse import unquote, urldefrag, urlparse
 
@@ -893,6 +895,14 @@ async def run_school(
 # ---------------------------------------------------------------------------
 
 
+def _append_line(path: Path, result: dict[str, Any]) -> None:
+    try:  # a failed write loses one line, not the rest of the run
+        with path.open("a", encoding="utf-8") as lines:
+            lines.write(json.dumps(result, ensure_ascii=False, default=str) + "\n")
+    except (OSError, TypeError, ValueError):
+        logger.exception("fees-agent could not write the line for school %s", result.get("school_id"))
+
+
 async def run_fees_agent(
     db: AsyncSession,
     *,
@@ -902,8 +912,15 @@ async def run_fees_agent(
     limit: Optional[int] = None,
     max_usd: float = DEFAULT_MAX_USD,
     apply: bool = False,
+    after_id: Optional[int] = None,
+    lines_path: Optional[Path] = None,
 ) -> dict[str, Any]:
-    """Run the agent over private and international schools with a website; returns the report."""
+    """Run the agent over private and international schools with a website; returns the report.
+
+    ``after_id`` starts after that school, to carry on a run that stopped. ``lines_path`` gets
+    each school's report appended as one JSON line as soon as it is done, so a killed run
+    keeps what it read (2026-10-13: a Sofia dry run killed at 55 minutes lost every read).
+    """
     from crawl4ai import AsyncWebCrawler, BrowserConfig, CacheMode, CrawlerRunConfig  # type: ignore
 
     query = select(School).where(School.country_code == country, School.website_url.isnot(None))
@@ -914,6 +931,8 @@ async def run_fees_agent(
     )
     if city:
         query = query.where(School.city == city)
+    if after_id is not None:
+        query = query.where(School.id > after_id)
     # Ids, not objects: a rollback after one school's failure expires every loaded object.
     school_ids = (await db.execute(query.with_only_columns(School.id).order_by(School.id).limit(limit))).scalars().all()
 
@@ -972,6 +991,8 @@ async def run_fees_agent(
                         if db.in_transaction():
                             await db.rollback()
                         results.append({"school_id": current_id, "outcome": "error", "reason": str(exc)[:200]})
+                    if lines_path is not None:
+                        _append_line(lines_path, results[-1])
     except Exception as exc:
         logger.exception("fees-agent run %s stopped", run_id)
         if db.in_transaction():
