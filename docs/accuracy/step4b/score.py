@@ -1,22 +1,51 @@
-import json, glob
-inh=json.load(open("inherited.json"))
-# Hand verdicts: duplicates in step 4 re-judged on their own fields (no other post row matches that fee), and the 4 new rows.
-fix={3703:("correct","f4"),3032:("missing_period","f10"),3715:("missing_period","f5"),3731:("correct","f1")}
-rows=[]
-for sid,xs in inh.items():
-    for x in xs:
-        v,f=fix.get(x["id"],(x["verdict"],x["fid"])); rows.append((int(sid),x["category"],x["amount"],x["period"],v,f))
-new=[(151,"tuition",11860,"yearly","correct","f2"),(151,"registration",200,None,"missing_period","f3"),
-     (151,"food",345,"quarter","correct","f5"),(520,"materials",595,None,"correct","f9")]
-rows+=new
-WRONG={"wrong_period","wrong_category","wrong_amount","wrong_group_plan_year","wrong_currency","stale"}
-site=sum(len(json.load(open(p))["site_fees"]) for p in glob.glob("../step4/adj/*.json"))
-unres=sum(r[4]=="unresolved" for r in rows); dup=sum(r[4]=="duplicate" for r in rows)
-judged=len(rows)-unres-dup; wrong=sum(r[4] in WRONG for r in rows)
-found={(r[0],r[5]) for r in rows if r[4] in("correct","missing_period")}
-right={(r[0],r[5]) for r in rows if r[4]=="correct"}
-print(f"site fees {site}; post rows {len(rows)}; right {sum(r[4]=='correct' for r in rows)}/{judged}; blank {sum(r[4]=='missing_period' for r in rows)}; wrong {wrong}/{judged} ({100*wrong/judged:.0f}%); dup {dup}; unres {unres}; found {len(found)}/{site} ({100*len(found)/site:.0f}%); fully right {len(right)}/{site} ({100*len(right)/site:.0f}%)")
-for r in rows:
-    if r[4] in WRONG: print("  wrong:",r)
-from collections import Counter
-print(Counter((r[0]) for r in rows if r[4] in("correct","missing_period")))
+"""Score each step 4b run's published rows against the step 4 key.
+
+Rows that match a step 4 candidate take its verdict (inherit.py). New rows were judged by hand
+against the same key (HAND below). A row step 4 called a duplicate, or one whose fee another row
+of this run already took, is re-judged on its own fields: it moves to another site fee with the
+same category, amount and currency if one is free (two grade tiers at one price), else it is a
+duplicate only if another row of this run matches that fee.
+"""
+import json, glob, sys
+WRONG = {"wrong_period", "wrong_category", "wrong_amount", "wrong_group_plan_year", "wrong_currency", "stale"}
+site = {int(p.split("/")[-1][:-5]): json.load(open(p))["site_fees"] for p in glob.glob("../step4/adj/*.json")}
+HAND = {  # (school, category, amount, label) -> (verdict, fid)
+    (151, "tuition", 11860.0, "5 - 7 grade"): ("correct", "f2"),
+    (151, "registration", 200.0, None): ("missing_period", "f3"),
+    (151, "food", 345.0, None): ("correct", "f5"),
+    (520, "materials", 595.0, None): ("correct", "f9"),
+    (170, "tuition", 4200.0, "На два пъти"): ("correct", "f11"),
+    (170, "transport", 2000.0, "Еднократно плащане"): ("missing_period", "f13"),
+    (170, "transport", 2500.0, "На два пъти"): ("correct", "f14"),
+    (568, "tuition", 9300.0, "Разсрочено плащане"): ("correct", "f2"),
+}
+def own(sid, r, fid):
+    f = next(f for f in site[sid] if f["fid"] == fid)
+    return "correct" if r["period"] == f["period"] else "missing_period" if r["period"] is None else "wrong_period"
+def score(run):
+    inh, todo = json.load(open(f"{run}/inherited.json")), json.load(open(f"{run}/todo.json"))
+    rows = [(int(s), x, x["verdict"], x["fid"]) for s, xs in inh.items() for x in xs]
+    rows += [(int(s), r, *HAND[(int(s), r["category"], r["amount"], r["plan_name"] or r["age_group"])]) for s, rs in todo.items() for r in rs]
+    out, taken = [], set()
+    for sid, r, v, fid in sorted(rows, key=lambda t: t[2] == "duplicate"):  # duplicates last
+        if fid and (sid, fid) in taken and v != "duplicate":
+            v = "duplicate"
+        if v == "duplicate" and fid:
+            f0 = next(f for f in site[sid] if f["fid"] == fid)
+            free = [f["fid"] for f in site[sid] if (sid, f["fid"]) not in taken and f["category"] == f0["category"]
+                    and f["amount"] == f0["amount"] and f["currency"] == f0["currency"]]
+            if free:
+                fid = free[0]; v = own(sid, r, fid)
+        if v in ("correct", "missing_period"):
+            taken.add((sid, fid))
+        out.append((sid, r["category"], r["amount"], r["period"], v, fid))
+    unres = sum(o[4] == "unresolved" for o in out); dup = sum(o[4] == "duplicate" for o in out)
+    judged = len(out) - unres - dup; wrong = sum(o[4] in WRONG for o in out)
+    found = {(o[0], o[5]) for o in out if o[4] in ("correct", "missing_period")}
+    total = sum(len(v) for v in site.values())
+    f170 = sum(1 for k in found if k[0] == 170); n170 = len(site[170])
+    print(f"{run:5} rows {len(out)}  wrong {wrong}/{judged} ({100*wrong/judged:.0f}%)  dup {dup}  unresolved {unres}"
+          f"  found {len(found)}/{total} ({100*len(found)/total:.0f}%)"
+          f"  without 170: {len(found)-f170}/{total-n170} ({100*(len(found)-f170)/(total-n170):.0f}%)")
+for run in sys.argv[1:] or ["run", "run2", "run3"]:
+    score(run)

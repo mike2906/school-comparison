@@ -1,6 +1,8 @@
 import json
 S="../step4/"  # step 4 packets and adjudications
-after=json.load(open("run/after.json"))
+import sys
+RUN = sys.argv[1] if len(sys.argv) > 1 else "run"
+after=json.load(open(f"{RUN}/after.json"))
 def k(r, per=True):
     return (r["category"], r.get("amount"), r.get("amount_min"), r.get("amount_max"), (r.get("currency") or "").upper(), r.get("period") if per else None)
 todo={}; res={}
@@ -24,7 +26,7 @@ for sid, rows in sorted(after.items(), key=lambda x:int(x[0])):
             res.setdefault(sid,[]).append({"id":r["id"],**row,"year":yr,"label":lab,"verdict":best["verdict"],"fid":best.get("fid"),"from":best["oid"],"amb":len({x["verdict"] for x in vs})>1})
         else:
             todo.setdefault(sid,[]).append(r)
-json.dump(res,open("inherited.json","w"),ensure_ascii=False,indent=1)
-json.dump(todo,open("todo.json","w"),ensure_ascii=False,indent=1)
+json.dump(res,open(f"{RUN}/inherited.json","w"),ensure_ascii=False,indent=1)
+json.dump(todo,open(f"{RUN}/todo.json","w"),ensure_ascii=False,indent=1)
 for sid in sorted(set(res)|set(todo),key=int):
     print(sid,"inherited",len(res.get(sid,[])),[ (x["category"],x["amount"],x["period"],x["verdict"]) for x in res.get(sid,[]) if x["verdict"]!="correct" or x["amb"]],"| new",[(r["category"],r["amount"],r["period"],r["academic_year"],r["plan_name"] or r["age_group"]) for r in todo.get(sid,[])])

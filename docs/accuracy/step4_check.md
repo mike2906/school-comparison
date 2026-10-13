@@ -71,20 +71,24 @@ Small sample: 13 schools with rows, 77 fees, 2 of them near what the fixes were 
 
 ## Re-run on the merged code (step 4b)
 
-The review fixes (#286, #287, #289) changed behaviour, so the same 24 schools were run again on
-merged main (2208893) on a copy of the launch DB: $0.0247, 10 schools written, 14 kept their old
-rows. Output is in `step4b/run/`. Published rows that match a step 4 candidate (same fields,
-year and label) take its verdict (`step4b/inherit.py`); the rest were judged by hand against the
-same key (`step4b/score.py`, result in `step4b/score.out`).
+The review fixes (#286, #287, #289) changed behaviour, so the same 24 schools were run three
+more times on merged main (2208893), each on a fresh copy of the launch DB ($0.025, $0.018 and
+$0.018). Output is in `step4b/run`, `run2`, `run3`. Published rows that match a step 4
+candidate (same fields, year and label) take its verdict (`step4b/inherit.py`); the 8 new rows
+were judged by hand against the same key (`step4b/score.py`, result in `step4b/score.out`).
 
-| After every gate | Step 4 | Step 4b |
-|---|---|---|
-| Wrong | 7/59 (12 %) | 6/47 (13 %) |
-| Found (of 77) | 52 (68 %) | 40 (52 %) |
-| Found, without 170 (of 63) | 39 (62 %) | 37 (59 %) |
+| After every gate | Today | Step 4 | Run 1 | Run 2 | Run 3 |
+|---|---|---|---|---|---|
+| Wrong | 18 % | 12 % | 13 % | 12 % | 12 % |
+| Found (of 77) | 40 % | 68 % | 53 % | 57 % | 60 % |
+| Found, without 170 (of 63) | | 62 % | 60 % | 60 % | 63 % |
 
-Wrong is still below today's 18 %, and the #289 fixes removed 170's old-row and one_time
-errors. Found misses the 55 % bar, and the whole drop is 170: the reader returned 5 of the 14
-fees on the same page it read fully in step 4 (same pages, same text length), none of them
-publishable, so the old rows were kept. That is run-to-run variance of the reader on a long
-price table, not a change in the code it runs.
+Every run is better than today on both counts, and two of three pass the 55 % bar. The drop
+from step 4 is 170: in all three runs the reader returned the same 5 of the 14 fees on the
+page it read fully in step 4 (same pages, same text length, same reader prompt), so it is not
+noise in one run. Why step 4's read was complete is not known. Five of the 24 schools gave a
+different result between runs (151, 170, 183, 568, 625), so a single run moves "found" by
+several points and one run cannot tell a small fix from noise.
+
+These 24 schools have now been looked at and tuned on (the #289 fixes, and any fix for 170's
+read), so they are no longer a fair final test. All 44 untouched Sofia schools are used up.

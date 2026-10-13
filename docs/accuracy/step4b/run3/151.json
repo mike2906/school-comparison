@@ -1,0 +1,151 @@
+{
+ "apply": true,
+ "pipeline_run_id": "1f198a40-f814-4b7d-9ca6-f95579651076",
+ "schools": 1,
+ "spent_usd": 0.000997,
+ "stopped": null,
+ "kept_old_rows": [],
+ "outcomes": {
+  "written": 1
+ },
+ "results": [
+  {
+   "school_id": 151,
+   "outcome": "written",
+   "pages": [
+    {
+     "url": "https://zlatarskischool.org/",
+     "chars": 19105,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://zlatarskischool.org/admissions/school-fees/",
+     "chars": 24717,
+     "prices": true,
+     "note": null
+    },
+    {
+     "url": "https://zlatarskischool.org/admissions/",
+     "chars": 29765,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://zlatarskischool.org/admission-to-grades-567/",
+     "chars": 27451,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://zlatarskischool.org/admissions/8-grade/",
+     "chars": 27929,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://zlatarskischool.org/admissions/ib-diploma/",
+     "chars": 27657,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://zlatarskischool.org/admissions/international-students/",
+     "chars": 24859,
+     "prices": false,
+     "note": null
+    }
+   ],
+   "fees": [
+    {
+     "category": "tuition",
+     "amount": 9690.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "yearly",
+     "label": "Students from Bulgarian schools",
+     "academic_year": "2026/2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://zlatarskischool.org/admissions/school-fees/",
+     "evidence": "| TUITION FEES FOR THE ACADEMIC 2026/2027 YEAR  |\n| 5 - 7 grade  | € 9690: Students from Bulgarian schools"
+    },
+    {
+     "category": "tuition",
+     "amount": 11860.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "yearly",
+     "label": "International students",
+     "academic_year": "2026/2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://zlatarskischool.org/admissions/school-fees/",
+     "evidence": "| TUITION FEES FOR THE ACADEMIC 2026/2027 YEAR  |\n| 5 - 7 grade  | € 9690: Students from Bulgarian schools\n€ 11860: International students"
+    },
+    {
+     "category": "registration",
+     "amount": 200.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "one_time",
+     "label": "Registration fee (for all candidates)",
+     "academic_year": null,
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://zlatarskischool.org/admissions/school-fees/",
+     "evidence": "| Registration fee (for all candidates): € 200"
+    },
+    {
+     "category": "transport",
+     "amount": 2500.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "School Transport (optional)",
+     "academic_year": null,
+     "kept": false,
+     "confidence": 0.0,
+     "checks": [
+      "dropped: evidence line is not on the page"
+     ],
+     "source_url": "https://zlatarskischool.org/admissions/school-fees/",
+     "evidence": "| School Transport (optional): € 2500 (in two installments)"
+    },
+    {
+     "category": "food",
+     "amount": 345.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "quarter",
+     "label": "Cafeteria Meals (optional)",
+     "academic_year": null,
+     "kept": false,
+     "confidence": 0.0,
+     "checks": [
+      "dropped: evidence line is not on the page"
+     ],
+     "source_url": "https://zlatarskischool.org/admissions/school-fees/",
+     "evidence": "| Cafeteria Meals (optional): € 345 (per quarter)"
+    }
+   ],
+   "rows_new": 3,
+   "rows_new_publishable": 3,
+   "rows_old_published": 3,
+   "rows_new_dropped": 0,
+   "regressions": [
+    "drops TRANSPORT 2500.00, which the page still shows"
+   ],
+   "rows_old_kept": 1,
+   "validation": "ok"
+  }
+ ]
+}

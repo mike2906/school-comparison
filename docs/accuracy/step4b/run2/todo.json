@@ -1,0 +1,70 @@
+{
+ "151": [
+  {
+   "id": 3702,
+   "category": "registration",
+   "amount": 200.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "academic_year": null,
+   "age_group": null,
+   "plan_name": null,
+   "source_url": "https://zlatarskischool.org/admissions/school-fees/",
+   "extractor": "agent",
+   "evidence": "|  \n  \n | Registration fee (for all candidates): € 200   \nSchool Transport (optional): € 2500 (in two installments)  \nCafeteria Meals (optional): € 345 (per quarter)  |",
+   "published": true
+  }
+ ],
+ "170": [
+  {
+   "id": 3714,
+   "category": "tuition",
+   "amount": 4200.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "academic_year": "2026-2027",
+   "age_group": "7, 8, 9, 10, 11, 12 клас",
+   "plan_name": "На два пъти",
+   "source_url": "https://www.svetinaum.net/c/bg/ceni/taksi-za-obuchenie/",
+   "extractor": "agent",
+   "evidence": "Такси за 2026-2027 учебна година:\n|  **Клас**  |  **Еднократно плащане**  |  **На два пъти**  |  **На осем вноски**  |\n|  7, 8, 9, 10, 11, 12 клас  |  4000 Евро  |  4200 Евро  |  4500 Евро  |",
+   "published": true
+  },
+  {
+   "id": 3715,
+   "category": "transport",
+   "amount": 2000.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "academic_year": "2026-2027",
+   "age_group": null,
+   "plan_name": "Еднократно плащане",
+   "source_url": "https://www.svetinaum.net/c/bg/ceni/taksi-za-obuchenie/",
+   "extractor": "agent",
+   "evidence": "Допълнително заплащане:\n|   |  **Еднократно плащане**  |  **На два пъти**  |\n|  **Транспорт в две посоки**  |  2000 Евро  |  2500 Евро  |",
+   "published": true
+  },
+  {
+   "id": 3716,
+   "category": "transport",
+   "amount": 2500.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "academic_year": "2026-2027",
+   "age_group": null,
+   "plan_name": "На два пъти",
+   "source_url": "https://www.svetinaum.net/c/bg/ceni/taksi-za-obuchenie/",
+   "extractor": "agent",
+   "evidence": "Допълнително заплащане:\n|   |  **Еднократно плащане**  |  **На два пъти**  |\n|  **Транспорт в две посоки**  |  2000 Евро  |  2500 Евро  |",
+   "published": true
+  }
+ ]
+}

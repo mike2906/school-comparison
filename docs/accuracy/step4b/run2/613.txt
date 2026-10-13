@@ -1,0 +1,3 @@
+Applied: 1 schools, $0.0007 spent, outcomes {'kept_old_rows': 1}
+Kept old rows: [613]
+Report: /tmp/step4c/docs/accuracy/step4b/run2/613.json
