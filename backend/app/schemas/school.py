@@ -17,7 +17,7 @@ from app.utils.display_gating import (
 from app.utils.i18n_resolver import resolve_address_i18n, resolve_name_i18n
 from app.utils.location_tags import semantic_location_tags
 from app.utils.school_attributes import build_display_attributes, publishable_display_i18n
-from app.utils.school_facts import SITE_REJECTED_STATUSES, publishable_school_facts
+from app.utils.school_facts import SITE_ACCEPTED_STATUSES, publishable_school_facts
 from app.utils.website_data import (
     attributes_for_publication,
     website_data_is_publishable,
@@ -397,10 +397,11 @@ class SchoolResponse(SchoolBase, SchoolPricingMixin):
     def school_facts(self) -> Optional[SchoolFacts]:
         # Facts carry their own page checks, so they do not wait for a Stage 6 report; a
         # withholding marker (failed URL check, shared site, re-extraction) still hides them,
-        # and so does a change of website (``publishable_school_facts``).
+        # so does a website URL validation has not accepted, and so does a change of website
+        # (``publishable_school_facts``).
         if "withheld_marker" in website_data_withheld_reasons(self.raw_attributes, self.raw_scrape_status):
             return None
-        if str(self.raw_scrape_status or "").strip().lower() in SITE_REJECTED_STATUSES:
+        if str(self.raw_scrape_status or "").strip().lower() not in SITE_ACCEPTED_STATUSES:
             return None
         facts = publishable_school_facts(self.raw_attributes, self.website_url)
         return SchoolFacts.model_validate(facts) if facts else None

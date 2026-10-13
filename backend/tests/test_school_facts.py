@@ -324,7 +324,18 @@ def test_a_moved_website_on_the_same_host_hides_the_facts():
 
 
 @pytest.mark.asyncio
-async def test_a_rejected_website_hides_the_facts(client, db_session):
+@pytest.mark.parametrize(
+    ("status", "shown"),
+    [
+        ("failed_validate", False),
+        ("no_official_website", False),
+        ("pending", False),
+        (None, False),
+        ("validated", True),
+        ("extraction_failed", True),
+    ],
+)
+async def test_facts_show_only_for_a_website_url_validation_accepted(client, db_session, status, shown):
     block = {"_schema_version": 1, "read_at": "t", "website_url": HOME, "facts": [_fact_row()]}
     school = School(
         name_i18n={"bg": "Училище", "en": "School"},
@@ -333,13 +344,13 @@ async def test_a_rejected_website_hides_the_facts(client, db_session):
         education_level="primary",
         city="sofia",
         website_url=HOME,
-        scrape_status="failed_validate",
+        scrape_status=status,
         attributes={"school_facts": block},
     )
     db_session.add(school)
     await db_session.commit()
     body = (await client.get(f"/schools/{school.id}")).json()
-    assert body["school_facts"] is None
+    assert (body["school_facts"] is not None) is shown
 
 
 @pytest.mark.asyncio

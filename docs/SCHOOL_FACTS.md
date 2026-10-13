@@ -43,8 +43,10 @@ its topic and a link to its page, and the date it was read; and a compare-page s
 with one row per topic any compared school has. A school with none shows nothing. Facts
 carry their own checks, so they do not wait for a Stage 6 report, but a website-data
 withholding marker (failed URL check, shared site) hides them, and so does a change of
-website (host and path) or a scrape status that rejects the site (`failed_validate`,
-`no_official_website`): facts show only while `website_url` is the site they were read from.
+website (host and path) or a website URL validation has not accepted (`pending`,
+`failed_validate`, `no_official_website`; `SITE_ACCEPTED_STATUSES`): facts show only while
+`website_url` is an accepted site and the one they were read from. The stage reads only
+accepted sites.
 
 Known gap: the compare page's Practical rows (meals, transport, after-school care) come from
 the old extraction, so a school can show "Not available" there and a meals fact in the

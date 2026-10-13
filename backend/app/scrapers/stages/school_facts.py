@@ -29,7 +29,7 @@ from app.scrapers.stages import common as stage_common
 from app.scrapers.stages.fees_agent import PageRead, Spend, SpendCapReached, find_pages
 from app.services.pipeline_runs import finalize_pipeline_run, pipeline_run_heartbeat, start_pipeline_run
 from app.services.provider_costs import ProviderCostError, execute_billable_request, provider_cost_scope
-from app.utils.school_facts import ATTRIBUTE_KEY
+from app.utils.school_facts import ATTRIBUTE_KEY, SITE_ACCEPTED_STATUSES
 
 logger = logging.getLogger(__name__)
 
@@ -233,10 +233,15 @@ async def run_school_facts(
     max_usd: float = DEFAULT_MAX_USD,
     apply: bool = False,
 ) -> dict[str, Any]:
-    """Run over schools with a website (all types, or the given ids); returns the report."""
+    """Run over schools with an accepted website (all types, or the given ids); returns the report."""
     from crawl4ai import AsyncWebCrawler, BrowserConfig, CacheMode, CrawlerRunConfig  # type: ignore
 
-    query = select(School.id).where(School.country_code == country, School.website_url.isnot(None))
+    # Only websites URL validation accepted: facts from an unchecked URL would not be shown.
+    query = select(School.id).where(
+        School.country_code == country,
+        School.website_url.isnot(None),
+        School.scrape_status.in_(SITE_ACCEPTED_STATUSES),
+    )
     if school_ids:
         query = query.where(School.id.in_(list(school_ids)))
     if city:

@@ -30,8 +30,10 @@ TOPICS = (
 )
 
 
-# Scrape statuses that say the stored website is not the school's (or there is none).
-SITE_REJECTED_STATUSES = frozenset({"failed_validate", "no_official_website"})
+# Scrape statuses reached only after URL validation accepted the stored website as the
+# school's own. ``pending`` (not checked yet), ``failed_validate`` and ``no_official_website``
+# are left out. Facts do not wait for extraction, so ``extraction_failed`` still counts.
+SITE_ACCEPTED_STATUSES = frozenset({"validated", "navigated", "extraction_failed", "extracted", "summarized"})
 
 
 def _site(url: Any) -> str:
