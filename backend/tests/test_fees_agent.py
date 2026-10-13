@@ -827,3 +827,19 @@ async def test_a_withheld_row_at_a_kept_amount_still_goes(db_session, frozen_tod
     )
     assert report["rows_old_kept"] == 1, report
     assert withheld.id not in [r.id for r in await _rows(db_session, school)]
+
+
+async def test_an_undated_read_replaces_this_years_rows_and_keeps_older_years(db_session, pages, frozen_today):
+    school = await _school(db_session)
+    await _old_rows(db_session, school, "2026-2027", [700])  # 170: stored dated, read undated
+    await _old_rows(db_session, school, "2025/2026", [650])  # history
+    await db_session.commit()
+    undated = [fee.model_copy(update={"academic_year": None}) for fee in FEES_STAGE]
+    report = await fees_agent.run_school(db_session, school, find=_find(pages), read=_read(undated), apply=True)
+    assert report["outcome"] == "written" and report["rows_old_kept"] == 0, report
+    rows = await _rows(db_session, school)
+    assert sorted((float(r.amount), r.academic_year) for r in rows) == [
+        (200.0, None),
+        (650.0, "2025/2026"),
+        (700.0, None),
+    ]

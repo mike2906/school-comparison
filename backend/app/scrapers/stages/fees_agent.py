@@ -22,6 +22,7 @@ from bs4 import BeautifulSoup
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.ai.client import create_agent, extract_provider_cost_usd, get_model, get_model_costs
 from app.config import CRAWLER_USER_AGENT, get_settings
@@ -47,6 +48,7 @@ from app.services.provider_costs import (
     execute_billable_request,
     provider_cost_scope,
 )
+from app.utils.academic_year import current_academic_year, normalize_academic_year
 from app.utils.display_gating import _BGN_PER_EUR, blocked_pricing_row_ids, pricing_row_is_publishable
 from app.utils.website_data import prepare_validation_rollover
 
@@ -446,6 +448,29 @@ def _in_euro(row: Pricing, proposed: list[Pricing]) -> Optional[_InEuro]:
     return _InEuro(row, tuple(converted))
 
 
+async def _superseded_rows(db: AsyncSession, school: School, rows: list[Pricing]) -> list[Pricing]:
+    """Every stored website row the read replaces: the years it produced (as the pipeline
+    does), and also any row not dated before the current school year. The agent reads only
+    the current or upcoming year, so an undated read of 170's fees is the same fees as the
+    rows stored under 2026-2027, not a second set beside them. Older years stay as history."""
+    replaced = await price_step._find_superseded_rows(db, school, rows)
+    if not rows:
+        return replaced
+    current = int(current_academic_year().split("/")[0])
+    stored = await db.execute(
+        select(Pricing)
+        .where(Pricing.school_id == school.id, Pricing.source == PriceSource.SCRAPED_WEBSITE)
+        .options(selectinload(Pricing.source_page).load_only(SourcePage.id, SourcePage.is_valid))
+    )
+    ids = {row.id for row in replaced}
+    for row in stored.scalars().all():
+        year = normalize_academic_year(row.academic_year)
+        undated = not str(row.academic_year or "").strip()
+        if row.id not in ids and (undated or (year is not None and int(year.split("/")[0]) >= current)):
+            replaced.append(row)
+    return replaced
+
+
 def _rows_to_keep(
     school: School, pages: list[SourcePage], superseded: list[Pricing], proposed: list[Pricing]
 ) -> tuple[list[Pricing], set[tuple[str, ...]], list[str]]:
@@ -531,7 +556,7 @@ async def run_school(
 
     rows, sources = _build_rows(school, checked)
     publishable = [row for row in rows if pricing_row_is_publishable(row)]
-    superseded = await price_step._find_superseded_rows(db, school, rows)
+    superseded = await _superseded_rows(db, school, rows)
     published_before = [row for row in superseded if pricing_row_is_publishable(row)]
     report |= {
         "rows_new": len(rows),
