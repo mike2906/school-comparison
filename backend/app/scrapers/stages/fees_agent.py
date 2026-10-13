@@ -666,6 +666,8 @@ def _fee_report(result: CheckedFee, page: Optional[PageRead]) -> dict[str, Any]:
         "period": fee.period.value if fee.period else None,
         "label": fee.label,
         "academic_year": fee.academic_year,
+        "age_group": fee.age_group,
+        "payment_options": [option.model_dump(exclude_none=True) for option in fee.payment_options],
         "kept": result.kept,
         "confidence": result.confidence,
         "checks": result.checks,
