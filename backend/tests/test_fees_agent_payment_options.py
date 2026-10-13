@@ -246,3 +246,9 @@ def test_a_name_that_starts_like_a_plan_but_is_not_one_stays():
     assert not fees_agent._PAYMENT_PLAN_NAME_RE.match("Вариант с обяд")
     assert not fees_agent._PAYMENT_PLAN_NAME_RE.match("Опция с транспорт")
     assert fees_agent._PAYMENT_PLAN_NAME_RE.match("Plan 3")
+
+
+def test_the_report_shows_each_fees_group_and_payment_options():
+    report = fees_agent._fee_report(check_fee(tuition(), PAGE_596), None)
+    assert report["age_group"] == "Grade 0"
+    assert [option["label"] for option in report["payment_options"]] == ["Plan 2", "Plan 3"]
