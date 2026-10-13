@@ -12,7 +12,7 @@ import asyncio
 import hashlib
 import logging
 import re
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any, Optional
@@ -35,7 +35,15 @@ from app.models.scrape_log import ScrapeType
 from app.models.source_page import SourcePage
 from app.schemas.extraction import ExtractedPrice
 from app.scrapers.extraction import llm_results, price_step, text_values
-from app.scrapers.extraction.agent_fees import READER_PROMPT, AgentFee, AgentFees, CheckedFee, check_fee
+from app.scrapers.extraction.agent_fees import (
+    READER_PROMPT,
+    AgentFee,
+    AgentFees,
+    CheckedFee,
+    check_fee,
+    fee_amounts,
+    page_numbers,
+)
 from app.scrapers.fee_pages import fee_http_client, page_key, pdf_text
 from app.scrapers.price_evidence import _PRICE_RE, PriceRow, _amount_key
 from app.scrapers.shared_site_check import registrable_domain
@@ -103,7 +111,7 @@ class PageRead:
 
 
 Finder = Callable[[School], Awaitable[list[PageRead]]]
-Reader = Callable[[School, list[PageRead]], Awaitable[list[AgentFee]]]
+Reader = Callable[[School, list[PageRead], Sequence[Decimal]], Awaitable[list[AgentFee]]]
 
 
 # ---------------------------------------------------------------------------
@@ -268,8 +276,21 @@ async def find_pages(crawler, run_config, client, school: School, spend: Spend) 
 # ---------------------------------------------------------------------------
 
 
-async def read_fees(school: School, pages: list[PageRead], spend: Spend) -> list[AgentFee]:
-    text = "\n\n".join(f"=== PAGE {page.url}\n{page.text}" for page in pages)[:MAX_READ_CHARS]
+def reader_text(pages: list[PageRead]) -> str:
+    """The text the reader sees: the pages one after another, cut to its limit."""
+    return "\n\n".join(f"=== PAGE {page.url}\n{page.text}" for page in pages)[:MAX_READ_CHARS]
+
+
+async def read_fees(school: School, pages: list[PageRead], spend: Spend, missed: Sequence[Decimal]) -> list[AgentFee]:
+    """Read the fees on ``pages``; ``missed`` names amounts an earlier read left out."""
+    text = reader_text(pages)
+    if missed:
+        text += (
+            "\n\nAn earlier read of these pages left out amounts that the school's stored fees have and "
+            f"the pages still show: {', '.join(format(amount, 'f') for amount in missed)}. Read the pages again "
+            "in full and list every fee, including every row of each fee table. Some of these "
+            "amounts may be from an older year or not be fees: the rules above still decide."
+        )
     in_price, out_price = get_model_costs("pricing")
     if not spend.allows((len(text) / 3 * in_price + READ_OUTPUT_TOKENS_RESERVE * out_price) / 1_000_000):
         raise SpendCapReached(f"spent ${spend.spent_usd:.4f} of ${spend.cap_usd}")
@@ -517,6 +538,56 @@ def _rows_to_keep(
     return kept, keys, reasons
 
 
+async def _missed_amounts(
+    db: AsyncSession, school: School, pages: list[PageRead], fees: list[AgentFee]
+) -> list[Decimal]:
+    """Amounts of the school's published website rows that the pages show and the read left out.
+
+    Only rows of this school year or later, or undated: an older year's table still on the
+    page is history, not a missed fee. A lev amount the read gives in euro is not missed.
+    """
+    stored = await db.execute(
+        select(Pricing)
+        .where(Pricing.school_id == school.id, Pricing.source == PriceSource.SCRAPED_WEBSITE)
+        .options(selectinload(Pricing.source_page).load_only(SourcePage.id, SourcePage.is_valid))
+    )
+    blocked = blocked_pricing_row_ids(school.attributes if isinstance(school.attributes, dict) else None)
+    current = current_academic_year()
+    read = {amount for fee in fees for amount in fee_amounts(fee)}
+    euro = _euro_amounts(fees)
+    published = set()
+    for row in stored.scalars().all():
+        year = normalize_academic_year(row.academic_year)
+        if row.amount is None or row.id in blocked or (year and year < current) or not pricing_row_is_publishable(row):
+            continue
+        amount = Decimal(str(row.amount)).normalize()
+        if (row.currency or "").upper() == "BGN":
+            target = amount / _BGN_PER_EUR
+            if any(abs(value - target) <= target * EURO_TOLERANCE for value in euro.get(row.category.value, ())):
+                continue
+        published.add(amount)
+    # What the reader can see (not what was cut off), without the page headers' URLs.
+    shown = page_numbers(re.sub(r"^=== PAGE .*$", "", reader_text(pages), flags=re.MULTILINE))
+    return sorted((published & shown) - read)
+
+
+def _euro_amounts(fees: list[AgentFee]) -> dict[str, set[Decimal]]:
+    """The euro amounts read, by category: 200 лв. of meals is not a 102 € bus fee."""
+    euro: dict[str, set[Decimal]] = {}
+    for fee in fees:
+        if (fee.currency or "").upper() == "EUR":
+            euro.setdefault(fee.category.value, set()).update(fee_amounts(fee))
+    return euro
+
+
+def _lev_twin(fee: AgentFee, euro: dict[str, set[Decimal]]) -> bool:
+    if (fee.currency or "").upper() != "BGN":
+        return False
+    targets = [amount / _BGN_PER_EUR for amount in fee_amounts(fee)]
+    values = euro.get(fee.category.value, ())
+    return bool(targets) and all(any(abs(v - t) <= t * EURO_TOLERANCE for v in values) for t in targets)
+
+
 def _fee_report(result: CheckedFee, page: Optional[PageRead]) -> dict[str, Any]:
     fee = result.fee
     return {
@@ -549,7 +620,7 @@ async def run_school(
         report["reason"] = "no page showing prices"
         return report
 
-    fees = await read(school, priced)
+    fees = await read(school, priced, ())
     # A known page keeps its id; a new one gets a negative placeholder until ``apply`` stores it.
     stored_pages = (await db.execute(select(SourcePage).where(SourcePage.school_id == school.id))).scalars().all()
     # Matched by page_key so a trailing slash or encoding difference finds the stored page.
@@ -564,6 +635,30 @@ async def run_school(
         for index, page in enumerate(pages)
         if page.text.strip()
     }
+    # The reader can stop part way down a fee table: at 170 it gave the same 5 of 14 fees in
+    # three runs. When the pages still show amounts the published rows have and the read left
+    # out, read once more, naming them, and add the fees at amounts the first read did not give.
+    missed = await _missed_amounts(db, school, priced, fees)
+    if missed:
+        report["reread"] = {"missed": [format(amount, "f") for amount in missed], "added": 0}
+        try:
+            again = await read(school, priced, missed)
+        except (SpendCapReached, ProviderCostCapExceeded) as exc:  # the first read is paid for: use it
+            report["reread"]["error"] = str(exc)  # the next school's first read stops the run
+            again = []
+        except ProviderCostError:  # the run is no longer running: write nothing
+            raise
+        except Exception as exc:  # a timed-out or malformed second read: the first still stands
+            logger.warning("fees-agent second read failed for school %s: %s", school.id, exc)
+            report["reread"]["error"] = str(exc)[:200]
+            again = []
+        first = {amount for fee in fees for amount in fee_amounts(fee)}
+        added = [fee for fee in again if fee_amounts(fee) and not set(fee_amounts(fee)) <= first]
+        # A page that prints both currencies: the lev twin of a euro fee is not a fee of its own.
+        euro = _euro_amounts([*fees, *added])
+        added = [fee for fee in added if not _lev_twin(fee, euro)]
+        fees = [*fees, *added]
+        report["reread"]["added"] = len(added)
     checked: list[tuple[CheckedFee, SourcePage]] = []
     for fee in fees:
         page = _page_for(fee, priced)
@@ -709,7 +804,7 @@ async def run_fees_agent(
                                 db,
                                 school,
                                 find=lambda s: find_pages(crawler, run_config, client, s, spend),
-                                read=lambda s, pages: read_fees(s, pages, spend),
+                                read=lambda s, pages, missed: read_fees(s, pages, spend, missed),
                                 apply=apply,
                             )
                         )

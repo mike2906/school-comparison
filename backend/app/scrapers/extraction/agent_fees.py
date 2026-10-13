@@ -109,13 +109,13 @@ def page_numbers(text: str) -> set[Decimal]:
     return {value for _, _, values in number_spans(text) for value in values}
 
 
-def _amounts(fee: AgentFee) -> list[Decimal]:
+def fee_amounts(fee: AgentFee) -> list[Decimal]:
     keys = (fee.amount,) if fee.amount is not None else (fee.amount_min, fee.amount_max)
     return [Decimal(str(key)).normalize() for key in keys if key is not None]
 
 
 def amount_on_page(fee: AgentFee, numbers: set[Decimal]) -> bool:
-    amounts = _amounts(fee)
+    amounts = fee_amounts(fee)
     return bool(amounts) and all(amount in numbers for amount in amounts)
 
 
@@ -222,20 +222,20 @@ def check_fee(fee: AgentFee, page_text: str) -> CheckedFee:
 
     checks: list[str] = []
     period = fee.period
-    if period is not None and not _names_period(period, evidence, _amounts(fee), fee.category):
+    if period is not None and not _names_period(period, evidence, fee_amounts(fee), fee.category):
         checks.append(f"period {period.value} cleared: the evidence does not name it")
         period = None
     if period is PricePeriod.ONE_TIME and fee.category is not PriceCategory.REGISTRATION:
         checks.append(f"one_time cleared: not valid for {fee.category.value}")
         period = None
-    if period is not None and fee.amount is not None and _is_first_instalment(evidence, _amounts(fee)[0]):
+    if period is not None and fee.amount is not None and _is_first_instalment(evidence, fee_amounts(fee)[0]):
         checks.append(f"period {period.value} cleared: first instalment of '1 x A + N x B'")
         period = None
 
     held = []
     if fee.category is not PriceCategory.REGISTRATION and _DEPOSIT_RE.search(f"{evidence} {_normalized(fee.label)}"):
         held.append(f"held: names a deposit but is filed as {fee.category.value}")
-    amounts = _amounts(fee)
+    amounts = fee_amounts(fee)
     if fee.amount is None and len(amounts) == 2 and amounts[0] != amounts[1]:
         if not _range_is_joined(evidence, min(amounts), max(amounts)):
             held.append("held: range ends are not joined by a range marker in the evidence")

@@ -312,7 +312,7 @@ def _find(pages):
 
 
 def _read(fees):
-    async def read(school, pages):
+    async def read(school, pages, missed):
         return fees
 
     return read
@@ -540,7 +540,7 @@ async def test_withheld_fee_is_stored_below_the_publish_floor(db_session, pages,
 async def test_spend_cap_stops_before_the_call():
     school = School(name_i18n={"bg": "Училище"}, school_type="private", education_level="primary")
     with pytest.raises(SpendCapReached):
-        await fees_agent.read_fees(school, [PageRead(URL, PAGE_STAGE, True)], Spend(0.0))
+        await fees_agent.read_fees(school, [PageRead(URL, PAGE_STAGE, True)], Spend(0.0), ())
     assert Spend(0.5).allows(0.5) and not Spend(0.5).allows(0.51)
 
 
@@ -669,6 +669,179 @@ async def test_a_fee_the_read_missed_keeps_its_row_and_the_rest_is_written(db_se
         (700.0, "agent"),
     ]
     assert "pricing_hold" not in (school.attributes or {})
+
+
+async def test_a_fee_the_read_missed_is_read_again_by_name(db_session, pages, frozen_today):
+    school = await _school(db_session)
+    await _old_rows(db_session, school, "2026/2027", [700, 90])  # the page still shows 90 (food)
+    await db_session.commit()
+    food = fee(
+        PriceCategory.FOOD, "Храна: 90 евро месечно", amount=90, period=PricePeriod.MONTHLY, academic_year="2026/2027"
+    )
+    asked = []
+
+    async def read(school, pages, missed):
+        asked.append(list(missed))
+        return [*FEES_STAGE, food] if missed else FEES_STAGE
+
+    report = await fees_agent.run_school(db_session, school, find=_find(pages), read=read, apply=True)
+    assert asked == [[], [Decimal("90")]]
+    assert report["reread"] == {"missed": ["90"], "added": 1}
+    assert report["outcome"] == "written" and report["rows_old_kept"] == 0, report
+    rows = await _rows(db_session, school)
+    assert [(float(r.amount), r.category, (r.pricing_context or {}).get("extractor")) for r in rows] == [
+        (90.0, PriceCategory.FOOD, "agent"),
+        (200.0, PriceCategory.REGISTRATION, "agent"),
+        (700.0, PriceCategory.TUITION, "agent"),
+    ]
+
+
+async def test_a_second_read_only_adds_fees_the_first_did_not_give(db_session, pages, frozen_today):
+    school = await _school(db_session)
+    await _old_rows(db_session, school, "2026/2027", [700, 90])
+    await db_session.commit()
+    food = fee(
+        PriceCategory.FOOD, "Храна: 90 евро месечно", amount=90, period=PricePeriod.MONTHLY, academic_year="2026/2027"
+    )
+
+    async def read(school, pages, missed):
+        # the second read drops 200 and repeats 700 without its period
+        return [FEES_STAGE[0].model_copy(update={"period": None}), food] if missed else FEES_STAGE
+
+    report = await fees_agent.run_school(db_session, school, find=_find(pages), read=read, apply=True)
+    assert report["reread"]["added"] == 1
+    rows = await _rows(db_session, school)
+    assert [(float(r.amount), r.period) for r in rows] == [
+        (90.0, PricePeriod.MONTHLY),
+        (200.0, PricePeriod.ONE_TIME),
+        (700.0, PricePeriod.MONTHLY),
+    ]
+
+
+@pytest.mark.parametrize(
+    "cap",
+    [fees_agent.SpendCapReached("spent $0.05 of $0.05"), fees_agent.ProviderCostCapExceeded("run cap reached")],
+)
+async def test_a_spend_cap_on_the_second_read_keeps_the_first(db_session, pages, frozen_today, cap):
+    school = await _school(db_session)
+    await _old_rows(db_session, school, "2026/2027", [700, 90])
+    await db_session.commit()
+
+    async def read(school, pages, missed):
+        if missed:
+            raise cap
+        return FEES_STAGE
+
+    report = await fees_agent.run_school(db_session, school, find=_find(pages), read=read, apply=True)
+    assert report["reread"]["added"] == 0 and "error" in report["reread"]
+    assert report["outcome"] == "written" and report["rows_old_kept"] == 1, report
+
+
+async def test_a_failed_second_read_keeps_the_first(db_session, pages, frozen_today):
+    school = await _school(db_session)
+    await _old_rows(db_session, school, "2026/2027", [700, 90])
+    await db_session.commit()
+
+    async def read(school, pages, missed):
+        if missed:
+            raise TimeoutError("read timed out")
+        return FEES_STAGE
+
+    report = await fees_agent.run_school(db_session, school, find=_find(pages), read=read, apply=True)
+    assert report["reread"]["error"] == "read timed out"
+    assert report["outcome"] == "written" and report["rows_old_kept"] == 1, report
+
+
+async def test_an_older_year_or_a_lev_twin_is_not_missed(db_session, frozen_today):
+    page_text = "Месечна такса: 700 евро (1369.08 лв.)\nМинала година: 650 евро"
+    school = await _school(db_session)
+    await _old_rows(db_session, school, "2025/2026", [650])  # last year's table, still on the page
+    await _old_rows(db_session, school, None, [1369.08])
+    lev = next(r for r in await _rows(db_session, school) if float(r.amount) == 1369.08)
+    lev.currency = "BGN"
+    await db_session.commit()
+    read = [fee(PriceCategory.TUITION, page_text, amount=700, period=PricePeriod.MONTHLY, academic_year="2026/2027")]
+    pages = [PageRead(URL, page_text, True)]
+    assert await fees_agent._missed_amounts(db_session, school, pages, read) == []
+
+
+async def test_numbers_in_a_page_url_are_not_shown_amounts(db_session, frozen_today):
+    school = await _school(db_session)
+    await _old_rows(db_session, school, "2026/2027", [700])
+    await db_session.commit()
+    pages = [PageRead("https://school.example/?page_id=700", "Храна: 90 евро", True)]
+    assert await fees_agent._missed_amounts(db_session, school, pages, []) == []
+
+
+async def test_amounts_past_the_reader_limit_are_not_missed(db_session, frozen_today, monkeypatch):
+    school = await _school(db_session)
+    await _old_rows(db_session, school, "2026/2027", [700, 90])
+    await db_session.commit()
+    monkeypatch.setattr(fees_agent, "MAX_READ_CHARS", len(f"=== PAGE {URL}\n") + 30)
+    pages = [PageRead(URL, "Месечна такса: 700 евро\n" + "x" * 50 + "\nХрана: 90 евро", True)]
+    assert await fees_agent._missed_amounts(db_session, school, pages, []) == [Decimal("700")]
+
+
+async def test_a_lev_row_is_missed_unless_its_euro_twin_is_the_same_kind_of_fee(db_session, frozen_today):
+    page_text = "Храна: 200 лв.\nТранспорт: 102.26 евро"
+    school = await _school(db_session)
+    await _old_rows(db_session, school, None, [200])
+    meals = (await _rows(db_session, school))[0]
+    meals.currency, meals.category = "BGN", PriceCategory.FOOD
+    await db_session.commit()
+    bus = [fee(PriceCategory.TRANSPORT, "Транспорт: 102.26 евро", amount=102.26)]
+    pages = [PageRead(URL, page_text, True)]
+    assert await fees_agent._missed_amounts(db_session, school, pages, bus) == [Decimal("200")]
+
+
+async def test_a_second_read_does_not_add_the_lev_column(db_session, frozen_today):
+    page_text = "Месечна такса: 700 евро | 1369.08 лв.\nХрана: 90 евро | 176.02 лв."
+    school = await _school(db_session)
+    await _old_rows(db_session, school, "2026/2027", [700, 90])
+    await db_session.commit()
+    tuition = fee(
+        PriceCategory.TUITION,
+        "Месечна такса: 700 евро | 1369.08 лв.",
+        amount=700,
+        period=PricePeriod.MONTHLY,
+        academic_year="2026/2027",
+    )
+    food = fee(
+        PriceCategory.FOOD,
+        "Храна: 90 евро | 176.02 лв.",
+        amount=90,
+        period=PricePeriod.MONTHLY,
+        academic_year="2026/2027",
+    )
+    lev = [
+        fee(
+            PriceCategory.TUITION, "Месечна такса: 700 евро | 1369.08 лв.", amount=1369.08, period=PricePeriod.MONTHLY
+        ).model_copy(update={"currency": "BGN"}),
+        fee(PriceCategory.FOOD, "Храна: 90 евро | 176.02 лв.", amount=176.02, period=PricePeriod.MONTHLY).model_copy(
+            update={"currency": "BGN"}
+        ),
+    ]
+
+    async def read(school, pages, missed):
+        return [tuition, food, *lev] if missed else [tuition]
+
+    pages = [PageRead(URL, page_text, True)]
+    report = await fees_agent.run_school(db_session, school, find=_find(pages), read=read)
+    assert report["reread"]["added"] == 1, report  # food 90 €; neither lev twin
+
+
+async def test_no_second_read_when_nothing_published_was_missed(db_session, pages, frozen_today):
+    school = await _school(db_session)
+    await _old_rows(db_session, school, "2026/2027", [700])
+    await db_session.commit()
+    asked = []
+
+    async def read(school, pages, missed):
+        asked.append(list(missed))
+        return FEES_STAGE
+
+    report = await fees_agent.run_school(db_session, school, find=_find(pages), read=read)
+    assert asked == [[]] and "reread" not in report
 
 
 async def test_a_period_the_read_drops_but_the_page_states_is_filled_back(db_session, pages, frozen_today):
