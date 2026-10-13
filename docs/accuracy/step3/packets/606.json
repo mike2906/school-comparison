@@ -1,0 +1,65 @@
+{
+ "school_id": 606,
+ "candidates": [
+  {
+   "oid": "o1",
+   "category": "materials",
+   "amount": 300.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": null,
+   "year": "2025-2026",
+   "url": "https://highschool1.transform.bg/priem/prices/"
+  },
+  {
+   "oid": "o2",
+   "category": "extracurricular",
+   "amount": 755.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "8. клас",
+   "year": "2025-2026",
+   "url": "https://highschool1.transform.bg/priem/prices/"
+  },
+  {
+   "oid": "o3",
+   "category": "tuition",
+   "amount": 3000.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "9. клас",
+   "year": "2025-2026",
+   "url": "https://highschool1.transform.bg/priem/prices/"
+  },
+  {
+   "oid": "o4",
+   "category": "tuition",
+   "amount": 2840.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "10. клас",
+   "year": "2025-2026",
+   "url": "https://highschool1.transform.bg/priem/prices/"
+  },
+  {
+   "oid": "o5",
+   "category": "tuition",
+   "amount": 3020.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "8. клас",
+   "year": "2025-2026",
+   "url": "https://highschool1.transform.bg/priem/prices/"
+  }
+ ]
+}

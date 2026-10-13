@@ -1,0 +1,18 @@
+{
+ "school_id": 573,
+ "website_url": "https://lauderschool.bg/",
+ "pages_read": [
+  "https://lauderschool.bg/",
+  "https://lauderschool.bg/admission-3/",
+  "https://lauderschool.bg/docs/",
+  "https://lauderschool.bg/educational-process/",
+  "https://lauderschool.bg/about-us/",
+  "https://lauderschool.bg/contact/",
+  "https://lauderschool.bg/wp-content/uploads/2023/09/Държавно-финансиране-ЧСУ-Роналд-Лаудер-2023-2024-02.pdf"
+ ],
+ "fetch_failed": [],
+ "blocked": false,
+ "site_states_no_fees": false,
+ "site_fees": [],
+ "notes": "No fee amounts anywhere. State-funding PDF (2023/2024) says admission involves 'плащане на такса от родителя' and some places are 'без заплащане на годишна учебна такса' (state-funded), but gives no amount. Transport is by external company 'срещу допълнително заплащане', no amount. So the site does NOT state there are no fees; it just prints none."
+}

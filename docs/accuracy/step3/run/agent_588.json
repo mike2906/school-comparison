@@ -1,0 +1,134 @@
+{
+ "apply": true,
+ "pipeline_run_id": "e507a5fa-a7a5-44e8-9481-b96b22f35f93",
+ "schools": 1,
+ "spent_usd": 0.00449,
+ "stopped": null,
+ "kept_old_rows": [],
+ "outcomes": {
+  "written": 1
+ },
+ "results": [
+  {
+   "school_id": 588,
+   "outcome": "written",
+   "pages": [
+    {
+     "url": "https://sluncheviprikazki.com/",
+     "chars": 6904,
+     "prices": true,
+     "note": null
+    },
+    {
+     "url": "https://sluncheviprikazki.com/%d0%bc%d0%b5%d1%81%d1%82%d0%be%d0%bf%d0%be%d0%bb%d0%be%d0%b6%d0%b5%d0%bd%d0%b8%d0%b5/",
+     "chars": 2200,
+     "prices": true,
+     "note": null
+    },
+    {
+     "url": "https://sluncheviprikazki.com/feed/",
+     "chars": 85813,
+     "prices": true,
+     "note": null
+    }
+   ],
+   "fees": [
+    {
+     "category": "tuition",
+     "amount": 690.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "monthly",
+     "label": "Целодневно",
+     "academic_year": null,
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://sluncheviprikazki.com/",
+     "evidence": "#### Месечна такса\nЦелодневно за деца от 3 до 6 години с включена храна и занимания\n# 690**€**"
+    },
+    {
+     "category": "tuition",
+     "amount": 450.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "monthly",
+     "label": "Полудневно",
+     "academic_year": null,
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://sluncheviprikazki.com/",
+     "evidence": "#### Месечна такса\nПолудневно за деца от 3 до 6 години с включена храна и занимания\n# 450€"
+    },
+    {
+     "category": "tuition",
+     "amount": 190.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Седмично",
+     "academic_year": null,
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://sluncheviprikazki.com/",
+     "evidence": "#### Седмично\nС включена храна\n# 190€"
+    },
+    {
+     "category": "tuition",
+     "amount": 690.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "monthly",
+     "label": "Целодневно",
+     "academic_year": null,
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://sluncheviprikazki.com/%d0%bc%d0%b5%d1%81%d1%82%d0%be%d0%bf%d0%be%d0%bb%d0%be%d0%b6%d0%b5%d0%bd%d0%b8%d0%b5/",
+     "evidence": "#### Месечна такса\nЦелодневно за деца от 1,5 до 3 години с включена храна и занимания\n# 690€"
+    },
+    {
+     "category": "tuition",
+     "amount": 450.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "monthly",
+     "label": "Полудневно",
+     "academic_year": null,
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://sluncheviprikazki.com/%d0%bc%d0%b5%d1%81%d1%82%d0%be%d0%bf%d0%be%d0%bb%d0%be%d0%b6%d0%b5%d0%bd%d0%b8%d0%b5/",
+     "evidence": "#### Месечна такса\nПолудневно за деца от 1,5 до 3 години с включена храна и занимания\n# 450€"
+    },
+    {
+     "category": "tuition",
+     "amount": 190.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Седмично",
+     "academic_year": null,
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://sluncheviprikazki.com/%d0%bc%d0%b5%d1%81%d1%82%d0%be%d0%bf%d0%be%d0%bb%d0%be%d0%b6%d0%b5%d0%bd%d0%b8%d0%b5/",
+     "evidence": "#### Седмично\nС включена храна\n# 190€"
+    }
+   ],
+   "rows_new": 6,
+   "rows_new_publishable": 6,
+   "rows_old_published": 2,
+   "regressions": [],
+   "validation": "needs_review"
+  }
+ ]
+}

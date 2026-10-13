@@ -1,0 +1,454 @@
+{
+ "school_id": 533,
+ "pages_read": [
+  "https://school3.transform.bg/application-and-admission/finansovi-uslovia/"
+ ],
+ "fetch_failed": [],
+ "site_states_no_fees": false,
+ "site_fees": [
+  {
+   "fid": "f1",
+   "category": "tuition",
+   "amount": 2960,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": null,
+   "plan": "1 вноска годишно",
+   "year": "2026/2027",
+   "url": "https://school3.transform.bg/application-and-admission/finansovi-uslovia/",
+   "quote": "Такса обучение | € 2960 (Такса в евро на 1 вноска годишно)"
+  },
+  {
+   "fid": "f2",
+   "category": "tuition",
+   "amount": 3040,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": null,
+   "plan": "3 вноски годишно",
+   "year": "2026/2027",
+   "url": "https://school3.transform.bg/application-and-admission/finansovi-uslovia/",
+   "quote": "Такса обучение | € 3040 (Такса в евро на 3 вноски годишно)"
+  },
+  {
+   "fid": "f3",
+   "category": "tuition",
+   "amount": 3120,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": null,
+   "plan": "равни месечни вноски",
+   "year": "2026/2027",
+   "url": "https://school3.transform.bg/application-and-admission/finansovi-uslovia/",
+   "quote": "Такса обучение | € 3120 (Такса в евро на равни месечни вноски)"
+  },
+  {
+   "fid": "f4",
+   "category": "activities",
+   "amount": 2960,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": null,
+   "plan": "1 вноска годишно",
+   "year": "2026/2027",
+   "url": "https://school3.transform.bg/application-and-admission/finansovi-uslovia/",
+   "quote": "Извънкласни дейности / Изследователска програма | € 2960 (Такса в евро на 1 вноска годишно)"
+  },
+  {
+   "fid": "f5",
+   "category": "activities",
+   "amount": 3040,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": null,
+   "plan": "3 вноски годишно",
+   "year": "2026/2027",
+   "url": "https://school3.transform.bg/application-and-admission/finansovi-uslovia/",
+   "quote": "Извънкласни дейности / Изследователска програма | € 3040 (Такса в евро на 3 вноски годишно)"
+  },
+  {
+   "fid": "f6",
+   "category": "activities",
+   "amount": 3120,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": null,
+   "plan": "равни месечни вноски",
+   "year": "2026/2027",
+   "url": "https://school3.transform.bg/application-and-admission/finansovi-uslovia/",
+   "quote": "Извънкласни дейности / Изследователска програма | € 3120 (Такса в евро на равни месечни вноски)"
+  },
+  {
+   "fid": "f7",
+   "category": "activities",
+   "amount": 740,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": null,
+   "plan": "1 вноска годишно",
+   "year": "2026/2027",
+   "url": "https://school3.transform.bg/application-and-admission/finansovi-uslovia/",
+   "quote": "Летни въвеждащи и завършващи дейности – септември/юни | € 740 (Такса в евро на 1 вноска годишно)"
+  },
+  {
+   "fid": "f8",
+   "category": "activities",
+   "amount": 760,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": null,
+   "plan": "3 вноски годишно",
+   "year": "2026/2027",
+   "url": "https://school3.transform.bg/application-and-admission/finansovi-uslovia/",
+   "quote": "Летни въвеждащи и завършващи дейности – септември/юни | € 760 (Такса в евро на 3 вноски годишно)"
+  },
+  {
+   "fid": "f9",
+   "category": "activities",
+   "amount": 780,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": null,
+   "plan": "равни месечни вноски",
+   "year": "2026/2027",
+   "url": "https://school3.transform.bg/application-and-admission/finansovi-uslovia/",
+   "quote": "Летни въвеждащи и завършващи дейности – септември/юни | € 780 (Такса в евро на равни месечни вноски)"
+  },
+  {
+   "fid": "f10",
+   "category": "tuition",
+   "amount": 740,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": null,
+   "plan": "1 вноска годишно",
+   "year": "2026/2027",
+   "url": "https://school3.transform.bg/application-and-admission/finansovi-uslovia/",
+   "quote": "Дарение за развитие ФОТ (препоръчително) | € 740 (Такса в евро на 1 вноска годишно)"
+  },
+  {
+   "fid": "f11",
+   "category": "tuition",
+   "amount": 760,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": null,
+   "plan": "3 вноски годишно",
+   "year": "2026/2027",
+   "url": "https://school3.transform.bg/application-and-admission/finansovi-uslovia/",
+   "quote": "Дарение за развитие ФОТ (препоръчително) | € 760 (Такса в евро на 3 вноски годишно)"
+  },
+  {
+   "fid": "f12",
+   "category": "tuition",
+   "amount": 780,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": null,
+   "plan": "равни месечни вноски",
+   "year": "2026/2027",
+   "url": "https://school3.transform.bg/application-and-admission/finansovi-uslovia/",
+   "quote": "Дарение за развитие ФОТ (препоръчително) | € 780 (Такса в евро на равни месечни вноски)"
+  },
+  {
+   "fid": "f13",
+   "category": "tuition",
+   "amount": 7400,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": null,
+   "plan": "1 вноска годишно",
+   "year": "2026/2027",
+   "url": "https://school3.transform.bg/application-and-admission/finansovi-uslovia/",
+   "quote": "Общо | € 7400 (Такса в евро на 1 вноска годишно)"
+  },
+  {
+   "fid": "f14",
+   "category": "tuition",
+   "amount": 7600,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": null,
+   "plan": "3 вноски годишно",
+   "year": "2026/2027",
+   "url": "https://school3.transform.bg/application-and-admission/finansovi-uslovia/",
+   "quote": "Общо | € 7600 (Такса в евро на 3 вноски годишно)"
+  },
+  {
+   "fid": "f15",
+   "category": "tuition",
+   "amount": 7800,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": null,
+   "plan": "равни месечни вноски",
+   "year": "2026/2027",
+   "url": "https://school3.transform.bg/application-and-admission/finansovi-uslovia/",
+   "quote": "Общо | € 7800 (Такса в евро на равни месечни вноски)"
+  },
+  {
+   "fid": "f16",
+   "category": "food",
+   "amount": 7.5,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "daily",
+   "group": null,
+   "plan": null,
+   "year": "2026/2027",
+   "url": "https://school3.transform.bg/application-and-admission/finansovi-uslovia/",
+   "quote": "Храна (опционално) | ≈ 7.5 ЕUR / ден"
+  },
+  {
+   "fid": "f17",
+   "category": "camp",
+   "amount": 950,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "group": null,
+   "plan": null,
+   "year": "2026/2027",
+   "url": "https://school3.transform.bg/application-and-admission/finansovi-uslovia/",
+   "quote": "Зелени училища (приблизително) | ≈ 950 EUR / за всички"
+  },
+  {
+   "fid": "f18",
+   "category": "extracurricular",
+   "amount": null,
+   "amount_min": 10,
+   "amount_max": 20,
+   "currency": "EUR",
+   "period": "per_session",
+   "group": null,
+   "plan": null,
+   "year": "2026/2027",
+   "url": "https://school3.transform.bg/application-and-admission/finansovi-uslovia/",
+   "quote": "Допълнителни извънкласни дейности (опционално) | от 10 до 20 EUR / за едно занимание"
+  },
+  {
+   "fid": "f19",
+   "category": "materials",
+   "amount": 100,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": null,
+   "plan": null,
+   "year": "2026/2027",
+   "url": "https://school3.transform.bg/application-and-admission/finansovi-uslovia/",
+   "quote": "Материали | 100 EUR / за 10 месеца"
+  },
+  {
+   "fid": "f20",
+   "category": "transport",
+   "amount": 200,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": null,
+   "plan": null,
+   "year": "2026/2027",
+   "url": "https://school3.transform.bg/application-and-admission/finansovi-uslovia/",
+   "quote": "Транспорт в две посоки (опционално) | ≈ 200 EUR / месец"
+  },
+  {
+   "fid": "f21",
+   "category": "registration",
+   "amount": 125,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "group": null,
+   "plan": null,
+   "year": "2026/2027",
+   "url": "https://school3.transform.bg/application-and-admission/finansovi-uslovia/",
+   "quote": "Административна такса за приемна процедура | 125 EUR / еднократно"
+  }
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "verdict": "missing_period",
+   "fid": "f21",
+   "reason": "125 EUR admin fee 'еднократно'; row period null",
+   "group_unstated": false
+  },
+  {
+   "oid": "o2",
+   "verdict": "missing_period",
+   "fid": "f16",
+   "reason": "7.5 EUR food 'на ден'; row period null",
+   "group_unstated": false
+  },
+  {
+   "oid": "o3",
+   "verdict": "correct",
+   "fid": "f1",
+   "reason": "Такса обучение 2960 EUR, 1-payment plan, yearly",
+   "group_unstated": false
+  },
+  {
+   "oid": "o4",
+   "verdict": "correct",
+   "fid": "f20",
+   "reason": "transport 200 EUR/month",
+   "group_unstated": false
+  },
+  {
+   "oid": "o5",
+   "verdict": "correct",
+   "fid": "f17",
+   "reason": "green schools ~950 EUR, no period stated",
+   "group_unstated": false
+  },
+  {
+   "oid": "o6",
+   "verdict": "missing_period",
+   "fid": "f19",
+   "reason": "materials 100 EUR 'за 10 месеца' (school year); row period null",
+   "group_unstated": false
+  },
+  {
+   "oid": "o7",
+   "verdict": "duplicate",
+   "fid": "f19",
+   "reason": "same materials fee as o6",
+   "group_unstated": false
+  },
+  {
+   "oid": "o8",
+   "verdict": "correct",
+   "fid": "f3",
+   "reason": "Такса обучение 3120 EUR, monthly-instalments plan yearly amount",
+   "group_unstated": false
+  },
+  {
+   "oid": "o9",
+   "verdict": "duplicate",
+   "fid": "f20",
+   "reason": "same transport fee as o4",
+   "group_unstated": false
+  },
+  {
+   "oid": "o10",
+   "verdict": "correct",
+   "fid": "f9",
+   "reason": "summer Sept/June activities 780 EUR (monthly plan)",
+   "group_unstated": false
+  },
+  {
+   "oid": "o11",
+   "verdict": "correct",
+   "fid": "f7",
+   "reason": "summer Sept/June activities 740 EUR (1-payment plan)",
+   "group_unstated": false
+  },
+  {
+   "oid": "o12",
+   "verdict": "correct",
+   "fid": "f2",
+   "reason": "Такса обучение 3040 EUR, 3-instalment plan",
+   "group_unstated": false
+  },
+  {
+   "oid": "o13",
+   "verdict": "correct",
+   "fid": "f4",
+   "reason": "Извънкласни дейности 2960 EUR, 1-payment plan",
+   "group_unstated": false
+  },
+  {
+   "oid": "o14",
+   "verdict": "correct",
+   "fid": "f21",
+   "reason": "125 EUR admin fee, one_time",
+   "group_unstated": false
+  },
+  {
+   "oid": "o15",
+   "verdict": "correct",
+   "fid": "f6",
+   "reason": "Извънкласни дейности 3120 EUR, monthly plan",
+   "group_unstated": false
+  },
+  {
+   "oid": "o16",
+   "verdict": "duplicate",
+   "fid": "f17",
+   "reason": "same green-schools fee as o5",
+   "group_unstated": false
+  },
+  {
+   "oid": "o17",
+   "verdict": "correct",
+   "fid": "f5",
+   "reason": "Извънкласни дейности 3040 EUR, 3-instalment plan",
+   "group_unstated": false
+  },
+  {
+   "oid": "o18",
+   "verdict": "missing_period",
+   "fid": "f18",
+   "reason": "10-20 EUR range 'за едно занимание'; row period null",
+   "group_unstated": false
+  },
+  {
+   "oid": "o19",
+   "verdict": "wrong_amount",
+   "fid": null,
+   "reason": "20 is only the upper end of the 10-20 EUR range, not a site fee by itself",
+   "group_unstated": false
+  },
+  {
+   "oid": "o20",
+   "verdict": "wrong_amount",
+   "fid": null,
+   "reason": "10 is only the lower end of the 10-20 EUR range, not a site fee by itself",
+   "group_unstated": false
+  },
+  {
+   "oid": "o21",
+   "verdict": "correct",
+   "fid": "f8",
+   "reason": "summer Sept/June activities 760 EUR (3-instalment plan)",
+   "group_unstated": false
+  }
+ ],
+ "notes": "Re-fetched finansovi-uslovia: key confirmed. o1 cites /applications/ URL; amount and label match the fee page."
+}

@@ -1,0 +1,289 @@
+{
+ "apply": true,
+ "pipeline_run_id": "2e746669-65b4-4b5f-bc2c-929cffeaaf3e",
+ "schools": 1,
+ "spent_usd": 0.004637,
+ "stopped": null,
+ "kept_old_rows": [],
+ "outcomes": {
+  "held": 1
+ },
+ "results": [
+  {
+   "school_id": 609,
+   "outcome": "held",
+   "pages": [
+    {
+     "url": "https://luiskarol.com/",
+     "chars": 4500,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://luiskarol.com/obuchenie-%d1%82%d0%b0%d0%ba%d1%81%d0%b8/",
+     "chars": 3891,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://luiskarol.com/priem-v-podgotvitelna-grupa/",
+     "chars": 11070,
+     "prices": true,
+     "note": null
+    },
+    {
+     "url": "https://luiskarol.com/priem-v-parvi-klas/",
+     "chars": 12707,
+     "prices": true,
+     "note": null
+    },
+    {
+     "url": "https://luiskarol.com/priem-za-5-klas-2/",
+     "chars": 5571,
+     "prices": true,
+     "note": null
+    },
+    {
+     "url": "https://luiskarol.com/priem-za-5-klas/",
+     "chars": 5715,
+     "prices": true,
+     "note": null
+    },
+    {
+     "url": "https://luiskarol.com/obuchenie-%d0%bf%d1%80%d0%be%d0%b3%d1%80%d0%b0%d0%bc%d0%b0-%d0%b8-%d0%b5%d1%82%d0%b0%d0%bf%d0%b8-%d0%bd%d0%b0-%d0%be%d0%b1%d1%83%d1%87%d0%b5%d0%bd%d0%b8%d0%b5-%d0%bf%d0%be-%d0%b0%d0%bd%d0%b3%d0%bb/",
+     "chars": 4294,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://luiskarol.com/obuchenie-%d0%bf%d1%80%d0%b0%d0%b2%d0%b8%d0%bb%d0%bd%d0%b8%d0%ba/",
+     "chars": 43456,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://luiskarol.com/chastno-uchilishte-%d0%b8%d0%b7%d0%b2%d1%8a%d0%bd%d0%ba%d0%bb%d0%b0%d1%81%d0%bd%d0%b8-%d0%b4%d0%b5%d0%b9%d0%bd%d0%be%d1%81%d1%82%d0%b8-lyatno-uchilishte/",
+     "chars": 7095,
+     "prices": true,
+     "note": null
+    },
+    {
+     "url": "https://luiskarol.com/kontakti/",
+     "chars": 2320,
+     "prices": false,
+     "note": null
+    }
+   ],
+   "fees": [
+    {
+     "category": "registration",
+     "amount": 30.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Явяването на детето на обследването",
+     "academic_year": "2026/2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [
+      "period one_time cleared: the evidence does not name it"
+     ],
+     "source_url": "https://luiskarol.com/priem-v-podgotvitelna-grupa/",
+     "evidence": "![📍](https://s.w.org/images/core/emoji/17.0.2/svg/1f4cd.svg)Явяването на детето на обследването се заплаща **30 €** / **58,67 лв.** на място в деня на подаване на заявлениетоилипо банковата сметка на Дружеството до три дни от получаване на входящ номер."
+    },
+    {
+     "category": "registration",
+     "amount": 250.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "one_time",
+     "label": "еднократна такса записване",
+     "academic_year": "2026/2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://luiskarol.com/priem-v-podgotvitelna-grupa/",
+     "evidence": "![✅](https://s.w.org/images/core/emoji/17.0.2/svg/2705.svg)Заедно с попълване на документите за записване се заплаща еднократна такса записване, представляваща двустранна гаранция, в размер на 250€/488,96 лв."
+    },
+    {
+     "category": "registration",
+     "amount": 30.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Явяването на детето на изпита",
+     "academic_year": "2026/2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [
+      "period one_time cleared: the evidence does not name it"
+     ],
+     "source_url": "https://luiskarol.com/priem-v-parvi-klas/",
+     "evidence": "![📍](https://s.w.org/images/core/emoji/17.0.2/svg/1f4cd.svg)Явяването на детето на изпита се заплаща **30 €** / **58,76 лв**. на място в деня на подаване на заявлениетоилипо банковата сметка на Дружеството до три дни от получаване на входящ номер."
+    },
+    {
+     "category": "registration",
+     "amount": 250.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "one_time",
+     "label": "еднократна такса записване",
+     "academic_year": "2026/2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://luiskarol.com/priem-v-parvi-klas/",
+     "evidence": "![✅](https://s.w.org/images/core/emoji/17.0.2/svg/2705.svg)Заедно с попълване на документите за записване се заплаща еднократна такса записване, представляваща двустранна гаранция, в размер на 250 €/ 488,96 лв."
+    },
+    {
+     "category": "camp",
+     "amount": 200.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Цена на курса",
+     "academic_year": "2026/2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://luiskarol.com/priem-v-parvi-klas/",
+     "evidence": "**![🌞](https://s.w.org/images/core/emoji/17.0.2/svg/1f31e.svg)☝Курсът на обучение е целодневен –** от 08:30 до 17:30 часа на всеки работен ден.**Цена на курса: 200 €/391,17 лв.,** с осигурен обяд и следобедна закуска**.** Заплащане: в**срок до 30.06.2026 г.**"
+    },
+    {
+     "category": "materials",
+     "amount": 74.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "комплектът учебници",
+     "academic_year": "2026/2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://luiskarol.com/priem-za-5-klas-2/",
+     "evidence": "При подписване на договор се заплаща комплектът учебници за учебната **2026/2027 г. Цена: приблизително 74 €.**"
+    },
+    {
+     "category": "registration",
+     "amount": 250.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "one_time",
+     "label": "такса записване",
+     "academic_year": "2026/2027",
+     "kept": false,
+     "confidence": 0.0,
+     "checks": [
+      "dropped: evidence line does not hold the amount"
+     ],
+     "source_url": "https://luiskarol.com/priem-za-5-klas/",
+     "evidence": "**![✅](https://s.w.org/images/core/emoji/17.0.2/svg/2705.svg) При подписване на договор за обучение на новоприет ученик се заплаща:**"
+    },
+    {
+     "category": "materials",
+     "amount": 74.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "комплектът учебници",
+     "academic_year": "2026/2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://luiskarol.com/priem-za-5-klas/",
+     "evidence": "**✔** комплектът учебници за учебната **2026/2027 г.** сприблизителна цена **74****€****/ 144,73 лв.**"
+    },
+    {
+     "category": "camp",
+     "amount": 500.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Цена за 4 седмици с включена храна /обяд, следобедна закуска, плод/",
+     "academic_year": null,
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://luiskarol.com/chastno-uchilishte-%d0%b8%d0%b7%d0%b2%d1%8a%d0%bd%d0%ba%d0%bb%d0%b0%d1%81%d0%bd%d0%b8-%d0%b4%d0%b5%d0%b9%d0%bd%d0%be%d1%81%d1%82%d0%b8-lyatno-uchilishte/",
+     "evidence": "| ЛЯТНО УЧИЛИЩЕ  |  ЦЕНИ  |\n| Цена за 4 седмици с включена храна /обяд, следобедна закуска, плод/   | 500 € / 977,92 лв.   |"
+    },
+    {
+     "category": "camp",
+     "amount": 390.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Цена за 3 седмици с включена храна/обяд, следобедна закуска, плод/",
+     "academic_year": null,
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://luiskarol.com/chastno-uchilishte-%d0%b8%d0%b7%d0%b2%d1%8a%d0%bd%d0%ba%d0%bb%d0%b0%d1%81%d0%bd%d0%b8-%d0%b4%d0%b5%d0%b9%d0%bd%d0%be%d1%81%d1%82%d0%b8-lyatno-uchilishte/",
+     "evidence": "| ЛЯТНО УЧИЛИЩЕ  |  ЦЕНИ  |\n| Цена за 3 седмици с включена храна/обяд, следобедна закуска, плод/   | 390 € / 762,77 лв.  |"
+    },
+    {
+     "category": "camp",
+     "amount": 270.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Цена за 2 седмици с включена храна/обяд,следобедна закуска, плод/",
+     "academic_year": null,
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://luiskarol.com/chastno-uchilishte-%d0%b8%d0%b7%d0%b2%d1%8a%d0%bd%d0%ba%d0%bb%d0%b0%d1%81%d0%bd%d0%b8-%d0%b4%d0%b5%d0%b9%d0%bd%d0%be%d1%81%d1%82%d0%b8-lyatno-uchilishte/",
+     "evidence": "| ЛЯТНО УЧИЛИЩЕ  |  ЦЕНИ  |\n| Цена за 2 седмици с включена храна/обяд,следобедна закуска, плод/   | 270 € / 528,07 лв.  |"
+    },
+    {
+     "category": "camp",
+     "amount": 140.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Цена за 1 седмица с включена храна/обяд, следобедна закуска, плод/",
+     "academic_year": null,
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://luiskarol.com/chastno-uchilishte-%d0%b8%d0%b7%d0%b2%d1%8a%d0%bd%d0%ba%d0%bb%d0%b0%d1%81%d0%bd%d0%b8-%d0%b4%d0%b5%d0%b9%d0%bd%d0%be%d1%81%d1%82%d0%b8-lyatno-uchilishte/",
+     "evidence": "| ЛЯТНО УЧИЛИЩЕ  |  ЦЕНИ  |\n| Цена за 1 седмица с включена храна/обяд, следобедна закуска, плод/   |  140€ / 273,82 лв.  |"
+    },
+    {
+     "category": "camp",
+     "amount": 35.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Цена за 1 ден с включен/обяд, следобедна закуска, плод/",
+     "academic_year": null,
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://luiskarol.com/chastno-uchilishte-%d0%b8%d0%b7%d0%b2%d1%8a%d0%bd%d0%ba%d0%bb%d0%b0%d1%81%d0%bd%d0%b8-%d0%b4%d0%b5%d0%b9%d0%bd%d0%be%d1%81%d1%82%d0%b8-lyatno-uchilishte/",
+     "evidence": "| ЛЯТНО УЧИЛИЩЕ  |  ЦЕНИ  |\n| Цена за 1 ден с включен/обяд, следобедна закуска, плод/   | 35€/ 68,45 лв.  |"
+    }
+   ],
+   "rows_new": 12,
+   "rows_new_publishable": 12,
+   "rows_old_published": 3,
+   "regressions": [
+    "loses the YEARLY period of TUITION 30.00",
+    "drops MATERIALS 144.73, which the page still shows"
+   ]
+  }
+ ]
+}

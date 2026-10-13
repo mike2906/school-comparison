@@ -1,0 +1,65 @@
+{
+ "apply": true,
+ "pipeline_run_id": "379d74d0-cacd-4928-8069-130edbe4d764",
+ "schools": 1,
+ "spent_usd": 0.000176,
+ "stopped": null,
+ "kept_old_rows": [
+  552
+ ],
+ "outcomes": {
+  "kept_old_rows": 1
+ },
+ "results": [
+  {
+   "school_id": 552,
+   "outcome": "kept_old_rows",
+   "pages": [
+    {
+     "url": "https://meridian22.org/",
+     "chars": 1877,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://meridian22.org/za-meridian-22",
+     "chars": 3091,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://meridian22.org/rakovodstvo",
+     "chars": 8030,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://meridian22.org/rakovodstvo-minalo",
+     "chars": 8830,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://meridian22.org/en",
+     "chars": 1803,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://meridian22.org/about-meridian-22",
+     "chars": 2642,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://meridian22.org/management",
+     "chars": 8359,
+     "prices": false,
+     "note": null
+    }
+   ],
+   "fees": [],
+   "reason": "no page showing prices"
+  }
+ ]
+}

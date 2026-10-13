@@ -1,0 +1,251 @@
+{
+ "school_id": 514,
+ "pages_read": [
+  "https://www.waldorf.bg/admission/"
+ ],
+ "fetch_failed": [],
+ "site_states_no_fees": false,
+ "site_fees": [
+  {
+   "fid": "f1",
+   "category": "tuition",
+   "amount": 7130,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "Детска градина & предучилищна група",
+   "plan": "плащане в пълен размер",
+   "year": null,
+   "url": "https://www.waldorf.bg/admission/",
+   "quote": "1. плащане в пълен размер: 7130 евро"
+  },
+  {
+   "fid": "f2",
+   "category": "tuition",
+   "amount": 7590,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "Детска градина & предучилищна група",
+   "plan": "плащане на 2 вноски",
+   "year": null,
+   "url": "https://www.waldorf.bg/admission/",
+   "quote": "2. плащане на 2 вноски: 7590 евро"
+  },
+  {
+   "fid": "f3",
+   "category": "tuition",
+   "amount": 8111,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "Детска градина & предучилищна група",
+   "plan": "плащане на 11 вноски",
+   "year": null,
+   "url": "https://www.waldorf.bg/admission/",
+   "quote": "3. плащане на 11 вноски: 8111 евро"
+  },
+  {
+   "fid": "f4",
+   "category": "food",
+   "amount": 6.2,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "daily",
+   "group": "Детска градина & предучилищна група",
+   "plan": null,
+   "year": null,
+   "url": "https://www.waldorf.bg/admission/",
+   "quote": "Таксата за кетъринг на ден е 6,20 евро"
+  },
+  {
+   "fid": "f5",
+   "category": "tuition",
+   "amount": 6150,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "Предучилищен и от 1-ви до 7-ми клас",
+   "plan": "плащане в пълен размер",
+   "year": null,
+   "url": "https://www.waldorf.bg/admission/",
+   "quote": "1. плащане в пълен размер: 6150 евро"
+  },
+  {
+   "fid": "f6",
+   "category": "tuition",
+   "amount": 6540,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "Предучилищен и от 1-ви до 7-ми клас",
+   "plan": "плащане на 2 вноски",
+   "year": null,
+   "url": "https://www.waldorf.bg/admission/",
+   "quote": "2. плащане на 2 вноски: 6540 евро"
+  },
+  {
+   "fid": "f7",
+   "category": "tuition",
+   "amount": 6990,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "Предучилищен и от 1-ви до 7-ми клас",
+   "plan": "плащане на 3 вноски",
+   "year": null,
+   "url": "https://www.waldorf.bg/admission/",
+   "quote": "3. плащане на 3 вноски: 6990 евро"
+  },
+  {
+   "fid": "f8",
+   "category": "tuition",
+   "amount": 6640,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "Гимназия, 8-ми до 12 клас",
+   "plan": "плащане в пълен размер",
+   "year": null,
+   "url": "https://www.waldorf.bg/admission/",
+   "quote": "1. плащане в пълен размер: 6640 евро"
+  },
+  {
+   "fid": "f9",
+   "category": "tuition",
+   "amount": 7060,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "Гимназия, 8-ми до 12 клас",
+   "plan": "плащане на 2 вноски",
+   "year": null,
+   "url": "https://www.waldorf.bg/admission/",
+   "quote": "2. плащане на 2 вноски: 7060 евро"
+  },
+  {
+   "fid": "f10",
+   "category": "tuition",
+   "amount": 7545,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "Гимназия, 8-ми до 12 клас",
+   "plan": "плащане на 3 вноски",
+   "year": null,
+   "url": "https://www.waldorf.bg/admission/",
+   "quote": "3. плащане на 3 вноски: 7545 евро"
+  },
+  {
+   "fid": "f11",
+   "category": "registration",
+   "amount": 400,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "group": "нови деца във Валдорфската детска градина",
+   "plan": null,
+   "year": null,
+   "url": "https://www.waldorf.bg/admission/",
+   "quote": "еднократен възстановим депозит за нови деца във Валдорфската детска градина: 400 евро"
+  },
+  {
+   "fid": "f12",
+   "category": "tuition",
+   "amount": 135,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "weekly",
+   "group": "гостуващи ученици във Валдорфското училище (Предучилищен и от 1-ви до 12-ми клас)",
+   "plan": null,
+   "year": null,
+   "url": "https://www.waldorf.bg/admission/",
+   "quote": "седмична такса за гостуващи ученици във Валдорфското училище: 135 евро"
+  },
+  {
+   "fid": "f13",
+   "category": "registration",
+   "amount": 800,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "group": "нови ученици във Валдорфското училище (Предучилищен и от 1-ви до 12-ми клас)",
+   "plan": null,
+   "year": null,
+   "url": "https://www.waldorf.bg/admission/",
+   "quote": "еднократен възстановим депозит за нови ученици във Валдорфското училище: 800 евро."
+  }
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "verdict": "missing_period",
+   "fid": "f3",
+   "reason": "8111 EUR KG 11-instalment plan figure; site fee is a yearly plan total, row period null",
+   "group_unstated": false
+  },
+  {
+   "oid": "o2",
+   "verdict": "missing_period",
+   "fid": "f4",
+   "reason": "6.20 EUR catering 'на ден'; row period null",
+   "group_unstated": false
+  },
+  {
+   "oid": "o3",
+   "verdict": "correct",
+   "fid": "f1",
+   "reason": "7130 EUR KG full payment, yearly",
+   "group_unstated": false
+  },
+  {
+   "oid": "o4",
+   "verdict": "correct",
+   "fid": "f11",
+   "reason": "400 EUR refundable deposit for new KG children, one_time",
+   "group_unstated": false
+  },
+  {
+   "oid": "o5",
+   "verdict": "wrong_amount",
+   "fid": null,
+   "reason": "'кетъринг в детската градина: 1/ден' is a garbled line with no currency; the site's catering fee is 6,20 евро/ден",
+   "group_unstated": false
+  },
+  {
+   "oid": "o6",
+   "verdict": "duplicate",
+   "fid": "f1",
+   "reason": "same 7130 fee as o3, which also has the correct period",
+   "group_unstated": false
+  },
+  {
+   "oid": "o7",
+   "verdict": "missing_period",
+   "fid": "f2",
+   "reason": "7590 EUR KG 2-instalment plan total; row period null",
+   "group_unstated": false
+  },
+  {
+   "oid": "o8",
+   "verdict": "duplicate",
+   "fid": "f4",
+   "reason": "same 6.20 catering fee as o2",
+   "group_unstated": false
+  }
+ ],
+ "notes": "Re-fetched /admission/: key confirmed. Catering line under 'Други такси' literally reads '1/ден' (garbled). Site still says applications for 2024-2025; fee lists carry no year."
+}

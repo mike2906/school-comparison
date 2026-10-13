@@ -1,0 +1,508 @@
+{
+ "school_id": 564,
+ "pages_read": [
+  "https://pitagor-school.eu/taksi/",
+  "https://pitagor-school.eu/taksi/transport-pitagor/",
+  "https://pitagor-school.eu/hranene/",
+  "https://pitagor-school.eu/priem-1klas-2026-2027/",
+  "https://pitagor-school.eu/priem-5-klas-2026-2027/"
+ ],
+ "fetch_failed": [],
+ "site_states_no_fees": false,
+ "site_fees": [
+  {
+   "fid": "f1",
+   "category": "tuition",
+   "amount": 7580,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "ПГ - 4. клас",
+   "plan": "ЕДНОКРАТНО ПЛАЩАНЕ",
+   "year": "2026-2027",
+   "url": "https://pitagor-school.eu/taksi/",
+   "quote": "Плащане до 31.03.2026 г. - 7580€ / 14825,19 лв."
+  },
+  {
+   "fid": "f2",
+   "category": "tuition",
+   "amount": 3975,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "group": "ПГ - 4. клас",
+   "plan": "НА ДВЕ ВНОСКИ",
+   "year": "2026-2027",
+   "url": "https://pitagor-school.eu/taksi/",
+   "quote": "Плащане I вноска до 31.03.2026 г. - 3975€ / 7774,42 лв.; Плащане II вноска до 30.01.2027 г. - 3975€"
+  },
+  {
+   "fid": "f3",
+   "category": "tuition",
+   "amount": 827,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": "ПГ - 4. клас",
+   "plan": "НА ДЕСЕТ ВНОСКИ",
+   "year": "2026-2027",
+   "url": "https://pitagor-school.eu/taksi/",
+   "quote": "останалите вноски до 5. число на текущия месец, считано от 09/2026 до 05/2027 - 827€ / 1617,47 лв."
+  },
+  {
+   "fid": "f4",
+   "category": "tuition",
+   "amount": 6990,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "5. - 7. клас",
+   "plan": "ЕДНОКРАТНО ПЛАЩАНЕ",
+   "year": "2026-2027",
+   "url": "https://pitagor-school.eu/taksi/",
+   "quote": "Плащане до 31.03.2026 г. - 6990€ / 13671,25 лв."
+  },
+  {
+   "fid": "f5",
+   "category": "tuition",
+   "amount": 3666,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "group": "5. - 7. клас",
+   "plan": "НА ДВЕ ВНОСКИ",
+   "year": "2026-2027",
+   "url": "https://pitagor-school.eu/taksi/",
+   "quote": "Плащане I вноска до 31.03.2026 г. - 3666€ / 7170,07 лв.; Плащане II вноска до 30.01.2027 г. - 3666€"
+  },
+  {
+   "fid": "f6",
+   "category": "tuition",
+   "amount": 762,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": "5. - 7. клас",
+   "plan": "НА ДЕСЕТ ВНОСКИ",
+   "year": "2026-2027",
+   "url": "https://pitagor-school.eu/taksi/",
+   "quote": "останалите вноски до 5. число на текущия месец, считано от 09/2026 до 05/2027 - 762€ / 1490,34 лв."
+  },
+  {
+   "fid": "f7",
+   "category": "tuition",
+   "amount": 6640,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "8. - 10. клас",
+   "plan": "ЕДНОКРАТНО ПЛАЩАНЕ",
+   "year": "2026-2027",
+   "url": "https://pitagor-school.eu/taksi/",
+   "quote": "Плащане до 31.03.2026 г. - 6640€ / 12986,71 лв."
+  },
+  {
+   "fid": "f8",
+   "category": "tuition",
+   "amount": 3482,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "group": "8. - 10. клас",
+   "plan": "НА ДВЕ ВНОСКИ",
+   "year": "2026-2027",
+   "url": "https://pitagor-school.eu/taksi/",
+   "quote": "Плащане I вноска до 31.03.2026 г. - 3482€ / 6810,2 лв.; Плащане II вноска до 30.01.2027 г. - 3482€"
+  },
+  {
+   "fid": "f9",
+   "category": "tuition",
+   "amount": 724,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": "8. - 10. клас",
+   "plan": "НА ДЕСЕТ ВНОСКИ",
+   "year": "2026-2027",
+   "url": "https://pitagor-school.eu/taksi/",
+   "quote": "останалите вноски до 5. число на текущия месец, считано от 09/2026 до 05/2027 - 724€ / 1416,02 лв."
+  },
+  {
+   "fid": "f10",
+   "category": "transport",
+   "amount": 2650,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "Двупосочно",
+   "plan": null,
+   "year": "2026/2027",
+   "url": "https://pitagor-school.eu/taksi/transport-pitagor/",
+   "quote": "Годишна такса – Двупосочно – 2650 евро"
+  },
+  {
+   "fid": "f11",
+   "category": "transport",
+   "amount": 2518,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "Двупосочно",
+   "plan": "Отстъпка за второ дете",
+   "year": "2026/2027",
+   "url": "https://pitagor-school.eu/taksi/transport-pitagor/",
+   "quote": "Отстъпка за второ дете – 2518 евро"
+  },
+  {
+   "fid": "f12",
+   "category": "transport",
+   "amount": 1988,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "Еднопосочно",
+   "plan": null,
+   "year": "2026/2027",
+   "url": "https://pitagor-school.eu/taksi/transport-pitagor/",
+   "quote": "Годишна такса – Еднопосочно – 1988 евро"
+  },
+  {
+   "fid": "f13",
+   "category": "transport",
+   "amount": 1889,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "Еднопосочно",
+   "plan": "Отстъпка за второ дете",
+   "year": "2026/2027",
+   "url": "https://pitagor-school.eu/taksi/transport-pitagor/",
+   "quote": "Отстъпка за второ дете – 1889 евро"
+  },
+  {
+   "fid": "f14",
+   "category": "food",
+   "amount": 720,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "term",
+   "group": "ПГ и ПУК",
+   "plan": null,
+   "year": "2026/27",
+   "url": "https://pitagor-school.eu/hranene/",
+   "quote": "ПГ и ПУК – за учебен срок – 720 евро"
+  },
+  {
+   "fid": "f15",
+   "category": "food",
+   "amount": 840,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "term",
+   "group": "1-ви до 4-ти клас",
+   "plan": null,
+   "year": "2026/27",
+   "url": "https://pitagor-school.eu/hranene/",
+   "quote": "1-ви до 4-ти клас – за учебен срок – 840 евро"
+  },
+  {
+   "fid": "f16",
+   "category": "food",
+   "amount": 8.5,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "daily",
+   "group": "5-ти до 10-ти клас",
+   "plan": "по желание при заявка",
+   "year": "2026/27",
+   "url": "https://pitagor-school.eu/hranene/",
+   "quote": "5-ти до 10-ти клас – по желание при заявка – 8.50 евро на ден",
+   "changed": "site states '8.50 евро на ден', a stated frequency; daily used as for other schools' per-day food fees"
+  },
+  {
+   "fid": "f17",
+   "category": "registration",
+   "amount": 25,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "group": "5. клас",
+   "plan": null,
+   "year": "2026/2027",
+   "url": "https://pitagor-school.eu/priem-5-klas-2026-2027/",
+   "quote": "такса за всеки избран изпит (25 евро на изпит)"
+  },
+  {
+   "fid": "f18",
+   "category": "registration",
+   "amount": 25,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "group": "8. клас",
+   "plan": null,
+   "year": "2026",
+   "url": "https://pitagor-school.eu/priem8klas/",
+   "quote": "такса за всеки избран изпит (25 евро на изпит)"
+  },
+  {
+   "fid": "f19",
+   "category": "registration",
+   "amount": 20,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "group": "ПГ (подготвителна група)",
+   "plan": null,
+   "year": "2026/2027",
+   "url": "https://pitagor-school.eu/priem-podgotvitelna-grupa/",
+   "quote": "Необходимо е заплащане на такса за обследване в размер на 20 €."
+  },
+  {
+   "fid": "f20",
+   "category": "registration",
+   "amount": 20,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "group": "1. клас (външни ученици, състезание Питагор Junior)",
+   "plan": null,
+   "year": "2026/2027",
+   "url": "https://pitagor-school.eu/priem-1klas-2026-2027/",
+   "quote": "таксата за участие е 20 евро"
+  }
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "verdict": "correct",
+   "fid": "f10",
+   "reason": "transport two-way 2650 EUR yearly",
+   "group_unstated": false
+  },
+  {
+   "oid": "o2",
+   "verdict": "correct",
+   "fid": "f15",
+   "reason": "food 840 EUR per term (grades 1-4)",
+   "group_unstated": false
+  },
+  {
+   "oid": "o3",
+   "verdict": "correct",
+   "fid": "f1",
+   "reason": "PG-4 one-time payment 7580 EUR, yearly",
+   "group_unstated": false
+  },
+  {
+   "oid": "o4",
+   "verdict": "missing_period",
+   "fid": "f13",
+   "reason": "one-way second-child 1889 EUR 'Годишна такса'; row period null",
+   "group_unstated": false
+  },
+  {
+   "oid": "o5",
+   "verdict": "missing_period",
+   "fid": "f20",
+   "reason": "20 EUR Pitagor Junior participation fee, one_time; row period null",
+   "group_unstated": false
+  },
+  {
+   "oid": "o6",
+   "verdict": "correct",
+   "fid": "f8",
+   "reason": "3482 EUR 8-10 two-instalment amount; count of payments, period null both",
+   "group_unstated": false
+  },
+  {
+   "oid": "o7",
+   "verdict": "correct",
+   "fid": "f5",
+   "reason": "3666 EUR 5-7 two-instalment amount; period null both",
+   "group_unstated": false
+  },
+  {
+   "oid": "o8",
+   "verdict": "correct",
+   "fid": "f4",
+   "reason": "5-7 one-time payment 6990 EUR yearly",
+   "group_unstated": false
+  },
+  {
+   "oid": "o9",
+   "verdict": "missing_period",
+   "fid": "f17",
+   "reason": "25 EUR per exam, 5th grade; row period null",
+   "group_unstated": false
+  },
+  {
+   "oid": "o10",
+   "verdict": "missing_period",
+   "fid": "f6",
+   "reason": "762 EUR 5-7 monthly instalment; row period null",
+   "group_unstated": false
+  },
+  {
+   "oid": "o11",
+   "verdict": "missing_period",
+   "fid": "f9",
+   "reason": "724 EUR 8-10 monthly instalment; row period null",
+   "group_unstated": false
+  },
+  {
+   "oid": "o12",
+   "verdict": "duplicate",
+   "fid": "f8",
+   "reason": "same as o6",
+   "group_unstated": false
+  },
+  {
+   "oid": "o13",
+   "verdict": "missing_period",
+   "fid": "f16",
+   "reason": "food 8.50 EUR 'на ден'; row period null",
+   "group_unstated": false
+  },
+  {
+   "oid": "o14",
+   "verdict": "missing_period",
+   "fid": "f3",
+   "reason": "827 EUR PG-4 monthly instalment; row period null",
+   "group_unstated": false
+  },
+  {
+   "oid": "o15",
+   "verdict": "correct",
+   "fid": "f12",
+   "reason": "transport one-way 1988 EUR yearly",
+   "group_unstated": false
+  },
+  {
+   "oid": "o16",
+   "verdict": "duplicate",
+   "fid": "f6",
+   "reason": "same as o10",
+   "group_unstated": false
+  },
+  {
+   "oid": "o17",
+   "verdict": "duplicate",
+   "fid": "f1",
+   "reason": "same as o3",
+   "group_unstated": false
+  },
+  {
+   "oid": "o18",
+   "verdict": "correct",
+   "fid": "f7",
+   "reason": "8-10 one-time payment 6640 EUR yearly",
+   "group_unstated": false
+  },
+  {
+   "oid": "o19",
+   "verdict": "missing_period",
+   "fid": "f19",
+   "reason": "20 EUR ПГ assessment fee, one_time; row period null",
+   "group_unstated": false
+  },
+  {
+   "oid": "o20",
+   "verdict": "correct",
+   "fid": "f14",
+   "reason": "food 720 EUR per term (ПГ и ПУК)",
+   "group_unstated": false
+  },
+  {
+   "oid": "o21",
+   "verdict": "duplicate",
+   "fid": "f5",
+   "reason": "same as o7",
+   "group_unstated": false
+  },
+  {
+   "oid": "o22",
+   "verdict": "correct",
+   "fid": "f2",
+   "reason": "3975 EUR PG-4 two-instalment amount; period null both",
+   "group_unstated": false
+  },
+  {
+   "oid": "o23",
+   "verdict": "duplicate",
+   "fid": "f12",
+   "reason": "same as o15",
+   "group_unstated": false
+  },
+  {
+   "oid": "o24",
+   "verdict": "duplicate",
+   "fid": "f3",
+   "reason": "same as o14",
+   "group_unstated": false
+  },
+  {
+   "oid": "o25",
+   "verdict": "missing_period",
+   "fid": "f11",
+   "reason": "two-way second-child 2518 EUR yearly; row period null",
+   "group_unstated": false
+  },
+  {
+   "oid": "o26",
+   "verdict": "duplicate",
+   "fid": "f2",
+   "reason": "same as o22",
+   "group_unstated": false
+  },
+  {
+   "oid": "o27",
+   "verdict": "duplicate",
+   "fid": "f4",
+   "reason": "same as o8",
+   "group_unstated": false
+  },
+  {
+   "oid": "o28",
+   "verdict": "duplicate",
+   "fid": "f7",
+   "reason": "same as o18",
+   "group_unstated": false
+  },
+  {
+   "oid": "o29",
+   "verdict": "duplicate",
+   "fid": "f10",
+   "reason": "same as o1",
+   "group_unstated": false
+  },
+  {
+   "oid": "o30",
+   "verdict": "duplicate",
+   "fid": "f9",
+   "reason": "same as o11",
+   "group_unstated": false
+  }
+ ],
+ "notes": "Re-fetched taksi, transport, hranene, 1st and 5th grade admission pages: key confirmed except f16 period set to daily ('на ден'). 'Годишна такса обучение' labels on instalment rows read as the section heading, not a contradiction."
+}

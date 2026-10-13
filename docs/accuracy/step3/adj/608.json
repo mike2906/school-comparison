@@ -1,0 +1,156 @@
+{
+ "school_id": 608,
+ "pages_read": [
+  "https://bg.maarifschools.org/page/okul-ucretleri"
+ ],
+ "fetch_failed": [
+  "https://bg.maarifschools.org/page/taksi-za-obuchenie",
+  "https://bg.maarifschools.org/page/detska-gradina"
+ ],
+ "site_states_no_fees": false,
+ "site_fees": [
+  {
+   "fid": "f1",
+   "category": "tuition",
+   "amount": 6650.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": null,
+   "plan": "Yıllık Eğitim Ücreti",
+   "year": null,
+   "url": "https://bg.maarifschools.org/page/okul-ucretleri",
+   "quote": "Yıllık Eğitim Ücreti*: 13.006,27 BGN/6.650,00 €"
+  },
+  {
+   "fid": "f2",
+   "category": "tuition",
+   "amount": 738.89,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": null,
+   "plan": "Aylık Eğitim Ücreti",
+   "year": null,
+   "url": "https://bg.maarifschools.org/page/okul-ucretleri",
+   "quote": "Aylık Eğitim Ücreti: 1.445,11 BGN/738,89 €"
+  },
+  {
+   "fid": "f3",
+   "category": "registration",
+   "amount": 150.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "group": null,
+   "plan": null,
+   "year": null,
+   "url": "https://bg.maarifschools.org/page/okul-ucretleri",
+   "quote": "Kayıt Ücreti**: 293,37BGN/150,00 €"
+  },
+  {
+   "fid": "f4",
+   "category": "food",
+   "amount": 150.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": null,
+   "plan": null,
+   "year": null,
+   "url": "https://bg.maarifschools.org/page/okul-ucretleri",
+   "quote": "Yemek Ücreti***: 293,37BGN****/ 150,00 €"
+  },
+  {
+   "fid": "f5",
+   "category": "uniforms",
+   "amount": 100.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "group": null,
+   "plan": null,
+   "year": null,
+   "url": "https://bg.maarifschools.org/page/okul-ucretleri",
+   "quote": "Forma Ücreti : 195,58BGN/ 100,00 €"
+  }
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "verdict": "correct",
+   "fid": "f3",
+   "reason": "registration 150 EUR one_time (footnote: paid once at first enrolment)",
+   "group_unstated": true
+  },
+  {
+   "oid": "o2",
+   "verdict": "correct",
+   "fid": "f5",
+   "reason": "uniform 100 EUR, no period stated",
+   "group_unstated": true
+  },
+  {
+   "oid": "o3",
+   "verdict": "duplicate",
+   "fid": "f3",
+   "reason": "same registration fee as o1, which also has the period",
+   "group_unstated": true
+  },
+  {
+   "oid": "o4",
+   "verdict": "correct",
+   "fid": "f2",
+   "reason": "monthly tuition 738.89 EUR",
+   "group_unstated": true
+  },
+  {
+   "oid": "o5",
+   "verdict": "correct",
+   "fid": "f1",
+   "reason": "annual tuition 6650 EUR",
+   "group_unstated": true
+  },
+  {
+   "oid": "o6",
+   "verdict": "duplicate",
+   "fid": "f1",
+   "reason": "same as o5",
+   "group_unstated": true
+  },
+  {
+   "oid": "o7",
+   "verdict": "duplicate",
+   "fid": "f5",
+   "reason": "same as o2",
+   "group_unstated": true
+  },
+  {
+   "oid": "o8",
+   "verdict": "duplicate",
+   "fid": "f2",
+   "reason": "same as o4",
+   "group_unstated": true
+  },
+  {
+   "oid": "o9",
+   "verdict": "correct",
+   "fid": "f4",
+   "reason": "meal fee 150 EUR, footnote states annual fee",
+   "group_unstated": true
+  },
+  {
+   "oid": "o10",
+   "verdict": "duplicate",
+   "fid": "f4",
+   "reason": "same meal fee as o9, which has the period",
+   "group_unstated": true
+  }
+ ],
+ "notes": "BG fee page (candidates' URL) and kindergarten page failed (server error, retried); Turkish fee page re-read and matches key and all candidate amounts. Fee page not tied to a specific institution on the shared Maarif domain; attribution to the kindergarten as in key."
+}

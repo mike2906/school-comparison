@@ -1,0 +1,113 @@
+{
+ "apply": true,
+ "pipeline_run_id": "5fbb9a7f-687e-467e-8b1a-554914cad346",
+ "schools": 1,
+ "spent_usd": 0.001195,
+ "stopped": null,
+ "kept_old_rows": [],
+ "outcomes": {
+  "written": 1
+ },
+ "results": [
+  {
+   "school_id": 608,
+   "outcome": "written",
+   "pages": [
+    {
+     "url": "https://bg.maarifschools.org/page/detska-gradina",
+     "chars": 9638,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://bg.maarifschools.org/page/taksi-za-obuchenie",
+     "chars": 9967,
+     "prices": true,
+     "note": null
+    }
+   ],
+   "fees": [
+    {
+     "category": "tuition",
+     "amount": 6650.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "yearly",
+     "label": "Годишна такса за обучение",
+     "academic_year": null,
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://bg.maarifschools.org/page/taksi-za-obuchenie",
+     "evidence": "Годишна такса за обучение*: **13.006,27 BGN/6.650,00 €**"
+    },
+    {
+     "category": "tuition",
+     "amount": 738.89,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "monthly",
+     "label": "Месечна такса за обучение",
+     "academic_year": null,
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://bg.maarifschools.org/page/taksi-za-obuchenie",
+     "evidence": "Месечна такса за обучение: **1.445,11 BGN/738,89 €**"
+    },
+    {
+     "category": "registration",
+     "amount": 150.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "one_time",
+     "label": "Такса за регистрация",
+     "academic_year": null,
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://bg.maarifschools.org/page/taksi-za-obuchenie",
+     "evidence": "Такса за регистрация**: **293,37 BGN/150,00 €**\n**Плаща се еднократно при първоначалната регистрация на ученика."
+    },
+    {
+     "category": "food",
+     "amount": 150.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "yearly",
+     "label": "Такса за храна",
+     "academic_year": null,
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://bg.maarifschools.org/page/taksi-za-obuchenie",
+     "evidence": "Такса за храна***: **293,37 BGN****/150,00 €**\n***Това е годишна такса, определена по споразумение с кетъринг компанията за три хранения на ден. Тя включва закуска, обяд и следобедна закуска."
+    },
+    {
+     "category": "uniforms",
+     "amount": 100.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Такса за униформа",
+     "academic_year": null,
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://bg.maarifschools.org/page/taksi-za-obuchenie",
+     "evidence": "Такса за униформа: **195,58 BGN****/100,00 €**"
+    }
+   ],
+   "rows_new": 5,
+   "rows_new_publishable": 5,
+   "rows_old_published": 5,
+   "regressions": [],
+   "validation": "ok"
+  }
+ ]
+}

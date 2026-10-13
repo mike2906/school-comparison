@@ -1,0 +1,79 @@
+{
+ "school_id": 562,
+ "pages_read": [
+  "https://ivanapostolov.bg/taksi/",
+  "https://ivanapostolov.bg/admission/"
+ ],
+ "fetch_failed": [
+  "https://ivanapostolov.bg/admissions-upper-grades/"
+ ],
+ "site_states_no_fees": false,
+ "site_fees": [
+  {
+   "fid": "f1",
+   "category": "tuition",
+   "amount": 8965,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": null,
+   "plan": null,
+   "year": "2026/2027",
+   "url": "https://ivanapostolov.bg/taksi/",
+   "quote": "Таксата за следващата учебна година (2026/2027) е 8965 евро."
+  },
+  {
+   "fid": "f2",
+   "category": "registration",
+   "amount": 75,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "group": "прием след 7. клас",
+   "plan": null,
+   "year": "2026/2027",
+   "url": "https://ivanapostolov.bg/admission/",
+   "quote": "Таксата за явяване на изпит е в размер на 75 € и се заплаща по банков път."
+  }
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "verdict": "correct",
+   "fid": "f1",
+   "reason": "8965 EUR tuition 2026/2027, yearly",
+   "group_unstated": false
+  },
+  {
+   "oid": "o2",
+   "verdict": "missing_period",
+   "fid": "f2",
+   "reason": "75 EUR exam fee (row cites upper-grades page, which failed to fetch; same amount on /admission/); row period null",
+   "group_unstated": false
+  },
+  {
+   "oid": "o3",
+   "verdict": "duplicate",
+   "fid": "f1",
+   "reason": "same 8965 tuition as o1",
+   "group_unstated": false
+  },
+  {
+   "oid": "o4",
+   "verdict": "duplicate",
+   "fid": "f2",
+   "reason": "same 75 EUR exam fee as o2, also period null",
+   "group_unstated": false
+  },
+  {
+   "oid": "o5",
+   "verdict": "correct",
+   "fid": "f2",
+   "reason": "75 EUR exam fee, one_time; no label",
+   "group_unstated": true
+  }
+ ],
+ "notes": "Re-fetched /taksi/ and /admission/: key confirmed. /admissions-upper-grades/ still fails to fetch. Meta description's 2023/2024 6900 EUR is older and excluded."
+}

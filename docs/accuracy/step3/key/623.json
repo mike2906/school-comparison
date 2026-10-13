@@ -1,0 +1,19 @@
+{
+ "school_id": 623,
+ "website_url": "https://www.lincolnsofia.com/",
+ "pages_read": [
+  "https://www.lincolnsofia.com/",
+  "https://www.lincolnsofia.com/%d0%b0%d0%b4%d0%bc%d0%b8%d0%bd%d0%b8%d1%81%d1%82%d1%80%d0%b0%d1%82%d0%b8%d0%b2%d0%bd%d0%b8-%d1%83%d1%81%d0%bb%d1%83%d0%b3%d0%b8/",
+  "https://www.lincolnsofia.com/%d1%83%d1%87%d0%b8%d0%bb%d0%b8%d1%89%d0%bd%d0%b8-%d0%b4%d0%be%d0%ba%d1%83%d0%bc%d0%b5%d0%bd%d1%82%d0%b8/",
+  "http://www.lincolnsofia.com/wp-content/uploads/2019/02/Приложение-1-към-Правилника.pdf",
+  "http://www.lincolnsofia.com/wp-content/uploads/2026/04/Правилник-Абрахам-Линкълн-2025-2026.pdf"
+ ],
+ "fetch_failed": [
+  "https://www.lincolnsofia.com/companies/",
+  "https://www.lincolnsofia.com/%d1%84%d0%be%d1%80%d0%bc%d0%b8-%d0%bd%d0%b0-%d0%be%d0%b1%d1%83%d1%87%d0%b5%d0%bd%d0%b8%d0%b5/"
+ ],
+ "blocked": false,
+ "site_states_no_fees": false,
+ "site_fees": [],
+ "notes": "ЧСУЧП 'Абрахам Линкълн'. No fees/admissions page in navigation; no amounts on pages read. Правилник 2025-2026 PDF and Приложение 1 към Правилника PDF are scanned images with no machine-readable text, so any fees in them could not be seen. 'За училището' (/companies/) and 'Форми на обучение' failed to fetch."
+}

@@ -1,0 +1,13 @@
+{
+ "school_id": 272,
+ "website_url": "https://pateta.bg/",
+ "pages_read": [
+  "https://pateta.bg/",
+  "https://pateta.bg/finansovi-usloviya/"
+ ],
+ "fetch_failed": [],
+ "blocked": false,
+ "site_states_no_fees": true,
+ "site_fees": [],
+ "notes": "The 'Прием и финансови условия' page gives no amounts. It says the monthly fee covers education, upbringing, stay, food and medical care, that extra activities cost more, and to contact office@pateta.bg or phone for prices."
+}

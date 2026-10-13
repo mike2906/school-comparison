@@ -1,0 +1,20 @@
+{
+ "school_id": 606,
+ "website_url": "https://highschool1.transform.bg/",
+ "pages_read": [
+  "https://highschool1.transform.bg/",
+  "https://highschool1.transform.bg/sitemap.xml",
+  "https://highschool1.transform.bg/page-sitemap.xml",
+  "https://highschool1.transform.bg/priem/",
+  "https://highschool1.transform.bg/priem/prices/",
+  "https://highschool1.transform.bg/tuition-free-of-charge/"
+ ],
+ "fetch_failed": [
+  "https://highschool1.transform.bg/taksi/",
+  "https://highschool1.transform.bg/admission-procedure/"
+ ],
+ "blocked": false,
+ "site_states_no_fees": false,
+ "site_fees": [],
+ "notes": "Fees page /priem/prices/ ('Финансови условия за учебната 2025-2026 година') contains only general budget text, no amounts (could be in content WebFetch did not render). /tuition-free-of-charge/ describes the statutory 20% fee-free places for prep group/1st grade and exemption criteria, no amounts. The site does not state that the school is free; it simply publishes no fee amounts."
+}

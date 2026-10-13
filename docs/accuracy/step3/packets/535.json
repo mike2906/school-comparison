@@ -1,0 +1,41 @@
+{
+ "school_id": 535,
+ "candidates": [
+  {
+   "oid": "o1",
+   "category": "camp",
+   "amount": 400.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "Месечна такса / целодневно",
+   "year": null,
+   "url": "https://www.orfei.net/lyatna-zanimalnya"
+  },
+  {
+   "oid": "o2",
+   "category": "camp",
+   "amount": 300.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "Месечна такса / полудневно",
+   "year": null,
+   "url": "https://www.orfei.net/lyatna-zanimalnya"
+  },
+  {
+   "oid": "o3",
+   "category": "extracurricular",
+   "amount": 240.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "Английски език (допълнително)",
+   "year": null,
+   "url": "https://www.orfei.net/lyatna-zanimalnya"
+  }
+ ]
+}

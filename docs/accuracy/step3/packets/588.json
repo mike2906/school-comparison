@@ -1,0 +1,101 @@
+{
+ "school_id": 588,
+ "candidates": [
+  {
+   "oid": "o1",
+   "category": "tuition",
+   "amount": 190.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "Седмично",
+   "year": null,
+   "url": "https://sluncheviprikazki.com/%d0%bc%d0%b5%d1%81%d1%82%d0%be%d0%bf%d0%be%d0%bb%d0%be%d0%b6%d0%b5%d0%bd%d0%b8%d0%b5/"
+  },
+  {
+   "oid": "o2",
+   "category": "tuition",
+   "amount": 450.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "Полудневно",
+   "year": null,
+   "url": "https://sluncheviprikazki.com/"
+  },
+  {
+   "oid": "o3",
+   "category": "tuition",
+   "amount": 190.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "Седмично",
+   "year": null,
+   "url": "https://sluncheviprikazki.com/"
+  },
+  {
+   "oid": "o4",
+   "category": "tuition",
+   "amount": 690.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "Целодневно за деца от 1 / Целодневно за деца от 1",
+   "year": null,
+   "url": "https://sluncheviprikazki.com/"
+  },
+  {
+   "oid": "o5",
+   "category": "tuition",
+   "amount": 690.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "Целодневно",
+   "year": null,
+   "url": "https://sluncheviprikazki.com/%d0%bc%d0%b5%d1%81%d1%82%d0%be%d0%bf%d0%be%d0%bb%d0%be%d0%b6%d0%b5%d0%bd%d0%b8%d0%b5/"
+  },
+  {
+   "oid": "o6",
+   "category": "tuition",
+   "amount": 450.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "Полудневно",
+   "year": null,
+   "url": "https://sluncheviprikazki.com/%d0%bc%d0%b5%d1%81%d1%82%d0%be%d0%bf%d0%be%d0%bb%d0%be%d0%b6%d0%b5%d0%bd%d0%b8%d0%b5/"
+  },
+  {
+   "oid": "o7",
+   "category": "tuition",
+   "amount": 690.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "Целодневно за деца от 3 до 6 години с включена хра / Целодневно за деца от 3 до 6 години с включена храна и занимания",
+   "year": null,
+   "url": "https://sluncheviprikazki.com/"
+  },
+  {
+   "oid": "o8",
+   "category": "tuition",
+   "amount": 690.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "Целодневно",
+   "year": null,
+   "url": "https://sluncheviprikazki.com/"
+  }
+ ]
+}

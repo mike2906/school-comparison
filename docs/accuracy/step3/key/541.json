@@ -1,0 +1,17 @@
+{
+ "school_id": 541,
+ "website_url": "https://abckinder.org/",
+ "pages_read": [
+  "https://abckinder.org/"
+ ],
+ "fetch_failed": [
+  "https://abckinder.org/apply",
+  "https://abckinder.org/apply/",
+  "https://abckinder.org/fees/",
+  "https://abckinder.org/sitemap.xml"
+ ],
+ "blocked": true,
+ "site_states_no_fees": false,
+ "site_fees": [],
+ "notes": "Homepage readable (no fees; nav: APPLY, DISCOVER, WORK WITH US, abc lozenetz/buntovnik/dragalevtsi - a chain of kindergartens) but WebFetch could not expose link hrefs and every subpage tried returned ROBOTS_DISALLOWED. Fees unknown, not 'no fees'."
+}

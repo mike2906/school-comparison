@@ -1,0 +1,77 @@
+{
+ "school_id": 593,
+ "candidates": [
+  {
+   "oid": "o1",
+   "category": "tuition",
+   "amount": 750.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "Monthly fee",
+   "year": null,
+   "url": "https://izzi.academy/admissions/tuition-fees/"
+  },
+  {
+   "oid": "o2",
+   "category": "tuition",
+   "amount": 9000.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "Izzi Science (Grades 4-7)",
+   "year": null,
+   "url": "https://izzi.academy/school/izzi-science-for-kids/apply/"
+  },
+  {
+   "oid": "o3",
+   "category": "tuition",
+   "amount": 7500.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "Annual Fee",
+   "year": null,
+   "url": "https://izzi.academy/admissions/tuition-fees/"
+  },
+  {
+   "oid": "o4",
+   "category": "tuition",
+   "amount": 8100.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "Izzi Science (Grades 1-3)",
+   "year": null,
+   "url": "https://izzi.academy/school/izzi-science-for-kids/apply/"
+  },
+  {
+   "oid": "o5",
+   "category": "transport",
+   "amount": 230.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "transport",
+   "year": null,
+   "url": "https://izzi.academy/admissions/tuition-fees/"
+  },
+  {
+   "oid": "o6",
+   "category": "tuition",
+   "amount": 7500.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "SMART Science (Grades 8-12)",
+   "year": null,
+   "url": "https://izzi.academy/admissions/tuition-fees/"
+  }
+ ]
+}
