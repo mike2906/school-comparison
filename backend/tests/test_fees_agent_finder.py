@@ -1,0 +1,149 @@
+"""R6: the fee agent's page finder on the sites step 3 found it missing (docs/accuracy/step3_check.md).
+
+The browser, the HTTP client, robots.txt and the link-picking model are stubbed.
+"""
+
+from __future__ import annotations
+
+from types import SimpleNamespace
+
+import pytest
+
+from app.models import School
+from app.scrapers.stages import fees_agent
+from app.scrapers.stages.fees_agent import Spend, SpendCapReached
+
+HOME = "https://meridian22.org/"
+
+
+class _Robots:
+    async def can_fetch(self, url, user_agent="*"):
+        return True
+
+
+class _Crawler:
+    """Serves each URL's (markdown, links) in turn; None fails the render."""
+
+    def __init__(self, pages):
+        self.pages = {url: list(results) for url, results in pages.items()}
+        self.calls: list[str] = []
+
+    async def arun(self, url, config):
+        self.calls.append(url)
+        results = self.pages.get(url) or [None]
+        result = results.pop(0) if len(results) > 1 else results[0]
+        if result is None:
+            return SimpleNamespace(success=False)
+        text, links = result
+        return SimpleNamespace(
+            success=True,
+            markdown=SimpleNamespace(raw_markdown=text),
+            links={"internal": [{"href": h, "text": t} for h, t in links if "meridian22.org" in h],
+                   "external": [{"href": h, "text": t} for h, t in links if "meridian22.org" not in h]},
+            redirected_url=url,
+        )  # fmt: skip
+
+
+class _Client:
+    def __init__(self, api=None):
+        self.api = api or {}
+        self.gets: list[tuple[str, dict]] = []
+
+    async def get(self, url, params=None, timeout=None, **kw):
+        self.gets.append((url, params or {}))
+        body = self.api.get((params or {}).get("slug"))
+        return SimpleNamespace(status_code=200 if body is not None else 404, json=lambda: body)
+
+
+@pytest.fixture(autouse=True)
+def _no_wait(monkeypatch):
+    import crawl4ai.utils
+
+    monkeypatch.setattr(crawl4ai.utils, "RobotsParser", _Robots)
+    monkeypatch.setattr(fees_agent, "RETRY_SECONDS", 0)
+
+
+def _school():
+    return School(id=1, name_i18n={}, country_code="bg", school_type="private", website_url=HOME)
+
+
+def _picks(urls=None, error=None):
+    async def pick(school, read, links, spend):
+        if error:
+            raise error
+        return urls or []
+
+    return pick
+
+
+@pytest.mark.parametrize(
+    ("url", "same"),
+    [
+        ("https://meridian22.bg/taksi", True),  # the umbrella site's sister domain
+        ("https://www.meridian22.org/x", True),
+        ("https://facebook.com/meridian22", False),
+        ("https://abc.org/", False),
+    ],
+)
+def test_same_site_takes_the_sister_domain(url, same):
+    assert fees_agent._same_site(url, HOME) is same
+
+
+def test_a_short_name_on_another_ending_is_not_the_same_site():
+    assert fees_agent._same_site("https://abc.bg/", "https://abc.org/") is False
+
+
+async def test_the_finder_follows_fee_links_onto_the_sister_domain(monkeypatch):
+    crawler = _Crawler({
+        HOME: [("Добре дошли", [("https://meridian22.bg/taksi", "Такси")])],
+        "https://meridian22.bg/taksi": [("Месечна такса: 700 евро " + "x" * 300, [])],
+    })  # fmt: skip
+    monkeypatch.setattr(fees_agent, "_pick", _picks(["https://meridian22.bg/taksi"]))
+    read = await fees_agent.find_pages(crawler, None, _Client(), _school(), Spend(0.05))
+    assert [(p.url, p.prices) for p in read][-1] == ("https://meridian22.bg/taksi", True)
+
+
+async def test_a_failed_render_is_tried_once_more(monkeypatch):
+    crawler = _Crawler({HOME: [None, ("Месечна такса: 700 евро " + "x" * 300, [])]})
+    monkeypatch.setattr(fees_agent, "_pick", _picks())
+    read = await fees_agent.find_pages(crawler, None, _Client(), _school(), Spend(0.05))
+    assert crawler.calls == [HOME, HOME]
+    assert read[0].prices
+
+
+async def test_a_thin_page_is_read_from_the_wordpress_api(monkeypatch):
+    fees = "https://meridian22.org/taksi/"
+    crawler = _Crawler({HOME: [("Начало " + "x" * 300, [(fees, "Такси")])], fees: [("Зареждане…", [])]})
+    client = _Client(
+        {"taksi": [{"content": {"rendered": "<table><tr><td>Месечна такса</td><td>700 евро</td></tr></table>"}}]}
+    )
+    monkeypatch.setattr(fees_agent, "_pick", _picks([fees]))
+    read = await fees_agent.find_pages(crawler, None, client, _school(), Spend(0.05))
+    page = next(p for p in read if p.url == fees)
+    assert "700 евро" in page.text and page.prices
+    assert client.gets == [("https://meridian22.org/wp-json/wp/v2/pages", {"slug": "taksi", "_fields": "content"})]
+
+
+async def test_a_thin_page_without_wordpress_keeps_its_own_text(monkeypatch):
+    crawler = _Crawler({HOME: [("Зареждане…", [])]})
+    monkeypatch.setattr(fees_agent, "_pick", _picks())
+    read = await fees_agent.find_pages(crawler, None, _Client(), _school(), Spend(0.05))
+    assert read[0].text == "Зареждане…"
+
+
+async def test_a_failed_pick_falls_back_to_the_fee_links(monkeypatch):
+    fees = "https://meridian22.org/taksi/"
+    crawler = _Crawler({
+        HOME: [("Начало " + "x" * 300, [(fees, "Такси"), ("https://meridian22.org/news/", "Новини")])],
+        fees: [("Месечна такса: 700 евро " + "x" * 300, [])],
+    })  # fmt: skip
+    monkeypatch.setattr(fees_agent, "_pick", _picks(error=TimeoutError("read timed out")))
+    read = await fees_agent.find_pages(crawler, None, _Client(), _school(), Spend(0.05))
+    assert [p.url for p in read] == [HOME, fees]
+
+
+async def test_a_spend_cap_during_the_pick_still_stops_the_school(monkeypatch):
+    crawler = _Crawler({HOME: [("Начало " + "x" * 300, [("https://meridian22.org/taksi/", "Такси")])]})
+    monkeypatch.setattr(fees_agent, "_pick", _picks(error=SpendCapReached("cap")))
+    with pytest.raises(SpendCapReached):
+        await fees_agent.find_pages(crawler, None, _Client(), _school(), Spend(0.05))
