@@ -1,0 +1,144 @@
+{
+ "apply": true,
+ "pipeline_run_id": "83c0513f-2e4e-4364-a656-3bf694bc55e4",
+ "schools": 1,
+ "spent_usd": 0.002109,
+ "stopped": null,
+ "kept_old_rows": [],
+ "outcomes": {
+  "written": 1
+ },
+ "results": [
+  {
+   "school_id": 625,
+   "outcome": "written",
+   "pages": [
+    {
+     "url": "https://dgsofia.com/",
+     "chars": 7404,
+     "prices": true,
+     "note": null
+    },
+    {
+     "url": "https://dgsofia.com/%d0%bf%d1%80%d0%b8%d0%b5%d0%bc/",
+     "chars": 5206,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://dgsofia.com/%d0%b7%d0%b0%d0%bf%d0%b8%d1%81%d0%b2%d0%b0%d0%bd%d0%b5/",
+     "chars": 2934,
+     "prices": true,
+     "note": null
+    },
+    {
+     "url": "https://dgsofia.com/%d0%bf%d1%80%d0%be%d0%b3%d1%80%d0%b0%d0%bc%d0%b0/",
+     "chars": 4587,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://dgsofia.com/wp-content/uploads/2022/10/1664270368750450.pdf",
+     "chars": 0,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://dgsofia.com/wp-content/uploads/2024/07/%D0%9B%D0%B8%D1%86%D0%B5%D0%BD%D0%B7-3129-1252.pdf",
+     "chars": 0,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://dgsofia.com/wp-content/uploads/2022/12/%D0%91%D0%95%D0%97%D0%9E%D0%9F%D0%90%D0%A1%D0%9D%D0%9E%D0%A1%D0%A2-%D0%9D%D0%90-%D0%94%D0%92%D0%98%D0%96%D0%95%D0%9D%D0%98%D0%95%D0%A2%D0%9E.pdf",
+     "chars": 0,
+     "prices": false,
+     "note": null
+    }
+   ],
+   "fees": [
+    {
+     "category": "tuition",
+     "amount": 454.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "monthly",
+     "label": "Месечно половин ден",
+     "academic_year": null,
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://dgsofia.com/",
+     "evidence": "## Месечнополовин ден\n### 888лв\n#### 454 €\nна месец"
+    },
+    {
+     "category": "tuition",
+     "amount": 680.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "monthly",
+     "label": "Месечно целодневно гледане",
+     "academic_year": null,
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://dgsofia.com/",
+     "evidence": "## Месечноцелодневно гледане\n### 1330лв\n#### 680 €\nна месец"
+    },
+    {
+     "category": "tuition",
+     "amount": 550.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "BGN",
+     "period": "monthly",
+     "label": "промоционална месечна такса",
+     "academic_year": null,
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://dgsofia.com/",
+     "evidence": "# Запишете Вашето дете до **15-ти октомври** и се възползвайте от промоционална месечна такса в размер на **550 лв.** за първите 3 месеца. [Записване](https://dgsofia.com/%d0%b7%d0%b0%d0%bf%d0%b8%d1%81%d0%b2%d0%b0%d0%bd%d0%b5/ \"Записване\")"
+    },
+    {
+     "category": "tuition",
+     "amount": 646.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "monthly",
+     "label": "Еднократно плащане за 6 месеца",
+     "academic_year": null,
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://dgsofia.com/",
+     "evidence": "## Еднократно плащане за 6 месеца\n### 1263лв\n#### 646 €\nна месец"
+    },
+    {
+     "category": "tuition",
+     "amount": 612.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "monthly",
+     "label": "Еднократно плащане за цяла година",
+     "academic_year": null,
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://dgsofia.com/",
+     "evidence": "## Еднократно плащане за цяла година\n### 1197лв\n#### 612 €\nна месец"
+    }
+   ],
+   "rows_new": 5,
+   "rows_new_publishable": 5,
+   "rows_old_published": 4,
+   "regressions": [],
+   "rows_old_kept": 0,
+   "validation": "ok"
+  }
+ ]
+}
