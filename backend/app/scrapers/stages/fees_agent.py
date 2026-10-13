@@ -37,14 +37,12 @@ from app.models.source_page import SourcePage
 from app.schemas.extraction import ExtractedPrice
 from app.scrapers.extraction import llm_results, price_step, text_values
 from app.scrapers.extraction.agent_fees import (
-    PUBLISH_CONFIDENCE,
     READER_PROMPT,
     AgentFee,
     AgentFees,
     CheckedFee,
     check_fee,
     fee_amounts,
-    option_amounts,
     page_numbers,
     read_amounts,
 )
@@ -350,7 +348,9 @@ _SINGLE_PAYMENT_RE = re.compile(r"^\s*1\s*[xх×]\s*(?:€|eur|лв\.?)?\s*[\d\s
 
 # "Plan 1", "План 2 – на вноски", "Вариант Б": the name of a way of paying, which says nothing once the fee
 # carries its payment options (596's plans 1-3).
-_PAYMENT_PLAN_NAME_RE = re.compile(r"^\s*(?:plan|план|option|опция|вариант)\s*(?:\d+|[a-zа-я]|[ivx]+)\b", re.IGNORECASE)
+_PAYMENT_PLAN_NAME_RE = re.compile(
+    r"^\s*(?:plan|план|option|опция|вариант)\s*(?:\d+|[a-zа-я]|[ivx]+)\s*(?:$|[-–—:/(,.])", re.IGNORECASE
+)
 
 
 def _band(row: Pricing) -> tuple[str, str]:
@@ -778,10 +778,11 @@ async def run_school(
     # row of its own) is listed under the new fee, not lost.
     # Only a fee that publishes: a held fee's options must not let the old rows go.
     listed = {
-        (result.fee.category.value, (result.fee.currency or "").upper(), amount)
-        for result, _ in checked
-        if result.confidence >= PUBLISH_CONFIDENCE
-        for amount in option_amounts(result.fee)
+        (row.category.value, (row.currency or "").upper(), Decimal(str(option[key])).normalize())
+        for row in publishable
+        for option in (row.pricing_context or {}).get("payment_options") or []
+        for key in ("total", "instalment", "first_payment")
+        if option.get(key) is not None
     }
     # An old row named for a payment plan ("Plan 3") of a group whose new fee carries its
     # payment options is one of that fee's instalments, even at an amount the read left out:

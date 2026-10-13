@@ -8,6 +8,7 @@ with its payment options; code checks the options' numbers against the evidence.
 
 from __future__ import annotations
 
+import pytest
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
@@ -15,7 +16,7 @@ from app.models import Pricing, School
 from app.models.pricing import PriceCategory, PricePeriod, PriceSource
 from app.models.scrape_log import ScrapeType
 from app.models.source_page import SourcePage
-from app.scrapers.extraction.agent_fees import AgentFee, PaymentOption, check_fee
+from app.scrapers.extraction.agent_fees import AgentFee, PaymentOption, _count_is_printed, check_fee
 from app.scrapers.stages import fees_agent
 from app.scrapers.stages.fees_agent import PageRead
 
@@ -224,3 +225,24 @@ def test_an_options_cell_does_not_vouch_for_the_fees_period():
     )
     result = check_fee(fee, line)
     assert result.fee.period is None and len(result.fee.payment_options) == 1
+
+
+@pytest.mark.parametrize(
+    ("payments", "text", "printed"),
+    [
+        (10, "10 месечни вноски по 950 €", True),
+        (3, "3 equal instalments of € 3.100", True),
+        (2, "€ 4.575 x 2", True),
+        (2, "2 x € 4.575", True),
+        (2, "Grade 2 | Plan 2 | € 4.575", False),
+        (2, "12 x € 500", False),
+    ],
+)
+def test_a_count_of_payments_as_sites_write_it(payments, text, printed):
+    assert _count_is_printed(payments, text) is printed
+
+
+def test_a_name_that_starts_like_a_plan_but_is_not_one_stays():
+    assert not fees_agent._PAYMENT_PLAN_NAME_RE.match("Вариант с обяд")
+    assert not fees_agent._PAYMENT_PLAN_NAME_RE.match("Опция с транспорт")
+    assert fees_agent._PAYMENT_PLAN_NAME_RE.match("Plan 3")

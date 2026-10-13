@@ -41,7 +41,9 @@ class AgentFee(BaseModel):
     amount_max: Optional[float] = None
     currency: str = Field(description="EUR or BGN, as printed; the EUR figure when both are printed")
     period: Optional[PricePeriod] = Field(description="null unless the evidence line states it")
-    plan_name: Optional[str] = Field(description="Payment plan or option, as the site names it")
+    plan_name: Optional[str] = Field(
+        description="What the fee buys (full day, half day), as the site names it; never a payment plan"
+    )
     academic_year: Optional[str] = Field(description="As the site states it, e.g. 2026/2027")
     age_group: Optional[str] = Field(description="Grade or age group, as the site states it")
     label: str = Field(description="The site's own words for this fee, short")
@@ -287,11 +289,15 @@ def _without_option_lines(lines: list[str], fee: AgentFee) -> str:
 
 
 # A count of instalments as the page writes it: "2 x", "9 ×", "10 вноски", "3 installments".
-_COUNT_AFTER_RE = r"\s*(?:[xх×]|вноск|instal|payments|плащания|versements|rates)"
+# One word may sit between: "10 месечни вноски", "3 equal instalments"; or "€ 4.575 x 2".
+_COUNT_WORD_RE = r"(?:[xх×](?![^\W\d_])|вноск|instal|payments|плащания|versements|rates)"
 
 
 def _count_is_printed(payments: int, text: str) -> bool:
-    return re.search(rf"(?<![\d.,]){payments}{_COUNT_AFTER_RE}", text, re.IGNORECASE) is not None
+    count = rf"(?<![\d.,]){payments}(?![\d.,]\d)"
+    after = rf"{count}\s*(?:[^\s\d]+\s+)?{_COUNT_WORD_RE}"
+    before = rf"(?<![^\W\d_])[xх×]\s*{count}"
+    return re.search(rf"{after}|{before}", text, re.IGNORECASE) is not None
 
 
 def _decimal(value: float) -> Decimal:
