@@ -1,0 +1,1937 @@
+{
+  "description": "Lane D R6 step 1 fresh reference set: fees read blind from each sampled school's own website. Sample: 50 schools drawn with seed 20261013 from the 138 Sofia private/international schools with a website, leaving out R4's schools and any school sharing a domain with them, one school per domain.",
+  "read_on": "2026-10-13",
+  "sample": {
+    "seed": 20261013,
+    "population": 138,
+    "eligible": 91,
+    "size": 50
+  },
+  "schools": [
+    {
+      "school_id": 157,
+      "website_url": "https://gradinamomo.com/",
+      "minutes": 1.0,
+      "prices": [],
+      "no_fees_on_site": false,
+      "unreachable": true,
+      "notes": "Home page fetch failed repeatedly (server error via https and http); proxy also refuses the host. Nothing readable.",
+      "reviewer": "s1-reviewer-1",
+      "name": "ЧАСТНА ДЕТСКА ГРАДИНА МОМО"
+    },
+    {
+      "school_id": 171,
+      "website_url": "https://roerich-school.org/",
+      "minutes": 2.0,
+      "prices": [
+        {
+          "category": "tuition",
+          "amount": 6300,
+          "currency": "EUR",
+          "period": null,
+          "label": "PK–VII клас, целодневна програма — до 19.12.2025",
+          "source_url": "https://roerich-school.org/%d1%82%d0%b0%d0%ba%d1%81%d0%b8-%d0%b8-%d1%84%d0%b8%d0%bd%d0%b0%d0%bd%d1%81%d0%be%d0%b2%d0%b8-%d1%83%d1%81%d0%bb%d0%be%d0%b2%d0%b8%d1%8f/",
+          "note": "2026/27; Christmas discount, first 7 contracts; total for the year"
+        },
+        {
+          "category": "tuition",
+          "amount": 6600,
+          "currency": "EUR",
+          "period": null,
+          "label": "PK–VII клас — записване до 23.01.2026",
+          "source_url": "https://roerich-school.org/%d1%82%d0%b0%d0%ba%d1%81%d0%b8-%d0%b8-%d1%84%d0%b8%d0%bd%d0%b0%d0%bd%d1%81%d0%be%d0%b2%d0%b8-%d1%83%d1%81%d0%bb%d0%be%d0%b2%d0%b8%d1%8f/",
+          "note": "2026/27 total; payable 2 x 3490 EUR"
+        },
+        {
+          "category": "tuition",
+          "amount": 6969,
+          "currency": "EUR",
+          "period": null,
+          "label": "PK–VII клас — записване до 20.02.2026",
+          "source_url": "https://roerich-school.org/%d1%82%d0%b0%d0%ba%d1%81%d0%b8-%d0%b8-%d1%84%d0%b8%d0%bd%d0%b0%d0%bd%d1%81%d0%be%d0%b2%d0%b8-%d1%83%d1%81%d0%bb%d0%be%d0%b2%d0%b8%d1%8f/",
+          "note": "2026/27 total; payable 2 x 3656 EUR"
+        },
+        {
+          "category": "tuition",
+          "amount": 7269,
+          "currency": "EUR",
+          "period": null,
+          "label": "PK–VII клас — след 20.02.2026",
+          "source_url": "https://roerich-school.org/%d1%82%d0%b0%d0%ba%d1%81%d0%b8-%d0%b8-%d1%84%d0%b8%d0%bd%d0%b0%d0%bd%d1%81%d0%be%d0%b2%d0%b8-%d1%83%d1%81%d0%bb%d0%be%d0%b2%d0%b8%d1%8f/",
+          "note": "2026/27 total; payable 2 x 3815 EUR. 5% sibling discount, 5% bring-a-friend"
+        },
+        {
+          "category": "tuition",
+          "amount": 4250,
+          "currency": "EUR",
+          "period": null,
+          "label": "VIII–XII клас — до 19.12.2025",
+          "source_url": "https://roerich-school.org/%d1%82%d0%b0%d0%ba%d1%81%d0%b8-%d0%b8-%d1%84%d0%b8%d0%bd%d0%b0%d0%bd%d1%81%d0%be%d0%b2%d0%b8-%d1%83%d1%81%d0%bb%d0%be%d0%b2%d0%b8%d1%8f/",
+          "note": "Christmas discount, first 5 contracts"
+        },
+        {
+          "category": "tuition",
+          "amount": 4500,
+          "currency": "EUR",
+          "period": null,
+          "label": "VIII–XII клас — записване до 23.01.2026",
+          "source_url": "https://roerich-school.org/%d1%82%d0%b0%d0%ba%d1%81%d0%b8-%d0%b8-%d1%84%d0%b8%d0%bd%d0%b0%d0%bd%d1%81%d0%be%d0%b2%d0%b8-%d1%83%d1%81%d0%bb%d0%be%d0%b2%d0%b8%d1%8f/",
+          "note": "payable 2 x 2360 EUR"
+        },
+        {
+          "category": "tuition",
+          "amount": 4725,
+          "currency": "EUR",
+          "period": null,
+          "label": "VIII–XII клас — записване до 20.02.2026",
+          "source_url": "https://roerich-school.org/%d1%82%d0%b0%d0%ba%d1%81%d0%b8-%d0%b8-%d1%84%d0%b8%d0%bd%d0%b0%d0%bd%d1%81%d0%be%d0%b2%d0%b8-%d1%83%d1%81%d0%bb%d0%be%d0%b2%d0%b8%d1%8f/",
+          "note": "payable 2 x 2480 EUR"
+        },
+        {
+          "category": "tuition",
+          "amount": 4950,
+          "currency": "EUR",
+          "period": null,
+          "label": "VIII–XII клас — след 20.02.2026",
+          "source_url": "https://roerich-school.org/%d1%82%d0%b0%d0%ba%d1%81%d0%b8-%d0%b8-%d1%84%d0%b8%d0%bd%d0%b0%d0%bd%d1%81%d0%be%d0%b2%d0%b8-%d1%83%d1%81%d0%bb%d0%be%d0%b2%d0%b8%d1%8f/",
+          "note": "payable 2 x 2600 EUR; 5% sibling, 5% bring-a-friend"
+        },
+        {
+          "category": "tuition",
+          "amount": 5555,
+          "currency": "EUR",
+          "period": null,
+          "label": "Ученици със СОП — до 20.02.2026",
+          "source_url": "https://roerich-school.org/%d1%82%d0%b0%d0%ba%d1%81%d0%b8-%d0%b8-%d1%84%d0%b8%d0%bd%d0%b0%d0%bd%d1%81%d0%be%d0%b2%d0%b8-%d1%83%d1%81%d0%bb%d0%be%d0%b2%d0%b8%d1%8f/",
+          "note": "payable 2 x 2915 EUR"
+        }
+      ],
+      "no_fees_on_site": false,
+      "unreachable": false,
+      "notes": "Home, 'Такси и финансови условия' page. 2026/27 tiered by enrolment deadline (amounts for the school year, period word not stated explicitly). Transport, food, uniform, camps etc. excluded but no amounts; 5% transport sibling discount mentioned without transport price. Installment amounts sum higher than totals (installment plan surcharge).",
+      "reviewer": "s1-reviewer-1",
+      "name": "ЧАСТНО СРЕДНО УЧИЛИЩЕ РЬОРИХ"
+    },
+    {
+      "school_id": 172,
+      "website_url": "https://www.svetasofia.com/",
+      "minutes": 2.0,
+      "prices": [
+        {
+          "category": "tuition",
+          "amount": 8900,
+          "currency": "EUR",
+          "period": "yearly",
+          "label": "ПУК – III клас, годишна такса (обучение и храна)",
+          "source_url": "https://www.svetasofia.com/finansovi-uslovia/",
+          "note": "2026/27; includes food; or 2 x 4450 EUR; 10% for third child"
+        },
+        {
+          "category": "transport",
+          "amount": 1750,
+          "currency": "EUR",
+          "period": "yearly",
+          "label": "Транспорт ПУК – III клас",
+          "source_url": "https://www.svetasofia.com/finansovi-uslovia/",
+          "note": "or 2 x 875 EUR"
+        },
+        {
+          "category": "tuition",
+          "amount": 9400,
+          "currency": "EUR",
+          "period": "yearly",
+          "label": "IV – VII клас, годишна такса (обучение и храна)",
+          "source_url": "https://www.svetasofia.com/finansovi-uslovia/",
+          "note": "2026/27; includes food; or 2 x 4700 EUR"
+        },
+        {
+          "category": "transport",
+          "amount": 1820,
+          "currency": "EUR",
+          "period": "yearly",
+          "label": "Транспорт IV – VII клас",
+          "source_url": "https://www.svetasofia.com/finansovi-uslovia/",
+          "note": "or 2 x 910 EUR"
+        },
+        {
+          "category": "registration",
+          "amount": 40,
+          "currency": "EUR",
+          "period": null,
+          "label": "Такса за участие в приема (ПУК и I клас)",
+          "source_url": "https://www.svetasofia.com/finansovi-uslovia/",
+          "note": null
+        }
+      ],
+      "no_fees_on_site": false,
+      "unreachable": false,
+      "notes": "Home, Финансови условия, Занимания по интереси (no amounts). Camps, exam fees, workbooks excluded without amounts.",
+      "reviewer": "s1-reviewer-1",
+      "name": "Частно основно училище Света София"
+    },
+    {
+      "school_id": 187,
+      "website_url": "https://palavikracheta.com/",
+      "minutes": 2.0,
+      "prices": [],
+      "no_fees_on_site": false,
+      "unreachable": true,
+      "notes": "Home page readable (no fees); /priem/ (Прием) and FAQ pages failed to fetch repeatedly; proxy refuses host. Could not verify fees.",
+      "reviewer": "s1-reviewer-1",
+      "name": "Частна детска градина Палави крачета"
+    },
+    {
+      "school_id": 213,
+      "website_url": "https://www.ezikovsviat.com/",
+      "minutes": 3.0,
+      "prices": [],
+      "no_fees_on_site": true,
+      "unreachable": false,
+      "notes": "Checked home, Прием, ЧПГЧО page, ЧОУ page, Документи (PDF list: curricula, plans; none fee-related). Tuition described (2 installments Sep/Jan, sibling discounts 5%/10%) but no amounts.",
+      "reviewer": "s1-reviewer-1",
+      "name": "ЧАСТНА ПРОФИЛИРАНА ГИМНАЗИЯ С ЧУЖДОЕЗИКОВО ОБУЧЕНИЕ ЕЗИКОВ СВЯТ"
+    },
+    {
+      "school_id": 214,
+      "website_url": "https://svetlina.net/",
+      "minutes": 2.0,
+      "prices": [],
+      "no_fees_on_site": false,
+      "unreachable": true,
+      "notes": "Home page text readable and states no fees, but no links extractable (JS menu) and guessed subpages/robots/sitemap failed; could not navigate to any fees/admissions page.",
+      "reviewer": "s1-reviewer-1",
+      "name": "ЧАСТНО ОСНОВНО УЧИЛИЩЕ СВЕТЛИНА"
+    },
+    {
+      "school_id": 220,
+      "website_url": "https://toddlersacademy.eu/bg/",
+      "minutes": 2.0,
+      "prices": [
+        {
+          "category": "tuition",
+          "amount": 8580,
+          "currency": "EUR",
+          "period": "yearly",
+          "label": "Обща такса за обучение (образователни услуги и храна)",
+          "source_url": "https://toddlersacademy.eu/bg/admission.html",
+          "note": "2026/27 (01.09.2026–31.07.2027); includes food; quarterly option 2310/2310/2310/1540 = 8470 (110 off)"
+        },
+        {
+          "category": "tuition",
+          "amount": 780,
+          "currency": "EUR",
+          "period": "monthly",
+          "label": "Вариант 1: 11 равни месечни вноски",
+          "source_url": "https://toddlersacademy.eu/bg/admission.html",
+          "note": null
+        },
+        {
+          "category": "tuition",
+          "amount": 8330,
+          "currency": "EUR",
+          "period": "yearly",
+          "label": "Вариант 3: еднократно плащане при подписване",
+          "source_url": "https://toddlersacademy.eu/bg/admission.html",
+          "note": "250 EUR discount for paying in full at signing"
+        },
+        {
+          "category": "registration",
+          "amount": 770,
+          "currency": "EUR",
+          "period": "one_time",
+          "label": "Депозит (оборудване, консумативи, комунални)",
+          "source_url": "https://toddlersacademy.eu/bg/admission.html",
+          "note": "deposit; deducted from the last installment"
+        },
+        {
+          "category": "materials",
+          "amount": 150,
+          "currency": "EUR",
+          "period": "one_time",
+          "label": "Учебници и тетрадки",
+          "source_url": "https://toddlersacademy.eu/bg/admission.html",
+          "note": null
+        },
+        {
+          "category": "registration",
+          "amount": 200,
+          "currency": "EUR",
+          "period": "one_time",
+          "label": "Регистрация (само при първо записване)",
+          "source_url": "https://toddlersacademy.eu/bg/admission.html",
+          "note": null
+        }
+      ],
+      "no_fees_on_site": false,
+      "unreachable": false,
+      "notes": "Home, Прием (admission.html).",
+      "reviewer": "s1-reviewer-1",
+      "name": "ЧАСТНА ДЕТСКА ГРАДИНА ДЕТСКА АКАДЕМИЯ"
+    },
+    {
+      "school_id": 271,
+      "website_url": "https://bgshkolo.com/",
+      "minutes": 2.5,
+      "prices": [
+        {
+          "category": "tuition",
+          "amount": 7200,
+          "currency": "EUR",
+          "period": "yearly",
+          "label": "1-ви до 6-ти клас",
+          "source_url": "https://bgshkolo.com/pricing-plans/",
+          "note": "2026/27; also 14 082 лв.; 5% sibling discount"
+        },
+        {
+          "category": "tuition",
+          "amount": 7200,
+          "currency": "EUR",
+          "period": "yearly",
+          "label": "7-ми до 12-ти клас",
+          "source_url": "https://bgshkolo.com/pricing-plans/",
+          "note": "2026/27; also 14 082 лв."
+        },
+        {
+          "category": "materials",
+          "amount": 250,
+          "currency": "EUR",
+          "period": "yearly",
+          "label": "Такса за учебни помагала",
+          "source_url": "https://bgshkolo.com/pricing-plans/",
+          "note": "applies across complex"
+        },
+        {
+          "category": "registration",
+          "amount": 500,
+          "currency": "EUR",
+          "period": "one_time",
+          "label": "Такса за постъпване",
+          "source_url": "https://bgshkolo.com/pricing-plans/",
+          "note": "new families only; applies across complex"
+        }
+      ],
+      "no_fees_on_site": false,
+      "unreachable": false,
+      "notes": "Home, Финансови условия (pricing-plans), Допълнителни услуги (food/transport/clubs/uniforms, no amounts). Skipped Детска градина 7950 EUR and Предучилищен клас 7950 EUR (both listed under the kindergarten section).",
+      "reviewer": "s1-reviewer-1",
+      "name": "ЧАСТНО СРЕДНО УЧИЛИЩЕ БЪЛГАРСКО ШКОЛО"
+    },
+    {
+      "school_id": 286,
+      "website_url": "https://www.slaveikov-school.org/",
+      "minutes": 3.0,
+      "prices": [
+        {
+          "category": "tuition",
+          "amount": 4700,
+          "currency": "EUR",
+          "period": "yearly",
+          "label": "Годишна учебна такса (едно дете)",
+          "source_url": "https://www.slaveikov-school.org/10551056104810451052-2026-2027.html",
+          "note": "2026/27; also 9192.40 лв.; 2 x 2350 EUR option"
+        },
+        {
+          "category": "tuition",
+          "amount": 3525,
+          "currency": "EUR",
+          "period": "yearly",
+          "label": "Второ дете от семейството",
+          "source_url": "https://www.slaveikov-school.org/10551056104810451052-2026-2027.html",
+          "note": "sibling discount price"
+        },
+        {
+          "category": "tuition",
+          "amount": 4465,
+          "currency": "EUR",
+          "period": null,
+          "label": "Еднократно авансово плащане с 5% отстъпка",
+          "source_url": "https://www.slaveikov-school.org/10551056104810451052-2026-2027.html",
+          "note": "due by 30 June"
+        },
+        {
+          "category": "tuition",
+          "amount": 4935,
+          "currency": "EUR",
+          "period": null,
+          "label": "Четири вноски с 5% увеличение (общо)",
+          "source_url": "https://www.slaveikov-school.org/10551056104810451052-2026-2027.html",
+          "note": null
+        },
+        {
+          "category": "tuition",
+          "amount": 517,
+          "currency": "EUR",
+          "period": "monthly",
+          "label": "10 месечни вноски с 10% увеличение",
+          "source_url": "https://www.slaveikov-school.org/10551056104810451052-2026-2027.html",
+          "note": null
+        },
+        {
+          "category": "tuition",
+          "amount": 4700,
+          "currency": "EUR",
+          "period": "yearly",
+          "label": "Предучилищна група — целодневно",
+          "source_url": "https://www.slaveikov-school.org/10551056104810451052-2026-2027.html",
+          "note": null
+        },
+        {
+          "category": "tuition",
+          "amount": 3225,
+          "currency": "EUR",
+          "period": "yearly",
+          "label": "Предучилищна група — до 13:00",
+          "source_url": "https://www.slaveikov-school.org/10551056104810451052-2026-2027.html",
+          "note": null
+        },
+        {
+          "category": "registration",
+          "amount": 80,
+          "currency": "EUR",
+          "period": "one_time",
+          "label": "Изпитна такса",
+          "source_url": "https://www.slaveikov-school.org/10551056104810451052-2026-2027.html",
+          "note": "per applicant"
+        },
+        {
+          "category": "registration",
+          "amount": 265,
+          "currency": "EUR",
+          "period": "yearly",
+          "label": "Административна такса",
+          "source_url": "https://www.slaveikov-school.org/10551056104810451052-2026-2027.html",
+          "note": "non-refundable, reserves place, per school year"
+        },
+        {
+          "category": "registration",
+          "amount": 265,
+          "currency": "EUR",
+          "period": null,
+          "label": "Регистрационна такса — 8 клас езикова гимназия",
+          "source_url": "https://www.slaveikov-school.org/10551056104810451052-2026-2027.html",
+          "note": "may be the same as the administrative fee; unclear"
+        }
+      ],
+      "no_fees_on_site": false,
+      "unreachable": false,
+      "notes": "Home, Прием 2026/2027 page, Предоставяни услуги (admin services, no amounts). Scholarships for 8th grade by NVO (percentages only).",
+      "reviewer": "s1-reviewer-1",
+      "name": "ЧАСТНО СРЕДНО УЧИЛИЩЕ ПЕТКО Р. СЛАВЕЙКОВ"
+    },
+    {
+      "school_id": 287,
+      "website_url": "https://www.wonderhouse-bg.com/",
+      "minutes": 1.5,
+      "prices": [
+        {
+          "category": "tuition",
+          "amount": 580,
+          "currency": "EUR",
+          "period": "monthly",
+          "label": "Деца под 3 години (ясла)",
+          "source_url": "https://www.wonderhouse-bg.com/taksi-i-zapisvania/",
+          "note": "2026/27; includes food, materials, English, music, dance; 10% 2nd child, 30% 3rd child"
+        },
+        {
+          "category": "tuition",
+          "amount": 580,
+          "currency": "EUR",
+          "period": "monthly",
+          "label": "Деца над 3 години (градина)",
+          "source_url": "https://www.wonderhouse-bg.com/taksi-i-zapisvania/",
+          "note": "same inclusions"
+        }
+      ],
+      "no_fees_on_site": false,
+      "unreachable": false,
+      "notes": "Home, Такси и записвания.",
+      "reviewer": "s1-reviewer-1",
+      "name": "Частна детска градина Чудната къщичка"
+    },
+    {
+      "school_id": 302,
+      "website_url": "https://www.ecodara.com/",
+      "minutes": 3,
+      "prices": [
+        {
+          "category": "tuition",
+          "currency": "EUR",
+          "period": "monthly",
+          "label": "Месечна такса за яслена група /2-годишни деца/ 2025/2026",
+          "source_url": "https://www.ecodara.com/content/taksa-za-detska-gradina.php",
+          "note": "Includes 4 meals/day and core curriculum, music, art, PE. Discounts: -10% second child, -3% paying 3 months, -5% paying annual fee.",
+          "amount": 680
+        },
+        {
+          "category": "tuition",
+          "currency": "EUR",
+          "period": "monthly",
+          "label": "Месечна такса за детска градина /от 3 до 7-годишни деца/",
+          "source_url": "https://www.ecodara.com/content/taksa-za-detska-gradina.php",
+          "note": "No school year stated next to this line. Same discounts as above.",
+          "amount": 650
+        },
+        {
+          "category": "activities",
+          "currency": "BGN",
+          "period": null,
+          "label": "Консултация с детски психолог",
+          "source_url": "https://www.ecodara.com/content/taksa-za-detska-gradina.php",
+          "note": "Per consultation, monthly by appointment; no school year stated.",
+          "amount": 30
+        }
+      ],
+      "no_fees_on_site": false,
+      "unreachable": false,
+      "notes": "Checked home and 'Прием и такса' page. An unlabeled line 'е 960 лева' follows the 650 EUR kindergarten fee with no group/period; not a conversion of 650 EUR; omitted as unidentifiable. Optional clubs (football, aikido, taekwondo, etc.) paid separately, no amounts.",
+      "reviewer": "s1-reviewer-2",
+      "name": "ЧАСТНА ДЕТСКА ГРАДИНА ЕКО ДАРА"
+    },
+    {
+      "school_id": 305,
+      "website_url": "https://djanirodari.org/",
+      "minutes": 3,
+      "prices": [
+        {
+          "category": "tuition",
+          "currency": "EUR",
+          "period": null,
+          "label": "Детска ясла – плащане такса наведнъж 2026/2027",
+          "source_url": "https://djanirodari.org/gradina/%d1%82%d0%b0%d0%ba%d1%81%d0%b8/",
+          "note": "Lump-sum payment; BGN 8801.24 also printed.",
+          "amount": 4500
+        },
+        {
+          "category": "tuition",
+          "currency": "EUR",
+          "period": null,
+          "label": "Детска ясла – плащане на две вноски (2x2375) 2026/2027",
+          "source_url": "https://djanirodari.org/gradina/%d1%82%d0%b0%d0%ba%d1%81%d0%b8/",
+          "note": null,
+          "amount": 4750
+        },
+        {
+          "category": "tuition",
+          "currency": "EUR",
+          "period": "monthly",
+          "label": "Детска ясла – плащане на месец 2026/2027",
+          "source_url": "https://djanirodari.org/gradina/%d1%82%d0%b0%d0%ba%d1%81%d0%b8/",
+          "note": null,
+          "amount": 500
+        },
+        {
+          "category": "tuition",
+          "currency": "EUR",
+          "period": null,
+          "label": "Първа група – плащане наведнъж 2026/2027",
+          "source_url": "https://djanirodari.org/gradina/%d1%82%d0%b0%d0%ba%d1%81%d0%b8/",
+          "note": null,
+          "amount": 4050
+        },
+        {
+          "category": "tuition",
+          "currency": "EUR",
+          "period": null,
+          "label": "Първа група – две вноски (2x2140) 2026/2027",
+          "source_url": "https://djanirodari.org/gradina/%d1%82%d0%b0%d0%ba%d1%81%d0%b8/",
+          "note": null,
+          "amount": 4280
+        },
+        {
+          "category": "tuition",
+          "currency": "EUR",
+          "period": "monthly",
+          "label": "Първа група – плащане на месец 2026/2027",
+          "source_url": "https://djanirodari.org/gradina/%d1%82%d0%b0%d0%ba%d1%81%d0%b8/",
+          "note": null,
+          "amount": 450
+        },
+        {
+          "category": "tuition",
+          "currency": "EUR",
+          "period": null,
+          "label": "Втора и трета група – плащане наведнъж 2026/2027",
+          "source_url": "https://djanirodari.org/gradina/%d1%82%d0%b0%d0%ba%d1%81%d0%b8/",
+          "note": null,
+          "amount": 3700
+        },
+        {
+          "category": "tuition",
+          "currency": "EUR",
+          "period": null,
+          "label": "Втора и трета група – две вноски (2x1950) 2026/2027",
+          "source_url": "https://djanirodari.org/gradina/%d1%82%d0%b0%d0%ba%d1%81%d0%b8/",
+          "note": null,
+          "amount": 3900
+        },
+        {
+          "category": "tuition",
+          "currency": "EUR",
+          "period": "monthly",
+          "label": "Втора и трета група – плащане на месец 2026/2027",
+          "source_url": "https://djanirodari.org/gradina/%d1%82%d0%b0%d0%ba%d1%81%d0%b8/",
+          "note": null,
+          "amount": 410
+        },
+        {
+          "category": "tuition",
+          "currency": "EUR",
+          "period": null,
+          "label": "Четвърта група (ПК) – плащане наведнъж 2026/2027",
+          "source_url": "https://djanirodari.org/gradina/%d1%82%d0%b0%d0%ba%d1%81%d0%b8/",
+          "note": null,
+          "amount": 4230
+        },
+        {
+          "category": "tuition",
+          "currency": "EUR",
+          "period": null,
+          "label": "Четвърта група (ПК) – две вноски (2x2240) 2026/2027",
+          "source_url": "https://djanirodari.org/gradina/%d1%82%d0%b0%d0%ba%d1%81%d0%b8/",
+          "note": null,
+          "amount": 4480
+        },
+        {
+          "category": "tuition",
+          "currency": "EUR",
+          "period": "monthly",
+          "label": "Четвърта група (ПК) – плащане на месец 2026/2027",
+          "source_url": "https://djanirodari.org/gradina/%d1%82%d0%b0%d0%ba%d1%81%d0%b8/",
+          "note": "Monthly plan totals 5450 EUR: 750 EUR капаро (deposit) + 470 EUR/month.",
+          "amount": 470
+        }
+      ],
+      "no_fees_on_site": false,
+      "unreachable": false,
+      "notes": "Checked home, parents page, /fees-jani-rodari/ (school fees, links only, skipped as sibling school), /gradina/ and kindergarten Такси page. Page also has 2025/2026 BGN prices (superseded). Food included in fee; uniform, materials, swimming/ballet etc., transport charged extra with no amounts.",
+      "reviewer": "s1-reviewer-2",
+      "name": "ЧАСТНА ДЕТСКА ГРАДИНА ДЖАНИ РОДАРИ"
+    },
+    {
+      "school_id": 329,
+      "website_url": "https://www.fpels.ws/",
+      "minutes": 2,
+      "prices": [
+        {
+          "category": "tuition",
+          "currency": "EUR",
+          "period": "yearly",
+          "label": "Стандартна такса 2026-2027 – 1 плащане",
+          "source_url": "https://www.fpels.ws/prices/",
+          "note": "Paid at contract signing.",
+          "amount": 6600
+        },
+        {
+          "category": "tuition",
+          "currency": "EUR",
+          "period": "yearly",
+          "label": "2026-2027 – 2 плащания (2x3450)",
+          "source_url": "https://www.fpels.ws/prices/",
+          "note": "Installment 2 due 13.12.2026.",
+          "amount": 6900
+        },
+        {
+          "category": "tuition",
+          "currency": "EUR",
+          "period": "yearly",
+          "label": "2026-2027 – 4 плащания (2400+3x1600)",
+          "source_url": "https://www.fpels.ws/prices/",
+          "note": "Due at signing, 13.11.2026, 13.01.2027, 13.03.2027.",
+          "amount": 7200
+        },
+        {
+          "category": "registration",
+          "currency": "EUR",
+          "period": null,
+          "label": "Такса кандидатстване",
+          "source_url": "https://www.fpels.ws/prices/",
+          "note": "Paid with the application by bank transfer.",
+          "amount": 70
+        }
+      ],
+      "no_fees_on_site": false,
+      "unreachable": false,
+      "notes": "Checked home and 'Такси и срокове' (/prices/). Period 'yearly' inferred from heading 'Такси учебна 2026-2027 г.'.",
+      "reviewer": "s1-reviewer-2",
+      "name": "Първа частна английска гимназия Уилям Шекспир"
+    },
+    {
+      "school_id": 350,
+      "website_url": "https://izgrevou.com/",
+      "minutes": 3,
+      "prices": [
+        {
+          "category": "tuition",
+          "currency": "EUR",
+          "period": "yearly",
+          "label": "Обучение 2026/27 – подготвителен клас, начален и прогимназиален етап",
+          "source_url": "https://izgrevou.com/priem/",
+          "note": "5% off for new students paying in one payment by 30.05.2026; 5% off for children from the school's kindergarten. 2027/28 tuition 7490 EUR also stated (out of window). Payable in 1, 2, 9 or 12 installments.",
+          "amount": 7160
+        },
+        {
+          "category": "registration",
+          "currency": "EUR",
+          "period": "one_time",
+          "label": "Такса прием и записване",
+          "source_url": "https://izgrevou.com/uchilishche/taksi/",
+          "note": "Non-refundable; children from Детска школа Изгрев exempt.",
+          "amount": 100
+        },
+        {
+          "category": "materials",
+          "currency": "EUR",
+          "period": "yearly",
+          "label": "Такса материали",
+          "source_url": "https://izgrevou.com/priem/",
+          "note": "Payable at start of year or in two term installments.",
+          "amount": 100
+        },
+        {
+          "category": "transport",
+          "currency": "EUR",
+          "period": "monthly",
+          "label": "Транспорт 2026/27 – в двете посоки",
+          "source_url": "https://izgrevou.com/priem/",
+          "note": "Optional. 2027/28: 220 EUR.",
+          "amount": 199
+        },
+        {
+          "category": "transport",
+          "currency": "EUR",
+          "period": "monthly",
+          "label": "Транспорт 2026/27 – в едната посока",
+          "source_url": "https://izgrevou.com/priem/",
+          "note": "Optional. 2027/28: 110 EUR.",
+          "amount": 99
+        },
+        {
+          "category": "food",
+          "currency": "EUR",
+          "period": null,
+          "label": "Обедно меню",
+          "source_url": "https://izgrevou.com/priem/",
+          "note": "Optional; range per meal not stated as period.",
+          "amount_min": 4.5,
+          "amount_max": 7.5
+        }
+      ],
+      "no_fees_on_site": false,
+      "unreachable": false,
+      "notes": "Checked home, /uchilishche/taksi/ and /priem/. A 5-page PDF summary button exists but URL not exposed.",
+      "reviewer": "s1-reviewer-2",
+      "name": "Частно основно училище Изгрев"
+    },
+    {
+      "school_id": 351,
+      "website_url": "https://slanchogledi.bg/",
+      "minutes": 2,
+      "prices": [
+        {
+          "category": "tuition",
+          "currency": "EUR",
+          "period": "monthly",
+          "label": "Месечна такса (септември – юли)",
+          "source_url": "https://slanchogledi.bg/admission/",
+          "note": "3% discount when paying the annual fee at once by 1 September. Paid 20th-25th of previous month.",
+          "amount": 800
+        },
+        {
+          "category": "tuition",
+          "currency": "EUR",
+          "period": null,
+          "label": "Такса за периода 16-31 август",
+          "source_url": "https://slanchogledi.bg/admission/",
+          "note": null,
+          "amount": 600
+        },
+        {
+          "category": "registration",
+          "currency": "EUR",
+          "period": null,
+          "label": "Първоначален депозит при подписване на договора",
+          "source_url": "https://slanchogledi.bg/admission/",
+          "note": null,
+          "amount": 600
+        }
+      ],
+      "no_fees_on_site": false,
+      "unreachable": false,
+      "notes": "Checked home and /admission/. School year not named; contract 1 Sept–31 Aug.",
+      "reviewer": "s1-reviewer-2",
+      "name": "ЧАСТНА ДЕТСКА ГРАДИНА СЛЪНЧОГЛЕДИ"
+    },
+    {
+      "school_id": 381,
+      "website_url": "https://eduteh.eu/",
+      "minutes": 3,
+      "prices": [
+        {
+          "category": "tuition",
+          "currency": "EUR",
+          "period": "yearly",
+          "label": "Такса за обучение 2026/2027",
+          "source_url": "https://eduteh.eu/chastno-osnovno-uchilishte/price-and-admission-chou/priem-petoklasnici",
+          "note": "Stated on both 1st-grade and 5th-grade admission pages; payable in 1, 2 or 3 installments. 7th grade is 10% higher than base.",
+          "amount": 8110
+        },
+        {
+          "category": "food",
+          "currency": "EUR",
+          "period": "monthly",
+          "label": "Такса за храна (учебна 2025/2026)",
+          "source_url": "https://eduteh.eu/chastno-osnovno-uchilishte/price-and-admission-chou/priem-petoklasnici",
+          "note": "Prepaid two months ahead; page labels it 2025/2026.",
+          "amount": 174
+        },
+        {
+          "category": "registration",
+          "currency": "EUR",
+          "period": null,
+          "label": "Административна такса за кандидатстване 2026/2027",
+          "source_url": "https://eduteh.eu/chastno-osnovno-uchilishte/price-and-admission-chou/priem-parvoklasnici",
+          "note": "Covers entrance exams/tests.",
+          "amount": 100
+        }
+      ],
+      "no_fees_on_site": false,
+      "unreachable": false,
+      "notes": "Checked home, 'Цена и прием в ЧОУ', priem-parvoklasnici, priem-petoklasnici. Skipped ЧПГ (id 550) pages. Transport, materials, extracurriculars, 16-18h care, green school, excursions charged separately, no amounts.",
+      "reviewer": "s1-reviewer-2",
+      "name": "Частно основно училище Образователни технологии"
+    },
+    {
+      "school_id": 393,
+      "website_url": "https://www.montessori-bulgaria.com/en",
+      "minutes": 3,
+      "prices": [
+        {
+          "category": "registration",
+          "currency": "BGN",
+          "period": null,
+          "label": "Non-refundable admission fee",
+          "source_url": "https://www.montessori-bulgaria.com/en/admission",
+          "note": "No school year stated. Tuition payable monthly (with two deposits) or yearly with 5% discount; no tuition amounts given.",
+          "amount": 600
+        }
+      ],
+      "no_fees_on_site": false,
+      "unreachable": false,
+      "notes": "Checked EN home, /en/admission, documents-and-steps page (PDFs are 2020 enrollment docs/application form, not fees). BG /bg/admission only redirects. No tuition amounts published.",
+      "reviewer": "s1-reviewer-2",
+      "name": "Частна детска градина Детска къща Монтесори"
+    },
+    {
+      "school_id": 405,
+      "website_url": "https://mmagdalena-bg.com/",
+      "minutes": 2,
+      "prices": [
+        {
+          "category": "tuition",
+          "currency": "EUR",
+          "period": "monthly",
+          "label": "Месечна такса (прием 2026/2027)",
+          "source_url": "https://mmagdalena-bg.com/priem/",
+          "note": "Includes 4 meals/day, English, music, folk dance, sport, insurance.",
+          "amount": 765
+        }
+      ],
+      "no_fees_on_site": false,
+      "unreachable": false,
+      "notes": "Checked home and /priem/ (menu 'Месечна такса' links there).",
+      "reviewer": "s1-reviewer-2",
+      "name": "Частна детска градина Мария Магдалена"
+    },
+    {
+      "school_id": 507,
+      "website_url": "https://questjunior.bg/",
+      "minutes": 2,
+      "prices": [
+        {
+          "category": "tuition",
+          "currency": "EUR",
+          "period": "monthly",
+          "label": "Месечна такса обучение, изхранване и грижа",
+          "source_url": "https://questjunior.bg/priem/taksi",
+          "note": "Includes food; 7 EUR per day of medical absence deducted.",
+          "amount": 800
+        },
+        {
+          "category": "materials",
+          "currency": "EUR",
+          "period": "yearly",
+          "label": "Годишна такса за учебни, творчески материали и консумативи",
+          "source_url": "https://questjunior.bg/priem/taksi",
+          "note": "Due by 1 September.",
+          "amount": 150
+        }
+      ],
+      "no_fees_on_site": false,
+      "unreachable": false,
+      "notes": "Checked home and /priem/taksi. No school year stated. Extracurriculars, camps, excursions extra, no amounts.",
+      "reviewer": "s1-reviewer-2",
+      "name": "Частна детска градина Куест"
+    },
+    {
+      "school_id": 511,
+      "website_url": "https://www.arty.bg/",
+      "minutes": 2,
+      "prices": [
+        {
+          "category": "tuition",
+          "currency": "EUR",
+          "period": "monthly",
+          "label": "Оборище – месечна такса за целодневно посещение",
+          "source_url": "https://www.arty.bg/bg/pages/charges.html",
+          "note": null,
+          "amount": 700
+        },
+        {
+          "category": "food",
+          "currency": "EUR",
+          "period": null,
+          "label": "Оборище – такса храна (четири пъти дневно)",
+          "source_url": "https://www.arty.bg/bg/pages/charges.html",
+          "note": null,
+          "amount": 140
+        },
+        {
+          "category": "tuition",
+          "currency": "EUR",
+          "period": "monthly",
+          "label": "Кукуш – месечна такса за целодневно посещение",
+          "source_url": "https://www.arty.bg/bg/pages/charges.html",
+          "note": null,
+          "amount": 600
+        },
+        {
+          "category": "food",
+          "currency": "EUR",
+          "period": null,
+          "label": "Кукуш – такса храна (четири пъти дневно)",
+          "source_url": "https://www.arty.bg/bg/pages/charges.html",
+          "note": null,
+          "amount": 140
+        }
+      ],
+      "no_fees_on_site": false,
+      "unreachable": false,
+      "notes": "Checked home and 'Прием и такси' (charges.html). Two locations with different tuition. No school year stated; food period not explicit.",
+      "reviewer": "s1-reviewer-2",
+      "name": "Частна детска градина Арти"
+    },
+    {
+      "school_id": 515,
+      "website_url": "https://britanica-parkschool.bg/",
+      "minutes": 3,
+      "prices": [
+        {
+          "category": "registration",
+          "currency": "EUR",
+          "period": "one_time",
+          "label": "Административна такса (детска градина)",
+          "source_url": "https://britanica-parkschool.bg/priem/",
+          "note": "Non-refundable, paid before trial days; school section states the same 240 EUR for the school",
+          "amount": 240
+        }
+      ],
+      "no_fees_on_site": false,
+      "unreachable": false,
+      "notes": "Checked home, /priem/, /detska-gradina/, /dokumenti/. Only the admin fee has an amount; annual fees, meals, transport listed as categories without amounts.",
+      "reviewer": "s1-reviewer-3",
+      "name": "ЧАСТНА ДЕТСКА ГРАДИНА БРИТАНИКА"
+    },
+    {
+      "school_id": 517,
+      "website_url": "https://www.parvamatematicheska.com/",
+      "minutes": 3,
+      "prices": [
+        {
+          "category": "tuition",
+          "currency": "EUR",
+          "period": "yearly",
+          "label": "5 клас 2026/2027, еднократно плащане",
+          "source_url": "https://www.parvamatematicheska.com/pchmg/finansovi-uslovija/",
+          "note": "Deposit (капаро) 1045 EUR deducted from last installment; 5% second child, 10% third child off annual tuition; scholarships for 20% of new 5th graders",
+          "amount": 7810
+        },
+        {
+          "category": "tuition",
+          "currency": "EUR",
+          "period": null,
+          "label": "5 клас 2026/2027, 2 х 4022 евро",
+          "source_url": "https://www.parvamatematicheska.com/pchmg/finansovi-uslovija/",
+          "note": "Two installments (by 09.07.2026 and 05.02.2027)",
+          "amount": 4022
+        },
+        {
+          "category": "tuition",
+          "currency": "EUR",
+          "period": "monthly",
+          "label": "5 клас 2026/2027, 8 х 1045 евро",
+          "source_url": "https://www.parvamatematicheska.com/pchmg/finansovi-uslovija/",
+          "note": "Eight installments: first at contract signing (капаро), then monthly Sept-March",
+          "amount": 1045
+        },
+        {
+          "category": "tuition",
+          "currency": "EUR",
+          "period": "yearly",
+          "label": "8 клас 2026/2027, еднократно плащане",
+          "source_url": "https://www.parvamatematicheska.com/pchmg/finansovi-uslovija/",
+          "note": "Deposit (капаро) 938 EUR deducted from last installment; 5% second child, 10% third child off annual tuition; scholarships for 20% of new 8th graders",
+          "amount": 7000
+        },
+        {
+          "category": "tuition",
+          "currency": "EUR",
+          "period": null,
+          "label": "8 клас 2026/2027, 2 х 3605 евро",
+          "source_url": "https://www.parvamatematicheska.com/pchmg/finansovi-uslovija/",
+          "note": "Two installments (by 22.07.2026 and 05.02.2027)",
+          "amount": 3605
+        },
+        {
+          "category": "tuition",
+          "currency": "EUR",
+          "period": "monthly",
+          "label": "8 клас 2026/2027, 8 х 938 евро",
+          "source_url": "https://www.parvamatematicheska.com/pchmg/finansovi-uslovija/",
+          "note": "Eight installments: first at contract signing (капаро), then monthly Sept-March",
+          "amount": 938
+        }
+      ],
+      "no_fees_on_site": false,
+      "unreachable": false,
+      "notes": "Checked home, Финансови условия, Извънкласни дейности (2026/27 'coming soon', no prices). Installment entries are per-installment amounts. ЧНУ Архимед is a separate school, skipped.",
+      "reviewer": "s1-reviewer-3",
+      "name": "ПЪРВА ЧАСТНА МАТЕМАТИЧЕСКА ГИМНАЗИЯ"
+    },
+    {
+      "school_id": 518,
+      "website_url": "https://doverie-bg.net/",
+      "minutes": 2.5,
+      "prices": [],
+      "no_fees_on_site": true,
+      "unreachable": false,
+      "notes": "Checked home, За нас, Правилник за дейността PDF (no amounts). No fees/admissions page; /filiali/ fetch errored.",
+      "reviewer": "s1-reviewer-3",
+      "name": "ЧАСТНА ДЕТСКА ГРАДИНА ДОВЕРИЕ"
+    },
+    {
+      "school_id": 525,
+      "website_url": "https://slaveiche.com/",
+      "minutes": 2.5,
+      "prices": [
+        {
+          "category": "tuition",
+          "currency": "EUR",
+          "period": "monthly",
+          "label": "Целодневно гледане",
+          "source_url": "https://slaveiche.com/taksi/",
+          "note": "Includes food, medical care, textbooks/supplies; 10% extra discount for second child",
+          "amount": 560
+        },
+        {
+          "category": "tuition",
+          "currency": "EUR",
+          "period": null,
+          "label": "Целодневно - при предплащане за 3 месеца",
+          "source_url": "https://slaveiche.com/taksi/",
+          "note": "Discounted prepayment price",
+          "amount": 540
+        },
+        {
+          "category": "tuition",
+          "currency": "EUR",
+          "period": null,
+          "label": "Целодневно - при предплащане над 6 месеца",
+          "source_url": "https://slaveiche.com/taksi/",
+          "note": "Discounted prepayment price",
+          "amount": 520
+        },
+        {
+          "category": "tuition",
+          "currency": "EUR",
+          "period": null,
+          "label": "Половин ден с включен обяд",
+          "source_url": "https://slaveiche.com/taksi/",
+          "note": "7.30-12.30 or 12.00-19.00",
+          "amount": 350
+        },
+        {
+          "category": "registration",
+          "currency": "EUR",
+          "period": null,
+          "label": "Депозит за запазване на място",
+          "source_url": "https://slaveiche.com/taksi/",
+          "note": "Prием page: reservation equals half a monthly fee",
+          "amount": 280
+        },
+        {
+          "category": "extracurricular",
+          "currency": "EUR",
+          "period": "monthly",
+          "label": "Английски език, 3 пъти седмично",
+          "source_url": "https://slaveiche.com/taksi/",
+          "note": null,
+          "amount": 20
+        },
+        {
+          "category": "extracurricular",
+          "currency": "EUR",
+          "period": "monthly",
+          "label": "Детска йога, 1 път седмично",
+          "source_url": "https://slaveiche.com/taksi/",
+          "note": null,
+          "amount": 25
+        },
+        {
+          "category": "extracurricular",
+          "currency": "EUR",
+          "period": "monthly",
+          "label": "Модерни танци, 2 пъти седмично",
+          "source_url": "https://slaveiche.com/taksi/",
+          "note": null,
+          "amount": 25
+        }
+      ],
+      "no_fees_on_site": false,
+      "unreachable": false,
+      "notes": "Checked home, /taksi/, /priem/. No school year stated on fees page. Speech therapy paid separately, no price.",
+      "reviewer": "s1-reviewer-3",
+      "name": "Частна детска градина Славейче"
+    },
+    {
+      "school_id": 527,
+      "website_url": "https://under1roof.bg/",
+      "minutes": 3,
+      "prices": [
+        {
+          "category": "tuition",
+          "currency": "EUR",
+          "period": "monthly",
+          "label": "Детска градина Целодневна",
+          "source_url": "https://under1roof.bg/price-table/",
+          "note": "Undated; discounts 5/10/15/20% for prepaying 3/6/9/12 months; 10% second child, 15% third child",
+          "amount": 550
+        },
+        {
+          "category": "tuition",
+          "currency": "BGN",
+          "period": "monthly",
+          "label": "Детска градина Полудневна",
+          "source_url": "https://under1roof.bg/price-table/",
+          "note": "Undated; printed in лв.",
+          "amount": 540
+        },
+        {
+          "category": "transport",
+          "currency": "BGN",
+          "period": "monthly",
+          "label": "Транспорт от врата до врата, базова цена в двете посоки",
+          "source_url": "https://under1roof.bg/price-table/",
+          "note": "Price depends on district",
+          "amount": 280
+        }
+      ],
+      "no_fees_on_site": false,
+      "unreachable": false,
+      "notes": "Checked home, /price-table/. Page has no current school year; an old 'Специална такса за 2020/2021 (-20%): 450 EUR/880 лв.' was skipped as outdated. Remaining prices undated and possibly stale (mixed EUR/BGN). Excursions and ski school without amounts.",
+      "reviewer": "s1-reviewer-3",
+      "name": "Частна детска градина ПОД 1 ПОКРИВ"
+    },
+    {
+      "school_id": 529,
+      "website_url": "https://www.ds-sofia.bg/",
+      "minutes": 3,
+      "prices": [
+        {
+          "category": "registration",
+          "currency": "EUR",
+          "period": "one_time",
+          "label": "Такса прием за новоприетите ученици",
+          "source_url": "https://www.ds-sofia.bg/учебни-такси",
+          "note": "2026/2027; non-refundable",
+          "amount": 2000
+        },
+        {
+          "category": "tuition",
+          "currency": "EUR",
+          "period": "yearly",
+          "label": "Предучилище, еднократна годишна вноска",
+          "source_url": "https://www.ds-sofia.bg/учебни-такси",
+          "note": "2026/2027; sibling discount 10% second, 15% each further child",
+          "amount": 6540
+        },
+        {
+          "category": "tuition",
+          "currency": "EUR",
+          "period": "yearly",
+          "label": "Предучилище, две равни вноски",
+          "source_url": "https://www.ds-sofia.bg/учебни-такси",
+          "note": "2026/2027; total annual amount when paid in two installments",
+          "amount": 7194
+        },
+        {
+          "category": "tuition",
+          "currency": "EUR",
+          "period": "yearly",
+          "label": "Начално училище, еднократна годишна вноска",
+          "source_url": "https://www.ds-sofia.bg/учебни-такси",
+          "note": "2026/2027",
+          "amount": 6580
+        },
+        {
+          "category": "tuition",
+          "currency": "EUR",
+          "period": "yearly",
+          "label": "Начално училище, две равни вноски",
+          "source_url": "https://www.ds-sofia.bg/учебни-такси",
+          "note": "2026/2027; total annual amount",
+          "amount": 7238
+        },
+        {
+          "category": "tuition",
+          "currency": "EUR",
+          "period": "yearly",
+          "label": "Гимназия, еднократна годишна вноска",
+          "source_url": "https://www.ds-sofia.bg/учебни-такси",
+          "note": "2026/2027",
+          "amount": 6740
+        },
+        {
+          "category": "tuition",
+          "currency": "EUR",
+          "period": "yearly",
+          "label": "Гимназия, две равни вноски",
+          "source_url": "https://www.ds-sofia.bg/учебни-такси",
+          "note": "2026/2027; total annual amount",
+          "amount": 7414
+        },
+        {
+          "category": "tuition",
+          "currency": "EUR",
+          "period": null,
+          "label": "Гост-ученици, за всеки учебен ден",
+          "source_url": "https://www.ds-sofia.bg/учебни-такси",
+          "note": "Per school day",
+          "amount": 80
+        }
+      ],
+      "no_fees_on_site": false,
+      "unreachable": false,
+      "notes": "Checked home, Учебни такси, fee regulation PDF 2026/2027 (served via filesusr.com redirect from site link), Хранене в училище (no prices; external caterer). PDF also: monthly payment +15% surcharge, late fees (50 EUR notice, 15 EUR/day), duplicate diploma 50 EUR / certificate 15 EUR — not listed as fees.",
+      "reviewer": "s1-reviewer-3",
+      "name": "Немско-българско училище за среща на културите София"
+    },
+    {
+      "school_id": 530,
+      "website_url": "https://detski-sviat.info/",
+      "minutes": 2.5,
+      "prices": [
+        {
+          "category": "tuition",
+          "currency": "EUR",
+          "period": "monthly",
+          "label": "Целодневен престой",
+          "source_url": "https://detski-sviat.info/ceni-i-taksi/",
+          "note": "Includes meals; 5% off for full-year payment; 10% off second and further child",
+          "amount": 750
+        },
+        {
+          "category": "tuition",
+          "currency": "EUR",
+          "period": "monthly",
+          "label": "Полудневен престой с обяд",
+          "source_url": "https://detski-sviat.info/ceni-i-taksi/",
+          "note": null,
+          "amount": 550
+        },
+        {
+          "category": "registration",
+          "currency": "EUR",
+          "period": "one_time",
+          "label": "Депозит за запазване на място (ново дете)",
+          "source_url": "https://detski-sviat.info/ceni-i-taksi/",
+          "note": null,
+          "amount": 200
+        },
+        {
+          "category": "registration",
+          "currency": "EUR",
+          "period": null,
+          "label": "Депозит за запазване на място за следващата учебна година",
+          "source_url": "https://detski-sviat.info/ceni-i-taksi/",
+          "note": "Deducted from September fee; paid 1 March - 15 April",
+          "amount": 150
+        }
+      ],
+      "no_fees_on_site": false,
+      "unreachable": false,
+      "notes": "Checked home, /priem/, /ceni-i-taksi/. No school year stated. Additional classes (speech therapy, dance, sports, English, math) listed without amounts.",
+      "reviewer": "s1-reviewer-3",
+      "name": "Частна детска градина Детски свят"
+    },
+    {
+      "school_id": 531,
+      "website_url": "https://www.montessori-high.com/bg",
+      "minutes": 2,
+      "prices": [
+        {
+          "category": "tuition",
+          "currency": "EUR",
+          "period": "monthly",
+          "label": "Група 0-3",
+          "source_url": "https://montessori-high.com/bg/priem",
+          "note": "Includes four organic meals",
+          "amount": 970
+        },
+        {
+          "category": "materials",
+          "currency": "EUR",
+          "period": "yearly",
+          "label": "Група 0-3, еднократна такса - образователна среда и ресурси",
+          "source_url": "https://montessori-high.com/bg/priem",
+          "note": null,
+          "amount": 390
+        },
+        {
+          "category": "tuition",
+          "currency": "EUR",
+          "period": "monthly",
+          "label": "Група 3-6",
+          "source_url": "https://montessori-high.com/bg/priem",
+          "note": "Includes meals, English, yoga, music etc.",
+          "amount": 970
+        },
+        {
+          "category": "materials",
+          "currency": "EUR",
+          "period": "yearly",
+          "label": "Група 3-6, еднократна такса - образователна среда и ресурси",
+          "source_url": "https://montessori-high.com/bg/priem",
+          "note": null,
+          "amount": 390
+        }
+      ],
+      "no_fees_on_site": false,
+      "unreachable": false,
+      "notes": "Checked home, /bg/priem. No school year stated.",
+      "reviewer": "s1-reviewer-3",
+      "name": "ЧАСТНА ДЕТСКА ГРАДИНА МОНТЕСОРИ ХАЙ"
+    },
+    {
+      "school_id": 532,
+      "website_url": "https://palavitemalchugani.bg/",
+      "minutes": 2,
+      "prices": [],
+      "no_fees_on_site": true,
+      "unreachable": false,
+      "notes": "Checked home, /priem/, HTML sitemap. No fee page or amounts.",
+      "reviewer": "s1-reviewer-3",
+      "name": "ЧАСТНА ДЕТСКА ГРАДИНА ПАЛАВИТЕ МАЛЧУГАНИ"
+    },
+    {
+      "school_id": 537,
+      "website_url": "https://pberon.com/",
+      "minutes": 2.5,
+      "prices": [],
+      "no_fees_on_site": true,
+      "unreachable": false,
+      "notes": "Checked home, Условия за кандидатстване (mentions annual tuition, no amount), Подкрепа, Лагери, Лятно училище. Kindergarten is on separate site dg-pberon.com (not checked).",
+      "reviewer": "s1-reviewer-3",
+      "name": "ЧАСТНО ОСНОВНО УЧИЛИЩЕ Д-Р ПЕТЪР БЕРОН"
+    },
+    {
+      "school_id": 539,
+      "website_url": "https://www.albertino.bg/",
+      "minutes": 2.5,
+      "prices": [],
+      "no_fees_on_site": true,
+      "unreachable": false,
+      "notes": "Home page (one-page site; Прием section has no separate page). Only price is Summer Academy 'Цена 180 евро на седмица' (10 юни - 23 август, 11 weeks, ages 5-8); year not stated but dates (Mon 10 Jun - Fri 23 Aug) match 2024, so treated as stale and excluded. If counted it would be camp 180 EUR per week. No monthly kindergarten fee stated.",
+      "reviewer": "s1-reviewer-4",
+      "name": "Частна детска градина Албертино"
+    },
+    {
+      "school_id": 542,
+      "website_url": "https://yourkidsbg.com/",
+      "minutes": 2.0,
+      "prices": [
+        {
+          "category": "tuition",
+          "amount": 950,
+          "currency": "BGN",
+          "period": "monthly",
+          "label": "Частна детска градина – Целодневен престой",
+          "source_url": "https://yourkidsbg.com/priem-i-taksi/",
+          "note": "School year not stated. Discounts: 10% for one calendar year prepaid, 5% for six months prepaid, 10% for second child."
+        },
+        {
+          "category": "tuition",
+          "amount": 750,
+          "currency": "BGN",
+          "period": "monthly",
+          "label": "Частна детска градина – Полудневен престой",
+          "source_url": "https://yourkidsbg.com/priem-i-taksi/",
+          "note": "Same discounts as full-day."
+        },
+        {
+          "category": "materials",
+          "amount": 150,
+          "currency": "BGN",
+          "period": "yearly",
+          "label": "Годишна такса за учебни материали",
+          "source_url": "https://yourkidsbg.com/priem-i-taksi/",
+          "note": null
+        },
+        {
+          "category": "registration",
+          "amount": 400,
+          "currency": "BGN",
+          "period": null,
+          "label": "Депозит за запазване на място при продължително отсъствие",
+          "source_url": "https://yourkidsbg.com/priem-i-taksi/",
+          "note": "Place-holding deposit during absence of a month or more; not an enrolment fee strictly - categorised as registration for lack of better fit."
+        }
+      ],
+      "no_fees_on_site": false,
+      "unreachable": false,
+      "notes": "Checked home and /priem-i-taksi/. Page also lists sibling nursery (Частна детска ясла) fees 1100 BGN full-day / 800 BGN half-day - skipped. Fees shown in BGN only, no year stated.",
+      "reviewer": "s1-reviewer-4",
+      "name": "ЧАСТНА ДЕТСКА ГРАДИНА ЙОР КИДС"
+    },
+    {
+      "school_id": 547,
+      "website_url": "https://mechopuh.bg/",
+      "minutes": 3.0,
+      "prices": [
+        {
+          "category": "tuition",
+          "amount": 600,
+          "currency": "EUR",
+          "period": "monthly",
+          "label": "Месечна такса – целодневен престой",
+          "source_url": "https://mechopuh.bg/priem/DogovorMechoPuh.pdf",
+          "note": "Contract Чл. 8 (also 1173,50 лв.); contract runs to 31.08.2027. Includes meals (Чл. 7)."
+        },
+        {
+          "category": "tuition",
+          "amount": 550,
+          "currency": "EUR",
+          "period": "monthly",
+          "label": "Месечна такса – полудневен престой",
+          "source_url": "https://mechopuh.bg/priem/DogovorMechoPuh.pdf",
+          "note": "Contract Чл. 8 (also 1075,71 лв.)."
+        }
+      ],
+      "no_fees_on_site": false,
+      "unreachable": false,
+      "notes": "Checked home, /priem, contract PDF DogovorMechoPuh.pdf. Чл. 10: one-off enrolment deposit equal to one monthly fee (refundable) - no separate amount, so not listed. Sports, consultations, trips charged separately without amounts.",
+      "reviewer": "s1-reviewer-4",
+      "name": "ЧАСТНА ДЕТСКА ГРАДИНА МЕЧО ПУХ"
+    },
+    {
+      "school_id": 548,
+      "website_url": "https://mechtatel.bg/",
+      "minutes": 2.0,
+      "prices": [],
+      "no_fees_on_site": true,
+      "unreachable": false,
+      "notes": "Checked home, /uslugi/, /programa/. No amounts anywhere; site directs to phone/inquiry form.",
+      "reviewer": "s1-reviewer-4",
+      "name": "ЧАСТНА ДЕТСКА ГРАДИНА Мечтател"
+    },
+    {
+      "school_id": 549,
+      "website_url": "http://www.prolet2006.com/",
+      "minutes": 0.5,
+      "prices": [],
+      "no_fees_on_site": false,
+      "unreachable": true,
+      "notes": "WebFetch refused: robots.txt disallows fetching.",
+      "reviewer": "s1-reviewer-4",
+      "name": "ЧАСТНА ДЕТСКА ГРАДИНА ПРОЛЕТ"
+    },
+    {
+      "school_id": 555,
+      "website_url": "https://stgeorgeschool.eu/",
+      "minutes": 2.5,
+      "prices": [],
+      "no_fees_on_site": false,
+      "unreachable": true,
+      "notes": "Home page readable but shows no fees or links; any deeper page (/bg/, /fees, sitemap.xml) refused by robots.txt. Could not verify fees.",
+      "reviewer": "s1-reviewer-4",
+      "name": "ЧАСТНА ДЕТСКА ГРАДИНА СВЕТИ ГЕОРГИ"
+    },
+    {
+      "school_id": 557,
+      "website_url": "https://www.tuti-bg.com/",
+      "minutes": 0.5,
+      "prices": [],
+      "no_fees_on_site": false,
+      "unreachable": true,
+      "notes": "WebFetch refused: robots.txt disallows fetching.",
+      "reviewer": "s1-reviewer-4",
+      "name": "ЧАСТНА ДЕТСКА ГРАДИНА ТУТИ 2011"
+    },
+    {
+      "school_id": 561,
+      "website_url": "https://azbuki-school.bg/",
+      "minutes": 2.0,
+      "prices": [
+        {
+          "category": "tuition",
+          "amount": 8950,
+          "currency": "EUR",
+          "period": "yearly",
+          "label": "Таксата за следващата учебна година (2026/2027)",
+          "source_url": "https://azbuki-school.bg/priem/",
+          "note": "Extracurricular activities, food and transport paid extra (no amounts)."
+        }
+      ],
+      "no_fees_on_site": false,
+      "unreachable": false,
+      "notes": "Checked home and /priem/. No fee PDFs.",
+      "reviewer": "s1-reviewer-4",
+      "name": "ЧАСТНО ОСНОВНО УЧИЛИЩЕ АЗБУКИ"
+    },
+    {
+      "school_id": 569,
+      "website_url": "https://busy-school.com/",
+      "minutes": 3.0,
+      "prices": [
+        {
+          "category": "tuition",
+          "amount": 5900,
+          "currency": "EUR",
+          "period": "yearly",
+          "label": "ПГУ от 15.09.2026 г. до 31.05.2027 г.",
+          "source_url": "https://busy-school.com/%d1%82%d0%b0%d0%ba%d1%81%d0%b8/",
+          "note": "Payable once or in 2 instalments of 3 000 EUR (at contract, by 15.01.2027). Discounts: 5% second child, 5% twins, 10% third child. Assessment: no fee; registration guarantee: no fee."
+        },
+        {
+          "category": "tuition",
+          "amount": 8000,
+          "currency": "EUR",
+          "period": "yearly",
+          "label": "ПГУ от 15.09.2026 г. до 14.09.2027 г.",
+          "source_url": "https://busy-school.com/%d1%82%d0%b0%d0%ba%d1%81%d0%b8/",
+          "note": "Full-year (incl. summer) preschool plan. Sibling discounts apply."
+        },
+        {
+          "category": "tuition",
+          "amount": 5900,
+          "currency": "EUR",
+          "period": "yearly",
+          "label": "1-4 клас от 15.09.2026 г. до 31.05.2027 г.",
+          "source_url": "https://busy-school.com/%d1%82%d0%b0%d0%ba%d1%81%d0%b8/",
+          "note": "Payable once or 2 x 3 000 EUR. Sibling discounts apply."
+        },
+        {
+          "category": "registration",
+          "amount": 70,
+          "currency": "EUR",
+          "period": "one_time",
+          "label": "Гаранционна такса записване – 1-4 клас",
+          "source_url": "https://busy-school.com/%d1%82%d0%b0%d0%ba%d1%81%d0%b8/",
+          "note": "Paid once at contract; waived if annual fee paid in one payment. 'Без такса' for ПГУ."
+        },
+        {
+          "category": "camp",
+          "amount": 640,
+          "currency": "EUR",
+          "period": "monthly",
+          "label": "Летен дневен лагер",
+          "source_url": "https://busy-school.com/%d1%82%d0%b0%d0%ba%d1%81%d0%b8/",
+          "note": null
+        },
+        {
+          "category": "food",
+          "amount": 8,
+          "currency": "EUR",
+          "period": null,
+          "label": "Храна",
+          "source_url": "https://busy-school.com/%d1%82%d0%b0%d0%ba%d1%81%d0%b8/",
+          "note": "8 EUR per attendance day (за присъствен ден)."
+        },
+        {
+          "category": "transport",
+          "amount": 179,
+          "currency": "EUR",
+          "period": "monthly",
+          "label": "Транспорт в посока",
+          "source_url": "https://busy-school.com/%d1%82%d0%b0%d0%ba%d1%81%d0%b8/",
+          "note": "One direction, per month."
+        },
+        {
+          "category": "materials",
+          "amount": 155,
+          "currency": "EUR",
+          "period": null,
+          "label": "Учебни материали",
+          "source_url": "https://busy-school.com/%d1%82%d0%b0%d0%ba%d1%81%d0%b8/",
+          "note": null
+        }
+      ],
+      "no_fees_on_site": false,
+      "unreachable": false,
+      "notes": "Checked home, Родители, Прием, ТАКСИ pages. Родители page still shows stale 2024/2025 fee (4 300 EUR/year ПГ & I клас) - skipped in favour of ТАКСИ page 2026/27.",
+      "reviewer": "s1-reviewer-4",
+      "name": "ЧАСТНО НАЧАЛНО УЧИЛИЩЕ БИЗИ"
+    },
+    {
+      "school_id": 574,
+      "website_url": "https://novigradini.com/",
+      "minutes": 2.0,
+      "prices": [
+        {
+          "category": "tuition",
+          "amount": 475.5,
+          "currency": "EUR",
+          "period": "monthly",
+          "label": "Месечна такса за обучение и грижа",
+          "source_url": "https://novigradini.com/anika/",
+          "note": "From September 2025 (930 лв.); described as reduced. Music (piano, singing) included. State compensation up to 281 EUR/month mentioned (subsidy, not a fee)."
+        }
+      ],
+      "no_fees_on_site": false,
+      "unreachable": false,
+      "notes": "Checked group home page and /anika/. Sibling kindergarten on the group site skipped.",
+      "reviewer": "s1-reviewer-4",
+      "name": "ЧАСТНА ДЕТСКА ГРАДИНА АНИКА"
+    },
+    {
+      "school_id": 585,
+      "website_url": "https://artisbg.com/",
+      "minutes": 2.0,
+      "prices": [],
+      "no_fees_on_site": true,
+      "unreachable": false,
+      "notes": "Checked home, about-us-3 (documents section, 2022-23 era PDFs/docs, none fee-related), contacts link. No Такси/Цени page; admission via Google Form. No amounts anywhere.",
+      "reviewer": "s1-reviewer-5",
+      "name": "Частно средно училище по изкуства и чужди езици Артис"
+    },
+    {
+      "school_id": 590,
+      "website_url": "https://erichkaestner.bg/",
+      "minutes": 3.0,
+      "prices": [],
+      "no_fees_on_site": false,
+      "unreachable": true,
+      "notes": "/ceni/ shows prices only as images (storage/2025/08/pricelist_2025_desk-1024x724.png and pricelist_2025_mobile-576x1024.png); image fetches returned server errors, so fees could not be read. Home page has a theme-demo 'Schedule and tuition' block ($1,800/$2,300/$2,600 per month, lorem ipsum text, English) - placeholder content, deliberately NOT recorded. /ceni/ footnotes: extra activities (min 5 kids) and individual specialist sessions charged separately, no amounts.",
+      "reviewer": "s1-reviewer-5",
+      "name": "Частна детска градина Ерих Кестнер"
+    },
+    {
+      "school_id": 595,
+      "website_url": "https://buditel.softuni.bg/",
+      "minutes": 3.0,
+      "prices": [
+        {
+          "category": "tuition",
+          "amount": 8320,
+          "currency": "EUR",
+          "period": "yearly",
+          "label": "Годишна такса за 8. клас 2026/2027 – плащане на една вноска",
+          "source_url": "https://buditel.softuni.bg/",
+          "note": "5% discount for second child from the family."
+        },
+        {
+          "category": "tuition",
+          "amount": 2920,
+          "currency": "EUR",
+          "period": null,
+          "label": "Годишна такса за 8. клас 2026/2027 – плащане на 3 вноски (на вноска)",
+          "source_url": "https://buditel.softuni.bg/",
+          "note": "Per installment, 3 installments."
+        },
+        {
+          "category": "registration",
+          "amount": 490,
+          "currency": "EUR",
+          "period": "one_time",
+          "label": "Еднократна такса регистрация (нов ученик)",
+          "source_url": "https://buditel.softuni.bg/",
+          "note": "Waived for contracts signed by 31.01.2026 (FAQ) / banner says preferential terms until 31.01.2027."
+        },
+        {
+          "category": "registration",
+          "amount": 100,
+          "currency": "EUR",
+          "period": "one_time",
+          "label": "Такса за кандидатстване (приемни изпити след 01.06.2026)",
+          "source_url": "https://buditel.softuni.bg/",
+          "note": "No application fee for candidates who sat the exam by 24.05.2026."
+        }
+      ],
+      "no_fees_on_site": false,
+      "unreachable": false,
+      "notes": "Home page states 2026/2027 fees (recorded). /fees/ page now states 2027/2028 8th grade: 8 900 EUR one payment, 3 x 3 115 EUR, application 100 EUR, registration 490 EUR (both waived if contract by 31.01.2027) - outside the 2025/26-2026/27 window so not recorded as entries; if the key should take the latest year, use these. Paid extras (excursions, licences, catering lunch) listed without amounts.",
+      "reviewer": "s1-reviewer-5",
+      "name": "Частна професионална гимназия по дигитални науки СофтУни БУДИТЕЛ"
+    },
+    {
+      "school_id": 598,
+      "website_url": "https://yagodina.bg/",
+      "minutes": 1.5,
+      "prices": [
+        {
+          "category": "tuition",
+          "amount": 785,
+          "currency": "EUR",
+          "period": "monthly",
+          "label": "Целодневно обучение",
+          "source_url": "https://yagodina.bg/prices/",
+          "note": "Includes meals, materials, events."
+        },
+        {
+          "category": "tuition",
+          "amount": 550,
+          "currency": "EUR",
+          "period": "monthly",
+          "label": "Полудневно обучение",
+          "source_url": "https://yagodina.bg/prices/",
+          "note": "Includes meals, materials, events."
+        }
+      ],
+      "no_fees_on_site": false,
+      "unreachable": false,
+      "notes": "Checked home, /prices/, /admission/ (no fees). School year not stated on prices page.",
+      "reviewer": "s1-reviewer-5",
+      "name": "Частна детска градина Ягодина"
+    },
+    {
+      "school_id": 601,
+      "website_url": "https://kidsville.space/",
+      "minutes": 2.5,
+      "prices": [
+        {
+          "category": "tuition",
+          "amount": 900,
+          "currency": "EUR",
+          "period": "monthly",
+          "label": "Средномесечна такса при абонамент на 1 вноска (A1)",
+          "source_url": "https://kidsville.space/%d1%86%d0%b5%d0%bd%d0%b8/",
+          "note": "Full day 08:00-18:00, 12-month period; 5% off for second child, 10% twins; 50% reduction for July/August absence."
+        },
+        {
+          "category": "tuition",
+          "amount": 925,
+          "currency": "EUR",
+          "period": "monthly",
+          "label": "Средномесечна такса при абонамент на 2 вноски (A2)",
+          "source_url": "https://kidsville.space/%d1%86%d0%b5%d0%bd%d0%b8/",
+          "note": "Same discounts as A1."
+        },
+        {
+          "category": "tuition",
+          "amount": 950,
+          "currency": "EUR",
+          "period": "monthly",
+          "label": "Ежемесечно заплащане (A3)",
+          "source_url": "https://kidsville.space/%d1%86%d0%b5%d0%bd%d0%b8/",
+          "note": "Same discounts as A1."
+        },
+        {
+          "category": "food",
+          "amount": 100,
+          "currency": "EUR",
+          "period": "monthly",
+          "label": "Храна (закуска, междинна закуска, обяд, следобедна закуска)",
+          "source_url": "https://kidsville.space/%d1%86%d0%b5%d0%bd%d0%b8/",
+          "note": "Page says plans A1-A3 exclude food (meta description contradicts)."
+        },
+        {
+          "category": "materials",
+          "amount": 350,
+          "currency": "EUR",
+          "period": "one_time",
+          "label": "Еднократна образователна такса (за учебната година)",
+          "source_url": "https://kidsville.space/%d1%86%d0%b5%d0%bd%d0%b8/",
+          "note": "Per school year."
+        },
+        {
+          "category": "registration",
+          "amount": 200,
+          "currency": "EUR",
+          "period": null,
+          "label": "Административна такса (новозаписани деца)",
+          "source_url": "https://kidsville.space/%d1%86%d0%b5%d0%bd%d0%b8/",
+          "note": null
+        }
+      ],
+      "no_fees_on_site": false,
+      "unreachable": false,
+      "notes": "Prices page says valid from 01.01.2023 (no newer list). /записване/ mentions administrative fee without amount.",
+      "reviewer": "s1-reviewer-5",
+      "name": "ЧАСТНА ДЕТСКА ГРАДИНА КИДСВИЛ"
+    },
+    {
+      "school_id": 602,
+      "website_url": "https://alissa-bg.com/",
+      "minutes": 2.0,
+      "prices": [],
+      "no_fees_on_site": true,
+      "unreachable": false,
+      "notes": "Checked home, /priem/ (says fee is monthly, set each school year, no amount), /roditeli/, /dopalnitelni-deynosti/. No amounts.",
+      "reviewer": "s1-reviewer-5",
+      "name": "Частна детска градина Алиса"
+    },
+    {
+      "school_id": 610,
+      "website_url": "https://montessorischools.bg/",
+      "minutes": 2.0,
+      "prices": [],
+      "no_fees_on_site": false,
+      "unreachable": true,
+      "notes": "Home page (English, Otkrivatel Montessori School) readable, no fees; /bg/, /fees, robots.txt all ROBOTS_DISALLOWED, so subpages could not be checked.",
+      "reviewer": "s1-reviewer-5",
+      "name": "ЧАСТНО СРЕДНО УЧИЛИЩЕ ОТКРИВАТЕЛ"
+    },
+    {
+      "school_id": 629,
+      "website_url": "https://saintkliment.com/",
+      "minutes": 2.0,
+      "prices": [],
+      "no_fees_on_site": true,
+      "unreachable": false,
+      "notes": "Checked home, /priem/, /za-roditeli/ (documents list, none fee-related). FAQ says tuition covers instruction, textbooks, lunch+snack; excludes transport, extra activities, uniform - no amounts.",
+      "reviewer": "s1-reviewer-5",
+      "name": "Частно основно училище Св. Климент Охридски"
+    },
+    {
+      "school_id": 632,
+      "website_url": "https://acatamus.bg/",
+      "minutes": 2.0,
+      "prices": [
+        {
+          "category": "tuition",
+          "amount": 700,
+          "currency": "EUR",
+          "period": "monthly",
+          "label": "Месечна такса за обучение 2026/2027",
+          "source_url": "https://acatamus.bg/priem/",
+          "note": "Printed as '7 00 евро' (typo); full-sum figure €7 000 implies 700/month x10. 10% discount when full sum (€7 000) paid at once."
+        },
+        {
+          "category": "activities",
+          "amount": 150,
+          "currency": "EUR",
+          "period": "monthly",
+          "label": "Допълнително всеки ученик заплаща (уъркшопи, семинари, театър, учебни материали, концерти)",
+          "source_url": "https://acatamus.bg/priem/",
+          "note": null
+        }
+      ],
+      "no_fees_on_site": false,
+      "unreachable": false,
+      "notes": "Checked home, /priem/ (ТАКСИ ЗА УЧЕБНАТА 2026/2027).",
+      "reviewer": "s1-reviewer-5",
+      "name": "ЧАСТНА ПРОФЕСИОНАЛНА ГИМНАЗИЯ АКАТАМУС"
+    },
+    {
+      "school_id": 634,
+      "website_url": "https://uwekind.com/",
+      "minutes": 3.0,
+      "prices": [
+        {
+          "category": "tuition",
+          "amount": 6820,
+          "currency": "EUR",
+          "period": "yearly",
+          "label": "Такса Образователни услуги – Детска градина (€6820/година)",
+          "source_url": "https://uwekind.com/admission/fees/",
+          "note": "Food not included. Sibling discount 5% 2nd, 10% 3rd child."
+        },
+        {
+          "category": "tuition",
+          "amount": 7000,
+          "currency": "EUR",
+          "period": null,
+          "label": "Детска градина – при разсрочено плащане на 2 вноски",
+          "source_url": "https://uwekind.com/admission/fees/",
+          "note": "Total for the year in 2 installments."
+        },
+        {
+          "category": "tuition",
+          "amount": 7400,
+          "currency": "EUR",
+          "period": null,
+          "label": "Детска градина – при разсрочено плащане на 10 вноски",
+          "source_url": "https://uwekind.com/admission/fees/",
+          "note": "Total for the year in 10 installments."
+        },
+        {
+          "category": "materials",
+          "amount": 450,
+          "currency": "EUR",
+          "period": null,
+          "label": "Такса Образователни ресурси и учебни практики (Детска градина)",
+          "source_url": "https://uwekind.com/admission/fees/",
+          "note": "Mandatory."
+        },
+        {
+          "category": "extracurricular",
+          "amount": 450,
+          "currency": "EUR",
+          "period": null,
+          "label": "Клубове по интереси – задължителен избор на едно занимание",
+          "source_url": "https://uwekind.com/admission/fees/",
+          "note": "General line (not kindergarten-specific); extra clubs charged separately."
+        },
+        {
+          "category": "registration",
+          "amount": 100,
+          "currency": "EUR",
+          "period": "one_time",
+          "label": "Такса кандидатстване (детска градина)",
+          "source_url": "https://uwekind.com/admission/fees/",
+          "note": "Non-refundable, new children only."
+        },
+        {
+          "category": "registration",
+          "amount": 500,
+          "currency": "EUR",
+          "period": "one_time",
+          "label": "Административна такса (новопостъпили ученици и деца)",
+          "source_url": "https://uwekind.com/admission/fees/",
+          "note": "Pairing of 500 EUR with heading inferred from layout; likely document-processing fee on enrolment."
+        },
+        {
+          "category": "food",
+          "amount": 1410,
+          "currency": "EUR",
+          "period": null,
+          "label": "Храна обяд, сутрешна и следобедна закуска (ДГ и ПК)",
+          "source_url": "https://uwekind.com/admission/fees/",
+          "note": "Mandatory for kindergarten; paid in 1 or 2 installments."
+        },
+        {
+          "category": "transport",
+          "amount": 2800,
+          "currency": "EUR",
+          "period": null,
+          "label": "Транспорт – в две посоки",
+          "source_url": "https://uwekind.com/admission/fees/",
+          "note": "Lozen students and kindergarten children."
+        },
+        {
+          "category": "transport",
+          "amount": 1950,
+          "currency": "EUR",
+          "period": null,
+          "label": "Транспорт – в една посока",
+          "source_url": "https://uwekind.com/admission/fees/",
+          "note": "Lozen students and kindergarten children."
+        }
+      ],
+      "no_fees_on_site": false,
+      "unreachable": false,
+      "notes": "2026-2027 fees from /admission/fees/. Skipped school-only (Увекинд school, id 635) lines: ПК/1-12 tuition 7880/8100/8250, resources 600, application 150, student food 1620/610/1650.",
+      "reviewer": "s1-reviewer-5",
+      "name": "ЧАСТНА НЕМСКА ДЕТСКА ГРАДИНА УВЕКИНД"
+    }
+  ]
+}
