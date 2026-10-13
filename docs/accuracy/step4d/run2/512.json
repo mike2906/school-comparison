@@ -1,0 +1,59 @@
+{
+ "apply": true,
+ "pipeline_run_id": "4332e303-731e-4e8d-9fa5-53ba8ec8a708",
+ "schools": 1,
+ "spent_usd": 0.000173,
+ "stopped": null,
+ "kept_old_rows": [
+  512
+ ],
+ "outcomes": {
+  "kept_old_rows": 1
+ },
+ "results": [
+  {
+   "school_id": 512,
+   "outcome": "kept_old_rows",
+   "pages": [
+    {
+     "url": "https://busy-land.com/",
+     "chars": 4187,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://busy-land.com/about-us/",
+     "chars": 3848,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://busy-land.com/%d0%ba%d0%be%d0%bd%d1%82%d0%b0%d0%ba%d1%82%d0%b8/",
+     "chars": 3503,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://busy-land.com/feed/",
+     "chars": 1389,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://busy-land.com/comments/feed/",
+     "chars": 964,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://busy-land.com/%d0%b3%d0%b0%d0%bb%d0%b5%d1%80%d0%b8%d1%8f/",
+     "chars": 8555,
+     "prices": false,
+     "note": null
+    }
+   ],
+   "fees": [],
+   "reason": "no page showing prices"
+  }
+ ]
+}

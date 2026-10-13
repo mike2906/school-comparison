@@ -1,0 +1,87 @@
+{
+ "apply": true,
+ "pipeline_run_id": "f95ba661-6aa4-4657-98a5-344f098c381c",
+ "schools": 1,
+ "spent_usd": 0.000378,
+ "stopped": null,
+ "kept_old_rows": [],
+ "outcomes": {
+  "written": 1
+ },
+ "results": [
+  {
+   "school_id": 615,
+   "outcome": "written",
+   "pages": [
+    {
+     "url": "https://growers.bg/",
+     "chars": 4975,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://growers.bg/taksi/",
+     "chars": 3387,
+     "prices": true,
+     "note": null
+    },
+    {
+     "url": "https://growers.bg/priem/",
+     "chars": 3618,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://growers.bg/uslugi/",
+     "chars": 4856,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://growers.bg/en/fees/",
+     "chars": 3286,
+     "prices": true,
+     "note": null
+    }
+   ],
+   "fees": [
+    {
+     "category": "tuition",
+     "amount": 500.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "monthly",
+     "label": "Full day",
+     "academic_year": null,
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://growers.bg/en/fees/",
+     "evidence": "#### Full day – 500eur\nMonthly fees"
+    },
+    {
+     "category": "food",
+     "amount": 88.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "monthly",
+     "label": "Food",
+     "academic_year": null,
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://growers.bg/en/fees/",
+     "evidence": "#### Food - 88Eur\nMonthly fees"
+    }
+   ],
+   "rows_new": 2,
+   "rows_new_publishable": 2,
+   "rows_old_published": 2,
+   "regressions": [],
+   "rows_old_kept": 0,
+   "validation": "ok"
+  }
+ ]
+}
