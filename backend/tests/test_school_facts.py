@@ -139,13 +139,16 @@ async def test_apply_replaces_stored_facts_and_dry_run_writes_nothing():
     stored = school.attributes["school_facts"]
     assert report["stored"] == 1 and db.commits == 1 and school.attributes["other"] == 1
     assert stored["_schema_version"] == 1 and [f["topic"] for f in stored["facts"]] == ["school_day"]
+    assert stored["website_url"] == HOME
 
 
 @pytest.mark.asyncio
-async def test_a_site_read_with_nothing_concrete_clears_the_facts():
-    school = _school(school_facts={"_schema_version": 1, "facts": [{"topic": "meals"}]})
-    await stage.run_school(_Db(), school, find=await _find(PAGES), call=_Calls([], passed=[]), apply=True)
-    assert school.attributes["school_facts"]["facts"] == []
+async def test_a_read_with_no_fact_kept_keeps_the_stored_facts():
+    # Often a partial crawl: a thin home page and the rest timed out.
+    old = {"_schema_version": 1, "facts": [{"topic": "meals"}]}
+    school, db = _school(school_facts=old), _Db()
+    report = await stage.run_school(db, school, find=await _find(PAGES), call=_Calls([], passed=[]), apply=True)
+    assert school.attributes["school_facts"] == old and db.commits == 0 and report["kept_stored_facts"]
 
 
 @pytest.mark.asyncio
@@ -170,6 +173,7 @@ def test_publishable_facts_drop_malformed_rows_and_the_quote():
     block = {
         "_schema_version": 1,
         "read_at": "2026-10-13T20:00:00+00:00",
+        "website_url": "https://www.school.example",
         "facts": [
             _fact_row(),
             _fact_row(topic="gossip"),
@@ -178,13 +182,13 @@ def test_publishable_facts_drop_malformed_rows_and_the_quote():
             "not a fact",
         ],
     }
-    published = publishable_school_facts({"school_facts": block})
+    published = publishable_school_facts({"school_facts": block}, HOME)
     assert published == {
         "read_at": "2026-10-13T20:00:00+00:00",
         "facts": [{"topic": "meals", "text_i18n": {"bg": "Обяд.", "en": "Lunch."}, "source_url": HOME}],
     }
-    assert publishable_school_facts({"school_facts": block | {"_schema_version": 2}}) is None
-    assert publishable_school_facts({"school_facts": block | {"facts": []}}) is None
+    assert publishable_school_facts({"school_facts": block | {"_schema_version": 2}}, HOME) is None
+    assert publishable_school_facts({"school_facts": block | {"facts": []}}, HOME) is None
 
 
 async def _detail(client, db_session, **attrs):
@@ -208,7 +212,7 @@ async def _detail(client, db_session, **attrs):
 @pytest.mark.asyncio
 async def test_detail_response_shows_facts_without_quotes(client, db_session):
     body = await _detail(
-        client, db_session, school_facts={"_schema_version": 1, "read_at": "t", "facts": [_fact_row()]}
+        client, db_session, school_facts={"_schema_version": 1, "read_at": "t", "website_url": HOME, "facts": [_fact_row()]}
     )
     assert body["school_facts"]["facts"] == [
         {"topic": "meals", "text_i18n": {"bg": "Обяд.", "en": "Lunch."}, "source_url": HOME}
@@ -218,6 +222,25 @@ async def test_detail_response_shows_facts_without_quotes(client, db_session):
 
 @pytest.mark.asyncio
 async def test_withheld_website_data_hides_the_facts(client, db_session):
-    block = {"_schema_version": 1, "read_at": "t", "facts": [_fact_row()]}
+    block = {"_schema_version": 1, "read_at": "t", "website_url": HOME, "facts": [_fact_row()]}
     body = await _detail(client, db_session, school_facts=block, website_data_withheld=True)
     assert body["school_facts"] is None
+
+
+def test_facts_show_only_for_the_site_they_were_read_from():
+    block = {"_schema_version": 1, "read_at": "t", "website_url": HOME, "facts": [_fact_row()]}
+    assert publishable_school_facts({"school_facts": block}, "https://www.school.example/bg/") is not None
+    assert publishable_school_facts({"school_facts": block}, "https://other.example/") is None
+    assert publishable_school_facts({"school_facts": block}, None) is None
+    assert publishable_school_facts({"school_facts": block | {"website_url": None}}, HOME) is None
+
+
+@pytest.mark.asyncio
+async def test_the_limit_cuts_in_the_readers_order_and_shows_in_topic_order():
+    quote = "Учебният ден започва в 08:00 часа и приключва в 14:00 часа."
+    facts = [_fact("admissions", quote, en="first")] + [_fact("curriculum", quote, en=f"c{n}") for n in range(3)]
+    facts += [_fact(topic, quote, en=topic) for topic in ("languages", "meals", "transport", "activities", "facilities", "support")]
+    report = await stage.read_school(_school(), PAGES, _Calls(facts, passed=list(range(1, 11))))
+    kept = [f["text_i18n"]["en"] for f in report["store"]]
+    assert len(kept) == 8 and "first" in kept and kept[-1] == "first"  # admissions shows last
+    assert "support" not in kept and kept.count("c0") + kept.count("c1") == 2

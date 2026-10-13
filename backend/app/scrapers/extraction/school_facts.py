@@ -16,22 +16,11 @@ from typing import Literal, Optional
 from pydantic import BaseModel, Field
 
 from app.scrapers.fee_pages import page_key
-from app.utils.school_facts import SCHEMA_VERSION, TOPICS  # noqa: F401  (re-exported for the stage)
+from app.utils.school_facts import SCHEMA_VERSION, TOPICS  # noqa: F401  (SCHEMA_VERSION re-exported)
 
 MAX_FACTS = 8
 
-Topic = Literal[
-    "curriculum",
-    "languages",
-    "school_day",
-    "class_size",
-    "meals",
-    "transport",
-    "activities",
-    "facilities",
-    "support",
-    "admissions",
-]
+Topic = Literal[TOPICS]  # the reader is held to the published topic list
 
 PICK_PROMPT = """You help find the pages of a school website that describe what the school is like for a child
 and a parent: about the school, curriculum or programme, subjects and languages taught, profiled classes,
@@ -79,9 +68,6 @@ JUDGE_PROMPT = """You check facts written about a school against the website lin
 For each numbered item you get a fact and a quote. Answer yes only if the quote by itself states everything
 the fact says: no part of the fact may come from elsewhere or be inferred, and a mission statement, slogan or
 general claim does not state a concrete fact. Return the numbers of the items that pass."""
-
-
-assert Topic.__args__ == TOPICS  # one list: the Literal is what the reader is held to
 
 
 class Fact(BaseModel):

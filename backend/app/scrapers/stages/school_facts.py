@@ -26,9 +26,9 @@ from app.scrapers.extraction import school_facts as facts_rules
 from app.scrapers.extraction.school_facts import Fact, Facts, Supported
 from app.scrapers.fee_pages import fee_http_client
 from app.scrapers.stages import common as stage_common
-from app.scrapers.stages.fees_agent import PageRead, Spend, SpendCapReached, find_pages
+from app.scrapers.stages.fees_agent import PageRead, Spend, SpendCapReached, find_pages, reader_text
 from app.services.pipeline_runs import finalize_pipeline_run, pipeline_run_heartbeat, start_pipeline_run
-from app.services.provider_costs import ProviderCostCapExceeded, execute_billable_request, provider_cost_scope
+from app.services.provider_costs import ProviderCostError, execute_billable_request, provider_cost_scope
 from app.utils.school_facts import ATTRIBUTE_KEY
 
 logger = logging.getLogger(__name__)
@@ -36,7 +36,6 @@ logger = logging.getLogger(__name__)
 STAGE = "school-facts"
 TIER = "pricing"  # the fee reader's model: cheap, and follows quoting rules well
 DEFAULT_MAX_USD = 0.50
-MAX_READ_CHARS = 100_000
 OUTPUT_TOKENS_RESERVE = 4000
 
 Finder = Callable[[School], Awaitable[list[PageRead]]]
@@ -69,14 +68,15 @@ def _name(school: School) -> str:
 
 
 def _ordered(kept: list[tuple[Fact, str]]) -> list[tuple[Fact, str]]:
-    """Topic order, at most 2 a topic and ``MAX_FACTS`` in all, the reader's order within a topic."""
+    """At most 2 a topic and ``MAX_FACTS`` in all, cut in the reader's (most useful first)
+    order, then put in topic order for display."""
     per_topic: dict[str, int] = {}
     out: list[tuple[Fact, str]] = []
-    for item in sorted(kept, key=lambda item: facts_rules.TOPICS.index(item[0].topic)):
+    for item in kept:
         if per_topic.get(item[0].topic, 0) < 2 and len(out) < facts_rules.MAX_FACTS:
             per_topic[item[0].topic] = per_topic.get(item[0].topic, 0) + 1
             out.append(item)
-    return out
+    return sorted(out, key=lambda item: facts_rules.TOPICS.index(item[0].topic))
 
 
 async def read_school(school: School, pages: list[PageRead], call: Caller) -> dict[str, Any]:
@@ -85,7 +85,7 @@ async def read_school(school: School, pages: list[PageRead], call: Caller) -> di
     report: dict[str, Any] = {"pages": [{"url": p.url, "chars": len(p.text), "note": p.note} for p in pages]}
     if not readable:
         return report | {"outcome": "nothing_read"}
-    text = "\n\n".join(f"=== PAGE {url}\n{body}" for url, body in readable)[:MAX_READ_CHARS]
+    text = reader_text([page for page in pages if page.text.strip()])
     read: Facts = await call(
         facts_rules.READER_PROMPT,
         Facts,
@@ -112,10 +112,11 @@ async def read_school(school: School, pages: list[PageRead], call: Caller) -> di
     return report | {"outcome": f"{len(kept)} of {len(read.facts)} kept"}
 
 
-def facts_block(facts: list[dict], model: str) -> dict[str, Any]:
+def facts_block(facts: list[dict], model: str, website_url: Optional[str]) -> dict[str, Any]:
     return {
         "_schema_version": facts_rules.SCHEMA_VERSION,
         "read_at": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
+        "website_url": website_url,
         "model": model,
         "facts": facts,
     }
@@ -130,10 +131,15 @@ async def run_school(db: AsyncSession, school: School, *, find: Finder, call: Ca
     }
     report |= await read_school(school, await find(school), call)
     facts = report.pop("store", None)
-    # A site that could not be read keeps its stored facts; one read in full replaces them,
-    # with none when it states nothing concrete.
-    if apply and facts is not None:
-        school.attributes = {**(school.attributes or {}), ATTRIBUTE_KEY: facts_block(facts, get_model(TIER))}
+    stored = ((school.attributes or {}).get(ATTRIBUTE_KEY) or {}).get("facts")
+    # A site not read, or read with no fact kept (often a partial crawl: a thin home page
+    # and the rest timed out), keeps the facts stored before. A read that keeps facts
+    # replaces them. The API only shows facts read from the school's current website.
+    if facts is None or (not facts and stored):
+        report["kept_stored_facts"] = bool(stored)
+    elif apply:
+        block = facts_block(facts, get_model(TIER), school.website_url)
+        school.attributes = {**(school.attributes or {}), ATTRIBUTE_KEY: block}
         await db.commit()
         report["stored"] = len(facts)
     return report
@@ -204,13 +210,14 @@ async def run_school_facts(
                         spend,
                         pick_prompt=facts_rules.PICK_PROMPT,
                         fallback_links=facts_rules.FALLBACK_LINK_RE,
+                        stage=STAGE,
                     )
 
                 for current_id in ids:
                     school = await db.get(School, current_id)
                     try:
                         results.append(await run_school(db, school, find=find, call=call, apply=apply))
-                    except (SpendCapReached, ProviderCostCapExceeded) as exc:
+                    except (SpendCapReached, ProviderCostError) as exc:  # a cap, or a run no longer running
                         error = f"stopped before school {current_id}: {exc}"
                         break
                     except Exception as exc:  # one school's failure leaves its stored facts as they are

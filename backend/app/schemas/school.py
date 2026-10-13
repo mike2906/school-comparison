@@ -396,10 +396,11 @@ class SchoolResponse(SchoolBase, SchoolPricingMixin):
     @property
     def school_facts(self) -> Optional[SchoolFacts]:
         # Facts carry their own page checks, so they do not wait for a Stage 6 report; a
-        # withholding marker (failed URL check, shared site, re-extraction) still hides them.
+        # withholding marker (failed URL check, shared site, re-extraction) still hides them,
+        # and so does a change of website (``publishable_school_facts``).
         if "withheld_marker" in website_data_withheld_reasons(self.raw_attributes, self.raw_scrape_status):
             return None
-        facts = publishable_school_facts(self.raw_attributes)
+        facts = publishable_school_facts(self.raw_attributes, self.website_url)
         return SchoolFacts.model_validate(facts) if facts else None
 
     @computed_field(return_type=list[FieldSourceResponse])

@@ -192,7 +192,12 @@ async def _wordpress_text(client, url: str) -> Optional[str]:
 
 
 async def _pick(
-    school: School, read: list[PageRead], links: list[tuple[str, str]], spend: Spend, prompt: str = PICK_PROMPT
+    school: School,
+    read: list[PageRead],
+    links: list[tuple[str, str]],
+    spend: Spend,
+    prompt: str = PICK_PROMPT,
+    stage: str = STAGE,
 ) -> list[str]:
     if not spend.allows(PICK_COST_ESTIMATE_USD):
         raise SpendCapReached(f"spent ${spend.spent_usd:.4f} of ${spend.cap_usd}")
@@ -206,7 +211,7 @@ async def _pick(
         lambda: agent.run(f"Institution: {name}\n\nRead so far:\n{pages}\n\nLinks:\n{shown}"),
         model=get_model("cheap"),
         school_id=school.id,
-        stage=STAGE,
+        stage=stage,
         timeout_seconds=60,
     )
     spend.spent_usd += extract_provider_cost_usd(result)
@@ -223,10 +228,11 @@ async def find_pages(
     *,
     pick_prompt: str = PICK_PROMPT,
     fallback_links: re.Pattern = _FEE_LINK_RE,
+    stage: str = STAGE,
 ) -> list[PageRead]:
     """Up to 3 hops and 12 pages from the home page; robots.txt is respected.
 
-    The school-facts stage passes its own link prompt and fallback keywords."""
+    The school-facts stage passes its own link prompt, fallback keywords and stage name."""
     from crawl4ai.utils import RobotsParser  # type: ignore
 
     robots = RobotsParser()
@@ -273,7 +279,7 @@ async def find_pages(
         if not unopened:
             break
         try:
-            queue = await _pick(school, read, unopened, spend, pick_prompt)
+            queue = await _pick(school, read, unopened, spend, pick_prompt, stage)
         except (SpendCapReached, ProviderCostError):  # a cap, or a run no longer running
             raise
         except Exception as exc:  # a timed-out pick (541) falls back to the keyword links below

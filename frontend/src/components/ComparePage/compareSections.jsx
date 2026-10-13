@@ -704,10 +704,12 @@ export function buildCompareSections({
     ]
 
     // One row per topic any compared school has a fact for; facts link their page.
+    const factsBySchool = new Map(schools.map(school => [school.id, getSchoolFacts(school, language)]))
+    const topicFacts = (school, topic) => (factsBySchool.get(school.id) || []).filter(fact => fact.topic === topic)
     const factRows = factTopicsIn(schools, language).map(topic => ({
       label: t(`schoolFacts.topics.${topic}`),
       getValue: (school) => {
-        const facts = getSchoolFacts(school, language).filter(fact => fact.topic === topic)
+        const facts = topicFacts(school, topic)
         return facts.length > 0 ? (
           <ul className="space-y-1">
             {facts.map((fact, index) => (
@@ -721,7 +723,7 @@ export function buildCompareSections({
           </ul>
         ) : renderPlaceholder()
       },
-      getCompare: (school) => getSchoolFacts(school, language).filter(fact => fact.topic === topic).map(fact => fact.text).join('|') || null,
+      getCompare: (school) => topicFacts(school, topic).map(fact => fact.text).join('|') || null,
     }))
 
     return [

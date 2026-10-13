@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from typing import Any, Optional
+from urllib.parse import urlparse
 
 SCHEMA_VERSION = 1
 ATTRIBUTE_KEY = "school_facts"
@@ -29,10 +30,20 @@ TOPICS = (
 )
 
 
-def publishable_school_facts(attributes: Any) -> Optional[dict[str, Any]]:
-    """``{"read_at", "facts": [{"topic", "text_i18n", "source_url"}]}``, or None when none can show."""
+def _host(url: Any) -> str:
+    host = (urlparse(url).hostname or "") if isinstance(url, str) else ""
+    return host.lower().removeprefix("www.")
+
+
+def publishable_school_facts(attributes: Any, website_url: Optional[str]) -> Optional[dict[str, Any]]:
+    """``{"read_at", "facts": [{"topic", "text_i18n", "source_url"}]}``, or None when none can show.
+
+    Facts show only while ``website_url`` is still the site they were read from: a school
+    whose site was found wrong, replaced or removed stops showing them until it is re-read."""
     block = attributes.get(ATTRIBUTE_KEY) if isinstance(attributes, Mapping) else None
     if not isinstance(block, Mapping) or block.get("_schema_version") != SCHEMA_VERSION:
+        return None
+    if not _host(website_url) or _host(block.get("website_url")) != _host(website_url):
         return None
     facts = []
     for fact in block.get("facts") or []:
