@@ -1,0 +1,14 @@
+{
+ "school_id": 513,
+ "website_url": "https://www.ecomalchovci.com/",
+ "pages_read": [
+  "https://www.ecomalchovci.com/"
+ ],
+ "fetch_failed": [
+  "https://ecomalchovci.com/ceni.php"
+ ],
+ "blocked": false,
+ "site_states_no_fees": true,
+ "site_fees": [],
+ "notes": "Single-page site, and its only internal link is lichnidanni.php (privacy). It lists no fees or prices. It mentions extracurricular activities (mental math, football, gymnastics, yoga, dance) without prices. A guessed URL, ceni.php, failed. 'site_states_no_fees' here means no fees are published; the site does not explicitly say fees are withheld."
+}

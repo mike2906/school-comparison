@@ -144,6 +144,10 @@ it comes after steps 1 to 5 prove the runs are reliable.
    rule-based ones. Then run the agent on Sofia into the launch DB, compare the scoreboard
    and `accuracy_report.py` before and after, and publish with a backup and before/after
    counts.
+   Ran 2026-10-13 (`docs/accuracy/step3_check.md`): **no-go**. Wrong 12 % after every gate
+   against 14 % today (the agent's own rows 2 %), but only 15 % of site fees found: the
+   replacement hold blocked 8 of 13 schools and the finder reached no fee page at 4. With nothing
+   held the agent finds 42 %. Next step waits on Mike.
 4. **Delete the unused extraction code** that step 3 leaves behind (`extraction/price_*.py`,
    `fee_lines.py` and whatever only they import). Validation's `price_evidence.py`,
    `price_carry_over.py`, `fee_pages.py` and `fee_image_reader.py` stay unless nothing uses

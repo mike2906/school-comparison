@@ -1,0 +1,18 @@
+{
+ "apply": true,
+ "pipeline_run_id": "1650f4fa-d3eb-4d65-abc6-98864ce4646a",
+ "schools": 1,
+ "spent_usd": 0.0,
+ "stopped": null,
+ "kept_old_rows": [],
+ "outcomes": {
+  "error": 1
+ },
+ "results": [
+  {
+   "school_id": 541,
+   "outcome": "error",
+   "reason": ""
+  }
+ ]
+}

@@ -1,0 +1,80 @@
+{
+ "apply": true,
+ "pipeline_run_id": "f06b4e01-b318-4b4a-9ac9-4b61389bc035",
+ "schools": 1,
+ "spent_usd": 0.001414,
+ "stopped": null,
+ "kept_old_rows": [
+  583
+ ],
+ "outcomes": {
+  "kept_old_rows": 1
+ },
+ "results": [
+  {
+   "school_id": 583,
+   "outcome": "kept_old_rows",
+   "pages": [
+    {
+     "url": "https://e-kestner.eu/",
+     "chars": 22067,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://e-kestner.eu/uchebni-taksi/",
+     "chars": 14844,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://e-kestner.eu/uchebni-taksi-uchilishte/",
+     "chars": 16783,
+     "prices": true,
+     "note": null
+    },
+    {
+     "url": "https://e-kestner.eu/uchebni-taksi-gimnaziq/",
+     "chars": 0,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://e-kestner.eu/priem/",
+     "chars": 0,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://e-kestner.eu/dokumenti/",
+     "chars": 0,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://e-kestner.eu/dokumenti-uchilisthe/",
+     "chars": 0,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://e-kestner.eu/dokumenti-gimnaziya/",
+     "chars": 0,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://e-kestner.eu/chesto-zadavani-vaprosi/",
+     "chars": 24084,
+     "prices": false,
+     "note": null
+    }
+   ],
+   "fees": [],
+   "rows_new": 0,
+   "rows_new_publishable": 0,
+   "rows_old_published": 0,
+   "reason": "nothing publishable read"
+  }
+ ]
+}

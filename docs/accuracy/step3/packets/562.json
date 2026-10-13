@@ -1,0 +1,65 @@
+{
+ "school_id": 562,
+ "candidates": [
+  {
+   "oid": "o1",
+   "category": "tuition",
+   "amount": 8965.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "Таксата за следващата учебна година",
+   "year": "2026/2027",
+   "url": "https://ivanapostolov.bg/taksi/"
+  },
+  {
+   "oid": "o2",
+   "category": "registration",
+   "amount": 75.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "такса",
+   "year": null,
+   "url": "https://ivanapostolov.bg/admissions-upper-grades/"
+  },
+  {
+   "oid": "o3",
+   "category": "tuition",
+   "amount": 8965.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": null,
+   "year": "2026/2027",
+   "url": "https://ivanapostolov.bg/taksi/"
+  },
+  {
+   "oid": "o4",
+   "category": "registration",
+   "amount": 75.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "Таксата за явяване на изпит",
+   "year": "2026/2027",
+   "url": "https://ivanapostolov.bg/admission/"
+  },
+  {
+   "oid": "o5",
+   "category": "registration",
+   "amount": 75.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "label": null,
+   "year": "2026/2027",
+   "url": "https://ivanapostolov.bg/admission/"
+  }
+ ]
+}

@@ -1,0 +1,87 @@
+{
+ "school_id": 608,
+ "website_url": "https://bg.maarifschools.org/page/detska-gradina",
+ "pages_read": [
+  "https://bg.maarifschools.org/",
+  "https://bg.maarifschools.org/page/okul-ucretleri",
+  "https://bg.maarifschools.org/page/anaokulu"
+ ],
+ "fetch_failed": [
+  "https://bg.maarifschools.org/page/detska-gradina"
+ ],
+ "blocked": false,
+ "site_states_no_fees": false,
+ "site_fees": [
+  {
+   "fid": "f1",
+   "category": "tuition",
+   "amount": 6650.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": null,
+   "plan": "Yıllık Eğitim Ücreti",
+   "year": null,
+   "url": "https://bg.maarifschools.org/page/okul-ucretleri",
+   "quote": "Yıllık Eğitim Ücreti*: 13.006,27 BGN/6.650,00 €"
+  },
+  {
+   "fid": "f2",
+   "category": "tuition",
+   "amount": 738.89,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": null,
+   "plan": "Aylık Eğitim Ücreti",
+   "year": null,
+   "url": "https://bg.maarifschools.org/page/okul-ucretleri",
+   "quote": "Aylık Eğitim Ücreti: 1.445,11 BGN/738,89 €"
+  },
+  {
+   "fid": "f3",
+   "category": "registration",
+   "amount": 150.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "group": null,
+   "plan": null,
+   "year": null,
+   "url": "https://bg.maarifschools.org/page/okul-ucretleri",
+   "quote": "Kayıt Ücreti**: 293,37BGN/150,00 €"
+  },
+  {
+   "fid": "f4",
+   "category": "food",
+   "amount": 150.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": null,
+   "plan": null,
+   "year": null,
+   "url": "https://bg.maarifschools.org/page/okul-ucretleri",
+   "quote": "Yemek Ücreti***: 293,37BGN****/ 150,00 €"
+  },
+  {
+   "fid": "f5",
+   "category": "uniforms",
+   "amount": 100.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "group": null,
+   "plan": null,
+   "year": null,
+   "url": "https://bg.maarifschools.org/page/okul-ucretleri",
+   "quote": "Forma Ücreti : 195,58BGN/ 100,00 €"
+  }
+ ],
+ "notes": "The given URL /page/detska-gradina failed 3 times (server error); used Turkish pages. The domain hosts Maarif International Education Bulgaria, Sofia Maarif Egitim Merkezi and Maarif Özel Anaokulu Sofya. The single fee page 'Okul Ücretleri' (linked as 'Eğitim Ücretleri' from the kindergarten page /page/anaokulu) is not tied to a specific school; included as the kindergarten's fees but attribution is uncertain. Amounts printed in BGN and EUR; EUR recorded. No academic year stated. Footnotes: * 5% discount if annual fee paid up front; ** registration paid once at first enrolment; *** meal fee is an annual fee, three meals a day. Discounts: 10% per sibling, 5-10% early registration (no periods given). Page has an image widget that could not be read."
+}

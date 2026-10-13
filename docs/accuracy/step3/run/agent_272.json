@@ -1,0 +1,71 @@
+{
+ "apply": true,
+ "pipeline_run_id": "f4abbba1-1a19-45a9-aeb6-2d6d8645fbab",
+ "schools": 1,
+ "spent_usd": 0.000351,
+ "stopped": null,
+ "kept_old_rows": [
+  272
+ ],
+ "outcomes": {
+  "kept_old_rows": 1
+ },
+ "results": [
+  {
+   "school_id": 272,
+   "outcome": "kept_old_rows",
+   "pages": [
+    {
+     "url": "https://pateta.bg/",
+     "chars": 10696,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://pateta.bg/finansovi-usloviya/",
+     "chars": 5574,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://pateta.bg/hranene/",
+     "chars": 6122,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://pateta.bg/vrazka-s-roditeli/",
+     "chars": 5705,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://pateta.bg/obsthi-usloviya/",
+     "chars": 4891,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://pateta.bg/contact/",
+     "chars": 5603,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://pateta.bg/en/financial-conditions/",
+     "chars": 4952,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://pateta.bg/ru/finansy/",
+     "chars": 4896,
+     "prices": false,
+     "note": null
+    }
+   ],
+   "fees": [],
+   "reason": "no page showing prices"
+  }
+ ]
+}

@@ -1,0 +1,106 @@
+{
+ "seed": 20261014,
+ "left": 44,
+ "schools": [
+  {
+   "school_id": 272,
+   "name": "\"ЧАСТНА ДЕТСКА ГРАДИНА ПАТЕТА\" ЕООД",
+   "website_url": "https://pateta.bg/"
+  },
+  {
+   "school_id": 300,
+   "name": "\"Частно средно училище с ранно чуждоезиково обучение ЕСПА\" ЕООД",
+   "website_url": "https://espa.bg/"
+  },
+  {
+   "school_id": 330,
+   "name": "\"Частна детска градина \"Къщата на Алиса и приятели\" ООД",
+   "website_url": "http://www.alisahouse.org/"
+  },
+  {
+   "school_id": 505,
+   "name": "Френско училище \"Виктор Юго\" в София",
+   "website_url": "https://vhugo.org/"
+  },
+  {
+   "school_id": 513,
+   "name": "\"ЧАСТНА ДЕТСКА ГРАДИНА ЕКОМАЛЧОВЦИ\" ООД",
+   "website_url": "https://www.ecomalchovci.com/"
+  },
+  {
+   "school_id": 514,
+   "name": "\"Частна детска градина \"Професор Николай Райнов\" ЕООД",
+   "website_url": "https://www.waldorf.bg/"
+  },
+  {
+   "school_id": 533,
+   "name": "\"ЧАСТНО ОСНОВНО УЧИЛИЩЕ ПРОГРЕСИВНО ОБРАЗОВАНИЕ 3 - СОФИЯ\" ЕООД",
+   "website_url": "https://school3.transform.bg/"
+  },
+  {
+   "school_id": 535,
+   "name": "\"Частно средно училище Орфей\" ООД",
+   "website_url": "https://www.orfei.net/"
+  },
+  {
+   "school_id": 541,
+   "name": "\"Частна детска градина АВСландия\" ООД",
+   "website_url": "https://abckinder.org/"
+  },
+  {
+   "school_id": 552,
+   "name": "\"ЧАСТНА ПРОФИЛИРАНА ГИМНАЗИЯ С ЧУЖДОЕЗИКОВО ОБУЧЕНИЕ МЕРИДИАН 22\" ЕООД",
+   "website_url": "https://meridian22.org/"
+  },
+  {
+   "school_id": 562,
+   "name": "\"ЧАСТНА ЕЗИКОВА ГИМНАЗИЯ ПРОФ. ИВАН АПОСТОЛОВ\" ООД",
+   "website_url": "https://ivanapostolov.bg/"
+  },
+  {
+   "school_id": 564,
+   "name": "\"ЧАСТНО СРЕДНО УЧИЛИЩЕ ПИТАГОР\" ООД",
+   "website_url": "https://pitagor-school.eu/"
+  },
+  {
+   "school_id": 573,
+   "name": "ФОНДАЦИЯ \"ЧАСТНО СРЕДНО УЧИЛИЩЕ \"РОНАЛД ЛАУДЕР\"",
+   "website_url": "https://lauderschool.bg/"
+  },
+  {
+   "school_id": 583,
+   "name": "\"Частна немска гимназия Ерих Кестнер\" ООД",
+   "website_url": "https://e-kestner.eu/"
+  },
+  {
+   "school_id": 588,
+   "name": "\"Частна детска градина Слънчеви приказки\" ООД",
+   "website_url": "https://sluncheviprikazki.com/"
+  },
+  {
+   "school_id": 593,
+   "name": "\"Частно средно училище \"Наука за деца\" ЕООД",
+   "website_url": "https://izzi.academy/"
+  },
+  {
+   "school_id": 606,
+   "name": "\"ЧАСТНА ПРОФИЛИРАНА ГИМНАЗИЯ \"ПРОГРЕСИВНО ОБРАЗОВАНИЕ - СОФИЯ\" ЕООД",
+   "website_url": "https://highschool1.transform.bg/"
+  },
+  {
+   "school_id": 608,
+   "name": "\"ЧАСТНА ДЕТСКА ГРАДИНА МААРИФ СОФИЯ\" ЕООД",
+   "website_url": "https://bg.maarifschools.org/page/detska-gradina"
+  },
+  {
+   "school_id": 609,
+   "name": "\"Частно начално училище Луис Карол - гр. София\" ЕООД",
+   "website_url": "https://luiskarol.com/"
+  },
+  {
+   "school_id": 623,
+   "name": "\"ЧАСТНО СРЕДНО УЧИЛИЩЕ С ЧУЖДОЕЗИКОВ ПРОФИЛ \"АБРАХАМ ЛИНКЪЛН\" ЕООД",
+   "website_url": "https://www.lincolnsofia.com/"
+  }
+ ]
+}

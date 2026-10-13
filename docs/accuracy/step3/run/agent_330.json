@@ -1,0 +1,115 @@
+{
+ "apply": true,
+ "pipeline_run_id": "63a0cd95-6440-4040-acfd-e0c56a818fde",
+ "schools": 1,
+ "spent_usd": 0.003863,
+ "stopped": null,
+ "kept_old_rows": [],
+ "outcomes": {
+  "held": 1
+ },
+ "results": [
+  {
+   "school_id": 330,
+   "outcome": "held",
+   "pages": [
+    {
+     "url": "http://www.alisahouse.org/",
+     "chars": 12651,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://alisahouse.org/%d1%86%d0%b5%d0%bd%d0%b8/",
+     "chars": 10161,
+     "prices": true,
+     "note": null
+    },
+    {
+     "url": "https://alisahouse.org/%d0%be%d1%82%d0%b7%d0%b8%d0%b2%d0%b8-%d0%b7%d0%b0-%d0%b3%d1%80%d0%b0%d0%b4%d0%b8%d0%bd%d0%b0%d1%82%d0%b0/",
+     "chars": 12245,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://alisahouse.org/%d0%b7%d0%b0-%d0%bd%d0%b0%d1%81/%d0%be%d1%82%d1%87%d0%b5%d1%82%d0%b8/",
+     "chars": 9557,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://alisahouse.org/%d0%bf%d1%80%d0%b8%d0%b5%d0%bc-%d0%b8-%d0%b7%d0%b0%d0%bf%d0%b8%d1%81%d0%b2%d0%b0%d0%bd%d0%b8%d1%8f/",
+     "chars": 9791,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "http://alisahouse.org/sklyuchen-dogovor-finansova-pomosht/",
+     "chars": 9696,
+     "prices": true,
+     "note": null
+    },
+    {
+     "url": "https://alisahouse.org/%d0%b7%d0%b0-%d0%bd%d0%b0%d1%81/%d1%83%d1%87%d0%b5%d0%b1%d0%bd%d0%b8-%d0%bf%d1%80%d0%b5%d0%b4%d0%bc%d0%b5%d1%82%d0%b8/",
+     "chars": 10306,
+     "prices": false,
+     "note": null
+    }
+   ],
+   "fees": [
+    {
+     "category": "tuition",
+     "amount": 400.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "monthly",
+     "label": "Ежемесечна такса",
+     "academic_year": null,
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://alisahouse.org/%d1%86%d0%b5%d0%bd%d0%b8/",
+     "evidence": "**А. ПЪРВИ ВАРИАНТ**\n**ВРЕМЕ НА ПОСЕЩЕНИЕ:** 8:00 – 13 часа\n**Ежемесечна такса:  \n**782,33 лв. / 400 € / платима до 15 число на предидущия месец"
+    },
+    {
+     "category": "tuition",
+     "amount": 460.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "monthly",
+     "label": "Ежемесечна такса",
+     "academic_year": null,
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://alisahouse.org/%d1%86%d0%b5%d0%bd%d0%b8/",
+     "evidence": "**Б. ВТОРИ ВАРИАНТ**\n**ВРЕМЕ НА ПОСЕЩЕНИЕ:** 8:00 – 15.00 часа\n**Ежемесечна такса:  \n**899.68 лв. / 460 € / платима до 15 число на предидущия месец"
+    },
+    {
+     "category": "tuition",
+     "amount": 510.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "monthly",
+     "label": "Ежемесечна такса",
+     "academic_year": null,
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://alisahouse.org/%d1%86%d0%b5%d0%bd%d0%b8/",
+     "evidence": "**В. ТРЕТИ ВАРИАНТ**\n**ВРЕМЕ НА ПОСЕЩЕНИЕ:** 8:00 – 18.00 часа\n**Ежемесечна такса:  \n**997,47 лв. / 510 € / платима до 15 число на предидущия месец"
+    }
+   ],
+   "rows_new": 3,
+   "rows_new_publishable": 3,
+   "rows_old_published": 2,
+   "regressions": [
+    "drops TUITION 899.68, which the page still shows",
+    "drops TUITION 782.33, which the page still shows"
+   ]
+  }
+ ]
+}

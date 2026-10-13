@@ -1,0 +1,173 @@
+{
+ "school_id": 609,
+ "candidates": [
+  {
+   "oid": "o1",
+   "category": "registration",
+   "amount": 30.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "Явяването на детето на обследването",
+   "year": "2026/2027",
+   "url": "https://luiskarol.com/priem-v-podgotvitelna-grupa/"
+  },
+  {
+   "oid": "o2",
+   "category": "registration",
+   "amount": 30.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "Явяването на детето на изпита",
+   "year": "2026/2027",
+   "url": "https://luiskarol.com/priem-v-parvi-klas/"
+  },
+  {
+   "oid": "o3",
+   "category": "camp",
+   "amount": 500.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "Цена за 4 седмици с включена храна /обяд, следобедна закуска, плод/",
+   "year": null,
+   "url": "https://luiskarol.com/chastno-uchilishte-%d0%b8%d0%b7%d0%b2%d1%8a%d0%bd%d0%ba%d0%bb%d0%b0%d1%81%d0%bd%d0%b8-%d0%b4%d0%b5%d0%b9%d0%bd%d0%be%d1%81%d1%82%d0%b8-lyatno-uchilishte/"
+  },
+  {
+   "oid": "o4",
+   "category": "registration",
+   "amount": 250.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "label": "еднократна такса записване",
+   "year": "2026/2027",
+   "url": "https://luiskarol.com/priem-v-parvi-klas/"
+  },
+  {
+   "oid": "o5",
+   "category": "camp",
+   "amount": 270.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "Цена за 2 седмици с включена храна/обяд,следобедна закуска, плод/",
+   "year": null,
+   "url": "https://luiskarol.com/chastno-uchilishte-%d0%b8%d0%b7%d0%b2%d1%8a%d0%bd%d0%ba%d0%bb%d0%b0%d1%81%d0%bd%d0%b8-%d0%b4%d0%b5%d0%b9%d0%bd%d0%be%d1%81%d1%82%d0%b8-lyatno-uchilishte/"
+  },
+  {
+   "oid": "o6",
+   "category": "camp",
+   "amount": 140.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "Цена за 1 седмица с включена храна/обяд, следобедна закуска, плод/",
+   "year": null,
+   "url": "https://luiskarol.com/chastno-uchilishte-%d0%b8%d0%b7%d0%b2%d1%8a%d0%bd%d0%ba%d0%bb%d0%b0%d1%81%d0%bd%d0%b8-%d0%b4%d0%b5%d0%b9%d0%bd%d0%be%d1%81%d1%82%d0%b8-lyatno-uchilishte/"
+  },
+  {
+   "oid": "o7",
+   "category": "materials",
+   "amount": 74.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "комплектът учебници",
+   "year": "2026/2027",
+   "url": "https://luiskarol.com/priem-za-5-klas/"
+  },
+  {
+   "oid": "o8",
+   "category": "registration",
+   "amount": 250.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "label": "еднократна такса записване",
+   "year": "2026/2027",
+   "url": "https://luiskarol.com/priem-v-podgotvitelna-grupa/"
+  },
+  {
+   "oid": "o9",
+   "category": "extracurricular",
+   "amount": 200.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "preschool / Готови за първи клас",
+   "year": "2026/2027",
+   "url": "https://luiskarol.com/priem-v-parvi-klas/"
+  },
+  {
+   "oid": "o10",
+   "category": "camp",
+   "amount": 35.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "Цена за 1 ден с включен/обяд, следобедна закуска, плод/",
+   "year": null,
+   "url": "https://luiskarol.com/chastno-uchilishte-%d0%b8%d0%b7%d0%b2%d1%8a%d0%bd%d0%ba%d0%bb%d0%b0%d1%81%d0%bd%d0%b8-%d0%b4%d0%b5%d0%b9%d0%bd%d0%be%d1%81%d1%82%d0%b8-lyatno-uchilishte/"
+  },
+  {
+   "oid": "o11",
+   "category": "camp",
+   "amount": 390.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "Цена за 3 седмици с включена храна/обяд, следобедна закуска, плод/",
+   "year": null,
+   "url": "https://luiskarol.com/chastno-uchilishte-%d0%b8%d0%b7%d0%b2%d1%8a%d0%bd%d0%ba%d0%bb%d0%b0%d1%81%d0%bd%d0%b8-%d0%b4%d0%b5%d0%b9%d0%bd%d0%be%d1%81%d1%82%d0%b8-lyatno-uchilishte/"
+  },
+  {
+   "oid": "o12",
+   "category": "materials",
+   "amount": 74.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "комплектът учебници",
+   "year": "2026/2027",
+   "url": "https://luiskarol.com/priem-za-5-klas-2/"
+  },
+  {
+   "oid": "o13",
+   "category": "materials",
+   "amount": 144.73,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "BGN",
+   "period": "yearly",
+   "label": "2026/2027",
+   "year": "2026/2027",
+   "url": "https://luiskarol.com/priem-za-5-klas/"
+  },
+  {
+   "oid": "o14",
+   "category": "camp",
+   "amount": 200.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "Цена на курса",
+   "year": "2026/2027",
+   "url": "https://luiskarol.com/priem-v-parvi-klas/"
+  }
+ ]
+}

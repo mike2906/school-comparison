@@ -1,0 +1,307 @@
+{
+ "school_id": 609,
+ "pages_read": [
+  "https://luiskarol.com/priem-v-parvi-klas/",
+  "https://luiskarol.com/priem-v-podgotvitelna-grupa/",
+  "https://luiskarol.com/priem-za-5-klas/",
+  "https://luiskarol.com/wp-json/wp/v2/pages?slug=priem-za-5-klas-2",
+  "https://luiskarol.com/wp-json/wp/v2/pages?slug=chastno-uchilishte-%d0%b8%d0%b7%d0%b2%d1%8a%d0%bd%d0%ba%d0%bb%d0%b0%d1%81%d0%bd%d0%b8-%d0%b4%d0%b5%d0%b9%d0%bd%d0%be%d1%81%d1%82%d0%b8-lyatno-uchilishte",
+  "https://luiskarol.com/wp-admin/admin-ajax.php?action=wp_ajax_ninja_tables_public_action&table_id=211&target_action=get-all-data&default_sorting=old_first"
+ ],
+ "fetch_failed": [
+  "https://luiskarol.com/priem-za-5-klas-2/",
+  "https://luiskarol.com/chastno-uchilishte-%d0%b8%d0%b7%d0%b2%d1%8a%d0%bd%d0%ba%d0%bb%d0%b0%d1%81%d0%bd%d0%b8-%d0%b4%d0%b5%d0%b9%d0%bd%d0%be%d1%81%d1%82%d0%b8-lyatno-uchilishte/"
+ ],
+ "site_states_no_fees": false,
+ "site_fees": [
+  {
+   "fid": "f1",
+   "category": "registration",
+   "amount": 30,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "group": "подготвителна група",
+   "plan": null,
+   "year": "2026/2027",
+   "url": "https://luiskarol.com/priem-v-podgotvitelna-grupa/",
+   "quote": "Явяването на детето на обследването се заплаща 30 €/ 58,67 лв."
+  },
+  {
+   "fid": "f2",
+   "category": "registration",
+   "amount": 250,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "group": "подготвителна група",
+   "plan": null,
+   "year": "2026/2027",
+   "url": "https://luiskarol.com/priem-v-podgotvitelna-grupa/",
+   "quote": "се заплаща еднократна такса записване, представляваща двустранна гаранция, в размер на 250€/488,96 лв."
+  },
+  {
+   "fid": "f3",
+   "category": "registration",
+   "amount": 30,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "group": "първи клас",
+   "plan": null,
+   "year": "2026/2027",
+   "url": "https://luiskarol.com/priem-v-parvi-klas/",
+   "quote": "Явяването на детето на изпита се заплаща 30 €/ 58,76 лв."
+  },
+  {
+   "fid": "f4",
+   "category": "registration",
+   "amount": 250,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "group": "първи клас",
+   "plan": null,
+   "year": "2026/2027",
+   "url": "https://luiskarol.com/priem-v-parvi-klas/",
+   "quote": "се заплаща еднократна такса записване, представляваща двустранна гаранция, в размер на 250 €/ 488,96 лв."
+  },
+  {
+   "fid": "f5",
+   "category": "camp",
+   "amount": 200,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "group": "първи клас (новоприети)",
+   "plan": "двуседмичен интензивен летен курс по английски език",
+   "year": "2026/2027",
+   "url": "https://luiskarol.com/priem-v-parvi-klas/",
+   "quote": "Цена на курса: 200 €/391,17 лв., с осигурен обяд и следобедна закуска."
+  },
+  {
+   "fid": "f6",
+   "category": "tuition",
+   "amount": 2400,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "BGN",
+   "period": "yearly",
+   "group": "5-ти клас външни ученици",
+   "plan": "Годишна такса – Английски език",
+   "year": "2023/2024",
+   "url": "https://luiskarol.com/priem-za-5-klas/",
+   "quote": "Годишна такса – Английски език за учебната 2023/2024 г. – 2400 лв. или 10 вноски по 240 лв."
+  },
+  {
+   "fid": "f7",
+   "category": "tuition",
+   "amount": 240,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "BGN",
+   "period": null,
+   "group": "5-ти клас външни ученици",
+   "plan": "10 вноски",
+   "year": "2023/2024",
+   "url": "https://luiskarol.com/priem-za-5-klas/",
+   "quote": "Годишна такса – Английски език за учебната 2023/2024 г. – 2400 лв. или 10 вноски по 240 лв."
+  },
+  {
+   "fid": "f9",
+   "category": "camp",
+   "amount": 500,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "group": null,
+   "plan": "Цена за 4 седмици",
+   "year": "2026 (01.06.2026-24.07.2026)",
+   "url": "https://luiskarol.com/chastno-uchilishte-%d0%b8%d0%b7%d0%b2%d1%8a%d0%bd%d0%ba%d0%bb%d0%b0%d1%81%d0%bd%d0%b8-%d0%b4%d0%b5%d0%b9%d0%bd%d0%be%d1%81%d1%82%d0%b8-lyatno-uchilishte/",
+   "quote": "Цена за 4 седмици с включена храна ... 500 € / 977,92 лв.",
+   "changed": "ЛЯТНО УЧИЛИЩЕ 2026 price table (Ninja Table 211, loaded via admin-ajax) missed by key"
+  },
+  {
+   "fid": "f10",
+   "category": "camp",
+   "amount": 390,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "group": null,
+   "plan": "Цена за 3 седмици",
+   "year": "2026 (01.06.2026-24.07.2026)",
+   "url": "https://luiskarol.com/chastno-uchilishte-%d0%b8%d0%b7%d0%b2%d1%8a%d0%bd%d0%ba%d0%bb%d0%b0%d1%81%d0%bd%d0%b8-%d0%b4%d0%b5%d0%b9%d0%bd%d0%be%d1%81%d1%82%d0%b8-lyatno-uchilishte/",
+   "quote": "Цена за 3 седмици с включена храна ... 390 € / 762,77 лв.",
+   "changed": "ЛЯТНО УЧИЛИЩЕ 2026 price table (Ninja Table 211, loaded via admin-ajax) missed by key"
+  },
+  {
+   "fid": "f11",
+   "category": "camp",
+   "amount": 270,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "group": null,
+   "plan": "Цена за 2 седмици",
+   "year": "2026 (01.06.2026-24.07.2026)",
+   "url": "https://luiskarol.com/chastno-uchilishte-%d0%b8%d0%b7%d0%b2%d1%8a%d0%bd%d0%ba%d0%bb%d0%b0%d1%81%d0%bd%d0%b8-%d0%b4%d0%b5%d0%b9%d0%bd%d0%be%d1%81%d1%82%d0%b8-lyatno-uchilishte/",
+   "quote": "Цена за 2 седмици с включена храна ... 270 € / 528,07 лв.",
+   "changed": "ЛЯТНО УЧИЛИЩЕ 2026 price table (Ninja Table 211, loaded via admin-ajax) missed by key"
+  },
+  {
+   "fid": "f12",
+   "category": "camp",
+   "amount": 140,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "group": null,
+   "plan": "Цена за 1 седмица",
+   "year": "2026 (01.06.2026-24.07.2026)",
+   "url": "https://luiskarol.com/chastno-uchilishte-%d0%b8%d0%b7%d0%b2%d1%8a%d0%bd%d0%ba%d0%bb%d0%b0%d1%81%d0%bd%d0%b8-%d0%b4%d0%b5%d0%b9%d0%bd%d0%be%d1%81%d1%82%d0%b8-lyatno-uchilishte/",
+   "quote": "Цена за 1 седмица с включена храна ... 140 € / 273,82 лв.",
+   "changed": "ЛЯТНО УЧИЛИЩЕ 2026 price table (Ninja Table 211, loaded via admin-ajax) missed by key"
+  },
+  {
+   "fid": "f13",
+   "category": "camp",
+   "amount": 35,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "group": null,
+   "plan": "Цена за 1 ден",
+   "year": "2026 (01.06.2026-24.07.2026)",
+   "url": "https://luiskarol.com/chastno-uchilishte-%d0%b8%d0%b7%d0%b2%d1%8a%d0%bd%d0%ba%d0%bb%d0%b0%d1%81%d0%bd%d0%b8-%d0%b4%d0%b5%d0%b9%d0%bd%d0%be%d1%81%d1%82%d0%b8-lyatno-uchilishte/",
+   "quote": "Цена за 1 ден с включена храна ... 35 € / 68,45 лв.",
+   "changed": "ЛЯТНО УЧИЛИЩЕ 2026 price table (Ninja Table 211, loaded via admin-ajax) missed by key"
+  },
+  {
+   "fid": "f14",
+   "category": "materials",
+   "amount": 74,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "group": "5. клас настоящи ученици",
+   "plan": null,
+   "year": "2026/2027",
+   "url": "https://luiskarol.com/priem-za-5-klas-2/",
+   "quote": "При подписване на договор се заплаща комплект учебница за учебната 2026/2027 г. Цена: приблизително 74 €.",
+   "changed": "page failed for key; read via WP REST API"
+  }
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "verdict": "missing_period",
+   "fid": "f1",
+   "reason": "30 EUR assessment fee, entry exam is one_time; row period null",
+   "group_unstated": false
+  },
+  {
+   "oid": "o2",
+   "verdict": "missing_period",
+   "fid": "f3",
+   "reason": "30 EUR 1st-grade exam fee, one_time; row period null",
+   "group_unstated": false
+  },
+  {
+   "oid": "o3",
+   "verdict": "correct",
+   "fid": "f9",
+   "reason": "summer school 4 weeks 500 EUR",
+   "group_unstated": true
+  },
+  {
+   "oid": "o4",
+   "verdict": "correct",
+   "fid": "f4",
+   "reason": "250 EUR one-time enrolment, 1st grade",
+   "group_unstated": false
+  },
+  {
+   "oid": "o5",
+   "verdict": "correct",
+   "fid": "f11",
+   "reason": "summer school 2 weeks 270 EUR",
+   "group_unstated": true
+  },
+  {
+   "oid": "o6",
+   "verdict": "correct",
+   "fid": "f12",
+   "reason": "summer school 1 week 140 EUR",
+   "group_unstated": true
+  },
+  {
+   "oid": "o7",
+   "verdict": "duplicate",
+   "fid": "f14",
+   "reason": "74 EUR textbooks 2026/27; o12 matches same fee with the right source page",
+   "group_unstated": true
+  },
+  {
+   "oid": "o8",
+   "verdict": "correct",
+   "fid": "f2",
+   "reason": "250 EUR one-time enrolment, preparatory group",
+   "group_unstated": false
+  },
+  {
+   "oid": "o9",
+   "verdict": "wrong_category",
+   "fid": "f5",
+   "reason": "200 EUR is the required 2-week summer course \"Готови за първи клас\" (camp); row also says extracurricular and yearly",
+   "group_unstated": false
+  },
+  {
+   "oid": "o10",
+   "verdict": "correct",
+   "fid": "f13",
+   "reason": "summer school 1 day 35 EUR",
+   "group_unstated": true
+  },
+  {
+   "oid": "o11",
+   "verdict": "correct",
+   "fid": "f10",
+   "reason": "summer school 3 weeks 390 EUR",
+   "group_unstated": true
+  },
+  {
+   "oid": "o12",
+   "verdict": "correct",
+   "fid": "f14",
+   "reason": "74 EUR textbook set 2026/27, current 5th-grade students",
+   "group_unstated": true
+  },
+  {
+   "oid": "o13",
+   "verdict": "wrong_period",
+   "fid": "f14",
+   "reason": "144.73 BGN = 74 EUR x 1.95583, but no frequency stated; row says yearly",
+   "group_unstated": true
+  },
+  {
+   "oid": "o14",
+   "verdict": "correct",
+   "fid": "f5",
+   "reason": "200 EUR course price, 1st grade 2026/27",
+   "group_unstated": true
+  }
+ ],
+ "notes": "Changes vs key: added summer school 2026 camp prices (f9-f13, period per 1 day/1-4 weeks -> null) and 2026/27 textbook set 74 EUR (f14, from priem-za-5-klas-2 via REST API). Dropped key f8 (2023/24 textbooks 120 лв) because materials are now stated for 2026/27. Kept 2023/24 tuition f6/f7 (no 2026/27 tuition stated). Exam fees 30 EUR treated one_time per rules (exam fee), so null-period rows are missing_period."
+}

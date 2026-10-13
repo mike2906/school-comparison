@@ -1,0 +1,132 @@
+{
+ "school_id": 609,
+ "website_url": "https://luiskarol.com/",
+ "pages_read": [
+  "https://luiskarol.com/",
+  "https://luiskarol.com/priem-v-podgotvitelna-grupa/",
+  "https://luiskarol.com/priem-v-parvi-klas/",
+  "https://luiskarol.com/priem-za-5-klas/",
+  "https://luiskarol.com/obuchenie-%d0%bf%d1%80%d0%be%d0%b3%d1%80%d0%b0%d0%bc%d0%b0-%d0%b8-%d0%b5%d1%82%d0%b0%d0%bf%d0%b8-%d0%bd%d0%b0-%d0%be%d0%b1%d1%83%d1%87%d0%b5%d0%bd%d0%b8%d0%b5-%d0%bf%d0%be-%d0%b0%d0%bd%d0%b3%d0%bb/"
+ ],
+ "fetch_failed": [
+  "https://luiskarol.com/priem-za-5-klas-2/",
+  "https://luiskarol.com/obuchenie-%d1%82%d0%b0%d0%ba%d1%81%d0%b8/"
+ ],
+ "blocked": false,
+ "site_states_no_fees": false,
+ "site_fees": [
+  {
+   "fid": "f1",
+   "category": "registration",
+   "amount": 30,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "group": "подготвителна група",
+   "plan": null,
+   "year": "2026/2027",
+   "url": "https://luiskarol.com/priem-v-podgotvitelna-grupa/",
+   "quote": "Явяването на детето на обследването се заплаща 30 €/ 58,67 лв."
+  },
+  {
+   "fid": "f2",
+   "category": "registration",
+   "amount": 250,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "group": "подготвителна група",
+   "plan": null,
+   "year": "2026/2027",
+   "url": "https://luiskarol.com/priem-v-podgotvitelna-grupa/",
+   "quote": "се заплаща еднократна такса записване, представляваща двустранна гаранция, в размер на 250€/488,96 лв."
+  },
+  {
+   "fid": "f3",
+   "category": "registration",
+   "amount": 30,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "group": "първи клас",
+   "plan": null,
+   "year": "2026/2027",
+   "url": "https://luiskarol.com/priem-v-parvi-klas/",
+   "quote": "Явяването на детето на изпита се заплаща 30 €/ 58,76 лв."
+  },
+  {
+   "fid": "f4",
+   "category": "registration",
+   "amount": 250,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "group": "първи клас",
+   "plan": null,
+   "year": "2026/2027",
+   "url": "https://luiskarol.com/priem-v-parvi-klas/",
+   "quote": "се заплаща еднократна такса записване, представляваща двустранна гаранция, в размер на 250 €/ 488,96 лв."
+  },
+  {
+   "fid": "f5",
+   "category": "camp",
+   "amount": 200,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "group": "първи клас (новоприети)",
+   "plan": "двуседмичен интензивен летен курс по английски език",
+   "year": "2026/2027",
+   "url": "https://luiskarol.com/priem-v-parvi-klas/",
+   "quote": "Цена на курса: 200 €/391,17 лв., с осигурен обяд и следобедна закуска."
+  },
+  {
+   "fid": "f6",
+   "category": "tuition",
+   "amount": 2400,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "BGN",
+   "period": "yearly",
+   "group": "5-ти клас външни ученици",
+   "plan": "Годишна такса – Английски език",
+   "year": "2023/2024",
+   "url": "https://luiskarol.com/priem-za-5-klas/",
+   "quote": "Годишна такса – Английски език за учебната 2023/2024 г. – 2400 лв. или 10 вноски по 240 лв."
+  },
+  {
+   "fid": "f7",
+   "category": "tuition",
+   "amount": 240,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "BGN",
+   "period": null,
+   "group": "5-ти клас външни ученици",
+   "plan": "10 вноски",
+   "year": "2023/2024",
+   "url": "https://luiskarol.com/priem-za-5-klas/",
+   "quote": "Годишна такса – Английски език за учебната 2023/2024 г. – 2400 лв. или 10 вноски по 240 лв."
+  },
+  {
+   "fid": "f8",
+   "category": "materials",
+   "amount": 120,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "BGN",
+   "period": null,
+   "group": "5-ти клас външни ученици",
+   "plan": null,
+   "year": "2023/2024",
+   "url": "https://luiskarol.com/priem-za-5-klas/",
+   "quote": "комплектът учебници за учебната 2023/2024 г. с приблизителна цена 120 лв."
+  }
+ ],
+ "notes": "Operator 'Дружество Луис Карол' (foreign-language teaching in partner state schools). No main tuition schedule for 2026/27 published. Entrance exam/assessment and enrolment fees are given in EUR and BGN (EUR recorded); BGN conversions differ between pages (58,67 vs 58,76). Summer course (f5) is a required 2-week intensive English course for newly admitted 1st-graders, payable by 30.06.2026; filed as camp. The 5th-grade external page is for 2023/2024: its tuition (2400 лв or 10 x 240 лв, count of payments -> period null) and textbooks (~120 лв, approximate) kept since no 2026/27 tuition/materials stated; its registration 400 лв and British Council A2 FLYERS exam fee 159 лв were left out because registration is stated for 2026/27. 'priem-za-5-klas-2' (current students) failed to fetch (3 attempts). 'обучение такси' menu item is taxi-driver training, not fees. Programme .docx files not read."
+}

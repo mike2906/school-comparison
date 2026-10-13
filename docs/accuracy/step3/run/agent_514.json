@@ -1,0 +1,170 @@
+{
+ "apply": true,
+ "pipeline_run_id": "dda07846-aedb-4360-b437-7a92a49c85ec",
+ "schools": 1,
+ "spent_usd": 0.001877,
+ "stopped": null,
+ "kept_old_rows": [],
+ "outcomes": {
+  "held": 1
+ },
+ "results": [
+  {
+   "school_id": 514,
+   "outcome": "held",
+   "pages": [
+    {
+     "url": "https://www.waldorf.bg/",
+     "chars": 27240,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://www.waldorf.bg/admission/",
+     "chars": 13416,
+     "prices": true,
+     "note": null
+    },
+    {
+     "url": "https://www.waldorf.bg/catering/",
+     "chars": 12628,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://www.waldorf.bg/school/",
+     "chars": 14367,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://www.waldorf.bg/gymnasium/",
+     "chars": 12807,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://www.waldorf.bg/school-of-arts/",
+     "chars": 15998,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://www.waldorf.bg/licenses/",
+     "chars": 11485,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://www.waldorf.bg/documentation/",
+     "chars": 12085,
+     "prices": false,
+     "note": null
+    }
+   ],
+   "fees": [
+    {
+     "category": "tuition",
+     "amount": 7130.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Такса за детска градина & предучилищна група",
+     "academic_year": null,
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [
+      "period yearly cleared: the evidence does not name it"
+     ],
+     "source_url": "https://www.waldorf.bg/admission/",
+     "evidence": "### Детска градина & предучилищна група:\n  1. плащане в пълен размер: **7130 евро**"
+    },
+    {
+     "category": "tuition",
+     "amount": 7590.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Такса за детска градина & предучилищна група",
+     "academic_year": null,
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://www.waldorf.bg/admission/",
+     "evidence": "### Детска градина & предучилищна група:\n  2. плащане на 2 вноски: **7590 евро**"
+    },
+    {
+     "category": "tuition",
+     "amount": 8111.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Такса за детска градина & предучилищна група",
+     "academic_year": null,
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://www.waldorf.bg/admission/",
+     "evidence": "### Детска градина & предучилищна група:\n  3. плащане на 11 вноски: **8111****евро****"
+    },
+    {
+     "category": "food",
+     "amount": 6.2,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Таксата за кетъринг на ден",
+     "academic_year": null,
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://www.waldorf.bg/admission/",
+     "evidence": "**Таксата за кетъринг на ден е**6,20 евро**"
+    },
+    {
+     "category": "food",
+     "amount": 1.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "кетъринг в детската градина",
+     "academic_year": null,
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://www.waldorf.bg/admission/",
+     "evidence": "### Други такси\n### Детска градина & предучилищна група:\n  * кетъринг в детската градина: **1** /ден"
+    },
+    {
+     "category": "registration",
+     "amount": 400.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "one_time",
+     "label": "еднократен възстановим депозит за нови деца",
+     "academic_year": null,
+     "kept": false,
+     "confidence": 0.0,
+     "checks": [
+      "dropped: evidence line is not on the page"
+     ],
+     "source_url": "https://www.waldorf.bg/admission/",
+     "evidence": "### Други такси\n### Детска градина & предучилищна група:\n  * еднократен възстановим депозит за нови деца във Валдорфската детска градина: **400****евро****"
+    }
+   ],
+   "rows_new": 5,
+   "rows_new_publishable": 5,
+   "rows_old_published": 3,
+   "regressions": [
+    "loses the YEARLY period of TUITION 7130.00",
+    "drops REGISTRATION 400.00, which the page still shows"
+   ]
+  }
+ ]
+}

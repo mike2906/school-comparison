@@ -1,0 +1,56 @@
+{
+ "school_id": 588,
+ "website_url": "https://sluncheviprikazki.com/",
+ "pages_read": [
+  "https://sluncheviprikazki.com/",
+  "https://sluncheviprikazki.com/%d0%bc%d0%b5%d1%81%d1%82%d0%be%d0%bf%d0%be%d0%bb%d0%be%d0%b6%d0%b5%d0%bd%d0%b8%d0%b5/"
+ ],
+ "fetch_failed": [],
+ "blocked": false,
+ "site_states_no_fees": false,
+ "site_fees": [
+  {
+   "fid": "f1",
+   "category": "tuition",
+   "amount": 690,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": "деца от 1,5 до 3 години",
+   "plan": "Целодневно",
+   "year": null,
+   "url": "https://sluncheviprikazki.com/%d0%bc%d0%b5%d1%81%d1%82%d0%be%d0%bf%d0%be%d0%bb%d0%be%d0%b6%d0%b5%d0%bd%d0%b8%d0%b5/",
+   "quote": "Месечна такса Целодневно за деца от 1,5 до 3 години с включена храна и занимания 690€"
+  },
+  {
+   "fid": "f2",
+   "category": "tuition",
+   "amount": 450,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": "деца от 1,5 до 3 години",
+   "plan": "Полудневно",
+   "year": null,
+   "url": "https://sluncheviprikazki.com/%d0%bc%d0%b5%d1%81%d1%82%d0%be%d0%bf%d0%be%d0%bb%d0%be%d0%b6%d0%b5%d0%bd%d0%b8%d0%b5/",
+   "quote": "Месечна такса Полудневно за деца от 1,5 до 3 години с включена храна и занимания 450€"
+  },
+  {
+   "fid": "f3",
+   "category": "tuition",
+   "amount": 190,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "group": null,
+   "plan": "Седмично",
+   "year": null,
+   "url": "https://sluncheviprikazki.com/%d0%bc%d0%b5%d1%81%d1%82%d0%be%d0%bf%d0%be%d0%bb%d0%be%d0%b6%d0%b5%d0%bd%d0%b8%d0%b5/",
+   "quote": "Седмично С включена храна 190€"
+  }
+ ],
+ "notes": "The 'Цени' page (URL slug 'местоположение') says 'от 1,5 до 3 години'; the homepage shows the same three prices (690/450/190€) but 'от 3 до 6 години'. Group conflict is the site's own; key uses the Цени page wording. 190€ labelled 'Седмично' (weekly - not in period vocabulary, so null). No year stated. Homepage contains unrelated spam links (casino etc.). Menu links a 'Парти център' on another domain (party-center.eu), not read."
+}

@@ -1,0 +1,489 @@
+{
+ "apply": true,
+ "pipeline_run_id": "cef9d681-e49d-45ba-a6a2-3242d80d98b4",
+ "schools": 1,
+ "spent_usd": 0.007758,
+ "stopped": null,
+ "kept_old_rows": [],
+ "outcomes": {
+  "written": 1
+ },
+ "results": [
+  {
+   "school_id": 564,
+   "outcome": "written",
+   "pages": [
+    {
+     "url": "https://pitagor-school.eu/",
+     "chars": 17532,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://pitagor-school.eu/taksi/",
+     "chars": 15023,
+     "prices": true,
+     "note": null
+    },
+    {
+     "url": "https://pitagor-school.eu/hranene/",
+     "chars": 13143,
+     "prices": true,
+     "note": null
+    },
+    {
+     "url": "https://pitagor-school.eu/priem/",
+     "chars": 12240,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://pitagor-school.eu/priem-podgotvitelna-grupa/",
+     "chars": 14771,
+     "prices": true,
+     "note": null
+    },
+    {
+     "url": "https://pitagor-school.eu/taksi/transport-pitagor/",
+     "chars": 13669,
+     "prices": true,
+     "note": null
+    },
+    {
+     "url": "https://pitagor-school.eu/wp-content/uploads/2026/10/19-23.10.2026-1-4-%D0%BA%D0%BB%D0%B0%D1%81.doc.pdf",
+     "chars": 1828,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://pitagor-school.eu/wp-content/uploads/2026/10/19-23.10.2026-5-10-%D0%BA%D0%BB%D0%B0%D1%81.doc.pdf",
+     "chars": 1501,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://pitagor-school.eu/priem-puk-2076-2028/",
+     "chars": 12724,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://pitagor-school.eu/priem-1klas-2026-2027/",
+     "chars": 14892,
+     "prices": true,
+     "note": null
+    },
+    {
+     "url": "https://pitagor-school.eu/priem-5-klas-2026-2027/",
+     "chars": 15943,
+     "prices": true,
+     "note": null
+    },
+    {
+     "url": "https://pitagor-school.eu/priem6klas/",
+     "chars": 13971,
+     "prices": false,
+     "note": null
+    }
+   ],
+   "fees": [
+    {
+     "category": "tuition",
+     "amount": 7580.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "yearly",
+     "label": "Годишна такса обучение",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://pitagor-school.eu/taksi/",
+     "evidence": "Годишна такса обучение и финансови условия  \nза ПГ - 4 .клас за 2026-2027 учебна година:\nЕДНОКРАТНО ПЛАЩАНЕ\nПлащане до 31.03.2026 г. - 7580€ / 14825,19 лв."
+    },
+    {
+     "category": "tuition",
+     "amount": 3975.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Годишна такса обучение",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://pitagor-school.eu/taksi/",
+     "evidence": "Годишна такса обучение и финансови условия  \nза ПГ - 4 .клас за 2026-2027 учебна година:\nНА ДВЕ ВНОСКИ\nПлащане I вноска до 31.03.2026 г. - 3975€ / 7774,42 лв."
+    },
+    {
+     "category": "tuition",
+     "amount": 3975.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Годишна такса обучение",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://pitagor-school.eu/taksi/",
+     "evidence": "Годишна такса обучение и финансови условия  \nза ПГ - 4 .клас за 2026-2027 учебна година:\nНА ДВЕ ВНОСКИ\nПлащане II вноска до 30.01.2027 г. - 3975€ / 7774,42 лв."
+    },
+    {
+     "category": "tuition",
+     "amount": 827.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Годишна такса обучение",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://pitagor-school.eu/taksi/",
+     "evidence": "Годишна такса обучение и финансови условия  \nза ПГ - 4 .клас за 2026-2027 учебна година:\nНА ДЕСЕТ ВНОСКИ\nПлащане I вноска до 31.03.2026 г - 827€ /1617,47 лв."
+    },
+    {
+     "category": "tuition",
+     "amount": 827.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Годишна такса обучение",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [
+      "period monthly cleared: the evidence does not name it"
+     ],
+     "source_url": "https://pitagor-school.eu/taksi/",
+     "evidence": "Годишна такса обучение и финансови условия  \nза ПГ - 4 .клас за 2026-2027 учебна година:\nНА ДЕСЕТ ВНОСКИ\nПлащане на останалите вноски до 5. число на текущия месец, считано от 09/2026 до 05/2027 - 827€ / 1617,47 лв."
+    },
+    {
+     "category": "tuition",
+     "amount": 6990.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "yearly",
+     "label": "Годишна такса обучение",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://pitagor-school.eu/taksi/",
+     "evidence": "Годишна такса обучение и финансови условия  \nза 5. - 7. клас за 2026-2027 учебна година:\nЕДНОКРАТНО ПЛАЩАНЕ\nПлащане до 31.03.2026 г. - 6990€ / 13671,25 лв."
+    },
+    {
+     "category": "tuition",
+     "amount": 3666.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Годишна такса обучение",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://pitagor-school.eu/taksi/",
+     "evidence": "Годишна такса обучение и финансови условия  \nза 5. - 7. клас за 2026-2027 учебна година:\nНА ДВЕ ВНОСКИ\nПлащане I вноска до 31.03.2026 г. - 3666€ / 7170,07 лв."
+    },
+    {
+     "category": "tuition",
+     "amount": 3666.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Годишна такса обучение",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://pitagor-school.eu/taksi/",
+     "evidence": "Годишна такса обучение и финансови условия  \nза 5. - 7. клас за 2026-2027 учебна година:\nНА ДВЕ ВНОСКИ\nПлащане II вноска до 30.01.2027 г. - 3666€ / 7170,07 лв."
+    },
+    {
+     "category": "tuition",
+     "amount": 762.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Годишна такса обучение",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://pitagor-school.eu/taksi/",
+     "evidence": "Годишна такса обучение и финансови условия  \nза 5. - 7. клас за 2026-2027 учебна година:\nНА ДЕСЕТ ВНОСКИ\nПлащане I вноска до 31.03.2026 г - 762€ / 1490,34 лв."
+    },
+    {
+     "category": "tuition",
+     "amount": 762.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Годишна такса обучение",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [
+      "period monthly cleared: the evidence does not name it"
+     ],
+     "source_url": "https://pitagor-school.eu/taksi/",
+     "evidence": "Годишна такса обучение и финансови условия  \nза 5. - 7. клас за 2026-2027 учебна година:\nНА ДЕСЕТ ВНОСКИ\nПлащане на останалите вноски до 5. число на текущия месец, считано от 09/2026 до 05/2027 - 762€ / 1490,34 лв."
+    },
+    {
+     "category": "tuition",
+     "amount": 6640.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "yearly",
+     "label": "Годишна такса обучение",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://pitagor-school.eu/taksi/",
+     "evidence": "Годишна такса обучение и финансови условия  \nза 8. - 10. клас за 2026-2027 учебна година:\nЕДНОКРАТНО ПЛАЩАНЕ\nПлащане до 31.03.2026 г. - 6640€ / 12986,71 лв."
+    },
+    {
+     "category": "tuition",
+     "amount": 3482.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Годишна такса обучение",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://pitagor-school.eu/taksi/",
+     "evidence": "Годишна такса обучение и финансови условия  \nза 8. - 10. клас за 2026-2027 учебна година:\nНА ДВЕ ВНОСКИ\nПлащане I вноска до 31.03.2026 г. - 3482€ / 6810,2 лв."
+    },
+    {
+     "category": "tuition",
+     "amount": 3482.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Годишна такса обучение",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://pitagor-school.eu/taksi/",
+     "evidence": "Годишна такса обучение и финансови условия  \nза 8. - 10. клас за 2026-2027 учебна година:\nНА ДВЕ ВНОСКИ\nПлащане II вноска до 30.01.2027 г. - 3482€ / 6810,2 лв."
+    },
+    {
+     "category": "tuition",
+     "amount": 724.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Годишна такса обучение",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://pitagor-school.eu/taksi/",
+     "evidence": "Годишна такса обучение и финансови условия  \nза 8. - 10. клас за 2026-2027 учебна година:\nНА ДЕСЕТ ВНОСКИ\nПлащане I вноска до 31.03.2026 г - 724€ / 1416,02 лв."
+    },
+    {
+     "category": "tuition",
+     "amount": 724.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Годишна такса обучение",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [
+      "period monthly cleared: the evidence does not name it"
+     ],
+     "source_url": "https://pitagor-school.eu/taksi/",
+     "evidence": "Годишна такса обучение и финансови условия  \nза 8. - 10. клас за 2026-2027 учебна година:\nНА ДЕСЕТ ВНОСКИ\nПлащане на останалите вноски до 5. число на текущия месец, считано от 09/2026 до 05/2027 - 724€ / 1416,02 лв."
+    },
+    {
+     "category": "food",
+     "amount": 720.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "term",
+     "label": "Такса хранене",
+     "academic_year": "2026/27",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://pitagor-school.eu/hranene/",
+     "evidence": "Таксите за учебната 2026/27 година са:\nПГ и ПУК – за учебен срок – 720 евро"
+    },
+    {
+     "category": "food",
+     "amount": 840.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "term",
+     "label": "Такса хранене",
+     "academic_year": "2026/27",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://pitagor-school.eu/hranene/",
+     "evidence": "Таксите за учебната 2026/27 година са:\n1-ви до 4-ти клас – за учебен срок – 840 евро"
+    },
+    {
+     "category": "food",
+     "amount": 8.5,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Хранене",
+     "academic_year": "2026/27",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://pitagor-school.eu/hranene/",
+     "evidence": "Таксите за учебната 2026/27 година са:\n5-ти до 10-ти клас – по желание при заявка – 8.50 евро на ден"
+    },
+    {
+     "category": "transport",
+     "amount": 2650.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "yearly",
+     "label": "Годишна такса – Двупосочно",
+     "academic_year": "2026/2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://pitagor-school.eu/taksi/transport-pitagor/",
+     "evidence": "Цените на предлаганата транспортна услуга са:\nГодишна такса – Двупосочно – 2650 евро;"
+    },
+    {
+     "category": "transport",
+     "amount": 2518.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Отстъпка за второ дете – двупосочно",
+     "academic_year": "2026/2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [
+      "period yearly cleared: the evidence does not name it"
+     ],
+     "source_url": "https://pitagor-school.eu/taksi/transport-pitagor/",
+     "evidence": "Цените на предлаганата транспортна услуга са:\nОтстъпка за второ дете – 2518 евро;"
+    },
+    {
+     "category": "transport",
+     "amount": 1988.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "yearly",
+     "label": "Годишна такса – Еднопосочно",
+     "academic_year": "2026/2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://pitagor-school.eu/taksi/transport-pitagor/",
+     "evidence": "Цените на предлаганата транспортна услуга са:\nГодишна такса – Еднопосочно – 1988 евро;"
+    },
+    {
+     "category": "transport",
+     "amount": 1889.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Отстъпка за второ дете – еднопосочно",
+     "academic_year": "2026/2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [
+      "period yearly cleared: the evidence does not name it"
+     ],
+     "source_url": "https://pitagor-school.eu/taksi/transport-pitagor/",
+     "evidence": "Цените на предлаганата транспортна услуга са:\nОтстъпка за второ дете – 1889 евро."
+    },
+    {
+     "category": "registration",
+     "amount": 20.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "такса за обследване",
+     "academic_year": "2026/2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [
+      "period one_time cleared: the evidence does not name it"
+     ],
+     "source_url": "https://pitagor-school.eu/priem-podgotvitelna-grupa/",
+     "evidence": "Прием за Подготвителена група 2026/2027 учебна година\nНеобходимо е заплащане на такса за обследване в размер на 20 €"
+    },
+    {
+     "category": "registration",
+     "amount": 20.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "таксата за участие",
+     "academic_year": "2026/2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [
+      "period one_time cleared: the evidence does not name it"
+     ],
+     "source_url": "https://pitagor-school.eu/priem-1klas-2026-2027/",
+     "evidence": "Важно уточнение: Резултатите от състезанието ще се използват при кандидатстване в първи клас (първи етап от приемната процедура) в Училище по математика „Питагор“ след отбелязване на съгласие от страна на родителите в регистрационната форма. За ученици, които не се обучават в училището, участие е възможно чрез записване в регистрационната форма, като таксата за участие е 20 евро."
+    },
+    {
+     "category": "registration",
+     "amount": 25.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Такса за участие",
+     "academic_year": "2026/2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [
+      "period one_time cleared: the evidence does not name it"
+     ],
+     "source_url": "https://pitagor-school.eu/priem-5-klas-2026-2027/",
+     "evidence": "### Прием 5. клас за 2026/2027 \n1.2. Такса за участие\nСлед подаване на заявлението кандидатите трябва да заплатят такса за всеки избран изпит (25 евро на изпит) по следната банкова сметка:"
+    }
+   ],
+   "rows_new": 19,
+   "rows_new_publishable": 19,
+   "rows_old_published": 5,
+   "regressions": [],
+   "validation": "needs_review"
+  }
+ ]
+}

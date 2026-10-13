@@ -1,0 +1,142 @@
+{
+ "school_id": 588,
+ "pages_read": [
+  "https://sluncheviprikazki.com/",
+  "https://sluncheviprikazki.com/%d0%bc%d0%b5%d1%81%d1%82%d0%be%d0%bf%d0%be%d0%bb%d0%be%d0%b6%d0%b5%d0%bd%d0%b8%d0%b5/"
+ ],
+ "fetch_failed": [],
+ "site_states_no_fees": false,
+ "site_fees": [
+  {
+   "fid": "f1",
+   "category": "tuition",
+   "amount": 690,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": "деца от 1,5 до 3 години",
+   "plan": "Целодневно",
+   "year": null,
+   "url": "https://sluncheviprikazki.com/%d0%bc%d0%b5%d1%81%d1%82%d0%be%d0%bf%d0%be%d0%bb%d0%be%d0%b6%d0%b5%d0%bd%d0%b8%d0%b5/",
+   "quote": "Месечна такса Целодневно за деца от 1,5 до 3 години с включена храна и занимания 690€"
+  },
+  {
+   "fid": "f2",
+   "category": "tuition",
+   "amount": 450,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": "деца от 1,5 до 3 години",
+   "plan": "Полудневно",
+   "year": null,
+   "url": "https://sluncheviprikazki.com/%d0%bc%d0%b5%d1%81%d1%82%d0%be%d0%bf%d0%be%d0%bb%d0%be%d0%b6%d0%b5%d0%bd%d0%b8%d0%b5/",
+   "quote": "Месечна такса Полудневно за деца от 1,5 до 3 години с включена храна и занимания 450€"
+  },
+  {
+   "fid": "f3",
+   "category": "tuition",
+   "amount": 190,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "group": null,
+   "plan": "Седмично",
+   "year": null,
+   "url": "https://sluncheviprikazki.com/%d0%bc%d0%b5%d1%81%d1%82%d0%be%d0%bf%d0%be%d0%bb%d0%be%d0%b6%d0%b5%d0%bd%d0%b8%d0%b5/",
+   "quote": "Седмично С включена храна 190€"
+  },
+  {
+   "fid": "f4",
+   "category": "tuition",
+   "amount": 690,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": "деца от 3 до 6 години",
+   "plan": "Целодневно",
+   "year": null,
+   "url": "https://sluncheviprikazki.com/",
+   "quote": "Месечна такса Целодневно за деца от 3 до 6 години с включена храна и занимания 690€",
+   "changed": "homepage states same amount for a different age group (3-6) than the Цени page"
+  },
+  {
+   "fid": "f5",
+   "category": "tuition",
+   "amount": 450,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": "деца от 3 до 6 години",
+   "plan": "Полудневно",
+   "year": null,
+   "url": "https://sluncheviprikazki.com/",
+   "quote": "Месечна такса Полудневно за деца от 3 до 6 години с включена храна и занимания 450€",
+   "changed": "homepage states same amount for a different age group (3-6) than the Цени page"
+  }
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "verdict": "correct",
+   "fid": "f3",
+   "reason": "190 EUR Седмично, period null on Цени page",
+   "group_unstated": true
+  },
+  {
+   "oid": "o2",
+   "verdict": "correct",
+   "fid": "f5",
+   "reason": "450 EUR monthly Полудневно on homepage",
+   "group_unstated": true
+  },
+  {
+   "oid": "o3",
+   "verdict": "duplicate",
+   "fid": "f3",
+   "reason": "same 190 EUR Седмично fee as o1",
+   "group_unstated": true
+  },
+  {
+   "oid": "o4",
+   "verdict": "correct",
+   "fid": "f1",
+   "reason": "690 EUR monthly Целодневно, label \"за деца от 1\" consistent with 1,5-3 group",
+   "group_unstated": false
+  },
+  {
+   "oid": "o5",
+   "verdict": "duplicate",
+   "fid": "f1",
+   "reason": "same 690 EUR Целодневно fee as o4 (o4 carries group)",
+   "group_unstated": true
+  },
+  {
+   "oid": "o6",
+   "verdict": "correct",
+   "fid": "f2",
+   "reason": "450 EUR monthly Полудневно on Цени page",
+   "group_unstated": true
+  },
+  {
+   "oid": "o7",
+   "verdict": "correct",
+   "fid": "f4",
+   "reason": "690 EUR monthly Целодневно 3-6 years as on homepage",
+   "group_unstated": false
+  },
+  {
+   "oid": "o8",
+   "verdict": "duplicate",
+   "fid": "f4",
+   "reason": "same homepage 690 EUR Целодневно fee as o7 (o7 carries group)",
+   "group_unstated": true
+  }
+ ],
+ "notes": "Re-fetched both pages: homepage says 3-6 years, Цени page says 1,5-3 years for the same 690/450 EUR; added the homepage group variants as f4/f5. 190 EUR weekly (Седмично) has no period in vocabulary -> null."
+}

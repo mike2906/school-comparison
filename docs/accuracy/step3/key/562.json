@@ -1,0 +1,46 @@
+{
+ "school_id": 562,
+ "website_url": "https://ivanapostolov.bg/",
+ "pages_read": [
+  "https://ivanapostolov.bg/",
+  "https://ivanapostolov.bg/taksi/",
+  "https://ivanapostolov.bg/admission/"
+ ],
+ "fetch_failed": [
+  "https://ivanapostolov.bg/admissions-upper-grades/",
+  "https://ivanapostolov.bg/clubs/"
+ ],
+ "blocked": false,
+ "site_states_no_fees": false,
+ "site_fees": [
+  {
+   "fid": "f1",
+   "category": "tuition",
+   "amount": 8965,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": null,
+   "plan": null,
+   "year": "2026/2027",
+   "url": "https://ivanapostolov.bg/taksi/",
+   "quote": "Таксата за следващата учебна година (2026/2027) е 8965 евро."
+  },
+  {
+   "fid": "f2",
+   "category": "registration",
+   "amount": 75,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "group": "прием след 7. клас",
+   "plan": null,
+   "year": "2026/2027",
+   "url": "https://ivanapostolov.bg/admission/",
+   "quote": "Таксата за явяване на изпит е в размер на 75 € и се заплаща по банков път."
+  }
+ ],
+ "notes": "Tuition page: 'Заплаща се на две, четири или повече вноски' with no instalment amounts; fee includes all clubs/sports. Meta description of /taksi/ still says 'Таксата за учебната 2023/2024 година е 6900 евро' - left out (older year, 2026/27 tuition stated). Exam fee under heading 'Прием 2026/2027' (exam date 27 март 2027 - site's own inconsistency). Upper-grades admission and clubs pages failed to fetch."
+}

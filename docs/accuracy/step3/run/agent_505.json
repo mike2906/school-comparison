@@ -1,0 +1,579 @@
+{
+ "apply": true,
+ "pipeline_run_id": "ce0c4093-d3b7-4d17-824f-3d4f12e9cf24",
+ "schools": 1,
+ "spent_usd": 0.006045,
+ "stopped": null,
+ "kept_old_rows": [],
+ "outcomes": {
+  "held": 1
+ },
+ "results": [
+  {
+   "school_id": 505,
+   "outcome": "held",
+   "pages": [
+    {
+     "url": "https://vhugo.org/",
+     "chars": 7032,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://vhugo.org/registration/frais-de-scolarite-2026-2027/",
+     "chars": 6463,
+     "prices": true,
+     "note": null
+    },
+    {
+     "url": "https://vhugo.org/registration/",
+     "chars": 5248,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://vhugo.org/information-for-parents/",
+     "chars": 7719,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://vhugo.org/wp-content/uploads/2026/02/Frais-scolarite-2026-2027-totaux.pdf",
+     "chars": 3621,
+     "prices": true,
+     "note": null
+    },
+    {
+     "url": "https://vhugo.org/bg/registration/frais-de-scolarite-2026-2027/",
+     "chars": 6311,
+     "prices": true,
+     "note": null
+    },
+    {
+     "url": "https://vhugo.org/wp-content/uploads/2026/03/Frais-scolarite-2026-2027-bulgare.pdf",
+     "chars": 3862,
+     "prices": true,
+     "note": null
+    },
+    {
+     "url": "https://vhugo.org/en/registration/frais-de-scolarite-2026-2027/",
+     "chars": 5345,
+     "prices": true,
+     "note": null
+    }
+   ],
+   "fees": [
+    {
+     "category": "registration",
+     "amount": 2200.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Droit de 1ère inscription",
+     "academic_year": "2026/2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [
+      "period one_time cleared: the evidence does not name it"
+     ],
+     "source_url": "https://vhugo.org/wp-content/uploads/2026/02/Frais-scolarite-2026-2027-totaux.pdf",
+     "evidence": "Droit de 1ère inscription\nDate de paiement Au moment de l'inscription\n1er enfant 2 200,00 EUR"
+    },
+    {
+     "category": "registration",
+     "amount": 1650.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Droit de 1ère inscription",
+     "academic_year": "2026/2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [
+      "period one_time cleared: the evidence does not name it"
+     ],
+     "source_url": "https://vhugo.org/wp-content/uploads/2026/02/Frais-scolarite-2026-2027-totaux.pdf",
+     "evidence": "Droit de 1ère inscription\nDate de paiement Au moment de l'inscription\n2ème enfant (-25%) 1 650,00 EUR"
+    },
+    {
+     "category": "registration",
+     "amount": 1100.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Droit de 1ère inscription",
+     "academic_year": "2026/2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [
+      "period one_time cleared: the evidence does not name it"
+     ],
+     "source_url": "https://vhugo.org/wp-content/uploads/2026/02/Frais-scolarite-2026-2027-totaux.pdf",
+     "evidence": "Droit de 1ère inscription\nDate de paiement Au moment de l'inscription\nA partir du 3ème enfant (-50%) 1 100,00 EUR"
+    },
+    {
+     "category": "tuition",
+     "amount": 8032.81,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Total droits scolaires (l'année)",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [
+      "period yearly cleared: the evidence does not name it"
+     ],
+     "source_url": "https://vhugo.org/wp-content/uploads/2026/02/Frais-scolarite-2026-2027-totaux.pdf",
+     "evidence": "LYCÉE\nTotal droits scolaires (l'année) 1er versement 2ème versement 3ème versement Entreprise < 50 Entreprise ≥ 50\n1er enfant 8 032,81 EUR 3 213,12 EUR 2 409,84 EUR 2 409,84 EUR 8 434,45 EUR 8 836,09 EUR"
+    },
+    {
+     "category": "tuition",
+     "amount": 3213.12,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "1er versement",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://vhugo.org/wp-content/uploads/2026/02/Frais-scolarite-2026-2027-totaux.pdf",
+     "evidence": "LYCÉE\nTotal droits scolaires (l'année) 1er versement 2ème versement 3ème versement Entreprise < 50 Entreprise ≥ 50\nDate de paiement payables en 3 versements 1er septembre 1er janvier 1er avril +5% +10%\n1er enfant 8 032,81 EUR 3 213,12 EUR 2 409,84 EUR 2 409,84 EUR 8 434,45 EUR 8 836,09 EUR"
+    },
+    {
+     "category": "tuition",
+     "amount": 2409.84,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "2ème versement",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://vhugo.org/wp-content/uploads/2026/02/Frais-scolarite-2026-2027-totaux.pdf",
+     "evidence": "LYCÉE\nTotal droits scolaires (l'année) 1er versement 2ème versement 3ème versement Entreprise < 50 Entreprise ≥ 50\nDate de paiement payables en 3 versements 1er septembre 1er janvier 1er avril +5% +10%\n1er enfant 8 032,81 EUR 3 213,12 EUR 2 409,84 EUR 2 409,84 EUR 8 434,45 EUR 8 836,09 EUR"
+    },
+    {
+     "category": "tuition",
+     "amount": 2409.84,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "3ème versement",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://vhugo.org/wp-content/uploads/2026/02/Frais-scolarite-2026-2027-totaux.pdf",
+     "evidence": "LYCÉE\nTotal droits scolaires (l'année) 1er versement 2ème versement 3ème versement Entreprise < 50 Entreprise ≥ 50\nDate de paiement payables en 3 versements 1er septembre 1er janvier 1er avril +5% +10%\n1er enfant 8 032,81 EUR 3 213,12 EUR 2 409,84 EUR 2 409,84 EUR 8 434,45 EUR 8 836,09 EUR"
+    },
+    {
+     "category": "tuition",
+     "amount": 8434.45,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Frais de scolarité",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [
+      "period yearly cleared: the evidence does not name it"
+     ],
+     "source_url": "https://vhugo.org/wp-content/uploads/2026/02/Frais-scolarite-2026-2027-totaux.pdf",
+     "evidence": "LYCÉE\nTotal droits scolaires (l'année) 1er versement 2ème versement 3ème versement Entreprise < 50 Entreprise ≥ 50\nDate de paiement payables en 3 versements 1er septembre 1er janvier 1er avril +5% +10%\n1er enfant 8 032,81 EUR 3 213,12 EUR 2 409,84 EUR 2 409,84 EUR 8 434,45 EUR 8 836,09 EUR"
+    },
+    {
+     "category": "tuition",
+     "amount": 8836.09,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Frais de scolarité",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [
+      "period yearly cleared: the evidence does not name it"
+     ],
+     "source_url": "https://vhugo.org/wp-content/uploads/2026/02/Frais-scolarite-2026-2027-totaux.pdf",
+     "evidence": "LYCÉE\nTotal droits scolaires (l'année) 1er versement 2ème versement 3ème versement Entreprise < 50 Entreprise ≥ 50\nDate de paiement payables en 3 versements 1er septembre 1er janvier 1er avril +5% +10%\n1er enfant 8 032,81 EUR 3 213,12 EUR 2 409,84 EUR 2 409,84 EUR 8 434,45 EUR 8 836,09 EUR"
+    },
+    {
+     "category": "tuition",
+     "amount": 7309.86,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Total droits scolaires (l'année)",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [
+      "period yearly cleared: the evidence does not name it"
+     ],
+     "source_url": "https://vhugo.org/wp-content/uploads/2026/02/Frais-scolarite-2026-2027-totaux.pdf",
+     "evidence": "LYCÉE\nTotal droits scolaires (l'année) 1er versement 2ème versement 3ème versement Entreprise < 50 Entreprise ≥ 50\n2ème enfant (-9%) 7 309,86 EUR 2 923,94 EUR 2 192,96 EUR 2 192,96 EUR 7 675,35 EUR 8 040,84 EUR"
+    },
+    {
+     "category": "tuition",
+     "amount": 2923.94,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "1er versement",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://vhugo.org/wp-content/uploads/2026/02/Frais-scolarite-2026-2027-totaux.pdf",
+     "evidence": "LYCÉE\nTotal droits scolaires (l'année) 1er versement 2ème versement 3ème versement Entreprise < 50 Entreprise ≥ 50\nDate de paiement payables en 3 versements 1er septembre 1er janvier 1er avril +5% +10%\n2ème enfant (-9%) 7 309,86 EUR 2 923,94 EUR 2 192,96 EUR 2 192,96 EUR 7 675,35 EUR 8 040,84 EUR"
+    },
+    {
+     "category": "tuition",
+     "amount": 2192.96,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "2ème versement",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://vhugo.org/wp-content/uploads/2026/02/Frais-scolarite-2026-2027-totaux.pdf",
+     "evidence": "LYCÉE\nTotal droits scolaires (l'année) 1er versement 2ème versement 3ème versement Entreprise < 50 Entreprise ≥ 50\nDate de paiement payables en 3 versements 1er septembre 1er janvier 1er avril +5% +10%\n2ème enfant (-9%) 7 309,86 EUR 2 923,94 EUR 2 192,96 EUR 2 192,96 EUR 7 675,35 EUR 8 040,84 EUR"
+    },
+    {
+     "category": "tuition",
+     "amount": 2192.96,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "3ème versement",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://vhugo.org/wp-content/uploads/2026/02/Frais-scolarite-2026-2027-totaux.pdf",
+     "evidence": "LYCÉE\nTotal droits scolaires (l'année) 1er versement 2ème versement 3ème versement Entreprise < 50 Entreprise ≥ 50\nDate de paiement payables en 3 versements 1er septembre 1er janvier 1er avril +5% +10%\n2ème enfant (-9%) 7 309,86 EUR 2 923,94 EUR 2 192,96 EUR 2 192,96 EUR 7 675,35 EUR 8 040,84 EUR"
+    },
+    {
+     "category": "tuition",
+     "amount": 7675.35,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Frais de scolarité",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [
+      "period yearly cleared: the evidence does not name it"
+     ],
+     "source_url": "https://vhugo.org/wp-content/uploads/2026/02/Frais-scolarite-2026-2027-totaux.pdf",
+     "evidence": "LYCÉE\nTotal droits scolaires (l'année) 1er versement 2ème versement 3ème versement Entreprise < 50 Entreprise ≥ 50\nDate de paiement payables en 3 versements 1er septembre 1er janvier 1er avril +5% +10%\n2ème enfant (-9%) 7 309,86 EUR 2 923,94 EUR 2 192,96 EUR 2 192,96 EUR 7 675,35 EUR 8 040,84 EUR"
+    },
+    {
+     "category": "tuition",
+     "amount": 8040.84,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Frais de scolarité",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [
+      "period yearly cleared: the evidence does not name it"
+     ],
+     "source_url": "https://vhugo.org/wp-content/uploads/2026/02/Frais-scolarite-2026-2027-totaux.pdf",
+     "evidence": "LYCÉE\nTotal droits scolaires (l'année) 1er versement 2ème versement 3ème versement Entreprise < 50 Entreprise ≥ 50\nDate de paiement payables en 3 versements 1er septembre 1er janvier 1er avril +5% +10%\n2ème enfant (-9%) 7 309,86 EUR 2 923,94 EUR 2 192,96 EUR 2 192,96 EUR 7 675,35 EUR 8 040,84 EUR"
+    },
+    {
+     "category": "tuition",
+     "amount": 6827.89,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Total droits scolaires (l'année)",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [
+      "period yearly cleared: the evidence does not name it"
+     ],
+     "source_url": "https://vhugo.org/wp-content/uploads/2026/02/Frais-scolarite-2026-2027-totaux.pdf",
+     "evidence": "LYCÉE\nTotal droits scolaires (l'année) 1er versement 2ème versement 3ème versement Entreprise < 50 Entreprise ≥ 50\n3ème enfant (-15%) 6 827,89 EUR 2 731,16 EUR 2 048,37 EUR 2 048,37 EUR 7 169,28 EUR 7 510,68 EUR"
+    },
+    {
+     "category": "tuition",
+     "amount": 2731.16,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "1er versement",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://vhugo.org/wp-content/uploads/2026/02/Frais-scolarite-2026-2027-totaux.pdf",
+     "evidence": "LYCÉE\nTotal droits scolaires (l'année) 1er versement 2ème versement 3ème versement Entreprise < 50 Entreprise ≥ 50\nDate de paiement payables en 3 versements 1er septembre 1er janvier 1er avril +5% +10%\n3ème enfant (-15%) 6 827,89 EUR 2 731,16 EUR 2 048,37 EUR 2 048,37 EUR 7 169,28 EUR 7 510,68 EUR"
+    },
+    {
+     "category": "tuition",
+     "amount": 2048.37,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "2ème versement",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://vhugo.org/wp-content/uploads/2026/02/Frais-scolarite-2026-2027-totaux.pdf",
+     "evidence": "LYCÉE\nTotal droits scolaires (l'année) 1er versement 2ème versement 3ème versement Entreprise < 50 Entreprise ≥ 50\nDate de paiement payables en 3 versements 1er septembre 1er janvier 1er avril +5% +10%\n3ème enfant (-15%) 6 827,89 EUR 2 731,16 EUR 2 048,37 EUR 2 048,37 EUR 7 169,28 EUR 7 510,68 EUR"
+    },
+    {
+     "category": "tuition",
+     "amount": 2048.37,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "3ème versement",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://vhugo.org/wp-content/uploads/2026/02/Frais-scolarite-2026-2027-totaux.pdf",
+     "evidence": "LYCÉE\nTotal droits scolaires (l'année) 1er versement 2ème versement 3ème versement Entreprise < 50 Entreprise ≥ 50\nDate de paiement payables en 3 versements 1er septembre 1er janvier 1er avril +5% +10%\n3ème enfant (-15%) 6 827,89 EUR 2 731,16 EUR 2 048,37 EUR 2 048,37 EUR 7 169,28 EUR 7 510,68 EUR"
+    },
+    {
+     "category": "tuition",
+     "amount": 7169.28,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Frais de scolarité",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [
+      "period yearly cleared: the evidence does not name it"
+     ],
+     "source_url": "https://vhugo.org/wp-content/uploads/2026/02/Frais-scolarite-2026-2027-totaux.pdf",
+     "evidence": "LYCÉE\nTotal droits scolaires (l'année) 1er versement 2ème versement 3ème versement Entreprise < 50 Entreprise ≥ 50\nDate de paiement payables en 3 versements 1er septembre 1er janvier 1er avril +5% +10%\n3ème enfant (-15%) 6 827,89 EUR 2 731,16 EUR 2 048,37 EUR 2 048,37 EUR 7 169,28 EUR 7 510,68 EUR"
+    },
+    {
+     "category": "tuition",
+     "amount": 7510.68,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Frais de scolarité",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [
+      "period yearly cleared: the evidence does not name it"
+     ],
+     "source_url": "https://vhugo.org/wp-content/uploads/2026/02/Frais-scolarite-2026-2027-totaux.pdf",
+     "evidence": "LYCÉE\nTotal droits scolaires (l'année) 1er versement 2ème versement 3ème versement Entreprise < 50 Entreprise ≥ 50\nDate de paiement payables en 3 versements 1er septembre 1er janvier 1er avril +5% +10%\n3ème enfant (-15%) 6 827,89 EUR 2 731,16 EUR 2 048,37 EUR 2 048,37 EUR 7 169,28 EUR 7 510,68 EUR"
+    },
+    {
+     "category": "tuition",
+     "amount": 6024.61,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Total droits scolaires (l'année)",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [
+      "period yearly cleared: the evidence does not name it"
+     ],
+     "source_url": "https://vhugo.org/wp-content/uploads/2026/02/Frais-scolarite-2026-2027-totaux.pdf",
+     "evidence": "LYCÉE\nTotal droits scolaires (l'année) 1er versement 2ème versement 3ème versement Entreprise < 50 Entreprise ≥ 50\n4ème enfant (-25%) 6 024,61 EUR 2 409,84 EUR 1 807,38 EUR 1 807,38 EUR 6 325,84 EUR 6 627,07 EUR"
+    },
+    {
+     "category": "tuition",
+     "amount": 2409.84,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "1er versement",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://vhugo.org/wp-content/uploads/2026/02/Frais-scolarite-2026-2027-totaux.pdf",
+     "evidence": "LYCÉE\nTotal droits scolaires (l'année) 1er versement 2ème versement 3ème versement Entreprise < 50 Entreprise ≥ 50\nDate de paiement payables en 3 versements 1er septembre 1er janvier 1er avril +5% +10%\n4ème enfant (-25%) 6 024,61 EUR 2 409,84 EUR 1 807,38 EUR 1 807,38 EUR 6 325,84 EUR 6 627,07 EUR"
+    },
+    {
+     "category": "tuition",
+     "amount": 1807.38,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "2ème versement",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://vhugo.org/wp-content/uploads/2026/02/Frais-scolarite-2026-2027-totaux.pdf",
+     "evidence": "LYCÉE\nTotal droits scolaires (l'année) 1er versement 2ème versement 3ème versement Entreprise < 50 Entreprise ≥ 50\nDate de paiement payables en 3 versements 1er septembre 1er janvier 1er avril +5% +10%\n4ème enfant (-25%) 6 024,61 EUR 2 409,84 EUR 1 807,38 EUR 1 807,38 EUR 6 325,84 EUR 6 627,07 EUR"
+    },
+    {
+     "category": "tuition",
+     "amount": 1807.38,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "3ème versement",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://vhugo.org/wp-content/uploads/2026/02/Frais-scolarite-2026-2027-totaux.pdf",
+     "evidence": "LYCÉE\nTotal droits scolaires (l'année) 1er versement 2ème versement 3ème versement Entreprise < 50 Entreprise ≥ 50\nDate de paiement payables en 3 versements 1er septembre 1er janvier 1er avril +5% +10%\n4ème enfant (-25%) 6 024,61 EUR 2 409,84 EUR 1 807,38 EUR 1 807,38 EUR 6 325,84 EUR 6 627,07 EUR"
+    },
+    {
+     "category": "tuition",
+     "amount": 6325.84,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Frais de scolarité",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [
+      "period yearly cleared: the evidence does not name it"
+     ],
+     "source_url": "https://vhugo.org/wp-content/uploads/2026/02/Frais-scolarite-2026-2027-totaux.pdf",
+     "evidence": "LYCÉE\nTotal droits scolaires (l'année) 1er versement 2ème versement 3ème versement Entreprise < 50 Entreprise ≥ 50\nDate de paiement payables en 3 versements 1er septembre 1er janvier 1er avril +5% +10%\n4ème enfant (-25%) 6 024,61 EUR 2 409,84 EUR 1 807,38 EUR 1 807,38 EUR 6 325,84 EUR 6 627,07 EUR"
+    },
+    {
+     "category": "tuition",
+     "amount": 6627.07,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Frais de scolarité",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [
+      "period yearly cleared: the evidence does not name it"
+     ],
+     "source_url": "https://vhugo.org/wp-content/uploads/2026/02/Frais-scolarite-2026-2027-totaux.pdf",
+     "evidence": "LYCÉE\nTotal droits scolaires (l'année) 1er versement 2ème versement 3ème versement Entreprise < 50 Entreprise ≥ 50\nDate de paiement payables en 3 versements 1er septembre 1er janvier 1er avril +5% +10%\n4ème enfant (-25%) 6 024,61 EUR 2 409,84 EUR 1 807,38 EUR 1 807,38 EUR 6 325,84 EUR 6 627,07 EUR"
+    },
+    {
+     "category": "extracurricular",
+     "amount": 200.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Disciplines Non Linguistiques (DNL)",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [
+      "period yearly cleared: the evidence does not name it"
+     ],
+     "source_url": "https://vhugo.org/wp-content/uploads/2026/02/Frais-scolarite-2026-2027-totaux.pdf",
+     "evidence": "OPTIONS ET DISCIPLINES SUPPLÉMENTAIRES (3ème à Terminale)\nDiscipline Tarif annuel\nDisciplines Non Linguistiques (DNL) 200,00 EUR"
+    },
+    {
+     "category": "extracurricular",
+     "amount": 300.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Option Danse",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [
+      "period yearly cleared: the evidence does not name it"
+     ],
+     "source_url": "https://vhugo.org/wp-content/uploads/2026/02/Frais-scolarite-2026-2027-totaux.pdf",
+     "evidence": "OPTIONS ET DISCIPLINES SUPPLÉMENTAIRES (3ème à Terminale)\nDiscipline Tarif annuel\nOption Danse 300,00 EUR"
+    },
+    {
+     "category": "registration",
+     "amount": 255.65,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Frais d'examen pour le BAC",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://vhugo.org/wp-content/uploads/2026/02/Frais-scolarite-2026-2027-totaux.pdf",
+     "evidence": "Frais d'examen pour le BAC et Brevet :\nBAC pour les Terminales – 255,65 EUR"
+    },
+    {
+     "category": "registration",
+     "amount": 102.26,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": null,
+     "label": "Frais d'examen pour le BAC",
+     "academic_year": "2026-2027",
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://vhugo.org/wp-content/uploads/2026/02/Frais-scolarite-2026-2027-totaux.pdf",
+     "evidence": "Frais d'examen pour le BAC et Brevet :\nBAC pour les Premières – 102,26 EUR"
+    }
+   ],
+   "rows_new": 31,
+   "rows_new_publishable": 31,
+   "rows_old_published": 11,
+   "regressions": [
+    "drops TUITION 7965.52, which the page still shows",
+    "drops TUITION 6822.12, which the page still shows",
+    "drops TUITION 6530.67, which the page still shows",
+    "drops TUITION 7351.15, which the page still shows",
+    "loses the YEARLY period of EXTRACURRICULAR 300.00",
+    "drops EXTRACURRICULAR 40.90, which the page still shows"
+   ]
+  }
+ ]
+}

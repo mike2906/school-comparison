@@ -1,0 +1,125 @@
+{
+ "school_id": 608,
+ "candidates": [
+  {
+   "oid": "o1",
+   "category": "registration",
+   "amount": 150.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "label": "Такса за регистрация",
+   "year": null,
+   "url": "https://bg.maarifschools.org/page/taksi-za-obuchenie"
+  },
+  {
+   "oid": "o2",
+   "category": "uniforms",
+   "amount": 100.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "Такса за униформа",
+   "year": null,
+   "url": "https://bg.maarifschools.org/page/taksi-za-obuchenie"
+  },
+  {
+   "oid": "o3",
+   "category": "registration",
+   "amount": 150.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "Такса за регистрация**",
+   "year": null,
+   "url": "https://bg.maarifschools.org/page/taksi-za-obuchenie"
+  },
+  {
+   "oid": "o4",
+   "category": "tuition",
+   "amount": 738.89,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "Месечна такса за обучение",
+   "year": null,
+   "url": "https://bg.maarifschools.org/page/taksi-za-obuchenie"
+  },
+  {
+   "oid": "o5",
+   "category": "tuition",
+   "amount": 6650.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "Годишна такса за обучение*",
+   "year": null,
+   "url": "https://bg.maarifschools.org/page/taksi-za-obuchenie"
+  },
+  {
+   "oid": "o6",
+   "category": "tuition",
+   "amount": 6650.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "Годишна такса за обучение",
+   "year": null,
+   "url": "https://bg.maarifschools.org/page/taksi-za-obuchenie"
+  },
+  {
+   "oid": "o7",
+   "category": "uniforms",
+   "amount": 100.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "Такса за униформа",
+   "year": null,
+   "url": "https://bg.maarifschools.org/page/taksi-za-obuchenie"
+  },
+  {
+   "oid": "o8",
+   "category": "tuition",
+   "amount": 738.89,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "Месечна такса за обучение",
+   "year": null,
+   "url": "https://bg.maarifschools.org/page/taksi-za-obuchenie"
+  },
+  {
+   "oid": "o9",
+   "category": "food",
+   "amount": 150.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "Такса за храна",
+   "year": null,
+   "url": "https://bg.maarifschools.org/page/taksi-za-obuchenie"
+  },
+  {
+   "oid": "o10",
+   "category": "food",
+   "amount": 150.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "Такса за храна***",
+   "year": null,
+   "url": "https://bg.maarifschools.org/page/taksi-za-obuchenie"
+  }
+ ]
+}

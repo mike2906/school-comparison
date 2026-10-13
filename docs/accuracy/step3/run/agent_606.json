@@ -1,0 +1,41 @@
+{
+ "apply": true,
+ "pipeline_run_id": "6615032a-a478-4e24-96aa-8e2244441086",
+ "schools": 1,
+ "spent_usd": 0.000444,
+ "stopped": null,
+ "kept_old_rows": [
+  606
+ ],
+ "outcomes": {
+  "kept_old_rows": 1
+ },
+ "results": [
+  {
+   "school_id": 606,
+   "outcome": "kept_old_rows",
+   "pages": [
+    {
+     "url": "https://highschool1.transform.bg/",
+     "chars": 106,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://highschool1.transform.bg/priem/prices/",
+     "chars": 106,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://highschool1.transform.bg/priem/",
+     "chars": 106,
+     "prices": false,
+     "note": null
+    }
+   ],
+   "fees": [],
+   "reason": "no page showing prices"
+  }
+ ]
+}

@@ -1,0 +1,121 @@
+{
+ "apply": true,
+ "pipeline_run_id": "12aa16b4-302c-49dd-983c-a0855bd484f1",
+ "schools": 1,
+ "spent_usd": 0.002665,
+ "stopped": null,
+ "kept_old_rows": [],
+ "outcomes": {
+  "held": 1
+ },
+ "results": [
+  {
+   "school_id": 593,
+   "outcome": "held",
+   "pages": [
+    {
+     "url": "https://izzi.academy/",
+     "chars": 22657,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://izzi.academy/admissions/tuition-fees/",
+     "chars": 28599,
+     "prices": true,
+     "note": null
+    },
+    {
+     "url": "https://izzi.academy/admissions/",
+     "chars": 19832,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://izzi.academy/admissions/darjavnofinansirane/",
+     "chars": 24782,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://izzi.academy/admissions/scholarships/",
+     "chars": 18174,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://izzi.academy/bg/admissions/tuition-fees/",
+     "chars": 14174,
+     "prices": true,
+     "note": null
+    },
+    {
+     "url": "https://izzi.academy/wp-content/uploads/2026/09/%D0%97%D0%B0%D1%8F%D0%B2%D0%BB%D0%B5%D0%BD%D0%B8%D0%B5-%D0%B7%D0%B0-%D0%BA%D0%B0%D0%BD%D0%B4%D0%B8%D0%B4%D0%B0%D1%82%D1%81%D1%82%D0%B2%D0%B0%D0%BD%D0%B5-2026-2027-%D0%9F%D0%A3%D0%9A.pdf",
+     "chars": 1784,
+     "prices": false,
+     "note": null
+    },
+    {
+     "url": "https://izzi.academy/wp-content/uploads/2026/09/%D0%97%D0%B0%D1%8F%D0%B2%D0%BB%D0%B5%D0%BD%D0%B8%D0%B5-%D0%B7%D0%B0-%D0%BA%D0%B0%D0%BD%D0%B4%D0%B8%D0%B4%D0%B0%D1%82%D1%81%D1%82%D0%B2%D0%B0%D0%BD%D0%B5-2026-2027-8.-%D0%BA%D0%BB%D0%B0%D1%81.pdf",
+     "chars": 2803,
+     "prices": false,
+     "note": null
+    }
+   ],
+   "fees": [
+    {
+     "category": "tuition",
+     "amount": 7500.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "yearly",
+     "label": "Annual Fee",
+     "academic_year": null,
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://izzi.academy/admissions/tuition-fees/",
+     "evidence": "HIGH SCHOOL\n##### SMART Science\nGrades 8th - 12th\n**SCHOOL YEAR FEE**  \n(September - June)  \n\nAnnual Fee  \n  \n**€7,500**  \n/year"
+    },
+    {
+     "category": "tuition",
+     "amount": 750.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "monthly",
+     "label": "Monthly fee",
+     "academic_year": null,
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://izzi.academy/admissions/tuition-fees/",
+     "evidence": "HIGH SCHOOL\n##### SMART Science\nGrades 8th - 12th\n**SCHOOL YEAR FEE**  \n(September - June)  \n\nAnnual Fee  \n  \n**€7,500**  \n/year  \n\n  \n**€750**  \n/month"
+    },
+    {
+     "category": "transport",
+     "amount": 230.0,
+     "amount_min": null,
+     "amount_max": null,
+     "currency": "EUR",
+     "period": "monthly",
+     "label": "transport",
+     "academic_year": null,
+     "kept": true,
+     "confidence": 0.9,
+     "checks": [],
+     "source_url": "https://izzi.academy/admissions/tuition-fees/",
+     "evidence": "HIGH SCHOOL\n##### SMART Science\nGrades 8th - 12th\n**NOT INCLUDED**\n  * transport (€230/month)"
+    }
+   ],
+   "rows_new": 3,
+   "rows_new_publishable": 3,
+   "rows_old_published": 3,
+   "regressions": [
+    "drops TUITION 8100.00, which the page still shows",
+    "drops TUITION 9000.00, which the page still shows"
+   ]
+  }
+ ]
+}

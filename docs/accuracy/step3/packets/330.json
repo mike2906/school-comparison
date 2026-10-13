@@ -1,0 +1,65 @@
+{
+ "school_id": 330,
+ "candidates": [
+  {
+   "oid": "o1",
+   "category": "tuition",
+   "amount": 782.33,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "BGN",
+   "period": "monthly",
+   "label": "Програма съгласно ДОИ за съответната възраст / А. ПЪРВИ ВАРИАНТ",
+   "year": null,
+   "url": "https://alisahouse.org/%d1%86%d0%b5%d0%bd%d0%b8/"
+  },
+  {
+   "oid": "o2",
+   "category": "tuition",
+   "amount": 460.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "Ежемесечна такса",
+   "year": null,
+   "url": "https://alisahouse.org/%d1%86%d0%b5%d0%bd%d0%b8/"
+  },
+  {
+   "oid": "o3",
+   "category": "tuition",
+   "amount": 510.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "Ежемесечна такса",
+   "year": null,
+   "url": "https://alisahouse.org/%d1%86%d0%b5%d0%bd%d0%b8/"
+  },
+  {
+   "oid": "o4",
+   "category": "tuition",
+   "amount": 899.68,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "BGN",
+   "period": "monthly",
+   "label": "Б. ВТОРИ ВАРИАНТ",
+   "year": null,
+   "url": "https://alisahouse.org/%d1%86%d0%b5%d0%bd%d0%b8/"
+  },
+  {
+   "oid": "o5",
+   "category": "tuition",
+   "amount": 400.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "Ежемесечна такса",
+   "year": null,
+   "url": "https://alisahouse.org/%d1%86%d0%b5%d0%bd%d0%b8/"
+  }
+ ]
+}
