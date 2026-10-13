@@ -53,20 +53,29 @@ For one school, with its `website_url`:
 4. **Store.** Upsert each page read as a `source_pages` row, and write the fees as `pricing`
    rows linked to their page: `source = scraped_website`, with `pricing_context` carrying
    `extractor: "agent"` and a `confidence` that code sets, not the model.
-   - **0.9** when the fee passes step 3 and none of the holds below applies.
-   - **0.5**, under the 0.7 publish floor, for:
-     - a one_time fee in any category but `registration` (enrolment, exam, deposit). Yearly
-       fees filed as one_time were the agent's most common error;
-     - a fee whose label names a deposit (`депозит`, `капаро`, deposit) but whose category is
+   - The reader returns, for every fee, the verbatim page line (or table row and heading) it
+     read the fee from. Code checks that the line is on the page and holds the amount; a fee
+     without such a line is withheld.
+   - **Period needs evidence.** Code keeps the model's period only when that line names it
+     (`месеч`/month, `годиш`/`учебна година`/year, `тримесеч`/quarter, `срок`/term,
+     `семест`/semester; for one_time, `еднократ`/once/`при записване`). Otherwise the period is
+     cleared and the fee publishes with a blank period, as a third of today's rows already do.
+     one_time is kept only for `registration` (enrolment, exam, deposit); on any other category
+     it is cleared, because "еднократно плащане" of a year's tuition is still yearly.
+   - **Instalments.** An amount the line gives as "1 x" ahead of "+ N x" is a first instalment:
+     its period is cleared. A count of payments ("2 x", "на две вноски") states no period.
+   - **Withheld** (confidence 0.5, under the 0.7 publish floor):
+     - a fee whose line names a deposit (`депозит`, `капаро`, deposit) but whose category is
        not `registration`;
-     - an instalment row (the label or the page line names a `вноска`, instalment or "N x")
-       that does not name its plan (`plan_name`, plus the plan's payments in `installments`);
-     - a range whose two ends are not printed together on one line of the page.
+     - a range, unless the line joins its two ends with a range marker (`–`, `от … до`, to).
+       Two fees in one table row are not a range.
+   - **0.9** for everything else that passes step 3.
 
-   The amount check in step 3 only guards against invented numbers. On the fresh sample, 12 of
-   the agent's 13 errors were a printed number with the wrong period or category, which that
-   check cannot see. The holds above target those error types, and the validation before the
-   switch-over (step 3 under Steps) measures whether they work.
+   The amount check in step 3 only guards against invented numbers. On the fresh sample, every
+   agent error but one was a printed number with the wrong period or category, which that check
+   cannot see. These rules are written to clear or withhold each of the 13 errors. Two of them
+   (220's 1540, 569's 155) depend on what the page line says, so the step-2 tests check every
+   case on the recorded pages, and that the valid fees next to them survive (see Steps).
 
 The publish boundary does not change: rows go through `pricing_row_is_publishable`, the
 validation stage's evidence check (`price_evidence.py`, which stays) and the
@@ -77,9 +86,9 @@ no new column, table or migration.
 **Replacing rows.** This reuses today's supersede rule (`price_step._find_superseded_rows`):
 a run replaces only the academic years it read, so earlier years stay as history. Because
 the agent's reads vary from run to run, a school whose new read has fewer than half as many
-fees as its current published rows keeps its old rows, and the run summary lists it. A
-school where the agent reads nothing also keeps its rows. A failed or partial crawl must
-not wipe good prices or make them flicker.
+publishable fees as its current published rows keeps its old rows, and the run summary lists
+it. A school where the agent reads nothing also keeps its rows. A failed or partial crawl
+must not wipe good prices or make them flicker.
 
 **Freshness.** Fees change about once a year, for the new school year. Run monthly, and
 weekly from June to September. One run over Sofia's 175 private and international schools
@@ -106,7 +115,7 @@ it comes after steps 1 to 5 prove the runs are reliable.
 ## Steps (one PR each)
 
 1. **Fresh-sample check** (read-only). Done 2026-10-13: see `docs/accuracy/fresh_check.md`.
-   The rescore there passes the fees-found bar (63 %) but is wrong more often than today
+   The rescore there passes the fees-found bar (67 %) but is wrong more often than today
    (8 % against 4 %). The fresh sample is now development data.
    Draw a new seeded sample of about 20 schools with fees, outside the R4 sample. Agents
    read the sites blind, as for R4. Then score the agent and today's published rows the same
@@ -116,12 +125,16 @@ it comes after steps 1 to 5 prove the runs are reliable.
 2. **The stage.** `app/scrapers/stages/fees_agent.py`, plus a thin `fees-agent` CLI command,
    built from the trial scripts with steps 3 and 4 above. The prompt takes the period and
    deposit rules from `docs/accuracy/fresh_rescore/rules.md`, and must never build a range
-   out of two fees. Tests use recorded pages and a stubbed model. Big PR (it changes what
-   the API publishes): one `@codex review`.
+   out of two fees. Tests use recorded pages and a stubbed model. They include the 13 errors
+   in `docs/accuracy/fresh_check.md` as regression cases, and valid fees from the same pages
+   that the rules must not clear or withhold. Big PR (it changes what the API publishes):
+   one `@codex review`. Experimental until step 3 passes: nothing calls it from `all`.
 3. **Validate, then switch over.** First, about 20 schools from the 41 that neither sample
    used get a key read blind. The step-2 stage and today's rows are scored on them with
-   `fresh_rescore/rules.md`. Go on only if the stage is wrong no more often than today's
-   rows and finds at least 55 % of the site fees. Then, in one PR, stop the extract stage
+   `fresh_rescore/rules.md`, frozen as they are now. Score what would be published after every
+   gate (`pricing_row_is_publishable`, evidence, implausible tuition), not the raw reader
+   output. Go on only if the stage is wrong no more often than today's rows and finds at least
+   55 % of the site fees. Then, in one PR, stop the extract stage
    from calling `_extract_prices`, so a later pipeline run can't overwrite agent rows with
    rule-based ones. Then run the agent on Sofia into the launch DB, compare the scoreboard
    and `accuracy_report.py` before and after, and publish with a backup and before/after

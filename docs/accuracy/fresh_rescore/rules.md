@@ -1,5 +1,11 @@
 # Adjudication rules (R6 step 1 rescore)
 
+Revised 2026-10-13 after a second review: a count of payments no longer implies a semester
+(applied by `rescore.py`, which clears a "semester" the page does not state), fees of a sibling
+school on a shared site are left out (`corrections.json`), and an older year's fees are left
+out only when the site states that category for 2026/27 or later. Frozen from here: the
+validation run on untouched schools uses these rules unchanged.
+
 You are rebuilding, from the school's own web pages, the list of fees the site states, and judging a
 shuffled list of candidate fee rows (from two different extractors, unlabelled) against it.
 
@@ -18,11 +24,13 @@ verbatim quote (<= 25 words) containing the amount.
   - yearly = charged once per school year (incl. "еднократна такса" for the school year, and a full
     year's tuition paid in one payment, e.g. "еднократно плащане" option);
   - one_time = charged once ever (enrolment, entry exam, deposit);
-  - instalments: each printed instalment amount is its own site fee. Its correct period is the
-    instalment frequency when the site states one (8 monthly payments -> monthly; quarterly ->
-    quarter; 2 per year -> semester). A one-off first or last instalment that differs from the rest
-    has no regular period: its correct period is null, and any other period is wrong_period.
-    Example: "1 x 2992 + 8 x 1051" gives 2992 (period null) and 1051 (monthly).
+  - instalments: each printed instalment amount is its own site fee. Its period is the one the
+    site states for it ("8 месечни вноски" -> monthly; "на тримесечие" -> quarter). A count of
+    payments ("2 x", "на две вноски") does not state a period, so the correct period is null,
+    and any period given to it is wrong_period. A one-off first or last instalment that differs
+    from the rest has period null too.
+    Example: "1 x 2992 + 8 x 1051" under a "Месечно плащане" heading gives 2992 (period null)
+    and 1051 (monthly).
   - A yearly total is a site fee only if the site prints it (or states it in words). A total computed
     by adding instalments is not a site fee.
   - If the site gives no frequency for an amount, the correct period is null.

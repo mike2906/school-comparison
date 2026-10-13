@@ -26,7 +26,8 @@ The first pass below had three faults, found in a second-opinion review:
 
 So every row from both sides was judged again, the same way, against a key rebuilt from the
 schools' pages. Everything is in `fresh_rescore/`, and
-`python3 docs/accuracy/fresh_rescore/rescore.py` reproduces the numbers.
+`python3 docs/accuracy/fresh_rescore/rescore.py` reproduces the numbers and lists every row that
+is not right (`rescore.out`).
 
 - **Rules** (`rules.md`). A site fee is one printed amount for one group, plan and year, so each
   instalment is its own fee. Period is how often that amount is charged: once per school year is
@@ -41,8 +42,16 @@ schools' pages. Everything is in `fresh_rescore/`, and
   Every other verdict is from a fresh fetch.
 - **Fixes in the scoring script.** The adjudicators sometimes marked a row "duplicate" because the
   other side had already matched that fee. Such rows are judged again on their fields. Rows for
-  2026/27 that were marked stale count as current. Fees from a 2025/26 table that the site also
-  states for 2026/27 are left out (13, mostly at 305).
+  2026/27 that were marked stale count as current.
+- **Second review (same day).**
+  - 11 fees belonging to a sibling school on a shared site are left out (`corrections.json`):
+    515's grades 5 to 12 and 634's school and gymnasium meals. 634's preschool-class fees stay,
+    since the kindergarten takes that age.
+  - A count of payments ("2 x") no longer implies a semester. Its period is blank unless the
+    page states one.
+  - Academic years are parsed. An older year's fee is left out only when the site also states
+    that category for 2026/27 or later (11 fees, at 305).
+  - The rules are now frozen for the validation run.
 - **Audit.** A second agent judged 20 random verdicts blind and agreed on 18. Both
   disagreements were a deposit or admin fee with no stated period, where it was more lenient.
 - **Raw outputs.** The original run outputs are in `run/`. The original key is unchanged in
@@ -50,19 +59,19 @@ schools' pages. Everything is in `fresh_rescore/`, and
 
 ### Corrected results
 
-The corrected key has 226 fees at 35 schools. The original had 149; the biggest gaps were 515's
-school tables, 305, 171 and 634. 7 schools state no fees.
+The corrected key has 217 fees at 35 schools. The original had 149; the biggest gaps were 305,
+515, 171 and 634. 7 schools state no fees.
 
 | | Agent | Published today |
 | --- | --- | --- |
 | Rows | 158 | 72 |
-| Fully right | 116 (73 %) | 46 (64 %) |
-| Right but period left blank | 29 (18 %) | 22 (31 %) |
+| Fully right | 127 (80 %) | 46 (64 %) |
+| Right but period left blank | 18 (11 %) | 22 (31 %) |
 | Wrong | 13 (8 %) | 3 (4 %) |
 | Duplicate of its own row | 0 | 1 |
 | Unresolved | 0 | 0 |
-| Site fees found, period blank allowed | 143 of 226 (63 %) | 66 of 226 (29 %) |
-| Site fees found fully right | 114 of 226 (50 %) | 44 of 226 (19 %) |
+| Site fees found, period blank allowed | 145 of 217 (67 %) | 68 of 217 (31 %) |
+| Site fees found fully right | 127 of 217 (59 %) | 46 of 217 (21 %) |
 | Schools with fees where it has at least one usable fee | 33 of 35 | 24 of 35 |
 
 Two caveats. 8 published rows and 2 agent rows have no label, so they could not be wrong on
@@ -74,6 +83,7 @@ the agent's rows had no such check.
   - Yearly fees filed as one_time (5): 220's 8330 and 150, 531's 390 twice, 632's 7000.
   - First instalments filed as monthly (4): 515's 2992 twice, 2904 and 2828.
   - A last instalment filed as quarterly (1): 220's 1540.
+  - A period the page does not state (1): 569's 155 materials filed as yearly.
 - **Category (1).** 220's 770 deposit filed as tuition.
 - **Amount (1).** 547's 550 to 600 range, built from two monthly fees.
 
@@ -84,21 +94,20 @@ the agent's rows had no such check.
 
 **Where the agent misses:**
 - 305: 18 current fees, with no priced page found.
-- 515: 8 fees from the grades 5 to 12 table, on the same page as the kindergarten table it
-  read, plus the 4 first instalments it filed wrong.
+- 515: the 4 first instalments it filed wrong.
 - 171: 11 deadline-tier fees.
-- 634: 9 fees.
+- 634: 6 fees.
 
 ### Against the step-1 bar
 
 The plan's bar is: "at least as accurate as today and finds at least 55 % of the site fees".
-- **Fees found: passed.** 63 % with a blank period allowed; 50 % fully right.
+- **Fees found: passed.** 67 % with a blank period allowed; 59 % fully right.
 - **Accuracy: mixed.**
-  - The agent is fully right more often (73 % against 64 %), because today's rows leave the period
-    blank twice as often.
+  - The agent is fully right more often (80 % against 64 %), mostly because today's rows leave
+    the period blank far more often.
   - The agent is wrong more often (8 % against 4 %, 13 rows against 3).
-  - 12 of its 13 errors break the period and deposit rules above, which the prompt has not been
-    told yet; the 13th is the range built from two fees.
+  - 11 of its 13 errors break the period and deposit rules above, which the prompt has not been
+    told yet. One is a period the page never states, and one is the range built from two fees.
 
 So step 1 passes on fees found but not cleanly on accuracy. Step 2 is justified only with those
 rules in the prompt and in code, and it should be checked on new schools before the switch-over
