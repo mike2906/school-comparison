@@ -276,16 +276,20 @@ async def find_pages(crawler, run_config, client, school: School, spend: Spend) 
 # ---------------------------------------------------------------------------
 
 
-async def read_fees(
-    school: School, pages: list[PageRead], spend: Spend, missed: Sequence[Decimal] = ()
-) -> list[AgentFee]:
+def reader_text(pages: list[PageRead]) -> str:
+    """The text the reader sees: the pages one after another, cut to its limit."""
+    return "\n\n".join(f"=== PAGE {page.url}\n{page.text}" for page in pages)[:MAX_READ_CHARS]
+
+
+async def read_fees(school: School, pages: list[PageRead], spend: Spend, missed: Sequence[Decimal]) -> list[AgentFee]:
     """Read the fees on ``pages``; ``missed`` names amounts an earlier read left out."""
-    text = "\n\n".join(f"=== PAGE {page.url}\n{page.text}" for page in pages)[:MAX_READ_CHARS]
+    text = reader_text(pages)
     if missed:
         text += (
             "\n\nAn earlier read of these pages left out amounts that the school's stored fees have and "
-            f"the pages still show: {', '.join(format(amount, 'f') for amount in missed)}. Read the pages again in "
-            "full and list every fee, including every row and column of each fee table."
+            f"the pages still show: {', '.join(format(amount, 'f') for amount in missed)}. Read the pages again "
+            "in full and list every fee, including every row and column of each fee table. Some of these "
+            "amounts may be from an older year or not be fees: the rules above still decide."
         )
     in_price, out_price = get_model_costs("pricing")
     if not spend.allows((len(text) / 3 * in_price + READ_OUTPUT_TOKENS_RESERVE * out_price) / 1_000_000):
@@ -549,14 +553,9 @@ async def _missed_amounts(
         for row in stored.scalars().all()
         if row.amount is not None and row.id not in blocked and pricing_row_is_publishable(row)
     }
-    shown = set().union(*(page_numbers(page.text) for page in pages))
+    shown = page_numbers(reader_text(pages))  # what the reader can see, not what was cut off
     read = {amount for fee in fees for amount in fee_amounts(fee)}
     return sorted((published & shown) - read)
-
-
-def _covered(fees: list[AgentFee], amounts: list[Decimal]) -> int:
-    read = {amount for fee in fees for amount in fee_amounts(fee)}
-    return sum(amount in read for amount in amounts)
 
 
 def _fee_report(result: CheckedFee, page: Optional[PageRead]) -> dict[str, Any]:
@@ -608,14 +607,19 @@ async def run_school(
     }
     # The reader can stop part way down a fee table: at 170 it gave the same 5 of 14 fees in
     # three runs. When the pages still show amounts the published rows have and the read left
-    # out, read once more, naming them, and keep the read that covers more of them.
+    # out, read once more, naming them, and add the fees at amounts the first read did not give.
     missed = await _missed_amounts(db, school, priced, fees)
     if missed:
-        again = await read(school, priced, missed)
-        report["reread"] = {"missed": [format(amount, "f") for amount in missed], "fees": len(again), "used": False}
-        if _covered(again, missed) > _covered(fees, missed) and len(again) >= len(fees):
-            fees = again
-            report["reread"]["used"] = True
+        report["reread"] = {"missed": [format(amount, "f") for amount in missed], "added": 0}
+        try:
+            again = await read(school, priced, missed)
+        except SpendCapReached as exc:  # the first read is paid for: use it
+            report["reread"]["error"] = str(exc)
+            again = []
+        first = {amount for fee in fees for amount in fee_amounts(fee)}
+        added = [fee for fee in again if fee_amounts(fee) and not set(fee_amounts(fee)) <= first]
+        fees = [*fees, *added]
+        report["reread"]["added"] = len(added)
     checked: list[tuple[CheckedFee, SourcePage]] = []
     for fee in fees:
         page = _page_for(fee, priced)
@@ -761,7 +765,7 @@ async def run_fees_agent(
                                 db,
                                 school,
                                 find=lambda s: find_pages(crawler, run_config, client, s, spend),
-                                read=lambda s, pages, missed=(): read_fees(s, pages, spend, missed),
+                                read=lambda s, pages, missed: read_fees(s, pages, spend, missed),
                                 apply=apply,
                             )
                         )
