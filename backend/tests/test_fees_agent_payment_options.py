@@ -290,3 +290,10 @@ def test_a_row_label_the_pdf_put_on_another_line_may_be_quoted_with_the_row():
 def test_a_line_made_of_words_not_on_the_page_is_still_dropped():
     fee = tuition(amount=9500, evidence="Grade 11 – 12 Plan 1 – € 9,500")
     assert not check_fee(fee, PAGE_596_SECONDARY).kept
+
+
+def test_one_time_in_english_names_the_period_of_a_registration_fee():
+    line = "ANNUAL TUITION FEES 2026-2027\nOne-time fee for initial enrollment of € 800"
+    fee = tuition(category=PriceCategory.REGISTRATION, amount=800, period=PricePeriod.ONE_TIME, evidence=line)
+    fee = fee.model_copy(update={"payment_options": []})
+    assert check_fee(fee, line).fee.period is PricePeriod.ONE_TIME

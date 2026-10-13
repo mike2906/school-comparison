@@ -157,7 +157,7 @@ _PERIOD_WORDS = {  # Bulgarian, English, and the French and German some schools 
     PricePeriod.QUARTER: r"тримесеч|\bquarter|vierteljährlich",
     PricePeriod.TERM: r"срок|\bterm\b",
     PricePeriod.SEMESTER: r"семест|\bsemester|semestre|halbj[aä]hr",
-    PricePeriod.ONE_TIME: r"еднократ|\bonce\b|при записване",
+    PricePeriod.ONE_TIME: r"еднократ|\bonce\b|\bone[- ]time\b|при записване",
 }
 # "for the school year" names a period only on the amount's own line: as a heading it often
 # covers fees charged per day or per month too (569's "ДОПЪЛНИТЕЛНИ ТАКСИ ЗА УЧЕБНАТА ГОДИНА").
