@@ -758,3 +758,47 @@ async def test_an_old_bgn_range_gives_way_to_the_same_range_in_euro(db_session, 
     assert report["outcome"] == "written" and report["rows_old_kept"] == 0, report
     rows = await _rows(db_session, school)
     assert [(float(r.amount_min), float(r.amount_max), r.currency) for r in rows] == [(500.0, 600.0, "EUR")]
+
+
+def test_half_yearly_in_german_is_not_yearly():
+    line = "Schulgeld 3.000 € halbjährlich"
+    assert check_fee(fee(PriceCategory.TUITION, line, amount=3000, period=PricePeriod.YEARLY), line).fee.period is None
+    kept = check_fee(fee(PriceCategory.TUITION, line, amount=3000, period=PricePeriod.SEMESTER), line)
+    assert kept.fee.period is PricePeriod.SEMESTER
+
+
+def test_a_registration_fee_the_line_calls_yearly_is_not_one_time():
+    line = "Годишна такса за записване: 300 евро"
+    result = check_fee(fee(PriceCategory.REGISTRATION, line, amount=300, period=PricePeriod.ONE_TIME), line)
+    assert result.fee.period is None
+
+
+def test_two_tiers_at_one_price_on_one_page_are_two_rows():
+    school = School(id=1, name_i18n={}, country_code="bg", school_type="private", education_level="primary")
+    page = SourcePage(id=-1, school_id=1, scrape_type=ScrapeType.WEBSITE, source_url=URL)
+    text = "1-4 клас: 700 евро\n5-7 клас: 700 евро"
+    low = check_fee(fee(PriceCategory.TUITION, "1-4 клас: 700 евро", amount=700, label="1-4 клас"), text)
+    high = check_fee(fee(PriceCategory.TUITION, "5-7 клас: 700 евро", amount=700, label="5-7 клас"), text)
+    rows, _ = fees_agent._build_rows(school, [(low, page), (high, page)])
+    assert len(rows) == 2
+
+
+def test_an_old_bgn_row_is_matched_only_to_a_euro_fee_of_its_kind():
+    old = Pricing(category=PriceCategory.FOOD, amount=200, currency="BGN")
+    bus = Pricing(category=PriceCategory.TRANSPORT, amount=102.26, currency="EUR")
+    assert fees_agent._in_euro(old, [bus]) is None
+    meals = Pricing(category=PriceCategory.FOOD, amount=102.26, currency="EUR")
+    assert fees_agent._in_euro(old, [meals]) is not None
+
+
+async def test_a_read_with_nothing_new_writes_nothing(db_session, frozen_today):
+    page_text = "Такса: 700 евро"
+    school = await _school(db_session)
+    await _old_rows(db_session, school, "2026/2027", [700])  # monthly: a period the read loses
+    await db_session.commit()
+    read = [fee(PriceCategory.TUITION, page_text, amount=700, academic_year="2026/2027")]
+    report = await fees_agent.run_school(
+        db_session, school, find=_find([PageRead(URL, page_text, True)]), read=_read(read), apply=True
+    )
+    assert report["outcome"] == "kept_old_rows" and report["reason"] == "every fee read is already stored", report
+    assert [(float(r.amount), r.period) for r in await _rows(db_session, school)] == [(700.0, PricePeriod.MONTHLY)]

@@ -126,17 +126,19 @@ def amount_on_page(fee: AgentFee, numbers: set[Decimal]) -> bool:
 _PERIOD_WORDS = {  # Bulgarian, English, and the French and German some schools publish in
     PricePeriod.MONTHLY: r"(?<!три)месеч|(?:на|за|/)\s*месец|\bmonth(?:ly)?\b|mensuel|par mois|monatlich|pro monat",
     PricePeriod.YEARLY: (
+        # "За цялата учебна година" (300) and a "(l'année)" column (505) name the year for
+        # what they head; a bare "for the school year" heading does not (_YEAR_ON_AMOUNT_LINE_RE).
         r"(?<!полу)(?<!дву)годиш|\b(?:year(?:ly)?|annual)\b|цялата учебна година"
-        r"|annuel|l'année|par an\b|jährlich|pro jahr"
+        r"|annuel|\(l'année\)|par an\b|(?<!halb)jährlich|pro jahr"
     ),
     PricePeriod.QUARTER: r"тримесеч|\bquarter",
     PricePeriod.TERM: r"срок|\bterm\b",
-    PricePeriod.SEMESTER: r"семест|\bsemester|semestre|halbjahr",
-    PricePeriod.ONE_TIME: r"еднократ|\bonce\b|при записване|inscription|einmalig",
+    PricePeriod.SEMESTER: r"семест|\bsemester|semestre|halbj[aä]hr",
+    PricePeriod.ONE_TIME: r"еднократ|\bonce\b|при записване",
 }
 # "for the school year" names a period only on the amount's own line: as a heading it often
 # covers fees charged per day or per month too (569's "ДОПЪЛНИТЕЛНИ ТАКСИ ЗА УЧЕБНАТА ГОДИНА").
-_YEAR_ON_AMOUNT_LINE_RE = re.compile(r"(?:учебн\w*|на|за)\s+година")
+_YEAR_ON_AMOUNT_LINE_RE = re.compile(r"(?:учебн\w*|на|за)\s+година|l'année")
 _DEPOSIT_RE = re.compile(r"депозит|капаро|deposit")
 # Only a currency and the marker may sit between a range's ends: "550 – 600", "550 EUR to 600".
 _RANGE_JOIN_RE = re.compile(r"(?:eur|€|евро|лв\.?|лева|bgn)?\s*(?:[–—-]|до|to)", re.IGNORECASE)
@@ -150,9 +152,12 @@ def _normalized(text: str) -> str:
 
 def _names_period(period: PricePeriod, evidence: str, amounts: list[Decimal], category: PriceCategory) -> bool:
     # An enrolment, exam or application fee is charged once by what it is (rules.md), so it
-    # needs no word for it; a deposit filed as registration is one too.
+    # needs no word for it; a deposit filed as registration is one too. Not when the line
+    # names a recurring period: "годишна такса за записване" is paid every year.
     if period is PricePeriod.ONE_TIME and category is PriceCategory.REGISTRATION:
-        return True
+        return not any(
+            re.search(words, evidence) for other, words in _PERIOD_WORDS.items() if other is not PricePeriod.ONE_TIME
+        )
     if re.search(_PERIOD_WORDS[period], evidence):
         return True
     if period is not PricePeriod.YEARLY:

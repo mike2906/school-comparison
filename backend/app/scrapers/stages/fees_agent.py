@@ -41,7 +41,7 @@ from app.scrapers.stages import common as stage_common
 from app.scrapers.validator import validate_school_data
 from app.services.pipeline_runs import finalize_pipeline_run, pipeline_run_heartbeat, start_pipeline_run
 from app.services.provider_costs import ProviderCostCapExceeded, execute_billable_request, provider_cost_scope
-from app.utils.display_gating import pricing_row_is_publishable
+from app.utils.display_gating import _BGN_PER_EUR, pricing_row_is_publishable
 from app.utils.website_data import prepare_validation_rollover
 
 logger = logging.getLogger(__name__)
@@ -250,7 +250,7 @@ def _build_rows(
 ) -> tuple[list[Pricing], list[FieldSource]]:
     rows: list[Pricing] = []
     sources: list[FieldSource] = []
-    seen: set[tuple] = set()
+    seen: dict[tuple, set[tuple]] = {}  # fee fields -> (page, label) pairs read
     for result, page in checked:
         fee = result.fee
         fields = price_step._normalized_price_fields(
@@ -269,10 +269,14 @@ def _build_rows(
         )
         if fields is None:
             continue
-        key = tuple(fields.values())
-        if key in seen:  # the same fee read twice, from one page or two
+        # The same fee on two pages is one row (564 lists its fees on three). On one page a
+        # second fee with the same fields but its own label is a fee of its own: two grade
+        # tiers at one price when the reader left their groups empty.
+        key, label = tuple(fields.values()), " ".join(fee.label.split()).casefold()
+        reads = seen.setdefault(key, set())
+        if reads and any(other != page.id or other_label == label for other, other_label in reads):
             continue
-        seen.add(key)
+        reads.add((page.id, label))
         rows.append(
             Pricing(
                 school_id=school.id,
@@ -328,7 +332,6 @@ async def _upsert_pages(db: AsyncSession, pages: dict[str, SourcePage], stored: 
     await db.flush()
 
 
-BGN_PER_EUR = Decimal("1.95583")
 EURO_TOLERANCE = Decimal("0.005")  # a site's own conversion is often rounded: 1369 лв. for 700 €
 
 
@@ -352,10 +355,10 @@ class _InEuro:
 def _in_euro(row: Pricing, proposed: list[Pricing]) -> Optional[_InEuro]:
     if (row.currency or "").upper() != "BGN":
         return None
-    euro = [
+    euro = [  # the same kind of fee: 200 лв. of meals is not a 102 € bus fee
         Decimal(str(value))
         for new in proposed
-        if (new.currency or "").upper() == "EUR"
+        if (new.currency or "").upper() == "EUR" and new.category == row.category
         for value in (new.amount, new.amount_min, new.amount_max)
         if value is not None
     ]
@@ -364,7 +367,7 @@ def _in_euro(row: Pricing, proposed: list[Pricing]) -> Optional[_InEuro]:
         if value is None:
             converted.append(None)
             continue
-        target = Decimal(str(value)) / BGN_PER_EUR
+        target = Decimal(str(value)) / _BGN_PER_EUR
         match = next((amount for amount in euro if abs(amount - target) <= target * EURO_TOLERANCE), None)
         if match is None:
             return None
@@ -479,9 +482,14 @@ async def run_school(
     if kept:  # by amount alone: a refiled category or currency is still the same fee
         superseded = [row for row in superseded if row not in kept]
         pairs = [(row, source) for row, source in zip(rows, sources) if _amount_group(row) not in kept_amounts]
+        report["rows_new_dropped"] = len(rows) - len(pairs)
         rows, sources = [row for row, _ in pairs], [source for _, source in pairs]
     report["regressions"] = regressions
     report["rows_old_kept"] = len(kept)
+    if not rows and not superseded:
+        report["outcome"] = "kept_old_rows"
+        report["reason"] = "every fee read is already stored"
+        return report
     if not apply:
         report["outcome"] = "would_write"
         return report
