@@ -297,3 +297,16 @@ def test_one_time_in_english_names_the_period_of_a_registration_fee():
     fee = tuition(category=PriceCategory.REGISTRATION, amount=800, period=PricePeriod.ONE_TIME, evidence=line)
     fee = fee.model_copy(update={"payment_options": []})
     assert check_fee(fee, line).fee.period is PricePeriod.ONE_TIME
+
+
+def test_a_label_quoted_with_a_row_it_does_not_sit_beside_is_dropped():
+    # "Grade 8 – 9" is on the plan 2 line; € 2,950 is the plan 3 first payment two lines up.
+    fee = tuition(amount=2950, evidence="Grade 8 – 9 € 2,950")
+    assert not check_fee(fee, PAGE_596_SECONDARY).kept
+
+
+def test_one_time_in_english_does_not_beat_a_recurring_word_on_the_same_line():
+    line = "Annual re-enrolment fee € 300, payable at one time"
+    fee = tuition(category=PriceCategory.REGISTRATION, amount=300, period=PricePeriod.ONE_TIME, evidence=line)
+    fee = fee.model_copy(update={"payment_options": []})
+    assert check_fee(fee, line).fee.period is not PricePeriod.ONE_TIME
