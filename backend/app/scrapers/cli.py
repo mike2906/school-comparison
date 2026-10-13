@@ -422,17 +422,11 @@ async def _fees_agent_command(*, school_id, city, country, limit, max_usd, apply
     from app.database import async_session_maker
     from app.scrapers.stages import fees_agent as fees_agent_stage
 
-    on_school = None
-    if report_path is not None:  # one line per school as it finishes, so a killed run keeps its reads
+    lines_path = None
+    if report_path is not None:  # each school's line is appended as it finishes (never emptied)
         report_path.parent.mkdir(parents=True, exist_ok=True)
-        lines_path = report_path.with_suffix(".jsonl")
-        lines_path.write_text("", encoding="utf-8")
+        lines_path = report_path.with_name(f"{report_path.stem}.schools.jsonl")
         console.print(f"Per-school lines: {lines_path}")
-
-        def on_school(result):
-            with lines_path.open("a", encoding="utf-8") as lines:
-                lines.write(json.dumps(result, ensure_ascii=False, default=str) + "\n")
-
     async with async_session_maker() as db:
         report = await fees_agent_stage.run_fees_agent(
             db,
@@ -443,7 +437,7 @@ async def _fees_agent_command(*, school_id, city, country, limit, max_usd, apply
             max_usd=max_usd,
             apply=apply,
             after_id=after_id,
-            on_school=on_school,
+            lines_path=lines_path,
         )
     console.print(
         f"{'Applied' if apply else 'Dry run'}: {report['schools']} schools, ${report['spent_usd']:.4f} spent, "
