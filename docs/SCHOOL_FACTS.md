@@ -32,7 +32,8 @@ some picks were trivia, yearly counts go stale, the paragraph only restated the 
    ignored). A second call on the same tier confirms each quote states the whole fact.
 4. **Store** (`--apply` only): `attributes["school_facts"]` =
    `{_schema_version, read_at, website_url, model, facts: [{topic, text_i18n, source_url, quote}]}`.
-   A read that keeps facts replaces the stored ones, and so does a read of 4 or more pages
+   Stored facts whose quote is still on a page read are carried into the new set (new facts
+   first, same limits). A read that keeps facts replaces the stored ones, and so does a read of 4 or more pages
    that keeps none. A site not read, or read from fewer pages with no fact kept (often a
    partial crawl), keeps the stored facts.
 
@@ -70,6 +71,11 @@ school (Sofia ~$3). Nothing reaches the site until an `--apply` run is published
   row, up to 8 lines; the judge sees each quote's page address (a B2 level on
   /anglijski-ezik/ is about English); plans in the future tense are not facts; a fact
   names only what its quote names. Facts still vary between runs (383 kept 8, then 4).
+- Dry run 4: 37 of 43 kept, $0.043; every page now fits the read. Fixed after it: most
+  wrong drops were the reader adding a year or adjective the quote lacks, so the reader is
+  told not to; a current-year timetable is not a "plan"; a link quoted without its address
+  now matches. Reads vary from run to run (383 kept 1, 8, 4, 4), so a stored fact whose
+  quote is still on a page read is carried over with no model call; new facts come first.
 - Note for runs: the cost guard reserves $0.10 per call, so `--max-usd` needs about $0.10
   headroom above the expected spend.
 - Top up OpenRouter (about $1.35 left on 2026-10-13).

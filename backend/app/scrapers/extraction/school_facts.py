@@ -66,7 +66,10 @@ Rules:
   its own quote: do not split one line into several facts.
 - Name only what the quote itself names: if a page lists taekwondo in text and fencing only as a picture,
   the fact is about taekwondo.
-- Only what the school has or does now. Plans and promises ("ще създаваме", "will open") are not facts.
+- Only what the school has or does now, or has set for the current or coming school year. Plans for
+  something that does not exist yet ("ще създаваме", "will open") are not facts.
+- Add nothing the quote lacks: no year, adjective, number or clause from elsewhere. A fact that says less
+  but all of it from the quote is better than one that says more.
 - Be specific: name the sports, clubs, languages, rooms or hours. "Sports activities are part of the programme"
   or "pupils are at school for the full day" with nothing more says too little; give the detail the page has
   (which sports, until what time) or leave the fact out. The subjects every school teaches under the state
@@ -80,7 +83,8 @@ states what the fact says; translation and plain rewording are fine. A heading, 
 a specialty, subject, club, sport or room is enough for a fact that only says the school offers or has it.
 The page's address can supply context the quote leaves out (a quote on /anglijski-ezik/ is about English).
 Fail an item when the fact adds something neither says (a number, a grade, a scope, a claim), when the quote
-describes a plan rather than what exists now, or
+describes a plan for something that does not exist yet (a menu or timetable set for the current or coming
+school year is not a plan), or
 when the quote is a bare label ("Училищен психолог") stretched into a description, or a slogan with nothing
 concrete in it. Return the numbers of the items that pass."""
 
@@ -106,7 +110,7 @@ class Supported(BaseModel):
 def _normalise(text: str) -> str:
     text = re.sub(r"!\[[^\]]*\]\([^)]*\)", " ", text)  # markdown images
     text = re.sub(r"\[([^\]]*)\]\([^)]*\)", r"\1", text)  # markdown links keep their text
-    text = re.sub(r"[*_#>|`\\]+", " ", text)
+    text = re.sub(r"[*_#>|`\\\[\]]+", " ", text)  # also a link's text quoted without its address
     text = text.replace("“", '"').replace("”", '"').replace("„", '"').replace("’", "'")
     text = text.replace("–", "-").replace("—", "-")
     text = re.sub(r"\s+([,.;:!?])", r"\1", text)  # "образование , което" as the reader tidies it
@@ -141,6 +145,21 @@ def _on_page(quote: str, text: str) -> bool:
     if len(quote) >= 12:
         return quote in _normalise(text)
     return any(_strip(_normalise(line)) == quote for line in text.splitlines())
+
+
+def stored_as_fact(stored: dict) -> Optional[Fact]:
+    """A stored fact back as a ``Fact``, to check its quote against a new read."""
+    try:
+        text = stored["text_i18n"]
+        return Fact(
+            topic=stored["topic"],
+            fact_en=text["en"],
+            fact_bg=text["bg"],
+            quote=stored["quote"],
+            source_url=stored["source_url"],
+        )
+    except (KeyError, TypeError, ValueError):
+        return None
 
 
 def quote_key(fact: Fact) -> str:

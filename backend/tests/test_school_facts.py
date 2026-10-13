@@ -340,3 +340,25 @@ async def test_a_rejected_website_hides_the_facts(client, db_session):
     await db_session.commit()
     body = (await client.get(f"/schools/{school.id}")).json()
     assert body["school_facts"] is None
+
+
+@pytest.mark.asyncio
+async def test_a_stored_fact_whose_quote_is_still_on_the_page_is_carried():
+    still = _fact_row(topic="school_day", quote=_line(2), text_i18n={"bg": "Б", "en": "Still there."})
+    gone = _fact_row(topic="meals", quote="Обяд и две закуски за I-IV клас.", text_i18n={"bg": "Б", "en": "Gone."})
+    school = _school(school_facts={"_schema_version": 1, "facts": [still, gone]})
+    new = [_fact("languages", _line(5), en="New.")]
+    report = await stage.read_school(school, LINES, _Calls(new, passed=[1]))
+    assert [f["text_i18n"]["en"] for f in report["store"]] == ["New.", "Still there."]
+    assert report["carried"] == ["Still there."]
+
+
+def test_a_link_quoted_without_its_address_matches():
+    page = [
+        (
+            HOME,
+            "2026– 2031 | Профил „Икономическо развитие“\n[Училищен учебен план / 8. В](https://school.example/plan.pdf)",
+        )
+    ]
+    quote = "2026– 2031 | Профил „Икономическо развитие“\n[Училищен учебен план / 8. В]"
+    assert quote_on_page(_fact("curriculum", quote), page) == HOME

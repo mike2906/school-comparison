@@ -60,7 +60,9 @@ def model_caller(spend: Spend) -> Caller:
     async def call(prompt: str, schema: type, message: str, school_id: int) -> Any:
         if not spend.allows(_estimate_usd(message)):
             raise SpendCapReached(f"spent ${spend.spent_usd:.4f} of ${spend.cap_usd}")
-        agent = create_agent(TIER, prompt, schema, retries=1, model_settings={"temperature": get_settings().extraction_temperature})
+        agent = create_agent(
+            TIER, prompt, schema, retries=1, model_settings={"temperature": get_settings().extraction_temperature}
+        )
         result = await execute_billable_request(
             lambda: agent.run(message), model=get_model(TIER), school_id=school_id, stage=STAGE, timeout_seconds=150
         )
@@ -159,8 +161,32 @@ async def read_school(school: School, pages: list[PageRead], call: Caller) -> di
     report["facts"] = [
         fact.model_dump() | {"kept": status[id(fact)] is None, "dropped": status[id(fact)]} for fact in read.facts
     ]
-    report["store"] = [facts_rules.stored_fact(fact, url) for fact, url in kept]
-    return report | {"outcome": f"{len(kept)} of {len(read.facts)} kept"}
+    carried = _carried(school, readable, kept)
+    store = _ordered(kept + carried)
+    report["carried"] = [fact.fact_en for fact, _ in carried if any(fact is f for f, _ in store)]
+    report["store"] = [facts_rules.stored_fact(fact, url) for fact, url in store]
+    outcome = f"{len(kept)} of {len(read.facts)} kept"
+    return report | {"outcome": outcome + (f", {len(report['carried'])} carried" if report["carried"] else "")}
+
+
+def _carried(school: School, readable: list[tuple[str, str]], kept: list[tuple[Fact, str]]) -> list[tuple[Fact, str]]:
+    """Stored facts whose quote is still on a page read, and not the quote of a new fact.
+
+    Reads vary from run to run; a fact accepted before stays while its page still says it,
+    with no model call, so the school's facts do not change on every refresh. New facts
+    come first, so they win a topic's places."""
+    stored = ((school.attributes or {}).get(ATTRIBUTE_KEY) or {}).get("facts") or []
+    new_quotes = {facts_rules.quote_key(fact) for fact, _ in kept}
+    carried = []
+    for row in stored:
+        fact = facts_rules.stored_as_fact(row) if isinstance(row, dict) else None
+        if fact is None or fact.topic not in facts_rules.TOPICS or facts_rules.quote_key(fact) in new_quotes:
+            continue
+        url = facts_rules.quote_on_page(fact, readable)
+        if url:
+            new_quotes.add(facts_rules.quote_key(fact))
+            carried.append((fact, url))
+    return carried
 
 
 def facts_block(facts: list[dict], model: str, website_url: Optional[str]) -> dict[str, Any]:
