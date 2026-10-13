@@ -1,0 +1,154 @@
+{
+ "school_id": 595,
+ "pages_read": [
+  "https://buditel.softuni.bg/",
+  "https://buditel.softuni.bg/fees/"
+ ],
+ "fetch_failed": [],
+ "site_states_no_fees": false,
+ "site_fees": [
+  {
+   "fid": "f1",
+   "category": "tuition",
+   "amount": 8900,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "8. клас",
+   "plan": "Плащане на една вноска",
+   "year": "2027/2028",
+   "url": "https://buditel.softuni.bg/fees/",
+   "quote": "Годишна такса за 8. клас за учебната 2027/2028 година ... Плащане на една вноска 8 900 евро"
+  },
+  {
+   "fid": "f2",
+   "category": "tuition",
+   "amount": 3115,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "group": "8. клас",
+   "plan": "Плащане на 3 вноски",
+   "year": "2027/2028",
+   "url": "https://buditel.softuni.bg/fees/",
+   "quote": "Плащане на 3 вноски | 3 вноски по 3 115 евро"
+  },
+  {
+   "fid": "f3",
+   "category": "registration",
+   "amount": 100,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "group": null,
+   "plan": null,
+   "year": null,
+   "url": "https://buditel.softuni.bg/fees/",
+   "quote": "Еднократна такса кандидатстване – плаща се прио полагане на приемен изпит от кандидат-ученик – 100 евро."
+  },
+  {
+   "fid": "f4",
+   "category": "registration",
+   "amount": 490,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "group": "нов ученик",
+   "plan": null,
+   "year": null,
+   "url": "https://buditel.softuni.bg/fees/",
+   "quote": "Еднократна такса регистрация – плаща се при подписан договор за обучение на нов ученик – 490 евро."
+  },
+  {
+   "fid": "f5",
+   "category": "tuition",
+   "amount": 8320,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "8. клас",
+   "plan": "Плащане на една вноска",
+   "year": "2026/2027",
+   "url": "https://buditel.softuni.bg/",
+   "quote": "Годишна такса за 8. клас за учебната 2026/2027 година: 8320 евро – Плащане на една вноска."
+  },
+  {
+   "fid": "f6",
+   "category": "tuition",
+   "amount": 2920,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "group": "8. клас",
+   "plan": "Плащане на 3 вноски",
+   "year": "2026/2027",
+   "url": "https://buditel.softuni.bg/",
+   "quote": "2920 евро на вноска – Плащане на 3 вноски."
+  }
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "verdict": "correct",
+   "fid": "f4",
+   "reason": "490 EUR one-time registration fee.",
+   "group_unstated": false
+  },
+  {
+   "oid": "o2",
+   "verdict": "missing_period",
+   "fid": "f1",
+   "reason": "8900 EUR one-payment 2027/2028 tuition; site shows annual single payment (yearly), row period null.",
+   "group_unstated": false
+  },
+  {
+   "oid": "o3",
+   "verdict": "duplicate",
+   "fid": "f3",
+   "reason": "Same 100 EUR application fee as o4, which is better (has one_time; site says 'Еднократна'). Row has period null.",
+   "group_unstated": false
+  },
+  {
+   "oid": "o4",
+   "verdict": "correct",
+   "fid": "f3",
+   "reason": "100 EUR one-time application fee.",
+   "group_unstated": false
+  },
+  {
+   "oid": "o5",
+   "verdict": "duplicate",
+   "fid": "f4",
+   "reason": "Same 490 EUR registration fee as o1; note matches homepage waiver text.",
+   "group_unstated": false
+  },
+  {
+   "oid": "o6",
+   "verdict": "stale",
+   "fid": "f5",
+   "reason": "8320 EUR is the 2026/2027 fee; dedicated /fees/ page now shows 2027/2028 (8900). Still printed on homepage.",
+   "group_unstated": false
+  },
+  {
+   "oid": "o7",
+   "verdict": "stale",
+   "fid": "f6",
+   "reason": "2920 EUR/instalment is 2026/2027; /fees/ now shows 3115 for 2027/2028. Still printed on homepage.",
+   "group_unstated": false
+  },
+  {
+   "oid": "o8",
+   "verdict": "stale",
+   "fid": "f5",
+   "reason": "8320 EUR 2026/2027; superseded on /fees/ by 2027/2028.",
+   "group_unstated": false
+  }
+ ],
+ "notes": "Homepage still shows 2026/2027 fees (8320 / 3x2920, waiver to 31.01.2026) while /fees/ shows 2027/2028 (8900 / 3x3115, waiver to 31.01.2027). Judged 2027/2028 as the year the site currently shows; 2026/2027 is the ongoing school year so the stale verdicts on o6-o8 are arguable. 3-instalment frequency not stated -> period null. 5% sibling discount not a fee."
+}

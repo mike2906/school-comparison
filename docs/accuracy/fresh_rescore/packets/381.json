@@ -1,0 +1,100 @@
+{
+ "school_id": 381,
+ "name": "Частно основно училище Образователни технологии",
+ "website": "https://eduteh.eu/",
+ "pages_the_crawler_visited": [
+  "https://eduteh.eu/",
+  "https://eduteh.eu/chastno-osnovno-uchilishte/price-and-admission-chou",
+  "https://eduteh.eu/chastno-osnovno-uchilishte/price-and-admission-chou/priem-parvoklasnici",
+  "https://eduteh.eu/chastno-osnovno-uchilishte/price-and-admission-chou/priem-petoklasnici",
+  "https://eduteh.eu/chastna-profilirana-gimnazia/admission",
+  "https://eduteh.eu/chastno-osnovno-uchilishte/price-and-admission-chou/dni-otvoreni-vrati-chou",
+  "https://eduteh.eu/articles/nova-biling-paralelka",
+  "https://eduteh.eu/chastna-profilirana-gimnazia/profiles/predpriemacheski",
+  "https://eduteh.eu/chastna-profilirana-gimnazia/admission/dni-otvoreni-vrati",
+  "https://eduteh.eu/chastno-osnovno-uchilishte/education-process-organization/transport"
+ ],
+ "pages_where_an_earlier_reader_found_fees": [
+  "https://eduteh.eu/chastno-osnovno-uchilishte/price-and-admission-chou/priem-parvoklasnici",
+  "https://eduteh.eu/chastno-osnovno-uchilishte/price-and-admission-chou/priem-petoklasnici"
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "category": "registration",
+   "amount": "100.00",
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "Административната такса за кандидатстване",
+   "note": ""
+  },
+  {
+   "oid": "o2",
+   "category": "tuition",
+   "amount": 8110.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "Такса за обучение",
+   "note": "For the 2026/2027 school year."
+  },
+  {
+   "oid": "o3",
+   "category": "food",
+   "amount": "174.00",
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "Таксата за храна",
+   "note": ""
+  },
+  {
+   "oid": "o4",
+   "category": "tuition",
+   "amount": "8110.00",
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "Таксата за обучение",
+   "note": ""
+  },
+  {
+   "oid": "o5",
+   "category": "registration",
+   "amount": 100.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "Административна такса за кандидатстване",
+   "note": "Учебна 2026/2027 година; includes admission tests and assessment."
+  },
+  {
+   "oid": "o6",
+   "category": "registration",
+   "amount": "200.00",
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "BGN",
+   "period": null,
+   "label": "Административната такса за кандидатстване",
+   "note": ""
+  },
+  {
+   "oid": "o7",
+   "category": "food",
+   "amount": 174.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "Такса за храна",
+   "note": "For the 2025/2026 school year."
+  }
+ ]
+}

@@ -1,0 +1,69 @@
+{
+ "school_id": 271,
+ "name": "ЧАСТНО СРЕДНО УЧИЛИЩЕ БЪЛГАРСКО ШКОЛО",
+ "website": "https://bgshkolo.com/",
+ "pages_the_crawler_visited": [
+  "https://bgshkolo.com/",
+  "https://bgshkolo.com/pricing-plans/"
+ ],
+ "pages_where_an_earlier_reader_found_fees": [
+  "https://bgshkolo.com/pricing-plans/"
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "category": "tuition",
+   "amount": "14082.00",
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "BGN",
+   "period": "yearly",
+   "label": "Standard",
+   "note": ""
+  },
+  {
+   "oid": "o2",
+   "category": "registration",
+   "amount": 500.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "label": "Такса за постъпване в учебния комплекс",
+   "note": "За новопостъпващи семейства."
+  },
+  {
+   "oid": "o3",
+   "category": "tuition",
+   "amount": "15549.00",
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "BGN",
+   "period": "yearly",
+   "label": "",
+   "note": ""
+  },
+  {
+   "oid": "o4",
+   "category": "materials",
+   "amount": 250.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "Такса за учебни помагала",
+   "note": ""
+  },
+  {
+   "oid": "o5",
+   "category": "tuition",
+   "amount": 7200.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "7-ми до 12-ти клас",
+   "note": ""
+  }
+ ]
+}

@@ -1,0 +1,61 @@
+{
+ "school_id": 574,
+ "name": "ЧАСТНА ДЕТСКА ГРАДИНА АНИКА",
+ "website": "https://novigradini.com/",
+ "pages_the_crawler_visited": [
+  "https://novigradini.com/#dipipopup-27586290#popup_on_load",
+  "https://novigradini.com/anika/",
+  "https://novigradini.com/anika/ceni/",
+  "https://novigradini.com/anika/priem/",
+  "https://novigradini.com/anika/hrana/"
+ ],
+ "pages_where_an_earlier_reader_found_fees": [
+  "https://novigradini.com/anika/"
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "category": "registration",
+   "amount": 475.5,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "label": "депозит",
+   "note": "Заплаща се при записване; приспада се от последната месечна такса при спазено предизвестие."
+  },
+  {
+   "oid": "o2",
+   "category": "registration",
+   "amount": "475.50",
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "label": "депозит",
+   "note": ""
+  },
+  {
+   "oid": "o3",
+   "category": "tuition",
+   "amount": "475.50",
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "Месечната такса в ЧДГ „Аника“",
+   "note": ""
+  },
+  {
+   "oid": "o4",
+   "category": "tuition",
+   "amount": 475.5,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "месечната такса",
+   "note": "От септември 2025 г.; включва целодневна грижа, образователна програма и музикално обучение."
+  }
+ ]
+}

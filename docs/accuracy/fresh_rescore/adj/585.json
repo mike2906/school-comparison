@@ -1,0 +1,72 @@
+{
+ "school_id": 585,
+ "pages_read": [
+  "https://artisbg.com/",
+  "https://artisbg.com/primary-education/",
+  "https://artisbg.com/junior-high-school/",
+  "https://artisbg.com/high-school-3/"
+ ],
+ "fetch_failed": [],
+ "site_states_no_fees": false,
+ "site_fees": [
+  {
+   "fid": "f1",
+   "category": "tuition",
+   "amount": 7900,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "I-XII клас (същата сума на трите страници за етапи)",
+   "plan": "Заплащане на цялата вноска при записване",
+   "year": null,
+   "url": "https://artisbg.com/primary-education/",
+   "quote": "Годишна такса за обучение 7900 € При заплащане на цялата вноска при записване"
+  },
+  {
+   "fid": "f2",
+   "category": "tuition",
+   "amount": 2050,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "group": "I-XII клас",
+   "plan": "Четири вноски",
+   "year": null,
+   "url": "https://artisbg.com/primary-education/",
+   "quote": "Четири вноски по 2050 €. Първата вноска се заплаща при записване на детето."
+  },
+  {
+   "fid": "f3",
+   "category": "registration",
+   "amount": 200,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "group": "I-XII клас",
+   "plan": null,
+   "year": null,
+   "url": "https://artisbg.com/primary-education/",
+   "quote": "Такса кандидатстване 200 €. Внася се еднократно и не подлежи на възстановяване"
+  }
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "verdict": "correct",
+   "fid": "f3",
+   "reason": "200 EUR application fee, one-time.",
+   "group_unstated": false
+  },
+  {
+   "oid": "o2",
+   "verdict": "correct",
+   "fid": "f1",
+   "reason": "7900 EUR annual tuition, paid in full at enrolment.",
+   "group_unstated": false
+  }
+ ],
+ "notes": "Fees are under #admission-and-fees on each stage page; identical amounts for primary, junior-high and high school. Instalment frequency not stated (4 instalments, first at enrolment) so period null. No academic year stated."
+}

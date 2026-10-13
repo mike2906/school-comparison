@@ -1,0 +1,237 @@
+{
+ "school_id": 286,
+ "pages_read": [
+  "https://www.slaveikov-school.org/10551056104810451052-2026-2027.html"
+ ],
+ "fetch_failed": [],
+ "site_states_no_fees": false,
+ "site_fees": [
+  {
+   "fid": "f1",
+   "category": "tuition",
+   "amount": 4700,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "one child (school grades)",
+   "plan": null,
+   "year": "2026/2027",
+   "url": "https://www.slaveikov-school.org/10551056104810451052-2026-2027.html",
+   "quote": "Годишна учебна такса ... 4700 евро (9192,40 лв.) за едно дете;"
+  },
+  {
+   "fid": "f2",
+   "category": "tuition",
+   "amount": 3525,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "second child from the family",
+   "plan": null,
+   "year": "2026/2027",
+   "url": "https://www.slaveikov-school.org/10551056104810451052-2026-2027.html",
+   "quote": "3525 евро (6894,30 лв.) за второ дете от семейството с отстъпка;"
+  },
+  {
+   "fid": "f3",
+   "category": "tuition",
+   "amount": 4700,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "group": "предучилищна група, целодневно",
+   "plan": null,
+   "year": "2026/2027",
+   "url": "https://www.slaveikov-school.org/10551056104810451052-2026-2027.html",
+   "quote": "Учебна такса за предучилищна група: 4700 евро (9192,40 лв.) за едно дете целодневно;"
+  },
+  {
+   "fid": "f4",
+   "category": "tuition",
+   "amount": 3225,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "group": "предучилищна група, до 13:00",
+   "plan": null,
+   "year": "2026/2027",
+   "url": "https://www.slaveikov-school.org/10551056104810451052-2026-2027.html",
+   "quote": "3225 евро (6307,55 лв.) до 13:00 часа"
+  },
+  {
+   "fid": "f5",
+   "category": "tuition",
+   "amount": 4465,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": null,
+   "plan": "авансово на една вноска с 5% отстъпка",
+   "year": "2026/2027",
+   "url": "https://www.slaveikov-school.org/10551056104810451052-2026-2027.html",
+   "quote": "Авансово на една вноска с 5% отстъпка ... 4465 евро (8732,78 лв.)"
+  },
+  {
+   "fid": "f6",
+   "category": "tuition",
+   "amount": 2350,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "semester",
+   "group": null,
+   "plan": "две равни вноски (30 юни, 30 януари)",
+   "year": "2026/2027",
+   "url": "https://www.slaveikov-school.org/10551056104810451052-2026-2027.html",
+   "quote": "На две равни вноски по 2350 евро всяка."
+  },
+  {
+   "fid": "f7",
+   "category": "tuition",
+   "amount": 4935,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": null,
+   "plan": "4 вноски с 5% оскъпяване (total)",
+   "year": "2026/2027",
+   "url": "https://www.slaveikov-school.org/10551056104810451052-2026-2027.html",
+   "quote": "При изплащане на 4 вноски с 5% оскъпяване – таксата е 4935 евро (9652,02 лв.)."
+  },
+  {
+   "fid": "f8",
+   "category": "tuition",
+   "amount": 517,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": null,
+   "plan": "10 равни вноски с 10% оскъпяване",
+   "year": "2026/2027",
+   "url": "https://www.slaveikov-school.org/10551056104810451052-2026-2027.html",
+   "quote": "Разсрочено плащане на 10 равни вноски с 10% оскъпяване по 517 евро (1011,16лв.) на месец."
+  },
+  {
+   "fid": "f9",
+   "category": "registration",
+   "amount": 80,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "group": "new applicants",
+   "plan": "изпитна такса",
+   "year": "2026/2027",
+   "url": "https://www.slaveikov-school.org/10551056104810451052-2026-2027.html",
+   "quote": "изпитна такса в размер на 80 евро (156,50лева )"
+  },
+  {
+   "fid": "f10",
+   "category": "registration",
+   "amount": 265,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "all students",
+   "plan": "административна такса",
+   "year": "2026/2027",
+   "url": "https://www.slaveikov-school.org/10551056104810451052-2026-2027.html",
+   "quote": "Административната такса за всяка учебна година е в размер на 265 евро (518,30 лева)"
+  },
+  {
+   "fid": "f11",
+   "category": "registration",
+   "amount": 265,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "group": "8. клас (езикова гимназия) applicants",
+   "plan": "регистрационна такса",
+   "year": "2026/2027",
+   "url": "https://www.slaveikov-school.org/10551056104810451052-2026-2027.html",
+   "quote": "Документите се разглеждат след платена регистрационна такса - 265 евро."
+  }
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "verdict": "correct",
+   "fid": "f2",
+   "reason": "3525 EUR yearly, second child, matches.",
+   "group_unstated": false
+  },
+  {
+   "oid": "o2",
+   "verdict": "missing_period",
+   "fid": "f6",
+   "reason": "2350 per instalment, 2 per year (June/January) -> semester; row period null.",
+   "group_unstated": false
+  },
+  {
+   "oid": "o3",
+   "verdict": "correct",
+   "fid": "f4",
+   "reason": "3225 EUR preschool до 13:00; site gives no frequency, row null.",
+   "group_unstated": false
+  },
+  {
+   "oid": "o4",
+   "verdict": "correct",
+   "fid": "f8",
+   "reason": "517 EUR monthly, 10 instalments plan.",
+   "group_unstated": false
+  },
+  {
+   "oid": "o5",
+   "verdict": "missing_period",
+   "fid": "f9",
+   "reason": "80 EUR exam fee is one_time; row period null.",
+   "group_unstated": false
+  },
+  {
+   "oid": "o6",
+   "verdict": "correct",
+   "fid": "f1",
+   "reason": "4700 EUR yearly tuition for one child.",
+   "group_unstated": false
+  },
+  {
+   "oid": "o7",
+   "verdict": "correct",
+   "fid": "f10",
+   "reason": "265 EUR administrative fee per school year, yearly.",
+   "group_unstated": false
+  },
+  {
+   "oid": "o8",
+   "verdict": "correct",
+   "fid": "f3",
+   "reason": "4700 EUR preschool full-day; no frequency on site, row null.",
+   "group_unstated": false
+  },
+  {
+   "oid": "o9",
+   "verdict": "missing_period",
+   "fid": "f7",
+   "reason": "4935 EUR is the printed total for the 4-instalment plan (yearly); row period null.",
+   "group_unstated": false
+  },
+  {
+   "oid": "o10",
+   "verdict": "missing_period",
+   "fid": "f5",
+   "reason": "4465 EUR single advance payment = yearly; row period null.",
+   "group_unstated": false
+  }
+ ],
+ "notes": "Preschool section has no 'годишна' wording, so its periods are null. A separate 8th-grade регистрационна такса of 265 EUR exists (f11) besides the yearly административна такса. Second-child fee is paid as second instalment by 30 Jan."
+}

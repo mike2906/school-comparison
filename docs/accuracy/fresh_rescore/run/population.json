@@ -1,0 +1,696 @@
+{
+  "seed": 20261013,
+  "population": 138,
+  "schools": [
+    {
+      "school_id": 149,
+      "name": "\"ЧАСТНА ДЕТСКА ГРАДИНА ТАТКОВА ГРАДИНА\" ЕООД",
+      "website_url": "https://tatkovagradina.eu/"
+    },
+    {
+      "school_id": 151,
+      "name": "\"ЧАСТНО ОСНОВНО УЧИЛИЩЕ \"Проф. д-р Васил Златарски\" ЕООД",
+      "website_url": "https://zlatarskischool.org/"
+    },
+    {
+      "school_id": 154,
+      "name": "\"ЧАСТНА ДЕТСКА ГРАДИНА КОСМИЧЕСКИ ДЕЦА\" ЕООД",
+      "website_url": "https://cosmos-kids.org/"
+    },
+    {
+      "school_id": 155,
+      "name": "\"ЧАСТНА ДЕТСКА ГРАДИНА БОБЧЕ ТОПЧЕ\" ООД",
+      "website_url": "https://bobche-topche.bg/"
+    },
+    {
+      "school_id": 157,
+      "name": "\"ЧАСТНА ДЕТСКА ГРАДИНА МОМО\" ЕООД",
+      "website_url": "https://gradinamomo.com/"
+    },
+    {
+      "school_id": 158,
+      "name": "\"Частна детска градина Бръмбазък\" ООД",
+      "website_url": "https://www.brambazak.bg/fees-en/"
+    },
+    {
+      "school_id": 170,
+      "name": "Частно профилирано средно училище \"Свети Наум\" ООД",
+      "website_url": "https://www.svetinaum.net/"
+    },
+    {
+      "school_id": 171,
+      "name": "\"ЧАСТНО СРЕДНО УЧИЛИЩЕ \"РЬОРИХ\" ЕООД",
+      "website_url": "https://roerich-school.org/"
+    },
+    {
+      "school_id": 172,
+      "name": "\"Частно основно училище Света София\" ЕООД",
+      "website_url": "https://www.svetasofia.com/"
+    },
+    {
+      "school_id": 175,
+      "name": "\"ЧАСТНА ДЕТСКА ГРАДИНА ВЕСЕЛОТО ГАРДЖЕ\" ЕООД",
+      "website_url": "https://www.veselotogardje.com/"
+    },
+    {
+      "school_id": 177,
+      "name": "\"ЧАСТНА ДЕТСКА ГРАДИНА \"ВЕСЕЛИТЕ КАМБАНКИ\" ООД",
+      "website_url": "http://detskagradina.org/"
+    },
+    {
+      "school_id": 178,
+      "name": "\"Частно средно училище Евлоги и Христо Георгиеви\" ЕООД",
+      "website_url": "https://unischool.bg/"
+    },
+    {
+      "school_id": 179,
+      "name": "\"ЧАСТНА ДЕТСКА ГРАДИНА ГЕРМАНИ БГ\" ЕАД",
+      "website_url": "https://www.germani.bg/"
+    },
+    {
+      "school_id": 180,
+      "name": "\"ЧАСТНА ДЕТСКА ГРАДИНА \"МОНТЕСОРИ КЪЩА НА ДЕЦАТА\" ЕООД",
+      "website_url": "https://www.casadeibambini.bg/"
+    },
+    {
+      "school_id": 182,
+      "name": "\"ЧАСТНА ДЕТСКА ГРАДИНА ЗВЕЗДИЧКА\" ЕООД",
+      "website_url": "https://zvezdichka-sofia.com/"
+    },
+    {
+      "school_id": 183,
+      "name": "\"Частна детска градина \"Сияние\" ООД",
+      "website_url": "https://www.sianie-bg.com/"
+    },
+    {
+      "school_id": 184,
+      "name": "\"ЧАСТНА ДЕТСКА ГРАДИНА ЕЛХИЦА\" ООД",
+      "website_url": "https://dg-59.com/"
+    },
+    {
+      "school_id": 185,
+      "name": "\"Частна детска градина \"НЕМО\" ООД",
+      "website_url": "https://nemo-bg.com/"
+    },
+    {
+      "school_id": 187,
+      "name": "\"Частна детска градина \"Палави крачета\" ЕООД",
+      "website_url": "https://palavikracheta.com/"
+    },
+    {
+      "school_id": 199,
+      "name": "\"Частна детска градина \"Арлекино\" ООД",
+      "website_url": "https://arlekino.info/"
+    },
+    {
+      "school_id": 213,
+      "name": "\"ЧАСТНА ПРОФИЛИРАНА ГИМНАЗИЯ С ЧУЖДОЕЗИКОВО ОБУЧЕНИЕ \"ЕЗИКОВ СВЯТ\" ЕООД",
+      "website_url": "https://www.ezikovsviat.com/"
+    },
+    {
+      "school_id": 214,
+      "name": "\"ЧАСТНО ОСНОВНО УЧИЛИЩЕ СВЕТЛИНА\" ЕООД",
+      "website_url": "https://svetlina.net/"
+    },
+    {
+      "school_id": 215,
+      "name": "\"ЧАСТНО ОСНОВНО УЧИЛИЩЕ \"ЕЗИКОВ СВЯТ\" ЕООД",
+      "website_url": "https://www.ezikovsviat.com/"
+    },
+    {
+      "school_id": 220,
+      "name": "\"ЧАСТНА ДЕТСКА ГРАДИНА ДЕТСКА АКАДЕМИЯ\" ООД",
+      "website_url": "https://toddlersacademy.eu/bg/"
+    },
+    {
+      "school_id": 271,
+      "name": "\"ЧАСТНО СРЕДНО УЧИЛИЩЕ БЪЛГАРСКО ШКОЛО\" ООД",
+      "website_url": "https://bgshkolo.com/"
+    },
+    {
+      "school_id": 272,
+      "name": "\"ЧАСТНА ДЕТСКА ГРАДИНА ПАТЕТА\" ЕООД",
+      "website_url": "https://pateta.bg/"
+    },
+    {
+      "school_id": 286,
+      "name": "\"ЧАСТНО СРЕДНО УЧИЛИЩЕ \"ПЕТКО Р. СЛАВЕЙКОВ\" ЕООД",
+      "website_url": "https://www.slaveikov-school.org/"
+    },
+    {
+      "school_id": 287,
+      "name": "\"Частна детска градина Чудната къщичка\" ЕООД",
+      "website_url": "https://www.wonderhouse-bg.com/"
+    },
+    {
+      "school_id": 300,
+      "name": "\"Частно средно училище с ранно чуждоезиково обучение ЕСПА\" ЕООД",
+      "website_url": "https://espa.bg/"
+    },
+    {
+      "school_id": 301,
+      "name": "АМЕРИКАНСКИ КОЛЕЖ В  СОФИЯ",
+      "website_url": "https://www.acs.bg/bg/"
+    },
+    {
+      "school_id": 302,
+      "name": "\"ЧАСТНА ДЕТСКА ГРАДИНА ЕКО ДАРА\" ЕООД",
+      "website_url": "https://www.ecodara.com/"
+    },
+    {
+      "school_id": 305,
+      "name": "\"ЧАСТНА ДЕТСКА ГРАДИНА \"ДЖАНИ РОДАРИ\" ЕООД",
+      "website_url": "https://djanirodari.org/"
+    },
+    {
+      "school_id": 329,
+      "name": "Първа частна английска гимназия \"Уилям Шекспир-Интелект Инвест\" ООД",
+      "website_url": "https://www.fpels.ws/"
+    },
+    {
+      "school_id": 330,
+      "name": "\"Частна детска градина \"Къщата на Алиса и приятели\" ООД",
+      "website_url": "http://www.alisahouse.org/"
+    },
+    {
+      "school_id": 339,
+      "name": "\"ЧАСТНО ОСНОВНО УЧИЛИЩЕ \"ТОМАС ЕДИСЪН\" ЕООД",
+      "website_url": "https://edisonschool.eu/"
+    },
+    {
+      "school_id": 350,
+      "name": "\"Частно основно училище Изгрев\" ЕООД",
+      "website_url": "https://izgrevou.com/"
+    },
+    {
+      "school_id": 351,
+      "name": "\"ЧАСТНА ДЕТСКА ГРАДИНА СЛЪНЧОГЛЕДИ\" ЕООД",
+      "website_url": "https://slanchogledi.bg/"
+    },
+    {
+      "school_id": 381,
+      "name": "Частно основно училище Образователни технологии\" ЕООД",
+      "website_url": "https://eduteh.eu/"
+    },
+    {
+      "school_id": 392,
+      "name": "\"ЧАСТНА ЕЗИКОВА ГИМНАЗИЯ \"Проф. д-р Васил Златарски\" ЕООД",
+      "website_url": "https://zlatarskischool.org/"
+    },
+    {
+      "school_id": 393,
+      "name": "\"Частна детска градина \"Детска къща Монтесори\" ООД",
+      "website_url": "https://www.montessori-bulgaria.com/en"
+    },
+    {
+      "school_id": 404,
+      "name": "\"Частно основно училище Куест\" ЕООД",
+      "website_url": "https://questschool.bg/"
+    },
+    {
+      "school_id": 405,
+      "name": "\"Частна детска градина Мария Магдалена\" ООД",
+      "website_url": "https://mmagdalena-bg.com/"
+    },
+    {
+      "school_id": 505,
+      "name": "Френско училище \"Виктор Юго\" в София",
+      "website_url": "https://vhugo.org/"
+    },
+    {
+      "school_id": 506,
+      "name": "Англо-американско училище в София",
+      "website_url": "https://www.aas-sofia.org/"
+    },
+    {
+      "school_id": 507,
+      "name": "\"Частна детска градина Куест\" ЕООД",
+      "website_url": "https://questjunior.bg/"
+    },
+    {
+      "school_id": 510,
+      "name": "\"Частна детска градина Светлина\" ЕООД",
+      "website_url": "https://svetlina.net/"
+    },
+    {
+      "school_id": 511,
+      "name": "\"Частна детска градина Арти\" ЕООД",
+      "website_url": "https://www.arty.bg/"
+    },
+    {
+      "school_id": 512,
+      "name": "Частна детска градина \"Бизиленд\" ООД",
+      "website_url": "https://busy-land.com/"
+    },
+    {
+      "school_id": 513,
+      "name": "\"ЧАСТНА ДЕТСКА ГРАДИНА ЕКОМАЛЧОВЦИ\" ООД",
+      "website_url": "https://www.ecomalchovci.com/"
+    },
+    {
+      "school_id": 514,
+      "name": "\"Частна детска градина \"Професор Николай Райнов\" ЕООД",
+      "website_url": "https://www.waldorf.bg/"
+    },
+    {
+      "school_id": 515,
+      "name": "\"ЧАСТНА ДЕТСКА ГРАДИНА БРИТАНИКА\" ООД",
+      "website_url": "https://britanica-parkschool.bg/"
+    },
+    {
+      "school_id": 516,
+      "name": "\"ЧАСТНО НАЧАЛНО УЧИЛИЩЕ СВЕТИЛНИК\" ЕООД",
+      "website_url": "https://svetilnik.bg/"
+    },
+    {
+      "school_id": 517,
+      "name": "\"ПЪРВА ЧАСТНА МАТЕМАТИЧЕСКА ГИМНАЗИЯ\" ООД",
+      "website_url": "https://www.parvamatematicheska.com/"
+    },
+    {
+      "school_id": 518,
+      "name": "ЧАСТНА ДЕТСКА ГРАДИНА \"ДОВЕРИЕ\" ЕООД",
+      "website_url": "https://doverie-bg.net/"
+    },
+    {
+      "school_id": 520,
+      "name": "ЧАСТНО ОСНОВНО УЧИЛИЩЕ ФЮЖЪН ЕООД",
+      "website_url": "https://school.fusion.bg/"
+    },
+    {
+      "school_id": 521,
+      "name": "Частна детска градина \"Пчелното кошерче\" ООД",
+      "website_url": "https://www.thebeehive.bg/"
+    },
+    {
+      "school_id": 522,
+      "name": "\"ЧАСТНО СРЕДНО УЧИЛИЩЕ \"ДРУЖБА\" - СОФИЯ\" ЕООД",
+      "website_url": "https://drujba.org/"
+    },
+    {
+      "school_id": 523,
+      "name": "\"Частно средно училище Дени Дидро\" ЕАД",
+      "website_url": "https://denisdiderot.bg/en-us/"
+    },
+    {
+      "school_id": 524,
+      "name": "частна детска градина \"Малките принцове\" ЕООД",
+      "website_url": "https://lespetitsprinces.bg/"
+    },
+    {
+      "school_id": 525,
+      "name": "\"Частна детска градина Славейче\" ЕООД",
+      "website_url": "https://slaveiche.com/"
+    },
+    {
+      "school_id": 526,
+      "name": "\"ЧАСТНА ДЕТСКА ГРАДИНА МЕРИДИАН 22\" ЕООД",
+      "website_url": "https://meridian22.bg/"
+    },
+    {
+      "school_id": 527,
+      "name": "Частна детска градина \"ПОД 1 ПОКРИВ\" ЕООД",
+      "website_url": "https://under1roof.bg/"
+    },
+    {
+      "school_id": 528,
+      "name": "\"ЧАСТНА ДЕТСКА ГРАДИНА РОСИЦА\" ЕООД",
+      "website_url": "https://tzarsimeon.bg/dgrosica/home"
+    },
+    {
+      "school_id": 529,
+      "name": "Сдружение на родителите от немско-българското училище за среща на културите София",
+      "website_url": "https://www.ds-sofia.bg/"
+    },
+    {
+      "school_id": 530,
+      "name": "\"Частна детска градина \"Детски свят\" ЕООД",
+      "website_url": "https://detski-sviat.info/"
+    },
+    {
+      "school_id": 531,
+      "name": "ЧАСТНА ДЕТСКА ГРАДИНА \"МОНТЕСОРИ ХАЙ\" ООД",
+      "website_url": "https://www.montessori-high.com/bg"
+    },
+    {
+      "school_id": 532,
+      "name": "\"ЧАСТНА ДЕТСКА ГРАДИНА ПАЛАВИТЕ МАЛЧУГАНИ\" ЕООД",
+      "website_url": "https://palavitemalchugani.bg/"
+    },
+    {
+      "school_id": 533,
+      "name": "\"ЧАСТНО ОСНОВНО УЧИЛИЩЕ ПРОГРЕСИВНО ОБРАЗОВАНИЕ 3 - СОФИЯ\" ЕООД",
+      "website_url": "https://school3.transform.bg/"
+    },
+    {
+      "school_id": 535,
+      "name": "\"Частно средно училище Орфей\" ООД",
+      "website_url": "https://www.orfei.net/"
+    },
+    {
+      "school_id": 536,
+      "name": "\"ЧАСТНА ПРОФЕСИОНАЛНА ГИМНАЗИЯ БАНКЕР\" ООД",
+      "website_url": "https://www.banker-school.com/"
+    },
+    {
+      "school_id": 537,
+      "name": "\"ЧАСТНО ОСНОВНО УЧИЛИЩЕ \"Д-Р ПЕТЪР БЕРОН\" ЕООД",
+      "website_url": "https://pberon.com/"
+    },
+    {
+      "school_id": 538,
+      "name": "\"ЧАСТНА ДЕТСКА ГРАДИНА УСМИВКА\" ЕООД",
+      "website_url": "https://usmivkabg.com/"
+    },
+    {
+      "school_id": 539,
+      "name": "\"Частна детска градина Албертино 01.09.\" ЕООД",
+      "website_url": "https://www.albertino.bg/"
+    },
+    {
+      "school_id": 541,
+      "name": "\"Частна детска градина АВСландия\" ООД",
+      "website_url": "https://abckinder.org/"
+    },
+    {
+      "school_id": 542,
+      "name": "\"ЧАСТНА ДЕТСКА ГРАДИНА ЙОР КИДС\" ЕООД",
+      "website_url": "https://yourkidsbg.com/"
+    },
+    {
+      "school_id": 544,
+      "name": "\"Частна детска градина ЛИДИ\" ООД",
+      "website_url": "https://www.dg-lidi.com/"
+    },
+    {
+      "school_id": 545,
+      "name": "\"ЧАСТНА ДЕТСКА ГРАДИНА РАЙ - М И М - 19\" ЕООД",
+      "website_url": "https://gradina-rai.com/"
+    },
+    {
+      "school_id": 546,
+      "name": "\"ЧАСТНА ДЕТСКА ГРАДИНА \"Д-Р ПЕТЪР БЕРОН\" ЕООД",
+      "website_url": "https://dg-pberon.com/"
+    },
+    {
+      "school_id": 547,
+      "name": "\"ЧАСТНА ДЕТСКА ГРАДИНА МЕЧО ПУХ\" ООД",
+      "website_url": "https://mechopuh.bg/"
+    },
+    {
+      "school_id": 548,
+      "name": "\"ЧАСТНА ДЕТСКА ГРАДИНА \"Мечтател\" ООД",
+      "website_url": "https://mechtatel.bg/"
+    },
+    {
+      "school_id": 549,
+      "name": "\"ЧАСТНА ДЕТСКА ГРАДИНА \"ПРОЛЕТ\" ООД",
+      "website_url": "http://www.prolet2006.com/"
+    },
+    {
+      "school_id": 550,
+      "name": "\"ЧАСТНА ПРОФИЛИРАНА ГИМНАЗИЯ ОБРАЗОВАТЕЛНИ ТЕХНОЛОГИИ\" ЕООД",
+      "website_url": "https://eduteh.eu/"
+    },
+    {
+      "school_id": 552,
+      "name": "\"ЧАСТНА ПРОФИЛИРАНА ГИМНАЗИЯ С ЧУЖДОЕЗИКОВО ОБУЧЕНИЕ МЕРИДИАН 22\" ЕООД",
+      "website_url": "https://meridian22.org/"
+    },
+    {
+      "school_id": 554,
+      "name": "\"ЧАСТНО ОСНОВНО УЧИЛИЩЕ \"БАНКЕРЧЕ\" ООД",
+      "website_url": "https://www.bankerche.com"
+    },
+    {
+      "school_id": 555,
+      "name": "\"ЧАСТНА ДЕТСКА ГРАДИНА \"СВЕТИ ГЕОРГИ\" ЕООД",
+      "website_url": "https://stgeorgeschool.eu/"
+    },
+    {
+      "school_id": 556,
+      "name": "\"ЧАСТНА ДЕТСКА ГРАДИНА КАНАДСКО МЕЧЕ\" ООД",
+      "website_url": "https://sofia-kindergarten.maplebear.bg/"
+    },
+    {
+      "school_id": 557,
+      "name": "\"ЧАСТНА ДЕТСКА ГРАДИНА ТУТИ 2011\" ООД",
+      "website_url": "https://www.tuti-bg.com/"
+    },
+    {
+      "school_id": 558,
+      "name": "\"ЧАСТНО ОСНОВНО УЧИЛИЩЕ ЦАР СИМЕОН ВЕЛИКИ\" ЕООД",
+      "website_url": "https://tzarsimeon.bg/"
+    },
+    {
+      "school_id": 561,
+      "name": "\"ЧАСТНО ОСНОВНО УЧИЛИЩЕ АЗБУКИ\" ООД",
+      "website_url": "https://azbuki-school.bg/"
+    },
+    {
+      "school_id": 562,
+      "name": "\"ЧАСТНА ЕЗИКОВА ГИМНАЗИЯ ПРОФ. ИВАН АПОСТОЛОВ\" ООД",
+      "website_url": "https://ivanapostolov.bg/"
+    },
+    {
+      "school_id": 564,
+      "name": "\"ЧАСТНО СРЕДНО УЧИЛИЩЕ ПИТАГОР\" ООД",
+      "website_url": "https://pitagor-school.eu/"
+    },
+    {
+      "school_id": 565,
+      "name": "\"ЧАСТНА ГИМНАЗИЯ ПО ПРИРОДНИ НАУКИ И ПРЕДПРИЕМАЧЕСТВО \"АСЕН ЙОРДАНОВ\" ЕООД",
+      "website_url": "https://tzarsimeon.bg/"
+    },
+    {
+      "school_id": 568,
+      "name": "\"ЧАСТНО ЕЗИКОВО СРЕДНО УЧИЛИЩЕ ДОРИС ТЕНЕДИ\" ЕАД",
+      "website_url": "http://doristenedi.com/"
+    },
+    {
+      "school_id": 569,
+      "name": "\"ЧАСТНО НАЧАЛНО УЧИЛИЩЕ \"БИЗИ\" ЕООД",
+      "website_url": "https://busy-school.com/"
+    },
+    {
+      "school_id": 572,
+      "name": "\"ЧАСТНА ДЕТСКА ГРАДИНА \"ВЪЛШЕБНО БОРЧЕ\" СОФИЯ\" ЕООД",
+      "website_url": "https://borche.org/"
+    },
+    {
+      "school_id": 573,
+      "name": "ФОНДАЦИЯ \"ЧАСТНО СРЕДНО УЧИЛИЩЕ \"РОНАЛД ЛАУДЕР\"",
+      "website_url": "https://lauderschool.bg/"
+    },
+    {
+      "school_id": 574,
+      "name": "\"ЧАСТНА ДЕТСКА ГРАДИНА АНИКА\" ООД",
+      "website_url": "https://novigradini.com/#dipipopup-27586290#popup_on_load"
+    },
+    {
+      "school_id": 575,
+      "name": "\"ЧАСТНО СРЕДНО ЕЗИКОВО УЧИЛИЩЕ БРИТАНИКА\" ООД",
+      "website_url": "https://britanica-parkschool.bg/"
+    },
+    {
+      "school_id": 576,
+      "name": "\"ЧАСТНА ДЕТСКА ГРАДИНА МАЛКИ СТЪПКИ - ЛИТЪЛ СТЕПС\" ООД",
+      "website_url": "https://littlesteps.bg/"
+    },
+    {
+      "school_id": 577,
+      "name": "\"Частна детска градина НЕМО - Бояна\" ООД",
+      "website_url": "https://nemo-bg.com/"
+    },
+    {
+      "school_id": 581,
+      "name": "\"ЧАСТНА ПРОФЕСИОНАЛНА ГИМНАЗИЯ \"ДАРБИ\" ЕООД",
+      "website_url": "https://darbicollege.com/en/"
+    },
+    {
+      "school_id": 583,
+      "name": "\"Частна немска гимназия Ерих Кестнер\" ООД",
+      "website_url": "https://e-kestner.eu/"
+    },
+    {
+      "school_id": 584,
+      "name": "\"Частно основно училище Ерих Кестнер\" ООД",
+      "website_url": "https://e-kestner.eu/"
+    },
+    {
+      "school_id": 585,
+      "name": "\"Частно средно училище по изкуства и чужди езици \"Артис\" ООД",
+      "website_url": "https://artisbg.com/"
+    },
+    {
+      "school_id": 587,
+      "name": "\"ЧАСТНА ДЕТСКА ГРАДИНА \"ДРУЖБА-СОФИЯ\" ЕООД",
+      "website_url": "https://drujba.org/"
+    },
+    {
+      "school_id": 588,
+      "name": "\"Частна детска градина Слънчеви приказки\" ООД",
+      "website_url": "https://sluncheviprikazki.com/"
+    },
+    {
+      "school_id": 590,
+      "name": "\"Частна детска градина Ерих Кестнер\" ООД",
+      "website_url": "https://erichkaestner.bg/"
+    },
+    {
+      "school_id": 591,
+      "name": "\"ЧАСТНА ДЕТСКА ГРАДИНА НИКАТОР\" ЕООД",
+      "website_url": "https://ruliceum.org/bg/"
+    },
+    {
+      "school_id": 592,
+      "name": "\"ЧАСТНО СРЕДНО УЧИЛИЩЕ НИКАТОР\" ЕООД",
+      "website_url": "https://ruliceum.org/bg/"
+    },
+    {
+      "school_id": 593,
+      "name": "\"Частно средно училище \"Наука за деца\" ЕООД",
+      "website_url": "https://izzi.academy/"
+    },
+    {
+      "school_id": 594,
+      "name": "\"ЧАСТНО СРЕДНО УЧИЛИЩЕ \"СВЕТИ ГЕОРГИ\" ЕООД",
+      "website_url": "https://stgeorgeschool.eu/"
+    },
+    {
+      "school_id": 595,
+      "name": "\"Частна професионална гимназия по дигитални науки СофтУни БУДИТЕЛ\" ООД",
+      "website_url": "https://buditel.softuni.bg/"
+    },
+    {
+      "school_id": 596,
+      "name": "\"Частно основно училище Канадско мече\" ООД",
+      "website_url": "https://sofia-school.maplebear.bg/"
+    },
+    {
+      "school_id": 597,
+      "name": "\"Частно средно училище Константин-Кирил Философ\" ООД",
+      "website_url": "https://www.kkf.bg/"
+    },
+    {
+      "school_id": 598,
+      "name": "\"Частна детска градина ''Ягодина'' ООД",
+      "website_url": "https://yagodina.bg/"
+    },
+    {
+      "school_id": 599,
+      "name": "\"Частна детска градина \"Детска мечта\" ООД",
+      "website_url": "https://detskamechta-bg.com/"
+    },
+    {
+      "school_id": 600,
+      "name": "\"Частно основно училище Стремеж\" ЕООД",
+      "website_url": "https://stremezh-education.com/"
+    },
+    {
+      "school_id": 601,
+      "name": "\"ЧАСТНА ДЕТСКА ГРАДИНА \"КИДСВИЛ\" ООД",
+      "website_url": "https://kidsville.space/"
+    },
+    {
+      "school_id": 602,
+      "name": "\"Частна детска градина Алиса\" ЕООД",
+      "website_url": "https://alissa-bg.com/"
+    },
+    {
+      "school_id": 603,
+      "name": "\"Частна детска градина Жирафче\" ООД",
+      "website_url": "https://www.giraffche.com"
+    },
+    {
+      "school_id": 606,
+      "name": "\"ЧАСТНА ПРОФИЛИРАНА ГИМНАЗИЯ \"ПРОГРЕСИВНО ОБРАЗОВАНИЕ - СОФИЯ\" ЕООД",
+      "website_url": "https://highschool1.transform.bg/"
+    },
+    {
+      "school_id": 608,
+      "name": "\"ЧАСТНА ДЕТСКА ГРАДИНА МААРИФ СОФИЯ\" ЕООД",
+      "website_url": "https://bg.maarifschools.org/page/detska-gradina"
+    },
+    {
+      "school_id": 609,
+      "name": "\"Частно начално училище Луис Карол - гр. София\" ЕООД",
+      "website_url": "https://luiskarol.com/"
+    },
+    {
+      "school_id": 610,
+      "name": "\"ЧАСТНО СРЕДНО УЧИЛИЩЕ ОТКРИВАТЕЛ\" ЕООД",
+      "website_url": "https://montessorischools.bg/"
+    },
+    {
+      "school_id": 613,
+      "name": "\"ЧАСТНО ОСНОВНО УЧИЛИЩЕ МИЛЕА\" Сдружение",
+      "website_url": "https://milea.bg/"
+    },
+    {
+      "school_id": 615,
+      "name": "\"Частна детска градина Растеж\" ЕООД",
+      "website_url": "https://growers.bg/"
+    },
+    {
+      "school_id": 616,
+      "name": "\"ЧАСТНА ДЕТСКА ГРАДИНА КИТА 2013\" ЕООД",
+      "website_url": "https://kita.bg/"
+    },
+    {
+      "school_id": 623,
+      "name": "\"ЧАСТНО СРЕДНО УЧИЛИЩЕ С ЧУЖДОЕЗИКОВ ПРОФИЛ \"АБРАХАМ ЛИНКЪЛН\" ЕООД",
+      "website_url": "https://www.lincolnsofia.com/"
+    },
+    {
+      "school_id": 624,
+      "name": "\"ЧАСТНА ДЕТСКА ГРАДИНА ФЪНКИ МЪНКИ\" ООД",
+      "website_url": "https://funkymonkey.bg/"
+    },
+    {
+      "school_id": 625,
+      "name": "\"Частна детска градина СОФИЯ\" ЕООД",
+      "website_url": "https://dgsofia.com/"
+    },
+    {
+      "school_id": 628,
+      "name": "\"ЧАСТНА ДЕТСКА ГРАДИНА - ПРИКАЗКА БЕЗ КРАЙ 1\" ЕООД",
+      "website_url": "https://novigradini.com/pbk/#dipipopup-27586290"
+    },
+    {
+      "school_id": 629,
+      "name": "\"Частно основно училище Св. Климент Охридски\" ООД",
+      "website_url": "https://saintkliment.com/"
+    },
+    {
+      "school_id": 630,
+      "name": "СДРУЖЕНИЕ \"ЧАСТНО СРЕДНО УЧИЛИЩЕ \"ПРОФЕСОР НИКОЛАЙ РАЙНОВ\"",
+      "website_url": "https://www.waldorf.bg/"
+    },
+    {
+      "school_id": 631,
+      "name": "\"Частна детска градина Щастливата къща\" ЕООД",
+      "website_url": "https://happyhouse-bg.com/"
+    },
+    {
+      "school_id": 632,
+      "name": "\"ЧАСТНА ПРОФЕСИОНАЛНА ГИМНАЗИЯ ПО СЦЕНИЧНИ ИЗКУСТВА И МЕНИДЖМЪНТ АКАТАМУС - СОФИЯ\" ЕООД",
+      "website_url": "https://acatamus.bg/"
+    },
+    {
+      "school_id": 633,
+      "name": "\"ЧАСТНО ОСНОВНО УЧИЛИЩЕ \"ПРОГРЕСИВНО ОБРАЗОВАНИЕ\" ЕООД",
+      "website_url": "https://school1.transform.bg/"
+    },
+    {
+      "school_id": 634,
+      "name": "\"ЧАСТНА НЕМСКА ДЕТСКА ГРАДИНА УВЕКИНД\" ООД",
+      "website_url": "https://uwekind.com/"
+    },
+    {
+      "school_id": 635,
+      "name": "\"ЧАСТНО СРЕДНО УЧИЛИЩЕ УВЕКИНД\" ООД",
+      "website_url": "https://uwekind.com/"
+    }
+  ]
+}

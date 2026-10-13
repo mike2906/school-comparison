@@ -1,0 +1,40 @@
+{
+ "school_id": 393,
+ "name": "Частна детска градина Детска къща Монтесори",
+ "website": "https://www.montessori-bulgaria.com/en",
+ "pages_the_crawler_visited": [
+  "https://www.montessori-bulgaria.com/en",
+  "https://www.montessori-bulgaria.com/en/admission",
+  "https://www.montessori-bulgaria.com/en/the-method/food",
+  "https://www.montessori-bulgaria.com/en/faq",
+  "https://www.montessori-bulgaria.com/en/admission/request-a-meeting",
+  "https://www.montessori-bulgaria.com/en/admission/documents-and-steps-for-enrollment"
+ ],
+ "pages_where_an_earlier_reader_found_fees": [
+  "https://www.montessori-bulgaria.com/en/admission"
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "category": "registration",
+   "amount": "600.00",
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "BGN",
+   "period": null,
+   "label": "non-refundable admission fee",
+   "note": ""
+  },
+  {
+   "oid": "o2",
+   "category": "registration",
+   "amount": 600.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "BGN",
+   "period": null,
+   "label": "admission fee",
+   "note": "Non-refundable."
+  }
+ ]
+}

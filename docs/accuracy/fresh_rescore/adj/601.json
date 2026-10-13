@@ -1,0 +1,175 @@
+{
+ "school_id": 601,
+ "pages_read": [
+  "https://kidsville.space/%d1%86%d0%b5%d0%bd%d0%b8/",
+  "https://kidsville.space/en/fees/"
+ ],
+ "fetch_failed": [],
+ "site_states_no_fees": false,
+ "site_fees": [
+  {
+   "fid": "f1",
+   "category": "tuition",
+   "amount": 900,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": "Целодневна база 08:00-18:00",
+   "plan": "A1 абонамент на 1 вноска (средномесечна)",
+   "year": "01.06-31.05 (12 месеца)",
+   "url": "https://kidsville.space/%d1%86%d0%b5%d0%bd%d0%b8/",
+   "quote": "Средномесечна такса при абонамент на 1 вноска | 900 €"
+  },
+  {
+   "fid": "f2",
+   "category": "tuition",
+   "amount": 925,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": "Целодневна база 08:00-18:00",
+   "plan": "A2 абонамент на 2 вноски (средномесечна)",
+   "year": "01.06-31.05 (12 месеца)",
+   "url": "https://kidsville.space/%d1%86%d0%b5%d0%bd%d0%b8/",
+   "quote": "Средномесечна такса при абонамент на 2 вноски | 925 €"
+  },
+  {
+   "fid": "f3",
+   "category": "tuition",
+   "amount": 950,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": "Целодневна база 08:00-18:00",
+   "plan": "A3 Ежемесечно заплащане",
+   "year": "01.06-31.05 (12 месеца)",
+   "url": "https://kidsville.space/%d1%86%d0%b5%d0%bd%d0%b8/",
+   "quote": "Ежемесечно заплащане | 950 €"
+  },
+  {
+   "fid": "f4",
+   "category": "food",
+   "amount": 100,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": null,
+   "plan": "Храна (закуска, подкрепителна закуска, обяд, следобедна закуска)",
+   "year": null,
+   "url": "https://kidsville.space/%d1%86%d0%b5%d0%bd%d0%b8/",
+   "quote": "100 евро / месец"
+  },
+  {
+   "fid": "f5",
+   "category": "materials",
+   "amount": 350,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": null,
+   "plan": "еднократна образователна такса за академичната година",
+   "year": null,
+   "url": "https://kidsville.space/%d1%86%d0%b5%d0%bd%d0%b8/",
+   "quote": "За академичната година е дължима еднократка образователна такса в размер на 350 евро."
+  },
+  {
+   "fid": "f6",
+   "category": "registration",
+   "amount": 200,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "group": "новозаписани деца",
+   "plan": "административна такса",
+   "year": null,
+   "url": "https://kidsville.space/%d1%86%d0%b5%d0%bd%d0%b8/",
+   "quote": "За новозаписани деца се дължи административна такса в размер на 200 евро."
+  }
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "verdict": "correct",
+   "fid": "f3",
+   "reason": "A3 monthly payment 950 EUR",
+   "group_unstated": false
+  },
+  {
+   "oid": "o2",
+   "verdict": "wrong_period",
+   "fid": "f5",
+   "reason": "350 is per academic year (yearly), not one_time",
+   "group_unstated": false
+  },
+  {
+   "oid": "o3",
+   "verdict": "missing_period",
+   "fid": "f6",
+   "reason": "Admin fee for new children is a one-time enrolment charge (EN page: one-time); row period null",
+   "group_unstated": false
+  },
+  {
+   "oid": "o4",
+   "verdict": "correct",
+   "fid": "f4",
+   "reason": "Food 100 EUR / month",
+   "group_unstated": false
+  },
+  {
+   "oid": "o5",
+   "verdict": "correct",
+   "fid": "f5",
+   "reason": "350 EUR educational resources fee for the academic year",
+   "group_unstated": false
+  },
+  {
+   "oid": "o6",
+   "verdict": "duplicate",
+   "fid": "f4",
+   "reason": "Same 100 EUR/month food fee as o4 (label 'Закуска' is narrower than the site's full meal list)",
+   "group_unstated": false
+  },
+  {
+   "oid": "o7",
+   "verdict": "duplicate",
+   "fid": "f3",
+   "reason": "Same 950 monthly fee as o1",
+   "group_unstated": false
+  },
+  {
+   "oid": "o8",
+   "verdict": "correct",
+   "fid": "f2",
+   "reason": "A2 average monthly fee 925",
+   "group_unstated": false
+  },
+  {
+   "oid": "o9",
+   "verdict": "correct",
+   "fid": "f1",
+   "reason": "A1 average monthly fee 900",
+   "group_unstated": false
+  },
+  {
+   "oid": "o10",
+   "verdict": "duplicate",
+   "fid": "f6",
+   "reason": "Same 200 admin fee as o3",
+   "group_unstated": false
+  },
+  {
+   "oid": "o11",
+   "verdict": "duplicate",
+   "fid": "f6",
+   "reason": "Same 200 admin fee as o3",
+   "group_unstated": false
+  }
+ ],
+ "notes": "BG page says valid from 01.01.2023; EN page says 01.01.2026 (same amounts). 900/925 are printed as average monthly fees for 1/2-instalment subscriptions; actual instalment amounts not printed, accepted as monthly as stated. 200 admin fee: BG text does not say one-time, EN says one-time; treated one_time. EN page says food is not included in all payment plans, BG says plans exclude food. Homepage not fetched for fees."
+}

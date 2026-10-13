@@ -1,0 +1,182 @@
+{
+ "school_id": 329,
+ "pages_read": [
+  "https://www.fpels.ws/prices/",
+  "https://www.fpels.ws/clubs/teatralna-akademia-scenichen-angliiski-ezik/"
+ ],
+ "fetch_failed": [],
+ "site_states_no_fees": false,
+ "site_fees": [
+  {
+   "fid": "f1",
+   "category": "tuition",
+   "amount": 6600,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": null,
+   "plan": "Плащане с 1 вноска / Стандартна такса",
+   "year": "2026-2027",
+   "url": "https://www.fpels.ws/prices/",
+   "quote": "СТАНДАРТНА ТАКСА EUR6600 ... ПЛАЩАНЕ С 1 ВНОСКА EUR6600 при подписване на договор"
+  },
+  {
+   "fid": "f2",
+   "category": "tuition",
+   "amount": 6900,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": null,
+   "plan": "Плащане с 2 вноски",
+   "year": "2026-2027",
+   "url": "https://www.fpels.ws/prices/",
+   "quote": "ПЛАЩАНЕ С 2 ВНОСКИ EUR6900"
+  },
+  {
+   "fid": "f3",
+   "category": "tuition",
+   "amount": 3450,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "semester",
+   "group": null,
+   "plan": "Плащане с 2 вноски (вноска 1 и 2)",
+   "year": "2026-2027",
+   "url": "https://www.fpels.ws/prices/",
+   "quote": "Вноска 1 EUR 3450 при подписване на договор; Вноска 2 EUR 3450 до 13.12.2026"
+  },
+  {
+   "fid": "f4",
+   "category": "tuition",
+   "amount": 7200,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": null,
+   "plan": "Плащане с 4 вноски",
+   "year": "2026-2027",
+   "url": "https://www.fpels.ws/prices/",
+   "quote": "ПЛАЩАНЕ С 4 ВНОСКИ EUR7200"
+  },
+  {
+   "fid": "f5",
+   "category": "tuition",
+   "amount": 2400,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "group": null,
+   "plan": "Плащане с 4 вноски (вноска 1)",
+   "year": "2026-2027",
+   "url": "https://www.fpels.ws/prices/",
+   "quote": "Вноска 1 EUR 2400 при подписване на договор"
+  },
+  {
+   "fid": "f6",
+   "category": "tuition",
+   "amount": 1600,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "group": null,
+   "plan": "Плащане с 4 вноски (вноски 2-4)",
+   "year": "2026-2027",
+   "url": "https://www.fpels.ws/prices/",
+   "quote": "Вноска 2 EUR 1600 до 13.11.2026 ... Вноска 4 EUR 1600 до 13.03.2027"
+  },
+  {
+   "fid": "f7",
+   "category": "registration",
+   "amount": 70,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "group": null,
+   "plan": "Такса кандидатстване",
+   "year": "2026-2027",
+   "url": "https://www.fpels.ws/prices/",
+   "quote": "Такса кандидатстване EUR 70"
+  },
+  {
+   "fid": "f8",
+   "category": "extracurricular",
+   "amount": 123,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "group": "Театрална академия – сценичен английски език",
+   "plan": null,
+   "year": "Януари–Септември 2026",
+   "url": "https://www.fpels.ws/clubs/teatralna-akademia-scenichen-angliiski-ezik/",
+   "quote": "Такса: 123 €"
+  }
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "verdict": "correct",
+   "fid": "f1",
+   "reason": "6600 EUR yearly standard fee matches",
+   "group_unstated": false
+  },
+  {
+   "oid": "o2",
+   "verdict": "missing_period",
+   "fid": "f4",
+   "reason": "7200 is printed 4-instalment total for the year; row period null",
+   "group_unstated": false
+  },
+  {
+   "oid": "o3",
+   "verdict": "missing_period",
+   "fid": "f7",
+   "reason": "70 EUR application fee is one_time; row period null",
+   "group_unstated": true
+  },
+  {
+   "oid": "o4",
+   "verdict": "correct",
+   "fid": "f8",
+   "reason": "123 EUR theatre club fee, site gives no frequency",
+   "group_unstated": true
+  },
+  {
+   "oid": "o5",
+   "verdict": "duplicate",
+   "fid": "f7",
+   "reason": "Same application fee as o3 (equally missing period)",
+   "group_unstated": false
+  },
+  {
+   "oid": "o6",
+   "verdict": "missing_period",
+   "fid": "f2",
+   "reason": "6900 is printed 2-instalment total for the year; row period null",
+   "group_unstated": false
+  },
+  {
+   "oid": "o7",
+   "verdict": "duplicate",
+   "fid": "f8",
+   "reason": "Same theatre club fee as o4",
+   "group_unstated": false
+  },
+  {
+   "oid": "o8",
+   "verdict": "duplicate",
+   "fid": "f1",
+   "reason": "Same 6600 standard fee as o1, which has the correct period",
+   "group_unstated": false
+  }
+ ],
+ "notes": "4-instalment plan instalments are on uneven bimonthly dates with no stated frequency, so 1600 has period null. Theatre club fee is for a Jan-Sep 2026 course, frequency not stated. Application fee period taken as one_time (entry fee) though the site does not say so explicitly."
+}

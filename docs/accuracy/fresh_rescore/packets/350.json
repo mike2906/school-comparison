@@ -1,0 +1,118 @@
+{
+ "school_id": 350,
+ "name": "Частно основно училище Изгрев",
+ "website": "https://izgrevou.com/",
+ "pages_the_crawler_visited": [
+  "https://izgrevou.com/",
+  "https://izgrevou.com/uchilishche/taksi/",
+  "https://izgrevou.com/priem/",
+  "https://izgrevou.com/uchilishche/hranene/",
+  "https://izgrevou.com/uchilishche/transport/",
+  "https://izgrevou.com/kategorii/priem/"
+ ],
+ "pages_where_an_earlier_reader_found_fees": [
+  "https://izgrevou.com/priem/",
+  "https://izgrevou.com/uchilishche/taksi/"
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "category": "registration",
+   "amount": "100.00",
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "label": "Такса прием и записване",
+   "note": ""
+  },
+  {
+   "oid": "o2",
+   "category": "transport",
+   "amount": 199.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "Транспорт – в двете посоки",
+   "note": "По желание; за 2026/27."
+  },
+  {
+   "oid": "o3",
+   "category": "registration",
+   "amount": 100.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "label": "Такса прием и записване",
+   "note": "За деца от детска школа „Изгрев“ няма такса."
+  },
+  {
+   "oid": "o4",
+   "category": "transport",
+   "amount": 99.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "Транспорт – в едната посока",
+   "note": "По желание; за 2026/27."
+  },
+  {
+   "oid": "o5",
+   "category": "tuition",
+   "amount": "7160.00",
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "Подготвителен клас / Подготвителен клас",
+   "note": ""
+  },
+  {
+   "oid": "o6",
+   "category": "materials",
+   "amount": 100.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "Такса материали",
+   "note": ""
+  },
+  {
+   "oid": "o7",
+   "category": "tuition",
+   "amount": 7160.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "Подготвителен клас, начален етап и прогимназиален",
+   "note": "За 2026/27 учебна година."
+  },
+  {
+   "oid": "o8",
+   "category": "food",
+   "amount": null,
+   "amount_min": 4.5,
+   "amount_max": 7.5,
+   "currency": "EUR",
+   "period": null,
+   "label": "Обедно меню",
+   "note": "По желание; вегетариански кетъринг."
+  },
+  {
+   "oid": "o9",
+   "category": "materials",
+   "amount": "100.00",
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "Такса материали",
+   "note": ""
+  }
+ ]
+}

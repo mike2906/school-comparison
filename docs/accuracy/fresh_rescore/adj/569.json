@@ -1,0 +1,244 @@
+{
+ "school_id": 569,
+ "pages_read": [
+  "https://busy-school.com/%d1%82%d0%b0%d0%ba%d1%81%d0%b8/"
+ ],
+ "fetch_failed": [],
+ "site_states_no_fees": false,
+ "site_fees": [
+  {
+   "fid": "f1",
+   "category": "tuition",
+   "amount": 5900,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "ПГУ",
+   "plan": "от 15.09.2026 до 31.05.2027",
+   "year": "2026/2027",
+   "url": "https://busy-school.com/%d1%82%d0%b0%d0%ba%d1%81%d0%b8/",
+   "quote": "ПГУ от 15. 09.2026 г. до 31.05.2027 г. | Без такса | Без такса | 5 900 Евро"
+  },
+  {
+   "fid": "f2",
+   "category": "tuition",
+   "amount": 8000,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "ПГУ",
+   "plan": "от 15.09.2026 до 14.09.2027",
+   "year": "2026/2027",
+   "url": "https://busy-school.com/%d1%82%d0%b0%d0%ba%d1%81%d0%b8/",
+   "quote": "ПГУ от 15.09.2026г. до 14.09.2027 г. | Без такса | Без такса | 8 000 Евро"
+  },
+  {
+   "fid": "f3",
+   "category": "tuition",
+   "amount": 5900,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "1-4 клас",
+   "plan": "от 15.09.2026 до 31.05.2027",
+   "year": "2026/2027",
+   "url": "https://busy-school.com/%d1%82%d0%b0%d0%ba%d1%81%d0%b8/",
+   "quote": "1-4 клас от 15.09.2026 г. до 31.05.2027 г. | Без такса | 70 Евро | 5 900 Евро"
+  },
+  {
+   "fid": "f4",
+   "category": "registration",
+   "amount": 70,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "group": "1-4 клас",
+   "plan": "Гаранционна такса записване",
+   "year": "2026/2027",
+   "url": "https://busy-school.com/%d1%82%d0%b0%d0%ba%d1%81%d0%b8/",
+   "quote": "Гаранционна такса записване се заплаща еднократно при сключване на договор за обучение."
+  },
+  {
+   "fid": "f5",
+   "category": "camp",
+   "amount": 640,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": "Летен дневен лагер",
+   "plan": null,
+   "year": null,
+   "url": "https://busy-school.com/%d1%82%d0%b0%d0%ba%d1%81%d0%b8/",
+   "quote": "Летен дневен лагер | –––– | ––– | 640 Евро /месец"
+  },
+  {
+   "fid": "f6",
+   "category": "food",
+   "amount": 8,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "group": null,
+   "plan": "за присъствен ден",
+   "year": "2026/2027",
+   "url": "https://busy-school.com/%d1%82%d0%b0%d0%ba%d1%81%d0%b8/",
+   "quote": "Храна – 8 Евро за присъствен ден"
+  },
+  {
+   "fid": "f7",
+   "category": "transport",
+   "amount": 179,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": "в посока",
+   "plan": null,
+   "year": "2026/2027",
+   "url": "https://busy-school.com/%d1%82%d0%b0%d0%ba%d1%81%d0%b8/",
+   "quote": "Транспорт в посока – 179 Евро за 1 месец"
+  },
+  {
+   "fid": "f8",
+   "category": "materials",
+   "amount": 155,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "group": null,
+   "plan": null,
+   "year": "2026/2027",
+   "url": "https://busy-school.com/%d1%82%d0%b0%d0%ba%d1%81%d0%b8/",
+   "quote": "Учебни материли- 155 Евро"
+  },
+  {
+   "fid": "f9",
+   "category": "tuition",
+   "amount": 3000,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "semester",
+   "group": null,
+   "plan": "2 равни вноски",
+   "year": "2026/2027",
+   "url": "https://busy-school.com/%d1%82%d0%b0%d0%ba%d1%81%d0%b8/",
+   "quote": "Плащане на 2 вноски по 3 000 Eвро : първа – при сключване на договор, втора – до 15.01.2027 г."
+  }
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "verdict": "correct",
+   "fid": "f5",
+   "reason": "640 EUR per month summer camp",
+   "group_unstated": false
+  },
+  {
+   "oid": "o2",
+   "verdict": "correct",
+   "fid": "f8",
+   "reason": "155 EUR materials, no frequency printed",
+   "group_unstated": false
+  },
+  {
+   "oid": "o3",
+   "verdict": "correct",
+   "fid": "f2",
+   "reason": "8000 EUR annual tuition ПГУ to 14.09.2027",
+   "group_unstated": false
+  },
+  {
+   "oid": "o4",
+   "verdict": "duplicate",
+   "fid": "f7",
+   "reason": "Same transport fee as o8, but period null",
+   "group_unstated": false
+  },
+  {
+   "oid": "o5",
+   "verdict": "correct",
+   "fid": "f6",
+   "reason": "8 EUR per attendance day; no listed period applies",
+   "group_unstated": false
+  },
+  {
+   "oid": "o6",
+   "verdict": "duplicate",
+   "fid": "f5",
+   "reason": "Same camp fee as o1",
+   "group_unstated": false
+  },
+  {
+   "oid": "o7",
+   "verdict": "correct",
+   "fid": "f4",
+   "reason": "70 EUR one-time registration guarantee, grades 1-4",
+   "group_unstated": false
+  },
+  {
+   "oid": "o8",
+   "verdict": "correct",
+   "fid": "f7",
+   "reason": "179 EUR per month one direction",
+   "group_unstated": false
+  },
+  {
+   "oid": "o9",
+   "verdict": "duplicate",
+   "fid": "f8",
+   "reason": "Same materials fee as o2; its yearly period is not printed (would be wrong_period)",
+   "group_unstated": false
+  },
+  {
+   "oid": "o10",
+   "verdict": "correct",
+   "fid": "f1",
+   "reason": "5900 EUR annual tuition ПГУ to 31.05.2027",
+   "group_unstated": false
+  },
+  {
+   "oid": "o11",
+   "verdict": "duplicate",
+   "fid": "f4",
+   "reason": "Same registration fee as o7 (period null)",
+   "group_unstated": false
+  },
+  {
+   "oid": "o12",
+   "verdict": "duplicate",
+   "fid": "f2",
+   "reason": "Same tuition as o3 (period null)",
+   "group_unstated": false
+  },
+  {
+   "oid": "o13",
+   "verdict": "duplicate",
+   "fid": "f1",
+   "reason": "Same tuition as o10 (period null)",
+   "group_unstated": false
+  },
+  {
+   "oid": "o14",
+   "verdict": "duplicate",
+   "fid": "f3",
+   "reason": "Same 1-4 tuition as o15 which has correct period",
+   "group_unstated": false
+  },
+  {
+   "oid": "o15",
+   "verdict": "correct",
+   "fid": "f3",
+   "reason": "5900 EUR annual tuition grades 1-4",
+   "group_unstated": false
+  }
+ ],
+ "notes": "Materials 155 sits under heading 'ДОПЪЛНИТЕЛНИ ТАКСИ ЗА УЧЕБНАТА ГОДИНА' (heading also covers per-day food and monthly transport), so no own frequency; period left null - if heading is read as yearly, o2 becomes missing_period and o9 correct. Instalment 2 x 3000 EUR (does not sum to 5900 or 8000) has no candidate. Food is per attendance day (no matching period value)."
+}

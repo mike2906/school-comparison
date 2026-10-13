@@ -1,0 +1,59 @@
+{
+ "school_id": 598,
+ "name": "Частна детска градина Ягодина",
+ "website": "https://yagodina.bg/",
+ "pages_the_crawler_visited": [
+  "https://yagodina.bg/",
+  "https://yagodina.bg/prices/",
+  "https://yagodina.bg/admission/"
+ ],
+ "pages_where_an_earlier_reader_found_fees": [
+  "https://yagodina.bg/prices/"
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "category": "tuition",
+   "amount": "550.00",
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "Полудневно обучение",
+   "note": ""
+  },
+  {
+   "oid": "o2",
+   "category": "tuition",
+   "amount": 785.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "Целодневно обучение",
+   "note": "Таксата включва храна, образователни материали и организиране на събития, празници и екскурзии, свързани с образователния процес."
+  },
+  {
+   "oid": "o3",
+   "category": "tuition",
+   "amount": "785.00",
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "Целодневно обучение",
+   "note": ""
+  },
+  {
+   "oid": "o4",
+   "category": "tuition",
+   "amount": 550.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "Полудневно обучение",
+   "note": "Таксата включва храна, образователни материали и организиране на събития, празници и екскурзии, свързани с образователния процес."
+  }
+ ]
+}

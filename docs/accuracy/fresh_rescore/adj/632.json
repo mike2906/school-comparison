@@ -1,0 +1,76 @@
+{
+ "school_id": 632,
+ "pages_read": [
+  "https://acatamus.bg/priem/"
+ ],
+ "fetch_failed": [],
+ "site_states_no_fees": false,
+ "site_fees": [
+  {
+   "fid": "f1",
+   "category": "tuition",
+   "amount": 700,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": null,
+   "plan": null,
+   "year": "2026/2027",
+   "url": "https://acatamus.bg/priem/",
+   "quote": "Месечна такса за обучение: 7 00 евро"
+  },
+  {
+   "fid": "f2",
+   "category": "activities",
+   "amount": 150,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": null,
+   "plan": null,
+   "year": "2026/2027",
+   "url": "https://acatamus.bg/priem/",
+   "quote": "Допълнително всеки ученик заплаща 150 евро на месец за уъркшопи, семинари, театрални представления,"
+  },
+  {
+   "fid": "f3",
+   "category": "tuition",
+   "amount": 7000,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": null,
+   "plan": "плащане на пълната сума наведнъж",
+   "year": "2026/2027",
+   "url": "https://acatamus.bg/priem/",
+   "quote": "Получавате 10% отстъпка при плащане на пълната сума ( €7 000) наведнъж."
+  }
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "verdict": "correct",
+   "fid": "f1",
+   "reason": "Monthly tuition printed '7 00 евро' = 700 EUR",
+   "group_unstated": false
+  },
+  {
+   "oid": "o2",
+   "verdict": "correct",
+   "fid": "f2",
+   "reason": "150 EUR/month mandatory extra for workshops, materials, events",
+   "group_unstated": false
+  },
+  {
+   "oid": "o3",
+   "verdict": "wrong_period",
+   "fid": "f3",
+   "reason": "7000 EUR is the full year's tuition paid at once -> yearly, not one_time",
+   "group_unstated": false
+  }
+ ],
+ "notes": "Monthly tuition printed with a stray space as '7 00 евро'; read as 700 (consistent with 7000 full sum = 10 months). 7000 is pre-discount; 10% off when paid at once (6300 not printed). 150/month is charged to every student, so activities rather than extracurricular."
+}

@@ -52,13 +52,27 @@ For one school, with its `website_url`:
    deterministic guard against invented numbers, not a second model.
 4. **Store.** Upsert each page read as a `source_pages` row, and write the fees as `pricing`
    rows linked to their page: `source = scraped_website`, with `pricing_context` carrying
-   `extractor: "agent"` and `confidence: 0.9` for fees that pass step 3.
+   `extractor: "agent"` and a `confidence` that code sets, not the model.
+   - **0.9** when the fee passes step 3 and none of the holds below applies.
+   - **0.5**, under the 0.7 publish floor, for:
+     - a one_time fee in any category but `registration` (enrolment, exam, deposit). Yearly
+       fees filed as one_time were the agent's most common error;
+     - a fee whose label names a deposit (`депозит`, `капаро`, deposit) but whose category is
+       not `registration`;
+     - an instalment row (the label or the page line names a `вноска`, instalment or "N x")
+       that does not name its plan (`plan_name`, plus the plan's payments in `installments`);
+     - a range whose two ends are not printed together on one line of the page.
+
+   The amount check in step 3 only guards against invented numbers. On the fresh sample, 12 of
+   the agent's 13 errors were a printed number with the wrong period or category, which that
+   check cannot see. The holds above target those error types, and the validation before the
+   switch-over (step 3 under Steps) measures whether they work.
 
 The publish boundary does not change: rows go through `pricing_row_is_publishable`, the
 validation stage's evidence check (`price_evidence.py`, which stays) and the
-implausible-tuition check, so a page that turns invalid still withholds its fees. The
-confidence floor (0.7) passes every agent row by design, so for these rows the guard
-against invented fees is step 3. There is no new column, table or migration.
+implausible-tuition check, so a page that turns invalid still withholds its fees. For agent
+rows, the confidence floor (0.7) is how the holds in step 4 keep a fee off the site. There is
+no new column, table or migration.
 
 **Replacing rows.** This reuses today's supersede rule (`price_step._find_superseded_rows`):
 a run replaces only the academic years it read, so earlier years stay as history. Because
@@ -92,18 +106,26 @@ it comes after steps 1 to 5 prove the runs are reliable.
 ## Steps (one PR each)
 
 1. **Fresh-sample check** (read-only). Done 2026-10-13: see `docs/accuracy/fresh_check.md`.
+   The rescore there passes the fees-found bar (63 %) but is wrong more often than today
+   (8 % against 4 %). The fresh sample is now development data.
    Draw a new seeded sample of about 20 schools with fees, outside the R4 sample. Agents
    read the sites blind, as for R4. Then score the agent and today's published rows the same
    way, with strict categories. Go on only if the agent
    is at least as accurate as today and finds at least 55 % of the site fees. Otherwise stop
    and bring the numbers back.
 2. **The stage.** `app/scrapers/stages/fees_agent.py`, plus a thin `fees-agent` CLI command,
-   built from the trial scripts with steps 3 and 4 above. Tests use recorded pages and a
-   stubbed model. Big PR (it changes what the API publishes): one `@codex review`.
-3. **Switch over.** In one PR, stop the extract stage from calling `_extract_prices`, so a
-   later pipeline run can't overwrite agent rows with rule-based ones. Then run the agent on
-   Sofia into the launch DB, compare the scoreboard and `accuracy_report.py` before and
-   after, and publish with a backup and before/after counts.
+   built from the trial scripts with steps 3 and 4 above. The prompt takes the period and
+   deposit rules from `docs/accuracy/fresh_rescore/rules.md`, and must never build a range
+   out of two fees. Tests use recorded pages and a stubbed model. Big PR (it changes what
+   the API publishes): one `@codex review`.
+3. **Validate, then switch over.** First, about 20 schools from the 41 that neither sample
+   used get a key read blind. The step-2 stage and today's rows are scored on them with
+   `fresh_rescore/rules.md`. Go on only if the stage is wrong no more often than today's
+   rows and finds at least 55 % of the site fees. Then, in one PR, stop the extract stage
+   from calling `_extract_prices`, so a later pipeline run can't overwrite agent rows with
+   rule-based ones. Then run the agent on Sofia into the launch DB, compare the scoreboard
+   and `accuracy_report.py` before and after, and publish with a backup and before/after
+   counts.
 4. **Delete the unused extraction code** that step 3 leaves behind (`extraction/price_*.py`,
    `fee_lines.py` and whatever only they import). Validation's `price_evidence.py`,
    `price_carry_over.py`, `fee_pages.py` and `fee_image_reader.py` stay unless nothing uses

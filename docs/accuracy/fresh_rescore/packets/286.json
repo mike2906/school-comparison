@@ -1,0 +1,128 @@
+{
+ "school_id": 286,
+ "name": "ЧАСТНО СРЕДНО УЧИЛИЩЕ ПЕТКО Р. СЛАВЕЙКОВ",
+ "website": "https://www.slaveikov-school.org/",
+ "pages_the_crawler_visited": [
+  "https://www.slaveikov-school.org/",
+  "https://www.slaveikov-school.org/10551056104810451052-2026-2027.html",
+  "https://www.slaveikov-school.org/1055108810801077108410851086-10741088107710841077-10851072-109110951080109010771083108010901077.html",
+  "https://www.slaveikov-school.org/104111021076107810771090.html",
+  "https://www.slaveikov-school.org/uploads/4/8/2/4/4824354/1_%D0%93%D0%A0%D0%90%D0%A4%D0%98%D0%9A_%D0%9F%D0%A0%D0%98%D0%95%D0%9C%D0%9D%D0%9E_%D0%92%D0%A0%D0%95%D0%9C%D0%95.pdf",
+  "https://www.slaveikov-school.org/uploads/4/8/2/4/4824354/0815c543fe259c240139.pdf"
+ ],
+ "pages_where_an_earlier_reader_found_fees": [
+  "https://www.slaveikov-school.org/10551056104810451052-2026-2027.html"
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "category": "tuition",
+   "amount": 3525.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "Годишна учебна такса",
+   "note": "За второ дете от семейството с отстъпка."
+  },
+  {
+   "oid": "o2",
+   "category": "tuition",
+   "amount": 2350.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "На две равни вноски",
+   "note": "Всяка вноска; две вноски."
+  },
+  {
+   "oid": "o3",
+   "category": "tuition",
+   "amount": 3225.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "Учебна такса за предучилищна група",
+   "note": "До 13:00 часа."
+  },
+  {
+   "oid": "o4",
+   "category": "tuition",
+   "amount": 517.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "Разсрочено плащане на 10 равни вноски",
+   "note": "На месец; учебна такса с 10% оскъпяване."
+  },
+  {
+   "oid": "o5",
+   "category": "registration",
+   "amount": 80.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "изпитна такса",
+   "note": "При кандидатстване на нови ученици."
+  },
+  {
+   "oid": "o6",
+   "category": "tuition",
+   "amount": 4700.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "Годишна учебна такса",
+   "note": "За едно дете."
+  },
+  {
+   "oid": "o7",
+   "category": "registration",
+   "amount": 265.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "административна такса",
+   "note": "За всяка учебна година; запазва мястото в съответния клас."
+  },
+  {
+   "oid": "o8",
+   "category": "tuition",
+   "amount": 4700.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "Учебна такса за предучилищна група",
+   "note": "За едно дете целодневно."
+  },
+  {
+   "oid": "o9",
+   "category": "tuition",
+   "amount": 4935.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "При изплащане на 4 вноски",
+   "note": "Учебна такса с 5% оскъпяване."
+  },
+  {
+   "oid": "o10",
+   "category": "tuition",
+   "amount": 4465.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "Авансово на една вноска",
+   "note": "Учебна такса с 5% отстъпка."
+  }
+ ]
+}

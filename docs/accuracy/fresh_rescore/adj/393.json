@@ -1,0 +1,45 @@
+{
+ "school_id": 393,
+ "pages_read": [
+  "https://www.montessori-bulgaria.com/en/admission",
+  "https://www.montessori-bulgaria.com/en/faq",
+  "https://www.montessori-bulgaria.com/en/admission/documents-and-steps-for-enrollment",
+  "https://www.montessori-bulgaria.com/web/files/documents/216/files/Necessary%20Documents%20for%20Enrollment%202020.pdf",
+  "https://www.montessori-bulgaria.com/bg/admission"
+ ],
+ "fetch_failed": [],
+ "site_states_no_fees": false,
+ "site_fees": [
+  {
+   "fid": "f1",
+   "category": "registration",
+   "amount": 600,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "BGN",
+   "period": "one_time",
+   "group": null,
+   "plan": null,
+   "year": null,
+   "url": "https://www.montessori-bulgaria.com/en/admission",
+   "quote": "a non-refundable admission fee of 600 BGN"
+  }
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "verdict": "missing_period",
+   "fid": "f1",
+   "reason": "600 BGN non-refundable admission fee; admission fee is one_time, row null",
+   "group_unstated": false
+  },
+  {
+   "oid": "o2",
+   "verdict": "duplicate",
+   "fid": "f1",
+   "reason": "Same 600 BGN admission fee as o1",
+   "group_unstated": false
+  }
+ ],
+ "notes": "Only amount on site is the 600 BGN admission fee; tuition and tuition deposit mentioned without amounts. No academic year stated. /bg/admission returned only a redirect stub."
+}

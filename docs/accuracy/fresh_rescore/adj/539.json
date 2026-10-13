@@ -1,0 +1,27 @@
+{
+ "school_id": 539,
+ "pages_read": [
+  "https://www.albertino.bg/",
+  "https://www.albertino.bg/sitemap.xml"
+ ],
+ "fetch_failed": [],
+ "site_states_no_fees": false,
+ "site_fees": [
+  {
+   "fid": "f1",
+   "category": "camp",
+   "amount": 180,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "weekly",
+   "group": "деца между 5 и 8 години",
+   "plan": "Лятна академия",
+   "year": null,
+   "url": "https://www.albertino.bg/",
+   "quote": "Цена 180 евро на седмица."
+  }
+ ],
+ "candidates": [],
+ "notes": "Only price on the site is the summer academy (camp) at 180 EUR per week (period 'weekly', not in the standard list). No regular tuition published. pages-sitemap.xml not read; nav links have no separate fee/admission URLs."
+}

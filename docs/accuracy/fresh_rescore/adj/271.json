@@ -1,0 +1,132 @@
+{
+ "school_id": 271,
+ "pages_read": [
+  "https://bgshkolo.com/pricing-plans/"
+ ],
+ "fetch_failed": [],
+ "site_states_no_fees": false,
+ "site_fees": [
+  {
+   "fid": "f1",
+   "category": "tuition",
+   "amount": 7950,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "Детска градина (Монтесори)",
+   "plan": null,
+   "year": "2026/2027",
+   "url": "https://bgshkolo.com/pricing-plans/",
+   "quote": "Детска градина € 7 950 /година (15 549 лв.)"
+  },
+  {
+   "fid": "f2",
+   "category": "tuition",
+   "amount": 7950,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "Предучилищен клас",
+   "plan": null,
+   "year": "2026/2027",
+   "url": "https://bgshkolo.com/pricing-plans/",
+   "quote": "Предучилищен клас € 7 950 /година (15 549 лв.)"
+  },
+  {
+   "fid": "f3",
+   "category": "tuition",
+   "amount": 7200,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "1-ви до 6-ти клас",
+   "plan": null,
+   "year": "2026/2027",
+   "url": "https://bgshkolo.com/pricing-plans/",
+   "quote": "1-ви до 6-ти клас € 7 200 /година (14 082 лв.)"
+  },
+  {
+   "fid": "f4",
+   "category": "tuition",
+   "amount": 7200,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "7-ми до 12-ти клас",
+   "plan": null,
+   "year": "2026/2027",
+   "url": "https://bgshkolo.com/pricing-plans/",
+   "quote": "7-ми до 12-ти клас € 7 200 /година (14 082 лв.)"
+  },
+  {
+   "fid": "f5",
+   "category": "materials",
+   "amount": 250,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": null,
+   "plan": "Такса за учебни помагала",
+   "year": "2026/2027",
+   "url": "https://bgshkolo.com/pricing-plans/",
+   "quote": "250 € /година (489 лв.)"
+  },
+  {
+   "fid": "f6",
+   "category": "registration",
+   "amount": 500,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "group": "Новопостъпващи семейства",
+   "plan": "Такса за постъпване в учебния комплекс",
+   "year": "2026/2027",
+   "url": "https://bgshkolo.com/pricing-plans/",
+   "quote": "500 € (978 лв.) еднократно"
+  }
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "verdict": "correct",
+   "fid": "f3",
+   "reason": "14082 BGN is the site's printed BGN equivalent of 7200 EUR/year (grades 1-6 and 7-12); 'Standard' plan label not on page but not a contradiction",
+   "group_unstated": true
+  },
+  {
+   "oid": "o2",
+   "verdict": "correct",
+   "fid": "f6",
+   "reason": "Enrolment fee 500 EUR one-time for new families",
+   "group_unstated": false
+  },
+  {
+   "oid": "o3",
+   "verdict": "correct",
+   "fid": "f1",
+   "reason": "15549 BGN printed equivalent of 7950 EUR/year (kindergarten/preschool); no label",
+   "group_unstated": true
+  },
+  {
+   "oid": "o4",
+   "verdict": "correct",
+   "fid": "f5",
+   "reason": "Materials 250 EUR /година",
+   "group_unstated": false
+  },
+  {
+   "oid": "o5",
+   "verdict": "correct",
+   "fid": "f4",
+   "reason": "Grades 7-12, 7200 EUR/year",
+   "group_unstated": false
+  }
+ ],
+ "notes": "Page prints EUR with BGN in parentheses for every fee; BGN candidates judged as the same site fee in the printed BGN figure. 14082 BGN applies to both 1-6 and 7-12; 15549 to both KG and preschool. Additional services page (transport/food) not fetched; no candidates for it."
+}

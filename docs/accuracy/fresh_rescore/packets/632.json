@@ -1,0 +1,47 @@
+{
+ "school_id": 632,
+ "name": "ЧАСТНА ПРОФЕСИОНАЛНА ГИМНАЗИЯ АКАТАМУС",
+ "website": "https://acatamus.bg/",
+ "pages_the_crawler_visited": [
+  "https://acatamus.bg/",
+  "https://acatamus.bg/priem/"
+ ],
+ "pages_where_an_earlier_reader_found_fees": [
+  "https://acatamus.bg/priem/"
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "category": "tuition",
+   "amount": 700.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "Месечна такса за обучение",
+   "note": ""
+  },
+  {
+   "oid": "o2",
+   "category": "activities",
+   "amount": 150.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "уъркшопи, семинари, театрални представления, учебни материали и ресурси, срочни и годишни концерти и други събития извън учебната програма",
+   "note": ""
+  },
+  {
+   "oid": "o3",
+   "category": "tuition",
+   "amount": 7000.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "label": "пълната сума",
+   "note": "10% discount when paid at once."
+  }
+ ]
+}

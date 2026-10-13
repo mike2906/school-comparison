@@ -1,0 +1,22 @@
+[
+ {"aid":"a1","verdict":"correct","site_period":"monthly","quote":"Месечна такса за детска градина /от 3 до 7-годишни деца/ ... 650 евро","reason":"650 EUR monthly for 3-7 year olds matches the site."},
+ {"aid":"a2","verdict":"wrong_amount","site_period":null,"quote":"Административната такса за кандидатстване за учебната 2026/2027 година е 100 евро.","reason":"Site states 100 EUR; 200 BGN is not on the page (no older-year figure visible)."},
+ {"aid":"a3","verdict":"missing_period","site_period":"semester","quote":"Two instalments 2 x €4,022; 1st by 09.07.2026; 2nd by 05.02.2027","reason":"Grade 5 two-instalment amount is correct, but 2 per year means semester; row period null."},
+ {"aid":"a4","verdict":"correct","site_period":"yearly","quote":"Гимназия ... Сума при две равни вноски € 7.414","reason":"Printed yearly sum for the gymnasium two-instalment plan, 2026/2027."},
+ {"aid":"a5","verdict":"correct","site_period":null,"quote":"Такса Храна (четири пъти дневно) - 140.00 евро;","reason":"Кукуш food fee of 140 EUR with no frequency stated; the row's null period matches."},
+ {"aid":"a6","verdict":"wrong_period","site_period":"yearly","quote":"390 евро годишно - еднократна такса - осигуряване на образователна среда и ресурси","reason":"'годишно - еднократна такса' is a once-per-school-year charge (yearly), not one_time."},
+ {"aid":"a7","verdict":"correct","site_period":"one_time","quote":"Гаранционна такса записване ... 1-4 клас ... 70 EUR (paid once on signing the contract)","reason":"70 EUR guarantee fee for grades 1-4, paid once at contract signing; registration, one_time."},
+ {"aid":"a8","verdict":"wrong_amount","site_period":"one_time","quote":"еднократна такса за записване в размер на една месечна такса за обучение","reason":"The contract prints no enrolment amount; the 550-600 range is built from the two monthly tuition fees (half-day and full-day)."},
+ {"aid":"a9","verdict":"correct","site_period":"monthly","quote":"по 517 евро (1011,16лв.) на месец","reason":"10 equal monthly instalments of 517 EUR (with the 10% increase) match the site."},
+ {"aid":"a10","verdict":"correct","site_period":null,"quote":"За новозаписани деца се дължи административна такса в размер на 200 евро.","reason":"200 EUR administrative fee with no frequency stated; the row's null period matches."},
+ {"aid":"a11","verdict":"missing_period","site_period":"yearly","quote":"2 вноски EUR6900; Вноска 1 EUR 3450 при подписване на договор; Вноска 2 EUR 3450 до 13.12.2026","reason":"6900 is the printed yearly total for the 2-instalment plan (2026-2027); row period null."},
+ {"aid":"a12","verdict":"wrong_category","site_period":"one_time","quote":"Депозит EUR 770, платим при подписване на договор; приспада се от последната вноска","reason":"A deposit belongs in registration, not tuition."},
+ {"aid":"a13","verdict":"correct","site_period":"yearly","quote":"Детска градина: Образователни услуги ... 7000 € (2 вноски)","reason":"Kindergarten 2-instalment yearly total of 7000 EUR, 2026-2027, is printed on the page."},
+ {"aid":"a14","verdict":"correct","site_period":"one_time","quote":"Прием: 100 €, еднократно.","reason":"100 EUR admission and enrolment fee, charged once."},
+ {"aid":"a15","verdict":"correct","site_period":"yearly","quote":"Детска градина: Образователни услуги 6820 €/год.","reason":"Base yearly kindergarten fee of 6820 EUR, 2026-2027."},
+ {"aid":"a16","verdict":"correct","site_period":"monthly","quote":"199 € на месец в двете посоки и 99 € в едната.","reason":"One-way transport for 2026/27 is 99 EUR monthly."},
+ {"aid":"a17","verdict":"missing_period","site_period":"semester","quote":"ПУК – III клас | 1 х 8900 | 2 х 4450 | 1 х 1750 | 2 х 875","reason":"Transport instalment of 875 paid twice a year (semester); row period null."},
+ {"aid":"a18","verdict":"correct","site_period":null,"quote":"Депозит за запазване на място за следващата учебна година ... 150 €","reason":"150 EUR deposit filed as registration; the site states no frequency."},
+ {"aid":"a19","verdict":"correct","site_period":"yearly","quote":"4700 евро (9192,40 лв.) за едно дете.","reason":"Annual tuition of 4700 EUR for one child."},
+ {"aid":"a20","verdict":"wrong_period","site_period":"yearly","quote":"Опция 3: 8330 EUR еднократно при подписване на договор (отстъпка EUR 250)","reason":"A full year's tuition paid in one payment is yearly, not one_time."}
+]

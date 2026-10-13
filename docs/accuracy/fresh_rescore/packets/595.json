@@ -1,0 +1,110 @@
+{
+ "school_id": 595,
+ "name": "Частна професионална гимназия по дигитални науки СофтУни БУДИТЕЛ",
+ "website": "https://buditel.softuni.bg/",
+ "pages_the_crawler_visited": [
+  "https://buditel.softuni.bg/",
+  "https://buditel.softuni.bg/fees/",
+  "https://buditel.softuni.bg/application-process/",
+  "https://buditel.softuni.bg/priem-sled-8-i-9-klas/",
+  "https://buditel.softuni.bg/stipendii/",
+  "https://buditel.softuni.bg/frequently-asked-questions/",
+  "https://buditel.softuni.bg/parents/",
+  "https://buditel.softuni.bg/apply/",
+  "https://buditel.softuni.bg/majors/",
+  "https://buditel.softuni.bg/dokumenti/"
+ ],
+ "pages_where_an_earlier_reader_found_fees": [
+  "https://buditel.softuni.bg/"
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "category": "registration",
+   "amount": "490.00",
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "label": "такса регистрация",
+   "note": ""
+  },
+  {
+   "oid": "o2",
+   "category": "tuition",
+   "amount": "8900.00",
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "Годишна такса за 8. клас за учебната 2027/2028 год / Годишна такса за 8. клас за учебната 2027/2028 година / Плащане на една вноска",
+   "note": ""
+  },
+  {
+   "oid": "o3",
+   "category": "registration",
+   "amount": 100.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "такса кандидатстване",
+   "note": "Приемни изпити след 01.06.2026 г., при наличие на свободни места."
+  },
+  {
+   "oid": "o4",
+   "category": "registration",
+   "amount": "100.00",
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "label": "такса кандидатстване",
+   "note": ""
+  },
+  {
+   "oid": "o5",
+   "category": "registration",
+   "amount": 490.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "label": "такса регистрация",
+   "note": "За нов ученик; договори, сключени до 31.01.2026 г., са освободени от таксата."
+  },
+  {
+   "oid": "o6",
+   "category": "tuition",
+   "amount": 8320.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "Годишна такса за 8. клас — плащане на една вноска",
+   "note": "Учебна 2026/2027 година."
+  },
+  {
+   "oid": "o7",
+   "category": "tuition",
+   "amount": 2920.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "Годишна такса за 8. клас — плащане на 3 вноски",
+   "note": "На вноска; учебна 2026/2027 година."
+  },
+  {
+   "oid": "o8",
+   "category": "tuition",
+   "amount": "8320.00",
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "Годишна такса за 8. клас за учебната 2026/2027 год / Годишна такса за 8. клас за учебната 2026/2027 година",
+   "note": ""
+  }
+ ]
+}

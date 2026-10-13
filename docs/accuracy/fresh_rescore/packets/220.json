@@ -1,0 +1,124 @@
+{
+ "school_id": 220,
+ "name": "ЧАСТНА ДЕТСКА ГРАДИНА ДЕТСКА АКАДЕМИЯ",
+ "website": "https://toddlersacademy.eu/bg/",
+ "pages_the_crawler_visited": [
+  "https://toddlersacademy.eu/bg/",
+  "https://toddlersacademy.eu/bg/admission.html"
+ ],
+ "pages_where_an_earlier_reader_found_fees": [
+  "https://toddlersacademy.eu/bg/admission.html"
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "category": "tuition",
+   "amount": 770.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "Депозит",
+   "note": "Платим при подписване на договор; приспада се от последната вноска, освен ако договорът не е прекратен предсрочно."
+  },
+  {
+   "oid": "o2",
+   "category": "materials",
+   "amount": 150.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "label": "Такса за учебници и тетрадки",
+   "note": ""
+  },
+  {
+   "oid": "o3",
+   "category": "tuition",
+   "amount": 2310.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "quarter",
+   "label": "I вноска (септ–ноем)",
+   "note": "Опция 2; тримесечни вноски с отстъпка EUR 110 при плащане на четири вноски."
+  },
+  {
+   "oid": "o4",
+   "category": "registration",
+   "amount": 200.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "label": "Такса за регистрация",
+   "note": "Само при първо постъпване."
+  },
+  {
+   "oid": "o5",
+   "category": "tuition",
+   "amount": 2310.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "quarter",
+   "label": "III вноска (март–май)",
+   "note": "Опция 2; тримесечни вноски с отстъпка EUR 110 при плащане на четири вноски."
+  },
+  {
+   "oid": "o6",
+   "category": "tuition",
+   "amount": 8330.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "label": "Опция 3",
+   "note": "Еднократно плащане при подписване на договор; включва отстъпка EUR 250."
+  },
+  {
+   "oid": "o7",
+   "category": "tuition",
+   "amount": 1540.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "quarter",
+   "label": "IV вноска (юни–юли)",
+   "note": "Опция 2; тримесечни вноски с отстъпка EUR 110 при плащане на четири вноски."
+  },
+  {
+   "oid": "o8",
+   "category": "tuition",
+   "amount": 2310.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "quarter",
+   "label": "II вноска (дек–фев)",
+   "note": "Опция 2; тримесечни вноски с отстъпка EUR 110 при плащане на четири вноски."
+  },
+  {
+   "oid": "o9",
+   "category": "tuition",
+   "amount": 780.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "Опция 1",
+   "note": "11 равни месечни вноски."
+  },
+  {
+   "oid": "o10",
+   "category": "tuition",
+   "amount": 8580.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "Обща такса за обучение",
+   "note": "За учебната 2026/2027 година."
+  }
+ ]
+}

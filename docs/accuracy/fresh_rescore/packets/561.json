@@ -1,0 +1,31 @@
+{
+ "school_id": 561,
+ "name": "ЧАСТНО ОСНОВНО УЧИЛИЩЕ АЗБУКИ",
+ "website": "https://azbuki-school.bg/",
+ "pages_the_crawler_visited": [
+  "https://azbuki-school.bg/",
+  "https://azbuki-school.bg/priem/",
+  "https://azbuki-school.bg/en/admissions/",
+  "https://azbuki-school.bg/timeline/24-%d0%b8-25-%d1%8f%d0%bd%d1%83%d0%b0%d1%80%d0%b8-%d0%bf%d1%80%d0%be%d0%b2%d0%b5%d0%b6%d0%b4%d0%b0%d0%bd%d0%b5-%d0%bd%d0%b0-%d0%bf%d1%80%d0%b8%d0%b5%d0%bc%d0%bd%d0%b8-%d0%b8%d0%b7%d0%bf%d0%b8%d1%82/",
+  "https://azbuki-school.bg/timeline/%d0%bf%d1%80%d0%be%d0%b2%d0%b5%d0%b6%d0%b4%d0%b0%d0%bd%d0%b5-%d0%bd%d0%b0-%d0%bf%d1%80%d0%b8%d0%b5%d0%bc%d0%bd%d0%b8-%d0%b8%d0%b7%d0%bf%d0%b8%d1%82%d0%b8/",
+  "https://azbuki-school.bg/timeline/%d0%be%d1%82-28-%d0%b4%d0%be-29-%d0%b0%d0%bf%d1%80%d0%b8%d0%bb-%d0%bf%d1%80%d0%be%d0%b2%d0%b5%d0%b6%d0%b4%d0%b0%d0%bd%d0%b5-%d0%bd%d0%b0-%d0%bf%d1%80%d0%b8%d0%b5%d0%bc%d0%bd%d0%b8-%d0%b8%d0%b7%d0%bf/",
+  "https://azbuki-school.bg/daily-schedule-and-eating/",
+  "https://azbuki-school.bg/en/daily-schedule-and-nutrition/"
+ ],
+ "pages_where_an_earlier_reader_found_fees": [
+  "https://azbuki-school.bg/priem/"
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "category": "tuition",
+   "amount": 8950.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "Таксата за следващата учебна година (2026/2027)",
+   "note": ""
+  }
+ ]
+}

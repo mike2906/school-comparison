@@ -1,0 +1,182 @@
+{
+ "school_id": 529,
+ "pages_read": [
+  "https://www.ds-sofia.bg/%D1%83%D1%87%D0%B5%D0%B1%D0%BD%D0%B8-%D1%82%D0%B0%D0%BA%D1%81%D0%B8",
+  "https://28213091-9851-4a7a-bf35-a142488d88e8.filesusr.com/ugd/3a4b7a_19260668942e4a169cec7e4f70a2981b.pdf"
+ ],
+ "fetch_failed": [],
+ "site_states_no_fees": false,
+ "site_fees": [
+  {
+   "fid": "f1",
+   "category": "registration",
+   "amount": 2000,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "group": "new students",
+   "plan": null,
+   "year": "2026/2027",
+   "url": "https://www.ds-sofia.bg/%D1%83%D1%87%D0%B5%D0%B1%D0%BD%D0%B8-%D1%82%D0%B0%D0%BA%D1%81%D0%B8",
+   "quote": "Такса прием (еднократна) за новоприетите ученици: 2.000 €"
+  },
+  {
+   "fid": "f2",
+   "category": "tuition",
+   "amount": 6540,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "Предучилищна",
+   "plan": "еднократна годишна вноска",
+   "year": "2026/2027",
+   "url": "https://www.ds-sofia.bg/%D1%83%D1%87%D0%B5%D0%B1%D0%BD%D0%B8-%D1%82%D0%B0%D0%BA%D1%81%D0%B8",
+   "quote": "Предучилищна ... Сума при еднократна годишна вноска € 6.540"
+  },
+  {
+   "fid": "f3",
+   "category": "tuition",
+   "amount": 7194,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "Предучилищна",
+   "plan": "две равни вноски (annual total)",
+   "year": "2026/2027",
+   "url": "https://www.ds-sofia.bg/%D1%83%D1%87%D0%B5%D0%B1%D0%BD%D0%B8-%D1%82%D0%B0%D0%BA%D1%81%D0%B8",
+   "quote": "Сума при две равни вноски € 7.194"
+  },
+  {
+   "fid": "f4",
+   "category": "tuition",
+   "amount": 6580,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "Начално училище",
+   "plan": "еднократна годишна вноска",
+   "year": "2026/2027",
+   "url": "https://www.ds-sofia.bg/%D1%83%D1%87%D0%B5%D0%B1%D0%BD%D0%B8-%D1%82%D0%B0%D0%BA%D1%81%D0%B8",
+   "quote": "Начално училище ... Сума при еднократна годишна вноска € 6.580"
+  },
+  {
+   "fid": "f5",
+   "category": "tuition",
+   "amount": 7238,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "Начално училище",
+   "plan": "две равни вноски (annual total)",
+   "year": "2026/2027",
+   "url": "https://www.ds-sofia.bg/%D1%83%D1%87%D0%B5%D0%B1%D0%BD%D0%B8-%D1%82%D0%B0%D0%BA%D1%81%D0%B8",
+   "quote": "Сума при две равни вноски € 7.238"
+  },
+  {
+   "fid": "f6",
+   "category": "tuition",
+   "amount": 6740,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "Гимназия",
+   "plan": "еднократна годишна вноска",
+   "year": "2026/2027",
+   "url": "https://www.ds-sofia.bg/%D1%83%D1%87%D0%B5%D0%B1%D0%BD%D0%B8-%D1%82%D0%B0%D0%BA%D1%81%D0%B8",
+   "quote": "Гимназия ... Сума при еднократна годишна вноска € 6.740"
+  },
+  {
+   "fid": "f7",
+   "category": "tuition",
+   "amount": 7414,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "Гимназия",
+   "plan": "две равни вноски (annual total)",
+   "year": "2026/2027",
+   "url": "https://www.ds-sofia.bg/%D1%83%D1%87%D0%B5%D0%B1%D0%BD%D0%B8-%D1%82%D0%B0%D0%BA%D1%81%D0%B8",
+   "quote": "Сума при две равни вноски € 7.414"
+  },
+  {
+   "fid": "f8",
+   "category": "tuition",
+   "amount": 80,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "daily",
+   "group": "гост-ученици",
+   "plan": null,
+   "year": "2026/2027",
+   "url": "https://www.ds-sofia.bg/%D1%83%D1%87%D0%B5%D0%B1%D0%BD%D0%B8-%D1%82%D0%B0%D0%BA%D1%81%D0%B8",
+   "quote": "За гост-учениците таксата за всеки учебен ден е 80,00€."
+  }
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "verdict": "correct",
+   "fid": "f1",
+   "reason": "2000 EUR one-time admission fee.",
+   "group_unstated": false
+  },
+  {
+   "oid": "o2",
+   "verdict": "correct",
+   "fid": "f6",
+   "reason": "6740 EUR yearly, gymnasium, single payment, 2026/2027.",
+   "group_unstated": false
+  },
+  {
+   "oid": "o3",
+   "verdict": "missing_period",
+   "fid": "f2",
+   "reason": "6540 EUR preschool single annual payment is yearly; row period null.",
+   "group_unstated": false
+  },
+  {
+   "oid": "o4",
+   "verdict": "duplicate",
+   "fid": "f6",
+   "reason": "Same fee as o2, which is more correct (o4 period null).",
+   "group_unstated": false
+  },
+  {
+   "oid": "o5",
+   "verdict": "duplicate",
+   "fid": "f1",
+   "reason": "Same admission fee as earlier o1.",
+   "group_unstated": false
+  },
+  {
+   "oid": "o6",
+   "verdict": "missing_period",
+   "fid": "f8",
+   "reason": "80 EUR per school day for guest students; row period null.",
+   "group_unstated": false
+  },
+  {
+   "oid": "o7",
+   "verdict": "missing_period",
+   "fid": "f4",
+   "reason": "6580 EUR primary single annual payment is yearly; row period null.",
+   "group_unstated": false
+  },
+  {
+   "oid": "o8",
+   "verdict": "correct",
+   "fid": "f7",
+   "reason": "7414 EUR is the printed annual total for the two-instalment plan (PDF: 'Годишна сума според начина на плащане').",
+   "group_unstated": false
+  }
+ ],
+ "notes": "Fee regulation PDF (linked from fee page, served via ds-sofia.bg redirect to filesusr.com) confirms two-instalment columns are annual totals; per-instalment amounts are not printed. Guest fee period is per day ('daily', not in the period list)."
+}

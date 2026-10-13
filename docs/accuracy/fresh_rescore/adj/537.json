@@ -1,0 +1,17 @@
+{
+ "school_id": 537,
+ "pages_read": [
+  "https://pberon.com/",
+  "https://pberon.com/obsthi-usloviya/",
+  "https://pberon.com/usloviya-za-kandidatstvane/",
+  "https://pberon.com/detska-gradina/",
+  "https://pberon.com/preduchilisthna-podgotovka/",
+  "https://pberon.com/documents/",
+  "https://pberon.com/onlajn-kandidatstvane/"
+ ],
+ "fetch_failed": [],
+ "site_states_no_fees": true,
+ "site_fees": [],
+ "candidates": [],
+ "notes": "Admission conditions page mentions an annual tuition fee and possible extra fees only in general terms, no amounts. Documents page lists 23 PDFs, none fee-related by title (not opened). 'za-chou-d-r-petar-beron' not fetched."
+}

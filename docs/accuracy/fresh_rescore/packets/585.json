@@ -1,0 +1,36 @@
+{
+ "school_id": 585,
+ "name": "Частно средно училище по изкуства и чужди езици Артис",
+ "website": "https://artisbg.com/",
+ "pages_the_crawler_visited": [
+  "https://artisbg.com/",
+  "https://artisbg.com/primary-education/",
+  "https://artisbg.com/junior-high-school/",
+  "https://artisbg.com/high-school-3/"
+ ],
+ "pages_where_an_earlier_reader_found_fees": [],
+ "candidates": [
+  {
+   "oid": "o1",
+   "category": "registration",
+   "amount": 200.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "label": "Такса кандидатстване",
+   "note": "Non-refundable; the site says it is paid once."
+  },
+  {
+   "oid": "o2",
+   "category": "tuition",
+   "amount": 7900.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "Годишна такса за обучение",
+   "note": "€7,900 when paid in full at enrollment; the site also states four installments of €2,050."
+  }
+ ]
+}

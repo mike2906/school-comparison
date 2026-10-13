@@ -1,0 +1,365 @@
+[
+ {
+  "aid": "a1",
+  "school_id": 302,
+  "website": "https://www.ecodara.com/",
+  "pages_hint": [
+   "https://www.ecodara.com/content/taksa-za-detska-gradina.php"
+  ],
+  "row": {
+   "category": "tuition",
+   "amount": 650.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "Месечна такса за детска градина /от 3 до 7-годишни деца/",
+   "note": ""
+  }
+ },
+ {
+  "aid": "a2",
+  "school_id": 381,
+  "website": "https://eduteh.eu/",
+  "pages_hint": [
+   "https://eduteh.eu/chastno-osnovno-uchilishte/price-and-admission-chou/priem-parvoklasnici",
+   "https://eduteh.eu/chastno-osnovno-uchilishte/price-and-admission-chou/priem-petoklasnici"
+  ],
+  "row": {
+   "category": "registration",
+   "amount": "200.00",
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "BGN",
+   "period": null,
+   "label": "Административната такса за кандидатстване",
+   "note": ""
+  }
+ },
+ {
+  "aid": "a3",
+  "school_id": 517,
+  "website": "https://www.parvamatematicheska.com/",
+  "pages_hint": [
+   "https://www.parvamatematicheska.com/pchmg/finansovi-uslovija/"
+  ],
+  "row": {
+   "category": "tuition",
+   "amount": 4022.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "На две вноски — 5. клас",
+   "note": "2 installments of €4,022 each."
+  }
+ },
+ {
+  "aid": "a4",
+  "school_id": 529,
+  "website": "https://www.ds-sofia.bg/",
+  "pages_hint": [
+   "https://www.ds-sofia.bg/учебни-такси"
+  ],
+  "row": {
+   "category": "tuition",
+   "amount": 7414.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "Гимназия — Две равни вноски годишно",
+   "note": "Учебна 2026/2027 година."
+  }
+ },
+ {
+  "aid": "a5",
+  "school_id": 511,
+  "website": "https://www.arty.bg/",
+  "pages_hint": [
+   "https://www.arty.bg/bg/pages/charges.html"
+  ],
+  "row": {
+   "category": "food",
+   "amount": 140.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "Такса Храна (четири пъти дневно)",
+   "note": "За Кукуш"
+  }
+ },
+ {
+  "aid": "a6",
+  "school_id": 531,
+  "website": "https://www.montessori-high.com/bg",
+  "pages_hint": [
+   "https://montessori-high.com/bg/priem"
+  ],
+  "row": {
+   "category": "materials",
+   "amount": 390.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "label": "осигуряване на образователна среда и ресурси",
+   "note": "The page describes this as 390 euros annually and as a one-time fee."
+  }
+ },
+ {
+  "aid": "a7",
+  "school_id": 569,
+  "website": "https://busy-school.com/",
+  "pages_hint": [
+   "https://busy-school.com/%d1%82%d0%b0%d0%ba%d1%81%d0%b8/"
+  ],
+  "row": {
+   "category": "registration",
+   "amount": 70.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "label": "Гаранционна такса записване",
+   "note": "За 1–4 клас."
+  }
+ },
+ {
+  "aid": "a8",
+  "school_id": 547,
+  "website": "https://mechopuh.bg/",
+  "pages_hint": [
+   "https://mechopuh.bg/priem/DogovorMechoPuh.pdf"
+  ],
+  "row": {
+   "category": "registration",
+   "amount": null,
+   "amount_min": 550.0,
+   "amount_max": 600.0,
+   "currency": "EUR",
+   "period": "one_time",
+   "label": "еднократна такса за записване",
+   "note": "Равна на една месечна такса за обучение."
+  }
+ },
+ {
+  "aid": "a9",
+  "school_id": 286,
+  "website": "https://www.slaveikov-school.org/",
+  "pages_hint": [
+   "https://www.slaveikov-school.org/10551056104810451052-2026-2027.html"
+  ],
+  "row": {
+   "category": "tuition",
+   "amount": 517.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "Разсрочено плащане на 10 равни вноски",
+   "note": "На месец; учебна такса с 10% оскъпяване."
+  }
+ },
+ {
+  "aid": "a10",
+  "school_id": 601,
+  "website": "https://kidsville.space/",
+  "pages_hint": [
+   "https://kidsville.space/%d1%86%d0%b5%d0%bd%d0%b8/"
+  ],
+  "row": {
+   "category": "registration",
+   "amount": "200.00",
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "административна такса",
+   "note": ""
+  }
+ },
+ {
+  "aid": "a11",
+  "school_id": 329,
+  "website": "https://www.fpels.ws/",
+  "pages_hint": [
+   "https://www.fpels.ws/prices/"
+  ],
+  "row": {
+   "category": "tuition",
+   "amount": 6900.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "Плащане с 2 вноски",
+   "note": "Учебна 2026–2027 г."
+  }
+ },
+ {
+  "aid": "a12",
+  "school_id": 220,
+  "website": "https://toddlersacademy.eu/bg/",
+  "pages_hint": [
+   "https://toddlersacademy.eu/bg/admission.html"
+  ],
+  "row": {
+   "category": "tuition",
+   "amount": 770.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "Депозит",
+   "note": "Платим при подписване на договор; приспада се от последната вноска, освен ако договорът не е прекратен предсрочно."
+  }
+ },
+ {
+  "aid": "a13",
+  "school_id": 634,
+  "website": "https://uwekind.com/",
+  "pages_hint": [
+   "https://uwekind.com/admission/fees/"
+  ],
+  "row": {
+   "category": "tuition",
+   "amount": 7000.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "Такса „Образователни услуги“ (Детска градина)",
+   "note": "При разсрочено плащане на 2 вноски"
+  }
+ },
+ {
+  "aid": "a14",
+  "school_id": 350,
+  "website": "https://izgrevou.com/",
+  "pages_hint": [
+   "https://izgrevou.com/priem/",
+   "https://izgrevou.com/uchilishche/taksi/"
+  ],
+  "row": {
+   "category": "registration",
+   "amount": "100.00",
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "label": "Такса прием и записване",
+   "note": ""
+  }
+ },
+ {
+  "aid": "a15",
+  "school_id": 634,
+  "website": "https://uwekind.com/",
+  "pages_hint": [
+   "https://uwekind.com/admission/fees/"
+  ],
+  "row": {
+   "category": "tuition",
+   "amount": 6820.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "Такса „Образователни услуги“ (Детска градина)",
+   "note": ""
+  }
+ },
+ {
+  "aid": "a16",
+  "school_id": 350,
+  "website": "https://izgrevou.com/",
+  "pages_hint": [
+   "https://izgrevou.com/priem/",
+   "https://izgrevou.com/uchilishche/taksi/"
+  ],
+  "row": {
+   "category": "transport",
+   "amount": 99.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "Транспорт – в едната посока",
+   "note": "По желание; за 2026/27."
+  }
+ },
+ {
+  "aid": "a17",
+  "school_id": 172,
+  "website": "https://www.svetasofia.com/",
+  "pages_hint": [
+   "https://www.svetasofia.com/finansovi-uslovia/"
+  ],
+  "row": {
+   "category": "transport",
+   "amount": 875.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "ПУК – III клас, такса транспорт (2 х)",
+   "note": "Възможност за плащане на две вноски."
+  }
+ },
+ {
+  "aid": "a18",
+  "school_id": 530,
+  "website": "https://detski-sviat.info/",
+  "pages_hint": [
+   "https://detski-sviat.info/ceni-i-taksi/"
+  ],
+  "row": {
+   "category": "registration",
+   "amount": 150.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "Депозит за запазване на място за следващата учебна година",
+   "note": "Приспада се от таксата за месец септември; заплаща се от 1-ви март до 15-ти април"
+  }
+ },
+ {
+  "aid": "a19",
+  "school_id": 286,
+  "website": "https://www.slaveikov-school.org/",
+  "pages_hint": [
+   "https://www.slaveikov-school.org/10551056104810451052-2026-2027.html"
+  ],
+  "row": {
+   "category": "tuition",
+   "amount": 4700.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "Годишна учебна такса",
+   "note": "За едно дете."
+  }
+ },
+ {
+  "aid": "a20",
+  "school_id": 220,
+  "website": "https://toddlersacademy.eu/bg/",
+  "pages_hint": [
+   "https://toddlersacademy.eu/bg/admission.html"
+  ],
+  "row": {
+   "category": "tuition",
+   "amount": 8330.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "label": "Опция 3",
+   "note": "Еднократно плащане при подписване на договор; включва отстъпка EUR 250."
+  }
+ }
+]

@@ -1,0 +1,170 @@
+{
+ "school_id": 172,
+ "name": "Частно основно училище Света София",
+ "website": "https://www.svetasofia.com/",
+ "pages_the_crawler_visited": [
+  "https://www.svetasofia.com/",
+  "https://www.svetasofia.com/finansovi-uslovia/",
+  "https://www.svetasofia.com/25-%d0%b3%d0%be%d0%b4%d0%b8%d0%bd%d0%b8-%d0%bf%d0%b8%d0%b0%d0%bd%d0%be-%d1%81%d1%86%d0%b5%d0%bd%d0%b0-%d0%b8-%d1%86%d0%b2%d0%b5%d1%82%d1%8f-%d0%ba%d0%be%d0%b8%d1%82%d0%be-%d0%bd%d0%b5-%d1%83%d0%b2/",
+  "https://www.svetasofia.com/zashto-da-izberete-nas/"
+ ],
+ "pages_where_an_earlier_reader_found_fees": [
+  "https://www.svetasofia.com/finansovi-uslovia/"
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "category": "transport",
+   "amount": 1750.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "ПУК – III клас, такса транспорт (1 х)",
+   "note": ""
+  },
+  {
+   "oid": "o2",
+   "category": "registration",
+   "amount": "40.00",
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "Такса правоучастие за прием в предучилищен клас и / Такса правоучастие за прием в предучилищен клас и 1-ви клас",
+   "note": ""
+  },
+  {
+   "oid": "o3",
+   "category": "tuition",
+   "amount": 9400.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "IV – VII клас, обучение и храна (1 х)",
+   "note": ""
+  },
+  {
+   "oid": "o4",
+   "category": "transport",
+   "amount": 910.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "IV – VII клас, такса транспорт (2 х)",
+   "note": "Възможност за плащане на две вноски."
+  },
+  {
+   "oid": "o5",
+   "category": "transport",
+   "amount": "1750.00",
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "ПУК – III клас / ПУК – III клас / такса транспорт",
+   "note": ""
+  },
+  {
+   "oid": "o6",
+   "category": "transport",
+   "amount": 1820.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "IV – VII клас, такса транспорт (1 х)",
+   "note": ""
+  },
+  {
+   "oid": "o7",
+   "category": "transport",
+   "amount": "1820.00",
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "IV – VII клас / IV – VII клас / такса транспорт",
+   "note": ""
+  },
+  {
+   "oid": "o8",
+   "category": "tuition",
+   "amount": 4450.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "ПУК – III клас, обучение и храна (2 х)",
+   "note": "Възможност за плащане на две вноски."
+  },
+  {
+   "oid": "o9",
+   "category": "tuition",
+   "amount": "9400.00",
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "IV – VII клас / IV – VII клас / годишна такса обучение и храна",
+   "note": ""
+  },
+  {
+   "oid": "o10",
+   "category": "transport",
+   "amount": 875.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "ПУК – III клас, такса транспорт (2 х)",
+   "note": "Възможност за плащане на две вноски."
+  },
+  {
+   "oid": "o11",
+   "category": "registration",
+   "amount": 40.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "Такса правоучастие за прием в предучилищен клас и 1-ви клас",
+   "note": ""
+  },
+  {
+   "oid": "o12",
+   "category": "tuition",
+   "amount": 8900.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "label": "ПУК – III клас, обучение и храна (1 х)",
+   "note": ""
+  },
+  {
+   "oid": "o13",
+   "category": "tuition",
+   "amount": "8900.00",
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "ПУК – III клас / ПУК – III клас / годишна такса обучение и храна",
+   "note": ""
+  },
+  {
+   "oid": "o14",
+   "category": "tuition",
+   "amount": 4700.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "IV – VII клас, обучение и храна (2 х)",
+   "note": "Възможност за плащане на две вноски."
+  }
+ ]
+}

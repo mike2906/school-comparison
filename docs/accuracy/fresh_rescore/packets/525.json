@@ -1,0 +1,147 @@
+{
+ "school_id": 525,
+ "name": "Частна детска градина Славейче",
+ "website": "https://slaveiche.com/",
+ "pages_the_crawler_visited": [
+  "https://slaveiche.com/",
+  "https://slaveiche.com/taksi/",
+  "https://slaveiche.com/priem/"
+ ],
+ "pages_where_an_earlier_reader_found_fees": [
+  "https://slaveiche.com/taksi/"
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "category": "extracurricular",
+   "amount": "20.00",
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "обучение по английски език / месечна такса",
+   "note": ""
+  },
+  {
+   "oid": "o2",
+   "category": "registration",
+   "amount": "280.00",
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "депозит за запазване на място",
+   "note": ""
+  },
+  {
+   "oid": "o3",
+   "category": "extracurricular",
+   "amount": 20.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "обучение по английски език",
+   "note": "3 пъти седмично"
+  },
+  {
+   "oid": "o4",
+   "category": "tuition",
+   "amount": 350.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "половин ден с включен обяд",
+   "note": ""
+  },
+  {
+   "oid": "o5",
+   "category": "tuition",
+   "amount": 560.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "целодневно гледане",
+   "note": "ежемесечно заплащане"
+  },
+  {
+   "oid": "o6",
+   "category": "extracurricular",
+   "amount": 25.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "модерни танци",
+   "note": "2 пъти седмично"
+  },
+  {
+   "oid": "o7",
+   "category": "tuition",
+   "amount": "560.00",
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "целодневно гледане",
+   "note": ""
+  },
+  {
+   "oid": "o8",
+   "category": "extracurricular",
+   "amount": 25.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "йога за деца",
+   "note": "1 път седмично"
+  },
+  {
+   "oid": "o9",
+   "category": "extracurricular",
+   "amount": "25.00",
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "label": "йога за деца",
+   "note": ""
+  },
+  {
+   "oid": "o10",
+   "category": "registration",
+   "amount": 280.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "депозит за запазване на място",
+   "note": ""
+  },
+  {
+   "oid": "o11",
+   "category": "tuition",
+   "amount": 520.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "при предплащане над 6 месеца",
+   "note": "Отстъпка при предплащане на целодневна такса"
+  },
+  {
+   "oid": "o12",
+   "category": "tuition",
+   "amount": 540.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "label": "при предплащане за 3 месеца",
+   "note": "Отстъпка при предплащане на целодневна такса"
+  }
+ ]
+}

@@ -1,0 +1,124 @@
+{
+ "school_id": 542,
+ "name": "ЧАСТНА ДЕТСКА ГРАДИНА ЙОР КИДС",
+ "website": "https://yourkidsbg.com/",
+ "pages_the_crawler_visited": [
+  "https://yourkidsbg.com/",
+  "https://yourkidsbg.com/priem-i-taksi/"
+ ],
+ "pages_where_an_earlier_reader_found_fees": [
+  "https://yourkidsbg.com/priem-i-taksi/"
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "category": "tuition",
+   "amount": "1100.00",
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "BGN",
+   "period": "monthly",
+   "label": "Частна Детска Ясла ,,Йор Кидс“ / Частна Детска Ясла ,,Йор Кидс“ / Целодневен престой",
+   "note": ""
+  },
+  {
+   "oid": "o2",
+   "category": "tuition",
+   "amount": "950.00",
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "BGN",
+   "period": "monthly",
+   "label": "Частна Детска Градина ,,Йор Кидс“ / Частна Детска Градина ,,Йор Кидс“ / Целодневен престой",
+   "note": ""
+  },
+  {
+   "oid": "o3",
+   "category": "materials",
+   "amount": 150.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "BGN",
+   "period": "yearly",
+   "label": "Годишна такса за учебни материали",
+   "note": ""
+  },
+  {
+   "oid": "o4",
+   "category": "tuition",
+   "amount": 750.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "BGN",
+   "period": "monthly",
+   "label": "Полудневен престой",
+   "note": "Частна Детска Градина „Йор Кидс“"
+  },
+  {
+   "oid": "o5",
+   "category": "tuition",
+   "amount": "750.00",
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "BGN",
+   "period": "monthly",
+   "label": "Частна Детска Градина ,,Йор Кидс“ / Частна Детска Градина ,,Йор Кидс“ / Полудневен престой",
+   "note": ""
+  },
+  {
+   "oid": "o6",
+   "category": "registration",
+   "amount": "400.00",
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "BGN",
+   "period": null,
+   "label": "Депозит за запазване на място при продължително отсъствие",
+   "note": ""
+  },
+  {
+   "oid": "o7",
+   "category": "tuition",
+   "amount": "800.00",
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "BGN",
+   "period": "monthly",
+   "label": "Частна Детска Ясла ,,Йор Кидс“ / Частна Детска Ясла ,,Йор Кидс“ / Полудневен престой",
+   "note": ""
+  },
+  {
+   "oid": "o8",
+   "category": "registration",
+   "amount": 400.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "BGN",
+   "period": null,
+   "label": "Депозит за запазване на място при продължително отсъствие",
+   "note": "При отсъствие на един месец и повече."
+  },
+  {
+   "oid": "o9",
+   "category": "materials",
+   "amount": "150.00",
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "BGN",
+   "period": "yearly",
+   "label": "Годишна такса за учебни материали",
+   "note": ""
+  },
+  {
+   "oid": "o10",
+   "category": "tuition",
+   "amount": 950.0,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "BGN",
+   "period": "monthly",
+   "label": "Целодневен престой",
+   "note": "Частна Детска Градина „Йор Кидс“"
+  }
+ ]
+}

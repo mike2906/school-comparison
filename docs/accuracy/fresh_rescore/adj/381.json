@@ -1,0 +1,120 @@
+{
+ "school_id": 381,
+ "pages_read": [
+  "https://eduteh.eu/chastno-osnovno-uchilishte/price-and-admission-chou",
+  "https://eduteh.eu/chastno-osnovno-uchilishte/price-and-admission-chou/priem-parvoklasnici",
+  "https://eduteh.eu/chastno-osnovno-uchilishte/price-and-admission-chou/priem-petoklasnici"
+ ],
+ "fetch_failed": [],
+ "site_states_no_fees": false,
+ "site_fees": [
+  {
+   "fid": "f1",
+   "category": "registration",
+   "amount": 100,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "group": "1 клас (кандидатстване)",
+   "plan": null,
+   "year": "2026/2027",
+   "url": "https://eduteh.eu/chastno-osnovno-uchilishte/price-and-admission-chou/priem-parvoklasnici",
+   "quote": "Административната такса за кандидатстване за учебната 2026/2027 година е 100 евро."
+  },
+  {
+   "fid": "f2",
+   "category": "registration",
+   "amount": 100,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "group": "5 клас (приемни изпити)",
+   "plan": null,
+   "year": "2026/2027",
+   "url": "https://eduteh.eu/chastno-osnovno-uchilishte/price-and-admission-chou/priem-petoklasnici",
+   "quote": "Административната такса за кандидатстване за учебната 2026/2027 година е 100 евро, като тя включва всички приемни изпити"
+  },
+  {
+   "fid": "f3",
+   "category": "tuition",
+   "amount": 8110,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": null,
+   "plan": null,
+   "year": "2026/2027",
+   "url": "https://eduteh.eu/chastno-osnovno-uchilishte/price-and-admission-chou/priem-petoklasnici",
+   "quote": "Таксата за обучение за учебната 2026/2027 година е 8110 евро."
+  },
+  {
+   "fid": "f4",
+   "category": "food",
+   "amount": 174,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": null,
+   "plan": null,
+   "year": "2025/2026",
+   "url": "https://eduteh.eu/chastno-osnovno-uchilishte/price-and-admission-chou/priem-parvoklasnici",
+   "quote": "Таксата за храна за учебната 2025/2026 г. е 174 евро на месец."
+  }
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "verdict": "correct",
+   "fid": "f1",
+   "reason": "100 EUR application fee, no period stated on site",
+   "group_unstated": false
+  },
+  {
+   "oid": "o2",
+   "verdict": "correct",
+   "fid": "f3",
+   "reason": "8110 EUR tuition for 2026/2027 school year",
+   "group_unstated": false
+  },
+  {
+   "oid": "o3",
+   "verdict": "correct",
+   "fid": "f4",
+   "reason": "174 EUR monthly food fee",
+   "group_unstated": false
+  },
+  {
+   "oid": "o4",
+   "verdict": "duplicate",
+   "fid": "f3",
+   "reason": "Same tuition as o2 (period null)",
+   "group_unstated": false
+  },
+  {
+   "oid": "o5",
+   "verdict": "correct",
+   "fid": "f2",
+   "reason": "100 EUR application fee incl. admission tests (grade 5 page)",
+   "group_unstated": false
+  },
+  {
+   "oid": "o6",
+   "verdict": "wrong_amount",
+   "fid": null,
+   "reason": "No 200 BGN amount on any page; site states 100 EUR only",
+   "group_unstated": false
+  },
+  {
+   "oid": "o7",
+   "verdict": "duplicate",
+   "fid": "f4",
+   "reason": "Same food fee as o3",
+   "group_unstated": false
+  }
+ ],
+ "notes": "Food fee is printed as for 2025/2026 while admissions/tuition are 2026/2027; it is the only food price on the site, so treated as correct not stale (possibly a site typo). Application fee has no stated frequency so site period left null. Grade 7 tuition is 10% higher, no amount printed. Same 100 EUR fee appears on both grade 1 and grade 5 pages."
+}

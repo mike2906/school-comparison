@@ -1,0 +1,104 @@
+{
+ "school_id": 531,
+ "pages_read": [
+  "https://montessori-high.com/bg/priem"
+ ],
+ "fetch_failed": [],
+ "site_states_no_fees": false,
+ "site_fees": [
+  {
+   "fid": "f1",
+   "category": "tuition",
+   "amount": 970,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": "група 0-3",
+   "plan": null,
+   "year": null,
+   "url": "https://montessori-high.com/bg/priem",
+   "quote": "Месечна Такса група 0-3 ... 970 евро"
+  },
+  {
+   "fid": "f2",
+   "category": "materials",
+   "amount": 390,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "група 0-3",
+   "plan": "еднократна такса",
+   "year": null,
+   "url": "https://montessori-high.com/bg/priem",
+   "quote": "390 евро годишно - еднократна такса - осигуряване на образователна среда и ресурси"
+  },
+  {
+   "fid": "f3",
+   "category": "tuition",
+   "amount": 970,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "monthly",
+   "group": "група 3-6 г.",
+   "plan": null,
+   "year": null,
+   "url": "https://montessori-high.com/bg/priem",
+   "quote": "Месечна такса група 3-6 г. ... 970 евро"
+  },
+  {
+   "fid": "f4",
+   "category": "materials",
+   "amount": 390,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "yearly",
+   "group": "група 3-6 г.",
+   "plan": "еднократна такса",
+   "year": null,
+   "url": "https://montessori-high.com/bg/priem",
+   "quote": "390 евро годишно - еднократна такса - осигуряване на образователна среда и ресурси"
+  }
+ ],
+ "candidates": [
+  {
+   "oid": "o1",
+   "verdict": "wrong_period",
+   "fid": "f2",
+   "reason": "390 EUR is stated 'годишно' as a once-per-year 'еднократна такса' -> yearly, not one_time.",
+   "group_unstated": true
+  },
+  {
+   "oid": "o2",
+   "verdict": "correct",
+   "fid": "f3",
+   "reason": "970 EUR monthly, group 3-6.",
+   "group_unstated": false
+  },
+  {
+   "oid": "o3",
+   "verdict": "correct",
+   "fid": "f1",
+   "reason": "970 EUR monthly, group 0-3.",
+   "group_unstated": false
+  },
+  {
+   "oid": "o4",
+   "verdict": "duplicate",
+   "fid": "f1",
+   "reason": "Same 970 EUR monthly 0-3 fee as earlier o3.",
+   "group_unstated": false
+  },
+  {
+   "oid": "o5",
+   "verdict": "wrong_period",
+   "fid": "f4",
+   "reason": "390 EUR yearly fee recorded as one_time; matched to the 3-6 group instance (identical fee listed per group).",
+   "group_unstated": true
+  }
+ ],
+ "notes": "390 EUR fee printed identically under both groups; o1/o5 assigned to the two group instances, so not marked duplicate. No academic year stated."
+}
