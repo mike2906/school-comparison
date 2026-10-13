@@ -1,7 +1,9 @@
 import json
-S="../step4/"  # step 4 packets and adjudications
+from pathlib import Path
+HERE = Path(__file__).resolve().parent
+S = f"{HERE.parent}/step4/"  # step 4 packets and adjudications
 import sys
-RUN = sys.argv[1] if len(sys.argv) > 1 else "run"
+RUN = HERE / (sys.argv[1] if len(sys.argv) > 1 else "run")
 after=json.load(open(f"{RUN}/after.json"))
 def k(r, per=True):
     return (r["category"], r.get("amount"), r.get("amount_min"), r.get("amount_max"), (r.get("currency") or "").upper(), r.get("period") if per else None)

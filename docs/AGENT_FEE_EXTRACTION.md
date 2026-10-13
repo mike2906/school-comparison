@@ -153,6 +153,10 @@ it comes after steps 1 to 5 prove the runs are reliable.
    68 % of site fees found against 40 %. The remaining wrong rows are last year's fees kept as
    history, old rows the rule-6 keep holds (a sibling's, a number still on the page), and old
    rows an undated read did not replace (fixed in #289).
+   That run was on the unmerged branch (22f2a85). On merged main (2208893) three runs found
+   53 %, 57 % and 60 % (wrong 12-13 %): the reader gave 5 of 170's 14 fees in every run. With
+   #290's second read, two runs found 69 % and 71 % (wrong 10 %). All 24 schools have now been
+   tuned on, so these are regression checks, not a fresh validation.
 4. **Delete the unused extraction code** that step 3 leaves behind (`extraction/price_*.py`,
    `fee_lines.py` and whatever only they import). Validation's `price_evidence.py`,
    `price_carry_over.py`, `fee_pages.py` and `fee_image_reader.py` stay unless nothing uses

@@ -8,8 +8,9 @@ is unchanged: after every gate, wrong no more often than today's rows, and at le
 fees the sites state found.
 
 **Result: go.** After every gate the output is wrong on 12 % of rows against 18 % today, and it
-finds 68 % of site fees against 40 % today. None of the post-gate wrong rows comes from the
-agent's own reading (see below).
+finds 68 % of site fees against 40 % today. Of the 7 post-gate wrong rows, 6 are old rows
+kept or left in place; one is the agent's 2000 EUR transport row with a period Stage 6 filled
+in (see below). On merged main the result is lower; see the step 4b and 4d sections.
 
 ## Sample, key and run
 
@@ -82,6 +83,11 @@ were judged by hand against the same key (`step4b/score.py`, result in `step4b/s
 | Wrong | 18 % | 12 % | 13 % | 12 % | 12 % |
 | Found (of 77) | 40 % | 68 % | 53 % | 57 % | 60 % |
 | Found, without 170 (of 63) | | 62 % | 60 % | 60 % | 63 % |
+
+The Step 4 column comes from `step4/score.py`; the run columns from `step4b/score.py`, which
+also moves a row whose fee another row already took to a free fee at the same price (two
+plans at one price at 170). That can count one more fee found per shared price, so the columns
+are close but not strictly like for like.
 
 Every run is better than today on both counts, and two of three pass the 55 % bar. The drop
 from step 4 is 170: in all three runs the reader returned the same 5 of the 14 fees on the

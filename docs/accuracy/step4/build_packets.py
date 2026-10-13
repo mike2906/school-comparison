@@ -1,8 +1,10 @@
 """Blind packets: today's published rows, the agent's kept fees, and post-gate published rows, shuffled."""
 import json, random
-R = "/tmp/claude-0/s4/run/"
+from pathlib import Path
+HERE = Path(__file__).resolve().parent
+R = f"{HERE}/run/"
 before, after = json.load(open(R + "before.json")), json.load(open(R + "after.json"))
-KEY = "/mnt/project-files/lane-d/step4/key/"
+KEY = f"{HERE}/key/"
 rng = random.Random(20261015)
 hidden = {}
 fields = ("category", "amount", "amount_min", "amount_max", "currency", "period")
@@ -45,6 +47,6 @@ for sid in sorted(before, key=int):
     hidden[sid] = {}
     for i, (row, views) in enumerate(cands, 1):
         out.append({"oid": f"o{i}", **row}); hidden[sid][f"o{i}"] = sorted(views)
-    json.dump({"school_id": int(sid), "candidates": out}, open(f"/tmp/claude-0/s4/packets/{sid}.json", "w"), ensure_ascii=False, indent=1)
+    json.dump({"school_id": int(sid), "candidates": out}, open(f"{HERE}/packets/{sid}.json", "w"), ensure_ascii=False, indent=1)
     print(sid, len(key["site_fees"]), "key;", len(out), "cands;", {v: sum(v in s for _, s in cands) for v in ("today", "agent", "post")})
-json.dump(hidden, open("/tmp/claude-0/s4/hidden_map.json", "w"), indent=1)
+json.dump(hidden, open(f"{HERE}/hidden_map.json", "w"), indent=1)

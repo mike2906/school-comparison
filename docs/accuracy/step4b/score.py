@@ -7,8 +7,10 @@ same category, amount and currency if one is free (two grade tiers at one price)
 duplicate only if another row of this run matches that fee.
 """
 import json, glob, sys
+from pathlib import Path
+HERE = Path(__file__).resolve().parent
 WRONG = {"wrong_period", "wrong_category", "wrong_amount", "wrong_group_plan_year", "wrong_currency", "stale"}
-site = {int(p.split("/")[-1][:-5]): json.load(open(p))["site_fees"] for p in glob.glob("../step4/adj/*.json")}
+site = {int(p.split("/")[-1][:-5]): json.load(open(p))["site_fees"] for p in glob.glob(str(HERE.parent / "step4/adj/*.json"))}
 HAND = {  # (school, category, amount, label) -> (verdict, fid)
     (151, "tuition", 11860.0, "5 - 7 grade"): ("correct", "f2"),
     (151, "registration", 200.0, None): ("missing_period", "f3"),
@@ -37,9 +39,11 @@ def own(sid, r, fid):
     f = next(f for f in site[sid] if f["fid"] == fid)
     return "correct" if r["period"] == f["period"] else "missing_period" if r["period"] is None else "wrong_period"
 def score(run):
-    inh, todo = json.load(open(f"{run}/inherited.json")), json.load(open(f"{run}/todo.json"))
+    inh, todo = json.load(open(HERE / run / "inherited.json")), json.load(open(HERE / run / "todo.json"))
     rows = [(int(s), x, x["verdict"], x["fid"]) for s, xs in inh.items() for x in xs]
-    rows += [(int(s), r, *HAND[(int(s), r["category"], r["amount"], r["plan_name"] or r["age_group"])]) for s, rs in todo.items() for r in rs]
+    # a new row nobody judged yet counts as unresolved rather than stopping the script
+    rows += [(int(s), r, *HAND.get((int(s), r["category"], r["amount"], r["plan_name"] or r["age_group"]), ("unresolved", None)))
+             for s, rs in todo.items() for r in rs]
     out, taken = [], set()
     for sid, r, v, fid in sorted(rows, key=lambda t: t[2] == "duplicate"):  # duplicates last
         if fid and (sid, fid) in taken and v != "duplicate":
