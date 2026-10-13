@@ -341,6 +341,14 @@ def _new_source_page(school: School, page: PageRead, stored: Optional[SourcePage
     )
 
 
+_SINGLE_PAYMENT_RE = re.compile(r"^\s*1\s*[xх×]\s*(?:€|eur|лв\.?)?\s*[\d\s.,]+(?:€|eur|лв\.?)?\s*$", re.IGNORECASE)
+
+
+def _single_payment(fee: AgentFee) -> bool:
+    """The fee is written as one payment of its whole amount: "1 x € 8.950"."""
+    return any(_SINGLE_PAYMENT_RE.match(text) for text in [fee.label, *fee.installments])
+
+
 def _build_rows(
     school: School, checked: list[tuple[CheckedFee, SourcePage]]
 ) -> tuple[list[Pricing], list[FieldSource]]:
@@ -364,10 +372,17 @@ def _build_rows(
             )
         )
         if fields is not None:
-            # A group or plan already tells two fees apart: then a second label for the same
-            # fields is the same fee said twice (596's "Annual tuition fee" and "1 x 8950").
-            label = "" if fields["age_group"] or fields["plan_name"] else " ".join(fee.label.split()).casefold()
+            # Single payments of one plan price are the same fee whatever they are called.
+            label = "" if _single_payment(fee) else " ".join(fee.label.split()).casefold()
             built.append((result, page, fields, label))
+
+    # A plan paid "1 x 8950" restates the plan's 8950 a second time (596): drop such a single
+    # payment when the same fee also comes without it, with or without its period.
+    def unperiodic(fields: dict) -> tuple:
+        return tuple(value for name, value in fields.items() if name != "period")
+
+    restated = {unperiodic(f) for r, _, f, _ in built if not _single_payment(r.fee)}
+    built = [b for b in built if not (_single_payment(b[0].fee) and unperiodic(b[2]) in restated)]
     # The same fee on two pages is one row (564 lists its fees on three). On one page a
     # second fee with the same fields but its own label is a fee of its own: two grade
     # tiers at one price when the reader left their groups empty. So each set of fields
