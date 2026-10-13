@@ -168,7 +168,13 @@ async def openrouter_credit() -> dict[str, Any]:
         for name, url in (("credits", "https://openrouter.ai/api/v1/credits"), ("key", "https://openrouter.ai/api/v1/key")):
             try:
                 response = await client.get(url, headers=headers)
-                out[name] = response.json().get("data") if response.status_code == 200 else f"HTTP {response.status_code}"
+                data = response.json().get("data") if response.status_code == 200 else None
+                # Balances only: the key's label and account ids stay out of the committed report.
+                out[name] = (
+                    {k: data.get(k) for k in ("total_credits", "total_usage", "usage_daily", "limit_remaining")}
+                    if isinstance(data, dict)
+                    else f"HTTP {response.status_code}"
+                )
             except Exception as exc:
                 out[name] = f"failed: {exc}"
     return out
