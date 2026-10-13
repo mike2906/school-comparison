@@ -879,7 +879,7 @@ def test_the_same_fee_read_from_two_pages_is_one_row():
     assert len(rows) == len(sources) == 1
 
 
-async def test_a_kept_old_row_is_not_doubled_by_the_same_amount_in_another_category(db_session, frozen_today):
+async def test_an_amount_read_as_another_kind_of_fee_replaces_the_old_row(db_session, frozen_today):
     page_text = "Месечна такса: 700 евро\nЕднократна такса за записване: 200 евро.\nХрана: 90 евро"
     school = await _school(db_session)
     await _old_rows(db_session, school, "2026/2027", [700, 90])  # 90 monthly: a period the read loses
@@ -892,9 +892,29 @@ async def test_a_kept_old_row_is_not_doubled_by_the_same_amount_in_another_categ
         read=_read([*FEES_STAGE, refiled]),
         apply=True,
     )
+    assert report["outcome"] == "written" and report["rows_old_kept"] == 0, report
+    rows = await _rows(db_session, school)
+    assert [(float(r.amount), r.category) for r in rows if float(r.amount) == 90] == [
+        (90.0, PriceCategory.EXTRACURRICULAR)
+    ]
+
+
+async def test_an_amount_read_as_the_same_fee_without_its_period_keeps_the_old_row(db_session, frozen_today):
+    page_text = "Месечна такса: 700 евро\nЕднократна такса за записване: 200 евро.\nЗанималня: 90 евро"
+    school = await _school(db_session)
+    await _old_rows(db_session, school, "2026/2027", [700, 90])  # 90 monthly tuition
+    await db_session.commit()
+    same = fee(PriceCategory.TUITION, "Занималня: 90 евро", amount=90, academic_year="2026/2027")
+    report = await fees_agent.run_school(
+        db_session,
+        school,
+        find=_find([PageRead(URL, page_text, True)]),
+        read=_read([*FEES_STAGE, same]),
+        apply=True,
+    )
     assert report["outcome"] == "written" and report["rows_old_kept"] == 1, report
     rows = await _rows(db_session, school)
-    assert [(float(r.amount), r.category) for r in rows if float(r.amount) == 90] == [(90.0, PriceCategory.TUITION)]
+    assert [(float(r.amount), r.period) for r in rows if float(r.amount) == 90] == [(90.0, PricePeriod.MONTHLY)]
 
 
 async def test_an_old_bgn_row_rounded_to_the_lev_gives_way_to_the_euro_fee(db_session, frozen_today):

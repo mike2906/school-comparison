@@ -523,10 +523,18 @@ def _rows_to_keep(
     for row in superseded:
         seen_as = _in_euro(row, proposed) or row
         groups.setdefault(_amount_group(seen_as), []).append(seen_as)
+    read_as: dict[tuple[str, ...], set[Any]] = {}
+    for row in proposed:
+        read_as.setdefault(_amount_group(row), set()).add(row.category)
     kept: list[Pricing] = []
     keys: set[tuple[str, ...]] = set()
     reasons: list[str] = []
     for key, olds in groups.items():
+        # The read files this amount as another kind of fee: its row replaces the old one even
+        # without the old row's period (506's learning support, stored as yearly tuition).
+        categories = {(old._row if isinstance(old, _InEuro) else old).category for old in olds}
+        if read_as.get(key) and not read_as[key] & categories:
+            continue
         lost = price_step._pricing_replacement_regressions(school, pages, olds, proposed)
         if lost:  # only what rule 6 protects: a withheld or blocked row at that amount still goes
             rows = [old._row if isinstance(old, _InEuro) else old for old in olds]
