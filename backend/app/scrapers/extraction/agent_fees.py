@@ -123,17 +123,22 @@ def amount_on_page(fee: AgentFee, numbers: set[Decimal]) -> bool:
 # What the evidence line names
 # ---------------------------------------------------------------------------
 
-_PERIOD_WORDS = {
-    PricePeriod.MONTHLY: r"(?<!три)месеч|(?:на|за|/)\s*месец|\bmonth(?:ly)?\b",
-    PricePeriod.YEARLY: r"(?<!полу)(?<!дву)годиш|\b(?:year(?:ly)?|annual)\b",
-    PricePeriod.QUARTER: r"тримесеч|\bquarter",
+_PERIOD_WORDS = {  # Bulgarian, English, and the French and German some schools publish in
+    PricePeriod.MONTHLY: r"(?<!три)месеч|(?:на|за|/)\s*месец|\bmonth(?:ly)?\b|mensuel|par mois|monatlich|pro monat",
+    PricePeriod.YEARLY: (
+        # "За цялата учебна година" (300) and a "(l'année)" column (505) name the year for
+        # what they head; a bare "for the school year" heading does not (_YEAR_ON_AMOUNT_LINE_RE).
+        r"(?<!полу)(?<!дву)годиш|\b(?:year(?:ly)?|annual)\b|цялата учебна година"
+        r"|annuel|\(l'année\)|par an\b|(?<![a-zäöü])jährlich|pro jahr"
+    ),
+    PricePeriod.QUARTER: r"тримесеч|\bquarter|vierteljährlich",
     PricePeriod.TERM: r"срок|\bterm\b",
-    PricePeriod.SEMESTER: r"семест|\bsemester",
+    PricePeriod.SEMESTER: r"семест|\bsemester|semestre|halbj[aä]hr",
     PricePeriod.ONE_TIME: r"еднократ|\bonce\b|при записване",
 }
 # "for the school year" names a period only on the amount's own line: as a heading it often
 # covers fees charged per day or per month too (569's "ДОПЪЛНИТЕЛНИ ТАКСИ ЗА УЧЕБНАТА ГОДИНА").
-_YEAR_ON_AMOUNT_LINE_RE = re.compile(r"(?:учебн\w*|на|за)\s+година")
+_YEAR_ON_AMOUNT_LINE_RE = re.compile(r"(?:учебн\w*|на|за)\s+година|l'année")
 _DEPOSIT_RE = re.compile(r"депозит|капаро|deposit")
 # Only a currency and the marker may sit between a range's ends: "550 – 600", "550 EUR to 600".
 _RANGE_JOIN_RE = re.compile(r"(?:eur|€|евро|лв\.?|лева|bgn)?\s*(?:[–—-]|до|to)", re.IGNORECASE)
@@ -145,7 +150,14 @@ def _normalized(text: str) -> str:
     return " ".join(text.split()).casefold()
 
 
-def _names_period(period: PricePeriod, evidence: str, amounts: list[Decimal]) -> bool:
+def _names_period(period: PricePeriod, evidence: str, amounts: list[Decimal], category: PriceCategory) -> bool:
+    # An enrolment, exam or application fee is charged once by what it is (rules.md), so it
+    # needs no word for it; a deposit filed as registration is one too. Not when the line
+    # names a recurring period: "годишна такса за записване" is paid every year.
+    if period is PricePeriod.ONE_TIME and category is PriceCategory.REGISTRATION:
+        return not any(
+            re.search(words, evidence) for other, words in _PERIOD_WORDS.items() if other is not PricePeriod.ONE_TIME
+        )
     if re.search(_PERIOD_WORDS[period], evidence):
         return True
     if period is not PricePeriod.YEARLY:
@@ -208,7 +220,7 @@ def check_fee(fee: AgentFee, page_text: str) -> CheckedFee:
 
     checks: list[str] = []
     period = fee.period
-    if period is not None and not _names_period(period, evidence, _amounts(fee)):
+    if period is not None and not _names_period(period, evidence, _amounts(fee), fee.category):
         checks.append(f"period {period.value} cleared: the evidence does not name it")
         period = None
     if period is PricePeriod.ONE_TIME and fee.category is not PriceCategory.REGISTRATION:

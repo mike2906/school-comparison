@@ -14,6 +14,7 @@ import logging
 import re
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from decimal import Decimal
 from typing import Any, Optional
 from urllib.parse import unquote, urldefrag, urlparse
 
@@ -34,13 +35,13 @@ from app.schemas.extraction import ExtractedPrice
 from app.scrapers.extraction import llm_results, price_step, text_values
 from app.scrapers.extraction.agent_fees import READER_PROMPT, AgentFee, AgentFees, CheckedFee, check_fee
 from app.scrapers.fee_pages import fee_http_client, page_key, pdf_text
-from app.scrapers.price_evidence import _PRICE_RE
+from app.scrapers.price_evidence import _PRICE_RE, PriceRow, _amount_key
 from app.scrapers.shared_site_check import registrable_domain
 from app.scrapers.stages import common as stage_common
 from app.scrapers.validator import validate_school_data
 from app.services.pipeline_runs import finalize_pipeline_run, pipeline_run_heartbeat, start_pipeline_run
 from app.services.provider_costs import ProviderCostCapExceeded, execute_billable_request, provider_cost_scope
-from app.utils.display_gating import pricing_row_is_publishable
+from app.utils.display_gating import _BGN_PER_EUR, blocked_pricing_row_ids, pricing_row_is_publishable
 from app.utils.website_data import prepare_validation_rollover
 
 logger = logging.getLogger(__name__)
@@ -249,7 +250,7 @@ def _build_rows(
 ) -> tuple[list[Pricing], list[FieldSource]]:
     rows: list[Pricing] = []
     sources: list[FieldSource] = []
-    seen: set[tuple] = set()
+    seen: dict[tuple, set[tuple]] = {}  # fee fields -> (page, label) pairs read
     for result, page in checked:
         fee = result.fee
         fields = price_step._normalized_price_fields(
@@ -268,10 +269,14 @@ def _build_rows(
         )
         if fields is None:
             continue
-        key = (*fields.values(), fee.label.casefold(), page.source_url)
-        if key in seen:  # the same fee read twice from one page
+        # The same fee on two pages is one row (564 lists its fees on three). On one page a
+        # second fee with the same fields but its own label is a fee of its own: two grade
+        # tiers at one price when the reader left their groups empty.
+        key, label = tuple(fields.values()), " ".join(fee.label.split()).casefold()
+        reads = seen.setdefault(key, set())
+        if reads and any(other != page.id or other_label == label for other, other_label in reads):
             continue
-        seen.add(key)
+        reads.add((page.id, label))
         rows.append(
             Pricing(
                 school_id=school.id,
@@ -325,6 +330,77 @@ async def _upsert_pages(db: AsyncSession, pages: dict[str, SourcePage], stored: 
         existing.page_category = new.page_category or existing.page_category
         pages[url] = existing
     await db.flush()
+
+
+EURO_TOLERANCE = Decimal("0.005")  # a site's own conversion is often rounded: 1369 лв. for 700 €
+
+
+def _amount_group(row: Any) -> tuple[str, ...]:
+    return _amount_key(PriceRow.from_pricing(row))
+
+
+class _InEuro:
+    """An old BGN row seen at the EUR amounts the read gives for it, so rule 6 checks its
+    period, plan and count like any other row (330's 899.68 BGN is 460 EUR)."""
+
+    def __init__(self, row: Pricing, amounts: tuple[Any, Any, Any]):
+        self._row = row
+        self.currency = "EUR"
+        self.amount, self.amount_min, self.amount_max = amounts
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._row, name)
+
+
+def _in_euro(row: Pricing, proposed: list[Pricing]) -> Optional[_InEuro]:
+    if (row.currency or "").upper() != "BGN":
+        return None
+    euro = [  # the same kind of fee: 200 лв. of meals is not a 102 € bus fee
+        Decimal(str(value))
+        for new in proposed
+        if (new.currency or "").upper() == "EUR" and new.category == row.category
+        for value in (new.amount, new.amount_min, new.amount_max)
+        if value is not None
+    ]
+    converted = []
+    for value in (row.amount, row.amount_min, row.amount_max):
+        if value is None:
+            converted.append(None)
+            continue
+        target = Decimal(str(value)) / _BGN_PER_EUR
+        match = next((amount for amount in euro if abs(amount - target) <= target * EURO_TOLERANCE), None)
+        if match is None:
+            return None
+        converted.append(match)
+    return _InEuro(row, tuple(converted))
+
+
+def _rows_to_keep(
+    school: School, pages: list[SourcePage], superseded: list[Pricing], proposed: list[Pricing]
+) -> tuple[list[Pricing], set[tuple[str, ...]], list[str]]:
+    """The superseded rows rule 6 says replacing would lose, the amounts they hold, and why.
+
+    Checked one amount at a time, so a fee the read missed keeps its own row and does not
+    hold back the rest of the school's fees.
+    """
+    blocked = blocked_pricing_row_ids(school.attributes if isinstance(school.attributes, dict) else None)
+    groups: dict[tuple[str, ...], list[Any]] = {}
+    for row in superseded:
+        seen_as = _in_euro(row, proposed) or row
+        groups.setdefault(_amount_group(seen_as), []).append(seen_as)
+    kept: list[Pricing] = []
+    keys: set[tuple[str, ...]] = set()
+    reasons: list[str] = []
+    for key, olds in groups.items():
+        lost = price_step._pricing_replacement_regressions(school, pages, olds, proposed)
+        if lost:  # only what rule 6 protects: a withheld or blocked row at that amount still goes
+            rows = [old._row if isinstance(old, _InEuro) else old for old in olds]
+            protected = [row for row in rows if row.id not in blocked and pricing_row_is_publishable(row)]
+            if protected:
+                kept.extend(protected)
+                keys.add(key)
+                reasons.extend(lost)
+    return kept, keys, reasons
 
 
 def _fee_report(result: CheckedFee, page: Optional[PageRead]) -> dict[str, Any]:
@@ -402,17 +478,26 @@ async def run_school(
         )
         return report
 
-    regressions = price_step._pricing_replacement_regressions(
+    # Old rows the read would lose (a fee it missed, a period it dropped) stay, instead of
+    # holding the whole school; new rows at those amounts give way to them.
+    kept, kept_amounts, regressions = _rows_to_keep(
         school, [*stored_pages, *source_pages.values()], superseded, publishable
     )
+    if kept:  # by amount alone: a refiled category or currency is still the same fee
+        superseded = [row for row in superseded if row not in kept]
+        pairs = [(row, source) for row, source in zip(rows, sources) if _amount_group(row) not in kept_amounts]
+        report["rows_new_dropped"] = len(rows) - len(pairs)
+        rows, sources = [row for row, _ in pairs], [source for _, source in pairs]
     report["regressions"] = regressions
+    report["rows_old_kept"] = len(kept)
+    if not rows and not superseded:
+        report["outcome"] = "kept_old_rows"
+        report["reason"] = "every fee read is already stored"
+        return report
     if not apply:
-        report["outcome"] = "would_hold" if regressions else "would_write"
+        report["outcome"] = "would_write"
         return report
-    if price_step._update_pricing_hold(school, regressions, len(rows)):
-        report["outcome"] = "held"
-        await db.commit()
-        return report
+    price_step._update_pricing_hold(school, [], len(rows))  # clears a hold an earlier run left
 
     await _upsert_pages(db, source_pages, stored)
     for row in rows:  # rows were built against the placeholder pages
