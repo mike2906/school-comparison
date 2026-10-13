@@ -59,9 +59,13 @@ Rules:
 - Only what the pages state about this institution. If a page covers a sister school or kindergarten,
   leave its facts out unless they plainly apply to this one.
 - Each fact is one short line in English (fact_en) and Bulgarian (fact_bg), saying only what its quote says.
-- For every fact, copy into "quote" the page line it comes from (or up to three adjacent lines when one line
-  is not enough), verbatim and in the page's language, and the URL from that page's PAGE line. The quote alone
-  must state the fact. Each fact has its own quote: do not split one line into several facts.
+- For every fact, copy into "quote" the page line it comes from, verbatim and in the page's language, and the
+  URL from that page's PAGE line. When one line is not enough (a list or table, such as shift times by grade),
+  copy its heading line and the rows you use, up to 8 lines. The quote alone must state the fact. Each fact has
+  its own quote: do not split one line into several facts.
+- Name only what the quote itself names: if a page lists taekwondo in text and fencing only as a picture,
+  the fact is about taekwondo.
+- Only what the school has or does now. Plans and promises ("ще създаваме", "will open") are not facts.
 - Be specific: name the sports, clubs, languages, rooms or hours. "Sports activities are part of the programme"
   or "pupils are at school for the full day" with nothing more says too little; give the detail the page has
   (which sports, until what time) or leave the fact out. The subjects every school teaches under the state
@@ -73,7 +77,9 @@ JUDGE_PROMPT = """You check facts written about a school against the website lin
 For each numbered item you get a fact (in English) and a quote (usually Bulgarian). Pass an item when the quote
 states what the fact says; translation and plain rewording are fine. A heading, list item or link title that names
 a specialty, subject, club, sport or room is enough for a fact that only says the school offers or has it.
-Fail an item only when the fact adds something the quote does not say (a number, a grade, a scope, a claim), or
+The page's address can supply context the quote leaves out (a quote on /anglijski-ezik/ is about English).
+Fail an item when the fact adds something neither says (a number, a grade, a scope, a claim), when the quote
+describes a plan rather than what exists now, or
 when the quote is a bare label ("Училищен психолог") stretched into a description, or a slogan with nothing
 concrete in it. Return the numbers of the items that pass."""
 
@@ -82,7 +88,7 @@ class Fact(BaseModel):
     topic: Topic
     fact_en: str
     fact_bg: str
-    quote: str = Field(description="The page line (or up to three adjacent lines) the fact comes from, verbatim")
+    quote: str = Field(description="The page line (or a heading and up to 8 rows) the fact comes from, verbatim")
     source_url: str = Field(description="The URL from the PAGE line of the page the quote is on")
 
 
@@ -110,26 +116,40 @@ def quote_on_page(fact: Fact, pages: Sequence[tuple[str, str]]) -> Optional[str]
 
     The page the fact names is tried first; a quote found on another page read is credited
     to that page, since the reader sometimes copies the wrong PAGE line."""
-    quote = _normalise(fact.quote).strip(" .…;:-")
-    if not quote:
+    whole = _strip(_normalise(fact.quote))
+    if not whole:
         return None
+    # A quote of several lines (a list or table) matches when each of its lines is on the
+    # page; the reader may leave out rows in between.
+    parts = [whole] + [_strip(_normalise(line)) for line in fact.quote.splitlines()]
+    parts = [part for part in parts if part]
     named = [p for p in pages if page_key(p[0]) == page_key(fact.source_url)]
     for url, text in [*named, *(p for p in pages if p not in named)]:
-        # A short quote (a heading such as "Таекуондо") must be a whole line, not part of one.
-        if len(quote) >= 12:
-            if quote in _normalise(text):
-                return url
-        elif any(_normalise(line).strip(" .…;:-") == quote for line in text.splitlines()):
+        if _on_page(whole, text) or (len(parts) > 2 and all(_on_page(part, text) for part in parts[1:])):
             return url
     return None
 
 
+def _strip(text: str) -> str:
+    return text.strip(" .…;:-")
+
+
+def _on_page(quote: str, text: str) -> bool:
+    # A short quote (a heading such as "Таекуондо") must be a whole line, not part of one.
+    if len(quote) >= 12:
+        return quote in _normalise(text)
+    return any(_strip(_normalise(line)) == quote for line in text.splitlines())
+
+
 def quote_key(fact: Fact) -> str:
-    return _normalise(fact.quote).strip(" .…;:-")
+    return _strip(_normalise(fact.quote))
 
 
-def judge_message(facts: Sequence[Fact]) -> str:
-    return "\n\n".join(f"{n}. Fact: {fact.fact_en}\nQuote: {fact.quote}" for n, fact in enumerate(facts, 1))
+def judge_message(quoted: Sequence[tuple[Fact, str]]) -> str:
+    """The numbered items for the judge: each fact, its quote, and the page the quote is on."""
+    return "\n\n".join(
+        f"{n}. Fact: {fact.fact_en}\nPage: {url}\nQuote: {fact.quote}" for n, (fact, url) in enumerate(quoted, 1)
+    )
 
 
 def stored_fact(fact: Fact, url: str) -> dict:

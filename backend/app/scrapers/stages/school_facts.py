@@ -113,6 +113,7 @@ async def read_school(school: School, pages: list[PageRead], call: Caller) -> di
     if not readable:
         return report | {"outcome": "nothing_read"}
     text = page_text(pages)
+    report["read_chars"] = len(text)  # after the menu is left out and each page is cut
     read: Facts = await call(
         facts_rules.READER_PROMPT,
         Facts,
@@ -132,7 +133,7 @@ async def read_school(school: School, pages: list[PageRead], call: Caller) -> di
     supported: set[int] = set()
     if quoted:
         verdict: Supported = await call(
-            facts_rules.JUDGE_PROMPT, Supported, facts_rules.judge_message([f for f, _ in quoted]), school.id
+            facts_rules.JUDGE_PROMPT, Supported, facts_rules.judge_message(quoted), school.id
         )
         supported = set(verdict.passed)
     kept = _ordered([item for n, item in enumerate(quoted, 1) if n in supported])

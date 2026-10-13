@@ -58,6 +58,11 @@ school (Sofia ~$3). Nothing reaches the site until an `--apply` run is published
   short (now a short quote must be a whole line); one line split into three facts (now one
   fact per quote); the menu and footer repeated on every page used up the read limit, so
   later pages were cut (now left out); standard state subjects listed as facts.
+- Dry run 3: 41 of 49 kept, $0.044 for 8 schools (menu stripping cut the cost by a
+  third). Fixed after it: a list or table quote (shift times by grade) now matches row by
+  row, up to 8 lines; the judge sees each quote's page address (a B2 level on
+  /anglijski-ezik/ is about English); plans in the future tense are not facts; a fact
+  names only what its quote names. Facts still vary between runs (383 kept 8, then 4).
 - Note for runs: the cost guard reserves $0.10 per call, so `--max-usd` needs about $0.10
   headroom above the expected spend.
 - Top up OpenRouter (about $1.35 left on 2026-10-13).

@@ -8,7 +8,7 @@ from __future__ import annotations
 import pytest
 
 from app.models import School
-from app.scrapers.extraction.school_facts import Fact, Facts, Supported, quote_on_page
+from app.scrapers.extraction.school_facts import Fact, Facts, Supported, judge_message, quote_on_page
 from app.scrapers.stages import school_facts as stage
 from app.scrapers.stages.fees_agent import PageRead
 from app.utils.school_facts import publishable_school_facts
@@ -284,3 +284,20 @@ def test_the_menu_every_page_repeats_is_left_out_of_the_read():
     pages = [PageRead(f"https://school.example/{n}", f"{menu}\nСтраница {n} има свой текст.", False) for n in range(4)]
     text = stage.page_text(pages)
     assert "Контакти" not in text and all(f"Страница {n}" in text for n in range(4))
+
+
+def test_a_list_quote_matches_row_by_row():
+    page = [
+        (
+            HOME,
+            "Двусменен режим:\n\nІ срок\n1. V – VІІІ клас – първа смяна от 7:30 до 13:15 часа\n2. ІХ-ХІІ клас – втора смяна",
+        )
+    ]
+    rows = "Двусменен режим:\n1. V – VІІІ клас – първа смяна от 7:30 до 13:15 часа\n2. ІХ-ХІІ клас – втора смяна"
+    assert quote_on_page(_fact("school_day", rows), page) == HOME
+    assert quote_on_page(_fact("school_day", rows + "\n3. Нов ред, който го няма"), page) is None
+
+
+def test_the_judge_sees_the_page_of_each_quote():
+    message = judge_message([(_fact("languages", "ниво B2"), "https://school.example/anglijski-ezik/")])
+    assert "Page: https://school.example/anglijski-ezik/" in message
