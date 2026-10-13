@@ -364,7 +364,10 @@ def _build_rows(
             )
         )
         if fields is not None:
-            built.append((result, page, fields, " ".join(fee.label.split()).casefold()))
+            # A group or plan already tells two fees apart: then a second label for the same
+            # fields is the same fee said twice (596's "Annual tuition fee" and "1 x 8950").
+            label = "" if fields["age_group"] or fields["plan_name"] else " ".join(fee.label.split()).casefold()
+            built.append((result, page, fields, label))
     # The same fee on two pages is one row (564 lists its fees on three). On one page a
     # second fee with the same fields but its own label is a fee of its own: two grade
     # tiers at one price when the reader left their groups empty. So each set of fields

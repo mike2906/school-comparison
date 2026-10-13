@@ -956,6 +956,17 @@ def test_two_tiers_at_one_price_on_one_page_are_two_rows():
     assert len(rows) == 2
 
 
+def test_one_plan_price_under_two_labels_is_one_row():
+    school = School(id=1, name_i18n={}, country_code="bg", school_type="private", education_level="primary")
+    page = SourcePage(id=-1, school_id=1, scrape_type=ScrapeType.WEBSITE, source_url=URL)
+    text = "Grade 0 Annual tuition fee € 8.950 Plan 1: 1 x € 8.950"
+    plan = {"age_group": "Grade 0", "plan_name": "Plan 1", "period": PricePeriod.YEARLY}
+    annual = check_fee(fee(PriceCategory.TUITION, text, amount=8950, label="Annual tuition fee", **plan), text)
+    once = check_fee(fee(PriceCategory.TUITION, text, amount=8950, label="Tuition payment", **plan), text)
+    rows, _ = fees_agent._build_rows(school, [(annual, page), (once, page)])
+    assert len(rows) == 1
+
+
 def test_an_old_bgn_row_is_matched_only_to_a_euro_fee_of_its_kind():
     old = Pricing(category=PriceCategory.FOOD, amount=200, currency="BGN")
     bus = Pricing(category=PriceCategory.TRANSPORT, amount=102.26, currency="EUR")
