@@ -610,11 +610,11 @@ def _fee_report(result: CheckedFee, page: Optional[PageRead]) -> dict[str, Any]:
 
 async def page_gone(client, url: str) -> bool:
     """The page answers 404 or 410. A site that does not answer now is not gone."""
-    try:
-        response = await client.get(url, follow_redirects=True, timeout=30)
+    try:  # the status line is enough: a stored fee PDF is not downloaded again
+        async with client.stream("GET", url, follow_redirects=True, timeout=30) as response:
+            return response.status_code in {404, 410}
     except httpx.HTTPError:
         return False
-    return response.status_code in {404, 410}
 
 
 async def run_school(
@@ -630,27 +630,10 @@ async def run_school(
     report: dict[str, Any] = {"school_id": school.id, "outcome": None, "pages": [], "fees": []}
     pages = await find(school)
     report["pages"] = [{"url": p.url, "chars": len(p.text), "prices": p.prices, "note": p.note} for p in pages]
-    priced = [page for page in pages if page.prices]
-    if not priced:
-        report["outcome"] = "kept_old_rows"
-        report["reason"] = "no page showing prices"
-        return report
-
-    fees = await read(school, priced, ())
     # A known page keeps its id; a new one gets a negative placeholder until ``apply`` stores it.
     stored_pages = (await db.execute(select(SourcePage).where(SourcePage.school_id == school.id))).scalars().all()
     # Matched by page_key so a trailing slash or encoding difference finds the stored page.
     stored = {page_key(page.source_url): page for page in stored_pages if page.scrape_type == ScrapeType.WEBSITE}
-    ruled_out = [page.url for page in priced if getattr(stored.get(page_key(page.url)), "is_valid", None) is False]
-    if ruled_out:
-        report["outcome"] = "kept_old_rows"
-        report["reason"] = f"page ruled invalid by an earlier stage: {ruled_out[0]}"
-        return report
-    source_pages = {
-        page.url: _new_source_page(school, page, stored.get(page_key(page.url)), -(index + 1))
-        for index, page in enumerate(pages)
-        if page.text.strip()
-    }
     # A price page the finder did not reach may be gone: 538's old fees address answers 404 and
     # its last-year rows stayed beside the new ones. Marked invalid, its rows stop being published
     # and the keep rule no longer holds them. A dry run only reports it.
@@ -671,6 +654,25 @@ async def run_school(
                     report.setdefault("pages_gone", []).append(page.source_url)
                     if apply:
                         page.is_valid = False
+        if apply and report.get("pages_gone"):  # saved now, whatever the read below does
+            await db.commit()
+    priced = [page for page in pages if page.prices]
+    if not priced:
+        report["outcome"] = "kept_old_rows"
+        report["reason"] = "no page showing prices"
+        return report
+
+    fees = await read(school, priced, ())
+    ruled_out = [page.url for page in priced if getattr(stored.get(page_key(page.url)), "is_valid", None) is False]
+    if ruled_out:
+        report["outcome"] = "kept_old_rows"
+        report["reason"] = f"page ruled invalid by an earlier stage: {ruled_out[0]}"
+        return report
+    source_pages = {
+        page.url: _new_source_page(school, page, stored.get(page_key(page.url)), -(index + 1))
+        for index, page in enumerate(pages)
+        if page.text.strip()
+    }
     # The reader can stop part way down a fee table: at 170 it gave the same 5 of 14 fees in
     # three runs. When the pages still show amounts the published rows have and the read left
     # out, read once more, naming them, and add the fees at amounts the first read did not give.
