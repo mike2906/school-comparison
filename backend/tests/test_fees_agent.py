@@ -718,14 +718,18 @@ async def test_a_second_read_only_adds_fees_the_first_did_not_give(db_session, p
     ]
 
 
-async def test_a_spend_cap_on_the_second_read_keeps_the_first(db_session, pages, frozen_today):
+@pytest.mark.parametrize(
+    "cap",
+    [fees_agent.SpendCapReached("spent $0.05 of $0.05"), fees_agent.ProviderCostCapExceeded("run cap reached")],
+)
+async def test_a_spend_cap_on_the_second_read_keeps_the_first(db_session, pages, frozen_today, cap):
     school = await _school(db_session)
     await _old_rows(db_session, school, "2026/2027", [700, 90])
     await db_session.commit()
 
     async def read(school, pages, missed):
         if missed:
-            raise fees_agent.SpendCapReached("spent $0.05 of $0.05")
+            raise cap
         return FEES_STAGE
 
     report = await fees_agent.run_school(db_session, school, find=_find(pages), read=read, apply=True)

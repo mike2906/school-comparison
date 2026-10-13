@@ -613,7 +613,7 @@ async def run_school(
         report["reread"] = {"missed": [format(amount, "f") for amount in missed], "added": 0}
         try:
             again = await read(school, priced, missed)
-        except SpendCapReached as exc:  # the first read is paid for: use it
+        except (SpendCapReached, ProviderCostCapExceeded) as exc:  # the first read is paid for: use it
             report["reread"]["error"] = str(exc)
             again = []
         first = {amount for fee in fees for amount in fee_amounts(fee)}
