@@ -843,3 +843,25 @@ async def test_an_undated_read_replaces_this_years_rows_and_keeps_older_years(db
         (650.0, "2025/2026"),
         (700.0, None),
     ]
+
+
+async def test_a_read_of_next_year_keeps_this_years_rows(db_session, pages, frozen_today):
+    school = await _school(db_session)
+    await _old_rows(db_session, school, "2026/2027", [650])  # still in force
+    await db_session.commit()
+    next_year = [fee.model_copy(update={"academic_year": "2027/2028"}) for fee in FEES_STAGE]
+    report = await fees_agent.run_school(db_session, school, find=_find(pages), read=_read(next_year), apply=True)
+    assert report["outcome"] == "written", report
+    rows = await _rows(db_session, school)
+    assert (650.0, "2026/2027") in [(float(r.amount), r.academic_year) for r in rows]
+
+
+async def test_an_unpublished_row_on_a_page_the_read_never_opened_stays(db_session, pages, frozen_today):
+    school = await _school(db_session)
+    await _old_rows(db_session, school, None, [480], page_url="https://school.example/kindergarten.pdf")
+    old = (await _rows(db_session, school))[0]
+    old.pricing_context = {"confidence": 0.5}  # below the publish floor, waiting for review
+    await db_session.commit()
+    report = await fees_agent.run_school(db_session, school, find=_find(pages), read=_read(FEES_STAGE), apply=True)
+    assert report["outcome"] == "written", report
+    assert 480.0 in [float(r.amount) for r in await _rows(db_session, school)]
