@@ -448,35 +448,35 @@ def _in_euro(row: Pricing, proposed: list[Pricing]) -> Optional[_InEuro]:
     return _InEuro(row, tuple(converted))
 
 
-async def _superseded_rows(
-    db: AsyncSession, school: School, rows: list[Pricing], read_page_ids: set[int]
-) -> list[Pricing]:
+async def _superseded_rows(db: AsyncSession, school: School, rows: list[Pricing]) -> list[Pricing]:
     """The stored website rows the read replaces: the years it produced (as the pipeline
-    does), every undated row, and, when the read itself states no year, this school year's
-    rows. The agent reads only the current or upcoming year, so an undated read of 170's fees
-    is the same fees as the rows stored under 2026-2027, not a second set beside them. Older
-    years stay as history, and so does this year beside a read of next year's fees.
-
-    Only rows rule 6 checks (published ones) or rows on a page the read opened go: an
-    unpublished row on a page the finder never reached was not read, so it is not replaced.
-    """
+    does), and a row dated this school year whose fee the read gives with no year. The
+    pipeline already treats an undated old row as the fee its dated re-read names; this is
+    the other way round. At 170 the read gave 4500, 4700, 5100 and 4000 EUR with no year
+    and the rows stored under 2026-2027 stayed beside them."""
     replaced = await price_step._find_superseded_rows(db, school, rows)
-    if not rows:
+    undated_fees = {
+        (row.category, float(row.amount))
+        for row in rows
+        if row.amount is not None and not str(row.academic_year or "").strip()
+    }
+    if not undated_fees:
         return replaced
     current = current_academic_year()
-    undated_read = any(not str(row.academic_year or "").strip() for row in rows)
     stored = await db.execute(
         select(Pricing)
         .where(Pricing.school_id == school.id, Pricing.source == PriceSource.SCRAPED_WEBSITE)
         .options(selectinload(Pricing.source_page).load_only(SourcePage.id, SourcePage.is_valid))
     )
     ids = {row.id for row in replaced}
-    for row in stored.scalars().all():
-        undated = not str(row.academic_year or "").strip()
-        this_year = undated_read and normalize_academic_year(row.academic_year) == current
-        seen = row.source_page_id in read_page_ids or pricing_row_is_publishable(row)
-        if row.id not in ids and (undated or this_year) and seen:
-            replaced.append(row)
+    replaced.extend(
+        row
+        for row in stored.scalars().all()
+        if row.id not in ids
+        and row.amount is not None
+        and normalize_academic_year(row.academic_year) == current
+        and (row.category, float(row.amount)) in undated_fees
+    )
     return replaced
 
 
@@ -565,8 +565,7 @@ async def run_school(
 
     rows, sources = _build_rows(school, checked)
     publishable = [row for row in rows if pricing_row_is_publishable(row)]
-    read_page_ids = {page.id for page in source_pages.values() if page.id and page.id > 0}
-    superseded = await _superseded_rows(db, school, rows, read_page_ids)
+    superseded = await _superseded_rows(db, school, rows)
     published_before = [row for row in superseded if pricing_row_is_publishable(row)]
     report |= {
         "rows_new": len(rows),

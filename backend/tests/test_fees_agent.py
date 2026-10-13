@@ -865,3 +865,16 @@ async def test_an_unpublished_row_on_a_page_the_read_never_opened_stays(db_sessi
     report = await fees_agent.run_school(db_session, school, find=_find(pages), read=_read(FEES_STAGE), apply=True)
     assert report["outcome"] == "written", report
     assert 480.0 in [float(r.amount) for r in await _rows(db_session, school)]
+
+
+async def test_an_undated_fee_beside_next_years_fees_leaves_this_years_rows(db_session, pages, frozen_today):
+    school = await _school(db_session)
+    await _old_rows(db_session, school, "2026/2027", [650])  # this year's tuition, still in force
+    await db_session.commit()
+    read = [
+        FEES_STAGE[0].model_copy(update={"academic_year": "2027/2028"}),
+        FEES_STAGE[1].model_copy(update={"academic_year": None}),  # registration: rarely dated
+    ]
+    report = await fees_agent.run_school(db_session, school, find=_find(pages), read=_read(read), apply=True)
+    assert report["outcome"] == "written", report
+    assert (650.0, "2026/2027") in [(float(r.amount), r.academic_year) for r in await _rows(db_session, school)]
