@@ -190,3 +190,14 @@ async def test_a_spend_cap_during_the_pick_still_stops_the_school(monkeypatch):
     monkeypatch.setattr(fees_agent, "_pick", _picks(error=SpendCapReached("cap")))
     with pytest.raises(SpendCapReached):
         await fees_agent.find_pages(crawler, None, _Client(), _school(), Spend(0.05))
+
+
+async def test_a_site_without_the_wordpress_api_is_asked_once(monkeypatch):
+    fees, prices = "https://meridian22.org/taksi/", "https://meridian22.org/tseni/"
+    crawler = _Crawler(
+        {HOME: [("Начало", [(fees, "Такси"), (prices, "Цени")])], fees: [("…", [])], prices: [("…", [])]}
+    )
+    client = _Client()  # every API call is a 404
+    monkeypatch.setattr(fees_agent, "_pick", _picks([fees, prices]))
+    await fees_agent.find_pages(crawler, None, client, _school(), Spend(0.05))
+    assert len(client.gets) == 1

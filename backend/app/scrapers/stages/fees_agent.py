@@ -156,17 +156,18 @@ def _wordpress_api(url: str) -> tuple[str, dict[str, str]]:
     }
 
 
-async def _wordpress_text(client, url: str) -> str:
+async def _wordpress_text(client, url: str) -> Optional[str]:
     """A page's content from the WordPress REST API, for sites that render it with scripts
-    (606 shows 106 characters to the crawler; its fee table is in the API)."""
+    (606 shows 106 characters to the crawler; its fee table is in the API). None when the
+    site has no such API, so the finder stops asking it."""
     api, params = _wordpress_api(url)
     try:
         response = await client.get(api, params=params, timeout=30)
-        items = response.json() if response.status_code == 200 else []
+        items = response.json() if response.status_code == 200 else None
     except Exception:
-        return ""
+        return None
     if not isinstance(items, list):
-        return ""
+        return None
     # A slug repeats under different parents (/detska-gradina/taksi and /uchilishte/taksi):
     # only the page at this URL will do.
     item = next((i for i in items if isinstance(i, dict) and page_key(str(i.get("link") or "")) == page_key(url)), None)
@@ -202,6 +203,7 @@ async def find_pages(crawler, run_config, client, school: School, spend: Spend) 
     from crawl4ai.utils import RobotsParser  # type: ignore
 
     robots = RobotsParser()
+    wordpress = True  # until the API is found missing
     site = school.website_url
     read: list[PageRead] = []
     seen: set[tuple] = set()
@@ -225,11 +227,14 @@ async def find_pages(crawler, run_config, client, school: School, spend: Spend) 
             seen.add(page_key(final))
             is_pdf = unquote(urlparse(final).path).lower().endswith(".pdf")
             if (
-                not is_pdf
+                wordpress
+                and not is_pdf
                 and len(text.strip()) < THIN_PAGE_CHARS
                 and await robots.can_fetch(_wordpress_api(final)[0], CRAWLER_USER_AGENT)
             ):
-                text = await _wordpress_text(client, final) or text
+                api_text = await _wordpress_text(client, final)
+                wordpress = api_text is not None
+                text = api_text or text
             read.append(PageRead(final, text, bool(_PRICE_RE.search(text))))
             for href, label in page_links:
                 href = urldefrag(href)[0]
