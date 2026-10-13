@@ -83,7 +83,6 @@ Rules:
 - Only the current or upcoming school year (2025/26 or 2026/27). If both appear, list the most recent.
 - One entry per fee the site states. A discounted or early-payment price is its own entry, with a note.
 - category: the monthly kindergarten fee and school tuition are tuition; a one-off enrolment or application fee is registration; learning support, therapy and similar services are activities; optional classes, clubs and sports charged on top are extracurricular.
-- A fee table lists one fee per row and per column (grade, group, plan): list every one of them, all the way to the end. Never summarise a table or stop early.
 - Skip lines without an amount (a percentage discount, a payment schedule).
 - currency as printed (EUR or BGN); if both are printed, the EUR figure.
 - period only when the site states it (per month, per year, one-time, per term...); otherwise null. Never guess.
