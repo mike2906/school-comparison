@@ -30,7 +30,7 @@ from app.database import async_session_maker
 from app.models import Pricing, School
 from app.models.field_source import FieldSource, SourceConfidence, SourceType
 from app.models.pipeline_run import PipelineRun
-from app.models.pricing import PriceSource
+from app.models.pricing import PriceCategory, PriceSource
 from app.models.scrape_log import ScrapeType
 from app.models.source_page import SourcePage
 from app.schemas.extraction import ExtractedPrice
@@ -510,6 +510,32 @@ async def _superseded_rows(db: AsyncSession, school: School, rows: list[Pricing]
     return replaced
 
 
+def _refiled(olds: list[Any], proposed: list[Pricing]) -> bool:
+    """True when the read files an old tuition row's amount as another kind of fee, so its row
+    replaces the old one even without the old row's period. The old pipeline filed every
+    amount on a fee page as tuition (506's learning support, stored as yearly tuition).
+
+    Only one old row and one read row at that amount, in the same currency and year: a missed
+    fee that shares its amount with an unrelated one is still kept.
+    """
+    if len(olds) != 1 or olds[0].category != PriceCategory.TUITION:
+        return False
+    old = olds[0]
+    old_year = normalize_academic_year(old.academic_year)
+
+    def same_year(new: Pricing) -> bool:
+        year = normalize_academic_year(new.academic_year)
+        return year == old_year or (year is None and old_year in (None, current_academic_year()))
+
+    key = _amount_group(old)
+    matches = [
+        new
+        for new in proposed
+        if _amount_group(new) == key and (new.currency or "").upper() == (old.currency or "").upper() and same_year(new)
+    ]
+    return len(matches) == 1 and matches[0].category != PriceCategory.TUITION
+
+
 def _rows_to_keep(
     school: School, pages: list[SourcePage], superseded: list[Pricing], proposed: list[Pricing]
 ) -> tuple[list[Pricing], set[tuple[str, ...]], list[str]]:
@@ -523,17 +549,11 @@ def _rows_to_keep(
     for row in superseded:
         seen_as = _in_euro(row, proposed) or row
         groups.setdefault(_amount_group(seen_as), []).append(seen_as)
-    read_as: dict[tuple[str, ...], set[Any]] = {}
-    for row in proposed:
-        read_as.setdefault(_amount_group(row), set()).add(row.category)
     kept: list[Pricing] = []
     keys: set[tuple[str, ...]] = set()
     reasons: list[str] = []
     for key, olds in groups.items():
-        # The read files this amount as another kind of fee: its row replaces the old one even
-        # without the old row's period (506's learning support, stored as yearly tuition).
-        categories = {(old._row if isinstance(old, _InEuro) else old).category for old in olds}
-        if read_as.get(key) and not read_as[key] & categories:
+        if _refiled(olds, proposed):
             continue
         lost = price_step._pricing_replacement_regressions(school, pages, olds, proposed)
         if lost:  # only what rule 6 protects: a withheld or blocked row at that amount still goes
