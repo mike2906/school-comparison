@@ -71,7 +71,7 @@ Rules:
 - Paying one fee in parts is not a fee of its own. When the site offers the same fee paid in one go and also in parts (2 instalments, quarterly or monthly instalments, "Plan 1 / Plan 2 / Plan 3", "1 x A + 9 x B"), list one entry: amount is the price paid in one go, and each way of paying in parts goes in payment_options with the numbers the site prints (total, payments, instalment, first_payment). Paying in one go is the entry itself, never an option.
 - If the site prints no price for paying in one go, the entry's amount is the total it prints for one plan; with no total printed, list each instalment amount as its own entry with the plan name.
 - A monthly fee that is the school's ordinary price (a kindergarten's monthly fee) is the entry itself, not an option.
-- List every fee the pages state, including services billed separately (uniforms, transport, food, extended day, clubs), not only tuition.
+- List the fees of every page, to the end of the last one: a school often has a fee page per stage (kindergarten, primary, secondary), and each one's fees are listed. Include services billed separately (uniforms, transport, food, extended day, clubs), not only tuition.
 - Skip lines without an amount (a percentage discount, a payment schedule). Never invent an amount, and never compute a total the site does not print.
 - currency as printed (EUR or BGN); if both are printed, the EUR figure.
 - category: the monthly kindergarten fee and school tuition are tuition; an enrolment, exam, application or entry-test fee is registration; a deposit (депозит, капаро) is registration, never tuition; learning support, therapy and similar services are activities; optional classes, clubs and sports charged on top are extracurricular.
