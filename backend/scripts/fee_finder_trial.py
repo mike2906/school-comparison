@@ -253,23 +253,29 @@ async def main(args: argparse.Namespace) -> None:
 
     Path(args.out).write_text(json.dumps(results, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
     _summarise(results, state["spent"])
+    _summarise(results, state["spent"], merge=True)
 
 
-def _scored(fees: list[dict]) -> list[dict]:
-    """Fees as scored: lines without an amount dropped, and activities and extracurricular
-    counted as one category (the reference and the reader split optional classes differently)."""
+def _scored(fees: list[dict], merge: bool = False) -> list[dict]:
+    """Fees as scored: lines without an amount dropped. With ``merge``, activities and
+    extracurricular count as one category (the lenient scoring of rounds 2 and 3)."""
     return [
-        fee | {"category": "activities" if fee["category"] == "extracurricular" else fee["category"]}
+        fee | ({"category": "activities"} if merge and fee["category"] == "extracurricular" else {})
         for fee in fees
         if fee.get("amount") is not None or fee.get("amount_min") is not None
     ]
 
 
-def _summarise(results: list[dict], spent: float) -> None:
-    right = total = found = ref_total = pub_found = 0
+def _summarise(results: list[dict], spent: float, merge: bool = False) -> None:
+    right = total = found = ref_total = pub_found = pub_right = pub_total = 0
     extra = []
     for r in results:
-        reference, reader = _scored(r["reference_fees"]), _scored(r["reader_fees"])
+        reference = _scored(r["reference_fees"], merge)
+        reader = _scored(r["reader_fees"], merge)
+        published = _scored([row for row in r["stored_rows"] if row["published"]], merge)
+        # A published row at a school whose site states no fee is wrong, so this counts every school.
+        pub_total += len(published)
+        pub_right += sum(bool(match_any(row, reference)) for row in published)
         if not reference:
             extra += [(r["school_id"], fee) for fee in reader]
             continue
@@ -277,15 +283,18 @@ def _summarise(results: list[dict], spent: float) -> None:
         right += sum(bool(match_any(fee, reference)) for fee in reader)
         ref_total += len(reference)
         found += sum(bool(match_any(fee, reader)) for fee in reference)
-        published = _scored([row for row in r["stored_rows"] if row["published"]])
         pub_found += sum(any(match_any(row, [fee]) for row in published) for fee in reference)
     n = len(results)
     print()
+    print(f"scoring: {'activities and extracurricular merged' if merge else 'strict categories'}")
     print(f"schools: {n}, spent ${spent:.4f} (${spent / n if n else 0:.4f} per school)")
     print(
         f"finder + reader: right {_rate(right, total)} of its fees; found {_rate(found, ref_total)} of the site's fees"
     )
-    print(f"published today: {_rate(pub_found, ref_total)} of the site's fees")
+    print(
+        f"published today: right {_rate(pub_right, pub_total)} of published rows; "
+        f"found {_rate(pub_found, ref_total)} of the site's fees"
+    )
     print(f"fees read at schools whose reviewer found none ({len(extra)}), to check by hand:")
     for school_id, fee in extra:
         amount = fee.get("amount") or (fee.get("amount_min"), fee.get("amount_max"))
