@@ -18,6 +18,7 @@ from decimal import Decimal
 from typing import Any, Optional
 from urllib.parse import unquote, urldefrag, urlparse
 
+import httpx
 from bs4 import BeautifulSoup
 from pydantic import BaseModel, Field
 from sqlalchemy import select
@@ -607,8 +608,23 @@ def _fee_report(result: CheckedFee, page: Optional[PageRead]) -> dict[str, Any]:
     }
 
 
+async def page_gone(client, url: str) -> bool:
+    """The page answers 404 or 410. A site that does not answer now is not gone."""
+    try:
+        response = await client.get(url, follow_redirects=True, timeout=30)
+    except httpx.HTTPError:
+        return False
+    return response.status_code in {404, 410}
+
+
 async def run_school(
-    db: AsyncSession, school: School, *, find: Finder, read: Reader, apply: bool = False
+    db: AsyncSession,
+    school: School,
+    *,
+    find: Finder,
+    read: Reader,
+    apply: bool = False,
+    gone: Optional[Callable[[str], Awaitable[bool]]] = None,
 ) -> dict[str, Any]:
     """Find, read, check and (with ``apply``) store one school's fees. Returns its report."""
     report: dict[str, Any] = {"school_id": school.id, "outcome": None, "pages": [], "fees": []}
@@ -635,6 +651,26 @@ async def run_school(
         for index, page in enumerate(pages)
         if page.text.strip()
     }
+    # A price page the finder did not reach may be gone: 538's old fees address answers 404 and
+    # its last-year rows stayed beside the new ones. Marked invalid, its rows stop being published
+    # and the keep rule no longer holds them. A dry run only reports it.
+    if gone is not None:
+        reached = {page_key(page.url) for page in pages}
+        priced_ids = set(
+            (
+                await db.execute(
+                    select(Pricing.source_page_id).where(
+                        Pricing.school_id == school.id, Pricing.source == PriceSource.SCRAPED_WEBSITE
+                    )
+                )
+            ).scalars()
+        )
+        for page in stored.values():
+            if page.id in priced_ids and page.is_valid and page_key(page.source_url) not in reached:
+                if await gone(page.source_url):
+                    report.setdefault("pages_gone", []).append(page.source_url)
+                    if apply:
+                        page.is_valid = False
     # The reader can stop part way down a fee table: at 170 it gave the same 5 of 14 fees in
     # three runs. When the pages still show amounts the published rows have and the read left
     # out, read once more, naming them, and add the fees at amounts the first read did not give.
@@ -806,6 +842,7 @@ async def run_fees_agent(
                                 find=lambda s: find_pages(crawler, run_config, client, s, spend),
                                 read=lambda s, pages, missed: read_fees(s, pages, spend, missed),
                                 apply=apply,
+                                gone=lambda url: page_gone(client, url),
                             )
                         )
                     except (SpendCapReached, ProviderCostCapExceeded) as exc:
