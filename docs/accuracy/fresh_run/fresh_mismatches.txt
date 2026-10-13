@@ -1,0 +1,71 @@
+READ, NO REFERENCE MATCH (38)
+172 | tuition | 4450.0 | EUR | None | ПУК – III клас, обучение и храна (2 х)
+172 | transport | 875.0 | EUR | None | ПУК – III клас, такса транспорт (2 х)
+172 | tuition | 4700.0 | EUR | None | IV – VII клас, обучение и храна (2 х)
+172 | transport | 910.0 | EUR | None | IV – VII клас, такса транспорт (2 х)
+220 | tuition | 2310.0 | EUR | quarter | I вноска (септ–ноем)
+220 | tuition | 2310.0 | EUR | quarter | II вноска (дек–фев)
+220 | tuition | 2310.0 | EUR | quarter | III вноска (март–май)
+220 | tuition | 1540.0 | EUR | quarter | IV вноска (юни–юли)
+220 | tuition | 8330.0 | EUR | one_time | Опция 3
+220 | tuition | 770.0 | EUR | None | Депозит
+286 | tuition | 2350.0 | EUR | None | На две равни вноски
+329 | extracurricular | 123.0 | EUR | None | Театрална академия – сценичен английски език
+515 | tuition | 11400.0 | EUR | yearly | Първа група — Пълно плащане
+515 | tuition | 5700.0 | EUR | None | Първа група — Две вноски
+515 | tuition | 2992.0 | EUR | monthly | Първа група — Месечно плащане
+515 | tuition | 1051.0 | EUR | monthly | Първа група — Месечно плащане
+515 | tuition | 11400.0 | EUR | yearly | Втора група — Пълно плащане
+515 | tuition | 5700.0 | EUR | None | Втора група — Две вноски
+515 | tuition | 2992.0 | EUR | monthly | Втора група — Месечно плащане
+515 | tuition | 1051.0 | EUR | monthly | Втора група — Месечно плащане
+515 | tuition | 11800.0 | EUR | yearly | Трета група — Пълно плащане
+515 | tuition | 5900.0 | EUR | None | Трета група — Две вноски
+515 | tuition | 2904.0 | EUR | monthly | Трета група — Месечно плащане
+515 | tuition | 1112.0 | EUR | monthly | Трета група — Месечно плащане
+515 | tuition | 12900.0 | EUR | yearly | Подготвителна група — Пълно плащане
+515 | tuition | 6450.0 | EUR | None | Подготвителна група — Две вноски
+515 | tuition | 2828.0 | EUR | monthly | Подготвителна група — Месечно плащане
+515 | tuition | 1259.0 | EUR | monthly | Подготвителна група — Месечно плащане
+515 | materials | 550.0 | EUR | yearly | Такса за учебни ресурси
+517 | registration | 35.0 | EUR | None | Такса за участие в Трети приемен изпит
+531 | materials | 390.0 | EUR | one_time | осигуряване на образователна среда и ресурси
+531 | materials | 390.0 | EUR | one_time | осигуряване на образователна среда и ресурси
+547 | registration | 550.0-600.0 | EUR | one_time | еднократна такса за записване
+574 | registration | 475.5 | EUR | one_time | депозит
+585 | tuition | 7900.0 | EUR | yearly | Годишна такса за обучение
+585 | registration | 200.0 | EUR | one_time | Такса кандидатстване
+601 | materials | 350.0 | EUR | yearly | Educational resources fee
+632 | tuition | 7000.0 | EUR | one_time | пълната сума
+
+REFERENCE FEES MISSED (27)
+171 | tuition | 6300 | EUR | None | PK–VII клас, целодневна програма — до 19.12.2025
+171 | tuition | 6600 | EUR | None | PK–VII клас — записване до 23.01.2026
+171 | tuition | 6969 | EUR | None | PK–VII клас — записване до 20.02.2026
+171 | tuition | 7269 | EUR | None | PK–VII клас — след 20.02.2026
+220 | tuition | 8330 | EUR | yearly | Вариант 3: еднократно плащане при подписване
+220 | registration | 770 | EUR | one_time | Депозит (оборудване, консумативи, комунални)
+302 | activities | 30 | BGN | None | Консултация с детски психолог
+305 | tuition | 4500 | EUR | None | Детска ясла – плащане такса наведнъж 2026/2027
+305 | tuition | 4750 | EUR | None | Детска ясла – плащане на две вноски (2x2375) 2026/2027
+305 | tuition | 500 | EUR | monthly | Детска ясла – плащане на месец 2026/2027
+305 | tuition | 4050 | EUR | None | Първа група – плащане наведнъж 2026/2027
+305 | tuition | 4280 | EUR | None | Първа група – две вноски (2x2140) 2026/2027
+305 | tuition | 450 | EUR | monthly | Първа група – плащане на месец 2026/2027
+305 | tuition | 3700 | EUR | None | Втора и трета група – плащане наведнъж 2026/2027
+305 | tuition | 3900 | EUR | None | Втора и трета група – две вноски (2x1950) 2026/2027
+305 | tuition | 410 | EUR | monthly | Втора и трета група – плащане на месец 2026/2027
+305 | tuition | 4230 | EUR | None | Четвърта група (ПК) – плащане наведнъж 2026/2027
+305 | tuition | 4480 | EUR | None | Четвърта група (ПК) – две вноски (2x2240) 2026/2027
+305 | tuition | 470 | EUR | monthly | Четвърта група (ПК) – плащане на месец 2026/2027
+529 | tuition | 6540 | EUR | yearly | Предучилище, еднократна годишна вноска
+529 | tuition | 7194 | EUR | yearly | Предучилище, две равни вноски
+529 | tuition | 6580 | EUR | yearly | Начално училище, еднократна годишна вноска
+529 | tuition | 7238 | EUR | yearly | Начално училище, две равни вноски
+531 | materials | 390 | EUR | yearly | Група 0-3, еднократна такса - образователна среда и ресурси
+531 | materials | 390 | EUR | yearly | Група 3-6, еднократна такса - образователна среда и ресурси
+601 | materials | 350 | EUR | one_time | Еднократна образователна такса (за учебната година)
+634 | extracurricular | 450 | EUR | None | Клубове по интереси – задължителен избор на едно занимание
+
+no-amount reader lines dropped: 0
+unreachable in reference: [157, 187, 214, 549, 555, 557, 590, 610]
