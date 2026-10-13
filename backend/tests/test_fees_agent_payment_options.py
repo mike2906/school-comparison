@@ -252,3 +252,41 @@ def test_the_report_shows_each_fees_group_and_payment_options():
     report = fees_agent._fee_report(check_fee(tuition(), PAGE_596), None)
     assert report["age_group"] == "Grade 0"
     assert [option["label"] for option in report["payment_options"]] == ["Plan 2", "Plan 3"]
+
+
+# 596's secondary fee PDF as pdf_text reads it: the grade label sits on the plan 2 line.
+PAGE_596_SECONDARY = """\
+ANNUAL TUITION FEES 2026-2027 · SECONDARY SCHOOL
+REGISTRATION & APPLICATION FEE: A one-time application fee of € 200 is payable
+Grade Payment Plan Plan 1 Plan 2 Plan 3
+Plan 1 – € 9,500
+1 x € 2,950 initial
+Grade 8 – 9 Plan 2 – € 9,700 1 x € 9,500 2 x € 4,850
+9 x € 780 monthly
+Plan 3 – € 9,950
+"""
+
+
+def test_a_row_label_the_pdf_put_on_another_line_may_be_quoted_with_the_row():
+    evidence = (
+        "ANNUAL TUITION FEES 2026-2027 · SECONDARY SCHOOL\nGrade Payment Plan Plan 1 Plan 2 Plan 3\n"
+        "Grade 8 – 9 Plan 1 – € 9,500\n1 x € 2,950 initial\nPlan 2 – € 9,700 1 x € 9,500 2 x € 4,850\n"
+        "9 x € 780 monthly\nPlan 3 – € 9,950"
+    )
+    fee = tuition(
+        amount=9500,
+        age_group="Grade 8 – 9",
+        period=PricePeriod.YEARLY,
+        evidence=evidence,
+        payment_options=[
+            PaymentOption(label="Plan 2", total=9700, payments=2, instalment=4850),
+            PaymentOption(label="Plan 3", total=9950, payments=9, instalment=780, first_payment=2950),
+        ],
+    )
+    result = check_fee(fee, PAGE_596_SECONDARY)
+    assert result.kept and len(result.fee.payment_options) == 2, result.checks
+
+
+def test_a_line_made_of_words_not_on_the_page_is_still_dropped():
+    fee = tuition(amount=9500, evidence="Grade 11 – 12 Plan 1 – € 9,500")
+    assert not check_fee(fee, PAGE_596_SECONDARY).kept
