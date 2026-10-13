@@ -18,6 +18,7 @@ from decimal import Decimal
 from typing import Any, Optional
 from urllib.parse import unquote, urldefrag, urlparse
 
+import httpx
 from bs4 import BeautifulSoup
 from pydantic import BaseModel, Field
 from sqlalchemy import select
@@ -625,13 +626,54 @@ def _fee_report(result: CheckedFee, page: Optional[PageRead]) -> dict[str, Any]:
     }
 
 
+async def page_gone(client, url: str) -> bool:
+    """The page answers 404 or 410. A site that does not answer now is not gone."""
+    try:  # the status line is enough: a stored fee PDF is not downloaded again
+        async with client.stream("GET", url, follow_redirects=True, timeout=30) as response:
+            return response.status_code in {404, 410}
+    except httpx.HTTPError:
+        return False
+
+
 async def run_school(
-    db: AsyncSession, school: School, *, find: Finder, read: Reader, apply: bool = False
+    db: AsyncSession,
+    school: School,
+    *,
+    find: Finder,
+    read: Reader,
+    apply: bool = False,
+    gone: Optional[Callable[[str], Awaitable[bool]]] = None,
 ) -> dict[str, Any]:
     """Find, read, check and (with ``apply``) store one school's fees. Returns its report."""
     report: dict[str, Any] = {"school_id": school.id, "outcome": None, "pages": [], "fees": []}
     pages = await find(school)
     report["pages"] = [{"url": p.url, "chars": len(p.text), "prices": p.prices, "note": p.note} for p in pages]
+    # A known page keeps its id; a new one gets a negative placeholder until ``apply`` stores it.
+    stored_pages = (await db.execute(select(SourcePage).where(SourcePage.school_id == school.id))).scalars().all()
+    # Matched by page_key so a trailing slash or encoding difference finds the stored page.
+    stored = {page_key(page.source_url): page for page in stored_pages if page.scrape_type == ScrapeType.WEBSITE}
+    # A price page the finder did not reach may be gone: 538's old fees address answers 404 and
+    # its last-year rows stayed beside the new ones. Marked invalid, its rows stop being published
+    # and the keep rule no longer holds them. A dry run only reports it.
+    if gone is not None:
+        reached = {page_key(page.url) for page in pages}
+        priced_ids = set(
+            (
+                await db.execute(
+                    select(Pricing.source_page_id).where(
+                        Pricing.school_id == school.id, Pricing.source == PriceSource.SCRAPED_WEBSITE
+                    )
+                )
+            ).scalars()
+        )
+        for page in stored.values():
+            if page.id in priced_ids and page.is_valid and page_key(page.source_url) not in reached:
+                if await gone(page.source_url):
+                    report.setdefault("pages_gone", []).append(page.source_url)
+                    if apply:
+                        page.is_valid = False
+        if apply and report.get("pages_gone"):  # saved now, whatever the read below does
+            await db.commit()
     priced = [page for page in pages if page.prices]
     if not priced:
         report["outcome"] = "kept_old_rows"
@@ -639,10 +681,6 @@ async def run_school(
         return report
 
     fees = await read(school, priced, ())
-    # A known page keeps its id; a new one gets a negative placeholder until ``apply`` stores it.
-    stored_pages = (await db.execute(select(SourcePage).where(SourcePage.school_id == school.id))).scalars().all()
-    # Matched by page_key so a trailing slash or encoding difference finds the stored page.
-    stored = {page_key(page.source_url): page for page in stored_pages if page.scrape_type == ScrapeType.WEBSITE}
     ruled_out = [page.url for page in priced if getattr(stored.get(page_key(page.url)), "is_valid", None) is False]
     if ruled_out:
         report["outcome"] = "kept_old_rows"
@@ -824,6 +862,7 @@ async def run_fees_agent(
                                 find=lambda s: find_pages(crawler, run_config, client, s, spend),
                                 read=lambda s, pages, missed: read_fees(s, pages, spend, missed),
                                 apply=apply,
+                                gone=lambda url: page_gone(client, url),
                             )
                         )
                     except (SpendCapReached, ProviderCostCapExceeded) as exc:
