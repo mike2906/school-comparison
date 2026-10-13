@@ -273,12 +273,11 @@ def _summarise(results: list[dict], spent: float, merge: bool = False) -> None:
         reference = _scored(r["reference_fees"], merge)
         reader = _scored(r["reader_fees"], merge)
         published = _scored([row for row in r["stored_rows"] if row["published"]], merge)
-        # A published row at a school whose site states no fee is wrong, so this counts every school.
+        # A fee at a school whose site states none is wrong, so both sides count every school.
         pub_total += len(published)
         pub_right += sum(bool(match_any(row, reference)) for row in published)
         if not reference:
             extra += [(r["school_id"], fee) for fee in reader]
-            continue
         total += len(reader)
         right += sum(bool(match_any(fee, reference)) for fee in reader)
         ref_total += len(reference)
