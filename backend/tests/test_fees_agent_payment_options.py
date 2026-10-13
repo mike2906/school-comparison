@@ -336,3 +336,11 @@ def test_one_time_in_english_with_a_dash_and_beside_a_term(line, one_time):
     fee = tuition(category=PriceCategory.REGISTRATION, amount=800, period=PricePeriod.ONE_TIME, evidence=page)
     fee = fee.model_copy(update={"payment_options": []})
     assert (check_fee(fee, page).fee.period is PricePeriod.ONE_TIME) is one_time
+
+
+def test_a_label_may_name_the_fee_but_not_carry_a_bare_price():
+    page = "Годишна такса\nКлас 1 – 4\n9 500 лв.\nPlan 2 – 9,700 1 x 9,500\nPlan 1 – 9,500"
+    named = tuition(amount=9500, period=PricePeriod.YEARLY, evidence="Годишна такса 9 500 лв.")
+    assert check_fee(named, page).kept
+    borrowed = tuition(amount=9500, evidence="Plan 2 – 9,700 Plan 1 – 9,500")
+    assert not check_fee(borrowed, page).kept

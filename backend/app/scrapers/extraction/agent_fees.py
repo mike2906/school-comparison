@@ -161,7 +161,7 @@ _PERIOD_WORDS = {  # Bulgarian, English, and the French and German some schools 
 }
 # English "one-time" names a period only on the amount's own line: 596's "ANNUAL TUITION FEES"
 # heading sits above its "One-time fee for initial enrollment".
-_ONE_TIME_EN_RE = re.compile(r"\bone\s*[-–—]?\s*time\b")
+_ONE_TIME_EN_RE = re.compile(r"\bone\s*[-‐‑–—]?\s*time\b")
 # "for the school year" names a period only on the amount's own line: as a heading it often
 # covers fees charged per day or per month too (569's "ДОПЪЛНИТЕЛНИ ТАКСИ ЗА УЧЕБНАТА ГОДИНА").
 _YEAR_ON_AMOUNT_LINE_RE = re.compile(r"(?:учебн\w*|на|за)\s+година|l'année")
@@ -315,9 +315,10 @@ def _count_is_printed(payments: int, text: str) -> bool:
 
 
 _LABEL_LINES_AWAY = 3
-# A label names the row; it holds no price or period of its own, so it cannot carry another
-# row's amount or "monthly" into the fee's line.
-_NOT_A_LABEL_RE = re.compile(rf"[€$£]|\b(?:eur|bgn|лв|лева|евро)\b|{'|'.join(_PERIOD_WORDS.values())}", re.IGNORECASE)
+# A label names the row ("Grade 8 – 9", "Годишна такса"): it holds no price, so it cannot
+# carry another row's amount, or that amount's "monthly", into the fee's line. A price is a
+# currency or a number of three digits or more.
+_NOT_A_LABEL_RE = re.compile(r"[€$£]|\b(?:eur|euros?|usd|bgn|лв|лева|leva|евро)\b|\d{3}|\d[.,\s]\d{3}", re.IGNORECASE)
 
 
 def _line_on_page(line: str, page: str, page_lines: list[str]) -> bool:
@@ -327,7 +328,7 @@ def _line_on_page(line: str, page: str, page_lines: list[str]) -> bool:
     secondary fees read "Plan 1 – € 9,500" on one line and "Grade 8 – 9 Plan 2 – …" two
     lines down, and the reader quoted the row as "Grade 8 – 9 Plan 1 – € 9,500". The row
     must be a whole line of the page and the label the start of a line at most three lines
-    from it, with no price or period word in it, so a label and an amount from unrelated
+    from it, with no price in it, so a label and an amount from unrelated
     places do not make a line.
     """
     if line in page:
