@@ -165,9 +165,11 @@ async def _wordpress_text(client, url: str) -> Optional[str]:
     api, params = _wordpress_api(url)
     try:
         response = await client.get(api, params=params, timeout=30)
+        if response.status_code >= 500:
+            return ""  # throttled or down for a moment: ask again for the next page
         items = response.json() if response.status_code == 200 else None
     except Exception:
-        return None
+        return ""
     if not isinstance(items, list):
         return None
     # A slug repeats under different parents (/detska-gradina/taksi and /uchilishte/taksi):
@@ -323,7 +325,7 @@ def _build_rows(
 ) -> tuple[list[Pricing], list[FieldSource]]:
     rows: list[Pricing] = []
     sources: list[FieldSource] = []
-    seen: dict[tuple, set[tuple]] = {}  # fee fields -> (page, label) pairs read
+    built = []
     for result, page in checked:
         fee = result.fee
         fields = price_step._normalized_price_fields(
@@ -340,16 +342,23 @@ def _build_rows(
                 confidence=result.confidence,
             )
         )
-        if fields is None:
+        if fields is not None:
+            built.append((result, page, fields, " ".join(fee.label.split()).casefold()))
+    # The same fee on two pages is one row (564 lists its fees on three). On one page a
+    # second fee with the same fields but its own label is a fee of its own: two grade
+    # tiers at one price when the reader left their groups empty. So each set of fields
+    # comes from the one page that lists it most often, once per label.
+    labels: dict[tuple, dict[Any, set[str]]] = {}
+    for _, page, fields, label in built:
+        labels.setdefault(tuple(fields.values()), {}).setdefault(page.id, set()).add(label)
+    taken: set[tuple] = set()
+    for result, page, fields, label in built:
+        key = tuple(fields.values())
+        by_page = labels[key]
+        if page.id != max(by_page, key=lambda page_id: len(by_page[page_id])) or (key, label) in taken:
             continue
-        # The same fee on two pages is one row (564 lists its fees on three). On one page a
-        # second fee with the same fields but its own label is a fee of its own: two grade
-        # tiers at one price when the reader left their groups empty.
-        key, label = tuple(fields.values()), " ".join(fee.label.split()).casefold()
-        reads = seen.setdefault(key, set())
-        if reads and any(other != page.id or other_label == label for other, other_label in reads):
-            continue
-        reads.add((page.id, label))
+        taken.add((key, label))
+        fee = result.fee
         rows.append(
             Pricing(
                 school_id=school.id,
@@ -456,7 +465,7 @@ async def _superseded_rows(db: AsyncSession, school: School, rows: list[Pricing]
     and the rows stored under 2026-2027 stayed beside them."""
     replaced = await price_step._find_superseded_rows(db, school, rows)
     undated_fees = {
-        (row.category, float(row.amount))
+        (row.category, float(row.amount), (row.currency or "").upper())
         for row in rows
         if row.amount is not None and not str(row.academic_year or "").strip()
     }
@@ -475,7 +484,7 @@ async def _superseded_rows(db: AsyncSession, school: School, rows: list[Pricing]
         if row.id not in ids
         and row.amount is not None
         and normalize_academic_year(row.academic_year) == current
-        and (row.category, float(row.amount)) in undated_fees
+        and (row.category, float(row.amount), (row.currency or "").upper()) in undated_fees
     )
     return replaced
 
@@ -598,6 +607,9 @@ async def run_school(
     if not rows and not superseded:
         report["outcome"] = "kept_old_rows"
         report["reason"] = "every fee read is already stored"
+        if apply:  # an earlier run's hold no longer applies
+            price_step._update_pricing_hold(school, [], 0)
+            await db.commit()
         return report
     if not apply:
         report["outcome"] = "would_write"

@@ -878,3 +878,38 @@ async def test_an_undated_fee_beside_next_years_fees_leaves_this_years_rows(db_s
     report = await fees_agent.run_school(db_session, school, find=_find(pages), read=_read(read), apply=True)
     assert report["outcome"] == "written", report
     assert (650.0, "2026/2027") in [(float(r.amount), r.academic_year) for r in await _rows(db_session, school)]
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "Такса при записване 300 лв., платима в срок до 15 юни",  # a deadline, not a term
+        "Записване 300 лв. еднократно; месечна такса 500 лв.",  # a neighbour's period
+    ],
+)
+def test_a_registration_fee_stays_one_time_beside_other_words(line):
+    result = check_fee(fee(PriceCategory.REGISTRATION, line, amount=300, period=PricePeriod.ONE_TIME), line)
+    assert result.fee.period is PricePeriod.ONE_TIME
+
+
+def test_tiers_on_one_page_survive_the_same_fee_read_first_elsewhere():
+    school = School(id=1, name_i18n={}, country_code="bg", school_type="private", education_level="primary")
+    home = SourcePage(id=-2, school_id=1, scrape_type=ScrapeType.WEBSITE, source_url=HOME)
+    fees_page = SourcePage(id=-1, school_id=1, scrape_type=ScrapeType.WEBSITE, source_url=URL)
+    text = "1-4 клас: 700 евро\n5-7 клас: 700 евро"
+    once = check_fee(fee(PriceCategory.TUITION, "1-4 клас: 700 евро", amount=700, label="Такса"), text)
+    low = check_fee(fee(PriceCategory.TUITION, "1-4 клас: 700 евро", amount=700, label="1-4 клас"), text)
+    high = check_fee(fee(PriceCategory.TUITION, "5-7 клас: 700 евро", amount=700, label="5-7 клас"), text)
+    rows, _ = fees_agent._build_rows(school, [(once, home), (low, fees_page), (high, fees_page)])
+    assert len(rows) == 2
+
+
+async def test_an_undated_read_leaves_the_same_number_in_another_currency(db_session, pages, frozen_today):
+    school = await _school(db_session)
+    await _old_rows(db_session, school, "2026/2027", [700])
+    old = (await _rows(db_session, school))[0]
+    old.currency = "BGN"  # 700 лв. is another fee than 700 €
+    await db_session.commit()
+    undated = [f.model_copy(update={"academic_year": None}) for f in FEES_STAGE]
+    await fees_agent.run_school(db_session, school, find=_find(pages), read=_read(undated), apply=True)
+    assert (700.0, "BGN") in [(float(r.amount), r.currency) for r in await _rows(db_session, school)]

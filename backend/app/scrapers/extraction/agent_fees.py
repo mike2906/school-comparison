@@ -153,11 +153,13 @@ def _normalized(text: str) -> str:
 def _names_period(period: PricePeriod, evidence: str, amounts: list[Decimal], category: PriceCategory) -> bool:
     # An enrolment, exam or application fee is charged once by what it is (rules.md), so it
     # needs no word for it; a deposit filed as registration is one too. Not when the line
-    # names a recurring period: "годишна такса за записване" is paid every year.
+    # calls it recurring and never one-time: "годишна такса за записване" is paid every year.
+    # "срок" is left out: "платима в срок до 15 юни" is a deadline, not a term.
     if period is PricePeriod.ONE_TIME and category is PriceCategory.REGISTRATION:
-        return not any(
-            re.search(words, evidence) for other, words in _PERIOD_WORDS.items() if other is not PricePeriod.ONE_TIME
-        )
+        if re.search(_PERIOD_WORDS[PricePeriod.ONE_TIME], evidence):
+            return True
+        recurring = (PricePeriod.MONTHLY, PricePeriod.YEARLY, PricePeriod.QUARTER, PricePeriod.SEMESTER)
+        return not any(re.search(_PERIOD_WORDS[other], evidence) for other in recurring)
     if re.search(_PERIOD_WORDS[period], evidence):
         return True
     if period is not PricePeriod.YEARLY:
