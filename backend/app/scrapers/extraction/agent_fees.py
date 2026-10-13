@@ -20,6 +20,20 @@ PUBLISH_CONFIDENCE = 0.9
 HELD_CONFIDENCE = 0.5  # under the 0.7 publish floor (display_gating.PRICING_CONFIDENCE_FLOOR)
 
 
+class PaymentOption(BaseModel):
+    """Another way to pay one fee: in parts, as the site prints them (596's "2 x € 4.575")."""
+
+    label: Optional[str] = Field(default=None, description="The site's name for this way of paying, e.g. Plan 2")
+    total: Optional[float] = Field(default=None, description="The total paid this way, only if the site prints it")
+    payments: Optional[int] = Field(
+        default=None, description="How many equal instalments: 9 in '1 x 2650 + 9 x 750', 2 in '2 x 4575'"
+    )
+    instalment: Optional[float] = Field(default=None, description="The amount of each of those instalments")
+    first_payment: Optional[float] = Field(
+        default=None, description="A first payment before the equal instalments: 2650 in '1 x 2650 + 9 x 750'"
+    )
+
+
 class AgentFee(BaseModel):
     category: PriceCategory
     amount: Optional[float] = None
@@ -33,6 +47,9 @@ class AgentFee(BaseModel):
     label: str = Field(description="The site's own words for this fee, short")
     notes: Optional[str] = None
     installments: list[str] = Field(default_factory=list)
+    payment_options: list[PaymentOption] = Field(
+        default_factory=list, description="Other ways the site offers to pay this same fee, in parts"
+    )
     source_url: str = Field(description="The URL of the page the fee was read from, copied from its PAGE line")
     evidence: str = Field(
         description="The page line the amount was read from, copied verbatim. In a table, the row "
@@ -48,7 +65,10 @@ READER_PROMPT = """You read a school's own web pages and list the fees it states
 Rules:
 - Only fees of the named institution. A shared site may also list a sibling school or kindergarten; skip their fees.
 - Only the current or upcoming school year. If several appear, list the most recent.
-- One entry per amount the site prints. Each printed instalment is its own fee, with the plan name. A discounted or early-payment price is its own entry, with a note.
+- One entry per fee and group (grade, age group, full or half day). A discounted or early-payment price is its own entry, with a note.
+- Paying one fee in parts is not a fee of its own. When the site offers the same fee paid in one go and also in parts (2 instalments, quarterly or monthly instalments, "Plan 1 / Plan 2 / Plan 3", "1 x A + 9 x B"), list one entry: amount is the price paid in one go, and each way of paying in parts goes in payment_options with the numbers the site prints (total, payments, instalment, first_payment). Paying in one go is the entry itself, never an option.
+- If the site prints no price for paying in one go, the entry's amount is the total it prints for one plan; with no total printed, list each instalment amount as its own entry with the plan name.
+- A monthly fee that is the school's ordinary price (a kindergarten's monthly fee) is the entry itself, not an option.
 - Skip lines without an amount (a percentage discount, a payment schedule). Never invent an amount, and never compute a total the site does not print.
 - currency as printed (EUR or BGN); if both are printed, the EUR figure.
 - category: the monthly kindergarten fee and school tuition are tuition; an enrolment, exam, application or entry-test fee is registration; a deposit (депозит, капаро) is registration, never tuition; learning support, therapy and similar services are activities; optional classes, clubs and sports charged on top are extracurricular.
@@ -60,8 +80,8 @@ Rules:
   - A yearly total only if the site prints it.
 - Never build a range from two different fees (a full-day and a half-day price are two entries). A range only when the site prints one.
 - source_url: the URL of the page the fee is on.
-- evidence: the line of the page the amount is on, copied character for character. For a table row, also copy the heading line that gives its period, plan or group, as a separate line. If the period is stated in a sentence above the table, copy that sentence too.
-- label: the site's own wording, short. academic_year, age_group and plan_name as the site states them, or null."""
+- evidence: the line of the page the amount is on, copied character for character, and the lines of its payment options. For a table row, also copy the heading line that gives its period, plan or group, as a separate line. If the period is stated in a sentence above the table, copy that sentence too.
+- label: the site's own wording, short. academic_year, age_group and plan_name as the site states them, or null. plan_name names what the fee buys (full day, half day), not a way of paying: a payment plan's name is its option's label."""
 
 
 # ---------------------------------------------------------------------------
@@ -220,6 +240,9 @@ def check_fee(fee: AgentFee, page_text: str) -> CheckedFee:
     if not amount_on_page(fee, page_numbers(page)):
         return _dropped(fee, "dropped: amount is not among the page's numbers")
 
+    # The period and deposit rules read the fee's own lines: "9 x € 750 monthly" names the
+    # period of a payment option, not of the price paid in one go above it.
+    evidence = _without_option_lines(lines, fee)
     checks: list[str] = []
     period = fee.period
     if period is not None and not _names_period(period, evidence, fee_amounts(fee), fee.category):
@@ -240,5 +263,63 @@ def check_fee(fee: AgentFee, page_text: str) -> CheckedFee:
         if not _range_is_joined(evidence, min(amounts), max(amounts)):
             held.append("held: range ends are not joined by a range marker in the evidence")
 
+    options, option_checks = _checked_options(fee, page_numbers("\n".join(lines)))
     confidence = HELD_CONFIDENCE if held else PUBLISH_CONFIDENCE
-    return CheckedFee(fee.model_copy(update={"period": period}), confidence, True, checks + held)
+    update = {"period": period, "payment_options": options}
+    return CheckedFee(fee.model_copy(update=update), confidence, True, checks + option_checks + held)
+
+
+def _without_option_lines(lines: list[str], fee: AgentFee) -> str:
+    """The evidence without the lines that hold only a payment option's numbers."""
+    own, options = set(fee_amounts(fee)), set(option_amounts(fee))
+    return "\n".join(line for line in lines if not (numbers := page_numbers(line)) & options or numbers & own)
+
+
+def _decimal(value: float) -> Decimal:
+    return Decimal(str(value)).normalize()
+
+
+def _checked_options(fee: AgentFee, numbers: set[Decimal]) -> tuple[list[PaymentOption], list[str]]:
+    """The fee's payment options whose numbers the evidence prints.
+
+    An option with a number the evidence does not hold is dropped; a count of payments the
+    evidence writes only in words is cleared. What is left must say what is paid: a total,
+    or a count and an instalment. One payment of the whole fee is the fee itself.
+    """
+    kept: list[PaymentOption] = []
+    checks: list[str] = []
+    for option in fee.payment_options:
+        printed = [value for value in (option.total, option.instalment, option.first_payment) if value is not None]
+        missing = [value for value in printed if _decimal(value) not in numbers]
+        if missing:
+            checks.append(f"payment option dropped: {missing[0]:g} is not in the evidence")
+            continue
+        payments = option.payments
+        if payments is not None and (payments < 1 or Decimal(payments) not in numbers):
+            payments = None
+        if payments == 1 and option.first_payment is None:  # "1 x € 8.950": the fee itself
+            if option.instalment is not None and fee.amount is not None and option.instalment != fee.amount:
+                checks.append(f"payment option dropped: one payment of {option.instalment:g} is not the fee's price")
+            continue
+        if option.total is None and (payments is None or option.instalment is None):
+            checks.append("payment option dropped: it states neither a total nor a count of instalments")
+            continue
+        if fee.amount is not None and option.total == fee.amount and payments is None and option.instalment is None:
+            continue  # the fee's own price again
+        kept.append(option.model_copy(update={"payments": payments}))
+    return kept, checks
+
+
+def read_amounts(fee: AgentFee) -> list[Decimal]:
+    """The amounts a read gives for the fee: its own and its payment options'."""
+    return [*fee_amounts(fee), *option_amounts(fee)]
+
+
+def option_amounts(fee: AgentFee) -> list[Decimal]:
+    """Every amount the fee's payment options print: read, though not stored as fees."""
+    return [
+        _decimal(value)
+        for option in fee.payment_options
+        for value in (option.total, option.instalment, option.first_payment)
+        if value is not None
+    ]

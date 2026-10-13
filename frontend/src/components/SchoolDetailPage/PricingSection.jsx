@@ -6,6 +6,7 @@ import { formatAmount } from '../../utils/format'
 import PriceSource from './PriceSource'
 import { pricePeriod, periodUnknown } from '../../utils/priceRows'
 import { planNameBeside, textLang } from '../../utils/priceLabels'
+import { paymentOptionTexts } from '../../utils/paymentOptions'
 
 /**
  * Every published price, grouped by academic year, then by category, then by the age
@@ -27,6 +28,7 @@ function PricingSection({ pricing }) {
       : t('pricing.priceOnRequest')
 
     const ageGroupLabel = showAgeGroup ? priceAgeGroupLabel(price, t) : null
+    const options = paymentOptionTexts(price, (value) => `${formatNumber(value)} ${currency}`, t)
     const planName = planNameBeside(price, t, bandLabel || ageGroupLabel)
 
     return (
@@ -39,6 +41,12 @@ function PricingSection({ pricing }) {
           </div>
           {ageGroupLabel && (
             <div className="text-sm text-neutral-500 break-words" lang={textLang(ageGroupLabel, i18n.language)}>{ageGroupLabel}</div>
+          )}
+          {/* The same fee paid in parts: under it, so a plan is not read as a fee of its own. */}
+          {options.length > 0 && (
+            <div className="text-sm text-neutral-600 break-words">
+              {t('pricing.payInParts')} {options.join(' · ')}
+            </div>
           )}
           {showSource && (
             <PriceSource source={price.source} url={price.source_url} checkedAt={price.scraped_at} />

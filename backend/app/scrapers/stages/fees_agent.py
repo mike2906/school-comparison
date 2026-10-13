@@ -12,7 +12,7 @@ import asyncio
 import hashlib
 import logging
 import re
-from collections.abc import Awaitable, Callable, Sequence
+from collections.abc import Awaitable, Callable, Iterable, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any, Optional
@@ -37,13 +37,16 @@ from app.models.source_page import SourcePage
 from app.schemas.extraction import ExtractedPrice
 from app.scrapers.extraction import llm_results, price_step, text_values
 from app.scrapers.extraction.agent_fees import (
+    PUBLISH_CONFIDENCE,
     READER_PROMPT,
     AgentFee,
     AgentFees,
     CheckedFee,
     check_fee,
     fee_amounts,
+    option_amounts,
     page_numbers,
+    read_amounts,
 )
 from app.scrapers.fee_pages import fee_http_client, page_key, pdf_text
 from app.scrapers.price_evidence import _PRICE_RE, PriceRow, _amount_key
@@ -345,6 +348,11 @@ def _new_source_page(school: School, page: PageRead, stored: Optional[SourcePage
 _SINGLE_PAYMENT_RE = re.compile(r"^\s*1\s*[xх×]\s*(?:€|eur|лв\.?)?\s*[\d\s.,]+(?:€|eur|лв\.?)?\s*$", re.IGNORECASE)
 
 
+# "Plan 1", "План 2 – на вноски", "Вариант Б": the name of a way of paying, which says nothing once the fee
+# carries its payment options (596's plans 1-3).
+_PAYMENT_PLAN_NAME_RE = re.compile(r"^\s*(?:plan|план|option|опция|вариант)\s*(?:\d+|[a-zа-я]|[ivx]+)\b", re.IGNORECASE)
+
+
 def _single_payment(fee: AgentFee) -> bool:
     """The fee is written as one payment of its whole amount: "1 x € 8.950"."""
     return any(_SINGLE_PAYMENT_RE.match(text) for text in [fee.label, *fee.installments])
@@ -366,7 +374,9 @@ def _build_rows(
                 period=fee.period.value if fee.period else None,
                 amount_min=fee.amount_min,
                 amount_max=fee.amount_max,
-                plan_name=fee.plan_name,
+                plan_name=None
+                if fee.payment_options and _PAYMENT_PLAN_NAME_RE.match(fee.plan_name or "")
+                else fee.plan_name,
                 academic_year=fee.academic_year,
                 age_group=fee.age_group,
                 confidence=result.confidence,
@@ -414,6 +424,7 @@ def _build_rows(
                     "evidence": fee.evidence,
                     "label": fee.label,
                     "installments": fee.installments,
+                    "payment_options": [option.model_dump(exclude_none=True) for option in fee.payment_options],
                     "notes": fee.notes,
                 },
             )
@@ -556,7 +567,11 @@ def _refiled(olds: list[Any], proposed: list[Pricing]) -> bool:
 
 
 def _rows_to_keep(
-    school: School, pages: list[SourcePage], superseded: list[Pricing], proposed: list[Pricing]
+    school: School,
+    pages: list[SourcePage],
+    superseded: list[Pricing],
+    proposed: list[Pricing],
+    listed: Iterable[tuple[str, Decimal]] = (),
 ) -> tuple[list[Pricing], set[tuple[str, ...]], list[str]]:
     """The superseded rows rule 6 says replacing would lose, the amounts they hold, and why.
 
@@ -574,7 +589,7 @@ def _rows_to_keep(
     for key, olds in groups.items():
         if _refiled(olds, proposed):
             continue
-        lost = price_step._pricing_replacement_regressions(school, pages, olds, proposed)
+        lost = price_step._pricing_replacement_regressions(school, pages, olds, proposed, listed)
         if lost:  # only what rule 6 protects: a withheld or blocked row at that amount still goes
             rows = [old._row if isinstance(old, _InEuro) else old for old in olds]
             protected = [row for row in rows if row.id not in blocked and pricing_row_is_publishable(row)]
@@ -600,7 +615,7 @@ async def _missed_amounts(
     )
     blocked = blocked_pricing_row_ids(school.attributes if isinstance(school.attributes, dict) else None)
     current = current_academic_year()
-    read = {amount for fee in fees for amount in fee_amounts(fee)}
+    read = {amount for fee in fees for amount in read_amounts(fee)}
     euro = _euro_amounts(fees)
     published = set()
     for row in stored.scalars().all():
@@ -736,7 +751,7 @@ async def run_school(
             logger.warning("fees-agent second read failed for school %s: %s", school.id, exc)
             report["reread"]["error"] = str(exc)[:200]
             again = []
-        first = {amount for fee in fees for amount in fee_amounts(fee)}
+        first = {amount for fee in fees for amount in read_amounts(fee)}
         added = [fee for fee in again if fee_amounts(fee) and not set(fee_amounts(fee)) <= first]
         # A page that prints both currencies: the lev twin of a euro fee is not a fee of its own.
         euro = _euro_amounts([*fees, *added])
@@ -754,7 +769,24 @@ async def run_school(
     rows, sources = _build_rows(school, checked)
     publishable = [row for row in rows if pricing_row_is_publishable(row)]
     superseded = await _superseded_rows(db, school, rows)
-    published_before = [row for row in superseded if pricing_row_is_publishable(row)]
+    # Amounts read as another way to pay a fee: an old row holding one (596's "2 x 4.575" was a
+    # row of its own) is listed under the new fee, not lost.
+    # Only a fee that publishes: a held fee's options must not let the old rows go.
+    listed = {
+        (result.fee.category.value, (result.fee.currency or "").upper(), amount)
+        for result, _ in checked
+        if result.confidence >= PUBLISH_CONFIDENCE
+        for amount in option_amounts(result.fee)
+    }
+    published_before = [
+        row
+        for row in superseded
+        if pricing_row_is_publishable(row)
+        and (
+            row.amount is None
+            or (row.category.value, (row.currency or "").upper(), Decimal(str(row.amount)).normalize()) not in listed
+        )
+    ]
     report |= {
         "rows_new": len(rows),
         "rows_new_publishable": len(publishable),
@@ -774,7 +806,11 @@ async def run_school(
     # Old rows the read would lose (a fee it missed, a period it dropped) stay, instead of
     # holding the whole school; new rows at those amounts give way to them.
     kept, kept_amounts, regressions = _rows_to_keep(
-        school, [*stored_pages, *source_pages.values()], superseded, publishable
+        school,
+        [*stored_pages, *source_pages.values()],
+        superseded,
+        publishable,
+        [(category, amount) for category, _, amount in listed],
     )
     if kept:  # by amount alone: a refiled category or currency is still the same fee
         superseded = [row for row in superseded if row not in kept]

@@ -62,8 +62,19 @@ For one school, with its `website_url`:
      cleared and the fee publishes with a blank period, as a third of today's rows already do.
      one_time is kept only for `registration` (enrolment, exam, deposit); on any other category
      it is cleared, because "еднократно плащане" of a year's tuition is still yearly.
-   - **Instalments.** An amount the line gives as "1 x" ahead of "+ N x" is a first instalment:
-     its period is cleared. A count of payments ("2 x", "на две вноски") states no period.
+   - **Payment options.** One fee paid in parts is one fee, not one per instalment. The reader
+     gives the price paid in one go as the fee and each way of paying in parts as a payment
+     option (`total`, `payments`, `instalment`, `first_payment`, as printed). Code keeps an
+     option only when the evidence prints its numbers, clears a count written only in words,
+     and drops a "1 x" option (the fee itself). Options are stored in
+     `pricing_context.payment_options` and shown under the fee ("Or in parts: 2 × 4,575 EUR
+     (9,150 EUR in total)"); a "Plan 1"-style name is dropped from a fee that has them. Their
+     amounts count as read, so the old rows of a school that stored each instalment as a fee
+     give way to the one fee (596 had 42 rows: 3 fees and 6 grade bands × 3 plans).
+   - **Instalments.** Where a site prints no price for paying in one go, instalments are
+     still fees of their own. An amount the line gives as "1 x" ahead of "+ N x" is a first
+     instalment: its period is cleared. A count of payments ("2 x", "на две вноски") states
+     no period.
    - **Withheld** (confidence 0.5, under the 0.7 publish floor):
      - a fee whose line names a deposit (`депозит`, `капаро`, deposit) but whose category is
        not `registration`;

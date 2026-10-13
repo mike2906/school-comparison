@@ -258,6 +258,9 @@
     "nextYear": "next academic year",
     "yearPrice": "{{year}}: {{price}}",
     "periodNotStated": "Period not stated",
+    "payInParts": "Or in parts:",
+    "paymentOptionTotal": "{{total}} in total",
+    "paymentOptionInParts": "{{total}} in instalments",
     "per": {
       "monthly": "month",
       "quarter": "quarter",
