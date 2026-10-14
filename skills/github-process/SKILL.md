@@ -14,13 +14,19 @@ you picked, and go to Mike only for the short list in "Still goes to Mike".
 1. Branch from `main` (`agent/*`, or the branch your harness assigns). Commit to `main`
    directly only when Mike asks.
 2. Make the smallest change that meets the requirement (`AGENTS.md` → Scope Discipline).
-3. Run the checks for what you touched (`CONTRIBUTING.md` lists them). Quiet output:
+3. A change to something a parent can do or see on the site (a new page, section,
+   calculator or filter, or a changed one) adds or updates its live flow in
+   `frontend/e2e/live/` in the same PR: one file per feature area, the school picked from
+   the live API, texts from the i18n files. The flows run after every deploy and daily
+   (`.github/workflows/live-flows.yml`), so after merging, check that the run following
+   your deploy is green.
+4. Run the checks for what you touched (`CONTRIBUTING.md` lists them). Quiet output:
    `uv run pytest -q 2>&1 | tail -3`.
-4. Read your own complete diff against the requirement and the invariants. For every check
+5. Read your own complete diff against the requirement and the invariants. For every check
    or guard you add or move, walk each path through the function (early returns, dry runs,
    error branches) and confirm it fires exactly where it should.
-5. Push, open the PR, and review it by size (below). Fix what blocks, push one batch.
-6. Merge on green CI once the review is settled (see "Merging").
+6. Push, open the PR, and review it by size (below). Fix what blocks, push one batch.
+7. Merge on green CI once the review is settled (see "Merging").
 
 ## Review by size
 

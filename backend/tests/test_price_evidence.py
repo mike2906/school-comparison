@@ -126,13 +126,15 @@ def test_630_invented_catering_row_copied_from_line_above_trips_rule_1():
 
 def test_630_weekly_guest_fee_filed_as_registration_trips_rule_3():
     wrong = row(Decimal("135"), category="REGISTRATION", period="ONE_TIME")
-    assert "3_period_unrepresentable" in rules(wrong, WALDORF, "school")
+    assert "3_period_unfit" in rules(wrong, WALDORF, "school")
     with_label = row(
         Decimal("135"),
         category="REGISTRATION",
         plan_name="седмична такса за гостуващи ученици във Валдорфското училище",
     )
-    assert "3_period_unrepresentable" in rules(with_label, WALDORF, "school")
+    assert "3_period_unfit" in rules(with_label, WALDORF, "school")
+    tuition = row(Decimal("135"), plan_name="седмична такса за гостуващи ученици във Валдорфското училище")
+    assert "3_period_unfit" not in rules(tuition, WALDORF, "school")
 
 
 def test_525_deposit_filed_as_tuition_trips_rule_4():
@@ -292,40 +294,47 @@ def test_rule_2_level_vocabulary(label, family, trips):
 
 
 @pytest.mark.parametrize(
-    "context,families,unrepresentable",
+    "context,families",
     [
-        ("€ 530 - целодневно гледане, ежемесечно заплащане", {"MONTHLY"}, False),
-        ("месечен абонамент", {"MONTHLY"}, False),
-        ("785 euro/месец", {"MONTHLY"}, False),
-        ("годишен абонамент", {"YEARLY"}, False),
-        ("еднократен възстановим депозит", {"ONE_TIME"}, False),
-        ("тримесечна такса", {"QUARTER"}, False),
-        ("- 3 пъти седмично - € 20", set(), False),
-        ("4 хранения дневно", set(), False),
-        ("целодневно обучение", set(), False),
-        ("полудневно обучение", set(), False),
-        ("часовете се провеждат ежедневно", set(), False),
-        ("ред на провеждане на часовете", set(), False),
-        ("за следващата учебна година", set(), False),
-        ("за 3 до 7-годишни деца", set(), False),
-        ("€ 20\nмесечна такса", {"MONTHLY"}, False),  # an amount then its period, not an age
-        ("500 месечно", {"MONTHLY"}, False),
-        ("такса на срок", {"TERM"}, False),
-        ("семестриална такса", {"SEMESTER"}, False),
-        ("седмична такса за гостуващи ученици", set(), True),
-        ("кетъринг 1 /ден", set(), True),
-        ("15 лв. на ден", set(), True),
-        ("€40 per hour", set(), True),
+        ("€ 530 - целодневно гледане, ежемесечно заплащане", {"MONTHLY"}),
+        ("месечен абонамент", {"MONTHLY"}),
+        ("785 euro/месец", {"MONTHLY"}),
+        ("годишен абонамент", {"YEARLY"}),
+        ("еднократен възстановим депозит", {"ONE_TIME"}),
+        ("тримесечна такса", {"QUARTER"}),
+        ("- 3 пъти седмично - € 20", set()),
+        ("4 хранения дневно", set()),
+        ("целодневно обучение", set()),
+        ("полудневно обучение", set()),
+        ("часовете се провеждат ежедневно", set()),
+        ("ред на провеждане на часовете", set()),
+        ("за следващата учебна година", set()),
+        ("за 3 до 7-годишни деца", set()),
+        ("€ 20\nмесечна такса", {"MONTHLY"}),  # an amount then its period, not an age
+        ("500 месечно", {"MONTHLY"}),
+        ("такса на срок", {"TERM"}),
+        ("семестриална такса", {"SEMESTER"}),
+        ("седмична такса за гостуващи ученици", {"WEEKLY"}),
+        ("кетъринг 1 /ден", {"DAILY"}),
+        ("15 лв. на ден", {"DAILY"}),
+        ("€40 per hour", {"HOURLY"}),
+        ("Дневна форма на обучение: 8000 €", set()),  # full-time study, not per day
+        ("съобразено с дневния режим", set()),
+        ("2 учебни часа седмично – 60 €", set()),
+        ("по 1 час седмично", set()),
+        ("седмична програма", set()),
+        ("Такса 30 € на час по английски", {"HOURLY"}),  # a lesson hour
+        ("Занималня до 18 часа дневно – 10 €", {"DAILY"}),
     ],
 )
-def test_period_families(context, families, unrepresentable):
-    assert period_families(normalize_text(context)) == (families, unrepresentable)
+def test_period_families(context, families):
+    assert period_families(normalize_text(context)) == families
 
 
 def test_own_line_period_outranks_table_header_below():
     text = normalize_text("School meals | 181,44 euro/ month |\nAnnual fee | Monthly fee")
     span = amount_spans(text, Decimal("181.44"))[0]
-    assert stated_period(text, span) == ({"MONTHLY"}, False)
+    assert stated_period(text, span) == {"MONTHLY"}
 
 
 def test_term_row_with_term_wording_passes():
