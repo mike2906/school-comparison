@@ -443,6 +443,14 @@ def _discount_report(discount: AgentDiscount, pages: list[PageRead]) -> dict[str
     }
 
 
+async def _lock_attributes(db: AsyncSession, school: School) -> None:
+    """Re-read the school's attributes under a row lock before changing them.
+
+    The read takes minutes and other stages (school facts, social links) write other
+    attributes keys meanwhile; writing back the copy loaded before it would wipe them."""
+    await db.refresh(school, attribute_names=["attributes"], with_for_update=True)
+
+
 def _store_discounts(school: School, report: dict[str, Any]) -> None:
     """The kept discounts of this read; an empty list too: the site no longer offers them."""
     kept = [{k: v for k, v in d.items() if k != "kept"} for d in report["discounts"] if d["kept"]]
@@ -975,6 +983,7 @@ async def run_school(
         report["outcome"] = "kept_old_rows"
         report["reason"] = "every fee read is already stored"
         if apply:  # an earlier run's hold no longer applies
+            await _lock_attributes(db, school)
             price_step._update_pricing_hold(school, [], 0)
             if discounts is not None:
                 _store_discounts(school, report)
@@ -983,6 +992,7 @@ async def run_school(
     if not apply:
         report["outcome"] = "would_write"
         return report
+    await _lock_attributes(db, school)
     price_step._update_pricing_hold(school, [], len(rows))  # clears a hold an earlier run left
 
     await _upsert_pages(db, source_pages, stored)

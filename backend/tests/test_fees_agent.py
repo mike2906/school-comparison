@@ -1311,3 +1311,26 @@ async def test_an_undated_read_leaves_the_same_number_in_another_currency(db_ses
     undated = [f.model_copy(update={"academic_year": None}) for f in FEES_STAGE]
     await fees_agent.run_school(db_session, school, find=_find(pages), read=_read(undated), apply=True)
     assert (700.0, "BGN") in [(float(r.amount), r.currency) for r in await _rows(db_session, school)]
+
+
+async def test_apply_keeps_attributes_another_stage_wrote_during_the_read(db_session, pages, frozen_today):
+    from sqlalchemy import update
+
+    school = await _school(db_session)
+    await db_session.commit()
+    attributes = dict(school.attributes or {})
+
+    async def read(school_, pages_, missed):
+        # Another stage (social links) writes its key while the reader runs.
+        await db_session.execute(
+            update(School)
+            .where(School.id == school.id)
+            .values(attributes={**attributes, "social_links": {"facebook": "https://facebook.com/x"}})
+            .execution_options(synchronize_session=False)
+        )
+        return FEES_STAGE
+
+    report = await fees_agent.run_school(db_session, school, find=_find(pages), read=read, apply=True)
+    assert report["outcome"] == "written", report
+    await db_session.refresh(school)
+    assert school.attributes["social_links"] == {"facebook": "https://facebook.com/x"}
