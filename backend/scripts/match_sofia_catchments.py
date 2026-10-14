@@ -109,16 +109,20 @@ def name_only_match(school: Any, points: list[GisPoint]) -> GisPoint | None:
     """
     name = (school.name_i18n or {}).get("bg") or ""
     key = name_key(name)
+    # One catchment can have several points (one per building).
     same_number = [p for p in points if key and name_key(p.name) == key]
-    if len(same_number) != 1 or not name_words(name) & name_words(same_number[0].name):
+    if len({p.gis_id for p in same_number}) != 1 or not name_words(name) & name_words(same_number[0].name):
         return None
-    point = same_number[0]
     near = [
-        distance_m(loc.lat, loc.lng, point.lat, point.lng)
+        (distance_m(loc.lat, loc.lng, p.lat, p.lng), p)
+        for p in same_number
         for loc in school.locations or []
         if getattr(loc, "lat", None) is not None and getattr(loc, "lng", None) is not None
     ]
-    return point if near and min(near) <= NAME_ONLY_MAX_M else None
+    if not near:
+        return None
+    distance, point = min(near, key=lambda item: item[0])
+    return point if distance <= NAME_ONLY_MAX_M else None
 
 
 def apply_ids(school: Any, ids: list[str]) -> bool:

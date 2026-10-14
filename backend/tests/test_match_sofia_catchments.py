@@ -67,3 +67,13 @@ def test_number_and_patron_match_when_addresses_are_spelled_differently():
     assert match_schools([far], points)[0] == {}
     other_patron = _school(257, '78 СУ "Никола Вапцаров"', "ж.к. Илинден, бл. 4")
     assert match_schools([other_patron], points)[0] == {}
+
+
+def test_a_catchment_with_several_buildings_still_matches_by_name():
+    buildings = {"features": [
+        _feature("608", '141. ОУ "Народни будители"', "ж.к. Люлин, бл. 1", lng=23.25, lat=42.71),
+        _feature("608", '141. ОУ "Народни будители" - сграда 2', "ж.к. Люлин, бл. 9", lng=23.26, lat=42.72),
+    ]}
+    points = points_from_geojson(buildings, {"608"})
+    school = _school(313, '141 ОУ "Народни будители"', "ул. 1 № 1", lat=42.711, lng=23.251)
+    assert match_schools([school], points)[0] == {313: ["608"]}
