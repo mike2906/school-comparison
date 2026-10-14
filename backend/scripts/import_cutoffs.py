@@ -107,10 +107,12 @@ async def run(archive: Path, apply: bool, max_unmatched: int | None = None) -> d
             by_school.setdefault(school_id, []).append(row)
 
         changed = 0
+        with_summary = 0
         for school in schools:
             keys = derived_admission_keys(by_school.get(school.id, []))
             if apply_to_school(school, keys):
                 changed += 1
+            with_summary += bool(keys.get("cutoff_summary"))
         refused = apply and max_unmatched is not None and len(unmatched) > max_unmatched
         if apply and not refused:
             await db.commit()
@@ -121,6 +123,7 @@ async def run(archive: Path, apply: bool, max_unmatched: int | None = None) -> d
     summary = {
         "rows": len(rows),
         "schools_with_cutoffs": len(by_school),
+        "schools_with_summary": with_summary,
         "schools_changed": changed,
         "unmatched_institutions": len(unmatched),
         "unmatched_by_stage": dict(unmatched_by_stage),

@@ -6,16 +6,20 @@
 # Every publish from this machine goes through here, by hand or from a script, so they
 # never overlap: it holds a machine-wide lock (PUBLISH_LOCK, default
 # ~/.local/state/schooldecider/publish.lock) from the upload until the run ends. Hold the
-# same lock around launch-DB writes that must land in one snapshot:
+# same lock around launch-DB writes that must land in one snapshot, and tell this script
+# you hold it:
 #
-#     flock "$(backend/scripts/publish_snapshot.sh --lock-path)" <command>
+#     flock "$(backend/scripts/publish_snapshot.sh --lock-path)" sh -c \
+#         '<write> && PUBLISH_LOCK_HELD=1 backend/scripts/publish_snapshot.sh'
 #
+# The lock is released only once the deploy run has finished (or after two hours).
 # Prints the dump name, the run URL and its summary; exits non-zero if the run fails.
 # Check the live API afterwards (skills/common-tasks/SKILL.md, Publish data to production).
 set -euo pipefail
 
 lock="${PUBLISH_LOCK:-$HOME/.local/state/schooldecider/publish.lock}"
 if [ "${1:-}" = "--lock-path" ]; then
+	mkdir -p "$(dirname "$lock")"
 	echo "$lock"
 	exit 0
 fi
@@ -39,19 +43,27 @@ echo "$output"
 dump="$(echo "$output" | sed -n 's/^backup: stored \([^ ]*\.dump\) .*/\1/p' | tail -1)"
 [ -n "$dump" ] || die "backup_offsite.sh named no dump"
 
-since="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+runs() {
+	gh run list -R "$repo" --workflow deploy.yml --event workflow_dispatch --limit 20 --json databaseId -q '.[].databaseId'
+}
+before="$(runs)" || die "could not list deploy runs"
 gh workflow run deploy.yml -R "$repo" --ref main -f snapshot="$dump" || die "could not start deploy.yml"
 run_id=""
-for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do
+for _ in $(seq 12); do
 	sleep 10
-	run_id="$(gh run list -R "$repo" --workflow deploy.yml --event workflow_dispatch --limit 5 \
-		--json databaseId,createdAt -q "[.[] | select(.createdAt >= \"$since\")] | last | .databaseId // empty")"
+	# The newest dispatched run that was not there before ours (no clock comparison).
+	run_id="$(runs | grep -vxF -f <(echo "$before") | head -1)" || true
 	[ -n "$run_id" ] && break
 done
 [ -n "$run_id" ] || die "deploy.yml run for $dump did not appear"
 echo "publish: $dump -> https://github.com/$repo/actions/runs/$run_id"
-status=0
-gh run watch "$run_id" -R "$repo" --exit-status --interval 30 > /dev/null || status=$?
+# Hold the lock until the run is really over: poll, and ride out gh or network errors.
+conclusion=""
+for _ in $(seq 240); do
+	read -r status conclusion < <(gh run view "$run_id" -R "$repo" --json status,conclusion -q '"\(.status) \(.conclusion)"' 2>/dev/null || echo "unknown -")
+	[ "$status" = completed ] && break
+	sleep 30
+done
 gh run view "$run_id" -R "$repo" --log 2>/dev/null | grep -o 'deploy: published the snapshot.*' | tail -1 || true
-[ "$status" -eq 0 ] || die "deploy run $run_id failed"
+[ "$conclusion" = success ] || die "deploy run $run_id ended ${conclusion:-without finishing in two hours}"
 echo "publish: done"
