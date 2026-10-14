@@ -35,7 +35,7 @@ def discount(**update) -> AgentDiscount:
         source_url=URL,
         evidence=SIBLING_EN,
     )
-    return base.model_copy(update=update)
+    return AgentDiscount.model_validate({**base.model_dump(), **update})
 
 
 def test_a_sibling_discount_the_page_states_is_kept():
@@ -295,3 +295,10 @@ async def test_discounts_show_beside_published_fees(client, db_session):
 async def test_discounts_do_not_show_without_a_published_fee(client, db_session):
     body = await _detail(client, db_session, priced=False)
     assert body["pricing"] == [] and body["fee_discounts"] == []
+
+
+def test_the_reader_is_asked_for_the_discount_text_in_named_fields():
+    # As a free-form dict the reader returned it empty, and every discount was dropped (596, 300).
+    schema = AgentDiscount.model_json_schema()
+    text = schema["$defs"][schema["properties"]["text_i18n"]["$ref"].rsplit("/", 1)[-1]]
+    assert text["required"] == ["bg", "en"]

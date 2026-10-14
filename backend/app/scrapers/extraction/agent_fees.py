@@ -76,6 +76,12 @@ class AgentFee(BaseModel):
         return _currency_code(value)
 
 
+class DiscountText(BaseModel):
+    # Two named fields: given a free-form dict, the reader left the text empty (596, 300).
+    bg: str = Field(description="One short sentence in Bulgarian stating the discount with its number")
+    en: str = Field(description="The same sentence in English, e.g. '5% off tuition for a second child'")
+
+
 class AgentDiscount(BaseModel):
     """A discount the school offers on its fees, stated with a percentage or an amount."""
 
@@ -91,9 +97,8 @@ class AgentDiscount(BaseModel):
     applies_to: Optional[str] = Field(
         default=None, description="Which fee it applies to, in the site's words (tuition), or null"
     )
-    text_i18n: dict[str, str] = Field(
-        description="Keys bg and en: one short sentence each stating the discount with its number and nothing "
-        "the evidence does not say, e.g. '5% off tuition for a second child'"
+    text_i18n: DiscountText = Field(
+        description="The discount stated in bg and en with its number and nothing the evidence does not say"
     )
     source_url: str = Field(description="The URL of the page the discount was read from, copied from its PAGE line")
     evidence: str = Field(description="The page line the discount was read from, copied verbatim")
@@ -488,7 +493,7 @@ def check_discount(discount: AgentDiscount, page_text: str) -> Optional[AgentDis
         return None
     if discount.child in _CHILD_WORDS and not re.search(_CHILD_WORDS[discount.child], evidence, re.IGNORECASE):
         return None
-    texts = [discount.text_i18n.get(lang, "") for lang in ("bg", "en")]
+    texts = [discount.text_i18n.bg, discount.text_i18n.en]
     if any(not text.strip() or value not in page_numbers(text) for text in texts):
         return None
     return discount.model_copy(update={"currency": discount.currency if discount.amount is not None else None})
