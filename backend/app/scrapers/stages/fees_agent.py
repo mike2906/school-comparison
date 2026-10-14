@@ -885,7 +885,10 @@ async def run_school(
     # The reader can stop part way down a fee table: at 170 it gave the same 5 of 14 fees in
     # three runs. When the pages still show amounts the published rows have and the read left
     # out, read once more, naming them, and add the fees at amounts the first read did not give.
-    missed = await _missed_amounts(db, school, priced, fees)
+    # A fee the first read gave but the checks drop counts as missed too: 596's first read
+    # stitched its secondary tuition from lines not on the page in one run of two.
+    passing = [fee for fee in fees if (page := _page_for(fee, priced)) and check_fee(fee, page.text).kept]
+    missed = await _missed_amounts(db, school, priced, passing)
     if missed:
         report["reread"] = {"missed": [format(amount, "f") for amount in missed], "added": 0}
         try:
@@ -899,7 +902,7 @@ async def run_school(
             logger.warning("fees-agent second read failed for school %s: %s", school.id, exc)
             report["reread"]["error"] = str(exc)[:200]
             again = []
-        first = {amount for fee in fees for amount in read_amounts(fee)}
+        first = {amount for fee in passing for amount in read_amounts(fee)}
         added = [fee for fee in again if fee_amounts(fee) and not set(fee_amounts(fee)) <= first]
         # A page that prints both currencies: the lev twin of a euro fee is not a fee of its own.
         euro = _euro_amounts([*fees, *added])

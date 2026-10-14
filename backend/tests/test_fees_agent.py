@@ -811,6 +811,32 @@ async def test_a_fee_the_read_missed_is_read_again_by_name(db_session, pages, fr
     ]
 
 
+async def test_a_fee_the_checks_drop_is_read_again(db_session, pages, frozen_today):
+    school = await _school(db_session)
+    await _old_rows(db_session, school, "2026/2027", [700, 90])
+    await db_session.commit()
+    food = fee(
+        PriceCategory.FOOD, "Храна: 90 евро месечно", amount=90, period=PricePeriod.MONTHLY, academic_year="2026/2027"
+    )
+    stitched = food.model_copy(update={"evidence": "Обяд за целия ден: 90 евро"})  # not on the page
+    asked = []
+
+    async def read(school, pages, missed):
+        asked.append(list(missed))
+        return [*FEES_STAGE, food] if missed else [*FEES_STAGE, stitched]
+
+    report = await fees_agent.run_school(db_session, school, find=_find(pages), read=read, apply=True)
+    assert asked == [[], [Decimal("90")]]
+    assert report["reread"] == {"missed": ["90"], "added": 1}
+    assert [f["kept"] for f in report["fees"] if f["amount"] == 90] == [False, True]
+    rows = await _rows(db_session, school)
+    assert [(float(r.amount), r.category) for r in rows] == [
+        (90.0, PriceCategory.FOOD),
+        (200.0, PriceCategory.REGISTRATION),
+        (700.0, PriceCategory.TUITION),
+    ]
+
+
 async def test_a_second_read_only_adds_fees_the_first_did_not_give(db_session, pages, frozen_today):
     school = await _school(db_session)
     await _old_rows(db_session, school, "2026/2027", [700, 90])
