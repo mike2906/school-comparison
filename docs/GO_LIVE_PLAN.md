@@ -1,5 +1,8 @@
 # Go-Live Plan — Consolidated from three AI reviews (July 2026)
 
+> Plans here are starting points, not instructions: re-evaluate an item against current
+> facts before building it (`AGENTS.md` → "Plans are starting points").
+
 Sources: full project review + data-quality architecture review (2026-07-06), recruiter
 assessment (2026-07-07). This file is the single backlog. Each task is written so a
 coding agent (Claude Code or Codex) can execute it in one session with no extra context.
@@ -2246,6 +2249,9 @@ the session scratchpad only.
             from the published snapshot); PR preview deploys point at it.
       - [ ] Playwright journeys for the core user stories (search and filter, school
             detail, compare, language switch), run in CI against staging.
+            Note (2026-10-14): until there is a staging stack, `frontend/e2e/live/` walks
+            these and the admission, facts, social-link and fee journeys on the live site
+            after every deploy and daily (`.github/workflows/live-flows.yml`).
       - [ ] Reviewer agent on a different model family from the coding agent, run in CI on
             every PR.
       - [ ] UI agent: walks the PR's acceptance criteria on the preview deploy and attaches

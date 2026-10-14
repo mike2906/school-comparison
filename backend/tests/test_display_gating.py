@@ -297,7 +297,7 @@ def test_launch_pricing_gate_requires_resolvable_academic_year(academic_year, ex
         {"amount": 500, "amount_min": 400, "amount_max": 600},
         {"currency": "bgn"},
         {"currency": "EURO"},
-        {"period": "weekly"},
+        {"period": "fortnightly"},
     ],
 )
 def test_launch_pricing_gate_rejects_malformed_curated_rows(overrides):
@@ -402,7 +402,7 @@ def test_launch_pricing_gate_publishes_an_unstated_period():
     assert pricing_row_is_publishable(_curated_pricing_row(period=None)) is True
 
 
-@pytest.mark.parametrize("period", ["weekly", "", "per visit"])
+@pytest.mark.parametrize("period", ["fortnightly", "", "per visit"])
 def test_launch_pricing_gate_still_rejects_an_invalid_stated_period(period):
     """Allowing NULL must not loosen validation of a period that *is* present."""
     assert pricing_row_is_publishable(_curated_pricing_row(period=period)) is False

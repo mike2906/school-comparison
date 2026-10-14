@@ -31,6 +31,7 @@ from app.utils.display_gating import (  # noqa: F401
     PRICING_CONFIDENCE_FLOOR,
     blocked_pricing_row_ids,
     implausible_tuition_row_ids,
+    is_agent_price,
     is_scraped_price,
     passes_pricing_gate,
     pricing_row_is_publishable,
@@ -39,6 +40,7 @@ from app.utils.display_gating import (  # noqa: F401
 from app.utils.i18n_resolver import resolve_display_name_i18n, resolve_name_i18n
 from app.utils.school_attributes import build_display_attributes
 from app.utils.website_data import (
+    agent_fees_publishable,
     attributes_for_publication,
     website_data_is_publishable,
     website_data_withheld_reasons,
@@ -236,15 +238,20 @@ def _pricing_gate_failures(
     rows: list[Pricing],
     blocked_ids: set[int] | frozenset[int] = frozenset(),
     website_withheld_school_ids: set[int] | frozenset[int] = frozenset(),
+    agent_withheld_school_ids: set[int] | frozenset[int] | None = None,
 ) -> dict[str, Any]:
     """``blocked_ids``: rows withheld by the schools' validation reports (e.g. UF45).
 
     ``website_withheld_school_ids``: schools whose website data is withheld, so their
-    scraped rows are too.
+    scraped rows are too. ``agent_withheld_school_ids``: the same for the fees agent's rows,
+    which do not wait for extraction (``agent_fees_publishable``); defaults to the first set.
     """
+    if agent_withheld_school_ids is None:
+        agent_withheld_school_ids = website_withheld_school_ids
     by_school: dict[int, list[Pricing]] = {}
     for row in rows:
-        if row.school_id in website_withheld_school_ids and is_scraped_price(row):
+        withheld = agent_withheld_school_ids if is_agent_price(row) else website_withheld_school_ids
+        if row.school_id in withheld and is_scraped_price(row):
             continue
         if pricing_row_is_publishable(row):
             by_school.setdefault(row.school_id, []).append(row)
@@ -353,6 +360,12 @@ async def compute_quality_metrics(
                 school.id
                 for school in schools
                 if not website_data_is_publishable(school.attributes, school.scrape_status)
+            },
+            {
+                school.id
+                for school in schools
+                if not website_data_is_publishable(school.attributes, school.scrape_status)
+                and not agent_fees_publishable(school.attributes, school.scrape_status)
             },
         ),
     }

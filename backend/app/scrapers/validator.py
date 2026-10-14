@@ -39,7 +39,7 @@ from app.scrapers.price_evidence import (
     RULE_OFFER_ENDS,
     RULE_PERIOD_CONFLICT,
     RULE_PERIOD_MISSING,
-    RULE_PERIOD_UNREPRESENTABLE,
+    RULE_PERIOD_UNFIT,
     PriceRow,
     check_price_row,
     name_key,
@@ -383,10 +383,10 @@ def _parse_spot_check_output(result: Any) -> SpotCheckOutput | None:
 _PRICE_EVIDENCE_ERROR_CODES = {
     RULE_AMOUNT_NEAR_LABEL: "pricing_amount_not_near_label",
     RULE_LEVEL: "pricing_label_names_other_level",
-    RULE_PERIOD_UNREPRESENTABLE: "pricing_period_unrepresentable",
     RULE_DEPOSIT: "pricing_deposit_as_tuition",
     RULE_INSTALLMENT: "pricing_installment_as_tuition",
     RULE_EXPIRED: "pricing_offer_expired",
+    RULE_PERIOD_UNFIT: "pricing_period_unfit_for_category",
 }
 
 

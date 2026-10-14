@@ -487,6 +487,44 @@ async def test_scoreboard_withholds_scraped_prices_of_a_withheld_website_like_th
     assert metrics["pricing_rows_failing_gates"]["failing"] == 1
 
 
+async def test_scoreboard_counts_agent_fees_of_a_school_not_extracted_like_the_api(db_session):
+    school = await _make_school(db_session, **(_published_website() | {"scrape_status": "validated"}))
+    page = await _evidence_page(db_session, school, url="https://example.com/fees")
+    rows = [
+        Pricing(
+            school_id=school.id,
+            category=PriceCategory.TUITION,
+            period=PricePeriod.YEARLY,
+            amount=amount,
+            source=PriceSource.SCRAPED_WEBSITE,
+            source_url="https://example.com/fees",
+            scraped_at=PRICING_VERIFIED_AT,
+            source_page_id=page.id,
+            pricing_context=_verified_context(1.0) | extra,
+        )
+        for amount, extra in ((7000, {"extractor": "agent"}), (6000, {}))
+    ]
+    db_session.add_all(rows)
+    await db_session.commit()
+
+    public = SchoolListResponse.model_validate(
+        {
+            "id": school.id,
+            "country_code": school.country_code,
+            "name_i18n": school.name_i18n,
+            "school_type": school.school_type,
+            "education_level": school.education_level,
+            "attributes": school.attributes,
+            "scrape_status": school.scrape_status,
+            "pricing": rows,
+        }
+    )
+    metrics = await compute_quality_metrics(db_session, country="bg", city="sofia")
+
+    assert [float(row.amount) for row in public.pricing] == [7000.0]
+    assert metrics["pricing_rows_failing_gates"]["publishable"] == 1
+
+
 async def test_scoreboard_counts_implausible_tuition_as_failing_like_the_api(db_session):
     school = await _make_school(db_session, **_published_website())
     page = await _evidence_page(db_session, school, url="https://example.com/fees")

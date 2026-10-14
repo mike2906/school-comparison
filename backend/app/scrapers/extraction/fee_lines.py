@@ -408,8 +408,6 @@ def _filter_model_prices(prices: list[ExtractedPrice], text: str) -> list[Extrac
         currency = (price.currency or "BGN")[:3].upper()
         year = _normalize_academic_year(price.academic_year)
         label = price.plan_name or price.age_group or price.notes
-        if period_families(f"{price.plan_name or ''} {price.age_group or ''}".casefold()) == (set(), True):
-            continue  # a per-day/week/hour fee has no period the schema can hold
         supported: list[tuple[bool, str | None]] = []  # (page names the year, period)
         for block, stale in blocks:
             spans = [
@@ -422,10 +420,7 @@ def _filter_model_prices(prices: list[ExtractedPrice], text: str) -> list[Extrac
             labels = label_spans(block, label)
             if labels:
                 spans = [min(spans, key=lambda span: min(_gap(span, found) for found in labels))]
-            stated = [_period_written_for(block, span) for span in spans]
-            if all(unrepresentable for _, unrepresentable in stated):
-                continue
-            families = [found for found, _ in stated]
+            families = [_period_written_for(block, span) for span in spans]
             agreed = families[0] if all(found == families[0] for found in families) else set()
             period = next(iter(agreed)).lower() if len(agreed) == 1 else None
             if period and not period_fits_category(price.category, period):
@@ -536,19 +531,17 @@ def _academic_year_is_over(year: str | None, *, today: datetime.date | None = No
     return int(normalized.split("/")[1]) < current_start
 
 
-def _period_written_for(block: str, span: tuple[int, int]) -> tuple[set[str], bool]:
+def _period_written_for(block: str, span: tuple[int, int]) -> set[str]:
     """Period wording for one amount; with none, its column header's, else its heading's."""
-    families, unrepresentable = stated_period(block, span)
-    if families or unrepresentable:
-        return families, unrepresentable
+    families = stated_period(block, span)
+    if families:
+        return families
     header = _table_header(block, span) if "|" in _line_of(block, span) else None
     cell = _header_cell(block, span, header) if header is not None else None
-    if cell is not None:
-        families, unrepresentable = period_families(cell)
-        if families or unrepresentable:
-            return families, unrepresentable
+    if cell is not None and (families := period_families(cell)):
+        return families
     headed = heading_period(block, span)
-    return ({headed} if headed else set()), False
+    return {headed} if headed else set()
 
 
 def _header_cell(block: str, span: tuple[int, int], header: str) -> str | None:

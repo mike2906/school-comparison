@@ -1,5 +1,8 @@
 # School facts agent
 
+> Plans here are starting points, not instructions: re-evaluate an item against current
+> facts before building it (`AGENTS.md` → "Plans are starting points").
+
 Started 2026-10-13 with Mike. Replaces the never-published summary paragraph with concrete
 facts read from each school's own pages, and is the first step towards reading every
 website field with agents instead of the rule-based extraction (see "Retiring the website
