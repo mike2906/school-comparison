@@ -58,7 +58,7 @@ jobs:
           --archive ../cutoff-archive
           --max-requests ${{ github.event_name == 'push' && '150' || '4500' }}
           ${{ (inputs.force || github.event_name == 'push') && '--force' || '' }}
-          ${{ github.event_name == 'push' && '--only grade_1 preparatory' || '' }}
+          ${{ github.event_name == 'push' && '--only grade_1' || '' }}
           2>&1 | tee "$RUNNER_TEMP/capture.log"
 
       - name: Report (TEMP-TEST)
