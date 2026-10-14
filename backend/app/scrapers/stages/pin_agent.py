@@ -135,7 +135,14 @@ def name_matches(school_name: str, osm_name: Optional[str]) -> bool:
     if numbers:
         others = ours - numbers
         return bool(numbers & theirs) and (not others or bool(others & theirs))
+    if theirs and theirs <= _acronyms(school_name):  # OSM names it only by our acronym ("ЕСПА")
+        return True
     return bool(ours) and len(ours & theirs) >= min(2, len(ours))
+
+
+def _acronyms(name: str) -> set[str]:
+    """Distinctive all-capitals words of three or more letters ("ЕСПА", not "ЧСУ")."""
+    return {w.casefold() for w in re.findall(r"(?<![А-Яа-яA-Za-z])[А-ЯA-Z]{3,}(?![А-Яа-яA-Za-z])", name)} - _GENERIC_NAME_WORDS
 
 
 def _number(text: str) -> Optional[int]:
