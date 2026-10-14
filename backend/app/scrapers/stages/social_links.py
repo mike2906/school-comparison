@@ -14,7 +14,7 @@ import logging
 import re
 from collections.abc import Awaitable, Callable, Sequence
 from typing import Any, Optional
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urldefrag, urljoin, urlparse
 
 from bs4 import BeautifulSoup
 from sqlalchemy import func, select
@@ -24,7 +24,7 @@ from app.config import CRAWLER_USER_AGENT
 from app.models import School
 from app.scrapers.fee_pages import fee_http_client
 from app.utils.school_facts import SITE_ACCEPTED_STATUSES
-from app.utils.social_links import ATTRIBUTE_KEY, NETWORKS, SCHEMA_VERSION, pick_links
+from app.utils.social_links import ATTRIBUTE_KEY, NETWORKS, SCHEMA_VERSION, host, pick_links
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +32,9 @@ logger = logging.getLogger(__name__)
 Fetch = Callable[[str], Awaitable[Optional[tuple[str, str]]]]
 
 _CONTACT_RE = re.compile(r"контакт|contact|kontakt", re.IGNORECASE)
+# A home page with fewer links is taken as not read (built by scripts the plain fetch does
+# not run, or a cookie wall), so it does not clear the stored links.
+MIN_HOME_LINKS = 5
 
 
 def page_links(html: str, base: str) -> list[str]:
@@ -45,17 +48,20 @@ def _on_site(url: str, site: str) -> bool:
     """On the school's own site: the same host, and under its path when it has one
     (sites.google.com/view/a is not /view/b)."""
     parsed, home = urlparse(url), urlparse(site)
-    if _host(url) != _host(site):
+    if host(url) != host(site):
         return False
-    prefix = home.path.rstrip("/").lower()
+    prefix = home.path.lower()
+    if "." in prefix.rsplit("/", 1)[-1]:  # a file (/index.php): its folder is the site
+        prefix = prefix.rsplit("/", 1)[0]
+    prefix = prefix.rstrip("/")
     path = parsed.path.lower()
     return not prefix or path == prefix or path.startswith(prefix + "/")
 
 
 def _contact_page(html: str, base: str, site: str) -> Optional[str]:
     for tag in BeautifulSoup(html, "html.parser").find_all("a"):
-        href = urljoin(base, str(tag.get("href") or ""))
-        if _on_site(href, site) and _CONTACT_RE.search(f"{href} {tag.get_text(' ', strip=True)}"):
+        href = urldefrag(urljoin(base, str(tag.get("href") or "")))[0]
+        if href.rstrip("/") != base.rstrip("/") and _on_site(href, site) and _CONTACT_RE.search(f"{href} {tag.get_text(' ', strip=True)}"):
             return href
     return None
 
@@ -67,6 +73,8 @@ async def read_school(school: School, fetch: Fetch) -> dict[str, Any]:
         return {"read": False, "links": {}, "ambiguous": [], "pages": []}
     final, html = home
     hrefs = page_links(html, final)
+    if len(hrefs) < MIN_HOME_LINKS:
+        return {"read": False, "links": {}, "ambiguous": [], "pages": [final], "note": "thin home page"}
     pages = [final]
     links, ambiguous = pick_links(hrefs)
     if not links and not ambiguous:
@@ -76,10 +84,6 @@ async def read_school(school: School, fetch: Fetch) -> dict[str, Any]:
             pages.append(page[0])
             links, ambiguous = pick_links(page_links(page[1], page[0]))
     return {"read": True, "links": links, "ambiguous": ambiguous, "pages": pages}
-
-
-def _host(url: Optional[str]) -> str:
-    return (urlparse(url or "").hostname or "").lower().removeprefix("www.")
 
 
 def drop_shared(reads: dict[int, dict[str, Any]], sites: dict[int, Optional[str]]) -> None:
@@ -92,10 +96,12 @@ def drop_shared(reads: dict[int, dict[str, Any]], sites: dict[int, Optional[str]
     domains: dict[str, set[str]] = {}
     for school_id, read in reads.items():
         for url in read["links"].values():
-            domains.setdefault(url, set()).add(_host(sites.get(school_id)))
+            site = host(sites.get(school_id))
+            if site:  # a school with no website now cannot tell a shared page
+                domains.setdefault(url, set()).add(site)
     for read in reads.values():
         for network, url in list(read["links"].items()):
-            if len(domains[url]) > 1:
+            if len(domains.get(url, ())) > 1:
                 del read["links"][network]
                 read.setdefault("shared", []).append(network)
 
@@ -159,15 +165,21 @@ async def run_social_links(
     else:
         reads = await _read_all(db, ids, fetch)
 
-    # The links stored for every other school count when telling a shared page.
+    # Stored links count when telling a shared page: every other school's, a school in the
+    # run whose site was not read (it keeps them), and a network a read left ambiguous.
     rows = await db.execute(select(School.id, School.website_url, School.attributes).where(School.country_code == country))
     sites: dict[int, Optional[str]] = {}
-    pool = dict(reads)
+    pool: dict[int, dict[str, Any]] = {}
     for school_id, website_url, attributes in rows:
         sites[school_id] = website_url
         block = (attributes or {}).get(ATTRIBUTE_KEY)
-        if school_id not in reads and isinstance(block, dict):
-            pool[school_id] = {"links": {n: block[n] for n in NETWORKS if isinstance(block.get(n), str)}}
+        stored = {n: block[n] for n in NETWORKS if isinstance(block.get(n), str)} if isinstance(block, dict) else {}
+        read = reads.get(school_id)
+        if read is not None and read["read"]:
+            read["links"] |= {n: stored[n] for n in read["ambiguous"] if n in stored}
+            pool[school_id] = read
+        elif stored:
+            pool[school_id] = {"links": stored}
     drop_shared(pool, sites)
 
     results = []
@@ -186,12 +198,12 @@ async def run_social_links(
                 }
         results.append(result)
     if apply:
-        # A page this run found shared is cleared from the other schools that store it too.
-        for school_id, read in pool.items():
-            if school_id in reads or not read.get("shared"):
+        # A page found shared is cleared from the stored links this run does not rewrite.
+        for school_id, entry in pool.items():
+            if entry is reads.get(school_id) or not entry.get("shared"):
                 continue
             school = await db.get(School, school_id)
-            block = {k: v for k, v in school.attributes[ATTRIBUTE_KEY].items() if k not in read["shared"]}
+            block = {k: v for k, v in school.attributes[ATTRIBUTE_KEY].items() if k not in entry["shared"]}
             school.attributes = {**school.attributes, ATTRIBUTE_KEY: block}
         await db.commit()
     outcomes: dict[str, int] = {}

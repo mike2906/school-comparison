@@ -29,6 +29,7 @@ IG = "https://www.instagram.com/school_example/"
         ),
         ("https://www.facebook.com/pg/school.example/about/", ("facebook", "https://www.facebook.com/school.example")),
         ("https://www.facebook.com/pg", None),
+        ("https://www.facebook.com//pages/School/123", ("facebook", "https://www.facebook.com/pages/School/123")),
         ("//facebook.com/school.example", ("facebook", "https://www.facebook.com/school.example")),
         ("https://instagram.com/School_Example", ("instagram", "https://www.instagram.com/school_example/")),
         # Not the school's page: sharing, a parents' group, an event, a post, Facebook itself.
@@ -55,7 +56,8 @@ def test_the_page_linked_most_wins_and_a_tie_names_none():
 
 
 def _html(*hrefs):
-    return "<html><body>" + "".join(f'<a href="{h}">x</a>' for h in hrefs) + "</body></html>"
+    menu = [f"/page{n}" for n in range(stage.MIN_HOME_LINKS)]
+    return "<html><body>" + "".join(f'<a href="{h}">x</a>' for h in [*menu, *hrefs]) + "</body></html>"
 
 
 def _fetcher(pages):
@@ -96,7 +98,7 @@ async def test_the_contact_page_must_be_on_the_schools_own_site():
 @pytest.mark.asyncio
 async def test_a_page_widget_iframe_counts():
     widget = "https://www.facebook.com/plugins/page.php?href=https%3A%2F%2Fwww.facebook.com%2Fschool.example"
-    read = await stage.read_school(_school(), _fetcher({HOME: f'<iframe src="{widget}"></iframe>'}))
+    read = await stage.read_school(_school(), _fetcher({HOME: _html() + f'<iframe src="{widget}"></iframe>'}))
     assert read["links"] == {"facebook": FB}
 
 
@@ -171,3 +173,48 @@ async def test_detail_response_carries_the_links(client, db_session):
     body = (await client.get(f"/schools/{school.id}")).json()
     assert body["social_links"] == {"facebook": FB, "instagram": IG}
     assert "social_links" not in (body.get("attributes") or {})
+
+
+@pytest.mark.asyncio
+async def test_a_home_page_that_is_a_file_still_finds_its_contact_page():
+    home = "https://school.example/index.php"
+    pages = {home: _html("/kontakti"), "https://school.example/kontakti": _html(FB)}
+    read = await stage.read_school(_school(website_url=home), _fetcher(pages))
+    assert read["links"] == {"facebook": FB}
+
+
+@pytest.mark.asyncio
+async def test_a_thin_home_page_counts_as_not_read_and_keeps_the_stored_links(db_session):
+    school = _school(attributes={"social_links": _block()})
+    db_session.add(school)
+    await db_session.commit()
+    thin = _fetcher({HOME: '<a href="/x">x</a>'})
+    report = await stage.run_social_links(db_session, school_ids=[school.id], fetch=thin, apply=True)
+    assert report["outcomes"] == {"not_read": 1} and school.attributes["social_links"]["facebook"] == FB
+
+
+@pytest.mark.asyncio
+async def test_a_tie_keeps_the_stored_page(db_session):
+    school = _school(attributes={"social_links": _block()})
+    db_session.add(school)
+    await db_session.commit()
+    tie = _fetcher({HOME: _html(FB, "https://www.facebook.com/web.studio", IG)})
+    await stage.run_social_links(db_session, school_ids=[school.id], fetch=tie, apply=True)
+    assert school.attributes["social_links"]["facebook"] == FB and school.attributes["social_links"]["instagram"] == IG
+
+
+@pytest.mark.asyncio
+async def test_a_school_not_read_still_counts_when_telling_a_shared_page(db_session):
+    designer = "https://www.facebook.com/web.studio"
+    down = _school(
+        website_url="https://down.example/",
+        attributes={"social_links": _block(website_url="https://down.example/", facebook=designer)},
+    )
+    school = _school()
+    db_session.add_all([down, school])
+    await db_session.commit()
+    await stage.run_social_links(
+        db_session, school_ids=[down.id, school.id], fetch=_fetcher({HOME: _html(designer)}), apply=True
+    )
+    assert "facebook" not in school.attributes["social_links"]
+    assert "facebook" not in down.attributes["social_links"]

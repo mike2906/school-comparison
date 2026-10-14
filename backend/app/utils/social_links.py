@@ -11,7 +11,7 @@ from __future__ import annotations
 from collections import Counter
 from collections.abc import Iterable, Mapping
 from typing import Any, Optional
-from urllib.parse import parse_qs, unquote, urlparse
+from urllib.parse import parse_qs, quote, unquote, urlparse
 
 from app.utils.school_facts import SITE_ACCEPTED_STATUSES, _site
 from app.utils.website_data import website_data_withheld_reasons
@@ -80,8 +80,9 @@ _INSTAGRAM_NOT_A_PROFILE = {
 }
 
 
-def _host(url: str) -> str:
-    return (urlparse(url).hostname or "").lower().removeprefix("www.")
+def host(url: Optional[str]) -> str:
+    """Host without www."""
+    return (urlparse(url or "").hostname or "").lower().removeprefix("www.")
 
 
 def _plain(part: str) -> bool:
@@ -96,14 +97,14 @@ def _facebook_page(url: str) -> Optional[str]:
     first = parts[0].lower()
     if first == "plugins":  # the Page Plugin widget: ?href= names the page it shows
         href = (parse_qs(parsed.query).get("href") or [""])[0]
-        return _facebook_page(href) if _host(href) in _FACEBOOK_HOSTS else None
+        return _facebook_page(href) if host(href) in _FACEBOOK_HOSTS else None
     if first == "pg" and len(parts) >= 2:  # the old page route: /pg/<page>/about
-        return _facebook_page(f"https://www.facebook.com/{parsed.path.split('/')[2]}")
+        return _facebook_page(f"https://www.facebook.com/{parts[1]}")
     if first == "profile.php":
         page_id = (parse_qs(parsed.query).get("id") or [""])[0]
         return f"https://www.facebook.com/profile.php?id={page_id}" if page_id.isdigit() else None
     if first in ("pages", "people") and len(parts) >= 3 and parts[2].isdigit():
-        return f"https://www.facebook.com/{first}/{parsed.path.split('/')[2]}/{parts[2]}"
+        return f"https://www.facebook.com/{first}/{quote(parts[1])}/{parts[2]}"
     if first in _FACEBOOK_NOT_A_PAGE or first in ("pages", "people") or not _plain(first):
         return None
     return f"https://www.facebook.com/{first}"  # page names are not case-sensitive
@@ -129,11 +130,11 @@ def profile_url(href: Any) -> Optional[tuple[str, str]]:
         url = f"https:{url}"
     if not url.lower().startswith(("http://", "https://")):
         return None
-    host = _host(url)
-    if host in _FACEBOOK_HOSTS:
+    site = host(url)
+    if site in _FACEBOOK_HOSTS:
         page = _facebook_page(url)
         return ("facebook", page) if page else None
-    if host in _INSTAGRAM_HOSTS:
+    if site in _INSTAGRAM_HOSTS:
         profile = _instagram_profile(url)
         return ("instagram", profile) if profile else None
     return None
