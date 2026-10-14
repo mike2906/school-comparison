@@ -210,5 +210,6 @@ single source for those rules, so don't restate them elsewhere. In short:
   vendor's model (`skills/second-opinion/SKILL.md`). Stop reviewing when a round only finds
   more wording edge cases.
 - Merge your own PRs on green CI. A short list (destructive migrations, secrets, infra
-  deletions, higher running cost, user privacy) still waits for Mike's "merge".
+  deletions, higher running cost, user privacy, a tripped circuit breaker) still waits
+  for Mike.
 - Never weaken a check to get your own PR through.
