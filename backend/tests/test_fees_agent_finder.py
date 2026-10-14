@@ -310,3 +310,10 @@ async def test_places_the_picker_leaves_free_go_to_this_years_fee_links(monkeypa
     read = await fees_agent.find_pages(crawler, None, _Client(), _school(), Spend(0.05))
     assert [p.url for p in read][1:3] == [forms, this_year]
     assert len(read) == 1 + fees_agent.MAX_PICKS
+
+
+async def test_a_fee_picture_with_bare_numbers_goes_to_the_reader(monkeypatch):
+    _picture_reads(monkeypatch, text="Fee picture on x\nGrade 1 | 15 350 | 14 750")
+    crawler = _Crawler({HOME: [("Такси " + "x" * 300, [], _PICTURE_PAGE)]})
+    read = await fees_agent.find_pages(crawler, None, _Client(), _school(), Spend(0.5), read_pictures=True)
+    assert read[-1].prices is True

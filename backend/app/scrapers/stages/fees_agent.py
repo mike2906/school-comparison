@@ -322,7 +322,10 @@ async def find_pages(
                         on_cost=spent,
                     )
                     if found is not None:
-                        picture_pages.append(PageRead(found[0], found[1], bool(_PRICE_RE.search(found[1]))))
+                        # A fee table's picture often prints bare numbers ("15 350") under a
+                        # currency heading, which the price pattern misses (594): any amount
+                        # sends it to the reader.
+                        picture_pages.append(PageRead(found[0], found[1], bool(re.search(r"\d{2}", found[1]))))
             for href, label in page_links:
                 href = urldefrag(href)[0]
                 if _same_site(href, site) and not unquote(href).lower().endswith(_SKIPPED):
