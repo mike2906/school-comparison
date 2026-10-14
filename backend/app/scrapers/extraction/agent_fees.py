@@ -214,7 +214,7 @@ _PERIOD_WORDS = {  # Bulgarian, English, and the French and German some schools 
     # Not "целодневна" (a full-day group).
     PricePeriod.DAILY: r"(?<![а-я])дневн(?![а-я]*\s+(?:форм|режим))|(?:на|за|/)\s*ден\b|\b(?:daily|per day|a day)\b|par jour|pro tag",
     PricePeriod.WEEKLY: r"седмичн|(?:на|за|/)\s*седмица|\b(?:weekly|per week|a week)\b|par semaine|pro woche",
-    PricePeriod.HOURLY: r"почасов|(?:на|за|/)\s*час\b(?!\s+по\b)|\b(?:hourly|per hour|an hour)\b|par heure|pro stunde",
+    PricePeriod.HOURLY: r"почасов|(?:на|за|/)\s*час\b|\b(?:hourly|per hour|an hour)\b|par heure|pro stunde",
 }
 # English "one-time" names a period only on the amount's own line: 596's "ANNUAL TUITION FEES"
 # heading sits above its "One-time fee for initial enrollment".
@@ -225,7 +225,8 @@ _YEAR_ON_AMOUNT_LINE_RE = re.compile(r"(?:учебн\w*|на|за)\s+годин�
 # How often a class meets, not how often it is paid: "3 пъти седмично", "twice a week",
 # "2 учебни часа седмично", "седмична програма".
 _HOW_OFTEN_RE = re.compile(
-    r"(?:\d+\s*(?:пъти|път|times?|x|(?:учебни\s+)?(?:час|hours?|lessons?|classes)\w*)|веднъж|двукратно|twice|once)\s*"
+    r"(?:\d+\s*(?:пъти|път|times?|x)|(?<!до )(?<!\d)\d+\s*(?:учебни\s+)?(?:час|hours?|lessons?|classes)\w*"
+    r"|веднъж|двукратно|twice|once)\s*"
     r"(?:седмично|в седмицата|на седмица|a week|per week|weekly|дневно|на ден|a day|per day|daily)"
     r"|седмичн\w*\s+(?:програм|разпис|график)|weekly (?:schedule|timetable)"
 )

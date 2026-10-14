@@ -305,12 +305,12 @@ def _snippet(text: str, span: tuple[int, int], width: int = 90) -> str:
 # ---------------------------------------------------------------------------
 
 # "3 пъти седмично" / "twice a week" / "2 учебни часа седмично" / "седмична програма" is how
-# often a class meets, not how often it is paid.
+# often a class meets, not how often it is paid ("до 18 часа дневно" is a closing time).
 _FREQUENCY_UNIT = r"(?:седмично|в седмицата|на седмица|a week|per week|weekly|дневно|на ден|a day|per day|daily)"
 _FREQUENCY_RE = re.compile(
     rf"\d+\s*(?:пъти|път|times?|x|хранения|meals)\s*{_FREQUENCY_UNIT}"
     rf"|(?:веднъж|двукратно|twice|once)\s*{_FREQUENCY_UNIT}"
-    rf"|\d+\s*(?:учебни\s+)?(?:час|hours?|lessons?|classes)\w*\s*{_FREQUENCY_UNIT}"
+    rf"|(?<!до )(?<!\d)\d+\s*(?:учебни\s+)?(?:час|hours?|lessons?|classes)\w*\s*{_FREQUENCY_UNIT}"
     r"|седмичн\w*\s+(?:програм|разпис|график)|weekly (?:schedule|timetable)",
     re.IGNORECASE,
 )
@@ -338,7 +338,7 @@ PERIOD_KEYWORDS: dict[str, re.Pattern[str]] = {
     "WEEKLY": re.compile(r"седмичн|\bна седмица|/\s*седм|\bweekly\b|per week|/\s*week|a week\b"),
     # Not "дневна форма на обучение" (full-time study) or "дневен режим" (the day's routine).
     "DAILY": re.compile(r"(?<![а-я])дневн(?![а-я]*\s+(?:форм|режим))|\bна ден\b|/\s*ден\b|\bdaily\b|per day|/\s*day\b|a day\b"),
-    "HOURLY": re.compile(r"\bна час\b(?!\s+по\b)|/\s*час\b|почасов|per hour|/\s*hour|hourly"),
+    "HOURLY": re.compile(r"\bна час\b|/\s*час\b|почасов|per hour|/\s*hour|hourly"),
 }
 _DEPOSIT_RE = re.compile(r"депозит|\bdeposit")
 # One installment of a fee ("I вноска", "1-ва вноска", "first installment"), not the fee
