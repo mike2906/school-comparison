@@ -54,6 +54,13 @@ local name (`CITY_NAMES`). The website itself is not trusted (wrong sites, other
 In Sofia (2026-10-14) about 1 in 5 private sites with a map point passed; most private
 kindergartens have no free source that places them.
 
+`cli pin-agent [--apply]` runs after it: one cheap model call per hidden location picks
+its building from candidates sources gave (website map points with OSM's address there,
+named OSM schools/kindergartens within 2 km), never typing coordinates. Code then requires
+the pick to be on our street (house number within 4) or the only OSM feature named as the
+school, of the same kind, with no other school pinned on the spot. Evidence goes in
+`geocode_meta.evidence`; method `agent_pick`, tag `coords_source=pin_agent`.
+
 ## Reusing a point for another record (UF44)
 
 - **Official building point first:** a location whose address gives the same street and house

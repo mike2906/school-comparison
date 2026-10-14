@@ -276,6 +276,23 @@ async def run_website_pins(
 
 
 async def _write(db: AsyncSession, location_id: int, point: tuple[float, float]) -> str:
+    return await write_pin(db, location_id, point, provider="website", method="website_map_link", tag=PIN_TAG)
+
+
+async def write_pin(
+    db: AsyncSession,
+    location_id: int,
+    point: tuple[float, float],
+    *,
+    provider: str,
+    method: str,
+    tag: str,
+    evidence: Optional[dict[str, Any]] = None,
+) -> str:
+    """Pin a still-hidden location at ``point`` (exact), under a short row lock, and commit.
+
+    Returns "placed", "pinned_meanwhile" (another stage pinned it since the read) or
+    "rejected" (the write gate refused it; the old point is kept)."""
     location = await db.get(SchoolLocation, location_id)
     # Another stage may have pinned it since the read; the lock waits for one still writing.
     await db.refresh(location, with_for_update=True)
@@ -290,9 +307,9 @@ async def _write(db: AsyncSession, location_id: int, point: tuple[float, float])
             success=True,
             lat=point[0],
             lng=point[1],
-            provider="website",
+            provider=provider,
             formatted_address=_address(location),
-            method="website_map_link",
+            method=method,
             precision="exact",
         ),
         school=school,
@@ -300,12 +317,14 @@ async def _write(db: AsyncSession, location_id: int, point: tuple[float, float])
     if not applied.success:
         await db.rollback()  # the gate cleared the old point; keep it
         return "rejected"
+    if evidence:
+        location.geocode_meta = {**location.geocode_meta, "evidence": evidence}
     tags = [
-        tag
-        for tag in location.location_tags or []
-        if not str(tag).startswith("coords_source=") or tag == OFFICIAL_COORDS_TAG
+        existing
+        for existing in location.location_tags or []
+        if not str(existing).startswith("coords_source=") or existing == OFFICIAL_COORDS_TAG
     ]
-    location.location_tags = [*tags, PIN_TAG]
+    location.location_tags = [*tags, tag]
     db.add(location)
     await db.commit()
     return "placed"
