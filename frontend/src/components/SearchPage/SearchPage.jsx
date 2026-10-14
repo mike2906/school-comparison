@@ -52,6 +52,7 @@ import {
   closedDetailSchoolId,
 } from '../../utils/searchViewState'
 import { LANGUAGE_SWITCH_EVENT, languageSwitchArrival } from '../../utils/languageSwitch'
+import { pinnedLocation } from '../../utils/coordinates'
 
 const TYPE_SORT_ORDER = {
   state: 0,
@@ -571,31 +572,30 @@ function SearchPage() {
     handleFilterChange({ schoolType: 'private' })
   }, [rawSchoolType])
 
-  // A pinned location first (primary, then any), so a school whose primary address has
-  // no verified pin is still measured and mapped from the building that has one.
-  const pickLocation = (locations) => {
-    const pinned = locations.filter(location => location.lat != null && location.lng != null)
-    return pinned.find(location => location.is_primary) || pinned[0]
-      || locations.find(location => location.is_primary) || locations[0]
-  }
-
-  const getLocationForAgeGroup = (school, ageGroupValue) => {
+  const locationsForAgeGroup = (school, ageGroupValue) => {
     const all = school.locations || []
-    if (!ageGroupValue) return pickLocation(all)
+    if (!ageGroupValue) return all
     const matching = all.filter(location => {
       if (Array.isArray(location.age_groups)) return location.age_groups.includes(ageGroupValue)
       if (location.age_group) return location.age_group === ageGroupValue
       return false
     })
-    return pickLocation(matching.length ? matching : all)
+    return matching.length ? matching : all
+  }
+
+  const getLocationForAgeGroup = (school, ageGroupValue) => {
+    const locations = locationsForAgeGroup(school, ageGroupValue)
+    return locations.find(location => location.is_primary) || locations[0]
   }
 
   const schoolsWithDistance = useMemo(() => {
     if (!userLocation) return schools
 
     return schools.map(school => {
-      const distanceLocation = getLocationForAgeGroup(school, filters.ageGroup)
-      const distance = distanceLocation?.lat && distanceLocation?.lng
+      // Measured from a pinned building, so a school whose main address has no verified
+      // pin still passes the distance filter through another building that has one.
+      const distanceLocation = pinnedLocation(locationsForAgeGroup(school, filters.ageGroup))
+      const distance = distanceLocation
         ? calculateDistance(userLocation.lat, userLocation.lng, distanceLocation.lat, distanceLocation.lng)
         : null
       return { ...school, distance }

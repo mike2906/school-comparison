@@ -35,7 +35,7 @@ PRICING_CONFIDENCE_FLOOR = 0.7
 NVO_MIN_PUPILS = 5
 
 # A location whose ``geocode_meta.precision`` is this has no published pin: the point is a
-# street- or area-level guess (school_service and school_relations use it too).
+# street- or area-level guess. The schema withholds it; same-place grouping skips it.
 UNVERIFIED_PIN_PRECISION = "approximate"
 
 _CURRENCY_RE = re.compile(r"^[A-Z]{3}$")

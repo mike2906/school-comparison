@@ -386,6 +386,7 @@ class TestSamePlaceEndpoints:
         assert response.json()["same_place"] == []
 
     @pytest.mark.asyncio
+    @pytest.mark.postgres
     async def test_an_unpublished_approximate_pin_is_no_place(self, seeded_db, seeded_client):
         kg, _ = await self._pair(seeded_db, school_meta={"precision": "approximate"})
         response = await seeded_client.get(f"/schools/{kg.id}")

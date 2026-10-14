@@ -84,10 +84,6 @@ export const STATUS_BADGE_CLASSES = {
   full: 'bg-red-50 text-red-700',
 }
 
-export function getPrimaryLocation(school) {
-  return school.locations?.find(location => location.is_primary) || school.locations?.[0] || null
-}
-
 export function getLanguageLabel(language, t) {
   return languageLabel(language, t)
 }

@@ -65,6 +65,9 @@ def test_name_key_reads_kind_and_number():
         # The numbers keep their roles: street 3 house 204, or a block, is not ул. 204 № 3.
         ("ж.к. Люлин, ул. 204 №3", "ул. 3 №204", False),
         ("ж.к. Люлин, бл. 22", "ул. 22", False),
+        # A bare number names no street.
+        ("№ 5", 'ул. "Варна" № 5', False),
+        ("бл. 22", "ж.к. Надежда, бл. 22", False),
     ],
 )
 def test_addresses_agree(ours, theirs, agree):
@@ -128,6 +131,10 @@ def test_classify_by_name_needs_one_point_and_a_school():
     # A shared number and one shared word is not enough: all the point's words must be ours.
     other = _point('33. ЕГ "Христо Смирненски"', 'ул. "Пловдив" №20', kind="school")
     row = _classify('33. ОУ "Христо Ботев"', 'ул. "Варна" №10', [other], single_location=True)
+    assert row.status == "name_only"
+    # Same number and patron, another stage: a different school.
+    other = _point('33. ПГ "Христо Ботев"', "", kind="school")
+    row = _classify('33 СУ "Христо Ботев"', "ж.к. Люлин", [other], single_location=True)
     assert row.status == "name_only"
     # A shared number without a shared name word is another school.
     other = _point('33. Езикова гимназия "Света София"', 'ул. "Пловдив" №20', kind="school")
