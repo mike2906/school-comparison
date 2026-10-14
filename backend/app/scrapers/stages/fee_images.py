@@ -20,7 +20,7 @@ from app.services.provider_costs import ProviderCostError, ProviderResponseUnatt
 logger = logging.getLogger(__name__)
 
 MAX_IMAGES = 4  # per school: 594 shows two school and two preschool tables
-IMAGE_COST_ESTIMATE_USD = 0.06  # two vision reads of one picture
+IMAGE_COST_ESTIMATE_USD = 0.03  # two vision reads: at most $0.018 in the 2026-10-14 Sofia run (19 pictures)
 
 
 def fee_images(html: str, base_url: str) -> list[tuple[str, str, str]]:

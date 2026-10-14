@@ -168,6 +168,8 @@ test('monthlyEquivalent does not fall through to monthly for other periods', () 
   assert.equal(monthlyEquivalent({ amount: 4725, period: 'semester' }), null)
   assert.equal(monthlyEquivalent({ amount: 6300, period: 'term' }), null)
   assert.equal(monthlyEquivalent({ amount: 1102, period: 'one_time' }), null)
+  // A daily lunch or a weekly camp is not a monthly fee: never ranked as one.
+  for (const period of ['daily', 'weekly', 'hourly']) assert.equal(monthlyEquivalent({ amount: 8, period }), null)
 })
 
 test('monthlyEquivalent does not invent a period the school did not state', () => {

@@ -1,5 +1,8 @@
 # Admission points: rules, calculator and catchments
 
+> Plans here are starting points, not instructions: re-evaluate an item against current
+> facts before building it (`AGENTS.md` → "Plans are starting points").
+
 Design for the parent-facing admission calculator (kindergarten, first grade, eighth
 grade) and the catchment map. Research: `/mnt/project-files/admission-points/research.md`
 (project files). Codex reviewed this design on 2026-10-14; its findings are folded in.

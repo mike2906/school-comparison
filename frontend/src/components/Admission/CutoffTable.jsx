@@ -9,7 +9,9 @@ function rowLabel(row, t) {
       : row.stage === 'preparatory'
         ? t('cutoffs.stage.preparatory')
         : t(`ageGroups.${row.age_group}`, { defaultValue: row.age_group || '' })
-  return row.building ? `${what} · ${row.building}` : what
+  // A nursery ranks two birth years separately, so each year is its own row.
+  const born = row.birth_year && row.stage !== 'grade_8' ? t('cutoffs.bornIn', { year: row.birth_year }) : null
+  return [what, born, row.building].filter(Boolean).join(' · ')
 }
 
 function CutoffValue({ round }) {
@@ -40,9 +42,9 @@ function CutoffValue({ round }) {
 
 function RoundCell({ round }) {
   const { t } = useTranslation()
-  if (!round) return <td className="px-3 py-2 text-neutral-400">—</td>
+  if (!round) return <td className="px-2 py-2 text-neutral-400 sm:px-3">—</td>
   return (
-    <td className="px-3 py-2 align-top">
+    <td className="px-2 py-2 align-top sm:px-3">
       <div className="font-medium text-neutral-900">
         <CutoffValue round={round} />
         {round.tie_at_cutoff && <span className="ml-1 text-xs font-normal text-neutral-500">{t('cutoffs.tie')}</span>}
@@ -66,12 +68,12 @@ function CutoffTable({ rows, isCurrentRules = () => null }) {
   if (!rows || rows.length === 0) return null
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[28rem] text-left text-sm">
+      <table className="w-full text-left text-sm">
         <thead className="text-xs uppercase tracking-wide text-neutral-500">
           <tr>
-            <th className="px-3 py-2 font-medium">{t('cutoffs.what')}</th>
-            <th className="px-3 py-2 font-medium">{t('cutoffs.firstRound')}</th>
-            <th className="px-3 py-2 font-medium">{t('cutoffs.latestRound')}</th>
+            <th className="px-2 py-2 font-medium sm:px-3">{t('cutoffs.what')}</th>
+            <th className="px-2 py-2 font-medium sm:px-3">{t('cutoffs.firstRound')}</th>
+            <th className="px-2 py-2 font-medium sm:px-3">{t('cutoffs.latestRound')}</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-neutral-100">
@@ -79,8 +81,8 @@ function CutoffTable({ rows, isCurrentRules = () => null }) {
             const current = isCurrentRules(row)
             const showLatest = row.rounds > 1 && row.latest?.round_id !== row.first?.round_id
             return (
-              <tr key={[row.stage, row.age_group, row.class_code, row.building].join('|')}>
-                <td className="px-3 py-2 align-top">
+              <tr key={[row.stage, row.age_group, row.birth_year, row.class_code, row.building].join('|')}>
+                <td className="px-2 py-2 align-top sm:px-3">
                   <div className="text-neutral-900">{rowLabel(row, t)}</div>
                   <div className="text-xs text-neutral-500">
                     {row.campaign}
@@ -89,7 +91,7 @@ function CutoffTable({ rows, isCurrentRules = () => null }) {
                   </div>
                 </td>
                 <RoundCell round={row.first} />
-                {showLatest ? <RoundCell round={row.latest} /> : <td className="px-3 py-2 text-neutral-400">—</td>}
+                {showLatest ? <RoundCell round={row.latest} /> : <td className="px-2 py-2 text-neutral-400 sm:px-3">—</td>}
               </tr>
             )
           })}

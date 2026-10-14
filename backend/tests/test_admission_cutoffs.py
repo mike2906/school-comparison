@@ -10,13 +10,13 @@ from scripts.import_cutoffs import apply_to_school, derived_admission_keys, scho
 
 
 def _row(round_id, classified_on, *, queue="general", points=16.0, source_id="171", age_group="first",
-         campaign="2026/2027", round_kind="current", name="ДГ №1"):
+         campaign="2026/2027", round_kind="current", name="ДГ №1", birth_year=2023):
     return {
         "country": "bg", "city": "sofia", "stage": "kindergarten", "campaign": campaign,
         "rule_set": "bg/sofia/kindergarten/2026-2027@2026-03-12", "round_id": round_id,
         "classified_on": classified_on, "round_name": "Текущо класиране", "round_kind": round_kind,
         "source": "kg.sofia.bg", "source_id": source_id, "institution_name": name, "district": "Възраждане",
-        "group_id": 7471, "group_label": "1-ва група, родени 2023 г.", "birth_year": 2023,
+        "group_id": 7471, "group_label": f"група, родени {birth_year} г.", "birth_year": birth_year,
         "age_group": age_group, "queue": queue, "places": 6, "applicants_count": 16, "admitted_count": 6,
         "undersubscribed": False, "last_admitted_points": points, "tie_at_cutoff": True,
         "not_admitted_at_cutoff": 1, "source_url": f"https://kg.sofia.bg/api/stat-rating/rated/{round_id}/7471",
@@ -52,6 +52,19 @@ def test_summary_takes_first_and_latest_general_round_of_the_latest_campaign():
     assert entry["first"]["last_admitted_points"] == 16.0 and entry["first"]["round_id"] == 443
     assert entry["latest"]["last_admitted_points"] == 8.0
     assert "building" not in entry
+
+
+def test_summary_keeps_birth_years_of_one_group_apart():
+    # A nursery ranks children born in two years separately; mixing them would show one
+    # year's first round beside the other year's latest round.
+    rows = [
+        _row(443, "2026-09-04", age_group="nursery", birth_year=2025, points=18.0),
+        _row(445, "2026-10-02", age_group="nursery", birth_year=2025, points=14.0),
+        _row(444, "2026-09-18", age_group="nursery", birth_year=2024, points=18.0),
+    ]
+    summary = school_cutoff_summary(rows)
+    assert [(e["birth_year"], e["rounds"]) for e in summary] == [(2025, 2), (2024, 1)]
+    assert summary[0]["latest"]["last_admitted_points"] == 14.0
 
 
 def test_match_keys():

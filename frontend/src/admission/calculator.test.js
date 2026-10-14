@@ -40,6 +40,10 @@ test('durations are counted to the date each stage uses', () => {
   assert.equal(measuredOnFor(kindergarten), kindergarten.schedule.first_general_ranking)
   assert.equal(measuredOnFor(grade1), grade1.schedule.applications_close)
   assert.equal(measuredOnFor({ campaign: '2030/2031', schedule: {} }), '2030-05-31')
+  // During the autumn rankings an address is counted to a ranking after today.
+  assert.equal(measuredOnFor(kindergarten, '2026-10-15'), '2026-10-15')
+  assert.equal(measuredOnFor(kindergarten, '2026-04-01'), kindergarten.schedule.first_general_ranking)
+  assert.equal(measuredOnFor(kindergarten, '2026-12-01'), kindergarten.schedule.first_general_ranking)
 })
 
 test('each tab finds its rule set, and a later year is only an illustration', () => {

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { EVALUATORS } from '../../admission/evaluators'
-import { formatRange, measuredOnFor } from '../../admission/calculator'
+import { formatRange, measuredOnFor, sofiaToday } from '../../admission/calculator'
 import { districtLabel, sortedDistricts } from '../../admission/catchments'
 import { calculateAgeGroup } from '../../utils/education'
 import { birthYearsFor } from '../../utils/ageSelection'
@@ -47,7 +47,8 @@ function KindergartenCalculator({ selected, startYear, kindergarten, districts }
   const inKindergarten = ageGroup == null || KINDERGARTEN_GROUPS.includes(ageGroup)
   const usesParentAddress = ageGroup == null || params.address_duration.parent_address_age_groups.includes(ageGroup)
   const nurseryApplies = ageGroup == null || params.nursery_attendance.age_groups.includes(ageGroup)
-  const measuredOn = measuredOnFor(ruleSet)
+  const today = sofiaToday()
+  const measuredOn = measuredOnFor(ruleSet, today)
 
   const knownDistrict = kindergarten?.districtCode ?? null
   const context = {
@@ -120,7 +121,7 @@ function KindergartenCalculator({ selected, startYear, kindergarten, districts }
               )}
               <DateField
                 label={t('admissionCalc.kg.since')}
-                hint={t('admissionCalc.kg.sinceHint', { date: measuredOn })}
+                hint={t(measuredOn === today ? 'admissionCalc.kg.sinceHintToday' : 'admissionCalc.kg.sinceHint', { date: measuredOn })}
                 value={a.addressSince}
                 max={measuredOn}
                 onChange={v => set('addressSince', v)}

@@ -32,6 +32,9 @@ class PricePeriod(str, enum.Enum):
     QUARTER = "quarter"
     TERM = "term"
     SEMESTER = "semester"
+    DAILY = "daily"
+    WEEKLY = "weekly"
+    HOURLY = "hourly"
 
 
 class PriceSource(str, enum.Enum):
