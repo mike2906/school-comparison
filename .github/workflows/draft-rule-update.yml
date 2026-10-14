@@ -119,6 +119,20 @@ jobs:
           --jq '.[] | select(.user.login == "github-actions[bot]" and ((.body // "") | contains("<!-- rule-draft -->") | not)) | "\n\n---\n\n" + .body' >> "$RUNNER_TEMP/issue.md" &&
           mkdir -p .rule-draft
 
+      # The env scrub below needs bubblewrap; the action installs it only for its
+      # allowed_non_write_users mode, so this copies its setup.
+      - name: Install subprocess isolation
+        if: env.HAS_TOKEN == 'true'
+        run: |
+          for i in 1 2 3; do
+            sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends bubblewrap socat && break
+            sleep 5
+          done
+          command -v bwrap
+          if [ -f /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
+
       - name: Draft
         if: env.HAS_TOKEN == 'true'
         uses: anthropics/claude-code-action@v1
