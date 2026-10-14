@@ -29,13 +29,18 @@ some picks were trivia, yearly counts go stale, the paragraph only restated the 
    with the page line it came from. Fees, exam results, slogans, news and yearly counts are
    excluded in the prompt. A fact can carry labels its quote states: filter tags from the
    existing vocabulary (`FACT_TAGS`: transportation, cafeteria, meals_provided, extended_day,
-   ...), languages with a level (immersion, bilingual, enrichment), and a maximum class size.
+   ...), languages with a level (immersion, bilingual, enrichment) and weekly hours,
+   languages of instruction, a maximum class size, the admission route for a grade
+   (`ADMISSION_TYPES`: entrance_exam, interview, trial_day, open_entry) with exam subjects,
+   places full or waiting list for a grade, the highest grade taught, curricula
+   (`CURRICULA`) and whether the diploma is recognised, application open/close dates, bus
+   areas by district, and special-needs support.
 3. **Check.** Code keeps a fact only if its quote is on a page read (markup and quote marks
    ignored). A second call on the same tier confirms each quote states the whole fact and
    its labels, and grades it: `key` (what parents choose on: programme, languages, hours,
    bus, meals, class size, support, admissions), `more` (concrete but secondary) or `minor`.
 4. **Store** (`--apply` only): `attributes["school_facts"]` =
-   `{_schema_version, read_at, website_url, model, facts: [{topic, text_i18n, source_url, quote, rank, tags, languages, max_class_size}]}`,
+   `{_schema_version, read_at, website_url, model, facts: [{topic, text_i18n, source_url, quote, rank, <labels>}]}`,
    key facts first. Stored facts whose quote is still on a page read are carried into the
    new set with their grade. A read that keeps facts replaces the stored ones, and so does a read of 4 or more pages
    that keeps none. A site not read, or read from fewer pages with no fact kept (often a
@@ -51,7 +56,11 @@ none shows nothing.
 **Labels feed the existing filters and fields** (`publication_attributes`): a shown fact's
 tags join `filter_tags` (so the search filters and the compare page's meals, transport and
 after-school rows see them), its languages join `language_focus`, and its class size is
-used when no curated one exists (before the old extraction's). Facts carry their own
+used when no curated one exists (before the old extraction's). The response also carries
+`school_facts.at_a_glance` (`at_a_glance` in `app/utils/school_facts.py`): admissions and
+places per grade, highest grade, curricula, diploma, application window (dropped once it
+has closed), instruction languages, language hours, class size, bus areas and support,
+summed from the shown facts and shown above the fact list and as compare rows. Facts carry their own
 checks, so they do not wait for a Stage 6 report, but a website-data withholding marker
 (failed URL check, shared site) hides them and their labels, and so does a change of
 website (host and path) or a website URL validation has not accepted (`pending`,

@@ -369,11 +369,55 @@ class SchoolFact(BaseModel):
     rank: Literal["key", "more"]
 
 
+class BilingualName(BaseModel):
+    bg: str
+    en: str
+
+
+class FactAdmission(BaseModel):
+    grade: Optional[int] = None  # 0 is kindergarten or preschool
+    types: list[str] = []  # entrance_exam, interview, trial_day, open_entry
+    subjects: list[BilingualName] = []
+
+
+class FactPlaces(BaseModel):
+    grade: Optional[int] = None
+    status: str  # full, waiting_list
+
+
+class FactApplications(BaseModel):
+    open: Optional[str] = None  # YYYY-MM-DD
+    close: Optional[str] = None
+
+
+class FactLanguage(BaseModel):
+    language: str
+    level: Optional[str] = None
+    hours_per_week: Optional[int] = None
+
+
+class FactsAtAGlance(BaseModel):
+    """The labels of a school's shown facts summed up (``app.utils.school_facts.at_a_glance``)."""
+
+    admission: list[FactAdmission] = []
+    places: list[FactPlaces] = []
+    highest_grade: Optional[int] = None
+    curricula: list[str] = []
+    diploma_recognised: Optional[bool] = None
+    applications: Optional[FactApplications] = None
+    instruction_languages: list[str] = []
+    languages: list[FactLanguage] = []
+    class_size: Optional[int] = None
+    bus_areas: list[BilingualName] = []
+    special_needs_support: Optional[bool] = None
+
+
 class SchoolFacts(BaseModel):
     """Facts read from the school's own pages (school-facts stage); each links its page."""
 
     read_at: str
     facts: list[SchoolFact]
+    at_a_glance: FactsAtAGlance = Field(default_factory=FactsAtAGlance)
 
 
 class SchoolResponse(SchoolBase, SchoolPricingMixin):

@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { factsReadDate, getSchoolFacts } from '../../utils/schoolFacts'
+import { atAGlanceLines, factsReadDate, getSchoolFacts } from '../../utils/schoolFacts'
 
-// "From the school's website": facts read from the school's own pages, each linking the
-// page it came from; the key facts first, the rest behind "show more". Nothing renders
-// when the school has none.
+// "From the school's website": what the facts' labels add up to (admission, curriculum,
+// bus areas ...), then the facts read from the school's own pages, each linking the page
+// it came from; the key facts first, the rest behind "show more". Nothing renders when
+// the school has none.
 function WebsiteFacts({ school }) {
   const { t, i18n } = useTranslation()
   const [showMore, setShowMore] = useState(false)
@@ -14,6 +15,7 @@ function WebsiteFacts({ school }) {
   const extra = all.length - key.length
   // A school whose facts are all "more" shows them all rather than an empty box.
   const facts = showMore || key.length === 0 ? all : key
+  const glance = atAGlanceLines(school, i18n.language, t)
   const readDate = factsReadDate(school)
 
   return (
@@ -22,6 +24,18 @@ function WebsiteFacts({ school }) {
       <p className="text-sm text-neutral-500 mb-5">
         {readDate ? t('schoolFacts.readOn', { date: readDate }) : t('schoolFacts.note')}
       </p>
+      {glance.length > 0 && (
+        <dl className="mb-6 grid grid-cols-1 sm:grid-cols-[10rem_1fr] gap-x-4 gap-y-2 rounded-xl bg-neutral-50 p-4">
+          {glance.map(line => (
+            <div key={line.key} className="contents">
+              <dt className="text-xs font-medium uppercase tracking-wide text-neutral-500 pt-1">
+                {t(`schoolFacts.glance.${line.key}`)}
+              </dt>
+              <dd className="text-neutral-800">{line.value}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
       <ul className="space-y-3">
         {facts.map((fact, index) => (
           <li key={`${fact.topic}-${index}`} className="flex flex-col sm:flex-row sm:gap-4">

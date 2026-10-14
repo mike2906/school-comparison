@@ -135,9 +135,9 @@ async def test_labels_are_stored_and_shown_to_the_judge():
     report = await stage.read_school(_school(), LINES, calls)
     stored = report["store"][0]
     assert stored["tags"] == ["extended_day"] and stored["max_class_size"] == 18
-    assert stored["languages"] == [{"language": "English", "level": "enrichment"}]
+    assert stored["languages"] == [{"language": "English", "level": "enrichment", "hours_per_week": None}]
     judged = calls.messages[1][1]
-    assert "Tags: extended_day" in judged and "English (enrichment)" in judged and "at most 18" in judged
+    assert "Tags: extended_day" in judged and "English (enrichment)" in judged and "Max class size: 18" in judged
 
 
 @pytest.mark.asyncio
@@ -220,19 +220,16 @@ def test_publishable_facts_drop_malformed_rows_and_the_quote():
         ],
     }
     published = publishable_school_facts({"school_facts": block}, HOME)
-    assert published == {
-        "read_at": "2026-10-13T20:00:00+00:00",
-        "facts": [
-            {
-                "topic": "meals",
-                "text_i18n": {"bg": "Обяд.", "en": "Lunch."},
-                "source_url": HOME,
-                "rank": "key",
-                "tags": ["cafeteria"],
-                "languages": [{"language": "English", "level": None}],
-                "max_class_size": None,
-            }
-        ],
+    assert published["read_at"] == "2026-10-13T20:00:00+00:00" and len(published["facts"]) == 1
+    fact = published["facts"][0]
+    assert "quote" not in fact
+    assert {key: fact[key] for key in ("topic", "text_i18n", "source_url", "rank", "tags", "languages")} == {
+        "topic": "meals",
+        "text_i18n": {"bg": "Обяд.", "en": "Lunch."},
+        "source_url": HOME,
+        "rank": "key",
+        "tags": ["cafeteria"],
+        "languages": [{"language": "English", "level": None, "hours_per_week": None}],
     }
     assert publishable_school_facts({"school_facts": block | {"_schema_version": 2}}, HOME) is None
     assert publishable_school_facts({"school_facts": block | {"facts": []}}, HOME) is None
@@ -476,3 +473,58 @@ async def test_a_fact_tag_makes_the_school_match_the_filter(seeded_client, seede
     assert "website_url" not in rows[school.id]
     options = (await seeded_client.get("/schools/filters")).json()
     assert "transportation" in options["facilities"]
+
+
+def test_at_a_glance_sums_up_the_labels_and_drops_a_closed_window():
+    import datetime
+
+    from app.utils.school_facts import at_a_glance
+
+    facts = [
+        {
+            "admission": ["entrance_exam"],
+            "admission_grade": 5,
+            "exam_subjects": [{"bg": "Математика", "en": "Maths"}, {"bg": "Английски", "en": "English"}],
+        },
+        {"admission": ["interview", "trial_day"], "admission_grade": 1, "places": "full"},
+        {"highest_grade": 4, "curricula": ["cambridge"], "bus_areas": [{"bg": "Бояна", "en": "Boyana"}]},
+        {"applications_open": "2026-03-01", "applications_close": "2026-04-30"},
+    ]
+    glance = at_a_glance(facts, today=datetime.date(2026, 4, 1))
+    assert glance["admission"][0] == {
+        "grade": 5,
+        "types": ["entrance_exam"],
+        "subjects": [{"bg": "Математика", "en": "Maths"}, {"bg": "Английски", "en": "English"}],
+    }
+    assert glance["places"] == [{"grade": 1, "status": "full"}]
+    assert glance["highest_grade"] == 4 and glance["curricula"] == ["cambridge"]
+    assert glance["applications"] == {"open": "2026-03-01", "close": "2026-04-30"}
+    assert at_a_glance(facts, today=datetime.date(2026, 5, 1))["applications"] is None
+
+
+@pytest.mark.asyncio
+async def test_the_detail_response_has_the_labels_at_a_glance(client, db_session):
+    rows = [
+        _fact_row(topic="admissions", admission=["entrance_exam"], admission_grade=5, places="bogus"),
+        _fact_row(topic="curriculum", highest_grade=4, curricula=["cambridge", "made_up"], rank="more"),
+    ]
+    body = await _detail(
+        client, db_session, school_facts={"_schema_version": 1, "read_at": "t", "website_url": HOME, "facts": rows}
+    )
+    glance = body["school_facts"]["at_a_glance"]
+    assert glance["admission"] == [{"grade": 5, "types": ["entrance_exam"], "subjects": []}]
+    assert glance["places"] == [] and glance["highest_grade"] == 4 and glance["curricula"] == ["cambridge"]
+    assert "admission" not in body["school_facts"]["facts"][0]  # labels show only summed up
+
+
+@pytest.mark.asyncio
+async def test_admission_labels_reach_the_judge_and_the_store():
+    fact = Fact.model_validate(
+        _fact("admissions", _line(3), en="Grade 5 entry is by exam in maths and English.").model_dump()
+        | {"admission": ["entrance_exam"], "admission_grade": 5, "exam_subjects": [{"bg": "Математика", "en": "Maths"}]}
+    )
+    calls = _Calls([fact], passed=[1])
+    stored = (await stage.read_school(_school(), LINES, calls))["store"][0]
+    assert stored["admission"] == ["entrance_exam"] and stored["exam_subjects"] == [{"bg": "Математика", "en": "Maths"}]
+    judged = calls.messages[1][1]
+    assert "Admission: entrance_exam" in judged and "Admission grade: 5" in judged and "Exam subjects: Maths" in judged

@@ -799,6 +799,51 @@
       "facilities": "База",
       "support": "Подкрепа",
       "admissions": "Прием"
+    },
+    "glance": {
+      "title": "Накратко",
+      "admission": "Прием",
+      "places": "Свободни места",
+      "applications": "Кандидатстване",
+      "highestGrade": "Обучение до",
+      "curricula": "Програма",
+      "diploma": "Диплома",
+      "instruction": "Обучение на",
+      "languages": "Езици",
+      "classSize": "Брой ученици в клас",
+      "bus": "Училищен автобус",
+      "support": "Подкрепа за деца със СОП",
+      "grade": "{{grade}} клас",
+      "kindergarten": "Детска градина",
+      "admissionTypes": {
+        "entrance_exam": "Приемен изпит",
+        "interview": "Събеседване",
+        "trial_day": "Пробен ден",
+        "open_entry": "Без приемен изпит"
+      },
+      "placesStatus": {
+        "full": "Няма места",
+        "waiting_list": "Списък на чакащите"
+      },
+      "window": "от {{open}} до {{close}}",
+      "opens": "От {{date}}",
+      "closes": "До {{date}}",
+      "curriculaNames": {
+        "bulgarian_state": "Държавна програма",
+        "ib": "IB",
+        "cambridge": "Кеймбридж",
+        "british": "Британска",
+        "american": "Американска",
+        "canadian": "Канадска",
+        "french": "Френска",
+        "german": "Немска"
+      },
+      "recognised": "Призната в България",
+      "notRecognised": "Не е призната в България",
+      "hours_one": "{{count}} час седмично",
+      "hours_other": "{{count}} часа седмично",
+      "upTo": "До {{count}} ученици",
+      "yes": "Да"
     }
   }
 }

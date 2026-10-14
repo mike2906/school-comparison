@@ -1,3 +1,5 @@
+import { languageLabel } from './languages.js'
+
 // Facts the school-facts stage read from a school's own pages (API `school_facts`).
 // Topic order matches backend app/utils/school_facts.py TOPICS.
 export const FACT_TOPICS = [
@@ -44,3 +46,63 @@ export function factsReadDate(school) {
   const value = school?.school_facts?.read_at
   return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value) ? value.slice(0, 10) : ''
 }
+
+const name = (item, language) => item?.[language] || item?.bg || ''
+
+// The school's fact labels summed up (API `school_facts.at_a_glance`), as
+// [{ key, value }] lines in display order, `value` in `language`; lines with nothing to
+// say are left out. `t` is i18next's.
+export function atAGlanceLines(school, language, t) {
+  const glance = school?.school_facts?.at_a_glance
+  if (!glance) return []
+  const grade = value => (value === 0 ? t('schoolFacts.glance.kindergarten') : t('schoolFacts.glance.grade', { grade: value }))
+  const date = value => (value ? new Date(`${value}T00:00:00`).toLocaleDateString(language, { day: 'numeric', month: 'long', year: 'numeric' }) : '')
+  const lines = []
+  const add = (key, value) => value && lines.push({ key, value })
+
+  add('admission', (glance.admission || []).map(row => {
+    const types = (row.types || []).map(type => t(`schoolFacts.glance.admissionTypes.${type}`)).join(', ')
+    const subjects = (row.subjects || []).map(subject => name(subject, language)).filter(Boolean).join(', ')
+    const what = [types, subjects && `(${subjects})`].filter(Boolean).join(' ')
+    return row.grade === null || row.grade === undefined ? what : `${grade(row.grade)}: ${what}`
+  }).filter(Boolean).join('; '))
+  add('places', (glance.places || []).map(row => {
+    const status = t(`schoolFacts.glance.placesStatus.${row.status}`)
+    return row.grade === null || row.grade === undefined ? status : `${grade(row.grade)}: ${status}`
+  }).join('; '))
+  add('applications', glance.applications && (
+    glance.applications.open && glance.applications.close
+      ? t('schoolFacts.glance.window', { open: date(glance.applications.open), close: date(glance.applications.close) })
+      : glance.applications.open
+        ? t('schoolFacts.glance.opens', { date: date(glance.applications.open) })
+        : t('schoolFacts.glance.closes', { date: date(glance.applications.close) })
+  ))
+  add('highestGrade', glance.highest_grade && grade(glance.highest_grade))
+  add('curricula', (glance.curricula || []).map(item => t(`schoolFacts.glance.curriculaNames.${item}`)).join(', '))
+  add('diploma', glance.diploma_recognised === true
+    ? t('schoolFacts.glance.recognised')
+    : glance.diploma_recognised === false ? t('schoolFacts.glance.notRecognised') : '')
+  add('instruction', (glance.instruction_languages || []).map(item => languageLabel(item, t)).join(', '))
+  add('languages', (glance.languages || []).map(item => {
+    const extra = [
+      item.level && t(`advancedFilters.levels.${item.level}`),
+      item.hours_per_week && t('schoolFacts.glance.hours', { count: item.hours_per_week }),
+    ].filter(Boolean).join(', ')
+    return extra ? `${languageLabel(item.language, t)} (${extra})` : languageLabel(item.language, t)
+  }).join(', '))
+  add('classSize', glance.class_size && t('schoolFacts.glance.upTo', { count: glance.class_size }))
+  add('bus', (glance.bus_areas || []).map(area => name(area, language)).filter(Boolean).join(', '))
+  add('support', glance.special_needs_support === true && t('schoolFacts.glance.yes'))
+  return lines
+}
+
+// The at-a-glance keys any of `schools` has a line for, in display order (compare rows).
+export function atAGlanceKeysIn(schools, language, t) {
+  const present = new Set(schools.flatMap(school => atAGlanceLines(school, language, t).map(line => line.key)))
+  return GLANCE_KEYS.filter(key => present.has(key))
+}
+
+const GLANCE_KEYS = [
+  'admission', 'places', 'applications', 'highestGrade', 'curricula', 'diploma',
+  'instruction', 'languages', 'classSize', 'bus', 'support',
+]

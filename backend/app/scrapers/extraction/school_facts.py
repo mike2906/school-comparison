@@ -18,8 +18,11 @@ from pydantic import BaseModel, Field
 
 from app.scrapers.fee_pages import page_key
 from app.utils.school_facts import (  # noqa: F401  (SCHEMA_VERSION re-exported)
+    ADMISSION_TYPES,
+    CURRICULA,
     FACT_TAGS,
     LANGUAGE_LEVELS,
+    PLACES,
     RANKS,
     SCHEMA_VERSION,
     TOPICS,
@@ -32,6 +35,9 @@ Topic = Literal[TOPICS]  # the reader is held to the published topic list
 Tag = Literal[FACT_TAGS]
 Level = Literal[LANGUAGE_LEVELS]
 Rank = Literal[RANKS]
+Admission = Literal[ADMISSION_TYPES]
+Places = Literal[PLACES]
+Curriculum = Literal[CURRICULA]
 
 PICK_PROMPT = """You help find the pages of a school website that describe what the school is like for a child
 and a parent: about the school, curriculum or programme, subjects and languages taught, profiled classes,
@@ -93,12 +99,29 @@ Rules:
   - languages: each language the quote says is taught beyond the standard state programme, with a level when
     stated: immersion (most teaching is in it), bilingual (some subjects are taught in it), enrichment
     (intensive or extended study of it); no level otherwise. Write the language's English name.
+    For a language the quote gives weekly hours for, add hours_per_week.
+  - instruction_languages: the languages most lessons are taught in, when the quote says.
   - max_class_size: the most pupils in a class or group, as a number, only when the quote gives it.
+  - admission: how children are admitted, any of entrance_exam, interview, trial_day, open_entry (no test
+    or interview); admission_grade: the grade it is for (0 for kindergarten or preschool), when stated;
+    exam_subjects: the subjects of an entrance exam, each as {"bg", "en"}.
+  - places: full or waiting_list when the quote says a class or grade has no places or a waiting list for the
+    current or coming school year (admission_grade for which grade).
+  - highest_grade: the highest grade the school teaches, as a number, when the quote says (1 to 12).
+  - curricula: the programmes taught, any of bulgarian_state, ib, cambridge, british, american, canadian,
+    french, german; diploma_recognised: true or false only when the quote says whether the diploma is
+    recognised in Bulgaria.
+  - applications_open, applications_close: the dates applications open and close for the current or coming
+    school year, as YYYY-MM-DD, only when the quote gives the full date.
+  - bus_areas: the districts or areas the school bus covers, each as {"bg", "en"} (the name in Bulgarian and
+    in Latin letters).
+  - special_needs_support: true when the quote says the school supports children with special educational needs.
 - Up to 20 facts, the most useful for choosing a school first. Fewer is fine. If the pages state nothing
   concrete, return no facts: that is a correct answer, never pad."""
 
 JUDGE_PROMPT = """You check facts written about a school against the website lines they were taken from.
-For each numbered item you get a fact (in English), any labels on it (tags, languages, class size), and a quote
+For each numbered item you get a fact (in English), any labels on it (tags, languages, admission, dates and so
+on), and a quote
 (usually Bulgarian). Pass an item when the quote states what the fact and every label say; translation and plain
 rewording are fine. A heading, list item or link title that names
 a specialty, subject, club, sport or room is enough for a fact that only says the school offers or has it.
@@ -119,6 +142,12 @@ An item that does not pass is listed under none."""
 class LanguageLabel(BaseModel):
     language: str = Field(description="The language's English name")
     level: Optional[Level] = None
+    hours_per_week: Optional[int] = None
+
+
+class Name(BaseModel):
+    bg: str
+    en: str
 
 
 class Fact(BaseModel):
@@ -130,6 +159,38 @@ class Fact(BaseModel):
     tags: list[Tag] = Field(default_factory=list, description="Filter tags the quote states")
     languages: list[LanguageLabel] = Field(default_factory=list, description="Languages taught beyond the standard")
     max_class_size: Optional[int] = Field(default=None, description="The most pupils in a class, if the quote gives it")
+    instruction_languages: list[str] = Field(default_factory=list)
+    admission: list[Admission] = Field(default_factory=list)
+    admission_grade: Optional[int] = None
+    exam_subjects: list[Name] = Field(default_factory=list)
+    places: Optional[Places] = None
+    highest_grade: Optional[int] = None
+    curricula: list[Curriculum] = Field(default_factory=list)
+    diploma_recognised: Optional[bool] = None
+    applications_open: Optional[str] = Field(default=None, description="YYYY-MM-DD")
+    applications_close: Optional[str] = Field(default=None, description="YYYY-MM-DD")
+    bus_areas: list[Name] = Field(default_factory=list)
+    special_needs_support: Optional[bool] = None
+
+
+# The labels a fact can carry, stored and restored as they are (``Fact`` validates them).
+LABEL_FIELDS = (
+    "tags",
+    "languages",
+    "max_class_size",
+    "instruction_languages",
+    "admission",
+    "admission_grade",
+    "exam_subjects",
+    "places",
+    "highest_grade",
+    "curricula",
+    "diploma_recognised",
+    "applications_open",
+    "applications_close",
+    "bus_areas",
+    "special_needs_support",
+)
 
 
 class Facts(BaseModel):
@@ -198,9 +259,7 @@ def stored_as_fact(stored: dict) -> Optional[Fact]:
             fact_bg=text["bg"],
             quote=stored["quote"],
             source_url=stored["source_url"],
-            tags=stored.get("tags") or [],
-            languages=stored.get("languages") or [],
-            max_class_size=stored.get("max_class_size"),
+            **{key: stored[key] for key in LABEL_FIELDS if stored.get(key) is not None},
         )
     except (KeyError, TypeError, ValueError):
         return None
@@ -211,17 +270,27 @@ def quote_key(fact: Fact) -> str:
 
 
 def _labels(fact: Fact) -> str:
-    parts = []
-    if fact.tags:
-        parts.append("Tags: " + ", ".join(fact.tags))
-    if fact.languages:
-        parts.append(
-            "Languages: "
-            + ", ".join(f"{item.language} ({item.level})" if item.level else item.language for item in fact.languages)
-        )
-    if fact.max_class_size is not None:
-        parts.append(f"Class size: at most {fact.max_class_size}")
-    return "".join(f"\n{part}" for part in parts)
+    """The fact's labels as ``\nName: value`` lines for the judge, unset ones left out."""
+    lines = []
+    for key in LABEL_FIELDS:
+        value = getattr(fact, key)
+        if value in (None, []):
+            continue
+        if isinstance(value, list):
+            value = ", ".join(_label_text(item) for item in value)
+        lines.append(f"\n{key.replace('_', ' ').capitalize()}: {value}")
+    return "".join(lines)
+
+
+def _label_text(item: object) -> str:
+    if isinstance(item, LanguageLabel):
+        extra = [
+            part for part in (item.level, f"{item.hours_per_week} h a week" if item.hours_per_week else None) if part
+        ]
+        return f"{item.language} ({', '.join(extra)})" if extra else item.language
+    if isinstance(item, Name):
+        return item.en
+    return str(item)
 
 
 def judge_message(quoted: Sequence[tuple[Fact, str]]) -> str:
@@ -239,7 +308,5 @@ def stored_fact(fact: Fact, url: str, rank: str) -> dict:
         "source_url": url,
         "quote": fact.quote.strip(),
         "rank": rank,
-        "tags": list(dict.fromkeys(fact.tags)),
-        "languages": [item.model_dump() for item in fact.languages],
-        "max_class_size": fact.max_class_size,
+        **fact.model_dump(include=set(LABEL_FIELDS)),
     }

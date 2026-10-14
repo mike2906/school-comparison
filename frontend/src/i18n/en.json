@@ -799,6 +799,51 @@
       "facilities": "Facilities",
       "support": "Support",
       "admissions": "Admissions"
+    },
+    "glance": {
+      "title": "At a glance",
+      "admission": "Admission",
+      "places": "Places",
+      "applications": "Applications",
+      "highestGrade": "Teaches up to",
+      "curricula": "Curriculum",
+      "diploma": "Diploma",
+      "instruction": "Taught in",
+      "languages": "Languages",
+      "classSize": "Class size",
+      "bus": "School bus",
+      "support": "Special needs support",
+      "grade": "Grade {{grade}}",
+      "kindergarten": "Kindergarten",
+      "admissionTypes": {
+        "entrance_exam": "Entrance exam",
+        "interview": "Interview",
+        "trial_day": "Trial day",
+        "open_entry": "No entrance test"
+      },
+      "placesStatus": {
+        "full": "Full",
+        "waiting_list": "Waiting list"
+      },
+      "window": "{{open}} to {{close}}",
+      "opens": "Opens {{date}}",
+      "closes": "Closes {{date}}",
+      "curriculaNames": {
+        "bulgarian_state": "Bulgarian state programme",
+        "ib": "IB",
+        "cambridge": "Cambridge",
+        "british": "British",
+        "american": "American",
+        "canadian": "Canadian",
+        "french": "French",
+        "german": "German"
+      },
+      "recognised": "Recognised in Bulgaria",
+      "notRecognised": "Not recognised in Bulgaria",
+      "hours_one": "{{count}} hour a week",
+      "hours_other": "{{count}} hours a week",
+      "upTo": "Up to {{count}} pupils",
+      "yes": "Yes"
     }
   }
 }
