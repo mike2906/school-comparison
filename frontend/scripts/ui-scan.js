@@ -39,7 +39,7 @@ async function fetchJson(url) {
 
 async function pageList() {
   const schools = (await fetchJson(`${API}/schools?country_code=bg&city=all`)).slice(0, LIMIT)
-  const paths = [{ path: '/search' }, { path: '/about' }]
+  const paths = [{ path: '/search' }, { path: '/about' }, { path: '/admission' }]
   for (const school of schools) paths.push({ path: `/schools/${school.id}`, schoolId: school.id })
   // Private and international schools three at a time: the compare page is where fees sit side by side.
   const privateIds = schools.filter(school => ['private', 'international'].includes(school.school_type)).map(school => school.id)

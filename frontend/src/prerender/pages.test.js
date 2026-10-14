@@ -129,7 +129,7 @@ test('fixed pages: aliases canonicalise to /search, compare and 404 are noindex 
     const pages = Object.fromEntries(fixedPages(translator(language), language).map((page) => [page.routePath, page]))
     assert.equal(pages['/'].canonicalPath, '/search')
     assert.ok(!pages['/'].sitemap)
-    assert.deepEqual([pages['/search'].sitemap, pages['/about'].sitemap], [true, true])
+    assert.deepEqual([pages['/search'].sitemap, pages['/about'].sitemap, pages['/admission'].sitemap], [true, true, true])
     for (const path of ['/compare', '/404']) {
       assert.equal(pages[path].noindex, true)
       assert.equal(pages[path].canonicalPath, null)

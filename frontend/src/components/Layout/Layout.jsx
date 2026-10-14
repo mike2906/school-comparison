@@ -19,6 +19,9 @@ function Footer({ clearCompareBar }) {
           <Link to="/schools" className="text-primary-700 underline">
             {t('seo.allSchools')}
           </Link>
+          <Link to="/admission" className="text-primary-700 underline">
+            {t('nav.admission')}
+          </Link>
           <Link to="/about" className="text-primary-700 underline">
             {t('nav.about')}
           </Link>
@@ -95,6 +98,14 @@ function Layout({ children, hideNavOnMobile = false, compactNavOnMobile = false,
                 }`}
               >
                 {t('nav.allSchools')}
+              </NavLink>
+              <NavLink
+                to="/admission"
+                className={({ isActive }) => `hidden md:inline-flex h-9 items-center whitespace-nowrap rounded-lg px-3 text-sm font-medium ${
+                  isActive ? 'bg-primary-50 text-primary-800' : 'text-neutral-700 hover:bg-neutral-100'
+                }`}
+              >
+                {t('nav.admission')}
               </NavLink>
               <NavLink
                 to="/about"
