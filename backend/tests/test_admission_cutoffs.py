@@ -131,3 +131,38 @@ def test_one_building_per_stage_is_not_named_even_with_other_sources():
     rows = [_row(443, "2026-09-04"), _grade8("2026/2027", 1, "03909", 480.0)]
     assert all("building" not in r for r in school_cutoffs(rows))
     assert all("building" not in e for e in school_cutoff_summary(rows))
+
+
+class _FakeSession:
+    def __init__(self, schools):
+        self.schools, self.committed = schools, False
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *exc):
+        return False
+
+    async def execute(self, _query):
+        return SimpleNamespace(scalars=lambda: iter(self.schools))
+
+    async def commit(self):
+        self.committed = True
+
+    async def rollback(self):
+        pass
+
+
+@pytest.mark.parametrize(("max_unmatched", "applied"), [(None, True), (1, True), (0, False)])
+async def test_apply_refuses_above_max_unmatched(tmp_path, monkeypatch, max_unmatched, applied):
+    from app.services.admission_cutoffs import write_rows
+    from scripts import import_cutoffs
+
+    write_rows(tmp_path, [_row(443, "2026-09-04"), _row(443, "2026-09-04", source_id="999", name="ДГ №999")])
+    school = SimpleNamespace(id=1, attributes={"kg_sofia_id": 171}, institutional_id=None, admission_info={})
+    session = _FakeSession([school])
+    monkeypatch.setattr(import_cutoffs, "async_session_maker", lambda: session)
+    summary = await import_cutoffs.run(tmp_path, apply=True, max_unmatched=max_unmatched)
+    assert summary["unmatched_institutions"] == 1
+    assert (summary["applied"], session.committed) == (applied, applied)
+    assert (summary["schools_with_cutoffs"], summary["schools_with_summary"]) == (1, 1)

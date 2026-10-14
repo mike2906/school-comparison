@@ -229,7 +229,6 @@
     "locationsFor": "Локации за {{name}}",
     "legendSchool": "Училище",
     "legendKindergarten": "Детска градина",
-    "approximatePin": "Приблизително местоположение (по улица)",
     "alsoHere": "На същия адрес:",
     "samePlace": "Също тук, под същото име:",
     "legendStacked": "Няколко на един адрес"
@@ -572,8 +571,7 @@
       "specialPrograms": "Специални програми"
     },
     "aria": {
-      "distance": "{{distance}} от вашето местоположение",
-      "distanceApprox": "Около {{distance}} от вашето местоположение"
+      "distance": "{{distance}} от вашето местоположение"
     }
   },
   "schoolDetail": {
@@ -595,9 +593,7 @@
     "admission": "Прием",
     "kgByPointsShort": "По точки (kg.sofia.bg)",
     "kgThresholdsLater": "Точките на последно приетите още не са публикувани тук",
-    "kgThresholdsBelow": "Вижте кой е приет досега по-долу",
-    "distanceValueApprox": "~{{km}} км",
-    "approximateLocation": "Точката на картата е приблизителна (по улица), затова и разстоянията са приблизителни."
+    "kgThresholdsBelow": "Вижте кой е приет досега по-долу"
   },
   "detailPanel": {
     "label": "Подробности за училището",

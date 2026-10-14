@@ -6,7 +6,8 @@ point with its name, address and район. A location is matched when the poin
 type agree with the school name *and* the addresses agree; everything else is reported for
 review and never written.
 
-Always writes a report first. Default is a dry run; --apply writes only "match" rows:
+Always writes a report first. Default is a dry run; --apply writes only "match" and
+"match_by_name" rows:
 coordinates (exact precision, through the geocoding write gate), a missing district, and a
 `coords_source=sofia_municipal` tag, which stops later geocoding runs replacing the point.
 
@@ -23,6 +24,7 @@ import csv
 import math
 import re
 import sys
+from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -45,6 +47,8 @@ LAYERS_URL = (
 LAYERS = {0: "school", 1: "kindergarten", 2: "nursery"}
 DISTRICTS_LAYER = 3
 PROVIDER = "sofia_municipal_arcgis"
+# Statuses --apply writes.
+MATCHED = {"match", "match_by_name"}
 DEFAULT_REPORT_ROOT = Path(__file__).parent.parent / "reports" / "municipal-points"
 
 # The municipal layers' district spellings -> the ones already stored (kg.sofia.bg, OSM).
@@ -52,6 +56,15 @@ DISTRICT_ALIASES = {"Подуене": "Подуяне", "Студентски": 
 # Latin letters that source data uses in place of look-alike Cyrillic ones.
 _LATIN_TO_CYRILLIC = str.maketrans("AaBEeKkMHOoPpCcTXxy", "АаВЕеКкМНОоРрСсТХху")
 # Address words that say nothing about where the building is.
+# A house or block number, and the city and postcodes, which say nothing about the building.
+_MARKED_NUMBER_RE = re.compile(r"(?:№|\bno\.?|\bбл\.?)\s*(\d+)")
+_CITY_AND_POSTCODE_RE = re.compile(r"гр\.\s*софия|\b1\d{3}\b")
+# School stages a name states, spelled out or abbreviated ("103. ОУ", "Основно училище").
+_SCHOOL_STAGES = {
+    "основно": "основно", "оу": "основно", "средно": "средно", "су": "средно",
+    "обединено": "обединено", "обу": "обединено", "начално": "начално", "ну": "начално",
+    "гимназия": "гимназия", "пг": "гимназия", "ег": "гимназия", "пмг": "гимназия",
+}
 _ADDRESS_STOPWORDS = {
     "гр", "град", "софия", "ул", "улица", "бул", "булевард", "жк", "ж", "к", "кв", "квартал",
     "район", "р", "н", "бл", "блок", "вх", "ет", "ап", "до", "и", "на", "с", "м", "в", "з",
@@ -103,8 +116,7 @@ def name_key(name: str) -> Optional[tuple[str, str]]:
 
 def address_parts(address: str) -> tuple[set[str], set[str]]:
     """(street words, numbers) of an address, normalized for comparison."""
-    text = address.translate(_LATIN_TO_CYRILLIC).casefold()
-    text = re.sub(r"гр\.\s*софия|\b1\d{3}\b", " ", text)  # city and postcodes
+    text = _CITY_AND_POSTCODE_RE.sub(" ", address.translate(_LATIN_TO_CYRILLIC).casefold())
     # Ordinals are part of the street name (ул. "8-ми март", ул. "504-та"), not house numbers.
     ordinal = r"(\d+)\s*-\s*(?:ми|ви|ри|ти|та|то|ва|ра|ия|ят)\b"
     ordinals = {f"#{n.lstrip('0')}" for n in re.findall(ordinal, text)}
@@ -115,9 +127,17 @@ def address_parts(address: str) -> tuple[set[str], set[str]]:
     }
     # House and block numbers when marked; otherwise every number (ул. 210 - II м. р.).
     # Unmarked numbers are often the complex ("Младост 4"), not the building.
-    marked = re.findall(r"(?:№|\bno\.?|\bбл\.?)\s*(\d+)", text)
+    marked = _MARKED_NUMBER_RE.findall(text)
     numbers = {n.lstrip("0") or "0" for n in (marked or re.findall(r"\d+", text))}
     return words, numbers
+
+
+def _numbers(address: str) -> tuple[set[str], set[str]]:
+    """(house and block numbers, every number) of an address, without the postcodes."""
+    text = _CITY_AND_POSTCODE_RE.sub(" ", address.translate(_LATIN_TO_CYRILLIC).casefold())
+    def strip(values: list[str]) -> set[str]:
+        return {n.lstrip("0") or "0" for n in values}
+    return strip(_MARKED_NUMBER_RE.findall(text)), strip(re.findall(r"\d+", text))
 
 
 def addresses_agree(ours: str, theirs: str) -> bool:
@@ -129,6 +149,20 @@ def addresses_agree(ours: str, theirs: str) -> bool:
     their_words, their_numbers = address_parts(theirs)
     if not our_words and not their_words:
         return bool(our_numbers) and our_numbers == their_numbers
+    if not our_words or not their_words:
+        # One side gives only a numbered street ("ул. 204 № 3"), the other adds its
+        # complex ("ж.к. Люлин, ул.204 №3"): the house or block numbers must agree, and
+        # so must every number, street included ("ул. 3 № 204" and "бл. 22" do not).
+        # A bare "№ 5" names no street, so it agrees with nothing.
+        wordless = ours if not our_words else theirs
+        our_marked, our_all = _numbers(ours)
+        their_marked, their_all = _numbers(theirs)
+        return (
+            bool(our_marked)
+            and our_marked == their_marked
+            and our_all == their_all
+            and bool(_numbers(wordless)[1] - _numbers(wordless)[0])
+        )
     if not our_words & their_words:
         return False
     if our_numbers or their_numbers:
@@ -141,6 +175,13 @@ def name_words(name: str) -> set[str]:
     """Distinctive words of an institution name (not its type)."""
     text = name.translate(_LATIN_TO_CYRILLIC).casefold()
     return {w for w in re.findall(r"[а-я]{4,}", text) if w not in _NAME_STOPWORDS}
+
+
+def school_stage(name: str) -> Optional[str]:
+    """The school stage a name states ("основно", "средно", ...), or None."""
+    text = name.translate(_LATIN_TO_CYRILLIC).casefold()
+    stages = {_SCHOOL_STAGES[w] for w in re.findall(r"[а-я]+", text) if w in _SCHOOL_STAGES}
+    return stages.pop() if len(stages) == 1 else None
 
 
 def building_suffix(name: str) -> str:
@@ -159,8 +200,17 @@ def distance_m(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
     return math.hypot(dx, dy)
 
 
-def classify(location: SchoolLocation, school: School, points: list[Point]) -> Row:
-    """Match one location to at most one municipal point."""
+def classify(
+    location: SchoolLocation, school: School, points: list[Point], *, single_location: bool = False
+) -> Row:
+    """Match one location to at most one municipal point.
+
+    A school with one location whose address names no matching point still matches the
+    only point with its number and stage whose distinctive name words are all in its own
+    name ("match_by_name"; 33. ОУ and 33. ЕГ share a number): the register address is
+    often just the complex ("ж.к. Дружба 1"), the point is the building.
+    Kindergartens are left out because they run several buildings under one name.
+    """
     name = (school.name_i18n or {}).get("bg") or ""
     address = (location.address_i18n or {}).get("bg") or ""
     key = name_key(name)
@@ -185,6 +235,16 @@ def classify(location: SchoolLocation, school: School, points: list[Point]) -> R
             return Row(location, school, "match", point, same_name)
         if len(agreeing) > 1:
             return Row(location, school, "ambiguous", None, agreeing)
+        if single_location and key[0] == "school":
+            words = name_words(name)
+            stage = school_stage(name)
+            named = [
+                p for p in same_name
+                if name_words(p.name) and name_words(p.name) <= words
+                and (stage is None or school_stage(p.name) in (None, stage))
+            ]
+            if len(named) == 1:
+                return Row(location, school, "match_by_name", named[0], same_name)
         return Row(location, school, "name_only", None, same_name)
     # No numbered name (or no point with that number): same kind at the same address,
     # confirmed by at least two distinctive name words.
@@ -348,7 +408,7 @@ async def fill_districts(db, apply: bool) -> None:
 
 async def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--apply", action="store_true", help="write the 'match' rows")
+    parser.add_argument("--apply", action="store_true", help="write the 'match' and 'match_by_name' rows")
     parser.add_argument("--report-root", type=Path, default=DEFAULT_REPORT_ROOT)
     parser.add_argument(
         "--fill-districts",
@@ -371,9 +431,13 @@ async def main() -> None:
             .where(School.city == "sofia", School.school_type == "state")
             .order_by(SchoolLocation.id)
         )).all()
-        rows = [classify(loc, school, points) for loc, school in pairs]
+        locations_per_school = Counter(school.id for _, school in pairs)
+        rows = [
+            classify(loc, school, points, single_location=locations_per_school[school.id] == 1)
+            for loc, school in pairs
+        ]
         for row in rows:
-            if row.status == "match" and _shares_point_with_other_address(row.point, points):
+            if row.status in MATCHED and _shares_point_with_other_address(row.point, points):
                 row.status, row.candidates = "shared_point", [row.point]
                 row.point = None
         for row in rows:
@@ -395,7 +459,7 @@ async def main() -> None:
             return
         written = 0
         for row in rows:
-            if row.status == "match" and await apply_match(db, row):
+            if row.status in MATCHED and await apply_match(db, row):
                 written += 1
         await db.commit()
         print(f"Wrote {written} municipal points")

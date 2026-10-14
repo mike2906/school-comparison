@@ -2,7 +2,8 @@
 """Load the admission cut-off archive into ``schools.admission_info`` (docs/ADMISSION_CUTOFFS.md).
 
 Reads a checkout of the ``cutoff-data`` branch, matches each row to a school (kg.sofia.bg
-institution id via ``attributes.kg_sofia_id(s)``, РУО rows via the НЕИСПУО code), and
+institution id via ``attributes.kg_sofia_id(s)``, else for 1st grade and school ПГУ by the
+Sofia school number, see ``isodz_school_match``; РУО rows via the НЕИСПУО code), and
 rewrites only the derived keys: ``cutoffs``, ``cutoff_summary``, ``kg_sofia_ids`` and
 ``admin_district``. The archive is the source of truth, so re-running is safe and a school
 whose rows disappear loses those keys. (First-grade ``catchment_ids`` come from
@@ -18,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import json
 import sys
 from collections import Counter
 from pathlib import Path
@@ -29,6 +31,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from app.database import async_session_maker  # noqa: E402
 from app.models import School  # noqa: E402
+from app.scrapers.sources.bg.isodz_school_match import match_school, number_index  # noqa: E402
 from app.services.admission_cutoffs import (  # noqa: E402
     iter_rows,
     match_key,
@@ -36,6 +39,8 @@ from app.services.admission_cutoffs import (  # noqa: E402
     school_cutoffs,
 )
 
+# ИСОДЗ stages run by schools, whose ids are not on our schools: matched by school number.
+SCHOOL_STAGES = ("grade_1", "preparatory")
 DERIVED_KEYS = ("cutoffs", "cutoff_summary", "kg_sofia_ids", "admin_district")
 
 
@@ -83,26 +88,33 @@ def apply_to_school(school: Any, keys: dict[str, Any]) -> bool:
     return True
 
 
-async def run(archive: Path, apply: bool) -> dict[str, Any]:
+async def run(archive: Path, apply: bool, max_unmatched: int | None = None) -> dict[str, Any]:
     rows = list(iter_rows(archive))
     async with async_session_maker() as db:
         schools = list((await db.execute(select(School).where(School.country_code == "bg"))).scalars())
         index = school_index(schools)
+        numbers = number_index(schools)
         by_school: dict[int, list[dict[str, Any]]] = {}
         unmatched: Counter = Counter()
         for row in rows:
             school_id = index.get(match_key(row))
+            if school_id is None and row.get("source") == "kg.sofia.bg" and row["stage"] in SCHOOL_STAGES:
+                school = match_school(row.get("institution_name"), numbers)
+                school_id = school.id if school else None
             if school_id is None:
                 unmatched[(row["stage"], row["source_id"], row.get("institution_name"))] += 1
                 continue
             by_school.setdefault(school_id, []).append(row)
 
         changed = 0
+        with_summary = 0
         for school in schools:
             keys = derived_admission_keys(by_school.get(school.id, []))
             if apply_to_school(school, keys):
                 changed += 1
-        if apply:
+            with_summary += bool(keys.get("cutoff_summary"))
+        refused = apply and max_unmatched is not None and len(unmatched) > max_unmatched
+        if apply and not refused:
             await db.commit()
         else:
             await db.rollback()
@@ -111,13 +123,14 @@ async def run(archive: Path, apply: bool) -> dict[str, Any]:
     summary = {
         "rows": len(rows),
         "schools_with_cutoffs": len(by_school),
+        "schools_with_summary": with_summary,
         "schools_changed": changed,
         "unmatched_institutions": len(unmatched),
         "unmatched_by_stage": dict(unmatched_by_stage),
-        "applied": apply,
+        "applied": apply and not refused,
     }
     print(summary)
-    for (stage, source_id, name), count in sorted(unmatched.items())[:40]:
+    for (stage, source_id, name), count in sorted(unmatched.items()):
         print(f"  unmatched {stage} {source_id} {name} ({count} rows)")
     return summary
 
@@ -126,8 +139,14 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--archive", type=Path, required=True, help="checkout of the cutoff-data branch")
     parser.add_argument("--apply", action="store_true", help="write the changes (default: dry run)")
+    parser.add_argument("--max-unmatched", type=int, help="with --apply, write nothing if more institutions are unmatched")
+    parser.add_argument("--summary-json", type=Path, help="also write the summary here")
     args = parser.parse_args()
-    asyncio.run(run(args.archive, args.apply))
+    summary = asyncio.run(run(args.archive, args.apply, args.max_unmatched))
+    if args.summary_json:
+        args.summary_json.write_text(json.dumps(summary) + "\n", encoding="utf-8")
+    if args.apply and not summary["applied"]:
+        sys.exit(f"not applied: {summary['unmatched_institutions']} unmatched institutions > --max-unmatched {args.max_unmatched}")
 
 
 if __name__ == "__main__":

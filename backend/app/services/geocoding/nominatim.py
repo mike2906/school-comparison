@@ -674,6 +674,20 @@ class NominatimProvider(BaseGeocodingProvider):
                 provider=self.provider_name,
             )
 
+    async def reverse_address(self, lat: float, lng: float) -> Optional[dict]:
+        """The address parts (road, house_number, ...) of the building nearest the point,
+        or None when Nominatim has none."""
+        await self._enforce_rate_limit()
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(
+                f"{self.BASE_URL}/reverse",
+                params={"lat": lat, "lon": lng, "format": "jsonv2", "zoom": 18, "addressdetails": 1},
+                headers={"User-Agent": self.user_agent},
+            )
+            response.raise_for_status()
+            address = response.json().get("address")
+        return address if isinstance(address, dict) else None
+
     async def reverse_geocode(self, lat: float, lng: float) -> GeocodingResult:
         """
         Reverse geocode coordinates to an address.

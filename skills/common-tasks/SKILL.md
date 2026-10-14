@@ -96,12 +96,13 @@ Production serves a copy of the launch DB. A change there (import, correction, m
 not on the site until it is published:
 
 ```bash
-backend/scripts/backup_offsite.sh        # uploads the launch DB; the output names the dump
-gh workflow run deploy.yml -f snapshot=sofia_schools-<stamp>.dump
+backend/scripts/publish_snapshot.sh      # upload a dump, run deploy.yml with it, wait
 ```
 
-The run loads the dump on the host (backup first, automatic restore on failure) and rebuilds
-the site; the API is down for about a minute. Wait for it in one background command, then
+It holds a machine-wide publish lock, so publishes from several threads (and the hourly
+cut-off publish, `docs/ADMISSION_CUTOFFS.md`) never overlap; it waits for the lock. The
+run loads the dump on the host (backup first, automatic restore on failure) and rebuilds
+the site; the API is down for about a minute. Run it in one background command, then
 check the run summary (`schools: <before> -> <after>`) and the live API against the launch DB
 (e.g. the school count from `https://api.schooldecider.com/schools?country_code=bg&city=sofia`).
 A green run alone is not proof: verify the data. Details and the manual fallback:

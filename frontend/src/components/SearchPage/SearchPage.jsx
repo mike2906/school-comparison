@@ -52,6 +52,7 @@ import {
   closedDetailSchoolId,
 } from '../../utils/searchViewState'
 import { LANGUAGE_SWITCH_EVENT, languageSwitchArrival } from '../../utils/languageSwitch'
+import { pinnedLocation } from '../../utils/coordinates'
 
 const TYPE_SORT_ORDER = {
   state: 0,
@@ -571,29 +572,33 @@ function SearchPage() {
     handleFilterChange({ schoolType: 'private' })
   }, [rawSchoolType])
 
-  const getPrimaryLocation = (school) => {
-    return school.locations?.find(location => location.is_primary) || school.locations?.[0]
-  }
-
-  const getLocationForAgeGroup = (school, ageGroupValue) => {
-    if (!ageGroupValue) return getPrimaryLocation(school)
-    const matching = school.locations?.filter(location => {
+  const locationsForAgeGroup = (school, ageGroupValue) => {
+    const all = school.locations || []
+    if (!ageGroupValue) return all
+    const matching = all.filter(location => {
       if (Array.isArray(location.age_groups)) return location.age_groups.includes(ageGroupValue)
       if (location.age_group) return location.age_group === ageGroupValue
       return false
-    }) || []
-    return matching.find(location => location.is_primary) || matching[0] || getPrimaryLocation(school)
+    })
+    return matching.length ? matching : all
+  }
+
+  const getLocationForAgeGroup = (school, ageGroupValue) => {
+    const locations = locationsForAgeGroup(school, ageGroupValue)
+    return locations.find(location => location.is_primary) || locations[0]
   }
 
   const schoolsWithDistance = useMemo(() => {
     if (!userLocation) return schools
 
     return schools.map(school => {
-      const distanceLocation = getLocationForAgeGroup(school, filters.ageGroup)
-      const distance = distanceLocation?.lat && distanceLocation?.lng
+      // Measured from a pinned building, so a school whose main address has no verified
+      // pin still passes the distance filter through another building that has one.
+      const distanceLocation = pinnedLocation(locationsForAgeGroup(school, filters.ageGroup))
+      const distance = distanceLocation
         ? calculateDistance(userLocation.lat, userLocation.lng, distanceLocation.lat, distanceLocation.lng)
         : null
-      return { ...school, distance, distanceApproximate: Boolean(distanceLocation?.coordinates_approximate) }
+      return { ...school, distance }
     })
   }, [schools, userLocation, filters.ageGroup])
 

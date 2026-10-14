@@ -26,6 +26,11 @@ die() {
 }
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+# backend/reports/ is untracked and lives only in the main checkout, so a run from a git
+# worktree archives the main checkout's copy.
+main_root="$(cd "$(git -C "$repo_root" rev-parse --path-format=absolute --git-common-dir)/.." && pwd)" \
+	|| die "$repo_root is not in a git checkout"
+[ -d "$main_root/backend/reports" ] || die "$main_root/backend/reports not found"
 env_file="${BACKUP_ENV_FILE:-$HOME/.config/schooldecider/backup.env}"
 database="${BACKUP_DATABASE:-sofia_schools}"
 container="${BACKUP_DB_CONTAINER:-sofia_schools_db}"
@@ -52,7 +57,7 @@ docker exec "$container" pg_dump -U postgres -d "$database" --format=custom > "$
 	|| die "the dump is empty or unreadable"
 
 # Older database dumps kept under reports/ are left out: this run's dump supersedes them.
-tar -czf "$reports" -C "$repo_root/backend" --exclude='*.dump' reports \
+tar -czf "$reports" -C "$main_root/backend" --exclude='*.dump' reports \
 	|| die "could not archive backend/reports"
 
 for file in "$dump" "$reports"; do

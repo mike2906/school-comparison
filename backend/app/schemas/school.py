@@ -2,12 +2,21 @@ from datetime import datetime
 from functools import cached_property
 from typing import Any, ClassVar, Literal, Optional, Union
 
-from pydantic import BaseModel, ConfigDict, Field, JsonValue, computed_field, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    JsonValue,
+    computed_field,
+    field_validator,
+    model_validator,
+)
 
 from app.models.pricing import PriceSource
 from app.schemas.field_source import FieldSourceResponse
 from app.schemas.pricing import PricingResponse
 from app.utils.display_gating import (
+    UNVERIFIED_PIN_PRECISION,
     blocked_pricing_row_ids,
     exam_result_is_publishable,
     implausible_tuition_row_ids,
@@ -280,13 +289,19 @@ class SchoolLocationBase(BaseModel):
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
-    @computed_field(return_type=bool)
-    @property
-    def coordinates_approximate(self) -> bool:
-        """The pin is street/area level, not the building (only this flag is published)."""
+    @model_validator(mode="after")
+    def withhold_unverified_pin(self) -> "SchoolLocationBase":
+        """Publish no pin rather than a street- or area-level guess.
+
+        An approximate point (a dataset name match, a street without the house) can sit
+        hundreds of metres to kilometres from the building; the location is still listed
+        with its address. The point stays in the DB for geocoding checks.
+        """
         meta = self.raw_geocode_meta if isinstance(self.raw_geocode_meta, dict) else {}
-        has_pin = self.lat is not None and self.lng is not None
-        return has_pin and meta.get("precision") == "approximate"
+        if meta.get("precision") == UNVERIFIED_PIN_PRECISION:
+            self.lat = None
+            self.lng = None
+        return self
 
     @field_validator("address_i18n", mode="before")
     @classmethod
