@@ -148,8 +148,14 @@ async def test_no_judge_call_when_no_quote_is_on_a_page():
 
 
 class _Db:
-    def __init__(self):
+    def __init__(self, fresh_attributes=None):
         self.commits = 0
+        self.fresh_attributes = fresh_attributes  # what another stage wrote during the read
+
+    async def refresh(self, obj, attribute_names=None, with_for_update=None):
+        assert attribute_names == ["attributes"] and with_for_update
+        if self.fresh_attributes is not None:
+            obj.attributes = self.fresh_attributes
 
     async def commit(self):
         self.commits += 1
@@ -177,6 +183,18 @@ async def test_apply_replaces_stored_facts_and_dry_run_writes_nothing():
     assert report["stored"] == 1 and db.commits == 1 and school.attributes["other"] == 1
     assert stored["_schema_version"] == 1 and [f["topic"] for f in stored["facts"]] == ["school_day"]
     assert stored["website_url"] == HOME
+
+
+@pytest.mark.asyncio
+async def test_apply_keeps_keys_another_stage_wrote_during_the_read():
+    quote = "Учебният ден започва в 08:00 часа и приключва в 14:00 часа."
+    school = _school(school_facts={"_schema_version": 1, "facts": []})
+    db = _Db(fresh_attributes={"social_links": {"facebook": "x"}})
+    await stage.run_school(
+        db, school, find=await _find(PAGES), call=_Calls([_fact("school_day", quote)], passed=[1]), apply=True
+    )
+    assert school.attributes["social_links"] == {"facebook": "x"}
+    assert [f["topic"] for f in school.attributes["school_facts"]["facts"]] == ["school_day"]
 
 
 @pytest.mark.asyncio
