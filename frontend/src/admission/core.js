@@ -19,10 +19,6 @@ export function addRanges(...ranges) {
   return ranges.reduce((acc, r) => range(acc.min + r.min, acc.max + r.max), ZERO)
 }
 
-export function isExact(r) {
-  return r.min === r.max
-}
-
 /** A yes/no criterion worth `points`: yes → points, no → 0, unknown → 0 to points. */
 export function flagPoints(answer, points) {
   if (answer === true) return range(points)
@@ -39,11 +35,6 @@ export function bestOf(parts) {
   return range(Math.max(...parts.map(p => p.min)), Math.max(...parts.map(p => p.max)))
 }
 
-/** Clamp a range to an upper limit ("at most 4 points from this section"). */
-export function capRange(r, cap) {
-  return range(Math.min(r.min, cap), Math.min(r.max, cap))
-}
-
 /** A real calendar day as a UTC timestamp, or null (rejects 2026-02-30). */
 function parseDay(iso) {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || '')
@@ -56,11 +47,13 @@ function parseDay(iso) {
 }
 
 /**
- * The day `years` after `since`. A 29 February start reaches its anniversary on
- * 1 March in a common year (Date.UTC rolls the day over).
+ * The day `years` after `since`. A term counted in years ends on the same date of the
+ * last month, or on that month's last day when it has no such date (ЗЗД чл. 60 ал. 2),
+ * so a 29 February start reaches its anniversary on 28 February in a common year.
  */
 function anniversary(since, years) {
-  return Date.UTC(since.y + years, since.m - 1, since.d)
+  const lastDay = new Date(Date.UTC(since.y + years, since.m, 0)).getUTCDate()
+  return Date.UTC(since.y + years, since.m - 1, Math.min(since.d, lastDay))
 }
 
 /** True when both are real days and `sinceIso` is not after `onIso`. */
@@ -179,6 +172,3 @@ export function campaignForStartYear(year) {
 }
 
 /** The September start year of a campaign (`2026/2027` → 2026). */
-export function startYearOfCampaign(campaign) {
-  return Number(String(campaign).slice(0, 4))
-}

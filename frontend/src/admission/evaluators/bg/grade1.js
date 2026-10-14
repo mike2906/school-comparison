@@ -21,7 +21,9 @@ function groupFor(params, address, context, measuredOn) {
   const rule = params.groups
   if (context.siblingUnderAgeAtSchool === true) return range(rule.sibling_group)
   const outside = rule.outside_group
-  const inside = durationTiers(rule.tiers, address?.since, measuredOn).map(tier => tier.group)
+  const matched = durationTiers(rule.tiers, address?.since, measuredOn)
+  // A rule file without a floor tier leaves short durations unmatched: the worst inside group.
+  const inside = (matched.length ? matched : rule.tiers.slice(-1)).map(tier => tier.group)
   let groups
   if (address?.inCatchment === true) groups = inside
   else if (address?.inCatchment === false) groups = [outside]
@@ -33,10 +35,14 @@ function groupFor(params, address, context, measuredOn) {
 
 function extraItems(params, answers, address, context, group) {
   const points = params.extra_points
-  const neighbouringApplies = group.max >= params.neighbouring_only_in_group
-  const neighbouring = !neighbouringApplies || address?.inCatchment === true
-    ? ZERO
-    : flagPoints(address?.inNeighbouring, points.neighbouring_catchment)
+  // The neighbouring bonus counts only in group 4; while the group is uncertain it may
+  // or may not apply.
+  const onlyIn = params.neighbouring_only_in_group
+  let neighbouring = ZERO
+  if (group.max >= onlyIn && address?.inCatchment !== true) {
+    neighbouring = flagPoints(address?.inNeighbouring, points.neighbouring_catchment)
+    if (group.min < onlyIn) neighbouring = range(0, neighbouring.max)
+  }
   return [
     { id: 'disability_50', points: flagPoints(answers.disability50, points.disability_50) },
     { id: 'parent_deceased', points: flagPoints(answers.parentDeceased, points.parent_deceased) },
@@ -63,6 +69,7 @@ function extraItems(params, answers, address, context, group) {
  * @param {object} options  { measuredOn } — the application date
  */
 export function evaluate(params, answers = {}, context = {}, { measuredOn } = {}) {
+  if (!measuredOn) throw new Error('evaluate needs options.measuredOn (the application date)')
   const address = answers.address || {}
   const group = groupFor(params, address, context, measuredOn)
   const items = extraItems(params, answers, address, context, group)

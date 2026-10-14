@@ -34,7 +34,7 @@ test('bestOf keeps only the best of mutually exclusive criteria', () => {
 test('wholeYearsBetween counts completed years and handles the anniversary', () => {
   assert.equal(wholeYearsBetween('2023-03-19', '2026-03-19'), 3)
   assert.equal(wholeYearsBetween('2023-03-19', '2026-03-18'), 2)
-  assert.equal(wholeYearsBetween('2024-02-29', '2025-02-28'), 0)
+  assert.equal(wholeYearsBetween('2024-02-29', '2025-02-28'), 1)
   assert.equal(wholeYearsBetween('2026-05-01', '2026-04-01'), null)
   assert.equal(wholeYearsBetween(null, '2026-04-01'), null)
 })
@@ -107,11 +107,12 @@ test('impossible, future and leap-day dates', () => {
   assert.equal(isValidSpan('2026-02-30', '2026-05-22'), false)
   assert.equal(isValidSpan('2026-06-01', '2026-05-22'), false)
   assert.equal(isValidSpan('2026-05-22', null), false)
-  // 29 February reaches its anniversary on 1 March in a common year.
-  assert.equal(wholeYearsBetween('2024-02-29', '2027-02-28'), 2)
-  assert.equal(wholeYearsBetween('2024-02-29', '2027-03-01'), 3)
-  assert.equal(moreThanYears('2024-02-29', '2027-03-01', 3), false)
-  assert.equal(moreThanYears('2024-02-29', '2027-03-02', 3), true)
+  // A year-term ends on the month's last day when it has no such date (ЗЗД чл. 60 ал. 2).
+  assert.equal(wholeYearsBetween('2024-02-29', '2027-02-27'), 2)
+  assert.equal(wholeYearsBetween('2024-02-29', '2027-02-28'), 3)
+  assert.equal(moreThanYears('2024-02-29', '2027-02-28', 3), false)
+  assert.equal(moreThanYears('2024-02-29', '2027-03-01', 3), true)
+  assert.equal(wholeYearsBetween('2024-02-29', '2028-02-29'), 4)
   const tiers = [{ more_than_years: 3, points: 8 }, { at_least_years: 1, points: 5 }, { points: 3 }]
   assert.deepEqual(durationTierPoints(tiers, '2026-06-01', '2026-05-22'), range(3, 8))
   assert.deepEqual(durationTierPoints(tiers, '2020-01-01', null), range(3, 8))

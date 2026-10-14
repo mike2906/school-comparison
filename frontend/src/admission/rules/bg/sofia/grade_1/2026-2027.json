@@ -338,6 +338,39 @@
           "max": 5
         }
       }
+    },
+    {
+      "name": "not sure about a sibling at the school: the group could be 1, so the neighbouring bonus is only possible",
+      "answers": {
+        "address": {
+          "inCatchment": false,
+          "inNeighbouring": true,
+          "since": "2015-01-01"
+        },
+        "disability50": false,
+        "parentDeceased": false,
+        "moreThanTwoChildren": false,
+        "twins": false,
+        "fosterUnknownAdopted": false
+      },
+      "context": {
+        "siblingUnderAgeAtSchool": null,
+        "siblingAtSchool": false,
+        "preparatoryGroupHere": false
+      },
+      "options": {
+        "measuredOn": "2026-05-31"
+      },
+      "expected": {
+        "group": {
+          "min": 1,
+          "max": 4
+        },
+        "points": {
+          "min": 0,
+          "max": 5
+        }
+      }
     }
   ]
 }

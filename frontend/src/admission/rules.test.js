@@ -48,6 +48,10 @@ test('every rule file is well formed', () => {
     }
     for (const id of rules.verified.sources) assert.ok(sourceIds.has(id), `${file}: verified cites unknown source ${id}`)
     assert.ok((rules.examples || []).length >= 3, `${file}: needs worked examples`)
+    for (const tiers of [rules.params.address_duration?.tiers, rules.params.groups?.tiers].filter(Boolean)) {
+      const last = tiers[tiers.length - 1]
+      assert.ok(last.more_than_years == null && last.at_least_years == null, `${file}: duration tiers need a floor tier`)
+    }
   }
 })
 

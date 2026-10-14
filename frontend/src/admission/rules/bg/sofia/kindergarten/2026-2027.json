@@ -554,6 +554,42 @@
       "expected": {
         "total": 18
       }
+    },
+    {
+      "name": "not sure about a Sofia address leaves both address criteria open; no parents given counts as unknown",
+      "answers": {
+        "ageGroup": "second",
+        "inSofia": null,
+        "addressSince": "2015-01-01",
+        "homeDistrict": "15",
+        "twins": false,
+        "closeInAge": false,
+        "social": {
+          "parentsDeceased": "none",
+          "family_disability_70": false,
+          "unknown_or_restricted_parent": false,
+          "foster_or_adopted": false,
+          "child_at_risk": false,
+          "three_plus_children": false
+        },
+        "additional": "none",
+        "transfer": false
+      },
+      "context": {
+        "district": "15",
+        "siblingThere": false,
+        "wishRank": 1
+      },
+      "options": {
+        "campaign": "2026/2027",
+        "measuredOn": "2026-05-22"
+      },
+      "expected": {
+        "total": {
+          "min": 3,
+          "max": 18
+        }
+      }
     }
   ]
 }

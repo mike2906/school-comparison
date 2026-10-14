@@ -34,6 +34,8 @@ function pointValues(table) {
 function parentActivityPoints(params, parents) {
   const table = params.parent_activity
   const best = Math.max(...pointValues(table))
+  // No parents given yet: one or two parents, each possibly earning the points.
+  if (!parents || parents.length === 0) return range(0, 2 * best)
   return addRanges(
     ...(parents || []).map(parent => {
       const activity = parent?.activity
@@ -59,8 +61,10 @@ function addressDurationPoints(params, answers, measuredOn) {
 function sameDistrictPoints(params, answers, context) {
   const points = params.same_district.points
   if (answers.inSofia === false) return ZERO
-  if (answers.homeDistrict == null || context.district == null) return range(0, points)
-  return range(answers.homeDistrict === context.district ? points : 0)
+  const known = answers.homeDistrict != null && context.district != null
+  if (known && answers.homeDistrict !== context.district) return ZERO
+  if (known && answers.inSofia === true) return range(points)
+  return range(0, points)
 }
 
 function nurseryPoints(params, answers, campaign) {
@@ -116,6 +120,9 @@ function wishPoints(params, answers, context) {
  *                          duration is counted to
  */
 export function evaluate(params, answers = {}, context = {}, { campaign, measuredOn } = {}) {
+  // Both decide points (address duration, the nursery point's end), so a caller that
+  // forgets them must fail rather than quietly award or widen points.
+  if (!campaign || !measuredOn) throw new Error('evaluate needs options.campaign and options.measuredOn')
   const social = socialItems(params, answers)
   const items = [
     { id: 'address_duration', group: 'general', points: addressDurationPoints(params, answers, measuredOn) },
