@@ -2,7 +2,8 @@
 """Load the admission cut-off archive into ``schools.admission_info`` (docs/ADMISSION_CUTOFFS.md).
 
 Reads a checkout of the ``cutoff-data`` branch, matches each row to a school (kg.sofia.bg
-institution id via ``attributes.kg_sofia_id(s)``, РУО rows via the НЕИСПУО code), and
+institution id via ``attributes.kg_sofia_id(s)``, else for 1st grade and school ПГУ by the
+Sofia school number, see ``isodz_school_match``; РУО rows via the НЕИСПУО code), and
 rewrites only the derived keys: ``cutoffs``, ``cutoff_summary``, ``kg_sofia_ids`` and
 ``admin_district``. The archive is the source of truth, so re-running is safe and a school
 whose rows disappear loses those keys. (First-grade ``catchment_ids`` come from
@@ -29,6 +30,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from app.database import async_session_maker  # noqa: E402
 from app.models import School  # noqa: E402
+from app.scrapers.sources.bg.isodz_school_match import match_school, number_index  # noqa: E402
 from app.services.admission_cutoffs import (  # noqa: E402
     iter_rows,
     match_key,
@@ -36,6 +38,8 @@ from app.services.admission_cutoffs import (  # noqa: E402
     school_cutoffs,
 )
 
+# ИСОДЗ stages run by schools, whose ids are not on our schools: matched by school number.
+SCHOOL_STAGES = ("grade_1", "preparatory")
 DERIVED_KEYS = ("cutoffs", "cutoff_summary", "kg_sofia_ids", "admin_district")
 
 
@@ -88,10 +92,14 @@ async def run(archive: Path, apply: bool) -> dict[str, Any]:
     async with async_session_maker() as db:
         schools = list((await db.execute(select(School).where(School.country_code == "bg"))).scalars())
         index = school_index(schools)
+        numbers = number_index(schools)
         by_school: dict[int, list[dict[str, Any]]] = {}
         unmatched: Counter = Counter()
         for row in rows:
             school_id = index.get(match_key(row))
+            if school_id is None and row.get("source") == "kg.sofia.bg" and row["stage"] in SCHOOL_STAGES:
+                school = match_school(row.get("institution_name"), numbers)
+                school_id = school.id if school else None
             if school_id is None:
                 unmatched[(row["stage"], row["source_id"], row.get("institution_name"))] += 1
                 continue
@@ -117,7 +125,7 @@ async def run(archive: Path, apply: bool) -> dict[str, Any]:
         "applied": apply,
     }
     print(summary)
-    for (stage, source_id, name), count in sorted(unmatched.items())[:40]:
+    for (stage, source_id, name), count in sorted(unmatched.items()):
         print(f"  unmatched {stage} {source_id} {name} ({count} rows)")
     return summary
 

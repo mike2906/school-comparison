@@ -73,8 +73,10 @@ files themselves download directly.
 ## Into the site
 
 `backend/scripts/import_cutoffs.py --archive <checkout of cutoff-data> [--apply]` matches rows
-to schools (kg.sofia.bg ids via `attributes.kg_sofia_id(s)`, РУО rows via
-`schools.institutional_id`) and rewrites only derived `admission_info` keys: `cutoffs` (all
+to schools (kg.sofia.bg ids via `attributes.kg_sofia_id(s)`, which only kindergartens
+carry; 1st-grade and school ПГУ rows by the Sofia school number, which is the last three
+digits of the НЕИСПУО code, confirmed by a word of the patron's name (`isodz_school_match.py`);
+РУО rows via `schools.institutional_id`) and rewrites only derived `admission_info` keys: `cutoffs` (all
 rows, trimmed; detail and compare responses only), `cutoff_summary` (per stage x age group
 or class x building: the general-queue first and latest round of the latest campaign; also
 on list responses), `kg_sofia_ids` and `admin_district`. (First-grade `catchment_ids`
