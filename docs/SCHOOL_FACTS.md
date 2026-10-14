@@ -23,39 +23,45 @@ some picks were trivia, yearly counts go stale, the paragraph only restated the 
 
 1. **Find.** The fees agent's finder (`find_pages`) with its own link prompt: about,
    curriculum, school day, admissions, clubs, transport, meals, support pages.
-2. **Read.** One `pricing`-tier call lists up to 8 facts, at most 2 a topic, each under one
-   fixed topic (`app/utils/school_facts.py` `TOPICS`: curriculum, languages, school_day,
-   class_size, meals, transport, activities, facilities, support, admissions), in Bulgarian
-   and English, with the page line it came from. Fees, exam results, slogans, news and
-   yearly counts are excluded in the prompt.
+2. **Read.** One `pricing`-tier call lists up to 20 facts, each under one fixed topic
+   (`app/utils/school_facts.py` `TOPICS`: curriculum, languages, school_day, class_size,
+   meals, transport, activities, facilities, support, admissions), in Bulgarian and English,
+   with the page line it came from. Fees, exam results, slogans, news and yearly counts are
+   excluded in the prompt. A fact can carry labels its quote states: filter tags from the
+   existing vocabulary (`FACT_TAGS`: transportation, cafeteria, meals_provided, extended_day,
+   ...), languages with a level (immersion, bilingual, enrichment), and a maximum class size.
 3. **Check.** Code keeps a fact only if its quote is on a page read (markup and quote marks
-   ignored). A second call on the same tier confirms each quote states the whole fact.
+   ignored). A second call on the same tier confirms each quote states the whole fact and
+   its labels, and grades it: `key` (what parents choose on: programme, languages, hours,
+   bus, meals, class size, support, admissions), `more` (concrete but secondary) or `minor`.
 4. **Store** (`--apply` only): `attributes["school_facts"]` =
-   `{_schema_version, read_at, website_url, model, facts: [{topic, text_i18n, source_url, quote}]}`.
-   Stored facts whose quote is still on a page read are carried into the new set (new facts
-   first, same limits). A read that keeps facts replaces the stored ones, and so does a read of 4 or more pages
+   `{_schema_version, read_at, website_url, model, facts: [{topic, text_i18n, source_url, quote, rank, tags, languages, max_class_size}]}`,
+   key facts first. Stored facts whose quote is still on a page read are carried into the
+   new set with their grade. A read that keeps facts replaces the stored ones, and so does a read of 4 or more pages
    that keeps none. A site not read, or read from fewer pages with no fact kept (often a
    partial crawl), keeps the stored facts.
 
 **Shown to parents** (`school_facts` on the detail and compare responses; the quote stays
-internal): a "From the school's website" box on the school page, one line per fact with
-its topic and a link to its page, and the date it was read; and a compare-page section
-with one row per topic any compared school has. A school with none shows nothing. Facts
-carry their own checks, so they do not wait for a Stage 6 report, but a website-data
-withholding marker (failed URL check, shared site) hides them, and so does a change of
-website (host and path) or a website URL validation has not accepted (`pending`,
-`failed_validate`, `no_official_website`; `SITE_ACCEPTED_STATUSES`): facts show only while
-`website_url` is an accepted site and the one they were read from. The stage reads only
-accepted sites.
+internal): a "From the school's website" box on the school page with the key facts (8 at
+most, 2 a topic; later key facts show as `more`), a "show more" for the rest, a link to
+each fact's page and the date it was read; and a compare-page section with one row per
+topic any compared school has a key fact for. `minor` facts are not shown. A school with
+none shows nothing.
 
-Known gap: the compare page's Practical rows (meals, transport, after-school care) come from
-the old extraction, so a school can show "Not available" there and a meals fact in the
-facts section. Those rows should read the facts once filter fields come from them (gap 1
-below).
+**Labels feed the existing filters and fields** (`publication_attributes`): a shown fact's
+tags join `filter_tags` (so the search filters and the compare page's meals, transport and
+after-school rows see them), its languages join `language_focus`, and its class size is
+used when no curated one exists (before the old extraction's). Facts carry their own
+checks, so they do not wait for a Stage 6 report, but a website-data withholding marker
+(failed URL check, shared site) hides them and their labels, and so does a change of
+website (host and path) or a website URL validation has not accepted (`pending`,
+`failed_validate`, `no_official_website`; `SITE_ACCEPTED_STATUSES`). The stage reads only
+accepted sites.
 
 Running it: `uv run python -m app.scrapers.cli school-facts --school-id N [--school-id M]
 [--city sofia --limit 20] [--apply] --out report.json`. Dry run by default. About $0.006 a
-school (Sofia ~$3). Nothing reaches the site until an `--apply` run is published.
+school with 8 facts (Sofia ~$3); up to 20 facts with labels is estimated at 15 to 25 % more,
+to be measured on the trial schools. Nothing reaches the site until an `--apply` run is published.
 
 ## Before a Sofia-wide `--apply`
 
@@ -81,6 +87,10 @@ school (Sofia ~$3). Nothing reaches the site until an `--apply` run is published
 - Note for runs: the cost guard reserves $0.10 per call, so `--max-usd` needs about $0.10
   headroom above the expected spend.
 - Top up OpenRouter (about $1.35 left on 2026-10-13).
+- Checker model: Luna. Considered (2026-10-14) TypeSafe's Jev decision model on OpenRouter
+  ($0.042 per million input tokens, typed yes/no and choice answers with probabilities): the
+  checker costs about $0.0005 a school, so it saves pennies, and its accuracy on
+  Bulgarian quote-supports-fact checks is untested. Worth a trial only at much larger scale.
 - Decide refresh: facts carry `read_at`; a yearly re-read is enough for most topics.
   Runs vary, so a refresh could keep the old fact where the new read only rewords it.
 
@@ -102,7 +112,8 @@ take over **reading** websites; the rest stays.
 
 Gaps to close before deleting stage 4 and 5 code:
 
-1. **Filter fields.** Search filters (language focus, special programmes, facilities,
+1. **Filter fields.** Started (2026-10-14): fact labels feed the existing filter tags,
+   language focus and class size; still to measure against the old extraction. Search filters (language focus, special programmes, facilities,
    teaching approach) and the compare page's yes/no rows (meals, transport, after-school
    care, accessibility) need values from a fixed vocabulary, not sentences. The API already
    computes filter tags from free text (`compute_filter_tags` with `canonical_tags` and the

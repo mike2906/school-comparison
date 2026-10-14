@@ -26,3 +26,10 @@ test('the read date is the date part of an ISO timestamp', () => {
   assert.equal(factsReadDate(school([], '2026-10-13T20:00:00+00:00')), '2026-10-13')
   assert.equal(factsReadDate(school([], 'soon')), '')
 })
+
+test('facts keep their rank; keyOnly keeps the key ones, and a fact with no rank is key', () => {
+  const ranked = school([{ ...fact('meals', 'Lunch'), rank: 'more' }, fact('curriculum', 'Cambridge')])
+  assert.deepEqual(getSchoolFacts(ranked, 'en').map(f => [f.text, f.rank]), [['Cambridge', 'key'], ['Lunch', 'more']])
+  assert.deepEqual(getSchoolFacts(ranked, 'en', { keyOnly: true }).map(f => f.text), ['Cambridge'])
+  assert.deepEqual(factTopicsIn([ranked], 'en'), ['curriculum'])
+})

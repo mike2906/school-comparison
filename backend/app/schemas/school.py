@@ -1,6 +1,6 @@
 from datetime import datetime
 from functools import cached_property
-from typing import Any, Optional, Union
+from typing import Any, Literal, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, computed_field, field_validator
 
@@ -17,11 +17,9 @@ from app.utils.display_gating import (
 from app.utils.i18n_resolver import resolve_address_i18n, resolve_name_i18n
 from app.utils.location_tags import semantic_location_tags
 from app.utils.school_attributes import build_display_attributes, publishable_display_i18n
-from app.utils.school_facts import SITE_ACCEPTED_STATUSES, publishable_school_facts
+from app.utils.school_facts import publication_attributes, shown_school_facts
 from app.utils.website_data import (
-    attributes_for_publication,
     website_data_is_publishable,
-    website_data_withheld_reasons,
 )
 
 
@@ -141,7 +139,10 @@ class SchoolAttributesMixin(BaseModel):
 
     @property
     def public_attributes_input(self) -> dict[str, Any]:
-        return attributes_for_publication(self.raw_attributes, self.raw_scrape_status)
+        # Shown school facts ride along so their tags, languages and class size reach the
+        # display and filter projections.
+        website_url = getattr(self, "website_url", None) or getattr(self, "raw_website_url", None)
+        return publication_attributes(self.raw_attributes, self.raw_scrape_status, website_url)
 
     @cached_property
     def display_projection(self) -> tuple[dict[str, Any], dict[str, dict[str, Any]]]:
@@ -364,6 +365,8 @@ class SchoolFact(BaseModel):
     topic: str
     text_i18n: dict[str, str]
     source_url: str
+    # "key" facts show first; "more" behind a "show more".
+    rank: Literal["key", "more"]
 
 
 class SchoolFacts(BaseModel):
@@ -395,16 +398,11 @@ class SchoolResponse(SchoolBase, SchoolPricingMixin):
     @computed_field(return_type=Optional[SchoolFacts])
     @property
     def school_facts(self) -> Optional[SchoolFacts]:
-        # Facts carry their own page checks, so they do not wait for a Stage 6 report; a
-        # withholding marker (failed URL check, shared site, re-extraction) still hides them,
-        # so does a website URL validation has not accepted, and so does a change of website
-        # (``publishable_school_facts``).
-        if "withheld_marker" in website_data_withheld_reasons(self.raw_attributes, self.raw_scrape_status):
-            return None
-        if str(self.raw_scrape_status or "").strip().lower() not in SITE_ACCEPTED_STATUSES:
-            return None
-        facts = publishable_school_facts(self.raw_attributes, self.website_url)
-        return SchoolFacts.model_validate(facts) if facts else None
+        # ``shown_school_facts`` is the gate (withholding marker, accepted website, same
+        # site). "minor" facts are not shown; they only feed the filters.
+        shown = shown_school_facts(self.raw_attributes, self.raw_scrape_status, self.website_url)
+        facts = [fact for fact in (shown or {}).get("facts", []) if fact["rank"] != "minor"]
+        return SchoolFacts.model_validate(shown | {"facts": facts}) if facts else None
 
     @computed_field(return_type=list[FieldSourceResponse])
     @property
@@ -456,6 +454,8 @@ class SchoolListResponse(SchoolPricingMixin):
     exam_results: list[ExamResultListItem] = []
     # Set on the list endpoint only (``same_place_by_school``); search leaves it empty.
     same_place: list[SamePlaceSchoolResponse] = []
+    # Not served on cards; the school-facts gate needs it so fact tags reach ``filter_tags``.
+    raw_website_url: Optional[str] = Field(default=None, validation_alias="website_url", exclude=True)
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 

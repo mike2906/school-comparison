@@ -13,8 +13,10 @@ export const FACT_TOPICS = [
   'admissions',
 ]
 
-// [{ topic, text, sourceUrl }] in topic order, text in `language` (Bulgarian if missing).
-export function getSchoolFacts(school, language) {
+// [{ topic, text, sourceUrl, rank }] in topic order, text in `language` (Bulgarian if
+// missing). `rank` is "key" (shown first) or "more" (behind "show more"); `keyOnly` keeps
+// the key facts. A fact from before ranks counts as key.
+export function getSchoolFacts(school, language, { keyOnly = false } = {}) {
   const facts = school?.school_facts?.facts
   if (!Array.isArray(facts)) return []
   return facts
@@ -23,14 +25,17 @@ export function getSchoolFacts(school, language) {
       topic: fact.topic,
       text: fact.text_i18n?.[language] || fact.text_i18n?.bg || '',
       sourceUrl: fact.source_url,
+      rank: fact.rank === 'more' ? 'more' : 'key',
     }))
-    .filter(fact => fact.text)
+    .filter(fact => fact.text && (!keyOnly || fact.rank === 'key'))
     .sort((a, b) => FACT_TOPICS.indexOf(a.topic) - FACT_TOPICS.indexOf(b.topic))
 }
 
-// Topics any of `schools` has a fact for, in display order.
+// Topics any of `schools` has a key fact for, in display order (the compare page's rows).
 export function factTopicsIn(schools, language) {
-  const present = new Set(schools.flatMap(school => getSchoolFacts(school, language).map(fact => fact.topic)))
+  const present = new Set(
+    schools.flatMap(school => getSchoolFacts(school, language, { keyOnly: true }).map(fact => fact.topic)),
+  )
   return FACT_TOPICS.filter(topic => present.has(topic))
 }
 

@@ -17,11 +17,21 @@ from typing import Literal, Optional
 from pydantic import BaseModel, Field
 
 from app.scrapers.fee_pages import page_key
-from app.utils.school_facts import SCHEMA_VERSION, TOPICS  # noqa: F401  (SCHEMA_VERSION re-exported)
+from app.utils.school_facts import (  # noqa: F401  (SCHEMA_VERSION re-exported)
+    FACT_TAGS,
+    LANGUAGE_LEVELS,
+    RANKS,
+    SCHEMA_VERSION,
+    TOPICS,
+)
 
-MAX_FACTS = 8
+# The reader's limit. Facts are graded afterwards; the API shows the key ones first.
+MAX_FACTS = 20
 
 Topic = Literal[TOPICS]  # the reader is held to the published topic list
+Tag = Literal[FACT_TAGS]
+Level = Literal[LANGUAGE_LEVELS]
+Rank = Literal[RANKS]
 
 PICK_PROMPT = """You help find the pages of a school website that describe what the school is like for a child
 and a parent: about the school, curriculum or programme, subjects and languages taught, profiled classes,
@@ -74,19 +84,41 @@ Rules:
   or "pupils are at school for the full day" with nothing more says too little; give the detail the page has
   (which sports, until what time) or leave the fact out. The subjects every school teaches under the state
   programme are not worth a fact.
-- At most 8 facts, the most useful for choosing a school first, and at most 2 per topic. Fewer is fine. If
-  the pages state nothing concrete, return no facts: that is a correct answer, never pad."""
+- Label a fact, only when its quote states it:
+  - tags, from this list: transportation (a school bus or transport service), cafeteria (the school's own
+    canteen or kitchen), meals_provided (meals served to pupils), extended_day (full-day schooling or
+    after-school care: целодневно обучение, занималня), sports_facilities (a gym, pool, pitch or courts),
+    library, computer_lab, music_program, sports_program (sports training or teams), arts_program,
+    montessori, waldorf, ib_program, project_based
+  - languages: each language the quote says is taught beyond the standard state programme, with a level when
+    stated: immersion (most teaching is in it), bilingual (some subjects are taught in it), enrichment
+    (intensive or extended study of it); no level otherwise. Write the language's English name.
+  - max_class_size: the most pupils in a class or group, as a number, only when the quote gives it.
+- Up to 20 facts, the most useful for choosing a school first. Fewer is fine. If the pages state nothing
+  concrete, return no facts: that is a correct answer, never pad."""
 
 JUDGE_PROMPT = """You check facts written about a school against the website lines they were taken from.
-For each numbered item you get a fact (in English) and a quote (usually Bulgarian). Pass an item when the quote
-states what the fact says; translation and plain rewording are fine. A heading, list item or link title that names
+For each numbered item you get a fact (in English), any labels on it (tags, languages, class size), and a quote
+(usually Bulgarian). Pass an item when the quote states what the fact and every label say; translation and plain
+rewording are fine. A heading, list item or link title that names
 a specialty, subject, club, sport or room is enough for a fact that only says the school offers or has it.
 The page's address can supply context the quote leaves out (a quote on /anglijski-ezik/ is about English).
 Fail an item when the fact adds something neither says (a number, a grade, a scope, a claim), when the quote
 describes a plan for something that does not exist yet (a menu or timetable set for the current or coming
 school year is not a plan), or
 when the quote is a bare label ("Училищен психолог") stretched into a description, or a slogan with nothing
-concrete in it. Return the numbers of the items that pass."""
+concrete in it, or when a label goes beyond the quote.
+Grade each item that passes by how much it helps a parent choose between schools, and list its number under one:
+- key: the programme or profile, which languages and how intensively, school hours or after-school care, a
+  school bus, meals, class size, support staff, or how admission works
+- more: concrete and true but secondary, such as a named club, sport, room or event that recurs every year
+- minor: true but of little use for choosing (a room every school has, a detail of a timetable)
+An item that does not pass is listed under none."""
+
+
+class LanguageLabel(BaseModel):
+    language: str = Field(description="The language's English name")
+    level: Optional[Level] = None
 
 
 class Fact(BaseModel):
@@ -95,15 +127,24 @@ class Fact(BaseModel):
     fact_bg: str
     quote: str = Field(description="The page line (or a heading and up to 8 rows) the fact comes from, verbatim")
     source_url: str = Field(description="The URL from the PAGE line of the page the quote is on")
+    tags: list[Tag] = Field(default_factory=list, description="Filter tags the quote states")
+    languages: list[LanguageLabel] = Field(default_factory=list, description="Languages taught beyond the standard")
+    max_class_size: Optional[int] = Field(default=None, description="The most pupils in a class, if the quote gives it")
 
 
 class Facts(BaseModel):
-    facts: list[Fact] = Field(description="Concrete facts, at most 8; empty if the pages state none")
+    facts: list[Fact] = Field(description="Concrete facts, at most 20; empty if the pages state none")
 
 
-class Supported(BaseModel):
-    # Required: with a default the model can answer with no list at all.
-    passed: list[int] = Field(description="The numbers of the items whose quote states the fact")
+class Graded(BaseModel):
+    # Required: with defaults the model can answer with no lists at all.
+    key: list[int] = Field(description="Items that pass and matter most for choosing a school")
+    more: list[int] = Field(description="Items that pass and are concrete but secondary")
+    minor: list[int] = Field(description="Items that pass but are of little use for choosing")
+
+    def rank(self, n: int) -> Optional[str]:
+        """The best grade item ``n`` got, or None when it did not pass."""
+        return next((rank for rank in RANKS if n in getattr(self, rank)), None)
 
 
 @lru_cache(maxsize=512)  # each page is matched against every quote part
@@ -157,6 +198,9 @@ def stored_as_fact(stored: dict) -> Optional[Fact]:
             fact_bg=text["bg"],
             quote=stored["quote"],
             source_url=stored["source_url"],
+            tags=stored.get("tags") or [],
+            languages=stored.get("languages") or [],
+            max_class_size=stored.get("max_class_size"),
         )
     except (KeyError, TypeError, ValueError):
         return None
@@ -166,17 +210,36 @@ def quote_key(fact: Fact) -> str:
     return _strip(_normalise(fact.quote))
 
 
+def _labels(fact: Fact) -> str:
+    parts = []
+    if fact.tags:
+        parts.append("Tags: " + ", ".join(fact.tags))
+    if fact.languages:
+        parts.append(
+            "Languages: "
+            + ", ".join(f"{item.language} ({item.level})" if item.level else item.language for item in fact.languages)
+        )
+    if fact.max_class_size is not None:
+        parts.append(f"Class size: at most {fact.max_class_size}")
+    return "".join(f"\n{part}" for part in parts)
+
+
 def judge_message(quoted: Sequence[tuple[Fact, str]]) -> str:
-    """The numbered items for the judge: each fact, its quote, and the page the quote is on."""
+    """The numbered items for the judge: each fact, its labels, its quote, and the page the quote is on."""
     return "\n\n".join(
-        f"{n}. Fact: {fact.fact_en}\nPage: {url}\nQuote: {fact.quote}" for n, (fact, url) in enumerate(quoted, 1)
+        f"{n}. Fact: {fact.fact_en}{_labels(fact)}\nPage: {url}\nQuote: {fact.quote}"
+        for n, (fact, url) in enumerate(quoted, 1)
     )
 
 
-def stored_fact(fact: Fact, url: str) -> dict:
+def stored_fact(fact: Fact, url: str, rank: str) -> dict:
     return {
         "topic": fact.topic,
         "text_i18n": {"bg": fact.fact_bg.strip(), "en": fact.fact_en.strip()},
         "source_url": url,
         "quote": fact.quote.strip(),
+        "rank": rank,
+        "tags": list(dict.fromkeys(fact.tags)),
+        "languages": [item.model_dump() for item in fact.languages],
+        "max_class_size": fact.max_class_size,
     }

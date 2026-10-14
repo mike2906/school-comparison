@@ -1,12 +1,19 @@
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { factsReadDate, getSchoolFacts } from '../../utils/schoolFacts'
 
 // "From the school's website": facts read from the school's own pages, each linking the
-// page it came from. Nothing renders when the school has none.
+// page it came from; the key facts first, the rest behind "show more". Nothing renders
+// when the school has none.
 function WebsiteFacts({ school }) {
   const { t, i18n } = useTranslation()
-  const facts = getSchoolFacts(school, i18n.language)
-  if (facts.length === 0) return null
+  const [showMore, setShowMore] = useState(false)
+  const all = getSchoolFacts(school, i18n.language)
+  if (all.length === 0) return null
+  const key = all.filter(fact => fact.rank === 'key')
+  const extra = all.length - key.length
+  // A school whose facts are all "more" shows them all rather than an empty box.
+  const facts = showMore || key.length === 0 ? all : key
   const readDate = factsReadDate(school)
 
   return (
@@ -35,6 +42,16 @@ function WebsiteFacts({ school }) {
           </li>
         ))}
       </ul>
+      {key.length > 0 && extra > 0 && (
+        <button
+          type="button"
+          onClick={() => setShowMore(value => !value)}
+          aria-expanded={showMore}
+          className="mt-4 text-sm font-medium text-primary-700 hover:text-primary-800 underline underline-offset-2"
+        >
+          {showMore ? t('schoolFacts.showLess') : t('schoolFacts.showMore', { count: extra })}
+        </button>
+      )}
     </div>
   )
 }

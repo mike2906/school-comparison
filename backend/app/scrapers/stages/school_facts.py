@@ -23,7 +23,7 @@ from app.database import async_session_maker
 from app.models import School
 from app.models.pipeline_run import PipelineRun
 from app.scrapers.extraction import school_facts as facts_rules
-from app.scrapers.extraction.school_facts import Fact, Facts, Supported
+from app.scrapers.extraction.school_facts import Fact, Facts, Graded
 from app.scrapers.fee_pages import fee_http_client
 from app.scrapers.stages import common as stage_common
 from app.scrapers.stages.fees_agent import PageRead, Spend, SpendCapReached, find_pages
@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 STAGE = "school-facts"
 TIER = "pricing"  # the fee reader's model: cheap, and follows quoting rules well
 DEFAULT_MAX_USD = 0.50
-OUTPUT_TOKENS_RESERVE = 4000
+OUTPUT_TOKENS_RESERVE = 6000  # up to 20 facts, each with its quote, in two languages
 MAX_READ_CHARS = 100_000
 # Each page is cut on its own, so one long page (a staff list of 56,000 characters at 564)
 # cannot push the admissions and activities pages after it out of the read.
@@ -99,16 +99,14 @@ def page_text(pages: list[PageRead]) -> str:
     return "\n\n".join(parts)[:MAX_READ_CHARS]
 
 
-def _ordered(kept: list[tuple[Fact, str]]) -> list[tuple[Fact, str]]:
-    """At most 2 a topic and ``MAX_FACTS`` in all, cut in the reader's (most useful first)
-    order, then put in topic order for display."""
-    per_topic: dict[str, int] = {}
-    out: list[tuple[Fact, str]] = []
-    for item in kept:
-        if per_topic.get(item[0].topic, 0) < 2 and len(out) < facts_rules.MAX_FACTS:
-            per_topic[item[0].topic] = per_topic.get(item[0].topic, 0) + 1
-            out.append(item)
-    return sorted(out, key=lambda item: facts_rules.TOPICS.index(item[0].topic))
+Ranked = tuple[Fact, str, str]  # the fact, the page its quote is on, its grade
+
+
+def _ordered(facts: list[Ranked]) -> list[Ranked]:
+    """Key facts first, then more, then minor, each in the reader's (most useful first)
+    order, ``MAX_FACTS`` at most. The API keeps this order to choose which key facts show."""
+    ranked = sorted(facts, key=lambda item: facts_rules.RANKS.index(item[2]))
+    return ranked[: facts_rules.MAX_FACTS]
 
 
 async def read_school(school: School, pages: list[PageRead], call: Caller) -> dict[str, Any]:
@@ -136,16 +134,15 @@ async def read_school(school: School, pages: list[PageRead], call: Caller) -> di
             repeats.append(fact)
         seen_quotes.add(key)
     quoted = [(fact, url) for fact, url in quoted if all(fact is not repeat for repeat in repeats)]
-    supported: set[int] = set()
+    grades: dict[int, str] = {}
     if quoted:
-        verdict: Supported = await call(
-            facts_rules.JUDGE_PROMPT, Supported, facts_rules.judge_message(quoted), school.id
-        )
-        supported = set(verdict.passed)
-    kept = _ordered([item for n, item in enumerate(quoted, 1) if n in supported])
-    kept_ids = {id(fact) for fact, _ in kept}
+        verdict: Graded = await call(facts_rules.JUDGE_PROMPT, Graded, facts_rules.judge_message(quoted), school.id)
+        grades = {n: rank for n in range(1, len(quoted) + 1) if (rank := verdict.rank(n))}
+    passed = [(fact, url, grades[n]) for n, (fact, url) in enumerate(quoted, 1) if n in grades]
+    kept = _ordered(passed)
+    kept_ids = {id(fact) for fact, _, _ in kept}
     quoted_ids = {id(fact) for fact, _ in quoted}
-    passed_ids = {id(fact) for n, (fact, _) in enumerate(quoted, 1) if n in supported}
+    passed_ids = {id(fact) for fact, _, _ in passed}
     repeat_ids = {id(fact) for fact in repeats}
 
     def dropped(fact: Fact) -> Optional[str]:
@@ -155,28 +152,32 @@ async def read_school(school: School, pages: list[PageRead], call: Caller) -> di
             return "same quote as an earlier fact"
         if id(fact) not in quoted_ids:
             return "quote not on page"
-        return "over the topic or total limit" if id(fact) in passed_ids else "quote does not state it"
+        return "over the limit" if id(fact) in passed_ids else "quote does not state it"
 
     status = {id(fact): dropped(fact) for fact in read.facts}
+    rank_of = {id(fact): rank for fact, _, rank in passed}
     report["facts"] = [
-        fact.model_dump() | {"kept": status[id(fact)] is None, "dropped": status[id(fact)]} for fact in read.facts
+        fact.model_dump()
+        | {"kept": status[id(fact)] is None, "dropped": status[id(fact)], "rank": rank_of.get(id(fact))}
+        for fact in read.facts
     ]
     carried = _carried(school, readable, kept)
     store = _ordered(kept + carried)
-    report["carried"] = [fact.fact_en for fact, _ in carried if any(fact is f for f, _ in store)]
-    report["store"] = [facts_rules.stored_fact(fact, url) for fact, url in store]
+    report["carried"] = [fact.fact_en for fact, _, _ in carried if any(fact is f for f, _, _ in store)]
+    report["store"] = [facts_rules.stored_fact(fact, url, rank) for fact, url, rank in store]
     outcome = f"{len(kept)} of {len(read.facts)} kept"
     return report | {"outcome": outcome + (f", {len(report['carried'])} carried" if report["carried"] else "")}
 
 
-def _carried(school: School, readable: list[tuple[str, str]], kept: list[tuple[Fact, str]]) -> list[tuple[Fact, str]]:
-    """Stored facts whose quote is still on a page read, and not the quote of a new fact.
+def _carried(school: School, readable: list[tuple[str, str]], kept: list[Ranked]) -> list[Ranked]:
+    """Stored facts whose quote is still on a page read, and not the quote of a new fact,
+    with the grade they were stored with.
 
     Reads vary from run to run; a fact accepted before stays while its page still says it,
     with no model call, so the school's facts do not change on every refresh. New facts
-    come first, so they win a topic's places."""
+    come first within each grade."""
     stored = ((school.attributes or {}).get(ATTRIBUTE_KEY) or {}).get("facts") or []
-    new_quotes = {facts_rules.quote_key(fact) for fact, _ in kept}
+    new_quotes = {facts_rules.quote_key(fact) for fact, _, _ in kept}
     carried = []
     for row in stored:
         fact = facts_rules.stored_as_fact(row) if isinstance(row, dict) else None
@@ -185,7 +186,7 @@ def _carried(school: School, readable: list[tuple[str, str]], kept: list[tuple[F
         url = facts_rules.quote_on_page(fact, readable)
         if url:
             new_quotes.add(facts_rules.quote_key(fact))
-            carried.append((fact, url))
+            carried.append((fact, url, row.get("rank") if row.get("rank") in facts_rules.RANKS else "key"))
     return carried
 
 

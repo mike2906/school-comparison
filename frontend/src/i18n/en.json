@@ -786,6 +786,8 @@
     "note": "What the school's own pages state. Each line links the page it came from.",
     "readOn": "What the school's own pages stated when we read them on {{date}}. Each line links the page it came from.",
     "source": "source",
+    "showMore": "Show {{count}} more",
+    "showLess": "Show fewer",
     "topics": {
       "curriculum": "Curriculum",
       "languages": "Languages",
