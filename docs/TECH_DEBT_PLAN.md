@@ -1,5 +1,8 @@
 # Tech debt review and refactor plan
 
+> Plans here are starting points, not instructions: re-evaluate an item against current
+> facts before building it (`AGENTS.md` → "Plans are starting points").
+
 Written 2026-10-10 against `main` at `fdbc0b9` (after PR #218). Approved 2026-10-10; see "Decisions taken". Each step's status is in the "Can start" column; check that a step is still open before starting it.
 
 Updated the same day with the findings of the test audit (the 2026-10-10 test audit, kept in the project files rather than the repo). The changes are marked **(test audit)**.

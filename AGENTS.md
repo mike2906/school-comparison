@@ -45,12 +45,20 @@ are independent stages.
 
 **Status sources:** the plan docs (`docs/GO_LIVE_PLAN.md`, `docs/TECH_DEBT_PLAN.md`,
 `docs/AGENT_FEE_EXTRACTION.md`, `docs/SCHOOL_FACTS.md`), git history and the DBs. Agent
-memory and old notes can be stale, and a rule recorded in a plan was one decision at one
-time: verify an item is still open before starting it, and update the plan in the same PR
-that finishes it.
+memory and old notes can be stale: verify an item is still open before starting it, and
+update the plan in the same PR that finishes it.
 
-Planned, not yet built: admission points calculator and parent-facing NVO calculator.
-Admission cut-offs are being captured (`docs/ADMISSION_CUTOFFS.md`).
+**Plans are starting points, not instructions.** Everything in a plan or design doc (an
+approach, a tool, a number, the order of steps) was chosen with what was known when it was
+written. When you pick an item up, re-evaluate it against current facts and what has been
+built since, as if choosing fresh; if a better option fits now, take it and say why it
+beats the doc's choice (a big or costly switch gets a second opinion first). This covers
+approaches, not Mike's product decisions or the invariants below: if the facts behind one
+of those changed, raise it with him rather than overriding it.
+
+Live: the admission points calculator (kindergarten, first grade, and the eighth-grade
+score from NVO results) with the catchment map (`docs/ADMISSION_POINTS.md`), and admission
+cut-offs (`docs/ADMISSION_CUTOFFS.md`).
 
 ---
 

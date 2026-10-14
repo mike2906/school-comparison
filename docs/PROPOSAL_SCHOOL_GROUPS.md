@@ -1,5 +1,8 @@
 # Proposal: school site groups
 
+> Plans here are starting points, not instructions: re-evaluate an item against current
+> facts before building it (`AGENTS.md` → "Plans are starting points").
+
 **Status: proposal only.** Nothing in this document has been applied. No schema change,
 no migration, no database write, and no pipeline run was performed to produce it. The
 groups below are derived read-only from existing rows by
