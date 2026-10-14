@@ -79,9 +79,22 @@ frontend/src/admission/
   evaluators/bg/grade8.js               national eighth-grade score
   rules/bg/sofia/kindergarten/2026-2027.json, 2027-2028.json
   rules/bg/sofia/grade_1/2026-2027.json, 2027-2028.json
-  rules/bg/grade_8/2026-2027.json       national (city: null)
+  rules/bg/grade_8/2026-2027.json, 2027-2028.json   national (city: null)
   rules.test.js                         every file's structure and examples
+  calculator.js                         tabs, start year, measuring date, cut-off rows
+  ruleSets.js                           bundles every rule file (Vite only)
+  catchments.js, loadCatchments.js      catchment and district lookups (static snapshot)
+frontend/src/components/AdmissionPage/  /admission: one form per stage, results, rule notice
+frontend/src/components/Admission/      school-page catchment map, address check, cut-offs
 ```
+
+The page is `/admission?stage=kindergarten|grade_1|grade_8&school=<id>`. Only the
+stage and the school id go in the URL; with a school, its district, catchment and
+cut-offs fill in the school-specific questions. Address durations are counted to the
+date the rules name: the ranking date for kindergartens (чл. 18 т. 1 "към датата на
+класиране"), the application deadline for first grade. Eighth grade shows the score
+under every formula the law allows, because each class's formula is in the school's
+admission plan, which we do not have.
 
 A rule file (abridged):
 

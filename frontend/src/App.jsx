@@ -23,20 +23,25 @@ import { languageSwitchArrival, restoreWindowScroll } from './utils/languageSwit
 // Loaded on demand: most visits never open the comparison. A tab that outlives a deploy
 // asks for a chunk file that no longer exists, so reload once to pick up the current build.
 const CHUNK_RELOAD_KEY = 'chunk-reload'
-const ComparePage = lazy(() =>
-  import('./components/ComparePage/ComparePage').then(
-    (module) => {
-      sessionStorage.removeItem(CHUNK_RELOAD_KEY)
-      return module
-    },
-    (error) => {
-      if (sessionStorage.getItem(CHUNK_RELOAD_KEY)) throw error
-      sessionStorage.setItem(CHUNK_RELOAD_KEY, '1')
-      window.location.reload()
-      return new Promise(() => {})
-    }
+function lazyPage(load) {
+  return lazy(() =>
+    load().then(
+      (module) => {
+        sessionStorage.removeItem(CHUNK_RELOAD_KEY)
+        return module
+      },
+      (error) => {
+        if (sessionStorage.getItem(CHUNK_RELOAD_KEY)) throw error
+        sessionStorage.setItem(CHUNK_RELOAD_KEY, '1')
+        window.location.reload()
+        return new Promise(() => {})
+      }
+    )
   )
-)
+}
+const ComparePage = lazyPage(() => import('./components/ComparePage/ComparePage'))
+// The calculator carries every rule file, so it is its own chunk too.
+const AdmissionPage = lazyPage(() => import('./components/AdmissionPage/AdmissionPage'))
 
 // The language is fixed for the lifetime of the document: switching it is a full
 // navigation to the other prefix (see LanguageToggle), which is why links and
@@ -142,6 +147,10 @@ const router = createBrowserRouter([
       {
         path: 'compare',
         element: <Suspense fallback={null}><ComparePage /></Suspense>,
+      },
+      {
+        path: 'admission',
+        element: <Suspense fallback={null}><AdmissionPage /></Suspense>,
       },
       {
         path: 'about',
