@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { EVALUATORS } from '../../admission/evaluators'
 import { formatRange, measuredOnFor } from '../../admission/calculator'
+import { districtLabel, sortedDistricts } from '../../admission/catchments'
 import { calculateAgeGroup } from '../../utils/education'
 import { birthYearsFor } from '../../utils/ageSelection'
 import { Choice, DateField, Field, INPUT_CLASS, MobileTotal, Section, YesNo } from './fields'
@@ -36,7 +37,7 @@ const INITIAL = {
  * district and it is compared with the kindergarten's.
  */
 function KindergartenCalculator({ selected, startYear, kindergarten, districts }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const [a, setA] = useState(INITIAL)
   const set = (key, value) => setA(prev => ({ ...prev, [key]: value }))
   const { ruleSet } = selected
@@ -125,7 +126,7 @@ function KindergartenCalculator({ selected, startYear, kindergarten, districts }
                 onChange={v => set('addressSince', v)}
               />
               {knownDistrict ? (
-                <Field label={t('admissionCalc.kg.homeDistrict')} hint={t('admissionCalc.kg.homeDistrictHint', { district: kindergarten.districtName })}>
+                <Field label={t('admissionCalc.kg.homeDistrict')} hint={t('admissionCalc.kg.homeDistrictHint', { district: districtLabel(kindergarten.districtName, i18n.language) })}>
                   {id => (
                     <select
                       id={id}
@@ -134,8 +135,8 @@ function KindergartenCalculator({ selected, startYear, kindergarten, districts }
                       className={INPUT_CLASS}
                     >
                       <option value="">{t('admissionCalc.notSure')}</option>
-                      {(districts?.features || []).map(f => (
-                        <option key={f.properties.code} value={f.properties.code}>{f.properties.name}</option>
+                      {sortedDistricts(districts, i18n.language).map(f => (
+                        <option key={f.properties.code} value={f.properties.code}>{districtLabel(f.properties.name, i18n.language)}</option>
                       ))}
                     </select>
                   )}

@@ -9,7 +9,7 @@ import {
 import { calculateDistance } from '../../utils/distance'
 import { formatAmount, formatKm, intlLocale } from '../../utils/format'
 import { statedTuition, YEAR_STATUS } from '../../utils/pricing'
-import { getLastAdmittedPoints, getMinNvoScore } from '../../utils/admission'
+import { getLastAdmittedPoints, getMinNvoScore, hasKindergartenCutoffs } from '../../utils/admission'
 import {
   getLanguageLabel,
   getExamTypeLabel,
@@ -176,7 +176,7 @@ function KeyFacts({ school, examAverages, nvoExamType, ageGroup = null }) {
         key="lastAdmitted"
         label={t('schoolDetail.admission')}
         value={t('schoolDetail.kgByPointsShort')}
-        detail={t('schoolDetail.kgThresholdsLater')}
+        detail={t(hasKindergartenCutoffs(school.admission_info) ? 'schoolDetail.kgThresholdsBelow' : 'schoolDetail.kgThresholdsLater')}
       />
     )
   }

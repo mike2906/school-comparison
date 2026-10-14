@@ -77,8 +77,8 @@ to schools (kg.sofia.bg ids via `attributes.kg_sofia_id(s)`, РУО rows via
 `schools.institutional_id`) and rewrites only derived `admission_info` keys: `cutoffs` (all
 rows, trimmed; detail and compare responses only), `cutoff_summary` (per stage x age group
 or class x building: the general-queue first and latest round of the latest campaign; also
-on list responses), `kg_sofia_ids`, `admin_district`, and `catchment_ids`
-(`{"bg-sofia-gis": [...]}` from `attributes.kg_sofia_esri_id(s)`). It prints unmatched
+on list responses), `kg_sofia_ids` and `admin_district`. (First-grade `catchment_ids`
+come from `scripts/match_sofia_catchments.py`, see `ADMISSION_POINTS.md`.) It prints unmatched
 institutions. Dry run by default; then publish as usual.
 
 ## Reading cut-offs honestly

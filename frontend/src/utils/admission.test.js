@@ -9,6 +9,7 @@ import {
   getMinNvoScore,
   getMinNvoScores,
   getPointsHistory,
+  hasKindergartenCutoffs,
   usesSofiaKindergartenSystem,
 } from './admission.js'
 
@@ -164,4 +165,10 @@ test('hasDisplayableAdmissionInfo ignores the keys the cut-off import adds for t
   assert.equal(hasDisplayableAdmissionInfo({ catchment_ids: { 'bg-sofia-gis': ['1'] }, kg_sofia_ids: ['1'], admin_district: 'Младост', cutoffs: [], cutoff_summary: [] }), false)
   assert.equal(hasDisplayableAdmissionInfo({ status: 'accepting', catchment_ids: {} }), true)
   assert.equal(hasDisplayableAdmissionInfo(null), false)
+})
+
+test('kindergarten cut-offs are recognised from the summary rows', () => {
+  assert.equal(hasKindergartenCutoffs({ cutoff_summary: [{ stage: 'nursery' }] }), true)
+  assert.equal(hasKindergartenCutoffs({ cutoff_summary: [{ stage: 'grade_8' }] }), false)
+  assert.equal(hasKindergartenCutoffs(undefined), false)
 })

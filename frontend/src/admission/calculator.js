@@ -92,6 +92,7 @@ export function cutoffValue(round) {
     return { kind: 'quota', boys: round.min_score_boys ?? null, girls: round.min_score_girls ?? null }
   }
   if (round.min_score != null) return { kind: 'score', score: round.min_score }
+  if (round.places === 0) return { kind: 'noPlaces' }
   if (round.undersubscribed) return { kind: 'everyone' }
   if (round.last_admitted_group != null) {
     return { kind: 'group', group: round.last_admitted_group, points: round.last_admitted_points ?? null }

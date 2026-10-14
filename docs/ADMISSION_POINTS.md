@@ -174,8 +174,8 @@ Sofia publishes official first-grade catchment polygons (arcgis.sofia.bg, layer
 school (layer 1, `adjacentezonesid`), the 24 district polygons (layer 3), and the full
 address list with each address's catchment school and neighbouring schools
 (urbandata.sofia.bg, "Адреси и прилежащи училища СО", 106,629 addresses). All of them key
-schools by the same GIS id, which kg.sofia.bg calls `esriId` and our kg.sofia.bg adapter
-already stores as `attributes.kg_sofia_esri_id`.
+schools by the same GIS school id (`integrationid` on layer 1). That is not the kg.sofia.bg
+`esriId`, which numbers kindergartens in their own layer.
 
 - **Classification uses the address table; the map only displays.** The membership of
   an address comes from the official address list, keyed by settlement code + street
@@ -194,7 +194,9 @@ already stores as `attributes.kg_sofia_esri_id`.
   shows the district outline.
 - **Ids.** Schools carry `admission_info.catchment_ids: {"bg-sofia-gis": [...]}`, a list
   because merged buildings can have several, namespaced by provider so other cities
-  can add their own.
+  can add their own. `backend/scripts/match_sofia_catchments.py` writes them, matching
+  schools to the layer-1 points that have a catchment by number, type and address (the
+  rules of `import_sofia_municipal_points.py`); run it after a new snapshot, then publish.
 - **Refresh.** A script rebuilds the snapshot from the two official sources
   (simplified on the server with ArcGIS `maxAllowableOffset`). The sources update once a
   year; the cloud cannot reach them, so the script runs in GitHub Actions or locally.
