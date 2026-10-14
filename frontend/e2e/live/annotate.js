@@ -10,11 +10,13 @@
 const clean = text => String(text).replace(/\s+/g, ' ').trim().slice(0, 900).replace(/%/g, '%25')
 const property = text => clean(text).replace(/:/g, '%3A').replace(/,/g, '%2C')
 
+const RUN_COUNTS = /^(tests|suites|pass|fail|cancelled|skipped|todo|duration_ms) [\d.]+$/
+
 export default async function* annotate(source) {
   for await (const event of source) {
-    // The run's closing counts are diagnostics too, at the top level.
-    if (event.type === 'test:diagnostic' && event.data.nesting > 0) {
-      yield `::notice title=Live flow::${clean(event.data.message)}\n`
+    if (event.type === 'test:diagnostic') {
+      // The run's closing counts ("tests 12", "duration_ms 3.2") are diagnostics too.
+      if (!RUN_COUNTS.test(event.data.message)) yield `::notice title=Live flow::${clean(event.data.message)}\n`
       continue
     }
     if (!process.env.LIVE_LAST_TRY || event.type !== 'test:fail' || event.data.details?.type === 'suite') continue
