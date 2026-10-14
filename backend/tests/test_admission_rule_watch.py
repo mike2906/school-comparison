@@ -352,3 +352,13 @@ def test_issue_creation_does_not_duplicate_after_a_lost_response(monkeypatch):
     monkeypatch.setattr(script.httpx, "Client", lambda **kw: real_client(transport=transport, **kw))
     script.post_issues([Finding(key="k", title="Rule watch: x", body="b", kind="changed")], "o/r", "t")
     assert created == ["Rule watch: x"]
+
+
+def test_recheck_ignores_changes_next_to_the_matching_lines():
+    state = {}
+    run({"targets": [LISTING]}, [], state, _fetcher({LISTING["url"]: _sessions(1)}), today=date(2027, 2, 1))
+    page = "<p>т. 4 Наредба за прием на деца</p><p>Прегледи: {n}</p>"
+    pages = {LISTING["url"]: _sessions(1, 2), "https://x.bg/content/2": _html(page.format(n=1))}
+    assert len(run({"targets": [LISTING]}, [], state, _fetcher(pages), today=date(2027, 2, 2)).findings) == 1
+    pages["https://x.bg/content/2"] = _html(page.format(n=2))
+    assert run({"targets": [LISTING]}, [], state, _fetcher(pages), today=date(2027, 2, 3)).findings == []

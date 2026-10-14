@@ -85,7 +85,12 @@ def _create_issue(gh: httpx.Client, api: str, finding: Finding) -> int:
     for attempt in range(1, 4):
         if attempt > 1:
             time.sleep(attempt * 5)
-            existing = _open_issue_numbers(gh, api).get(finding.title)
+            try:
+                existing = _open_issue_numbers(gh, api).get(finding.title)
+            except httpx.HTTPError:
+                if attempt == 3:
+                    raise
+                continue  # cannot tell whether it exists: don't post blind
             if existing:
                 return existing
         try:

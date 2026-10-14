@@ -145,8 +145,10 @@ so a changed footer or session cookie doesn't count. List pages remember the lin
 the first run only records them. A followed page is read again for 21 days (a session
 page gains its decisions after the session) and reported again if its matching lines
 change; a near-empty page (maintenance, bot check) is retried rather than marked read.
-`also` makes a keyword count only next to admission words ("Наредба № 10" is also an
-agriculture ordinance's number). State (hashes, texts, seen links, failure counts) lives
+`also` makes a keyword count only on a line with admission words ("Наредба № 10" is
+also an agriculture ordinance's number). The news target has none on purpose: a court
+ruling's title may not mention admissions, and a missed ruling costs more than a
+false issue. State (hashes, texts, seen links, failure counts) lives
 on the `rule-watch-data` branch; deleting `state.json` there takes a fresh baseline.
 
 **Acting on an issue.** Read the source. If the rules changed, add a new rule file for the

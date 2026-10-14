@@ -73,7 +73,7 @@ jobs:
       # A failed run means changes are not being noticed: say so where the findings go.
       # One open issue at a time; later failures add a comment.
       - name: Report a failed run
-        if: failure() && github.event_name == 'schedule'
+        if: (failure() || cancelled()) && github.event_name == 'schedule'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

@@ -42,7 +42,8 @@ FAILURES_BEFORE_REPORT = 3
 MAX_DIFF_LINES = 80
 MAX_FOLLOW_PER_RUN = 15
 FOLLOW_ATTEMPTS = 3
-FOLLOWED_MIN_CHARS = 200
+FOLLOWED_MIN_CHARS = 100
+MAX_RECHECK_PER_RUN = 15
 RECHECK_DAYS = 21
 STATE_FILE = "state.json"
 
@@ -221,6 +222,11 @@ def _hits(lines: list[str], target: dict[str, Any]) -> list[str]:
     return matching_lines(text, target.get("keywords") or [], context=1 if target.get("follow") else 0)
 
 
+def _hits_digest(lines: list[str], target: dict[str, Any]) -> str:
+    """Hash of the matching lines alone, so a change in a neighbouring line is no update."""
+    return text_hash("\n".join(_hits(lines, dict(target, follow=False))))
+
+
 def _new_item(target: dict[str, Any], url: str, link_text: str, hits: list[str], what: str) -> Finding:
     quoted = "\n".join(f"> {line}" for line in hits[:40])
     return Finding(
@@ -239,7 +245,7 @@ def _open(url: str, target: dict[str, Any], fetch: Fetcher) -> tuple[Optional[li
     if page.error:
         return None, page.error
     text = clean_text(page.html or page.text, target.get("select"))
-    if len(text) < FOLLOWED_MIN_CHARS:
+    if len(text) < target.get("page_min_chars", FOLLOWED_MIN_CHARS):
         return None, f"only {len(text)} characters of text"
     return text.splitlines(), None
 
@@ -288,7 +294,7 @@ def _check_listing(
             else:
                 entry.get("attempts", {}).pop(url, None)
                 hits = _hits(lines, target)
-                recent[url] = {"since": today.isoformat(), "hits": text_hash("\n".join(hits))}
+                recent[url] = {"since": today.isoformat(), "hits": _hits_digest(lines, target)}
         else:
             hits = _hits([link_text], target)
         if hits:
@@ -297,25 +303,31 @@ def _check_listing(
     # Pages followed in the last RECHECK_DAYS are read again: a session page gains its
     # decisions after the session, a consultation its outcome.
     titles = dict(found)
-    for url, info in list(recent.items()):
+    new_urls = {url for url, _ in new}
+    rechecked = 0
+    # Oldest first: each page is read about daily while the list stays under the budget.
+    for url, info in sorted(recent.items(), key=lambda item: item[1].get("checked", item[1]["since"])):
         if (today - date.fromisoformat(info["since"])).days > RECHECK_DAYS:
             del recent[url]
             continue
-        if url in [u for u, _ in new] or followed >= MAX_FOLLOW_PER_RUN:
+        if url in new_urls or rechecked >= MAX_RECHECK_PER_RUN:
             continue
-        followed += 1
+        rechecked += 1
         lines, error = _open(url, target, fetch)
         if error:
             continue
-        hits = _hits(lines, target)
-        digest = text_hash("\n".join(hits))
-        if hits and digest != info["hits"]:
-            result.findings.append(_new_item(target, url, titles.get(url, ""), hits, "Updated entry"))
+        info["checked"] = today.isoformat()
+        digest = _hits_digest(lines, target)
+        if digest != info["hits"]:
+            hits = _hits(lines, target)
+            if hits:
+                result.findings.append(_new_item(target, url, titles.get(url, ""), hits, "Updated entry"))
         info["hits"] = digest
     entry["seen"] = seen[-max(500, 3 * len(found)) :]
     entry["baselined"] = True
     result.report.append(
-        f"{target['id']}: {len(found)} links, {len(new)} new{' (baseline)' if baseline else ''}, followed {followed}"
+        f"{target['id']}: {len(found)} links, {len(new)} new{' (baseline)' if baseline else ''}, "
+        f"followed {followed}, re-read {rechecked}"
     )
 
 
