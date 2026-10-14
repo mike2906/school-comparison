@@ -1,0 +1,16 @@
+name: Probe kg.sofia.bg reach
+on:
+  push:
+    branches: [agent/probe-kg-reach]
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - run: |
+          for u in https://kg.sofia.bg/ https://kg.sofia.bg/api/public/regions/all https://kg.sofia.bg/api/public/kg/type/kinderGarden/all https://ruo-sofia-grad.com/ https://www.mon.bg/ https://klasirane.eu/; do
+            echo "$u -> $(curl -s -o /tmp/out -w '%{http_code} %{size_download}B %{time_total}s' -m 20 -A 'Mozilla/5.0' "$u")"
+            head -c 300 /tmp/out; echo
+          done
