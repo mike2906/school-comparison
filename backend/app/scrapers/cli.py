@@ -487,6 +487,35 @@ def school_facts_command(school_ids, city, country, limit, max_usd, apply_change
         console.print(f"Report: {report_path}")
 
 
+@cli.command("social-links")
+@click.option("--school-id", "school_ids", type=int, multiple=True, help="Run these schools (repeatable)")
+@click.option("--city", default=None, help="Only schools in this city")
+@click.option("--country", default="bg", show_default=True, help="Country code")
+@click.option("--limit", type=int, default=None, help="Maximum schools")
+@click.option("--apply", "apply_changes", is_flag=True, help="Store links (default is a dry run that writes nothing)")
+@click.option("--out", "report_path", type=click.Path(dir_okay=False, path_type=Path), help="Write the JSON report")
+def social_links_command(school_ids, city, country, limit, apply_changes, report_path):
+    """Find the Facebook page and Instagram profile each school's website links (no model calls)."""
+    import json
+
+    from app.database import async_session_maker
+    from app.scrapers.stages import social_links as social_links_stage
+
+    async def _run():
+        async with async_session_maker() as db:
+            return await social_links_stage.run_social_links(
+                db, country=country, city=city, school_ids=school_ids, limit=limit, apply=apply_changes
+            )
+
+    report = asyncio.run(_run())
+    mode = "Applied" if apply_changes else "Dry run"
+    console.print(f"{mode}: {report['schools']} schools, outcomes {report['outcomes']}, found {report['found']}")
+    if report_path is not None:
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(json.dumps(report, ensure_ascii=False, indent=1, default=str), encoding="utf-8")
+        console.print(f"Report: {report_path}")
+
+
 @cli.command("promote-curated-identities")
 @click.option(
     "--school-id",
