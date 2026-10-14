@@ -35,12 +35,18 @@ export function startYearChoices(now = new Date()) {
 /**
  * The date a rule set counts address durations to. The rule files give the campaign's
  * schedule; when a file has no usable date the end of May of the start year is used,
- * which is when Sofia's applications close.
+ * which is when Sofia's applications close. While a campaign's later rankings are still
+ * running (Sofia kindergartens rank every two weeks until `current_rankings_until`), a
+ * parent applying now is counted to a ranking after today, so today is used: it is at
+ * most one ranking early, never later than the real date.
  */
-export function measuredOnFor(ruleSet) {
+export function measuredOnFor(ruleSet, today = null) {
   const schedule = ruleSet?.schedule || {}
-  return schedule.applications_close || schedule.first_general_ranking || schedule.first_ranking ||
+  const first = schedule.applications_close || schedule.first_general_ranking || schedule.first_ranking ||
     `${String(ruleSet?.campaign || '').slice(0, 4)}-05-31`
+  const until = schedule.current_rankings_until
+  if (today && until && today > first && today <= until) return today
+  return first
 }
 
 /** The rule set, applicability and legal events in force for one tab and start year. */

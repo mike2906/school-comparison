@@ -934,7 +934,7 @@
     "kg": {
       "childTitle": "Your child",
       "birthYear": "Year of birth",
-      "birthYearHint": "Groups go by calendar year of birth: group = {{year}} minus the year of birth.",
+      "birthYearHint": "Groups go by calendar year of birth, not exact age.",
       "group": "Group: {{group}}.",
       "notKindergartenAge": "Children born in this year start school, not kindergarten, in this September.",
       "addressTitle": "Address",
@@ -991,7 +991,8 @@
         "sen": "Children with special educational needs are admitted to a limited number of places per group, confirmed by the regional support centre.",
         "chronic": "Each group admits only a few children with a chronic illness."
       },
-      "tieBreak": "Children with equal points are ordered by a random number."
+      "tieBreak": "Children with equal points are ordered by a random number.",
+      "sinceHintToday": "Moves within Sofia do not reset this date. Counted to the date of your ranking; here, to today ({{date}})."
     },
     "g1": {
       "addressTitle": "Address",
@@ -1037,7 +1038,7 @@
       "hasExamHint": "Then the exam counts twice and each NVO counts once.",
       "exam": "Aptitude exam result (points out of {{max}})",
       "resultTitle": "Your score",
-      "resultIntro": "Each class sets how much the NVO results count. Find the class's formula in the school's admission plan and read your score on that line. The maximum is 500.",
+      "resultIntro": "Each class sets how much the NVO results count. Find the class's formula in the school's admission plan and read your score on that line. The maximum depends on the formula, up to 500.",
       "formula": "Formula",
       "formulaText": "{{bg}} × Bulgarian + {{math}} × maths + two grades",
       "examPart": "2 × exam",
@@ -1067,6 +1068,7 @@
       "preparatory": "Preparatory group"
     },
     "calculate": "Calculate your points",
-    "quotaScores": "boys {{boys}}, girls {{girls}}"
+    "quotaScores": "boys {{boys}}, girls {{girls}}",
+    "bornIn": "born {{year}}"
   }
 }
