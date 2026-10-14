@@ -362,3 +362,21 @@ def test_recheck_ignores_changes_next_to_the_matching_lines():
     assert len(run({"targets": [LISTING]}, [], state, _fetcher(pages), today=date(2027, 2, 2)).findings) == 1
     pages["https://x.bg/content/2"] = _html(page.format(n=2))
     assert run({"targets": [LISTING]}, [], state, _fetcher(pages), today=date(2027, 2, 3)).findings == []
+
+
+def test_each_touched_issue_starts_one_draft(monkeypatch):
+    import httpx
+
+    from scripts import watch_admission_rules as script
+
+    started = []
+
+    def handler(request):
+        started.append(json.loads(request.content)["inputs"]["issue"])
+        return httpx.Response(204)
+
+    transport = httpx.MockTransport(handler)
+    real_client = httpx.Client
+    monkeypatch.setattr(script.httpx, "Client", lambda **kw: real_client(transport=transport, **kw))
+    script.start_drafts([7, 9, 7], "draft-rule-update.yml", "o/r", "t")
+    assert started == ["7", "9"]

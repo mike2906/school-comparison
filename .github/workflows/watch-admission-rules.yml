@@ -3,7 +3,8 @@ name: Watch admission rules
 # Checks the official sources behind frontend/src/admission/rules (council sessions and
 # consultations, the ИСОДЗ calendar, МОН drafts) and opens a `rule-watch` issue when one
 # changes, or when a campaign's rule file is missing or still provisional past its date.
-# State lives on the rule-watch-data branch. Docs: docs/ADMISSION_POINTS.md
+# Each issue it opens or comments on starts draft-rule-update.yml, where Claude drafts
+# the rule-file change. State lives on the rule-watch-data branch. Docs: docs/ADMISSION_POINTS.md
 on:
   schedule:
     - cron: "40 4 * * *"
@@ -19,6 +20,7 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
+  actions: write  # start draft-rule-update.yml for each issue
   contents: write
   issues: write
 
@@ -57,6 +59,7 @@ jobs:
           uv run python -m scripts.watch_admission_rules
           --state ../rule-watch-state
           --rules ../frontend/src/admission/rules
+          --draft-workflow draft-rule-update.yml
           ${{ (github.event_name == 'schedule' || inputs.issues) && '--issues' || '' }}
 
       - name: Save the watch state

@@ -151,14 +151,23 @@ ruling's title may not mention admissions, and a missed ruling costs more than a
 false issue. State (hashes, texts, seen links, failure counts) lives
 on the `rule-watch-data` branch; deleting `state.json` there takes a fresh baseline.
 
-**Acting on an issue.** Read the source. If the rules changed, add a new rule file for the
-campaign (or a new version within it) with its acts, sources and worked examples, add the
-version date to `RULE_VERSIONS` (`kg_sofia_ratings.py`, `ruo_sofia_min_max.py`; a test
-checks they agree with the rule files), and close the issue from the PR. A catchment
-change needs a new snapshot (`backend/scripts/build_sofia_catchments.py`). If nothing
-changed, close the issue. A date or unreadable-source issue closed while its condition
-still holds is opened again the next day, on purpose. A provisional file becomes verified only after someone checks
-it against the official text.
+**Acting on an issue.** Each issue the watch opens or comments on starts
+`.github/workflows/draft-rule-update.yml`, where Claude (anthropics/claude-code-action, on
+Mike's Claude subscription via the `CLAUDE_CODE_OAUTH_TOKEN` secret from
+`claude setup-token`, valid a year) reads the issue and the source and either:
+- closes the issue with a comment saying why nothing changed (or labels it `needs-human`
+  when unsure), or
+- opens a PR: a new rule file (or version) with its acts, sources and worked examples,
+  `RULE_VERSIONS` updated when the version date changes (a test checks they agree with
+  the rule files), or a schedule, status event or confirmation on the campaign's file.
+
+It never merges: a PR is reviewed like any other, because a wrong points value is worse
+than a late one. A catchment change needs a new snapshot
+(`backend/scripts/build_sofia_catchments.py`). A date or unreadable-source issue closed
+while its condition still holds is opened again the next day, on purpose. A provisional
+file becomes verified only after the full official text was read. To redo a draft, run
+the workflow by hand with the issue number. Without the secret the workflow only logs a
+warning, and the issue waits for a person or agent.
 
 **Adding a city or stage.** Add its rule family to `families` (a test fails until every
 family under `frontend/src/admission/rules/<country>` has its dates) and its council,

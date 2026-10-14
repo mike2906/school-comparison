@@ -109,8 +109,10 @@ def post_issues(findings: list[Finding], repo: str, token: str) -> None:
     """Open an issue per finding, or comment on the open one with the same title.
 
     Non-repeatable findings (missing files, unreachable sources) that already have an
-    open issue are skipped, so a daily run does not repeat them.
+    open issue are skipped, so a daily run does not repeat them. Returns the numbers of
+    the issues opened or commented on.
     """
+    touched: list[int] = []
     api = f"https://api.github.com/repos/{repo}"
     headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"}
     with httpx.Client(timeout=30.0, headers=headers) as gh:
@@ -128,6 +130,22 @@ def post_issues(findings: list[Finding], repo: str, token: str) -> None:
                 number = _create_issue(gh, api, finding)
                 open_issues[finding.title] = number
                 logger.info("Opened #%s %s", number, finding.title)
+            touched.append(number)
+    return touched
+
+
+def start_drafts(issues: list[int], workflow: str, repo: str, token: str) -> None:
+    """Start the drafting workflow once per issue. Issues opened with GITHUB_TOKEN start no
+    workflow by themselves, but a workflow_dispatch from it does."""
+    api = f"https://api.github.com/repos/{repo}/actions/workflows/{workflow}/dispatches"
+    headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"}
+    with httpx.Client(timeout=30.0, headers=headers) as gh:
+        for number in dict.fromkeys(issues):
+            response = gh.post(api, json={"ref": "main", "inputs": {"issue": str(number)}})
+            if response.is_success:
+                logger.info("Started %s for #%s", workflow, number)
+            else:  # the issue exists either way; a person or the next change can pick it up
+                logger.warning("Could not start %s for #%s: HTTP %s", workflow, number, response.status_code)
 
 
 def main() -> None:
@@ -136,6 +154,7 @@ def main() -> None:
     parser.add_argument("--rules", type=Path, required=True, help="frontend/src/admission/rules")
     parser.add_argument("--country", default="bg")
     parser.add_argument("--issues", action="store_true", help="open GitHub issues (needs GITHUB_TOKEN, GITHUB_REPOSITORY)")
+    parser.add_argument("--draft-workflow", help="workflow file to start for each issue opened or commented on")
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -154,9 +173,11 @@ def main() -> None:
         print("Trial run: state not saved.")
         return
     # Post before saving: if posting fails, the next run sees the same change again.
-    if findings:
-        post_issues(findings, os.environ["GITHUB_REPOSITORY"], os.environ["GITHUB_TOKEN"])
+    repo, token = os.environ.get("GITHUB_REPOSITORY", ""), os.environ.get("GITHUB_TOKEN", "")
+    touched = post_issues(findings, repo, token) if findings else []
     save_state(args.state, result.state)
+    if touched and args.draft_workflow:
+        start_drafts(touched, args.draft_workflow, repo, token)
 
 
 if __name__ == "__main__":
