@@ -438,6 +438,26 @@ async def test_a_stored_fact_whose_quote_is_still_on_the_page_is_carried():
     assert report["carried"] == ["Still there."]
 
 
+@pytest.mark.asyncio
+async def test_a_carried_fact_loses_a_sign_up_link_the_pages_no_longer_have():
+    row = _fact_row(
+        topic="admissions",
+        quote=_line(2),
+        text_i18n={"bg": "Б", "en": "Open day."},
+        open_days=["2026-11-12"],
+        register_url="https://forms.example/old",
+    )
+    school = _school(school_facts={"_schema_version": 1, "facts": [row]})
+    report = await stage.read_school(school, LINES, _Calls([_fact("languages", _line(5), en="New.")], passed=[1]))
+    carried = [f for f in report["store"] if f["text_i18n"]["en"] == "Open day."][0]
+    assert carried["open_days"] == ["2026-11-12"] and carried["register_url"] is None
+    linked = [PageRead(HOME, LINES[0].text + "\n[Запиши се](https://forms.example/old)", False)]
+    report = await stage.read_school(school, linked, _Calls([_fact("languages", _line(5), en="New.")], passed=[1]))
+    assert [f["register_url"] for f in report["store"] if f["text_i18n"]["en"] == "Open day."] == [
+        "https://forms.example/old"
+    ]
+
+
 def test_a_link_quoted_without_its_address_matches():
     page = [
         (
@@ -610,4 +630,56 @@ def test_admission_facts_without_a_grade_are_not_merged_and_ranges_are_kept():
         (None, None, ["entrance_exam"]),
         (None, None, ["interview"]),
         (5, None, ["interview"]),
+    ]
+
+
+def test_a_sign_up_link_must_be_a_link_on_a_page_read():
+    from app.scrapers.extraction.school_facts import link_on_page
+
+    pages = [(ABOUT, "[Запиши се](/open-day/) и [форма](https://forms.example/x)")]
+    assert link_on_page("https://school.example/open-day", pages)  # relative link, trailing slash
+    assert link_on_page("https://forms.example/x", pages)
+    assert not link_on_page("https://forms.example/made-up", pages)
+    assert not link_on_page("javascript:alert(1)", pages)
+    tricky = [(ABOUT, "[a](https://f.example/r?token=abc/) [b](https://f.example/reg(foo))")]
+    assert not link_on_page("https://f.example/r?token=abc", tricky)  # query must match exactly
+    assert link_on_page("https://f.example/r?token=abc/", tricky)
+    assert not link_on_page("https://f.example/reg(foo", tricky)
+    assert link_on_page("https://f.example/reg(foo)", tricky)
+
+
+@pytest.mark.asyncio
+async def test_open_days_are_stored_and_an_invented_sign_up_link_is_dropped():
+    pages = [PageRead(HOME, _line(0) + "\n[Запиши се](https://forms.example/x)", False)]
+    kept = _fact("admissions", _line(0), en="Open day on 12 November.").model_dump()
+    invented = _fact("admissions", _line(0), en="Open day on 3 December.").model_dump()
+    facts = [
+        Fact.model_validate(kept | {"open_days": ["2026-11-12"], "register_url": "https://forms.example/x"}),
+        Fact.model_validate(
+            invented | {"topic": "school_day", "open_days": ["2026-12-03"], "register_url": "https://x.example/"}
+        ),
+    ]
+    calls = _Calls(facts, passed=[1, 2])
+    stored = (await stage.read_school(_school(), pages, calls))["store"]
+    assert [(f["open_days"], f["register_url"]) for f in stored] == [
+        (["2026-11-12"], "https://forms.example/x"),
+        (["2026-12-03"], None),
+    ]
+    assert "forms.example" not in calls.messages[1][1]  # the judge is not asked about links
+
+
+def test_at_a_glance_lists_upcoming_open_days_only():
+    import datetime
+
+    from app.utils.school_facts import _labels, at_a_glance
+
+    facts = [
+        _labels({"open_days": ["2026-12-03", "2026-10-01", "bad"], "register_url": "https://f.example/x"})
+        | {"source_url": HOME},
+        _labels({"open_days": ["2026-11-12"], "register_url": "ftp://nope"}) | {"source_url": ABOUT},
+    ]
+    days = at_a_glance(facts, today=datetime.date(2026, 10, 14))["open_days"]
+    assert days == [
+        {"date": "2026-11-12", "register_url": None, "source_url": ABOUT},
+        {"date": "2026-12-03", "register_url": "https://f.example/x", "source_url": HOME},
     ]

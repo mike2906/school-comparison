@@ -805,6 +805,8 @@
       "admission": "Прием",
       "places": "Свободни места",
       "applications": "Кандидатстване",
+      "openDays": "Дни на отворените врати",
+      "register": "Записване",
       "highestGrade": "Обучение до",
       "curricula": "Програма",
       "diploma": "Диплома",
