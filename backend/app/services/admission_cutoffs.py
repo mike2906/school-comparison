@@ -101,7 +101,8 @@ PUBLIC_ROW_FIELDS = (
     "stage", "campaign", "rule_set", "round_id", "round_name", "round_kind", "classified_on",
     "age_group", "birth_year", "queue", "building", "places", "applicants_count", "admitted_count",
     "undersubscribed", "last_admitted_points", "last_admitted_group", "tie_at_cutoff",
-    "not_admitted_at_cutoff", "class_code", "class_name", "min_score", "max_score", "source_url",
+    "not_admitted_at_cutoff", "class_code", "class_name", "quota", "min_score", "max_score",
+    "min_score_boys", "min_score_girls", "source_url",
 )
 SUMMARY_ROUND_FIELDS = (
     "round_id", "round_name", "round_kind", "classified_on", "places", "applicants_count",

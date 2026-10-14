@@ -1,0 +1,32 @@
+name: Probe RUO parse (temporary)
+on:
+  push:
+    branches: [agent/cutoff-import-2]
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v8.3.2
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - working-directory: backend
+        run: |
+          uv sync --locked
+          uv run python -m scripts.capture_ruo_min_max --archive "$RUNNER_TEMP/a" 2>&1 | tee "$RUNNER_TEMP/log"
+          grep -v "^INFO HTTP" "$RUNNER_TEMP/log" | tail -c 6000 | tr '\n' '|' | sed 's/::/:/g' | xargs -0 -I{} echo "::notice title=log::{}"
+          uv run python - "$RUNNER_TEMP/a" <<'PY' | xargs -0 -I{} echo "::notice title=check::{}"
+          import json, sys, collections
+          from pathlib import Path
+          from app.services.admission_cutoffs import iter_rows
+          rows = list(iter_rows(Path(sys.argv[1])))
+          by = collections.Counter((r["campaign"], r["round_id"]) for r in rows)
+          q = collections.Counter((r["campaign"], r["quota"]) for r in rows)
+          smg = [(r["campaign"], r["round_id"], r["class_code"], r["min_score"], r["max_score"]) for r in rows if r["source_id"] == "2216306"][:12]
+          odd = [(r["campaign"], r["round_id"], r["source_id"], r["class_code"], r["min_score"], r["max_score"]) for r in rows if (r["min_score"] or 0) > (r["max_score"] or 999) or (r["min_score"] or 100) < 50][:10]
+          print(json.dumps({"by_round": {f"{k[0]} r{k[1]}": v for k, v in sorted(by.items())}, "quota": {f"{k[0]} {k[1]}": v for k, v in sorted(q.items())}, "smg": smg, "odd": odd}, ensure_ascii=False).replace("::", ":"), end="")
+          PY
