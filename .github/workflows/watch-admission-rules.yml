@@ -52,6 +52,7 @@ jobs:
         run: uv sync --locked
 
       - name: Watch
+        id: watch
         working-directory: backend
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -62,7 +63,9 @@ jobs:
           --draft-workflow draft-rule-update.yml
           ${{ (github.event_name == 'schedule' || inputs.issues) && '--issues' || '' }}
 
+      # Also after a failed run: the script saves state only once the issues are posted.
       - name: Save the watch state
+        if: always() && steps.watch.outcome != 'skipped'
         working-directory: rule-watch-state
         run: |
           git add -A

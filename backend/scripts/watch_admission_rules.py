@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import logging
 import os
+import sys
 import time
 from pathlib import Path
 
@@ -136,9 +137,11 @@ def post_issues(findings: list[Finding], repo: str, token: str) -> list[int]:
     return touched
 
 
-def start_drafts(issues: list[int], workflow: str, repo: str, token: str) -> None:
+def start_drafts(issues: list[int], workflow: str, repo: str, token: str) -> list[int]:
     """Start the drafting workflow once per issue. Issues opened with GITHUB_TOKEN start no
-    workflow by themselves, but a workflow_dispatch from it does."""
+    workflow by themselves, but a workflow_dispatch from it does. Returns the issues whose
+    draft could not be started."""
+    failed: list[int] = []
     api = f"https://api.github.com/repos/{repo}/actions/workflows/{workflow}/dispatches"
     headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"}
     with httpx.Client(timeout=30.0, headers=headers) as gh:
@@ -147,11 +150,14 @@ def start_drafts(issues: list[int], workflow: str, repo: str, token: str) -> Non
                 response = gh.post(api, json={"ref": "main", "inputs": {"issue": str(number)}})
             except httpx.HTTPError as error:
                 logger.warning("Could not start %s for #%s: %s", workflow, number, error)
+                failed.append(number)
                 continue
             if response.is_success:
                 logger.info("Started %s for #%s", workflow, number)
-            else:  # the issue exists either way; a person or the next change can pick it up
+            else:
                 logger.warning("Could not start %s for #%s: HTTP %s", workflow, number, response.status_code)
+                failed.append(number)
+    return failed
 
 
 def main() -> None:
@@ -185,7 +191,10 @@ def main() -> None:
     touched = post_issues(findings, repo, token) if findings else []
     save_state(args.state, result.state)
     if touched and args.draft_workflow:
-        start_drafts(touched, args.draft_workflow, repo, token)
+        # State is saved, so the issues are not repeated; failing the run reports it instead.
+        failed = start_drafts(touched, args.draft_workflow, repo, token)
+        if failed:
+            sys.exit(f"No draft started for issue(s) {failed}: run {args.draft_workflow} by hand.")
 
 
 if __name__ == "__main__":

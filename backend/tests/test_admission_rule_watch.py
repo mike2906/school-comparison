@@ -412,7 +412,7 @@ def test_a_failed_dispatch_does_not_stop_the_others(monkeypatch):
     transport = httpx.MockTransport(handler)
     real_client = httpx.Client
     monkeypatch.setattr(script.httpx, "Client", lambda **kw: real_client(transport=transport, **kw))
-    script.start_drafts([7, 9], "draft-rule-update.yml", "o/r", "t")
+    assert script.start_drafts([7, 9], "draft-rule-update.yml", "o/r", "t") == [7]
     assert started == ["9"]
 
 

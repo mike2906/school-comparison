@@ -1,10 +1,11 @@
 """Print the text of an official page or PDF, for the rule-update drafting workflow.
 
 Only hosts the admission rules already rely on can be read: the hosts of every source in
-the rule files and the watch config, plus Bulgarian government and court domains. That
-keeps an agent reading untrusted page text from sending data anywhere else.
+the rule files and the watch config on main, plus Bulgarian government and court domains.
+That keeps an agent reading untrusted page text from sending data anywhere else. The
+hosts come from origin/main when it is there, so editing a rule file adds none.
 
-    uv run python -m scripts.fetch_official <url> [--max-chars 200000]
+    uv run --no-sync --directory backend python -m scripts.fetch_official <url> [--max-chars 200000]
 """
 
 from __future__ import annotations
@@ -12,6 +13,7 @@ from __future__ import annotations
 import argparse
 import io
 import json
+import subprocess
 import sys
 from pathlib import Path
 from urllib.parse import urlparse
@@ -21,7 +23,9 @@ import pdfplumber
 
 from app.services.admission_rule_watch import SOURCES_DIR, USER_AGENT, clean_text
 
-RULES_DIR = Path(__file__).resolve().parents[2] / "frontend" / "src" / "admission" / "rules"
+REPO = Path(__file__).resolve().parents[2]
+RULES_DIR = REPO / "frontend" / "src" / "admission" / "rules"
+MAIN_REF = "refs/remotes/origin/main"
 OFFICIAL_SUFFIXES = (
     "sofia.bg",
     "government.bg",
@@ -41,10 +45,43 @@ def _urls(value: object) -> list[str]:
     return [value] if isinstance(value, str) and value.startswith("http") else []
 
 
+def _config_texts() -> list[str]:
+    """The rule files and watch configs, from origin/main if present, else the working tree."""
+    git = ["git", "-C", str(REPO)]
+    try:
+        names = subprocess.run(
+            [
+                *git,
+                "ls-tree",
+                "-r",
+                "--name-only",
+                MAIN_REF,
+                "--",
+                "frontend/src/admission/rules",
+                "backend/app/scrapers/sources",
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.split()
+    except (OSError, subprocess.CalledProcessError):
+        paths = [*RULES_DIR.rglob("*.json"), *SOURCES_DIR.glob("*/admission_rule_watch.json")]
+        return [p.read_text("utf-8") for p in paths]
+    wanted = [
+        n
+        for n in names
+        if n.endswith(".json") and ("/admission/rules/" in n or n.endswith("/admission_rule_watch.json"))
+    ]
+    return [
+        subprocess.run([*git, "show", f"{MAIN_REF}:{n}"], capture_output=True, text=True, check=True).stdout
+        for n in wanted
+    ]
+
+
 def allowed_hosts() -> set[str]:
     hosts: set[str] = set()
-    for path in [*RULES_DIR.rglob("*.json"), *SOURCES_DIR.glob("*/admission_rule_watch.json")]:
-        hosts.update(urlparse(u).hostname or "" for u in _urls(json.loads(path.read_text("utf-8"))))
+    for text in _config_texts():
+        hosts.update(urlparse(u).hostname or "" for u in _urls(json.loads(text)))
     hosts.discard("")
     return hosts
 

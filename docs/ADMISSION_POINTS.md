@@ -161,11 +161,16 @@ Mike's Claude subscription via the `CLAUDE_CODE_OAUTH_TOKEN` secret from
   `RULE_VERSIONS` updated when the version date changes (a test checks they agree with
   the rule files), or a schedule, status event or confirmation on the campaign's file.
 
-Claude reads sources only through `backend/scripts/fetch_official.py`, which reads pages
-and PDFs from the official hosts the rule files and watch config already use, so text on
-a page cannot send it elsewhere. Its tools are limited to the issue, its own
-`rule-watch/issue-N` branch, that script and the tests. Missing, provisional, unreadable
-and failed-run issues are never closed without a fix.
+Claude sees only what the watch wrote on the issue (other people's comments are left
+out), so the only outside text it reads is the official pages. It reads them through
+`backend/scripts/fetch_official.py`, which fetches only the official hosts listed on main.
+It can edit only the rule JSON files, the watch config and the two `RULE_VERSIONS`
+modules, comment on or close its own issue, and push its own `rule-watch/issue-N` branch;
+merging is blocked. This narrows what an injected instruction on an official page could
+do; it is not a sandbox. Missing, provisional, unreadable
+and failed-run issues are never closed without a fix. If a draft cannot be started, the
+daily run fails (state is still saved); its log, linked from the failed-run issue, names the issue to run
+by hand.
 
 It never merges: a PR is reviewed like any other, because a wrong points value is worse
 than a late one. A catchment change needs a new snapshot
