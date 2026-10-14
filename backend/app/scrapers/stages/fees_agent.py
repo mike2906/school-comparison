@@ -412,7 +412,7 @@ async def read_fees(school: School, pages: list[PageRead], spend: Spend, missed:
         )
     in_price, out_price = get_model_costs("pricing")
     estimate = (len(text) / 3 * in_price + READ_OUTPUT_TOKENS_RESERVE * out_price) / 1_000_000
-    if not spend.allows(estimate):  # before building the agent: a stopped run makes nothing
+    if not spend.allows(estimate):  # before building the agent; ``hold`` below checks again
         raise SpendCapReached(f"spent ${spend.spent_usd:.4f} of ${spend.cap_usd}")
     agent = create_agent(
         "pricing",
@@ -1130,23 +1130,15 @@ async def run_fees_agent(
             ):
 
                 async def one(school_db: AsyncSession, current_id: int) -> dict[str, Any]:
-                    school = await school_db.get(School, current_id)
-                    try:
-                        return await run_school(
-                            school_db,
-                            school,
-                            find=lambda s: find_pages(crawler, run_config, client, s, spend, read_pictures=True),
-                            read=lambda s, pages, missed: read_fees(s, pages, spend, missed),
-                            apply=apply,
-                            gone=lambda url: page_gone(client, url),
-                        )
-                    except (SpendCapReached, ProviderCostCapExceeded):
-                        raise
-                    except Exception as exc:  # one school's failure leaves its rows as they are
-                        logger.exception("fees-agent failed for school %s", current_id)
-                        if school_db.in_transaction():
-                            await school_db.rollback()
-                        return {"school_id": current_id, "outcome": "error", "reason": str(exc)[:200]}
+                    # A failure here is that school's error (school_pool): its rows stay as they are.
+                    return await run_school(
+                        school_db,
+                        await school_db.get(School, current_id),
+                        find=lambda s: find_pages(crawler, run_config, client, s, spend, read_pictures=True),
+                        read=lambda s, pages, missed: read_fees(s, pages, spend, missed),
+                        apply=apply,
+                        gone=lambda url: page_gone(client, url),
+                    )
 
                 results, error = await school_pool.run_schools(
                     db,

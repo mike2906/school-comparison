@@ -91,15 +91,22 @@ async def run_schools(
                     except stop_on as exc:
                         stopped = stopped or f"stopped before school {school_id}: {exc}"
                         return
-                    except Exception as exc:  # a failure ``work`` did not handle stays this school's
+                    except Exception as exc:  # one school's failure is that school's error result
                         logger.exception("school %s failed", school_id)
-                        if school_db.in_transaction():
-                            await school_db.rollback()
+                        try:
+                            if school_db.in_transaction():
+                                await school_db.rollback()
+                        except Exception:  # a dropped connection: the session starts over next school
+                            logger.exception("rollback after school %s failed", school_id)
                         result = {"school_id": school_id, "outcome": "error", "reason": str(exc)[:200]}
                     done[school_id] = result
                     report_ready()
 
-    async with asyncio.TaskGroup() as group:
-        for _ in range(min(workers, len(queue))):
-            group.create_task(worker())
+    try:
+        async with asyncio.TaskGroup() as group:
+            for _ in range(min(workers, len(queue))):
+                group.create_task(worker())
+    except Exception as exc:  # e.g. a session that cannot open: keep what the schools read
+        logger.exception("school pool stopped")
+        stopped = stopped or f"run stopped: {exc!r}"[:300]
     return [done[school_id] for school_id in school_ids if school_id in done], stopped

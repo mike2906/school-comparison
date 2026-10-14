@@ -86,6 +86,12 @@ stages stay separate.
   run; risks the validated fee page choice).
 - The daily open-days hash check (its own thread).
 - Concurrent page fetches within one school site.
+- Known gaps: a school on a subdomain (kg.xschool.bg) and one on the bare domain
+  (xschool.bg) get different site keys, though the finder follows links across both, so
+  they can be crawled at once. Writers other than the facts stage, the fees agent and
+  Stage 6 (e.g. the extractor) still write the whole attributes JSON from an early read.
+- `--workers` is capped at 16: the DB engine allows 35 connections (a worker's plus a
+  ledger session per call in flight).
 
 ## Second opinion (Codex, 2026-10-14)
 

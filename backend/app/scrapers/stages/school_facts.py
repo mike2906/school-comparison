@@ -59,12 +59,13 @@ def model_caller(spend: Spend) -> Caller:
     """One structured call on the stage's tier, within the run's spend cap."""
 
     async def call(prompt: str, schema: type, message: str, school_id: int) -> Any:
-        if not spend.allows(_estimate_usd(message)):
+        estimate = _estimate_usd(message)
+        if not spend.allows(estimate):  # before building the agent; ``hold`` below checks again
             raise SpendCapReached(f"spent ${spend.spent_usd:.4f} of ${spend.cap_usd}")
         agent = create_agent(
             TIER, prompt, schema, retries=1, model_settings={"temperature": get_settings().extraction_temperature}
         )
-        with spend.hold(_estimate_usd(message)):
+        with spend.hold(estimate):
             result = await execute_billable_request(
                 lambda: agent.run(message), model=get_model(TIER), school_id=school_id, stage=STAGE, timeout_seconds=150
             )
@@ -311,16 +312,9 @@ async def run_school_facts(
                     )
 
                 async def one(school_db: AsyncSession, current_id: int) -> dict[str, Any]:
+                    # A failure here is that school's error (school_pool): its stored facts stay.
                     school = await school_db.get(School, current_id)
-                    try:
-                        return await run_school(school_db, school, find=find, call=call, apply=apply)
-                    except (SpendCapReached, ProviderCostError):  # a cap, or a run no longer running
-                        raise
-                    except Exception as exc:  # one school's failure leaves its stored facts as they are
-                        logger.exception("school-facts failed for school %s", current_id)
-                        if school_db.in_transaction():
-                            await school_db.rollback()
-                        return {"school_id": current_id, "outcome": "error", "reason": str(exc)[:200]}
+                    return await run_school(school_db, school, find=find, call=call, apply=apply)
 
                 results, error = await school_pool.run_schools(
                     db, ids, one, workers=workers, stop_on=(SpendCapReached, ProviderCostError), sites=sites

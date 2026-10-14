@@ -400,7 +400,9 @@ async def _shared_site_check_command(*, school_ids, city, country, dry_run, repo
 @click.option("--apply", "apply_changes", is_flag=True, help="Write rows (default is a dry run that writes nothing)")
 @click.option("--out", "report_path", type=click.Path(dir_okay=False, path_type=Path), help="Write the JSON report")
 @click.option("--after-id", type=int, default=None, help="Start after this school id (carry on a stopped run)")
-@click.option("--workers", type=int, default=8, show_default=True, help="Schools read at a time")
+@click.option(
+    "--workers", type=click.IntRange(1, 16), default=8, show_default=True, help="Schools read at a time (1-16)"
+)
 def fees_agent_command(school_id, city, country, limit, max_usd, apply_changes, report_path, after_id, workers):
     """Read private and international schools' fee pages with the fee agent (experimental, not in `all`)."""
     asyncio.run(
@@ -464,7 +466,9 @@ async def _fees_agent_command(*, school_id, city, country, limit, max_usd, apply
 @click.option("--max-usd", type=float, default=0.50, show_default=True, help="Spend cap for the run")
 @click.option("--apply", "apply_changes", is_flag=True, help="Store facts (default is a dry run that writes nothing)")
 @click.option("--out", "report_path", type=click.Path(dir_okay=False, path_type=Path), help="Write the JSON report")
-@click.option("--workers", type=int, default=8, show_default=True, help="Schools read at a time")
+@click.option(
+    "--workers", type=click.IntRange(1, 16), default=8, show_default=True, help="Schools read at a time (1-16)"
+)
 def school_facts_command(school_ids, city, country, limit, max_usd, apply_changes, report_path, workers):
     """Read schools' own pages for concrete facts by topic (experimental, not in `all`)."""
     import json
