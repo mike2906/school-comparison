@@ -498,6 +498,48 @@ def school_facts_command(school_ids, city, country, limit, max_usd, apply_change
         console.print(f"Report: {report_path}")
 
 
+@cli.command("site-agents")
+@click.option("--school-id", "school_ids", type=int, multiple=True, help="Run these schools (repeatable)")
+@click.option("--city", default=None, help="Only schools in this city")
+@click.option("--country", default="bg", show_default=True, help="Country code")
+@click.option("--limit", type=int, default=None, help="Maximum schools")
+@click.option("--max-usd", type=float, default=0.50, show_default=True, help="Spend cap for the run")
+@click.option("--apply", "apply_changes", is_flag=True, help="Store facts and fees (default is a dry run)")
+@click.option("--out", "report_path", type=click.Path(dir_okay=False, path_type=Path), help="Write the JSON report")
+@click.option("--workers", type=int, default=4, show_default=True, help="Schools read at a time")
+def site_agents_command(school_ids, city, country, limit, max_usd, apply_changes, report_path, workers):
+    """School facts and fees from one crawl of each school's site (experimental, not in `all`)."""
+    import json
+
+    from app.database import async_session_maker
+    from app.scrapers.stages import site_agents
+
+    async def _run():
+        async with async_session_maker() as db:
+            return await site_agents.run_site_agents(
+                db,
+                country=country,
+                city=city,
+                school_ids=school_ids,
+                limit=limit,
+                max_usd=max_usd,
+                apply=apply_changes,
+                workers=workers,
+            )
+
+    report = asyncio.run(_run())
+    console.print(f"{'Applied' if apply_changes else 'Dry run'}: {report['schools']} schools, ${report['spent_usd']:.4f}")
+    for result in report["results"]:
+        outcomes = ", ".join(f"{name} {result[name]['outcome']}" for name in ("facts", "fees") if name in result)
+        console.print(f"  {result['school_id']}: {outcomes}")
+    if report["stopped"]:
+        console.print(f"[yellow]{report['stopped']}[/yellow]")
+    if report_path is not None:
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(json.dumps(report, ensure_ascii=False, indent=1, default=str), encoding="utf-8")
+        console.print(f"Report: {report_path}")
+
+
 @cli.command("social-links")
 @click.option("--school-id", "school_ids", type=int, multiple=True, help="Run these schools (repeatable)")
 @click.option("--city", default=None, help="Only schools in this city")

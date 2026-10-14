@@ -256,7 +256,9 @@ async def run_school_facts(
         query = query.where(School.id.in_(list(school_ids)))
     if city:
         query = query.where(func.lower(School.city) == city.lower())
-    ids = (await db.execute(query.order_by(School.id).limit(limit))).scalars().all()
+    rows = (await db.execute(query.add_columns(School.website_url).order_by(School.id).limit(limit))).all()
+    ids = [row.id for row in rows]
+    sites = {row.id: row.website_url for row in rows}
 
     spend = Spend(max_usd)
     run = await start_pipeline_run(
@@ -320,7 +322,7 @@ async def run_school_facts(
                         return {"school_id": current_id, "outcome": "error", "reason": str(exc)[:200]}
 
                 results, error = await school_pool.run_schools(
-                    db, ids, one, workers=workers, stop_on=(SpendCapReached, ProviderCostError)
+                    db, ids, one, workers=workers, stop_on=(SpendCapReached, ProviderCostError), sites=sites
                 )
     except Exception as exc:
         logger.exception("school-facts run %s stopped", run_id)

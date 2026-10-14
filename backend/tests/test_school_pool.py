@@ -73,3 +73,29 @@ async def test_a_stop_ends_the_run_and_no_new_school_starts():
     assert stopped == "stopped before school 2: cap"
     assert 2 not in [r["school_id"] for r in results]
     assert started == [1, 2]  # 1 finishes; 3 never starts
+
+
+def test_site_key_joins_a_domains_endings_and_keeps_shared_hosts_apart():
+    from app.scrapers.stages.school_pool import site_key
+
+    assert site_key("https://www.meridian22.org/") == site_key("https://meridian22.bg/sch") == "meridian22"
+    assert site_key("https://dg42.sofia.bg/") != site_key("https://dg43.sofia.bg/")
+    assert site_key(None) is None
+
+
+async def test_schools_on_one_site_never_run_at_the_same_time():
+    running: set[str] = set()
+    clashes = []
+    sites = {1: "https://a.bg/", 2: "https://a.bg/x", 3: "https://b.bg/", 4: "https://a.org/"}
+
+    async def work(db, school_id):
+        site = sites[school_id].split("/")[2].split(".")[0]
+        if site in running:
+            clashes.append(school_id)
+        running.add(site)
+        await asyncio.sleep(0.01)
+        running.discard(site)
+        return {"school_id": school_id}
+
+    results, _ = await run_schools("caller", [1, 2, 3, 4], work, workers=4, sites=sites, session_factory=_Session)
+    assert clashes == [] and [r["school_id"] for r in results] == [1, 2, 3, 4]

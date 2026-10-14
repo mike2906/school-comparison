@@ -15,7 +15,7 @@ import json
 import logging
 import re
 from collections.abc import Awaitable, Callable, Iterable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, Optional
@@ -119,6 +119,19 @@ class PageRead:
     text: str
     prices: bool
     note: Optional[str] = None
+
+
+@dataclass
+class SiteCache:
+    """One school's fetched pages, shared by the finders of one site read (``site-agents``):
+    a page both link pickers choose, and the home page, are fetched once. Keyed by the exact
+    URL (``page_key`` folds case and ``www``, which can be different pages); a failed or
+    empty fetch is not kept, so the next finder tries again. Each finder keeps its own
+    queue, limits and WordPress state."""
+
+    pages: dict[str, Any] = field(default_factory=dict)  # URL -> _fetch result
+    wordpress: dict[str, Optional[str]] = field(default_factory=dict)  # final URL -> API text
+    robots: Any = None
 
 
 Finder = Callable[[School], Awaitable[list[PageRead]]]
@@ -254,14 +267,17 @@ async def find_pages(
     fallback_links: re.Pattern = _FEE_LINK_RE,
     stage: str = STAGE,
     read_pictures: bool = False,
+    cache: Optional[SiteCache] = None,
 ) -> list[PageRead]:
     """Up to 3 hops and 12 pages from the home page; robots.txt is respected.
 
     With ``read_pictures``, up to 4 pictures named for fees are read as pages of their own.
-    The school-facts stage passes its own link prompt, fallback keywords and stage name."""
+    The school-facts stage passes its own link prompt, fallback keywords and stage name.
+    A ``cache`` shared with another finder of the same school serves pages it fetched."""
     from crawl4ai.utils import RobotsParser  # type: ignore
 
-    robots = RobotsParser()
+    cache = cache or SiteCache()
+    robots = cache.robots = cache.robots or RobotsParser()
     wordpress = True  # until the API is found missing
     site = school.website_url
     read: list[PageRead] = []
@@ -286,10 +302,13 @@ async def find_pages(
                 read.append(PageRead(url, "", False, "robots.txt"))
                 continue
             try:
-                final, text, page_links, page_pictures = await _fetch(crawler, run_config, client, url)
+                fetched = cache.pages.get(url) or await _fetch(crawler, run_config, client, url)
             except Exception as exc:  # a failed page is recorded and skipped
                 read.append(PageRead(url, "", False, str(exc)[:120]))
                 continue
+            if fetched[1].strip():  # an empty render is not kept: the next finder tries again
+                cache.pages[url] = fetched
+            final, text, page_links, page_pictures = fetched
             if page_key(final) != page_key(url) and page_key(final) in seen:
                 continue  # a second link to a page already read (often a percent-encoded redirect)
             seen.add(page_key(final))
@@ -300,7 +319,9 @@ async def find_pages(
                 and len(text.strip()) < THIN_PAGE_CHARS
                 and await robots.can_fetch(_wordpress_api(final)[0], CRAWLER_USER_AGENT)
             ):
-                api_text = await _wordpress_text(client, final)
+                if final not in cache.wordpress:
+                    cache.wordpress[final] = await _wordpress_text(client, final)
+                api_text = cache.wordpress[final]
                 wordpress = api_text is not None
                 text = api_text or text
             read.append(PageRead(final, text, bool(_PRICE_RE.search(text))))
@@ -1072,7 +1093,9 @@ async def run_fees_agent(
     if after_id is not None:
         query = query.where(School.id > after_id)
     # Ids, not objects: a rollback after one school's failure expires every loaded object.
-    school_ids = (await db.execute(query.with_only_columns(School.id).order_by(School.id).limit(limit))).scalars().all()
+    rows = (await db.execute(query.with_only_columns(School.id, School.website_url).order_by(School.id).limit(limit))).all()
+    school_ids = [row.id for row in rows]
+    sites = {row.id: row.website_url for row in rows}
 
     spend = Spend(max_usd)
     run = await start_pipeline_run(
@@ -1135,6 +1158,7 @@ async def run_fees_agent(
                     one,
                     workers=workers,
                     stop_on=(SpendCapReached, ProviderCostCapExceeded),
+                    sites=sites,
                     on_result=(lambda result: _append_line(lines_path, result)) if lines_path is not None else None,
                 )
     except Exception as exc:
