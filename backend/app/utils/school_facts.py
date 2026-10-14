@@ -149,11 +149,20 @@ def _as_list(value: Any) -> list[Any]:
     return value if isinstance(value, list) else []
 
 
-def at_a_glance(facts: list[Mapping[str, Any]], today: Optional[datetime.date] = None) -> dict[str, Any]:
-    """The school's labels summed up from its shown facts (any rank), key facts first.
+PLACES_SHOWN_DAYS = 180
+OPEN_ONLY_WINDOW_DAYS = 120
 
-    One value fields take the first fact that has one; lists are joined. An application
-    window whose closing date has passed is left out."""
+
+def at_a_glance(
+    facts: list[Mapping[str, Any]], read_at: Optional[str] = None, today: Optional[datetime.date] = None
+) -> dict[str, Any]:
+    """The school's labels summed up from its facts, key facts first.
+
+    Lists are joined; admission rows are merged per grade; the highest grade is the
+    largest stated. The first application window that has not closed is shown (a window
+    with only an opening date for ``OPEN_ONLY_WINDOW_DAYS`` after it opens). Full / waiting
+    list places show only for ``PLACES_SHOWN_DAYS`` after the read. Class size is left to
+    the school's own ``class_size`` field, which applies the curated value and its gate."""
     today = today or datetime.date.today()
 
     def first(key: str) -> Any:
@@ -162,45 +171,50 @@ def at_a_glance(facts: list[Mapping[str, Any]], today: Optional[datetime.date] =
     bus_areas: list[dict[str, str]] = []
     for fact in facts:
         bus_areas += [area for area in fact.get("bus_areas") or [] if area not in bus_areas]
-    admission = []
+    admission: list[dict[str, Any]] = []
     for fact in facts:
-        if fact.get("admission") or fact.get("exam_subjects"):
-            row = {
-                "grade": fact.get("admission_grade"),
-                "types": fact.get("admission") or [],
-                "subjects": fact.get("exam_subjects") or [],
-            }
-            if row not in admission:
-                admission.append(row)
+        if not (fact.get("admission") or fact.get("exam_subjects")):
+            continue
+        row = next((r for r in admission if r["grade"] == fact.get("admission_grade")), None)
+        if row is None:
+            row = {"grade": fact.get("admission_grade"), "types": [], "subjects": []}
+            admission.append(row)
+        row["types"] += [t for t in fact.get("admission") or [] if t not in row["types"]]
+        row["subjects"] += [s for s in fact.get("exam_subjects") or [] if s not in row["subjects"]]
     places = []
+    read = _date(read_at[:10]) if isinstance(read_at, str) else None
+    if read and (today - datetime.date.fromisoformat(read)).days <= PLACES_SHOWN_DAYS:
+        for fact in facts:
+            row = {"grade": fact.get("admission_grade"), "status": fact.get("places")}
+            if row["status"] and row not in places:
+                places.append(row)
+    window = None
     for fact in facts:
-        if fact.get("places") and {"grade": fact.get("admission_grade"), "status": fact["places"]} not in places:
-            places.append({"grade": fact.get("admission_grade"), "status": fact["places"]})
-    window = next(
-        (
-            {"open": f.get("applications_open"), "close": f.get("applications_close")}
-            for f in facts
-            if f.get("applications_open") or f.get("applications_close")
-        ),
-        None,
-    )
-    if window and window["close"] and datetime.date.fromisoformat(window["close"]) < today:
-        window = None
+        opens, closes = fact.get("applications_open"), fact.get("applications_close")
+        if closes:
+            current = datetime.date.fromisoformat(closes) >= today
+        elif opens:
+            current = (today - datetime.date.fromisoformat(opens)).days <= OPEN_ONLY_WINDOW_DAYS
+        else:
+            continue
+        if current:
+            window = {"open": opens, "close": closes}
+            break
     languages: list[dict[str, Any]] = []
     for fact in facts:
         for item in fact.get("languages") or []:
             if all(row["language"] != item["language"] for row in languages):
                 languages.append(item)
+    grades = [fact["highest_grade"] for fact in facts if fact.get("highest_grade") is not None]
     return {
         "admission": admission,
         "places": places,
-        "highest_grade": first("highest_grade"),
+        "highest_grade": max(grades) if grades else None,
         "curricula": [c for c in CURRICULA if c in {v for f in facts for v in f.get("curricula") or []}],
         "diploma_recognised": first("diploma_recognised"),
         "applications": window,
         "instruction_languages": list(dict.fromkeys(v for f in facts for v in f.get("instruction_languages") or [])),
         "languages": languages,
-        "class_size": first("max_class_size"),
         "bus_areas": bus_areas,
         "special_needs_support": first("special_needs_support"),
     }
@@ -258,7 +272,10 @@ def publishable_school_facts(attributes: Any, website_url: Optional[str]) -> Opt
         )
     if not facts:
         return None
-    return {"read_at": str(block.get("read_at") or ""), "facts": facts, "at_a_glance": at_a_glance(facts)}
+    read_at = str(block.get("read_at") or "")
+    # Minor facts are never shown, so their labels stay out of the summary too.
+    shown = [fact for fact in facts if fact["rank"] != "minor"]
+    return {"read_at": read_at, "facts": facts, "at_a_glance": at_a_glance(shown, read_at)}
 
 
 def shown_school_facts(attributes: Any, scrape_status: Any, website_url: Optional[str]) -> Optional[dict[str, Any]]:

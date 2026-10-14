@@ -490,7 +490,7 @@ def test_at_a_glance_sums_up_the_labels_and_drops_a_closed_window():
         {"highest_grade": 4, "curricula": ["cambridge"], "bus_areas": [{"bg": "Бояна", "en": "Boyana"}]},
         {"applications_open": "2026-03-01", "applications_close": "2026-04-30"},
     ]
-    glance = at_a_glance(facts, today=datetime.date(2026, 4, 1))
+    glance = at_a_glance(facts, "2026-03-20T10:00:00", today=datetime.date(2026, 4, 1))
     assert glance["admission"][0] == {
         "grade": 5,
         "types": ["entrance_exam"],
@@ -500,6 +500,50 @@ def test_at_a_glance_sums_up_the_labels_and_drops_a_closed_window():
     assert glance["highest_grade"] == 4 and glance["curricula"] == ["cambridge"]
     assert glance["applications"] == {"open": "2026-03-01", "close": "2026-04-30"}
     assert at_a_glance(facts, today=datetime.date(2026, 5, 1))["applications"] is None
+
+
+def test_at_a_glance_merges_grades_and_ages_out_stale_dates_and_places():
+    import datetime
+
+    from app.utils.school_facts import at_a_glance
+
+    facts = [
+        {"admission": ["entrance_exam"], "admission_grade": 5, "exam_subjects": [{"bg": "Математика", "en": "Maths"}]},
+        {"admission": ["interview"], "admission_grade": 5, "places": "waiting_list"},
+        {"highest_grade": 4},
+        {"highest_grade": 12},
+        {"applications_open": "2025-03-01", "applications_close": "2025-04-30"},
+        {"applications_open": "2026-11-01", "applications_close": "2026-12-15"},
+    ]
+    today = datetime.date(2026, 10, 14)
+    glance = at_a_glance(facts, "2026-10-01", today=today)
+    assert glance["admission"] == [
+        {"grade": 5, "types": ["entrance_exam", "interview"], "subjects": [{"bg": "Математика", "en": "Maths"}]}
+    ]
+    assert glance["highest_grade"] == 12
+    assert glance["applications"] == {"open": "2026-11-01", "close": "2026-12-15"}
+    assert glance["places"] == [{"grade": 5, "status": "waiting_list"}]
+    assert at_a_glance(facts, "2026-01-10", today=today)["places"] == []  # read too long ago
+    open_only = [{"applications_open": "2026-03-01"}]
+    assert at_a_glance(open_only, today=today)["applications"] is None
+    assert at_a_glance(open_only, today=datetime.date(2026, 4, 1))["applications"] == {
+        "open": "2026-03-01",
+        "close": None,
+    }
+
+
+@pytest.mark.asyncio
+async def test_minor_facts_labels_stay_out_of_the_glance(client, db_session):
+    rows = [
+        _fact_row(topic="curriculum", highest_grade=7),
+        _fact_row(topic="transport", bus_areas=[{"bg": "Бояна", "en": "Boyana"}], rank="minor"),
+    ]
+    body = await _detail(
+        client, db_session, school_facts={"_schema_version": 1, "read_at": "t", "website_url": HOME, "facts": rows}
+    )
+    glance = body["school_facts"]["at_a_glance"]
+    assert glance["highest_grade"] == 7 and glance["bus_areas"] == []
+    assert "class_size" not in glance
 
 
 @pytest.mark.asyncio
@@ -527,4 +571,8 @@ async def test_admission_labels_reach_the_judge_and_the_store():
     stored = (await stage.read_school(_school(), LINES, calls))["store"][0]
     assert stored["admission"] == ["entrance_exam"] and stored["exam_subjects"] == [{"bg": "Математика", "en": "Maths"}]
     judged = calls.messages[1][1]
-    assert "Admission: entrance_exam" in judged and "Admission grade: 5" in judged and "Exam subjects: Maths" in judged
+    assert (
+        "Admission: entrance_exam" in judged
+        and "Admission grade: 5" in judged
+        and "Exam subjects: Математика / Maths" in judged
+    )

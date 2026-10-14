@@ -407,7 +407,6 @@ class FactsAtAGlance(BaseModel):
     applications: Optional[FactApplications] = None
     instruction_languages: list[str] = []
     languages: list[FactLanguage] = []
-    class_size: Optional[int] = None
     bus_areas: list[BilingualName] = []
     special_needs_support: Optional[bool] = None
 

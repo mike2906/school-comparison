@@ -801,16 +801,14 @@
       "admissions": "Прием"
     },
     "glance": {
-      "title": "Накратко",
       "admission": "Прием",
       "places": "Свободни места",
       "applications": "Кандидатстване",
       "highestGrade": "Обучение до",
       "curricula": "Програма",
       "diploma": "Диплома",
-      "instruction": "Обучение на",
+      "instruction": "Език на обучение",
       "languages": "Езици",
-      "classSize": "Брой ученици в клас",
       "bus": "Училищен автобус",
       "support": "Подкрепа за деца със СОП",
       "grade": "{{grade}} клас",
@@ -829,7 +827,7 @@
       "opens": "От {{date}}",
       "closes": "До {{date}}",
       "curriculaNames": {
-        "bulgarian_state": "Държавна програма",
+        "bulgarian_state": "Българска държавна програма",
         "ib": "IB",
         "cambridge": "Кеймбридж",
         "british": "Британска",
@@ -842,7 +840,6 @@
       "notRecognised": "Не е призната в България",
       "hours_one": "{{count}} час седмично",
       "hours_other": "{{count}} часа седмично",
-      "upTo": "До {{count}} ученици",
       "yes": "Да"
     }
   }

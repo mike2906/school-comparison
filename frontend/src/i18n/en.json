@@ -801,7 +801,6 @@
       "admissions": "Admissions"
     },
     "glance": {
-      "title": "At a glance",
       "admission": "Admission",
       "places": "Places",
       "applications": "Applications",
@@ -810,7 +809,6 @@
       "diploma": "Diploma",
       "instruction": "Taught in",
       "languages": "Languages",
-      "classSize": "Class size",
       "bus": "School bus",
       "support": "Special needs support",
       "grade": "Grade {{grade}}",
@@ -842,7 +840,6 @@
       "notRecognised": "Not recognised in Bulgaria",
       "hours_one": "{{count}} hour a week",
       "hours_other": "{{count}} hours a week",
-      "upTo": "Up to {{count}} pupils",
       "yes": "Yes"
     }
   }

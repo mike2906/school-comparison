@@ -57,11 +57,11 @@ none shows nothing.
 tags join `filter_tags` (so the search filters and the compare page's meals, transport and
 after-school rows see them), its languages join `language_focus`, and its class size is
 used when no curated one exists (before the old extraction's). The response also carries
-`school_facts.at_a_glance` (`at_a_glance` in `app/utils/school_facts.py`): admissions and
-places per grade, highest grade, curricula, diploma, application window (dropped once it
-has closed), instruction languages, language hours, class size, bus areas and support,
-summed from the shown facts and shown above the fact list and as compare rows. Facts carry their own
-checks, so they do not wait for a Stage 6 report, but a website-data withholding marker
+`school_facts.at_a_glance` (`at_a_glance` in `app/utils/school_facts.py`): admissions per
+grade, places (only for 180 days after the read), the highest grade stated, curricula,
+diploma, the first application window not yet closed, instruction languages, language
+hours, bus areas and support, summed from the shown (not minor) facts and shown above the
+fact list and as compare rows. Facts carry their own checks, so they do not wait for a Stage 6 report, but a website-data withholding marker
 (failed URL check, shared site) hides them and their labels, and so does a change of
 website (host and path) or a website URL validation has not accepted (`pending`,
 `failed_validate`, `no_official_website`; `SITE_ACCEPTED_STATUSES`). The stage reads only

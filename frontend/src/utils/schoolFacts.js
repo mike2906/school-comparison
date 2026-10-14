@@ -90,7 +90,6 @@ export function atAGlanceLines(school, language, t) {
     ].filter(Boolean).join(', ')
     return extra ? `${languageLabel(item.language, t)} (${extra})` : languageLabel(item.language, t)
   }).join(', '))
-  add('classSize', glance.class_size && t('schoolFacts.glance.upTo', { count: glance.class_size }))
   add('bus', (glance.bus_areas || []).map(area => name(area, language)).filter(Boolean).join(', '))
   add('support', glance.special_needs_support === true && t('schoolFacts.glance.yes'))
   return lines
@@ -104,5 +103,5 @@ export function atAGlanceKeysIn(schools, language, t) {
 
 const GLANCE_KEYS = [
   'admission', 'places', 'applications', 'highestGrade', 'curricula', 'diploma',
-  'instruction', 'languages', 'classSize', 'bus', 'support',
+  'instruction', 'languages', 'bus', 'support',
 ]
