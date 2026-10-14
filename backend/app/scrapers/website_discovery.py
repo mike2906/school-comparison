@@ -26,6 +26,7 @@ from app.models import School, ScrapeType, SourcePage
 from app.scrapers.base import BaseScraper
 from app.scrapers.school_tokens import extract_school_name_tokens
 from app.scrapers.url_validator import URLValidator, extract_validation_aliases
+from app.utils.social_links import profile_url
 
 logger = logging.getLogger(__name__)
 
@@ -247,6 +248,8 @@ _KNOWN_MEDIA_HOSTS = {
     "segabg.com",
     "standartnews.com",
 }
+SOCIAL_CANDIDATES_KEY = "social_link_candidates"
+MAX_SOCIAL_CANDIDATES = 3
 _SOCIAL_HOSTS = {
     "facebook.com",
     "m.facebook.com",
@@ -307,6 +310,9 @@ class WebsiteDiscoverer:
         self.searxng_base_url = (settings.searxng_base_url or "").rstrip("/")
         self.search_timeout = max(1.0, float(settings.website_search_timeout_seconds))
         self.provider_disable_seconds = max(0, int(settings.website_search_provider_disable_seconds))
+        # Facebook pages and Instagram profiles seen in search results, by school id: never a
+        # website, but kept as unconfirmed candidates (``_store_social_candidates``).
+        self.social_hits: dict[int, list[tuple[str, str]]] = {}
 
     async def discover(
         self,
@@ -377,10 +383,13 @@ class WebsiteDiscoverer:
                     discovery_hints=discovery_hints,
                 )
 
+        self._store_social_candidates(school)
         if not resolved_url:
             if can_mark_no_website:
                 school.scrape_status = "no_official_website"
                 school.website_url = None
+                await db.commit()
+            elif SOCIAL_CANDIDATES_KEY in (school.attributes or {}):
                 await db.commit()
             return {
                 "school_id": school.id,
@@ -415,6 +424,29 @@ class WebsiteDiscoverer:
             "candidates_checked": len(seen),
             "search_candidates": searched,
         }
+
+    def _store_social_candidates(self, school: School) -> None:
+        """Keep the pages search found for this school, most often found first, in
+        ``attributes["social_link_candidates"]``. Unconfirmed: a hit for the school's name
+        is often another school's page or a fan page, so these are never shown; a later
+        check (the page's own phone or address against the registry) has to confirm one."""
+        hits = self.social_hits.pop(school.id, [])
+        if not hits:
+            return
+        counts: dict[tuple[str, str], int] = {}
+        for network, url in hits:
+            key = (network, url.lower())
+            counts[key] = counts.get(key, 0) + 1
+        ranked = sorted(counts, key=lambda key: -counts[key])
+        block = {
+            "found_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            **{
+                network: [url for n, url in ranked if n == network][:MAX_SOCIAL_CANDIDATES]
+                for network in ("facebook", "instagram")
+                if any(n == network for n, _ in ranked)
+            },
+        }
+        school.attributes = {**(school.attributes or {}), SOCIAL_CANDIDATES_KEY: block}
 
     async def recover_failed_school(
         self,
@@ -724,6 +756,9 @@ class WebsiteDiscoverer:
                 for link in links:
                     if not link or link in provider_seen:
                         continue
+                    social = profile_url(link)
+                    if social:
+                        self.social_hits.setdefault(school.id, []).append(social)
                     provider_seen.add(link)
                     provider_candidates.append(link)
                     if len(provider_candidates) >= max_collected:

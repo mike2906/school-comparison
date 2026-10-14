@@ -239,6 +239,46 @@ class TestWebsiteDiscovery:
         assert result["found"] is True
         assert school.website_url == "https://official-school.bg"
 
+    async def test_facebook_hits_are_kept_as_unconfirmed_candidates_when_no_site_is_found(self, db_session):
+        school = School(
+            name_i18n={"bg": "Училище Тест", "en": "Test School"},
+            country_code="bg",
+            school_type="state",
+            education_level="primary",
+            city="sofia",
+            website_url=None,
+            scrape_status="no_official_website",
+            attributes={},
+        )
+        db_session.add(school)
+        await db_session.commit()
+
+        mock_response = MagicMock()
+        mock_response.raise_for_status.return_value = None
+        mock_response.json.return_value = {
+            "results": [
+                {"url": "https://www.facebook.com/uchilishte.test"},
+                {"url": "https://www.facebook.com/groups/parents.test"},
+                {"url": "https://www.instagram.com/uchilishte_test/"},
+            ]
+        }
+        mock_response.text = "<html></html>"  # the HTML providers find nothing
+        with patch("httpx.AsyncClient") as mock_client_class:
+            mock_client = AsyncMock()
+            mock_client.__aenter__.return_value = mock_client
+            mock_client.__aexit__.return_value = None
+            mock_client.get.return_value = mock_response
+            mock_client_class.return_value = mock_client
+            result = await discover_school_website(
+                db=db_session, school_id=school.id, country_code="bg", use_search_fallback=True
+            )
+
+        await db_session.refresh(school)
+        assert result["found"] is False and school.website_url is None
+        candidates = school.attributes["social_link_candidates"]
+        assert candidates["facebook"] == ["https://www.facebook.com/uchilishte.test"]  # not the group
+        assert candidates["instagram"] == ["https://www.instagram.com/uchilishte_test/"]
+
     async def test_stops_after_search_results_without_generated_domain_guessing(self, db_session):
         school = School(
             name_i18n={"bg": '"ЧАСТНА ДЕТСКА ГРАДИНА "ПРОЛЕТ" ООД'},

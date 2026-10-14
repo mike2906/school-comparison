@@ -155,7 +155,10 @@ network, and stores the school's Facebook page and Instagram profile in
 `attributes["social_links"]`. Share buttons, groups, events and posts are not a page; a page
 linked from two different schools' websites (a web designer's) is dropped. The detail page
 links them; `app/utils/social_links.py` `shown_social_links` gates them like the facts. A
-school with no website is not covered: website discovery rejects Facebook results. Reading
+school with no website gets no link: website discovery keeps the pages search finds in
+`attributes["social_link_candidates"]` (never shown; a name match is often another school's
+or a fan page) until a check such as the page's phone or address against the registry
+confirms one. Reading
 posts (open days announced only on Facebook) is not built; options and the recommendation are
 in the project's `social-media/research.md`.
 
