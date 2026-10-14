@@ -15,6 +15,7 @@ import json
 import logging
 import re
 from collections.abc import Awaitable, Callable, Iterable, Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
@@ -56,6 +57,7 @@ from app.scrapers.price_evidence import _PRICE_RE, PriceRow, _amount_key
 from app.scrapers.shared_site_check import registrable_domain
 from app.scrapers.stages import common as stage_common
 from app.scrapers.stages import fee_images as fee_images_module
+from app.scrapers.stages import school_pool
 from app.scrapers.stages.fee_images import fee_images
 from app.scrapers.validator import validate_school_data
 from app.services.pipeline_runs import finalize_pipeline_run, pipeline_run_heartbeat, start_pipeline_run
@@ -99,12 +101,27 @@ class SpendCapReached(RuntimeError):
 
 
 class Spend:
+    """The run's spend so far, plus the estimates of calls in flight (several schools read
+    at once), checked against the cap before each call."""
+
     def __init__(self, cap_usd: float):
         self.cap_usd = cap_usd
         self.spent_usd = 0.0
+        self.pending_usd = 0.0
 
     def allows(self, estimate_usd: float) -> bool:
-        return self.spent_usd + estimate_usd <= self.cap_usd
+        return self.spent_usd + self.pending_usd + estimate_usd <= self.cap_usd
+
+    @contextmanager
+    def hold(self, estimate_usd: float):
+        """Count ``estimate_usd`` as spent while a call is in flight; refuse it over the cap."""
+        if not self.allows(estimate_usd):
+            raise SpendCapReached(f"spent ${self.spent_usd:.4f} of ${self.cap_usd}")
+        self.pending_usd += estimate_usd
+        try:
+            yield
+        finally:
+            self.pending_usd -= estimate_usd
 
 
 class Picks(BaseModel):
@@ -226,13 +243,14 @@ async def _pick(
     pages = "\n".join(f"- {page.url} ({'shows prices' if page.prices else 'no prices'})" for page in read)
     shown = "\n".join(f"{url} | {text}" for url, text in links[:MAX_LINKS_SHOWN])
     try:
-        result = await execute_billable_request(
-            lambda: agent.run(f"Institution: {name}\n\nRead so far:\n{pages}\n\nLinks:\n{shown}"),
-            model=get_model("cheap"),
-            school_id=school.id,
-            stage=stage,
-            timeout_seconds=60,
-        )
+        with spend.hold(PICK_COST_ESTIMATE_USD):
+            result = await execute_billable_request(
+                lambda: agent.run(f"Institution: {name}\n\nRead so far:\n{pages}\n\nLinks:\n{shown}"),
+                model=get_model("cheap"),
+                school_id=school.id,
+                stage=stage,
+                timeout_seconds=60,
+            )
     except ProviderResponseUnattributed:
         # Counted at its assumed maximum, as the ledger counts it; the caller falls back to keyword links.
         spend.spent_usd += float(settings.provider_request_reserve_usd)
@@ -310,19 +328,18 @@ async def find_pages(
                     if not fee_images_module.on_site(picture, site):
                         continue
                     seen.add(page_key(picture[0]))
-                    if not spend.allows(fee_images_module.IMAGE_COST_ESTIMATE_USD):
-                        raise SpendCapReached(f"spent ${spend.spent_usd:.4f} of ${spend.cap_usd}")
-                    pictures.append(picture)
-                    found = await fee_images_module.read_image(
-                        client,
-                        picture,
-                        page_url=final,
-                        site_url=site,
-                        school_id=school.id,
-                        stage=stage,
-                        allowed=allowed,
-                        on_cost=spent,
-                    )
+                    with spend.hold(fee_images_module.IMAGE_COST_ESTIMATE_USD):
+                        pictures.append(picture)
+                        found = await fee_images_module.read_image(
+                            client,
+                            picture,
+                            page_url=final,
+                            site_url=site,
+                            school_id=school.id,
+                            stage=stage,
+                            allowed=allowed,
+                            on_cost=spent,
+                        )
                     if found is not None:
                         # A fee table's picture often prints bare numbers ("15 350") under a
                         # currency heading, which the price pattern misses (594): any amount
@@ -394,7 +411,8 @@ async def read_fees(school: School, pages: list[PageRead], spend: Spend, missed:
             "amounts may be from an older year or not be fees: the rules above still decide."
         )
     in_price, out_price = get_model_costs("pricing")
-    if not spend.allows((len(text) / 3 * in_price + READ_OUTPUT_TOKENS_RESERVE * out_price) / 1_000_000):
+    estimate = (len(text) / 3 * in_price + READ_OUTPUT_TOKENS_RESERVE * out_price) / 1_000_000
+    if not spend.allows(estimate):  # before building the agent; ``hold`` below checks again
         raise SpendCapReached(f"spent ${spend.spent_usd:.4f} of ${spend.cap_usd}")
     agent = create_agent(
         "pricing",
@@ -404,13 +422,14 @@ async def read_fees(school: School, pages: list[PageRead], spend: Spend, missed:
         model_settings={"temperature": get_settings().extraction_temperature},
     )
     name = (school.name_i18n or {}).get("bg") or (school.name_i18n or {}).get("en")
-    result = await execute_billable_request(
-        lambda: agent.run(f"Institution: {name} ({school.school_type} {school.education_level})\n\n{text}"),
-        model=get_model("pricing"),
-        school_id=school.id,
-        stage=STAGE,
-        timeout_seconds=240,
-    )
+    with spend.hold(estimate):
+        result = await execute_billable_request(
+            lambda: agent.run(f"Institution: {name} ({school.school_type} {school.education_level})\n\n{text}"),
+            model=get_model("pricing"),
+            school_id=school.id,
+            stage=STAGE,
+            timeout_seconds=240,
+        )
     spend.spent_usd += extract_provider_cost_usd(result)
     read = FeeRead(result.output.fees)
     read.discounts = result.output.discounts
@@ -1046,8 +1065,12 @@ async def run_fees_agent(
     apply: bool = False,
     after_id: Optional[int] = None,
     lines_path: Optional[Path] = None,
+    workers: int = 1,
 ) -> dict[str, Any]:
     """Run the agent over private and international schools with a website; returns the report.
+
+    ``workers`` schools are read at a time, each with its own session; lines are still
+    appended in id order, so ``after_id`` with the last line's id skips no school.
 
     ``after_id`` starts after that school, to carry on a run that stopped. ``lines_path`` gets
     each school's report appended as one JSON line as soon as it is done, so a killed run
@@ -1066,7 +1089,9 @@ async def run_fees_agent(
     if after_id is not None:
         query = query.where(School.id > after_id)
     # Ids, not objects: a rollback after one school's failure expires every loaded object.
-    school_ids = (await db.execute(query.with_only_columns(School.id).order_by(School.id).limit(limit))).scalars().all()
+    rows = (await db.execute(query.with_only_columns(School.id, School.website_url).order_by(School.id).limit(limit))).all()
+    school_ids = [row.id for row in rows]
+    sites = {row.id: row.website_url for row in rows}
 
     spend = Spend(max_usd)
     run = await start_pipeline_run(
@@ -1092,6 +1117,7 @@ async def run_fees_agent(
             stage=STAGE,
             cap_usd=max_usd,
             request_reserve_usd=float(settings.provider_request_reserve_usd),
+            max_in_flight=workers,
         ):
             async with (
                 pipeline_run_heartbeat(
@@ -1102,29 +1128,27 @@ async def run_fees_agent(
                 AsyncWebCrawler(config=browser) as crawler,
                 fee_http_client() as client,
             ):
-                for current_id in school_ids:
-                    school = await db.get(School, current_id)
-                    try:
-                        results.append(
-                            await run_school(
-                                db,
-                                school,
-                                find=lambda s: find_pages(crawler, run_config, client, s, spend, read_pictures=True),
-                                read=lambda s, pages, missed: read_fees(s, pages, spend, missed),
-                                apply=apply,
-                                gone=lambda url: page_gone(client, url),
-                            )
-                        )
-                    except (SpendCapReached, ProviderCostCapExceeded) as exc:
-                        error = f"stopped before school {current_id}: {exc}"
-                        break
-                    except Exception as exc:  # one school's failure leaves its rows as they are
-                        logger.exception("fees-agent failed for school %s", current_id)
-                        if db.in_transaction():
-                            await db.rollback()
-                        results.append({"school_id": current_id, "outcome": "error", "reason": str(exc)[:200]})
-                    if lines_path is not None:
-                        _append_line(lines_path, results[-1])
+
+                async def one(school_db: AsyncSession, current_id: int) -> dict[str, Any]:
+                    # A failure here is that school's error (school_pool): its rows stay as they are.
+                    return await run_school(
+                        school_db,
+                        await school_db.get(School, current_id),
+                        find=lambda s: find_pages(crawler, run_config, client, s, spend, read_pictures=True),
+                        read=lambda s, pages, missed: read_fees(s, pages, spend, missed),
+                        apply=apply,
+                        gone=lambda url: page_gone(client, url),
+                    )
+
+                results, error = await school_pool.run_schools(
+                    db,
+                    school_ids,
+                    one,
+                    workers=workers,
+                    stop_on=(SpendCapReached, ProviderCostCapExceeded),
+                    sites=sites,
+                    on_result=(lambda result: _append_line(lines_path, result)) if lines_path is not None else None,
+                )
     except Exception as exc:
         logger.exception("fees-agent run %s stopped", run_id)
         if db.in_transaction():

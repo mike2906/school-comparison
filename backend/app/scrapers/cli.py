@@ -400,7 +400,10 @@ async def _shared_site_check_command(*, school_ids, city, country, dry_run, repo
 @click.option("--apply", "apply_changes", is_flag=True, help="Write rows (default is a dry run that writes nothing)")
 @click.option("--out", "report_path", type=click.Path(dir_okay=False, path_type=Path), help="Write the JSON report")
 @click.option("--after-id", type=int, default=None, help="Start after this school id (carry on a stopped run)")
-def fees_agent_command(school_id, city, country, limit, max_usd, apply_changes, report_path, after_id):
+@click.option(
+    "--workers", type=click.IntRange(1, 16), default=8, show_default=True, help="Schools read at a time (1-16)"
+)
+def fees_agent_command(school_id, city, country, limit, max_usd, apply_changes, report_path, after_id, workers):
     """Read private and international schools' fee pages with the fee agent (experimental, not in `all`)."""
     asyncio.run(
         _fees_agent_command(
@@ -412,11 +415,12 @@ def fees_agent_command(school_id, city, country, limit, max_usd, apply_changes, 
             apply=apply_changes,
             report_path=report_path,
             after_id=after_id,
+            workers=workers,
         )
     )
 
 
-async def _fees_agent_command(*, school_id, city, country, limit, max_usd, apply, report_path, after_id):
+async def _fees_agent_command(*, school_id, city, country, limit, max_usd, apply, report_path, after_id, workers):
     import json
 
     from app.database import async_session_maker
@@ -438,6 +442,7 @@ async def _fees_agent_command(*, school_id, city, country, limit, max_usd, apply
             apply=apply,
             after_id=after_id,
             lines_path=lines_path,
+            workers=workers,
         )
     console.print(
         f"{'Applied' if apply else 'Dry run'}: {report['schools']} schools, ${report['spent_usd']:.4f} spent, "
@@ -461,7 +466,10 @@ async def _fees_agent_command(*, school_id, city, country, limit, max_usd, apply
 @click.option("--max-usd", type=float, default=0.50, show_default=True, help="Spend cap for the run")
 @click.option("--apply", "apply_changes", is_flag=True, help="Store facts (default is a dry run that writes nothing)")
 @click.option("--out", "report_path", type=click.Path(dir_okay=False, path_type=Path), help="Write the JSON report")
-def school_facts_command(school_ids, city, country, limit, max_usd, apply_changes, report_path):
+@click.option(
+    "--workers", type=click.IntRange(1, 16), default=8, show_default=True, help="Schools read at a time (1-16)"
+)
+def school_facts_command(school_ids, city, country, limit, max_usd, apply_changes, report_path, workers):
     """Read schools' own pages for concrete facts by topic (experimental, not in `all`)."""
     import json
 
@@ -471,7 +479,14 @@ def school_facts_command(school_ids, city, country, limit, max_usd, apply_change
     async def _run():
         async with async_session_maker() as db:
             return await school_facts_stage.run_school_facts(
-                db, country=country, city=city, school_ids=school_ids, limit=limit, max_usd=max_usd, apply=apply_changes
+                db,
+                country=country,
+                city=city,
+                school_ids=school_ids,
+                limit=limit,
+                max_usd=max_usd,
+                apply=apply_changes,
+                workers=workers,
             )
 
     report = asyncio.run(_run())

@@ -632,3 +632,104 @@ async def test_a_run_that_stopped_is_not_named_unattributed(monkeypatch):
         with pytest.raises(ProviderAttributionUncertain) as raised:
             await execute_billable_request(_call, model="mock", school_id=1)
     assert not isinstance(raised.value, ProviderResponseUnattributed)
+
+
+async def test_more_dispatch_slots_run_calls_side_by_side_and_reserve_one_at_a_time(monkeypatch):
+    import app.database as database
+    import app.services.provider_costs as provider_costs
+
+    class _Session:
+        async def __aenter__(self):
+            return object()
+
+        async def __aexit__(self, *_args):
+            return None
+
+    reserving = 0
+    overlapped = []
+
+    async def _reserve(*_args, **_kwargs):
+        nonlocal reserving
+        reserving += 1
+        overlapped.append(reserving)
+        await asyncio.sleep(0.01)
+        reserving -= 1
+        return SimpleNamespace(client_request_id="client")
+
+    async def _noop(*_args, **_kwargs):
+        return None
+
+    monkeypatch.setattr(database, "async_session_maker", lambda: _Session())
+    monkeypatch.setattr(provider_costs, "reserve_provider_request", _reserve)
+    monkeypatch.setattr(
+        provider_costs, "extract_exact_provider_attributions", lambda _result: [{"provider_request_id": "mock"}]
+    )
+    monkeypatch.setattr(provider_costs, "attribute_provider_responses", _noop)
+    in_flight = 0
+    most = 0
+
+    async def _call():
+        nonlocal in_flight, most
+        in_flight += 1
+        most = max(most, in_flight)
+        await asyncio.sleep(0.05)
+        in_flight -= 1
+        return "done"
+
+    async def _run(slots: int) -> int:
+        nonlocal most
+        most = 0
+        with provider_cost_scope(
+            pipeline_run_id="run-1", stage="extract", cap_usd=1.0, request_reserve_usd=0.1, max_in_flight=slots
+        ):
+            await asyncio.gather(*(execute_billable_request(_call, model="mock", school_id=n) for n in range(6)))
+        return most
+
+    assert await _run(1) == 1  # the default: one call at a time, as before
+    assert await _run(3) == 3
+    assert max(overlapped) == 1  # reservations (the cap checks) never overlap
+
+
+async def test_calls_in_flight_count_at_the_reserve_in_the_cap_check(monkeypatch, async_engine, db_session):
+    """Cap 0.25, reserve 0.1: two calls in flight count 0.2, so a third is refused
+    while they are pending, though three slots are free."""
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+    import app.database as database
+    import app.services.provider_costs as provider_costs
+
+    monkeypatch.setattr(
+        database, "async_session_maker", async_sessionmaker(async_engine, class_=AsyncSession, expire_on_commit=False)
+    )
+    request_ids = iter(["req-a", "req-b"])
+    monkeypatch.setattr(
+        provider_costs,
+        "extract_exact_provider_attributions",
+        lambda _result: [
+            {
+                "provider_request_id": next(request_ids),
+                "input_tokens": 10,
+                "output_tokens": 2,
+                "provider_cost_usd": Decimal("0.01"),
+            }
+        ],
+    )
+    run = await start_pipeline_run(
+        db_session, country="bg", city="sofia", cli_stage="extract", config={"provider_cost_cap_usd": 0.25}
+    )
+    release = asyncio.Event()
+
+    async def _held():
+        await release.wait()
+        return object()
+
+    with provider_cost_scope(
+        pipeline_run_id=run.id, stage="extract", cap_usd=0.25, request_reserve_usd=0.1, max_in_flight=3
+    ):
+        first = asyncio.create_task(execute_billable_request(_held, model="mock", school_id=1))
+        second = asyncio.create_task(execute_billable_request(_held, model="mock", school_id=2))
+        await asyncio.sleep(0.1)
+        with pytest.raises(ProviderCostCapExceeded):
+            await execute_billable_request(_held, model="mock", school_id=3)
+        release.set()
+        await asyncio.gather(first, second)

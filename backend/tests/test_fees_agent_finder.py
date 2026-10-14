@@ -331,3 +331,13 @@ def test_this_years_pages_take_a_year_suffix():
     start = int(fees_agent.current_academic_year()[:4])
     assert pattern.search(f"такси {start}/{start + 1}г.") and pattern.search(f"taksi_{start}_{start + 1}_bg")
     assert not pattern.search(f"{start}/{start + 1}0")
+
+
+def test_calls_in_flight_count_against_the_cap():
+    spend = Spend(0.10)
+    with spend.hold(0.06):
+        assert not spend.allows(0.05)  # a second worker's call would pass the cap
+        with pytest.raises(SpendCapReached):
+            with spend.hold(0.05):
+                pass
+    assert spend.pending_usd == 0 and spend.allows(0.05)
