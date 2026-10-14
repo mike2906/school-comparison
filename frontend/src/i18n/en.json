@@ -144,6 +144,8 @@
     "address": "Address",
     "phone": "Phone",
     "website": "Website",
+    "facebook": "Facebook",
+    "instagram": "Instagram",
     "continuesTo": "Continues to:",
     "continuesToSchool": "(school)",
     "continuedFrom": "Related kindergarten:",

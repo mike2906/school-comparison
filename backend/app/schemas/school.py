@@ -20,6 +20,7 @@ from app.utils.i18n_resolver import resolve_address_i18n, resolve_name_i18n
 from app.utils.location_tags import semantic_location_tags
 from app.utils.school_attributes import build_display_attributes, publishable_display_i18n
 from app.utils.school_facts import SITE_ACCEPTED_STATUSES, publication_attributes, shown_school_facts
+from app.utils.social_links import shown_social_links
 from app.utils.website_data import (
     website_data_is_publishable,
     website_data_withheld_reasons,
@@ -424,6 +425,13 @@ class SchoolFacts(BaseModel):
     at_a_glance: FactsAtAGlance = Field(default_factory=FactsAtAGlance)
 
 
+class SocialLinks(BaseModel):
+    """The school's own Facebook page and Instagram profile, as its website links them."""
+
+    facebook: Optional[str] = None
+    instagram: Optional[str] = None
+
+
 class FeeDiscount(BaseModel):
     """A discount the school's own pages state beside its fees (sibling, early payment)."""
 
@@ -463,6 +471,13 @@ class SchoolResponse(SchoolBase, SchoolPricingMixin):
         shown = shown_school_facts(self.raw_attributes, self.raw_scrape_status, self.website_url)
         facts = [fact for fact in (shown or {}).get("facts", []) if fact["rank"] != "minor"]
         return SchoolFacts.model_validate(shown | {"facts": facts}) if facts else None
+
+    @computed_field(return_type=Optional[SocialLinks])
+    @property
+    def social_links(self) -> Optional[SocialLinks]:
+        # ``shown_social_links`` is the gate (withholding marker, accepted website, same site).
+        shown = shown_social_links(self.raw_attributes, self.raw_scrape_status, self.website_url)
+        return SocialLinks.model_validate(shown) if shown else None
 
     @computed_field(return_type=list[FeeDiscount])
     @property
