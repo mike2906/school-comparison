@@ -258,6 +258,7 @@
     "nextYear": "следващата учебна година",
     "yearPrice": "{{year}}: {{price}}",
     "periodNotStated": "Периодът не е посочен",
+    "discounts": "Отстъпки",
     "payInParts": "Или на части:",
     "paymentOptionTotal": "общо {{total}}",
     "paymentOptionInParts": "{{total}} на вноски",

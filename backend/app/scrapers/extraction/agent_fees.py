@@ -10,7 +10,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -59,8 +59,32 @@ class AgentFee(BaseModel):
     )
 
 
+class AgentDiscount(BaseModel):
+    """A discount the school offers on its fees, stated with a percentage or an amount."""
+
+    kind: Literal["sibling", "early_payment", "pay_in_full", "other"]
+    percent: Optional[float] = Field(default=None, description="The percentage off, if the site states one")
+    amount: Optional[float] = Field(
+        default=None, description="The amount off, if the site states one; never with percent"
+    )
+    currency: Optional[str] = Field(default=None, description="EUR or BGN, as printed; only with amount")
+    child: Optional[int] = Field(
+        default=None, description="For a sibling discount, which child it is for: 2 for the second, 3 for the third"
+    )
+    applies_to: Optional[str] = Field(
+        default=None, description="Which fee it applies to, in the site's words (tuition), or null"
+    )
+    text_i18n: dict[str, str] = Field(
+        description="Keys bg and en: one short sentence each stating the discount with its number and nothing "
+        "the evidence does not say, e.g. '5% off tuition for a second child'"
+    )
+    source_url: str = Field(description="The URL of the page the discount was read from, copied from its PAGE line")
+    evidence: str = Field(description="The page line the discount was read from, copied verbatim")
+
+
 class AgentFees(BaseModel):
     fees: list[AgentFee] = Field(default_factory=list)
+    discounts: list[AgentDiscount] = Field(default_factory=list)
 
 
 READER_PROMPT = """You read a school's own web pages and list the fees it states. Each page starts with a "=== PAGE <url>" line.
@@ -72,7 +96,8 @@ Rules:
 - If the site prints no price for paying in one go, the entry's amount is the total it prints for one plan; with no total printed, list each instalment amount as its own entry with the plan name.
 - A monthly fee that is the school's ordinary price (a kindergarten's monthly fee) is the entry itself, not an option.
 - List the fees of every page, to the end of the last one: a school often has a fee page per stage (kindergarten, primary, secondary), and each one's fees are listed. Include services billed separately (uniforms, transport, food, extended day, clubs), not only tuition.
-- Skip lines without an amount (a percentage discount, a payment schedule). Never invent an amount, and never compute a total the site does not print.
+- Skip a payment schedule. Never invent an amount, and never compute a total the site does not print.
+- A discount the school offers (for siblings, for paying early, for paying the whole year at once, any other stated discount) goes in discounts, never in fees, and only when the page states it with a percentage or an amount. One entry per discount ("5% for a second child, 10% for a third" is two). text_i18n says in bg and en only what the evidence says. A discounted price the site prints as an amount stays a fee entry (see above).
 - currency as printed (EUR or BGN); if both are printed, the EUR figure.
 - category: the monthly kindergarten fee and school tuition are tuition; an enrolment, exam, application or entry-test fee is registration; a deposit (депозит, капаро) is registration, never tuition; learning support, therapy and similar services are activities; optional classes, clubs and sports charged on top are extracurricular; transport, food, uniforms and extended day (after-school care) are their own categories.
 - period only when the page states it for THAT amount (per month, per year, per term...); otherwise null. Never guess.
@@ -398,3 +423,50 @@ def option_amounts(fee: AgentFee) -> list[Decimal]:
         for value in (option.total, option.instalment, option.first_payment)
         if value is not None
     ]
+
+
+# Which child a sibling discount is for, as pages write it: "второ дете", "2nd child", "the third".
+_CHILD_WORDS = {
+    # A bare "2" is not enough: in "2% sibling discount" it is the percentage.
+    2: r"\b2\s*-?\s*(?:ро|nd|ри)\b|втор|second",
+    3: r"\b3\s*-?\s*(?:то|rd|ти)\b|трет|third",
+    4: r"\b4\s*-?\s*(?:то|th|ти)\b|четвърт|fourth",
+}
+
+
+def _percent_printed(value: Decimal, text: str) -> bool:
+    """The number is printed as a percentage: "10%", "10 %", "10 процента", "10 percent"."""
+    return any(
+        value in values and re.match(r"\s*(?:%|процент|percent)", text[end:], re.IGNORECASE)
+        for _, end, values in number_spans(text)
+    )
+
+
+def check_discount(discount: AgentDiscount, page_text: str) -> Optional[AgentDiscount]:
+    """The discount if the page backs it, else None: its evidence is on the page and prints
+    its number as a percentage (or holds its amount), a sibling discount's child is named
+    there, and both sentences state that number."""
+    page = _normalized(page_text)
+    lines = [_normalized(line) for line in discount.evidence.splitlines() if line.strip()]
+    if not lines:
+        return None
+    if any(line not in page for line in lines):
+        page_lines = [_normalized(text) for text in page_text.splitlines() if text.strip()]
+        if any(not _line_on_page(line, page, page_lines) for line in lines):
+            return None
+    if (discount.percent is None) == (discount.amount is None):
+        return None
+    number = discount.percent if discount.percent is not None else discount.amount
+    if number <= 0 or (discount.percent is not None and number > 100):  # 100%: a free place
+        return None
+    value = _decimal(number)
+    evidence = "\n".join(lines)
+    # "до 15 май – 10% отстъпка": 15 is a date, so a percent must be printed as one.
+    if not (_percent_printed(value, evidence) if discount.percent is not None else value in page_numbers(evidence)):
+        return None
+    if discount.child in _CHILD_WORDS and not re.search(_CHILD_WORDS[discount.child], evidence, re.IGNORECASE):
+        return None
+    texts = [discount.text_i18n.get(lang, "") for lang in ("bg", "en")]
+    if any(not text.strip() or value not in page_numbers(text) for text in texts):
+        return None
+    return discount.model_copy(update={"currency": discount.currency if discount.amount is not None else None})

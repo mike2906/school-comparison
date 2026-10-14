@@ -71,6 +71,13 @@ For one school, with its `website_url`:
      (9,150 EUR in total)"); a "Plan 1"-style name is dropped from a fee that has them. Their
      amounts count as read, so the old rows of a school that stored each instalment as a fee
      give way to the one fee (596 had 42 rows: 3 fees and 6 grade bands × 3 plans).
+   - **Discounts.** A percentage or amount off (siblings, paying early, paying the whole year
+     at once) is no fee: the reader lists it in `discounts` with a bg and an en sentence. Code
+     keeps one only when its evidence line is on the page, holds its one number (percent or
+     amount, never both), and both sentences state that number. A read that passed the
+     thin-read guard stores the kept ones, or none, in `attributes.fee_discounts` (the first
+     read's; a thin read leaves them alone); the detail page shows them under the fees, gated
+     like `school_facts` and only while the school has a published fee.
    - **Instalments.** Where a site prints no price for paying in one go, instalments are
      still fees of their own. An amount the line gives as "1 x" ahead of "+ N x" is a first
      instalment: its period is cleared. A count of payments ("2 x", "на две вноски") states
