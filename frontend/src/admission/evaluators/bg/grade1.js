@@ -68,12 +68,3 @@ export function evaluate(params, answers = {}, context = {}, { measuredOn } = {}
   const items = extraItems(params, answers, address, context, group)
   return { group, points: addRanges(...items.map(item => item.points)), items }
 }
-
-/**
- * Orders two results for the same school: a better (lower) group wins, then more
- * points. Used to tell the parent which address to apply with.
- */
-export function compareResults(a, b) {
-  if (a.group.max !== b.group.max) return a.group.max - b.group.max
-  return b.points.min - a.points.min
-}
