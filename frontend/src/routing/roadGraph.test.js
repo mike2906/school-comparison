@@ -12,6 +12,7 @@ const node = {
   1: [23.300, 42.700], 2: [23.301, 42.700], 3: [23.302, 42.700],
   4: [23.300, 42.701], 5: [23.301, 42.701], 6: [23.302, 42.701],
   7: [23.300, 42.702], 8: [23.301, 42.702], 9: [23.302, 42.702], 20: [23.302, 42.7005],
+  40: [23.304, 42.700], 41: [23.304, 42.701], 42: [23.304, 42.702], 43: [23.305, 42.701],
 }
 const between = (a, b, f = 0.5) => [node[a][0] + (node[b][0] - node[a][0]) * f, node[a][1] + (node[b][1] - node[a][1]) * f]
 const seconds = (from, to) => {
@@ -58,6 +59,13 @@ test('a turn restriction via a way applies only to traffic that entered from its
   const allowed = seconds(between(2, 5), between(5, 6))
   assert.ok(allowed < 25, `starting on the via road ${allowed} s`)
   assert.ok(banned > 60 && Number.isFinite(banned), `from the bottom row ${banned} s`)
+})
+
+test('an only-restriction via a way forbids leaving the via way at a junction on it', () => {
+  const banned = seconds(between(3, 40), between(41, 43))
+  const allowed = seconds(between(40, 41), between(41, 43))
+  assert.ok(allowed < 20, `starting on the via road ${allowed} s`)
+  assert.ok(banned > allowed + 30 && Number.isFinite(banned), `from 3-40 ${banned} s`)
 })
 
 test('a bollard stops through-traffic but its road stays reachable from both sides', () => {

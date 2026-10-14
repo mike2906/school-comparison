@@ -27,6 +27,7 @@ export function useDriveTimes(userLocation, schools) {
 
   useEffect(() => {
     if (!userLocation) {
+      requestRef.current += 1 // an answer still on its way is for the old location
       setState({ status: 'idle', seconds: EMPTY })
       return
     }

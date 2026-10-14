@@ -288,9 +288,12 @@ def apply_restrictions(rd, edges):
                     prev = c
                 edges.extend(cps)
                 copies[key] = cps
-            last = copies[key][-1]
+            cps = copies[key]
+            if only:  # the whole via way must be followed: no leaving it at a junction on the way
+                for c in cps[:-1]:
+                    banned.update((c, o) for o in out_of[c.dst])
             bad = [o for o in out_of[end] if o not in outs] if only else outs
-            banned.update((last, o) for o in bad)
+            banned.update((cps[-1], o) for o in bad)
             done = True
         stats["via_way" if done else "unmatched"] += 1
     return banned, dict(stats)
