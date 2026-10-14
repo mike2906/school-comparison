@@ -2068,7 +2068,7 @@ the session scratchpad only.
       schedule with an LLM verifier in place of human review; (2) features go from a
       prompt to production through agent build, test, review and UI checks, with no
       human checks. Mike is looped in only for the big changes listed in
-      `skills/github-process/SKILL.md` ("Big changes") and when a circuit breaker trips.
+      `skills/github-process/SKILL.md` ("Still goes to Mike") and when a circuit breaker trips.
       No automation may depend on a human approving routine output. What makes this safe:
       automated gates, circuit breakers, rollback and alerting.
 
