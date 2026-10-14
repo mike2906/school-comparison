@@ -94,7 +94,11 @@ def test_json_target_compares_canonical_form():
     run({"targets": [target]}, [], state, _fetcher({target["url"]: '[{"start": "2026-05-22", "title": "a"}]'}))
     reordered = '[{"title": "a",   "start": "2026-05-22"}]'
     assert run({"targets": [target]}, [], state, _fetcher({target["url"]: reordered})).findings == []
-    added = '[{"start": "2026-05-22", "title": "a"}, {"start": "2027-05-21", "title": "b"}]'
+    two = '[{"start": "2026-05-22", "title": "a"}, {"start": "2026-06-05", "title": "c"}]'
+    run({"targets": [target]}, [], state, _fetcher({target["url"]: two}))
+    reordered = '[{"start": "2026-06-05", "title": "c"}, {"start": "2026-05-22", "title": "a"}]'
+    assert run({"targets": [target]}, [], state, _fetcher({target["url"]: reordered})).findings == []
+    added = '[{"start": "2026-05-22", "title": "a"}, {"start": "2026-06-05", "title": "c"}, {"start": "2027-05-21", "title": "b"}]'
     [finding] = run({"targets": [target]}, [], state, _fetcher({target["url"]: added})).findings
     assert "2027-05-21" in finding.body
 
@@ -128,6 +132,26 @@ def test_listing_retries_a_new_page_that_failed_to_load():
     pages["https://x.bg/content/2"] = _html("<p>Прием на деца: нови правила</p>")
     [finding] = run({"targets": [LISTING]}, [], state, _fetcher(pages)).findings
     assert "content/2" in finding.body
+
+
+def test_listing_reports_a_new_page_that_never_opens():
+    state = {}
+    run({"targets": [LISTING]}, [], state, _fetcher({LISTING["url"]: _sessions(1)}))
+    pages = {LISTING["url"]: _sessions(1, 2)}
+    for _ in range(2):
+        assert run({"targets": [LISTING]}, [], state, _fetcher(pages)).findings == []
+    [finding] = run({"targets": [LISTING]}, [], state, _fetcher(pages)).findings
+    assert "could not be opened" in finding.body and "content/2" in finding.body
+    assert run({"targets": [LISTING]}, [], state, _fetcher(pages)).findings == []
+
+
+def test_broken_target_does_not_stop_the_others():
+    broken = dict(LISTING, id="broken", link_pattern="(")
+    state = {}
+    result = run({"targets": [broken, PAGE]}, [], state, _fetcher({LISTING["url"]: _sessions(1), PAGE["url"]: _html("x" * 60)}))
+    assert state["targets"]["broken"]["failures"] == 1
+    assert state["targets"]["p"]["hash"]
+    assert result.findings == []
 
 
 def test_listing_without_follow_matches_link_text():

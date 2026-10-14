@@ -40,6 +40,7 @@ USER_AGENT = "Mozilla/5.0 (compatible; schooldecider.com admission rule watch; +
 FAILURES_BEFORE_REPORT = 3
 MAX_DIFF_LINES = 80
 MAX_FOLLOW_PER_RUN = 15
+FOLLOW_ATTEMPTS = 3
 STATE_FILE = "state.json"
 
 
@@ -105,7 +106,11 @@ def clean_text(html: str, select: Optional[str] = None) -> str:
 
 
 def canonical_json(raw: str) -> str:
-    return json.dumps(json.loads(raw), ensure_ascii=False, sort_keys=True, indent=1)
+    """Sorted keys, and a top-level list sorted too, so a reordered response is no change."""
+    data = json.loads(raw)
+    if isinstance(data, list):
+        data = sorted(data, key=lambda item: json.dumps(item, ensure_ascii=False, sort_keys=True))
+    return json.dumps(data, ensure_ascii=False, sort_keys=True, indent=1)
 
 
 def text_hash(text: str) -> str:
@@ -122,7 +127,8 @@ def matching_lines(text: str, keywords: list[str], context: int = 1) -> list[str
     wanted = [_norm(k) for k in keywords]
     keep: set[int] = set()
     for i, line in enumerate(lines):
-        if any(k in _norm(line) for k in wanted):
+        normalised = _norm(line)
+        if any(k in normalised for k in wanted):
             keep.update(range(max(0, i - context), min(len(lines), i + context + 1)))
     return [lines[i] for i in sorted(keep)]
 
@@ -222,9 +228,16 @@ def _check_listing(
             followed += 1
             page = fetch(url)
             if page.error:
-                result.report.append(f"{target['id']}: {url} failed ({page.error}); retried next run")
-                continue
-            hits = matching_lines(clean_text(page.html or page.text, target.get("select")), keywords)
+                attempts = entry.setdefault("attempts", {})
+                attempts[url] = attempts.get(url, 0) + 1
+                result.report.append(f"{target['id']}: {url} failed {attempts[url]}x ({page.error})")
+                if attempts[url] < FOLLOW_ATTEMPTS:
+                    continue  # retried next run
+                del attempts[url]
+                hits = [f"(could not be opened after {FOLLOW_ATTEMPTS} tries: {page.error}; check it by hand)"]
+            else:
+                entry.get("attempts", {}).pop(url, None)
+                hits = matching_lines(clean_text(page.html or page.text, target.get("select")), keywords)
         else:
             hits = [link_text] if any(_norm(k) in _norm(link_text) for k in keywords) else []
         if hits:
@@ -239,7 +252,7 @@ def _check_listing(
                 )
             )
         seen.append(url)
-    entry["seen"] = seen[-500:]
+    entry["seen"] = seen[-max(500, 3 * len(found)) :]
     entry["baselined"] = True
     result.report.append(
         f"{target['id']}: {len(found)} links, {len(new)} new{' (baseline)' if baseline else ''}, followed {followed}"
@@ -265,7 +278,7 @@ def check_targets(
                 _check_page(target, fetched, entry, result)
             else:
                 raise ValueError(f"unknown target kind {target['kind']!r}")
-        except WatchError as exc:
+        except Exception as exc:  # noqa: BLE001 - one broken target must not stop the others
             entry["failures"] = entry.get("failures", 0) + 1
             entry["last_error"] = str(exc)
             result.report.append(f"{target['id']}: FAILED {entry['failures']}x: {exc}")

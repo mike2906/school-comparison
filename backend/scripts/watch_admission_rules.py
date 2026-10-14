@@ -1,7 +1,8 @@
 """Check the official admission-rule sources and open a GitHub issue for each change.
 
 Run daily by .github/workflows/watch-admission-rules.yml; needs no database. Without
-``--issues`` it only prints what it found (and still updates the state directory).
+``--issues`` it only prints what it found and leaves the state unchanged, so a trial run
+does not swallow a change.
 
     uv run python -m scripts.watch_admission_rules --state ../rule-watch-state \
         --rules ../frontend/src/admission/rules [--issues]
@@ -14,6 +15,7 @@ from __future__ import annotations
 import argparse
 import logging
 import os
+import time
 from pathlib import Path
 
 import httpx
@@ -33,6 +35,7 @@ logger = logging.getLogger("watch_admission_rules")
 
 LABEL = "rule-watch"
 FOOTER = "\n\n---\n_Opened by the admission rule watch (.github/workflows/watch-admission-rules.yml)._"
+MAX_BODY = 60_000  # GitHub rejects issue and comment bodies over 65,536 characters
 
 
 def merge(findings: list[Finding]) -> list[Finding]:
@@ -44,6 +47,24 @@ def merge(findings: list[Finding]) -> list[Finding]:
         else:
             merged[finding.key] = Finding(**vars(finding))
     return list(merged.values())
+
+
+def _body(finding: Finding) -> str:
+    body = finding.body
+    if len(body) > MAX_BODY:
+        body = body[:MAX_BODY] + "\n\n… (cut; the full text is in the workflow log)"
+    return body + FOOTER
+
+
+def _send(gh: httpx.Client, url: str, payload: dict) -> httpx.Response:
+    """POST with up to three tries, so a passing GitHub error does not drop a finding."""
+    for attempt in range(1, 4):
+        response = gh.post(url, json=payload)
+        if response.status_code < 500 and response.status_code != 429:
+            break
+        time.sleep(attempt * 5)
+    response.raise_for_status()
+    return response
 
 
 def post_issues(findings: list[Finding], repo: str, token: str) -> None:
@@ -65,13 +86,10 @@ def post_issues(findings: list[Finding], repo: str, token: str) -> None:
                 logger.info("Already open: #%s %s", number, finding.title)
                 continue
             if number:
-                gh.post(f"{api}/issues/{number}/comments", json={"body": finding.body + FOOTER}).raise_for_status()
+                _send(gh, f"{api}/issues/{number}/comments", {"body": _body(finding)})
                 logger.info("Commented on #%s %s", number, finding.title)
             else:
-                created = gh.post(
-                    f"{api}/issues", json={"title": finding.title, "body": finding.body + FOOTER, "labels": [LABEL]}
-                )
-                created.raise_for_status()
+                created = _send(gh, f"{api}/issues", {"title": finding.title, "body": _body(finding), "labels": [LABEL]})
                 open_issues[finding.title] = created.json()["number"]
                 logger.info("Opened #%s %s", created.json()["number"], finding.title)
 
@@ -95,11 +113,14 @@ def main() -> None:
     findings = merge(result.findings)
     for finding in findings:
         print(f"\n## {finding.title}\n{finding.body}")
-    if args.issues and findings:
-        # Post before saving: if posting fails, the next run sees the same change again.
+    print(f"\n{len(findings)} finding(s)")
+    if not args.issues:
+        print("Trial run: state not saved.")
+        return
+    # Post before saving: if posting fails, the next run sees the same change again.
+    if findings:
         post_issues(findings, os.environ["GITHUB_REPOSITORY"], os.environ["GITHUB_TOKEN"])
     save_state(args.state, result.state)
-    print(f"\n{len(findings)} finding(s)")
 
 
 if __name__ == "__main__":
