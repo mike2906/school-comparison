@@ -571,18 +571,23 @@ function SearchPage() {
     handleFilterChange({ schoolType: 'private' })
   }, [rawSchoolType])
 
-  const getPrimaryLocation = (school) => {
-    return school.locations?.find(location => location.is_primary) || school.locations?.[0]
+  // A pinned location first (primary, then any), so a school whose primary address has
+  // no verified pin is still measured and mapped from the building that has one.
+  const pickLocation = (locations) => {
+    const pinned = locations.filter(location => location.lat != null && location.lng != null)
+    return pinned.find(location => location.is_primary) || pinned[0]
+      || locations.find(location => location.is_primary) || locations[0]
   }
 
   const getLocationForAgeGroup = (school, ageGroupValue) => {
-    if (!ageGroupValue) return getPrimaryLocation(school)
-    const matching = school.locations?.filter(location => {
+    const all = school.locations || []
+    if (!ageGroupValue) return pickLocation(all)
+    const matching = all.filter(location => {
       if (Array.isArray(location.age_groups)) return location.age_groups.includes(ageGroupValue)
       if (location.age_group) return location.age_group === ageGroupValue
       return false
-    }) || []
-    return matching.find(location => location.is_primary) || matching[0] || getPrimaryLocation(school)
+    })
+    return pickLocation(matching.length ? matching : all)
   }
 
   const schoolsWithDistance = useMemo(() => {

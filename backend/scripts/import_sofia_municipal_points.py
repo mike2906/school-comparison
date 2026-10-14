@@ -123,6 +123,12 @@ def address_parts(address: str) -> tuple[set[str], set[str]]:
     return words, numbers
 
 
+def marked_numbers(address: str) -> set[str]:
+    """House and block numbers (after № or бл.)."""
+    text = address.translate(_LATIN_TO_CYRILLIC).casefold()
+    return {n.lstrip("0") or "0" for n in re.findall(r"(?:№|\bno\.?|\bбл\.?)\s*(\d+)", text)}
+
+
 def all_numbers(address: str) -> set[str]:
     """Every number of an address (street and house), without the city's postcodes."""
     text = re.sub(r"гр\.\s*софия|\b1\d{3}\b", " ", address.casefold())
@@ -140,8 +146,10 @@ def addresses_agree(ours: str, theirs: str) -> bool:
         return bool(our_numbers) and our_numbers == their_numbers
     if not our_words or not their_words:
         # One side gives only a numbered street ("ул. 204 № 3"), the other adds its
-        # complex ("ж.к. Люлин, ул.204 №3"): every number, street included, must agree.
-        return bool(all_numbers(ours)) and all_numbers(ours) == all_numbers(theirs)
+        # complex ("ж.к. Люлин, ул.204 №3"): the house or block numbers must agree, and
+        # so must every number, street included ("ул. 3 № 204" and "бл. 22" do not).
+        marked = marked_numbers(ours)
+        return bool(marked) and marked == marked_numbers(theirs) and all_numbers(ours) == all_numbers(theirs)
     if not our_words & their_words:
         return False
     if our_numbers or their_numbers:
@@ -178,8 +186,9 @@ def classify(
     """Match one location to at most one municipal point.
 
     A school with one location whose address names no matching point still matches the
-    only point with its number and a distinctive word of its name ("match_by_name"): the
-    register address is often just the complex ("ж.к. Дружба 1"), the point is the building.
+    only point with its number whose distinctive name words are all in its own name
+    ("match_by_name"; numbers are unique among Sofia's municipal schools): the register
+    address is often just the complex ("ж.к. Дружба 1"), the point is the building.
     Kindergartens are left out because they run several buildings under one name.
     """
     name = (school.name_i18n or {}).get("bg") or ""
@@ -208,7 +217,7 @@ def classify(
             return Row(location, school, "ambiguous", None, agreeing)
         if single_location and key[0] == "school":
             words = name_words(name)
-            named = [p for p in same_name if words & name_words(p.name)]
+            named = [p for p in same_name if name_words(p.name) and name_words(p.name) <= words]
             if len(named) == 1:
                 return Row(location, school, "match_by_name", named[0], same_name)
         return Row(location, school, "name_only", None, same_name)
