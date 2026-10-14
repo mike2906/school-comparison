@@ -306,9 +306,11 @@ def _snippet(text: str, span: tuple[int, int], width: int = 90) -> str:
 
 # "3 пъти седмично" / "twice a week" / "2 учебни часа седмично" / "седмична програма" is how
 # often a class meets, not how often it is paid ("до 18 часа дневно" is a closing time).
+# "четири пъти дневно" too: 511's monthly food fee is for four meals a day.
+_COUNT = r"(?:\d+|един|една|два|две|три|четири|пет|шест|седем|two|three|four|five|six)"
 _FREQUENCY_UNIT = r"(?:седмично|в седмицата|на седмица|a week|per week|weekly|дневно|на ден|a day|per day|daily)"
 _FREQUENCY_RE = re.compile(
-    rf"\d+\s*(?:пъти|път|times?|x|хранения|meals)\s*{_FREQUENCY_UNIT}"
+    rf"{_COUNT}\s*(?:пъти|път|times?|x|хранения|meals)\s*{_FREQUENCY_UNIT}"
     rf"|(?:веднъж|двукратно|twice|once)\s*{_FREQUENCY_UNIT}"
     rf"|(?<!до )(?<!\d)\d+\s*(?:учебни\s+)?(?:час|hours?|lessons?|classes)\w*\s*{_FREQUENCY_UNIT}"
     r"|седмичн\w*\s+(?:програм|разпис|график)|weekly (?:schedule|timetable)",

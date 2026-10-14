@@ -1373,6 +1373,7 @@ async def test_apply_keeps_attributes_another_stage_wrote_during_the_read(db_ses
         ("hourly", "Такса 30 € на час по английски", True),
         ("daily", "Занималня до 18 часа дневно – 10 €", True),
         ("weekly", "Плуване до 3 пъти седмично – 80 € на месец", False),
+        ("daily", "Такса Храна (четири пъти дневно) - 140.00 евро", False),
     ],
 )
 def test_per_unit_periods_need_a_price_word_not_a_timetable(period, evidence, named):
