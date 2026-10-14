@@ -496,6 +496,14 @@ def test_a_pdf_table_with_a_merged_cell_or_one_column_is_left_out():
     assert table_lines([]) == []
 
 
+def test_a_pdf_table_whose_rows_have_no_line_between_them_is_left_out():
+    from app.scrapers.fee_pages import table_lines
+
+    # No rule between the rows: the whole body is one row, and "Grade 1 | € 500" would be read.
+    table = [["Grade", "Monthly", "Yearly"], ["Grade 1\nGrade 2\nGrade 3", "€ 450\n€ 500\n€ 550", "€ 4500\n€ 5000\n€ 5500"]]
+    assert table_lines(table) == []
+
+
 def test_fee_pictures_are_the_ones_named_for_fees():
     from app.scrapers.stages.fee_images import fee_images
 
@@ -510,9 +518,68 @@ def test_fee_pictures_are_the_ones_named_for_fees():
         (
             "https://stgeorgeschool.eu/wp-content/uploads/2026/01/SGS-FEES-2026-2027-ENG.png",
             "https://stgeorgeschool.eu/wp-content/uploads/2026/01/SGS-FEES-2026-2027-ENG-700x453.png",
+            "",
         ),
         (
             "https://stgeorgeschool.eu/wp-content/uploads/2026/01/table.png",
             "https://stgeorgeschool.eu/wp-content/uploads/2026/01/table.png",
+            "Такси 2026",
         ),
     ]
+
+
+async def test_a_fee_picture_on_another_site_is_not_read(monkeypatch):
+    from types import SimpleNamespace
+
+    from app.scrapers.stages import fee_images
+
+    gets = []
+
+    class _Client:
+        async def get(self, url, **_kw):
+            gets.append(url)
+            return SimpleNamespace(status_code=200, headers={"content-type": "image/png"}, content=b"png", url=url)
+
+    async def allowed(_url):
+        return True
+
+    picture = ("https://i0.wp.com/school.bg/fees.png", "https://i0.wp.com/school.bg/fees.png", "")
+    found = await fee_images.read_image(
+        _Client(), picture, page_url="https://school.bg/taksi/", site_url="https://school.bg/",
+        school_id=1, stage="fees-agent", allowed=allowed, on_cost=lambda _c: None,
+    )  # fmt: skip
+    assert found is None and gets == []
+
+
+async def test_a_fee_picture_read_without_a_cost_counts_at_the_reserve_and_a_cap_stops(monkeypatch):
+    from types import SimpleNamespace
+
+    import pytest
+
+    from app.scrapers.stages import fee_images
+    from app.services.provider_costs import ProviderCostCapExceeded, ProviderResponseUnattributed
+
+    class _Client:
+        async def get(self, url, **_kw):
+            return SimpleNamespace(status_code=200, headers={"content-type": "image/png"}, content=b"png", url=url)
+
+    async def allowed(_url):
+        return True
+
+    def reader(error):
+        async def read(*_a, reraise=(), **_kw):
+            assert isinstance(error, reraise)
+            raise error
+
+        return read
+
+    picture = ("https://school.bg/fees.png", "https://school.bg/fees.png", "")
+    costs = []
+    kwargs = dict(page_url="https://school.bg/taksi/", site_url="https://school.bg/", school_id=1,
+                  stage="fees-agent", allowed=allowed, on_cost=costs.append)  # fmt: skip
+    monkeypatch.setattr(fee_images, "read_fee_image", reader(ProviderResponseUnattributed("no cost")))
+    assert await fee_images.read_image(_Client(), picture, **kwargs) is None
+    assert costs == [float(fee_images.get_settings().provider_request_reserve_usd)]
+    monkeypatch.setattr(fee_images, "read_fee_image", reader(ProviderCostCapExceeded("cap")))
+    with pytest.raises(ProviderCostCapExceeded):
+        await fee_images.read_image(_Client(), picture, **kwargs)

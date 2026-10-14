@@ -75,10 +75,13 @@ async def read_fee_image(
     school_id: int | None = None,
     stage: str = "navigate",
     on_cost: Callable[[float], None] | None = None,
+    reraise: tuple[type[BaseException], ...] = (),
 ) -> str | None:
     """The image's text, or None when it shows no fees or two readings disagree.
 
-    ``on_cost`` gets each reading's provider cost, for a caller that keeps its own spend."""
+    ``on_cost`` gets each reading's provider cost, for a caller that keeps its own spend;
+    errors in ``reraise`` (a spend cap, a stopped run) reach the caller instead of
+    dropping the picture."""
     readings: list[str] = []
     for _ in range(2):
         agent = create_agent(tier="vision", system_prompt=_PROMPT, result_type=str)
@@ -90,6 +93,8 @@ async def read_fee_image(
                 stage=stage,
                 timeout_seconds=READ_TIMEOUT_SECONDS,
             )
+        except reraise:
+            raise
         except Exception as exc:
             logger.warning("Fee image read failed for school %s: %s", school_id, exc)
             return None

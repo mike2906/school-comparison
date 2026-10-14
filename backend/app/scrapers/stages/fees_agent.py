@@ -146,7 +146,7 @@ def _same_site(url: str, site: str) -> bool:
 
 async def _fetch(
     crawler, run_config, client, url: str
-) -> tuple[str, str, list[tuple[str, str]], list[tuple[str, str]]]:
+) -> tuple[str, str, list[tuple[str, str]], list[tuple[str, str, str]]]:
     """(final URL, text, same-site links, fee pictures). PDFs are read with pdfplumber, pages rendered."""
     if unquote(urlparse(url).path).lower().endswith(".pdf"):
         response = await client.get(url, follow_redirects=True, timeout=30)
@@ -267,7 +267,8 @@ async def find_pages(
     seen: set[tuple] = set()
     links: dict[str, str] = {}
     queue = [site]
-    pictures: list[tuple[str, str]] = []
+    pictures: list[tuple[str, str, str]] = []
+    picture_pages: list[PageRead] = []  # read after the pages, so they take none of the page slots
 
     async def allowed(url: str) -> bool:
         return await robots.can_fetch(url, CRAWLER_USER_AGENT)
@@ -303,18 +304,25 @@ async def find_pages(
                 text = api_text or text
             read.append(PageRead(final, text, bool(_PRICE_RE.search(text))))
             if read_pictures:
-                for urls in page_pictures:
-                    if len(pictures) >= fee_images_module.MAX_IMAGES or page_key(urls[0]) in seen:
+                for picture in page_pictures:
+                    if len(pictures) >= fee_images_module.MAX_IMAGES or page_key(picture[0]) in seen:
                         continue
-                    seen.add(page_key(urls[0]))
+                    seen.add(page_key(picture[0]))
                     if not spend.allows(fee_images_module.IMAGE_COST_ESTIMATE_USD):
                         raise SpendCapReached(f"spent ${spend.spent_usd:.4f} of ${spend.cap_usd}")
-                    pictures.append(urls)
-                    picture = await fee_images_module.read_image(
-                        client, urls, school_id=school.id, stage=stage, allowed=allowed, on_cost=spent
+                    pictures.append(picture)
+                    found = await fee_images_module.read_image(
+                        client,
+                        picture,
+                        page_url=final,
+                        site_url=site,
+                        school_id=school.id,
+                        stage=stage,
+                        allowed=allowed,
+                        on_cost=spent,
                     )
-                    if picture is not None:
-                        read.append(PageRead(picture[0], picture[1], bool(_PRICE_RE.search(picture[1]))))
+                    if found is not None:
+                        picture_pages.append(PageRead(found[0], found[1], bool(_PRICE_RE.search(found[1]))))
             for href, label in page_links:
                 href = urldefrag(href)[0]
                 if _same_site(href, site) and not unquote(href).lower().endswith(_SKIPPED):
@@ -338,7 +346,7 @@ async def find_pages(
             queue = [url for url, label in unopened if fallback_links.search(f"{unquote(url)} {label}")][:MAX_PICKS]
         if not queue:
             break
-    return read
+    return read + picture_pages
 
 
 # ---------------------------------------------------------------------------

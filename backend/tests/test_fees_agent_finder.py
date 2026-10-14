@@ -262,10 +262,10 @@ _PICTURE_PAGE = '<main><img src="/wp-content/uploads/fees-2026-700x453.png" widt
 def _picture_reads(monkeypatch, text="Grade 1 | 7 880 €"):
     reads = []
 
-    async def read_image(client, urls, *, school_id, stage, allowed, on_cost):
-        reads.append((urls, stage))
+    async def read_image(client, picture, *, page_url, site_url, school_id, stage, allowed, on_cost):
+        reads.append((picture[:2], stage))
         on_cost(0.03)
-        return (urls[0], text)
+        return (picture[0], text)
 
     monkeypatch.setattr(fees_agent.fee_images_module, "read_image", read_image)
     return reads
