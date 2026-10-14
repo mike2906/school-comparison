@@ -87,21 +87,6 @@ export function getSchoolTypeLabel(config, key, language) {
 }
 
 /**
- * Convert a grade to admission points using the country config.
- */
-export function gradeToPoints(config, grade) {
-  const table = config?.education_config?.grade_to_points_table
-  if (!table) return 0
-  const thresholds = Object.entries(table)
-    .map(([k, v]) => [parseFloat(k), v])
-    .sort((a, b) => b[0] - a[0])
-  for (const [threshold, points] of thresholds) {
-    if (grade >= threshold) return points
-  }
-  return 0
-}
-
-/**
  * Get exam subjects from config.
  */
 export function getExamSubjects(config) {

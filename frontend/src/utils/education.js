@@ -5,10 +5,7 @@
  * When called without config, they fall back to the default Bulgaria logic
  * for backwards compatibility.
  */
-import {
-  calculateAgeGroup as configCalculateAgeGroup,
-  gradeToPoints as configGradeToPoints,
-} from './countryConfig.js'
+import { calculateAgeGroup as configCalculateAgeGroup } from './countryConfig.js'
 
 // Default Bulgaria age groups for backwards compatibility
 const BG_AGE_GROUPS = [
@@ -25,10 +22,6 @@ const BG_AGE_GROUPS = [
 const BG_FALLBACK_CONFIG = {
   education_config: {
     age_groups: BG_AGE_GROUPS,
-    grade_to_points_table: {
-      '6.00': 50, '5.50': 39, '5.00': 26, '4.50': 18,
-      '4.00': 14, '3.50': 10, '3.00': 7, '2.50': 4, '2.00': 2,
-    },
   },
 }
 
@@ -42,37 +35,6 @@ const BG_FALLBACK_CONFIG = {
  */
 export function calculateAgeGroup(targetYear, birthYear, config = null) {
   return configCalculateAgeGroup(config || BG_FALLBACK_CONFIG, targetYear, birthYear)
-}
-
-/**
- * Convert a grade to NVO admission points.
- *
- * @param {number} grade
- * @param {object} [config] - Country config from useCountry(). Uses Bulgaria default if omitted.
- * @returns {number}
- */
-export function gradeToPoints(grade, config = null) {
-  return configGradeToPoints(config || BG_FALLBACK_CONFIG, grade)
-}
-
-/**
- * Calculate gymnasium admission score.
- *
- * @param {number} nvoBulgarian
- * @param {number} nvoMath
- * @param {number} qualifyingGrade1
- * @param {number} qualifyingGrade2
- * @param {object} [config]
- * @returns {number}
- */
-export function calculateGymnasiumScore(nvoBulgarian, nvoMath, qualifyingGrade1, qualifyingGrade2, config = null) {
-  const cfg = config || BG_FALLBACK_CONFIG
-  return (
-    nvoBulgarian +
-    nvoMath +
-    configGradeToPoints(cfg, qualifyingGrade1) +
-    configGradeToPoints(cfg, qualifyingGrade2)
-  )
 }
 
 /**

@@ -24,52 +24,6 @@ def calculate_age_group(config: dict, target_year: int, birth_year: int) -> Opti
     return None
 
 
-def grade_to_points(config: dict, grade: float) -> int:
-    """
-    Convert a grade to admission points using the country's grade_to_points_table.
-
-    Args:
-        config: education_config dict from Country model
-        grade: Grade value
-
-    Returns:
-        Points for admission calculation
-    """
-    table = config.get("grade_to_points_table", {})
-    # Sort thresholds descending
-    thresholds = sorted(
-        [(float(k), v) for k, v in table.items()],
-        key=lambda x: x[0],
-        reverse=True,
-    )
-    for threshold, points in thresholds:
-        if grade >= threshold:
-            return points
-    return 0
-
-
-def calculate_gymnasium_score(
-    config: dict,
-    nvo_scores: dict[str, float],
-    qualifying_grades: list[float],
-) -> float:
-    """
-    Calculate gymnasium admission score using config-driven formula.
-
-    Args:
-        config: education_config dict from Country model
-        nvo_scores: Dict of {subject_key: score} e.g. {"bulgarian": 90, "math": 85}
-        qualifying_grades: List of qualifying subject grades
-
-    Returns:
-        Total admission score
-    """
-    total = sum(nvo_scores.values())
-    for grade in qualifying_grades:
-        total += grade_to_points(config, grade)
-    return total
-
-
 def get_valid_keys(config: dict, field: str) -> list[str]:
     """Get valid keys for a config field (age_groups, education_levels, etc.)."""
     return [item["key"] for item in config.get(field, [])]
