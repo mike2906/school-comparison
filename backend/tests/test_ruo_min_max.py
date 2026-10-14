@@ -6,7 +6,13 @@ from datetime import date
 from openpyxl import Workbook
 from openpyxl.styles import Font
 
-from app.scrapers.sources.bg.ruo_sofia_min_max import archive_rows, class_code, load_sources, parse_workbook
+from app.scrapers.sources.bg.ruo_sofia_min_max import (
+    archive_rows,
+    class_code,
+    load_sources,
+    parse_workbook,
+    rule_set_for,
+)
 
 BLUE = Font(color="FF0070C0")
 TITLE = "СПРАВКА\nза минималния и максималния бал по паралелки\nв РУО СОФИЯ-ГРАД\nкъм дата 21.07.2025 г."
@@ -74,10 +80,15 @@ def test_archive_rows_skip_classes_nobody_entered():
     assert len(out) == 2
     smg, quota = out
     assert (smg["stage"], smg["campaign"], smg["round_id"], smg["round_name"]) == ("grade_8", "2025/2026", 2, "Второ класиране")
-    assert smg["rule_set"] == "bg/national/grade_8/2025-2026"
+    assert smg["rule_set"] == "bg/grade_8/2025-2026"  # July 2025, before ДВ 79/2025
     assert (smg["source_id"], smg["queue"], smg["quota"]) == ("2216306", "general", False)
     assert "min_score_boys" not in smg
     assert (quota["quota"], quota["min_score_boys"], quota["min_score_girls"]) == (True, 475.0, 483.5)
+
+
+def test_rule_set_names_the_version_in_force():
+    assert rule_set_for(2025, date(2025, 7, 21)) == "bg/grade_8/2025-2026"
+    assert rule_set_for(2026, date(2026, 7, 14)) == "bg/grade_8/2026-2027@2025-09-26"
 
 
 def test_source_list_is_well_formed():

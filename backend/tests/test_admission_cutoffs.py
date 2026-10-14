@@ -111,7 +111,7 @@ async def test_list_response_leaves_out_the_round_history(seeded_db, seeded_clie
 def _grade8(campaign, round_id, code, min_score, quota=False, **extra):
     return {
         "country": "bg", "city": "sofia", "stage": "grade_8", "campaign": campaign,
-        "rule_set": "bg/national/grade_8", "round_id": round_id, "classified_on": f"{campaign[:4]}-07-1{round_id}",
+        "rule_set": "bg/grade_8", "round_id": round_id, "classified_on": f"{campaign[:4]}-07-1{round_id}",
         "round_kind": "general", "source": "ruo-sofia-grad", "source_id": "2216164", "institution_name": "164. ГПИЕ",
         "class_code": code, "class_name": "Испански", "queue": "general", "quota": quota,
         "min_score": min_score, "max_score": 490.0, **extra,

@@ -32,6 +32,10 @@ SOURCE = "ruo-sofia-grad"
 
 _DATE_RE = re.compile(r"(\d{1,2})\.(\d{1,2})\.(\d{4})")
 ROUND_NAMES = {1: "Първо класиране", 2: "Второ класиране", 3: "Трето класиране", 4: "Четвърто класиране"}
+# Наредба № 10/2016 amendments known to the rule files (frontend/src/admission/rules/bg/grade_8);
+# a ranking is labelled with the latest one in force on its date. Earlier amendments are not
+# yet researched, so older rankings carry no version.
+RULE_VERSIONS = ("2025-09-26",)  # ДВ бр. 79/2025
 # Plain text is black: theme colour 1 (up to 2025) or FF000000 (2026).
 _PLAIN_RGB = {"FF000000", "00000000"}
 
@@ -156,10 +160,17 @@ def parse_workbook(content: bytes, year: int) -> tuple[Optional[date], list[MinM
     return report_date(sheet), rows
 
 
+def rule_set_for(year: int, classified_on: date) -> str:
+    versions = [v for v in RULE_VERSIONS if v <= classified_on.isoformat()]
+    suffix = f"@{versions[-1]}" if versions else ""
+    return f"bg/grade_8/{year}-{year + 1}{suffix}"
+
+
 def archive_rows(source: dict[str, Any], classified_on: Optional[date], rows: list[MinMaxRow], retrieved_at: str) -> list[dict[str, Any]]:
     """Archive rows for one справка; classes nobody was admitted to are left out."""
     year = int(source["year"])
     campaign = f"{year}/{year + 1}"
+    classified_on = classified_on or date.fromisoformat(source["date"])
     out = []
     for row in rows:
         if row.min_score is None and row.max_score is None:
@@ -169,9 +180,9 @@ def archive_rows(source: dict[str, Any], classified_on: Optional[date], rows: li
             "city": "sofia",
             "stage": "grade_8",
             "campaign": campaign,
-            "rule_set": f"bg/national/grade_8/{year}-{year + 1}",
+            "rule_set": rule_set_for(year, classified_on),
             "round_id": int(source["round"]),
-            "classified_on": (classified_on or date.fromisoformat(source["date"])).isoformat(),
+            "classified_on": classified_on.isoformat(),
             "round_name": ROUND_NAMES.get(int(source["round"])),
             "round_kind": "general",
             "source": SOURCE,
