@@ -37,7 +37,7 @@ countries are new folders; a new source only has to emit the same rows.
 | country, city | `bg`, `sofia` |
 | stage | `nursery`, `kindergarten`, `preparatory` (ПГУ in a school), `grade_1`, `grade_8` |
 | campaign | school year the child starts, repo spelling `2026/2027` (`app/utils/academic_year`) |
-| rule_set | the rules the round ran under, matching the rule file ids in `frontend/src/admission/rules`: family, campaign and the date of the rules version in force, e.g. `bg/sofia/kindergarten/2026-2027@2026-03-12` or `bg/grade_8/2026-2027@2025-09-26` (dates in `RULE_VERSIONS` in `kg_sofia_ratings.py` and `ruo_sofia_min_max.py`; add one when the rules are amended). No suffix means no known version was in force on that date |
+| rule_set | the rules the round ran under, matching the rule file ids in `frontend/src/admission/rules`: family, campaign and the date of the rules version in force, e.g. `bg/sofia/kindergarten/2026-2027@2026-03-12` or `bg/grade_8/2026-2027@2025-09-26` (dates in `RULE_VERSIONS` in `kg_sofia_ratings.py` and `ruo_sofia_min_max.py`; add one when the rules are amended, and a test fails until they match the rule files). No suffix means no known version was in force on that date |
 | round_id | the source's round id (ИСОДЗ `ratingId`) |
 | classified_on | date of the published list (Sofia local date) |
 | round_name, round_kind | from the ИСОДЗ calendar: `Първо класиране` (`general`), `Текущо класиране` (`current`); null if the calendar no longer lists the date |

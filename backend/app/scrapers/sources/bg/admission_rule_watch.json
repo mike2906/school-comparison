@@ -1,0 +1,120 @@
+{
+ "_about": "Official sources watched for changes to the Bulgarian admission rules (app/services/admission_rule_watch.py, docs/ADMISSION_POINTS.md → Keeping rules current). `families` lists every rule family under frontend/src/admission/rules/bg with the dates (MM-DD of the year applications run) by which next campaign's file must exist and a provisional one must be confirmed.",
+ "targets": [
+  {
+   "id": "sofia-council-sessions",
+   "title": "Sofia council sessions",
+   "kind": "listing",
+   "url": "https://council.sofia.bg/meetings-mandat-2023-2027",
+   "link_pattern": "/meetings-mandat-2023-2027/-/asset_publisher/[^/]+/content/",
+   "follow": true,
+   "keywords": [
+    "прием на деца",
+    "прием на ученици",
+    "приемане на деца",
+    "приемане на ученици"
+   ],
+   "affects": [
+    "bg/sofia/kindergarten",
+    "bg/sofia/grade_1"
+   ],
+   "why": "Each session page lists the adopted decisions; the kindergarten and first-grade ordinances are amended by council decision (Реш. 200 and 201 of 12.03.2026). Catchment changes for first grade also pass through here (they need a new catchment snapshot, backend/scripts/build_sofia_catchments.py). The page is per council mandate: the next mandate starts after the October 2027 elections, when this URL must be updated (the watcher reports it as unreadable once no sessions are listed).",
+   "drop_query": true
+  },
+  {
+   "id": "sofia-public-consultations",
+   "title": "Sofia public consultations",
+   "kind": "listing",
+   "url": "https://www.sofia.bg/bg/public-consultations",
+   "link_pattern": "/w/\\d+",
+   "follow": true,
+   "keywords": [
+    "прием на деца",
+    "прием на ученици",
+    "приемане на деца",
+    "приемане на ученици",
+    "детски градини",
+    "първи клас"
+   ],
+   "affects": [
+    "bg/sofia/kindergarten",
+    "bg/sofia/grade_1"
+   ],
+   "why": "Draft amendments to municipal ordinances are published here for 30 days before the council votes, so this is the earliest warning."
+  },
+  {
+   "id": "sofia-news",
+   "title": "Sofia municipality news",
+   "kind": "listing",
+   "url": "https://www.sofia.bg/news",
+   "link_pattern": "/w/\\d+",
+   "follow": false,
+   "keywords": [
+    "административния съд",
+    "административен съд",
+    "върховния административен",
+    "прием в първи клас",
+    "прием в детск",
+    "прием на деца",
+    "прием на ученици",
+    "правилата за прием",
+    "класирането за първи клас",
+    "класиране за детск",
+    "върховният административен"
+   ],
+   "affects": [
+    "bg/sofia/kindergarten",
+    "bg/sofia/grade_1"
+   ],
+   "why": "The municipality announces court rulings on its admission ordinances here (for example the 27.05.2026 first-grade ruling) and the yearly schedules. This is how the ВАС appeal on the first-grade address choice (Реш. 201/2026) is followed: the court portals cannot be read automatically."
+  },
+  {
+   "id": "isodz-calendar",
+   "title": "ИСОДЗ admission calendar",
+   "kind": "json",
+   "url": "https://kg.sofia.bg/api/public/calendarEvents",
+   "affects": [
+    "bg/sofia/kindergarten",
+    "bg/sofia/grade_1"
+   ],
+   "why": "The official kindergarten and first-grade schedule. The next campaign's schedule is published by 5 January; it fills the `schedule` of the rule files and is the cue to confirm provisional ones."
+  },
+  {
+   "id": "strategy-consultations",
+   "title": "National public consultations",
+   "kind": "listing",
+   "url": "https://strategy.bg/bg/public-consultations",
+   "link_pattern": "/public-consultations/\\d+$",
+   "follow": false,
+   "keywords": [
+    "наредба № 10",
+    "наредба №10",
+    "организация на дейностите в училищното образование",
+    "прием на ученици",
+    "приемане на ученици"
+   ],
+   "affects": [
+    "bg/grade_8",
+    "bg/sofia/grade_1"
+   ],
+   "why": "Every draft national act, including МОН's amendments to Наредба № 10 (8th-grade score formulas, the national first-grade template), is published here for consultation before adoption. mon.bg itself is behind a Cloudflare check that GitHub's runners cannot pass."
+  }
+ ],
+ "families": {
+  "bg/sofia/kindergarten": {
+   "next_campaign_by": "01-05",
+   "confirm_by": "01-10",
+   "note": "the ИСОДЗ calendar (kg.sofia.bg) and council decisions amending the Наредба за прием на деца (usually February or March)."
+  },
+  "bg/sofia/grade_1": {
+   "next_campaign_by": "01-05",
+   "confirm_by": "01-10",
+   "note": "the ИСОДЗ calendar (kg.sofia.bg), council decisions amending the first-grade ordinance, and the ВАС appeal on the address choice (Реш. 201/2026)."
+  },
+  "bg/grade_8": {
+   "next_campaign_by": "01-15",
+   "confirm_by": "02-15",
+   "note": "Наредба № 10 (чл. 55–60) for amendments, and the МОН order with the 8th-grade schedule (usually January)."
+  }
+ }
+}

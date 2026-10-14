@@ -1,0 +1,71 @@
+name: Watch admission rules
+
+# Checks the official sources behind frontend/src/admission/rules (council sessions and
+# consultations, the ИСОДЗ calendar, МОН drafts) and opens a `rule-watch` issue when one
+# changes, or when a campaign's rule file is missing or still provisional past its date.
+# State lives on the rule-watch-data branch. Docs: docs/ADMISSION_POINTS.md
+on:
+  schedule:
+    - cron: "40 4 * * *"
+  workflow_dispatch:
+    inputs:
+      issues:
+        description: Open issues for what is found
+        type: boolean
+        default: true
+
+concurrency:
+  group: watch-admission-rules
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  watch:
+    name: Rule sources
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v7
+
+      - name: Check out the watch state
+        uses: actions/checkout@v7
+        with:
+          ref: rule-watch-data
+          path: rule-watch-state
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v8.3.2
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install
+        working-directory: backend
+        run: uv sync --locked
+
+      - name: Watch
+        working-directory: backend
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: >-
+          uv run python -m scripts.watch_admission_rules
+          --state ../rule-watch-state
+          --rules ../frontend/src/admission/rules
+          ${{ (github.event_name == 'schedule' || inputs.issues) && '--issues' || '' }}
+
+      - name: Save the watch state
+        working-directory: rule-watch-state
+        run: |
+          git add -A
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git -c user.name="rule watch" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -q -m "Rule watch $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push origin HEAD:rule-watch-data
