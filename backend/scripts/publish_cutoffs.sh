@@ -87,10 +87,11 @@ if ! docker exec "$container" pg_dump -U postgres -d "$database" --format=custom
 	stop "pg_dump failed"
 fi
 log "backup $backup"
+# Set first, so an apply cut short after its commit still gets published next run.
+touch "$state/cutoffs_unpublished"
 uv run python scripts/import_cutoffs.py --archive "$archive" --apply --max-unmatched "$max_unmatched" \
 	--summary-json "$state/cutoffs_applied.json" > /dev/null || stop "apply failed"
 log "applied: $(cat "$state/cutoffs_applied.json")"
-touch "$state/cutoffs_unpublished"
 
 PUBLISH_LOCK_HELD=1 "$repo_root/backend/scripts/publish_snapshot.sh" || stop "publish failed (applied, not published; the next run retries)"
 rm -f "$state/cutoffs_unpublished"
