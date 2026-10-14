@@ -33,11 +33,13 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from app.database import async_session_maker  # noqa: E402
 from app.models import School  # noqa: E402
-from scripts.import_sofia_municipal_points import Point, classify  # noqa: E402
+from scripts.import_sofia_municipal_points import Point, classify, distance_m, name_key, name_words  # noqa: E402
 
 POINTS_URL = "https://arcgis.sofia.bg/arcgis/rest/services/Schools/SchoolsZones/MapServer/1/query"
 SNAPSHOT_ROOT = Path(__file__).resolve().parents[2] / "frontend" / "public" / "catchments" / "bg" / "sofia"
 PROVIDER = "bg-sofia-gis"
+# The name-only fallback still needs the school's own point this close to the catchment's.
+NAME_ONLY_MAX_M = 1500
 
 
 @dataclass
@@ -81,16 +83,42 @@ def match_schools(schools: list[Any], points: list[GisPoint]) -> tuple[dict[int,
     """
     claims: dict[str, set[int]] = {}
     for school in schools:
+        found = False
         for location in school.locations or []:
             row = classify(location, school, points)
             if row.status == "match":
                 claims.setdefault(row.point.gis_id, set()).add(school.id)
+                found = True
+        if not found and (point := name_only_match(school, points)):
+            claims.setdefault(point.gis_id, set()).add(school.id)
     by_school: dict[int, list[str]] = {}
     conflicts = {gis_id: sorted(ids) for gis_id, ids in claims.items() if len(ids) > 1}
     for gis_id, ids in claims.items():
         if gis_id not in conflicts:
             by_school.setdefault(next(iter(ids)), []).append(gis_id)
     return {sid: sorted(ids, key=lambda v: (len(v), v)) for sid, ids in by_school.items()}, conflicts
+
+
+def name_only_match(school: Any, points: list[GisPoint]) -> GisPoint | None:
+    """The one catchment point with the school's number that shares a patron word.
+
+    Addresses are spelled too differently in about one in ten cases (a block number on
+    one side, a street on the other). Numbers are unique among Sofia's municipal schools,
+    so a number plus a shared name word is enough, as long as the school's own point is
+    near.
+    """
+    name = (school.name_i18n or {}).get("bg") or ""
+    key = name_key(name)
+    same_number = [p for p in points if key and name_key(p.name) == key]
+    if len(same_number) != 1 or not name_words(name) & name_words(same_number[0].name):
+        return None
+    point = same_number[0]
+    near = [
+        distance_m(loc.lat, loc.lng, point.lat, point.lng)
+        for loc in school.locations or []
+        if getattr(loc, "lat", None) is not None and getattr(loc, "lng", None) is not None
+    ]
+    return point if near and min(near) <= NAME_ONLY_MAX_M else None
 
 
 def apply_ids(school: Any, ids: list[str]) -> bool:
@@ -144,13 +172,15 @@ async def run(campaign: str, points_path: Path | None, apply: bool) -> dict[str,
             await db.refresh(school, attribute_names=["admission_info"], with_for_update=True)
             if apply_ids(school, ids):
                 changed.append(school)
+        # Read before commit/rollback: both expire the loaded objects.
+        names = {s.id: (s.name_i18n or {}).get("bg") for s in schools}
+        changed_ids = [s.id for s in changed]
         if apply:
             await db.commit()
         else:
             await db.rollback()
 
     matched = {gis_id for ids in by_school.values() for gis_id in ids}
-    names = {s.id: (s.name_i18n or {}).get("bg") for s in schools}
     summary = {
         "catchments": len(catchments),
         "points_with_catchment": len(points),
@@ -165,8 +195,8 @@ async def run(campaign: str, points_path: Path | None, apply: bool) -> dict[str,
         print(f"  conflict {gis_id} {catchments[gis_id]}: schools {ids}")
     for gis_id in sorted(set(catchments) - matched, key=lambda v: (len(v), v)):
         print(f"  unmatched {gis_id} {catchments[gis_id]}")
-    for school in changed:
-        print(f"  {school.id} {names[school.id]}: {by_school.get(school.id, [])}")
+    for school_id in changed_ids:
+        print(f"  {school_id} {names[school_id]}: {by_school.get(school_id, [])}")
     return summary
 
 
