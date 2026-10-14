@@ -9,11 +9,13 @@ import {
   catchmentUrl,
   districtAt,
   districtByName,
+  districtLabel,
   indexAddresses,
   indexCatchments,
   neighbouringCatchments,
   normalizeHouseNumber,
   searchKey,
+  sortedDistricts,
   searchStreets,
 } from './catchments.js'
 
@@ -76,4 +78,13 @@ test('districts are found by point and by name', () => {
   assert.equal(districtByName(districts, 'подуяне').properties.code, '06')
   assert.equal(districtByName(districts, 'Студентски град').properties.code, '16')
   assert.equal(districtByName(districts, ''), null)
+})
+
+test('district names are transliterated and sorted for English pages', () => {
+  assert.equal(districtLabel('Овча купел', 'en'), 'Ovcha Kupel')
+  assert.equal(districtLabel('Нови Искър', 'en'), 'Novi Iskar')
+  assert.equal(districtLabel('Нови Искър', 'bg'), 'Нови Искър')
+  const districts = { features: ['Средец', 'Банкя', 'Възраждане'].map(name => ({ properties: { name } })) }
+  assert.deepEqual(sortedDistricts(districts, 'bg').map(f => f.properties.name), ['Банкя', 'Възраждане', 'Средец'])
+  assert.deepEqual(sortedDistricts(districts, 'en').map(f => districtLabel(f.properties.name, 'en')), ['Bankya', 'Sredets', 'Vazrazhdane'])
 })

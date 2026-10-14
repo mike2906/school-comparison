@@ -91,6 +91,7 @@ test('a round reports a score, a group with points, points, or room for everyone
   assert.deepEqual(cutoffValue({ last_admitted_group: 2, last_admitted_points: 4 }), { kind: 'group', group: 2, points: 4 })
   assert.deepEqual(cutoffValue({ last_admitted_points: 14 }), { kind: 'points', points: 14 })
   assert.deepEqual(cutoffValue({ undersubscribed: true, last_admitted_points: 3 }), { kind: 'everyone' })
+  assert.deepEqual(cutoffValue({ places: 0, admitted_count: 0 }), { kind: 'noPlaces' })
   assert.equal(cutoffValue({}), null)
   assert.equal(cutoffValue(undefined), null)
 })

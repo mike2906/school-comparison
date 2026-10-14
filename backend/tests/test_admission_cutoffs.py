@@ -6,7 +6,7 @@ import pytest
 
 from app.models import School, SchoolLocation
 from app.services.admission_cutoffs import match_key, school_cutoff_summary, school_cutoffs
-from scripts.import_cutoffs import apply_to_school, catchment_ids, derived_admission_keys, school_index
+from scripts.import_cutoffs import apply_to_school, derived_admission_keys, school_index
 
 
 def _row(round_id, classified_on, *, queue="general", points=16.0, source_id="171", age_group="first",
@@ -68,24 +68,20 @@ def test_school_index_prefers_a_schools_own_kg_id():
     assert index[("institutional_id", "2000036")] == 1
 
 
-def test_catchment_ids_from_esri_ids():
-    assert catchment_ids({"kg_sofia_esri_id": 36, "kg_sofia_esri_ids": ["36", "479"]}) == {"bg-sofia-gis": ["36", "479"]}
-    assert catchment_ids({}) == {}
-
-
 def test_apply_replaces_only_derived_keys_and_reports_change():
     school = SimpleNamespace(admission_info={"status": "accepting", "cutoffs": [{"old": 1}]}, attributes={})
-    keys = derived_admission_keys([_row(443, "2026-09-04")], {"kg_sofia_esri_id": 171})
+    school.admission_info["catchment_ids"] = {"bg-sofia-gis": ["616"]}
+    keys = derived_admission_keys([_row(443, "2026-09-04")])
     assert apply_to_school(school, keys) is True
     info = school.admission_info
     assert info["status"] == "accepting"
     assert info["kg_sofia_ids"] == ["171"] and info["admin_district"] == "Възраждане"
-    assert info["catchment_ids"] == {"bg-sofia-gis": ["171"]}
+    assert info["catchment_ids"] == {"bg-sofia-gis": ["616"]}, "catchments have their own script"
     assert info["cutoffs"][0]["round_id"] == 443
     assert apply_to_school(school, keys) is False
     # Rows gone from the archive -> derived keys gone.
-    assert apply_to_school(school, derived_admission_keys([], {})) is True
-    assert school.admission_info == {"status": "accepting"}
+    assert apply_to_school(school, derived_admission_keys([])) is True
+    assert school.admission_info == {"status": "accepting", "catchment_ids": {"bg-sofia-gis": ["616"]}}
 
 
 @pytest.mark.asyncio
@@ -93,7 +89,7 @@ async def test_list_response_leaves_out_the_round_history(seeded_db, seeded_clie
     rows = [_row(443, "2026-09-04"), _row(445, "2026-10-02", points=8.0)]
     school = School(
         name_i18n={"bg": "ДГ №1"}, country_code="bg", city="sofia", school_type="state",
-        education_level="kindergarten", admission_info={"status": "accepting", **derived_admission_keys(rows, {})},
+        education_level="kindergarten", admission_info={"status": "accepting", **derived_admission_keys(rows)},
     )
     seeded_db.add(school)
     await seeded_db.flush()

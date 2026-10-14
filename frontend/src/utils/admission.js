@@ -169,6 +169,11 @@ const NON_DISPLAY_ADMISSION_KEYS = new Set([
   'cutoffs', 'cutoff_summary', 'kg_sofia_ids', 'admin_district', 'catchment_ids',
 ])
 
+/** True when the cut-off import gave a school kindergarten or nursery rows. */
+export function hasKindergartenCutoffs(admissionInfo) {
+  return (admissionInfo?.cutoff_summary || []).some(row => ['nursery', 'kindergarten', 'preparatory'].includes(row.stage))
+}
+
 /** True when `admission_info` holds something the admission sections display. */
 export function hasDisplayableAdmissionInfo(admissionInfo) {
   return Object.keys(admissionInfo || {}).some(key => !NON_DISPLAY_ADMISSION_KEYS.has(key))

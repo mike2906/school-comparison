@@ -150,3 +150,21 @@ export function districtByName(districts, name) {
     return own === key || own.startsWith(`${key} `) || key.startsWith(`${own} `)
   }) ?? null
 }
+
+/** A district's name for the page: as published in Bulgarian, transliterated otherwise. */
+export function districtLabel(name, language) {
+  if (!name || String(language || '').startsWith('bg')) return name || ''
+  return String(name)
+    .toLowerCase()
+    .split(/(\s+|-)/)
+    .map(part => Array.from(part, ch => LATIN[ch] ?? ch).join(''))
+    .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+    .join('')
+}
+
+/** District features in alphabetical order of their label in the page language. */
+export function sortedDistricts(districts, language) {
+  return [...(districts?.features || [])].sort((a, b) =>
+    districtLabel(a.properties.name, language).localeCompare(districtLabel(b.properties.name, language), language)
+  )
+}

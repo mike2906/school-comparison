@@ -17,6 +17,7 @@ function CutoffValue({ round }) {
   const value = cutoffValue(round)
   if (!value) return <span className="text-neutral-400">—</span>
   if (value.kind === 'everyone') return <span>{t('cutoffs.everyone')}</span>
+  if (value.kind === 'noPlaces') return <span>{t('cutoffs.noPlaces')}</span>
   if (value.kind === 'score') return <span className="tabular-nums">{value.score}</span>
   if (value.kind === 'quota') {
     return (
@@ -47,7 +48,8 @@ function RoundCell({ round }) {
         {round.tie_at_cutoff && <span className="ml-1 text-xs font-normal text-neutral-500">{t('cutoffs.tie')}</span>}
       </div>
       <div className="text-xs text-neutral-500">
-        {[round.round_name, round.classified_on].filter(Boolean).join(' · ')}
+        {/* The source's round names are Bulgarian only and sometimes cut off; the column says which round. */}
+        {[round.round_kind === 'current' ? t('cutoffs.currentRound') : null, round.classified_on].filter(Boolean).join(' · ')}
       </div>
     </td>
   )

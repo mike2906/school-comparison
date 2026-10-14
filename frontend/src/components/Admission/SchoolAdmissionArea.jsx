@@ -6,6 +6,7 @@ import {
   addressFactsForSchool,
   districtAt,
   districtByName,
+  districtLabel,
   neighbouringCatchments,
   schoolCatchmentIds,
 } from '../../admission/catchments'
@@ -46,6 +47,15 @@ function Legend({ items }) {
   )
 }
 
+function Panel({ title, children }) {
+  return (
+    <section className="bg-white rounded-2xl shadow-card border border-neutral-200 p-6 md:p-8 mb-6">
+      <h2 className="text-2xl font-bold text-neutral-900 mb-4">{title}</h2>
+      {children}
+    </section>
+  )
+}
+
 function AddressVerdict({ facts }) {
   const { t } = useTranslation()
   if (!facts || facts.inCatchment == null) return null
@@ -68,8 +78,10 @@ function CatchmentArea({ ids, point }) {
     return { own, neighbours }
   }, [catchments, ids])
 
-  if (failed) return <p className="text-sm text-red-700">{t('admissionArea.loadFailed')}</p>
-  if (!areas) return <p className="text-sm text-neutral-500">{t('common.loading')}</p>
+  const title = t('admissionArea.catchmentTitle')
+  if (failed) return <Panel title={title}><p className="text-sm text-red-700">{t('admissionArea.loadFailed')}</p></Panel>
+  if (!areas) return <Panel title={title}><p className="text-sm text-neutral-500">{t('common.loading')}</p></Panel>
+  // An id the snapshot does not know: no section rather than an empty one.
   if (areas.own.length === 0) return null
 
   // A merged school can have several buildings, each with its own catchment.
@@ -80,7 +92,7 @@ function CatchmentArea({ ids, point }) {
     : null
 
   return (
-    <>
+    <Panel title={title}>
       <p className="text-sm text-neutral-700">{t('admissionArea.catchmentIntro')}</p>
       <div className="mt-4">
         <AreaMap primary={areas.own} secondary={areas.neighbours} point={point} />
@@ -101,25 +113,26 @@ function CatchmentArea({ ids, point }) {
         {t('admissionArea.catchmentSource', { campaign: CATCHMENT_CAMPAIGNS[0] })}{' '}
         <a href={catchmentViewerUrl(ids[0])} target="_blank" rel="noreferrer" className="underline">arcgis.sofia.bg</a>
       </p>
-    </>
+    </Panel>
   )
 }
 
 /** Sofia municipal kindergartens: no catchment, a district bonus. */
 function DistrictArea({ school, point }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { data: districts, failed } = useLoaded(loadDistricts, true)
-  if (failed) return <p className="text-sm text-red-700">{t('admissionArea.loadFailed')}</p>
-  if (!districts) return <p className="text-sm text-neutral-500">{t('common.loading')}</p>
+  const title = t('admissionArea.districtTitle')
+  if (failed) return <Panel title={title}><p className="text-sm text-red-700">{t('admissionArea.loadFailed')}</p></Panel>
+  if (!districts) return <Panel title={title}><p className="text-sm text-neutral-500">{t('common.loading')}</p></Panel>
 
   const district = districtByName(districts, school.admission_info?.admin_district) ||
     (point ? districtAt(districts, point[0], point[1]) : null)
   if (!district) return null
 
   return (
-    <>
+    <Panel title={title}>
       <p className="text-sm text-neutral-700">
-        {t('admissionArea.districtIntro', { district: district.properties.name })}
+        {t('admissionArea.districtIntro', { district: districtLabel(district.properties.name, i18n.language) })}
       </p>
       <div className="mt-4">
         <AreaMap primary={[district]} point={point} />
@@ -128,7 +141,7 @@ function DistrictArea({ school, point }) {
         {t('admissionArea.districtSource')}{' '}
         <a href={OFFICIAL_SYSTEM_URL} target="_blank" rel="noreferrer" className="underline">kg.sofia.bg</a>
       </p>
-    </>
+    </Panel>
   )
 }
 
@@ -137,23 +150,16 @@ function DistrictArea({ school, point }) {
  * Sofia municipal schools, the district bonus area for Sofia municipal kindergartens.
  */
 function SchoolAdmissionArea({ school }) {
-  const { t } = useTranslation()
   const ids = schoolCatchmentIds(school)
   const isKindergarten = usesSofiaKindergartenSystem(school)
   const location = getMappableLocations(school.locations).find(p => p.location.is_primary) ||
     getMappableLocations(school.locations)[0]
   const point = location ? [location.lat, location.lng] : null
 
-  if (ids.length === 0 && !isKindergarten) return null
-
-  return (
-    <section className="bg-white rounded-2xl shadow-card border border-neutral-200 p-6 md:p-8 mb-6">
-      <h2 className="text-2xl font-bold text-neutral-900 mb-4">
-        {t(ids.length > 0 ? 'admissionArea.catchmentTitle' : 'admissionArea.districtTitle')}
-      </h2>
-      {ids.length > 0 ? <CatchmentArea ids={ids} point={point} /> : <DistrictArea school={school} point={point} />}
-    </section>
-  )
+  // Kindergartens have no first-grade catchment, whatever ids they carry.
+  if (isKindergarten) return <DistrictArea school={school} point={point} />
+  if (ids.length > 0) return <CatchmentArea ids={ids} point={point} />
+  return null
 }
 
 export default SchoolAdmissionArea

@@ -595,6 +595,7 @@
     "admission": "Прием",
     "kgByPointsShort": "По точки (kg.sofia.bg)",
     "kgThresholdsLater": "Точките на последно приетите още не са публикувани тук",
+    "kgThresholdsBelow": "Вижте кой е приет досега по-долу",
     "distanceValueApprox": "~{{km}} км",
     "approximateLocation": "Точката на картата е приблизителна (по улица), затова и разстоянията са приблизителни."
   },
@@ -1057,6 +1058,8 @@
     "firstRound": "Най-ранно класиране",
     "latestRound": "Последно класиране",
     "everyone": "Всички кандидатствали",
+    "noPlaces": "Няма места",
+    "currentRound": "текущо класиране",
     "points": "{{points}} точки",
     "groupOnly": "Група {{group}}",
     "groupAndPoints": "Група {{group}}, {{points}} точки",

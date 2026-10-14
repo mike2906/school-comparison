@@ -3,10 +3,10 @@
 
 Reads a checkout of the ``cutoff-data`` branch, matches each row to a school (kg.sofia.bg
 institution id via ``attributes.kg_sofia_id(s)``, РУО rows via the НЕИСПУО code), and
-rewrites only the derived keys: ``cutoffs``, ``cutoff_summary``, ``kg_sofia_ids``,
-``admin_district`` and ``catchment_ids`` (the school's Sofia GIS ids, from
-``attributes.kg_sofia_esri_id(s)``, which the calculator uses to look up catchment areas). The archive is the source of truth, so re-running is safe and a school
-whose rows disappear loses those keys.
+rewrites only the derived keys: ``cutoffs``, ``cutoff_summary``, ``kg_sofia_ids`` and
+``admin_district``. The archive is the source of truth, so re-running is safe and a school
+whose rows disappear loses those keys. (First-grade ``catchment_ids`` come from
+``scripts/match_sofia_catchments.py``, not from here.)
 
 Default is a dry run that prints what would change; ``--apply`` writes.
 
@@ -36,7 +36,7 @@ from app.services.admission_cutoffs import (  # noqa: E402
     school_cutoffs,
 )
 
-DERIVED_KEYS = ("cutoffs", "cutoff_summary", "kg_sofia_ids", "admin_district", "catchment_ids")
+DERIVED_KEYS = ("cutoffs", "cutoff_summary", "kg_sofia_ids", "admin_district")
 
 
 def school_index(schools: list[Any]) -> dict[tuple[str, str], int]:
@@ -57,20 +57,11 @@ def school_index(schools: list[Any]) -> dict[tuple[str, str], int]:
     return index
 
 
-def catchment_ids(attributes: dict[str, Any] | None) -> dict[str, list[str]]:
-    attrs = attributes or {}
-    ids = {str(value) for value in attrs.get("kg_sofia_esri_ids") or [] if value is not None}
-    if attrs.get("kg_sofia_esri_id") is not None:
-        ids.add(str(attrs["kg_sofia_esri_id"]))
-    return {"bg-sofia-gis": sorted(ids, key=lambda v: (len(v), v))} if ids else {}
-
-
-def derived_admission_keys(rows: list[dict[str, Any]], attributes: dict[str, Any] | None = None) -> dict[str, Any]:
+def derived_admission_keys(rows: list[dict[str, Any]]) -> dict[str, Any]:
     kg_rows = [row for row in rows if row.get("source") == "kg.sofia.bg"]
     keys: dict[str, Any] = {
         "cutoffs": school_cutoffs(rows),
         "cutoff_summary": school_cutoff_summary(rows),
-        "catchment_ids": catchment_ids(attributes),
     }
     if kg_rows:
         keys["kg_sofia_ids"] = sorted({str(row["source_id"]) for row in kg_rows}, key=lambda v: (len(v), v))
@@ -108,7 +99,7 @@ async def run(archive: Path, apply: bool) -> dict[str, Any]:
 
         changed = 0
         for school in schools:
-            keys = derived_admission_keys(by_school.get(school.id, []), school.attributes)
+            keys = derived_admission_keys(by_school.get(school.id, []))
             if apply_to_school(school, keys):
                 changed += 1
         if apply:
