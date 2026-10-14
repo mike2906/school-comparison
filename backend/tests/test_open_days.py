@@ -345,3 +345,20 @@ def test_on_an_open_days_page_every_dated_line_is_read():
     page = "# Дни на отворените врати\n" + "\n".join(f"Текст {n}" for n in range(30)) + "\nДата: 14.11.2026 (събота)"
     assert "14.11.2026" in rules.excerpt(page, "https://s.example/events/open-days-2026-2027/")
     assert "14.11.2026" not in rules.excerpt(page, "https://s.example/news/")
+
+
+@pytest.mark.asyncio
+async def test_the_same_open_day_with_a_longer_quote_replaces_the_stored_fact():
+    stored = {
+        "topic": "admissions",
+        "text_i18n": {"bg": "Ден", "en": "Open day"},
+        "source_url": HOME,
+        "quote": "Ден на отворените врати",
+        "rank": "more",
+        "open_days": ["2026-11-15"],
+    }
+    school = _school(school_facts={"_schema_version": 1, "website_url": HOME, "facts": [stored]})
+    calls = _Calls([_date_fact()], key=[1])
+    report = await stage.check_school(school, _fetcher({HOME: HOME_TEXT}), calls, TODAY)
+    facts = stage.merged([stored], report["add"], report["remove"])
+    assert [row["quote"] for row in facts] == [ANNOUNCEMENT] and report["facts"][0]["rank"] == "key"

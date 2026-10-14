@@ -169,6 +169,7 @@ async def _read_dates(
         school.id,
     )
     rows, quoted, relinked = [], [], []
+    stored_rows = [row for row in _date_facts(school) if all(row is not gone for gone in removed)]
     stored: dict[str, Optional[dict]] = {
         facts_rules.quote_key(fact): row
         for row in ((school.attributes or {}).get(ATTRIBUTE_KEY) or {}).get("facts") or []
@@ -188,13 +189,15 @@ async def _read_dates(
                 old = stored[key]
                 # The same line with a new sign-up link replaces the stored fact; else it is a repeat.
                 if old is not None and fact.register_url and fact.register_url != old.get("register_url"):
-                    relinked.append(old)
+                    relinked.append((old, fact))
                 else:
                     why = "already stored"
             stored[key] = None  # the reader repeating a fact
         if why is None:
+            # The same open day read again with a longer or reworded quote replaces the stored fact.
+            relinked += [(row, fact) for row in _same_dates(fact, stored_rows)]
             quoted.append((fact, url))
-        rows.append(fact.model_dump() | {"dropped": why})
+        rows.append(fact.model_dump() | {"dropped": why, "rank": None})
     if not quoted:
         return [], rows, []
     verdict: Graded = await call(
@@ -210,13 +213,26 @@ async def _read_dates(
         # school, not for visiting one) would keep it out of the dates at a glance.
         if rank:
             kept.append((fact, url, "more" if rank == "minor" else rank))
-        next(row for row in rows if row["quote"] == fact.quote)["dropped"] = None if rank else "quote does not state it"
+        row = next(row for row in rows if row["quote"] == fact.quote)
+        row["dropped"], row["rank"] = (None, kept[-1][2]) if rank else ("quote does not state it", None)
     # A stored fact is replaced only by a new one that passed.
-    kept_keys = {facts_rules.quote_key(fact) for fact, _, _ in kept}
-    relinked = [
-        row for row in relinked if (f := facts_rules.stored_as_fact(row)) and facts_rules.quote_key(f) in kept_keys
+    kept_ids = {id(fact) for fact, _, _ in kept}
+    replaced: list[dict] = []
+    for row, fact in relinked:
+        if id(fact) in kept_ids and all(row is not r for r in replaced):
+            replaced.append(row)
+    return kept, rows, replaced
+
+
+def _same_dates(fact: DateFact, rows: Sequence[dict]) -> list[dict]:
+    """Stored date facts that name one of the fact's open days, or the same application window."""
+    window = (fact.applications_open, fact.applications_close)
+    return [
+        row
+        for row in rows
+        if set(fact.open_days) & set(row.get("open_days") or [])
+        or (any(window) and window == (row.get("applications_open"), row.get("applications_close")))
     ]
-    return kept, rows, relinked
 
 
 def _gone(school: School, pages: list[PageRead]) -> list[dict]:
