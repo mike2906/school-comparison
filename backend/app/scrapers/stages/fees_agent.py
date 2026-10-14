@@ -299,7 +299,7 @@ async def find_pages(
         try:
             queue = await _pick(school, read, unopened, spend, pick_prompt, stage)
         except ProviderResponseUnattributed as exc:  # an errored pick (517, 616): no cost to read
-            logger.warning("fees-agent link pick came back without a cost for school %s: %s", school.id, exc)
+            logger.warning("%s link pick came back without a cost for school %s: %s", stage, school.id, exc)
             queue = []
         except (SpendCapReached, ProviderCostError):  # a cap, or a run no longer running
             raise
