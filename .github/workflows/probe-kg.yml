@@ -11,6 +11,6 @@ jobs:
     steps:
       - run: |
           for u in https://kg.sofia.bg/ https://kg.sofia.bg/api/public/regions/all https://kg.sofia.bg/api/public/kg/type/kinderGarden/all https://ruo-sofia-grad.com/ https://www.mon.bg/ https://klasirane.eu/; do
-            echo "$u -> $(curl -s -o /tmp/out -w '%{http_code} %{size_download}B %{time_total}s' -m 20 -A 'Mozilla/5.0' "$u")"
-            head -c 300 /tmp/out; echo
+            r=$(curl -s -o /tmp/out -w '%{http_code} %{size_download}B %{time_total}s' -m 20 -A 'Mozilla/5.0' "$u")
+            echo "::notice title=$u::$r $(head -c 200 /tmp/out | tr -d '\n\r:' )"
           done
