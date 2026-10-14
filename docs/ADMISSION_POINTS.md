@@ -148,7 +148,8 @@ campaign (or a new version within it) with its acts, sources and worked examples
 version date to `RULE_VERSIONS` (`kg_sofia_ratings.py`, `ruo_sofia_min_max.py`; a test
 checks they agree with the rule files), and close the issue from the PR. A catchment
 change needs a new snapshot (`backend/scripts/build_sofia_catchments.py`). If nothing
-changed, close the issue. A provisional file becomes verified only after someone checks
+changed, close the issue. A date or unreadable-source issue closed while its condition
+still holds is opened again the next day, on purpose. A provisional file becomes verified only after someone checks
 it against the official text.
 
 **Adding a city or stage.** Add its rule family to `families` (a test fails until every

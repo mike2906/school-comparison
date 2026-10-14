@@ -260,3 +260,10 @@ def test_config_is_valid_json_with_unique_ids():
     ids = [t["id"] for t in config["targets"]]
     assert len(ids) == len(set(ids))
     json.dumps(config)
+
+
+def test_keywords_have_no_edge_whitespace():
+    """Keywords are whitespace-normalised before matching, so a trailing space would be lost."""
+    for target in load_config("bg")["targets"]:
+        for keyword in target.get("keywords", []):
+            assert keyword == " ".join(keyword.split()), keyword

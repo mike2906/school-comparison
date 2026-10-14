@@ -36,6 +36,7 @@ from bs4 import BeautifulSoup
 
 SOURCES_DIR = Path(__file__).resolve().parent.parent / "scrapers" / "sources"
 # sofia.bg rejects user agents without a browser-style prefix ("Unsupported Browser").
+ROBOTS_NAME = "SchoolDeciderBot"  # the crawler name in app/config.py CRAWLER_USER_AGENT
 USER_AGENT = "Mozilla/5.0 (compatible; schooldecider.com admission rule watch; +https://schooldecider.com)"
 FAILURES_BEFORE_REPORT = 3
 MAX_DIFF_LINES = 80
@@ -403,7 +404,9 @@ def make_fetcher(client: Any, delay: float = 1.0) -> Fetcher:
             parser: Optional[RobotFileParser] = RobotFileParser()
             try:
                 response = client.get(urljoin(root, "robots.txt"))
-                if response.status_code >= 400:
+                if response.status_code in (401, 403):
+                    parser.disallow_all = True  # as RobotFileParser.read() treats them
+                elif response.status_code >= 400:
                     parser = None  # no robots.txt: everything allowed
                 else:
                     parser.parse(response.text.splitlines())
@@ -411,7 +414,8 @@ def make_fetcher(client: Any, delay: float = 1.0) -> Fetcher:
                 parser = None
             robots[root] = parser
         parser = robots[root]
-        return parser is None or parser.can_fetch(USER_AGENT, url)
+        # Match rules addressed to our crawler name, not to "Mozilla" (the UA's first token).
+        return parser is None or parser.can_fetch(ROBOTS_NAME, url)
 
     def fetch(url: str) -> Fetched:
         if not allowed(url):

@@ -59,9 +59,14 @@ def _body(finding: Finding) -> str:
 def _send(gh: httpx.Client, url: str, payload: dict) -> httpx.Response:
     """POST with up to three tries, so a passing GitHub error does not drop a finding."""
     for attempt in range(1, 4):
-        response = gh.post(url, json=payload)
-        if response.status_code < 500 and response.status_code != 429:
-            break
+        try:
+            response = gh.post(url, json=payload)
+        except httpx.TransportError:
+            if attempt == 3:
+                raise
+        else:
+            if (response.status_code < 500 and response.status_code != 429) or attempt == 3:
+                break
         time.sleep(attempt * 5)
     response.raise_for_status()
     return response
