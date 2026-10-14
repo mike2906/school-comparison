@@ -107,7 +107,7 @@ PUBLIC_ROW_FIELDS = (
 SUMMARY_ROUND_FIELDS = (
     "round_id", "round_name", "round_kind", "classified_on", "places", "applicants_count",
     "admitted_count", "undersubscribed", "last_admitted_points", "last_admitted_group",
-    "tie_at_cutoff", "min_score", "max_score",
+    "tie_at_cutoff", "min_score", "max_score", "min_score_boys", "min_score_girls",
 )
 
 
@@ -142,28 +142,36 @@ def school_cutoffs(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
 def school_cutoff_summary(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """The small list-response view: for the latest campaign, per stage x age group (or
     8th-grade class) x building, the general-queue result of the first and the latest round.
+
+    The latest campaign is chosen per stage and building before grouping, so a class or
+    group offered in an earlier year only (8th-grade class codes are unique within a year)
+    never shows as current.
     """
     general = [row for row in rows if row.get("queue") == "general"]
     if not general:
         return []
     several = len({row["source_id"] for row in rows}) > 1
+    latest_by_stage: dict[tuple, int] = {}
+    for row in general:
+        key = (row["stage"], row["source_id"])
+        latest_by_stage[key] = max(latest_by_stage.get(key, 0), _campaign_start(row["campaign"]))
     groups: dict[tuple, list[dict[str, Any]]] = {}
     for row in general:
+        if _campaign_start(row["campaign"]) != latest_by_stage[(row["stage"], row["source_id"])]:
+            continue
         key = (row["stage"], row.get("age_group"), row.get("class_code"), row["source_id"])
         groups.setdefault(key, []).append(row)
     summary = []
     for (stage, age_group, class_code, _source_id), items in groups.items():
-        latest_campaign = max(items, key=lambda r: _campaign_start(r["campaign"]))["campaign"]
-        in_campaign = sorted(
-            (r for r in items if r["campaign"] == latest_campaign),
-            key=lambda r: (r.get("classified_on") or "", r["round_id"]),
-        )
+        in_campaign = sorted(items, key=lambda r: (r.get("classified_on") or "", r["round_id"]))
+        latest_campaign = in_campaign[0]["campaign"]
         first, latest = in_campaign[0], in_campaign[-1]
         entry = {
             "stage": stage,
             "age_group": age_group,
             "class_code": class_code,
             "class_name": first.get("class_name"),
+            "quota": first.get("quota"),
             "building": first.get("institution_name") if several else None,
             "campaign": latest_campaign,
             "rule_set": first.get("rule_set"),

@@ -106,3 +106,25 @@ async def test_list_response_leaves_out_the_round_history(seeded_db, seeded_clie
     detail = (await seeded_client.get(f"/schools/{school.id}")).json()
     assert len(detail["admission_info"]["cutoffs"]) == 2
     assert detail["admission_info"]["kg_sofia_ids"] == ["171"]
+
+
+def _grade8(campaign, round_id, code, min_score, quota=False, **extra):
+    return {
+        "country": "bg", "city": "sofia", "stage": "grade_8", "campaign": campaign,
+        "rule_set": "bg/national/grade_8", "round_id": round_id, "classified_on": f"{campaign[:4]}-07-1{round_id}",
+        "round_kind": "general", "source": "ruo-sofia-grad", "source_id": "2216164", "institution_name": "164. ГПИЕ",
+        "class_code": code, "class_name": "Испански", "queue": "general", "quota": quota,
+        "min_score": min_score, "max_score": 490.0, **extra,
+    }
+
+
+def test_summary_drops_classes_only_offered_in_earlier_years():
+    rows = [_grade8("2025/2026", 1, "2561", 470.0), _grade8("2026/2027", 1, "03909", 480.0)]
+    assert [(e["campaign"], e["class_code"]) for e in school_cutoff_summary(rows)] == [("2026/2027", "03909")]
+
+
+def test_summary_keeps_quota_minima():
+    rows = [_grade8("2026/2027", 1, "02561", 475.0, quota=True, min_score_boys=475.0, min_score_girls=483.5)]
+    (entry,) = school_cutoff_summary(rows)
+    assert entry["quota"] is True
+    assert (entry["first"]["min_score_boys"], entry["first"]["min_score_girls"]) == (475.0, 483.5)
