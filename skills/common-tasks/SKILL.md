@@ -107,9 +107,8 @@ check the run summary (`schools: <before> -> <after>`) and the live API against 
 A green run alone is not proof: verify the data. Details and the manual fallback:
 `deploy/README.md` → Data publish.
 
-Publish only launch-DB changes that were themselves allowed (the one-off data-fix exception in
-`skills/github-process/SKILL.md`, or approved by Mike), and report each publish to Mike with
-the dump name and the before/after counts. A publish whose diff you cannot explain goes to Mike.
+Who may publish, and what to report, is in `skills/github-process/SKILL.md` → Launch DB and
+publishing. A publish whose diff you cannot explain goes to Mike.
 
 ## Data-quality scoreboard
 ```bash

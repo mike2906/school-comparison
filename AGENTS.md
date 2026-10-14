@@ -35,15 +35,19 @@ Bulgarian cities, then other countries.
 - Multi-country architecture with country-specific education configs
 - Bilingual interface (Bulgarian primary, English secondary for MVP)
 
-**Current status:** Multi-country refactoring complete. Scraping pipeline Stages 1-7 are
-implemented and run through the scraper CLI (discovery, website discovery, URL
-validation, navigation, extraction, validation/spot checks, summarization). Official Bulgaria
-NVO import is an independent stage, with Sofia backfilled for `nvo_4`, `nvo_7`, `nvo_10`
-across 2021-2025. Current work is data quality and go-live (backlog: `docs/GO_LIVE_PLAN.md`).
+**Current status:** The site is live for Sofia with no real users yet. The scraper CLI
+runs the pipeline stages (discovery, website discovery, URL validation, navigation,
+extraction, validation/spot checks, summarization). Private-school fees now come from the
+fees agent (`docs/AGENT_FEE_EXTRACTION.md`); the old price extraction stays behind
+`EXTRACTION_PIPELINE_PRICES` until Mike is confident in the agent. School facts, an agent
+stage replacing the summaries, are in `docs/SCHOOL_FACTS.md`. Official NVO and ДЗИ imports
+are independent stages.
 
-**Status source of truth:** `docs/GO_LIVE_PLAN.md` checkboxes, plus git history and the DBs.
-Agent memory or notes can be stale; verify an item is still open before starting it, and
-tick the item in the plan in the same PR that finishes it.
+**Status sources:** the plan docs (`docs/GO_LIVE_PLAN.md`, `docs/TECH_DEBT_PLAN.md`,
+`docs/AGENT_FEE_EXTRACTION.md`, `docs/SCHOOL_FACTS.md`), git history and the DBs. Agent
+memory and old notes can be stale, and a rule recorded in a plan was one decision at one
+time: verify an item is still open before starting it, and update the plan in the same PR
+that finishes it.
 
 Planned, not yet built: admission points calculator, parent-facing NVO calculator, and
 admission-threshold tooling.
@@ -97,9 +101,11 @@ use `pip install` or `requirements.txt`.
 
 Procedures you only need for a specific task. Read the `SKILL.md` when its "use when" applies.
 
-- `skills/github-process/SKILL.md` — Full PR flow and **all review rules** (branch → checks →
-  PR → pre-review → optional `@codex review` → merge). Use when the user says "follow github
-  process" or asks you to open/land a PR.
+- `skills/github-process/SKILL.md` — PR flow and **all review, merge and publish rules**
+  (branch → checks → PR → review by size → self-merge). Use when opening or landing a PR, or
+  writing to the launch DB.
+- `skills/second-opinion/SKILL.md` — Ask the other vendor's model (Claude ↔ Codex CLI) to
+  challenge a big PR, plan, research conclusion or anything hard to undo.
 - `skills/common-tasks/SKILL.md` — Recipes: add route/column/translation, seed, run the app,
   import NVO, data-quality scoreboard, promote curated identities, publish data to
   production. Use when doing one of these.
@@ -178,7 +184,7 @@ you hit a real problem.
 - Treat existing implementation work as sunk cost when a simpler design is available.
 - Prefer what libraries already do (Leaflet distance, not a custom haversine) and simple
   retries (1-2-3, not backoff with jitter). No caching/queues before a real performance problem.
-- Large files (`app/scrapers/extractor.py` is ~2,400 lines): locate
+- Large files (`app/scrapers/extractor.py` is ~1,900 lines): locate
   code with `grep -n` and read only the needed line ranges.
 - **Don't grow the giant files.** New functions do not go into `app/scrapers/cli.py`,
   `app/scrapers/extractor.py`, `app/scrapers/validator.py` or
@@ -195,13 +201,15 @@ a new column? Can I use what's already installed? Is there a simpler way?
 
 ## GitHub Process and Reviews
 
-Branching, checks, self-review, PRs, review requests, triage, and merging are defined in
+Branching, checks, review, merging and publishing are defined in
 **`skills/github-process/SKILL.md`**; read it before committing or opening a PR. It is the
-single source for the review rules, so don't restate them elsewhere. Hold these even before
-reading it:
+single source for those rules, so don't restate them elsewhere. In short:
 
-- Commit directly to `main` only when the user explicitly asks.
-- Codex auto-review is **off**. Give Mike the PR URL for independent ChatGPT pre-review;
-  post `@codex review` only when Mike explicitly asks, and only one Codex review per PR.
-- When Mike says **merge**, merge on green CI without requesting another review.
-- Agents may merge their own PRs only within the self-merge lane defined in the skill.
+- Work autonomously: make routine calls yourself and say which default you picked.
+- Small PRs get the harness's built-in review; big PRs get a review from the other
+  vendor's model (`skills/second-opinion/SKILL.md`). Stop reviewing when a round only finds
+  more wording edge cases.
+- Merge your own PRs on green CI. A short list (destructive migrations, secrets, infra
+  deletions, higher running cost, user privacy, a tripped circuit breaker) still waits
+  for Mike.
+- Never weaken a check to get your own PR through.

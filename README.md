@@ -103,12 +103,11 @@ kept in the repository:
   [`frontend/AGENTS.md`](frontend/AGENTS.md) hold the domain rules and invariants an agent
   reads before changing code. [`skills/`](skills/) holds task procedures.
 - [`skills/github-process/SKILL.md`](skills/github-process/SKILL.md) defines the review
-  rules. Work happens on an `agent/*` branch and goes through a pull request and CI. The
-  agent reviews its own complete diff, and code changes get a second, tool-assisted review.
-- An agent may merge its own pull request only when the change is docs, tests, config
-  defaults or a small bug fix with a regression test. Changes to the publish boundary,
-  migrations, credentials, infrastructure, running cost or the checks themselves go to a
-  human.
+  rules. Work happens on a branch and goes through a pull request and CI. Small changes
+  get a tool-assisted review; big ones are reviewed by a model from another vendor
+  (Claude and Codex check each other, [`skills/second-opinion/`](skills/second-opinion/SKILL.md)).
+- Agents merge their own pull requests on green CI. Destructive migrations, credentials,
+  infrastructure deletions, running cost and user privacy go to a human.
 - An agent must never loosen a check to get its pull request through.
 
 [`docs/GO_LIVE_PLAN.md`](docs/GO_LIVE_PLAN.md) is the working backlog, including what
