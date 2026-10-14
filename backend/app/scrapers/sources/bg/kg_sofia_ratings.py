@@ -323,6 +323,23 @@ def group_rounds(dz_payload: dict[str, Any], family: str) -> list[GroupRound]:
     return out
 
 
+# Dates the Sofia admission rules last changed, per rule family (Столичен общински съвет
+# decisions; kindergarten rules also govern nurseries and ПГУ). A round is labelled with the
+# latest version adopted on or before its date. Add a date here when the council amends a
+# rule set; the calculator's rule files use the same `@<date>` suffix.
+RULE_VERSIONS = {
+    "kindergarten": ("2023-02-23", "2026-03-12"),  # Реш. 121/2023, Реш. 200/2026
+    "grade_1": ("2026-03-12",),  # Реш. 201/2026
+}
+
+
+def rule_set_for(stage: str, campaign: str, classified_on: date) -> str:
+    family = "grade_1" if stage == "grade_1" else "kindergarten"
+    versions = [v for v in RULE_VERSIONS[family] if v <= classified_on.isoformat()]
+    suffix = f"@{versions[-1]}" if versions else ""
+    return f"bg/sofia/{family}/{campaign.replace('/', '-')}{suffix}"
+
+
 _CALENDAR_PREFIX = {"grade_1": "i-ви клас", "kindergarten": "сдя, дг, пгу", "preparatory": "сдя, дг, пгу"}
 
 
@@ -355,7 +372,7 @@ def rows_for_round(
             "city": "sofia",
             "stage": round_.stage,
             "campaign": round_.campaign,
-            "rule_set": f"bg/sofia/{'grade_1' if round_.stage == 'grade_1' else 'kindergarten'}/{round_.campaign.replace('/', '-')}",
+            "rule_set": rule_set_for(round_.stage, round_.campaign, round_.classified_on),
             "round_id": round_.rating_id,
             "classified_on": round_.classified_on.isoformat(),
             "round_name": round_name,

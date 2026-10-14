@@ -13,6 +13,7 @@ from app.scrapers.sources.bg.kg_sofia_ratings import (
     rating_date,
     round_names,
     rows_for_round,
+    rule_set_for,
     start_offset,
 )
 from app.services.admission_cutoffs import check_row, iter_rows, write_rows
@@ -162,7 +163,7 @@ def test_rows_carry_labels_and_no_child_data(tmp_path):
     for row in rows:
         check_row(row)
     general = next(row for row in rows if row["queue"] == "general")
-    assert general["rule_set"] == "bg/sofia/kindergarten/2026-2027"
+    assert general["rule_set"] == "bg/sofia/kindergarten/2026-2027@2026-03-12"
     assert general["source_id"] == "171" and general["district"] == "Възраждане"
     assert "XX" not in json.dumps(rows, ensure_ascii=False)
 
@@ -196,3 +197,9 @@ def test_round_names_from_calendar():
     (round_,) = [r for r in group_rounds(_payload("dz_1_629"), "grade_1") if r.rating_id == 31]
     (row,) = rows_for_round(round_, aggregate_round(parse_list(_content("rated_31_9463")), None, None), "t", names[("grade_1", "2026-06-02")])
     assert (row["round_name"], row["round_kind"]) == ("Първо класиране", "general")
+
+
+def test_rule_set_names_the_rules_in_force_on_the_round_date():
+    assert rule_set_for("nursery", "2026/2027", date(2026, 9, 4)) == "bg/sofia/kindergarten/2026-2027@2026-03-12"
+    assert rule_set_for("kindergarten", "2025/2026", date(2025, 9, 4)) == "bg/sofia/kindergarten/2025-2026@2023-02-23"
+    assert rule_set_for("grade_1", "2026/2027", date(2026, 6, 2)) == "bg/sofia/grade_1/2026-2027@2026-03-12"
