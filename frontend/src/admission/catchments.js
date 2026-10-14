@@ -51,8 +51,12 @@ export function indexAddresses(addresses) {
   })
 }
 
-/** Streets matching what the parent typed, best first. */
-export function searchStreets(streets, query, limit = 8) {
+/**
+ * Streets matching what the parent typed, best first. Within a match quality, streets
+ * in the city come first, then its outer quarters (ГР.СОФИЯ,КВ.…), then same-named
+ * streets in Sofia's other towns and villages.
+ */
+export function searchStreets(streets, query, limit = 12) {
   const key = streetKey(query)
   if (String(query || '').trim().length < 2 || !key) return []
   const ranked = []
@@ -60,7 +64,12 @@ export function searchStreets(streets, query, limit = 8) {
     const rank = street.key.startsWith(key) ? 0 : street.key.includes(` ${key}`) ? 1 : street.key.includes(key) ? 2 : -1
     if (rank >= 0) ranked.push({ rank, street })
   }
-  ranked.sort((a, b) => a.rank - b.rank || a.street.key.length - b.street.key.length || a.street.key.localeCompare(b.street.key))
+  const outsideCity = street => (street.settlement === 'ГР.СОФИЯ' ? 0 : street.settlement?.startsWith('ГР.СОФИЯ') ? 1 : 2)
+  ranked.sort((a, b) =>
+    a.rank - b.rank ||
+    outsideCity(a.street) - outsideCity(b.street) ||
+    a.street.key.length - b.street.key.length ||
+    a.street.key.localeCompare(b.street.key))
   return ranked.slice(0, limit).map(entry => entry.street)
 }
 

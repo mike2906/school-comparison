@@ -590,6 +590,52 @@
           "max": 18
         }
       }
+    },
+    {
+      "name": "no birth year yet: the nursery point and the parent's-address rule may apply",
+      "answers": {
+        "ageGroup": null,
+        "inSofia": true,
+        "addressSince": "2020-01-15",
+        "parentChildSameAddress": false,
+        "homeDistrict": "15",
+        "parents": [
+          {
+            "activity": "working"
+          },
+          {
+            "activity": "working"
+          }
+        ],
+        "twins": false,
+        "closeInAge": false,
+        "nurseryAttended": true,
+        "social": {
+          "parentsDeceased": "none",
+          "family_disability_70": false,
+          "unknown_or_restricted_parent": false,
+          "foster_or_adopted": false,
+          "child_at_risk": false,
+          "three_plus_children": false
+        },
+        "additional": "none",
+        "transfer": false
+      },
+      "context": {
+        "district": "15",
+        "siblingThere": false,
+        "wishRank": 1
+      },
+      "options": {
+        "campaign": "2026/2027",
+        "measuredOn": "2026-05-22"
+      },
+      "expected": {
+        "total": {
+          "min": 10,
+          "max": 19
+        }
+      }
     }
   ]
 }

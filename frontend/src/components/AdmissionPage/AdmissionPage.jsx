@@ -128,7 +128,7 @@ function AdmissionPage() {
         <p className="mt-2 max-w-3xl text-neutral-700">{t('admissionCalc.intro')}</p>
         <p className="mt-2 max-w-3xl text-sm text-neutral-600">{t('admissionCalc.privacy')}</p>
 
-        <div className="mt-6 flex gap-2 overflow-x-auto pb-1" role="tablist">
+        <div className="mt-6 flex flex-wrap gap-2" role="tablist">
           {STAGES.map(option => (
             <button
               key={option.id}

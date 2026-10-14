@@ -147,8 +147,9 @@ def school_cutoffs(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def school_cutoff_summary(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """The small list-response view: for the latest campaign, per stage x age group (or
-    8th-grade class) x building, the general-queue result of the first and the latest round.
+    """The small list-response view: for the latest campaign, per stage x age group x birth
+    year (or 8th-grade class) x building, the general-queue result of the first and the
+    latest round. A nursery group ranks two birth years separately, so they are never mixed.
 
     The latest campaign is chosen per stage and building before grouping, so a class or
     group offered in an earlier year only (8th-grade class codes are unique within a year)
@@ -166,16 +167,17 @@ def school_cutoff_summary(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     for row in general:
         if _campaign_start(row["campaign"]) != latest_by_stage[(row["stage"], row["source_id"])]:
             continue
-        key = (row["stage"], row.get("age_group"), row.get("class_code"), row["source_id"])
+        key = (row["stage"], row.get("age_group"), row.get("birth_year"), row.get("class_code"), row["source_id"])
         groups.setdefault(key, []).append(row)
     summary = []
-    for (stage, age_group, class_code, _source_id), items in groups.items():
+    for (stage, age_group, birth_year, class_code, _source_id), items in groups.items():
         in_campaign = sorted(items, key=lambda r: (r.get("classified_on") or "", r["round_id"]))
         latest_campaign = in_campaign[0]["campaign"]
         first, latest = in_campaign[0], in_campaign[-1]
         entry = {
             "stage": stage,
             "age_group": age_group,
+            "birth_year": birth_year,
             "class_code": class_code,
             "class_name": first.get("class_name"),
             "quota": first.get("quota"),
@@ -187,7 +189,10 @@ def school_cutoff_summary(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
             "latest": {k: latest.get(k) for k in SUMMARY_ROUND_FIELDS if latest.get(k) is not None},
         }
         summary.append({k: v for k, v in entry.items() if v is not None})
-    return sorted(summary, key=lambda e: (e["stage"], e.get("age_group") or "", e.get("class_code") or "", e.get("building") or ""))
+    return sorted(
+        summary,
+        key=lambda e: (e["stage"], e.get("age_group") or "", -(e.get("birth_year") or 0), e.get("class_code") or "", e.get("building") or ""),
+    )
 
 
 def match_key(row: dict[str, Any]) -> tuple[str, str]:
