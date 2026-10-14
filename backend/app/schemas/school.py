@@ -430,13 +430,14 @@ class SchoolResponse(SchoolBase, SchoolPricingMixin):
             return []
         # Beside the published fees read from the same site: not beside manual rows while the
         # website's are withheld (no current Stage 6 report).
-        if not self.website_data_publishable or not any(
-            row.source is PriceSource.SCRAPED_WEBSITE for row in self.pricing
-        ):
+        if not self.website_data_publishable:
             return []
+        fee_pages = [
+            row.source_url for row in self.pricing if row.source is PriceSource.SCRAPED_WEBSITE and row.source_url
+        ]
         return [
             FeeDiscount.model_validate(d)
-            for d in publishable_fee_discounts(self.raw_attributes, self.website_url) or []
+            for d in publishable_fee_discounts(self.raw_attributes, self.website_url, fee_pages) or []
         ]
 
     @computed_field(return_type=list[FieldSourceResponse])

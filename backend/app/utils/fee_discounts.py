@@ -7,8 +7,9 @@ API never serialises the stored block itself.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from typing import Any, Optional
+from urllib.parse import unquote, urlparse
 
 from app.utils.school_facts import _site
 
@@ -21,10 +22,22 @@ def _number(value: Any) -> Optional[float]:
     return float(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else None
 
 
-def publishable_fee_discounts(attributes: Any, website_url: Optional[str]) -> Optional[list[dict[str, Any]]]:
+def _page(url: Any) -> tuple[str, str, str]:
+    """Host without www, path and query: the same page however its address was written."""
+    parsed = urlparse(url if isinstance(url, str) else "")
+    host = (parsed.hostname or "").lower().removeprefix("www.")
+    return host, unquote(parsed.path).rstrip("/").lower(), parsed.query
+
+
+def publishable_fee_discounts(
+    attributes: Any, website_url: Optional[str], fee_pages: Iterable[str]
+) -> Optional[list[dict[str, Any]]]:
     """``[{"kind", "percent", "amount", "currency", "child", "text_i18n", "source_url"}]``, or None.
 
-    Shown only while ``website_url`` is still the site they were read from."""
+    Shown only while ``website_url`` is still the site they were read from, and each only
+    while a fee from its own page is published (``fee_pages``): a page that is gone or
+    ruled invalid takes its discounts with it."""
+    pages = {_page(url) for url in fee_pages}
     block = attributes.get(ATTRIBUTE_KEY) if isinstance(attributes, Mapping) else None
     if not isinstance(block, Mapping) or block.get("_schema_version") != SCHEMA_VERSION:
         return None
@@ -40,6 +53,7 @@ def publishable_fee_discounts(attributes: Any, website_url: Optional[str]) -> Op
             item.get("kind") in KINDS
             and isinstance(url, str)
             and url.startswith(("http://", "https://"))
+            and _page(url) in pages
             and isinstance(text, Mapping)
             and all(isinstance(text.get(lang), str) and text[lang].strip() for lang in ("bg", "en"))
         ):

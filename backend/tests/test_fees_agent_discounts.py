@@ -80,6 +80,9 @@ def test_an_amount_discount_keeps_its_currency_and_a_percent_one_has_none():
         ({"percent": 15, "evidence": "Enrol by 15 May: 10% off", "text_i18n": {"en": "15% off", "bg": "15% отстъпка"}},
          PAGE + "Enrol by 15 May: 10% off\n"),  # 15 is a date, not the percentage
         ({"child": 3}, PAGE.replace(SIBLING_EN, "5% discount for the second child")),  # the page names the second
+        ({"evidence": "5% sibling discount", "percent": 5, "child": 2}, PAGE + "5% sibling discount\n"),  # no child named
+        ({"evidence": "2% sibling discount", "percent": 2, "text_i18n": {"en": "2% off", "bg": "2% отстъпка"}},
+         PAGE + "2% sibling discount\n"),  # the 2 is the percentage, not the second child
     ],
 )  # fmt: skip
 def test_a_discount_the_page_does_not_back_is_dropped(update, page):
@@ -228,17 +231,23 @@ def test_publishable_discounts_drop_malformed_items():
         _stored(percent="5"),
         "junk",
     ]
-    published = publishable_fee_discounts(_block(*items), HOME)
+    published = publishable_fee_discounts(_block(*items), HOME, [URL])
     assert [d["percent"] for d in published] == [5.0, None]
     assert published[0].keys() == {"kind", "percent", "amount", "currency", "child", "text_i18n", "source_url"}
 
 
 def test_discounts_of_another_schema_version_or_a_moved_website_are_not_published():
-    assert publishable_fee_discounts(_block(_stored(), _schema_version=2), HOME) is None
-    assert publishable_fee_discounts(_block(_stored()), "https://other.example") is None
-    assert publishable_fee_discounts(_block(_stored(), website_url=None), HOME) is None
-    assert publishable_fee_discounts(_block(), HOME) is None
-    assert publishable_fee_discounts(_block(_stored()), "https://www.school.example/") is not None
+    assert publishable_fee_discounts(_block(_stored(), _schema_version=2), HOME, [URL]) is None
+    assert publishable_fee_discounts(_block(_stored()), "https://other.example", [URL]) is None
+    assert publishable_fee_discounts(_block(_stored(), website_url=None), HOME, [URL]) is None
+    assert publishable_fee_discounts(_block(), HOME, [URL]) is None
+    assert publishable_fee_discounts(_block(_stored()), "https://www.school.example/", [URL]) is not None
+
+
+def test_a_discount_shows_only_while_a_fee_from_its_own_page_is_published():
+    assert publishable_fee_discounts(_block(_stored()), HOME, ["https://www.school.example/fees/"]) is not None
+    assert publishable_fee_discounts(_block(_stored()), HOME, ["https://school.example/other-fees"]) is None
+    assert publishable_fee_discounts(_block(_stored()), HOME, []) is None
 
 
 async def _detail(client, db_session, *, priced: bool):

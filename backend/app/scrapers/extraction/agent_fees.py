@@ -427,9 +427,10 @@ def option_amounts(fee: AgentFee) -> list[Decimal]:
 
 # Which child a sibling discount is for, as pages write it: "второ дете", "2nd child", "the third".
 _CHILD_WORDS = {
-    2: r"\b2\s*-?\s*(?:ро|nd|-?ри)?\b|втор|second",
-    3: r"\b3\s*-?\s*(?:то|rd|-?ти)?\b|трет|third",
-    4: r"\b4\s*-?\s*(?:то|th|-?ти)?\b|четвърт|fourth",
+    # A bare "2" is not enough: in "2% sibling discount" it is the percentage.
+    2: r"\b2\s*-?\s*(?:ро|nd|ри)\b|втор|second",
+    3: r"\b3\s*-?\s*(?:то|rd|ти)\b|трет|third",
+    4: r"\b4\s*-?\s*(?:то|th|ти)\b|четвърт|fourth",
 }
 
 
