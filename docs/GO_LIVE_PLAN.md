@@ -2246,6 +2246,9 @@ the session scratchpad only.
             from the published snapshot); PR preview deploys point at it.
       - [ ] Playwright journeys for the core user stories (search and filter, school
             detail, compare, language switch), run in CI against staging.
+            Note (2026-10-14): until there is a staging stack, `frontend/e2e/live/` walks
+            these and the admission, facts, social-link and fee journeys on the live site
+            after every deploy and daily (`.github/workflows/live-flows.yml`).
       - [ ] Reviewer agent on a different model family from the coding agent, run in CI on
             every PR.
       - [ ] UI agent: walks the PR's acceptance criteria on the preview deploy and attaches

@@ -36,25 +36,28 @@ describe('finding a school', () => {
 })
 
 describe('a school page', () => {
-  test('facts from the school website link their pages, open days included', async () => {
-    const school = await findSchool(
-      'with facts and an open day',
-      s => (s.school_facts?.at_a_glance?.open_days || []).length > 0,
-      isPrivate,
-      200,
-    )
+  test('facts from the school website link their pages, open days included', async testContext => {
+    // Open days are listed only while upcoming, so some weeks no school has one; the
+    // facts must still show then.
+    const openDays = s => (s.school_facts?.at_a_glance?.open_days || []).length > 0
+    const school = await findSchool('with an open day', openDays, isPrivate, 200)
+      .catch(() => findSchool('with facts', s => (s.school_facts?.facts || []).length > 0, isPrivate))
     await open('bg', `/schools/${school.id}`)
     const facts = card(t('bg', 'schoolFacts.title'))
     await facts.waitFor()
+    // Every fact names the page it came from.
+    const sources = await facts.locator('li a').evaluateAll(links => links.map(a => a.href))
+    assert.ok(sources.length > 0 && sources.every(href => /^https?:\/\//.test(href)))
+    if (!openDays(school)) {
+      testContext.diagnostic('No school lists an upcoming open day; checked the facts only.')
+      return
+    }
     const line = facts.locator('dt', { hasText: t('bg', 'schoolFacts.glance.openDays') })
     await line.waitFor()
     const days = school.school_facts.at_a_glance.open_days
     const expected = days.find(day => day.register_url)?.register_url || days[0].source_url
     const href = await line.locator('xpath=following-sibling::dd[1]//a').getAttribute('href')
     assert.equal(href, expected, 'the open day links its sign-up or announcement page')
-    // Every fact names the page it came from.
-    const sources = await facts.locator('li a').evaluateAll(links => links.map(a => a.href))
-    assert.ok(sources.length > 0 && sources.every(href => /^https?:\/\//.test(href)))
   })
 
   test("the school's own Facebook or Instagram is linked", async () => {
