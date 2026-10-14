@@ -1,0 +1,313 @@
+{
+  "id": "bg/grade_8/2026-2027",
+  "country": "bg",
+  "city": null,
+  "stage": "grade_8",
+  "campaign": "2026/2027",
+  "evaluator": "bg/grade8",
+  "title": {
+    "bg": "Наредба № 10 от 1.09.2016 г. за организация на дейностите в училищното образование, чл. 55–60",
+    "en": "Ordinance No. 10 of 2016 on school education, articles 55 to 60 (eighth-grade admission)"
+  },
+  "official_system_url": "https://ruo.mon.bg/sofia-grad/",
+  "version": "2025-09-26",
+  "acts": [
+    {
+      "id": "2025-09-26",
+      "act": "Наредба № 10/2016, изм. ДВ, бр. 79 от 2025 г.",
+      "in_force_from": "2025-09-26",
+      "note": "Adds wording for an integrated НВО test; the formula variants of чл. 57 ал. 3 are unchanged.",
+      "source": "naredba-10"
+    }
+  ],
+  "status_events": [],
+  "schedule": {
+    "rankings": [
+      "2026-07-14",
+      "2026-07-21",
+      "2026-07-29",
+      "2026-08-05"
+    ],
+    "source": "ruo-sofia-2026-minmax"
+  },
+  "verified": {
+    "status": "verified",
+    "on": "2026-10-14",
+    "sources": [
+      "naredba-10"
+    ],
+    "note": "Checked against the consolidated text (Ciela) of чл. 55–60. The grade-to-points scale is the one Наредба № 11/2016 sets and RUO publishes (6 = 50, 5 = 39, 4 = 26, 3 = 15)."
+  },
+  "sources": [
+    {
+      "id": "naredba-10",
+      "title": "Наредба № 10 от 1.09.2016 г. за организация на дейностите в училищното образование (консолидиран текст)",
+      "url": "https://www.ciela.net/svobodna-zona-normativi/view/2136904663",
+      "retrieved": "2026-10-14"
+    },
+    {
+      "id": "ruo-sofia-2026-minmax",
+      "title": "РУО София-град: справка за минималния и максималния бал по паралелки, 2026",
+      "url": "https://ruo.mon.bg/sofia-grad/student-admission/spravka-za-minimalniya-i-maksimalniya-bal-po-paralelki-v-ruo-sofiya-grad-kam-data-21-07-2026-g/",
+      "retrieved": "2026-10-14"
+    }
+  ],
+  "params": {
+    "article": "чл. 57 (чл. 58 for classes with an aptitude exam)",
+    "nvo_max": 100,
+    "exam_max": 50,
+    "exam_note": "The aptitude exam's grade converted to points (at most 50) and doubled (чл. 58 ал. 1 т. 2, ал. 6).",
+    "grade_points": {
+      "6": 50,
+      "5": 39,
+      "4": 26,
+      "3": 15
+    },
+    "nvo_weight_variants": [
+      {
+        "bulgarian": 2,
+        "math": 2
+      },
+      {
+        "bulgarian": 3,
+        "math": 1
+      },
+      {
+        "bulgarian": 1,
+        "math": 3
+      },
+      {
+        "bulgarian": 2,
+        "math": 1
+      },
+      {
+        "bulgarian": 1,
+        "math": 2
+      },
+      {
+        "bulgarian": 1,
+        "math": 1
+      }
+    ],
+    "tiebreak": [
+      "nvo_sum",
+      "grade_points_sum",
+      "grade_average"
+    ],
+    "olympiad_max": 100,
+    "olympiad_note": "Olympiad or competition points scaled to 100 (чл. 57 ал. 2), only with formula variants 2, 6 or 7 (ал. 5), doubled with variant 7 (ал. 6)."
+  },
+  "examples": [
+    {
+      "name": "the usual formula: twice each НВО plus two grades",
+      "answers": {
+        "nvo": {
+          "bulgarian": 80,
+          "math": 70
+        },
+        "grades": {
+          "bulgarian": 6,
+          "math": 5
+        }
+      },
+      "context": {
+        "nvo_weights": {
+          "bulgarian": 2,
+          "math": 2
+        },
+        "grade_subjects": [
+          "bulgarian",
+          "math"
+        ]
+      },
+      "expected": {
+        "score": 389
+      }
+    },
+    {
+      "name": "maths tripled, Bulgarian once, quarter points kept",
+      "answers": {
+        "nvo": {
+          "bulgarian": 60.25,
+          "math": 90.5
+        },
+        "grades": {
+          "math": 6,
+          "physics": 6
+        }
+      },
+      "context": {
+        "nvo_weights": {
+          "bulgarian": 1,
+          "math": 3
+        },
+        "grade_subjects": [
+          "math",
+          "physics"
+        ]
+      },
+      "expected": {
+        "score": 431.75
+      }
+    },
+    {
+      "name": "aptitude-exam class: each НВО once plus the exam doubled",
+      "answers": {
+        "nvo": {
+          "bulgarian": 70,
+          "math": 60
+        },
+        "grades": {
+          "bulgarian": 6,
+          "art": 5
+        },
+        "exam": 40
+      },
+      "context": {
+        "nvo_weights": {
+          "bulgarian": 1,
+          "math": 1
+        },
+        "grade_subjects": [
+          "bulgarian",
+          "art"
+        ],
+        "exam_weight": 2
+      },
+      "expected": {
+        "score": 299
+      }
+    },
+    {
+      "name": "a missing НВО result gives the range it could reach",
+      "answers": {
+        "nvo": {
+          "bulgarian": 80,
+          "math": null
+        },
+        "grades": {
+          "bulgarian": 6,
+          "math": null
+        }
+      },
+      "context": {
+        "nvo_weights": {
+          "bulgarian": 2,
+          "math": 2
+        },
+        "grade_subjects": [
+          "bulgarian",
+          "math"
+        ]
+      },
+      "expected": {
+        "score": {
+          "min": 225,
+          "max": 460
+        }
+      }
+    },
+    {
+      "name": "an extra НВО subject plus olympiad points (чл. 57 ал. 3 variant 6 with ал. 2)",
+      "answers": {
+        "nvo": {
+          "bulgarian": 70,
+          "math": 80,
+          "english": 90
+        },
+        "grades": {
+          "bulgarian": 5,
+          "math": 6
+        },
+        "olympiad": 50
+      },
+      "context": {
+        "nvo_weights": {
+          "bulgarian": 1,
+          "math": 1,
+          "english": 1
+        },
+        "grade_subjects": [
+          "bulgarian",
+          "math"
+        ],
+        "olympiad_weight": 1
+      },
+      "expected": {
+        "score": 379
+      }
+    },
+    {
+      "name": "variant 7 doubles the olympiad points (чл. 57 ал. 6)",
+      "answers": {
+        "nvo": {
+          "bulgarian": 70,
+          "math": 80
+        },
+        "grades": {
+          "bulgarian": 5,
+          "math": 6
+        },
+        "olympiad": 50
+      },
+      "context": {
+        "nvo_weights": {
+          "bulgarian": 1,
+          "math": 1
+        },
+        "grade_subjects": [
+          "bulgarian",
+          "math"
+        ],
+        "olympiad_weight": 2
+      },
+      "expected": {
+        "score": 339
+      }
+    },
+    {
+      "name": "an impossible grade or НВО score is rejected, not scored as zero",
+      "answers": {
+        "nvo": {
+          "bulgarian": 120,
+          "math": 80
+        },
+        "grades": {
+          "bulgarian": 2,
+          "math": 6
+        }
+      },
+      "context": {
+        "nvo_weights": {
+          "bulgarian": 2,
+          "math": 2
+        },
+        "grade_subjects": [
+          "bulgarian",
+          "math"
+        ]
+      },
+      "expected": {
+        "errors": [
+          "nvo_bulgarian",
+          "grade_bulgarian"
+        ]
+      }
+    },
+    {
+      "name": "a class without a formula cannot be scored",
+      "answers": {
+        "nvo": {
+          "bulgarian": 70,
+          "math": 80
+        }
+      },
+      "context": {},
+      "expected": {
+        "errors": [
+          "formula"
+        ]
+      }
+    }
+  ]
+}

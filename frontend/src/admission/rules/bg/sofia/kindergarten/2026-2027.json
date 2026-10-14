@@ -1,0 +1,595 @@
+{
+  "id": "bg/sofia/kindergarten/2026-2027",
+  "country": "bg",
+  "city": "sofia",
+  "stage": "kindergarten",
+  "campaign": "2026/2027",
+  "evaluator": "bg/sofia/kindergarten",
+  "title": {
+    "bg": "Наредба за прием на деца в общинските самостоятелни детски ясли, детски градини и в подготвителните групи в общинските училища на територията на Столичната община",
+    "en": "Sofia ordinance on admission to municipal nurseries, kindergartens and preparatory groups"
+  },
+  "official_system_url": "https://kg.sofia.bg/",
+  "version": "2026-03-12",
+  "acts": [
+    {
+      "id": "2023-02-23",
+      "act": "Решение № 121 по Протокол № 71 от 23.02.2023 г.",
+      "in_force_from": "2023-03-02",
+      "source": "ordinance-consolidated"
+    },
+    {
+      "id": "2026-03-12",
+      "act": "Решение № 200 по Протокол № 58 от 12.03.2026 г.",
+      "in_force_from": "2026-03-19",
+      "note": "§ 3: the new address text of чл. 18 т. 1 applies from the announcement of free places for 2026/2027.",
+      "source": "decision-200"
+    }
+  ],
+  "status_events": [
+    {
+      "status": "suspended",
+      "scope": [
+        "address_duration"
+      ],
+      "from": "2026-04-01",
+      "from_precision": "month",
+      "to": "2026-05-07",
+      "note": "Административен съд София-град suspended the new address rules pending the case.",
+      "source": "vas-2026-05-07"
+    },
+    {
+      "status": "suspension_lifted",
+      "scope": [
+        "address_duration"
+      ],
+      "from": "2026-05-07",
+      "to": null,
+      "note": "ВАС Определение № 4913 / 07.05.2026, адм. дело № 4485/2026, overturned the suspension (final on the suspension). No ruling on the merits found as of 2026-10-14.",
+      "source": "vas-2026-05-07"
+    }
+  ],
+  "schedule": {
+    "first_general_ranking": "2026-05-22",
+    "general_rankings": [
+      "2026-05-22",
+      "2026-06-05",
+      "2026-06-19"
+    ],
+    "current_rankings_until": "2026-11-27",
+    "source": "sofia-bg-2026-schedule"
+  },
+  "verified": {
+    "status": "verified",
+    "on": "2026-10-14",
+    "sources": [
+      "ordinance-consolidated",
+      "decision-200-transitional"
+    ],
+    "note": "Checked against the consolidated text (Ciela) of чл. 14, 18–20 and § 2–3 of the transitional provisions of Решение № 200."
+  },
+  "sources": [
+    {
+      "id": "ordinance-consolidated",
+      "title": "Наредба за прием на деца ... (консолидиран текст)",
+      "url": "https://www.ciela.net/svobodna-zona-normativi/view/2137232559",
+      "retrieved": "2026-10-14"
+    },
+    {
+      "id": "decision-200",
+      "title": "Решение № 200 на СОС от 12.03.2026 г.",
+      "url": "https://council.sofia.bg/documents/d/guest/r-200-2026",
+      "retrieved": "2026-10-14"
+    },
+    {
+      "id": "decision-200-transitional",
+      "title": "Преходни и заключителни разпоредби към Решение № 200 (§ 2, § 3)",
+      "url": "https://www.ciela.net/svobodna-zona-normativi/view/2137232559",
+      "retrieved": "2026-10-14"
+    },
+    {
+      "id": "vas-2026-05-07",
+      "title": "ВАС отмени определението на АССГ за спиране действието на част от новите правила (БТА)",
+      "url": "https://www.bta.bg/bg/news/bulgaria/oficial-messages/1120999-vas-otmeni-opredelenieto-na-assg-za-spirane-deystvieto-na-chast-ot-novite-pravil",
+      "retrieved": "2026-10-14"
+    },
+    {
+      "id": "sofia-bg-2026-schedule",
+      "title": "Столична община: график на класиранията 2026/2027",
+      "url": "https://www.sofia.bg/en/w/7283210",
+      "retrieved": "2026-10-14"
+    }
+  ],
+  "params": {
+    "address_duration": {
+      "article": "чл. 18, т. 1",
+      "tiers": [
+        {
+          "more_than_years": 3,
+          "points": 8
+        },
+        {
+          "at_least_years": 1,
+          "points": 5
+        },
+        {
+          "points": 3
+        }
+      ],
+      "parent_address_age_groups": [
+        "nursery",
+        "first"
+      ],
+      "moves_within_city_reset": false
+    },
+    "same_district": {
+      "article": "чл. 18, т. 2",
+      "points": 3
+    },
+    "parent_activity": {
+      "article": "чл. 18, т. 2а–4",
+      "working": 2,
+      "student": 2
+    },
+    "nursery_attendance": {
+      "article": "чл. 18, т. 5",
+      "points": 1,
+      "age_groups": [
+        "first"
+      ],
+      "last_campaign": "2027/2028"
+    },
+    "siblings": {
+      "article": "чл. 18, т. 6–8",
+      "same_institution": 1,
+      "twins": 1,
+      "close_in_age": 1
+    },
+    "social": {
+      "article": "чл. 18, т. 9–15",
+      "parents_deceased": {
+        "both": 7,
+        "one": 6
+      },
+      "family_disability_70": 4,
+      "unknown_or_restricted_parent": 4,
+      "foster_or_adopted": 3,
+      "child_at_risk": 3,
+      "three_plus_children": 2
+    },
+    "additional": {
+      "article": "чл. 18, т. 16–17",
+      "sen": 7,
+      "chronic": 3
+    },
+    "wish_order": [
+      3,
+      2,
+      1
+    ],
+    "wish_order_article": "чл. 19",
+    "transfer_wish_penalty": 1,
+    "social_priority_share": 0.3,
+    "tiebreak": "random"
+  },
+  "examples": [
+    {
+      "name": "first group, both parents working, long-standing address in the same district, nursery, first wish",
+      "answers": {
+        "ageGroup": "first",
+        "inSofia": true,
+        "addressSince": "2020-01-15",
+        "parentChildSameAddress": true,
+        "homeDistrict": "15",
+        "parents": [
+          {
+            "activity": "working"
+          },
+          {
+            "activity": "working"
+          }
+        ],
+        "twins": false,
+        "closeInAge": false,
+        "nurseryAttended": true,
+        "social": {
+          "parentsDeceased": "none",
+          "family_disability_70": false,
+          "unknown_or_restricted_parent": false,
+          "foster_or_adopted": false,
+          "child_at_risk": false,
+          "three_plus_children": false
+        },
+        "additional": "none",
+        "transfer": false
+      },
+      "context": {
+        "district": "15",
+        "siblingThere": false,
+        "wishRank": 1
+      },
+      "options": {
+        "campaign": "2026/2027",
+        "measuredOn": "2026-05-22"
+      },
+      "expected": {
+        "total": 19
+      }
+    },
+    {
+      "name": "exactly three years is the 1-to-3-year tier (5, not 8); second group uses the child's address",
+      "answers": {
+        "ageGroup": "second",
+        "inSofia": true,
+        "addressSince": "2023-05-22",
+        "parentChildSameAddress": false,
+        "homeDistrict": "01",
+        "parents": [
+          {
+            "activity": "working"
+          },
+          {
+            "activity": "student"
+          }
+        ],
+        "twins": false,
+        "closeInAge": false,
+        "nurseryAttended": true,
+        "social": {
+          "parentsDeceased": "none",
+          "family_disability_70": false,
+          "unknown_or_restricted_parent": false,
+          "foster_or_adopted": false,
+          "child_at_risk": false,
+          "three_plus_children": false
+        },
+        "additional": "none",
+        "transfer": false
+      },
+      "context": {
+        "district": "15",
+        "siblingThere": false,
+        "wishRank": 2
+      },
+      "options": {
+        "campaign": "2026/2027",
+        "measuredOn": "2026-05-22"
+      },
+      "expected": {
+        "total": 11
+      }
+    },
+    {
+      "name": "one day past three years reaches 8 points",
+      "answers": {
+        "ageGroup": "third",
+        "inSofia": true,
+        "addressSince": "2023-05-21",
+        "homeDistrict": "01",
+        "parents": [
+          {
+            "activity": "none"
+          }
+        ],
+        "twins": false,
+        "closeInAge": false,
+        "social": {
+          "parentsDeceased": "none",
+          "family_disability_70": false,
+          "unknown_or_restricted_parent": false,
+          "foster_or_adopted": false,
+          "child_at_risk": false,
+          "three_plus_children": false
+        },
+        "additional": "none",
+        "transfer": false
+      },
+      "context": {
+        "district": "02",
+        "siblingThere": false,
+        "wishRank": null
+      },
+      "options": {
+        "campaign": "2026/2027",
+        "measuredOn": "2026-05-22"
+      },
+      "expected": {
+        "total": {
+          "min": 8,
+          "max": 11
+        }
+      }
+    },
+    {
+      "name": "first group: parent's address not the child's gives no address-duration points",
+      "answers": {
+        "ageGroup": "first",
+        "inSofia": true,
+        "addressSince": "2015-01-01",
+        "parentChildSameAddress": false,
+        "homeDistrict": "15",
+        "parents": [
+          {
+            "activity": "working"
+          },
+          {
+            "activity": "none"
+          }
+        ],
+        "twins": false,
+        "closeInAge": false,
+        "nurseryAttended": false,
+        "social": {
+          "parentsDeceased": "none",
+          "family_disability_70": false,
+          "unknown_or_restricted_parent": false,
+          "foster_or_adopted": false,
+          "child_at_risk": false,
+          "three_plus_children": false
+        },
+        "additional": "none",
+        "transfer": false
+      },
+      "context": {
+        "district": "15",
+        "siblingThere": false,
+        "wishRank": 3
+      },
+      "options": {
+        "campaign": "2026/2027",
+        "measuredOn": "2026-05-22"
+      },
+      "expected": {
+        "total": 6
+      }
+    },
+    {
+      "name": "only one of sibling there, twins and close in age counts",
+      "answers": {
+        "ageGroup": "second",
+        "inSofia": false,
+        "parents": [
+          {
+            "activity": "none"
+          },
+          {
+            "activity": "none"
+          }
+        ],
+        "twins": true,
+        "closeInAge": true,
+        "social": {
+          "parentsDeceased": "none",
+          "family_disability_70": false,
+          "unknown_or_restricted_parent": false,
+          "foster_or_adopted": false,
+          "child_at_risk": false,
+          "three_plus_children": false
+        },
+        "additional": "none",
+        "transfer": false
+      },
+      "context": {
+        "district": "15",
+        "siblingThere": true,
+        "wishRank": null
+      },
+      "options": {
+        "campaign": "2026/2027",
+        "measuredOn": "2026-05-22"
+      },
+      "expected": {
+        "total": {
+          "min": 1,
+          "max": 4
+        }
+      }
+    },
+    {
+      "name": "social criteria add up and give first-ranking priority; SEN and chronic illness are exclusive",
+      "answers": {
+        "ageGroup": "second",
+        "inSofia": true,
+        "addressSince": "2025-09-01",
+        "homeDistrict": "03",
+        "parents": [
+          {
+            "activity": "working"
+          }
+        ],
+        "twins": false,
+        "closeInAge": false,
+        "social": {
+          "parentsDeceased": "one",
+          "family_disability_70": false,
+          "unknown_or_restricted_parent": false,
+          "foster_or_adopted": false,
+          "child_at_risk": false,
+          "three_plus_children": true
+        },
+        "additional": "sen",
+        "transfer": false
+      },
+      "context": {
+        "district": "03",
+        "siblingThere": false,
+        "wishRank": 1
+      },
+      "options": {
+        "campaign": "2026/2027",
+        "measuredOn": "2026-05-22"
+      },
+      "expected": {
+        "total": 26,
+        "socialPriority": true,
+        "specialPlaces": "sen"
+      }
+    },
+    {
+      "name": "a transfer request lowers each wish's points by one",
+      "answers": {
+        "ageGroup": "third",
+        "inSofia": true,
+        "addressSince": "2010-01-01",
+        "homeDistrict": "05",
+        "parents": [
+          {
+            "activity": "working"
+          },
+          {
+            "activity": "working"
+          }
+        ],
+        "twins": false,
+        "closeInAge": false,
+        "social": {
+          "parentsDeceased": "none",
+          "family_disability_70": false,
+          "unknown_or_restricted_parent": false,
+          "foster_or_adopted": false,
+          "child_at_risk": false,
+          "three_plus_children": false
+        },
+        "additional": "none",
+        "transfer": true
+      },
+      "context": {
+        "district": "05",
+        "siblingThere": false,
+        "wishRank": 1
+      },
+      "options": {
+        "campaign": "2026/2027",
+        "measuredOn": "2026-05-22"
+      },
+      "expected": {
+        "total": 17
+      }
+    },
+    {
+      "name": "not sure answers give the full range",
+      "answers": {
+        "ageGroup": "first",
+        "inSofia": true,
+        "addressSince": null,
+        "parentChildSameAddress": true,
+        "homeDistrict": null,
+        "parents": [
+          {
+            "activity": "working"
+          },
+          {
+            "activity": null
+          }
+        ],
+        "twins": false,
+        "closeInAge": false,
+        "nurseryAttended": null,
+        "social": {
+          "parentsDeceased": "none",
+          "family_disability_70": false,
+          "unknown_or_restricted_parent": false,
+          "foster_or_adopted": false,
+          "child_at_risk": false,
+          "three_plus_children": false
+        },
+        "additional": "none",
+        "transfer": false
+      },
+      "context": {
+        "district": "15",
+        "siblingThere": false,
+        "wishRank": 1
+      },
+      "options": {
+        "campaign": "2026/2027",
+        "measuredOn": "2026-05-22"
+      },
+      "expected": {
+        "total": {
+          "min": 8,
+          "max": 19
+        }
+      }
+    },
+    {
+      "name": "the nursery point ends with the 2027/28 campaign (§ 2 of Решение № 200)",
+      "answers": {
+        "ageGroup": "first",
+        "inSofia": true,
+        "addressSince": "2020-01-15",
+        "parentChildSameAddress": true,
+        "homeDistrict": "15",
+        "parents": [
+          {
+            "activity": "working"
+          },
+          {
+            "activity": "working"
+          }
+        ],
+        "twins": false,
+        "closeInAge": false,
+        "nurseryAttended": true,
+        "social": {
+          "parentsDeceased": "none",
+          "family_disability_70": false,
+          "unknown_or_restricted_parent": false,
+          "foster_or_adopted": false,
+          "child_at_risk": false,
+          "three_plus_children": false
+        },
+        "additional": "none",
+        "transfer": false
+      },
+      "context": {
+        "district": "15",
+        "siblingThere": false,
+        "wishRank": 1
+      },
+      "options": {
+        "campaign": "2028/2029",
+        "measuredOn": "2028-05-22"
+      },
+      "expected": {
+        "total": 18
+      }
+    },
+    {
+      "name": "not sure about a Sofia address leaves both address criteria open; no parents given counts as unknown",
+      "answers": {
+        "ageGroup": "second",
+        "inSofia": null,
+        "addressSince": "2015-01-01",
+        "homeDistrict": "15",
+        "twins": false,
+        "closeInAge": false,
+        "social": {
+          "parentsDeceased": "none",
+          "family_disability_70": false,
+          "unknown_or_restricted_parent": false,
+          "foster_or_adopted": false,
+          "child_at_risk": false,
+          "three_plus_children": false
+        },
+        "additional": "none",
+        "transfer": false
+      },
+      "context": {
+        "district": "15",
+        "siblingThere": false,
+        "wishRank": 1
+      },
+      "options": {
+        "campaign": "2026/2027",
+        "measuredOn": "2026-05-22"
+      },
+      "expected": {
+        "total": {
+          "min": 3,
+          "max": 18
+        }
+      }
+    }
+  ]
+}
