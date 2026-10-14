@@ -131,6 +131,7 @@ def _labels(fact: Mapping[str, Any]) -> dict[str, Any]:
         ],
         "admission": listed("admission", ADMISSION_TYPES),
         "admission_grade": _int_in(fact.get("admission_grade"), 0, 12),
+        "admission_grade_to": _grade_to(fact),
         "exam_subjects": _bilingual(fact.get("exam_subjects"), 8),
         "places": fact.get("places") if fact.get("places") in PLACES else None,
         "highest_grade": _int_in(fact.get("highest_grade"), 1, 12),
@@ -143,6 +144,12 @@ def _labels(fact: Mapping[str, Any]) -> dict[str, Any]:
         "bus_areas": _bilingual(fact.get("bus_areas"), 20),
         "special_needs_support": True if fact.get("special_needs_support") is True else None,
     }
+
+
+def _grade_to(fact: Mapping[str, Any]) -> Optional[int]:
+    """The last grade of a stated range, kept only after a valid first grade."""
+    first, last = _int_in(fact.get("admission_grade"), 0, 12), _int_in(fact.get("admission_grade_to"), 0, 12)
+    return last if first is not None and last is not None and last > first else None
 
 
 def _as_list(value: Any) -> list[str]:
@@ -176,9 +183,14 @@ def at_a_glance(
     for fact in facts:
         if not (fact.get("admission") or fact.get("exam_subjects")):
             continue
-        row = next((r for r in admission if r["grade"] == fact.get("admission_grade")), None)
+        grade, grade_to = fact.get("admission_grade"), fact.get("admission_grade_to")
+        # Facts for the same grades merge; a fact that names no grade stays a row of its own.
+        row = next(
+            (r for r in admission if grade is not None and (r["grade"], r["grade_to"]) == (grade, grade_to)),
+            None,
+        )
         if row is None:
-            row = {"grade": fact.get("admission_grade"), "types": [], "subjects": []}
+            row = {"grade": grade, "grade_to": grade_to, "types": [], "subjects": []}
             admission.append(row)
         row["types"] += [t for t in fact.get("admission") or [] if t not in row["types"]]
         row["subjects"] += [s for s in fact.get("exam_subjects") or [] if s not in row["subjects"]]
@@ -186,7 +198,11 @@ def at_a_glance(
     read = _date(read_at[:10]) if isinstance(read_at, str) else None
     if read and (today - datetime.date.fromisoformat(read)).days <= PLACES_SHOWN_DAYS:
         for fact in facts:
-            row = {"grade": fact.get("admission_grade"), "status": fact.get("places")}
+            row = {
+                "grade": fact.get("admission_grade"),
+                "grade_to": fact.get("admission_grade_to"),
+                "status": fact.get("places"),
+            }
             if row["status"] and row not in places:
                 places.append(row)
     window = None

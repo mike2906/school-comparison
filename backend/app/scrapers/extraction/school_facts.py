@@ -104,7 +104,8 @@ Rules:
   - max_class_size: the most pupils in a class or group, as a number, only when the quote gives it.
   - admission: how children are admitted, only as the quote states it: any of entrance_exam, interview,
     trial_day, open_entry (the quote says there is no test or interview); admission_grade: the grade it is
-    for (0 for kindergarten or preschool), when stated; exam_subjects: the subjects of an entrance exam, each as {"bg", "en"}.
+    for (0 for kindergarten or preschool), when stated; for a range of grades (grades 2 to 4), admission_grade
+    is the first and admission_grade_to the last; exam_subjects: the subjects of an entrance exam, each as {"bg", "en"}.
   - places: full or waiting_list when the quote says a class or grade has no places or a waiting list for the
     current or coming school year (admission_grade for which grade).
   - highest_grade: the highest grade the school teaches, as a number, when the quote says (1 to 12).
@@ -162,6 +163,7 @@ class Fact(BaseModel):
     instruction_languages: list[str] = Field(default_factory=list)
     admission: list[Admission] = Field(default_factory=list)
     admission_grade: Optional[int] = None
+    admission_grade_to: Optional[int] = None
     exam_subjects: list[Name] = Field(default_factory=list)
     places: Optional[Places] = None
     highest_grade: Optional[int] = None
@@ -181,6 +183,7 @@ LABEL_FIELDS = (
     "instruction_languages",
     "admission",
     "admission_grade",
+    "admission_grade_to",
     "exam_subjects",
     "places",
     "highest_grade",

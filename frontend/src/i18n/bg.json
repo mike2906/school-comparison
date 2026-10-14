@@ -813,6 +813,7 @@
       "bus": "Училищен автобус",
       "support": "Подкрепа за деца със СОП",
       "grade": "{{grade}} клас",
+      "grades": "{{from}}–{{to}} клас",
       "kindergarten": "Детска градина",
       "admissionTypes": {
         "entrance_exam": "Приемен изпит",

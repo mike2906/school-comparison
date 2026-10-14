@@ -56,6 +56,14 @@ export function atAGlanceLines(school, language, t) {
   const glance = school?.school_facts?.at_a_glance
   if (!glance) return []
   const grade = value => (value === 0 ? t('schoolFacts.glance.kindergarten') : t('schoolFacts.glance.grade', { grade: value }))
+  const grades = row => {
+    if (row.grade === null || row.grade === undefined) return ''
+    if (!row.grade_to) return grade(row.grade)
+    return row.grade === 0
+      ? `${t('schoolFacts.glance.kindergarten')} – ${grade(row.grade_to)}`
+      : t('schoolFacts.glance.grades', { from: row.grade, to: row.grade_to })
+  }
+  const forGrades = (row, what) => (grades(row) ? `${grades(row)}: ${what}` : what)
   const date = value => (value ? new Date(`${value}T00:00:00`).toLocaleDateString(language, { day: 'numeric', month: 'long', year: 'numeric' }) : '')
   const lines = []
   const add = (key, value) => value && lines.push({ key, value })
@@ -64,11 +72,11 @@ export function atAGlanceLines(school, language, t) {
     const types = (row.types || []).map(type => t(`schoolFacts.glance.admissionTypes.${type}`)).join(', ')
     const subjects = (row.subjects || []).map(subject => name(subject, language)).filter(Boolean).join(', ')
     const what = [types, subjects && `(${subjects})`].filter(Boolean).join(' ')
-    return row.grade === null || row.grade === undefined ? what : `${grade(row.grade)}: ${what}`
+    return what && forGrades(row, what)
   }).filter(Boolean).join('; '))
   add('places', (glance.places || []).map(row => {
     const status = t(`schoolFacts.glance.placesStatus.${row.status}`)
-    return row.grade === null || row.grade === undefined ? status : `${grade(row.grade)}: ${status}`
+    return forGrades(row, status)
   }).join('; '))
   add('applications', glance.applications && (
     glance.applications.open && glance.applications.close

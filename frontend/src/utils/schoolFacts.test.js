@@ -55,3 +55,17 @@ test('at a glance lines say what the labels add up to, in display order', () => 
   assert.deepEqual(atAGlanceLines({}, 'en', t), [])
   assert.deepEqual(atAGlanceKeysIn([{ school_facts: { at_a_glance: glance } }, {}], 'en', t).slice(0, 2), ['admission', 'places'])
 })
+
+test('an admission row for a range of grades names the range; one with no grade has no prefix', () => {
+  const glance = {
+    admission: [
+      { grade: 2, grade_to: 4, types: ['entrance_exam'], subjects: [] },
+      { grade: null, grade_to: null, types: ['interview'], subjects: [] },
+    ],
+  }
+  const [line] = atAGlanceLines({ school_facts: { facts: [], at_a_glance: glance } }, 'en', t)
+  assert.equal(
+    line.value,
+    'schoolFacts.glance.grades{"from":2,"to":4}: schoolFacts.glance.admissionTypes.entrance_exam; schoolFacts.glance.admissionTypes.interview',
+  )
+})

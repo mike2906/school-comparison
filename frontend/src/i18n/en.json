@@ -813,6 +813,7 @@
       "bus": "School bus",
       "support": "Special needs support",
       "grade": "Grade {{grade}}",
+      "grades": "Grades {{from}}–{{to}}",
       "kindergarten": "Kindergarten",
       "admissionTypes": {
         "entrance_exam": "Entrance exam",

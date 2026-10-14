@@ -497,10 +497,11 @@ def test_at_a_glance_sums_up_the_labels_and_drops_a_closed_window():
     glance = at_a_glance(facts, "2026-03-20T10:00:00", today=datetime.date(2026, 4, 1))
     assert glance["admission"][0] == {
         "grade": 5,
+        "grade_to": None,
         "types": ["entrance_exam"],
         "subjects": [{"bg": "Математика", "en": "Maths"}, {"bg": "Английски", "en": "English"}],
     }
-    assert glance["places"] == [{"grade": 1, "status": "full"}]
+    assert glance["places"] == [{"grade": 1, "grade_to": None, "status": "full"}]
     assert glance["highest_grade"] == 4 and glance["curricula"] == ["cambridge"]
     assert glance["applications"] == {"open": "2026-03-01", "close": "2026-04-30"}
     assert at_a_glance(facts, today=datetime.date(2026, 5, 1))["applications"] is None
@@ -522,11 +523,16 @@ def test_at_a_glance_merges_grades_and_ages_out_stale_dates_and_places():
     today = datetime.date(2026, 10, 14)
     glance = at_a_glance(facts, "2026-10-01", today=today)
     assert glance["admission"] == [
-        {"grade": 5, "types": ["entrance_exam", "interview"], "subjects": [{"bg": "Математика", "en": "Maths"}]}
+        {
+            "grade": 5,
+            "grade_to": None,
+            "types": ["entrance_exam", "interview"],
+            "subjects": [{"bg": "Математика", "en": "Maths"}],
+        }
     ]
     assert glance["highest_grade"] == 12
     assert glance["applications"] == {"open": "2026-11-01", "close": "2026-12-15"}
-    assert glance["places"] == [{"grade": 5, "status": "waiting_list"}]
+    assert glance["places"] == [{"grade": 5, "grade_to": None, "status": "waiting_list"}]
     assert at_a_glance(facts, "2026-01-10", today=today)["places"] == []  # read too long ago
     open_only = [{"applications_open": "2026-03-01"}]
     assert at_a_glance(open_only, today=today)["applications"] is None
@@ -560,7 +566,7 @@ async def test_the_detail_response_has_the_labels_at_a_glance(client, db_session
         client, db_session, school_facts={"_schema_version": 1, "read_at": "t", "website_url": HOME, "facts": rows}
     )
     glance = body["school_facts"]["at_a_glance"]
-    assert glance["admission"] == [{"grade": 5, "types": ["entrance_exam"], "subjects": []}]
+    assert glance["admission"] == [{"grade": 5, "grade_to": None, "types": ["entrance_exam"], "subjects": []}]
     assert glance["places"] == [] and glance["highest_grade"] == 4 and glance["curricula"] == ["cambridge"]
     assert "admission" not in body["school_facts"]["facts"][0]  # labels show only summed up
 
@@ -587,3 +593,21 @@ def test_a_malformed_stored_list_is_dropped_not_raised():
 
     labels = _labels({"tags": [["cafeteria"], {"a": 1}, "cafeteria"], "admission": [["x"]], "curricula": [{}]})
     assert labels["tags"] == ["cafeteria"] and labels["admission"] == [] and labels["curricula"] == []
+
+
+def test_admission_facts_without_a_grade_are_not_merged_and_ranges_are_kept():
+    from app.utils.school_facts import _labels, at_a_glance
+
+    facts = [
+        _labels({"admission": ["entrance_exam"], "admission_grade": 2, "admission_grade_to": 4}),
+        _labels({"admission": ["entrance_exam"], "exam_subjects": [{"bg": "Математика", "en": "Maths"}]}),
+        _labels({"admission": ["interview"]}),
+        _labels({"admission": ["interview"], "admission_grade": 5, "admission_grade_to": 3}),  # bad range
+    ]
+    rows = at_a_glance(facts)["admission"]
+    assert [(r["grade"], r["grade_to"], r["types"]) for r in rows] == [
+        (2, 4, ["entrance_exam"]),
+        (None, None, ["entrance_exam"]),
+        (None, None, ["interview"]),
+        (5, None, ["interview"]),
+    ]

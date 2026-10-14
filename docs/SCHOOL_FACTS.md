@@ -31,7 +31,8 @@ some picks were trivia, yearly counts go stale, the paragraph only restated the 
    existing vocabulary (`FACT_TAGS`: transportation, cafeteria, meals_provided, extended_day,
    ...), languages with a level (immersion, bilingual, enrichment) and weekly hours,
    languages of instruction, a maximum class size, the admission route for a grade
-   (`ADMISSION_TYPES`: entrance_exam, interview, trial_day, open_entry) with exam subjects,
+   (`ADMISSION_TYPES`: entrance_exam, interview, trial_day, open_entry) with exam subjects
+   and the grade or range of grades it is for,
    places full or waiting list for a grade, the highest grade taught, curricula
    (`CURRICULA`) and whether the diploma is recognised, application open/close dates, bus
    areas by district, and special-needs support.
@@ -58,7 +59,7 @@ tags join `filter_tags` (so the search filters and the compare page's meals, tra
 after-school rows see them), its languages join `language_focus`, and its class size is
 used when no curated one exists (before the old extraction's). The response also carries
 `school_facts.at_a_glance` (`at_a_glance` in `app/utils/school_facts.py`): admissions per
-grade, places (only for 180 days after the read), the highest grade stated, curricula,
+grade or range (a fact naming no grade stays its own row), places (only for 180 days after the read), the highest grade stated, curricula,
 diploma, the first application window not yet closed, instruction languages, language
 hours, bus areas and support, summed from the shown (not minor) facts and shown above the
 fact list and as compare rows. Facts carry their own checks, so they do not wait for a Stage 6 report, but a website-data withholding marker
