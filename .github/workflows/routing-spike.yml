@@ -1,0 +1,47 @@
+name: Routing spike data
+
+# Throwaway spike (thread "Browser routing test"): the cloud agent cannot reach OSM mirrors, so
+# this job clips Sofia from the Geofabrik Bulgaria extract and, when sample pairs exist, answers
+# them with OSRM's car profile. Outputs go to the routing-spike-data pre-release.
+on:
+  push:
+    branches: [agent/routing-spike]
+    paths: [".github/workflows/routing-spike.yml", "tools/routing-spike/pairs.json"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  TAG: routing-spike-data
+  # Stolichna municipality plus ~5 km buffer.
+  BBOX: "22.98,42.47,23.70,42.90"
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+  data:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Release
+        run: gh release view "$TAG" || gh release create "$TAG" --prerelease --title "Routing spike data" --notes "Spike inputs/outputs. OSM data (c) OpenStreetMap contributors, ODbL." --target "$GITHUB_SHA"
+      - name: Clip Sofia
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq osmium-tool
+          curl -sSfL -o bg.osm.pbf https://download.geofabrik.de/europe/bulgaria-latest.osm.pbf
+          osmium extract -b "$BBOX" --strategy complete_ways bg.osm.pbf -o sofia.osm.pbf
+          ls -l bg.osm.pbf sofia.osm.pbf
+          gh release upload "$TAG" sofia.osm.pbf --clobber
+      - name: OSRM answers
+        if: hashFiles('tools/routing-spike/pairs.json') != ''
+        run: |
+          IMG=ghcr.io/project-osrm/osrm-backend:v5.27.1
+          mkdir osrm && cp sofia.osm.pbf osrm/
+          docker run --rm -v "$PWD/osrm:/data" $IMG osrm-extract -p /opt/car.lua /data/sofia.osm.pbf
+          docker run --rm -v "$PWD/osrm:/data" $IMG osrm-partition /data/sofia.osrm
+          docker run --rm -v "$PWD/osrm:/data" $IMG osrm-customize /data/sofia.osrm
+          docker run -d --name osrm -p 5000:5000 -v "$PWD/osrm:/data" $IMG osrm-routed --algorithm mld --max-table-size 10000 /data/sofia.osrm
+          sleep 5
+          python3 tools/routing-spike/osrm_query.py tools/routing-spike/pairs.json osrm_results.json
+          gh release upload "$TAG" osrm_results.json --clobber
