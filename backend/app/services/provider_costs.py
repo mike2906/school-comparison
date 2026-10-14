@@ -47,7 +47,10 @@ class ProviderCostScope:
     stage: str
     cap_usd: Decimal
     request_reserve_usd: Decimal
-    dispatch_lock: asyncio.Lock
+    # Calls in flight at once (1 for most stages). Reservations stay one at a time, so
+    # each cap check counts every call still in flight at the request reserve.
+    dispatch_slots: asyncio.Semaphore
+    reserve_lock: asyncio.Lock
 
 
 _SCOPE: contextvars.ContextVar[ProviderCostScope | None] = contextvars.ContextVar(
@@ -72,13 +75,16 @@ def provider_cost_scope(
     stage: str,
     cap_usd: float,
     request_reserve_usd: float,
+    max_in_flight: int = 1,
 ):
     cap = _usd(cap_usd, field="provider cost cap")
     reserve = _usd(request_reserve_usd, field="provider request reserve")
     if cap <= 0 or reserve <= 0:
         raise ProviderAttributionUncertain("provider cost cap and request reserve must be positive")
     token = _SCOPE.set(
-        ProviderCostScope(pipeline_run_id, stage, cap, reserve, asyncio.Lock())
+        ProviderCostScope(
+            pipeline_run_id, stage, cap, reserve, asyncio.Semaphore(max(1, int(max_in_flight))), asyncio.Lock()
+        )
     )
     try:
         yield
@@ -431,18 +437,18 @@ async def execute_billable_request(
 ) -> Any:
     """Run a provider call with durable reservation and exact post-response attribution.
 
-    ``timeout_seconds`` bounds only the provider call, not the wait for the dispatch
-    lock, so queued calls in a batch don't use up their timeout before dispatch.
+    ``timeout_seconds`` bounds only the provider call, not the wait for a dispatch
+    slot, so queued calls in a batch don't use up their timeout before dispatch.
     """
     scope = _SCOPE.get()
     if scope is None:
         return await _bounded(call, timeout_seconds)
 
-    # A scope is shared by all tasks spawned inside the batch. Serializing the
-    # dispatch-through-attribution interval makes every next cap decision use
-    # the preceding request's exact provider cost, and prevents ordinary batch
-    # concurrency from colliding with its pending reservation.
-    async with scope.dispatch_lock:
+    # A scope is shared by all tasks spawned inside the batch. With one slot (the
+    # default) the dispatch-through-attribution interval is serialized, so every next
+    # cap decision uses the preceding request's exact provider cost. With more, each
+    # cap decision counts the calls still in flight at the request reserve.
+    async with scope.dispatch_slots:
         return await _execute_tracked_billable_request(
             call,
             scope=scope,
@@ -472,7 +478,7 @@ async def _execute_tracked_billable_request(
 
     from app.database import async_session_maker
 
-    async with async_session_maker() as ledger_db:
+    async with scope.reserve_lock, async_session_maker() as ledger_db:
         reservation = await reserve_provider_request(
             ledger_db,
             pipeline_run_id=scope.pipeline_run_id,

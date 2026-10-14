@@ -56,6 +56,7 @@ from app.scrapers.price_evidence import _PRICE_RE, PriceRow, _amount_key
 from app.scrapers.shared_site_check import registrable_domain
 from app.scrapers.stages import common as stage_common
 from app.scrapers.stages import fee_images as fee_images_module
+from app.scrapers.stages import school_pool
 from app.scrapers.stages.fee_images import fee_images
 from app.scrapers.validator import validate_school_data
 from app.services.pipeline_runs import finalize_pipeline_run, pipeline_run_heartbeat, start_pipeline_run
@@ -1046,8 +1047,13 @@ async def run_fees_agent(
     apply: bool = False,
     after_id: Optional[int] = None,
     lines_path: Optional[Path] = None,
+    workers: int = 1,
 ) -> dict[str, Any]:
     """Run the agent over private and international schools with a website; returns the report.
+
+    ``workers`` schools are read at a time, each with its own session; with more than one,
+    lines are appended as schools finish, not in id order, so resume with ``after_id`` only
+    from an id below which every school has a line.
 
     ``after_id`` starts after that school, to carry on a run that stopped. ``lines_path`` gets
     each school's report appended as one JSON line as soon as it is done, so a killed run
@@ -1092,6 +1098,7 @@ async def run_fees_agent(
             stage=STAGE,
             cap_usd=max_usd,
             request_reserve_usd=float(settings.provider_request_reserve_usd),
+            max_in_flight=workers,
         ):
             async with (
                 pipeline_run_heartbeat(
@@ -1102,29 +1109,34 @@ async def run_fees_agent(
                 AsyncWebCrawler(config=browser) as crawler,
                 fee_http_client() as client,
             ):
-                for current_id in school_ids:
-                    school = await db.get(School, current_id)
+
+                async def one(school_db: AsyncSession, current_id: int) -> dict[str, Any]:
+                    school = await school_db.get(School, current_id)
                     try:
-                        results.append(
-                            await run_school(
-                                db,
-                                school,
-                                find=lambda s: find_pages(crawler, run_config, client, s, spend, read_pictures=True),
-                                read=lambda s, pages, missed: read_fees(s, pages, spend, missed),
-                                apply=apply,
-                                gone=lambda url: page_gone(client, url),
-                            )
+                        return await run_school(
+                            school_db,
+                            school,
+                            find=lambda s: find_pages(crawler, run_config, client, s, spend, read_pictures=True),
+                            read=lambda s, pages, missed: read_fees(s, pages, spend, missed),
+                            apply=apply,
+                            gone=lambda url: page_gone(client, url),
                         )
-                    except (SpendCapReached, ProviderCostCapExceeded) as exc:
-                        error = f"stopped before school {current_id}: {exc}"
-                        break
+                    except (SpendCapReached, ProviderCostCapExceeded):
+                        raise
                     except Exception as exc:  # one school's failure leaves its rows as they are
                         logger.exception("fees-agent failed for school %s", current_id)
-                        if db.in_transaction():
-                            await db.rollback()
-                        results.append({"school_id": current_id, "outcome": "error", "reason": str(exc)[:200]})
-                    if lines_path is not None:
-                        _append_line(lines_path, results[-1])
+                        if school_db.in_transaction():
+                            await school_db.rollback()
+                        return {"school_id": current_id, "outcome": "error", "reason": str(exc)[:200]}
+
+                results, error = await school_pool.run_schools(
+                    db,
+                    school_ids,
+                    one,
+                    workers=workers,
+                    stop_on=(SpendCapReached, ProviderCostCapExceeded),
+                    on_result=(lambda result: _append_line(lines_path, result)) if lines_path is not None else None,
+                )
     except Exception as exc:
         logger.exception("fees-agent run %s stopped", run_id)
         if db.in_transaction():

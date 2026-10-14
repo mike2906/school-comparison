@@ -26,6 +26,7 @@ from app.scrapers.extraction import school_facts as facts_rules
 from app.scrapers.extraction.school_facts import Fact, Facts, Graded
 from app.scrapers.fee_pages import fee_http_client
 from app.scrapers.stages import common as stage_common
+from app.scrapers.stages import school_pool
 from app.scrapers.stages.fees_agent import PageRead, Spend, SpendCapReached, find_pages
 from app.services.pipeline_runs import finalize_pipeline_run, pipeline_run_heartbeat, start_pipeline_run
 from app.services.provider_costs import ProviderCostError, execute_billable_request, provider_cost_scope
@@ -239,8 +240,10 @@ async def run_school_facts(
     limit: Optional[int] = None,
     max_usd: float = DEFAULT_MAX_USD,
     apply: bool = False,
+    workers: int = 1,
 ) -> dict[str, Any]:
-    """Run over schools with an accepted website (all types, or the given ids); returns the report."""
+    """Run over schools with an accepted website (all types, or the given ids), ``workers``
+    schools at a time; returns the report."""
     from crawl4ai import AsyncWebCrawler, BrowserConfig, CacheMode, CrawlerRunConfig  # type: ignore
 
     # Only websites URL validation accepted: facts from an unchecked URL would not be shown.
@@ -280,6 +283,7 @@ async def run_school_facts(
             stage=STAGE,
             cap_usd=max_usd,
             request_reserve_usd=float(settings.provider_request_reserve_usd),
+            max_in_flight=workers,
         ):
             async with (
                 pipeline_run_heartbeat(
@@ -303,18 +307,21 @@ async def run_school_facts(
                         stage=STAGE,
                     )
 
-                for current_id in ids:
-                    school = await db.get(School, current_id)
+                async def one(school_db: AsyncSession, current_id: int) -> dict[str, Any]:
+                    school = await school_db.get(School, current_id)
                     try:
-                        results.append(await run_school(db, school, find=find, call=call, apply=apply))
-                    except (SpendCapReached, ProviderCostError) as exc:  # a cap, or a run no longer running
-                        error = f"stopped before school {current_id}: {exc}"
-                        break
+                        return await run_school(school_db, school, find=find, call=call, apply=apply)
+                    except (SpendCapReached, ProviderCostError):  # a cap, or a run no longer running
+                        raise
                     except Exception as exc:  # one school's failure leaves its stored facts as they are
                         logger.exception("school-facts failed for school %s", current_id)
-                        if db.in_transaction():
-                            await db.rollback()
-                        results.append({"school_id": current_id, "outcome": "error", "reason": str(exc)[:200]})
+                        if school_db.in_transaction():
+                            await school_db.rollback()
+                        return {"school_id": current_id, "outcome": "error", "reason": str(exc)[:200]}
+
+                results, error = await school_pool.run_schools(
+                    db, ids, one, workers=workers, stop_on=(SpendCapReached, ProviderCostError)
+                )
     except Exception as exc:
         logger.exception("school-facts run %s stopped", run_id)
         if db.in_transaction():
