@@ -241,3 +241,11 @@ async def test_overpass_lookup_tries_the_next_server_when_one_is_busy():
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
         assert await stage.osm_lookup(client)(42.6, 23.3) == [{"type": "node", "lat": 1, "lon": 2}]
     assert calls == list(stage.OVERPASS_URLS)
+
+
+@pytest.mark.asyncio
+async def test_the_stage_can_start_a_pipeline_run_for_its_spend(db_session):
+    from app.services.pipeline_runs import start_pipeline_run
+
+    run = await start_pipeline_run(db_session, country="bg", city="sofia", cli_stage=stage.STAGE)
+    assert run.id
