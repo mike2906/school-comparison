@@ -1,9 +1,8 @@
 # Admission points: rules, calculator and catchments
 
 Design for the parent-facing admission calculator (kindergarten, first grade, eighth
-grade) and the catchment map. Research and sources:
-`/mnt/project-files/admission-points/research.md` (project files), summarised here only
-where a decision depends on it.
+grade) and the catchment map. Research: `/mnt/project-files/admission-points/research.md`
+(project files). Codex reviewed this design on 2026-10-14; its findings are folded in.
 
 ## Decisions
 
@@ -12,87 +11,109 @@ where a decision depends on it.
    one evaluator written as plain code that reads those parameters. There is no generic
    rule language or criterion-block engine: Sofia's kindergarten rules, the national
    first-grade template and the eighth-grade score are different shapes, and a DSL would
-   be harder to read and test than three short functions.
-2. **Reuse follows the law, not the city.** First grade is one national template
-   (Наредба 10, чл. 43): four residence groups, then municipal extra points inside a
-   group. So `bg/grade1.js` serves every Bulgarian city; a new city is a new parameter
-   file. Eighth grade is national: one evaluator, the per-class formula is data.
-   Kindergarten rules are municipal and differ in shape, so each shape gets its own
-   evaluator; when a second city with the same shape arrives (Varna, Veliko Tarnovo and
-   Burgas use graded catchments), it gets a parameter file for a shared evaluator then.
-3. **City-agnostic helpers live in `core.js`:** value ranges for unknown answers, address
-   duration in years from dates, choice-rank points, rule-set selection by campaign,
-   revision and status. They know nothing about Sofia.
-4. **Keyed by campaign, then revision.** `campaign` is the school year the child starts
-   (`2026-27`). Inside a campaign, `revisions` lists each act with its adoption and
-   in-force dates, and `status_events` records suspensions (the April to May 2026 court
-   suspension of the kindergarten address rules). A cut-off is read against
-   `<rule set id>@<revision id>`, the same string the cut-off archive stores.
-5. **Never roll rules forward.** When the parent asks about a campaign that has no rule
-   set yet, the calculator uses the newest one and says plainly that the rules for that
-   year are not published or not yet checked. Every rule set records when and against
-   what it was last verified.
-6. **Everything runs in the browser.** Answers include disability, deceased parents,
+   be harder to read and test than short functions.
+2. **Share what the law shares, no more.** First grade follows one national template
+   (Наредба 10, чл. 43: four residence groups, then municipal extra points inside a
+   group), so `bg/grade1.js` holds that grouping and a city adds a parameter file. Where
+   a city's own procedure differs (address rules, locks, exceptions), it gets its own
+   code beside the shared part rather than a growing list of flags. Kindergarten rules
+   are municipal and differ in shape, so each shape gets its own evaluator; a second city
+   with the same shape (Varna, Veliko Tarnovo and Burgas use graded catchments) shares an
+   evaluator then, not before. Another country brings its own evaluators and result
+   shapes; only `core.js` is shared.
+3. **`core.js` is arithmetic, not policy:** ranges for unknown answers, calendar-safe
+   durations (impossible, missing or future dates count as unknown; a 29 February start
+   reaches its anniversary on 1 March), choice-rank points, and rule-set selection.
+4. **One file is one immutable version of the calculation.** A file covers one campaign
+   (the school year the child starts, spelled `2026/2027` like the rest of the repo) and
+   holds the parameters in force for it, the acts it encodes (`acts`), its `version`
+   (the date of the latest act) and dated legal events (`status_events`: `suspended`,
+   `suspension_lifted`, `annulled_not_final`, `annulled_final`, `upheld_final`, never
+   interchangeable). A change during a campaign adds a new file; old files never change
+   meaning. Cut-offs store `<id>@<version>`, so each is read against the calculation it
+   was made under, and cut-offs made under different rules are labelled as not directly
+   comparable (Sofia's address points went from 5/4/3 to 8/5/3 in 2026).
+5. **Never roll rules forward.** Each file says how far it applies: `verified` (checked
+   for this campaign), `provisional` (written for this campaign from the law in force,
+   before the campaign's schedule or amendments are out; re-checked when they are), or,
+   when only an older campaign exists, an `illustration` that is never presented as this
+   year's rules. Transitional provisions that end a criterion by campaign (the nursery
+   point ends after 2027/2028) are parameters, so an illustration cannot award it later.
+6. **Points, priority and capacity are separate results.** The kindergarten total sums
+   every чл. 18 criterion and the wish-order points, as the published lists do. Social
+   criteria also give first-ranking priority for up to 30% of places (чл. 14 ал. 5); SEN
+   has 2 places per group plus a possible referral (ал. 6); chronic illness is capped at 3
+   per group (ал. 9). Those are reported beside the total, not folded into it. First
+   grade returns a group and points, never one number.
+7. **Everything runs in the browser.** Answers include disability, deceased parents,
    adoption and foster care. They never leave the page: no API call, no URL parameter,
-   no storage, no analytics event carries them. The backend serves no rules endpoint;
-   rule files ship in the frontend bundle (loaded on the calculator route only).
-7. **Unknown is an answer.** Every question has "not sure". The result is then a range
-   (`8 to 12 points`) and the breakdown says which answer would settle it.
-8. **Golden tests per rule set.** Each rule file carries worked examples, including
-   boundary dates and mutually exclusive criteria; `rules.test.js` runs every example
-   against its evaluator in CI.
-9. **No promises.** Results show the source, the act and the date checked, link to the
-   official system, and never say a child "would get in". Cut-offs are shown as "last
-   year the last child admitted had N points", labelled with the rules they were made
-   under; cut-offs made under different rules are marked as not directly comparable.
+   no storage, no analytics or error-report payload carries them, and a typed address
+   never moves the map (tile requests would reveal the area). The backend serves no
+   rules endpoint; rule files ship in the calculator's own bundle chunk.
+8. **Unknown is an answer.** Every question has "not sure". The result is then a range;
+   its maximum assumes every unknown is favourable, so the page says "up to".
+9. **Golden tests per rule file.** Each file carries worked examples, including exact
+   anniversaries, mutually exclusive criteria, unknowns and invalid input;
+   `rules.test.js` runs every example against its evaluator and checks the file's
+   structure (ids, sources, version, status values).
+10. **No promises.** Results show the source, the act and the date checked, link to the
+    official system, and never say a child "would get in".
 
 ## Stages
 
 | Stage | Who sets the rules | Calculator output |
 |---|---|---|
-| Nursery, kindergarten groups, preparatory groups (Sofia) | Municipal ordinance | General-queue points per kindergarten (district bonus and wish order depend on the kindergarten), plus social-queue and additional points |
-| First grade (municipal schools) | National template plus municipal extra points | Residence group (1 to 4) per school, plus extra points inside the group |
-| Fifth grade | No common points system: specialised schools admit on their own exams or НВО 4 | No calculator; the page says so |
-| Eighth grade | National (Наредба 10, чл. 57 to 59) | Бал per class, from the class's own formula |
+| Nursery, kindergarten groups, preparatory groups (Sofia) | Municipal ordinance | Points per kindergarten (district bonus, sibling there and wish order depend on it), plus social priority and SEN/chronic places |
+| First grade (municipal schools) | National template plus municipal extra points | Group (1 to 4) and extra points per school, for each address the parent could choose; the chosen address applies to every school and is locked after the first ranking |
+| Fifth grade | No common system in Sofia; a national plan only for maths and science profiled schools (Наредба 10, чл. 73–74) | No calculator; the page says so |
+| Eighth grade | National (Наредба 10, чл. 57–59) | Score per class from the class's own formula (weights, two grade subjects, aptitude exam, olympiad points) |
 
 ## Files
 
 ```
 frontend/src/admission/
-  core.js                         city-agnostic helpers
-  registry.js                     every rule set, keyed by id
+  core.js                               city-agnostic arithmetic and selection
+  evaluators/index.js                   evaluator id -> module
   evaluators/bg/sofiaKindergarten.js
-  evaluators/bg/grade1.js
-  evaluators/bg/grade8.js
-  rules/bg/sofia/kindergarten/2026-27.json
-  rules/bg/sofia/grade_1/2026-27.json
-  rules/bg/grade_8/2026-27.json
-  rules.test.js                   runs every rule file's examples
+  evaluators/bg/grade1.js               national first-grade template
+  evaluators/bg/grade8.js               national eighth-grade score
+  rules/bg/sofia/kindergarten/2026-2027.json, 2027-2028.json
+  rules/bg/sofia/grade_1/2026-2027.json, 2027-2028.json
+  rules/bg/grade_8/2026-2027.json       national (city: null)
+  rules.test.js                         every file's structure and examples
 ```
 
-A rule file:
+A rule file (abridged):
 
 ```json
 {
-  "id": "bg/sofia/kindergarten/2026-27",
-  "country": "bg", "city": "sofia", "stage": "kindergarten", "campaign": "2026-27",
+  "id": "bg/sofia/kindergarten/2026-2027",
+  "country": "bg", "city": "sofia", "stage": "kindergarten", "campaign": "2026/2027",
   "evaluator": "bg/sofia/kindergarten",
-  "revisions": [{ "id": "2026-03-12", "act": "Решение № 200 / 12.03.2026", "in_force_from": "2026-03-19", "source": "decision-200" }],
-  "status_events": [{ "status": "suspended", "from": "2026-04-..", "to": "2026-05-07", "scope": ["address"], "source": "..." }],
-  "verified": { "on": "2026-10-14", "sources": ["decision-200"] },
+  "version": "2026-03-12",
+  "acts": [{ "id": "2026-03-12", "act": "Решение № 200 ...", "in_force_from": "2026-03-19", "source": "decision-200" }],
+  "status_events": [{ "status": "suspension_lifted", "from": "2026-05-07", "source": "vas-2026-05-07" }],
+  "schedule": { "first_general_ranking": "2026-05-22" },
+  "verified": { "status": "verified", "on": "2026-10-14", "sources": ["ordinance-consolidated"] },
   "sources": [{ "id": "decision-200", "title": "...", "url": "...", "retrieved": "2026-10-14" }],
-  "official_system_url": "https://kg.sofia.bg/",
   "params": { "...": "evaluator-specific" },
-  "examples": [{ "name": "...", "answers": {}, "context": {}, "expected": {} }]
+  "examples": [{ "name": "...", "answers": {}, "context": {}, "options": {}, "expected": {} }]
 }
 ```
 
+## Keeping rules current
+
+Rules change every one to three years per city and stage, usually in February or March.
+A watcher (separate work) checks each file's `sources` and the council's new acts and
+court news, and opens an issue when something changes; a person or agent then adds the
+next file and its examples. Provisional files are re-checked when the campaign's
+schedule is published (by 5 January in Sofia).
+
 ## Cut-offs
 
-Owned by the cut-off thread; shape agreed in
-`/mnt/project-files/admission-points/cutoff-shape.md` and `cutoff-shape-comments.md`:
-an archive of snapshots in `data/cutoffs/<country>/<city>/<stage>/<campaign>/<round>.json`
-and a derived summary in `admission_info.cutoffs`, each row tagged with `rule_set`.
+Owned by the cut-off capture (`docs/ADMISSION_CUTOFFS.md`, PR #304): an archive of
+snapshots per city, stage, campaign and round, and `admission_info.cutoffs` /
+`cutoff_summary` in the API, each row tagged with `rule_set` (`<id>@<version>`).
 
 ## Catchments and districts
 
@@ -104,20 +125,24 @@ address list with each address's catchment school and neighbouring schools
 schools by the same GIS id, which kg.sofia.bg calls `esriId` and our kg.sofia.bg adapter
 already stores as `attributes.kg_sofia_esri_id`.
 
-- **Map.** A school's catchment is its own polygon (groups 1 to 3). Its neighbouring area
-  is the union of the polygons of the schools that list it as neighbouring (+5 points,
-  group 4 only). Two shades, not a scale. Each address belongs to exactly one catchment.
-- **Address check.** A parent can type their street and number; the lookup runs in the
-  browser against a compact index built from the address list, loaded only on demand.
+- **Classification uses the address table; the map only displays.** The membership of
+  an address comes from the official address list, keyed by settlement code + street
+  code + number (+ entrance), never from a point-in-polygon test. Polygons are simplified
+  for display. Both are snapshotted per campaign (`catchments/bg/sofia/2026-2027/`).
+- **Map.** A school's catchment is its own polygon (groups 1 to 3). Its neighbouring
+  area is the union of the polygons of the schools that list it as neighbouring (+5
+  points, group 4 only); adjacency is not always symmetric, so it is always read in that
+  direction. Two shades, not a scale. Each address belongs to exactly one catchment.
+- **Address check.** A parent picks their street and number; the lookup runs in the
+  browser against a compact index built from the address list, loaded only on demand,
+  and the map is not moved to the address.
 - **Kindergartens** in Sofia have no catchment. The district bonus (3 points) depends on
-  the kindergarten's district, which the page works out from its coordinates and the
-  district polygons, and shows as an outline.
-- **Ids.** The school response gains one public field, the catchment id (the GIS id),
-  projected from `kg_sofia_esri_id` through the response allowlist.
-- **Refresh.** A script rebuilds the static files from the two official sources
+  the kindergarten's district: the one kg.sofia.bg gives (`admission_info.admin_district`,
+  from the cut-off capture), else the district polygon its coordinates fall in. The page
+  shows the district outline.
+- **Ids.** Schools carry `admission_info.catchment_ids: {"bg-sofia-gis": [...]}`, a list
+  because merged buildings can have several, namespaced by provider so other cities
+  can add their own.
+- **Refresh.** A script rebuilds the snapshot from the two official sources
   (simplified on the server with ArcGIS `maxAllowableOffset`). The sources update once a
   year; the cloud cannot reach them, so the script runs in GitHub Actions or locally.
-
-Rules change every one to three years per city and stage. A watcher (separate thread)
-checks each rule file's `sources` and opens an issue or PR when the text changes; a
-person or agent then updates the rule file and its examples.

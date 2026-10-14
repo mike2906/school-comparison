@@ -1,0 +1,344 @@
+{
+  "id": "bg/sofia/grade_1/2027-2028",
+  "country": "bg",
+  "city": "sofia",
+  "stage": "grade_1",
+  "campaign": "2027/2028",
+  "evaluator": "bg/grade1",
+  "title": {
+    "bg": "Наредба за прием на ученици в първи клас в общинските училища на територията на Столична община",
+    "en": "Sofia ordinance on first-grade admission to municipal schools"
+  },
+  "official_system_url": "https://kg.sofia.bg/",
+  "version": "2026-03-12",
+  "acts": [
+    {
+      "id": "2022-02-24",
+      "act": "Решение № 101 от 24.02.2022 г.",
+      "in_force_from": "2022-03-02",
+      "source": "ordinance-consolidated"
+    },
+    {
+      "id": "2026-03-12",
+      "act": "Решение № 201 по Протокол № 58 от 12.03.2026 г.",
+      "in_force_from": "2026-03-12",
+      "in_force_precision": "approximate",
+      "note": "New чл. 6 ал. 5 and чл. 11: the parent picks the child's permanent or current address; it can be changed only until the first ranking and is kept for all later rankings.",
+      "source": "decision-201"
+    }
+  ],
+  "status_events": [
+    {
+      "status": "suspended",
+      "scope": [
+        "address_choice"
+      ],
+      "from": "2026-03-25",
+      "to": "2026-05-18",
+      "note": "Административен съд София-град suspended § 3 and § 5 of the amending ordinance (the address choice and lock) pending the case.",
+      "source": "vas-2026-05-18"
+    },
+    {
+      "status": "suspension_lifted",
+      "scope": [
+        "address_choice"
+      ],
+      "from": "2026-05-18",
+      "to": null,
+      "note": "ВАС Определение № 5326 / 18.05.2026, адм. дело № 4277/2026, overturned the suspension (final on the suspension, not on the merits).",
+      "source": "vas-2026-05-18"
+    },
+    {
+      "status": "annulled_not_final",
+      "scope": [
+        "address_choice"
+      ],
+      "from": "2026-05-27",
+      "to": null,
+      "note": "Press reports of 27–28.05.2026: the first-instance court ruled against § 3 and § 5. Not final; Sofia appealed to ВАС and the March rules applied to the 2026 rankings. No ВАС ruling found as of 2026-10-14.",
+      "source": "court-2026-05"
+    }
+  ],
+  "schedule": {
+    "applications_close": "2027-05-31",
+    "first_ranking": "2027-06-02",
+    "estimated": true,
+    "note": "The 2027 schedule is published by 5 January 2027. Until then the dates are estimated from the 2026 schedule."
+  },
+  "verified": {
+    "status": "provisional",
+    "on": "2026-10-14",
+    "sources": [
+      "ordinance-consolidated"
+    ],
+    "note": "The ordinance in force on 2026-10-14, checked for amendments up to that date. The council usually amends it in February or March before a campaign, so this must be re-checked when the 2027 schedule is published; until then the page calls it provisional."
+  },
+  "sources": [
+    {
+      "id": "ordinance-consolidated",
+      "title": "Наредба за прием на ученици в първи клас ... (консолидиран текст, sofia.obshtini.bg)",
+      "url": "https://12sou-sofia.info/wp-content/uploads/2026/03/naredba.pdf",
+      "retrieved": "2026-10-14"
+    },
+    {
+      "id": "decision-201",
+      "title": "Решение № 201 на СОС от 12.03.2026 г.",
+      "url": "https://council.sofia.bg/documents/d/guest/r-201-2026",
+      "retrieved": "2026-10-14"
+    },
+    {
+      "id": "court-2026-05",
+      "title": "Решение на административния съд поставя под напрежение класирането за първи клас (bTV)",
+      "url": "https://btvnovinite.bg/bulgaria/reshenie-na-administrativnija-sad-postavja-pod-naprezhenie-klasiraneto-za-parvi-klas-v-sofija.html",
+      "retrieved": "2026-10-14"
+    },
+    {
+      "id": "schedule-2026-press",
+      "title": "Прием в първи клас 2026: срокове (clubz.bg)",
+      "url": "https://clubz.bg/175179",
+      "retrieved": "2026-10-14"
+    },
+    {
+      "id": "vas-2026-05-18",
+      "title": "ВАС, Определение № 5326 от 18.05.2026 г. по адм. дело № 4277/2026",
+      "url": "https://info-adc.justice.bg/courts/portal/edis.nsf/e_act.xsp?code=vas&guid=1274720299&id=2636546",
+      "retrieved": "2026-10-14"
+    }
+  ],
+  "params": {
+    "groups": {
+      "article": "чл. 9, т. 9.1–9.4",
+      "tiers": [
+        {
+          "more_than_years": 3,
+          "group": 1
+        },
+        {
+          "more_than_years": 1,
+          "group": 2
+        },
+        {
+          "group": 3
+        }
+      ],
+      "outside_group": 4,
+      "sibling_group": 1,
+      "sibling_max_age": 12
+    },
+    "extra_points": {
+      "article": "чл. 9, т. 9.5–9.12",
+      "disability_50": 6,
+      "parent_deceased": 6,
+      "sibling_at_school": 4,
+      "preparatory_group_here": 4,
+      "more_than_two_children": 5,
+      "twins": 5,
+      "foster_unknown_adopted": 3,
+      "neighbouring_catchment": 5
+    },
+    "neighbouring_only_in_group": 4,
+    "address_choice": {
+      "article": "чл. 6, ал. 5; чл. 11",
+      "choose_one": true,
+      "locked_after_first_ranking": true
+    },
+    "tiebreak": "random"
+  },
+  "examples": [
+    {
+      "name": "in the catchment for more than three years is group 1; twins and a large family count once",
+      "answers": {
+        "address": {
+          "inCatchment": true,
+          "inNeighbouring": false,
+          "since": "2021-02-01"
+        },
+        "disability50": false,
+        "parentDeceased": false,
+        "moreThanTwoChildren": true,
+        "twins": true,
+        "fosterUnknownAdopted": false
+      },
+      "context": {
+        "siblingUnderAgeAtSchool": false,
+        "siblingAtSchool": false,
+        "preparatoryGroupHere": false
+      },
+      "options": {
+        "measuredOn": "2027-05-31"
+      },
+      "expected": {
+        "group": 1,
+        "points": 5
+      }
+    },
+    {
+      "name": "exactly three years in the catchment is group 2",
+      "answers": {
+        "address": {
+          "inCatchment": true,
+          "inNeighbouring": false,
+          "since": "2024-05-31"
+        },
+        "disability50": false,
+        "parentDeceased": false,
+        "moreThanTwoChildren": false,
+        "twins": false,
+        "fosterUnknownAdopted": false
+      },
+      "context": {
+        "siblingUnderAgeAtSchool": false,
+        "siblingAtSchool": false,
+        "preparatoryGroupHere": true
+      },
+      "options": {
+        "measuredOn": "2027-05-31"
+      },
+      "expected": {
+        "group": 2,
+        "points": 4
+      }
+    },
+    {
+      "name": "exactly one year is group 3, one day more is group 2",
+      "answers": {
+        "address": {
+          "inCatchment": true,
+          "inNeighbouring": false,
+          "since": "2026-05-31"
+        },
+        "disability50": false,
+        "parentDeceased": false,
+        "moreThanTwoChildren": false,
+        "twins": false,
+        "fosterUnknownAdopted": false
+      },
+      "context": {
+        "siblingUnderAgeAtSchool": false,
+        "siblingAtSchool": false,
+        "preparatoryGroupHere": false
+      },
+      "options": {
+        "measuredOn": "2027-05-31"
+      },
+      "expected": {
+        "group": 3,
+        "points": 0
+      }
+    },
+    {
+      "name": "one year and a day is group 2",
+      "answers": {
+        "address": {
+          "inCatchment": true,
+          "inNeighbouring": false,
+          "since": "2026-05-30"
+        },
+        "disability50": false,
+        "parentDeceased": false,
+        "moreThanTwoChildren": false,
+        "twins": false,
+        "fosterUnknownAdopted": false
+      },
+      "context": {
+        "siblingUnderAgeAtSchool": false,
+        "siblingAtSchool": false,
+        "preparatoryGroupHere": false
+      },
+      "options": {
+        "measuredOn": "2027-05-31"
+      },
+      "expected": {
+        "group": 2,
+        "points": 0
+      }
+    },
+    {
+      "name": "outside but in a neighbouring catchment is group 4 with 5 points",
+      "answers": {
+        "address": {
+          "inCatchment": false,
+          "inNeighbouring": true,
+          "since": "2011-01-01"
+        },
+        "disability50": false,
+        "parentDeceased": true,
+        "moreThanTwoChildren": false,
+        "twins": false,
+        "fosterUnknownAdopted": false
+      },
+      "context": {
+        "siblingUnderAgeAtSchool": false,
+        "siblingAtSchool": false,
+        "preparatoryGroupHere": false
+      },
+      "options": {
+        "measuredOn": "2027-05-31"
+      },
+      "expected": {
+        "group": 4,
+        "points": 11
+      }
+    },
+    {
+      "name": "a sibling up to 12 at the school gives group 1 from anywhere; the neighbouring bonus then does not apply",
+      "answers": {
+        "address": {
+          "inCatchment": false,
+          "inNeighbouring": true,
+          "since": "2026-01-01"
+        },
+        "disability50": false,
+        "parentDeceased": false,
+        "moreThanTwoChildren": false,
+        "twins": false,
+        "fosterUnknownAdopted": false
+      },
+      "context": {
+        "siblingUnderAgeAtSchool": true,
+        "siblingAtSchool": true,
+        "preparatoryGroupHere": false
+      },
+      "options": {
+        "measuredOn": "2027-05-31"
+      },
+      "expected": {
+        "group": 1,
+        "points": 4
+      }
+    },
+    {
+      "name": "not sure whether the address is in the catchment spans groups 1 to 4",
+      "answers": {
+        "address": {
+          "inCatchment": null,
+          "inNeighbouring": null,
+          "since": "2016-01-01"
+        },
+        "disability50": false,
+        "parentDeceased": false,
+        "moreThanTwoChildren": false,
+        "twins": false,
+        "fosterUnknownAdopted": false
+      },
+      "context": {
+        "siblingUnderAgeAtSchool": false,
+        "siblingAtSchool": false,
+        "preparatoryGroupHere": false
+      },
+      "options": {
+        "measuredOn": "2027-05-31"
+      },
+      "expected": {
+        "group": {
+          "min": 1,
+          "max": 4
+        },
+        "points": {
+          "min": 0,
+          "max": 5
+        }
+      }
+    }
+  ]
+}

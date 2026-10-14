@@ -56,10 +56,6 @@ BULGARIA_CONFIG = Country(
             "private": "interview_test",
         },
         "grade_scale": {"min": 2, "max": 6},
-        "grade_to_points_table": {
-            "6.00": 50, "5.50": 39, "5.00": 26, "4.50": 18,
-            "4.00": 14, "3.50": 10, "3.00": 7, "2.50": 4, "2.00": 2,
-        },
         "age_calculation_method": "enrollment_year_minus_birth_year",
     },
     map_config={

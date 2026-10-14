@@ -127,18 +127,22 @@ Example: children born Dec 31, 2022 and Jan 1, 2022 both enter the same group in
 
 **Never** use exact birth dates or "age on September 1st" logic. This is a common bug.
 
-### Admission Systems (stored in `admission_info` JSON)
+### Admission Systems
 
-**State kindergartens:** Points system (Бал)
-- Parents get points based on: address, employment, siblings, etc.
-- Historical thresholds per round: `{"year": 2024, "age_group": "first", "rounds": [{"round": 1, "last_admitted_points": 8, "admitted_count": 35}]}`
-- This data comes from kg.sofia.bg
+Rules, calculator and catchments: `docs/ADMISSION_POINTS.md`. Rule sets are JSON files
+with worked examples under `frontend/src/admission/rules/`, evaluated in the browser
+only. Never change a points value without its source and an example.
 
-**State gymnasiums:** NVO score formula
-- `score = NVO Bulgarian + NVO Math + Subject 1 + Subject 2`
-- Historical minimums: `{"year": 2024, "min_score": 196.5}`
+**State kindergartens (Sofia):** one points total (address, district, parents' work,
+siblings, social and SEN criteria, wish order), random number on ties.
+**First grade (municipal schools):** a group 1–4 by catchment and residence, then extra
+points inside the group.
+**Eighth grade:** a score (бал) per class: weighted НВО results plus two certificate
+grades as points (6 = 50, 5 = 39, 4 = 26, 3 = 15), max 500; each class sets its weights.
+**Fifth grade, private schools:** no common system.
 
-**Private schools:** Entry tests/interviews (no standardised system)
+Cut-offs (last admitted points or score per round) come from kg.sofia.bg and RUO
+snapshots, which keep no history of their own; see `docs/ADMISSION_CUTOFFS.md`.
 
 ### Shifts (смени)
 Many state schools run two shifts:

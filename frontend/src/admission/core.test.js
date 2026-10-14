@@ -7,10 +7,10 @@ import {
   campaignForStartYear,
   choiceRankPoints,
   durationTierPoints,
+  isValidSpan,
   flagPoints,
   moreThanYears,
   range,
-  revisionOn,
   ruleVersionKey,
   selectRuleSet,
   statusEventsOn,
@@ -66,38 +66,59 @@ test('choiceRankPoints follows the wish order table', () => {
 })
 
 const SETS = [
-  { id: 'bg/sofia/kindergarten/2025-26', country: 'bg', city: 'sofia', stage: 'kindergarten', campaign: '2025-26' },
-  { id: 'bg/sofia/kindergarten/2026-27', country: 'bg', city: 'sofia', stage: 'kindergarten', campaign: '2026-27',
-    revisions: [{ id: '2026-03-12', in_force_from: '2026-03-19' }, { id: '2026-06-01', in_force_from: '2026-06-10' }],
-    status_events: [{ status: 'suspended', from: '2026-04-14', to: '2026-05-07' }] },
-  { id: 'bg/grade_8/2026-27', country: 'bg', city: null, stage: 'grade_8', campaign: '2026-27' },
+  { id: 'bg/sofia/kindergarten/2025-2026', country: 'bg', city: 'sofia', stage: 'kindergarten', campaign: '2025/2026', verified: { status: 'verified' } },
+  { id: 'bg/sofia/kindergarten/2026-2027', country: 'bg', city: 'sofia', stage: 'kindergarten', campaign: '2026/2027', version: '2026-03-12',
+    verified: { status: 'verified' },
+    status_events: [{ status: 'suspended', from: '2026-04-01', to: '2026-05-07' }] },
+  { id: 'bg/sofia/kindergarten/2027-2028', country: 'bg', city: 'sofia', stage: 'kindergarten', campaign: '2027/2028', verified: { status: 'provisional' } },
+  { id: 'bg/grade_8/2026-2027', country: 'bg', city: null, stage: 'grade_8', campaign: '2026/2027', verified: { status: 'verified' } },
 ]
 
-test('selectRuleSet never carries rules forward silently', () => {
-  const exact = selectRuleSet(SETS, { country: 'bg', city: 'sofia', stage: 'kindergarten', campaign: '2026-27' })
-  assert.equal(exact.ruleSet.campaign, '2026-27')
-  assert.equal(exact.confirmed, true)
+test('selectRuleSet says how far the rules apply and never passes old rules off as current', () => {
+  const exact = selectRuleSet(SETS, { country: 'bg', city: 'sofia', stage: 'kindergarten', campaign: '2026/2027' })
+  assert.equal(exact.ruleSet.campaign, '2026/2027')
+  assert.equal(exact.applies, 'verified')
 
-  const later = selectRuleSet(SETS, { country: 'bg', city: 'sofia', stage: 'kindergarten', campaign: '2027-28' })
-  assert.equal(later.ruleSet.campaign, '2026-27')
-  assert.equal(later.confirmed, false)
+  const provisional = selectRuleSet(SETS, { country: 'bg', city: 'sofia', stage: 'kindergarten', campaign: '2027/2028' })
+  assert.equal(provisional.applies, 'provisional')
 
-  assert.equal(selectRuleSet(SETS, { country: 'bg', city: 'varna', stage: 'kindergarten', campaign: '2026-27' }), null)
-  assert.equal(selectRuleSet(SETS, { country: 'bg', city: 'sofia', stage: 'kindergarten', campaign: '2024-25' }), null)
-  assert.equal(selectRuleSet(SETS, { country: 'bg', city: null, stage: 'grade_8', campaign: '2026-27' }).confirmed, true)
+  const later = selectRuleSet(SETS, { country: 'bg', city: 'sofia', stage: 'kindergarten', campaign: '2028/2029' })
+  assert.equal(later.ruleSet.campaign, '2027/2028')
+  assert.equal(later.applies, 'illustration')
+
+  assert.equal(selectRuleSet(SETS, { country: 'bg', city: 'varna', stage: 'kindergarten', campaign: '2026/2027' }), null)
+  assert.equal(selectRuleSet(SETS, { country: 'bg', city: 'sofia', stage: 'kindergarten', campaign: '2024/2025' }), null)
 })
 
-test('revisionOn and statusEventsOn read the dated history', () => {
+test('selectRuleSet finds national rules for a city', () => {
+  const national = selectRuleSet(SETS, { country: 'bg', city: 'sofia', stage: 'grade_8', campaign: '2026/2027' })
+  assert.equal(national.ruleSet.id, 'bg/grade_8/2026-2027')
+  assert.equal(national.applies, 'verified')
+})
+
+test('statusEventsOn and ruleVersionKey', () => {
   const set = SETS[1]
-  assert.equal(revisionOn(set, '2026-03-18'), null)
-  assert.equal(revisionOn(set, '2026-03-19').id, '2026-03-12')
-  assert.equal(revisionOn(set, '2026-07-01').id, '2026-06-01')
   assert.equal(statusEventsOn(set, '2026-04-20').length, 1)
   assert.equal(statusEventsOn(set, '2026-05-08').length, 0)
-  assert.equal(ruleVersionKey(set, revisionOn(set, '2026-05-22')), 'bg/sofia/kindergarten/2026-27@2026-03-12')
+  assert.equal(ruleVersionKey(set), 'bg/sofia/kindergarten/2026-2027@2026-03-12')
+})
+
+test('impossible, future and leap-day dates', () => {
+  assert.equal(isValidSpan('2026-02-30', '2026-05-22'), false)
+  assert.equal(isValidSpan('2026-06-01', '2026-05-22'), false)
+  assert.equal(isValidSpan('2026-05-22', null), false)
+  // 29 February reaches its anniversary on 1 March in a common year.
+  assert.equal(wholeYearsBetween('2024-02-29', '2027-02-28'), 2)
+  assert.equal(wholeYearsBetween('2024-02-29', '2027-03-01'), 3)
+  assert.equal(moreThanYears('2024-02-29', '2027-03-01', 3), false)
+  assert.equal(moreThanYears('2024-02-29', '2027-03-02', 3), true)
+  const tiers = [{ more_than_years: 3, points: 8 }, { at_least_years: 1, points: 5 }, { points: 3 }]
+  assert.deepEqual(durationTierPoints(tiers, '2026-06-01', '2026-05-22'), range(3, 8))
+  assert.deepEqual(durationTierPoints(tiers, '2020-01-01', null), range(3, 8))
+  assert.deepEqual(durationTierPoints([], '2020-01-01', '2026-05-22'), range(0))
 })
 
 test('campaignForStartYear names the school year', () => {
-  assert.equal(campaignForStartYear(2026), '2026-27')
-  assert.equal(campaignForStartYear(2099), '2099-00')
+  assert.equal(campaignForStartYear(2026), '2026/2027')
+  assert.equal(campaignForStartYear(2099), '2099/2100')
 })
