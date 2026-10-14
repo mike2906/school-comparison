@@ -222,7 +222,8 @@ async def run_social_links(
         else:
             result["outcome"] = "found" if read["links"] else "none"
             if apply:
-                await db.refresh(school, ["attributes"])  # another stage may have written since the read
+                # another stage may have written since the read; the lock waits for one still writing
+                await db.refresh(school, attribute_names=["attributes"], with_for_update=True)
                 school.attributes = {
                     **(school.attributes or {}),
                     ATTRIBUTE_KEY: links_block(read["links"], school.website_url),
@@ -234,7 +235,7 @@ async def run_social_links(
             if entry is reads.get(school_id) or not entry.get("shared"):
                 continue
             school = await db.get(School, school_id)
-            await db.refresh(school, ["attributes"])
+            await db.refresh(school, attribute_names=["attributes"], with_for_update=True)
             block = {k: v for k, v in (school.attributes or {}).get(ATTRIBUTE_KEY, {}).items() if k not in entry["shared"]}
             school.attributes = {**school.attributes, ATTRIBUTE_KEY: block}
         await db.commit()
