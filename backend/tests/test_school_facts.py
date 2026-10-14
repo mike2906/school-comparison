@@ -580,3 +580,10 @@ async def test_admission_labels_reach_the_judge_and_the_store():
         and "Admission grade: 5" in judged
         and "Exam subjects: Математика / Maths" in judged
     )
+
+
+def test_a_malformed_stored_list_is_dropped_not_raised():
+    from app.utils.school_facts import _labels
+
+    labels = _labels({"tags": [["cafeteria"], {"a": 1}, "cafeteria"], "admission": [["x"]], "curricula": [{}]})
+    assert labels["tags"] == ["cafeteria"] and labels["admission"] == [] and labels["curricula"] == []

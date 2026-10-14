@@ -145,8 +145,9 @@ def _labels(fact: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
-def _as_list(value: Any) -> list[Any]:
-    return value if isinstance(value, list) else []
+def _as_list(value: Any) -> list[str]:
+    """The strings of a stored list; anything else (a nested list, a dict) is dropped."""
+    return [item for item in value if isinstance(item, str)] if isinstance(value, list) else []
 
 
 PLACES_SHOWN_DAYS = 180
