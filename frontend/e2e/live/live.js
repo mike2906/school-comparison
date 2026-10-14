@@ -34,8 +34,7 @@ export function t(lang, key, vars = {}) {
 /** `/en` for English, nothing for Bulgarian (the URL decides the language). */
 export const prefix = lang => (lang === 'en' ? '/en' : '')
 
-export const schoolName = (school, lang) =>
-  school.resolved_name_i18n?.[lang] || school.name_i18n?.[lang] || Object.values(school.name_i18n || {})[0] || ''
+export { getAddress as address, getSchoolName as schoolName } from '../../src/utils/i18n.js'
 
 export async function fetchJson(url) {
   const response = await fetch(url, { signal: AbortSignal.timeout(30_000) })
@@ -44,9 +43,9 @@ export async function fetchJson(url) {
 }
 
 let listing
-/** Every published school, as the search page gets them. */
+/** Every published Sofia school, as the search page gets them. */
 export function allSchools() {
-  listing ??= fetchJson(`${API}/schools?country_code=bg&city=all`)
+  listing ??= fetchJson(`${API}/schools?country_code=bg&city=sofia`)
   return listing
 }
 
@@ -63,12 +62,16 @@ export function schoolDetail(id) {
  */
 export async function findSchool(what, test, listTest = () => true, limit = 80) {
   const candidates = (await allSchools()).filter(listTest).slice(0, limit)
-  for (const candidate of candidates) {
-    const detail = await schoolDetail(candidate.id)
-    if (test(detail)) return detail
+  // A few at a time, in list order, so the first match is always the same school.
+  for (let i = 0; i < candidates.length; i += 8) {
+    const batch = await Promise.all(candidates.slice(i, i + 8).map(candidate => schoolDetail(candidate.id)))
+    const found = batch.find(test)
+    if (found) return found
   }
-  throw new Error(`No live school ${what} (checked ${candidates.length})`)
+  throw new NoSchoolError(`No live school ${what} (checked ${candidates.length})`)
 }
+
+export class NoSchoolError extends Error {}
 
 let browser
 export let page

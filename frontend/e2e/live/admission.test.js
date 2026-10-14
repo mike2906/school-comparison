@@ -7,7 +7,8 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { describe, test } from 'node:test'
 
-import { catchmentSchoolFor, indexAddresses, schoolCatchmentIds } from '../../src/admission/catchments.js'
+import { catchmentSchoolFor, catchmentUrl, indexAddresses, schoolCatchmentIds } from '../../src/admission/catchments.js'
+import { CATCHMENT_CAMPAIGNS } from '../../src/admission/loadCatchments.js'
 import { usesSofiaKindergartenSystem } from '../../src/utils/admission.js'
 import { DESKTOP, findSchool, number, open, page, schoolName, t, liveBrowser } from './live.js'
 
@@ -61,8 +62,7 @@ describe('admission calculator', () => {
     await page.getByLabel(g1('since')).first().fill(`${start - 5}-01-15`)
     // An address inside the catchment for years is group 1 (of 1–4, 1 is best).
     const group = page.locator('aside p', { hasText: new RegExp(`^${g1('group')}$`) }).first().locator('xpath=following-sibling::p[1]')
-    await page.waitForFunction(() => document.querySelector('aside p.text-4xl'))
-    assert.equal(number(await group.innerText()), 1)
+    await group.filter({ hasText: /^1$/ }).waitFor()
   })
 
   test('eighth grade: each formula gives the score the rules say', async () => {
@@ -125,12 +125,18 @@ describe('admission from a school page', () => {
   test('a first-grade catchment check names the right area for a real address', async () => {
     const school = await findSchool('with a first-grade catchment', () => true, s => schoolCatchmentIds(s).length > 0)
     const ids = schoolCatchmentIds(school)
-    const table = JSON.parse(await readFile(new URL('../../public/catchments/bg/sofia/2026-2027/addresses.json', import.meta.url)))
-    // A street in this school's catchment with a plain house number, as a parent would type it.
+    // The table the site itself loads (public/ is served at the site root).
+    const tablePath = `../../public${catchmentUrl(CATCHMENT_CAMPAIGNS[0], 'addresses.json')}`
+    const streets = indexAddresses(JSON.parse(await readFile(new URL(tablePath, import.meta.url))))
+    const sameName = new Map()
+    for (const street of streets) sameName.set(street.key, (sameName.get(street.key) || 0) + 1)
+    // A Sofia street in this school's catchment with a plain house number, as a parent
+    // would type it, and a name no other street has, so the suggestion to pick is clear.
     let address
-    for (const street of indexAddresses(table)) {
+    for (const street of streets) {
+      if (street.settlement !== 'ГР.СОФИЯ' || street.key.length <= 4 || sameName.get(street.key) > 1) continue
       const number = [...street.numbers.entries()].find(([n, id]) => ids.includes(id) && /^\d+$/.test(n))?.[0]
-      if (number && street.settlement === 'ГР.СОФИЯ' && street.key.length > 4) {
+      if (number) {
         address = { street, number }
         break
       }
@@ -142,7 +148,9 @@ describe('admission from a school page', () => {
     const area = page.locator('section').filter({ has: page.getByRole('heading', { name: t('bg', 'admissionArea.catchmentTitle') }) })
     await area.locator('.leaflet-container').waitFor()
     await area.getByLabel(t('bg', 'admissionArea.street')).fill(address.street.street.replace(/^[^.]*\./, ''))
-    await area.getByRole('button', { name: new RegExp(`^${address.street.street.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`) }).first().click()
+    // The suggestion is the street, then its district in brackets.
+    const escaped = address.street.street.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    await area.getByRole('button', { name: new RegExp(`^${escaped}( \\(|$)`) }).click()
     await area.getByLabel(t('bg', 'admissionArea.number')).fill(address.number)
     await area.getByText(t('bg', 'admissionArea.verdict.inside')).waitFor()
   })

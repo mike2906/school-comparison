@@ -13,6 +13,8 @@ on:
     branches: [main]
   schedule:
     - cron: "23 6 * * *"
+  push:
+    branches: [agent/live-flows]
   workflow_dispatch:
     inputs:
       site_url:
@@ -26,7 +28,8 @@ on:
 
 concurrency:
   group: live-flows
-  cancel-in-progress: true
+  # Queued, not cancelled: a later deploy or the daily run never drops a deploy's check.
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -64,9 +67,9 @@ jobs:
         env:
           LIVE_SITE_URL: ${{ inputs.site_url || 'https://schooldecider.com' }}
           LIVE_API_URL: ${{ inputs.api_url || 'https://api.schooldecider.com' }}
-        # One retry, so a single slow answer does not page anyone. Each failed flow is an
-        # annotation on the run's page.
-        run: npm run test:live:ci || { echo "Retrying once in 60 seconds."; sleep 60; npm run test:live:ci; }
+        # One retry, so a single slow answer does not page anyone. Each flow that fails the
+        # retry too is an annotation on the run's page.
+        run: npm run test:live || { echo "Retrying once in 60 seconds."; sleep 60; npm run test:live:ci; }
 
       - name: Upload screenshots
         if: failure()

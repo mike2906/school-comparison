@@ -7,7 +7,7 @@
 import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
 
-import { PHONE, allSchools, findSchool, open, page, schoolName, t, liveBrowser } from './live.js'
+import { NoSchoolError, PHONE, address, allSchools, findSchool, open, page, schoolName, t, liveBrowser } from './live.js'
 
 liveBrowser(PHONE)
 
@@ -20,6 +20,7 @@ const planRow = school => (school.pricing || []).find(row => (row.pricing_contex
 describe('finding a school', () => {
   test('search by name, open the school, switch to English', async () => {
     const school = (await allSchools()).find(s => isPrivate(s) && schoolName(s, 'bg').length > 6)
+    assert.ok(school, 'a private school to search for')
     const name = schoolName(school, 'bg')
     await open('bg', '/search')
     // Phones get a shorter box of their own (nameSearch.placeholderShort).
@@ -41,7 +42,10 @@ describe('a school page', () => {
     // facts must still show then.
     const openDays = s => (s.school_facts?.at_a_glance?.open_days || []).length > 0
     const school = await findSchool('with an open day', openDays, isPrivate, 200)
-      .catch(() => findSchool('with facts', s => (s.school_facts?.facts || []).length > 0, isPrivate))
+      .catch(error => {
+        if (!(error instanceof NoSchoolError)) throw error
+        return findSchool('with facts', s => (s.school_facts?.facts || []).length > 0, isPrivate)
+      })
     await open('bg', `/schools/${school.id}`)
     const facts = card(t('bg', 'schoolFacts.title'))
     await facts.waitFor()
@@ -95,13 +99,11 @@ describe('a school page', () => {
 
   test('a school with only an approximate location has no pin but keeps its address', async () => {
     const listed = (await allSchools()).find(s => (s.locations || []).length > 0 && !(s.locations || []).some(hasCoordinates) &&
-      (s.locations || []).some(location => location.address_i18n?.bg || location.resolved_address_i18n?.bg))
+      s.locations.some(location => address(location, 'bg')))
     assert.ok(listed, 'a listed school without a published point')
     await open('bg', `/schools/${listed.id}`)
     await page.getByRole('heading', { name: t('bg', 'schools.locationsAndEnrollment') }).waitFor()
     assert.equal(await page.locator('a[href*="google.com/maps/dir"]').count(), 0, 'no directions to a guessed point')
-    const location = listed.locations.find(l => l.resolved_address_i18n?.bg || l.address_i18n?.bg)
-    const address = location.resolved_address_i18n?.bg || location.address_i18n.bg
-    await page.getByText(address, { exact: false }).first().waitFor()
+    await page.getByText(address(listed.locations.find(location => address(location, 'bg')), 'bg')).first().waitFor()
   })
 })
