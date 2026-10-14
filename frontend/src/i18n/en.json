@@ -72,6 +72,7 @@
   "sorting": {
     "sortBy": "Sort by",
     "distance": "Distance",
+    "driveTime": "Drive time",
     "name": "Name",
     "type": "Type",
     "pricePrivate": "Price (Private only)",
@@ -1076,5 +1077,14 @@
     "calculate": "Calculate your points",
     "quotaScores": "boys {{boys}}, girls {{girls}}",
     "bornIn": "born {{year}}"
+  },
+  "driveTime": {
+    "minutes": "~{{minutes}} min",
+    "aria": "About {{minutes}} minutes by car, leaving around 8:00 on a weekday",
+    "note": "Drive times are estimates for leaving around 8:00 on a weekday.",
+    "attribution": "Roads © OpenStreetMap contributors",
+    "loading": "Working out drive times…",
+    "outside": "Drive times are only available in and around Sofia.",
+    "unavailable": "Drive times could not be loaded."
   }
 }

@@ -55,7 +55,7 @@ def _estimate_usd(message: str) -> float:
     return (len(message) / 3 * in_price + OUTPUT_TOKENS_RESERVE * out_price) / 1_000_000
 
 
-def model_caller(spend: Spend) -> Caller:
+def model_caller(spend: Spend, stage: str = STAGE) -> Caller:
     """One structured call on the stage's tier, within the run's spend cap."""
 
     async def call(prompt: str, schema: type, message: str, school_id: int) -> Any:
@@ -67,7 +67,7 @@ def model_caller(spend: Spend) -> Caller:
         )
         with spend.hold(estimate):
             result = await execute_billable_request(
-                lambda: agent.run(message), model=get_model(TIER), school_id=school_id, stage=STAGE, timeout_seconds=150
+                lambda: agent.run(message), model=get_model(TIER), school_id=school_id, stage=stage, timeout_seconds=150
             )
         spend.spent_usd += extract_provider_cost_usd(result)
         return result.output

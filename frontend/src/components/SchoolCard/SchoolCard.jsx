@@ -7,6 +7,7 @@ import { useCountry } from '../../context/CountryContext'
 import { useCompare } from '../../context/CompareContext'
 import { getSchoolName, getAddress } from '../../utils/i18n'
 import { formatAmount, formatDistance, intlLocale } from '../../utils/format'
+import { rushHourMinutes } from '../../routing/driveTimes'
 import { getStatusInfo } from '../../utils/schoolAttributes'
 import {
   curatedRequirement,
@@ -307,6 +308,7 @@ const SchoolCard = memo(function SchoolCard({
     : distanceValue <= 5
     ? { backgroundColor: 'rgba(245,158,11,0.1)', color: '#d97706' }
     : { backgroundColor: 'rgba(239,68,68,0.1)', color: '#dc2626' }
+  const driveMinutes = rushHourMinutes(school.driveSeconds)
   const statusStyle = statusInfo ? {
     backgroundColor: statusInfo.color,
     boxShadow: `0 0 8px ${hexToRgba(statusInfo.color, 0.4)}`,
@@ -395,14 +397,27 @@ const SchoolCard = memo(function SchoolCard({
             {schoolName}
           </h3>
         </div>
-        {distanceLabel && (
-          <span
-            className="inline-flex flex-shrink-0 items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full"
-            style={distanceStyle}
-            aria-label={t('schoolCard.aria.distance', { distance: distanceLabel })}
-          >
-            📍 {distanceLabel}
-          </span>
+        {(distanceLabel || driveMinutes != null) && (
+          <div className="flex flex-shrink-0 flex-col items-end gap-1">
+            {distanceLabel && (
+              <span
+                className="inline-flex flex-shrink-0 items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full"
+                style={distanceStyle}
+                aria-label={t('schoolCard.aria.distance', { distance: distanceLabel })}
+              >
+                📍 {distanceLabel}
+              </span>
+            )}
+            {driveMinutes != null && (
+              <span
+                className="inline-flex flex-shrink-0 items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-700"
+                aria-label={t('driveTime.aria', { minutes: driveMinutes })}
+                title={t('driveTime.aria', { minutes: driveMinutes })}
+              >
+                🚗 {t('driveTime.minutes', { minutes: driveMinutes })}
+              </span>
+            )}
+          </div>
         )}
       </div>
 

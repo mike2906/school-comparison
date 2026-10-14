@@ -100,6 +100,7 @@ use `pip install` or `requirements.txt`.
 │   └── src/              # components/, i18n/, api/, utils/
 ├── skills/               # Task procedures (index below)
 ├── docs/                 # Plans and design notes (GO_LIVE_PLAN.md)
+├── tools/road-graph/     # OSM → car road graph for in-browser drive times (docs/DRIVE_TIMES.md)
 └── docker-compose.yml    # PostgreSQL + SearXNG
 ```
 

@@ -88,3 +88,7 @@ infra/.terraform/
 
 # UI scan output (frontend/scripts/ui-scan.js)
 frontend/ui-scan-report/
+frontend/live-flows-report/
+
+# Road graph: fetched from the road-graph release at deploy time (docs/DRIVE_TIMES.md)
+frontend/public/routing/
