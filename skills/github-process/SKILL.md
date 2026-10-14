@@ -73,6 +73,10 @@ While the site has no users, agents may change the launch DB and publish without
   then check the live API against the launch DB.
 - Report each write and publish to Mike: what changed, why, the backup path, the dump
   name and the before/after counts. A diff you cannot explain is not published.
+- The hourly cut-off publish (`backend/scripts/publish_cutoffs.sh`, Mike chose to automate
+  it on 2026-10-14) runs these steps itself and reports only through its log and a GitHub
+  issue when it stops. Agents publishing by hand use `publish_snapshot.sh`, which shares
+  its lock.
 - Provider spend stays under $0.50 a run unless Mike agreed a bigger run.
 
 ## Commit / PR conventions

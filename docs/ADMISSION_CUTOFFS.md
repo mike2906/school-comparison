@@ -81,7 +81,28 @@ rows, trimmed; detail and compare responses only), `cutoff_summary` (per stage x
 or class x building: the general-queue first and latest round of the latest campaign; also
 on list responses), `kg_sofia_ids` and `admin_district`. (First-grade `catchment_ids`
 come from `scripts/match_sofia_catchments.py`, see `ADMISSION_POINTS.md`.) It prints unmatched
-institutions. Dry run by default; then publish as usual.
+institutions. Dry run by default; then publish as usual. `--max-unmatched N` makes
+`--apply` write nothing when more institutions are unmatched; `--summary-json` saves the
+summary.
+
+### Publishing new rounds
+
+`backend/scripts/publish_cutoffs.sh` runs hourly from cron on the machine with the launch
+DB. When the `cutoff-data` branch has moved and the dry run changes something, it takes the
+publish lock, checks that at most 5 institutions are unmatched and the archive has not
+shrunk, takes a `pg_dump` backup, applies, publishes with `publish_snapshot.sh` and checks
+that the live list shows as many schools with cut-offs as the launch DB. If a check fails it
+stops without writing and opens one GitHub issue, "Automatic cut-off publish stopped".
+State and log: `~/.local/state/schooldecider/`. Setup (WSL needs cron running, e.g. systemd
+enabled in `/etc/wsl.conf`):
+
+```
+PATH=/home/mike2906/.local/bin:/usr/local/bin:/usr/bin:/bin
+40 * * * * /home/mike2906/sofiaschoolcomparison/backend/scripts/publish_cutoffs.sh
+```
+
+It needs `~/cutoff-archive` (a worktree of `cutoff-data`), the launch DB container,
+`gh` signed in, and the backup credentials of `backup_offsite.sh`.
 
 ## Reading cut-offs honestly
 

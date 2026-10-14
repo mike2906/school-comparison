@@ -156,6 +156,9 @@ once the environment secret is set (`gh secret delete <NAME>`).
 Production holds a copy of the launch DB. Changes there (imports, corrections, merges)
 reach the site only when a new snapshot is loaded on the host.
 
+`backend/scripts/publish_snapshot.sh` does both steps below and waits for the run, under a
+machine-wide lock so two publishes never overlap; use it unless you need the steps apart.
+
 1. **Upload the launch DB** (local machine, repository root). The last lines name the dump:
    ```bash
    backend/scripts/backup_offsite.sh

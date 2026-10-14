@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import json
 import sys
 from collections import Counter
 from pathlib import Path
@@ -87,7 +88,7 @@ def apply_to_school(school: Any, keys: dict[str, Any]) -> bool:
     return True
 
 
-async def run(archive: Path, apply: bool) -> dict[str, Any]:
+async def run(archive: Path, apply: bool, max_unmatched: int | None = None) -> dict[str, Any]:
     rows = list(iter_rows(archive))
     async with async_session_maker() as db:
         schools = list((await db.execute(select(School).where(School.country_code == "bg"))).scalars())
@@ -110,7 +111,8 @@ async def run(archive: Path, apply: bool) -> dict[str, Any]:
             keys = derived_admission_keys(by_school.get(school.id, []))
             if apply_to_school(school, keys):
                 changed += 1
-        if apply:
+        refused = apply and max_unmatched is not None and len(unmatched) > max_unmatched
+        if apply and not refused:
             await db.commit()
         else:
             await db.rollback()
@@ -122,7 +124,7 @@ async def run(archive: Path, apply: bool) -> dict[str, Any]:
         "schools_changed": changed,
         "unmatched_institutions": len(unmatched),
         "unmatched_by_stage": dict(unmatched_by_stage),
-        "applied": apply,
+        "applied": apply and not refused,
     }
     print(summary)
     for (stage, source_id, name), count in sorted(unmatched.items()):
@@ -134,8 +136,14 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--archive", type=Path, required=True, help="checkout of the cutoff-data branch")
     parser.add_argument("--apply", action="store_true", help="write the changes (default: dry run)")
+    parser.add_argument("--max-unmatched", type=int, help="with --apply, write nothing if more institutions are unmatched")
+    parser.add_argument("--summary-json", type=Path, help="also write the summary here")
     args = parser.parse_args()
-    asyncio.run(run(args.archive, args.apply))
+    summary = asyncio.run(run(args.archive, args.apply, args.max_unmatched))
+    if args.summary_json:
+        args.summary_json.write_text(json.dumps(summary) + "\n", encoding="utf-8")
+    if args.apply and not summary["applied"]:
+        sys.exit(f"not applied: {summary['unmatched_institutions']} unmatched institutions > --max-unmatched {args.max_unmatched}")
 
 
 if __name__ == "__main__":
