@@ -23,8 +23,6 @@ from app.scrapers.shared_site_check import registrable_domain, site_id
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_WORKERS = 4
-
 Work = Callable[[AsyncSession, int], Awaitable[dict[str, Any]]]
 
 

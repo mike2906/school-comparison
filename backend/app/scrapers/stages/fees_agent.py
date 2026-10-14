@@ -16,7 +16,7 @@ import logging
 import re
 from collections.abc import Awaitable, Callable, Iterable, Sequence
 from contextlib import contextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, Optional
@@ -135,21 +135,6 @@ class PageRead:
     text: str
     prices: bool
     note: Optional[str] = None
-
-
-@dataclass
-class SiteCache:
-    """One school's fetched pages, shared by the finders of one site read (``site-agents``):
-    a page both link pickers choose, and the home page, are fetched once. Keyed by the exact
-    URL (``page_key`` folds case and ``www``, which can be different pages); a failed or
-    empty fetch is not kept, so the next finder tries again. Each finder keeps its own
-    queue, limits and WordPress state."""
-
-    pages: dict[str, Any] = field(default_factory=dict)  # URL -> _fetch result
-    wordpress: dict[str, Optional[str]] = field(default_factory=dict)  # final URL -> API text
-    robots: Any = None
-    fetches: int = 0  # pages fetched, failures included
-    hits: int = 0  # pages served from the cache
 
 
 Finder = Callable[[School], Awaitable[list[PageRead]]]
@@ -286,17 +271,14 @@ async def find_pages(
     fallback_links: re.Pattern = _FEE_LINK_RE,
     stage: str = STAGE,
     read_pictures: bool = False,
-    cache: Optional[SiteCache] = None,
 ) -> list[PageRead]:
     """Up to 3 hops and 12 pages from the home page; robots.txt is respected.
 
     With ``read_pictures``, up to 4 pictures named for fees are read as pages of their own.
-    The school-facts stage passes its own link prompt, fallback keywords and stage name.
-    A ``cache`` shared with another finder of the same school serves pages it fetched."""
+    The school-facts stage passes its own link prompt, fallback keywords and stage name."""
     from crawl4ai.utils import RobotsParser  # type: ignore
 
-    cache = cache or SiteCache()
-    robots = cache.robots = cache.robots or RobotsParser()
+    robots = RobotsParser()
     wordpress = True  # until the API is found missing
     site = school.website_url
     read: list[PageRead] = []
@@ -321,17 +303,10 @@ async def find_pages(
                 read.append(PageRead(url, "", False, "robots.txt"))
                 continue
             try:
-                fetched = cache.pages.get(url)
-                cache.hits += fetched is not None
-                if fetched is None:
-                    cache.fetches += 1
-                    fetched = await _fetch(crawler, run_config, client, url)
+                final, text, page_links, page_pictures = await _fetch(crawler, run_config, client, url)
             except Exception as exc:  # a failed page is recorded and skipped
                 read.append(PageRead(url, "", False, str(exc)[:120]))
                 continue
-            if fetched[1].strip():  # an empty render is not kept: the next finder tries again
-                cache.pages[url] = fetched
-            final, text, page_links, page_pictures = fetched
             if page_key(final) != page_key(url) and page_key(final) in seen:
                 continue  # a second link to a page already read (often a percent-encoded redirect)
             seen.add(page_key(final))
@@ -342,9 +317,7 @@ async def find_pages(
                 and len(text.strip()) < THIN_PAGE_CHARS
                 and await robots.can_fetch(_wordpress_api(final)[0], CRAWLER_USER_AGENT)
             ):
-                if final not in cache.wordpress:
-                    cache.wordpress[final] = await _wordpress_text(client, final)
-                api_text = cache.wordpress[final]
+                api_text = await _wordpress_text(client, final)
                 wordpress = api_text is not None
                 text = api_text or text
             read.append(PageRead(final, text, bool(_PRICE_RE.search(text))))
@@ -1096,9 +1069,8 @@ async def run_fees_agent(
 ) -> dict[str, Any]:
     """Run the agent over private and international schools with a website; returns the report.
 
-    ``workers`` schools are read at a time, each with its own session; with more than one,
-    lines are appended as schools finish, not in id order, so resume with ``after_id`` only
-    from an id below which every school has a line.
+    ``workers`` schools are read at a time, each with its own session; lines are still
+    appended in id order, so ``after_id`` with the last line's id skips no school.
 
     ``after_id`` starts after that school, to carry on a run that stopped. ``lines_path`` gets
     each school's report appended as one JSON line as soon as it is done, so a killed run

@@ -333,47 +333,6 @@ def test_this_years_pages_take_a_year_suffix():
     assert not pattern.search(f"{start}/{start + 1}0")
 
 
-async def test_a_shared_cache_serves_the_second_finder_without_fetching_again(monkeypatch):
-    fees = "https://meridian22.org/taksi"
-    about = "https://meridian22.org/za-nas"
-    crawler = _Crawler(
-        {
-            HOME: [("Начало " + "x" * 300, [(fees, "Такси"), (about, "За нас")])],
-            fees: [("Такса 500 лв. " + "x" * 300, [])],
-            about: [("За училището " + "x" * 300, [])],
-        }
-    )
-    cache = fees_agent.SiteCache()
-    monkeypatch.setattr(fees_agent, "_pick", _picks([about, fees]))
-    first = await fees_agent.find_pages(crawler, None, _Client(), _school(), Spend(0.05), cache=cache)
-    monkeypatch.setattr(fees_agent, "_pick", _picks([fees]))
-    second = await fees_agent.find_pages(crawler, None, _Client(), _school(), Spend(0.05), cache=cache)
-    assert crawler.calls == [HOME, about, fees]  # each page rendered once
-    assert [p.url for p in second] == [HOME, fees]
-    assert [(p.text, p.prices) for p in second] == [(p.text, p.prices) for p in first if p.url != about]
-
-
-async def test_a_failed_page_is_not_cached_so_the_second_finder_tries_again(monkeypatch):
-    broken = "https://meridian22.org/taksi"
-    crawler = _Crawler({HOME: [("Начало " + "x" * 300, [(broken, "Такси")])]})
-    tries = []
-
-    async def fetch(crawler_, run_config, client, url):
-        if url == broken:
-            tries.append(url)
-            raise TimeoutError("slow site")
-        return await original(crawler_, run_config, client, url)
-
-    original = fees_agent._fetch
-    monkeypatch.setattr(fees_agent, "_fetch", fetch)
-    monkeypatch.setattr(fees_agent, "_pick", _picks([broken]))
-    cache = fees_agent.SiteCache()
-    await fees_agent.find_pages(crawler, None, _Client(), _school(), Spend(0.05), cache=cache)
-    second = await fees_agent.find_pages(crawler, None, _Client(), _school(), Spend(0.05), cache=cache)
-    assert crawler.calls == [HOME] and tries == [broken, broken]
-    assert second[-1].url == broken and second[-1].note == "slow site"
-
-
 def test_calls_in_flight_count_against_the_cap():
     spend = Spend(0.10)
     with spend.hold(0.06):

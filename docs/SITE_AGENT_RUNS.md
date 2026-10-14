@@ -23,7 +23,7 @@ the calls are a large part of each school's time.
 ### 1. Schools in parallel (both stages)
 
 - `stages/school_pool.py` runs one coroutine per school, `--workers N` at a time
-  (CLI default 4; 1 keeps the old loop and the caller's session), each worker with its
+  (CLI default 8; 1 keeps the old loop and the caller's session), each worker with its
   own `AsyncSession` (one session is not safe across tasks). One crawl4ai browser and one
   httpx client are shared by the workers; crawl4ai 0.9.4 gives concurrent `arun` calls
   their own pages (they share a browser context, so cookies, which do not matter across
@@ -72,30 +72,13 @@ the calls are a large part of each school's time.
   pending.
 - The two agents pass `max_in_flight=workers`; nothing else changes.
 
-### 3. One crawl for both readers (`site-agents` command)
+### 3. One crawl for both readers: tried and dropped
 
-- A per-school page cache shared by the two finders: `find_pages` gets an optional
-  `cache` (`SiteCache`) that keeps a page's fetch (final URL, text, links, pictures) and
-  its WordPress API text by exact URL (`page_key` folds case and `www`, which can be
-  different pages), and shares one robots.txt parser. A failed or empty fetch is not
-  kept, so the second finder tries again. Each finder keeps its own queue, page limit,
-  pictures and WordPress state, so it reads what it would on its own, give or take the
-  site changing between the two reads of a separate run. Each school's report gives
-  `fetches` and `fetches_saved` (pages served from the cache), the number that decides
-  whether `site-agents` stays.
-- Each agent stops the run as it does on its own: facts on any provider-cost error, fees
-  only on a cap (an unattributed fee read is that school's error).
-- School selection is the union of the two stages': facts for a website URL validation
-  accepted, fees for any private or international school with a website.
-- `site-agents` runs, per school, the facts finder and reader, then (private and
-  international schools only) the fees finder and reader on the same cache, each with its
-  own link prompt, its own reader and its own write path. Their prompts, checks and
-  outputs are untouched.
-- What it saves: the home page and any page both pickers choose (often admissions) are
-  fetched once. It does not save model calls; the link picks stay separate because the
-  two readers need different pages and the fee pages passed validation with their own
-  picker. Crawling is free, so the gain is time and fewer hits on school sites, not money.
-- `fees-agent` and `school-facts` stay as they are for single-agent runs.
+A `site-agents` command that ran both finders on one per-school page cache was built and
+measured (below): it saved 19 of 137 page fetches (14%) on the private schools and nothing
+on state schools, and no model calls. With schools in parallel that is a few seconds per
+private school, not worth a third command and a cache. Removed before merge; the two
+stages stay separate.
 
 ## Not in this change
 
@@ -109,19 +92,26 @@ the calls are a large part of each school's time.
 Codex (read-only, on Mike's PC) agreed with parallel schools and challenged the rest.
 Taken: the overshoot bound above was wrong and is now stated as N x excess; the
 `discover_pages_many` precedent was wrong (it opens a crawler per site); schools sharing a
-site now go to one worker; the cache uses exact URLs and does not keep failures; the
-Stage 6 lost-update race is fixed; the combined selection is the union. Not taken: a
+site now go to one worker; the
+Stage 6 lost-update race is fixed. Not taken: a
 crawler per worker (four browsers on a laptop; a shared one is what crawl4ai supports).
-Open: Codex would measure separate parallel stages before keeping `site-agents`. The
-copy-DB dry run below measures that, and `site-agents` is dropped if the shared pages
-are few.
+Codex would measure separate parallel stages before keeping `site-agents`; the
+measurement below agreed, and it was dropped.
 
-## Test plan
+## Measurement (2026-10-14, Mike's PC, copy of the launch DB, dry runs, $0.23)
 
-- Unit tests: the semaphore keeps the reservation order and cap; the worker pool stops on
-  a cap; each worker uses its own session; the cache serves a second finder without a
-  second fetch.
-- On a copy of the launch DB on Mike's PC, after the live runs finish: dry runs on ~10
-  schools (mostly private): `school-facts` and `fees-agent` with `--workers 1` and 4, and
-  `site-agents --workers 4`, comparing time, pages fetched (the overlap), and pages,
-  facts and fees per school. Spend: a few cents.
+12 Sofia schools (8 private or international, 4 state), 8 cores, 16 GB RAM:
+
+| run | wall time | spend | system RAM peak (2.55 GB idle) | errors |
+|---|---|---|---|---|
+| school-facts, 1 worker | 12:40 | $0.076 | 3.37 GB | 0 |
+| school-facts, 8 workers | 2:53 | $0.056 | 3.58 GB | 0 |
+| site-agents, 8 workers ($0.14 cap) | 3:20 (9 schools) | $0.095 | 3.51 GB | 0 |
+
+- 8 workers: 4.4x faster, same 12 pages per school with identical URLs; facts kept vary
+  run to run as the model does. Memory and CPU are not the limit at 8, so 8 is the default.
+- The cap stops a run early by up to N in-flight estimates: the $0.14 site-agents run
+  stopped at $0.07 counted, $0.095 real, because 8 calls in flight were held at their
+  full-output estimates. On a city run ($2 to $4 caps) that is ~2%; a short test run
+  needs a cap a few times its expected spend.
+- Shared crawl: 19 of 137 fetches saved (above).
