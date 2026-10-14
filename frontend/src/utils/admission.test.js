@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
   classifyAdmissionRequirement,
+  hasDisplayableAdmissionInfo,
   curatedRequirement,
   getAdmissionRequirement,
   getLastAdmittedPoints,
@@ -157,4 +158,10 @@ test('minimum NVO score is the latest year, and the history is newest first', ()
   assert.deepEqual(getMinNvoScores(gymnasium).map(item => item.year), [2025, 2024, 2023])
   assert.equal(getMinNvoScore({ historical_min_scores: [] }), null)
   assert.deepEqual(getMinNvoScores(null), [])
+})
+
+test('hasDisplayableAdmissionInfo ignores the keys the cut-off import adds for the calculator', () => {
+  assert.equal(hasDisplayableAdmissionInfo({ catchment_ids: { 'bg-sofia-gis': ['1'] }, kg_sofia_ids: ['1'], admin_district: 'Младост', cutoffs: [], cutoff_summary: [] }), false)
+  assert.equal(hasDisplayableAdmissionInfo({ status: 'accepting', catchment_ids: {} }), true)
+  assert.equal(hasDisplayableAdmissionInfo(null), false)
 })

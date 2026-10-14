@@ -3,7 +3,9 @@ name: Capture admission cut-offs
 # Saves each Sofia ИСОДЗ round (kindergarten, nursery, ПГУ, first grade) as aggregate rows
 # on the cutoff-data branch. kg.sofia.bg keeps only the current school year online, so a
 # round missed here is gone. Lists come out at about 17:00 Sofia time on round days; the
-# 03:15 run finishes a scan that hit its request budget. Docs: docs/ADMISSION_CUTOFFS.md
+# 03:15 run finishes a scan that hit its request budget. It also archives any РУО 8th-grade
+# min/max file listed in ruo_sofia_min_max_sources.json and not yet captured.
+# Docs: docs/ADMISSION_CUTOFFS.md
 on:
   schedule:
     - cron: "15 3,16,21 * * *"
@@ -57,6 +59,12 @@ jobs:
           --max-requests 4500
           ${{ inputs.force && '--force' || '' }}
 
+      - name: Capture 8th-grade min/max files
+        if: always()
+        working-directory: backend
+        timeout-minutes: 10
+        run: uv run python -m scripts.capture_ruo_min_max --archive ../cutoff-archive
+
       - name: Commit the archive
         if: always()
         working-directory: cutoff-archive
@@ -67,5 +75,5 @@ jobs:
             exit 0
           fi
           git -c user.name="cut-off capture" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
-            commit -q -m "Capture ИСОДЗ rounds $(date -u +%Y-%m-%dT%H:%MZ)"
+            commit -q -m "Capture admission rounds $(date -u +%Y-%m-%dT%H:%MZ)"
           git push origin HEAD:cutoff-data

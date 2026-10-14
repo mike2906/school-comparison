@@ -54,7 +54,32 @@ countries are new folders; a new source only has to emit the same rows.
 | undersubscribed | nobody who applied was turned away |
 | source_url, retrieved_at | the exact list and when we read it |
 
-8th-grade rows (РУО) add `class_code`, `class_name`, `min_score`, `max_score`.
+8th-grade rows (РУО, `source` = `ruo-sofia-grad`, `source_id` = the school's НЕИСПУО code)
+add `class_code` (4 digits up to 2025, 5 from 2026; unique within a year only),
+`class_name`, `min_score`, `max_score` (overall), and `quota` with `min_score_boys` /
+`min_score_girls` for classes admitted by quota. Each справка covers only the children
+admitted in that round, so round 2-4 scores are often lower than round 1, and a class with
+nobody admitted in a round has no row.
+
+## 8th grade sources
+
+`app/scrapers/sources/bg/ruo_sofia_min_max_sources.json` lists every known file (2022–2026;
+2022 round 4 and 2023 round 3 are lost). The capture workflow downloads any listed file not
+yet archived. **Each July–August the new year's four files must be added to that list**: the
+РУО post pages are behind a Cloudflare check, so the file URLs are found by opening the posts
+under `ruo.mon.bg/sofia-grad/ucheniczi/priem-na-ucheniczi/priem-v-8-klas/` in a browser; the
+files themselves download directly.
+
+## Into the site
+
+`backend/scripts/import_cutoffs.py --archive <checkout of cutoff-data> [--apply]` matches rows
+to schools (kg.sofia.bg ids via `attributes.kg_sofia_id(s)`, РУО rows via
+`schools.institutional_id`) and rewrites only derived `admission_info` keys: `cutoffs` (all
+rows, trimmed; detail and compare responses only), `cutoff_summary` (per stage x age group
+or class x building: the general-queue first and latest round of the latest campaign; also
+on list responses), `kg_sofia_ids`, `admin_district`, and `catchment_ids`
+(`{"bg-sofia-gis": [...]}` from `attributes.kg_sofia_esri_id(s)`). It prints unmatched
+institutions. Dry run by default; then publish as usual.
 
 ## Reading cut-offs honestly
 

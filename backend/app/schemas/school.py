@@ -1,6 +1,6 @@
 from datetime import datetime
 from functools import cached_property
-from typing import Any, Literal, Optional, Union
+from typing import Any, ClassVar, Literal, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, computed_field, field_validator
 
@@ -110,8 +110,19 @@ class SchoolAdmissionInfo(BaseModel):
     historical_thresholds: list[dict[str, JsonValue]] = Field(default_factory=list)
     min_score: Optional[JsonValue] = None
     historical_min_scores: list[dict[str, JsonValue]] = Field(default_factory=list)
+    # Official round cut-offs, derived from the archive by scripts/import_cutoffs.py
+    # (docs/ADMISSION_CUTOFFS.md). Aggregates only; `cutoffs` stays off list responses.
+    cutoffs: list[dict[str, JsonValue]] = Field(default_factory=list)
+    cutoff_summary: list[dict[str, JsonValue]] = Field(default_factory=list)
+    kg_sofia_ids: list[str] = Field(default_factory=list)
+    admin_district: Optional[str] = None
+    catchment_ids: dict[str, list[str]] = Field(default_factory=dict)
 
     model_config = ConfigDict(extra="ignore")
+
+
+# Full round history is detail/compare-only: a school collects hundreds of rows a year.
+LIST_RESPONSE_ADMISSION_EXCLUDE = frozenset({"cutoffs"})
 
 
 class SchoolAttributesMixin(BaseModel):
@@ -171,12 +182,16 @@ class SchoolAttributesMixin(BaseModel):
             for locale, values in localized.items()
         }
 
+    # Keys of the public admission payload this response leaves out.
+    admission_exclude: ClassVar[frozenset[str]] = frozenset()
+
     @computed_field(return_type=Optional[dict[str, JsonValue]])
     @property
     def admission_info(self) -> Optional[dict[str, JsonValue]]:
         if not isinstance(self.raw_admission_info, dict):
             return None
-        public = SchoolAdmissionInfo.model_validate(self.raw_admission_info)
+        raw = {key: value for key, value in self.raw_admission_info.items() if key not in self.admission_exclude}
+        public = SchoolAdmissionInfo.model_validate(raw)
         payload = public.model_dump(mode="json", exclude_none=True, exclude_defaults=True)
         return payload or None
 
@@ -547,6 +562,8 @@ class SchoolDetailResponse(SchoolResponse):
 
 
 class SchoolListResponse(SchoolPricingMixin):
+    admission_exclude: ClassVar[frozenset[str]] = LIST_RESPONSE_ADMISSION_EXCLUDE
+
     id: int
     country_code: str = "bg"
     name_i18n: dict
