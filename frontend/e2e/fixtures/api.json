@@ -333,7 +333,6 @@
           "is_primary": true,
           "id": 1,
           "school_id": 1,
-          "coordinates_approximate": false,
           "location_tags": [],
           "resolved_address_i18n": {
             "bg": "ул. Кричим 25, Лозенец, София",
@@ -496,7 +495,6 @@
           "is_primary": true,
           "id": 2,
           "school_id": 2,
-          "coordinates_approximate": false,
           "location_tags": [],
           "resolved_address_i18n": {
             "bg": "ул. Цар Иван Асен II 42, Център, София",
@@ -632,7 +630,6 @@
           "is_primary": true,
           "id": 3,
           "school_id": 3,
-          "coordinates_approximate": false,
           "location_tags": [],
           "resolved_address_i18n": {
             "bg": "кв. Младост, София",
@@ -744,7 +741,6 @@
           "is_primary": true,
           "id": 22,
           "school_id": 21,
-          "coordinates_approximate": false,
           "location_tags": [],
           "resolved_address_i18n": {
             "bg": "кв. Красно село, София",
@@ -868,7 +864,6 @@
           "is_primary": true,
           "id": 23,
           "school_id": 22,
-          "coordinates_approximate": false,
           "location_tags": [],
           "resolved_address_i18n": {
             "bg": "кв. Лозенец, София",
@@ -986,7 +981,6 @@
           "is_primary": true,
           "id": 40,
           "school_id": 39,
-          "coordinates_approximate": false,
           "location_tags": [],
           "resolved_address_i18n": {
             "bg": "ул. Панайот Волов 27, Лозенец, София",
@@ -1014,7 +1008,6 @@
           "is_primary": false,
           "id": 41,
           "school_id": 39,
-          "coordinates_approximate": false,
           "location_tags": [],
           "resolved_address_i18n": {
             "bg": "ул. Чипровци 1, Лозенец, София",
@@ -1121,7 +1114,6 @@
           "is_primary": true,
           "id": 42,
           "school_id": 40,
-          "coordinates_approximate": false,
           "location_tags": [],
           "resolved_address_i18n": {
             "bg": "ул. Ген. Гурко 18, Център, София",
@@ -1232,7 +1224,6 @@
           "is_primary": true,
           "id": 61,
           "school_id": 56,
-          "coordinates_approximate": false,
           "location_tags": [],
           "resolved_address_i18n": {
             "bg": "ул. Николай Хайтов 12, Дианабад, София",
@@ -1367,7 +1358,6 @@
           "is_primary": true,
           "id": 66,
           "school_id": 61,
-          "coordinates_approximate": false,
           "location_tags": [],
           "resolved_address_i18n": {
             "bg": "кв. Дружба 2, София",
@@ -1535,7 +1525,6 @@
           "is_primary": true,
           "id": 67,
           "school_id": 62,
-          "coordinates_approximate": false,
           "location_tags": [],
           "resolved_address_i18n": {
             "bg": "кв. Студентски град, София",
@@ -1703,7 +1692,6 @@
           "is_primary": true,
           "id": 74,
           "school_id": 69,
-          "coordinates_approximate": false,
           "location_tags": [],
           "resolved_address_i18n": {
             "bg": "ул. Симеоновско шосе 12, Симеоново, София",
@@ -1737,7 +1725,6 @@
           "is_primary": false,
           "id": 75,
           "school_id": 69,
-          "coordinates_approximate": false,
           "location_tags": [],
           "resolved_address_i18n": {
             "bg": "бул. Черни връх 61, Симеоново, София",
@@ -1899,7 +1886,6 @@
           "is_primary": true,
           "id": 81,
           "school_id": 75,
-          "coordinates_approximate": false,
           "location_tags": [],
           "resolved_address_i18n": {
             "bg": "кв. Надежда, София",
@@ -2079,7 +2065,6 @@
           "is_primary": true,
           "id": 93,
           "school_id": 87,
-          "coordinates_approximate": false,
           "location_tags": [],
           "resolved_address_i18n": {
             "bg": "ул. Коста Лулчев 13, Симеоново, София",
@@ -2202,7 +2187,6 @@
           "is_primary": true,
           "id": 100,
           "school_id": 94,
-          "coordinates_approximate": false,
           "location_tags": [],
           "resolved_address_i18n": {
             "bg": "кв. Център, София",
@@ -2414,7 +2398,6 @@
           "is_primary": true,
           "id": 101,
           "school_id": 95,
-          "coordinates_approximate": false,
           "location_tags": [],
           "resolved_address_i18n": {
             "bg": "кв. Център, София",
@@ -2632,7 +2615,6 @@
         "is_primary": true,
         "id": 101,
         "school_id": 95,
-        "coordinates_approximate": false,
         "location_tags": [],
         "resolved_address_i18n": {
           "bg": "кв. Център, София",
@@ -2928,7 +2910,6 @@
           "is_primary": true,
           "id": 74,
           "school_id": 69,
-          "coordinates_approximate": false,
           "location_tags": [],
           "resolved_address_i18n": {
             "bg": "ул. Симеоновско шосе 12, Симеоново, София",
@@ -2962,7 +2943,6 @@
           "is_primary": false,
           "id": 75,
           "school_id": 69,
-          "coordinates_approximate": false,
           "location_tags": [],
           "resolved_address_i18n": {
             "bg": "бул. Черни връх 61, Симеоново, София",

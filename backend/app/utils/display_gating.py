@@ -34,6 +34,10 @@ PRICING_CONFIDENCE_FLOOR = 0.7
 # it describes those few pupils, not the school.
 NVO_MIN_PUPILS = 5
 
+# A location whose ``geocode_meta.precision`` is this has no published pin: the point is a
+# street- or area-level guess. The schema withholds it; same-place grouping skips it.
+UNVERIFIED_PIN_PRECISION = "approximate"
+
 _CURRENCY_RE = re.compile(r"^[A-Z]{3}$")
 _PRICE_PERIODS = {"monthly", "yearly", "one_time", "quarter", "term", "semester"}
 

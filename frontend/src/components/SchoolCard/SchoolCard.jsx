@@ -298,7 +298,7 @@ const SchoolCard = memo(function SchoolCard({
   const distanceValue = typeof school.distance === 'number' ? school.distance : null
   // Only a known distance is shown; the list header prompts for a location once instead.
   const distanceLabel = distanceValue != null
-    ? formatDistance(distanceValue, { approximate: school.distanceApproximate, language: i18n.language, t })
+    ? formatDistance(distanceValue, { language: i18n.language, t })
     : null
   const distanceStyle = distanceValue == null
     ? { backgroundColor: '#f3f4f6', color: '#6b7280' }
@@ -399,10 +399,7 @@ const SchoolCard = memo(function SchoolCard({
           <span
             className="inline-flex flex-shrink-0 items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full"
             style={distanceStyle}
-            aria-label={t(
-              school.distanceApproximate ? 'schoolCard.aria.distanceApprox' : 'schoolCard.aria.distance',
-              { distance: formatDistance(distanceValue, { language: i18n.language, t }) },
-            )}
+            aria-label={t('schoolCard.aria.distance', { distance: distanceLabel })}
           >
             📍 {distanceLabel}
           </span>

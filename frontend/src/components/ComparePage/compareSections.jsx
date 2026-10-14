@@ -265,7 +265,7 @@ export function buildCompareSections({
           return distance != null
             ? (
               <span className="text-sm text-neutral-700">
-                {formatDistance(distance, { approximate: metrics.distanceApproximate, language: language, t })}
+                {formatDistance(distance, { language: language, t })}
               </span>
             )
             : renderPlaceholder()
@@ -647,7 +647,7 @@ export function buildCompareSections({
                     <div className="text-xs text-neutral-500">
                       {shiftInfo?.shift ? t(`schoolCard.shift.${shiftInfo.shift}`) : null}
                       {distance != null
-                        ? ` • ${formatDistance(distance, { approximate: location.coordinates_approximate, language: language, t })}`
+                        ? ` • ${formatDistance(distance, { language: language, t })}`
                         : ''}
                     </div>
                   </div>

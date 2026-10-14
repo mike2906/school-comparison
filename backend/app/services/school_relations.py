@@ -368,12 +368,15 @@ async def same_place_by_school(db, *, country_code: str, city: Optional[str]) ->
     naming the place), ``location_id`` (this school's pin in the place) and
     ``other_location_id`` (the other's pin there).
     """
-    from sqlalchemy import select
+    from sqlalchemy import or_, select
 
     from app.models import School, SchoolLocation
     from app.services.school_service import SchoolService
+    from app.utils.display_gating import UNVERIFIED_PIN_PRECISION
     from app.utils.i18n_resolver import resolve_name_i18n
     from app.utils.website_data import attributes_for_publication
+
+    precision = SchoolLocation.geocode_meta["precision"].as_string()
 
     query = (
         select(
@@ -391,6 +394,8 @@ async def same_place_by_school(db, *, country_code: str, city: Optional[str]) ->
             School.country_code == country_code,
             School.school_type != "state",
             SchoolService._scoped_resolved_location_clause(SchoolLocation, city),
+            # Only published pins: an approximate point is not the building.
+            or_(precision.is_(None), precision != UNVERIFIED_PIN_PRECISION),
         )
     )
     city_clause = SchoolService._city_clause(city)

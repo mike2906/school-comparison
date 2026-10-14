@@ -7,6 +7,7 @@ import { getLastSearchUrl } from '../../utils/searchViewState'
 import { useCountry } from '../../context/CountryContext'
 import { fetchCompare, fetchExamAverages } from '../../api/schools'
 import { calculateDistance } from '../../utils/distance'
+import { pinnedLocation } from '../../utils/coordinates'
 import { compareSchoolNames, getSchoolName } from '../../utils/i18n'
 import { hasDisplayEvidence, normalizeSchoolList } from '../../utils/schoolAttributes'
 import { comparisonExamType, examGradeLabel, getAvailableExamTypes } from '../../utils/nvo'
@@ -16,7 +17,6 @@ import { hasDisplayableAdmissionInfo } from '../../utils/admission'
 import { buildCompareSections } from './compareSections'
 import {
   getNvoDetail,
-  getPrimaryLocation,
   nvoNotApplicable,
   parseIds,
   SOURCE_CATEGORY_LABELS,
@@ -147,9 +147,9 @@ function ComparePage() {
   const metricsById = useMemo(() => {
     const map = new Map()
     localizedSchools.forEach((school) => {
-      const primaryLocation = getPrimaryLocation(school)
-      const distance = userLocation && primaryLocation?.lat && primaryLocation?.lng
-        ? calculateDistance(userLocation.lat, userLocation.lng, primaryLocation.lat, primaryLocation.lng)
+      const distanceLocation = pinnedLocation(school.locations)
+      const distance = userLocation && distanceLocation
+        ? calculateDistance(userLocation.lat, userLocation.lng, distanceLocation.lat, distanceLocation.lng)
         : null
       const pricingRange = statedTuition(school.pricing, { ageGroup: selectedAgeGroup })
       // State schools charge no tuition, so they sort as the cheapest, matching "Безплатно".
@@ -160,7 +160,6 @@ function ComparePage() {
 
       map.set(school.id, {
         distance,
-        distanceApproximate: Boolean(primaryLocation?.coordinates_approximate),
         pricingRange,
         priceSort,
         nvoDetail,
