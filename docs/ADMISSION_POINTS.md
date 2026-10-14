@@ -116,11 +116,49 @@ A rule file (abridged):
 
 ## Keeping rules current
 
-Rules change every one to three years per city and stage, usually in February or March.
-A watcher (separate work) checks each file's `sources` and the council's new acts and
-court news, and opens an issue when something changes; a person or agent then adds the
-next file and its examples. Provisional files are re-checked when the campaign's
-schedule is published (by 5 January in Sofia).
+Rules change every one to three years per city and stage, usually in February or March,
+and sometimes by a court ruling. The watcher automates noticing, not rewriting: it never
+edits or rolls a rule file forward, and the calculator keeps calling a provisional file
+"not final" until someone confirms it.
+
+**What runs.** `.github/workflows/watch-admission-rules.yml`, daily at 04:40 UTC on
+GitHub's runners (they reach the Sofia sites; nothing runs on Mike's PC), runs
+`backend/scripts/watch_admission_rules.py`. The targets and dates are in
+`backend/app/scrapers/sources/bg/admission_rule_watch.json`; the logic is in
+`app/services/admission_rule_watch.py`. It opens a GitHub issue labelled `rule-watch`
+for each finding, or comments on the open one with the same title:
+
+| Finding | When |
+|---|---|
+| A council session mentions admission rules | A new session page on council.sofia.bg names "прием на деца/ученици" (amendments, catchment changes) |
+| A consultation mentions them | A new Sofia draft (sofia.bg public consultations) or national draft (strategy.bg: Наредба № 10, admission) |
+| Municipal news | A new sofia.bg news title about admission or a court ruling on it (this is how the ВАС appeal on the first-grade address choice is followed; the court portals can't be read automatically) |
+| The ИСОДЗ calendar changed | kg.sofia.bg's schedule for kindergartens and first grade (the next campaign's is due by 5 January) |
+| No file for a campaign | On `next_campaign_by` (MM-DD of the year applications run), the family has no file for that campaign |
+| A provisional file is not confirmed | On `confirm_by`, the campaign's file is still `provisional` |
+| A source can't be read | Three runs in a row failed (HTTP error, robots.txt, layout changed: no links or too little text) |
+
+Pages are compared as cleaned text (scripts and markup dropped, whitespace collapsed),
+so a changed footer or session cookie doesn't count. List pages remember the links seen;
+the first run only records them. State (hashes, texts, seen links, failure counts) lives
+on the `rule-watch-data` branch; deleting `state.json` there takes a fresh baseline.
+
+**Acting on an issue.** Read the source. If the rules changed, add a new rule file for the
+campaign (or a new version within it) with its acts, sources and worked examples, add the
+version date to `RULE_VERSIONS` (`kg_sofia_ratings.py`, `ruo_sofia_min_max.py`; a test
+checks they agree with the rule files), and close the issue from the PR. A catchment
+change needs a new snapshot (`backend/scripts/build_sofia_catchments.py`). If nothing
+changed, close the issue. A provisional file becomes verified only after someone checks
+it against the official text.
+
+**Adding a city or stage.** Add its rule family to `families` (a test fails until every
+family under `frontend/src/admission/rules/<country>` has its dates) and its council,
+consultation and schedule pages to `targets`. Another country gets its own
+`sources/<country>/admission_rule_watch.json` and a `--country` run.
+
+Known gaps: mon.bg is behind a Cloudflare check, so МОН drafts are seen through
+strategy.bg; the council page is per mandate, so its URL must change after the October
+2027 elections (the watcher reports it as unreadable when it stops listing sessions).
 
 ## Cut-offs
 
