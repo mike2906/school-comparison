@@ -20,6 +20,7 @@ from app.utils.display_gating import (
     blocked_pricing_row_ids,
     exam_result_is_publishable,
     implausible_tuition_row_ids,
+    is_agent_price,
     is_scraped_price,
     pricing_row_is_publishable,
     summary_is_publishable,
@@ -31,6 +32,7 @@ from app.utils.school_attributes import build_display_attributes, publishable_di
 from app.utils.school_facts import SITE_ACCEPTED_STATUSES, publication_attributes, shown_school_facts
 from app.utils.social_links import shown_social_links
 from app.utils.website_data import (
+    agent_fees_publishable,
     website_data_is_publishable,
     website_data_withheld_reasons,
 )
@@ -232,10 +234,13 @@ class SchoolPricingMixin(SchoolAttributesMixin):
         # (for example, a string confidence of "0.9") into a valid public type.
         # A scraped row is website-derived data (P1.16): withheld with the rest of it.
         website_ok = self.website_data_publishable
+        # The fees agent's rows do not wait for the old extraction stage (``agent_fees_publishable``).
+        agent_ok = website_ok or agent_fees_publishable(self.raw_attributes, self.raw_scrape_status)
         publishable = [
             row
             for row in self.raw_pricing
-            if pricing_row_is_publishable(row) and (website_ok or not is_scraped_price(row))
+            if pricing_row_is_publishable(row)
+            and (not is_scraped_price(row) or (agent_ok if is_agent_price(row) else website_ok))
         ]
         blocked_ids |= implausible_tuition_row_ids(publishable)
         published: list[PricingResponse] = []
@@ -526,7 +531,7 @@ class SchoolResponse(SchoolBase, SchoolPricingMixin):
             return []
         # Beside the published fees read from the same site: not beside manual rows while the
         # website's are withheld (no current Stage 6 report).
-        if not self.website_data_publishable:
+        if not agent_fees_publishable(self.raw_attributes, self.raw_scrape_status):
             return []
         fee_pages = [
             row.source_url for row in self.pricing if row.source is PriceSource.SCRAPED_WEBSITE and row.source_url
