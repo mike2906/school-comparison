@@ -162,3 +162,14 @@ export function getMinNvoScores(admissionInfo) {
     .map(item => ({ year: item.year, score: item.min_score }))
     .sort((a, b) => b.year - a.year)
 }
+
+// Keys the cut-off import adds for the calculator, not for the admission rows the pages
+// render today, so they don't make a school count as having admission information.
+const NON_DISPLAY_ADMISSION_KEYS = new Set([
+  'cutoffs', 'cutoff_summary', 'kg_sofia_ids', 'admin_district', 'catchment_ids',
+])
+
+/** True when `admission_info` holds something the admission sections display. */
+export function hasDisplayableAdmissionInfo(admissionInfo) {
+  return Object.keys(admissionInfo || {}).some(key => !NON_DISPLAY_ADMISSION_KEYS.has(key))
+}

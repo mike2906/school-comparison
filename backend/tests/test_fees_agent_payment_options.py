@@ -344,3 +344,12 @@ def test_a_label_may_name_the_fee_but_not_carry_a_bare_price():
     assert check_fee(named, page).kept
     borrowed = tuition(amount=9500, evidence="Plan 2 – 9,700 Plan 1 – 9,500")
     assert not check_fee(borrowed, page).kept
+
+
+@pytest.mark.parametrize(
+    ("printed", "code"), [("евро", "EUR"), ("Euro", "EUR"), ("€", "EUR"), ("лв.", "BGN"), ("eur", "EUR")]
+)
+def test_a_currency_word_is_stored_as_its_code(printed, code):
+    # 158: the reader returned "евро" and every fee failed the publish gate's code check.
+    fee = tuition(amount=590, evidence="590 евро").model_dump()
+    assert AgentFee.model_validate({**fee, "currency": printed}).currency == code

@@ -561,3 +561,74 @@ async def test_dispatch_timeout_excludes_time_queued_for_the_dispatch_lock(monke
         )
 
     assert results == ["slow", "fast"]
+
+
+async def test_a_response_without_a_cost_is_marked_uncertain_and_named_unattributed(monkeypatch):
+    import app.database as database
+    import app.services.provider_costs as provider_costs
+    from app.services.provider_costs import ProviderResponseUnattributed
+
+    class _Session:
+        async def __aenter__(self):
+            return object()
+
+        async def __aexit__(self, *_args):
+            return None
+
+    marked = []
+
+    async def _mark(_db, *, client_request_id, reason):
+        marked.append(client_request_id)
+
+    async def _reserve(*_args, **_kwargs):
+        return SimpleNamespace(client_request_id="client")
+
+    monkeypatch.setattr(database, "async_session_maker", lambda: _Session())
+    monkeypatch.setattr(provider_costs, "reserve_provider_request", _reserve)
+    monkeypatch.setattr(provider_costs, "mark_provider_request_uncertain", _mark)
+
+    # 517/616: Google ended the pick with an error; OpenRouter sent no cost and no tokens.
+    errored = SimpleNamespace(
+        provider_response_id="gen-1",
+        provider_details={"finish_reason": "error", "upstream_inference_cost": 0.0},
+        usage=None,
+    )
+
+    async def _call():
+        return SimpleNamespace(all_messages=lambda: [errored])
+
+    with provider_cost_scope(
+        pipeline_run_id="run-1", stage="fees_agent", cap_usd=1.0, request_reserve_usd=0.1
+    ):
+        with pytest.raises(ProviderResponseUnattributed):
+            await execute_billable_request(_call, model="mock", school_id=1)
+    assert marked == ["client"]
+
+
+async def test_a_run_that_stopped_is_not_named_unattributed(monkeypatch):
+    import app.database as database
+    import app.services.provider_costs as provider_costs
+    from app.services.provider_costs import ProviderResponseUnattributed
+
+    class _Session:
+        async def __aenter__(self):
+            return object()
+
+        async def __aexit__(self, *_args):
+            return None
+
+    async def _reserve(*_args, **_kwargs):
+        raise ProviderAttributionUncertain("pipeline run is missing or no longer running")
+
+    monkeypatch.setattr(database, "async_session_maker", lambda: _Session())
+    monkeypatch.setattr(provider_costs, "reserve_provider_request", _reserve)
+
+    async def _call():
+        raise AssertionError("never dispatched")
+
+    with provider_cost_scope(
+        pipeline_run_id="run-1", stage="fees_agent", cap_usd=1.0, request_reserve_usd=0.1
+    ):
+        with pytest.raises(ProviderAttributionUncertain) as raised:
+            await execute_billable_request(_call, model="mock", school_id=1)
+    assert not isinstance(raised.value, ProviderResponseUnattributed)

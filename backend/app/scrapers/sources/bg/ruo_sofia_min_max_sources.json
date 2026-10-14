@@ -1,0 +1,130 @@
+{
+ "_about": "РУО София-град min/max score files per 8th-grade round. Add each year's files (July-August) here; capture_ruo_min_max.py downloads any not yet archived. sha256 is the file as first seen; a mismatch is logged and the new file used (РУО has replaced a file after publishing). Missing: 2022 round 4 (never archived), 2023 round 3 (Wayback serves HTML).",
+ "files": [
+  {
+   "year": 2022,
+   "round": 1,
+   "date": "2022-07-11",
+   "url": "https://web.archive.org/web/20230317175333id_/https://ruo-sofia-grad.com/wp-content/uploads/2022/07/po_bal_sait.xlsx",
+   "sha256": "822fb886b4f31b4eef9afcdbac27f70c0b9af8a829828c3c1959b546542c339d"
+  },
+  {
+   "year": 2022,
+   "round": 2,
+   "date": "2022-07-19",
+   "url": "https://web.archive.org/web/20230317175334id_/https://ruo-sofia-grad.com/wp-content/uploads/2022/07/min_max_2_etap_2022.xlsx",
+   "sha256": "f0ab7cdbf218e0174d47861f2094c996200b71a377e00b246bd0701844d5754d"
+  },
+  {
+   "year": 2022,
+   "round": 3,
+   "date": "2022-07-29",
+   "url": "https://web.archive.org/web/20230317175334id_/https://ruo-sofia-grad.com/wp-content/uploads/2022/07/min_max_III_etap.xlsx",
+   "sha256": "e4301c3c545b127a433d43869986cb60d37be9b82c590b933dc828eee99f2b23"
+  },
+  {
+   "year": 2023,
+   "round": 1,
+   "date": "2023-07-12",
+   "url": "https://web.archive.org/web/20240510025547id_/https://ruo-sofia-grad.com/wp-content/uploads/2023/07/min_ma%D1%85_paralelki_1.etap_2023.xlsx",
+   "sha256": "60e96db7d0182b00324fe0bcc91909aa9f7878ec913df3be0c272789d7d8e7d4"
+  },
+  {
+   "year": 2023,
+   "round": 2,
+   "date": "2023-07-19",
+   "url": "https://web.archive.org/web/20240510025404id_/https://ruo-sofia-grad.com/wp-content/uploads/2023/07/min_max_2_etap_2023.xlsx",
+   "sha256": "fbb94228b3e7bcd4b00c3cbfe495934c20dca114f51601e0bb75d12de5840c3a"
+  },
+  {
+   "year": 2023,
+   "round": 4,
+   "date": "2023-08-10",
+   "url": "https://web.archive.org/web/20240510025355id_/https://ruo-sofia-grad.com/wp-content/uploads/2023/08/min_max_po_par_4_etap_2023.xlsx"
+  },
+  {
+   "year": 2024,
+   "round": 1,
+   "date": "2024-07-12",
+   "url": "https://web.archive.org/web/20240717113736id_/https://ruo-sofia-grad.com/wp-content/uploads/2024/07/min_max_paralelki_1_etap_2024.xlsx",
+   "sha256": "f2b47731501bee7abd4ceba23a09a057676e836f2bb7498b22f1cbd993b4d144"
+  },
+  {
+   "year": 2024,
+   "round": 2,
+   "date": "2024-07-19",
+   "url": "https://web.archive.org/web/20251110115522id_/https://ruo-sofia-grad.com/wp-content/uploads/2024/07/min_max_2_klasirane_2024.xlsx",
+   "sha256": "4d8a6678b36a57300cc3c87f03249fdb38722177c0363222d30c7e7942479ddb"
+  },
+  {
+   "year": 2024,
+   "round": 3,
+   "date": "2024-07-30",
+   "url": "https://web.archive.org/web/20251110134731id_/https://ruo-sofia-grad.com/wp-content/uploads/2024/07/min_max_3_klasirane_2024-1.xlsx",
+   "sha256": "e728bcd8ad2896a19ed27be1276d1076def95dc5efbbfdd5c53e9a91298e4fd3"
+  },
+  {
+   "year": 2024,
+   "round": 4,
+   "date": "2024-08-07",
+   "url": "https://web.archive.org/web/20251110124753id_/https://ruo-sofia-grad.com/wp-content/uploads/2024/08/min_max_4_klasirane_2024.xlsx",
+   "sha256": "d771988febf8997a4cf3daf67f26993ec00227d8f8d430c32ff6c787892c5093"
+  },
+  {
+   "year": 2025,
+   "round": 1,
+   "date": "2025-07-14",
+   "url": "https://web.archive.org/web/20251110134343id_/https://ruo-sofia-grad.com/wp-content/uploads/2025/07/za_saita_min_max_1kl_2025.xlsx",
+   "sha256": "39bb5b54f264ae33b84260ceaa6fa266e04c70977ff0d28a9537a74198ebc390"
+  },
+  {
+   "year": 2025,
+   "round": 2,
+   "date": "2025-07-21",
+   "url": "https://web.archive.org/web/20251106093502id_/https://ruo-sofia-grad.com/wp-content/uploads/2025/07/za_saita_min_max_2_klasirane_2025.xlsx",
+   "sha256": "c2a0fd209e9fa43b25a2b08e51835490d9d046939a93787505871194a93512fc"
+  },
+  {
+   "year": 2025,
+   "round": 3,
+   "date": "2025-07-30",
+   "url": "https://web.archive.org/web/20251110122544id_/https://ruo-sofia-grad.com/wp-content/uploads/2025/07/za_saita_min_max_3_klasirane_2025.xlsx",
+   "sha256": "849982d60e115dd82a6663309a3db96a76c6cb0fc087c771ce4e2410378cc160"
+  },
+  {
+   "year": 2025,
+   "round": 4,
+   "date": "2025-08-06",
+   "url": "https://web.archive.org/web/20251110120247id_/https://ruo-sofia-grad.com/wp-content/uploads/2025/08/za_saita_min_max_4kl_2025.xlsx",
+   "sha256": "2015e39ce4ea5191a74dbce079bb5c4c71b2f6d4ab9152f3f7e5893a3de351b9"
+  },
+  {
+   "year": 2026,
+   "round": 1,
+   "date": "2026-07-14",
+   "url": "https://ruo.mon.bg/sofia-grad/files/sites/2/2026/07/min_max_1klas_2026-1.xlsx",
+   "sha256": "052c28459c2a276df0fa51ea95d87c71ee8b02df170ffe40bac9ecc0c606b8d2"
+  },
+  {
+   "year": 2026,
+   "round": 2,
+   "date": "2026-07-21",
+   "url": "https://ruo.mon.bg/sofia-grad/files/sites/2/2026/07/min_max_2klas_2026_.xlsx",
+   "sha256": "fb67519cab7232b0246319b7ae2d6a7961dc3ef47615f9e8356a24e869bef637"
+  },
+  {
+   "year": 2026,
+   "round": 3,
+   "date": "2026-07-29",
+   "url": "https://ruo.mon.bg/sofia-grad/files/sites/2/2026/07/min_max_3_klasirane_2026.xlsx",
+   "sha256": "58f160a9bc90e931d5408fe5cf460fe0e6fe262c59cefe64f5424e5d06ab7e55"
+  },
+  {
+   "year": 2026,
+   "round": 4,
+   "date": "2026-08-05",
+   "url": "https://ruo.mon.bg/sofia-grad/files/sites/2/2026/08/min_max_4kl_2026.xlsx",
+   "sha256": "45218dd5138e4ec5fc05f0be247115d76f85151bf03c96adf8982732c99b1946"
+  }
+ ]
+}

@@ -11,6 +11,7 @@ import { compareSchoolNames, getSchoolName } from '../../utils/i18n'
 import { hasDisplayEvidence, normalizeSchoolList } from '../../utils/schoolAttributes'
 import { comparisonExamType, examGradeLabel, getAvailableExamTypes } from '../../utils/nvo'
 import { statedTuition, tuitionSortValue } from '../../utils/pricing'
+import { hasDisplayableAdmissionInfo } from '../../utils/admission'
 
 import { buildCompareSections } from './compareSections'
 import {
@@ -336,7 +337,7 @@ function ComparePage() {
         present.add('academic')
       }
       const hasAdmission = Boolean(
-        (school.admission_info && Object.keys(school.admission_info).length > 0) ||
+        hasDisplayableAdmissionInfo(school.admission_info) ||
         school.attributes?.entry_requirements?.length
       )
       if (hasAdmission) {

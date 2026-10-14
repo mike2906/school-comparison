@@ -60,6 +60,7 @@ from app.services.pipeline_runs import finalize_pipeline_run, pipeline_run_heart
 from app.services.provider_costs import (
     ProviderCostCapExceeded,
     ProviderCostError,
+    ProviderResponseUnattributed,
     execute_billable_request,
     provider_cost_scope,
 )
@@ -206,19 +207,31 @@ async def _pick(
 ) -> list[str]:
     if not spend.allows(PICK_COST_ESTIMATE_USD):
         raise SpendCapReached(f"spent ${spend.spent_usd:.4f} of ${spend.cap_usd}")
+    settings = get_settings()
+    # One output call: 517/616's picker sent 23 parallel calls that Google ended with an
+    # error and OpenRouter returned with no cost or usage.
     agent = create_agent(
-        "cheap", prompt, Picks, retries=1, model_settings={"temperature": get_settings().extraction_temperature}
+        "cheap",
+        prompt,
+        Picks,
+        retries=1,
+        model_settings={"temperature": settings.extraction_temperature, "parallel_tool_calls": False},
     )
     name = (school.name_i18n or {}).get("bg") or (school.name_i18n or {}).get("en")
     pages = "\n".join(f"- {page.url} ({'shows prices' if page.prices else 'no prices'})" for page in read)
     shown = "\n".join(f"{url} | {text}" for url, text in links[:MAX_LINKS_SHOWN])
-    result = await execute_billable_request(
-        lambda: agent.run(f"Institution: {name}\n\nRead so far:\n{pages}\n\nLinks:\n{shown}"),
-        model=get_model("cheap"),
-        school_id=school.id,
-        stage=stage,
-        timeout_seconds=60,
-    )
+    try:
+        result = await execute_billable_request(
+            lambda: agent.run(f"Institution: {name}\n\nRead so far:\n{pages}\n\nLinks:\n{shown}"),
+            model=get_model("cheap"),
+            school_id=school.id,
+            stage=stage,
+            timeout_seconds=60,
+        )
+    except ProviderResponseUnattributed:
+        # Counted at its assumed maximum, as the ledger counts it; the caller falls back to keyword links.
+        spend.spent_usd += float(settings.provider_request_reserve_usd)
+        raise
     spend.spent_usd += extract_provider_cost_usd(result)
     allowed = {url for url, _ in links}
     return [url for url in result.output.urls if url in allowed][:MAX_PICKS]
@@ -285,6 +298,9 @@ async def find_pages(
             break
         try:
             queue = await _pick(school, read, unopened, spend, pick_prompt, stage)
+        except ProviderResponseUnattributed as exc:  # an errored pick (517, 616): no cost to read
+            logger.warning("%s link pick came back without a cost for school %s: %s", stage, school.id, exc)
+            queue = []
         except (SpendCapReached, ProviderCostError):  # a cap, or a run no longer running
             raise
         except Exception as exc:  # a timed-out pick (541) falls back to the keyword links below
