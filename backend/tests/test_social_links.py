@@ -227,3 +227,21 @@ async def test_a_broken_href_is_skipped_and_a_parents_board_link_is_not_the_scho
     html += f'<a href="{board}">Училищно настоятелство</a><a href="{board}" title="Настоятелство">f</a>'
     read = await stage.read_school(_school(), _fetcher({HOME: html}))
     assert read["links"] == {"facebook": FB}
+
+
+@pytest.mark.asyncio
+async def test_apply_keeps_a_write_another_stage_made_during_the_run(db_session):
+    from sqlalchemy import text
+
+    school = _school(attributes={"other": 1})
+    db_session.add(school)
+    await db_session.commit()
+
+    async def fetch(url):
+        # Another stage stores its block while the pages are being read.
+        await db_session.execute(text("UPDATE schools SET attributes = :a WHERE id = :i"), {"a": '{"other": 2}', "i": school.id})
+        await db_session.commit()
+        return url, _html(FB)
+
+    await stage.run_social_links(db_session, school_ids=[school.id], fetch=fetch, apply=True)
+    assert school.attributes["other"] == 2 and school.attributes["social_links"]["facebook"] == FB
