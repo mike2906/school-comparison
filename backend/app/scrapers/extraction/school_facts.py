@@ -13,6 +13,7 @@ import re
 from collections.abc import Sequence
 from functools import lru_cache
 from typing import Literal, Optional
+from urllib.parse import urljoin
 
 from pydantic import BaseModel, Field
 
@@ -114,6 +115,9 @@ Rules:
     recognised in Bulgaria.
   - applications_open, applications_close: the dates applications open and close for the current or coming
     school year, as YYYY-MM-DD, only when the quote gives the full date.
+  - open_days: the dates of open days, open lessons or days of open doors (Ден на отворените врати), as
+    YYYY-MM-DD, only when the quote gives the full date; register_url: the link to sign up for them,
+    copied exactly from the page's markdown link, only when the page has one.
   - bus_areas: the districts or areas the school bus covers, each as {"bg", "en"} (the name in Bulgarian and
     in Latin letters).
   - special_needs_support: true when the quote says the school supports children with special educational needs.
@@ -173,6 +177,8 @@ class Fact(BaseModel):
     applications_close: Optional[str] = Field(default=None, description="YYYY-MM-DD")
     bus_areas: list[Name] = Field(default_factory=list)
     special_needs_support: Optional[bool] = None
+    open_days: list[str] = Field(default_factory=list, description="YYYY-MM-DD")
+    register_url: Optional[str] = None
 
 
 # The labels a fact can carry, stored and restored as they are (``Fact`` validates them).
@@ -193,6 +199,8 @@ LABEL_FIELDS = (
     "applications_close",
     "bus_areas",
     "special_needs_support",
+    "open_days",
+    "register_url",
 )
 
 
@@ -241,6 +249,19 @@ def quote_on_page(fact: Fact, pages: Sequence[tuple[str, str]]) -> Optional[str]
     return None
 
 
+def link_on_page(url: Optional[str], pages: Sequence[tuple[str, str]]) -> bool:
+    """Whether ``url`` is a link on one of the pages read (the reader must not write its own)."""
+    if not url or not url.startswith(("http://", "https://")):
+        return False
+    target = url.strip().rstrip("/")
+    return any(
+        urljoin(page_url, link).rstrip("/") == target for page_url, text in pages for link in _LINK_RE.findall(text)
+    )
+
+
+_LINK_RE = re.compile(r"\]\(<?([^)\s>]+)")
+
+
 def _strip(text: str) -> str:
     return text.strip(" .…;:-")
 
@@ -277,7 +298,7 @@ def _labels(fact: Fact) -> str:
     lines = []
     for key in LABEL_FIELDS:
         value = getattr(fact, key)
-        if value in (None, []):
+        if value in (None, []) or key == "register_url":  # checked in code (``link_on_page``)
             continue
         if isinstance(value, list):
             value = ", ".join(_label_text(item) for item in value)

@@ -35,7 +35,8 @@ some picks were trivia, yearly counts go stale, the paragraph only restated the 
    and the grade or range of grades it is for,
    places full or waiting list for a grade, the highest grade taught, curricula
    (`CURRICULA`) and whether the diploma is recognised, application open/close dates, bus
-   areas by district, and special-needs support.
+   areas by district, special-needs support, and open-day dates with a sign-up link (kept only
+   when code finds that link on a page read).
 3. **Check.** Code keeps a fact only if its quote is on a page read (markup and quote marks
    ignored). A second call on the same tier confirms each quote states the whole fact and
    its labels, and grades it: `key` (what parents choose on: programme, languages, hours,
@@ -61,7 +62,7 @@ used when no curated one exists (before the old extraction's). The response also
 `school_facts.at_a_glance` (`at_a_glance` in `app/utils/school_facts.py`): admissions per
 grade or range (a fact naming no grade stays its own row), places (only for 180 days after the read), the highest grade stated, curricula,
 diploma, the first application window not yet closed, instruction languages, language
-hours, bus areas and support, summed from the shown (not minor) facts and shown above the
+hours, bus areas, support and the next open days (until their date), summed from the shown (not minor) facts and shown above the
 fact list and as compare rows. Facts carry their own checks, so they do not wait for a Stage 6 report, but a website-data withholding marker
 (failed URL check, shared site) hides them and their labels, and so does a change of
 website (host and path) or a website URL validation has not accepted (`pending`,

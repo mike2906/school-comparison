@@ -69,3 +69,17 @@ test('an admission row for a range of grades names the range; one with no grade 
     'schoolFacts.glance.grades{"from":2,"to":4}: schoolFacts.glance.admissionTypes.entrance_exam; schoolFacts.glance.admissionTypes.interview',
   )
 })
+
+test('open days list their dates with the sign-up link, or the source page when there is none', () => {
+  const school = (days) => ({ school_facts: { facts: [], at_a_glance: { open_days: days } } })
+  const [withLink] = atAGlanceLines(school([
+    { date: '2026-11-12', register_url: null, source_url: 'https://s.bg/news' },
+    { date: '2026-12-03', register_url: 'https://forms.example/x', source_url: 'https://s.bg/news' },
+  ]), 'en', t)
+  assert.equal(withLink.key, 'openDays')
+  assert.equal(withLink.href, 'https://forms.example/x')
+  assert.equal(withLink.linkText, 'schoolFacts.glance.register')
+  const [noLink] = atAGlanceLines(school([{ date: '2026-11-12', source_url: 'https://s.bg/news' }]), 'en', t)
+  assert.equal(noLink.href, 'https://s.bg/news')
+  assert.equal(noLink.linkText, 'schoolFacts.source')
+})

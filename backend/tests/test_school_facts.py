@@ -611,3 +611,50 @@ def test_admission_facts_without_a_grade_are_not_merged_and_ranges_are_kept():
         (None, None, ["interview"]),
         (5, None, ["interview"]),
     ]
+
+
+def test_a_sign_up_link_must_be_a_link_on_a_page_read():
+    from app.scrapers.extraction.school_facts import link_on_page
+
+    pages = [(ABOUT, "[Запиши се](/open-day/) и [форма](https://forms.example/x)")]
+    assert link_on_page("https://school.example/open-day", pages)  # relative link, trailing slash
+    assert link_on_page("https://forms.example/x", pages)
+    assert not link_on_page("https://forms.example/made-up", pages)
+    assert not link_on_page("javascript:alert(1)", pages)
+
+
+@pytest.mark.asyncio
+async def test_open_days_are_stored_and_an_invented_sign_up_link_is_dropped():
+    pages = [PageRead(HOME, _line(0) + "\n[Запиши се](https://forms.example/x)", False)]
+    kept = _fact("admissions", _line(0), en="Open day on 12 November.").model_dump()
+    invented = _fact("admissions", _line(0), en="Open day on 3 December.").model_dump()
+    facts = [
+        Fact.model_validate(kept | {"open_days": ["2026-11-12"], "register_url": "https://forms.example/x"}),
+        Fact.model_validate(
+            invented | {"topic": "school_day", "open_days": ["2026-12-03"], "register_url": "https://x.example/"}
+        ),
+    ]
+    calls = _Calls(facts, passed=[1, 2])
+    stored = (await stage.read_school(_school(), pages, calls))["store"]
+    assert [(f["open_days"], f["register_url"]) for f in stored] == [
+        (["2026-11-12"], "https://forms.example/x"),
+        (["2026-12-03"], None),
+    ]
+    assert "forms.example" not in calls.messages[1][1]  # the judge is not asked about links
+
+
+def test_at_a_glance_lists_upcoming_open_days_only():
+    import datetime
+
+    from app.utils.school_facts import _labels, at_a_glance
+
+    facts = [
+        _labels({"open_days": ["2026-12-03", "2026-10-01", "bad"], "register_url": "https://f.example/x"})
+        | {"source_url": HOME},
+        _labels({"open_days": ["2026-11-12"], "register_url": "ftp://nope"}) | {"source_url": ABOUT},
+    ]
+    days = at_a_glance(facts, today=datetime.date(2026, 10, 14))["open_days"]
+    assert days == [
+        {"date": "2026-11-12", "register_url": None, "source_url": ABOUT},
+        {"date": "2026-12-03", "register_url": "https://f.example/x", "source_url": HOME},
+    ]

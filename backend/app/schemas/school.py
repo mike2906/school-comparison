@@ -401,6 +401,12 @@ class FactLanguage(BaseModel):
     hours_per_week: Optional[int] = None
 
 
+class FactOpenDay(BaseModel):
+    date: str  # YYYY-MM-DD, upcoming only
+    register_url: Optional[str] = None  # a sign-up link found on the school's pages
+    source_url: Optional[str] = None  # the page that announces it
+
+
 class FactsAtAGlance(BaseModel):
     """The labels of a school's shown facts summed up (``app.utils.school_facts.at_a_glance``)."""
 
@@ -414,6 +420,7 @@ class FactsAtAGlance(BaseModel):
     languages: list[FactLanguage] = []
     bus_areas: list[BilingualName] = []
     special_needs_support: Optional[bool] = None
+    open_days: list[FactOpenDay] = []
 
 
 class SchoolFacts(BaseModel):

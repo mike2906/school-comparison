@@ -707,10 +707,22 @@ export function buildCompareSections({
     const factsBySchool = new Map(schools.map(school => [school.id, getSchoolFacts(school, language, { keyOnly: true })]))
     const topicFacts = (school, topic) => (factsBySchool.get(school.id) || []).filter(fact => fact.topic === topic)
     // The facts' labels summed up (admission, curriculum, bus areas ...), one row a kind.
-    const glanceValue = (school, key) => atAGlanceLines(school, language, t).find(line => line.key === key)?.value || null
+    const glanceLine = (school, key) => atAGlanceLines(school, language, t).find(line => line.key === key)
+    const glanceValue = (school, key) => glanceLine(school, key)?.value || null
     const glanceRows = atAGlanceKeysIn(schools, language, t).map(key => ({
       label: t(`schoolFacts.glance.${key}`),
-      getValue: (school) => glanceValue(school, key) || renderPlaceholder(),
+      getValue: (school) => {
+        const line = glanceLine(school, key)
+        if (!line) return renderPlaceholder()
+        return line.href ? (
+          <span>
+            {line.value}{' '}
+            <a href={line.href} target="_blank" rel="noopener noreferrer nofollow" className="text-primary-700 underline underline-offset-2">
+              {line.linkText}
+            </a>
+          </span>
+        ) : line.value
+      },
       getCompare: (school) => glanceValue(school, key),
     }))
     const factRows = factTopicsIn(schools, language).map(topic => ({
