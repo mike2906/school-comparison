@@ -154,6 +154,7 @@ def main() -> None:
     parser.add_argument("--only", nargs="*", default=[], choices=sorted({family for family, _ in INSTITUTION_TYPES.values()}))
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+    logging.getLogger("httpx").setLevel(logging.WARNING)
     summary = asyncio.run(
         capture(args.archive, delay=args.delay, max_requests=args.max_requests, force=args.force, only=args.only)
     )
