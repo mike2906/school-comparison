@@ -40,6 +40,10 @@ schools never snap onto motorways or motorway/trunk links.
   or the median rank correlation per home point drops below 0.98. October 2026: median 1.03,
   97% within 10%, rank correlation 0.998.
 - The build fails if the gzipped graph is over 4 MB.
+- A live user flow (`frontend/e2e/live/drive-times.test.js`) sets a location on the live site,
+  waits for the times, checks the sort and fails if any main-thread task takes over 1 s. It
+  posts how long the times took as a notice on the run (October 2026, GitHub runner: 2.9 s
+  from opening the page, longest task 0.15 s).
 
 ## Phone cost (October 2026)
 

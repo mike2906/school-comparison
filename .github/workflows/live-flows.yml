@@ -52,7 +52,10 @@ jobs:
           SITE: ${{ inputs.site_url || 'https://schooldecider.com' }}
         run: |
           sha="$(curl -fsS -m 20 -H 'Cache-Control: no-cache' "$SITE/version.txt?cb=$GITHUB_RUN_ID" 2>/dev/null | tr -d '[:space:]' || true)"
-          if ! [[ "$sha" =~ ^[0-9a-f]{40}$ ]]; then
+          # A manual run on a branch checks that branch's flows, to try a new flow before merging it.
+          if [[ "$GITHUB_EVENT_NAME" == workflow_dispatch && "$GITHUB_REF" != refs/heads/main ]]; then
+            sha="$GITHUB_SHA"
+          elif ! [[ "$sha" =~ ^[0-9a-f]{40}$ ]]; then
             echo "::warning::$SITE/version.txt gave no commit; using $GITHUB_SHA."
             sha="$GITHUB_SHA"
           fi
@@ -81,7 +84,7 @@ jobs:
           LIVE_API_URL: ${{ inputs.api_url || 'https://api.schooldecider.com' }}
         # One retry, so a single slow answer does not page anyone. Each flow that fails the
         # retry too is an annotation on the run's page.
-        run: npm run test:live || { echo "Retrying once in 60 seconds."; sleep 60; npm run test:live:ci; }
+        run: npm run test:live:ci || { echo "Retrying once in 60 seconds."; sleep 60; LIVE_LAST_TRY=1 npm run test:live:ci; }
 
       - name: Upload screenshots
         if: failure()
