@@ -39,7 +39,7 @@ NVO_MIN_PUPILS = 5
 UNVERIFIED_PIN_PRECISION = "approximate"
 
 _CURRENCY_RE = re.compile(r"^[A-Z]{3}$")
-_PRICE_PERIODS = {"monthly", "yearly", "one_time", "quarter", "term", "semester"}
+_PRICE_PERIODS = {"monthly", "yearly", "one_time", "quarter", "term", "semester", "daily", "weekly", "hourly"}
 
 # Tuition plausibility. A tuition row whose yearly equivalent is below the floor, or far
 # below the school's typical tuition, is almost always a misfiled add-on (a yoga class, an

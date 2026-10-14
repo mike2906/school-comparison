@@ -138,7 +138,7 @@ def test_330_paid_by_the_previous_month_is_monthly():
     page = "Такса 900 лв. / 460 €, а при годишно плащане 9000 лв.\n"
     assert findings(row(Decimal("900"), currency="BGN"), page, "kindergarten") == set()
     # Two prices in one currency are two fees: the second's words are not the first's.
-    assert stated_period(normalize_text("650 € / 6 792 € годишно"), (0, 3)) == (set(), False)
+    assert stated_period(normalize_text("650 € / 6 792 € годишно"), (0, 3)) == set()
 
 
 def test_517_a_one_time_word_under_a_yearly_fee_gives_way_to_the_heading():
@@ -369,8 +369,8 @@ def test_610_a_flattened_plan_header_is_not_the_fees_heading():
 
 
 def test_610_one_payment_is_yearly():
-    assert period_families("плащане на 1 вноска") == ({"YEARLY"}, False)
-    assert period_families("плащане на 10 месечни вноски") == ({"MONTHLY"}, False)
+    assert period_families("плащане на 1 вноска") == {"YEARLY"}
+    assert period_families("плащане на 10 месечни вноски") == {"MONTHLY"}
     page = "Програма | Плащане на 1 вноска | Плащане на 2 вноски\nГимназия | 7 400 | 2 х 3 900 = 7 800\n"
     findings = check_price_row(row(7400), page, "school", today=TODAY)
     assert [(f.rule, f.period) for f in findings] == [(RULE_PERIOD_MISSING, "YEARLY")]
@@ -467,7 +467,7 @@ def test_a_course_length_is_not_an_age():
 def test_every_school_year_is_yearly_only_when_nothing_else_says(text, families):
     from app.scrapers.price_evidence import period_families
 
-    assert period_families(text.casefold())[0] == families
+    assert period_families(text.casefold()) == families
 
 
 @pytest.mark.parametrize(
@@ -481,4 +481,4 @@ def test_every_school_year_is_yearly_only_when_nothing_else_says(text, families)
 def test_a_note_that_prices_change_every_year_names_no_period(text):
     from app.scrapers.price_evidence import period_families
 
-    assert period_families(text.casefold())[0] == set()
+    assert period_families(text.casefold()) == set()
