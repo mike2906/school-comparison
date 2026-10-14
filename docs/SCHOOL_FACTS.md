@@ -105,6 +105,51 @@ to be measured on the trial schools. Nothing reaches the site until an `--apply`
 - Decide refresh: facts carry `read_at`; a yearly re-read is enough for most topics.
   Runs vary, so a refresh could keep the old fact where the new read only rewords it.
 
+## Open days (`open-days` stage, run from cron)
+
+Open days and application windows are announced weeks ahead, so a yearly facts read misses
+most of them (launch DB, 2026-10-14: 12 schools had open-day dates, 2 of them upcoming).
+The `open-days` stage (`app/scrapers/stages/open_days.py`, rules in
+`app/scrapers/extraction/open_days.py`) checks every school with an accepted website often
+and cheaply:
+
+1. **Open, no model.** The home page, the pages it watched before, the pages stored date
+   facts came from, up to 3 home-page links named for open days or admissions, and (only
+   when a mention changed) up to 2 links on the changed lines, such as a headline's article.
+   6 pages a school at most.
+2. **Hash the mentions.** Lines naming an open day, open lesson, information meeting or
+   application window (`MENTION_RE`), with 2 lines either side, cleaned like the quote
+   check; numbers on a nearby line with no date (a visitor counter) are masked. A news
+   feed elsewhere on the page changes nothing. Hashes live in
+   `attributes["open_days_watch"]` (internal).
+3. **Read only on a change.** One reader call on the lines around the changed mentions
+   (today's date in the prompt; a date without a year is the next one, and only within
+   200 days), then the school-facts checks: quote on a page read, sign-up link on a page,
+   and the judge. Past dates are dropped. A kept date fact is stored with the school's
+   facts at least as `more` (the judge grades for choosing a school, and a `minor` fact
+   would stay out of the dates at a glance). A page whose stored dates a full facts read
+   did not carry is read again once.
+4. **Remove.** A stored date fact whose page was read again without its quote is removed.
+
+About $0.001 to $0.002 a school whose mentions changed; nothing otherwise. The first run
+reads every school that mentions open days (estimated at $0.10 to $0.30 for Sofia; measured on the first run).
+
+`backend/scripts/watch_open_days.sh` runs it from cron on the machine with the launch DB:
+hourly, doing nothing until a check is due (a day after the last, a week in July and
+August), so a laptop that slept catches up at the next hour. $0.30 a run and $0.60 a day
+at most (`OPEN_DAYS_MAX_USD`, `OPEN_DAYS_DAY_USD`). It publishes with
+`publish_snapshot.sh` only when some school's dates changed; a failed run or publish opens
+one GitHub issue, "Open-days check stopped", and retries at the next hour. Log and reports:
+`~/.local/state/schooldecider/open_days.log`, `open-days-*.json` (kept a month). Setup:
+
+```
+PATH=/home/mike2906/.local/bin:/usr/local/bin:/usr/bin:/bin
+10 * * * * /home/mike2906/sofiaschoolcomparison/backend/scripts/watch_open_days.sh
+```
+
+Not covered: open days announced only on Facebook or Instagram (see `social-media/research.md`
+in the project files), and pages robots.txt blocks.
+
 ## Retiring the website reading pipeline
 
 Mike asked (2026-10-13) what else the pipeline does before going agent-only. Agents should
