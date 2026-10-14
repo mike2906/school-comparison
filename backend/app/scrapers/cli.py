@@ -502,6 +502,48 @@ def school_facts_command(school_ids, city, country, limit, max_usd, apply_change
         console.print(f"Report: {report_path}")
 
 
+@cli.command("open-days")
+@click.option("--school-id", "school_ids", type=int, multiple=True, help="Check these schools (repeatable)")
+@click.option("--city", default=None, help="Only schools in this city")
+@click.option("--country", default="bg", show_default=True, help="Country code")
+@click.option("--limit", type=int, default=None, help="Maximum schools")
+@click.option("--max-usd", type=float, default=0.30, show_default=True, help="Provider spend cap for the run")
+@click.option("--apply", "apply_changes", is_flag=True, help="Store dates and page hashes (default: dry run)")
+@click.option("--out", "report_path", type=click.Path(dir_okay=False, path_type=Path), help="Write the JSON report")
+@click.option(
+    "--workers", type=click.IntRange(1, 16), default=8, show_default=True, help="Schools checked at a time (1-16)"
+)
+def open_days_command(school_ids, city, country, limit, max_usd, apply_changes, report_path, workers):
+    """Check schools' pages for new open days and application dates (model only on a change)."""
+    import json
+
+    from app.database import async_session_maker
+    from app.scrapers.stages import open_days as open_days_stage
+
+    async def _run():
+        async with async_session_maker() as db:
+            return await open_days_stage.run_open_days(
+                db,
+                country=country,
+                city=city,
+                school_ids=school_ids,
+                limit=limit,
+                max_usd=max_usd,
+                apply=apply_changes,
+                workers=workers,
+            )
+
+    report = asyncio.run(_run())
+    mode = "Applied" if apply_changes else "Dry run"
+    console.print(f"{mode}: {report['schools']} schools, {report['outcomes']}, ${report['spent_usd']:.4f}")
+    if report["stopped"]:
+        console.print(f"[yellow]{report['stopped']}[/yellow]")
+    if report_path is not None:
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(json.dumps(report, ensure_ascii=False, indent=1, default=str), encoding="utf-8")
+        console.print(f"Report: {report_path}")
+
+
 @cli.command("social-links")
 @click.option("--school-id", "school_ids", type=int, multiple=True, help="Run these schools (repeatable)")
 @click.option("--city", default=None, help="Only schools in this city")
