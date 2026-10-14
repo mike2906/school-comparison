@@ -12,12 +12,24 @@ from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
 from typing import Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.models.pricing import PriceCategory, PricePeriod
 
 PUBLISH_CONFIDENCE = 0.9
 HELD_CONFIDENCE = 0.5  # under the 0.7 publish floor (display_gating.PRICING_CONFIDENCE_FLOOR)
+
+
+# The reader sometimes copies the page's word for the currency: 158 printed "евро", and its
+# fees failed the publish gate's three-letter code check.
+_CURRENCY_WORDS = {"евро": "EUR", "euro": "EUR", "euros": "EUR", "€": "EUR", "лв": "BGN", "лв.": "BGN", "лева": "BGN"}
+
+
+def _currency_code(value: Optional[str]) -> Optional[str]:
+    if value is None:
+        return None
+    text = value.strip()
+    return _CURRENCY_WORDS.get(text.casefold(), text.upper())
 
 
 class PaymentOption(BaseModel):
@@ -58,6 +70,11 @@ class AgentFee(BaseModel):
         "and, on a line of its own, the heading that gives its period or plan."
     )
 
+    @field_validator("currency")
+    @classmethod
+    def _currency_code(cls, value: str) -> str:
+        return _currency_code(value)
+
 
 class AgentDiscount(BaseModel):
     """A discount the school offers on its fees, stated with a percentage or an amount."""
@@ -80,6 +97,11 @@ class AgentDiscount(BaseModel):
     )
     source_url: str = Field(description="The URL of the page the discount was read from, copied from its PAGE line")
     evidence: str = Field(description="The page line the discount was read from, copied verbatim")
+
+    @field_validator("currency")
+    @classmethod
+    def _currency_code(cls, value: Optional[str]) -> Optional[str]:
+        return _currency_code(value)
 
 
 class AgentFees(BaseModel):
