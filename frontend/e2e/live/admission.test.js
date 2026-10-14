@@ -134,7 +134,8 @@ describe('admission from a school page', () => {
     // would type it, and a name no other street has, so the suggestion to pick is clear.
     let address
     for (const street of streets) {
-      if (street.settlement !== 'ГР.СОФИЯ' || street.key.length <= 4 || sameName.get(street.key) > 1) continue
+      // An ordinary street (УЛ.), typed without its prefix as a parent would.
+      if (street.settlement !== 'ГР.СОФИЯ' || !/^УЛ\./.test(street.street) || street.key.length <= 4 || sameName.get(street.key) > 1) continue
       const number = [...street.numbers.entries()].find(([n, id]) => ids.includes(id) && /^\d+$/.test(n))?.[0]
       if (number) {
         address = { street, number }
@@ -147,7 +148,7 @@ describe('admission from a school page', () => {
     await open('bg', `/schools/${school.id}`)
     const area = page.locator('section').filter({ has: page.getByRole('heading', { name: t('bg', 'admissionArea.catchmentTitle') }) })
     await area.locator('.leaflet-container').waitFor()
-    await area.getByLabel(t('bg', 'admissionArea.street')).fill(address.street.street.replace(/^[^.]*\./, ''))
+    await area.getByLabel(t('bg', 'admissionArea.street')).fill(address.street.street.replace(/^УЛ\./, ''))
     // The suggestion is the street, then its district in brackets.
     const escaped = address.street.street.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
     await area.getByRole('button', { name: new RegExp(`^${escaped}( \\(|$)`) }).click()
