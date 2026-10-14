@@ -332,10 +332,14 @@ def test_a_long_page_does_not_push_later_pages_out_of_the_read():
 
 
 @pytest.mark.asyncio
-async def test_one_line_split_into_several_facts_keeps_the_first():
-    facts = [_fact("school_day", _line(1), en="a"), _fact("languages", _line(1), en="b")]
-    report = await stage.read_school(_school(), LINES, _Calls(facts, passed=[1]))
-    assert [f["dropped"] for f in report["facts"]] == [None, "same quote as an earlier fact"]
+async def test_one_line_split_into_several_facts_on_a_topic_keeps_the_first():
+    facts = [
+        _fact("school_day", _line(1), en="a"),
+        _fact("school_day", _line(1), en="b"),
+        _fact("languages", _line(1), en="c"),
+    ]
+    report = await stage.read_school(_school(), LINES, _Calls(facts, passed=[1, 2]))
+    assert [f["dropped"] for f in report["facts"]] == [None, "same quote as an earlier fact", None]
 
 
 def test_a_short_quote_must_be_a_whole_line():

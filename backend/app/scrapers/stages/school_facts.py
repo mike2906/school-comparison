@@ -126,10 +126,10 @@ async def read_school(school: School, pages: list[PageRead], call: Caller) -> di
     )
     on_page = [(fact, facts_rules.quote_on_page(fact, readable)) for fact in read.facts]
     quoted = [(fact, url) for fact, url in on_page if url]
-    seen_quotes: set[str] = set()
+    seen_quotes: set[tuple[str, str]] = set()
     repeats: list[Fact] = []
-    for fact, _ in quoted:  # one line split into several facts keeps the first
-        key = facts_rules.quote_key(fact)
+    for fact, _ in quoted:  # one line split into several facts on a topic keeps the first
+        key = (fact.topic, facts_rules.quote_key(fact))
         if key in seen_quotes:
             repeats.append(fact)
         seen_quotes.add(key)
