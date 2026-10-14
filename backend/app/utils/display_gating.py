@@ -419,6 +419,12 @@ def is_scraped_price(row: Any) -> bool:
     return str(getattr(source, "value", source) or "").lower() == "scraped_website"
 
 
+def is_agent_price(row: Any) -> bool:
+    """True for a website row the fees agent wrote (``pricing_context.extractor``)."""
+    context = _pricing_row_value(row, "pricing_context")
+    return isinstance(context, Mapping) and context.get("extractor") == "agent"
+
+
 def _yearly_tuition_eur(row: Any) -> tuple[decimal.Decimal, bool] | None:
     """Yearly EUR equivalent of a tuition row, and whether its period was stated.
 

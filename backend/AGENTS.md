@@ -73,6 +73,12 @@ not wait for a Stage 6 report, because most schools they are for were never extr
 `attributes_for_publication` always drops them; `publication_attributes` adds the shown ones,
 whose labels then join `filter_tags`, `language_focus` and `class_size`.
 
+Fee rows the fees agent wrote (`pricing_context.extractor == "agent"`) pass Stage 6 like any
+scraped row but do not wait for the old extraction stage's `extracted` status:
+`website_data.agent_fees_publishable` needs a current Stage 6 report, no withholding marker
+and an accepted website (`SITE_ACCEPTED_STATUSES`). The old pipeline's rows still need
+`extracted`/`summarized`.
+
 Social links (`attributes.social_links`, `social-links` stage) pass the same three checks
 through `app/utils/social_links.py` `shown_social_links` and reach the detail and compare
 responses as `social_links`.

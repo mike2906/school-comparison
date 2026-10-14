@@ -12,6 +12,11 @@ WEBSITE_DATA_WITHHELD_KEY = "website_data_withheld"
 VALIDATION_HISTORY_KEY = "data_validation_history"
 VALIDATION_ATTEMPT_KEY = "data_validation_attempt"
 WEBSITE_PUBLISHABLE_STATUSES = frozenset({"extracted", "summarized"})
+# Scrape statuses reached only after URL validation accepted the stored website as the
+# school's own. ``pending`` (not checked yet), ``failed_validate`` and ``no_official_website``
+# are left out. Facts and the fees agent's rows do not wait for extraction, so
+# ``extraction_failed`` still counts.
+SITE_ACCEPTED_STATUSES = frozenset({"validated", "navigated", "extraction_failed", "extracted", "summarized"})
 
 _PRIVATE_WEBSITE_ATTRIBUTE_KEYS = frozenset(
     {
@@ -123,6 +128,19 @@ def website_data_withheld_reasons(attributes: Any, scrape_status: Any) -> list[s
     if status not in WEBSITE_PUBLISHABLE_STATUSES:
         reasons.append("status_not_publishable")
     return reasons
+
+
+def agent_fees_publishable(attributes: Any, scrape_status: Any) -> bool:
+    """Whether the fees agent's rows may cross the API boundary.
+
+    The agent reads the fee pages itself and Stage 6 checks its rows, so they do not wait
+    for the old extraction stage to move the status to ``extracted``: St George (594) has
+    stayed ``validated`` with its fee rows never shown. A current Stage 6 report, no
+    withholding marker and an accepted website are still required.
+    """
+    status = str(scrape_status or "").strip().lower()
+    reasons = set(website_data_withheld_reasons(attributes, scrape_status)) - {"status_not_publishable"}
+    return not reasons and status in SITE_ACCEPTED_STATUSES
 
 
 def website_data_is_publishable(attributes: Any, scrape_status: Any) -> bool:

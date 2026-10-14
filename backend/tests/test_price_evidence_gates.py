@@ -516,3 +516,31 @@ def test_sofia_today_follows_eu_summer_time(monkeypatch, moment, sofia_day):
 
     monkeypatch.setattr(display_gating, "datetime", types.SimpleNamespace(**{**vars(datetime), "datetime": _DateTime}))
     assert display_gating._sofia_today() == sofia_day
+
+
+@pytest.mark.asyncio
+async def test_fees_agent_rows_show_before_the_old_extraction_moves_the_status(db_session, client):
+    """594 stayed ``validated``: the agent's checked rows show, the old pipeline's do not."""
+    school, page = await _school_with_page(
+        db_session, level="upper_secondary", website_url="https://www.waldorf.bg", page_text=WALDORF
+    )
+    school.scrape_status = "validated"
+    agent = _row(school, page, "tuition", 6150, "yearly", "Предучилищен и от 1-ви до 7-ми клас")
+    agent.pricing_context = {"confidence": 1.0, "extractor": "agent"}
+    pipeline = _row(school, page, "tuition", 6150, "yearly", "Предучилищен и от 1-ви до 7-ми клас")
+    db_session.add_all([agent, pipeline])
+    await db_session.commit()
+
+    response = await client.get(f"/schools/{school.id}")
+    assert response.json()["pricing"] == []  # no Stage 6 report yet
+
+    await validator_module.validate_school_data(db_session, school.id, "bg")
+    await db_session.refresh(school)
+    assert school.scrape_status == "validated"
+    response = await client.get(f"/schools/{school.id}")
+    assert [row["id"] for row in response.json()["pricing"]] == [agent.id]
+
+    school.scrape_status = "failed_validate"  # the website is no longer accepted as the school's
+    await db_session.commit()
+    response = await client.get(f"/schools/{school.id}")
+    assert response.json()["pricing"] == []

@@ -14,7 +14,11 @@ from urllib.parse import urlparse
 
 from app.utils.display_lists import canonical_language
 from app.utils.facility_vocabulary import APPROACH_VOCAB, FACILITY_VOCAB, PROGRAM_VOCAB
-from app.utils.website_data import attributes_for_publication, website_data_withheld_reasons
+from app.utils.website_data import (  # noqa: F401 (SITE_ACCEPTED_STATUSES is imported from here)
+    SITE_ACCEPTED_STATUSES,
+    attributes_for_publication,
+    website_data_withheld_reasons,
+)
 
 SCHEMA_VERSION = 1
 ATTRIBUTE_KEY = "school_facts"
@@ -61,10 +65,6 @@ RANKS = ("key", "more", "minor")
 MAX_KEY_FACTS = 8
 MAX_KEY_PER_TOPIC = 2
 
-# Scrape statuses reached only after URL validation accepted the stored website as the
-# school's own. ``pending`` (not checked yet), ``failed_validate`` and ``no_official_website``
-# are left out. Facts do not wait for extraction, so ``extraction_failed`` still counts.
-SITE_ACCEPTED_STATUSES = frozenset({"validated", "navigated", "extraction_failed", "extracted", "summarized"})
 
 
 def _site(url: Any) -> str:
