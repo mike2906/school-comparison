@@ -34,6 +34,7 @@ pairs.sources.forEach(([x, y], si) => {
     ratios.push(m / theirs[i])
     worst.push({ from: [x, y], to: pairs.dests[i], mine: Math.round(m), osrm: Math.round(theirs[i]) })
   })
+  if (mine.length < 2) return
   const rm = rank(mine)
   const ro = rank(ref)
   const n = mine.length

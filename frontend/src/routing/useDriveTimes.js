@@ -12,6 +12,7 @@ const EMPTY = new Map()
 export function useDriveTimes(userLocation, schools) {
   const workerRef = useRef(null)
   const requestRef = useRef(0)
+  const lastRequestRef = useRef(null) // { originKey, targetsKey } of the request in flight or answered
   const [state, setState] = useState({ status: 'idle', seconds: EMPTY })
 
   const targets = useMemo(() => {
@@ -23,11 +24,15 @@ export function useDriveTimes(userLocation, schools) {
     })
   }, [schools, userLocation])
 
-  useEffect(() => () => workerRef.current?.terminate(), [])
+  useEffect(() => () => {
+    workerRef.current?.terminate()
+    workerRef.current = null
+  }, [])
 
   useEffect(() => {
     if (!userLocation) {
       requestRef.current += 1 // an answer still on its way is for the old location
+      lastRequestRef.current = null
       setState({ status: 'idle', seconds: EMPTY })
       return
     }
@@ -39,8 +44,14 @@ export function useDriveTimes(userLocation, schools) {
       workerRef.current = new Worker(new URL('./driveTimes.worker.js', import.meta.url), { type: 'module' })
     }
     const worker = workerRef.current
+    const originKey = `${userLocation.lat},${userLocation.lng}`
+    const targetsKey = targets.map(t => `${t.id}:${t.lat},${t.lng}`).join(';')
+    const last = lastRequestRef.current
+    if (last && last.originKey === originKey && last.targetsKey === targetsKey) return
+    lastRequestRef.current = { originKey, targetsKey }
     const requestId = ++requestRef.current
-    setState(prev => ({ status: 'loading', seconds: prev.seconds }))
+    // A new start makes every time stale; a new school list for the same start keeps them.
+    setState(prev => ({ status: 'loading', seconds: last?.originKey === originKey ? prev.seconds : EMPTY }))
     worker.onmessage = ({ data }) => {
       if (data.requestId !== requestRef.current) return
       setState({

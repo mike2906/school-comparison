@@ -5,8 +5,8 @@
      1 2 3
      Restrictions: no right turn 1->4 then 4->5 (via node 4);
                    no turn from the bottom row via 2->5 onto 5->6 (via way).
-     East block: 3 - 40, then 40 - 41 - 42 north (41 is a junction with a dead end to 43) and
-     42 - 9 back west. Only straight on from 3-40 via 40-41-42 onto 42-9 (via way). -->
+     East block: 3 - 40, then 40 - 41 - 42 north (41 is a junction with a dead end to 43, 40 one
+     to 46) and 42 - 9 back west. Only straight on from 3-40 via 40-41-42 onto 42-9 (via way). -->
 <osm version="0.6">
   <node id="1" lat="42.700" lon="23.300"/>
   <node id="2" lat="42.700" lon="23.301"/>
@@ -22,9 +22,11 @@
   <node id="41" lat="42.701" lon="23.304"/>
   <node id="42" lat="42.702" lon="23.304"/>
   <node id="43" lat="42.701" lon="23.305"/>
+  <node id="46" lat="42.700" lon="23.305"/>
   <way id="43"><nd ref="3"/><nd ref="40"/><tag k="highway" v="residential"/></way>
   <way id="41"><nd ref="40"/><nd ref="41"/><nd ref="42"/><tag k="highway" v="residential"/></way>
   <way id="42"><nd ref="41"/><nd ref="43"/><tag k="highway" v="residential"/></way>
+  <way id="45"><nd ref="40"/><nd ref="46"/><tag k="highway" v="residential"/></way>
   <way id="44"><nd ref="42"/><nd ref="9"/><tag k="highway" v="residential"/></way>
   <way id="10"><nd ref="4"/><nd ref="5"/><tag k="highway" v="residential"/></way>
   <way id="16"><nd ref="5"/><nd ref="6"/><tag k="highway" v="residential"/></way>

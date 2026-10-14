@@ -235,7 +235,7 @@ def apply_restrictions(rd, edges):
         into_way[e.way].append(e)
         way_from[(e.way, e.src)].append(e)
         out_of[e.src].append(e)
-    banned = set()
+    banned, node_bans = set(), set()
     stats = defaultdict(int)
     copies = {}  # (in edge, via path) -> list of copy edges
 
@@ -264,7 +264,7 @@ def apply_restrictions(rd, edges):
                 continue
             for i in ins:
                 bad = [o for o in out_of[vid] if o not in outs] if only else outs
-                banned.update((i, o) for o in bad)
+                node_bans.update((i, o) for o in bad)
             stats["via_node"] += 1
             continue
         # Via way: find the from edge ending at one end of the via way.
@@ -289,14 +289,22 @@ def apply_restrictions(rd, edges):
                 edges.extend(cps)
                 copies[key] = cps
             cps = copies[key]
-            if only:  # the whole via way must be followed: no leaving it at a junction on the way
+            if only:  # the whole via way must be followed: onto it, and along it past its junctions
+                banned.update((i, o) for o in out_of[i.dst] if o is not path[0])
                 for c in cps[:-1]:
                     banned.update((c, o) for o in out_of[c.dst])
             bad = [o for o in out_of[end] if o not in outs] if only else outs
             banned.update((cps[-1], o) for o in bad)
             done = True
         stats["via_way" if done else "unmatched"] += 1
-    return banned, dict(stats)
+    # A copy of a via-way edge keeps the via-node restrictions of the edge it copies.
+    by_from = defaultdict(list)
+    for f, o in node_bans:
+        by_from[id(f)].append(o)
+    for cps in copies.values():
+        for c in cps:
+            banned.update((c, o) for o in by_from.get(id(c.copy_of), []))
+    return banned | node_bans, dict(stats)
 
 
 def main():

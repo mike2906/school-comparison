@@ -13,6 +13,7 @@ const TURN_PENALTY = 75
 const U_TURN = 200
 const BIAS = 1.075
 const CELL = 500 // snapping grid cell, 1e-5 deg (~400 x 550 m)
+const SNAP_CELLS = 3 // cells searched each way: at least ~1.2 km, beyond MAX_START_METRES
 
 export function decodeGraph(buf) {
   const h = new Uint32Array(buf, 0, 8)
@@ -100,7 +101,7 @@ export function decodeGraph(buf) {
       : TURN_PENALTY / (1 + Math.exp(-((13 * BIAS) * -angle / 180 - 6.5 / BIAS)))
   }
   return {
-    N, E, C, firstOut, src, tgt, weight, nRoads, bearingIn, bearingOut, chainFwd, chainBwd,
+    N, E, C, lat, lon, firstOut, src, tgt, weight, nRoads, bearingIn, bearingOut, chainFwd, chainBwd,
     geomStart, gx, gy, restricted, banned, onlyFrom, turnTable, grid: null,
   }
 }
@@ -147,7 +148,7 @@ function buildGrid(g) {
 /**
  * Nearest point on a road the user can start from or arrive at (not motorways).
  * Returns { chain, frac (by length along the chain), metres } or null when no road is
- * within ~1 km.
+ * within ~1.2 km.
  */
 export function snapToRoad(g, lng, lat) {
   if (!g.grid) g.grid = buildGrid(g)
@@ -159,10 +160,9 @@ export function snapToRoad(g, lng, lat) {
   const cx = Math.floor((px - minX) / CELL)
   const cy = Math.floor((py - minY) / CELL)
   let best = Infinity, bc = -1, bk = 0, bt = 0
-  // 5 x 5 cells: covers at least 2 cells (~800 m) in every direction.
-  for (let y = cy - 2; y <= cy + 2; y++) {
+  for (let y = cy - SNAP_CELLS; y <= cy + SNAP_CELLS; y++) {
     if (y < 0 || y >= rows) continue
-    for (let x = cx - 2; x <= cx + 2; x++) {
+    for (let x = cx - SNAP_CELLS; x <= cx + SNAP_CELLS; x++) {
       if (x < 0 || x >= cols) continue
       const cell = y * cols + x
       for (let i = start[cell]; i < start[cell + 1]; i++) {
@@ -196,7 +196,9 @@ export function snapToRoad(g, lng, lat) {
 // Cost of turning from edge f into edge e, or -1 when the turn is not allowed.
 function turnCost(g, f, e) {
   const v = g.tgt[f]
-  const uTurn = g.tgt[e] === g.src[f]
+  // Back the way it came: same two nodes and a heading within ~22 degrees of reversed, so a
+  // different road between the same two junctions is an ordinary turn.
+  const uTurn = g.tgt[e] === g.src[f] && Math.abs(((g.bearingIn[e] - g.bearingOut[f]) & 255) - 128) <= 16
   if (uTurn && g.firstOut[v + 1] - g.firstOut[v] > 1) return -1
   if (g.onlyFrom[e] >= 0 && g.onlyFrom[e] !== f) return -1
   if (g.restricted[f] && g.banned.has(f * g.E + e)) return -1
