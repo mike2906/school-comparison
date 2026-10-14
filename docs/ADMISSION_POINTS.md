@@ -162,7 +162,12 @@ and writes a decision with its reasons. A second job without Claude then:
   one), starts CI on it and links it on the issue. A PR holds a new rule file (or
   version) with its acts, sources and worked examples, `RULE_VERSIONS` updated when the
   version date changes (a test checks they agree with the rule files), or a schedule,
-  status event or confirmation on the campaign's file.
+  status event or confirmation on the campaign's file. Opening the PR needs the repo
+  setting "Allow GitHub Actions to create and approve pull requests"; without it the
+  issue gets a link to open the PR by hand.
+
+If Claude ends without a decision, the issue is labelled `needs-human`. `close` on any
+other kind of issue becomes `needs-human`.
 
 Claude reads untrusted page text, so its job has a read-only GitHub token and no tool
 that writes to GitHub or reaches other hosts. It sees only what the watch wrote on the

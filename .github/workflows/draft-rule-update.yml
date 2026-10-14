@@ -122,6 +122,8 @@ jobs:
       - name: Draft
         if: env.HAS_TOKEN == 'true'
         uses: anthropics/claude-code-action@v1
+        env:
+          CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: "1"  # commands it runs do not see the Claude token
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ secrets.GITHUB_TOKEN }}  # this job's read-only token
@@ -129,7 +131,7 @@ jobs:
           claude_args: >-
             --max-turns 80
             --allowedTools "Read(/${{ runner.temp }}/issue.md),Edit(frontend/src/admission/rules/**/*.json),Edit(backend/app/scrapers/sources/bg/admission_rule_watch.json),Edit(backend/app/scrapers/sources/bg/kg_sofia_ratings.py),Edit(backend/app/scrapers/sources/bg/ruo_sofia_min_max.py),Edit(.rule-draft/*),Bash(git status),Bash(git diff),Bash(uv run --no-sync --directory backend python -m scripts.fetch_official:*),Bash(npm --prefix frontend test)"
-            --disallowedTools "Read(//proc/**),Read(.git/**),Edit(.git/**),Bash(gh:*),Bash(curl:*),Bash(wget:*)"
+            --disallowedTools "Read(//proc/**),Read(.git/**),Edit(.git/**),Bash(gh:*),Bash(curl:*),Bash(wget:*),Bash(env:*),Bash(printenv:*)"
           prompt: |
             You maintain the admission rule files of a school-comparison site for parents in
             Bulgaria. The daily rule watch opened or updated issue #${{ inputs.issue }}: an
@@ -191,13 +193,19 @@ jobs:
       - name: Pack the draft
         id: pack
         if: env.HAS_TOKEN == 'true'
+        env:
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -f  # ALLOWED_PATHS holds globs for git, not the shell
           # New rule files count too (intent-to-add puts them in the diff).
           git ls-files --others --exclude-standard -z -- $ALLOWED_PATHS | xargs -0 -r git add -N --
           git diff --binary HEAD -- $ALLOWED_PATHS > .rule-draft/changes.patch
+          if [ ! -s .rule-draft/decision ]; then
+            echo needs-human > .rule-draft/decision
+            echo "The drafting run ended without a result: $RUN_URL" > .rule-draft/comment.md
+          fi
           ls -la .rule-draft
-          if [ -s .rule-draft/decision ]; then echo "drafted=true" >> "$GITHUB_OUTPUT"; fi
+          echo "drafted=true" >> "$GITHUB_OUTPUT"
 
       - name: Keep the draft
         if: steps.pack.outputs.drafted == 'true'
@@ -236,10 +244,16 @@ jobs:
         env:
           DRAFT: ${{ runner.temp }}/draft
           CLAUDE_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          ISSUE_TITLE=$(gh issue view "$ISSUE" --repo "$GITHUB_REPOSITORY" --json title --jq .title)
           set -f  # ALLOWED_PATHS holds globs for git, not the shell
           decision=$(tr -d '[:space:]' < "$DRAFT/decision" 2>/dev/null || true)
           case "$decision" in close|needs-human|pr) ;; *) echo "Unknown decision: $decision"; decision=needs-human;; esac
+          # Only a changed page or a new entry may be closed without a fix.
+          if [ "$decision" = close ]; then
+            case "$ISSUE_TITLE" in *" changed"|*" mention admission rules") ;; *) decision=needs-human;; esac
+          fi
           # Refuse anything that looks like a credential, so page text cannot get one posted.
           if grep -rqE 'gh[opsu]_[A-Za-z0-9]{20,}|github_pat_|sk-ant-|x-access-token' "$DRAFT" \
              || { [ -n "$CLAUDE_TOKEN" ] && grep -rqF "$CLAUDE_TOKEN" "$DRAFT"; }; then
@@ -279,11 +293,15 @@ jobs:
           url=$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$BRANCH" --state open --json url --jq '.[0].url // ""')
           if [ -z "$url" ]; then
             { echo "Closes #$ISSUE"; echo; cat "$DRAFT/pr-body.md" 2>/dev/null || true; } > "$RUNNER_TEMP/body.md"
+            # Needs "Allow GitHub Actions to create and approve pull requests"; without it the
+            # issue gets a link to open the PR by hand.
             url=$(gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$BRANCH" --draft \
-              --title "$title" --body-file "$RUNNER_TEMP/body.md")
+              --title "$title" --body-file "$RUNNER_TEMP/body.md") \
+              || url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/compare/main...$BRANCH?expand=1 (open the PR from here)"
           fi
           # Pushes made with GITHUB_TOKEN start no workflows, so start CI by hand.
-          gh workflow run ci.yml --repo "$GITHUB_REPOSITORY" --ref "$BRANCH"
+          gh workflow run ci.yml --repo "$GITHUB_REPOSITORY" --ref "$BRANCH" \
+            || echo "::warning::Could not start CI on $BRANCH"
           echo "url=$url" >> "$GITHUB_OUTPUT"
 
       - name: Comment on the issue
