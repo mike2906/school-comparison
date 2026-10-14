@@ -6,6 +6,7 @@ const b = readFileSync(graphPath);
 const g = decode(b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength));
 const pairs = JSON.parse(readFileSync(pairsPath)), osrm = JSON.parse(readFileSync(osrmPath));
 const dests = pairs.dests.map(([x, y]) => snap(g, x, y));
+const outliers = [];
 const ratios = [], absErr = [], rhos = [], top5 = [], big = [];
 const rank = a => { const idx = a.map((v, i) => [v, i]).sort((x, y) => x[0] - y[0]); const r = new Array(a.length); idx.forEach(([, i], k) => r[i] = k); return r; };
 pairs.sources.forEach((s, si) => {
@@ -15,7 +16,7 @@ pairs.sources.forEach((s, si) => {
   const m = mine.filter((_, i) => ok[i]), o = theirs.filter((_, i) => ok[i]);
   m.forEach((v, i) => {
     ratios.push(v / o[i]); absErr.push(Math.abs(v - o[i]));
-    if (Math.abs(v / o[i] - 1) > 0.3) big.push({ si, from: s, to: pairs.dests[mine.indexOf(v)], mine: Math.round(v), osrm: Math.round(o[i]) });
+    if (Math.abs(v / o[i] - 1) > 0.3) outliers.push([s, pairs.dests[mine.indexOf(v)]]), big.push({ si, from: s, to: pairs.dests[mine.indexOf(v)], mine: Math.round(v), osrm: Math.round(o[i]) });
   });
   const rm = rank(m), ro = rank(o), n = m.length;
   rhos.push(1 - 6 * rm.reduce((acc, x, i) => acc + (x - ro[i]) ** 2, 0) / (n * (n * n - 1)));
@@ -30,3 +31,6 @@ console.log('within 10%%: %s%%  within 20%%: %s%%', (100 * ratios.filter(r => Ma
 console.log('Spearman per source  min %s  median %s', Math.min(...rhos).toFixed(3), q(rhos, 0.5).toFixed(3));
 console.log('top-5 overlap per source  median %s/5  min %s/5', q(top5, 0.5), Math.min(...top5));
 console.log('off by >30%%:', big.length); console.log(JSON.stringify(big.slice(0, 8)));
+
+import { writeFileSync } from 'fs';
+if (process.argv[5]) writeFileSync(process.argv[5], JSON.stringify(outliers));

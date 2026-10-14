@@ -97,9 +97,10 @@ function turnCost(g, f, e) {
 }
 
 // One search from a snapped point. Returns per-edge entry cost (deciseconds) in Float64Array.
-export function search(g, origin, weights = g.w) {
+export function search(g, origin, weights = g.w, trackParent = false) {
   const { E, firstOut, tgt } = g;
   const dist = new Float64Array(E).fill(Infinity);
+  const parent = trackParent ? new Int32Array(E).fill(-1) : null;
   let cap = 1 << 16, hk = new Float64Array(cap), hv = new Uint32Array(cap), n = 0;
   const push = (k, v) => {
     if (n === cap) {
@@ -134,7 +135,7 @@ export function search(g, origin, weights = g.w) {
       const tc = turnCost(g, f, e);
       if (tc < 0) continue;
       const nd = base + tc;
-      if (nd < dist[e]) { dist[e] = nd; push(nd, e); }
+      if (nd < dist[e]) { dist[e] = nd; if (parent) parent[e] = f; push(nd, e); }
     }
   };
   // Virtual origin: drive the rest of each directed edge of the snapped chain.
@@ -148,7 +149,7 @@ export function search(g, origin, weights = g.w) {
     settled++;
     relaxFrom(f, d + weights[f]);
   }
-  return { dist, settled, origin, weights };
+  return { dist, settled, origin, weights, parent };
 }
 
 // Seconds to reach a snapped destination, or Infinity.
