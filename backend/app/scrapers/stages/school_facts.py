@@ -221,6 +221,9 @@ async def run_school(db: AsyncSession, school: School, *, find: Finder, call: Ca
         report["kept_stored_facts"] = bool(stored)
     elif apply:
         block = facts_block(facts, get_model(TIER), school.website_url)
+        # The read takes a while and other stages write other attributes keys meanwhile:
+        # re-read the row under a lock so only this key changes.
+        await db.refresh(school, attribute_names=["attributes"], with_for_update=True)
         school.attributes = {**(school.attributes or {}), ATTRIBUTE_KEY: block}
         await db.commit()
         report["stored"] = len(facts)
