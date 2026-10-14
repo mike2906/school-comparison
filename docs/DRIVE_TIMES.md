@@ -44,7 +44,8 @@ schools never snap onto motorways or motorway/trunk links.
 ## Phone cost (October 2026)
 
 Chromium with the CPU slowed 6x: ~0.5 s to unpack, ~0.27 s per whole-city search, ~10 MB of
-memory. Not yet measured on a real phone.
+memory. Snapping uses a grid index built on first use (~0.5 s once), then ~0.5 ms per point,
+so 300 school pins take ~0.16 s (brute force over every road took ~9 s). Not yet measured on a real phone.
 
 ## Licence
 
