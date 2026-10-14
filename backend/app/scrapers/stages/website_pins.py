@@ -1,12 +1,13 @@
 """Website-pins stage: place a hidden (approximate or missing) pin on the school's own map point.
 
 A school's website often embeds a map of its building. That point is taken only when
-OpenStreetMap puts it at our address: Nominatim's nearest building there must have the
-same street and house number (``same_building``). A wrong website, a map of another
+OpenStreetMap puts it at our address: Nominatim's nearest building there must be in our
+town, on our street, with exactly our house number. A wrong website, a map of another
 branch, or a point dropped on the district centre then fails the check, so the website
 itself does not have to be trusted. Two distinct points on the site that both pass are
-left alone. No model calls. The default is a dry run that writes nothing. Not part of
-``all``; run it after geocoding.
+left alone. Only cities with write bounds (Sofia) for now: the town check needs each
+city's local name. No model calls. The default is a dry run that writes nothing. Not part
+of ``all``; run it after geocoding.
 """
 
 from __future__ import annotations
@@ -25,7 +26,7 @@ from app.models import School, SchoolLocation
 from app.scrapers.fee_pages import fee_http_client
 from app.scrapers.stages.social_links import Fetch, _contact_page, _http_fetch, page_links
 from app.services.geocoding.base import GeocodingResult
-from app.services.geocoding.bg.address_match import same_building
+from app.services.geocoding.bg.address_match import same_building, same_house_number
 from app.services.geocoding.bounds import get_city_bounds, point_in_bounds
 from app.services.geocoding.write_gate import apply_geocode_result_to_location, has_pinned_point
 from app.utils.display_gating import UNVERIFIED_PIN_PRECISION
@@ -56,7 +57,9 @@ def _link_point(url: str) -> Optional[tuple[float, float]]:
     """The point a Google Maps or OpenStreetMap link or embed is centred on, or None."""
     parsed = urlparse(url)
     host = (parsed.hostname or "").lower()
-    if not _MAP_HOST_RE.search(host) or (host.startswith("www.google") and "/maps" not in parsed.path):
+    if not _MAP_HOST_RE.search(host):
+        return None
+    if "google." in host and not host.startswith("maps.") and not parsed.path.startswith("/maps"):
         return None
     text = unquote(url)
     if match := _EMBED_RE.search(text):
@@ -94,6 +97,22 @@ def nominatim_address(parts: Optional[dict]) -> Optional[str]:
     return f'ул. "{road}" № {number}'
 
 
+# Our address's own locality ("гр. Банкя", "с. Казичене"), when it names one.
+_LOCALITY_RE = re.compile(r"(?<![а-яa-z])(?:гр|с)\.\s*([а-я][а-я -]*?)\s*(?=[,\d(]|$)")
+# The town Nominatim gives for a point, from the most to the least local.
+_PLACE_KEYS = ("village", "town", "city")
+# A city's local name, for addresses that do not name their town.
+CITY_NAMES = {("bg", "sofia"): "софия"}
+
+
+def same_town(address: str, parts: Optional[dict], default_town: str) -> bool:
+    """Whether Nominatim's place is the town our address names (else ``default_town``)."""
+    match = _LOCALITY_RE.search((address or "").casefold())
+    wanted = match.group(1).strip() if match else default_town
+    found = next((parts[key] for key in _PLACE_KEYS if isinstance((parts or {}).get(key), str)), "")
+    return bool(wanted) and found.casefold().strip() == wanted
+
+
 def _address(location: SchoolLocation) -> str:
     address = location.address_i18n or {}
     return address.get("bg") or address.get("en") or ""
@@ -112,7 +131,8 @@ async def place(
     address: str,
     points: Sequence[tuple[float, float]],
     reverse: Reverse,
-    bounds: Optional[dict[str, float]],
+    bounds: dict[str, float],
+    town: str,
 ) -> dict[str, Any]:
     """``{"outcome": ..., "point": (lat, lng) | None, "checked": [...]}`` for one address.
 
@@ -121,11 +141,19 @@ async def place(
     """
     checked, matches = [], []
     for lat, lng in points:
-        if bounds and not point_in_bounds(lat, lng, bounds):
+        if not point_in_bounds(lat, lng, bounds):
             checked.append({"point": (lat, lng), "found": None, "note": "outside the city"})
             continue
-        found = nominatim_address(await reverse(lat, lng))
-        agrees = bool(found) and same_building(address, found)
+        parts = await reverse(lat, lng)
+        found = nominatim_address(parts)
+        # same_building matches the street but takes any shared number (a block number,
+        # 55а for 55б); the house number itself must be exactly ours.
+        agrees = (
+            bool(found)
+            and same_building(address, found)
+            and same_house_number(parts.get("house_number"), address)
+            and same_town(address, parts, town)
+        )
         checked.append({"point": (lat, lng), "found": found, "agrees": agrees})
         if agrees:
             matches.append((lat, lng))
@@ -159,7 +187,7 @@ async def run_website_pins(
     db: AsyncSession,
     *,
     country: str = "bg",
-    city: Optional[str] = None,
+    city: str = "sofia",
     school_ids: Sequence[int] = (),
     limit: Optional[int] = None,
     apply: bool = False,
@@ -179,8 +207,7 @@ async def run_website_pins(
     )
     if school_ids:
         query = query.where(School.id.in_(list(school_ids)))
-    if city:
-        query = query.where(func.lower(School.city) == city.lower())
+    query = query.where(func.lower(School.city) == city.lower())
     ids = list((await db.execute(query)).scalars().all())
 
     if reverse is None:
@@ -189,6 +216,10 @@ async def run_website_pins(
         from app.services.geocoding.service import nominatim_user_agent
 
         reverse = NominatimProvider(user_agent=nominatim_user_agent(get_settings())).reverse_address
+
+    bounds, town = get_city_bounds(country, city), CITY_NAMES.get((country, (city or "").casefold()))
+    if bounds is None or town is None:
+        raise ValueError(f"website-pins needs a city with write bounds and a local name, not {city!r}")
 
     async def _run(fetch: Fetch) -> list[dict[str, Any]]:
         results = []
@@ -217,14 +248,11 @@ async def run_website_pins(
                     results.append({**row, "outcome": "not_read", **({"note": note} if note else {})})
                     continue
                 try:
-                    found = await place(_address(location), points, reverse, get_city_bounds(country, school.city))
+                    found = await place(_address(location), points, reverse, bounds, town)
                 except Exception as exc:  # Nominatim down: report, keep the location as it is
                     results.append({**row, "outcome": "not_checked", "note": str(exc)[:200]})
                     continue
-                result = {**row, **found}
-                if found["outcome"] == "placed" and apply:
-                    result["outcome"] = await _write(db, location, school, found["point"])
-                results.append(result)
+                results.append({**row, **found})
         return results
 
     if fetch is None:
@@ -235,18 +263,24 @@ async def run_website_pins(
     else:
         results = await _run(fetch)
     if apply:
-        await db.commit()
+        # Written after all the reading, each row locked only for its own short write.
+        for result in results:
+            if result["outcome"] == "placed":
+                result["outcome"] = await _write(db, result["location_id"], result["point"])
     outcomes: dict[str, int] = {}
     for result in results:
         outcomes[result["outcome"]] = outcomes.get(result["outcome"], 0) + 1
     return {"apply": apply, "locations": len(results), "outcomes": outcomes, "results": results}
 
 
-async def _write(db: AsyncSession, location: SchoolLocation, school: School, point: tuple[float, float]) -> str:
+async def _write(db: AsyncSession, location_id: int, point: tuple[float, float]) -> str:
+    location = await db.get(SchoolLocation, location_id)
     # Another stage may have pinned it since the read; the lock waits for one still writing.
     await db.refresh(location, with_for_update=True)
     if not needs_pin(location):
+        await db.rollback()
         return "pinned_meanwhile"
+    school = await db.get(School, location.school_id)
     applied = await apply_geocode_result_to_location(
         db,
         location,
@@ -262,9 +296,10 @@ async def _write(db: AsyncSession, location: SchoolLocation, school: School, poi
         school=school,
     )
     if not applied.success:
-        db.add(location)
+        await db.rollback()  # the gate cleared the old point; keep it
         return "rejected"
     tags = [tag for tag in location.location_tags or [] if not str(tag).startswith("coords_source=")]
     location.location_tags = [*tags, PIN_TAG]
     db.add(location)
+    await db.commit()
     return "placed"

@@ -518,7 +518,7 @@ def social_links_command(school_ids, city, country, limit, apply_changes, report
 
 @cli.command("website-pins")
 @click.option("--school-id", "school_ids", type=int, multiple=True, help="Run these schools (repeatable)")
-@click.option("--city", default=None, help="Only schools in this city")
+@click.option("--city", default="sofia", show_default=True, help="City (only Sofia has the bounds and town name yet)")
 @click.option("--country", default="bg", show_default=True, help="Country code")
 @click.option("--limit", type=int, default=None, help="Maximum schools")
 @click.option("--apply", "apply_changes", is_flag=True, help="Write pins (default is a dry run that writes nothing)")
