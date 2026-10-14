@@ -47,13 +47,14 @@ runs() {
 	gh run list -R "$repo" --workflow deploy.yml --event workflow_dispatch --limit 20 --json databaseId -q '.[].databaseId'
 }
 before="$(runs)" || die "could not list deploy runs"
-gh workflow run deploy.yml -R "$repo" --ref main -f snapshot="$dump" || die "could not start deploy.yml"
-run_id=""
+started="$(gh workflow run deploy.yml -R "$repo" --ref main -f snapshot="$dump" 2>&1)" || die "could not start deploy.yml: $started"
+# Newer gh prints the new run's URL; older gh prints nothing, so fall back to the newest
+# dispatched run that was not there before ours.
+run_id="$(echo "$started" | sed -n 's#.*/actions/runs/\([0-9][0-9]*\).*#\1#p' | head -1)"
 for _ in $(seq 12); do
+	[ -z "$run_id" ] || break
 	sleep 10
-	# The newest dispatched run that was not there before ours (no clock comparison).
 	run_id="$(runs | grep -vxF -f <(echo "$before") | head -1)" || true
-	[ -n "$run_id" ] && break
 done
 [ -n "$run_id" ] || die "deploy.yml run for $dump did not appear"
 echo "publish: $dump -> https://github.com/$repo/actions/runs/$run_id"

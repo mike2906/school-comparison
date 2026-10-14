@@ -66,12 +66,7 @@ git -C "$archive" checkout -q --detach "$head"
 cd "$repo_root/backend"
 uv run python scripts/import_cutoffs.py --archive "$archive" --summary-json "$state/cutoffs_dry_run.json" > /dev/null \
 	|| stop "dry run failed"
-# "unpublished" marks an apply whose publish failed: publish it even with nothing new.
-if [ "$(field "$state/cutoffs_dry_run.json" schools_changed)" = 0 ] && [ ! -f "$state/cutoffs_unpublished" ]; then
-	echo "$head" > "$state/cutoffs_published_sha"
-	exit 0  # a capture with no new rounds
-fi
-log "cutoff-data $head: $(cat "$state/cutoffs_dry_run.json")"
+# Checked on every new commit: rows for unknown institutions change no school.
 unmatched="$(field "$state/cutoffs_dry_run.json" unmatched_institutions)"
 [ "$unmatched" -le "$max_unmatched" ] || stop "$unmatched unmatched institutions (max $max_unmatched)"
 rows="$(field "$state/cutoffs_dry_run.json" rows)"
@@ -79,6 +74,12 @@ if [ -f "$state/cutoffs_published.json" ]; then
 	before="$(field "$state/cutoffs_published.json" rows)"
 	[ "$rows" -ge "$before" ] || stop "the archive shrank from $before to $rows rows"
 fi
+# "unpublished" marks an apply whose publish failed: publish it even with nothing new.
+if [ "$(field "$state/cutoffs_dry_run.json" schools_changed)" = 0 ] && [ ! -f "$state/cutoffs_unpublished" ]; then
+	echo "$head" > "$state/cutoffs_published_sha"
+	exit 0  # a capture with no new rounds
+fi
+log "cutoff-data $head: $(cat "$state/cutoffs_dry_run.json")"
 
 backup="$backups/$database-pre-cutoffs-$(date -u +%Y%m%dT%H%M%SZ).dump"
 if ! docker exec "$container" pg_dump -U postgres -d "$database" --format=custom > "$backup" || ! [ -s "$backup" ]; then
