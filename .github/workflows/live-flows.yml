@@ -13,6 +13,8 @@ on:
     branches: [main]
   schedule:
     - cron: "23 6 * * *"
+  push:
+    branches: [agent/live-flows]
   workflow_dispatch:
     inputs:
       site_url:
@@ -43,11 +45,25 @@ jobs:
       run:
         working-directory: frontend
     steps:
+      # The flows of the commit the live site was built from (deploy.yml writes it to
+      # version.txt): a docs-only push or a rolled-back deploy leaves main ahead of it.
+      - name: Find the live commit
+        id: live
+        working-directory: .
+        env:
+          SITE: ${{ inputs.site_url || 'https://schooldecider.com' }}
+        run: |
+          sha="$(curl -fsS -m 20 -H 'Cache-Control: no-cache' "$SITE/version.txt?cb=$GITHUB_RUN_ID" 2>/dev/null | tr -d '[:space:]' || true)"
+          if ! [[ "$sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::warning::$SITE/version.txt gave no commit; using $GITHUB_SHA."
+            sha="$GITHUB_SHA"
+          fi
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
       - name: Check out repository
         uses: actions/checkout@v7
         with:
-          # The flows of the commit that was deployed, not of a later push.
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          ref: ${{ steps.live.outputs.sha }}
 
       - name: Set up Node
         uses: actions/setup-node@v7
