@@ -14,6 +14,7 @@ from app.utils.display_gating import (
     pricing_row_is_publishable,
     summary_is_publishable,
 )
+from app.utils.fee_discounts import publishable_fee_discounts
 from app.utils.i18n_resolver import resolve_address_i18n, resolve_name_i18n
 from app.utils.location_tags import semantic_location_tags
 from app.utils.school_attributes import build_display_attributes, publishable_display_i18n
@@ -373,6 +374,18 @@ class SchoolFacts(BaseModel):
     facts: list[SchoolFact]
 
 
+class FeeDiscount(BaseModel):
+    """A discount the school's own pages state beside its fees (sibling, early payment)."""
+
+    kind: str
+    percent: Optional[float] = None
+    amount: Optional[float] = None
+    currency: Optional[str] = None
+    child: Optional[int] = None
+    text_i18n: dict[str, str]
+    source_url: str
+
+
 class SchoolResponse(SchoolBase, SchoolPricingMixin):
     id: int
     created_at: datetime
@@ -405,6 +418,21 @@ class SchoolResponse(SchoolBase, SchoolPricingMixin):
             return None
         facts = publishable_school_facts(self.raw_attributes, self.website_url)
         return SchoolFacts.model_validate(facts) if facts else None
+
+    @computed_field(return_type=list[FeeDiscount])
+    @property
+    def fee_discounts(self) -> list[FeeDiscount]:
+        # Gated like the facts, and shown only beside published fees (``publishable_fee_discounts``).
+        if "withheld_marker" in website_data_withheld_reasons(self.raw_attributes, self.raw_scrape_status):
+            return []
+        if str(self.raw_scrape_status or "").strip().lower() not in SITE_ACCEPTED_STATUSES:
+            return []
+        if not self.pricing:
+            return []
+        return [
+            FeeDiscount.model_validate(d)
+            for d in publishable_fee_discounts(self.raw_attributes, self.website_url) or []
+        ]
 
     @computed_field(return_type=list[FieldSourceResponse])
     @property

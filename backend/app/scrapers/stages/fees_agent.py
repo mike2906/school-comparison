@@ -9,6 +9,7 @@ Page-line checks live in ``extraction/agent_fees.py``; row replacement reuses th
 from __future__ import annotations
 
 import asyncio
+import datetime
 import hashlib
 import json
 import logging
@@ -40,9 +41,11 @@ from app.schemas.extraction import ExtractedPrice
 from app.scrapers.extraction import llm_results, price_step, text_values
 from app.scrapers.extraction.agent_fees import (
     READER_PROMPT,
+    AgentDiscount,
     AgentFee,
     AgentFees,
     CheckedFee,
+    check_discount,
     check_fee,
     fee_amounts,
     page_numbers,
@@ -304,7 +307,13 @@ def reader_text(pages: list[PageRead]) -> str:
     return "\n\n".join(f"=== PAGE {page.url}\n{page.text}" for page in pages)[:MAX_READ_CHARS]
 
 
-async def read_fees(school: School, pages: list[PageRead], spend: Spend, missed: Sequence[Decimal]) -> list[AgentFee]:
+class FeeRead(list):
+    """The fees of one read, with the discounts it also gave: a list to every reader."""
+
+    discounts: list[AgentDiscount]
+
+
+async def read_fees(school: School, pages: list[PageRead], spend: Spend, missed: Sequence[Decimal]) -> FeeRead:
     """Read the fees on ``pages``; ``missed`` names amounts an earlier read left out."""
     text = reader_text(pages)
     if missed:
@@ -333,7 +342,9 @@ async def read_fees(school: School, pages: list[PageRead], spend: Spend, missed:
         timeout_seconds=120,
     )
     spend.spent_usd += extract_provider_cost_usd(result)
-    return result.output.fees
+    read = FeeRead(result.output.fees)
+    read.discounts = result.output.discounts
+    return read
 
 
 # ---------------------------------------------------------------------------
@@ -344,6 +355,35 @@ async def read_fees(school: School, pages: list[PageRead], spend: Spend, missed:
 def _page_for(fee: AgentFee, pages: list[PageRead]) -> Optional[PageRead]:
     by_key = {page_key(page.url): page for page in pages}
     return by_key.get(page_key(fee.source_url)) or (pages[0] if len(pages) == 1 else None)
+
+
+def _discount_report(discount: AgentDiscount, pages: list[PageRead]) -> dict[str, Any]:
+    by_key = {page_key(page.url): page for page in pages}
+    page = by_key.get(page_key(discount.source_url)) or (pages[0] if len(pages) == 1 else None)
+    checked = check_discount(discount, page.text) if page else None
+    shown = checked or discount
+    return {
+        "kind": shown.kind,
+        "percent": shown.percent,
+        "amount": shown.amount,
+        "currency": shown.currency,
+        "child": shown.child,
+        "text_i18n": shown.text_i18n,
+        "source_url": page.url if page else shown.source_url,
+        "kept": checked is not None,
+    }
+
+
+def _store_discounts(school: School, report: dict[str, Any]) -> None:
+    """The kept discounts of this read; an empty list too: the site no longer offers them."""
+    kept = [{k: v for k, v in d.items() if k != "kept"} for d in report["discounts"] if d["kept"]]
+    block = {
+        "_schema_version": 1,
+        "read_at": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
+        "website_url": school.website_url,
+        "discounts": kept,
+    }
+    school.attributes = {**(school.attributes or {}), "fee_discounts": block}
 
 
 def _new_source_page(school: School, page: PageRead, stored: Optional[SourcePage], new_id: int) -> SourcePage:
@@ -716,7 +756,7 @@ async def run_school(
     gone: Optional[Callable[[str], Awaitable[bool]]] = None,
 ) -> dict[str, Any]:
     """Find, read, check and (with ``apply``) store one school's fees. Returns its report."""
-    report: dict[str, Any] = {"school_id": school.id, "outcome": None, "pages": [], "fees": []}
+    report: dict[str, Any] = {"school_id": school.id, "outcome": None, "pages": [], "fees": [], "discounts": []}
     pages = await find(school)
     report["pages"] = [{"url": p.url, "chars": len(p.text), "prices": p.prices, "note": p.note} for p in pages]
     # A known page keeps its id; a new one gets a negative placeholder until ``apply`` stores it.
@@ -752,6 +792,7 @@ async def run_school(
         return report
 
     fees = await read(school, priced, ())
+    discounts = getattr(fees, "discounts", [])  # the first read's; a reread only adds fees
     ruled_out = [page.url for page in priced if getattr(stored.get(page_key(page.url)), "is_valid", None) is False]
     if ruled_out:
         report["outcome"] = "kept_old_rows"
@@ -793,6 +834,8 @@ async def run_school(
         report["fees"].append(_fee_report(result, page))
         if result.kept and page:
             checked.append((result, source_pages[page.url]))
+
+    report["discounts"] = [_discount_report(discount, priced) for discount in discounts]
 
     rows, sources = _build_rows(school, checked)
     publishable = [row for row in rows if pricing_row_is_publishable(row)]
@@ -861,6 +904,7 @@ async def run_school(
         report["reason"] = "every fee read is already stored"
         if apply:  # an earlier run's hold no longer applies
             price_step._update_pricing_hold(school, [], 0)
+            _store_discounts(school, report)
             await db.commit()
         return report
     if not apply:
@@ -875,6 +919,7 @@ async def run_school(
     for source in sources:
         source.scraped_at = text_values._utcnow_naive()
     await price_step._write_price_rows(db, school, [row.id for row in superseded], rows, sources)
+    _store_discounts(school, report)
     # The new rows stay withheld until Stage 6 has checked them, as after an extraction.
     school.attributes = prepare_validation_rollover(school.attributes)
     await db.commit()

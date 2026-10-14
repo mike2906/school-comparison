@@ -1,20 +1,23 @@
 import { useTranslation } from 'react-i18next'
 import { displayPrice, groupPricingByAcademicYear, groupRowsByAgeGroup, priceAgeGroupLabel, YEAR_STATUS } from '../../utils/pricing'
-import { sharedPriceSource } from '../../utils/priceSources'
+import { sharedPriceSource, sourceSiteName } from '../../utils/priceSources'
 import { groupPricingByCategory } from './helpers'
 import { formatAmount } from '../../utils/format'
 import PriceSource from './PriceSource'
 import { pricePeriod, periodUnknown } from '../../utils/priceRows'
 import { planNameBeside, textLang } from '../../utils/priceLabels'
 import { paymentOptionTexts } from '../../utils/paymentOptions'
+import { feeDiscountLines } from '../../utils/feeDiscounts'
 
 /**
  * Every published price, grouped by academic year, then by category, then by the age
  * group it is for. Each year says where its prices came from: once when they share one
  * page, otherwise on each row.
  */
-function PricingSection({ pricing }) {
+function PricingSection({ pricing, discounts }) {
   const { t, i18n } = useTranslation()
+
+  const discountLines = feeDiscountLines(discounts, i18n.language)
 
   const formatNumber = (value) => formatAmount(value, i18n.language)
 
@@ -129,6 +132,31 @@ function PricingSection({ pricing }) {
           )
         })}
       </div>
+
+      {discountLines.length > 0 && (
+        <div className="mt-8">
+          <h3 className="text-sm font-semibold text-neutral-500 uppercase tracking-wide mb-3">{t('pricing.discounts')}</h3>
+          <ul className="space-y-2">
+            {discountLines.map(line => (
+              <li key={line.key} className="text-neutral-900 break-words">
+                <span lang={textLang(line.text, i18n.language)}>{line.text}</span>
+                {line.url && (
+                  <a
+                    href={line.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="ml-2 text-xs text-teal-700 hover:text-teal-800 underline break-all"
+                    aria-label={t('pricing.sourceLinkLabel', { site: sourceSiteName(line.url) })}
+                  >
+                    {t('pricing.sourceLink', { site: sourceSiteName(line.url) })}
+                    <span aria-hidden="true"> ↗</span>
+                  </a>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   )
 }
