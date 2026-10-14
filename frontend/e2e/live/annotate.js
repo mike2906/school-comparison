@@ -1,6 +1,7 @@
 /**
  * A node:test reporter that turns each failed flow into a GitHub Actions error
  * annotation, so the run's page names the broken journey and why without opening the log.
+ * A flow's own diagnostics (`testContext.diagnostic`, such as timings) become notices.
  * Used beside the usual reporter: `--test-reporter=spec --test-reporter=./e2e/live/annotate.js`.
  */
 // Workflow commands decode %XX, and a title also ends at "," or ":" (actions/toolkit escapeData, escapeProperty).
@@ -9,6 +10,11 @@ const property = text => clean(text).replace(/:/g, '%3A').replace(/,/g, '%2C')
 
 export default async function* annotate(source) {
   for await (const event of source) {
+    // The run's closing counts are diagnostics too, at the top level.
+    if (event.type === 'test:diagnostic' && event.data.nesting > 0) {
+      yield `::notice title=Live flow::${clean(event.data.message)}\n`
+      continue
+    }
     if (event.type !== 'test:fail' || event.data.details?.type === 'suite') continue
     const error = event.data.details?.error
     const cause = error?.cause ?? error
