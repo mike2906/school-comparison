@@ -37,11 +37,31 @@ _CONTACT_RE = re.compile(r"контакт|contact|kontakt", re.IGNORECASE)
 MIN_HOME_LINKS = 5
 
 
+# A link labelled as the parents' board or parents' page is not the school's own page
+# (104 ОУ links its "Училищно настоятелство" page).
+_NOT_THE_SCHOOL_RE = re.compile(r"настоятел|родител|parent|\bpta\b", re.IGNORECASE)
+
+
+def _join(base: str, href: Any) -> Optional[str]:
+    """``href`` made absolute, or None when it is not a usable address (606 links
+    ``instagram-feed%20feed=3`` in brackets, which urljoin rejects)."""
+    try:
+        return urljoin(base, str(href).strip()) if href else None
+    except ValueError:
+        return None
+
+
+def _label(tag) -> str:
+    return " ".join([tag.get_text(" ", strip=True), str(tag.get("title") or ""), str(tag.get("aria-label") or "")])
+
+
 def page_links(html: str, base: str) -> list[str]:
-    """Every link and frame address on the page, absolute."""
+    """Every link and frame address on the page, absolute, except links labelled as a
+    parents' page."""
     soup = BeautifulSoup(html, "html.parser")
-    found = [tag.get("href") for tag in soup.find_all("a")] + [tag.get("src") for tag in soup.find_all("iframe")]
-    return [urljoin(base, str(href).strip()) for href in found if href]
+    found = [tag.get("href") for tag in soup.find_all("a") if not _NOT_THE_SCHOOL_RE.search(_label(tag))]
+    found += [tag.get("src") for tag in soup.find_all("iframe")]
+    return [url for url in (_join(base, href) for href in found) if url]
 
 
 def _on_site(url: str, site: str) -> bool:
@@ -60,7 +80,10 @@ def _on_site(url: str, site: str) -> bool:
 
 def _contact_page(html: str, base: str, site: str) -> Optional[str]:
     for tag in BeautifulSoup(html, "html.parser").find_all("a"):
-        href = urldefrag(urljoin(base, str(tag.get("href") or "")))[0]
+        joined = _join(base, tag.get("href"))
+        if not joined:
+            continue
+        href = urldefrag(joined)[0]
         if href.rstrip("/") != base.rstrip("/") and _on_site(href, site) and _CONTACT_RE.search(f"{href} {tag.get_text(' ', strip=True)}"):
             return href
     return None
@@ -132,7 +155,14 @@ def _http_fetch(client, robots) -> Fetch:
 
 
 async def _read_all(db: AsyncSession, ids: list[int], fetch: Fetch) -> dict[int, dict[str, Any]]:
-    return {school_id: await read_school(await db.get(School, school_id), fetch) for school_id in ids}
+    reads = {}
+    for school_id in ids:
+        try:
+            reads[school_id] = await read_school(await db.get(School, school_id), fetch)
+        except Exception as exc:  # one school's page must not stop the run; it keeps its links
+            logger.exception("social-links failed for school %s", school_id)
+            reads[school_id] = {"read": False, "links": {}, "ambiguous": [], "pages": [], "note": str(exc)[:200]}
+    return reads
 
 
 async def run_social_links(
