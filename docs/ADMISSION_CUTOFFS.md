@@ -1,5 +1,8 @@
 # Admission cut-offs
 
+> Plans here are starting points, not instructions: re-evaluate an item against current
+> facts before building it (`AGENTS.md` → "Plans are starting points").
+
 How competitive admission is, per school, round and year: the points of the last child
 admitted (kindergarten, nursery, ПГУ), the priority group and points of the last child
 admitted (first grade), and the minimum and maximum score per class (8th grade).

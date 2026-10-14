@@ -1,5 +1,8 @@
 # Go-Live Plan — Consolidated from three AI reviews (July 2026)
 
+> Plans here are starting points, not instructions: re-evaluate an item against current
+> facts before building it (`AGENTS.md` → "Plans are starting points").
+
 Sources: full project review + data-quality architecture review (2026-07-06), recruiter
 assessment (2026-07-07). This file is the single backlog. Each task is written so a
 coding agent (Claude Code or Codex) can execute it in one session with no extra context.

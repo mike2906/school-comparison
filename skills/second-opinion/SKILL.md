@@ -27,7 +27,9 @@ Not for routine edits, small PRs or reversible experiments: those just go ahead.
 
 Give the other model the question, the evidence (file paths, numbers, the PR or doc, the
 repo checkout it can read) and your recommendation, and ask it to find what is wrong
-rather than to agree. Keep it read-only.
+rather than to agree. For a plan or design, put the problem and current facts first and
+any earlier plan last, as one option to beat, so neither model anchors on it. Keep it
+read-only.
 
 Weigh the answer on its evidence. Report both views and your decision in one place (the
 PR or the thread). It is advice, not a vote: one round, then decide.
