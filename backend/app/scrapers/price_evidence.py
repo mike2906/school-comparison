@@ -641,6 +641,23 @@ def _terms_above(text: str, span: tuple[int, int], limit: int = 3) -> str:
     return "\n".join(terms)
 
 
+def _column_terms(text: str, span: tuple[int, int]) -> str:
+    """``_terms_above``, with a table header cut to the amount's own column.
+
+    594's fee table heads one column "TUITION FEE RETURNING STUDENTS with signed contracts
+    before 30.04.2025": that date is not the admission fee's, two columns to its left.
+    """
+    terms = _terms_above(text, span)
+    line_start = text.rfind("\n", 0, span[0]) + 1
+    cells = _line_of(text, span).count("|") + 1
+    if cells < 2:
+        return terms
+    column = text[line_start: span[0]].count("|")
+    return "\n".join(
+        line.split("|")[column] if line.count("|") + 1 == cells else line for line in terms.split("\n")
+    )
+
+
 def _own_words(text: str, span: tuple[int, int]) -> str:
     """The amount's segment; with no level named there, the line it stands under too."""
     segment = amount_segment(text, span)
@@ -1001,7 +1018,7 @@ def check_price_row(
     # note below it ("Ранно записване до 31.03. - 10% отстъпка" is a discount on the price
     # above, which stays).
     # Every occurrence must be a dated offer; the row ends with the last of them.
-    ends = [offer_end(f"{_terms_above(text, span)}\n{amount_segment(text, span)}") for span in chosen]
+    ends = [offer_end(f"{_column_terms(text, span)}\n{amount_segment(text, span)}") for span in chosen]
     if all(ends):
         end = max(ends)
         if end < (today or datetime.date.today()):
