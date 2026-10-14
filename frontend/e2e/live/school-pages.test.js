@@ -22,8 +22,8 @@ describe('finding a school', () => {
     const school = (await allSchools()).find(s => isPrivate(s) && schoolName(s, 'bg').length > 6)
     const name = schoolName(school, 'bg')
     await open('bg', '/search')
-    // Phones and desktops get their own search box; use the one on screen.
-    await page.getByPlaceholder(t('bg', 'landing.searchPlaceholder')).filter({ visible: true }).first().fill(name)
+    // Phones get a shorter box of their own (nameSearch.placeholderShort).
+    await page.getByPlaceholder(t('bg', 'nameSearch.placeholderShort')).filter({ visible: true }).first().fill(name)
     await page.waitForURL(url => url.searchParams.get('q') === name)
     await page.locator(`a[href="/schools/${school.id}"]`).first().click()
     await page.waitForURL(url => url.pathname === `/schools/${school.id}`)
