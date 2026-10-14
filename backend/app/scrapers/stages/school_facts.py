@@ -127,8 +127,7 @@ async def read_school(school: School, pages: list[PageRead], call: Caller) -> di
     on_page = [(fact, facts_rules.quote_on_page(fact, readable)) for fact in read.facts]
     quoted = [(fact, url) for fact, url in on_page if url]
     for fact, _ in quoted:  # a sign-up link the pages do not have is dropped, the fact kept
-        if fact.register_url and not facts_rules.link_on_page(fact.register_url, readable):
-            fact.register_url = None
+        facts_rules.check_link(fact, readable)
     seen_quotes: set[tuple[str, str]] = set()
     repeats: list[Fact] = []
     for fact, _ in quoted:  # one line split into several facts on a topic keeps the first
@@ -188,6 +187,7 @@ def _carried(school: School, readable: list[tuple[str, str]], kept: list[Ranked]
             continue
         url = facts_rules.quote_on_page(fact, readable)
         if url:
+            facts_rules.check_link(fact, readable)  # a link the school has since removed goes
             new_quotes.add(facts_rules.quote_key(fact))
             carried.append((fact, url, row.get("rank") if row.get("rank") in facts_rules.RANKS else "key"))
     return carried

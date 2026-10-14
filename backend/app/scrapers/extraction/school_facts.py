@@ -13,7 +13,7 @@ import re
 from collections.abc import Sequence
 from functools import lru_cache
 from typing import Literal, Optional
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlsplit
 
 from pydantic import BaseModel, Field
 
@@ -253,13 +253,26 @@ def link_on_page(url: Optional[str], pages: Sequence[tuple[str, str]]) -> bool:
     """Whether ``url`` is a link on one of the pages read (the reader must not write its own)."""
     if not url or not url.startswith(("http://", "https://")):
         return False
-    target = url.strip().rstrip("/")
+    target = _link_key(url.strip())
     return any(
-        urljoin(page_url, link).rstrip("/") == target for page_url, text in pages for link in _LINK_RE.findall(text)
+        _link_key(urljoin(page_url, link)) == target for page_url, text in pages for link in _LINK_RE.findall(text)
     )
 
 
-_LINK_RE = re.compile(r"\]\(<?([^)\s>]+)")
+def check_link(fact: Fact, pages: Sequence[tuple[str, str]]) -> None:
+    """Drop the fact's sign-up link unless it is a link on a page read (new and carried facts)."""
+    if fact.register_url and not link_on_page(fact.register_url, pages):
+        fact.register_url = None
+
+
+def _link_key(url: str) -> tuple[str, str, str, str]:
+    # Only the path's trailing slash is ignored; the query must match exactly.
+    parts = urlsplit(url)
+    return parts.scheme.lower(), parts.netloc.lower(), parts.path.rstrip("/"), parts.query
+
+
+# A markdown link's destination, with one level of parentheses inside it (``/a(b)``).
+_LINK_RE = re.compile(r"\]\(<?((?:[^()\s<>]|\([^()\s<>]*\))+)")
 
 
 def _strip(text: str) -> str:

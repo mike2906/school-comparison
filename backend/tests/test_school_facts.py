@@ -438,6 +438,26 @@ async def test_a_stored_fact_whose_quote_is_still_on_the_page_is_carried():
     assert report["carried"] == ["Still there."]
 
 
+@pytest.mark.asyncio
+async def test_a_carried_fact_loses_a_sign_up_link_the_pages_no_longer_have():
+    row = _fact_row(
+        topic="admissions",
+        quote=_line(2),
+        text_i18n={"bg": "Б", "en": "Open day."},
+        open_days=["2026-11-12"],
+        register_url="https://forms.example/old",
+    )
+    school = _school(school_facts={"_schema_version": 1, "facts": [row]})
+    report = await stage.read_school(school, LINES, _Calls([_fact("languages", _line(5), en="New.")], passed=[1]))
+    carried = [f for f in report["store"] if f["text_i18n"]["en"] == "Open day."][0]
+    assert carried["open_days"] == ["2026-11-12"] and carried["register_url"] is None
+    linked = [PageRead(HOME, LINES[0].text + "\n[Запиши се](https://forms.example/old)", False)]
+    report = await stage.read_school(school, linked, _Calls([_fact("languages", _line(5), en="New.")], passed=[1]))
+    assert [f["register_url"] for f in report["store"] if f["text_i18n"]["en"] == "Open day."] == [
+        "https://forms.example/old"
+    ]
+
+
 def test_a_link_quoted_without_its_address_matches():
     page = [
         (
@@ -621,6 +641,11 @@ def test_a_sign_up_link_must_be_a_link_on_a_page_read():
     assert link_on_page("https://forms.example/x", pages)
     assert not link_on_page("https://forms.example/made-up", pages)
     assert not link_on_page("javascript:alert(1)", pages)
+    tricky = [(ABOUT, "[a](https://f.example/r?token=abc/) [b](https://f.example/reg(foo))")]
+    assert not link_on_page("https://f.example/r?token=abc", tricky)  # query must match exactly
+    assert link_on_page("https://f.example/r?token=abc/", tricky)
+    assert not link_on_page("https://f.example/reg(foo", tricky)
+    assert link_on_page("https://f.example/reg(foo)", tricky)
 
 
 @pytest.mark.asyncio
