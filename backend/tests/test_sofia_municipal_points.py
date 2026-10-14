@@ -24,10 +24,10 @@ def _point(name, address, lat=42.7, lng=23.3, kind="kindergarten", district="М�
     return Point(kind=kind, name=name, address=address, district=district, lat=lat, lng=lng)
 
 
-def _classify(name, address, points):
+def _classify(name, address, points, **kwargs):
     location = SimpleNamespace(address_i18n={"bg": address})
     school = SimpleNamespace(name_i18n={"bg": name})
-    return classify(location, school, points)
+    return classify(location, school, points, **kwargs)
 
 
 def test_name_key_reads_kind_and_number():
@@ -57,6 +57,11 @@ def test_name_key_reads_kind_and_number():
         ("гр. София, ж.к. Бели брези, бл. 6", "ж.к. Бели брези", False),
         ("гр. София, ж.к. Бели брези,", "ж.к. Бели брези", True),
         ('бул."АЛЕКСАНДЪР СТАМБОЛИЙСКИ" №125-А', 'бул. "Александър Стамболийски" № 125А', True),
+        # A numbered street on one side, the complex added on the other (90. СУ, 94. СУ).
+        ("ж.к.Люлин,ІІ микрорайон,ул.204 №3", 'ул. "204" № 3', True),
+        ('кв. "Христо Ботев" ул.511 № 22', "ул. 511 № 22", True),
+        ('кв. "Христо Ботев" ул.511 № 22', "ул. 511 № 2", False),
+        ('ж.к. "Дружба" 1', "", False),
     ],
 )
 def test_addresses_agree(ours, theirs, agree):
@@ -96,6 +101,30 @@ def test_classify_unnumbered_school_needs_matching_name_words():
 def test_classify_reports_a_different_address_as_name_only():
     point = _point("ДГ №24 Надежда (с яслени групи)", 'ул. "Kумановски бой" № 16')
     row = _classify("ДГ №24 Надежда - сграда 2", 'гр. София, ул. "Царевец", №34', [point])
+    assert row.status == "name_only"
+
+
+def test_classify_single_location_school_matches_its_one_numbered_point_by_name():
+    ou = _point('33. ОУ "Санкт Петербург"', "", kind="school")
+    eg = _point('33. Езикова гимназия "Света София"', 'ул. "Пловдив" №20', kind="school")
+    name, address = '33 основно училище "Санкт Петербург"', 'ж.к. "Люлин" - III микрорайон'
+
+    row = _classify(name, address, [ou, eg], single_location=True)
+    assert (row.status, row.point) == ("match_by_name", ou)
+    # A school with several locations cannot tell which building the point is.
+    assert _classify(name, address, [ou, eg]).status == "name_only"
+
+
+def test_classify_by_name_needs_one_point_and_a_school():
+    buildings = [_point('141. ОУ "Народни будители"', "", kind="school", lat=lat) for lat in (42.73, 42.74)]
+    row = _classify('141 Основно училище "Народни будители"', 'жк. "Свобода"', buildings, single_location=True)
+    assert row.status == "name_only"
+    kindergarten = _point("ДГ №24 Надежда (с яслени групи)", 'ул. "Kумановски бой" № 16')
+    row = _classify("ДГ №24 Надежда", 'ул. "Царевец", №34', [kindergarten], single_location=True)
+    assert row.status == "name_only"
+    # A shared number without a shared name word is another school.
+    other = _point('33. Езикова гимназия "Света София"', 'ул. "Пловдив" №20', kind="school")
+    row = _classify('33 основно училище "Санкт Петербург"', "ж.к. Люлин", [other], single_location=True)
     assert row.status == "name_only"
 
 

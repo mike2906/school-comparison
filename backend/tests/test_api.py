@@ -742,7 +742,7 @@ class TestSchoolsEndpoint:
         assert not any("source" in tag or "coords" in tag for tag in tags)
 
     @pytest.mark.asyncio
-    async def test_location_publishes_only_whether_the_pin_is_approximate(self, seeded_db, seeded_client):
+    async def test_location_publishes_no_pin_for_an_approximate_point(self, seeded_db, seeded_client):
         school = School(
             name_i18n={"bg": "Училище с приблизителен адрес", "en": "Approximate Pin School"},
             country_code="bg",
@@ -750,7 +750,14 @@ class TestSchoolsEndpoint:
             education_level="primary",
             city="sofia",
         )
-        seeded_db.add(school)
+        only_approximate = School(
+            name_i18n={"bg": "Само приблизително", "en": "Only Approximate"},
+            country_code="bg",
+            school_type="private",
+            education_level="primary",
+            city="sofia",
+        )
+        seeded_db.add_all([school, only_approximate])
         await seeded_db.flush()
         metas = [
             {"precision": "approximate", "provider": "nominatim", "formatted_address": "x"},
@@ -762,36 +769,35 @@ class TestSchoolsEndpoint:
             seeded_db.add(SchoolLocation(
                 school_id=school.id,
                 address_i18n={"bg": f"ул. Тест {i}, София"},
-                lat=42.7 + i / 100,
+                lat=[42.70, 42.71, 42.72, 42.73][i],
                 lng=23.3,
                 is_primary=i == 0,
                 geocode_meta=meta,
             ))
-        # Half a coordinate is no pin either.
         seeded_db.add(SchoolLocation(
-            school_id=school.id,
-            address_i18n={"bg": "ул. Тест 8, София"},
-            lat=42.8,
-            is_primary=False,
-            geocode_meta={"precision": "approximate"},
-        ))
-        # An approximate record without coordinates has no pin to qualify.
-        seeded_db.add(SchoolLocation(
-            school_id=school.id,
-            address_i18n={"bg": "ул. Тест 9, София"},
-            is_primary=False,
-            geocode_meta={"precision": "approximate", "status": "rejected"},
+            school_id=only_approximate.id,
+            address_i18n={"bg": "ул. Тест 5, София"},
+            lat=42.71,
+            lng=23.31,
+            is_primary=True,
+            geocode_meta={"precision": "approximate", "method": "geojson_name_match"},
         ))
         await seeded_db.commit()
 
         detail = (await seeded_client.get(f"/schools/{school.id}")).json()
-        flags = {loc["resolved_address_i18n"]["bg"][:10]: loc["coordinates_approximate"] for loc in detail["locations"]}
-        assert sorted(flags.values()) == [False, False, False, False, False, True]
-        assert all("geocode_meta" not in loc and "raw_geocode_meta" not in loc for loc in detail["locations"])
+        pins = {loc["resolved_address_i18n"]["bg"][:10]: loc["lat"] for loc in detail["locations"]}
+        assert pins == {"ул. Тест 0": None, "ул. Тест 1": 42.71, "ул. Тест 2": 42.72, "ул. Тест 3": 42.73}
+        assert all(
+            not {"geocode_meta", "raw_geocode_meta", "coordinates_approximate"} & loc.keys()
+            for loc in detail["locations"]
+        )
 
-        listed = (await seeded_client.get("/schools")).json()
-        row = next(item for item in listed if item["id"] == school.id)
-        assert sorted(loc["coordinates_approximate"] for loc in row["locations"]) == [False, False, False, False, False, True]
+        # A school whose only point is approximate stays listed, with its address and no pin.
+        listed = {item["id"]: item for item in (await seeded_client.get("/schools")).json()}
+        assert [(loc["lat"], loc["lng"]) for loc in listed[only_approximate.id]["locations"]] == [(None, None)]
+        assert sorted(
+            loc["lat"] is None for loc in listed[school.id]["locations"]
+        ) == [False, False, False, True]
 
     @pytest.mark.asyncio
     async def test_list_keeps_terminally_unresolved_school(self, seeded_db, seeded_client):

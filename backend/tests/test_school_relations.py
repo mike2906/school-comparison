@@ -333,7 +333,7 @@ class TestSamePlaceRule:
 
 
 class TestSamePlaceEndpoints:
-    async def _pair(self, db, *, school_lat=42.6505):
+    async def _pair(self, db, *, school_lat=42.6505, school_meta=None):
         kg = await _add(db, name=SVETLINA_KG, level="kindergarten", url=None,
                         attributes={"extracted": {"secret": "must not ship"}})
         school = await _add(db, name=SVETLINA_SCHOOL, level="lower_secondary", url=None)
@@ -341,7 +341,9 @@ class TestSamePlaceEndpoints:
             SchoolLocation.__table__.select().where(SchoolLocation.school_id == school.id)
         )).first()
         await db.execute(
-            SchoolLocation.__table__.update().where(SchoolLocation.id == location.id).values(lat=school_lat)
+            SchoolLocation.__table__.update()
+            .where(SchoolLocation.id == location.id)
+            .values(lat=school_lat, geocode_meta=school_meta)
         )
         await db.commit()
         return kg, school
@@ -380,6 +382,12 @@ class TestSamePlaceEndpoints:
     @pytest.mark.asyncio
     async def test_too_far_apart_is_two_places(self, seeded_db, seeded_client):
         kg, _ = await self._pair(seeded_db, school_lat=42.6520)
+        response = await seeded_client.get(f"/schools/{kg.id}")
+        assert response.json()["same_place"] == []
+
+    @pytest.mark.asyncio
+    async def test_an_unpublished_approximate_pin_is_no_place(self, seeded_db, seeded_client):
+        kg, _ = await self._pair(seeded_db, school_meta={"precision": "approximate"})
         response = await seeded_client.get(f"/schools/{kg.id}")
         assert response.json()["same_place"] == []
 

@@ -190,21 +190,15 @@ function KeyFacts({ school, examAverages, nvoExamType, ageGroup = null }) {
 
   if (savedLocation) {
     const nearest = getMappableLocations(locations)
-      .map(point => ({
-        km: calculateDistance(savedLocation.lat, savedLocation.lng, point.lat, point.lng),
-        approximate: Boolean(point.location.coordinates_approximate),
-      }))
-      .filter(item => item.km != null)
-      .sort((a, b) => a.km - b.km)[0]
-    if (nearest) {
+      .map(point => calculateDistance(savedLocation.lat, savedLocation.lng, point.lat, point.lng))
+      .filter(km => km != null)
+      .sort((a, b) => a - b)[0]
+    if (nearest != null) {
       facts.distance = (
         <Fact
           key="distance"
           label={t('schoolDetail.distance')}
-          value={t(
-            nearest.approximate ? 'schoolDetail.distanceValueApprox' : 'schoolDetail.distanceValue',
-            { km: formatKm(nearest.km, i18n.language) },
-          )}
+          value={t('schoolDetail.distanceValue', { km: formatKm(nearest, i18n.language) })}
         />
       )
     }

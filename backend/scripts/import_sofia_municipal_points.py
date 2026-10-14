@@ -6,7 +6,8 @@ point with its name, address and район. A location is matched when the poin
 type agree with the school name *and* the addresses agree; everything else is reported for
 review and never written.
 
-Always writes a report first. Default is a dry run; --apply writes only "match" rows:
+Always writes a report first. Default is a dry run; --apply writes only "match" and
+"match_by_name" rows:
 coordinates (exact precision, through the geocoding write gate), a missing district, and a
 `coords_source=sofia_municipal` tag, which stops later geocoding runs replacing the point.
 
@@ -45,6 +46,8 @@ LAYERS_URL = (
 LAYERS = {0: "school", 1: "kindergarten", 2: "nursery"}
 DISTRICTS_LAYER = 3
 PROVIDER = "sofia_municipal_arcgis"
+# Statuses --apply writes.
+MATCHED = {"match", "match_by_name"}
 DEFAULT_REPORT_ROOT = Path(__file__).parent.parent / "reports" / "municipal-points"
 
 # The municipal layers' district spellings -> the ones already stored (kg.sofia.bg, OSM).
@@ -120,6 +123,12 @@ def address_parts(address: str) -> tuple[set[str], set[str]]:
     return words, numbers
 
 
+def all_numbers(address: str) -> set[str]:
+    """Every number of an address (street and house), without the city's postcodes."""
+    text = re.sub(r"гр\.\s*софия|\b1\d{3}\b", " ", address.casefold())
+    return {n.lstrip("0") or "0" for n in re.findall(r"\d+", text)}
+
+
 def addresses_agree(ours: str, theirs: str) -> bool:
     """Same street (a shared word) and a shared number, unless neither gives one.
 
@@ -129,6 +138,10 @@ def addresses_agree(ours: str, theirs: str) -> bool:
     their_words, their_numbers = address_parts(theirs)
     if not our_words and not their_words:
         return bool(our_numbers) and our_numbers == their_numbers
+    if not our_words or not their_words:
+        # One side gives only a numbered street ("ул. 204 № 3"), the other adds its
+        # complex ("ж.к. Люлин, ул.204 №3"): every number, street included, must agree.
+        return bool(all_numbers(ours)) and all_numbers(ours) == all_numbers(theirs)
     if not our_words & their_words:
         return False
     if our_numbers or their_numbers:
@@ -159,8 +172,16 @@ def distance_m(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
     return math.hypot(dx, dy)
 
 
-def classify(location: SchoolLocation, school: School, points: list[Point]) -> Row:
-    """Match one location to at most one municipal point."""
+def classify(
+    location: SchoolLocation, school: School, points: list[Point], *, single_location: bool = False
+) -> Row:
+    """Match one location to at most one municipal point.
+
+    A school with one location whose address names no matching point still matches the
+    only point with its number and a distinctive word of its name ("match_by_name"): the
+    register address is often just the complex ("ж.к. Дружба 1"), the point is the building.
+    Kindergartens are left out because they run several buildings under one name.
+    """
     name = (school.name_i18n or {}).get("bg") or ""
     address = (location.address_i18n or {}).get("bg") or ""
     key = name_key(name)
@@ -185,6 +206,11 @@ def classify(location: SchoolLocation, school: School, points: list[Point]) -> R
             return Row(location, school, "match", point, same_name)
         if len(agreeing) > 1:
             return Row(location, school, "ambiguous", None, agreeing)
+        if single_location and key[0] == "school":
+            words = name_words(name)
+            named = [p for p in same_name if words & name_words(p.name)]
+            if len(named) == 1:
+                return Row(location, school, "match_by_name", named[0], same_name)
         return Row(location, school, "name_only", None, same_name)
     # No numbered name (or no point with that number): same kind at the same address,
     # confirmed by at least two distinctive name words.
@@ -371,9 +397,15 @@ async def main() -> None:
             .where(School.city == "sofia", School.school_type == "state")
             .order_by(SchoolLocation.id)
         )).all()
-        rows = [classify(loc, school, points) for loc, school in pairs]
+        locations_per_school: dict[int, int] = {}
+        for _, school in pairs:
+            locations_per_school[school.id] = locations_per_school.get(school.id, 0) + 1
+        rows = [
+            classify(loc, school, points, single_location=locations_per_school[school.id] == 1)
+            for loc, school in pairs
+        ]
         for row in rows:
-            if row.status == "match" and _shares_point_with_other_address(row.point, points):
+            if row.status in MATCHED and _shares_point_with_other_address(row.point, points):
                 row.status, row.candidates = "shared_point", [row.point]
                 row.point = None
         for row in rows:
@@ -395,7 +427,7 @@ async def main() -> None:
             return
         written = 0
         for row in rows:
-            if row.status == "match" and await apply_match(db, row):
+            if row.status in MATCHED and await apply_match(db, row):
                 written += 1
         await db.commit()
         print(f"Wrote {written} municipal points")

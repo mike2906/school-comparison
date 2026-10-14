@@ -160,7 +160,6 @@ function ComparePage() {
 
       map.set(school.id, {
         distance,
-        distanceApproximate: Boolean(primaryLocation?.coordinates_approximate),
         pricingRange,
         priceSort,
         nvoDetail,

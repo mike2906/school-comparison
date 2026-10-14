@@ -21,12 +21,9 @@ export function formatKm(distanceKm, language) {
   return kmFormatters.get(locale).format(distanceKm)
 }
 
-/**
- * "1.2 km" / "1,2 км" through the `schoolDetail.distanceValue` i18n keys; "~" when
- * measured from an approximate (street-level) pin.
- */
-export function formatDistance(distanceKm, { approximate = false, language, t }) {
+/** "1.2 km" / "1,2 км" through the `schoolDetail.distanceValue` i18n key. */
+export function formatDistance(distanceKm, { language, t }) {
   const km = formatKm(distanceKm, language)
   if (km == null) return null
-  return t(approximate ? 'schoolDetail.distanceValueApprox' : 'schoolDetail.distanceValue', { km })
+  return t('schoolDetail.distanceValue', { km })
 }
