@@ -13,8 +13,6 @@ on:
     branches: [main]
   schedule:
     - cron: "23 6 * * *"
-  push:
-    branches: [agent/live-flows]
   workflow_dispatch:
     inputs:
       site_url:
