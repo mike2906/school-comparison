@@ -47,7 +47,8 @@ def school_index(schools: list[Any]) -> dict[tuple[str, str], int]:
         for kg_id in attrs.get("kg_sofia_ids") or []:
             if kg_id is not None:
                 index.setdefault(("kg_sofia_id", str(kg_id)), school.id)
-    for school in schools:
+    # Highest id first, so on a shared id the lowest school id wins, the same on every run.
+    for school in sorted(schools, key=lambda s: s.id, reverse=True):
         attrs = school.attributes or {}
         if attrs.get("kg_sofia_id") is not None:
             index[("kg_sofia_id", str(attrs["kg_sofia_id"]))] = school.id
@@ -72,7 +73,7 @@ def derived_admission_keys(rows: list[dict[str, Any]], attributes: dict[str, Any
         "catchment_ids": catchment_ids(attributes),
     }
     if kg_rows:
-        keys["kg_sofia_ids"] = sorted({str(row["source_id"]) for row in kg_rows}, key=int)
+        keys["kg_sofia_ids"] = sorted({str(row["source_id"]) for row in kg_rows}, key=lambda v: (len(v), v))
         districts = Counter(row["district"] for row in kg_rows if row.get("district"))
         if districts:
             keys["admin_district"] = districts.most_common(1)[0][0]

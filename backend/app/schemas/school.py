@@ -189,10 +189,9 @@ class SchoolAttributesMixin(BaseModel):
     def admission_info(self) -> Optional[dict[str, JsonValue]]:
         if not isinstance(self.raw_admission_info, dict):
             return None
-        public = SchoolAdmissionInfo.model_validate(self.raw_admission_info)
-        payload = public.model_dump(
-            mode="json", exclude_none=True, exclude_defaults=True, exclude=set(self.admission_exclude)
-        )
+        raw = {key: value for key, value in self.raw_admission_info.items() if key not in self.admission_exclude}
+        public = SchoolAdmissionInfo.model_validate(raw)
+        payload = public.model_dump(mode="json", exclude_none=True, exclude_defaults=True)
         return payload or None
 
 

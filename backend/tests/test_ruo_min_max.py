@@ -87,3 +87,10 @@ def test_source_list_is_well_formed():
         assert source["round"] in (1, 2, 3, 4)
         assert date.fromisoformat(source["date"]).year == source["year"]
         assert source["url"].endswith(".xlsx")
+
+
+def test_indexed_palette_colour_marks_quota():
+    from openpyxl.styles.colors import Color
+
+    _, rows = parse_workbook(_workbook(quota_font=Font(color=Color(indexed=12))), 2025)
+    assert [r.quota for r in rows] == [False, True, False]

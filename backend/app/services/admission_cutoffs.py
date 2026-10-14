@@ -121,14 +121,21 @@ def public_row(row: dict[str, Any], building: Any) -> dict[str, Any]:
     return {key: value for key, value in out.items() if value is not None}
 
 
+def _stages_with_several_buildings(rows: list[dict[str, Any]]) -> set[str]:
+    sources: dict[str, set[str]] = {}
+    for row in rows:
+        sources.setdefault(row["stage"], set()).add(str(row["source_id"]))
+    return {stage for stage, ids in sources.items() if len(ids) > 1}
+
+
 def school_cutoffs(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """All of one school's archive rows, trimmed for the page, newest first.
 
     ``building`` names the source institution only when the school has several (a
-    kindergarten with branch buildings ranks each one separately).
+    kindergarten with branch buildings ranks each one separately) within that stage.
     """
-    several = len({row["source_id"] for row in rows}) > 1
-    out = [public_row(row, row.get("institution_name") if several else None) for row in rows]
+    several = _stages_with_several_buildings(rows)
+    out = [public_row(row, row.get("institution_name") if row["stage"] in several else None) for row in rows]
     return sorted(
         out,
         key=lambda r: (
@@ -150,7 +157,7 @@ def school_cutoff_summary(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     general = [row for row in rows if row.get("queue") == "general"]
     if not general:
         return []
-    several = len({row["source_id"] for row in rows}) > 1
+    several = _stages_with_several_buildings(rows)
     latest_by_stage: dict[tuple, int] = {}
     for row in general:
         key = (row["stage"], row["source_id"])
@@ -172,7 +179,7 @@ def school_cutoff_summary(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
             "class_code": class_code,
             "class_name": first.get("class_name"),
             "quota": first.get("quota"),
-            "building": first.get("institution_name") if several else None,
+            "building": first.get("institution_name") if stage in several else None,
             "campaign": latest_campaign,
             "rule_set": first.get("rule_set"),
             "rounds": len(in_campaign),

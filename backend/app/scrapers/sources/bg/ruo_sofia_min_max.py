@@ -80,6 +80,9 @@ def _is_coloured(cell) -> bool:
         return False
     if color.type == "rgb":
         return isinstance(color.rgb, str) and color.rgb.upper() not in _PLAIN_RGB
+    if color.type == "indexed":
+        # 8 is black and 64 the system text colour in the legacy palette.
+        return color.indexed not in (None, 8, 64)
     if color.type == "theme":
         # Theme 1 is the default text colour; 2023 marks quota rows with theme 4 (accent).
         return color.theme not in (None, 1)
@@ -127,7 +130,7 @@ def _header_columns(sheet) -> tuple[int, dict[str, int]]:
 
 
 def parse_workbook(content: bytes, year: int) -> tuple[Optional[date], list[MinMaxRow]]:
-    sheet = load_workbook(io.BytesIO(content)).worksheets[0]
+    sheet = load_workbook(io.BytesIO(content), data_only=True).worksheets[0]
     first_row, columns = _header_columns(sheet)
     rows = []
     for cells in sheet.iter_rows(min_row=first_row):

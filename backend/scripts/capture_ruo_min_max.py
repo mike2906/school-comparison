@@ -19,9 +19,13 @@ from pathlib import Path
 import httpx
 
 from app.scrapers.sources.bg.ruo_sofia_min_max import SOURCE, archive_rows, load_sources, parse_workbook
-from app.services.admission_cutoffs import load_state, save_state, write_rows
+from app.services.admission_cutoffs import load_state, round_path, save_state, write_rows
 
 logger = logging.getLogger("capture_ruo_min_max")
+
+# РУО has replaced a file after publishing it, so files are re-downloaded and compared
+# for this long after their date; a changed file is re-parsed and its rows replaced.
+RECHECK_DAYS = 45
 
 
 def capture(archive: Path, delay: float = 2.0) -> dict:
@@ -32,7 +36,8 @@ def capture(archive: Path, delay: float = 2.0) -> dict:
     with httpx.Client(timeout=60.0, follow_redirects=True, headers={"User-Agent": "schooldecider.com cut-off archive"}) as http:
         for source in load_sources():
             url = source["url"]
-            if url in captured:
+            recent = (date.today() - date.fromisoformat(source["date"])).days <= RECHECK_DAYS
+            if url in captured and not recent:
                 continue
             if summary["files"] or summary["failed"]:
                 time.sleep(delay)
@@ -43,6 +48,10 @@ def capture(archive: Path, delay: float = 2.0) -> dict:
                 if not content.startswith(b"PK"):
                     raise ValueError(f"not an XLSX ({response.headers.get('content-type')})")
                 digest = hashlib.sha256(content).hexdigest()
+                if captured.get(url) == digest:
+                    continue
+                if url in captured:
+                    logger.warning("%s changed since it was captured; re-parsing", url)
                 if source.get("sha256") and digest != source["sha256"]:
                     logger.warning("%s: sha256 %s differs from the listed %s; using the new file", url, digest, source["sha256"])
                     summary["sha_changed"].append(url)
@@ -53,6 +62,8 @@ def capture(archive: Path, delay: float = 2.0) -> dict:
                     raise ValueError("no rows parsed")
                 retrieved_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
                 new_rows = archive_rows(source, classified_on, rows, retrieved_at)
+                if url in captured and new_rows:
+                    round_path(archive, new_rows[0]).unlink(missing_ok=True)  # replace, don't merge
                 write_rows(archive, new_rows)
                 captured[url] = digest
                 ruo_state.get("failed", {}).pop(url, None)
@@ -67,7 +78,9 @@ def capture(archive: Path, delay: float = 2.0) -> dict:
             except Exception as error:  # one bad file must not stop the others
                 logger.error("%s: %s", url, error)
                 summary["failed"].append(url)
-                ruo_state.setdefault("failed", {})[url] = f"{datetime.now(timezone.utc).date()}: {error}"
+                # Keep the first failure's date so a file that keeps failing doesn't
+                # rewrite the state (and make a commit) every run.
+                ruo_state.setdefault("failed", {}).setdefault(url, f"since {datetime.now(timezone.utc).date()}: {error}")
                 save_state(archive, state)
     return summary
 

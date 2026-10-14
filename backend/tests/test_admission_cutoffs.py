@@ -128,3 +128,10 @@ def test_summary_keeps_quota_minima():
     (entry,) = school_cutoff_summary(rows)
     assert entry["quota"] is True
     assert (entry["first"]["min_score_boys"], entry["first"]["min_score_girls"]) == (475.0, 483.5)
+
+
+def test_one_building_per_stage_is_not_named_even_with_other_sources():
+    # A school with first-grade rows (kg.sofia.bg id) and 8th-grade rows (НЕИСПУО code).
+    rows = [_row(443, "2026-09-04"), _grade8("2026/2027", 1, "03909", 480.0)]
+    assert all("building" not in r for r in school_cutoffs(rows))
+    assert all("building" not in e for e in school_cutoff_summary(rows))
