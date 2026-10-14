@@ -307,6 +307,8 @@ async def find_pages(
                 for picture in page_pictures:
                     if len(pictures) >= fee_images_module.MAX_IMAGES or page_key(picture[0]) in seen:
                         continue
+                    if not fee_images_module.on_site(picture, site):
+                        continue
                     seen.add(page_key(picture[0]))
                     if not spend.allows(fee_images_module.IMAGE_COST_ESTIMATE_USD):
                         raise SpendCapReached(f"spent ${spend.spent_usd:.4f} of ${spend.cap_usd}")
@@ -325,7 +327,8 @@ async def find_pages(
                         # A fee table's picture often prints bare numbers ("15 350") under a
                         # currency heading, which the price pattern misses (594): any amount
                         # sends it to the reader.
-                        picture_pages.append(PageRead(found[0], found[1], bool(re.search(r"\d{2}", found[1]))))
+                        transcription = found[1].split("\n", 1)[-1]  # after the heading line
+                        picture_pages.append(PageRead(found[0], found[1], bool(re.search(r"\d{2}", transcription))))
             for href, label in page_links:
                 href = urldefrag(href)[0]
                 if _same_site(href, site) and not unquote(href).lower().endswith(_SKIPPED):
@@ -353,14 +356,15 @@ async def find_pages(
         queue = (queue + keyword)[:MAX_PICKS]
         if not queue:
             break
-    return read + picture_pages
+    # Pictures first: they are short, and the reader's text is cut at its limit from the end.
+    return picture_pages + read
 
 
 def _this_years_pages() -> re.Pattern:
     """A URL or link text naming this school year or the next ("2026-2027", "2027/28")."""
     start = int(current_academic_year()[:4])
     years = [(str(year), str(year + 1)) for year in (start, start + 1)]
-    return re.compile("|".join(rf"{first}\D{{0,3}}(?:{second}|{second[2:]})\b" for first, second in years))
+    return re.compile("|".join(rf"{first}\D{{0,3}}(?:{second}|{second[2:]})(?!\d)" for first, second in years))
 
 
 # ---------------------------------------------------------------------------

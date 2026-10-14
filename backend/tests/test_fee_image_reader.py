@@ -82,3 +82,10 @@ async def test_each_reading_reports_its_cost_under_the_callers_stage():
         text = await read_fee_image(b"png", "image/png", school_id=1, stage="fees_agent", on_cost=costs.append)
     assert text == "Grade 1 | 14750"
     assert costs == [0.01, 0.01] and stages == ["fees_agent", "fees_agent"]
+
+
+@pytest.mark.asyncio
+async def test_a_price_misread_outside_the_table_discards_the_picture():
+    first = "Клас | Такса\n1 клас | 7 880 €\nТакса записване: 300 €"
+    assert await _read(first, first.replace("300 €", "800 €")) is None
+    assert await _read(first, first) == first

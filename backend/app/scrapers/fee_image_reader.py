@@ -43,21 +43,28 @@ def numbers_in(text: str) -> list[str]:
 _CURRENCIES = (("EUR", r"€|\beur|евро"), ("BGN", r"лв|\bbgn|лева"), ("USD", r"\$|\busd"), ("GBP", r"£|\bgbp"))
 
 
-def reading_signature(text: str) -> tuple[frozenset[str], list[tuple[str, tuple[str, ...]]]]:
+def reading_signature(
+    text: str,
+) -> tuple[frozenset[str], list[tuple[str, tuple[str, ...]]], list[str]]:
     """What two readings of one picture must agree on.
 
     The currencies named anywhere, and each table row from the first one that holds a
     price: its first cell with the numbers of the row. The same digits under another row's label or another
-    currency are a different fee. Titles and header rows are left out: how a reading
-    wraps them varies and says nothing about the fees.
+    currency are a different fee. Header rows are left out, and the lines outside the
+    table count only by their numbers: how a reading wraps a title varies, but a
+    misread "Registration: 300 €" under the table is a wrong fee.
     """
     lowered = (text or "").casefold()
     currencies = frozenset(code for code, pattern in _CURRENCIES if re.search(pattern, lowered))
     rows = []
+    outside: list[str] = []
     in_table = False
     for line in lowered.splitlines():
         numbers = tuple(numbers_in(line))
-        if "|" not in line or not numbers:
+        if "|" not in line:
+            outside.extend(numbers)
+            continue
+        if not numbers:
             continue
         # Header rows come first and hold only small numbers ("1 installment"); from the
         # first row with a price on, every row counts, also one with a small fee.
@@ -65,7 +72,7 @@ def reading_signature(text: str) -> tuple[frozenset[str], list[tuple[str, tuple[
         if in_table:
             label = "".join(re.findall(r"[^\W_]+", line.split("|", 1)[0]))
             rows.append((label, numbers))
-    return currencies, sorted(rows)
+    return currencies, sorted(rows), sorted(outside)
 
 
 async def read_fee_image(

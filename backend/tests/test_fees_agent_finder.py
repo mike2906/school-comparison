@@ -278,7 +278,7 @@ async def test_a_fee_picture_is_read_as_a_page_of_its_own(monkeypatch):
     read = await fees_agent.find_pages(crawler, None, _Client(), _school(), spend, read_pictures=True)
     original = "https://meridian22.org/wp-content/uploads/fees-2026.png"
     assert reads == [((original, _FEES_PICTURE), fees_agent.STAGE)]
-    assert [(p.url, p.text, p.prices) for p in read][1:] == [(original, "Grade 1 | 7 880 €", True)]
+    assert [(p.url, p.text, p.prices) for p in read][:-1] == [(original, "Grade 1 | 7 880 €", True)]
     assert spend.spent_usd == pytest.approx(0.03)
 
 
@@ -313,7 +313,21 @@ async def test_places_the_picker_leaves_free_go_to_this_years_fee_links(monkeypa
 
 
 async def test_a_fee_picture_with_bare_numbers_goes_to_the_reader(monkeypatch):
-    _picture_reads(monkeypatch, text="Fee picture on x\nGrade 1 | 15 350 | 14 750")
+    _picture_reads(monkeypatch, text="Fee picture on https://meridian22.org/taksi-2026/\nGrade 1 | 15 350 | 14 750")
     crawler = _Crawler({HOME: [("Такси " + "x" * 300, [], _PICTURE_PAGE)]})
     read = await fees_agent.find_pages(crawler, None, _Client(), _school(), Spend(0.5), read_pictures=True)
-    assert read[-1].prices is True
+    assert read[0].prices is True
+
+
+async def test_a_picture_whose_only_numbers_are_in_its_heading_shows_no_price(monkeypatch):
+    _picture_reads(monkeypatch, text="Fee picture on https://meridian22.org/taksi-2026/\nУчебна програма")
+    crawler = _Crawler({HOME: [("Такси " + "x" * 300, [], _PICTURE_PAGE)]})
+    read = await fees_agent.find_pages(crawler, None, _Client(), _school(), Spend(0.5), read_pictures=True)
+    assert read[0].prices is False
+
+
+def test_this_years_pages_take_a_year_suffix():
+    pattern = fees_agent._this_years_pages()
+    start = int(fees_agent.current_academic_year()[:4])
+    assert pattern.search(f"такси {start}/{start + 1}г.") and pattern.search(f"taksi_{start}_{start + 1}_bg")
+    assert not pattern.search(f"{start}/{start + 1}0")

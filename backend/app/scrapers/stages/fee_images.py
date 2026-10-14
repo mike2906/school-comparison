@@ -35,6 +35,11 @@ def fee_images(html: str, base_url: str) -> list[tuple[str, str, str]]:
     ]
 
 
+def on_site(picture: tuple[str, str, str], site_url: str) -> bool:
+    """The picture, or its scaled copy, is on the school's own site."""
+    return any(_same_site(url, site_url) for url in picture[:2])
+
+
 async def read_image(
     client,
     picture: tuple[str, str, str],
