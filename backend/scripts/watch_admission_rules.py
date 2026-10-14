@@ -72,6 +72,39 @@ def _send(gh: httpx.Client, url: str, payload: dict) -> httpx.Response:
     return response
 
 
+def _open_issue_numbers(gh: httpx.Client, api: str) -> dict[str, int]:
+    response = gh.get(f"{api}/issues", params={"labels": LABEL, "state": "open", "per_page": 100})
+    response.raise_for_status()
+    return {issue["title"]: issue["number"] for issue in response.json() if "pull_request" not in issue}
+
+
+def _create_issue(gh: httpx.Client, api: str, finding: Finding) -> int:
+    """Open the issue. After a failed attempt, look for it before trying again: GitHub can
+    create an issue and still fail the response, and a blind retry would open a duplicate."""
+    payload = {"title": finding.title, "body": _body(finding), "labels": [LABEL]}
+    for attempt in range(1, 4):
+        if attempt > 1:
+            time.sleep(attempt * 5)
+            try:
+                existing = _open_issue_numbers(gh, api).get(finding.title)
+            except httpx.HTTPError:
+                if attempt == 3:
+                    raise
+                continue  # cannot tell whether it exists: don't post blind
+            if existing:
+                return existing
+        try:
+            response = gh.post(f"{api}/issues", json=payload)
+        except httpx.TransportError:
+            if attempt == 3:
+                raise
+            continue
+        if (response.status_code < 500 and response.status_code != 429) or attempt == 3:
+            response.raise_for_status()
+            return response.json()["number"]
+    raise AssertionError("unreachable")
+
+
 def post_issues(findings: list[Finding], repo: str, token: str) -> None:
     """Open an issue per finding, or comment on the open one with the same title.
 
@@ -82,9 +115,7 @@ def post_issues(findings: list[Finding], repo: str, token: str) -> None:
     headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"}
     with httpx.Client(timeout=30.0, headers=headers) as gh:
         gh.post(f"{api}/labels", json={"name": LABEL, "color": "d4c5f9", "description": "Admission rule sources changed"})
-        response = gh.get(f"{api}/issues", params={"labels": LABEL, "state": "open", "per_page": 100})
-        response.raise_for_status()
-        open_issues = {issue["title"]: issue["number"] for issue in response.json()}
+        open_issues = _open_issue_numbers(gh, api)
         for finding in findings:
             number = open_issues.get(finding.title)
             if number and not finding.repeatable:
@@ -94,9 +125,9 @@ def post_issues(findings: list[Finding], repo: str, token: str) -> None:
                 _send(gh, f"{api}/issues/{number}/comments", {"body": _body(finding)})
                 logger.info("Commented on #%s %s", number, finding.title)
             else:
-                created = _send(gh, f"{api}/issues", {"title": finding.title, "body": _body(finding), "labels": [LABEL]})
-                open_issues[finding.title] = created.json()["number"]
-                logger.info("Opened #%s %s", created.json()["number"], finding.title)
+                number = _create_issue(gh, api, finding)
+                open_issues[finding.title] = number
+                logger.info("Opened #%s %s", number, finding.title)
 
 
 def main() -> None:

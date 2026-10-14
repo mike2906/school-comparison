@@ -42,6 +42,9 @@ FAILURES_BEFORE_REPORT = 3
 MAX_DIFF_LINES = 80
 MAX_FOLLOW_PER_RUN = 15
 FOLLOW_ATTEMPTS = 3
+FOLLOWED_MIN_CHARS = 100
+MAX_RECHECK_PER_RUN = 15
+RECHECK_DAYS = 21
 STATE_FILE = "state.json"
 
 
@@ -208,8 +211,47 @@ def _check_page(target: dict[str, Any], fetched: Fetched, entry: dict[str, Any],
     entry["hash"], entry["text"] = digest, text
 
 
+def _hits(lines: list[str], target: dict[str, Any]) -> list[str]:
+    """Lines (with context) holding a keyword and, when the target sets ``also``, one of those too.
+
+    ``also`` gives a bare keyword its context: "Наредба № 10" is also an agriculture
+    ordinance's number, and a court name alone says nothing about admissions.
+    """
+    also = [_norm(a) for a in target.get("also") or []]
+    text = "\n".join(line for line in lines if not also or any(a in _norm(line) for a in also))
+    return matching_lines(text, target.get("keywords") or [], context=1 if target.get("follow") else 0)
+
+
+def _hits_digest(lines: list[str], target: dict[str, Any]) -> str:
+    """Hash of the matching lines alone, so a change in a neighbouring line is no update."""
+    return text_hash("\n".join(_hits(lines, dict(target, follow=False))))
+
+
+def _new_item(target: dict[str, Any], url: str, link_text: str, hits: list[str], what: str) -> Finding:
+    quoted = "\n".join(f"> {line}" for line in hits[:40])
+    return Finding(
+        key=f"new_item:{target['id']}",
+        title=f"Rule watch: {target['title']} mention admission rules",
+        body=f"{what}: [{link_text or url}]({url})\n\nMatching lines:\n\n{quoted}" + _footer(target),
+        kind="new_item",
+        repeatable=True,
+    )
+
+
+def _open(url: str, target: dict[str, Any], fetch: Fetcher) -> tuple[Optional[list[str]], Optional[str]]:
+    """The followed page's lines, or an error. A near-empty 200 (a maintenance or bot-check
+    page) counts as an error, so the page is retried rather than marked as read."""
+    page = fetch(url)
+    if page.error:
+        return None, page.error
+    text = clean_text(page.html or page.text, target.get("select"))
+    if len(text) < target.get("page_min_chars", FOLLOWED_MIN_CHARS):
+        return None, f"only {len(text)} characters of text"
+    return text.splitlines(), None
+
+
 def _check_listing(
-    target: dict[str, Any], fetched: Fetched, entry: dict[str, Any], result: RunResult, fetch: Fetcher
+    target: dict[str, Any], fetched: Fetched, entry: dict[str, Any], result: RunResult, fetch: Fetcher, today: date
 ) -> None:
     found = links(fetched.html or fetched.text, target["url"], target["link_pattern"], target.get("drop_query", False))
     if len(found) < target.get("min_links", 1):
@@ -217,7 +259,20 @@ def _check_listing(
     seen: list[str] = entry.get("seen") or []
     baseline = not seen and not entry.get("baselined")
     new = [(url, text) for url, text in found if url not in seen]
-    keywords = target.get("keywords") or []
+    if seen and len(new) == len(found):
+        # Every entry on the page is new: older ones may have scrolled past unread.
+        result.findings.append(
+            Finding(
+                key=f"overflow:{target['id']}",
+                title=f"Rule watch: {target['title']} may have missed entries",
+                body=f"All {len(found)} entries on the page were new since the last check, so earlier ones "
+                "may have scrolled to the next page unread. Look through the listing's older pages by hand "
+                "back to the last check." + _footer(target),
+                kind="unreachable",
+                repeatable=True,
+            )
+        )
+    recent: dict[str, dict[str, Any]] = entry.setdefault("recent", {})
     followed = 0
     for url, link_text in new:
         if baseline:
@@ -227,36 +282,52 @@ def _check_listing(
             if followed >= MAX_FOLLOW_PER_RUN:
                 break  # the rest stay unseen and are checked next run
             followed += 1
-            page = fetch(url)
-            if page.error:
+            lines, error = _open(url, target, fetch)
+            if error:
                 attempts = entry.setdefault("attempts", {})
                 attempts[url] = attempts.get(url, 0) + 1
-                result.report.append(f"{target['id']}: {url} failed {attempts[url]}x ({page.error})")
+                result.report.append(f"{target['id']}: {url} failed {attempts[url]}x ({error})")
                 if attempts[url] < FOLLOW_ATTEMPTS:
                     continue  # retried next run
                 del attempts[url]
-                hits = [f"(could not be opened after {FOLLOW_ATTEMPTS} tries: {page.error}; check it by hand)"]
+                hits = [f"(could not be read after {FOLLOW_ATTEMPTS} tries: {error}; check it by hand)"]
             else:
                 entry.get("attempts", {}).pop(url, None)
-                hits = matching_lines(clean_text(page.html or page.text, target.get("select")), keywords)
+                hits = _hits(lines, target)
+                recent[url] = {"since": today.isoformat(), "hits": _hits_digest(lines, target)}
         else:
-            hits = [link_text] if any(_norm(k) in _norm(link_text) for k in keywords) else []
+            hits = _hits([link_text], target)
         if hits:
-            quoted = "\n".join(f"> {line}" for line in hits[:40])
-            result.findings.append(
-                Finding(
-                    key=f"new_item:{target['id']}",
-                    title=f"Rule watch: {target['title']} mention admission rules",
-                    body=f"New entry: [{link_text or url}]({url})\n\nMatching lines:\n\n{quoted}" + _footer(target),
-                    kind="new_item",
-                    repeatable=True,
-                )
-            )
+            result.findings.append(_new_item(target, url, link_text, hits, "New entry"))
         seen.append(url)
+    # Pages followed in the last RECHECK_DAYS are read again: a session page gains its
+    # decisions after the session, a consultation its outcome.
+    titles = dict(found)
+    new_urls = {url for url, _ in new}
+    rechecked = 0
+    # Oldest first: each page is read about daily while the list stays under the budget.
+    for url, info in sorted(recent.items(), key=lambda item: item[1].get("checked", item[1]["since"])):
+        if (today - date.fromisoformat(info["since"])).days > RECHECK_DAYS:
+            del recent[url]
+            continue
+        if url in new_urls or rechecked >= MAX_RECHECK_PER_RUN:
+            continue
+        rechecked += 1
+        lines, error = _open(url, target, fetch)
+        if error:
+            continue
+        info["checked"] = today.isoformat()
+        digest = _hits_digest(lines, target)
+        if digest != info["hits"]:
+            hits = _hits(lines, target)
+            if hits:
+                result.findings.append(_new_item(target, url, titles.get(url, ""), hits, "Updated entry"))
+        info["hits"] = digest
     entry["seen"] = seen[-max(500, 3 * len(found)) :]
     entry["baselined"] = True
     result.report.append(
-        f"{target['id']}: {len(found)} links, {len(new)} new{' (baseline)' if baseline else ''}, followed {followed}"
+        f"{target['id']}: {len(found)} links, {len(new)} new{' (baseline)' if baseline else ''}, "
+        f"followed {followed}, re-read {rechecked}"
     )
 
 
@@ -265,7 +336,7 @@ class WatchError(Exception):
 
 
 def check_targets(
-    targets: list[dict[str, Any]], state: dict[str, Any], fetch: Fetcher, result: RunResult
+    targets: list[dict[str, Any]], state: dict[str, Any], fetch: Fetcher, result: RunResult, today: date
 ) -> None:
     for target in targets:
         entry = state.setdefault("targets", {}).setdefault(target["id"], {})
@@ -274,7 +345,7 @@ def check_targets(
             if fetched.error:
                 raise WatchError(fetched.error)
             if target["kind"] == "listing":
-                _check_listing(target, fetched, entry, result, fetch)
+                _check_listing(target, fetched, entry, result, fetch, today)
             elif target["kind"] in ("page", "json"):
                 _check_page(target, fetched, entry, result)
             else:
@@ -369,8 +440,9 @@ def run(
     today: Optional[date] = None,
 ) -> RunResult:
     result = RunResult(state=state)
-    check_targets(config.get("targets", []), state, fetch, result)
-    check_families(config.get("families", {}), rules, today or date.today(), result)
+    today = today or date.today()
+    check_targets(config.get("targets", []), state, fetch, result, today)
+    check_families(config.get("families", {}), rules, today, result)
     state["last_run"] = _now()
     return result
 

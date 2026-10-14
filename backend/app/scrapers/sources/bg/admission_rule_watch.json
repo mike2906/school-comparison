@@ -12,7 +12,11 @@
     "прием на деца",
     "прием на ученици",
     "приемане на деца",
-    "приемане на ученици"
+    "приемане на ученици",
+    "прием в първи клас",
+    "прием в детск",
+    "прилежащи райони",
+    "прилежащите райони"
    ],
    "affects": [
     "bg/sofia/kindergarten",
@@ -34,7 +38,11 @@
     "приемане на деца",
     "приемане на ученици",
     "детски градини",
-    "първи клас"
+    "първи клас",
+    "прием в първи клас",
+    "прием в детск",
+    "прилежащи райони",
+    "прилежащите райони"
    ],
    "affects": [
     "bg/sofia/kindergarten",
@@ -97,7 +105,13 @@
     "bg/grade_8",
     "bg/sofia/grade_1"
    ],
-   "why": "Every draft national act, including МОН's amendments to Наредба № 10 (8th-grade score formulas, the national first-grade template), is published here for consultation before adoption. mon.bg itself is behind a Cloudflare check that GitHub's runners cannot pass."
+   "why": "Every draft national act, including МОН's amendments to Наредба № 10 (8th-grade score formulas, the national first-grade template), is published here for consultation before adoption. mon.bg itself is behind a Cloudflare check that GitHub's runners cannot pass.",
+   "also": [
+    "образован",
+    "училищ",
+    "ученици",
+    "детск"
+   ]
   }
  ],
  "families": {
