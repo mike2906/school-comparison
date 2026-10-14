@@ -419,7 +419,7 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
         <KeyFacts school={school} examAverages={examAverages} nvoExamType={keyFactsExamType} ageGroup={preferredAgeGroup} />
 
         {/* Price is what a private-school parent decides on first. */}
-        {hasPricing && <PricingSection pricing={pricing} />}
+        {hasPricing && <PricingSection pricing={pricing} discounts={school.fee_discounts} />}
 
         <WebsiteFacts school={school} />
 
