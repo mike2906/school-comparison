@@ -396,6 +396,16 @@ def test_171_a_tier_whose_enrolment_deadline_passed_two_lines_up_has_expired():
     assert check_price_row(row(7269), page, "school", today=TODAY) == []
 
 
+def test_594_a_date_in_another_columns_header_does_not_end_this_fee():
+    page = (
+        "GRADE | Admission Fee | Educational Resources Fee | "
+        "TUITION FEE RETURNING STUDENTS with signed contracts before 30.04.2025 | TUITION FEE NEW STUDENTS\n"
+        "Grade 1 | 500 | 565 | 14 750 | 15 350\n"
+    )
+    assert check_price_row(row(565, category="MATERIALS", period="YEARLY"), page, "school", today=TODAY) == []
+    assert RULE_EXPIRED in [f.rule for f in check_price_row(row(14750), page, "school", today=TODAY)]
+
+
 def test_533_a_unit_after_the_amount_that_is_no_period():
     page = "Зелени училища (приблизително) | ≈ 950 EUR / за всички\nТранспорт | ≈ 200 EUR / месец\n"
     assert states_another_unit(page, 950)
