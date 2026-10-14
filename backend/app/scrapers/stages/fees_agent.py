@@ -905,7 +905,7 @@ async def run_school(
         first = {amount for fee in passing for amount in read_amounts(fee)}
         added = [fee for fee in again if fee_amounts(fee) and not set(fee_amounts(fee)) <= first]
         # A page that prints both currencies: the lev twin of a euro fee is not a fee of its own.
-        euro = _euro_amounts([*fees, *added])
+        euro = _euro_amounts([*passing, *added])
         added = [fee for fee in added if not _lev_twin(fee, euro)]
         fees = [*fees, *added]
         report["reread"]["added"] = len(added)
