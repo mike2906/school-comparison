@@ -7,8 +7,6 @@ name: Capture admission cut-offs
 on:
   schedule:
     - cron: "15 3,16,21 * * *"
-  push:  # TEMP-TEST
-    branches: [agent/cutoff-capture]  # TEMP-TEST
   workflow_dispatch:
     inputs:
       force:
@@ -56,17 +54,8 @@ jobs:
         run: >-
           uv run python -m scripts.capture_isodz_cutoffs
           --archive ../cutoff-archive
-          --max-requests ${{ github.event_name == 'push' && '150' || '4500' }}
-          ${{ (inputs.force || github.event_name == 'push') && '--force' || '' }}
-          ${{ github.event_name == 'push' && '--only grade_1' || '' }}
-          2>&1 | tee "$RUNNER_TEMP/capture.log"
-
-      - name: Report (TEMP-TEST)
-        if: always() && github.event_name == 'push'
-        run: |
-          tail -c 3000 "$RUNNER_TEMP/capture.log" | tr '\n' '|' | sed 's/::/:/g' | xargs -0 -I{} echo "::notice title=log::{}"
-          cd cutoff-archive && find . -name '*.json' | head -40 | tr '\n' ' ' | xargs -0 -I{} echo "::notice title=files::{}"
-          f=$(find . -name 'round-*.json' | head -1); [ -n "$f" ] && head -c 3500 "$f" | tr '\n' ' ' | xargs -0 -I{} echo "::notice title=sample::{}" || true
+          --max-requests 4500
+          ${{ inputs.force && '--force' || '' }}
 
       - name: Commit the archive
         if: always()

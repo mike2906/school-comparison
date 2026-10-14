@@ -153,35 +153,43 @@ def aggregate_round(
     """Reduce one group's three round lists to one aggregate row per queue.
 
     ``last_admitted_points`` (and, for first grade, ``last_admitted_group``) is the last
-    line of the admitted list. ``tie_at_cutoff`` is true when that line needed the random
-    number; ``not_admitted_at_cutoff`` counts the children with the same score who were
-    not admitted. A queue nobody applied to is left out unless it had places.
+    line of the admitted list. ``not_admitted_at_cutoff`` counts the children with that
+    same score who were not admitted, so ``tie_at_cutoff`` means the random number decided
+    the line. (The admitted list shows random numbers for every tied block, even one that
+    got in whole, so they say nothing about the line on their own.)
+
+    ``applicants_count`` is the waiting list before the round. Children admitted to a
+    school they ranked higher drop out of this group's admitted and not-admitted lists, so
+    those two lists do not add up to it. A queue nobody applied to is left out unless it
+    had places.
     """
     if rated is None:
         return []
     by_queue: dict[str, dict[str, Any]] = {}
 
     def bucket(queue: str) -> dict[str, Any]:
-        return by_queue.setdefault(queue, {"queue": queue, "rated": [], "not_rated": [], "places": None})
+        return by_queue.setdefault(queue, {"queue": queue, "rated": [], "not_rated": [], "places": None, "waiting": None})
 
     for section in rated:
         bucket(section.queue)["rated"].extend(section.entries)
     for section in not_rated or []:
         bucket(section.queue)["not_rated"].extend(section.entries)
     for section in entry or []:
+        data = bucket(section.queue)
+        data["waiting"] = (data["waiting"] or 0) + len(section.entries)
         if section.places is not None:
-            bucket(section.queue)["places"] = section.places
+            data["places"] = section.places
 
     rows = []
     for queue, data in by_queue.items():
         admitted: list[ListEntry] = data["rated"]
         rejected: list[ListEntry] = data["not_rated"]
-        if not admitted and not rejected and not data["places"]:
+        if not admitted and not rejected and not data["places"] and not data["waiting"]:
             continue
         row: dict[str, Any] = {
             "queue": queue,
             "places": data["places"],
-            "applicants_count": len(admitted) + len(rejected),
+            "applicants_count": data["waiting"],
             "admitted_count": len(admitted),
             "undersubscribed": not rejected,
             "last_admitted_points": None,
@@ -193,8 +201,9 @@ def aggregate_round(
             row["last_admitted_points"] = last.points
             if last.priority_group is not None:
                 row["last_admitted_group"] = last.priority_group
-            row["tie_at_cutoff"] = last.has_random
-            row["not_admitted_at_cutoff"] = sum(1 for item in rejected if _rank_key(item) == _rank_key(last))
+            tied = sum(1 for item in rejected if _rank_key(item) == _rank_key(last))
+            row["not_admitted_at_cutoff"] = tied
+            row["tie_at_cutoff"] = tied > 0
         rows.append(row)
     return sorted(rows, key=lambda item: [q for _, q in QUEUE_MARKERS].index(item["queue"]))
 
@@ -314,7 +323,30 @@ def group_rounds(dz_payload: dict[str, Any], family: str) -> list[GroupRound]:
     return out
 
 
-def rows_for_round(round_: GroupRound, aggregates: list[dict[str, Any]], retrieved_at: str) -> list[dict[str, Any]]:
+_CALENDAR_PREFIX = {"grade_1": "i-ви клас", "kindergarten": "сдя, дг, пгу", "preparatory": "сдя, дг, пгу"}
+
+
+def round_names(events: list[dict[str, Any]]) -> dict[tuple[str, str], str]:
+    """(family, ISO date) -> round title from the ИСОДЗ calendar, e.g. "Първо класиране"."""
+    names: dict[tuple[str, str], str] = {}
+    for event in events or []:
+        title = " ".join((event.get("title") or "").split())
+        lowered = title.lower()
+        if "класиране" not in lowered or not event.get("start"):
+            continue
+        for family, prefix in _CALENDAR_PREFIX.items():
+            if lowered.startswith(prefix):
+                # "СДЯ, ДГ, ПГУ - 17:00 ч. - Текущо класиране" -> "Текущо класиране"
+                names[(family, event["start"])] = title.split(" - ")[-1].strip()
+    return names
+
+
+def rows_for_round(
+    round_: GroupRound,
+    aggregates: list[dict[str, Any]],
+    retrieved_at: str,
+    round_name: Optional[str] = None,
+) -> list[dict[str, Any]]:
     """Archive rows: the round's labels around each queue aggregate."""
     rows = []
     for aggregate in aggregates:
@@ -326,6 +358,8 @@ def rows_for_round(round_: GroupRound, aggregates: list[dict[str, Any]], retriev
             "rule_set": f"bg/sofia/{'grade_1' if round_.stage == 'grade_1' else 'kindergarten'}/{round_.campaign.replace('/', '-')}",
             "round_id": round_.rating_id,
             "classified_on": round_.classified_on.isoformat(),
+            "round_name": round_name,
+            "round_kind": None if not round_name else ("current" if "текущо" in round_name.lower() else "general"),
             "source": "kg.sofia.bg",
             "source_id": str(round_.institution_id),
             "institution_name": round_.institution_name,

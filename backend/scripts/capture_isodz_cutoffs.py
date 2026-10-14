@@ -25,6 +25,7 @@ from app.scrapers.sources.bg.kg_sofia_ratings import (
     IsodzClient,
     aggregate_round,
     group_rounds,
+    round_names,
     rows_for_round,
 )
 from app.services.admission_cutoffs import iter_rows, load_state, save_state, write_rows
@@ -59,7 +60,7 @@ def round_published_since(events: list[dict], since: date, today: date) -> bool:
     return False
 
 
-async def _capture_institution(client, dz, family, today, captured, empty, rows, summary, spend) -> None:
+async def _capture_institution(client, dz, family, today, captured, empty, rows, summary, spend, names) -> None:
     for round_ in group_rounds(dz, family):
         key = f"{round_.rating_id}:{round_.group_id}"
         if (round_.rating_id, round_.group_id) in captured or key in empty:
@@ -76,7 +77,8 @@ async def _capture_institution(client, dz, family, today, captured, empty, rows,
         not_rated = await client.round_list("not-rated", round_.rating_id, round_.group_id)
         entry = await client.round_list("entry", round_.rating_id, round_.group_id)
         retrieved_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
-        new_rows = rows_for_round(round_, aggregate_round(rated, not_rated, entry), retrieved_at)
+        name = names.get((family, round_.classified_on.isoformat()))
+        new_rows = rows_for_round(round_, aggregate_round(rated, not_rated, entry), retrieved_at, name)
         if not new_rows:
             empty.add(key)
             summary["empty_lists"] += 1
@@ -97,10 +99,11 @@ async def capture(archive: Path, *, delay: float, max_requests: int, force: bool
     async with httpx.AsyncClient(timeout=30.0, follow_redirects=True, headers={"User-Agent": "schooldecider.com cut-off archive"}) as http:
         client = IsodzClient(http, delay=delay)
 
+        events = await client.calendar()
+        names = round_names(events)
         last_scan = isodz_state.get("last_full_scan")
         if not force and last_scan and not isodz_state.get("incomplete"):
             last = date.fromisoformat(last_scan)
-            events = await client.calendar()
             if today - last < timedelta(days=FULL_SCAN_EVERY_DAYS) and not round_published_since(events, last, today):
                 logger.info("No round published since %s; nothing to do.", last)
                 summary["requests"] = client.requests
@@ -124,7 +127,7 @@ async def capture(archive: Path, *, delay: float, max_requests: int, force: bool
                     dz = await client.dz(endpoint_type, int(institution["id"]))
                     rows = []
                     try:
-                        await _capture_institution(client, dz, family, today, captured, empty, rows, summary, spend)
+                        await _capture_institution(client, dz, family, today, captured, empty, rows, summary, spend, names)
                     finally:
                         if rows:
                             write_rows(archive, rows)

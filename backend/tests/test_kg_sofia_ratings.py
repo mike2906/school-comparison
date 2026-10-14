@@ -11,6 +11,7 @@ from app.scrapers.sources.bg.kg_sofia_ratings import (
     group_rounds,
     parse_list,
     rating_date,
+    round_names,
     rows_for_round,
     start_offset,
 )
@@ -60,7 +61,7 @@ def test_kindergarten_round_aggregate():
     assert general == {
         "queue": "general",
         "places": 6,
-        "applicants_count": 11,
+        "applicants_count": 16,
         "admitted_count": 6,
         "undersubscribed": False,
         "last_admitted_points": 16.0,
@@ -79,8 +80,27 @@ def test_first_grade_round_aggregate():
     (row,) = aggregate_round(rated, None, None)
     assert row["last_admitted_group"] == 4
     assert row["last_admitted_points"] == 0.0
-    assert row["tie_at_cutoff"] is True
+    assert row["applicants_count"] is None  # no waiting list was given
+    # Random numbers on the admitted list alone don't make a tie at the line.
+    assert row["tie_at_cutoff"] is False
     assert row["undersubscribed"] is True  # no not-rated list was given
+
+
+def test_first_grade_cutoff_between_groups_is_not_a_tie():
+    # 2. СУ, round 31: the tied block "Първа група, 0.0" was admitted whole; the first
+    # child turned away was "Втора група, 5.0".
+    rated = parse_list(_content("rated_31_9463"))
+    rated[0].entries[-1].priority_group = 1
+    not_rated = parse_list(_content("rated_31_9463"))
+    not_rated[0].entries = [
+        type(rated[0].entries[0])(points=5.0, priority_group=2),
+        type(rated[0].entries[0])(points=0.0, priority_group=4),
+    ]
+    (row,) = aggregate_round(rated, not_rated, None)
+    assert (row["tie_at_cutoff"], row["not_admitted_at_cutoff"], row["undersubscribed"]) == (False, 0, False)
+    not_rated[0].entries.insert(1, type(rated[0].entries[0])(points=0.0, priority_group=1))
+    (row,) = aggregate_round(rated, not_rated, None)
+    assert (row["tie_at_cutoff"], row["not_admitted_at_cutoff"]) == (True, 1)
 
 
 @pytest.mark.parametrize(
@@ -158,3 +178,21 @@ def test_check_row_rejects_per_child_fields():
         check_row({"country": "bg", "city": "sofia", "stage": "kindergarten", "campaign": "2026/2027",
                    "round_id": 1, "source": "kg.sofia.bg", "source_id": "1", "queue": "general",
                    "initials": "АБ"})
+
+
+def test_round_names_from_calendar():
+    events = [
+        {"start": "2026-01-16", "end": "2026-01-17", "title": "СДЯ, ДГ, ПГУ - 17:00 ч. - Текущо класиране"},
+        {"start": "2026-01-19", "end": "2026-01-24", "title": "СДЯ, ДГ, ПГУ - Записване на класираните деца"},
+        {"start": "2026-06-02", "end": "2026-06-03", "title": "I-ви клас - Първо класиране"},
+        {"start": "2026-03-02", "end": "2026-03-03", "title": "Период без класирания"},
+    ]
+    names = round_names(events)
+    assert names == {
+        ("kindergarten", "2026-01-16"): "Текущо класиране",
+        ("preparatory", "2026-01-16"): "Текущо класиране",
+        ("grade_1", "2026-06-02"): "Първо класиране",
+    }
+    (round_,) = [r for r in group_rounds(_payload("dz_1_629"), "grade_1") if r.rating_id == 31]
+    (row,) = rows_for_round(round_, aggregate_round(parse_list(_content("rated_31_9463")), None, None), "t", names[("grade_1", "2026-06-02")])
+    assert (row["round_name"], row["round_kind"]) == ("Първо класиране", "general")
