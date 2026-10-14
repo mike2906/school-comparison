@@ -27,6 +27,10 @@ _PRIVATE_WEBSITE_ATTRIBUTE_KEYS = frozenset(
 )
 
 
+# ``app.utils.school_facts`` ATTRIBUTE_KEY and PUBLISHED_KEY (that module imports this one).
+_SCHOOL_FACTS_KEYS = ("school_facts", "school_facts_published")
+
+
 def _validation_report_identity(report: Mapping[str, Any]) -> tuple[Any, Any, Any]:
     return (
         report.get("_schema_version", report.get("schema_version")),
@@ -127,8 +131,13 @@ def website_data_is_publishable(attributes: Any, scrape_status: Any) -> bool:
 
 
 def attributes_for_publication(attributes: Any, scrape_status: Any) -> dict[str, Any]:
-    """Return raw attributes with private website-derived branches removed when withheld."""
+    """Return raw attributes with private website-derived branches removed when withheld.
+
+    School facts are always removed: they carry their own gate, and only
+    ``app.utils.school_facts.publication_attributes`` adds back the facts that may show."""
     attrs = dict(attributes) if isinstance(attributes, Mapping) else {}
+    for key in _SCHOOL_FACTS_KEYS:
+        attrs.pop(key, None)
     if website_data_is_publishable(attrs, scrape_status):
         # UF45 rule 5: a display name validation flagged (a sibling's name) falls back
         # to the registry name.

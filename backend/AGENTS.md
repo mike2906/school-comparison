@@ -64,6 +64,15 @@ allowlist. Website-derived fields must additionally pass `app/utils/website_data
 gate. Useful scraped admission fields are projected through localized attributes; never expose
 `admission_info.website_extracted` or `FieldSource.value_json` directly.
 
+School facts (`attributes.school_facts`, `school-facts` stage, `docs/SCHOOL_FACTS.md`) have
+their own gate instead of Stage 6: each fact's quote must be on a page read and a second call
+confirms the quote states the fact and its labels. `app/utils/school_facts.py`
+`shown_school_facts` lets them through only with no withholding marker, a website URL
+validation accepted (`SITE_ACCEPTED_STATUSES`) and the same site they were read from; they do
+not wait for a Stage 6 report, because most schools they are for were never extracted.
+`attributes_for_publication` always drops them; `publication_attributes` adds the shown ones,
+whose labels then join `filter_tags`, `language_focus` and `class_size`.
+
 `app/utils/display_gating.py` drops display fields, pricing rows, and summaries flagged by
 error-level issues / actionable spot-check discrepancies, plus pricing rows with no
 `source_url` or confidence below `PRICING_CONFIDENCE_FLOOR`. When adding a response field, go

@@ -41,6 +41,7 @@ from app.utils.facility_vocabulary import (
     canonical_tags,
 )
 from app.utils.list_translations import translate_items
+from app.utils.school_facts import PUBLISHED_KEY, TAG_GROUPS
 
 DISPLAY_LOCALES: tuple[str, ...] = ("bg", "en")
 
@@ -390,6 +391,9 @@ def build_localized_attributes(
         for entry in _normalize_focus_entries(
             _normalize_focus_entries(attrs.get("language_focus"))
             + _normalize_focus_entries(extracted.get("languages"))
+            + _normalize_focus_entries(
+                [item for fact in _published_facts(attrs) for item in _as_list(fact.get("languages"))]
+            )
         )
         # A plain "Bulgarian" at a school taught in Bulgarian says nothing; a focus with a
         # level ("English: immersion" at a bilingual school) is kept.
@@ -491,6 +495,12 @@ def _scraped_school_hours(value: Any) -> Optional[str]:
     return match.group(0)
 
 
+def _published_facts(attrs: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+    """The facts ``app.utils.school_facts.publication_attributes`` let through (any rank)."""
+    block = _as_mapping(attrs.get(PUBLISHED_KEY))
+    return [fact for fact in _as_list(block.get("facts")) if isinstance(fact, Mapping)]
+
+
 def compute_filter_tags(attributes: Mapping[str, Any] | None) -> dict[str, list[str]]:
     """Map the free-text display fields onto the advanced filter's controlled vocabulary.
 
@@ -545,15 +555,29 @@ def compute_filter_tags(attributes: Mapping[str, Any] | None) -> dict[str, list[
         facilities_text = facilities_text + _nested("operations", "transport")
     meals_text = [] if "special_programs" in blocked else _nested("operations", "meals")
 
+    # Tags a school fact's quote states (each checked against its page) are already
+    # canonical; each joins the group whose vocabulary has it.
+    fact_tags: dict[str, list[str]] = {"facilities": [], "special_programs": [], "teaching_approach": []}
+    for fact in _published_facts(attrs):
+        for tag in _as_list(fact.get("tags")):
+            if tag in TAG_GROUPS and tag not in fact_tags[TAG_GROUPS[tag]]:
+                fact_tags[TAG_GROUPS[tag]].append(tag)
+
+    def _with_facts(group: str, tags: list[str]) -> list[str]:
+        return tags + [tag for tag in fact_tags[group] if tag not in tags]
+
     return {
-        "facilities": canonical_tags(facilities_text, FACILITY_VOCAB),
+        "facilities": _with_facts("facilities", canonical_tags(facilities_text, FACILITY_VOCAB)),
         # Programs and extracurricular both feed the "special programs" filter (a sports
         # club is a sports program); Montessori/IB live in programs, so they feed
         # teaching_approach as well.
-        "special_programs": canonical_tags(
-            programs_text + activities_text + meals_text, PROGRAM_VOCAB
+        "special_programs": _with_facts(
+            "special_programs",
+            canonical_tags(programs_text + activities_text + meals_text, PROGRAM_VOCAB),
         ),
-        "teaching_approach": canonical_tags(programs_text + approach_text, APPROACH_VOCAB),
+        "teaching_approach": _with_facts(
+            "teaching_approach", canonical_tags(programs_text + approach_text, APPROACH_VOCAB)
+        ),
     }
 
 
@@ -569,9 +593,14 @@ def build_base_attributes(attributes: Mapping[str, Any] | None) -> dict[str, Any
     publish_dynamic_fields = get_settings().publish_website_dynamic_fields
 
     class_size = _parse_class_size(attrs.get("class_size"))
-    if class_size is None and publish_dynamic_fields:
+    if class_size is None:
+        # A school fact's class size is checked against its page, so it comes before the
+        # old extraction's and neither waits for the dynamic-fields flag nor its block.
+        sizes = (_parse_class_size(fact.get("max_class_size")) for fact in _published_facts(attrs))
+        class_size = next((size for size in sizes if size is not None), None)
+    if class_size is None and publish_dynamic_fields and "class_size" not in blocked:
         class_size = _parse_class_size(extracted.get("class_size"))
-    if "class_size" in blocked:
+    if "class_size" in blocked and attrs.get("class_size") is not None:
         class_size = None
 
     school_hours = _normalize_text(attrs.get("school_hours"))

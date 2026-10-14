@@ -6,7 +6,7 @@ import { calculateDistance } from '../../utils/distance'
 import { formatDistance } from '../../utils/format'
 import { getAddress, getSummary } from '../../utils/i18n'
 import { hasAnySchoolSummary } from './summaryVisibility'
-import { FACT_TOPICS, getSchoolFacts } from '../../utils/schoolFacts'
+import { atAGlanceKeysIn, atAGlanceLines, factTopicsIn, getSchoolFacts } from '../../utils/schoolFacts'
 import {
   getAfterSchoolEvidence,
   getCanonicalAmenityEvidence,
@@ -703,11 +703,17 @@ export function buildCompareSections({
       },
     ]
 
-    // One row per topic any compared school has a fact for; facts link their page.
-    const factsBySchool = new Map(schools.map(school => [school.id, getSchoolFacts(school, language)]))
+    // One row per topic any compared school has a key fact for; facts link their page.
+    const factsBySchool = new Map(schools.map(school => [school.id, getSchoolFacts(school, language, { keyOnly: true })]))
     const topicFacts = (school, topic) => (factsBySchool.get(school.id) || []).filter(fact => fact.topic === topic)
-    const factTopics = new Set([...factsBySchool.values()].flat().map(fact => fact.topic))
-    const factRows = FACT_TOPICS.filter(topic => factTopics.has(topic)).map(topic => ({
+    // The facts' labels summed up (admission, curriculum, bus areas ...), one row a kind.
+    const glanceValue = (school, key) => atAGlanceLines(school, language, t).find(line => line.key === key)?.value || null
+    const glanceRows = atAGlanceKeysIn(schools, language, t).map(key => ({
+      label: t(`schoolFacts.glance.${key}`),
+      getValue: (school) => glanceValue(school, key) || renderPlaceholder(),
+      getCompare: (school) => glanceValue(school, key),
+    }))
+    const factRows = factTopicsIn(schools, language).map(topic => ({
       label: t(`schoolFacts.topics.${topic}`),
       getValue: (school) => {
         const facts = topicFacts(school, topic)
@@ -731,7 +737,7 @@ export function buildCompareSections({
       { key: 'overview', title: t('compare.sections.quickOverview'), rows: overviewRows },
       { key: 'academic', title: t('compare.sections.academicPerformance'), rows: academicRows },
       { key: 'practical', title: t('compare.sections.practicalDetails'), rows: practicalRows },
-      { key: 'websiteFacts', title: t('schoolFacts.title'), rows: factRows },
+      { key: 'websiteFacts', title: t('schoolFacts.title'), rows: [...glanceRows, ...factRows] },
       { key: 'admission', title: t('compare.sections.admissionEnrollment'), rows: admissionRows },
       { key: 'pricing', title: t('compare.sections.pricing'), rows: pricingRows },
       { key: 'locations', title: t('compare.sections.locations'), rows: locationRows },

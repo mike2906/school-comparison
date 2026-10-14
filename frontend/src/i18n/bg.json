@@ -787,6 +787,8 @@
     "note": "Какво пише на собствените страници на училището. Всеки ред води към страницата, от която е взет.",
     "readOn": "Какво пишеше на собствените страници на училището, когато ги прочетохме на {{date}}. Всеки ред води към страницата, от която е взет.",
     "source": "източник",
+    "showMore": "Покажи още {{count}}",
+    "showLess": "Покажи по-малко",
     "topics": {
       "curriculum": "Учебна програма",
       "languages": "Езици",
@@ -798,6 +800,49 @@
       "facilities": "База",
       "support": "Подкрепа",
       "admissions": "Прием"
+    },
+    "glance": {
+      "admission": "Прием",
+      "places": "Свободни места",
+      "applications": "Кандидатстване",
+      "highestGrade": "Обучение до",
+      "curricula": "Програма",
+      "diploma": "Диплома",
+      "instruction": "Език на обучение",
+      "languages": "Езици",
+      "bus": "Училищен автобус",
+      "support": "Подкрепа за деца със СОП",
+      "grade": "{{grade}} клас",
+      "grades": "{{from}}–{{to}} клас",
+      "kindergarten": "Детска градина",
+      "admissionTypes": {
+        "entrance_exam": "Приемен изпит",
+        "interview": "Събеседване",
+        "trial_day": "Пробен ден",
+        "open_entry": "Без приемен изпит"
+      },
+      "placesStatus": {
+        "full": "Няма места",
+        "waiting_list": "Списък на чакащите"
+      },
+      "window": "от {{open}} до {{close}}",
+      "opens": "От {{date}}",
+      "closes": "До {{date}}",
+      "curriculaNames": {
+        "bulgarian_state": "Българска държавна програма",
+        "ib": "IB",
+        "cambridge": "Кеймбридж",
+        "british": "Британска",
+        "american": "Американска",
+        "canadian": "Канадска",
+        "french": "Френска",
+        "german": "Немска"
+      },
+      "recognised": "Призната в България",
+      "notRecognised": "Не е призната в България",
+      "hours_one": "{{count}} час седмично",
+      "hours_other": "{{count}} часа седмично",
+      "yes": "Да"
     }
   }
 }

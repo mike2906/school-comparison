@@ -787,6 +787,8 @@
     "note": "What the school's own pages state. Each line links the page it came from.",
     "readOn": "What the school's own pages stated when we read them on {{date}}. Each line links the page it came from.",
     "source": "source",
+    "showMore": "Show {{count}} more",
+    "showLess": "Show fewer",
     "topics": {
       "curriculum": "Curriculum",
       "languages": "Languages",
@@ -798,6 +800,49 @@
       "facilities": "Facilities",
       "support": "Support",
       "admissions": "Admissions"
+    },
+    "glance": {
+      "admission": "Admission",
+      "places": "Places",
+      "applications": "Applications",
+      "highestGrade": "Teaches up to",
+      "curricula": "Curriculum",
+      "diploma": "Diploma",
+      "instruction": "Taught in",
+      "languages": "Languages",
+      "bus": "School bus",
+      "support": "Special needs support",
+      "grade": "Grade {{grade}}",
+      "grades": "Grades {{from}}–{{to}}",
+      "kindergarten": "Kindergarten",
+      "admissionTypes": {
+        "entrance_exam": "Entrance exam",
+        "interview": "Interview",
+        "trial_day": "Trial day",
+        "open_entry": "No entrance test"
+      },
+      "placesStatus": {
+        "full": "Full",
+        "waiting_list": "Waiting list"
+      },
+      "window": "{{open}} to {{close}}",
+      "opens": "Opens {{date}}",
+      "closes": "Closes {{date}}",
+      "curriculaNames": {
+        "bulgarian_state": "Bulgarian state programme",
+        "ib": "IB",
+        "cambridge": "Cambridge",
+        "british": "British",
+        "american": "American",
+        "canadian": "Canadian",
+        "french": "French",
+        "german": "German"
+      },
+      "recognised": "Recognised in Bulgaria",
+      "notRecognised": "Not recognised in Bulgaria",
+      "hours_one": "{{count}} hour a week",
+      "hours_other": "{{count}} hours a week",
+      "yes": "Yes"
     }
   }
 }
