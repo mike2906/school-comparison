@@ -66,8 +66,9 @@ jobs:
         env:
           LIVE_SITE_URL: ${{ inputs.site_url || 'https://schooldecider.com' }}
           LIVE_API_URL: ${{ inputs.api_url || 'https://api.schooldecider.com' }}
-        # One retry, so a single slow answer does not page anyone.
-        run: npm run test:live || { echo "Retrying once in 60 seconds."; sleep 60; npm run test:live; }
+        # One retry, so a single slow answer does not page anyone. Each failed flow is an
+        # annotation on the run's page.
+        run: npm run test:live:ci || { echo "Retrying once in 60 seconds."; sleep 60; npm run test:live:ci; }
 
       - name: Upload screenshots
         if: failure()

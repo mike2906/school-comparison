@@ -10,6 +10,7 @@
     "test": "node --test 'src/**/*.test.js' 'scripts/*.test.js'",
     "test:journeys": "node --test --test-concurrency=1 'e2e/*.test.js'",
     "test:live": "node --test --test-concurrency=1 'e2e/live/*.test.js'",
+    "test:live:ci": "node --test --test-concurrency=1 --test-reporter=spec --test-reporter-destination=stdout --test-reporter=./e2e/live/annotate.js --test-reporter-destination=stdout 'e2e/live/*.test.js'",
     "scan:ui": "node scripts/ui-scan.js",
     "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"
