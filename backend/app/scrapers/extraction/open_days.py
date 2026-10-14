@@ -18,7 +18,7 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
-from app.scrapers.extraction.school_facts import Fact, _normalise
+from app.scrapers.extraction.school_facts import _LINK_RE, Fact, _normalise
 from app.utils.school_facts import OPEN_ONLY_WINDOW_DAYS
 
 # A line that announces an open day or an application window.
@@ -68,8 +68,12 @@ class DateFacts(BaseModel):
     facts: list[DateFact] = Field(description="Upcoming open days and application windows; empty if none")
 
 
+# ``_normalise`` caches whole pages for the quote checks; single lines would push them out.
+_clean = _normalise.__wrapped__
+
+
 def _lines(text: str) -> list[str]:
-    return [line for line in (" ".join(_normalise(raw).split()) for raw in text.splitlines()) if line]
+    return [line for line in (" ".join(_clean(raw).split()) for raw in text.splitlines()) if line]
 
 
 def mention_lines(text: str, context: int = HASH_CONTEXT) -> list[str]:
@@ -109,7 +113,7 @@ def excerpt(text: str) -> str:
     raw = [line for line in text.splitlines() if line.strip()]
     keep: set[int] = set()
     for n, line in enumerate(raw):
-        if MENTION_RE.search(_normalise(line)):
+        if MENTION_RE.search(_clean(line)):
             keep.update(range(max(0, n - READ_CONTEXT), min(len(raw), n + READ_CONTEXT + 1)))
     out, last = [], -2
     for n in sorted(keep):
@@ -120,20 +124,17 @@ def excerpt(text: str) -> str:
     return "\n".join(out)[:MAX_EXCERPT_CHARS]
 
 
-_MD_LINK_RE = re.compile(r"\]\(<?([^()\s<>]+)")
-
-
 def mention_links(text: str, context: int = 0) -> list[str]:
     """Link addresses on the raw lines that mention open days or applications, and on the
     ``context`` lines either side (a news headline linking its article, a sign-up button)."""
     raw = [line for line in text.splitlines() if line.strip()]
     keep: set[int] = set()
     for n, line in enumerate(raw):
-        if MENTION_RE.search(_normalise(line)):
+        if MENTION_RE.search(_clean(line)):
             keep.update(range(max(0, n - context), min(len(raw), n + context + 1)))
     found: list[str] = []
     for n in sorted(keep):
-        found += [link for link in _MD_LINK_RE.findall(raw[n]) if link not in found]
+        found += [link for link in _LINK_RE.findall(raw[n]) if link not in found]
     return found
 
 
@@ -153,15 +154,19 @@ def upcoming(fact: DateFact, today: datetime.date) -> Optional[str]:
         return "malformed date"
     if not (days or opens or closes):
         return "no date"
-    if not fact.year_stated and any(
-        not 0 <= (d - today).days <= UNDATED_YEAR_MAX_DAYS for d in [*days, *(x for x in (opens, closes) if x)]
-    ):
-        return "date without a year too far ahead"
-    if days:
-        return None if max(days) >= today else "past date"
+    if not fact.year_stated:
+        ahead = [*days, *(x for x in (closes,) if x)]
+        # A window already open (opened 1 October, closes 30 November) may open in the past.
+        if any(not 0 <= (d - today).days <= UNDATED_YEAR_MAX_DAYS for d in ahead) or (
+            opens and not -OPEN_ONLY_WINDOW_DAYS <= (opens - today).days <= UNDATED_YEAR_MAX_DAYS
+        ):
+            return "date without a year too far ahead"
+    open_day = bool(days) and max(days) >= today
     if closes:  # an application window counts until it closes
-        return None if closes >= today else "past date"
-    return None if (today - opens).days <= OPEN_ONLY_WINDOW_DAYS else "past date"
+        window = closes >= today
+    else:
+        window = opens is not None and (today - opens).days <= OPEN_ONLY_WINDOW_DAYS
+    return None if open_day or window else "past date"
 
 
 def judge_note(today: datetime.date, facts: Sequence[DateFact]) -> str:

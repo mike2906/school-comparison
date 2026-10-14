@@ -281,3 +281,51 @@ def test_a_passed_open_day_is_not_shown():
     block = {"_schema_version": 1, "website_url": HOME, "facts": [row("2000-04-16"), row("2999-11-15")]}
     shown = publishable_school_facts({"school_facts": block}, HOME)
     assert [fact["open_days"] for fact in shown["facts"]] == [["2999-11-15"]]
+
+
+def test_a_window_already_open_or_beside_a_past_open_day_is_kept():
+    def window(**extra):
+        return DateFact(topic="admissions", fact_en="x", fact_bg="x", quote="q", source_url=HOME, **extra)
+
+    # 1 October to 30 November with no year, read on 14 October.
+    assert (
+        rules.upcoming(
+            window(applications_open="2026-10-01", applications_close="2026-11-30", year_stated=False), TODAY
+        )
+        is None
+    )
+    assert rules.upcoming(window(open_days=["2026-10-10"], applications_close="2026-11-30"), TODAY) is None
+
+
+@pytest.mark.asyncio
+async def test_the_same_line_with_a_new_sign_up_link_replaces_the_stored_fact():
+    page = f"{ANNOUNCEMENT}\n\n[Запишете се](https://school.example/form-2)"
+    stored = {
+        "topic": "admissions",
+        "text_i18n": {"bg": "Ден", "en": "Open day"},
+        "source_url": HOME,
+        "quote": ANNOUNCEMENT,
+        "rank": "more",
+        "open_days": ["2026-11-15"],
+        "register_url": "https://school.example/form-1",
+    }
+    school = _school(school_facts={"_schema_version": 1, "website_url": HOME, "facts": [stored]})
+    calls = _Calls([_date_fact(register_url="https://school.example/form-2")], key=[1])
+    report = await stage.check_school(school, _fetcher({HOME: page}), calls, TODAY)
+    facts = stage.merged([stored], report["add"], report["remove"])
+    assert [row["register_url"] for row in facts] == ["https://school.example/form-2"]
+
+
+def test_over_the_limit_a_fact_without_a_date_goes():
+    others = [{"topic": "meals", "quote": str(n), "source_url": HOME, "rank": "more"} for n in range(20)]
+    new = {"topic": "admissions", "quote": "d", "source_url": HOME, "rank": "minor", "open_days": ["2026-11-15"]}
+    rows = stage.merged(others, [new], [])
+    assert len(rows) == 20 and new in rows and others[-1] not in rows
+
+
+@pytest.mark.asyncio
+async def test_watched_pages_leave_room_for_a_changed_headlines_article():
+    watched = {f"https://school.example/p{n}": "x" for n in range(6)}
+    fetch = _fetcher({HOME: HOME_TEXT, NEWS: "Ден на отворените врати на 15.11.2026 г."})
+    await stage.check_school(_school(open_days_watch={"pages": watched}), fetch, _Calls(), TODAY)
+    assert NEWS in fetch.opened

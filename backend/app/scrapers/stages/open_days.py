@@ -19,7 +19,7 @@ import datetime
 import logging
 from collections.abc import Awaitable, Callable, Sequence
 from typing import Any, Optional
-from urllib.parse import urldefrag, urljoin
+from urllib.parse import unquote, urldefrag, urljoin
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -82,8 +82,8 @@ async def check_school(school: School, fetch: Fetcher, call: Caller, today: date
     pages: list[PageRead] = []
     seen: set[tuple] = set()
 
-    async def read(url: str) -> Optional[tuple[str, list[tuple[str, str]]]]:
-        if page_key(url) in seen or len(pages) >= MAX_PAGES:
+    async def read(url: str, limit: int = MAX_PAGES) -> Optional[tuple[str, list[tuple[str, str]]]]:
+        if page_key(url) in seen or len(pages) >= limit:
             return None
         seen.add(page_key(url))
         try:
@@ -103,11 +103,14 @@ async def check_school(school: School, fetch: Fetcher, call: Caller, today: date
     if not home or not home[0].strip():
         return report | {"outcome": "not_read"}
     named = [url for url, label in home[1] if _same_site(url, site) and rules.LINK_RE.search(f"{url} {label}")]
-    named.sort(key=lambda url: not rules.MENTION_RE.search(url))
-    queue = [*(row.get("source_url") for row in _date_facts(school)), *watch, *named[:MAX_NEW_LINKS]]
+    named = named[:MAX_NEW_LINKS]
+    open_day_links = [url for url in named if rules.MENTION_RE.search(unquote(url))]
+    # Stored dates' pages, then links named for open days, then watched pages, then admissions
+    # links; ``MAX_FOLLOWED`` places are left for the articles a changed headline links.
+    queue = [*(row.get("source_url") for row in _date_facts(school)), *open_day_links, *watch, *named]
     for url in queue:
         if url:
-            await read(urldefrag(url)[0])
+            await read(urldefrag(url)[0], MAX_PAGES - MAX_FOLLOWED)
 
     hashes = {page.url: rules.mention_hash(page.text) for page in pages if page.text.strip()}
     # A page whose dates were stored and are gone (a full facts read did not carry them) is
@@ -136,7 +139,8 @@ async def check_school(school: School, fetch: Fetcher, call: Caller, today: date
     removed = _gone(school, pages)
     kept: list[tuple[DateFact, str, str]] = []
     if changed:
-        kept, report["facts"] = await _read_dates(school, changed, readable, call, today, removed)
+        kept, report["facts"], relinked = await _read_dates(school, changed, readable, call, today, removed)
+        removed += relinked
     if not kept and not removed:
         return report | {"outcome": "changed, nothing new" if changed else "unchanged"}
     # Merged into the stored facts at write time (``merged``), under the row lock.
@@ -154,8 +158,9 @@ async def _read_dates(
     call: Caller,
     today: datetime.date,
     removed: Sequence[dict] = (),
-) -> tuple[list[tuple[DateFact, str, str]], list[dict]]:
-    """The reader's upcoming dates that pass the facts checks: (fact, page, grade), and the report rows."""
+) -> tuple[list[tuple[DateFact, str, str]], list[dict], list[dict]]:
+    """The reader's upcoming dates that pass the facts checks: (fact, page, grade), the
+    report rows, and the stored rows they replace (same quote, a new sign-up link)."""
     text = "\n\n".join(f"=== PAGE {page.url}\n{rules.excerpt(page.text)}" for page in changed)
     read: DateFacts = await call(
         rules.READER_PROMPT.format(today=today.isoformat()),
@@ -163,9 +168,9 @@ async def _read_dates(
         f"Institution: {facts_stage._name(school)} ({school.school_type} {school.education_level})\n\n{text}",
         school.id,
     )
-    rows, quoted = [], []
-    stored_quotes = {
-        facts_rules.quote_key(fact)
+    rows, quoted, relinked = [], [], []
+    stored: dict[str, Optional[dict]] = {
+        facts_rules.quote_key(fact): row
         for row in ((school.attributes or {}).get(ATTRIBUTE_KEY) or {}).get("facts") or []
         if isinstance(row, dict)
         and all(row is not gone for gone in removed)
@@ -174,20 +179,24 @@ async def _read_dates(
     for fact in read.facts:
         url = facts_rules.quote_on_page(fact, readable)
         why = (
-            "quote not on page"
-            if not url
-            else "no date"
-            if not rules.has_dates(fact)
-            else rules.upcoming(fact, today)
-            or ("already stored" if facts_rules.quote_key(fact) in stored_quotes else None)
+            "quote not on page" if not url else "no date" if not rules.has_dates(fact) else rules.upcoming(fact, today)
         )
         if why is None:
             facts_rules.check_link(fact, readable)
+            key = facts_rules.quote_key(fact)
+            if key in stored:
+                old = stored[key]
+                # The same line with a new sign-up link replaces the stored fact; else it is a repeat.
+                if old is not None and fact.register_url and fact.register_url != old.get("register_url"):
+                    relinked.append(old)
+                else:
+                    why = "already stored"
+            stored[key] = None  # the reader repeating a fact
+        if why is None:
             quoted.append((fact, url))
-            stored_quotes.add(facts_rules.quote_key(fact))  # the reader repeating a fact
         rows.append(fact.model_dump() | {"dropped": why})
     if not quoted:
-        return [], rows
+        return [], rows, []
     verdict: Graded = await call(
         facts_rules.JUDGE_PROMPT,
         Graded,
@@ -202,12 +211,17 @@ async def _read_dates(
         if rank:
             kept.append((fact, url, "more" if rank == "minor" else rank))
         next(row for row in rows if row["quote"] == fact.quote)["dropped"] = None if rank else "quote does not state it"
-    return kept, rows
+    # A stored fact is replaced only by a new one that passed.
+    kept_keys = {facts_rules.quote_key(fact) for fact, _, _ in kept}
+    relinked = [
+        row for row in relinked if (f := facts_rules.stored_as_fact(row)) and facts_rules.quote_key(f) in kept_keys
+    ]
+    return kept, rows, relinked
 
 
 def _gone(school: School, pages: list[PageRead]) -> list[dict]:
-    """Stored date facts from a page read again in full whose quote, or sign-up link, is no
-    longer on it (a link moved to a new form is read again with the changed lines)."""
+    """Stored date facts from a page read again in full whose quote is no longer on it. (A
+    sign-up link moved to a new form changes the hash; the new read replaces the fact.)"""
     full = [(page.url, page.text) for page in pages if len(page.text.strip()) >= THIN_PAGE_CHARS]
     read_keys = {page_key(url) for url, _ in full}
     gone = []
@@ -215,9 +229,7 @@ def _gone(school: School, pages: list[PageRead]) -> list[dict]:
         fact = facts_rules.stored_as_fact(row)
         if fact is None or page_key(row.get("source_url") or "") not in read_keys:
             continue
-        if not facts_rules.quote_on_page(fact, full) or (
-            fact.register_url and not facts_rules.link_on_page(fact.register_url, full)
-        ):
+        if not facts_rules.quote_on_page(fact, full):
             gone.append(row)
     return gone
 
@@ -228,11 +240,15 @@ def _fact_id(row: dict) -> tuple[str, str]:
 
 def merged(stored: list, add: list[dict], remove: Sequence[tuple[str, str]]) -> list[dict]:
     """The stored facts without the removed ones, with the new ones first, key facts first,
-    ``MAX_FACTS`` at most."""
+    ``MAX_FACTS`` at most: over the limit, the least useful fact without a date goes."""
     gone = {tuple(item) for item in remove}
     rows = add + [row for row in stored if isinstance(row, dict) and _fact_id(row) not in gone]
     rank = {name: n for n, name in enumerate(facts_rules.RANKS)}
-    return sorted(rows, key=lambda row: rank.get(row.get("rank"), 0))[: facts_rules.MAX_FACTS]
+    rows.sort(key=lambda row: rank.get(row.get("rank"), 0))
+    while len(rows) > facts_rules.MAX_FACTS:
+        undated = [n for n, row in enumerate(rows) if not _stored_has_dates(row)]
+        del rows[undated[-1] if undated else -1]
+    return rows
 
 
 async def run_school(

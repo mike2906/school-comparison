@@ -292,7 +292,9 @@ def publishable_school_facts(attributes: Any, website_url: Optional[str]) -> Opt
         ):
             continue
         labels = _labels(fact)
-        if labels.get("open_days") and max(labels["open_days"]) < today:
+        if labels.get("open_days") and max(labels["open_days"]) < today and not (
+            labels.get("applications_close") and labels["applications_close"] >= today
+        ):
             continue  # an open day that has passed ("Open day on 16 April") is not news any more
         topic = fact["topic"]
         rank = fact.get("rank") if fact.get("rank") in RANKS else "key"
