@@ -114,7 +114,9 @@ def test_listing_baselines_then_reports_only_new_matching_items():
 
     pages = {
         LISTING["url"]: _sessions(1, 2, 3, 4),
-        "https://x.bg/content/3": _html("<p>т. 5 Наредба за изменение на Наредбата за прием на деца в общинските детски градини</p>"),
+        "https://x.bg/content/3": _html(
+            "<p>т. 5 Наредба за изменение на Наредбата за прием на деца в общинските детски градини</p>"
+        ),
         "https://x.bg/content/4": _html("<p>т. 1 Бюджет</p>"),
     }
     result = run({"targets": [LISTING]}, [], state, _fetcher(pages))
@@ -151,7 +153,9 @@ def test_listing_reports_a_new_page_that_never_opens():
 def test_broken_target_does_not_stop_the_others():
     broken = dict(LISTING, id="broken", link_pattern="(")
     state = {}
-    result = run({"targets": [broken, PAGE]}, [], state, _fetcher({LISTING["url"]: _sessions(1), PAGE["url"]: _html("x" * 60)}))
+    result = run(
+        {"targets": [broken, PAGE]}, [], state, _fetcher({LISTING["url"]: _sessions(1), PAGE["url"]: _html("x" * 60)})
+    )
     assert state["targets"]["broken"]["failures"] == 1
     assert state["targets"]["p"]["hash"]
     assert result.findings == []
@@ -188,7 +192,11 @@ def test_unreadable_source_is_reported_after_repeated_failures():
 
 
 def _rule(family, campaign, status):
-    return {"id": f"{family}/{campaign.replace('/', '-')}", "campaign": campaign, "verified": {"status": status, "on": "2026-10-14"}}
+    return {
+        "id": f"{family}/{campaign.replace('/', '-')}",
+        "campaign": campaign,
+        "verified": {"status": status, "on": "2026-10-14"},
+    }
 
 
 FAMILIES = {"bg/sofia/kindergarten": {"next_campaign_by": "01-05", "confirm_by": "01-10"}}
@@ -202,7 +210,10 @@ def test_missing_next_campaign_file_is_reported_after_its_date():
 
 
 def test_provisional_file_must_be_confirmed_by_its_date():
-    rules = [_rule("bg/sofia/kindergarten", "2026/2027", "verified"), _rule("bg/sofia/kindergarten", "2027/2028", "provisional")]
+    rules = [
+        _rule("bg/sofia/kindergarten", "2026/2027", "verified"),
+        _rule("bg/sofia/kindergarten", "2027/2028", "provisional"),
+    ]
     assert run({"families": FAMILIES}, rules, {}, _fetcher({}), today=date(2027, 1, 9)).findings == []
     [finding] = run({"families": FAMILIES}, rules, {}, _fetcher({}), today=date(2027, 1, 10)).findings
     assert finding.kind == "provisional"
@@ -298,7 +309,9 @@ def test_recent_pages_are_read_again_for_new_matches():
     pages = {LISTING["url"]: _sessions(1, 2), "https://x.bg/content/2": _html("<p>т. 1 Бюджет</p>")}
     assert run({"targets": [LISTING]}, [], state, _fetcher(pages), today=date(2027, 2, 2)).findings == []
     assert run({"targets": [LISTING]}, [], state, _fetcher(pages), today=date(2027, 2, 3)).findings == []
-    pages["https://x.bg/content/2"] = _html("<p>т. 1 Бюджет</p><p>т. 2 Решение № 5 за изменение на Наредбата за прием на деца</p>")
+    pages["https://x.bg/content/2"] = _html(
+        "<p>т. 1 Бюджет</p><p>т. 2 Решение № 5 за изменение на Наредбата за прием на деца</p>"
+    )
     [finding] = run({"targets": [LISTING]}, [], state, _fetcher(pages), today=date(2027, 2, 4)).findings
     assert finding.body.startswith("Updated entry") and "Решение № 5" in finding.body
     assert run({"targets": [LISTING]}, [], state, _fetcher(pages), today=date(2027, 2, 5)).findings == []
@@ -380,3 +393,36 @@ def test_each_touched_issue_starts_one_draft(monkeypatch):
     monkeypatch.setattr(script.httpx, "Client", lambda **kw: real_client(transport=transport, **kw))
     script.start_drafts([7, 9, 7], "draft-rule-update.yml", "o/r", "t")
     assert started == ["7", "9"]
+
+
+def test_a_failed_dispatch_does_not_stop_the_others(monkeypatch):
+    import httpx
+
+    from scripts import watch_admission_rules as script
+
+    started = []
+
+    def handler(request):
+        issue = json.loads(request.content)["inputs"]["issue"]
+        if issue == "7":
+            raise httpx.ConnectError("down", request=request)
+        started.append(issue)
+        return httpx.Response(204)
+
+    transport = httpx.MockTransport(handler)
+    real_client = httpx.Client
+    monkeypatch.setattr(script.httpx, "Client", lambda **kw: real_client(transport=transport, **kw))
+    script.start_drafts([7, 9], "draft-rule-update.yml", "o/r", "t")
+    assert started == ["9"]
+
+
+def test_fetch_official_reads_only_official_hosts():
+    from scripts.fetch_official import allowed_hosts, is_allowed
+
+    hosts = allowed_hosts()
+    assert "council.sofia.bg" in hosts
+    assert is_allowed("https://www.sofia.bg/news", hosts)
+    assert is_allowed("https://info-adc.justice.bg/x", hosts)
+    assert not is_allowed("https://example.com/", hosts)
+    assert not is_allowed("https://sofia.bg.example.com/", hosts)
+    assert not is_allowed("file:///etc/passwd", hosts)

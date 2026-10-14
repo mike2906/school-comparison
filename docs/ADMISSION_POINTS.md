@@ -161,6 +161,12 @@ Mike's Claude subscription via the `CLAUDE_CODE_OAUTH_TOKEN` secret from
   `RULE_VERSIONS` updated when the version date changes (a test checks they agree with
   the rule files), or a schedule, status event or confirmation on the campaign's file.
 
+Claude reads sources only through `backend/scripts/fetch_official.py`, which reads pages
+and PDFs from the official hosts the rule files and watch config already use, so text on
+a page cannot send it elsewhere. Its tools are limited to the issue, its own
+`rule-watch/issue-N` branch, that script and the tests. Missing, provisional, unreadable
+and failed-run issues are never closed without a fix.
+
 It never merges: a PR is reviewed like any other, because a wrong points value is worse
 than a late one. A catchment change needs a new snapshot
 (`backend/scripts/build_sofia_catchments.py`). A date or unreadable-source issue closed
