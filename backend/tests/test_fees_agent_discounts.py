@@ -55,6 +55,8 @@ def test_two_discounts_from_one_line_are_both_kept():
 
 def test_an_amount_discount_keeps_its_currency_and_a_percent_one_has_none():
     amount = discount(
+        kind="early_payment",
+        child=None,
         percent=None,
         amount=100,
         currency="EUR",
@@ -75,14 +77,23 @@ def test_an_amount_discount_keeps_its_currency_and_a_percent_one_has_none():
         ({"text_i18n": {"en": "5% off for a second child", "bg": ""}}, PAGE),
         ({"amount": 5, "currency": "EUR"}, PAGE),  # both set
         ({"percent": None}, PAGE),  # neither set
-        (
-            {"percent": 100, "evidence": "100% discount for the second child"},
-            PAGE + "100% discount for the second child\n",
-        ),
+        ({"percent": 15, "evidence": "Enrol by 15 May: 10% off", "text_i18n": {"en": "15% off", "bg": "15% отстъпка"}},
+         PAGE + "Enrol by 15 May: 10% off\n"),  # 15 is a date, not the percentage
+        ({"child": 3}, PAGE.replace(SIBLING_EN, "5% discount for the second child")),  # the page names the second
     ],
-)
+)  # fmt: skip
 def test_a_discount_the_page_does_not_back_is_dropped(update, page):
     assert check_discount(discount(**update), page) is None
+
+
+def test_a_free_place_for_a_third_child_is_kept():
+    free = discount(
+        percent=100,
+        child=3,
+        evidence="100% discount for the third child",
+        text_i18n={"en": "100% off for a third child", "bg": "100% отстъпка за трето дете"},
+    )
+    assert check_discount(free, PAGE + "100% discount for the third child\n") is not None
 
 
 # ---------------------------------------------------------------------------
@@ -173,6 +184,17 @@ async def test_a_thin_read_leaves_the_stored_discounts_alone(db_session, frozen_
     assert school.attributes["fee_discounts"] == old
 
 
+async def test_a_reader_that_gives_no_discounts_leaves_the_stored_ones_alone(db_session, frozen_today):
+    old = {"_schema_version": 1, "read_at": "t", "website_url": HOME, "discounts": [{"kind": "sibling"}]}
+    school = await _school(db_session, fee_discounts=old)
+
+    async def read(_school, _pages, _missed):
+        return [_fee()]  # a plain list: no discounts were asked for
+
+    await fees_agent.run_school(db_session, school, find=_find, read=read, apply=True)
+    assert school.attributes["fee_discounts"] == old
+
+
 # ---------------------------------------------------------------------------
 # The publish boundary
 # ---------------------------------------------------------------------------
@@ -220,7 +242,9 @@ def test_discounts_of_another_schema_version_or_a_moved_website_are_not_publishe
 
 
 async def _detail(client, db_session, *, priced: bool):
-    school = await _school(db_session, **_block(_stored()))
+    school = await _school(
+        db_session, **_block(_stored()), data_validation={"_schema_version": 1, "status": "ok", "issues": []}
+    )
     if priced:
         page = SourcePage(
             school_id=school.id,
@@ -240,7 +264,7 @@ async def _detail(client, db_session, *, priced: bool):
                 currency="EUR",
                 period=PricePeriod.MONTHLY,
                 academic_year="2026-2027",
-                source=PriceSource.OFFICIAL,
+                source=PriceSource.SCRAPED_WEBSITE,
                 source_url=URL,
                 source_page_id=page.id,
                 pricing_context={"confidence": 0.9},

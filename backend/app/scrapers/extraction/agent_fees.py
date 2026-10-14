@@ -425,9 +425,26 @@ def option_amounts(fee: AgentFee) -> list[Decimal]:
     ]
 
 
+# Which child a sibling discount is for, as pages write it: "второ дете", "2nd child", "the third".
+_CHILD_WORDS = {
+    2: r"\b2\s*-?\s*(?:ро|nd|-?ри)?\b|втор|second",
+    3: r"\b3\s*-?\s*(?:то|rd|-?ти)?\b|трет|third",
+    4: r"\b4\s*-?\s*(?:то|th|-?ти)?\b|четвърт|fourth",
+}
+
+
+def _percent_printed(value: Decimal, text: str) -> bool:
+    """The number is printed as a percentage: "10%", "10 %", "10 процента", "10 percent"."""
+    return any(
+        value in values and re.match(r"\s*(?:%|процент|percent)", text[end:], re.IGNORECASE)
+        for _, end, values in number_spans(text)
+    )
+
+
 def check_discount(discount: AgentDiscount, page_text: str) -> Optional[AgentDiscount]:
-    """The discount if the page backs it, else None: its evidence is on the page and holds
-    its one number, and both sentences state that number."""
+    """The discount if the page backs it, else None: its evidence is on the page and prints
+    its number as a percentage (or holds its amount), a sibling discount's child is named
+    there, and both sentences state that number."""
     page = _normalized(page_text)
     lines = [_normalized(line) for line in discount.evidence.splitlines() if line.strip()]
     if not lines:
@@ -439,10 +456,14 @@ def check_discount(discount: AgentDiscount, page_text: str) -> Optional[AgentDis
     if (discount.percent is None) == (discount.amount is None):
         return None
     number = discount.percent if discount.percent is not None else discount.amount
-    if number <= 0 or (discount.percent is not None and number >= 100):
+    if number <= 0 or (discount.percent is not None and number > 100):  # 100%: a free place
         return None
     value = _decimal(number)
-    if value not in page_numbers("\n".join(lines)):
+    evidence = "\n".join(lines)
+    # "до 15 май – 10% отстъпка": 15 is a date, so a percent must be printed as one.
+    if not (_percent_printed(value, evidence) if discount.percent is not None else value in page_numbers(evidence)):
+        return None
+    if discount.child in _CHILD_WORDS and not re.search(_CHILD_WORDS[discount.child], evidence, re.IGNORECASE):
         return None
     texts = [discount.text_i18n.get(lang, "") for lang in ("bg", "en")]
     if any(not text.strip() or value not in page_numbers(text) for text in texts):

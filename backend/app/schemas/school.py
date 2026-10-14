@@ -4,6 +4,7 @@ from typing import Any, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, computed_field, field_validator
 
+from app.models.pricing import PriceSource
 from app.schemas.field_source import FieldSourceResponse
 from app.schemas.pricing import PricingResponse
 from app.utils.display_gating import (
@@ -427,7 +428,11 @@ class SchoolResponse(SchoolBase, SchoolPricingMixin):
             return []
         if str(self.raw_scrape_status or "").strip().lower() not in SITE_ACCEPTED_STATUSES:
             return []
-        if not self.pricing:
+        # Beside the published fees read from the same site: not beside manual rows while the
+        # website's are withheld (no current Stage 6 report).
+        if not self.website_data_publishable or not any(
+            row.source is PriceSource.SCRAPED_WEBSITE for row in self.pricing
+        ):
             return []
         return [
             FeeDiscount.model_validate(d)

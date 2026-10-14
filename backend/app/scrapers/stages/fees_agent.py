@@ -352,14 +352,13 @@ async def read_fees(school: School, pages: list[PageRead], spend: Spend, missed:
 # ---------------------------------------------------------------------------
 
 
-def _page_for(fee: AgentFee, pages: list[PageRead]) -> Optional[PageRead]:
+def _page_for(fee: AgentFee | AgentDiscount, pages: list[PageRead]) -> Optional[PageRead]:
     by_key = {page_key(page.url): page for page in pages}
     return by_key.get(page_key(fee.source_url)) or (pages[0] if len(pages) == 1 else None)
 
 
 def _discount_report(discount: AgentDiscount, pages: list[PageRead]) -> dict[str, Any]:
-    by_key = {page_key(page.url): page for page in pages}
-    page = by_key.get(page_key(discount.source_url)) or (pages[0] if len(pages) == 1 else None)
+    page = _page_for(discount, pages)
     checked = check_discount(discount, page.text) if page else None
     shown = checked or discount
     return {
@@ -792,7 +791,9 @@ async def run_school(
         return report
 
     fees = await read(school, priced, ())
-    discounts = getattr(fees, "discounts", [])  # the first read's; a reread only adds fees
+    # The first read's; a reread only adds fees. None (a reader that gives no discounts)
+    # leaves the stored ones alone; an empty list means the pages offer none now.
+    discounts = getattr(fees, "discounts", None)
     ruled_out = [page.url for page in priced if getattr(stored.get(page_key(page.url)), "is_valid", None) is False]
     if ruled_out:
         report["outcome"] = "kept_old_rows"
@@ -835,7 +836,8 @@ async def run_school(
         if result.kept and page:
             checked.append((result, source_pages[page.url]))
 
-    report["discounts"] = [_discount_report(discount, priced) for discount in discounts]
+    if discounts is not None:
+        report["discounts"] = [_discount_report(discount, priced) for discount in discounts]
 
     rows, sources = _build_rows(school, checked)
     publishable = [row for row in rows if pricing_row_is_publishable(row)]
@@ -904,7 +906,8 @@ async def run_school(
         report["reason"] = "every fee read is already stored"
         if apply:  # an earlier run's hold no longer applies
             price_step._update_pricing_hold(school, [], 0)
-            _store_discounts(school, report)
+            if discounts is not None:
+                _store_discounts(school, report)
             await db.commit()
         return report
     if not apply:
@@ -919,7 +922,8 @@ async def run_school(
     for source in sources:
         source.scraped_at = text_values._utcnow_naive()
     await price_step._write_price_rows(db, school, [row.id for row in superseded], rows, sources)
-    _store_discounts(school, report)
+    if discounts is not None:
+        _store_discounts(school, report)
     # The new rows stay withheld until Stage 6 has checked them, as after an extraction.
     school.attributes = prepare_validation_rollover(school.attributes)
     await db.commit()
