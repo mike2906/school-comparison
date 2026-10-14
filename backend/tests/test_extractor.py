@@ -4936,7 +4936,6 @@ def test_model_row_year_and_period_come_from_the_page():
             "Tuition EUR 10,000\nLate payment fee EUR 150",
             _model_price(category="registration", amount=150),
         ),
-        ("Guest pupils: EUR 80 per day", _model_price(category="tuition", amount=80)),
         ("Tuition 10 000 лв. per year", _model_price(category="tuition", amount=10000)),
         ("Our campus is at 300 Vitosha Blvd. Tuition EUR 9,000", _model_price(category="materials", amount=300)),
         (
@@ -4944,7 +4943,7 @@ def test_model_row_year_and_period_come_from_the_page():
             _model_price(category="tuition", amount=8000, period="yearly"),
         ),
     ],
-    ids=["total", "penalty", "per-day", "other-currency", "bare-number", "stale-page"],
+    ids=["total", "penalty", "other-currency", "bare-number", "stale-page"],
 )
 def test_model_row_the_page_does_not_bear_out_is_dropped(text, row):
     text = f"--- SOURCE: https://school.test/fees ---\n{text}"
@@ -5158,7 +5157,7 @@ def test_pricing_selection_counts_bare_table_cells_as_prices():
     assert "15 350" in selected_text
 
 
-def test_model_rows_for_a_past_year_a_weekly_fee_or_a_guessed_lev_are_dropped():
+def test_model_rows_for_a_past_year_or_a_guessed_lev_are_dropped_and_a_weekly_fee_is_kept_as_weekly():
     old = "--- SOURCE: https://school.test/fees ---\nТакси за учебната 2024/2025 г.\nПГ и I клас 4 300 евро\n"
     row = _model_price(category="tuition", amount=4300, academic_year="2024/2025")
     assert fee_lines._filter_model_prices([row], old) == []
@@ -5170,7 +5169,12 @@ def test_model_rows_for_a_past_year_a_weekly_fee_or_a_guessed_lev_are_dropped():
         _model_price(category="tuition", amount=190, plan_name="Седмично"),
         _model_price(category="tuition", amount=690, plan_name="Целодневно"),
     ]
-    assert [r.amount for r in fee_lines._filter_model_prices(rows, weekly)] == [690]
+    kept = fee_lines._filter_model_prices(rows, weekly)
+    assert [(r.amount, r.period) for r in kept] == [(190, "weekly"), (690, "monthly")]
+
+    guest = "--- SOURCE: https://school.test/fees ---\nGuest pupils: EUR 80 per day"
+    kept = fee_lines._filter_model_prices([_model_price(category="tuition", amount=80)], guest)
+    assert [(r.amount, r.period) for r in kept] == [(80, "daily")]
 
     # A fee table that names no currency is in euro: a row calling its cell leva is a guess.
     table = "--- SOURCE: https://school.test/fees ---\nКлас | Такса\nПодготвителен клас | 7 400\n"

@@ -101,7 +101,7 @@ async def test_630_wrong_rows_are_withheld_and_the_fixed_ones_publish(db_session
         "pricing_amount_not_near_label",
         "pricing_label_names_other_level",
     }
-    assert _issue_codes(school, weekly) == {"pricing_period_unrepresentable"}
+    assert _issue_codes(school, weekly) == {"pricing_period_unfit_for_category"}
 
     response = await client.get(f"/schools/{school.id}")
     assert [row["id"] for row in response.json()["pricing"]] == [good.id]

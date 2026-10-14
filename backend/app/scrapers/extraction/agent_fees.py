@@ -130,6 +130,7 @@ Rules:
 - period only when the page states it for THAT amount (per month, per year, per term...); otherwise null. Never guess.
   - "once per school year" or "еднократна такса" for the school year is yearly; a full year's tuition paid in one payment is yearly too.
   - one_time only for a fee charged once ever: enrolment, exam, application, deposit. Never for tuition or materials.
+  - A price per day, per week or per hour (a daily lunch, a weekly camp, an hourly class) is daily, weekly or hourly. How often a class meets ("3 пъти седмично") is not a period.
   - A count of payments ("2 x", "на две вноски") states no period: null.
   - In "1 x A + N x B", A is a first instalment with no period; B has the period the plan states (8 monthly instalments: monthly).
   - A yearly total only if the site prints it.
@@ -210,6 +211,10 @@ _PERIOD_WORDS = {  # Bulgarian, English, and the French and German some schools 
     PricePeriod.TERM: r"срок|\bterm\b",
     PricePeriod.SEMESTER: r"семест|\bsemester|semestre|halbj[aä]hr",
     PricePeriod.ONE_TIME: r"еднократ|\bonce\b|при записване",
+    # Not "целодневна" (a full-day group).
+    PricePeriod.DAILY: r"(?<![а-я])дневн|(?:на|за|/)\s*ден\b|\b(?:daily|per day|a day)\b|par jour|pro tag",
+    PricePeriod.WEEKLY: r"седмичн|(?:на|за|/)\s*седмица|\b(?:weekly|per week|a week)\b|par semaine|pro woche",
+    PricePeriod.HOURLY: r"почасов|(?:на|за|/)\s*час\b|\b(?:hourly|per hour|an hour)\b|par heure|pro stunde",
 }
 # English "one-time" names a period only on the amount's own line: 596's "ANNUAL TUITION FEES"
 # heading sits above its "One-time fee for initial enrollment".
@@ -217,6 +222,11 @@ _ONE_TIME_EN_RE = re.compile(r"\bone\s*[-‐‑–—]?\s*time\b")
 # "for the school year" names a period only on the amount's own line: as a heading it often
 # covers fees charged per day or per month too (569's "ДОПЪЛНИТЕЛНИ ТАКСИ ЗА УЧЕБНАТА ГОДИНА").
 _YEAR_ON_AMOUNT_LINE_RE = re.compile(r"(?:учебн\w*|на|за)\s+година|l'année")
+# How often a class meets, not how often it is paid: "3 пъти седмично", "twice a week".
+_HOW_OFTEN_RE = re.compile(
+    r"(?:\d+\s*(?:пъти|път|times?|x)|веднъж|двукратно|twice|once)\s*"
+    r"(?:седмично|в седмицата|на седмица|a week|per week|weekly|дневно|на ден|a day|per day|daily)"
+)
 _DEPOSIT_RE = re.compile(r"депозит|капаро|deposit")
 # Only a currency and the marker may sit between a range's ends: "550 – 600", "550 EUR to 600".
 _RANGE_JOIN_RE = re.compile(r"(?:eur|€|евро|лв\.?|лева|bgn)?\s*(?:[–—-]|до|to)", re.IGNORECASE)
@@ -247,6 +257,8 @@ def _names_period(period: PricePeriod, evidence: str, amounts: list[Decimal], ca
         ):
             return True
         return not any(re.search(_PERIOD_WORDS[other], evidence) for other in recurring)
+    if period in (PricePeriod.DAILY, PricePeriod.WEEKLY):
+        evidence = _HOW_OFTEN_RE.sub(" ", evidence.casefold())
     if re.search(_PERIOD_WORDS[period], evidence):
         return True
     if period is not PricePeriod.YEARLY:

@@ -331,12 +331,11 @@ PERIOD_KEYWORDS: dict[str, re.Pattern[str]] = {
     "QUARTER": re.compile(r"тримесеч|quarterly|per quarter"),
     "SEMESTER": re.compile(r"семестър|семестриал|полугодиш|per semester"),
     "TERM": re.compile(r"\bна срок\b|per term|termly"),
+    # A daily lunch, a weekly camp, an hourly class. Not "целодневна" (a full-day group).
+    "WEEKLY": re.compile(r"седмичн|\bна седмица|/\s*седм|\bweekly\b|per week|/\s*week|a week\b"),
+    "DAILY": re.compile(r"(?<![а-я])дневн|\bна ден\b|/\s*ден\b|\bdaily\b|per day|/\s*day\b|a day\b"),
+    "HOURLY": re.compile(r"\bна час\b|/\s*час\b|почасов|per hour|/\s*hour|hourly"),
 }
-_UNREPRESENTABLE_RE = re.compile(
-    r"седмичн|\bна седмица|/\s*седм|\bweekly\b|per week|/\s*week|a week\b"
-    r"|(?<![а-я])дневн|\bна ден\b|/\s*ден\b|\bdaily\b|per day|/\s*day\b|a day\b"
-    r"|\bна час\b|/\s*час\b|почасов|per hour|/\s*hour|hourly"
-)
 _DEPOSIT_RE = re.compile(r"депозит|\bdeposit")
 # One installment of a fee ("I вноска", "1-ва вноска", "first installment"), not the fee
 # itself. A bare number is not an ordinal: "за 1 вноска" is the fee paid in one go.
@@ -398,31 +397,31 @@ _EVERY_YEAR_RE = re.compile(
 )
 
 
-def period_families(context: str) -> tuple[set[str], bool]:
-    """(representable period families named, whether an unrepresentable one is named)."""
+def period_families(context: str) -> set[str]:
+    """The period families the words name."""
     cleaned = _AGE_RE.sub(" ", _FREQUENCY_RE.sub(" ", context))
     families = {period for period, pattern in PERIOD_KEYWORDS.items() if pattern.search(cleaned)}
-    unrepresentable = bool(_UNREPRESENTABLE_RE.search(cleaned))
-    if not families and not unrepresentable and _EVERY_YEAR_RE.search(cleaned):
+    if not families and _EVERY_YEAR_RE.search(cleaned):
         families = {"YEARLY"}
-    return families, unrepresentable
+    return families
 
 
-def stated_period(text: str, span: tuple[int, int]) -> tuple[set[str], bool]:
+def stated_period(text: str, span: tuple[int, int]) -> set[str]:
     """Period wording for one amount: its own line segment first, else its context.
 
     "181,44 euro/ month" settles the period even when the next line is a table header
     naming both "annual fee" and "monthly fee".
     """
-    families, unrepresentable = period_families(amount_segment(text, span))
-    if families or unrepresentable:
-        return families, unrepresentable
-    return period_families(amount_context(text, span))
+    return period_families(amount_segment(text, span)) or period_families(amount_context(text, span))
 
 
 HEADING_LINES = 20  # how far above an amount its table or list heading may stand
 HEADING_CHARS = 80  # a longer line is prose, not a heading
 _TABLE_RULE_RE = re.compile(r"^[\s|:\-–—=*_]*$")
+
+
+# Periods that price one unit (a lunch, a camp week, a lesson): never a table's heading.
+PER_UNIT_PERIODS = frozenset({"DAILY", "WEEKLY", "HOURLY"})
 
 
 def heading_period(text: str, span: tuple[int, int], skip: frozenset[str] = frozenset()) -> Optional[str]:
@@ -461,8 +460,8 @@ def heading_period(text: str, span: tuple[int, int], skip: frozenset[str] = froz
             continue
         if index and _is_price_line(lines[index - 1]) and re.match(r"\s*[-–—/]", line):
             continue  # "€ 530\n- ежемесечно заплащане": the price above's description
-        families, unrepresentable = period_families(line)
-        if not (families or unrepresentable):
+        families = period_families(line)
+        if not families:
             following = next((later for later in lines[index + 1:] if later.strip()), amount_line)
             section = "|" not in line and _is_price_line(following) and not _is_bare_price_line(following)
             if markdown_heading or section or re.fullmatch(r"\s*\*\*.+\*\*\s*", line):
@@ -470,15 +469,15 @@ def heading_period(text: str, span: tuple[int, int], skip: frozenset[str] = froz
             continue
         if "|" not in line and _PLAN_LINE_RE.search(line):
             return None
-        if families and families <= skip and not unrepresentable:
+        if families <= skip:
             continue
         if "|" in line and "|" in amount_line:
             # The header row of the amount's table: only the amount's own column speaks.
             cells = line.split("|")
             if len(cells) != amount_line.count("|") + 1:
                 return None
-            families, unrepresentable = period_families(cells[amount_line[:column_at].count("|")])
-        if unrepresentable or len(families) != 1 or len(line.strip(" #*_|")) > HEADING_CHARS:
+            families = period_families(cells[amount_line[:column_at].count("|")])
+        if len(families) != 1 or families & PER_UNIT_PERIODS or len(line.strip(" #*_|")) > HEADING_CHARS:
             return None
         following = next(
             (later for later in lines[index + 1:] if later.strip() and not _TABLE_RULE_RE.match(later)), None
@@ -810,7 +809,9 @@ RULE_AMOUNT_NEAR_LABEL = "1_amount_near_label"
 RULE_LEVEL = "2_level_fits_school"
 RULE_PERIOD_MISSING = "3_period_missing"
 RULE_PERIOD_CONFLICT = "3_period_conflict"
-RULE_PERIOD_UNREPRESENTABLE = "3_period_unrepresentable"
+# A price per day, week or hour on a row whose category cannot be paid that way: 630's
+# "седмична такса за гостуващи ученици" came out a registration fee.
+RULE_PERIOD_UNFIT = "3_period_unfit"
 RULE_DEPOSIT = "4_deposit_not_tuition"
 RULE_INSTALLMENT = "4_installment_not_tuition"
 RULE_EXPIRED = "7_offer_expired"
@@ -972,33 +973,33 @@ def check_price_row(
         hit(RULE_LEVEL, f"amount's label lines name {other_family}", contexts[0])
 
     # Rule 3: period. Needs agreement across the occurrences considered.
-    found = [stated_period(text, span) for span in chosen]
-    if all(unrepresentable for _, unrepresentable in found):
-        hit(RULE_PERIOD_UNREPRESENTABLE, "per day/week/hour next to the amount", contexts[0])
-    else:
-        families = [fams for fams, _ in found]
-        single = families[0] if all(f == families[0] for f in families) and len(families[0]) == 1 else None
-        stored = _enum(row.period)
-        headed: set[Optional[str]] = set()
-        if stored is None and (
-            not any(families) or (single and not period_fits_category(row.category, next(iter(single))))
-        ):
-            # Nothing beside the amount, or only a word the fee cannot have (517's
-            # "Еднократно плащане: До 09.07.2026" under a yearly fee): the heading of its
-            # table or list may say.
-            headed = {heading_period(text, span) for span in chosen}
-            if len(headed) == 1 and None not in headed and not period_fits_category(row.category, next(iter(headed))):
-                # "ЕДНОКРАТНО ПЛАЩАНЕ" under "Годишна такса" (564): the heading above it says.
-                headed = {heading_period(text, span, skip=frozenset(headed)) for span in chosen}
-        if len(headed) == 1 and None not in headed and period_fits_category(row.category, next(iter(headed))):
-            stated = headed.pop()
-            hit(RULE_PERIOD_MISSING, f"null period, heading says {stated}", contexts[0], stated)
-        elif single and stored is None:
-            stated = next(iter(single))
-            hit(RULE_PERIOD_MISSING, f"null period, text says {stated}", contexts[0], stated)
-        elif single and stored and stored not in single and {stored} | single != {"ONE_TIME", "YEARLY"}:
-            stated = next(iter(single))
-            hit(RULE_PERIOD_CONFLICT, f"stored {stored}, text says {stated}", contexts[0], stated)
+    families = [stated_period(text, span) for span in chosen]
+    single = families[0] if all(f == families[0] for f in families) and len(families[0]) == 1 else None
+    stored = _enum(row.period)
+    headed: set[Optional[str]] = set()
+    if stored is None and (
+        not any(families) or (single and not period_fits_category(row.category, next(iter(single))))
+    ):
+        # Nothing beside the amount, or only a word the fee cannot have (517's
+        # "Еднократно плащане: До 09.07.2026" under a yearly fee): the heading of its
+        # table or list may say.
+        headed = {heading_period(text, span) for span in chosen}
+        if len(headed) == 1 and None not in headed and not period_fits_category(row.category, next(iter(headed))):
+            # "ЕДНОКРАТНО ПЛАЩАНЕ" under "Годишна такса" (564): the heading above it says.
+            headed = {heading_period(text, span, skip=frozenset(headed)) for span in chosen}
+    if single and single <= PER_UNIT_PERIODS and not period_fits_category(
+        row.category, next(iter(single))
+    ):
+        hit(RULE_PERIOD_UNFIT, f"{row.category} priced per {next(iter(single)).lower()}", contexts[0])
+    elif len(headed) == 1 and None not in headed and period_fits_category(row.category, next(iter(headed))):
+        stated = headed.pop()
+        hit(RULE_PERIOD_MISSING, f"null period, heading says {stated}", contexts[0], stated)
+    elif single and stored is None:
+        stated = next(iter(single))
+        hit(RULE_PERIOD_MISSING, f"null period, text says {stated}", contexts[0], stated)
+    elif single and stored and stored not in single and {stored} | single != {"ONE_TIME", "YEARLY"}:
+        stated = next(iter(single))
+        hit(RULE_PERIOD_CONFLICT, f"stored {stored}, text says {stated}", contexts[0], stated)
 
     # Rule 4: a deposit filed as tuition.
     if _enum(row.category) == "TUITION":
@@ -1070,7 +1071,7 @@ def _page_states_period(row: PriceRow, page_text: Optional[str]) -> bool:
     if not (text and row.period and row.amounts):
         return False
     for value in row.amounts:
-        stated = [stated_period(text, span)[0] for span in amount_spans(text, value)]
+        stated = [stated_period(text, span) for span in amount_spans(text, value)]
         stated = [families for families in stated if families]
         if not stated or any(families != {row.period} for families in stated):
             return False
@@ -1089,7 +1090,7 @@ def states_another_unit(page_text: Optional[str], value: Any) -> bool:
     text = normalize_text(page_text)
     for span in amount_spans(text, value) if text else []:
         match = _UNIT_AFTER_RE.match(text[span[1]:])
-        if match and _has_words(match["unit"]) and period_families(f"/ {match['unit']}") == (set(), False):
+        if match and _has_words(match["unit"]) and not period_families(f"/ {match['unit']}"):
             return True
     return False
 
@@ -1216,9 +1217,7 @@ def period_in_label_parts(block: str, label: str | None) -> str | None:
     """
     found: set[str] = set()
     for part in str(label or "").split(" / "):
-        named, per_unit = period_families(part.casefold())
-        if per_unit:
-            return None
+        named = period_families(part.casefold())
         if named and label_spans(block, part):
             found |= named
     return next(iter(found)).lower() if len(found) == 1 else None
