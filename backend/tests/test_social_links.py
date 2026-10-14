@@ -218,3 +218,12 @@ async def test_a_school_not_read_still_counts_when_telling_a_shared_page(db_sess
     )
     assert "facebook" not in school.attributes["social_links"]
     assert "facebook" not in down.attributes["social_links"]
+
+
+@pytest.mark.asyncio
+async def test_a_broken_href_is_skipped_and_a_parents_board_link_is_not_the_school():
+    board = "https://www.facebook.com/profile.php?id=61577575697354"
+    html = _html(FB) + '<a href="https://[instagram-feed%20feed=3]">x</a>'
+    html += f'<a href="{board}">Училищно настоятелство</a><a href="{board}" title="Настоятелство">f</a>'
+    read = await stage.read_school(_school(), _fetcher({HOME: html}))
+    assert read["links"] == {"facebook": FB}

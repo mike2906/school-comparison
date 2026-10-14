@@ -35,7 +35,6 @@ def bg_country():
             ],
             "admission_systems": {"kindergarten_state": "points", "gymnasium": "nvo_score"},
             "grade_scale": {"min": 2, "max": 6},
-            "grade_to_points_table": {"6.00": 50, "5.50": 39},
             "age_calculation_method": "enrollment_year_minus_birth_year",
         },
         map_config={
@@ -113,7 +112,6 @@ class TestCountriesEndpoint:
         assert "exam_subjects" in config
         assert "admission_systems" in config
         assert "grade_scale" in config
-        assert "grade_to_points_table" in config
         assert "age_calculation_method" in config
         nursery = next(group for group in config["age_groups"] if group["key"] == "nursery")
         assert nursery["min_diff"] == 0

@@ -38,6 +38,8 @@ import SchoolActions from './SchoolActions'
 import TagList from './TagList'
 import PhoneLinks from './PhoneLinks'
 import SocialLinks from './SocialLinks'
+import SchoolAdmissionArea from '../Admission/SchoolAdmissionArea'
+import SchoolCutoffs from '../Admission/SchoolCutoffs'
 
 // The chart library is large and only schools with exam results need it. If the chunk
 // cannot be loaded (a tab that outlived a deploy), the page stays usable without the chart.
@@ -648,6 +650,9 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
             </div>
           </div>
         )}
+
+        <SchoolAdmissionArea school={school} />
+        <SchoolCutoffs school={school} />
 
         {/* Academic Performance (NVO Results) */}
         {hasExamResults && (() => {

@@ -50,33 +50,10 @@ The NVO is the national standardised exam. It's the single most important data p
 
 ### Admission Systems
 
-**State kindergartens/schools — Points ("Бал") system:**
-
-This is a well-documented, mechanical system. Sofia Municipality runs it through kg.sofia.bg. Children are ranked by points; those with more points get priority. The points system has two tiers:
-
-*General criteria (everyone gets these):*
-- Criterion 0: Preference order bonus — 3 pts for 1st choice, 2 for 2nd, 1 for 3rd
-- Criterion 1: Address duration in Sofia Municipality — up to 5 pts (permanent address 3+ years)
-- Criterion 2: Address in the same district as the school — 3 pts
-- Criteria 3 & 4: Working parent or studying parent — 2 pts each per parent (only one of these two can be used per parent)
-- Criterion 5: Child previously attended a registered nursery — 1 pt
-- Criteria 6/7/8 (only one applies): Sibling at same school (1 pt), twins (1 pt), or children born < 2 years apart (1 pt)
-
-*Social criteria (reserved quota — 30% of seats):*
-- Orphaned children (6–7 pts), family disability (4 pts), foster/adopted children (3 pts), large families with 3+ children (2 pts), etc.
-
-*Additional criteria:*
-- Children with special educational needs — 7 pts
-- Children with chronic illness — 3 pts
-
-**Tiebreaker:** If points are equal, order of registration in the online system decides.
-
-**State gymnasiums (after Grade 7) — Score ("Бал") system:**
-
-The admission score is a formula:
-`Score = NVO Bulgarian + NVO Math + converted grades from two qualifying subjects (chosen by the school)`
-
-Each school publishes the minimum score needed for admission from the previous year. This is publicly available and extremely useful for the app.
+The admission rules that were summarised here were out of date (pre-2026 address points,
+and a registration-order tiebreak that Sofia does not use: ties go to a random number).
+The current rules, their sources and the calculator design are in
+`docs/ADMISSION_POINTS.md`.
 
 **Private schools:** No standardised system. Most use entry tests or interviews. The app can note what's known but can't calculate anything mechanical here.
 

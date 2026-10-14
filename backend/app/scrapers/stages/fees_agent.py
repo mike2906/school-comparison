@@ -402,7 +402,7 @@ async def read_fees(school: School, pages: list[PageRead], spend: Spend, missed:
         model=get_model("pricing"),
         school_id=school.id,
         stage=STAGE,
-        timeout_seconds=120,
+        timeout_seconds=240,
     )
     spend.spent_usd += extract_provider_cost_usd(result)
     read = FeeRead(result.output.fees)
@@ -430,7 +430,7 @@ def _discount_report(discount: AgentDiscount, pages: list[PageRead]) -> dict[str
         "amount": shown.amount,
         "currency": shown.currency,
         "child": shown.child,
-        "text_i18n": shown.text_i18n,
+        "text_i18n": shown.text_i18n.model_dump(),
         "source_url": page.url if page else shown.source_url,
         "kept": checked is not None,
     }
