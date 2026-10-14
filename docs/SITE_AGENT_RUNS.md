@@ -1,5 +1,8 @@
 # Faster site-agent runs (fees agent + school facts)
 
+> Plans here are starting points, not instructions: re-evaluate an item against current
+> facts before building it (`AGENTS.md` → "Plans are starting points").
+
 Started 2026-10-14 with Mike. Goal: a city run that finishes in about an hour instead of
 an afternoon, with no change to what either agent reads, checks or stores, so the next
 cities need no babysitting.

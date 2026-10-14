@@ -48,6 +48,13 @@ test('searchStreets finds a street by part of its name, in either alphabet', () 
   assert.deepEqual(searchStreets(streets, 'щ'), [])
 })
 
+test('searchStreets lists the city street before same-named village streets', () => {
+  for (const query of ['стара планина', 'витоша']) {
+    const found = searchStreets(streets, query)
+    assert.equal(found[0].settlement, 'ГР.СОФИЯ', query)
+  }
+})
+
 test('house numbers are read the way the table writes them', () => {
   assert.equal(normalizeHouseNumber('032'), '32')
   assert.equal(normalizeHouseNumber(' 18 a '), '18А')

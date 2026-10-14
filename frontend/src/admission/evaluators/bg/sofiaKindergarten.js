@@ -49,11 +49,13 @@ function parentActivityPoints(params, parents) {
 function addressDurationPoints(params, answers, measuredOn) {
   const rule = params.address_duration
   if (answers.inSofia === false) return ZERO
-  const usesParentAddress = rule.parent_address_age_groups.includes(answers.ageGroup)
+  // Unknown age group: the parent's-address rule may or may not apply.
+  const usesParentAddress = answers.ageGroup == null ? null : rule.parent_address_age_groups.includes(answers.ageGroup)
   // Nursery and first group: one parent's address, which must also be the child's.
-  if (usesParentAddress && answers.parentChildSameAddress === false) return ZERO
+  if (usesParentAddress === true && answers.parentChildSameAddress === false) return ZERO
   const tiers = durationTierPoints(rule.tiers, answers.addressSince, measuredOn)
-  const certain = answers.inSofia === true && (!usesParentAddress || answers.parentChildSameAddress === true)
+  const certain = answers.inSofia === true &&
+    (usesParentAddress === false || answers.parentChildSameAddress === true)
   return certain ? tiers : range(0, tiers.max)
 }
 
@@ -69,8 +71,10 @@ function sameDistrictPoints(params, answers, context) {
 
 function nurseryPoints(params, answers, campaign) {
   const rule = params.nursery_attendance
-  if (!rule.age_groups.includes(answers.ageGroup)) return ZERO
   if (rule.last_campaign && campaign > rule.last_campaign) return ZERO
+  // Unknown age group: the point may apply.
+  if (answers.ageGroup == null) return range(0, flagPoints(answers.nurseryAttended, rule.points).max)
+  if (!rule.age_groups.includes(answers.ageGroup)) return ZERO
   return flagPoints(answers.nurseryAttended, rule.points)
 }
 

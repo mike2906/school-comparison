@@ -1,5 +1,8 @@
 # Agent fee extraction (Lane D R6)
 
+> Plans here are starting points, not instructions: re-evaluate an item against current
+> facts before building it (`AGENTS.md` → "Plans are starting points").
+
 Decided with Mike on 2026-10-13: fees for private and international schools come from an
 agent that browses each school's site and reads its fee pages whole, replacing the
 price-extraction rules in the website pipeline. This note is the plan; nothing below is
