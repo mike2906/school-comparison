@@ -329,3 +329,19 @@ async def test_watched_pages_leave_room_for_a_changed_headlines_article():
     fetch = _fetcher({HOME: HOME_TEXT, NEWS: "Ден на отворените врати на 15.11.2026 г."})
     await stage.check_school(_school(open_days_watch={"pages": watched}), fetch, _Calls(), TODAY)
     assert NEWS in fetch.opened
+
+
+def test_the_dated_passage_beats_a_menu_naming_open_days():
+    menu = "\n".join(f"* [Пункт {n}](/p{n})" for n in range(30)) + "\n* [Дни на отворените врати](/otvoreni-vrati)\n"
+    filler = "\n".join(
+        f"Кандидатстване: общ текст за родителите, ред {n}, " + "дълго описание " * 20 for n in range(40)
+    )
+    page = menu * 2 + filler + "\n## Ден на отворените врати - 26.10.2026\nГрупа 1: 16:00-17:00"
+    out = rules.excerpt(page)
+    assert "26.10.2026" in out and len(out) <= rules.MAX_EXCERPT_CHARS + 50
+
+
+def test_on_an_open_days_page_every_dated_line_is_read():
+    page = "# Дни на отворените врати\n" + "\n".join(f"Текст {n}" for n in range(30)) + "\nДата: 14.11.2026 (събота)"
+    assert "14.11.2026" in rules.excerpt(page, "https://s.example/events/open-days-2026-2027/")
+    assert "14.11.2026" not in rules.excerpt(page, "https://s.example/news/")

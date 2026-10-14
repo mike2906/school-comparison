@@ -161,7 +161,7 @@ async def _read_dates(
 ) -> tuple[list[tuple[DateFact, str, str]], list[dict], list[dict]]:
     """The reader's upcoming dates that pass the facts checks: (fact, page, grade), the
     report rows, and the stored rows they replace (same quote, a new sign-up link)."""
-    text = "\n\n".join(f"=== PAGE {page.url}\n{rules.excerpt(page.text)}" for page in changed)
+    text = "\n\n".join(f"=== PAGE {page.url}\n{rules.excerpt(page.text, page.url)}" for page in changed)
     read: DateFacts = await call(
         rules.READER_PROMPT.format(today=today.isoformat()),
         DateFacts,

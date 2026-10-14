@@ -15,6 +15,7 @@ import hashlib
 import re
 from collections.abc import Sequence
 from typing import Optional
+from urllib.parse import unquote
 
 from pydantic import BaseModel, Field
 
@@ -108,16 +109,43 @@ def mention_hash(text: str) -> str:
     return hashlib.sha256("\n".join(lines).encode()).hexdigest()[:16] if lines else ""
 
 
-def excerpt(text: str) -> str:
-    """The raw lines around each mention (links kept, for the sign-up address), for the reader."""
+# A menu item: a line that is one link and nothing else ("* [Отворени врати](/otvoreni-vrati)").
+_MENU_LINE_RE = re.compile(r"^\s*(?:[*+-]|\d+\.)?\s*\[[^\]]*\]\([^)]*\)\s*$")
+
+
+def excerpt(text: str, url: str = "") -> str:
+    """The raw lines around each mention (links kept, for the sign-up address), for the reader.
+
+    A menu item naming open days is not a mention, unless it carries a date; on a page about
+    open days (its address says so) every line with a date is one. Passages with a date go
+    first when the excerpt is cut (a site's menu repeats "Дни на отворените врати" before the
+    dated paragraph), then are put back in page order."""
     raw = [line for line in text.splitlines() if line.strip()]
-    keep: set[int] = set()
+    about = bool(MENTION_RE.search(unquote(url)))
+    anchors = []
     for n, line in enumerate(raw):
-        if MENTION_RE.search(_clean(line)):
-            keep.update(range(max(0, n - READ_CONTEXT), min(len(raw), n + READ_CONTEXT + 1)))
+        clean = _clean(line)
+        dated = bool(_DATE_RE.search(clean))
+        if (MENTION_RE.search(clean) and (dated or not _MENU_LINE_RE.match(line))) or (about and dated):
+            anchors.append(n)
+    dated_lines = {n for n, line in enumerate(raw) if _DATE_RE.search(_clean(line))}
+
+    def window(n: int) -> range:
+        return range(max(0, n - READ_CONTEXT), min(len(raw), n + READ_CONTEXT + 1))
+
+    # Each mention's window, those with a date in them first, taken while they fit.
+    keep: set[int] = set()
+    size = 0
+    for n in sorted(anchors, key=lambda n: (not dated_lines.intersection(window(n)), n)):
+        new = [m for m in window(n) if m not in keep]
+        cost = sum(len(raw[m]) + 1 for m in new)
+        if keep and size + cost > MAX_EXCERPT_CHARS:
+            continue
+        keep.update(new)
+        size += cost
     out, last = [], -2
     for n in sorted(keep):
-        if n != last + 1:
+        if n != last + 1 and out:
             out.append("...")
         out.append(raw[n])
         last = n
