@@ -35,6 +35,12 @@ class ProviderAttributionUncertain(ProviderCostError):
     pass
 
 
+class ProviderResponseUnattributed(ProviderAttributionUncertain):
+    """A response came back without exact cost or usage (e.g. an errored generation).
+
+    Its ledger row is uncertain and counts toward the cap at the request reserve."""
+
+
 @dataclass(frozen=True)
 class ProviderCostScope:
     pipeline_run_id: str
@@ -489,6 +495,15 @@ async def _execute_tracked_billable_request(
 
     try:
         attributions = extract_exact_provider_attributions(result)
+    except ProviderAttributionUncertain as exc:
+        async with async_session_maker() as ledger_db:
+            await mark_provider_request_uncertain(
+                ledger_db,
+                client_request_id=reservation.client_request_id,
+                reason="provider attribution missing or delayed after response",
+            )
+        raise ProviderResponseUnattributed(str(exc)) from exc
+    try:
         async with async_session_maker() as ledger_db:
             await attribute_provider_responses(
                 ledger_db,

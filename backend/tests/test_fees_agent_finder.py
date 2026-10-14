@@ -185,6 +185,40 @@ async def test_a_failed_pick_falls_back_to_the_fee_links(monkeypatch):
     assert [p.url for p in read] == [HOME, fees]
 
 
+async def test_a_pick_that_came_back_without_a_cost_falls_back_to_the_fee_links(monkeypatch):
+    from app.services.provider_costs import ProviderResponseUnattributed
+
+    fees = "https://meridian22.org/taksi/"
+    crawler = _Crawler({
+        HOME: [("Начало " + "x" * 300, [(fees, "Такси"), ("https://meridian22.org/news/", "Новини")])],
+        fees: [("Месечна такса: 700 евро " + "x" * 300, [])],
+    })  # fmt: skip
+    monkeypatch.setattr(fees_agent, "_pick", _picks(error=ProviderResponseUnattributed("no cost")))
+    read = await fees_agent.find_pages(crawler, None, _Client(), _school(), Spend(0.05))
+    assert [p.url for p in read] == [HOME, fees]
+
+
+async def test_an_unattributed_pick_counts_at_the_request_reserve(monkeypatch):
+    from app.services.provider_costs import ProviderResponseUnattributed
+
+    seen = {}
+
+    def _agent(tier, prompt, output, **kwargs):
+        seen.update(kwargs["model_settings"])
+        return SimpleNamespace(run=None)
+
+    async def _unattributed(*_args, **_kwargs):
+        raise ProviderResponseUnattributed("no cost")
+
+    monkeypatch.setattr(fees_agent, "create_agent", _agent)
+    monkeypatch.setattr(fees_agent, "execute_billable_request", _unattributed)
+    spend = Spend(1.0)
+    with pytest.raises(ProviderResponseUnattributed):
+        await fees_agent._pick(_school(), [], [("https://meridian22.org/taksi/", "Такси")], spend)
+    assert spend.spent_usd == float(fees_agent.get_settings().provider_request_reserve_usd)
+    assert seen["parallel_tool_calls"] is False
+
+
 async def test_a_spend_cap_during_the_pick_still_stops_the_school(monkeypatch):
     crawler = _Crawler({HOME: [("Начало " + "x" * 300, [("https://meridian22.org/taksi/", "Такси")])]})
     monkeypatch.setattr(fees_agent, "_pick", _picks(error=SpendCapReached("cap")))
