@@ -17,7 +17,9 @@ Not for routine edits, small PRs or reversible experiments: those just go ahead.
 ## How
 
 - **Claude asks Codex**, on the latest Sol model:
-  `codex exec --skip-git-repo-check -s read-only -m <latest Sol id> "<prompt>"`
+  `codex exec --skip-git-repo-check -s read-only "<prompt>"`. The model comes from
+  `~/.codex/config.toml` on the PC; keep that on the newest Sol rather than pinning an id
+  here, and pass `-m` only to override it.
 - **Codex asks Claude**, on the latest Opus:
   `claude -p --model opus "<prompt>"` (the `opus` alias always means the newest Opus).
 - For a PR, `codex review` (CLI) or one `@codex review` comment on the PR (runs on GitHub,
@@ -34,5 +36,7 @@ PR or the thread). It is advice, not a vote: one round, then decide.
 
 Only on Mike's PC, in WSL (`~/sofiaschoolcomparison`), logged in to Mike's subscriptions,
 so a call costs nothing extra. A cloud session reaches them through a Remote Control
-session on that PC. If the PC is offline, carry on with reversible steps and get the
-second opinion before the step that is hard to undo.
+session on that PC. If the PC is offline, a big PR gets one `@codex review` on GitHub
+instead; for a decision, carry on with reversible steps and get the second opinion before
+the step that is hard to undo (a merge that adds a migration or a publish counts as hard
+to undo).

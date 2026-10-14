@@ -32,7 +32,6 @@ dist/
 # Local Claude Code state is ignored; the skills symlink is shared (see AGENTS.md)
 .claude/*
 !.claude/skills
-# Shared subagent definition (pins implementation subagents to a cheaper model)
 *.swp
 *.swo
 *~

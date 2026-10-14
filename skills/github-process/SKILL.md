@@ -30,7 +30,8 @@ you picked, and go to Mike only for the short list in "Still goes to Mike".
 - **Big PR**: one review by the other vendor's model (`skills/second-opinion/SKILL.md`;
   one `@codex review` on the PR counts, see the end of this file). Big means it changes
   what the API publishes (response fields, gates, allowlists), adds a migration, changes
-  how data is extracted or published, or is hard to review in one sitting. When unsure, treat it as big.
+  how data is extracted or published, changes CI workflows, gate thresholds or the
+  accuracy reference set, or is hard to review in one sitting. When unsure, treat it as big.
 - **After a substantial round of fixes** (several fixes, or any that change logic rather
   than wording), run the built-in review once more on the whole PR.
 - **Then stop.** Don't request another round when the last one only found more page
@@ -45,7 +46,8 @@ value could have been found" is a recall gap, not a bug: note it on the PR and m
 ## Merging
 
 Merge your own PR on green CI once the review is settled; you don't need Mike's word. After
-merging, check that post-merge `main` CI passes. An agent must never skip, weaken or delete
+merging, check that the merge commit has the PR head's tree and that post-merge `main` CI
+passes. An agent must never skip, weaken or delete
 a check, test or gate to get its own PR through.
 
 ### Still goes to Mike
@@ -64,6 +66,7 @@ Open the PR, say what you need, and wait for his "merge" on these only:
 While the site has no users, agents may change the launch DB and publish without asking
 (Mike, 2026-10-14). Revisit this once real users arrive.
 
+- Data only: schema changes go through an Alembic migration and a PR.
 - Before any write: a `pg_dump` backup in the same session, and a dry run or a
   `WHERE`-guarded statement that shows the rows it changes.
 - Publish with the recipe in `skills/common-tasks/SKILL.md` → Publish data to production,
