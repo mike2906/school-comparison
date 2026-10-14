@@ -222,27 +222,53 @@ def _osm_address(tags: dict) -> Optional[str]:
     return nominatim_address({"road": street, "house_number": number}) or f'ул. "{street}"'
 
 
-def osm_lookup(client: httpx.AsyncClient) -> Lookup:
-    """Named OSM schools, kindergartens and colleges within SEARCH_RADIUS_M of a point."""
+class CityOsm:
+    """Every named OSM school, kindergarten and college in the city, read once per run.
 
-    async def lookup(lat: float, lng: float) -> list[dict]:
+    One city-wide query instead of one per location: the public Overpass servers often
+    answer 504 when busy, and a run of a hundred small queries meets that many times.
+    When no server answers, the run goes on with website candidates only (``failed``)."""
+
+    def __init__(self, client: httpx.AsyncClient, bounds: dict[str, float]):
+        self.client, self.bounds = client, bounds
+        self.elements: Optional[list[dict]] = None
+        self.failed: Optional[str] = None
+        self._lock = asyncio.Lock()
+
+    async def _read(self) -> list[dict]:
+        b = self.bounds
         query = (
-            f"[out:json][timeout:25];nwr(around:{SEARCH_RADIUS_M},{lat},{lng})"
+            f"[out:json][timeout:180];nwr({b['south']},{b['west']},{b['north']},{b['east']})"
             '[amenity~"^(school|kindergarten|college)$"][name];out center tags;'
         )
         error: Optional[Exception] = None
         for attempt, url in enumerate([*OVERPASS_URLS, *OVERPASS_URLS]):  # each server twice
             if attempt:
-                await asyncio.sleep(attempt)
+                await asyncio.sleep(5 * attempt)
             try:
-                response = await client.post(url, data={"data": query}, timeout=40)
+                response = await self.client.post(url, data={"data": query}, timeout=200)
                 response.raise_for_status()
                 return response.json().get("elements", [])
             except (httpx.HTTPError, ValueError) as exc:  # busy (429/504), down, or not JSON
                 error = exc
         raise RuntimeError(f"no Overpass server answered: {error}")
 
-    return lookup
+    async def __call__(self, lat: float, lng: float) -> list[dict]:
+        async with self._lock:
+            if self.elements is None and self.failed is None:
+                try:
+                    self.elements = await self._read()
+                except RuntimeError as exc:
+                    logger.warning("pin-agent goes on without OSM candidates: %s", exc)
+                    self.failed = str(exc)[:200]
+                    self.elements = []
+        return [
+            element
+            for element in self.elements
+            if (centre := element.get("center") or element).get("lat") is not None
+            and centre.get("lon") is not None
+            and _distance_m((lat, lng), (float(centre["lat"]), float(centre["lon"]))) <= SEARCH_RADIUS_M
+        ]
 
 
 def osm_candidates(elements: Sequence[dict]) -> list[Candidate]:
@@ -384,6 +410,7 @@ async def run_pin_agent(
 
     results: list[dict[str, Any]] = []
     stopped: Optional[str] = None
+    osm_failed: list[Optional[str]] = []
 
     async def _run(fetch: Fetch, lookup: Lookup) -> None:
         nonlocal stopped
@@ -430,7 +457,9 @@ async def run_pin_agent(
         from crawl4ai.utils import RobotsParser  # type: ignore
 
         async with fee_http_client() as client, httpx.AsyncClient(headers={"User-Agent": CRAWLER_USER_AGENT}) as osm:
-            await _run(fetch or _http_fetch(client, RobotsParser()), lookup or osm_lookup(osm))
+            city_osm = CityOsm(osm, bounds)
+            await _run(fetch or _http_fetch(client, RobotsParser()), lookup or city_osm)
+            osm_failed.append(city_osm.failed)
 
     if injected_call:
         await _with_sources()
@@ -461,18 +490,23 @@ async def run_pin_agent(
                 await db.rollback()
             error = stopped = f"run stopped: {str(exc)[:200]}"
         failed = sum(r["outcome"] == "error" for r in results)
-        run = await db.get(PipelineRun, run_id, populate_existing=True)
-        await finalize_pipeline_run(
-            db,
-            run,
-            country=country,
-            city=city,
-            stage_summaries=[
-                stage_common.stage_summary(processed=len(results), succeeded=len(results) - failed, failed=failed)
-            ],
-            error_summary=error or stopped,
-        )
-        spend.spent_usd = max(spend.spent_usd, float(run.total_llm_cost_usd or 0))
+        try:
+            run = await db.get(PipelineRun, run_id, populate_existing=True)
+            spend.spent_usd = max(spend.spent_usd, float(run.total_llm_cost_usd or 0))
+            await finalize_pipeline_run(
+                db,
+                run,
+                country=country,
+                city=city,
+                stage_summaries=[
+                    stage_common.stage_summary(processed=len(results), succeeded=len(results) - failed, failed=failed)
+                ],
+                error_summary=error or stopped,
+            )
+        except Exception:  # the run's bookkeeping must not lose the picks and the report
+            logger.exception("pin-agent could not finalize run %s", run_id)
+            if db.in_transaction():
+                await db.rollback()
 
     if apply:
         # Written after all the reading, each row locked only for its own short write.
@@ -487,5 +521,5 @@ async def run_pin_agent(
         outcomes[row["outcome"]] = outcomes.get(row["outcome"], 0) + 1
     return {
         "apply": apply, "locations": len(results), "outcomes": outcomes, "spent_usd": round(spend.spent_usd, 4),
-        "stopped": stopped, "results": results,
+        "stopped": stopped, "osm_unavailable": next((f for f in osm_failed if f), None), "results": results,
     }

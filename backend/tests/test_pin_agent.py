@@ -227,20 +227,41 @@ def test_osm_street_without_number_is_kept():
 
 
 @pytest.mark.asyncio
-async def test_overpass_lookup_tries_the_next_server_when_one_is_busy():
+async def test_city_osm_reads_the_city_once_tries_the_next_server_and_filters_by_distance(monkeypatch):
     import httpx
 
+    monkeypatch.setattr(stage.asyncio, "sleep", _no_sleep)
     calls = []
+    near = {"type": "node", "lat": 42.6005, "lon": 23.3005}
+    far = {"type": "way", "center": {"lat": 42.75, "lon": 23.45}}
 
     def handler(request):
         calls.append(str(request.url))
         if len(calls) == 1:
             return httpx.Response(504)
-        return httpx.Response(200, json={"elements": [{"type": "node", "lat": 1, "lon": 2}]})
+        return httpx.Response(200, json={"elements": [near, far]})
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
-        assert await stage.osm_lookup(client)(42.6, 23.3) == [{"type": "node", "lat": 1, "lon": 2}]
-    assert calls == list(stage.OVERPASS_URLS)
+        city = stage.CityOsm(client, SOFIA)
+        assert await city(42.6, 23.3) == [near]
+        assert await city(42.75, 23.45) == [far]
+    assert calls == list(stage.OVERPASS_URLS)  # the second server answered; no more queries
+
+
+@pytest.mark.asyncio
+async def test_city_osm_goes_on_without_osm_when_no_server_answers(monkeypatch):
+    import httpx
+
+    monkeypatch.setattr(stage.asyncio, "sleep", _no_sleep)
+    async with httpx.AsyncClient(transport=httpx.MockTransport(lambda request: httpx.Response(504))) as client:
+        city = stage.CityOsm(client, SOFIA)
+        assert await city(42.6, 23.3) == []
+        assert await city(42.7, 23.3) == []
+    assert city.failed
+
+
+async def _no_sleep(seconds):
+    return None
 
 
 @pytest.mark.asyncio
