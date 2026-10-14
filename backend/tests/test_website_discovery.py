@@ -238,6 +238,7 @@ class TestWebsiteDiscovery:
         await db_session.refresh(school)
         assert result["found"] is True
         assert school.website_url == "https://official-school.bg"
+        assert "social_link_candidates" not in school.attributes  # only kept when no site is found
 
     async def test_facebook_hits_are_kept_as_unconfirmed_candidates_when_no_site_is_found(self, db_session):
         school = School(
@@ -278,6 +279,18 @@ class TestWebsiteDiscovery:
         candidates = school.attributes["social_link_candidates"]
         assert candidates["facebook"] == ["https://www.facebook.com/uchilishte.test"]  # not the group
         assert candidates["instagram"] == ["https://www.instagram.com/uchilishte_test/"]
+
+        # A later search with no social hits removes the old candidates.
+        mock_response.json.return_value = {"results": []}
+        with patch("httpx.AsyncClient") as mock_client_class:
+            mock_client = AsyncMock()
+            mock_client.__aenter__.return_value = mock_client
+            mock_client.__aexit__.return_value = None
+            mock_client.get.return_value = mock_response
+            mock_client_class.return_value = mock_client
+            await discover_school_website(db=db_session, school_id=school.id, country_code="bg", use_search_fallback=True)
+        await db_session.refresh(school)
+        assert "social_link_candidates" not in school.attributes
 
     async def test_stops_after_search_results_without_generated_domain_guessing(self, db_session):
         school = School(

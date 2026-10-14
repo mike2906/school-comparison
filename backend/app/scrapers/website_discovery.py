@@ -12,6 +12,7 @@ import logging
 import pathlib
 import re
 import time
+from collections import Counter
 from datetime import datetime, timezone
 from urllib.parse import parse_qs, unquote, urlparse
 
@@ -321,6 +322,7 @@ class WebsiteDiscoverer:
         use_search_fallback: bool = True,
     ) -> dict:
         """Discover a school website URL and persist it when found."""
+        self.social_hits.pop(school.id, None)  # hits left by a run that stopped part-way
         existing_url = school.website_url
         resolved_url = None
         method = None
@@ -383,14 +385,16 @@ class WebsiteDiscoverer:
                     discovery_hints=discovery_hints,
                 )
 
-        self._store_social_candidates(school)
+        if not resolved_url and use_search_fallback:
+            self._store_social_candidates(school)
+        self.social_hits.pop(school.id, None)
         if not resolved_url:
             if can_mark_no_website:
                 school.scrape_status = "no_official_website"
                 school.website_url = None
                 await db.commit()
-            elif SOCIAL_CANDIDATES_KEY in (school.attributes or {}):
-                await db.commit()
+            elif use_search_fallback:
+                await db.commit()  # the social link candidates
             return {
                 "school_id": school.id,
                 "found": False,
@@ -426,27 +430,28 @@ class WebsiteDiscoverer:
         }
 
     def _store_social_candidates(self, school: School) -> None:
-        """Keep the pages search found for this school, most often found first, in
-        ``attributes["social_link_candidates"]``. Unconfirmed: a hit for the school's name
-        is often another school's page or a fan page, so these are never shown; a later
-        check (the page's own phone or address against the registry) has to confirm one."""
-        hits = self.social_hits.pop(school.id, [])
-        if not hits:
-            return
-        counts: dict[tuple[str, str], int] = {}
-        for network, url in hits:
-            key = (network, url.lower())
-            counts[key] = counts.get(key, 0) + 1
-        ranked = sorted(counts, key=lambda key: -counts[key])
-        block = {
-            "found_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-            **{
-                network: [url for n, url in ranked if n == network][:MAX_SOCIAL_CANDIDATES]
-                for network in ("facebook", "instagram")
-                if any(n == network for n, _ in ranked)
-            },
+        """For a school search found no website for: the pages search found, most often
+        found first, in ``attributes["social_link_candidates"]`` (replacing an older block;
+        removed when search found none). Unconfirmed: a hit for the school's name is often
+        another school's page or a fan page, so these are never shown; a later check (the
+        page's own phone or address against the registry) has to confirm one."""
+        counts = {network: Counter() for network in ("facebook", "instagram")}
+        for network, url in self.social_hits.get(school.id, []):
+            counts[network][url.lower()] += 1
+        attrs = dict(school.attributes or {})
+        attrs.pop(SOCIAL_CANDIDATES_KEY, None)
+        found = {
+            network: [url for url, _ in counter.most_common(MAX_SOCIAL_CANDIDATES)]
+            for network, counter in counts.items()
+            if counter
         }
-        school.attributes = {**(school.attributes or {}), SOCIAL_CANDIDATES_KEY: block}
+        if found:
+            attrs[SOCIAL_CANDIDATES_KEY] = {
+                "_schema_version": 1,
+                "found_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                **found,
+            }
+        school.attributes = attrs
 
     async def recover_failed_school(
         self,
@@ -751,13 +756,15 @@ class WebsiteDiscoverer:
         for provider in self.search_providers:
             provider_candidates: list[str] = []
             provider_seen: set[str] = set()
+            social_seen: set[tuple[str, str]] = set()
             for query in queries:
                 links = await self._search_provider(provider=provider, query=query, school_id=school.id)
                 for link in links:
                     if not link or link in provider_seen:
                         continue
                     social = profile_url(link)
-                    if social:
+                    if social and (query, social[1].lower()) not in social_seen:  # once a query
+                        social_seen.add((query, social[1].lower()))
                         self.social_hits.setdefault(school.id, []).append(social)
                     provider_seen.add(link)
                     provider_candidates.append(link)
