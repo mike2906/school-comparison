@@ -151,14 +151,40 @@ ruling's title may not mention admissions, and a missed ruling costs more than a
 false issue. State (hashes, texts, seen links, failure counts) lives
 on the `rule-watch-data` branch; deleting `state.json` there takes a fresh baseline.
 
-**Acting on an issue.** Read the source. If the rules changed, add a new rule file for the
-campaign (or a new version within it) with its acts, sources and worked examples, add the
-version date to `RULE_VERSIONS` (`kg_sofia_ratings.py`, `ruo_sofia_min_max.py`; a test
-checks they agree with the rule files), and close the issue from the PR. A catchment
-change needs a new snapshot (`backend/scripts/build_sofia_catchments.py`). If nothing
-changed, close the issue. A date or unreadable-source issue closed while its condition
-still holds is opened again the next day, on purpose. A provisional file becomes verified only after someone checks
-it against the official text.
+**Acting on an issue.** Each issue the watch opens or comments on starts
+`.github/workflows/draft-rule-update.yml`. Claude (anthropics/claude-code-action, on
+Mike's Claude subscription via the `CLAUDE_CODE_OAUTH_TOKEN` secret from
+`claude setup-token`, valid a year) reads the issue and the source, edits the rule files
+and writes a decision with its reasons. A second job without Claude then:
+- `close`: comments and closes the issue (only for changed or new entries),
+- `needs-human`: comments and labels it `needs-human`,
+- `pr`: commits the edits to `rule-watch/issue-N`, opens a draft PR (or adds to the open
+  one), starts CI on it and links it on the issue. A PR holds a new rule file (or
+  version) with its acts, sources and worked examples, `RULE_VERSIONS` updated when the
+  version date changes (a test checks they agree with the rule files), or a schedule,
+  status event or confirmation on the campaign's file. Opening the PR needs the repo
+  setting "Allow GitHub Actions to create and approve pull requests"; without it the
+  issue gets a link to open the PR by hand.
+
+If Claude ends without a decision, the issue is labelled `needs-human`. `close` on any
+other kind of issue becomes `needs-human`.
+
+Claude reads untrusted page text, so its job has a read-only GitHub token and no tool
+that writes to GitHub or reaches other hosts. It sees only what the watch wrote on the
+issue (other people's comments are left out), reads sources only through
+`backend/scripts/fetch_official.py` (the official hosts listed on main), and can edit
+only the rule JSON files, the watch config and the two `RULE_VERSIONS` modules. The
+publish job applies only changes to those files and publishes nothing that looks like a
+credential. If a draft cannot be started, the daily run fails (state is still saved);
+its log, linked from the failed-run issue, names the issue to run by hand.
+
+Nothing is merged automatically: a PR is reviewed like any other, because a wrong points
+value is worse than a late one. A catchment change needs a new snapshot
+(`backend/scripts/build_sofia_catchments.py`). A date or unreadable-source issue closed
+while its condition still holds is opened again the next day, on purpose. A provisional
+file becomes verified only after the full official text was read. To redo a draft, run
+the workflow by hand with the issue number. Without the secret the workflow only logs a
+warning, and the issue waits for a person or agent.
 
 **Adding a city or stage.** Add its rule family to `families` (a test fails until every
 family under `frontend/src/admission/rules/<country>` has its dates) and its council,

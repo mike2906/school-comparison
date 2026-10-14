@@ -6,6 +6,8 @@ on:
     # main is tested by the Deploy workflow, which calls this one.
     branches-ignore: [main]
   workflow_call:
+  # draft-rule-update.yml starts it on its branches: GITHUB_TOKEN pushes start nothing.
+  workflow_dispatch:
 
 permissions:
   contents: read
