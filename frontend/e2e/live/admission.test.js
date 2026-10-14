@@ -29,7 +29,7 @@ const answer = (question, option) =>
 describe('admission calculator', () => {
   test('kindergarten: a fully answered form gives one total that adds up', async () => {
     await open('bg', '/admission?stage=kindergarten')
-    const kg = key => t('bg', `admissionCalc.kg.${key}`)
+    const kg = (key, vars) => t('bg', `admissionCalc.kg.${key}`, vars)
     const start = Number((await campaign()).slice(0, 4))
     // Three years before the start year is a kindergarten group (not the nursery).
     await page.getByLabel(kg('birthYear')).selectOption(String(start - 3))

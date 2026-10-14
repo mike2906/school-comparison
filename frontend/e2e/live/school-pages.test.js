@@ -13,6 +13,8 @@ liveBrowser(PHONE)
 
 const hasCoordinates = location => location.lat != null && location.lng != null
 const isPrivate = school => ['private', 'international'].includes(school.school_type)
+// The white card a section heading opens.
+const card = heading => page.getByRole('heading', { name: heading, exact: true }).locator('xpath=ancestor::div[contains(@class, "rounded-2xl")][1]')
 const planRow = school => (school.pricing || []).find(row => (row.pricing_context?.payment_options || []).length > 0)
 
 describe('finding a school', () => {
@@ -20,7 +22,8 @@ describe('finding a school', () => {
     const school = (await allSchools()).find(s => isPrivate(s) && schoolName(s, 'bg').length > 6)
     const name = schoolName(school, 'bg')
     await open('bg', '/search')
-    await page.getByPlaceholder(t('bg', 'landing.searchPlaceholder')).first().fill(name)
+    // Phones and desktops get their own search box; use the one on screen.
+    await page.getByPlaceholder(t('bg', 'landing.searchPlaceholder')).filter({ visible: true }).first().fill(name)
     await page.waitForURL(url => url.searchParams.get('q') === name)
     await page.locator(`a[href="/schools/${school.id}"]`).first().click()
     await page.waitForURL(url => url.pathname === `/schools/${school.id}`)
@@ -41,7 +44,7 @@ describe('a school page', () => {
       200,
     )
     await open('bg', `/schools/${school.id}`)
-    const facts = page.locator('div').filter({ has: page.getByRole('heading', { name: t('bg', 'schoolFacts.title'), exact: true }) }).last()
+    const facts = card(t('bg', 'schoolFacts.title'))
     await facts.waitFor()
     const line = facts.locator('dt', { hasText: t('bg', 'schoolFacts.glance.openDays') })
     await line.waitFor()
@@ -70,7 +73,7 @@ describe('a school page', () => {
     const listed = (await allSchools()).find(s => isPrivate(s) && planRow(s))
     assert.ok(listed, 'a private school with a payment plan')
     await open('bg', `/schools/${listed.id}`)
-    const section = page.locator('div').filter({ has: page.getByRole('heading', { name: t('bg', 'pricing.title'), exact: true }) }).last()
+    const section = card(t('bg', 'pricing.title'))
     await section.getByText(t('bg', 'pricing.payInParts')).first().waitFor()
     const text = await section.innerText()
     assert.match(text, /EUR|€/, 'fees are shown in euro')
