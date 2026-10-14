@@ -874,8 +874,12 @@ async def run_spot_check_for_school(
 
     try:
         async with _tx_context(db):
+            # Locked and re-read, as in validate_school_data: the whole JSON is written back.
             school_result = await db.execute(
-                select(School).where(School.id == school_id, School.country_code == country_code)
+                select(School)
+                .where(School.id == school_id, School.country_code == country_code)
+                .with_for_update()
+                .execution_options(populate_existing=True)
             )
             school = school_result.scalar_one_or_none()
             if not school:

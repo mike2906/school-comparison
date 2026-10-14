@@ -36,9 +36,12 @@ the calls are a large part of each school's time.
   fees first read), in which case that school stores nothing, as a serial run's last
   school does today. The fees re-read still swallows a cap refusal and keeps its first
   read; the next school's first read then stops the run.
-- Results are reported in school-id order; the fees agent's `--out` lines are still
-  appended as each school finishes, so `--after-id` resume needs the highest id with
-  every lower id done. The report says which ids finished.
+- Results are reported in school-id order. The fees agent's `--out` lines are written in
+  id order too, each once every lower id is done, so `--after-id` with the last line's id
+  still skips no school (a few schools read past it are read again). An error the stage
+  did not catch becomes that school's `error` result instead of ending the run.
+- The in-process `Spend` check does not count calls in flight in other workers, so near
+  the cap up to N calls can pass it at once; the ledger reservation above is the hard cap.
 - Politeness: one school's pages are still fetched one at a time, and schools on one
   site (same host, or a domain of their own under another ending, e.g. meridian22.org and
   meridian22.bg, which the fees finder treats as one site) are handed to one worker and
@@ -74,7 +77,11 @@ the calls are a large part of each school's time.
   different pages), and shares one robots.txt parser. A failed or empty fetch is not
   kept, so the second finder tries again. Each finder keeps its own queue, page limit,
   pictures and WordPress state, so it reads what it would on its own, give or take the
-  site changing between the two reads of a separate run.
+  site changing between the two reads of a separate run. Each school's report gives
+  `fetches` and `fetches_saved` (pages served from the cache), the number that decides
+  whether `site-agents` stays.
+- Each agent stops the run as it does on its own: facts on any provider-cost error, fees
+  only on a cap (an unattributed fee read is that school's error).
 - School selection is the union of the two stages': facts for a website URL validation
   accepted, fees for any private or international school with a website.
 - `site-agents` runs, per school, the facts finder and reader, then (private and

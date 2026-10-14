@@ -11,15 +11,17 @@ Plan: ``docs/SITE_AGENT_RUNS.md``.
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from contextlib import asynccontextmanager
 from typing import Any, Optional
-from urllib.parse import urlparse
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import async_session_maker
-from app.scrapers.shared_site_check import registrable_domain
+from app.scrapers.shared_site_check import registrable_domain, site_id
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_WORKERS = 4
 
@@ -27,14 +29,15 @@ Work = Callable[[AsyncSession, int], Awaitable[dict[str, Any]]]
 
 
 def site_key(url: Optional[str]) -> Optional[str]:
-    """Schools whose crawls can reach the same site share a key: one host, or a domain of
-    its own under any ending (meridian22.org and meridian22.bg, which the fees finder treats
-    as one site). Hosts on a shared domain (dg42.sofia.bg) keep their own key."""
-    host = (urlparse(url or "").hostname or "").lower().removeprefix("www.")
-    if not host:
+    """Schools whose crawls can reach the same site share a key: a domain of its own under
+    any ending when its name has 5+ letters (meridian22.org and meridian22.bg, as the fees
+    finder's ``_same_site``), else the host, or the tenant on a path-hosted platform
+    (sites.google.com/view/x). Hosts on a shared domain (dg42.sofia.bg) keep their own."""
+    site = site_id(url)
+    if not site:
         return None
-    domain = registrable_domain(url)
-    return domain.split(".", 1)[0] if domain == host else host
+    name = site.split(".", 1)[0]
+    return name if site == registrable_domain(url) and len(name) >= 5 else site
 
 
 async def run_schools(
@@ -49,11 +52,14 @@ async def run_schools(
     sites: Optional[Mapping[int, Optional[str]]] = None,
 ) -> tuple[list[dict[str, Any]], Optional[str]]:
     """``work(session, school_id)`` for each id; returns the results in id order and why
-    the run stopped early (None when every school ran). ``work`` handles a school's own
-    failure; only ``stop_on`` exceptions end the run. ``sites`` maps a school id to its
-    website, to keep schools on one registrable domain in one worker."""
+    the run stopped early (None when every school ran). ``stop_on`` exceptions end the run;
+    any other error is that school's ``error`` result. ``sites`` maps a school id to its
+    website, to keep schools on one site in one worker. ``on_result`` gets results in the
+    order of ``school_ids``, each once every school before it is done, so a resume after the
+    last one reported skips no school."""
     workers = max(1, int(workers))
-    results: list[dict[str, Any]] = []
+    done: dict[int, dict[str, Any]] = {}
+    reported = 0
     stopped: Optional[str] = None
     groups: dict[Any, list[int]] = {}
     for school_id in school_ids:
@@ -68,6 +74,13 @@ async def run_schools(
             async with session_factory() as own:
                 yield own
 
+    def report_ready() -> None:
+        nonlocal reported
+        while reported < len(school_ids) and school_ids[reported] in done:
+            if on_result is not None:
+                on_result(done[school_ids[reported]])
+            reported += 1
+
     async def worker() -> None:
         nonlocal stopped
         async with session() as school_db:
@@ -80,13 +93,15 @@ async def run_schools(
                     except stop_on as exc:
                         stopped = stopped or f"stopped before school {school_id}: {exc}"
                         return
-                    results.append(result)
-                    if on_result is not None:
-                        on_result(result)
+                    except Exception as exc:  # a failure ``work`` did not handle stays this school's
+                        logger.exception("school %s failed", school_id)
+                        if school_db.in_transaction():
+                            await school_db.rollback()
+                        result = {"school_id": school_id, "outcome": "error", "reason": str(exc)[:200]}
+                    done[school_id] = result
+                    report_ready()
 
-    async with asyncio.TaskGroup() as group:  # an unexpected error cancels the other workers
+    async with asyncio.TaskGroup() as group:
         for _ in range(min(workers, len(queue))):
             group.create_task(worker())
-    order = {school_id: n for n, school_id in enumerate(school_ids)}
-    results.sort(key=lambda result: order.get(result.get("school_id"), len(order)))
-    return results, stopped
+    return [done[school_id] for school_id in school_ids if school_id in done], stopped

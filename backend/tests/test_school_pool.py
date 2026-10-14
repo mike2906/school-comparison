@@ -17,6 +17,9 @@ class _Session:
     async def __aexit__(self, *_args):
         return None
 
+    def in_transaction(self):
+        return False
+
 
 class Stop(Exception):
     pass
@@ -54,7 +57,17 @@ async def test_workers_get_their_own_sessions_and_results_keep_the_given_order()
     )
     assert most == 3 and _Session.opened == 3
     assert [r["school_id"] for r in results] == [1, 2, 3, 4]
-    assert len(lines) == 4 and stopped is None
+    assert [r["school_id"] for r in lines] == [1, 2, 3, 4] and stopped is None  # in order, for --after-id
+
+
+async def test_an_unhandled_error_is_that_schools_error_and_the_rest_still_run():
+    async def work(db, school_id):
+        if school_id == 2:
+            raise RuntimeError("connection reset")
+        return {"school_id": school_id, "outcome": "ok"}
+
+    results, stopped = await run_schools("caller", [1, 2, 3], work, workers=2, session_factory=_Session)
+    assert [r["outcome"] for r in results] == ["ok", "error", "ok"] and stopped is None
 
 
 async def test_a_stop_ends_the_run_and_no_new_school_starts():
@@ -86,7 +99,7 @@ def test_site_key_joins_a_domains_endings_and_keeps_shared_hosts_apart():
 async def test_schools_on_one_site_never_run_at_the_same_time():
     running: set[str] = set()
     clashes = []
-    sites = {1: "https://a.bg/", 2: "https://a.bg/x", 3: "https://b.bg/", 4: "https://a.org/"}
+    sites = {1: "https://alpha.bg/", 2: "https://alpha.bg/x", 3: "https://bravo.bg/", 4: "https://alpha.org/"}
 
     async def work(db, school_id):
         site = sites[school_id].split("/")[2].split(".")[0]

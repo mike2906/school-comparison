@@ -132,6 +132,8 @@ class SiteCache:
     pages: dict[str, Any] = field(default_factory=dict)  # URL -> _fetch result
     wordpress: dict[str, Optional[str]] = field(default_factory=dict)  # final URL -> API text
     robots: Any = None
+    fetches: int = 0  # pages fetched, failures included
+    hits: int = 0  # pages served from the cache
 
 
 Finder = Callable[[School], Awaitable[list[PageRead]]]
@@ -302,7 +304,11 @@ async def find_pages(
                 read.append(PageRead(url, "", False, "robots.txt"))
                 continue
             try:
-                fetched = cache.pages.get(url) or await _fetch(crawler, run_config, client, url)
+                fetched = cache.pages.get(url)
+                cache.hits += fetched is not None
+                if fetched is None:
+                    cache.fetches += 1
+                    fetched = await _fetch(crawler, run_config, client, url)
             except Exception as exc:  # a failed page is recorded and skipped
                 read.append(PageRead(url, "", False, str(exc)[:120]))
                 continue

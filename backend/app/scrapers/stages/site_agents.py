@@ -27,7 +27,7 @@ from app.scrapers.stages import common as stage_common
 from app.scrapers.stages import fees_agent, school_facts, school_pool
 from app.scrapers.stages.fees_agent import SiteCache, Spend, SpendCapReached, find_pages
 from app.services.pipeline_runs import finalize_pipeline_run, pipeline_run_heartbeat, start_pipeline_run
-from app.services.provider_costs import ProviderCostError, provider_cost_scope
+from app.services.provider_costs import ProviderCostCapExceeded, ProviderCostError, provider_cost_scope
 from app.utils.school_facts import SITE_ACCEPTED_STATUSES
 
 logger = logging.getLogger(__name__)
@@ -35,7 +35,11 @@ logger = logging.getLogger(__name__)
 STAGE = "site-agents"
 DEFAULT_MAX_USD = 0.50
 FEE_SCHOOL_TYPES = ("private", "international")
-_STOPS = (SpendCapReached, ProviderCostError)
+# What stops the run, as in each stage on its own: school facts stop on any provider-cost
+# error (a run no longer running); the fees agent only on a cap, and records an
+# unattributed response as that school's error.
+_FACTS_STOPS = (SpendCapReached, ProviderCostError)
+_FEES_STOPS = (SpendCapReached, ProviderCostCapExceeded)
 
 
 async def run_site_agents(
@@ -132,6 +136,7 @@ async def run_site_agents(
                         steps.append(
                             (
                                 "facts",
+                                _FACTS_STOPS,
                                 lambda: school_facts.run_school(
                                     school_db, school, find=find_facts, call=call, apply=apply
                                 ),
@@ -141,6 +146,7 @@ async def run_site_agents(
                         steps.append(
                             (
                                 "fees",
+                                _FEES_STOPS,
                                 lambda: fees_agent.run_school(
                                     school_db,
                                     school,
@@ -151,10 +157,10 @@ async def run_site_agents(
                                 ),
                             )
                         )
-                    for name, step in steps:
+                    for name, stops, step in steps:
                         try:
                             report[name] = await step()
-                        except _STOPS:
+                        except stops:
                             raise
                         except Exception as exc:  # one agent's failure leaves its stored data as it is
                             logger.exception("site-agents %s failed for school %s", name, current_id)
@@ -162,11 +168,12 @@ async def run_site_agents(
                                 await school_db.rollback()
                             report[name] = {"school_id": current_id, "outcome": "error", "reason": str(exc)[:200]}
                             school = await school_db.get(School, current_id)  # the rollback expired it
-                    report["pages_fetched"] = len(cache.pages)
+                    report["fetches"] = cache.fetches
+                    report["fetches_saved"] = cache.hits
                     return report
 
                 results, error = await school_pool.run_schools(
-                    db, ids, one, workers=workers, stop_on=_STOPS, sites=sites
+                    db, ids, one, workers=workers, stop_on=(*_FACTS_STOPS, ProviderCostCapExceeded), sites=sites
                 )
     except Exception as exc:
         logger.exception("site-agents run %s stopped", run_id)
