@@ -55,6 +55,8 @@ from app.scrapers.fee_pages import fee_http_client, page_key, pdf_text
 from app.scrapers.price_evidence import _PRICE_RE, PriceRow, _amount_key
 from app.scrapers.shared_site_check import registrable_domain
 from app.scrapers.stages import common as stage_common
+from app.scrapers.stages import fee_images as fee_images_module
+from app.scrapers.stages.fee_images import fee_images
 from app.scrapers.validator import validate_school_data
 from app.services.pipeline_runs import finalize_pipeline_run, pipeline_run_heartbeat, start_pipeline_run
 from app.services.provider_costs import (
@@ -142,13 +144,15 @@ def _same_site(url: str, site: str) -> bool:
     return host == home and len(home_name) >= 5 and name == home_name
 
 
-async def _fetch(crawler, run_config, client, url: str) -> tuple[str, str, list[tuple[str, str]]]:
-    """(final URL, text, same-site links). PDFs are read with pdfplumber, pages rendered."""
+async def _fetch(
+    crawler, run_config, client, url: str
+) -> tuple[str, str, list[tuple[str, str]], list[tuple[str, str, str]]]:
+    """(final URL, text, same-site links, fee pictures). PDFs are read with pdfplumber, pages rendered."""
     if unquote(urlparse(url).path).lower().endswith(".pdf"):
         response = await client.get(url, follow_redirects=True, timeout=30)
         if response.status_code != 200:
-            return url, "", []
-        return str(response.url), await asyncio.to_thread(pdf_text, response.content), []
+            return url, "", [], []
+        return str(response.url), await asyncio.to_thread(pdf_text, response.content, tables=True), [], []
     for attempt in range(2):  # a site that throttles returns an empty page now and then (583)
         result = await asyncio.wait_for(crawler.arun(url=url, config=run_config), timeout=60)
         if getattr(result, "success", False):
@@ -156,13 +160,14 @@ async def _fetch(crawler, run_config, client, url: str) -> tuple[str, str, list[
         if attempt == 0:
             await asyncio.sleep(RETRY_SECONDS)
     else:
-        return url, "", []
+        return url, "", [], []
     markdown = getattr(result, "markdown", None)
     text = getattr(markdown, "raw_markdown", None) or str(markdown or "")
     found = getattr(result, "links", None) or {}
     links = [*(found.get("internal") or []), *(found.get("external") or [])]
     pairs = [(str(link["href"]), str(link.get("text") or "").strip()[:80]) for link in links if link.get("href")]
-    return str(getattr(result, "redirected_url", None) or url), text, pairs
+    final = str(getattr(result, "redirected_url", None) or url)
+    return final, text, pairs, fee_images(getattr(result, "html", None) or "", final)
 
 
 def _wordpress_api(url: str) -> tuple[str, dict[str, str]]:
@@ -247,9 +252,11 @@ async def find_pages(
     pick_prompt: str = PICK_PROMPT,
     fallback_links: re.Pattern = _FEE_LINK_RE,
     stage: str = STAGE,
+    read_pictures: bool = False,
 ) -> list[PageRead]:
     """Up to 3 hops and 12 pages from the home page; robots.txt is respected.
 
+    With ``read_pictures``, up to 4 pictures named for fees are read as pages of their own.
     The school-facts stage passes its own link prompt, fallback keywords and stage name."""
     from crawl4ai.utils import RobotsParser  # type: ignore
 
@@ -260,6 +267,15 @@ async def find_pages(
     seen: set[tuple] = set()
     links: dict[str, str] = {}
     queue = [site]
+    pictures: list[tuple[str, str, str]] = []
+    picture_pages: list[PageRead] = []  # read after the pages, so they take none of the page slots
+
+    async def allowed(url: str) -> bool:
+        return await robots.can_fetch(url, CRAWLER_USER_AGENT)
+
+    def spent(cost: float) -> None:
+        spend.spent_usd += cost
+
     for hop in range(MAX_HOPS + 1):
         for url in queue:
             if page_key(url) in seen or len(read) >= MAX_FETCHES:
@@ -269,7 +285,7 @@ async def find_pages(
                 read.append(PageRead(url, "", False, "robots.txt"))
                 continue
             try:
-                final, text, page_links = await _fetch(crawler, run_config, client, url)
+                final, text, page_links, page_pictures = await _fetch(crawler, run_config, client, url)
             except Exception as exc:  # a failed page is recorded and skipped
                 read.append(PageRead(url, "", False, str(exc)[:120]))
                 continue
@@ -287,6 +303,32 @@ async def find_pages(
                 wordpress = api_text is not None
                 text = api_text or text
             read.append(PageRead(final, text, bool(_PRICE_RE.search(text))))
+            if read_pictures:
+                for picture in page_pictures:
+                    if len(pictures) >= fee_images_module.MAX_IMAGES or page_key(picture[0]) in seen:
+                        continue
+                    if not fee_images_module.on_site(picture, site):
+                        continue
+                    seen.add(page_key(picture[0]))
+                    if not spend.allows(fee_images_module.IMAGE_COST_ESTIMATE_USD):
+                        raise SpendCapReached(f"spent ${spend.spent_usd:.4f} of ${spend.cap_usd}")
+                    pictures.append(picture)
+                    found = await fee_images_module.read_image(
+                        client,
+                        picture,
+                        page_url=final,
+                        site_url=site,
+                        school_id=school.id,
+                        stage=stage,
+                        allowed=allowed,
+                        on_cost=spent,
+                    )
+                    if found is not None:
+                        # A fee table's picture often prints bare numbers ("15 350") under a
+                        # currency heading, which the price pattern misses (594): any amount
+                        # sends it to the reader.
+                        transcription = found[1].split("\n", 1)[-1]  # after the heading line
+                        picture_pages.append(PageRead(found[0], found[1], bool(re.search(r"\d{2}", transcription))))
             for href, label in page_links:
                 href = urldefrag(href)[0]
                 if _same_site(href, site) and not unquote(href).lower().endswith(_SKIPPED):
@@ -306,11 +348,23 @@ async def find_pages(
         except Exception as exc:  # a timed-out pick (541) falls back to the keyword links below
             logger.warning("fees-agent link pick failed for school %s: %s", school.id, exc)
             queue = []
-        if not queue:
-            queue = [url for url, label in unopened if fallback_links.search(f"{unquote(url)} {label}")][:MAX_PICKS]
+        # Places the picker leaves free go to the keyword links, this year's first: 594's
+        # picker chose the application forms over /school-fees-2026-2027/ in one run of two.
+        keyword = [url for url, label in unopened if url not in queue and fallback_links.search(f"{unquote(url)} {label}")]
+        this_year = _this_years_pages()
+        keyword.sort(key=lambda url: not this_year.search(f"{unquote(url)} {links.get(url, '')}"))
+        queue = (queue + keyword)[:MAX_PICKS]
         if not queue:
             break
-    return read
+    # Pictures first: they are short, and the reader's text is cut at its limit from the end.
+    return picture_pages + read
+
+
+def _this_years_pages() -> re.Pattern:
+    """A URL or link text naming this school year or the next ("2026-2027", "2027/28")."""
+    start = int(current_academic_year()[:4])
+    years = [(str(year), str(year + 1)) for year in (start, start + 1)]
+    return re.compile("|".join(rf"{first}\D{{0,3}}(?:{second}|{second[2:]})(?!\d)" for first, second in years))
 
 
 # ---------------------------------------------------------------------------
@@ -1042,7 +1096,7 @@ async def run_fees_agent(
                             await run_school(
                                 db,
                                 school,
-                                find=lambda s: find_pages(crawler, run_config, client, s, spend),
+                                find=lambda s: find_pages(crawler, run_config, client, s, spend, read_pictures=True),
                                 read=lambda s, pages, missed: read_fees(s, pages, spend, missed),
                                 apply=apply,
                                 gone=lambda url: page_gone(client, url),

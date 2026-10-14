@@ -194,15 +194,39 @@ def pdf_page_images(data: bytes) -> list[bytes]:
     return images
 
 
-def pdf_text(data: bytes) -> str:
-    """Text layer of a PDF's first pages; empty for a scanned (image-only) file."""
+def pdf_text(data: bytes, *, tables: bool = False) -> str:
+    """Text layer of a PDF's first pages; empty for a scanned (image-only) file.
+
+    With ``tables``, the clean tables (see :func:`table_lines`) follow the text one row per
+    line. They come after the cut, so a long PDF keeps all the text it kept before."""
     import pdfplumber
 
     parts: list[str] = []
+    rows: list[str] = []
     with pdfplumber.open(io.BytesIO(data)) as pdf:
         for page in pdf.pages[:MAX_PDF_PAGES]:
             parts.append(page.extract_text() or "")
-    return "\n".join(part.strip() for part in parts if part.strip())[:MAX_TEXT_CHARS]
+            if tables:
+                rows.extend(line for table in page.extract_tables() for line in table_lines(table))
+    text = "\n".join(part.strip() for part in parts if part.strip())[:MAX_TEXT_CHARS]
+    return "\n".join([text, *rows])[: 2 * MAX_TEXT_CHARS] if rows else text
+
+
+def table_lines(table: list[list[str | None]]) -> list[str]:
+    """A PDF table's rows, one per line, cells joined by " | " and a cell's lines by " / ".
+
+    A PDF's text layer reads a table line by line across its cells, so a row whose cells
+    hold several lines comes out interleaved with the next row (596: "Plan 1 – € 9,500"
+    two lines above its grade). Only a whole grid is kept, so a row never pairs amounts
+    from different rows: a table with a merged or missing cell (None) or a single column
+    is a fragment, and one whose first column holds several lines in a cell has rows
+    the PDF draws no line between ("Grade 1 / Grade 2 | € 450 / € 500")."""
+    if not table or any(cell is None for row in table for cell in row) or max(len(row) for row in table) < 2:
+        return []
+    cells = [[[part.strip() for part in cell.splitlines() if part.strip()] for cell in row] for row in table]
+    if any(len(row[0]) > 1 for row in cells[1:]):
+        return []
+    return [" | ".join(" / ".join(lines) for lines in row) for row in cells]
 
 
 async def fetch_fee_documents(

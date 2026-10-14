@@ -15,10 +15,11 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Callable
 
 from pydantic_ai import BinaryContent
 
-from app.ai.client import create_agent, get_model
+from app.ai.client import create_agent, extract_provider_cost_usd, get_model
 from app.services.provider_costs import execute_billable_request
 
 logger = logging.getLogger(__name__)
@@ -42,21 +43,28 @@ def numbers_in(text: str) -> list[str]:
 _CURRENCIES = (("EUR", r"€|\beur|евро"), ("BGN", r"лв|\bbgn|лева"), ("USD", r"\$|\busd"), ("GBP", r"£|\bgbp"))
 
 
-def reading_signature(text: str) -> tuple[frozenset[str], list[tuple[str, tuple[str, ...]]]]:
+def reading_signature(
+    text: str,
+) -> tuple[frozenset[str], list[tuple[str, tuple[str, ...]]], list[str]]:
     """What two readings of one picture must agree on.
 
     The currencies named anywhere, and each table row from the first one that holds a
     price: its first cell with the numbers of the row. The same digits under another row's label or another
-    currency are a different fee. Titles and header rows are left out: how a reading
-    wraps them varies and says nothing about the fees.
+    currency are a different fee. Header rows are left out, and the lines outside the
+    table count only by their numbers: how a reading wraps a title varies, but a
+    misread "Registration: 300 €" under the table is a wrong fee.
     """
     lowered = (text or "").casefold()
     currencies = frozenset(code for code, pattern in _CURRENCIES if re.search(pattern, lowered))
     rows = []
+    outside: list[str] = []
     in_table = False
     for line in lowered.splitlines():
         numbers = tuple(numbers_in(line))
-        if "|" not in line or not numbers:
+        if "|" not in line:
+            outside.extend(numbers)
+            continue
+        if not numbers:
             continue
         # Header rows come first and hold only small numbers ("1 installment"); from the
         # first row with a price on, every row counts, also one with a small fee.
@@ -64,11 +72,23 @@ def reading_signature(text: str) -> tuple[frozenset[str], list[tuple[str, tuple[
         if in_table:
             label = "".join(re.findall(r"[^\W_]+", line.split("|", 1)[0]))
             rows.append((label, numbers))
-    return currencies, sorted(rows)
+    return currencies, sorted(rows), sorted(outside)
 
 
-async def read_fee_image(data: bytes, media_type: str, *, school_id: int | None = None) -> str | None:
-    """The image's text, or None when it shows no fees or two readings disagree."""
+async def read_fee_image(
+    data: bytes,
+    media_type: str,
+    *,
+    school_id: int | None = None,
+    stage: str = "navigate",
+    on_cost: Callable[[float], None] | None = None,
+    reraise: tuple[type[BaseException], ...] = (),
+) -> str | None:
+    """The image's text, or None when it shows no fees or two readings disagree.
+
+    ``on_cost`` gets each reading's provider cost, for a caller that keeps its own spend;
+    errors in ``reraise`` (a spend cap, a stopped run) reach the caller instead of
+    dropping the picture."""
     readings: list[str] = []
     for _ in range(2):
         agent = create_agent(tier="vision", system_prompt=_PROMPT, result_type=str)
@@ -77,12 +97,16 @@ async def read_fee_image(data: bytes, media_type: str, *, school_id: int | None 
                 lambda agent=agent: agent.run([BinaryContent(data=data, media_type=media_type)]),
                 model=get_model("vision"),
                 school_id=school_id,
-                stage="navigate",
+                stage=stage,
                 timeout_seconds=READ_TIMEOUT_SECONDS,
             )
+        except reraise:
+            raise
         except Exception as exc:
             logger.warning("Fee image read failed for school %s: %s", school_id, exc)
             return None
+        if on_cost is not None:
+            on_cost(extract_provider_cost_usd(result))
         text = str(getattr(result, "output", None) or getattr(result, "data", "") or "").strip()
         if not text or text.upper() == NOTHING:
             return None

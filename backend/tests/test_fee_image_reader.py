@@ -58,3 +58,34 @@ async def test_a_small_fee_misread_in_a_table_discards_the_picture():
     first = "Fee | 1 installment | 2 installments\nTuition | 1000 EUR | 520\nFood | 9 EUR | 5"
     assert await _read(first, first.replace("Food | 9 EUR", "Food | 90 EUR")) is None
     assert await _read(first, first) == first
+
+
+@pytest.mark.asyncio
+async def test_each_reading_reports_its_cost_under_the_callers_stage():
+    readings = [
+        SimpleNamespace(
+            output="Grade 1 | 14750", all_messages=lambda: [SimpleNamespace(provider_details={"cost": 0.01})]
+        )
+        for _ in range(2)
+    ]
+    agent = SimpleNamespace(run=AsyncMock(side_effect=readings))
+    costs, stages = [], []
+
+    async def billable(call, *, stage, **_kwargs):
+        stages.append(stage)
+        return await call()
+
+    with (
+        patch.object(fee_image_reader, "create_agent", return_value=agent),
+        patch.object(fee_image_reader, "execute_billable_request", billable),
+    ):
+        text = await read_fee_image(b"png", "image/png", school_id=1, stage="fees_agent", on_cost=costs.append)
+    assert text == "Grade 1 | 14750"
+    assert costs == [0.01, 0.01] and stages == ["fees_agent", "fees_agent"]
+
+
+@pytest.mark.asyncio
+async def test_a_price_misread_outside_the_table_discards_the_picture():
+    first = "Клас | Такса\n1 клас | 7 880 €\nТакса записване: 300 €"
+    assert await _read(first, first.replace("300 €", "800 €")) is None
+    assert await _read(first, first) == first
