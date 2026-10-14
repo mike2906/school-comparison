@@ -152,28 +152,29 @@ false issue. State (hashes, texts, seen links, failure counts) lives
 on the `rule-watch-data` branch; deleting `state.json` there takes a fresh baseline.
 
 **Acting on an issue.** Each issue the watch opens or comments on starts
-`.github/workflows/draft-rule-update.yml`, where Claude (anthropics/claude-code-action, on
+`.github/workflows/draft-rule-update.yml`. Claude (anthropics/claude-code-action, on
 Mike's Claude subscription via the `CLAUDE_CODE_OAUTH_TOKEN` secret from
-`claude setup-token`, valid a year) reads the issue and the source and either:
-- closes the issue with a comment saying why nothing changed (or labels it `needs-human`
-  when unsure), or
-- opens a PR: a new rule file (or version) with its acts, sources and worked examples,
-  `RULE_VERSIONS` updated when the version date changes (a test checks they agree with
-  the rule files), or a schedule, status event or confirmation on the campaign's file.
+`claude setup-token`, valid a year) reads the issue and the source, edits the rule files
+and writes a decision with its reasons. A second job without Claude then:
+- `close`: comments and closes the issue (only for changed or new entries),
+- `needs-human`: comments and labels it `needs-human`,
+- `pr`: commits the edits to `rule-watch/issue-N`, opens a draft PR (or adds to the open
+  one), starts CI on it and links it on the issue. A PR holds a new rule file (or
+  version) with its acts, sources and worked examples, `RULE_VERSIONS` updated when the
+  version date changes (a test checks they agree with the rule files), or a schedule,
+  status event or confirmation on the campaign's file.
 
-Claude sees only what the watch wrote on the issue (other people's comments are left
-out), so the only outside text it reads is the official pages. It reads them through
-`backend/scripts/fetch_official.py`, which fetches only the official hosts listed on main.
-It can edit only the rule JSON files, the watch config and the two `RULE_VERSIONS`
-modules, comment on or close its own issue, and push its own `rule-watch/issue-N` branch;
-merging is blocked. This narrows what an injected instruction on an official page could
-do; it is not a sandbox. Missing, provisional, unreadable
-and failed-run issues are never closed without a fix. If a draft cannot be started, the
-daily run fails (state is still saved); its log, linked from the failed-run issue, names the issue to run
-by hand.
+Claude reads untrusted page text, so its job has a read-only GitHub token and no tool
+that writes to GitHub or reaches other hosts. It sees only what the watch wrote on the
+issue (other people's comments are left out), reads sources only through
+`backend/scripts/fetch_official.py` (the official hosts listed on main), and can edit
+only the rule JSON files, the watch config and the two `RULE_VERSIONS` modules. The
+publish job applies only changes to those files and publishes nothing that looks like a
+credential. If a draft cannot be started, the daily run fails (state is still saved);
+its log, linked from the failed-run issue, names the issue to run by hand.
 
-It never merges: a PR is reviewed like any other, because a wrong points value is worse
-than a late one. A catchment change needs a new snapshot
+Nothing is merged automatically: a PR is reviewed like any other, because a wrong points
+value is worse than a late one. A catchment change needs a new snapshot
 (`backend/scripts/build_sofia_catchments.py`). A date or unreadable-source issue closed
 while its condition still holds is opened again the next day, on purpose. A provisional
 file becomes verified only after the full official text was read. To redo a draft, run
