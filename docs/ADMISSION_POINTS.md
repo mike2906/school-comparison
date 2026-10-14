@@ -137,10 +137,16 @@ for each finding, or comments on the open one with the same title:
 | No file for a campaign | On `next_campaign_by` (MM-DD of the year applications run), the family has no file for that campaign |
 | A provisional file is not confirmed | On `confirm_by`, the campaign's file is still `provisional` |
 | A source can't be read | Three runs in a row failed (HTTP error, robots.txt, layout changed: no links or too little text) |
+| A listing may have missed entries | Every entry on a list page was new, so older ones may have scrolled to page 2 unread |
+| The daily run failed | Checkout, install, posting or saving the state failed (scheduled runs only) |
 
 Pages are compared as cleaned text (scripts and markup dropped, whitespace collapsed),
 so a changed footer or session cookie doesn't count. List pages remember the links seen;
-the first run only records them. State (hashes, texts, seen links, failure counts) lives
+the first run only records them. A followed page is read again for 21 days (a session
+page gains its decisions after the session) and reported again if its matching lines
+change; a near-empty page (maintenance, bot check) is retried rather than marked read.
+`also` makes a keyword count only next to admission words ("Наредба № 10" is also an
+agriculture ordinance's number). State (hashes, texts, seen links, failure counts) lives
 on the `rule-watch-data` branch; deleting `state.json` there takes a fresh baseline.
 
 **Acting on an issue.** Read the source. If the rules changed, add a new rule file for the
@@ -158,7 +164,9 @@ consultation and schedule pages to `targets`. Another country gets its own
 `sources/<country>/admission_rule_watch.json` and a `--country` run.
 
 Known gaps: mon.bg is behind a Cloudflare check, so МОН drafts are seen through
-strategy.bg; the council page is per mandate, so its URL must change after the October
+strategy.bg, and the adopted text of a Наредба № 10 amendment is not watched (the
+State Gazette isn't either); the 8th-grade file's yearly `confirm_by` re-check is the
+backstop; the council page is per mandate, so its URL must change after the October
 2027 elections (the watcher reports it as unreadable when it stops listing sessions).
 
 ## Cut-offs

@@ -69,3 +69,21 @@ jobs:
           git -c user.name="rule watch" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
             commit -q -m "Rule watch $(date -u +%Y-%m-%dT%H:%MZ)"
           git push origin HEAD:rule-watch-data
+
+      # A failed run means changes are not being noticed: say so where the findings go.
+      # One open issue at a time; later failures add a comment.
+      - name: Report a failed run
+        if: failure() && github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          title="Rule watch: the daily run failed"
+          number=$(gh issue list --repo "$GITHUB_REPOSITORY" --label rule-watch --state open --search "\"$title\" in:title" --json number,title --jq ".[] | select(.title == \"$title\") | .number" | head -n1)
+          body="The admission rule watch failed, so source changes are not being noticed until it runs again: $RUN_URL"
+          if [ -n "$number" ]; then
+            gh issue comment "$number" --repo "$GITHUB_REPOSITORY" --body "$body"
+          else
+            gh label create rule-watch --repo "$GITHUB_REPOSITORY" --color d4c5f9 2>/dev/null || true
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --label rule-watch --body "$body"
+          fi

@@ -49,8 +49,11 @@ LISTING = {
 }
 
 
+FILLER = "<p>" + "Столичен общински съвет, дневен ред. " * 8 + "</p>"
+
+
 def _html(body):
-    return f"<html><body><nav>menu</nav><main>{body}</main><footer>© 2026</footer></body></html>"
+    return f"<html><body><nav>menu</nav><main>{body}{FILLER}</main><footer>© 2026</footer></body></html>"
 
 
 def _sessions(*ids):
@@ -141,7 +144,7 @@ def test_listing_reports_a_new_page_that_never_opens():
     for _ in range(2):
         assert run({"targets": [LISTING]}, [], state, _fetcher(pages)).findings == []
     [finding] = run({"targets": [LISTING]}, [], state, _fetcher(pages)).findings
-    assert "could not be opened" in finding.body and "content/2" in finding.body
+    assert "could not be read" in finding.body and "content/2" in finding.body
     assert run({"targets": [LISTING]}, [], state, _fetcher(pages)).findings == []
 
 
@@ -267,3 +270,85 @@ def test_keywords_have_no_edge_whitespace():
     for target in load_config("bg")["targets"]:
         for keyword in target.get("keywords", []):
             assert keyword == " ".join(keyword.split()), keyword
+
+
+def test_listing_reports_when_every_entry_is_new():
+    state = {}
+    run({"targets": [LISTING]}, [], state, _fetcher({LISTING["url"]: _sessions(1, 2)}))
+    pages = {LISTING["url"]: _sessions(3, 4)}
+    for i in (3, 4):
+        pages[f"https://x.bg/content/{i}"] = _html("<p>Бюджет</p>")
+    [finding] = run({"targets": [LISTING]}, [], state, _fetcher(pages)).findings
+    assert "may have missed entries" in finding.title
+
+
+def test_listing_retries_a_placeholder_page():
+    state = {}
+    run({"targets": [LISTING]}, [], state, _fetcher({LISTING["url"]: _sessions(1)}))
+    pages = {LISTING["url"]: _sessions(1, 2), "https://x.bg/content/2": "<html><body>Maintenance</body></html>"}
+    assert run({"targets": [LISTING]}, [], state, _fetcher(pages)).findings == []
+    pages["https://x.bg/content/2"] = _html("<p>Наредба за прием на деца</p>")
+    [finding] = run({"targets": [LISTING]}, [], state, _fetcher(pages)).findings
+    assert "content/2" in finding.body
+
+
+def test_recent_pages_are_read_again_for_new_matches():
+    state = {}
+    run({"targets": [LISTING]}, [], state, _fetcher({LISTING["url"]: _sessions(1)}), today=date(2027, 2, 1))
+    pages = {LISTING["url"]: _sessions(1, 2), "https://x.bg/content/2": _html("<p>т. 1 Бюджет</p>")}
+    assert run({"targets": [LISTING]}, [], state, _fetcher(pages), today=date(2027, 2, 2)).findings == []
+    assert run({"targets": [LISTING]}, [], state, _fetcher(pages), today=date(2027, 2, 3)).findings == []
+    pages["https://x.bg/content/2"] = _html("<p>т. 1 Бюджет</p><p>т. 2 Решение № 5 за изменение на Наредбата за прием на деца</p>")
+    [finding] = run({"targets": [LISTING]}, [], state, _fetcher(pages), today=date(2027, 2, 4)).findings
+    assert finding.body.startswith("Updated entry") and "Решение № 5" in finding.body
+    assert run({"targets": [LISTING]}, [], state, _fetcher(pages), today=date(2027, 2, 5)).findings == []
+    fetch = _fetcher(pages)
+    run({"targets": [LISTING]}, [], state, fetch, today=date(2027, 3, 1))
+    assert fetch.calls == [LISTING["url"]]  # older than RECHECK_DAYS: no longer read
+
+
+def test_also_requires_admission_context():
+    target = dict(LISTING, follow=False, link_pattern=".", keywords=["наредба № 10"], also=["образован", "училищ"])
+    state = {}
+    run({"targets": [target]}, [], state, _fetcher({target["url"]: _html('<a href="/a">Старо</a>')}))
+    page = _html(
+        '<a href="/a">Старо</a><a href="/b">Изменение на Наредба № 10 за подпомагане на земеделски стопани</a>'
+        '<a href="/c">Изменение на Наредба № 10 за организация на дейностите в училищното образование</a>'
+    )
+    [finding] = run({"targets": [target]}, [], state, _fetcher({target["url"]: page})).findings
+    assert "/c" in finding.body and "/b" not in finding.body
+
+
+def test_council_keywords_catch_catchment_and_amendment_wording():
+    council = next(t for t in load_config("bg")["targets"] if t["id"] == "sofia-council-sessions")
+    for line in (
+        "относно промяна на прилежащите райони за прием в първи клас за учебната 2027/2028 г.",
+        "относно приемане на Наредба за изменение и допълнение на Наредба за прием на деца в общинските ...",
+    ):
+        assert matching_lines(line, council["keywords"]), line
+
+
+def test_issue_creation_does_not_duplicate_after_a_lost_response(monkeypatch):
+    import httpx
+
+    from app.services.admission_rule_watch import Finding
+    from scripts import watch_admission_rules as script
+
+    monkeypatch.setattr(script.time, "sleep", lambda _: None)
+    created = []
+
+    def handler(request):
+        if request.method == "GET":
+            return httpx.Response(200, json=[{"title": t, "number": n} for n, t in enumerate(created, 1)])
+        if request.url.path.endswith("/labels"):
+            return httpx.Response(422, json={})
+        if request.url.path.endswith("/issues"):
+            created.append(json.loads(request.content)["title"])
+            return httpx.Response(502)  # created, but the response is lost
+        raise AssertionError(request.url)
+
+    transport = httpx.MockTransport(handler)
+    real_client = httpx.Client
+    monkeypatch.setattr(script.httpx, "Client", lambda **kw: real_client(transport=transport, **kw))
+    script.post_issues([Finding(key="k", title="Rule watch: x", body="b", kind="changed")], "o/r", "t")
+    assert created == ["Rule watch: x"]
