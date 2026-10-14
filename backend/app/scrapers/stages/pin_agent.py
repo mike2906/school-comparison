@@ -4,15 +4,17 @@ For a location the API publishes without a pin (approximate or none), gathers ca
 points: the school's own website map points (with OpenStreetMap's address there) and
 OpenStreetMap schools and kindergartens near the location's street. One model call picks
 the candidate that is this school's building, or none. The model never gives coordinates:
-it picks a candidate by number, and code checks the pick before anything is written. The
-candidate must be on our street (house number within ``MAX_NUMBER_GAP``) or be an OSM
-school or kindergarten whose name matches the school's, and no other school may be pinned
-on that spot. Anything else stays hidden. Runs after ``website-pins`` (which takes exact
+it picks a candidate by number, and code checks the pick before anything is written
+(``check_pick``). The pick must always be on our street, its house number within
+``MAX_NUMBER_GAP`` of ours when both are known; an OSM feature must also be named as this
+school (the only one of that name, of the same kind, private or not alike); and no other
+school may be pinned on that spot. Anything else stays hidden. Runs after ``website-pins`` (which takes exact
 address matches without a model). Default is a dry run that writes nothing. Not in ``all``.
 """
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 from collections.abc import Awaitable, Callable, Sequence
@@ -26,9 +28,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.client import create_agent, extract_provider_cost_usd, get_model, get_model_costs
 from app.config import CRAWLER_USER_AGENT, get_settings
+from app.database import async_session_maker
 from app.models import School, SchoolLocation
+from app.models.pipeline_run import PipelineRun
 from app.scrapers.fee_pages import fee_http_client
 from app.scrapers.shared_site_check import level_family
+from app.scrapers.stages import common as stage_common
 from app.scrapers.stages.fees_agent import Spend, SpendCapReached
 from app.scrapers.stages.social_links import Fetch, _http_fetch
 from app.scrapers.stages.website_pins import (
@@ -44,7 +49,8 @@ from app.scrapers.stages.website_pins import (
 )
 from app.services.geocoding.bg.address_match import house_number, same_street
 from app.services.geocoding.bounds import get_city_bounds, point_in_bounds
-from app.services.provider_costs import execute_billable_request
+from app.services.pipeline_runs import finalize_pipeline_run, pipeline_run_heartbeat, start_pipeline_run
+from app.services.provider_costs import ProviderCostError, execute_billable_request, provider_cost_scope
 from app.utils.school_facts import SITE_ACCEPTED_STATUSES
 
 logger = logging.getLogger(__name__)
@@ -54,7 +60,8 @@ TIER = "pricing"  # cheap and follows instructions well (the fees and facts read
 DEFAULT_MAX_USD = 0.50
 OUTPUT_TOKENS_RESERVE = 400
 PIN_TAG = "coords_source=pin_agent"
-OVERPASS_URL = "https://overpass-api.de/api/interpreter"
+# Public Overpass servers, tried in turn: the main one often answers 504 when busy.
+OVERPASS_URLS = ("https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter")
 # How far from the location's street point OSM schools are looked for.
 SEARCH_RADIUS_M = 2000
 # A building on our street whose number is this close to ours counts as ours (OSM and
@@ -72,6 +79,13 @@ _GENERIC_NAME_WORDS = {
     "kindergarten", "international", "private", "the", "and", "for", "на", "по", "за", "и",
     "чоу", "чсу", "чдг", "дг", "оу", "су", "ну", "пг", "спг", "пмг", "чпг", "чну", "обу",
 }
+# A private institution's name: "ЧСУ", "ЧДГ", "Частна ...", "Private ...".
+_PRIVATE_ABBREVIATION_RE = re.compile(r"(?<![А-Яа-яA-Za-z])Ч[А-Я]{1,5}(?![А-Яа-я])")
+_PRIVATE_WORD_RE = re.compile(r"частн|private", re.IGNORECASE)
+
+
+def is_private_name(name: Optional[str]) -> bool:
+    return bool(_PRIVATE_ABBREVIATION_RE.search(name or "") or _PRIVATE_WORD_RE.search(name or ""))
 
 Lookup = Callable[[float, float], Awaitable[list[dict]]]
 Caller = Callable[[str, int], Awaitable["Pick"]]
@@ -138,6 +152,11 @@ def on_our_street(address: str, candidate_address: Optional[str]) -> bool:
     return ours is not None and theirs is not None and abs(ours - theirs) <= MAX_NUMBER_GAP
 
 
+def _numbers_far_apart(address: str, candidate_address: str) -> bool:
+    ours, theirs = _number(address), _number(candidate_address)
+    return ours is not None and theirs is not None and abs(ours - theirs) > MAX_NUMBER_GAP
+
+
 def check_pick(
     school_name: str,
     kindergarten: bool,
@@ -149,26 +168,33 @@ def check_pick(
 ) -> Optional[str]:
     """Why the picked candidate cannot be written, or None when it can.
 
-    A name match counts only when it is the one OSM feature of that name among the
-    candidates (a chain's branches share a name) and OSM gives it no other street."""
+    ``candidate.address`` is OSM's street (and number) for the point: its tags, else
+    Nominatim's nearest building. The street must always be ours. A website point also
+    needs a house number near ours. An OSM feature needs no number but must be named as
+    this school, the only feature of that name among the candidates (a chain's branches
+    share one), of the same kind, and private or not as the school is."""
     if not point_in_bounds(*candidate.point, bounds):
         return "outside the city"
     if not candidate.town_ok:
         return "another town"
     if any(_distance_m(candidate.point, pin) < OTHER_SCHOOL_M for pin in other_pins):
         return "another school is pinned there"
-    if on_our_street(address, candidate.address):
-        return None
-    if candidate.source == "osm_school" and (candidate.amenity == "kindergarten") != kindergarten:
+    if not candidate.address or not same_street(address, candidate.address):
+        return "not on our street"
+    if _numbers_far_apart(address, candidate.address):
+        return "another house number"
+    if candidate.source != "osm_school":
+        return None if on_our_street(address, candidate.address) else "no house number to compare"
+    if (candidate.amenity == "kindergarten") != kindergarten:
         return "OSM maps another kind of institution there"
-    if candidate.source == "osm_school" and name_matches(school_name, candidate.name):
-        namesakes = [c for c in candidates if c.source == "osm_school" and name_matches(school_name, c.name)]
-        if len(namesakes) > 1:
-            return "several OSM features have this name"
-        if candidate.address and not same_street(address, candidate.address):
-            return "OSM gives the named building another street"
-        return None
-    return "neither on our street nor named as this school"
+    if not name_matches(school_name, candidate.name):
+        return "OSM names another institution there"
+    if is_private_name(school_name) != is_private_name(candidate.name):
+        return "one name is a private institution's, the other not"
+    namesakes = [c for c in candidates if c.source == "osm_school" and name_matches(school_name, c.name)]
+    if len(namesakes) > 1:
+        return "several OSM features have this name"
+    return None
 
 
 def candidates_message(school_name: str, kind: str, address: str, candidates: Sequence[Candidate]) -> str:
@@ -182,8 +208,11 @@ def candidates_message(school_name: str, kind: str, address: str, candidates: Se
 
 
 def _osm_address(tags: dict) -> Optional[str]:
+    """OSM's street, with the number when tagged; a street without a number still counts."""
     street, number = tags.get("addr:street"), tags.get("addr:housenumber")
-    return nominatim_address({"road": street, "house_number": number})
+    if not street:
+        return None
+    return nominatim_address({"road": street, "house_number": number}) or f'ул. "{street}"'
 
 
 def osm_lookup(client: httpx.AsyncClient) -> Lookup:
@@ -194,9 +223,17 @@ def osm_lookup(client: httpx.AsyncClient) -> Lookup:
             f"[out:json][timeout:25];nwr(around:{SEARCH_RADIUS_M},{lat},{lng})"
             '[amenity~"^(school|kindergarten|college)$"][name];out center tags;'
         )
-        response = await client.post(OVERPASS_URL, data={"data": query}, timeout=40)
-        response.raise_for_status()
-        return response.json().get("elements", [])
+        error: Optional[Exception] = None
+        for attempt, url in enumerate([*OVERPASS_URLS, *OVERPASS_URLS]):  # each server twice
+            if attempt:
+                await asyncio.sleep(attempt)
+            try:
+                response = await client.post(url, data={"data": query}, timeout=40)
+                response.raise_for_status()
+                return response.json().get("elements", [])
+            except (httpx.HTTPError, ValueError) as exc:  # busy (429/504), down, or not JSON
+                error = exc
+        raise RuntimeError(f"no Overpass server answered: {error}")
 
     return lookup
 
@@ -228,10 +265,15 @@ def model_caller(spend: Spend) -> Caller:
             raise SpendCapReached(f"spent ${spend.spent_usd:.4f} of ${spend.cap_usd}")
         agent = create_agent(TIER, PROMPT, Pick, retries=1, model_settings={"temperature": 0})
         with spend.hold(estimate):
-            result = await execute_billable_request(
-                lambda: agent.run(message), model=get_model(TIER), school_id=school_id, stage=STAGE, timeout_seconds=90
-            )
-        spend.spent_usd += extract_provider_cost_usd(result)
+            try:
+                result = await execute_billable_request(
+                    lambda: agent.run(message), model=get_model(TIER), school_id=school_id, stage=STAGE, timeout_seconds=90
+                )
+            except Exception:
+                spend.spent_usd += estimate  # a failed call may still have been charged
+                raise
+        # No cost reported is not free: count the estimate (retries can cost more than one call).
+        spend.spent_usd += extract_provider_cost_usd(result) or estimate
         return result.output
 
     return call
@@ -277,6 +319,14 @@ async def place_location(
     if not pick.sure:
         return row | {"outcome": "not_sure"}
     chosen = candidates[pick.candidate - 1]
+    if chosen.address is None or (chosen.source == "osm_school" and _number(chosen.address) is None):
+        # OSM tags gave no street (or no number): take Nominatim's nearest building there.
+        parts = await reverse(*chosen.point)
+        found = nominatim_address(parts)
+        if found and (chosen.address is None or same_street(found, chosen.address)):
+            chosen.address = found
+        chosen.town_ok = chosen.town_ok and same_town(address, parts, town)
+        row["candidates"][pick.candidate - 1] = asdict(chosen)
     refused = check_pick(
         name, level_family(school.education_level) == "kindergarten", address, chosen, candidates, bounds, other_pins
     )
@@ -317,6 +367,7 @@ async def run_pin_agent(
             pins_by_school.setdefault(loc.school_id, []).append((float(loc.lat), float(loc.lng)))
 
     spend = Spend(max_usd)
+    injected_call = call is not None
     call = call or model_caller(spend)
     if reverse is None:
         from app.services.geocoding.nominatim import NominatimProvider
@@ -355,21 +406,66 @@ async def run_pin_agent(
                         school, location, website_points, reverse=reverse, lookup=lookup, call=call,
                         bounds=bounds, town=town, other_pins=others,
                     )
-                except SpendCapReached as exc:
+                except (SpendCapReached, ProviderCostError) as exc:
                     stopped = str(exc)
                     return
                 except Exception as exc:  # one location's lookups must not stop the run
                     logger.exception("pin-agent failed for location %s", location.id)
                     row |= {"outcome": "error", "note": str(exc)[:200]}
+                if row["outcome"] == "placed":  # later schools may not pick the same building
+                    pins_by_school.setdefault(school_id, []).append(row["point"])
                 results.append(row)
 
-    if fetch is None or lookup is None:
+    async def _with_sources() -> None:
+        if fetch is not None and lookup is not None:
+            await _run(fetch, lookup)
+            return
         from crawl4ai.utils import RobotsParser  # type: ignore
 
         async with fee_http_client() as client, httpx.AsyncClient(headers={"User-Agent": CRAWLER_USER_AGENT}) as osm:
             await _run(fetch or _http_fetch(client, RobotsParser()), lookup or osm_lookup(osm))
+
+    if injected_call:
+        await _with_sources()
     else:
-        await _run(fetch, lookup)
+        # Billed calls are reserved and attributed to a pipeline run, as in the other agents.
+        settings = get_settings()
+        run = await start_pipeline_run(
+            db, country=country, city=city, cli_stage=STAGE, config={"provider_cost_cap_usd": max_usd, "apply": apply}
+        )
+        run_id = run.id
+        error: Optional[str] = None
+        try:
+            with provider_cost_scope(
+                pipeline_run_id=run_id,
+                stage=STAGE,
+                cap_usd=max_usd,
+                request_reserve_usd=float(settings.provider_request_reserve_usd),
+            ):
+                async with pipeline_run_heartbeat(
+                    run_id,
+                    session_factory=async_session_maker,
+                    interval_seconds=float(settings.pipeline_heartbeat_interval_seconds),
+                ):
+                    await _with_sources()
+        except Exception as exc:
+            logger.exception("pin-agent run %s stopped", run_id)
+            if db.in_transaction():
+                await db.rollback()
+            error = stopped = f"run stopped: {str(exc)[:200]}"
+        failed = sum(r["outcome"] == "error" for r in results)
+        run = await db.get(PipelineRun, run_id, populate_existing=True)
+        await finalize_pipeline_run(
+            db,
+            run,
+            country=country,
+            city=city,
+            stage_summaries=[
+                stage_common.stage_summary(processed=len(results), succeeded=len(results) - failed, failed=failed)
+            ],
+            error_summary=error or stopped,
+        )
+        spend.spent_usd = max(spend.spent_usd, float(run.total_llm_cost_usd or 0))
 
     if apply:
         # Written after all the reading, each row locked only for its own short write.

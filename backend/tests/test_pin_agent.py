@@ -50,22 +50,50 @@ def _check(candidate, candidates=None, other_pins=()):
     return stage.check_pick("НПМГ Акад. Чакалов", False, "ул. Бигла 56", candidate, candidates or [candidate], SOFIA, other_pins)
 
 
-def test_check_pick():
+def test_check_pick_website_point():
     on_street = Candidate(point=NPMG_POINT, source="website_map", address='ул. "Бигла" № 52')
     assert _check(on_street) is None
     assert _check(Candidate(point=(41.0, 23.3), source="website_map", address='ул. "Бигла" № 52')) == "outside the city"
     assert _check(Candidate(point=NPMG_POINT, source="website_map", address='ул. "Бигла" № 52', town_ok=False)) == "another town"
     assert _check(on_street, other_pins=[(42.67050, 23.32980)]) == "another school is pinned there"
-    named = Candidate(point=(42.68, 23.33), source="osm_school", name="НПМГ Чакалов")
+    assert _check(Candidate(point=NPMG_POINT, source="website_map", address='ул. "Бигла" № 150')) == "another house number"
+    assert _check(Candidate(point=NPMG_POINT, source="website_map", address='ул. "Бигла"')) == "no house number to compare"
+    assert _check(Candidate(point=NPMG_POINT, source="website_map", address=None)) == "not on our street"
+
+
+def test_check_pick_osm_feature():
+    named = Candidate(point=(42.68, 23.33), source="osm_school", name="НПМГ Чакалов", address='ул. "Бигла"')
     assert _check(named) is None
-    twin = Candidate(point=(42.69, 23.34), source="osm_school", name="НПМГ Чакалов филиал")
+    # The street is always required, also for a well-named feature.
+    assert _check(Candidate(point=(42.68, 23.33), source="osm_school", name="НПМГ Чакалов")) == "not on our street"
+    elsewhere = Candidate(point=(42.68, 23.33), source="osm_school", name="НПМГ Чакалов", address='ул. "Казбек"')
+    assert _check(elsewhere) == "not on our street"
+    far_number = Candidate(point=(42.68, 23.33), source="osm_school", name="НПМГ Чакалов", address='ул. "Бигла" № 150')
+    assert _check(far_number) == "another house number"
+    twin = Candidate(point=(42.69, 23.34), source="osm_school", name="НПМГ Чакалов филиал", address='ул. "Бигла"')
     assert _check(named, [named, twin]) == "several OSM features have this name"
-    elsewhere = Candidate(point=(42.68, 23.33), source="osm_school", name="НПМГ Чакалов", address='ул. "Казбек" № 3')
-    assert _check(elsewhere) == "OSM gives the named building another street"
-    kindergarten = Candidate(point=(42.68, 23.33), source="osm_school", name="НПМГ Чакалов", amenity="kindergarten")
+    kindergarten = Candidate(
+        point=(42.68, 23.33), source="osm_school", name="НПМГ Чакалов", address='ул. "Бигла"', amenity="kindergarten"
+    )
     assert _check(kindergarten) == "OSM maps another kind of institution there"
-    website_named = Candidate(point=(42.68, 23.33), source="website_map", name="НПМГ", address='ул. "Казбек" № 3')
-    assert _check(website_named) == "neither on our street nor named as this school"
+    # Our street and number, but OSM names another institution there.
+    other = Candidate(point=(42.68, 23.33), source="osm_school", name="ДГ 12 Детски рай", address='ул. "Бигла" № 52')
+    assert _check(other) == "OSM names another institution there"
+
+
+def test_check_pick_private_and_state_names_differ():
+    state = Candidate(point=(42.68, 23.33), source="osm_school", name="СУ Васил Левски", address='ул. "Бигла"')
+    refused = stage.check_pick("ЧСУ Васил Левски", False, "ул. Бигла 56", state, [state], SOFIA, ())
+    assert refused == "one name is a private institution's, the other not"
+    private = Candidate(point=(42.68, 23.33), source="osm_school", name="Частно СУ Васил Левски", address='ул. "Бигла"')
+    assert stage.check_pick("ЧСУ Васил Левски", False, "ул. Бигла 56", private, [private], SOFIA, ()) is None
+
+
+def test_is_private_name():
+    assert stage.is_private_name("ЧДГ Детски свят")
+    assert stage.is_private_name("Частна детска градина")
+    assert not stage.is_private_name("НПМГ Акад. Л. Чакалов")
+    assert not stage.is_private_name("138 СУ Проф. Васил Златарски")
 
 
 def _school(**kwargs):
@@ -164,3 +192,49 @@ async def test_no_candidates_makes_no_model_call(db_session):
     stubs, messages = _stubs(Pick(candidate=1, sure=True, reason="x"))
     report = await stage.run_pin_agent(db_session, school_ids=[school.id], **stubs)
     assert report["outcomes"] == {"no_candidates": 1} and messages == []
+
+
+@pytest.mark.asyncio
+async def test_two_schools_cannot_take_the_same_building_in_one_run(db_session):
+    first, _ = await _seed(db_session)
+    second = _school(name_i18n={"bg": "ЧСУ Бигла", "en": "Bigla"})
+    db_session.add(second)
+    await db_session.flush()
+    db_session.add(SchoolLocation(
+        school_id=second.id, address_i18n={"bg": "ул. Бигла 54"}, lat=42.66, lng=23.31,
+        geocode_meta={"precision": "approximate"},
+    ))
+    await db_session.commit()
+    pages = {HOME: f'<a href="https://maps.google.com/?q={NPMG_POINT[0]},{NPMG_POINT[1]}">map</a>'}
+    stubs, _ = _stubs(
+        Pick(candidate=1, sure=True, reason="website point"),
+        pages=pages,
+        reverse={NPMG_POINT: {"road": "Бигла", "house_number": "52", "city": "София"}},
+    )
+    report = await stage.run_pin_agent(db_session, school_ids=[first.id, second.id], **stubs)
+    assert [r["outcome"] for r in report["results"]] == ["placed", "refused"]
+    assert report["results"][1]["refused"] == "another school is pinned there"
+
+
+def test_osm_street_without_number_is_kept():
+    [candidate] = stage.osm_candidates(
+        [{"type": "way", "center": {"lat": 42.6, "lon": 23.3}, "tags": {"name": "X", "addr:street": "Казбек"}}]
+    )
+    assert candidate.address == 'ул. "Казбек"'
+
+
+@pytest.mark.asyncio
+async def test_overpass_lookup_tries_the_next_server_when_one_is_busy():
+    import httpx
+
+    calls = []
+
+    def handler(request):
+        calls.append(str(request.url))
+        if len(calls) == 1:
+            return httpx.Response(504)
+        return httpx.Response(200, json={"elements": [{"type": "node", "lat": 1, "lon": 2}]})
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        assert await stage.osm_lookup(client)(42.6, 23.3) == [{"type": "node", "lat": 1, "lon": 2}]
+    assert calls == list(stage.OVERPASS_URLS)
