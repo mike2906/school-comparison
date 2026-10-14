@@ -36,7 +36,7 @@ PR or the thread). It is advice, not a vote: one round, then decide.
 
 Only on Mike's PC, in WSL (`~/sofiaschoolcomparison`), logged in to Mike's subscriptions,
 so a call costs nothing extra. Plain `codex` resolves to the current install; don't put
-another nvm Node's `bin` first on the PATH (an old Codex sits under Node 24). A cloud session reaches them through a Remote Control
-session on that PC. If the PC is offline, a big PR gets one `@codex review` on GitHub
+another nvm Node's `bin` first on the PATH (an old Codex sits under Node 24). A cloud
+session reaches them through a Remote Control session on that PC. If the PC is offline, a big PR gets one `@codex review` on GitHub
 instead; for a decision, carry on with reversible steps and get the second opinion before
 the step that is hard to undo, such as a merge that adds a migration.
