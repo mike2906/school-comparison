@@ -1,11 +1,14 @@
 import { useEffect, useId, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { catchmentSchoolFor, searchStreets } from '../../admission/catchments'
-import { loadAddresses } from '../../admission/loadCatchments'
+import { loadAddresses, loadDistricts } from '../../admission/loadCatchments'
 
-function streetLabel(street) {
-  const place = street.settlement === 'ГР.СОФИЯ' ? '' : ` (${street.settlement})`
-  return `${street.street}${place}`
+// The district tells apart streets with the same name (two УЛ.ЗЕМЛЯНЕ, in different
+// catchments), so it is always shown.
+function streetLabel(street, districtNames) {
+  const district = districtNames?.get(street.district)
+  const place = [street.settlement === 'ГР.СОФИЯ' ? null : street.settlement, district].filter(Boolean).join(', ')
+  return place ? `${street.street} (${place})` : street.street
 }
 
 /**
@@ -26,9 +29,15 @@ function AddressCheck({ onResult, catchments, ownIds = [] }) {
   const [street, setStreet] = useState(null)
   const [number, setNumber] = useState('')
 
+  const [districtNames, setDistrictNames] = useState(null)
+
   const start = () => {
     if (streets || failed) return
     loadAddresses().then(data => setStreets(data.streets), () => setFailed(true))
+    loadDistricts().then(
+      data => setDistrictNames(new Map(data.features.map(f => [f.properties.code, f.properties.name]))),
+      () => {}
+    )
   }
 
   const suggestions = streets && !street ? searchStreets(streets, query) : []
@@ -52,7 +61,7 @@ function AddressCheck({ onResult, catchments, ownIds = [] }) {
             id={`${id}-street`}
             type="text"
             autoComplete="off"
-            value={street ? streetLabel(street) : query}
+            value={street ? streetLabel(street, districtNames) : query}
             onFocus={start}
             onChange={event => {
               setStreet(null)
@@ -71,7 +80,7 @@ function AddressCheck({ onResult, catchments, ownIds = [] }) {
                     className="w-full px-3 py-2 text-left text-sm hover:bg-neutral-100"
                     onClick={() => setStreet(option)}
                   >
-                    {streetLabel(option)}
+                    {streetLabel(option, districtNames)}
                   </button>
                 </li>
               ))}
