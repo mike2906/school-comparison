@@ -1,0 +1,356 @@
+{
+ "content": null,
+ "error": null,
+ "itemCount": null,
+ "items": {
+  "dz": {
+   "id": 171,
+   "type": "ДГ (с яслени групи)",
+   "externalId": 1,
+   "name": "Червената шапчица",
+   "region": "Възраждане",
+   "address": "гр.София,  ул. \"Брегалница\", №48",
+   "infoForParents": "<p>stub</p>",
+   "currentGroups": [
+    {
+     "draft": 2024,
+     "label": "2-ра ясла, родени 2024 г.",
+     "groupId": 9006,
+     "listWaitingVisible": true,
+     "visibleRatings": [
+      443,
+      444,
+      445
+     ],
+     "spots": [
+      {
+       "zapisani": 22,
+       "svobodni": 0,
+       "nezapisani": 0,
+       "capacity": 22,
+       "uncommitted": 0,
+       "type": "general",
+       "label": "Общ ред"
+      },
+      {
+       "zapisani": 0,
+       "svobodni": 0,
+       "nezapisani": 0,
+       "capacity": 0,
+       "uncommitted": 0,
+       "type": "chronic",
+       "label": "Хронични заболявания"
+      },
+      {
+       "zapisani": 0,
+       "svobodni": 0,
+       "nezapisani": 0,
+       "capacity": 0,
+       "uncommitted": 0,
+       "type": "sop",
+       "label": "СОП"
+      },
+      {
+       "zapisani": 0,
+       "svobodni": -1,
+       "nezapisani": -1,
+       "capacity": -1,
+       "uncommitted": -1,
+       "type": "workgroup",
+       "label": "Работна група"
+      }
+     ],
+     "ratingHistory": [
+      {
+       "ratingId": 443,
+       "ratingDate": "2026-09-03T21:00:00.000+00:00"
+      },
+      {
+       "ratingId": 444,
+       "ratingDate": "2026-09-17T21:00:00.000+00:00"
+      },
+      {
+       "ratingId": 445,
+       "ratingDate": "2026-10-01T21:00:00.000+00:00"
+      }
+     ],
+     "countGroups": 1.0,
+     "comment": "",
+     "active": 1
+    },
+    {
+     "draft": 2023,
+     "label": "1-ва група, родени 2023 г.",
+     "groupId": 7471,
+     "listWaitingVisible": true,
+     "visibleRatings": [
+      443,
+      444,
+      445
+     ],
+     "spots": [
+      {
+       "zapisani": 25,
+       "svobodni": 1,
+       "nezapisani": 0,
+       "capacity": 26,
+       "uncommitted": 0,
+       "type": "general",
+       "label": "Общ ред"
+      },
+      {
+       "zapisani": 0,
+       "svobodni": 1,
+       "nezapisani": 0,
+       "capacity": 1,
+       "uncommitted": 0,
+       "type": "chronic",
+       "label": "Хронични заболявания"
+      },
+      {
+       "zapisani": 0,
+       "svobodni": 1,
+       "nezapisani": 0,
+       "capacity": 1,
+       "uncommitted": 0,
+       "type": "sop",
+       "label": "СОП"
+      },
+      {
+       "zapisani": 0,
+       "svobodni": -1,
+       "nezapisani": -1,
+       "capacity": -1,
+       "uncommitted": -1,
+       "type": "workgroup",
+       "label": "Работна група"
+      }
+     ],
+     "ratingHistory": [
+      {
+       "ratingId": 443,
+       "ratingDate": "2026-09-03T21:00:00.000+00:00"
+      },
+      {
+       "ratingId": 444,
+       "ratingDate": "2026-09-17T21:00:00.000+00:00"
+      },
+      {
+       "ratingId": 445,
+       "ratingDate": "2026-10-01T21:00:00.000+00:00"
+      }
+     ],
+     "countGroups": 1.0,
+     "comment": "",
+     "active": 1
+    },
+    {
+     "draft": 2022,
+     "label": "2-ра група, родени 2022 г.",
+     "groupId": 7008,
+     "listWaitingVisible": true,
+     "visibleRatings": [
+      443,
+      444,
+      445
+     ],
+     "spots": [
+      {
+       "zapisani": 26,
+       "svobodni": 2,
+       "nezapisani": 0,
+       "capacity": 28,
+       "uncommitted": 0,
+       "type": "general",
+       "label": "Общ ред"
+      },
+      {
+       "zapisani": 0,
+       "svobodni": 0,
+       "nezapisani": 0,
+       "capacity": 0,
+       "uncommitted": 0,
+       "type": "chronic",
+       "label": "Хронични заболявания"
+      },
+      {
+       "zapisani": 0,
+       "svobodni": 1,
+       "nezapisani": 0,
+       "capacity": 1,
+       "uncommitted": 0,
+       "type": "sop",
+       "label": "СОП"
+      },
+      {
+       "zapisani": 0,
+       "svobodni": -1,
+       "nezapisani": -1,
+       "capacity": -1,
+       "uncommitted": -1,
+       "type": "workgroup",
+       "label": "Работна група"
+      }
+     ],
+     "ratingHistory": [
+      {
+       "ratingId": 443,
+       "ratingDate": "2026-09-03T21:00:00.000+00:00"
+      },
+      {
+       "ratingId": 444,
+       "ratingDate": "2026-09-17T21:00:00.000+00:00"
+      },
+      {
+       "ratingId": 445,
+       "ratingDate": "2026-10-01T21:00:00.000+00:00"
+      }
+     ],
+     "countGroups": 1.0,
+     "comment": "",
+     "active": 1
+    },
+    {
+     "draft": 2021,
+     "label": "3-та група, родени 2021 г.",
+     "groupId": 6289,
+     "listWaitingVisible": true,
+     "visibleRatings": [
+      443,
+      444,
+      445
+     ],
+     "spots": [
+      {
+       "zapisani": 25,
+       "svobodni": 0,
+       "nezapisani": 0,
+       "capacity": 26,
+       "uncommitted": 0,
+       "type": "general",
+       "label": "Общ ред"
+      },
+      {
+       "zapisani": 0,
+       "svobodni": 0,
+       "nezapisani": 0,
+       "capacity": 0,
+       "uncommitted": 0,
+       "type": "chronic",
+       "label": "Хронични заболявания"
+      },
+      {
+       "zapisani": 1,
+       "svobodni": 0,
+       "nezapisani": 0,
+       "capacity": 1,
+       "uncommitted": 0,
+       "type": "sop",
+       "label": "СОП"
+      },
+      {
+       "zapisani": 0,
+       "svobodni": -1,
+       "nezapisani": -1,
+       "capacity": -1,
+       "uncommitted": -1,
+       "type": "workgroup",
+       "label": "Работна група"
+      }
+     ],
+     "ratingHistory": [
+      {
+       "ratingId": 443,
+       "ratingDate": "2026-09-03T21:00:00.000+00:00"
+      },
+      {
+       "ratingId": 444,
+       "ratingDate": "2026-09-17T21:00:00.000+00:00"
+      },
+      {
+       "ratingId": 445,
+       "ratingDate": "2026-10-01T21:00:00.000+00:00"
+      }
+     ],
+     "countGroups": 1.0,
+     "comment": "",
+     "active": 1
+    },
+    {
+     "draft": 2020,
+     "label": "Подготвителна група, родени 2020 г.",
+     "groupId": 6527,
+     "listWaitingVisible": true,
+     "visibleRatings": [
+      443,
+      444,
+      445
+     ],
+     "spots": [
+      {
+       "zapisani": 39,
+       "svobodni": 13,
+       "nezapisani": 0,
+       "capacity": 52,
+       "uncommitted": 0,
+       "type": "general",
+       "label": "Общ ред"
+      },
+      {
+       "zapisani": 0,
+       "svobodni": 0,
+       "nezapisani": 0,
+       "capacity": 0,
+       "uncommitted": 0,
+       "type": "chronic",
+       "label": "Хронични заболявания"
+      },
+      {
+       "zapisani": 2,
+       "svobodni": 0,
+       "nezapisani": 0,
+       "capacity": 2,
+       "uncommitted": 0,
+       "type": "sop",
+       "label": "СОП"
+      },
+      {
+       "zapisani": 0,
+       "svobodni": -1,
+       "nezapisani": -1,
+       "capacity": -1,
+       "uncommitted": -1,
+       "type": "workgroup",
+       "label": "Работна група"
+      }
+     ],
+     "ratingHistory": [
+      {
+       "ratingId": 443,
+       "ratingDate": "2026-09-03T21:00:00.000+00:00"
+      },
+      {
+       "ratingId": 444,
+       "ratingDate": "2026-09-17T21:00:00.000+00:00"
+      },
+      {
+       "ratingId": 445,
+       "ratingDate": "2026-10-01T21:00:00.000+00:00"
+      }
+     ],
+     "countGroups": 1.0,
+     "comment": "",
+     "active": 1
+    }
+   ],
+   "featureGroups": null,
+   "branches": null,
+   "nameFull": "ДГ №1 Червената шапчица (с яслени групи)",
+   "esriId": 171
+  },
+  "schoolYear": "2026/2027",
+  "schoolYearNext": "2027/2028"
+ },
+ "locked": false,
+ "noRatings": true
+}

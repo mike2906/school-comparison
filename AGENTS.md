@@ -49,8 +49,8 @@ memory and old notes can be stale, and a rule recorded in a plan was one decisio
 time: verify an item is still open before starting it, and update the plan in the same PR
 that finishes it.
 
-Planned, not yet built: admission points calculator, parent-facing NVO calculator, and
-admission-threshold tooling.
+Planned, not yet built: admission points calculator and parent-facing NVO calculator.
+Admission cut-offs are being captured (`docs/ADMISSION_CUTOFFS.md`).
 
 ---
 
@@ -131,8 +131,9 @@ Example: children born Dec 31, 2022 and Jan 1, 2022 both enter the same group in
 
 **State kindergartens:** Points system (Бал)
 - Parents get points based on: address, employment, siblings, etc.
-- Historical thresholds per round: `{"year": 2024, "age_group": "first", "rounds": [{"round": 1, "last_admitted_points": 8, "admitted_count": 35}]}`
-- This data comes from kg.sofia.bg
+- Round cut-offs (last admitted points per round, group and queue) are captured from
+  kg.sofia.bg into an archive branch, since the site keeps only the current school year:
+  `docs/ADMISSION_CUTOFFS.md`. Store aggregates only, never a child's line.
 
 **State gymnasiums:** NVO score formula
 - `score = NVO Bulgarian + NVO Math + Subject 1 + Subject 2`

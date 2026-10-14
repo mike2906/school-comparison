@@ -1,0 +1,16 @@
+{
+ "content": "<html>  <head>    <title></title>    <meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\">  </head>  <body>    <p><strong class='title_sub'>Столична община</strong></p>    <p class=\"page_title\"><strong>ДГ №1 Червената шапчица (с яслени групи)</strong></p>    <p class=\"page_title\"><strong>Набор 2023</strong></p>    <strong>КЛАСИРАНЕ  НА 04.09.2026</strong>    <br/><br/>    <br/>    <table width=\"720px\">        <tr><td colspan=\"5\"><p><span class='title_sub'><strong>Списък некласираните със СОП от 04.09.2026</strong></span></p></td></tr>        \r\n    </table>    <br/>    <table width=\"720px\">        <tr><td colspan=\"5\"><p><span class='title_sub'><strong>Списък некласираните с хронични заболявания от 04.09.2026</strong></span></p></td></tr>        \r\n    </table>    <br/>    <table width=\"720px\">        <tr><td colspan=\"5\"><p><span class='title_sub'><strong>Списък некласираните по общи критерии от 04.09.2026</strong></span></p></td></tr>        \r\n<tr><td>1.</td><td>XX</td><td>00000000</td><td>16.0</td><td> 11111111</td></tr>\r\n<tr><td>2.</td><td>XX</td><td>00000000</td><td>15.0</td><td></td></tr>\r\n<tr><td>3.</td><td>XX</td><td>00000000</td><td>13.0</td><td></td></tr>\r\n<tr><td>4.</td><td>XX</td><td>00000000</td><td>8.0</td><td></td></tr>\r\n<tr><td>5.</td><td>XX</td><td>00000000</td><td>6.0</td><td></td></tr>\r\n    </table>    <br/>    <p></p>  </body></html>",
+ "error": null,
+ "itemCount": null,
+ "items": {
+  "path": "/drbd/www/lists/ratings/r9/0443/171_7471_unrated.html"
+ },
+ "locked": false,
+ "updateAllowed": null,
+ "schoolLocked": false,
+ "noRatings": true,
+ "createdAt": "2026-10-14T08:40:10.227+00:00",
+ "success": null,
+ "token": null,
+ "groupAcceptingFrom": null
+}
