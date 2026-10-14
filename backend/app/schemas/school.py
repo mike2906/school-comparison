@@ -1,6 +1,6 @@
 from datetime import datetime
 from functools import cached_property
-from typing import Any, Literal, Optional, Union
+from typing import Any, ClassVar, Literal, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, computed_field, field_validator
 
@@ -20,6 +20,7 @@ from app.utils.i18n_resolver import resolve_address_i18n, resolve_name_i18n
 from app.utils.location_tags import semantic_location_tags
 from app.utils.school_attributes import build_display_attributes, publishable_display_i18n
 from app.utils.school_facts import SITE_ACCEPTED_STATUSES, publication_attributes, shown_school_facts
+from app.utils.social_links import shown_social_links
 from app.utils.website_data import (
     website_data_is_publishable,
     website_data_withheld_reasons,
@@ -109,8 +110,19 @@ class SchoolAdmissionInfo(BaseModel):
     historical_thresholds: list[dict[str, JsonValue]] = Field(default_factory=list)
     min_score: Optional[JsonValue] = None
     historical_min_scores: list[dict[str, JsonValue]] = Field(default_factory=list)
+    # Official round cut-offs, derived from the archive by scripts/import_cutoffs.py
+    # (docs/ADMISSION_CUTOFFS.md). Aggregates only; `cutoffs` stays off list responses.
+    cutoffs: list[dict[str, JsonValue]] = Field(default_factory=list)
+    cutoff_summary: list[dict[str, JsonValue]] = Field(default_factory=list)
+    kg_sofia_ids: list[str] = Field(default_factory=list)
+    admin_district: Optional[str] = None
+    catchment_ids: dict[str, list[str]] = Field(default_factory=dict)
 
     model_config = ConfigDict(extra="ignore")
+
+
+# Full round history is detail/compare-only: a school collects hundreds of rows a year.
+LIST_RESPONSE_ADMISSION_EXCLUDE = frozenset({"cutoffs"})
 
 
 class SchoolAttributesMixin(BaseModel):
@@ -170,12 +182,16 @@ class SchoolAttributesMixin(BaseModel):
             for locale, values in localized.items()
         }
 
+    # Keys of the public admission payload this response leaves out.
+    admission_exclude: ClassVar[frozenset[str]] = frozenset()
+
     @computed_field(return_type=Optional[dict[str, JsonValue]])
     @property
     def admission_info(self) -> Optional[dict[str, JsonValue]]:
         if not isinstance(self.raw_admission_info, dict):
             return None
-        public = SchoolAdmissionInfo.model_validate(self.raw_admission_info)
+        raw = {key: value for key, value in self.raw_admission_info.items() if key not in self.admission_exclude}
+        public = SchoolAdmissionInfo.model_validate(raw)
         payload = public.model_dump(mode="json", exclude_none=True, exclude_defaults=True)
         return payload or None
 
@@ -401,6 +417,12 @@ class FactLanguage(BaseModel):
     hours_per_week: Optional[int] = None
 
 
+class FactOpenDay(BaseModel):
+    date: str  # YYYY-MM-DD, upcoming only
+    register_url: Optional[str] = None  # a sign-up link found on the school's pages
+    source_url: Optional[str] = None  # the page that announces it
+
+
 class FactsAtAGlance(BaseModel):
     """The labels of a school's shown facts summed up (``app.utils.school_facts.at_a_glance``)."""
 
@@ -414,6 +436,7 @@ class FactsAtAGlance(BaseModel):
     languages: list[FactLanguage] = []
     bus_areas: list[BilingualName] = []
     special_needs_support: Optional[bool] = None
+    open_days: list[FactOpenDay] = []
 
 
 class SchoolFacts(BaseModel):
@@ -422,6 +445,13 @@ class SchoolFacts(BaseModel):
     read_at: str
     facts: list[SchoolFact]
     at_a_glance: FactsAtAGlance = Field(default_factory=FactsAtAGlance)
+
+
+class SocialLinks(BaseModel):
+    """The school's own Facebook page and Instagram profile, as its website links them."""
+
+    facebook: Optional[str] = None
+    instagram: Optional[str] = None
 
 
 class FeeDiscount(BaseModel):
@@ -463,6 +493,13 @@ class SchoolResponse(SchoolBase, SchoolPricingMixin):
         shown = shown_school_facts(self.raw_attributes, self.raw_scrape_status, self.website_url)
         facts = [fact for fact in (shown or {}).get("facts", []) if fact["rank"] != "minor"]
         return SchoolFacts.model_validate(shown | {"facts": facts}) if facts else None
+
+    @computed_field(return_type=Optional[SocialLinks])
+    @property
+    def social_links(self) -> Optional[SocialLinks]:
+        # ``shown_social_links`` is the gate (withholding marker, accepted website, same site).
+        shown = shown_social_links(self.raw_attributes, self.raw_scrape_status, self.website_url)
+        return SocialLinks.model_validate(shown) if shown else None
 
     @computed_field(return_type=list[FeeDiscount])
     @property
@@ -525,6 +562,8 @@ class SchoolDetailResponse(SchoolResponse):
 
 
 class SchoolListResponse(SchoolPricingMixin):
+    admission_exclude: ClassVar[frozenset[str]] = LIST_RESPONSE_ADMISSION_EXCLUDE
+
     id: int
     country_code: str = "bg"
     name_i18n: dict

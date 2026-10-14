@@ -141,6 +141,8 @@ def _labels(fact: Mapping[str, Any]) -> dict[str, Any]:
         else None,
         "applications_open": _date(fact.get("applications_open")),
         "applications_close": _date(fact.get("applications_close")),
+        "open_days": sorted({d for d in map(_date, _as_list(fact.get("open_days"))) if d})[:6],
+        "register_url": _url(fact.get("register_url")),
         "bus_areas": _bilingual(fact.get("bus_areas"), 20),
         "special_needs_support": True if fact.get("special_needs_support") is True else None,
     }
@@ -150,6 +152,12 @@ def _grade_to(fact: Mapping[str, Any]) -> Optional[int]:
     """The last grade of a stated range, kept only after a valid first grade."""
     first, last = _int_in(fact.get("admission_grade"), 0, 12), _int_in(fact.get("admission_grade_to"), 0, 12)
     return last if first is not None and last is not None and last > first else None
+
+
+def _url(value: Any) -> Optional[str]:
+    if isinstance(value, str) and value.startswith(("http://", "https://")) and len(value) <= 500:
+        return value
+    return None
 
 
 def _as_list(value: Any) -> list[str]:
@@ -169,7 +177,8 @@ def at_a_glance(
     Lists are joined; admission rows are merged per grade; the highest grade is the
     largest stated. The first application window that has not closed is shown (a window
     with only an opening date for ``OPEN_ONLY_WINDOW_DAYS`` after it opens). Full / waiting
-    list places show only for ``PLACES_SHOWN_DAYS`` after the read. Class size is left to
+    list places show only for ``PLACES_SHOWN_DAYS`` after the read; open days only until
+    their date, the next four at most. Class size is left to
     the school's own ``class_size`` field, which applies the curated value and its gate."""
     today = today or datetime.date.today()
 
@@ -222,6 +231,15 @@ def at_a_glance(
         for item in fact.get("languages") or []:
             if all(row["language"] != item["language"] for row in languages):
                 languages.append(item)
+    open_days: dict[str, dict[str, Any]] = {}
+    for fact in facts:
+        for day in fact.get("open_days") or []:
+            if datetime.date.fromisoformat(day) >= today and day not in open_days:
+                open_days[day] = {
+                    "date": day,
+                    "register_url": fact.get("register_url"),
+                    "source_url": fact.get("source_url"),
+                }
     grades = [fact["highest_grade"] for fact in facts if fact.get("highest_grade") is not None]
     return {
         "admission": admission,
@@ -234,6 +252,7 @@ def at_a_glance(
         "languages": languages,
         "bus_areas": bus_areas,
         "special_needs_support": first("special_needs_support"),
+        "open_days": [open_days[day] for day in sorted(open_days)][:4],
     }
 
 

@@ -1,0 +1,79 @@
+name: Capture admission cut-offs
+
+# Saves each Sofia ИСОДЗ round (kindergarten, nursery, ПГУ, first grade) as aggregate rows
+# on the cutoff-data branch. kg.sofia.bg keeps only the current school year online, so a
+# round missed here is gone. Lists come out at about 17:00 Sofia time on round days; the
+# 03:15 run finishes a scan that hit its request budget. It also archives any РУО 8th-grade
+# min/max file listed in ruo_sofia_min_max_sources.json and not yet captured.
+# Docs: docs/ADMISSION_CUTOFFS.md
+on:
+  schedule:
+    - cron: "15 3,16,21 * * *"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Scan every institution even if no round was published
+        type: boolean
+        default: false
+
+concurrency:
+  group: capture-cutoffs
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  capture:
+    name: ИСОДЗ rounds
+    runs-on: ubuntu-24.04
+    timeout-minutes: 110
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v7
+
+      - name: Check out the archive
+        uses: actions/checkout@v7
+        with:
+          ref: cutoff-data
+          path: cutoff-archive
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v8.3.2
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install
+        working-directory: backend
+        run: uv sync --locked
+
+      - name: Capture
+        working-directory: backend
+        timeout-minutes: 95
+        run: >-
+          uv run python -m scripts.capture_isodz_cutoffs
+          --archive ../cutoff-archive
+          --max-requests 4500
+          ${{ inputs.force && '--force' || '' }}
+
+      - name: Capture 8th-grade min/max files
+        if: always()
+        working-directory: backend
+        timeout-minutes: 10
+        run: uv run python -m scripts.capture_ruo_min_max --archive ../cutoff-archive
+
+      - name: Commit the archive
+        if: always()
+        working-directory: cutoff-archive
+        run: |
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No new rounds."
+            exit 0
+          fi
+          git -c user.name="cut-off capture" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -q -m "Capture admission rounds $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push origin HEAD:cutoff-data

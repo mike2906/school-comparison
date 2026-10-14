@@ -35,7 +35,8 @@ some picks were trivia, yearly counts go stale, the paragraph only restated the 
    and the grade or range of grades it is for,
    places full or waiting list for a grade, the highest grade taught, curricula
    (`CURRICULA`) and whether the diploma is recognised, application open/close dates, bus
-   areas by district, and special-needs support.
+   areas by district, special-needs support, and open-day dates with a sign-up link (kept only
+   when code finds that link on a page read).
 3. **Check.** Code keeps a fact only if its quote is on a page read (markup and quote marks
    ignored). A second call on the same tier confirms each quote states the whole fact and
    its labels, and grades it: `key` (what parents choose on: programme, languages, hours,
@@ -61,7 +62,7 @@ used when no curated one exists (before the old extraction's). The response also
 `school_facts.at_a_glance` (`at_a_glance` in `app/utils/school_facts.py`): admissions per
 grade or range (a fact naming no grade stays its own row), places (only for 180 days after the read), the highest grade stated, curricula,
 diploma, the first application window not yet closed, instruction languages, language
-hours, bus areas and support, summed from the shown (not minor) facts and shown above the
+hours, bus areas, support and the next open days (until their date), summed from the shown (not minor) facts and shown above the
 fact list and as compare rows. Facts carry their own checks, so they do not wait for a Stage 6 report, but a website-data withholding marker
 (failed URL check, shared site) hides them and their labels, and so does a change of
 website (host and path) or a website URL validation has not accepted (`pending`,
@@ -147,6 +148,19 @@ usually among them) instead of the old navigation. They must be exact, a wrong p
 worse than none, and most are already stored (Sofia, 2026-10-13: phones for 208 of 214
 state, 60 of 74 private, 296 of 329 kindergartens). So: same crawl, separate step, keep
 the stored value unless the new one passes the same format checks.
+
+**Social links** (2026-10-14): the `social-links` stage (`app/scrapers/stages/social_links.py`,
+no model calls) reads the home page, and the contact page when the home page links neither
+network, and stores the school's Facebook page and Instagram profile in
+`attributes["social_links"]`. Share buttons, groups, events and posts are not a page; a page
+linked from two different schools' websites (a web designer's) is dropped. The detail page
+links them; `app/utils/social_links.py` `shown_social_links` gates them like the facts. A
+school with no website gets no link: website discovery keeps the pages search finds in
+`attributes["social_link_candidates"]` (never shown; a name match is often another school's
+or a fan page) until a check such as the page's phone or address against the registry
+confirms one. Reading
+posts (open days announced only on Facebook) is not built; options and the recommendation are
+in the project's `social-media/research.md`.
 
 **Bad website URLs** surface here: 22seu.org (school 395) is a parked domain that
 redirects to a holding page. A read that finds only a redirect stub should send the

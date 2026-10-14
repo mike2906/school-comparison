@@ -37,6 +37,7 @@ import { parseCoordinate } from '../../utils/coordinates'
 import SchoolActions from './SchoolActions'
 import TagList from './TagList'
 import PhoneLinks from './PhoneLinks'
+import SocialLinks from './SocialLinks'
 
 // The chart library is large and only schools with exam results need it. If the chunk
 // cannot be loaded (a tab that outlived a deploy), the page stays usable without the chart.
@@ -399,6 +400,10 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
                 {t('schools.website')}
               </a>
             )}
+            <SocialLinks
+              links={school.social_links}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-primary-50 text-primary-700 rounded-lg hover:bg-primary-100 transition-colors border border-primary-200"
+            />
             <PhoneLinks
               phone={primaryLocation?.phone}
               className="inline-flex items-center gap-2 px-4 py-2 bg-neutral-50 text-neutral-700 rounded-lg hover:bg-neutral-100 transition-colors border border-neutral-200"

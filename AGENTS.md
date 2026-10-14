@@ -49,8 +49,8 @@ memory and old notes can be stale, and a rule recorded in a plan was one decisio
 time: verify an item is still open before starting it, and update the plan in the same PR
 that finishes it.
 
-Planned, not yet built: admission points calculator, parent-facing NVO calculator, and
-admission-threshold tooling.
+Planned, not yet built: admission points calculator and parent-facing NVO calculator.
+Admission cut-offs are being captured (`docs/ADMISSION_CUTOFFS.md`).
 
 ---
 
@@ -142,7 +142,8 @@ grades as points (6 = 50, 5 = 39, 4 = 26, 3 = 15), max 500; each class sets its 
 **Fifth grade, private schools:** no common system.
 
 Cut-offs (last admitted points or score per round) come from kg.sofia.bg and RUO
-snapshots, which keep no history of their own; see `docs/ADMISSION_CUTOFFS.md`.
+snapshots, which keep no history of their own; see `docs/ADMISSION_CUTOFFS.md`. Store
+aggregates only, never a child's line.
 
 ### Shifts (смени)
 Many state schools run two shifts:

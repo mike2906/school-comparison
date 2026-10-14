@@ -1,0 +1,117 @@
+{
+ "content": null,
+ "error": null,
+ "itemCount": null,
+ "items": {
+  "dz": {
+   "id": 629,
+   "type": "СУ",
+   "externalId": 1,
+   "name": "Пенчо П. Славейков",
+   "region": "Оборище",
+   "address": "гр.София,  ул. \"Стара планина\", №11",
+   "infoForParents": "<p>stub</p>",
+   "currentGroups": null,
+   "featureGroups": [
+    {
+     "draft": 2019,
+     "label": "1-ви клас, родени 2019 г.",
+     "groupId": 9463,
+     "listWaitingVisible": true,
+     "visibleRatings": [
+      31,
+      32,
+      33,
+      34,
+      35,
+      36
+     ],
+     "spots": [
+      {
+       "zapisani": 41,
+       "svobodni": 3,
+       "nezapisani": 0,
+       "capacity": 44,
+       "uncommitted": 0,
+       "type": "general",
+       "label": "Общ ред"
+      },
+      {
+       "zapisani": 0,
+       "svobodni": 0,
+       "nezapisani": 0,
+       "capacity": 0,
+       "uncommitted": 0,
+       "type": "chronic",
+       "label": "Хронични заболявания"
+      },
+      {
+       "zapisani": 0,
+       "svobodni": 0,
+       "nezapisani": 0,
+       "capacity": 0,
+       "uncommitted": 0,
+       "type": "sop",
+       "label": "СОП"
+      },
+      {
+       "zapisani": 0,
+       "svobodni": -1,
+       "nezapisani": -1,
+       "capacity": -1,
+       "uncommitted": -1,
+       "type": "workgroup",
+       "label": "Работна група"
+      }
+     ],
+     "ratingHistory": [
+      {
+       "ratingId": 31,
+       "ratingDate": "2026-06-01T21:00:00.000+00:00"
+      },
+      {
+       "ratingId": 32,
+       "ratingDate": "2026-06-08T21:00:00.000+00:00"
+      },
+      {
+       "ratingId": 33,
+       "ratingDate": "2026-06-15T21:00:00.000+00:00"
+      },
+      {
+       "ratingId": 34,
+       "ratingDate": "2026-06-22T21:00:00.000+00:00"
+      },
+      {
+       "ratingId": 35,
+       "ratingDate": "2026-09-01T21:00:00.000+00:00"
+      },
+      {
+       "ratingId": 36,
+       "ratingDate": "2026-09-08T21:00:00.000+00:00"
+      }
+     ],
+     "countGroups": 1.0,
+     "comment": "",
+     "active": 1
+    }
+   ],
+   "branches": [
+    {
+     "id": 522,
+     "name": {
+      "publicName": "1. СУ \"Пенчо П. Славейков\" (полудневна организация)",
+      "publicType": "ПГУ"
+     },
+     "region": "Оборище",
+     "esriId": 680
+    }
+   ],
+   "nameFull": "1. СУ \"Пенчо П. Славейков\"",
+   "esriId": 616
+  },
+  "schoolYear": "2026/2027",
+  "schoolYearNext": "2027/2028"
+ },
+ "locked": false,
+ "noRatings": true
+}

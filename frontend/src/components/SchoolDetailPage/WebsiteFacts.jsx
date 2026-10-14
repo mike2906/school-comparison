@@ -31,7 +31,17 @@ function WebsiteFacts({ school }) {
               <dt className="text-xs font-medium uppercase tracking-wide text-neutral-500 pt-1">
                 {t(`schoolFacts.glance.${line.key}`)}
               </dt>
-              <dd className="text-neutral-800">{line.value}</dd>
+              <dd className="text-neutral-800">
+                {line.value}
+                {line.href && (
+                  <>
+                    {' '}
+                    <a href={line.href} target="_blank" rel="noopener noreferrer nofollow" className="text-primary-700 underline underline-offset-2">
+                      {line.linkText}
+                    </a>
+                  </>
+                )}
+              </dd>
             </div>
           ))}
         </dl>

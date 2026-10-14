@@ -66,7 +66,7 @@ export function atAGlanceLines(school, language, t) {
   const forGrades = (row, what) => (grades(row) ? `${grades(row)}: ${what}` : what)
   const date = value => (value ? new Date(`${value}T00:00:00`).toLocaleDateString(language, { day: 'numeric', month: 'long', year: 'numeric' }) : '')
   const lines = []
-  const add = (key, value) => value && lines.push({ key, value })
+  const add = (key, value, link) => value && lines.push(link ? { key, value, ...link } : { key, value })
 
   add('admission', (glance.admission || []).map(row => {
     const types = (row.types || []).map(type => t(`schoolFacts.glance.admissionTypes.${type}`)).join(', ')
@@ -98,6 +98,11 @@ export function atAGlanceLines(school, language, t) {
     ].filter(Boolean).join(', ')
     return extra ? `${languageLabel(item.language, t)} (${extra})` : languageLabel(item.language, t)
   }).join(', '))
+  const openDays = glance.open_days || []
+  const signUp = openDays.find(day => day.register_url)
+  add('openDays', openDays.map(day => date(day.date)).join(', '), signUp
+    ? { href: signUp.register_url, linkText: t('schoolFacts.glance.register') }
+    : openDays[0]?.source_url && { href: openDays[0].source_url, linkText: t('schoolFacts.source') })
   add('bus', (glance.bus_areas || []).map(area => name(area, language)).filter(Boolean).join(', '))
   add('support', glance.special_needs_support === true && t('schoolFacts.glance.yes'))
   return lines
@@ -111,5 +116,5 @@ export function atAGlanceKeysIn(schools, language, t) {
 
 const GLANCE_KEYS = [
   'admission', 'places', 'applications', 'highestGrade', 'curricula', 'diploma',
-  'instruction', 'languages', 'bus', 'support',
+  'openDays', 'instruction', 'languages', 'bus', 'support',
 ]

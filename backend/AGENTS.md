@@ -73,6 +73,10 @@ not wait for a Stage 6 report, because most schools they are for were never extr
 `attributes_for_publication` always drops them; `publication_attributes` adds the shown ones,
 whose labels then join `filter_tags`, `language_focus` and `class_size`.
 
+Social links (`attributes.social_links`, `social-links` stage) pass the same three checks
+through `app/utils/social_links.py` `shown_social_links` and reach the detail and compare
+responses as `social_links`.
+
 `app/utils/display_gating.py` drops display fields, pricing rows, and summaries flagged by
 error-level issues / actionable spot-check discrepancies, plus pricing rows with no
 `source_url` or confidence below `PRICING_CONFIDENCE_FLOOR`. When adding a response field, go
