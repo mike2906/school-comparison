@@ -47,7 +47,7 @@ from app.scrapers.stages.website_pins import (
     same_town,
     write_pin,
 )
-from app.services.geocoding.bg.address_match import house_number, same_street
+from app.services.geocoding.bg.address_match import house_number, same_building, same_street
 from app.services.geocoding.bounds import get_city_bounds, point_in_bounds
 from app.services.pipeline_runs import finalize_pipeline_run, pipeline_run_heartbeat, start_pipeline_run
 from app.services.provider_costs import ProviderCostError, execute_billable_request, provider_cost_scope
@@ -78,10 +78,18 @@ _GENERIC_NAME_WORDS = {
     "школа", "школо", "център", "софия", "столична", "national", "school",
     "kindergarten", "international", "private", "the", "and", "for", "на", "по", "за", "и",
     "чоу", "чсу", "чдг", "дг", "оу", "су", "ну", "пг", "спг", "пмг", "чпг", "чну", "обу",
+    "еоод", "оод", "ад", "език", "езиков", "езици",
 }
+# Words that say what kind of institution a name is ("СУ", "СПГЕ", "училище", "ЧДГ").
+_TYPE_ABBREVIATION_RE = re.compile(r"(?<![А-Яа-яA-Za-z])[А-Я]{0,4}(?:У|Г|ГЕ|ДГ)(?![А-Яа-я])")
+_TYPE_WORD_RE = re.compile(r"училищ|гимназ|градин|school|kindergarten|college", re.IGNORECASE)
 # A private institution's name: "ЧСУ", "ЧДГ", "Частна ...", "Private ...".
 _PRIVATE_ABBREVIATION_RE = re.compile(r"(?<![А-Яа-яA-Za-z])Ч[А-Я]{1,5}(?![А-Яа-я])")
 _PRIVATE_WORD_RE = re.compile(r"частн|private", re.IGNORECASE)
+
+
+def names_a_type(name: Optional[str]) -> bool:
+    return bool(_TYPE_ABBREVIATION_RE.search(name or "") or _TYPE_WORD_RE.search(name or ""))
 
 
 def is_private_name(name: Optional[str]) -> bool:
@@ -123,13 +131,15 @@ the evidence is clear. Never invent a candidate."""
 
 
 def _words(text: str) -> set[str]:
+    """Distinctive name words, cut to five letters so word forms agree ("немски", "немско")."""
     words = re.findall(r"[а-яa-z]+|\d+", (text or "").casefold().replace("ё", "е"))
-    return {w for w in words if (w.isdigit() or len(w) >= 3) and w not in _GENERIC_NAME_WORDS}
+    return {w if w.isdigit() else w[:5] for w in words if (w.isdigit() or len(w) >= 3) and w not in _GENERIC_NAME_WORDS}
 
 
-def name_matches(school_name: str, osm_name: Optional[str]) -> bool:
+def name_matches(school_name: str, osm_name: Optional[str], *, at_our_number: bool = False) -> bool:
     """Whether an OSM name is this institution: the same number when the school name has
-    one, and otherwise two shared distinctive name words (one when ours has only one)."""
+    one, and otherwise two shared distinctive name words (one when ours has only one, or
+    when OSM puts the feature at our exact street and number)."""
     ours, theirs = _words(school_name), _words(osm_name or "")
     numbers = {w for w in ours if w.isdigit()}
     if numbers:
@@ -137,7 +147,7 @@ def name_matches(school_name: str, osm_name: Optional[str]) -> bool:
         return bool(numbers & theirs) and (not others or bool(others & theirs))
     if theirs and theirs <= _acronyms(school_name):  # OSM names it only by our acronym ("ЕСПА")
         return True
-    return bool(ours) and len(ours & theirs) >= min(2, len(ours))
+    return bool(ours) and len(ours & theirs) >= (1 if at_our_number else min(2, len(ours)))
 
 
 def _acronyms(name: str) -> set[str]:
@@ -171,7 +181,7 @@ def check_pick(
     candidate: Candidate,
     candidates: Sequence[Candidate],
     bounds: dict[str, float],
-    other_pins: Sequence[tuple[float, float]],
+    other_pins: Sequence[tuple[tuple[float, float], str]],
 ) -> Optional[str]:
     """Why the picked candidate cannot be written, or None when it can.
 
@@ -184,7 +194,10 @@ def check_pick(
         return "outside the city"
     if not candidate.town_ok:
         return "another town"
-    if any(_distance_m(candidate.point, pin) < OTHER_SCHOOL_M for pin in other_pins):
+    if any(
+        _distance_m(candidate.point, pin) < OTHER_SCHOOL_M and not same_building(address, pin_address)
+        for pin, pin_address in other_pins
+    ):  # schools sharing one building (the same address) may share its pin
         return "another school is pinned there"
     if not candidate.address or not same_street(address, candidate.address):
         return "not on our street"
@@ -194,9 +207,11 @@ def check_pick(
         return None if on_our_street(address, candidate.address) else "no house number to compare"
     if (candidate.amenity == "kindergarten") != kindergarten:
         return "OSM maps another kind of institution there"
-    if not name_matches(school_name, candidate.name):
+    at_our_number = _number(address) is not None and _number(address) == _number(candidate.address)
+    if not name_matches(school_name, candidate.name, at_our_number=at_our_number):
         return "OSM names another institution there"
-    if is_private_name(school_name) != is_private_name(candidate.name):
+    # A bare name ("ЕСПА") says nothing about private or state.
+    if names_a_type(candidate.name) and is_private_name(school_name) != is_private_name(candidate.name):
         return "one name is a private institution's, the other not"
     namesakes = [c for c in candidates if c.source == "osm_school" and name_matches(school_name, c.name)]
     if len(namesakes) > 1:
@@ -322,7 +337,7 @@ async def place_location(
     call: Caller,
     bounds: dict[str, float],
     town: str,
-    other_pins: Sequence[tuple[float, float]],
+    other_pins: Sequence[tuple[tuple[float, float], str]],
 ) -> dict[str, Any]:
     """The report row for one location; ``point`` is set when the pick passed the checks."""
     address = _address(location)
@@ -394,10 +409,10 @@ async def run_pin_agent(
     pinned = (
         await db.execute(select(SchoolLocation).where(SchoolLocation.lat.isnot(None), SchoolLocation.lng.isnot(None)))
     ).scalars().all()
-    pins_by_school: dict[int, list[tuple[float, float]]] = {}
+    pins_by_school: dict[int, list[tuple[tuple[float, float], str]]] = {}
     for loc in pinned:
         if not needs_pin(loc):
-            pins_by_school.setdefault(loc.school_id, []).append((float(loc.lat), float(loc.lng)))
+            pins_by_school.setdefault(loc.school_id, []).append(((float(loc.lat), float(loc.lng)), _address(loc)))
 
     spend = Spend(max_usd)
     injected_call = call is not None
@@ -447,7 +462,7 @@ async def run_pin_agent(
                     logger.exception("pin-agent failed for location %s", location.id)
                     row |= {"outcome": "error", "note": str(exc)[:200]}
                 if row["outcome"] == "placed":  # later schools may not pick the same building
-                    pins_by_school.setdefault(school_id, []).append(row["point"])
+                    pins_by_school.setdefault(school_id, []).append((row["point"], row["address"]))
                 results.append(row)
 
     async def _with_sources() -> None:

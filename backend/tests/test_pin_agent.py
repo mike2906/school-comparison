@@ -28,6 +28,7 @@ NPMG_POINT = (42.67046, 23.32978)
         ("Частно училище за ранно чуждоезиково обучение ЕСПА", "ЕСПА", True),
         ("ЧСУ Васил Левски", "ЧСУ Христо Ботев", False),
         ("СПГЕ Джон Атанасов", "СПГЕ Попов", False),
+        ("Частно основно училище Света София ЕООД", "ЧОУ „Света София“", True),
         ("ЧДГ Детски свят", "Частна детска градина Детски свят", True),
     ],
 )
@@ -58,7 +59,9 @@ def test_check_pick_website_point():
     assert _check(on_street) is None
     assert _check(Candidate(point=(41.0, 23.3), source="website_map", address='ул. "Бигла" № 52')) == "outside the city"
     assert _check(Candidate(point=NPMG_POINT, source="website_map", address='ул. "Бигла" № 52', town_ok=False)) == "another town"
-    assert _check(on_street, other_pins=[(42.67050, 23.32980)]) == "another school is pinned there"
+    assert _check(on_street, other_pins=[((42.67050, 23.32980), "ул. Казбек 3")]) == "another school is pinned there"
+    # Schools sharing one building may share its pin.
+    assert _check(on_street, other_pins=[((42.67050, 23.32980), 'ул. "Бигла" № 56')]) is None
     assert _check(Candidate(point=NPMG_POINT, source="website_map", address='ул. "Бигла" № 150')) == "another house number"
     assert _check(Candidate(point=NPMG_POINT, source="website_map", address='ул. "Бигла"')) == "no house number to compare"
     assert _check(Candidate(point=NPMG_POINT, source="website_map", address=None)) == "not on our street"
@@ -90,6 +93,20 @@ def test_check_pick_private_and_state_names_differ():
     assert refused == "one name is a private institution's, the other not"
     private = Candidate(point=(42.68, 23.33), source="osm_school", name="Частно СУ Васил Левски", address='ул. "Бигла"')
     assert stage.check_pick("ЧСУ Васил Левски", False, "ул. Бигла 56", private, [private], SOFIA, ()) is None
+
+
+def test_osm_name_at_our_exact_number_needs_one_shared_word():
+    veda = Candidate(point=(42.68, 23.33), source="osm_school", name="Частно немско училище „Веда“", address='ул. "Бигла" № 56')
+    assert stage.check_pick("ЧСУ с немски език Веда", False, "ул. Бигла 56", veda, [veda], SOFIA, ()) is None
+    nearby = Candidate(point=(42.68, 23.33), source="osm_school", name="Частно училище „Веда“", address='ул. "Бигла" № 54')
+    assert stage.check_pick("ЧСУ Веда Ломоносов", False, "ул. Бигла 56", nearby, [nearby], SOFIA, ()) == (
+        "OSM names another institution there"
+    )
+
+
+def test_a_bare_osm_name_is_not_called_state():
+    espa = Candidate(point=(42.68, 23.33), source="osm_school", name="ЕСПА", address='ул. "Бигла"')
+    assert stage.check_pick("Частно училище ЕСПА", False, "ул. Бигла 56", espa, [espa], SOFIA, ()) is None
 
 
 def test_is_private_name():
