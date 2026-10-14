@@ -135,7 +135,15 @@ async def run(campaign: str, points_path: Path | None, apply: bool) -> dict[str,
         )).scalars())
         candidates = [s for s in schools if s.education_level != "kindergarten"]
         by_school, conflicts = match_schools(candidates, points)
-        changed = [s for s in schools if apply_ids(s, by_school.get(s.id, []))]
+        changed = []
+        for school in schools:
+            ids = by_school.get(school.id, [])
+            if ((school.admission_info or {}).get("catchment_ids") or {}).get(PROVIDER, []) == ids:
+                continue
+            # Other stages write admission_info too: re-read it under a row lock first.
+            await db.refresh(school, attribute_names=["admission_info"], with_for_update=True)
+            if apply_ids(school, ids):
+                changed.append(school)
         if apply:
             await db.commit()
         else:
