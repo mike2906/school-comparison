@@ -28,7 +28,7 @@ from app.scrapers.stages.social_links import Fetch, _contact_page, _http_fetch, 
 from app.services.geocoding.base import GeocodingResult
 from app.services.geocoding.bg.address_match import same_building, same_house_number
 from app.services.geocoding.bounds import get_city_bounds, point_in_bounds
-from app.services.geocoding.write_gate import apply_geocode_result_to_location, has_pinned_point
+from app.services.geocoding.write_gate import OFFICIAL_COORDS_TAG, apply_geocode_result_to_location, has_pinned_point
 from app.utils.display_gating import UNVERIFIED_PIN_PRECISION
 from app.utils.school_facts import SITE_ACCEPTED_STATUSES
 
@@ -43,7 +43,7 @@ SAME_POINT_METRES = 50
 # Google embeds carry the pin as !3d<lat>!4d<lng> (or !2d<lng>!3d<lat> for the view).
 _EMBED_RE = re.compile(r"!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)|!2d(-?\d+\.\d+)!3d(-?\d+\.\d+)")
 _PAIR_RE = re.compile(r"(-?\d{1,2}\.\d{3,})\s*,\s*(-?\d{1,3}\.\d{3,})")
-_MAP_HOST_RE = re.compile(r"(^|\.)(google\.[a-z.]+|openstreetmap\.org)$")
+_MAP_HOST_RE = re.compile(r"(^|\.)(google\.[a-z]{2,3}(\.[a-z]{2})?|openstreetmap\.org)$")
 
 
 def _distance_m(a: tuple[float, float], b: tuple[float, float]) -> float:
@@ -98,7 +98,9 @@ def nominatim_address(parts: Optional[dict]) -> Optional[str]:
 
 
 # Our address's own locality ("гр. Банкя", "с. Казичене"), when it names one.
-_LOCALITY_RE = re.compile(r"(?<![а-яa-z])(?:гр|с)\.\s*([а-я][а-я -]*?)\s*(?=[,\d(]|$)")
+_LOCALITY_RE = re.compile(
+    r"(?<![а-яa-z])(?:гр|с)\.\s*([а-я][а-я -]*?)\s*(?=[,\d(]|\s-|(?:ж\.?\s*к|жк|кв|р-н|ул|бул)[.\s]|$)"
+)
 # The town Nominatim gives for a point, from the most to the least local.
 _PLACE_KEYS = ("village", "town", "city")
 # A city's local name, for addresses that do not name their town.
@@ -298,7 +300,11 @@ async def _write(db: AsyncSession, location_id: int, point: tuple[float, float])
     if not applied.success:
         await db.rollback()  # the gate cleared the old point; keep it
         return "rejected"
-    tags = [tag for tag in location.location_tags or [] if not str(tag).startswith("coords_source=")]
+    tags = [
+        tag
+        for tag in location.location_tags or []
+        if not str(tag).startswith("coords_source=") or tag == OFFICIAL_COORDS_TAG
+    ]
     location.location_tags = [*tags, PIN_TAG]
     db.add(location)
     await db.commit()

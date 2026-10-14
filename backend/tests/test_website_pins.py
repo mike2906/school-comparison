@@ -37,6 +37,7 @@ def _at(road, number, town="София", key="city"):
         # Not a map: a search page, another site with numbers, a map with no point.
         ("https://www.google.com/search?q=42.66613,23.28123", None),
         ("https://google.com/search?q=42.66613,23.28123", None),
+        ("https://maps.google.com.evil.example/?q=42.66613,23.28123", None),
         ("https://school.example/page?ll=42.66613,23.28123", None),
         ("https://maps.google.com/?q=Kazbek+55", None),
     ],
@@ -101,6 +102,8 @@ async def test_place_needs_town_street_and_house_number(parts, outcome):
         # An address naming its own town needs that town, not the city.
         ('гр. Банкя, ул. "Васил Левски" № 10', _at("Васил Левски", "10"), "no_match"),
         ('гр. Банкя, ул. "Васил Левски" № 10', _at("Васил Левски", "10", "Банкя", "town"), "placed"),
+        ('гр. София - 1000, ул. "Казбек" № 55', _at("Казбек", "55"), "placed"),
+        ('гр. София ж.к. Люлин, ул. "Казбек" № 55', _at("Казбек", "55"), "placed"),
         ('с. Казичене, ул. "Христо Ботев" 4', _at("Христо Ботев", "4", "Казичене", "village"), "placed"),
     ],
 )
