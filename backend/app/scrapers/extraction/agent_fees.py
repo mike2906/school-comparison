@@ -225,7 +225,8 @@ _YEAR_ON_AMOUNT_LINE_RE = re.compile(r"(?:учебн\w*|на|за)\s+годин�
 # How often a class meets, not how often it is paid: "3 пъти седмично", "twice a week",
 # "2 учебни часа седмично", "седмична програма".
 _HOW_OFTEN_RE = re.compile(
-    r"(?:\d+\s*(?:пъти|път|times?|x)|(?<!до )(?<!\d)\d+\s*(?:учебни\s+)?(?:час|hours?|lessons?|classes)\w*"
+    r"(?:(?:\d+|един|една|два|две|три|четири|пет|шест|седем|two|three|four|five|six)\s*"
+    r"(?:пъти|път|times?|x|хранения|meals)|(?<!до )(?<!\d)\d+\s*(?:учебни\s+)?(?:час|hours?|lessons?|classes)\w*"
     r"|веднъж|двукратно|twice|once)\s*"
     r"(?:седмично|в седмицата|на седмица|a week|per week|weekly|дневно|на ден|a day|per day|daily)"
     r"|седмичн\w*\s+(?:програм|разпис|график)|weekly (?:schedule|timetable)"
