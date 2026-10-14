@@ -848,5 +848,30 @@
       "hours_other": "{{count}} hours a week",
       "yes": "Yes"
     }
+  },
+  "admissionArea": {
+    "catchmentTitle": "First-grade catchment area",
+    "districtTitle": "District for admission points",
+    "catchmentIntro": "In Sofia, children living in a school's catchment area are ranked first for 1st grade. Children in a neighbouring area get 5 extra points if they are ranked with everyone outside the catchment. It is a yes/no question: an address is either in the catchment or not.",
+    "legendOwn": "This school's catchment area",
+    "legendNeighbours": "Neighbouring areas (5 extra points in the last group)",
+    "legendOutside": "Everywhere else in Sofia",
+    "mapLabel": "Map of the school's admission area",
+    "checkTitle": "Check an address",
+    "street": "Street",
+    "streetPlaceholder": "Start typing a street or neighbourhood",
+    "number": "Number",
+    "loadFailed": "The area data could not be loaded. Please try again later.",
+    "numberNotListed": "This number is not in the official address list. Check the spelling, or ask the school or district.",
+    "addressBelongsTo": "This address belongs to the catchment of {{school}}.",
+    "addressPrivacy": "The address is checked in your browser. It is not sent or saved anywhere.",
+    "verdict": {
+      "inside": "This address is inside this school's catchment area.",
+      "neighbouring": "This address is in a neighbouring area: it gets 5 extra points if the child is ranked in the last group (outside the catchment).",
+      "outside": "This address is outside this school's catchment area and its neighbouring areas."
+    },
+    "catchmentSource": "Official Sofia Municipality catchment areas for the {{campaign}} campaign. Always confirm on the municipality map,",
+    "districtIntro": "Municipal kindergartens in Sofia have no catchment area. Children whose address is in the same district ({{district}}) get 3 extra points.",
+    "districtSource": "District boundaries from Sofia Municipality. Points are confirmed in the official system,"
   }
 }
