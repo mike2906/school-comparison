@@ -53,6 +53,8 @@ import {
 } from '../../utils/searchViewState'
 import { LANGUAGE_SWITCH_EVENT, languageSwitchArrival } from '../../utils/languageSwitch'
 import { pinnedLocation } from '../../utils/coordinates'
+import { useDriveTimes } from '../../routing/useDriveTimes'
+import DriveTimeNote from '../../routing/DriveTimeNote'
 
 const TYPE_SORT_ORDER = {
   state: 0,
@@ -337,7 +339,7 @@ function SearchPage() {
     if (userLocation && !previousLocationRef.current) {
       setSortBy('distance')
     }
-    if (!userLocation && sortBy === 'distance') {
+    if (!userLocation && (sortBy === 'distance' || sortBy === 'drive')) {
       setSortBy('name')
     }
     previousLocationRef.current = userLocation
@@ -598,18 +600,24 @@ function SearchPage() {
       const distance = distanceLocation
         ? calculateDistance(userLocation.lat, userLocation.lng, distanceLocation.lat, distanceLocation.lng)
         : null
-      return { ...school, distance }
+      return { ...school, distance, distanceLocation }
     })
   }, [schools, userLocation, filters.ageGroup])
+
+  const driveTimes = useDriveTimes(userLocation, schoolsWithDistance)
+  const schoolsWithDrive = useMemo(() => {
+    if (driveTimes.seconds.size === 0) return schoolsWithDistance
+    return schoolsWithDistance.map(school => ({ ...school, driveSeconds: driveTimes.seconds.get(school.id) ?? null }))
+  }, [schoolsWithDistance, driveTimes.seconds])
 
   const distanceLimit = userLocation && distanceFilter !== 'any' ? parseFloat(distanceFilter) : null
 
   const filteredSchools = useMemo(() => {
-    return schoolsWithDistance.filter(school => (
+    return schoolsWithDrive.filter(school => (
       (!distanceLimit || (typeof school.distance === 'number' && school.distance <= distanceLimit)) &&
       schoolMatchesQuery(school, nameQuery)
     ))
-  }, [schoolsWithDistance, distanceLimit, nameQuery])
+  }, [schoolsWithDrive, distanceLimit, nameQuery])
 
   const boundedSchools = useMemo(() => {
     if (!searchInBounds || !mapBounds) return filteredSchools
@@ -667,6 +675,13 @@ function SearchPage() {
     switch (sortBy) {
       case 'distance':
         list.sort((a, b) => (a.distance ?? Number.POSITIVE_INFINITY) - (b.distance ?? Number.POSITIVE_INFINITY))
+        break
+      case 'drive':
+        // Until drive times arrive (or for schools without one) distance decides.
+        list.sort((a, b) => (
+          (a.driveSeconds ?? Number.POSITIVE_INFINITY) - (b.driveSeconds ?? Number.POSITIVE_INFINITY) ||
+          (a.distance ?? Number.POSITIVE_INFINITY) - (b.distance ?? Number.POSITIVE_INFINITY)
+        ))
         break
       case 'type':
         list.sort((a, b) => (TYPE_SORT_ORDER[a.school_type] ?? 99) - (TYPE_SORT_ORDER[b.school_type] ?? 99))
@@ -968,6 +983,7 @@ function SearchPage() {
   const allSortOptions = userLocation
     ? [
         { value: 'distance', label: t('sorting.distance') },
+        { value: 'drive', label: t('sorting.driveTime') },
         { value: 'name', label: t('sorting.name') },
         { value: 'nvo', label: nvoSortLabel },
         { value: 'type', label: t('sorting.type') },
@@ -1238,6 +1254,7 @@ function SearchPage() {
                     </select>
                   </div>
                 </div>
+                <DriveTimeNote status={driveTimes.status} />
                 <div className="lg:hidden">
                   {activeFilterChips}
                 </div>
