@@ -544,3 +544,21 @@ async def test_fees_agent_rows_show_before_the_old_extraction_moves_the_status(d
     await db_session.commit()
     response = await client.get(f"/schools/{school.id}")
     assert response.json()["pricing"] == []
+
+
+@pytest.mark.asyncio
+async def test_a_fee_charged_per_day_shows_with_its_period(db_session, client):
+    school, page = await _school_with_page(
+        db_session,
+        level="kindergarten",
+        website_url="https://day.test",
+        page_text="Такси\nМесечна такса | 500 EUR\nХрана (опционално) | 7.5 EUR / ден\n",
+    )
+    food = _row(school, page, "food", 7.5, "daily", "Храна")
+    food.pricing_context = {"confidence": 1.0, "extractor": "agent"}
+    db_session.add(food)
+    await db_session.commit()
+
+    await validator_module.validate_school_data(db_session, school.id, "bg")
+    response = await client.get(f"/schools/{school.id}")
+    assert [(row["id"], row["period"]) for row in response.json()["pricing"]] == [(food.id, "daily")]

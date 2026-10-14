@@ -364,7 +364,8 @@ async def compute_quality_metrics(
             {
                 school.id
                 for school in schools
-                if not agent_fees_publishable(school.attributes, school.scrape_status)
+                if not website_data_is_publishable(school.attributes, school.scrape_status)
+                and not agent_fees_publishable(school.attributes, school.scrape_status)
             },
         ),
     }

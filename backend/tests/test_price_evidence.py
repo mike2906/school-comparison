@@ -318,6 +318,12 @@ def test_rule_2_level_vocabulary(label, family, trips):
         ("кетъринг 1 /ден", {"DAILY"}),
         ("15 лв. на ден", {"DAILY"}),
         ("€40 per hour", {"HOURLY"}),
+        ("Дневна форма на обучение: 8000 €", set()),  # full-time study, not per day
+        ("дневен режим", set()),
+        ("2 учебни часа седмично – 60 €", set()),
+        ("по 1 час седмично", set()),
+        ("седмична програма", set()),
+        ("на час по английски", set()),
     ],
 )
 def test_period_families(context, families):

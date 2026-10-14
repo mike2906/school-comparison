@@ -1360,3 +1360,20 @@ async def test_apply_keeps_attributes_another_stage_wrote_during_the_read(db_ses
     assert report["outcome"] == "written", report
     await db_session.refresh(school)
     assert school.attributes["social_links"] == {"facebook": "https://facebook.com/x"}
+
+
+@pytest.mark.parametrize(
+    "period,evidence,named",
+    [
+        ("daily", "Храна – 7.5 € на ден", True),
+        ("daily", "Дневна форма на обучение – 8000 €", False),
+        ("weekly", "Лятна занималня – 120 € на седмица", True),
+        ("weekly", "Английски, 4 учебни часа седмично – 60 €", False),
+        ("hourly", "Индивидуален урок – 30 € на час", True),
+        ("hourly", "Такса 30 € на час по английски", False),
+    ],
+)
+def test_per_unit_periods_need_a_price_word_not_a_timetable(period, evidence, named):
+    from app.scrapers.extraction.agent_fees import _names_period
+
+    assert _names_period(PricePeriod(period), evidence, [Decimal("30")], PriceCategory.EXTRACURRICULAR) is named

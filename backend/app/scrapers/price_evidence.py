@@ -304,11 +304,14 @@ def _snippet(text: str, span: tuple[int, int], width: int = 90) -> str:
 # Rule vocabularies
 # ---------------------------------------------------------------------------
 
-# "3 пъти седмично" / "twice a week" is how often a class meets, not how often it is paid.
+# "3 пъти седмично" / "twice a week" / "2 учебни часа седмично" / "седмична програма" is how
+# often a class meets, not how often it is paid.
 _FREQUENCY_UNIT = r"(?:седмично|в седмицата|на седмица|a week|per week|weekly|дневно|на ден|a day|per day|daily)"
 _FREQUENCY_RE = re.compile(
     rf"\d+\s*(?:пъти|път|times?|x|хранения|meals)\s*{_FREQUENCY_UNIT}"
-    rf"|(?:веднъж|двукратно|twice|once)\s*{_FREQUENCY_UNIT}",
+    rf"|(?:веднъж|двукратно|twice|once)\s*{_FREQUENCY_UNIT}"
+    rf"|\d+\s*(?:учебни\s+)?(?:час|hours?|lessons?|classes)\w*\s*{_FREQUENCY_UNIT}"
+    r"|седмичн\w*\s+(?:програм|разпис|график)|weekly (?:schedule|timetable)",
     re.IGNORECASE,
 )
 # An age, not a period: "3 до 7-годишни деца", "6-месечни бебета".
@@ -333,8 +336,9 @@ PERIOD_KEYWORDS: dict[str, re.Pattern[str]] = {
     "TERM": re.compile(r"\bна срок\b|per term|termly"),
     # A daily lunch, a weekly camp, an hourly class. Not "целодневна" (a full-day group).
     "WEEKLY": re.compile(r"седмичн|\bна седмица|/\s*седм|\bweekly\b|per week|/\s*week|a week\b"),
-    "DAILY": re.compile(r"(?<![а-я])дневн|\bна ден\b|/\s*ден\b|\bdaily\b|per day|/\s*day\b|a day\b"),
-    "HOURLY": re.compile(r"\bна час\b|/\s*час\b|почасов|per hour|/\s*hour|hourly"),
+    # Not "дневна форма на обучение" (full-time study) or "дневен режим" (the day's routine).
+    "DAILY": re.compile(r"(?<![а-я])дневн(?![а-я]*\s+(?:форм|режим))|\bна ден\b|/\s*ден\b|\bdaily\b|per day|/\s*day\b|a day\b"),
+    "HOURLY": re.compile(r"\bна час\b(?!\s+по\b)|/\s*час\b|почасов|per hour|/\s*hour|hourly"),
 }
 _DEPOSIT_RE = re.compile(r"депозит|\bdeposit")
 # One installment of a fee ("I вноска", "1-ва вноска", "first installment"), not the fee
@@ -990,7 +994,7 @@ def check_price_row(
     if single and single <= PER_UNIT_PERIODS and not period_fits_category(
         row.category, next(iter(single))
     ):
-        hit(RULE_PERIOD_UNFIT, f"{row.category} priced per {next(iter(single)).lower()}", contexts[0])
+        hit(RULE_PERIOD_UNFIT, f"{row.category} priced {next(iter(single)).lower()}", contexts[0])
     elif len(headed) == 1 and None not in headed and period_fits_category(row.category, next(iter(headed))):
         stated = headed.pop()
         hit(RULE_PERIOD_MISSING, f"null period, heading says {stated}", contexts[0], stated)

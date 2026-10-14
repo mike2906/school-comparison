@@ -212,9 +212,9 @@ _PERIOD_WORDS = {  # Bulgarian, English, and the French and German some schools 
     PricePeriod.SEMESTER: r"семест|\bsemester|semestre|halbj[aä]hr",
     PricePeriod.ONE_TIME: r"еднократ|\bonce\b|при записване",
     # Not "целодневна" (a full-day group).
-    PricePeriod.DAILY: r"(?<![а-я])дневн|(?:на|за|/)\s*ден\b|\b(?:daily|per day|a day)\b|par jour|pro tag",
+    PricePeriod.DAILY: r"(?<![а-я])дневн(?![а-я]*\s+(?:форм|режим))|(?:на|за|/)\s*ден\b|\b(?:daily|per day|a day)\b|par jour|pro tag",
     PricePeriod.WEEKLY: r"седмичн|(?:на|за|/)\s*седмица|\b(?:weekly|per week|a week)\b|par semaine|pro woche",
-    PricePeriod.HOURLY: r"почасов|(?:на|за|/)\s*час\b|\b(?:hourly|per hour|an hour)\b|par heure|pro stunde",
+    PricePeriod.HOURLY: r"почасов|(?:на|за|/)\s*час\b(?!\s+по\b)|\b(?:hourly|per hour|an hour)\b|par heure|pro stunde",
 }
 # English "one-time" names a period only on the amount's own line: 596's "ANNUAL TUITION FEES"
 # heading sits above its "One-time fee for initial enrollment".
@@ -222,10 +222,12 @@ _ONE_TIME_EN_RE = re.compile(r"\bone\s*[-‐‑–—]?\s*time\b")
 # "for the school year" names a period only on the amount's own line: as a heading it often
 # covers fees charged per day or per month too (569's "ДОПЪЛНИТЕЛНИ ТАКСИ ЗА УЧЕБНАТА ГОДИНА").
 _YEAR_ON_AMOUNT_LINE_RE = re.compile(r"(?:учебн\w*|на|за)\s+година|l'année")
-# How often a class meets, not how often it is paid: "3 пъти седмично", "twice a week".
+# How often a class meets, not how often it is paid: "3 пъти седмично", "twice a week",
+# "2 учебни часа седмично", "седмична програма".
 _HOW_OFTEN_RE = re.compile(
-    r"(?:\d+\s*(?:пъти|път|times?|x)|веднъж|двукратно|twice|once)\s*"
+    r"(?:\d+\s*(?:пъти|път|times?|x|(?:учебни\s+)?(?:час|hours?|lessons?|classes)\w*)|веднъж|двукратно|twice|once)\s*"
     r"(?:седмично|в седмицата|на седмица|a week|per week|weekly|дневно|на ден|a day|per day|daily)"
+    r"|седмичн\w*\s+(?:програм|разпис|график)|weekly (?:schedule|timetable)"
 )
 _DEPOSIT_RE = re.compile(r"депозит|капаро|deposit")
 # Only a currency and the marker may sit between a range's ends: "550 – 600", "550 EUR to 600".
