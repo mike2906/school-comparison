@@ -1,0 +1,57 @@
+sofia-council-sessions: 20 links, 20 new, followed 15
+sofia-public-consultations: 3 links, 3 new, followed 3
+sofia-news: 10 links, 10 new, followed 0
+isodz-calendar: 20515 chars, baseline
+strategy-consultations: 20 links, 20 new, followed 0
+bg/sofia/kindergarten: campaigns ['2026/2027', '2027/2028']
+bg/sofia/grade_1: campaigns ['2026/2027', '2027/2028']
+bg/grade_8: campaigns ['2026/2027']
+
+## Rule watch: Sofia council sessions mention admission rules
+New entry: [Заседание №61 от 14.05.2026 година](https://council.sofia.bg/meetings-mandat-2023-2027/-/asset_publisher/yino/content/%D0%97%D0%B0%D1%81%D0%B5%D0%B4%D0%B0%D0%BD%D0%B8%D0%B5-%E2%84%9661-%D0%BE%D1%82-14.05.2026-%D0%B3%D0%BE%D0%B4%D0%B8%D0%BD%D0%B0?p_r_p_assetEntryId=2067605&_com_liferay_asset_publisher_web_portlet_AssetPublisherPortlet_INSTANCE_yino_redirect=https%3A%2F%2Fcouncil.sofia.bg%3A443%2Fmeetings-mandat-2023-2027%3Fp_p_id%3Dcom_liferay_asset_publisher_web_portlet_AssetPublisherPortlet_INSTANCE_yino%26p_p_lifecycle%3D0%26p_p_state%3Dnormal%26p_p_mode%3Dview%26p_r_p_assetEntryId%3D2067605%26_com_liferay_asset_publisher_web_portlet_AssetPublisherPortlet_INSTANCE_yino_cur%3D0%26p_r_p_resetCur%3Dfalse)
+
+Matching lines:
+
+> Доклад вх.№ СОА26-ВК08-6348/1/11.05.2026 г.
+> относно изменение на Решение № 325 от 30.04.2026 г., Протокол № 58, на Столичния общински съвет относно промяна на прилежащите райони за прием на ученици в първи клас за учебната 2026/2027 г. във връзка с откриването на ново училище в кв. „Манастирски ливади-запад“, район „Витоша“.
+> Докл. Зарко Клинков, Десислава Желязкова
+
+Source: https://council.sofia.bg/meetings-mandat-2023-2027
+Rule families: `bg/sofia/kindergarten`, `bg/sofia/grade_1`
+Why it is watched: Each session page lists the adopted decisions; the kindergarten and first-grade ordinances are amended by council decision (Реш. 200 and 201 of 12.03.2026). The page is per council mandate: the next mandate starts after the October 2027 elections, when this URL must be updated (the watcher reports it as unreadable once no sessions are listed).
+
+If this changes the rules, add a new rule file for the campaign with its acts, sources and worked examples (docs/ADMISSION_POINTS.md → Keeping rules current); never edit an old file's meaning. If it does not, close this issue.
+
+---
+
+New entry: [Заседание №58 от 12.03.2026 година](https://council.sofia.bg/meetings-mandat-2023-2027/-/asset_publisher/yino/content/%D0%97%D0%B0%D1%81%D0%B5%D0%B4%D0%B0%D0%BD%D0%B8%D0%B5-%E2%84%9658-%D0%BE%D1%82-12.03.2026-%D0%B3%D0%BE%D0%B4%D0%B8%D0%BD%D0%B0?p_r_p_assetEntryId=2042416&_com_liferay_asset_publisher_web_portlet_AssetPublisherPortlet_INSTANCE_yino_redirect=https%3A%2F%2Fcouncil.sofia.bg%3A443%2Fmeetings-mandat-2023-2027%3Fp_p_id%3Dcom_liferay_asset_publisher_web_portlet_AssetPublisherPortlet_INSTANCE_yino%26p_p_lifecycle%3D0%26p_p_state%3Dnormal%26p_p_mode%3Dview%26p_r_p_assetEntryId%3D2042416%26_com_liferay_asset_publisher_web_portlet_AssetPublisherPortlet_INSTANCE_yino_cur%3D0%26p_r_p_resetCur%3Dfalse)
+
+Matching lines:
+
+> СОА26-ВК66-580/23.01.2026 г.
+> относно приемане на Наредба за изменение и допълнение на Наредба за прием на деца в общинските самостоятелни детски ясли, детски градини и в подготвителните групи в общинските училища на територията на Столичната община, приета с Решение № 121 на Столичен общински съвет по Протокол № 71 от 23.02.2023 г., в сила от 02.03.2023 г.
+> Докл. Десислава Желязкова, Емил Димитров
+> СОА26-ВК66-1275/16.02.2026 г.
+> относно приемане на Наредба за изменение и допълнение на Наредбата за прием на ученици в първи клас в общинските училища на територията на Столична община, приета с Решение № 101 по Протокол № 48 от 24.02.2022 г., в сила от 2.03.2022 г.
+> Докл. Десислава Желязкова
+
+Source: https://council.sofia.bg/meetings-mandat-2023-2027
+Rule families: `bg/sofia/kindergarten`, `bg/sofia/grade_1`
+Why it is watched: Each session page lists the adopted decisions; the kindergarten and first-grade ordinances are amended by council decision (Реш. 200 and 201 of 12.03.2026). The page is per council mandate: the next mandate starts after the October 2027 elections, when this URL must be updated (the watcher reports it as unreadable once no sessions are listed).
+
+If this changes the rules, add a new rule file for the campaign with its acts, sources and worked examples (docs/ADMISSION_POINTS.md → Keeping rules current); never edit an old file's meaning. If it does not, close this issue.
+
+## Rule watch: National public consultations mention admission rules
+New entry: [Проект на Постановление на Министерския съвет за изменение на Постановление № 46 на Министерския съвет от 19 март 2020 г. за определяне на минимални диференцирани размери на паричните средства за физическа активност, физическо възпитание, спорт и спортно-туристическа дейност на деца и учащи в институции в системата на предучилищното и училищното образование и във висшите училища (Oбн., ДВ, бр. 26 от 2020 г., изм. и доп., бр. 18 от 2021 г., бр. 106 от 2023 г. и бр. 23 от 2025 г.)](https://strategy.bg/bg/public-consultations/12797)
+
+Matching lines:
+
+> Проект на Постановление на Министерския съвет за изменение на Постановление № 46 на Министерския съвет от 19 март 2020 г. за определяне на минимални диференцирани размери на паричните средства за физическа активност, физическо възпитание, спорт и спортно-туристическа дейност на деца и учащи в институции в системата на предучилищното и училищното образование и във висшите училища (Oбн., ДВ, бр. 26 от 2020 г., изм. и доп., бр. 18 от 2021 г., бр. 106 от 2023 г. и бр. 23 от 2025 г.)
+
+Source: https://strategy.bg/bg/public-consultations
+Rule families: `bg/grade_8`, `bg/sofia/grade_1`
+Why it is watched: Every draft national act, including МОН's amendments to Наредба № 10 (8th-grade score formulas, the national first-grade template), is published here for consultation before adoption. mon.bg itself is behind a Cloudflare check that GitHub's runners cannot pass.
+
+If this changes the rules, add a new rule file for the campaign with its acts, sources and worked examples (docs/ADMISSION_POINTS.md → Keeping rules current); never edit an old file's meaning. If it does not, close this issue.
+
+2 finding(s)

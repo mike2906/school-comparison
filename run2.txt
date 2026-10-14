@@ -1,0 +1,10 @@
+sofia-council-sessions: 20 links, 0 new, followed 0
+sofia-public-consultations: 3 links, 0 new, followed 0
+sofia-news: 10 links, 0 new, followed 0
+isodz-calendar: 20515 chars, ok
+strategy-consultations: 20 links, 0 new, followed 0
+bg/sofia/kindergarten: campaigns ['2026/2027', '2027/2028']
+bg/sofia/grade_1: campaigns ['2026/2027', '2027/2028']
+bg/grade_8: campaigns ['2026/2027']
+
+0 finding(s)
