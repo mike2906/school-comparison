@@ -81,10 +81,17 @@ _GENERIC_NAME_WORDS = {
     "еоод", "оод", "ад", "език", "езиков", "езици",
 }
 # Words that say what kind of institution a name is ("СУ", "СПГЕ", "училище", "ЧДГ").
-_TYPE_ABBREVIATION_RE = re.compile(r"(?<![А-Яа-яA-Za-z])[А-Я]{0,4}(?:У|Г|ГЕ|ДГ)(?![А-Яа-я])")
-_TYPE_WORD_RE = re.compile(r"училищ|гимназ|градин|school|kindergarten|college", re.IGNORECASE)
+_TYPE_ABBREVIATION_RE = re.compile(r"(?<![А-Яа-яA-Za-z])[А-Я]{0,4}(?:У|Г|ГЕ|ДГ|ДЗ|ДЯ)(?![А-Яа-я])")
+_TYPE_WORD_RE = re.compile(r"училищ|гимназ|градин|ясла|колеж|лицей|school|kindergarten|college", re.IGNORECASE)
 # A private institution's name: "ЧСУ", "ЧДГ", "Частна ...", "Private ...".
-_PRIVATE_ABBREVIATION_RE = re.compile(r"(?<![А-Яа-яA-Za-z])Ч[А-Я]{1,5}(?![А-Яа-я])")
+_PRIVATE_ABBREVIATION_RE = re.compile(r"(?<![А-Яа-яA-Za-z])Ч[А-Я]{0,3}(?:У|Г|ГЕ|ДГ|ДЗ|ДЯ)(?![А-Яа-я])")
+# Ordinal names are numbers ("Първа английска гимназия" is not "Втора ...").
+_ORDINALS = {
+    "първа": "1", "първо": "1", "втора": "2", "второ": "2", "трета": "3", "трето": "3",
+    "четвърта": "4", "четвърто": "4", "пета": "5", "пето": "5", "шеста": "6", "шесто": "6",
+    "седма": "7", "седмо": "7", "осма": "8", "осмо": "8", "девета": "9", "девето": "9",
+    "десета": "10", "десето": "10",
+}
 _PRIVATE_WORD_RE = re.compile(r"частн|private", re.IGNORECASE)
 
 
@@ -132,7 +139,7 @@ the evidence is clear. Never invent a candidate."""
 
 def _words(text: str) -> set[str]:
     """Distinctive name words, cut to five letters so word forms agree ("немски", "немско")."""
-    words = re.findall(r"[а-яa-z]+|\d+", (text or "").casefold().replace("ё", "е"))
+    words = [_ORDINALS.get(w, w) for w in re.findall(r"[а-яa-z]+|\d+", (text or "").casefold().replace("ё", "е"))]
     return {w if w.isdigit() else w[:5] for w in words if (w.isdigit() or len(w) >= 3) and w not in _GENERIC_NAME_WORDS}
 
 
@@ -151,7 +158,10 @@ def name_matches(school_name: str, osm_name: Optional[str], *, at_our_number: bo
 
 
 def _acronyms(name: str) -> set[str]:
-    """Distinctive all-capitals words of three or more letters ("ЕСПА", not "ЧСУ")."""
+    """Distinctive all-capitals words of three or more letters ("ЕСПА", not "ЧСУ"); none
+    in a name written all in capitals, where every word looks like one."""
+    if name == name.upper():
+        return set()
     return {w.casefold() for w in re.findall(r"(?<![А-Яа-яA-Za-z])[А-ЯA-Z]{3,}(?![А-Яа-яA-Za-z])", name)} - _GENERIC_NAME_WORDS
 
 
@@ -182,6 +192,8 @@ def check_pick(
     candidates: Sequence[Candidate],
     bounds: dict[str, float],
     other_pins: Sequence[tuple[tuple[float, float], str]],
+    *,
+    private: Optional[bool] = None,
 ) -> Optional[str]:
     """Why the picked candidate cannot be written, or None when it can.
 
@@ -211,10 +223,13 @@ def check_pick(
     if not name_matches(school_name, candidate.name, at_our_number=at_our_number):
         return "OSM names another institution there"
     # A bare name ("ЕСПА") says nothing about private or state.
-    if names_a_type(candidate.name) and is_private_name(school_name) != is_private_name(candidate.name):
+    ours_private = is_private_name(school_name) if private is None else private
+    if names_a_type(candidate.name) and ours_private != is_private_name(candidate.name):
         return "one name is a private institution's, the other not"
-    namesakes = [c for c in candidates if c.source == "osm_school" and name_matches(school_name, c.name)]
-    if len(namesakes) > 1:
+    if any(
+        c is not candidate and c.source == "osm_school" and name_matches(school_name, c.name, at_our_number=True)
+        for c in candidates
+    ):
         return "several OSM features have this name"
     return None
 
@@ -263,7 +278,10 @@ class CityOsm:
             try:
                 response = await self.client.post(url, data={"data": query}, timeout=200)
                 response.raise_for_status()
-                return response.json().get("elements", [])
+                body = response.json()
+                if "runtime error" in str(body.get("remark") or ""):  # a timed-out, partial answer
+                    raise ValueError(f"partial answer: {body['remark'][:120]}")
+                return body.get("elements", [])
             except (httpx.HTTPError, ValueError) as exc:  # busy (429/504), down, or not JSON
                 error = exc
         raise RuntimeError(f"no Overpass server answered: {error}")
@@ -376,7 +394,8 @@ async def place_location(
         chosen.town_ok = chosen.town_ok and same_town(address, parts, town)
         row["candidates"][pick.candidate - 1] = asdict(chosen)
     refused = check_pick(
-        name, level_family(school.education_level) == "kindergarten", address, chosen, candidates, bounds, other_pins
+        name, level_family(school.education_level) == "kindergarten", address, chosen, candidates, bounds, other_pins,
+        private=school.school_type != "state",
     )
     if refused:
         return row | {"outcome": "refused", "refused": refused}

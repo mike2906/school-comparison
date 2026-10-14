@@ -1132,9 +1132,12 @@ async def clear_website_derived_locations(
         website_address = "address_source=website_contact" in tags
         if website_address and keep_officially_confirmed_addresses and OFFICIAL_COORDS_TAG in tags:
             website_address = False
+        meta = location.geocode_meta or {}
         website_coords = (
             "coords_source=website_map_link" in tags
-            or (location.geocode_meta or {}).get("method") == "website_map_link"
+            or meta.get("method") == "website_map_link"
+            # the pin agent's pick of a map point from the website
+            or (meta.get("method") == "agent_pick" and meta.get("provider") == "website_map")
         )
         if not (website_address or website_coords):
             continue
@@ -1163,8 +1166,10 @@ async def clear_website_derived_locations(
             if tag not in {
                 "address_source=website_contact",
                 "coords_source=website_map_link",
+                "coords_source=pin_agent",
             }
             or (tag == "address_source=website_contact" and not website_address)
+            or (tag == "coords_source=pin_agent" and not website_coords)
         ]
         db.add(location)
     return changed + campus_changes

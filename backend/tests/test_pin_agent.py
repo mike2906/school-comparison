@@ -287,3 +287,34 @@ async def test_the_stage_can_start_a_pipeline_run_for_its_spend(db_session):
 
     run = await start_pipeline_run(db_session, country="bg", city="sofia", cli_stage=stage.STAGE)
     assert run.id
+
+
+def test_review_round_two_cases():
+    # A weaker relaxed match is refused while a fully named feature exists nearby.
+    prince = Candidate(point=(42.68, 23.33), source="osm_school", name="Принц", address='ул. "Бигла" № 56', amenity="kindergarten")
+    full = Candidate(point=(42.69, 23.34), source="osm_school", name="Малкият принц", address='ул. "Бигла" № 70', amenity="kindergarten")
+    assert stage.check_pick("ЧДГ Малкият принц", True, "ул. Бигла 56", prince, [prince, full], SOFIA, ()) == (
+        "several OSM features have this name"
+    )
+    # Our side's private-ness comes from the school type, and ОДЗ names a type.
+    odz = Candidate(point=(42.68, 23.33), source="osm_school", name="ОДЗ №5 Звездица", address='ул. "Бигла" № 56', amenity="kindergarten")
+    assert stage.check_pick("Звездица", True, "ул. Бигла 56", odz, [odz], SOFIA, (), private=True) == (
+        "one name is a private institution's, the other not"
+    )
+    assert not stage.is_private_name("ДГ 26 ЧАЙКА")
+    assert stage.is_private_name("ЧЕСУ Дорис Тенеди")
+    # Ordinals are numbers; an all-capitals name has no acronyms.
+    assert not stage.name_matches("Втора английска езикова гимназия", "Първа английска езикова гимназия")
+    assert not stage.name_matches("ЧДГ МАЛКИЯТ ПРИНЦ", "Принц")
+
+
+@pytest.mark.asyncio
+async def test_city_osm_treats_a_timed_out_partial_answer_as_failed(monkeypatch):
+    import httpx
+
+    monkeypatch.setattr(stage.asyncio, "sleep", _no_sleep)
+    partial = {"remark": "runtime error: Query timed out in \"query\" at line 1", "elements": []}
+    async with httpx.AsyncClient(transport=httpx.MockTransport(lambda request: httpx.Response(200, json=partial))) as client:
+        city = stage.CityOsm(client, SOFIA)
+        assert await city(42.6, 23.3) == []
+    assert city.failed

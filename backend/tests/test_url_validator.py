@@ -1110,6 +1110,17 @@ async def test_update_validation_result_clears_stale_validated_website_on_invali
         geocode_meta={"method": "geojson", "precision": "approximate"},
         is_primary=False,
     )
+    # The pin agent's picks: a website map point goes with the website, an OSM building stays.
+    agent_website_pin = SchoolLocation(
+        school_id=school.id, address_i18n={"bg": "ул. Бигла 56"}, lat=42.72, lng=23.32,
+        location_tags=["coords_source=pin_agent"],
+        geocode_meta={"method": "agent_pick", "provider": "website_map", "precision": "exact"},
+    )
+    agent_osm_pin = SchoolLocation(
+        school_id=school.id, address_i18n={"bg": "ул. Бигла 58"}, lat=42.73, lng=23.33,
+        location_tags=["coords_source=pin_agent"],
+        geocode_meta={"method": "agent_pick", "provider": "osm_school", "precision": "exact"},
+    )
     db_session.add_all(
         [
             SourcePage(
@@ -1122,6 +1133,8 @@ async def test_update_validation_result_clears_stale_validated_website_on_invali
             ),
             website_location,
             official_location,
+            agent_website_pin,
+            agent_osm_pin,
         ]
     )
     db_session.add_all(
@@ -1215,6 +1228,10 @@ async def test_update_validation_result_clears_stale_validated_website_on_invali
     assert website_location.geocode_meta == {}
     assert "address_source=website_contact" not in (website_location.location_tags or [])
     assert "coords_source=website_map_link" not in (website_location.location_tags or [])
+    await db_session.refresh(agent_website_pin)
+    await db_session.refresh(agent_osm_pin)
+    assert (agent_website_pin.lat, agent_website_pin.location_tags) == (None, [])
+    assert (agent_osm_pin.lat, agent_osm_pin.location_tags) == (42.73, ["coords_source=pin_agent"])
     assert official_location.address_i18n == {"bg": "Официален втори адрес"}
     assert official_location.lat == 42.71
     assert official_location.lng == 23.31
