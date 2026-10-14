@@ -25,5 +25,5 @@ schema changes start with Alembic autogeneration and require review. Do not comm
 in [SECURITY.md](SECURITY.md).
 
 CI additionally verifies migrations and backup restoration against disposable PostgreSQL.
-Deployment, schema and security changes require maintainer review before merge; the detailed
-maintainer workflow is in [skills/github-process/SKILL.md](skills/github-process/SKILL.md).
+Deployment, schema and security changes from contributors require maintainer review before
+merge; the maintainer and agent workflow is in [skills/github-process/SKILL.md](skills/github-process/SKILL.md).
