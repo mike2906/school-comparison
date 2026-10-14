@@ -38,5 +38,4 @@ Only on Mike's PC, in WSL (`~/sofiaschoolcomparison`), logged in to Mike's subsc
 so a call costs nothing extra. A cloud session reaches them through a Remote Control
 session on that PC. If the PC is offline, a big PR gets one `@codex review` on GitHub
 instead; for a decision, carry on with reversible steps and get the second opinion before
-the step that is hard to undo (a merge that adds a migration or a publish counts as hard
-to undo).
+the step that is hard to undo, such as a merge that adds a migration.
