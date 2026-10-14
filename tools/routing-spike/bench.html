@@ -1,0 +1,39 @@
+<!doctype html><meta charset="utf-8"><title>routing bench</title>
+<script type="module">
+// ?main runs the same code on the main thread, because DevTools CPU throttling does not reach
+// workers; the worker path shows real-world wiring, the main path the throttled numbers.
+import { decode, snap, search, costTo } from './router.js';
+const MAIN = location.search.includes('main');
+const w = MAIN ? null : new Worker('./worker.js', { type: 'module' });
+let g, dests;
+async function callMain(data) {
+  const t = {};
+  if (data.type === 'load') {
+    let t0 = performance.now();
+    const raw = await (await fetch(data.url, { cache: 'no-store' })).arrayBuffer();
+    t.downloadMs = performance.now() - t0; t0 = performance.now();
+    const ab = await new Response(new Blob([raw]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
+    t.gunzipMs = performance.now() - t0; t0 = performance.now();
+    g = decode(ab); t.decodeMs = performance.now() - t0; t0 = performance.now();
+    dests = data.dests.map(([x, y]) => snap(g, x, y)); t.snapAllDestsMs = performance.now() - t0;
+    t.graphBytes = g.bytes;
+  } else {
+    let t0 = performance.now();
+    const o = snap(g, data.from[0], data.from[1]); t.snapMs = performance.now() - t0; t0 = performance.now();
+    const r = search(g, o); t.searchMs = performance.now() - t0;
+    t.secs = dests.map(d => costTo(g, r, d)); t.searchBytes = r.dist.byteLength;
+  }
+  return t;
+}
+const call = (m) => MAIN ? callMain(m) : new Promise(r => { w.onmessage = e => r(e.data); w.postMessage(m); });
+window.bench = async (pairs) => {
+  const load = await call({ type: 'load', url: './sofia.graph.gz', dests: pairs.dests });
+  const runs = [];
+  for (const s of pairs.sources) runs.push(await call({ type: 'route', from: s }));
+  let mem = null;
+  if (self.crossOriginIsolated && performance.measureUserAgentSpecificMemory) {
+    try { mem = await performance.measureUserAgentSpecificMemory(); } catch (e) { mem = String(e); }
+  }
+  return { load, runs, mem };
+};
+</script>
