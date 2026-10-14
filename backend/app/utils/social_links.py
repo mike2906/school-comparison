@@ -43,6 +43,7 @@ _FACEBOOK_NOT_A_PAGE = {
     "media",
     "notes",
     "permalink.php",
+    "pg",
     "photo",
     "photo.php",
     "photos",
@@ -96,6 +97,8 @@ def _facebook_page(url: str) -> Optional[str]:
     if first == "plugins":  # the Page Plugin widget: ?href= names the page it shows
         href = (parse_qs(parsed.query).get("href") or [""])[0]
         return _facebook_page(href) if _host(href) in _FACEBOOK_HOSTS else None
+    if first == "pg" and len(parts) >= 2:  # the old page route: /pg/<page>/about
+        return _facebook_page(f"https://www.facebook.com/{parsed.path.split('/')[2]}")
     if first == "profile.php":
         page_id = (parse_qs(parsed.query).get("id") or [""])[0]
         return f"https://www.facebook.com/profile.php?id={page_id}" if page_id.isdigit() else None

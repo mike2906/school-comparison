@@ -27,6 +27,8 @@ IG = "https://www.instagram.com/school_example/"
             "https://www.facebook.com/plugins/page.php?href=https%3A%2F%2Fwww.facebook.com%2Fschool.example&tabs=timeline",
             ("facebook", "https://www.facebook.com/school.example"),
         ),
+        ("https://www.facebook.com/pg/school.example/about/", ("facebook", "https://www.facebook.com/school.example")),
+        ("https://www.facebook.com/pg", None),
         ("//facebook.com/school.example", ("facebook", "https://www.facebook.com/school.example")),
         ("https://instagram.com/School_Example", ("instagram", "https://www.instagram.com/school_example/")),
         # Not the school's page: sharing, a parents' group, an event, a post, Facebook itself.
@@ -84,6 +86,14 @@ async def test_the_contact_page_is_read_when_the_home_page_links_neither():
 
 
 @pytest.mark.asyncio
+async def test_the_contact_page_must_be_on_the_schools_own_site():
+    home = "https://sites.google.com/view/a"
+    pages = {home: _html("https://sites.google.com/view/b/contact"), "https://sites.google.com/view/b/contact": _html(FB)}
+    read = await stage.read_school(_school(website_url=home), _fetcher(pages))
+    assert read["links"] == {} and read["pages"] == [home]
+
+
+@pytest.mark.asyncio
 async def test_a_page_widget_iframe_counts():
     widget = "https://www.facebook.com/plugins/page.php?href=https%3A%2F%2Fwww.facebook.com%2Fschool.example"
     read = await stage.read_school(_school(), _fetcher({HOME: f'<iframe src="{widget}"></iframe>'}))
@@ -125,6 +135,19 @@ async def test_a_page_linked_from_two_schools_sites_is_dropped(db_session):
     by_id = {r["school_id"]: r for r in report["results"]}
     assert by_id[school.id]["links"] == {"instagram": IG} and by_id[school.id]["shared"] == ["facebook"]
     assert by_id[sibling.id]["links"] == {"instagram": IG}
+
+
+@pytest.mark.asyncio
+async def test_apply_clears_a_shared_page_stored_for_a_school_outside_the_run(db_session):
+    designer = "https://www.facebook.com/web.studio"
+    stored = {"_schema_version": 1, "website_url": "https://other.example/", "facebook": designer, "instagram": IG}
+    other = _school(website_url="https://other.example/", attributes={"social_links": stored})
+    school = _school()
+    db_session.add_all([other, school])
+    await db_session.commit()
+    await stage.run_social_links(db_session, school_ids=[school.id], fetch=_fetcher({HOME: _html(designer)}), apply=True)
+    assert "facebook" not in other.attributes["social_links"] and other.attributes["social_links"]["instagram"] == IG
+    assert "facebook" not in school.attributes["social_links"]
 
 
 def _block(**overrides):

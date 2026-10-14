@@ -23,7 +23,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import CRAWLER_USER_AGENT
 from app.models import School
 from app.scrapers.fee_pages import fee_http_client
-from app.scrapers.shared_site_check import registrable_domain
 from app.utils.school_facts import SITE_ACCEPTED_STATUSES
 from app.utils.social_links import ATTRIBUTE_KEY, NETWORKS, SCHEMA_VERSION, pick_links
 
@@ -42,11 +41,21 @@ def page_links(html: str, base: str) -> list[str]:
     return [urljoin(base, str(href).strip()) for href in found if href]
 
 
-def _contact_page(html: str, base: str) -> Optional[str]:
-    home = registrable_domain(base)
+def _on_site(url: str, site: str) -> bool:
+    """On the school's own site: the same host, and under its path when it has one
+    (sites.google.com/view/a is not /view/b)."""
+    parsed, home = urlparse(url), urlparse(site)
+    if _host(url) != _host(site):
+        return False
+    prefix = home.path.rstrip("/").lower()
+    path = parsed.path.lower()
+    return not prefix or path == prefix or path.startswith(prefix + "/")
+
+
+def _contact_page(html: str, base: str, site: str) -> Optional[str]:
     for tag in BeautifulSoup(html, "html.parser").find_all("a"):
         href = urljoin(base, str(tag.get("href") or ""))
-        if registrable_domain(href) == home and _CONTACT_RE.search(f"{href} {tag.get_text(' ', strip=True)}"):
+        if _on_site(href, site) and _CONTACT_RE.search(f"{href} {tag.get_text(' ', strip=True)}"):
             return href
     return None
 
@@ -61,7 +70,7 @@ async def read_school(school: School, fetch: Fetch) -> dict[str, Any]:
     pages = [final]
     links, ambiguous = pick_links(hrefs)
     if not links and not ambiguous:
-        contact = _contact_page(html, final)
+        contact = _contact_page(html, final, final)
         page = await fetch(contact) if contact else None
         if page is not None:
             pages.append(page[0])
@@ -177,6 +186,13 @@ async def run_social_links(
                 }
         results.append(result)
     if apply:
+        # A page this run found shared is cleared from the other schools that store it too.
+        for school_id, read in pool.items():
+            if school_id in reads or not read.get("shared"):
+                continue
+            school = await db.get(School, school_id)
+            block = {k: v for k, v in school.attributes[ATTRIBUTE_KEY].items() if k not in read["shared"]}
+            school.attributes = {**school.attributes, ATTRIBUTE_KEY: block}
         await db.commit()
     outcomes: dict[str, int] = {}
     for result in results:
