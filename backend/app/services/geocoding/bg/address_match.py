@@ -140,3 +140,10 @@ def same_house_number(result_house_number: object, address: str) -> bool:
         result_house_number.translate(_LATIN_TO_CYRILLIC).casefold(),
     )
     return bool(found) and found.group(1).lstrip("0") + (found.group(2) or "") == wanted
+
+
+def same_street(first: str, second: str) -> bool:
+    """Whether two addresses name the same street, whatever their numbers (one's street
+    words all in the other's)."""
+    a, b = _parse(first or ""), _parse(second or "")
+    return bool(a.street and b.street) and (a.street <= b.street or b.street <= a.street)
