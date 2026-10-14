@@ -1,0 +1,156 @@
+/**
+ * Live flows for the admission features: the points calculator at /admission (all three
+ * stages), a school's cut-offs and its link into the calculator, and the first-grade
+ * catchment check with a real address from the published address table.
+ */
+import assert from 'node:assert/strict'
+import { readFile } from 'node:fs/promises'
+import { describe, test } from 'node:test'
+
+import { catchmentSchoolFor, indexAddresses, schoolCatchmentIds } from '../../src/admission/catchments.js'
+import { usesSofiaKindergartenSystem } from '../../src/utils/admission.js'
+import { DESKTOP, findSchool, number, open, page, schoolName, t, liveBrowser } from './live.js'
+
+liveBrowser(DESKTOP)
+
+const ruleFile = async (stagePath, campaign) =>
+  JSON.parse(await readFile(new URL(`../../src/admission/rules/bg/${stagePath}/${campaign.replace('/', '-')}.json`, import.meta.url)))
+
+/** The start year the page has chosen, as the rule files name a campaign ("2027/2028"). */
+async function campaign() {
+  const year = Number(await page.getByLabel(t('bg', 'admissionCalc.startYear')).inputValue())
+  return `${year}/${year + 1}`
+}
+
+/** A question's answer button, found by the question's own label. */
+const answer = (question, option) =>
+  page.getByRole('radiogroup', { name: question, exact: true }).getByRole('radio', { name: option, exact: true })
+
+describe('admission calculator', () => {
+  test('kindergarten: a fully answered form gives one total that adds up', async () => {
+    await open('bg', '/admission?stage=kindergarten')
+    const kg = key => t('bg', `admissionCalc.kg.${key}`)
+    const start = Number((await campaign()).slice(0, 4))
+    // Three years before the start year is a kindergarten group (not the nursery).
+    await page.getByLabel(kg('birthYear')).selectOption(String(start - 3))
+    await answer(kg('inSofia'), t('bg', 'admissionCalc.yes')).click()
+    const sameAddress = answer(kg('sameAddress'), t('bg', 'admissionCalc.yes'))
+    if (await sameAddress.count()) await sameAddress.click()
+    await page.getByLabel(kg('since')).fill(`${start - 4}-01-15`)
+    await answer(kg('sameDistrict'), t('bg', 'admissionCalc.yes')).click()
+    await answer(kg('parentActivity', { n: 1 }), kg('activity.working')).click()
+    await answer(kg('parentActivity', { n: 2 }), kg('activity.working')).click()
+    const nursery = answer(kg('nursery'), t('bg', 'admissionCalc.no'))
+    if (await nursery.count()) await nursery.click()
+    await answer(kg('siblingThere'), t('bg', 'admissionCalc.no')).click()
+
+    const aside = page.locator('aside').filter({ hasText: kg('total') })
+    const total = number(await aside.locator('p.text-4xl').innerText())
+    const items = await aside.locator('dd').allInnerTexts()
+    assert.ok(items.length > 0, 'the total lists the criteria it counts')
+    assert.equal(total, items.map(number).reduce((sum, value) => sum + value, 0), 'the total is the sum of its lines')
+    assert.ok(total > 0, 'an address in Sofia and two working parents give points')
+    assert.equal(await page.getByText(t('bg', 'admissionCalc.rangeNote')).count(), 0, 'every answer given: one total, not a range')
+  })
+
+  test('first grade: answering for any school gives a group', async () => {
+    await open('bg', '/admission?stage=grade_1')
+    const g1 = key => t('bg', `admissionCalc.g1.${key}`)
+    await answer(g1('inCatchment'), t('bg', 'admissionCalc.yes')).click()
+    const start = Number((await campaign()).slice(0, 4))
+    await page.getByLabel(g1('since')).first().fill(`${start - 5}-01-15`)
+    // An address inside the catchment for years is group 1 (of 1–4, 1 is best).
+    const group = page.locator('aside p', { hasText: new RegExp(`^${g1('group')}$`) }).first().locator('xpath=following-sibling::p[1]')
+    await page.waitForFunction(() => document.querySelector('aside p.text-4xl'))
+    assert.equal(number(await group.innerText()), 1)
+  })
+
+  test('eighth grade: each formula gives the score the rules say', async () => {
+    await open('bg', '/admission?stage=grade_8')
+    const g8 = key => t('bg', `admissionCalc.g8.${key}`)
+    const rules = await ruleFile('grade_8', await campaign())
+    const { grade_points: gradePoints, nvo_weight_variants: variants } = rules.params
+    const nvo = { bulgarian: 80.5, math: 62 }
+    await page.getByLabel(g8('bulgarian')).fill(String(nvo.bulgarian))
+    await page.getByLabel(g8('math')).fill(String(nvo.math))
+    await page.getByLabel(g8('grade.first')).selectOption('6')
+    await page.getByLabel(g8('grade.second')).selectOption('5')
+    await answer(g8('hasExam'), t('bg', 'admissionCalc.no')).click()
+
+    const rows = page.locator('table tbody tr')
+    assert.equal(await rows.count(), variants.length, 'one row per formula the law allows')
+    for (const weights of variants) {
+      const label = t('bg', 'admissionCalc.g8.formulaText', { bg: weights.bulgarian, math: weights.math })
+      const expected = Math.round((weights.bulgarian * nvo.bulgarian + weights.math * nvo.math + gradePoints['6'] + gradePoints['5']) * 100) / 100
+      const shown = await rows.filter({ hasText: label }).locator('td').last().innerText()
+      assert.equal(number(shown), expected, label)
+    }
+  })
+})
+
+describe('admission from a school page', () => {
+  test('a kindergarten with cut-offs shows them and opens the calculator for it', async () => {
+    const school = await findSchool(
+      'kindergarten with cut-offs',
+      () => true,
+      s => usesSofiaKindergartenSystem(s) && (s.admission_info?.cutoff_summary || []).length > 0,
+    )
+    await open('bg', `/schools/${school.id}`)
+    const cutoffs = page.locator('section').filter({ has: page.getByRole('heading', { name: t('bg', 'cutoffs.title') }) })
+    await cutoffs.locator('table').waitFor()
+    assert.ok(await cutoffs.locator('tbody tr').count() > 0, 'a row per age group')
+    await page.getByRole('heading', { name: t('bg', 'admissionArea.districtTitle') }).waitFor()
+
+    await cutoffs.getByRole('link', { name: t('bg', 'cutoffs.calculate') }).click()
+    await page.waitForURL(url => url.pathname === '/admission' && url.searchParams.get('school') === String(school.id))
+    await page.getByRole('link', { name: schoolName(school, 'bg'), exact: true }).waitFor()
+    // The calculator repeats the school's cut-offs under the form.
+    await page.getByRole('heading', { name: t('bg', 'cutoffs.title') }).waitFor()
+    await page.getByRole('tab', { name: t('bg', 'admissionCalc.stages.kindergarten'), selected: true }).waitFor()
+  })
+
+  test('an eighth-grade school shows its class cut-offs', async () => {
+    const school = await findSchool(
+      'with 8th-grade cut-offs',
+      () => true,
+      s => (s.admission_info?.cutoff_summary || []).some(row => row.stage === 'grade_8'),
+    )
+    await open('bg', `/schools/${school.id}`)
+    const cutoffs = page.locator('section').filter({ has: page.getByRole('heading', { name: t('bg', 'cutoffs.title') }) })
+    await cutoffs.locator('table').waitFor()
+    const classes = school.admission_info.cutoff_summary.filter(row => row.stage === 'grade_8')
+    assert.ok(await cutoffs.locator('tbody tr').count() >= 1, `${classes.length} classes in the API`)
+  })
+
+  test('a first-grade catchment check names the right area for a real address', async () => {
+    const school = await findSchool('with a first-grade catchment', () => true, s => schoolCatchmentIds(s).length > 0)
+    const ids = schoolCatchmentIds(school)
+    const table = JSON.parse(await readFile(new URL('../../public/catchments/bg/sofia/2026-2027/addresses.json', import.meta.url)))
+    // A street in this school's catchment with a plain house number, as a parent would type it.
+    let address
+    for (const street of indexAddresses(table)) {
+      const number = [...street.numbers.entries()].find(([n, id]) => ids.includes(id) && /^\d+$/.test(n))?.[0]
+      if (number && street.settlement === 'ГР.СОФИЯ' && street.key.length > 4) {
+        address = { street, number }
+        break
+      }
+    }
+    assert.ok(address, `an address in catchment ${ids.join(', ')}`)
+    assert.ok(ids.includes(catchmentSchoolFor(address.street, address.number)))
+
+    await open('bg', `/schools/${school.id}`)
+    const area = page.locator('section').filter({ has: page.getByRole('heading', { name: t('bg', 'admissionArea.catchmentTitle') }) })
+    await area.locator('.leaflet-container').waitFor()
+    await area.getByLabel(t('bg', 'admissionArea.street')).fill(address.street.street.replace(/^[^.]*\./, ''))
+    await area.getByRole('button', { name: new RegExp(`^${address.street.street.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`) }).first().click()
+    await area.getByLabel(t('bg', 'admissionArea.number')).fill(address.number)
+    await area.getByText(t('bg', 'admissionArea.verdict.inside')).waitFor()
+  })
+
+  test('the calculator is in the English menu', async () => {
+    await open('en', '/search')
+    await page.getByRole('link', { name: t('en', 'nav.admission'), exact: true }).first().click()
+    await page.waitForURL(url => url.pathname === '/en/admission')
+    await page.getByRole('heading', { level: 1, name: t('en', 'admissionCalc.title') }).waitFor()
+  })
+})

@@ -1,0 +1,78 @@
+name: Live flows
+
+# Walks a parent's journeys on the live site in a real browser: the admission calculator,
+# cut-offs and catchment check, school facts and open days, social links, fees with
+# payment plans, compare, and schools without a verified pin. Each flow picks its school
+# from the live API. Runs after every deploy and daily, so data changes are caught too.
+# Read-only. GitHub emails the repository owner when a run fails; screenshots of failed
+# flows are attached to the run. Flows: frontend/e2e/live/ (one file per feature area).
+on:
+  workflow_run:
+    workflows: [Deploy]
+    types: [completed]
+    branches: [main]
+  schedule:
+    - cron: "23 6 * * *"
+  push:
+    branches: [agent/live-flows]
+  workflow_dispatch:
+    inputs:
+      site_url:
+        description: Site to check
+        type: string
+        default: https://schooldecider.com
+      api_url:
+        description: API the site reads from
+        type: string
+        default: https://api.schooldecider.com
+
+concurrency:
+  group: live-flows
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  flows:
+    name: Parent journeys
+    # After a deploy, only a successful one: a failed deploy rolled back and says so itself.
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          # The flows of the commit that was deployed, not of a later push.
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Flows
+        env:
+          LIVE_SITE_URL: ${{ inputs.site_url || 'https://schooldecider.com' }}
+          LIVE_API_URL: ${{ inputs.api_url || 'https://api.schooldecider.com' }}
+        # One retry, so a single slow answer does not page anyone.
+        run: npm run test:live || { echo "Retrying once in 60 seconds."; sleep 60; npm run test:live; }
+
+      - name: Upload screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-flows-report
+          path: frontend/live-flows-report/
+          if-no-files-found: ignore
