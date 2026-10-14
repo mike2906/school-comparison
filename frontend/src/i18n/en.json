@@ -1067,6 +1067,7 @@
       "grade_1": "1st grade",
       "preparatory": "Preparatory group"
     },
-    "calculate": "Calculate your points"
+    "calculate": "Calculate your points",
+    "quotaScores": "boys {{boys}}, girls {{girls}}"
   }
 }

@@ -66,6 +66,8 @@ export function sofiaToday(now = new Date()) {
 export function sameRules(cutoffRuleSet, ruleSet) {
   if (!cutoffRuleSet || !ruleSet) return null
   const [id, version] = String(cutoffRuleSet).split('@')
+  // Without a version the row does not say which rules it was ranked under.
+  if (!version) return null
   // Different campaigns of one family share the calculation when the same act is in force.
   const family = id.split('/').slice(0, -1).join('/')
   const ownFamily = ruleSet.id.split('/').slice(0, -1).join('/')
@@ -85,6 +87,10 @@ export function summaryRowsFor(summary, stage, { ageGroup = null } = {}) {
 /** The cut-off a row reports for a round: points, group and points, or a min score. */
 export function cutoffValue(round) {
   if (!round) return null
+  // Classes with gender quotas rank boys and girls separately, each with its own minimum.
+  if (round.min_score_boys != null || round.min_score_girls != null) {
+    return { kind: 'quota', boys: round.min_score_boys ?? null, girls: round.min_score_girls ?? null }
+  }
   if (round.min_score != null) return { kind: 'score', score: round.min_score }
   if (round.undersubscribed) return { kind: 'everyone' }
   if (round.last_admitted_group != null) {

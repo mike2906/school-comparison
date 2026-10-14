@@ -18,6 +18,13 @@ function CutoffValue({ round }) {
   if (!value) return <span className="text-neutral-400">—</span>
   if (value.kind === 'everyone') return <span>{t('cutoffs.everyone')}</span>
   if (value.kind === 'score') return <span className="tabular-nums">{value.score}</span>
+  if (value.kind === 'quota') {
+    return (
+      <span className="tabular-nums">
+        {t('cutoffs.quotaScores', { boys: value.boys ?? '—', girls: value.girls ?? '—' })}
+      </span>
+    )
+  }
   if (value.kind === 'group') {
     return (
       <span className="tabular-nums">

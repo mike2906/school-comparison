@@ -68,6 +68,7 @@ test('cut-offs are read against the rules version they were ranked under', () =>
   assert.equal(sameRules('bg/sofia/kindergarten/2025-2026@2024-02-29', rules), false)
   assert.equal(sameRules('bg/sofia/grade_1/2026-2027@2026-03-12', rules), false)
   assert.equal(sameRules(undefined, rules), null)
+  assert.equal(sameRules('bg/national/grade_8/2026-2027', rules), null, 'no version: unknown, not different')
 })
 
 test('summary rows are picked per tab and age group', () => {
@@ -86,6 +87,7 @@ test('summary rows are picked per tab and age group', () => {
 
 test('a round reports a score, a group with points, points, or room for everyone', () => {
   assert.deepEqual(cutoffValue({ min_score: 401.5 }), { kind: 'score', score: 401.5 })
+  assert.deepEqual(cutoffValue({ min_score: 380, min_score_boys: 380, min_score_girls: 412.25 }), { kind: 'quota', boys: 380, girls: 412.25 })
   assert.deepEqual(cutoffValue({ last_admitted_group: 2, last_admitted_points: 4 }), { kind: 'group', group: 2, points: 4 })
   assert.deepEqual(cutoffValue({ last_admitted_points: 14 }), { kind: 'points', points: 14 })
   assert.deepEqual(cutoffValue({ undersubscribed: true, last_admitted_points: 3 }), { kind: 'everyone' })

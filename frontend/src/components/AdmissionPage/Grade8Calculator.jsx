@@ -21,14 +21,17 @@ function Grade8Calculator({ selected }) {
 
   const gradeValues = Object.keys(params.grade_points).map(Number).sort((x, y) => y - x)
   // A class with an aptitude exam counts each НВО once and the exam twice (чл. 58 ал. 1).
-  const variants = hasExam ? [{ bulgarian: 1, math: 1 }] : params.nvo_weight_variants
-  const rows = variants.map(weights => {
+  // When the parent is not sure whether it has one, both kinds of formula are shown.
+  const examFormula = { weights: { bulgarian: 1, math: 1 }, examWeight: 2 }
+  const plainFormulas = params.nvo_weight_variants.map(weights => ({ weights, examWeight: 0 }))
+  const formulas = hasExam === true ? [examFormula] : hasExam === false ? plainFormulas : [...plainFormulas, examFormula]
+  const rows = formulas.map(({ weights, examWeight }) => {
     const result = EVALUATORS[ruleSet.evaluator].evaluate(
       params,
       { nvo, grades, exam },
-      { nvo_weights: weights, grade_subjects: GRADE_SUBJECTS, exam_weight: hasExam ? 2 : 0 }
+      { nvo_weights: weights, grade_subjects: GRADE_SUBJECTS, exam_weight: examWeight }
     )
-    return { weights, result }
+    return { weights, examWeight, result }
   })
   const invalid = rows.find(row => row.result.errors)?.result.errors || []
 
@@ -75,8 +78,8 @@ function Grade8Calculator({ selected }) {
             </Field>
           ))}
         </div>
-        <YesNo label={t('admissionCalc.g8.hasExam')} hint={t('admissionCalc.g8.hasExamHint')} value={hasExam} onChange={v => setHasExam(v === true)} />
-        {hasExam && (
+        <YesNo label={t('admissionCalc.g8.hasExam')} hint={t('admissionCalc.g8.hasExamHint')} value={hasExam} onChange={setHasExam} />
+        {hasExam !== false && (
           <NumberField
             label={t('admissionCalc.g8.exam', { max: params.exam_max })}
             value={exam}
@@ -101,11 +104,11 @@ function Grade8Calculator({ selected }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-100">
-              {rows.map(({ weights, result }) => (
-                <tr key={`${weights.bulgarian}-${weights.math}`}>
+              {rows.map(({ weights, examWeight, result }) => (
+                <tr key={`${weights.bulgarian}-${weights.math}-${examWeight}`}>
                   <td className="py-2 pr-3 text-neutral-800">
                     {t('admissionCalc.g8.formulaText', { bg: weights.bulgarian, math: weights.math })}
-                    {hasExam && ` + ${t('admissionCalc.g8.examPart')}`}
+                    {examWeight > 0 && ` + ${t('admissionCalc.g8.examPart')}`}
                   </td>
                   <td className="py-2 text-right font-medium tabular-nums text-neutral-900">{formatRange(result.score)}</td>
                 </tr>
