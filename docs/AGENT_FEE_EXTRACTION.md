@@ -148,7 +148,9 @@ it comes after steps 1 to 5 prove the runs are reliable.
    that the rules must not clear or withhold. Big PR (it changes what the API publishes):
    one `@codex review`. Experimental until step 3 passes: nothing calls it from `all`.
    Built 2026-10-13 as an experimental dry-run-by-default command (`fees-agent`, `--apply`
-   to write). Not yet wired: fee tables published only as images (`fee_image_reader.py`).
+   to write). Since 2026-10-14 the finder also reads up to 4 pictures named for fees with
+   `fee_image_reader.py` (594's tables are pictures), and a PDF's clean tables follow its text
+   one row per line (596's PDF text interleaves table rows); scanned PDFs are not read yet.
    A dry run still calls the models and records its pipeline run and spend; it writes no fees or pages.
    `--apply` withholds the school's website data and runs Stage 6 on it straight after
    writing, as an extraction does; if Stage 6 fails the data stays withheld.

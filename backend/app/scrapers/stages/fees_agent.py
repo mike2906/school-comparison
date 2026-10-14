@@ -55,6 +55,8 @@ from app.scrapers.fee_pages import fee_http_client, page_key, pdf_text
 from app.scrapers.price_evidence import _PRICE_RE, PriceRow, _amount_key
 from app.scrapers.shared_site_check import registrable_domain
 from app.scrapers.stages import common as stage_common
+from app.scrapers.stages import fee_images as fee_images_module
+from app.scrapers.stages.fee_images import fee_images
 from app.scrapers.validator import validate_school_data
 from app.services.pipeline_runs import finalize_pipeline_run, pipeline_run_heartbeat, start_pipeline_run
 from app.services.provider_costs import (
@@ -142,13 +144,15 @@ def _same_site(url: str, site: str) -> bool:
     return host == home and len(home_name) >= 5 and name == home_name
 
 
-async def _fetch(crawler, run_config, client, url: str) -> tuple[str, str, list[tuple[str, str]]]:
-    """(final URL, text, same-site links). PDFs are read with pdfplumber, pages rendered."""
+async def _fetch(
+    crawler, run_config, client, url: str
+) -> tuple[str, str, list[tuple[str, str]], list[tuple[str, str]]]:
+    """(final URL, text, same-site links, fee pictures). PDFs are read with pdfplumber, pages rendered."""
     if unquote(urlparse(url).path).lower().endswith(".pdf"):
         response = await client.get(url, follow_redirects=True, timeout=30)
         if response.status_code != 200:
-            return url, "", []
-        return str(response.url), await asyncio.to_thread(pdf_text, response.content), []
+            return url, "", [], []
+        return str(response.url), await asyncio.to_thread(pdf_text, response.content, tables=True), [], []
     for attempt in range(2):  # a site that throttles returns an empty page now and then (583)
         result = await asyncio.wait_for(crawler.arun(url=url, config=run_config), timeout=60)
         if getattr(result, "success", False):
@@ -156,13 +160,14 @@ async def _fetch(crawler, run_config, client, url: str) -> tuple[str, str, list[
         if attempt == 0:
             await asyncio.sleep(RETRY_SECONDS)
     else:
-        return url, "", []
+        return url, "", [], []
     markdown = getattr(result, "markdown", None)
     text = getattr(markdown, "raw_markdown", None) or str(markdown or "")
     found = getattr(result, "links", None) or {}
     links = [*(found.get("internal") or []), *(found.get("external") or [])]
     pairs = [(str(link["href"]), str(link.get("text") or "").strip()[:80]) for link in links if link.get("href")]
-    return str(getattr(result, "redirected_url", None) or url), text, pairs
+    final = str(getattr(result, "redirected_url", None) or url)
+    return final, text, pairs, fee_images(getattr(result, "html", None) or "", final)
 
 
 def _wordpress_api(url: str) -> tuple[str, dict[str, str]]:
@@ -247,9 +252,11 @@ async def find_pages(
     pick_prompt: str = PICK_PROMPT,
     fallback_links: re.Pattern = _FEE_LINK_RE,
     stage: str = STAGE,
+    read_pictures: bool = False,
 ) -> list[PageRead]:
     """Up to 3 hops and 12 pages from the home page; robots.txt is respected.
 
+    With ``read_pictures``, up to 4 pictures named for fees are read as pages of their own.
     The school-facts stage passes its own link prompt, fallback keywords and stage name."""
     from crawl4ai.utils import RobotsParser  # type: ignore
 
@@ -260,6 +267,14 @@ async def find_pages(
     seen: set[tuple] = set()
     links: dict[str, str] = {}
     queue = [site]
+    pictures: list[tuple[str, str]] = []
+
+    async def allowed(url: str) -> bool:
+        return await robots.can_fetch(url, CRAWLER_USER_AGENT)
+
+    def spent(cost: float) -> None:
+        spend.spent_usd += cost
+
     for hop in range(MAX_HOPS + 1):
         for url in queue:
             if page_key(url) in seen or len(read) >= MAX_FETCHES:
@@ -269,7 +284,7 @@ async def find_pages(
                 read.append(PageRead(url, "", False, "robots.txt"))
                 continue
             try:
-                final, text, page_links = await _fetch(crawler, run_config, client, url)
+                final, text, page_links, page_pictures = await _fetch(crawler, run_config, client, url)
             except Exception as exc:  # a failed page is recorded and skipped
                 read.append(PageRead(url, "", False, str(exc)[:120]))
                 continue
@@ -287,6 +302,19 @@ async def find_pages(
                 wordpress = api_text is not None
                 text = api_text or text
             read.append(PageRead(final, text, bool(_PRICE_RE.search(text))))
+            if read_pictures:
+                for urls in page_pictures:
+                    if len(pictures) >= fee_images_module.MAX_IMAGES or page_key(urls[0]) in seen:
+                        continue
+                    seen.add(page_key(urls[0]))
+                    if not spend.allows(fee_images_module.IMAGE_COST_ESTIMATE_USD):
+                        raise SpendCapReached(f"spent ${spend.spent_usd:.4f} of ${spend.cap_usd}")
+                    pictures.append(urls)
+                    picture = await fee_images_module.read_image(
+                        client, urls, school_id=school.id, stage=stage, allowed=allowed, on_cost=spent
+                    )
+                    if picture is not None:
+                        read.append(PageRead(picture[0], picture[1], bool(_PRICE_RE.search(picture[1]))))
             for href, label in page_links:
                 href = urldefrag(href)[0]
                 if _same_site(href, site) and not unquote(href).lower().endswith(_SKIPPED):
@@ -1042,7 +1070,7 @@ async def run_fees_agent(
                             await run_school(
                                 db,
                                 school,
-                                find=lambda s: find_pages(crawler, run_config, client, s, spend),
+                                find=lambda s: find_pages(crawler, run_config, client, s, spend, read_pictures=True),
                                 read=lambda s, pages, missed: read_fees(s, pages, spend, missed),
                                 apply=apply,
                                 gone=lambda url: page_gone(client, url),

@@ -194,15 +194,33 @@ def pdf_page_images(data: bytes) -> list[bytes]:
     return images
 
 
-def pdf_text(data: bytes) -> str:
-    """Text layer of a PDF's first pages; empty for a scanned (image-only) file."""
+def pdf_text(data: bytes, *, tables: bool = False) -> str:
+    """Text layer of a PDF's first pages; empty for a scanned (image-only) file.
+
+    With ``tables``, each page's clean tables follow its text one row per line (see
+    :func:`table_lines`)."""
     import pdfplumber
 
     parts: list[str] = []
     with pdfplumber.open(io.BytesIO(data)) as pdf:
         for page in pdf.pages[:MAX_PDF_PAGES]:
             parts.append(page.extract_text() or "")
+            if tables:
+                parts.extend("\n".join(table_lines(table)) for table in page.extract_tables())
     return "\n".join(part.strip() for part in parts if part.strip())[:MAX_TEXT_CHARS]
+
+
+def table_lines(table: list[list[str | None]]) -> list[str]:
+    """A PDF table's rows, one per line, cells joined by " | " and a cell's lines by " / ".
+
+    A PDF's text layer reads a table line by line across its cells, so a row whose cells
+    hold several lines comes out interleaved with the next row (596: "Plan 1 – € 9,500"
+    two lines above its grade). Only a whole grid is kept: a table with a merged or
+    missing cell (None) or a single column is a fragment, and its rows could pair
+    amounts that are not in one row."""
+    if not table or any(cell is None for row in table for cell in row) or max(len(row) for row in table) < 2:
+        return []
+    return [" | ".join(" / ".join(part.strip() for part in cell.splitlines() if part.strip()) for cell in row) for row in table]
 
 
 async def fetch_fee_documents(

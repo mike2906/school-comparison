@@ -468,3 +468,51 @@ async def test_a_timed_out_fee_page_is_fetched_once_more():
     assert [document.url for document in documents] == [f"{SITE}/fees"]
     # One retry after a timeout, none after another failure; a second timeout is given up.
     assert attempts == {f"{SITE}/fees": 2, f"{SITE}/taksi": 2, f"{SITE}/ceni": 1}
+
+
+def test_a_pdf_table_is_given_one_row_per_line():
+    from app.scrapers.fee_pages import table_lines
+
+    # 596's secondary fees: the text layer puts "Plan 1 – € 9,500" two lines above its grade.
+    table = [
+        ["Grade", "Payment Plan", "Plan 1", "Plan 2", "Plan 3"],
+        ["Grade 8 – 9", "Plan 1 – € 9,500\nPlan 2 – € 9,700\nPlan 3 – € 9,950", "1 x € 9,500", "2 x € 4,850",
+         "1 x € 2,950 initial\n9 x € 780 monthly"],
+    ]  # fmt: skip
+    assert table_lines(table) == [
+        "Grade | Payment Plan | Plan 1 | Plan 2 | Plan 3",
+        "Grade 8 – 9 | Plan 1 – € 9,500 / Plan 2 – € 9,700 / Plan 3 – € 9,950 | 1 x € 9,500 | 2 x € 4,850 | "
+        "1 x € 2,950 initial / 9 x € 780 monthly",
+    ]
+
+
+def test_a_pdf_table_with_a_merged_cell_or_one_column_is_left_out():
+    from app.scrapers.fee_pages import table_lines
+
+    # 596's primary fees: merged cells pair "Plan 1" with Plan 3's first payment.
+    merged = [["Grade 0", "", "1 x € 8.950"], [None, "Plan 1 - € 8.950", "1 x € 2.650 initial"]]
+    assert table_lines(merged) == []
+    assert table_lines([["ТАКСИ ЗА УЧЕБНАТА 2026/2027\n€ 7880 € 8190"]]) == []
+    assert table_lines([]) == []
+
+
+def test_fee_pictures_are_the_ones_named_for_fees():
+    from app.scrapers.stages.fee_images import fee_images
+
+    base = "https://stgeorgeschool.eu/school-fees-2026-2027/"
+    html = (
+        '<main><img src="/wp-content/uploads/2026/01/SGS-FEES-2026-2027-ENG-700x453.png" width="700">'
+        '<img src="/wp-content/uploads/2026/01/campus-700x453.jpg" width="700">'
+        '<img src="/wp-content/uploads/2026/01/table.png" alt="Такси 2026" width="700">'
+        '<img src="/wp-content/uploads/logo.png"></main>'
+    )
+    assert fee_images(html, base) == [
+        (
+            "https://stgeorgeschool.eu/wp-content/uploads/2026/01/SGS-FEES-2026-2027-ENG.png",
+            "https://stgeorgeschool.eu/wp-content/uploads/2026/01/SGS-FEES-2026-2027-ENG-700x453.png",
+        ),
+        (
+            "https://stgeorgeschool.eu/wp-content/uploads/2026/01/table.png",
+            "https://stgeorgeschool.eu/wp-content/uploads/2026/01/table.png",
+        ),
+    ]

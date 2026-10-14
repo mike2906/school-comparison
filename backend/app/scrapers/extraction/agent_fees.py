@@ -130,7 +130,7 @@ Rules:
   - A yearly total only if the site prints it.
 - Never build a range from two different fees (a full-day and a half-day price are two entries). A range only when the site prints one.
 - source_url: the URL of the page the fee is on.
-- evidence: the line of the page the amount is on, copied character for character, and the lines of its payment options. For a table row, also copy the heading line that gives its period, plan or group, as a separate line. If the period is stated in a sentence above the table, copy that sentence too.
+- evidence: the line of the page the amount is on, copied character for character, and the lines of its payment options. For a table row, also copy the heading line that gives its period, plan or group, as a separate line. If the period is stated in a sentence above the table, copy that sentence too. A PDF's tables are repeated after its text, one row per line with cells split by " | " and a cell's lines by " / ": when the text above splits a table row over several lines, copy the row and its heading row from there instead of joining lines yourself.
 - label: the site's own wording, short. academic_year, age_group and plan_name as the site states them, or null. plan_name names what the fee buys (full day, half day), not a way of paying: a payment plan's name is its option's label."""
 
 

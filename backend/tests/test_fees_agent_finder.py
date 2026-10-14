@@ -34,9 +34,10 @@ class _Crawler:
         result = results.pop(0) if len(results) > 1 else results[0]
         if result is None:
             return SimpleNamespace(success=False)
-        text, links = result
+        text, links, html = (*result, "")[:3]
         return SimpleNamespace(
             success=True,
+            html=html,
             markdown=SimpleNamespace(raw_markdown=text),
             links={"internal": [{"href": h, "text": t} for h, t in links if "meridian22.org" in h],
                    "external": [{"href": h, "text": t} for h, t in links if "meridian22.org" not in h]},
@@ -252,3 +253,45 @@ async def test_a_wordpress_api_that_is_down_for_a_moment_is_asked_again(monkeypa
     monkeypatch.setattr(fees_agent, "_pick", _picks([fees, prices]))
     await fees_agent.find_pages(crawler, None, client, _school(), Spend(0.05))
     assert len(client.gets) == 3
+
+
+_FEES_PICTURE = "https://meridian22.org/wp-content/uploads/fees-2026-700x453.png"
+_PICTURE_PAGE = '<main><img src="/wp-content/uploads/fees-2026-700x453.png" width="700"></main>'
+
+
+def _picture_reads(monkeypatch, text="Grade 1 | 7 880 €"):
+    reads = []
+
+    async def read_image(client, urls, *, school_id, stage, allowed, on_cost):
+        reads.append((urls, stage))
+        on_cost(0.03)
+        return (urls[0], text)
+
+    monkeypatch.setattr(fees_agent.fee_images_module, "read_image", read_image)
+    return reads
+
+
+async def test_a_fee_picture_is_read_as_a_page_of_its_own(monkeypatch):
+    reads = _picture_reads(monkeypatch)
+    crawler = _Crawler({HOME: [("Такси: депозит " + "x" * 300, [], _PICTURE_PAGE)]})
+    spend = Spend(0.5)
+    read = await fees_agent.find_pages(crawler, None, _Client(), _school(), spend, read_pictures=True)
+    original = "https://meridian22.org/wp-content/uploads/fees-2026.png"
+    assert reads == [((original, _FEES_PICTURE), fees_agent.STAGE)]
+    assert [(p.url, p.text, p.prices) for p in read][1:] == [(original, "Grade 1 | 7 880 €", True)]
+    assert spend.spent_usd == pytest.approx(0.03)
+
+
+async def test_pictures_are_read_only_when_asked(monkeypatch):
+    reads = _picture_reads(monkeypatch)
+    crawler = _Crawler({HOME: [("Такси " + "x" * 300, [], _PICTURE_PAGE)]})
+    read = await fees_agent.find_pages(crawler, None, _Client(), _school(), Spend(0.5))
+    assert reads == [] and [p.url for p in read] == [HOME]
+
+
+async def test_a_fee_picture_past_the_spend_cap_stops_the_school(monkeypatch):
+    reads = _picture_reads(monkeypatch)
+    crawler = _Crawler({HOME: [("Такси " + "x" * 300, [], _PICTURE_PAGE)]})
+    with pytest.raises(SpendCapReached):
+        await fees_agent.find_pages(crawler, None, _Client(), _school(), Spend(0.01), read_pictures=True)
+    assert reads == []
