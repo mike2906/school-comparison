@@ -15,6 +15,7 @@ import json
 import logging
 import re
 from collections.abc import Awaitable, Callable, Iterable, Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from decimal import Decimal
 from pathlib import Path
@@ -100,12 +101,27 @@ class SpendCapReached(RuntimeError):
 
 
 class Spend:
+    """The run's spend so far, plus the estimates of calls in flight (several schools read
+    at once), checked against the cap before each call."""
+
     def __init__(self, cap_usd: float):
         self.cap_usd = cap_usd
         self.spent_usd = 0.0
+        self.pending_usd = 0.0
 
     def allows(self, estimate_usd: float) -> bool:
-        return self.spent_usd + estimate_usd <= self.cap_usd
+        return self.spent_usd + self.pending_usd + estimate_usd <= self.cap_usd
+
+    @contextmanager
+    def hold(self, estimate_usd: float):
+        """Count ``estimate_usd`` as spent while a call is in flight; refuse it over the cap."""
+        if not self.allows(estimate_usd):
+            raise SpendCapReached(f"spent ${self.spent_usd:.4f} of ${self.cap_usd}")
+        self.pending_usd += estimate_usd
+        try:
+            yield
+        finally:
+            self.pending_usd -= estimate_usd
 
 
 class Picks(BaseModel):
@@ -242,13 +258,14 @@ async def _pick(
     pages = "\n".join(f"- {page.url} ({'shows prices' if page.prices else 'no prices'})" for page in read)
     shown = "\n".join(f"{url} | {text}" for url, text in links[:MAX_LINKS_SHOWN])
     try:
-        result = await execute_billable_request(
-            lambda: agent.run(f"Institution: {name}\n\nRead so far:\n{pages}\n\nLinks:\n{shown}"),
-            model=get_model("cheap"),
-            school_id=school.id,
-            stage=stage,
-            timeout_seconds=60,
-        )
+        with spend.hold(PICK_COST_ESTIMATE_USD):
+            result = await execute_billable_request(
+                lambda: agent.run(f"Institution: {name}\n\nRead so far:\n{pages}\n\nLinks:\n{shown}"),
+                model=get_model("cheap"),
+                school_id=school.id,
+                stage=stage,
+                timeout_seconds=60,
+            )
     except ProviderResponseUnattributed:
         # Counted at its assumed maximum, as the ledger counts it; the caller falls back to keyword links.
         spend.spent_usd += float(settings.provider_request_reserve_usd)
@@ -338,19 +355,18 @@ async def find_pages(
                     if not fee_images_module.on_site(picture, site):
                         continue
                     seen.add(page_key(picture[0]))
-                    if not spend.allows(fee_images_module.IMAGE_COST_ESTIMATE_USD):
-                        raise SpendCapReached(f"spent ${spend.spent_usd:.4f} of ${spend.cap_usd}")
-                    pictures.append(picture)
-                    found = await fee_images_module.read_image(
-                        client,
-                        picture,
-                        page_url=final,
-                        site_url=site,
-                        school_id=school.id,
-                        stage=stage,
-                        allowed=allowed,
-                        on_cost=spent,
-                    )
+                    with spend.hold(fee_images_module.IMAGE_COST_ESTIMATE_USD):
+                        pictures.append(picture)
+                        found = await fee_images_module.read_image(
+                            client,
+                            picture,
+                            page_url=final,
+                            site_url=site,
+                            school_id=school.id,
+                            stage=stage,
+                            allowed=allowed,
+                            on_cost=spent,
+                        )
                     if found is not None:
                         # A fee table's picture often prints bare numbers ("15 350") under a
                         # currency heading, which the price pattern misses (594): any amount
@@ -422,7 +438,8 @@ async def read_fees(school: School, pages: list[PageRead], spend: Spend, missed:
             "amounts may be from an older year or not be fees: the rules above still decide."
         )
     in_price, out_price = get_model_costs("pricing")
-    if not spend.allows((len(text) / 3 * in_price + READ_OUTPUT_TOKENS_RESERVE * out_price) / 1_000_000):
+    estimate = (len(text) / 3 * in_price + READ_OUTPUT_TOKENS_RESERVE * out_price) / 1_000_000
+    if not spend.allows(estimate):  # before building the agent: a stopped run makes nothing
         raise SpendCapReached(f"spent ${spend.spent_usd:.4f} of ${spend.cap_usd}")
     agent = create_agent(
         "pricing",
@@ -432,13 +449,14 @@ async def read_fees(school: School, pages: list[PageRead], spend: Spend, missed:
         model_settings={"temperature": get_settings().extraction_temperature},
     )
     name = (school.name_i18n or {}).get("bg") or (school.name_i18n or {}).get("en")
-    result = await execute_billable_request(
-        lambda: agent.run(f"Institution: {name} ({school.school_type} {school.education_level})\n\n{text}"),
-        model=get_model("pricing"),
-        school_id=school.id,
-        stage=STAGE,
-        timeout_seconds=240,
-    )
+    with spend.hold(estimate):
+        result = await execute_billable_request(
+            lambda: agent.run(f"Institution: {name} ({school.school_type} {school.education_level})\n\n{text}"),
+            model=get_model("pricing"),
+            school_id=school.id,
+            stage=STAGE,
+            timeout_seconds=240,
+        )
     spend.spent_usd += extract_provider_cost_usd(result)
     read = FeeRead(result.output.fees)
     read.discounts = result.output.discounts

@@ -372,3 +372,13 @@ async def test_a_failed_page_is_not_cached_so_the_second_finder_tries_again(monk
     second = await fees_agent.find_pages(crawler, None, _Client(), _school(), Spend(0.05), cache=cache)
     assert crawler.calls == [HOME] and tries == [broken, broken]
     assert second[-1].url == broken and second[-1].note == "slow site"
+
+
+def test_calls_in_flight_count_against_the_cap():
+    spend = Spend(0.10)
+    with spend.hold(0.06):
+        assert not spend.allows(0.05)  # a second worker's call would pass the cap
+        with pytest.raises(SpendCapReached):
+            with spend.hold(0.05):
+                pass
+    assert spend.pending_usd == 0 and spend.allows(0.05)

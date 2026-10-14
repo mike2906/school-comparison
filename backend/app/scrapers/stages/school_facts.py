@@ -64,9 +64,10 @@ def model_caller(spend: Spend) -> Caller:
         agent = create_agent(
             TIER, prompt, schema, retries=1, model_settings={"temperature": get_settings().extraction_temperature}
         )
-        result = await execute_billable_request(
-            lambda: agent.run(message), model=get_model(TIER), school_id=school_id, stage=STAGE, timeout_seconds=150
-        )
+        with spend.hold(_estimate_usd(message)):
+            result = await execute_billable_request(
+                lambda: agent.run(message), model=get_model(TIER), school_id=school_id, stage=STAGE, timeout_seconds=150
+            )
         spend.spent_usd += extract_provider_cost_usd(result)
         return result.output
 

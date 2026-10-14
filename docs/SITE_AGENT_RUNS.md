@@ -40,8 +40,11 @@ the calls are a large part of each school's time.
   id order too, each once every lower id is done, so `--after-id` with the last line's id
   still skips no school (a few schools read past it are read again). An error the stage
   did not catch becomes that school's `error` result instead of ending the run.
-- The in-process `Spend` check does not count calls in flight in other workers, so near
-  the cap up to N calls can pass it at once; the ledger reservation above is the hard cap.
+- The in-process `Spend` check counts calls in flight in every worker at their estimate
+  (`Spend.hold`), and the estimates assume a full output, so with N workers the run
+  still stops before its cap on our own numbers; the ledger reservation above stays the
+  backstop. The DB engine allows 35 connections (5 + 30 overflow): each worker holds
+  one, each call in flight takes a short one for the ledger, plus the heartbeat.
 - Politeness: one school's pages are still fetched one at a time, and schools on one
   site (same host, or a domain of their own under another ending, e.g. meridian22.org and
   meridian22.bg, which the fees finder treats as one site) are handed to one worker and
