@@ -47,6 +47,12 @@ Sofia state schools and kindergartens take the municipality's points
 (`scripts/import_sofia_municipal_points.py`); a single-location school whose register
 address is only its complex matches its one numbered point by name (`match_by_name`).
 
+Any city: `cli website-pins [--apply]` (after geocoding) pins a hidden location on its own
+website's map point only when Nominatim's nearest building there has our street and house
+number. The website itself is not trusted (wrong sites, other branches fail the check).
+In Sofia (2026-10-14) about 1 in 5 private sites with a map point passed; most private
+kindergartens have no free source that places them.
+
 ## Reusing a point for another record (UF44)
 
 - **Official building point first:** a location whose address gives the same street and house
