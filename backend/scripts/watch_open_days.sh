@@ -72,6 +72,9 @@ if [ ! -f "$state/open_days_unpublished" ]; then
 	if ! PROVIDER_REQUEST_RESERVE_USD="${PROVIDER_REQUEST_RESERVE_USD:-0.01}" \
 		uv run python -m app.scrapers.cli open-days --city "$city" --apply --max-usd "$max_usd" --out "$report" > /dev/null; then
 		echo "$today $max_usd" >> "$state/open_days_spend"  # unknown: count the whole cap
+		# Schools write one at a time, so some may have stored dates before it failed: publish
+		# them next hour (their hashes are stored, so a later run would not see them as new).
+		touch "$state/open_days_unpublished"
 		stop "the open-days stage failed"
 	fi
 	python3 -c 'import json, sys; print(sys.argv[2], json.load(open(sys.argv[1]))["spent_usd"])' "$report" "$today" >> "$state/open_days_spend"
@@ -82,6 +85,8 @@ print(json.dumps({k: r[k] for k in ("schools", "outcomes", "facts_changed", "spe
 	log "checked: $summary"
 	changed="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["facts_changed"])' "$report")"
 	stopped="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["stopped"] or "")' "$report")"
+	errors="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["outcomes"].get("error", 0))' "$report")"
+	schools="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["schools"])' "$report")"
 	# Old reports: keep a month.
 	find "$state" -name 'open-days-*.json' -mtime +30 -delete
 	[ "$changed" = 0 ] || touch "$state/open_days_unpublished"
@@ -92,6 +97,8 @@ print(json.dumps({k: r[k] for k in ("schools", "outcomes", "facts_changed", "spe
 	"run stopped"*) stop "$stopped" ;; # a crash, not a cap: what it wrote is published next hour
 	*) log "run stopped early: $stopped" ;;
 	esac
+	# A few broken sites are normal; most schools failing is the check failing.
+	[ $((errors * 10)) -le "$schools" ] || stop "$errors of $schools schools failed"
 	date -u +%s > "$state/open_days_last_ok"
 fi
 

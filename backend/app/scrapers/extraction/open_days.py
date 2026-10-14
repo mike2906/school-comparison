@@ -99,6 +99,8 @@ def mention_hash(text: str) -> str:
         line if MENTION_RE.search(line) or _DATE_RE.search(line) else re.sub(r"\d+", "#", line)
         for line in mention_lines(text)
     ]
+    # The cleaned lines keep a link's text only: a sign-up form moved to a new address is a change.
+    lines += mention_links(text, HASH_CONTEXT)
     return hashlib.sha256("\n".join(lines).encode()).hexdigest()[:16] if lines else ""
 
 
@@ -121,13 +123,17 @@ def excerpt(text: str) -> str:
 _MD_LINK_RE = re.compile(r"\]\(<?([^()\s<>]+)")
 
 
-def mention_links(text: str) -> list[str]:
-    """Link addresses on the raw lines that mention open days or applications (a news
-    headline linking its article)."""
-    found: list[str] = []
-    for line in text.splitlines():
+def mention_links(text: str, context: int = 0) -> list[str]:
+    """Link addresses on the raw lines that mention open days or applications, and on the
+    ``context`` lines either side (a news headline linking its article, a sign-up button)."""
+    raw = [line for line in text.splitlines() if line.strip()]
+    keep: set[int] = set()
+    for n, line in enumerate(raw):
         if MENTION_RE.search(_normalise(line)):
-            found += [link for link in _MD_LINK_RE.findall(line) if link not in found]
+            keep.update(range(max(0, n - context), min(len(raw), n + context + 1)))
+    found: list[str] = []
+    for n in sorted(keep):
+        found += [link for link in _MD_LINK_RE.findall(raw[n]) if link not in found]
     return found
 
 

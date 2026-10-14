@@ -92,6 +92,9 @@ async def check_school(school: School, fetch: Fetcher, call: Caller, today: date
             report["pages"].append({"url": url, "note": str(exc)[:120]})
             return None
         seen.add(page_key(final))
+        if not _same_site(final, site):  # redirected to another site: its dates are not this school's
+            report["pages"].append({"url": url, "note": f"redirected to {final}"})
+            return None
         pages.append(PageRead(url, text, False))  # the URL asked for: the watch list's key
         report["pages"].append({"url": url, "chars": len(text)})
         return text, links
@@ -130,10 +133,10 @@ async def check_school(school: School, fetch: Fetcher, call: Caller, today: date
     report["changed"] = [page.url for page in changed]
 
     readable = [(page.url, page.text) for page in pages if page.text.strip()]
+    removed = _gone(school, pages)
     kept: list[tuple[DateFact, str, str]] = []
     if changed:
-        kept, report["facts"] = await _read_dates(school, changed, readable, call, today)
-    removed = _gone(school, pages)
+        kept, report["facts"] = await _read_dates(school, changed, readable, call, today, removed)
     if not kept and not removed:
         return report | {"outcome": "changed, nothing new" if changed else "unchanged"}
     # Merged into the stored facts at write time (``merged``), under the row lock.
@@ -145,7 +148,12 @@ async def check_school(school: School, fetch: Fetcher, call: Caller, today: date
 
 
 async def _read_dates(
-    school: School, changed: list[PageRead], readable: list[tuple[str, str]], call: Caller, today: datetime.date
+    school: School,
+    changed: list[PageRead],
+    readable: list[tuple[str, str]],
+    call: Caller,
+    today: datetime.date,
+    removed: Sequence[dict] = (),
 ) -> tuple[list[tuple[DateFact, str, str]], list[dict]]:
     """The reader's upcoming dates that pass the facts checks: (fact, page, grade), and the report rows."""
     text = "\n\n".join(f"=== PAGE {page.url}\n{rules.excerpt(page.text)}" for page in changed)
@@ -159,7 +167,9 @@ async def _read_dates(
     stored_quotes = {
         facts_rules.quote_key(fact)
         for row in ((school.attributes or {}).get(ATTRIBUTE_KEY) or {}).get("facts") or []
-        if isinstance(row, dict) and (fact := facts_rules.stored_as_fact(row))
+        if isinstance(row, dict)
+        and all(row is not gone for gone in removed)
+        and (fact := facts_rules.stored_as_fact(row))
     }
     for fact in read.facts:
         url = facts_rules.quote_on_page(fact, readable)
@@ -196,7 +206,8 @@ async def _read_dates(
 
 
 def _gone(school: School, pages: list[PageRead]) -> list[dict]:
-    """Stored date facts from a page read again in full whose quote is no longer on it."""
+    """Stored date facts from a page read again in full whose quote, or sign-up link, is no
+    longer on it (a link moved to a new form is read again with the changed lines)."""
     full = [(page.url, page.text) for page in pages if len(page.text.strip()) >= THIN_PAGE_CHARS]
     read_keys = {page_key(url) for url, _ in full}
     gone = []
@@ -204,7 +215,9 @@ def _gone(school: School, pages: list[PageRead]) -> list[dict]:
         fact = facts_rules.stored_as_fact(row)
         if fact is None or page_key(row.get("source_url") or "") not in read_keys:
             continue
-        if not facts_rules.quote_on_page(fact, full):
+        if not facts_rules.quote_on_page(fact, full) or (
+            fact.register_url and not facts_rules.link_on_page(fact.register_url, full)
+        ):
             gone.append(row)
     return gone
 
@@ -231,8 +244,13 @@ async def run_school(
     if not apply or watch is None:
         return report
     # The check takes a while and other stages write other attributes keys meanwhile:
-    # re-read the row under a lock so only these keys change.
-    await db.refresh(school, attribute_names=["attributes"], with_for_update=True)
+    # re-read the row under a lock so only these keys change. A website changed meanwhile
+    # makes this check's dates another site's: nothing is written.
+    checked_site = school.website_url
+    await db.refresh(school, attribute_names=["attributes", "website_url"], with_for_update=True)
+    if _site(school.website_url) != _site(checked_site):
+        await db.rollback()
+        return report | {"outcome": "website changed during the check"}
     attributes = dict(school.attributes or {})
     if add is not None:
         block = attributes.get(ATTRIBUTE_KEY) or facts_stage.facts_block(

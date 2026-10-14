@@ -129,7 +129,10 @@ and cheaply:
    facts at least as `more` (the judge grades for choosing a school, and a `minor` fact
    would stay out of the dates at a glance). A page whose stored dates a full facts read
    did not carry is read again once.
-4. **Remove.** A stored date fact whose page was read again without its quote is removed.
+4. **Remove.** A stored date fact whose page was read again in full without its quote or
+   its sign-up link is removed (a moved sign-up link changes the hash, so it is read
+   again). A page that redirects to another site is not read. A fact whose open days have
+   all passed is not shown (`publishable_school_facts`), whichever stage stored it.
 
 About $0.001 to $0.002 a school whose mentions changed; nothing otherwise. The first run
 reads every school that mentions open days (estimated at $0.10 to $0.30 for Sofia; measured on the first run).
@@ -139,7 +142,8 @@ hourly, doing nothing until a check is due (a day after the last, a week in July
 August), so a laptop that slept catches up at the next hour. $0.30 a run and $0.60 a day
 at most (`OPEN_DAYS_MAX_USD`, `OPEN_DAYS_DAY_USD`). It publishes with
 `publish_snapshot.sh` only when some school's dates changed; a failed run or publish opens
-one GitHub issue, "Open-days check stopped", and retries at the next hour. Log and reports:
+one GitHub issue, "Open-days check stopped", and retries at the next hour; so does a run
+in which more than 1 school in 10 failed. Log and reports:
 `~/.local/state/schooldecider/open_days.log`, `open-days-*.json` (kept a month). Setup:
 
 ```

@@ -179,7 +179,7 @@ class _Db:
         self.commits, self.fresh_attributes = 0, fresh_attributes
 
     async def refresh(self, obj, attribute_names=None, with_for_update=None):
-        assert attribute_names == ["attributes"] and with_for_update
+        assert attribute_names == ["attributes", "website_url"] and with_for_update
         if self.fresh_attributes is not None:
             obj.attributes = self.fresh_attributes
 
@@ -221,3 +221,63 @@ async def test_a_home_page_not_read_changes_nothing():
     school, db = _school(other=1), _Db()
     report = await stage.run_school(db, school, fetch=_fetcher({}), call=_Calls(), apply=True, today=TODAY)
     assert report["outcome"] == "not_read" and db.commits == 0 and school.attributes == {"other": 1}
+
+
+def test_the_stage_is_tracked_for_the_cost_ledger():
+    from app.services.pipeline_runs import stage_is_tracked
+
+    assert stage_is_tracked(stage.STAGE)
+
+
+def test_a_moved_sign_up_link_is_a_change():
+    page = f"{ANNOUNCEMENT}\n\n[Запишете се](https://school.example/form-1)"
+    assert rules.mention_hash(page) != rules.mention_hash(page.replace("form-1", "form-2"))
+
+
+@pytest.mark.asyncio
+async def test_a_page_redirected_to_another_site_is_not_read():
+    async def fetch(url):
+        if url == ADMISSIONS:
+            return "https://other.example/news", HOME_TEXT, []
+        return url, HOME_TEXT if url == HOME else "", []
+
+    school = _school(open_days_watch={"pages": {ADMISSIONS: "x"}})
+    calls = _Calls([_date_fact()], key=[1])
+    report = await stage.check_school(school, fetch, calls, TODAY)
+    assert report["changed"] == [HOME]
+    assert {"url": ADMISSIONS, "note": "redirected to https://other.example/news"} in report["pages"]
+
+
+@pytest.mark.asyncio
+async def test_nothing_is_written_when_the_website_changed_during_the_check():
+    class _MovedDb(_Db):
+        async def refresh(self, obj, attribute_names=None, with_for_update=None):
+            assert "website_url" in attribute_names
+            obj.website_url = "https://new-site.example/"
+
+        async def rollback(self):
+            pass
+
+    school, db = _school(other=1), _MovedDb()
+    report = await stage.run_school(
+        db, school, fetch=_fetcher({HOME: HOME_TEXT}), call=_Calls([_date_fact()], key=[1]), apply=True, today=TODAY
+    )
+    assert report["outcome"] == "website changed during the check" and db.commits == 0
+    assert school.attributes == {"other": 1}
+
+
+def test_a_passed_open_day_is_not_shown():
+    from app.utils.school_facts import publishable_school_facts
+
+    def row(day):
+        return {
+            "topic": "admissions",
+            "text_i18n": {"bg": "Ден", "en": f"Open day on {day}"},
+            "source_url": HOME,
+            "rank": "more",
+            "open_days": [day],
+        }
+
+    block = {"_schema_version": 1, "website_url": HOME, "facts": [row("2000-04-16"), row("2999-11-15")]}
+    shown = publishable_school_facts({"school_facts": block}, HOME)
+    assert [fact["open_days"] for fact in shown["facts"]] == [["2999-11-15"]]

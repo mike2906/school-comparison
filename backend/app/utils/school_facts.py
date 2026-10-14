@@ -277,6 +277,7 @@ def publishable_school_facts(attributes: Any, website_url: Optional[str]) -> Opt
         return None
     facts = []
     key_per_topic: dict[str, int] = {}
+    today = datetime.date.today().isoformat()
     for fact in block.get("facts") or []:
         if not isinstance(fact, Mapping):
             continue
@@ -290,6 +291,9 @@ def publishable_school_facts(attributes: Any, website_url: Optional[str]) -> Opt
             and all(isinstance(text.get(lang), str) and text[lang].strip() for lang in ("bg", "en"))
         ):
             continue
+        labels = _labels(fact)
+        if labels.get("open_days") and max(labels["open_days"]) < today:
+            continue  # an open day that has passed ("Open day on 16 April") is not news any more
         topic = fact["topic"]
         rank = fact.get("rank") if fact.get("rank") in RANKS else "key"
         if rank == "key":
@@ -303,7 +307,7 @@ def publishable_school_facts(attributes: Any, website_url: Optional[str]) -> Opt
                 "text_i18n": {"bg": text["bg"], "en": text["en"]},
                 "source_url": url,
                 "rank": rank,
-                **_labels(fact),
+                **labels,
             }
         )
     if not facts:
