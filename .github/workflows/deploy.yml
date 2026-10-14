@@ -279,6 +279,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Built monthly by road-graph.yml. Without it the site still works; drive times say
+      # they could not be loaded.
+      - name: Fetch the road graph
+        run: |
+          mkdir -p public/routing
+          curl -fsSL --retry 3 -o public/routing/sofia-roads.bin.gz \
+            "https://github.com/$GITHUB_REPOSITORY/releases/download/road-graph/sofia-roads.bin.gz" \
+            || { rm -f public/routing/sofia-roads.bin.gz; echo "::warning::No road graph release yet: drive times are unavailable"; }
+
       - name: Build
         env:
           VITE_SITE_ORIGIN: ${{ env.SITE_ORIGIN }}
