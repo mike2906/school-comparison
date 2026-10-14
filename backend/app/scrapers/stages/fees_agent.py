@@ -342,11 +342,22 @@ async def find_pages(
         except Exception as exc:  # a timed-out pick (541) falls back to the keyword links below
             logger.warning("fees-agent link pick failed for school %s: %s", school.id, exc)
             queue = []
-        if not queue:
-            queue = [url for url, label in unopened if fallback_links.search(f"{unquote(url)} {label}")][:MAX_PICKS]
+        # Places the picker leaves free go to the keyword links, this year's first: 594's
+        # picker chose the application forms over /school-fees-2026-2027/ in one run of two.
+        keyword = [url for url, label in unopened if url not in queue and fallback_links.search(f"{unquote(url)} {label}")]
+        this_year = _this_years_pages()
+        keyword.sort(key=lambda url: not this_year.search(f"{unquote(url)} {links.get(url, '')}"))
+        queue = (queue + keyword)[:MAX_PICKS]
         if not queue:
             break
     return read + picture_pages
+
+
+def _this_years_pages() -> re.Pattern:
+    """A URL or link text naming this school year or the next ("2026-2027", "2027/28")."""
+    start = int(current_academic_year()[:4])
+    years = [(str(year), str(year + 1)) for year in (start, start + 1)]
+    return re.compile("|".join(rf"{first}\D{{0,3}}(?:{second}|{second[2:]})\b" for first, second in years))
 
 
 # ---------------------------------------------------------------------------

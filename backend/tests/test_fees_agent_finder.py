@@ -295,3 +295,18 @@ async def test_a_fee_picture_past_the_spend_cap_stops_the_school(monkeypatch):
     with pytest.raises(SpendCapReached):
         await fees_agent.find_pages(crawler, None, _Client(), _school(), Spend(0.01), read_pictures=True)
     assert reads == []
+
+
+async def test_places_the_picker_leaves_free_go_to_this_years_fee_links(monkeypatch):
+    forms = "https://meridian22.org/admission/forms/"
+    old = "https://meridian22.org/fees-2019-2020/"
+    this_year = "https://meridian22.org/school-fees-2026-2027/"
+    others = [f"https://meridian22.org/fees-{n}/" for n in range(5)]
+    links = [(forms, "Forms"), (old, "Fees"), *[(u, "Fees") for u in others], (this_year, "School fees")]
+    crawler = _Crawler({HOME: [("Начало " + "x" * 300, links)]})
+    monkeypatch.setattr(fees_agent, "_pick", _picks([forms]))
+    monkeypatch.setattr(fees_agent, "current_academic_year", lambda: "2026/2027")
+    monkeypatch.setattr(fees_agent, "MAX_HOPS", 1)
+    read = await fees_agent.find_pages(crawler, None, _Client(), _school(), Spend(0.05))
+    assert [p.url for p in read][1:3] == [forms, this_year]
+    assert len(read) == 1 + fees_agent.MAX_PICKS
