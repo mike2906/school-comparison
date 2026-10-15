@@ -355,21 +355,25 @@ def esri_id(location: SchoolLocation) -> Optional[str]:
 
 
 def match_by_id(row: Row, buildings: dict[str, Point]) -> Row:
-    """An unmatched kindergarten building placed by kg.sofia.bg's id for it.
+    """A hidden kindergarten building placed by kg.sofia.bg's id for it.
 
-    The id is the join; the point's number or address must still agree with ours, so an id
-    reused for another kindergarten is not taken."""
-    if row.status in MATCHED:
+    Only a location the map hides (``needs_pin``) is placed, never one already pinned. The
+    layer's id is not always kg.sofia.bg's id for the same kindergarten (merged or
+    renumbered ones), so the point's name must carry our number, and a building name
+    ("сграда 2") must be ours too; anything else is reported as "id_name_mismatch"."""
+    from app.scrapers.stages.website_pins import needs_pin
+
+    if row.status in MATCHED or not needs_pin(row.location):
         return row
     point = buildings.get(esri_id(row.location) or "")
     if point is None:
         return row
     name = (row.school.name_i18n or {}).get("bg") or ""
-    address = (row.location.address_i18n or {}).get("bg") or ""
     key = name_key(name)
-    if (key and name_key(point.name) == key) or addresses_agree(address, point.address):
+    ours, theirs = building_suffix(name), building_suffix(point.name)
+    if key and name_key(point.name) == key and (not ours or not theirs or ours == theirs):
         return Row(row.location, row.school, "match_by_id", point, [point])
-    return Row(row.location, row.school, "id_disagrees", None, [point])
+    return Row(row.location, row.school, "id_name_mismatch", None, [point])
 
 
 def write_report(rows: list[Row], report_dir: Path) -> Path:
