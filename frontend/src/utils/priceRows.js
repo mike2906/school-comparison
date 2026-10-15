@@ -49,8 +49,8 @@ export function pricePeriod(row) {
   return null
 }
 
-// Registration and application fees are paid once by nature, so a missing period is no news.
-const ONE_OFF_CATEGORIES = new Set(['registration'])
+// Registration fees are paid once and uniform items are bought once, so a missing period is no news.
+const ONE_OFF_CATEGORIES = new Set(['registration', 'uniforms'])
 
 /** True when a row's period is unknown and a parent could misread how often it is paid. */
 export function periodUnknown(row) {

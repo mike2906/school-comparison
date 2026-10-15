@@ -125,8 +125,9 @@ test('rowAgeGroupKeys: a school named "гимназия", "начално пла
   assert.deepEqual(keys(null, 'ПГУ от 15.09.2026г. / Годишна такса'), ['preschool'])
 })
 
-test('periodUnknown: not for registration fees, which are paid once by nature', () => {
+test('periodUnknown: not for registration fees or uniform items, which are paid once by nature', () => {
   assert.equal(periodUnknown({ category: 'registration', plan_name: 'такса кандидатстване', period: null }), false)
+  assert.equal(periodUnknown({ category: 'uniforms', plan_name: 'Тениска с къс ръкав', period: null }), false)
   assert.equal(periodUnknown({ category: 'food', plan_name: 'Храна обяд', period: null }), true)
   assert.equal(periodUnknown({ category: 'food', plan_name: 'Месечна такса храна', period: null }), false)
 })
