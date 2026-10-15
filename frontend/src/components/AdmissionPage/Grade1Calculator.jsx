@@ -1,77 +1,105 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { EVALUATORS } from '../../admission/evaluators'
 import { formatRange, measuredOnFor } from '../../admission/calculator'
 import { addressFactsForSchool } from '../../admission/catchments'
+import { EMPTY_ADDRESS, evaluateGrade1, GRADE1_INITIAL } from '../../admission/inputs'
 import { loadCatchments } from '../../admission/loadCatchments'
+import { getSaved, saveStage } from '../../admission/saved'
+import { useSavedAdmission } from '../../hooks/useSavedAdmission'
 import AddressCheck from '../Admission/AddressCheck'
 import CutoffComparison from '../Admission/CutoffComparison'
 import { DateField, MobileTotal, Section, YesNo } from './fields'
 import PointsList from './PointsList'
+import SaveAnswers from './SaveAnswers'
 
-const EMPTY_ADDRESS = { inCatchment: null, inNeighbouring: null, since: null }
+// Answers about one school: never saved, since the list compares every school.
+const PER_PLACE = { siblingAtSchool: null, siblingYoung: null, preparatoryGroupHere: null }
+const withoutPlace = answers => ({ ...answers, ...PER_PLACE })
+// A checked address is re-checked against whichever school is on the page.
+const restoredAddress = address => ({ ...EMPTY_ADDRESS, check: address.check ?? null, since: address.since ?? null })
 
-/** The catchment snapshot, when the page has a school with catchment ids. */
-function useCatchments(enabled) {
+/** The catchment snapshot (it names the catchment of a checked address). */
+function useCatchments() {
   const [catchments, setCatchments] = useState(null)
   useEffect(() => {
-    if (!enabled) return undefined
     let live = true
     loadCatchments().then(data => live && setCatchments(data.byId), () => {})
     return () => {
       live = false
     }
-  }, [enabled])
+  }, [])
   return catchments
 }
 
-/** One of the child's addresses: checked against the school's catchment, or answered. */
+/**
+ * One of the child's addresses: checked against the official address table, or
+ * answered. With a school on the page the check is about that school; without one, the
+ * result is for the school whose catchment the address is in.
+ */
 function AddressQuestions({ index, value, onChange, school, catchments, measuredOn }) {
   const { t } = useTranslation()
   const ids = school?.catchmentIds || []
-  const canCheck = ids.length > 0 && catchments
+  // The address as last checked, so a saved one comes back filled in.
+  const [checked] = useState(() => (value.check ? { streetId: value.check.streetId, number: value.check.number } : null))
 
   const fromCheck = result => {
     if (!result?.schoolId) {
-      onChange({ ...value, inCatchment: null, inNeighbouring: null })
+      onChange(prev => ({ ...prev, check: null, ...(prev.check ? { inCatchment: null, inNeighbouring: null } : {}) }))
+      return
+    }
+    const check = { streetId: result.streetId, number: result.number, schoolId: result.schoolId }
+    if (ids.length === 0) {
+      onChange(prev => ({ ...prev, check, inCatchment: true, inNeighbouring: false }))
       return
     }
     // A merged school can have several catchments; the best one counts.
     const facts = ids.map(id => addressFactsForSchool(catchments, result.schoolId, id))
-    onChange({
-      ...value,
+    onChange(prev => ({
+      ...prev,
+      check,
       inCatchment: facts.some(f => f.inCatchment),
       inNeighbouring: !facts.some(f => f.inCatchment) && facts.some(f => f.inNeighbouring),
-    })
+    }))
   }
+  const checkedHere = Boolean(value.check)
 
   return (
     <div className="space-y-4 rounded-xl border border-neutral-200 p-4">
       <h3 className="font-medium text-neutral-900">{t('admissionCalc.g1.addressN', { n: index + 1 })}</h3>
-      {canCheck ? (
-        <>
-          <AddressCheck catchments={catchments} ownIds={ids} onResult={fromCheck} />
-          {value.inCatchment != null && (
-            <p className="text-sm text-neutral-800">
-              {t(value.inCatchment
-                ? 'admissionArea.verdict.inside'
-                : value.inNeighbouring ? 'admissionArea.verdict.neighbouring' : 'admissionArea.verdict.outside')}
-            </p>
-          )}
-        </>
-      ) : (
+      {catchments && (
+        <AddressCheck
+          catchments={catchments}
+          ownIds={ids}
+          nameSchool={ids.length > 0}
+          onResult={fromCheck}
+          value={checked}
+        />
+      )}
+      {checkedHere && ids.length === 0 && (
+        <p className="text-sm text-neutral-800">
+          {t('admissionCalc.g1.forCatchmentSchool', { school: catchments?.get(value.check.schoolId)?.properties.name || '' })}
+        </p>
+      )}
+      {checkedHere && ids.length > 0 && value.inCatchment != null && (
+        <p className="text-sm text-neutral-800">
+          {t(value.inCatchment
+            ? 'admissionArea.verdict.inside'
+            : value.inNeighbouring ? 'admissionArea.verdict.neighbouring' : 'admissionArea.verdict.outside')}
+        </p>
+      )}
+      {!checkedHere && (
         <>
           <YesNo
             label={t('admissionCalc.g1.inCatchment')}
             hint={t('admissionCalc.g1.inCatchmentHint')}
             value={value.inCatchment}
-            onChange={v => onChange({ ...value, inCatchment: v })}
+            onChange={v => onChange(prev => ({ ...prev, inCatchment: v }))}
           />
           {value.inCatchment !== true && (
             <YesNo
               label={t('admissionCalc.g1.inNeighbouring')}
               value={value.inNeighbouring}
-              onChange={v => onChange({ ...value, inNeighbouring: v })}
+              onChange={v => onChange(prev => ({ ...prev, inNeighbouring: v }))}
             />
           )}
         </>
@@ -82,7 +110,7 @@ function AddressQuestions({ index, value, onChange, school, catchments, measured
           hint={t('admissionCalc.g1.sinceHint', { date: measuredOn })}
           value={value.since}
           max={measuredOn}
-          onChange={v => onChange({ ...value, since: v })}
+          onChange={v => onChange(prev => ({ ...prev, since: v }))}
         />
       )}
     </div>
@@ -98,40 +126,35 @@ function Grade1Calculator({ selected, startYear, school, cutoffRows = [], isCurr
   const { ruleSet } = selected
   const params = ruleSet.params
   const measuredOn = measuredOnFor(ruleSet)
-  const catchments = useCatchments(Boolean(school?.catchmentIds?.length))
+  const catchments = useCatchments()
+  const saved = useSavedAdmission().grade_1
 
-  const [addresses, setAddresses] = useState([EMPTY_ADDRESS])
-  const [a, setA] = useState({
-    siblingAtSchool: null,
-    siblingYoung: null,
-    preparatoryGroupHere: null,
-    disability50: false,
-    parentDeceased: false,
-    moreThanTwoChildren: null,
-    twins: false,
-    fosterUnknownAdopted: false,
+  const [addresses, setAddresses] = useState(() => {
+    const entry = getSaved().grade_1
+    return entry?.addresses?.length ? entry.addresses.slice(0, 2).map(restoredAddress) : [EMPTY_ADDRESS]
+  })
+  const [a, setA] = useState(() => {
+    const entry = getSaved().grade_1
+    return entry ? { ...GRADE1_INITIAL, ...withoutPlace(entry.answers) } : GRADE1_INITIAL
   })
   const set = (key, value) => setA(prev => ({ ...prev, [key]: value }))
+  const updateAddress = (i, update) => setAddresses(prev => prev.map((old, j) => (j === i ? update(old) : old)))
 
   const context = {
     siblingAtSchool: a.siblingAtSchool,
     siblingUnderAgeAtSchool: a.siblingAtSchool === false ? false : a.siblingAtSchool === true ? a.siblingYoung : null,
     preparatoryGroupHere: a.preparatoryGroupHere,
   }
-  const evaluate = address => EVALUATORS[ruleSet.evaluator].evaluate(
-    params,
-    {
-      address,
-      disability50: a.disability50,
-      parentDeceased: a.parentDeceased,
-      moreThanTwoChildren: a.moreThanTwoChildren,
-      twins: a.twins,
-      fosterUnknownAdopted: a.fosterUnknownAdopted,
-    },
-    context,
-    { measuredOn }
-  )
+  const evaluate = address => evaluateGrade1(ruleSet, a, address, context)
   const results = addresses.map(evaluate)
+
+  // Only what the list can reuse: the checked address and dates, not yes/no answers
+  // about whichever school was on the page.
+  const toSave = () => ({ startYear, addresses: addresses.map(restoredAddress), answers: withoutPlace(a) })
+  const home = addresses[0]?.check ? { streetId: addresses[0].check.streetId, number: addresses[0].check.number } : undefined
+  const save = () => saveStage('grade_1', toSave(), { home })
+  const dirty = !saved || JSON.stringify({ ...toSave(), savedOn: saved.savedOn }) !== JSON.stringify(saved)
+  const listUrl = `/search?${new URLSearchParams({ school_type: 'state', target_year: String(startYear), age_group: 'grade_1_4' })}`
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
@@ -142,7 +165,7 @@ function Grade1Calculator({ selected, startYear, school, cutoffRows = [], isCurr
               key={i}
               index={i}
               value={address}
-              onChange={next => setAddresses(addresses.map((old, j) => (j === i ? next : old)))}
+              onChange={update => updateAddress(i, update)}
               school={school}
               catchments={catchments}
               measuredOn={measuredOn}
@@ -226,6 +249,13 @@ function Grade1Calculator({ selected, startYear, school, cutoffRows = [], isCurr
         ))}
         <p className="text-xs text-neutral-600">{t('admissionCalc.g1.groupNote')}</p>
         {results.length > 1 && <p className="text-xs text-neutral-600">{t('admissionCalc.g1.lockNote')}</p>}
+        <SaveAnswers
+          stage="grade_1"
+          onSave={save}
+          dirty={dirty}
+          listUrl={listUrl}
+          blockedReason={addresses[0]?.check ? null : t('savedAdmission.needsAddressToSave')}
+        />
       </aside>
     </div>
   )

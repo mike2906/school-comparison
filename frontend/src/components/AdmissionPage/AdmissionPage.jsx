@@ -17,6 +17,7 @@ import {
 } from '../../admission/calculator'
 import { districtAt, districtByName, schoolCatchmentIds } from '../../admission/catchments'
 import { loadDistricts } from '../../admission/loadCatchments'
+import { getSaved } from '../../admission/saved'
 import { getMappableLocations } from '../SchoolDetailPage/LocationMap'
 import CutoffTable from '../Admission/CutoffTable'
 import RuleSetNotice from './RuleSetNotice'
@@ -69,7 +70,8 @@ function schoolPoint(school) {
 /**
  * The admission calculator: kindergarten points, first-grade group and points, and the
  * eighth-grade score, from the rule files in src/admission/rules. Everything is
- * calculated in the browser; no answer is sent, stored or put in the URL.
+ * calculated in the browser; no answer is sent or put in the URL, and answers are stored
+ * only when the parent saves them on this device (src/admission/saved.js).
  */
 function AdmissionPage() {
   const { t, i18n } = useTranslation()
@@ -78,9 +80,10 @@ function AdmissionPage() {
   const school = useSchool(params.get('school'))
   const districts = useDistricts()
   const today = sofiaToday()
-  // Each tab opens on the campaign a parent applying today is ranked under, until the
-  // parent picks another year.
-  const [chosenYear, setChosenYear] = useState(null)
+  // Each tab opens on the year of the answers saved on this device, else on the campaign
+  // a parent applying today is ranked under, until the parent picks another year.
+  const savedYear = id => getSaved()[id]?.startYear ?? null
+  const [chosenYear, setChosenYear] = useState(() => savedYear(stage.id))
   const startYear = chosenYear ?? defaultStartYear(new Date(), { ruleSets: RULE_SETS, stage, today })
 
   useEffect(() => {
@@ -114,7 +117,7 @@ function AdmissionPage() {
   const Calculator = CALCULATORS[stage.id]
 
   // However the tab changes (a click, a link, Back), it opens on its own default year.
-  useEffect(() => setChosenYear(null), [stage.id])
+  useEffect(() => setChosenYear(savedYear(stage.id)), [stage.id])
 
   const chooseStage = id => {
     const next = new URLSearchParams(params)

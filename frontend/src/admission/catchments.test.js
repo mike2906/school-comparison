@@ -5,6 +5,11 @@ import { fileURLToPath } from 'node:url'
 
 import {
   addressFactsForSchool,
+  areaAtPoint,
+  displayPlaceName,
+  splitAddress,
+  streetDisplayName,
+  streetForLocation,
   catchmentSchoolFor,
   catchmentUrl,
   districtAt,
@@ -102,4 +107,45 @@ test('district names are transliterated and sorted for English pages', () => {
   const districts = { features: ['Средец', 'Банкя', 'Възраждане'].map(name => ({ properties: { name } })) }
   assert.deepEqual(sortedDistricts(districts, 'bg').map(f => f.properties.name), ['Банкя', 'Възраждане', 'Средец'])
   assert.deepEqual(sortedDistricts(districts, 'en').map(f => districtLabel(f.properties.name, 'en')), ['Bankya', 'Sredets', 'Vazrazhdane'])
+})
+
+test('table names read like street signs, transliterated in English', () => {
+  assert.equal(displayPlaceName('УЛ.ИВАН ЩЕРЕВ', 'bg'), 'ул. Иван Щерев')
+  assert.equal(displayPlaceName('УЛ.ИВАН ЩЕРЕВ', 'en'), 'ul. Ivan Shterev')
+  assert.equal(displayPlaceName('ЖК.МЛАДОСТ 1', 'en'), 'zh.k. Mladost 1')
+  assert.equal(displayPlaceName('УЛ.ОТЕЦ ГЕНАДИЙ (239-ТА)', 'bg'), 'ул. Отец Генадий (239-та)')
+  assert.equal(
+    streetDisplayName({ street: 'УЛ.ЗЕМЛЯНЕ', settlement: 'ГР.СОФИЯ,КВ.СУХОДОЛ' }, 'en', 'ВИТОША'),
+    'ul. Zemlyane (kv. Suhodol, Vitosha)',
+  )
+  assert.equal(streetDisplayName({ street: 'УЛ.ИВАН ЩЕРЕВ', settlement: 'ГР.СОФИЯ' }, 'bg'), 'ул. Иван Щерев')
+})
+
+test('one typed address splits into street and number', () => {
+  assert.deepEqual(splitAddress('Иван Щерев 5'), { street: 'Иван Щерев', number: '5' })
+  assert.deepEqual(splitAddress('ул. Иван Щерев, № 5А'), { street: 'ул. Иван Щерев', number: '5А' })
+  assert.deepEqual(splitAddress('Ivan Shterev 12 b'), { street: 'Ivan Shterev', number: '12b' })
+  assert.deepEqual(splitAddress('Витоша'), { street: 'Витоша', number: '' })
+  assert.deepEqual(splitAddress('15'), { street: '15', number: '' })
+  // A typed Latin type word is ignored when searching.
+  assert.equal(searchStreets(streets, 'ul. Ivan Shterev')[0].street, 'УЛ.ИВАН ЩЕРЕВ')
+})
+
+test('a found road and number match one table street', () => {
+  const street = streets.find(s => s.street === 'УЛ.ИВАН ЩЕРЕВ')
+  const [number, schoolId] = [...street.numbers.entries()][0]
+  const geometry = catchments.get(schoolId).geometry
+  const ring = geometry.type === 'Polygon' ? geometry.coordinates[0] : geometry.coordinates[0][0]
+  const [lng, lat] = ring[0]
+  const match = streetForLocation(streets, catchments, { road: 'улица Иван Щерев', houseNumber: number }, lat, lng)
+  assert.equal(match?.street.id, street.id)
+  assert.equal(match.number, number)
+  assert.equal(streetForLocation(streets, catchments, { road: 'улица Иван Щерев', houseNumber: null }, lat, lng), null)
+  assert.equal(streetForLocation(streets, catchments, { road: 'Nowhere', houseNumber: '1' }, lat, lng), null)
+})
+
+test('a point is placed against a school\'s areas', () => {
+  const [id, feature] = [...catchments.entries()][0]
+  const neighbours = neighbouringCatchments(catchments, id)
+  assert.equal(areaAtPoint([feature], neighbours, 0, 0), 'outside')
 })

@@ -1,13 +1,15 @@
 /**
  * Live flows for the admission features: the points calculator at /admission (all three
- * stages), a school's cut-offs and its link into the calculator, and the first-grade
- * catchment check with a real address from the published address table.
+ * stages), a school's cut-offs and its link into the calculator, the first-grade
+ * catchment check with a real address from the published address table (one address
+ * field, as a parent types it), and answers saved on the device showing on every school
+ * in the list.
  */
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { describe, test } from 'node:test'
 
-import { catchmentSchoolFor, catchmentUrl, indexAddresses, schoolCatchmentIds } from '../../src/admission/catchments.js'
+import { catchmentSchoolFor, catchmentUrl, displayPlaceName, indexAddresses, schoolCatchmentIds, streetDisplayName } from '../../src/admission/catchments.js'
 import { CATCHMENT_CAMPAIGNS } from '../../src/admission/loadCatchments.js'
 import { usesSofiaKindergartenSystem } from '../../src/utils/admission.js'
 import { DESKTOP, findSchool, number, open, page, schoolName, t, liveBrowser } from './live.js'
@@ -26,6 +28,38 @@ async function campaign() {
 /** A question's answer button, found by the question's own label. */
 const answer = (question, option) =>
   page.getByRole('radiogroup', { name: question, exact: true }).getByRole('radio', { name: option, exact: true })
+
+const addressTable = async file =>
+  JSON.parse(await readFile(new URL(`../../public${catchmentUrl(CATCHMENT_CAMPAIGNS[0], file)}`, import.meta.url)))
+
+/**
+ * A Sofia street in one of these catchments with a plain house number, and a name no
+ * other street has, so the suggestion to pick is clear. Read from the table the site
+ * itself loads (public/ is served at the site root).
+ */
+async function addressIn(ids) {
+  const streets = indexAddresses(await addressTable('addresses.json'))
+  const districtNames = new Map((await addressTable('districts.json')).features.map(f => [f.properties.code, f.properties.name]))
+  const sameName = new Map()
+  for (const street of streets) sameName.set(street.key, (sameName.get(street.key) || 0) + 1)
+  for (const street of streets) {
+    // An ordinary street (УЛ.), typed without its prefix as a parent would.
+    if (street.settlement !== 'ГР.СОФИЯ' || !/^УЛ\./.test(street.street) || street.key.length <= 4 || sameName.get(street.key) > 1) continue
+    const number = [...street.numbers.entries()].find(([n, id]) => ids.includes(id) && /^\d+$/.test(n))?.[0]
+    if (number) {
+      assert.ok(ids.includes(catchmentSchoolFor(street, number)))
+      return { street, number, district: districtNames.get(street.district) }
+    }
+  }
+  assert.fail(`an address in catchment ${ids.join(', ')}`)
+}
+
+/** Types "street number" into the one address field and picks the suggestion. */
+async function typeAddress(scope, { street, number, district }, lang) {
+  const name = displayPlaceName(street.street, lang).replace(/^\S+\s/, '')
+  await scope.getByLabel(t(lang, 'admissionArea.address')).first().fill(`${name} ${number}`)
+  await scope.getByRole('button', { name: `${streetDisplayName(street, lang, district)} ${number}`, exact: true }).click()
+}
 
 describe('admission calculator', () => {
   test('kindergarten: a fully answered form gives one total that adds up', async () => {
@@ -160,36 +194,49 @@ describe('admission from a school page', () => {
 
   test('a first-grade catchment check names the right area for a real address', async () => {
     const school = await findSchool('with a first-grade catchment', () => true, s => schoolCatchmentIds(s).length > 0)
-    const ids = schoolCatchmentIds(school)
-    // The table the site itself loads (public/ is served at the site root).
-    const tablePath = `../../public${catchmentUrl(CATCHMENT_CAMPAIGNS[0], 'addresses.json')}`
-    const streets = indexAddresses(JSON.parse(await readFile(new URL(tablePath, import.meta.url))))
-    const sameName = new Map()
-    for (const street of streets) sameName.set(street.key, (sameName.get(street.key) || 0) + 1)
-    // A Sofia street in this school's catchment with a plain house number, as a parent
-    // would type it, and a name no other street has, so the suggestion to pick is clear.
-    let address
-    for (const street of streets) {
-      // An ordinary street (УЛ.), typed without its prefix as a parent would.
-      if (street.settlement !== 'ГР.СОФИЯ' || !/^УЛ\./.test(street.street) || street.key.length <= 4 || sameName.get(street.key) > 1) continue
-      const number = [...street.numbers.entries()].find(([n, id]) => ids.includes(id) && /^\d+$/.test(n))?.[0]
-      if (number) {
-        address = { street, number }
-        break
-      }
-    }
-    assert.ok(address, `an address in catchment ${ids.join(', ')}`)
-    assert.ok(ids.includes(catchmentSchoolFor(address.street, address.number)))
-
+    const address = await addressIn(schoolCatchmentIds(school))
     await open('bg', `/schools/${school.id}`)
     const area = page.locator('section').filter({ has: page.getByRole('heading', { name: t('bg', 'admissionArea.catchmentTitle') }) })
     await area.locator('.leaflet-container').waitFor()
-    await area.getByLabel(t('bg', 'admissionArea.street')).fill(address.street.street.replace(/^УЛ\./, ''))
-    // The suggestion is the street, then its district in brackets.
-    const escaped = address.street.street.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    await area.getByRole('button', { name: new RegExp(`^${escaped}( \\(|$)`) }).click()
-    await area.getByLabel(t('bg', 'admissionArea.number')).fill(address.number)
+    // With nothing saved, "use my location" comes before typing an address.
+    await area.getByRole('button', { name: t('bg', 'location.useMyLocation') }).waitFor()
+    await typeAddress(area, address, 'bg')
     await area.getByText(t('bg', 'admissionArea.verdict.inside')).waitFor()
+  })
+
+  test('in English the address field shows street names in Latin letters', async () => {
+    const school = await findSchool('with a first-grade catchment', () => true, s => schoolCatchmentIds(s).length > 0)
+    const address = await addressIn(schoolCatchmentIds(school))
+    await open('en', `/schools/${school.id}`)
+    const area = page.locator('section').filter({ has: page.getByRole('heading', { name: t('en', 'admissionArea.catchmentTitle') }) })
+    await typeAddress(area, address, 'en')
+    await area.getByText(t('en', 'admissionArea.verdict.inside')).waitFor()
+    assert.match(await area.getByLabel(t('en', 'admissionArea.address')).inputValue(), /^ul\. [A-Za-z]/)
+  })
+
+  test('saved first-grade answers compare every school in the list, and can be forgotten', async () => {
+    const school = await findSchool('with a first-grade catchment and cut-offs', () => true, s =>
+      schoolCatchmentIds(s).length > 0 && (s.admission_info?.cutoff_summary || []).some(row => row.stage === 'grade_1'))
+    const address = await addressIn(schoolCatchmentIds(school))
+    await open('bg', '/admission?stage=grade_1')
+    const g1 = key => t('bg', `admissionCalc.g1.${key}`)
+    await typeAddress(page.locator('main'), address, 'bg')
+    const start = Number((await campaign()).slice(0, 4))
+    await page.getByLabel(g1('since')).first().fill(`${start - 5}-01-15`)
+    await page.getByRole('button', { name: t('bg', 'savedAdmission.save') }).click()
+    await page.getByRole('link', { name: t('bg', 'savedAdmission.seeList') }).click()
+    await page.waitForURL(url => url.pathname === '/search' && url.searchParams.get('age_group') === 'grade_1_4')
+    await page.getByTestId('saved-admission-banner').waitFor()
+    await page.getByTestId('saved-verdict-line').first().waitFor()
+
+    // The school page compares the same answers with that school, and uses the address.
+    await open('bg', `/schools/${school.id}`)
+    await page.getByTestId('saved-verdict').waitFor()
+    const area = page.locator('section').filter({ has: page.getByRole('heading', { name: t('bg', 'admissionArea.catchmentTitle') }) })
+    await area.getByText(t('bg', 'admissionArea.verdict.inside')).waitFor()
+
+    await page.getByTestId('saved-verdict').getByRole('button', { name: t('bg', 'savedAdmission.forget') }).click()
+    assert.equal(await page.getByTestId('saved-verdict').count(), 0)
   })
 
   test('the calculator is in the English menu', async () => {

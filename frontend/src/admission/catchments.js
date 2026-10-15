@@ -24,8 +24,63 @@ export function searchKey(text) {
     .trim()
 }
 
+// The same words as a parent types them in Latin ("ul. Ivan Shterev", "blvd Vitosha").
+const LATIN_STREET_PREFIX = /^(?:ul|bul|blvd|boulevard|str|street|zh\.?\s?k|jk|kv)\.?\s+/i
+
 function streetKey(name) {
-  return searchKey(String(name || '').replace(STREET_PREFIX, ''))
+  return searchKey(String(name || '').replace(STREET_PREFIX, '').replace(LATIN_STREET_PREFIX, ''))
+}
+
+const TYPE_WORDS = { ул: 'ул.', бул: 'бул.', пл: 'пл.', жк: 'ж.к.', кв: 'кв.', м: 'м.', вз: 'в.з.', пр: 'пр.', гр: 'гр.', с: 'с.' }
+
+function transliterate(text) {
+  return Array.from(text, ch => {
+    const lower = ch.toLowerCase()
+    const latin = LATIN[lower]
+    if (latin == null) return ch
+    return ch === lower ? latin : latin.charAt(0).toUpperCase() + latin.slice(1)
+  }).join('')
+}
+
+/**
+ * An address-table name as a parent reads it: `УЛ.ИВАН ЩЕРЕВ` → `ул. Иван Щерев`, or in
+ * English `ul. Ivan Shterev` (transliterated, as the street signs are).
+ */
+export function displayPlaceName(raw, language) {
+  const text = String(raw || '').trim()
+  const typed = /^(ул|бул|пл|ж\.?к|кв|м|в\.?з|пр|гр|с)\.\s*/i.exec(text)
+  const name = text
+    .slice(typed ? typed[0].length : 0)
+    .toLowerCase()
+    // Capitals start words, and the second half of a double name (Ал. Батенберг, Горна-Баня),
+    // but not an ordinal ending (239-та).
+    .replace(/(^|[\s(]|(?<=\p{L})-)(\p{L})/gu, (_, before, ch) => before + ch.toUpperCase())
+  const type = typed ? TYPE_WORDS[typed[1].toLowerCase().replace(/\./g, '')] : null
+  const shown = type ? `${type} ${name}` : name
+  return String(language || '').startsWith('bg') ? shown : transliterate(shown)
+}
+
+/** A street with its place: `ул. Земляне (кв. Суходол)`; the district tells same-named streets apart. */
+export function streetDisplayName(street, language, districtName = null) {
+  // `ГР.СОФИЯ,КВ.СЕСЛАВЦИ`: the quarter is what tells streets apart, not the city.
+  const [town, quarter] = String(street.settlement || '').split(',')
+  const place = [
+    quarter ? displayPlaceName(quarter, language) : town !== 'ГР.СОФИЯ' ? displayPlaceName(town, language) : null,
+    districtName ? districtLabel(districtName, language) : null,
+  ].filter(Boolean).join(', ')
+  const name = displayPlaceName(street.street, language)
+  return place ? `${name} (${place})` : name
+}
+
+/**
+ * One typed address split into street and house number: `Иван Щерев 5` →
+ * `{ street: 'Иван Щерев', number: '5' }`. Without a trailing number, all of it is the street.
+ */
+export function splitAddress(text) {
+  const value = String(text || '').trim()
+  const match = /^(.*?\S)[\s,]+(?:№\s*|no\.?\s*)?(\d+\s?[a-zа-я]?)$/iu.exec(value)
+  if (!match || !/\p{L}/u.test(match[1])) return { street: value, number: '' }
+  return { street: match[1].replace(/[\s,]+$/, ''), number: match[2].replace(/\s+/g, '') }
 }
 
 /** Where a campaign's snapshot lives. */
@@ -194,4 +249,36 @@ export function sortedDistricts(districts, language) {
   return [...(districts?.features || [])].sort((a, b) =>
     districtLabel(a.properties.name, language).localeCompare(districtLabel(b.properties.name, language), language)
   )
+}
+
+// The full words OpenStreetMap uses where the address table abbreviates (улица → УЛ.).
+const LONG_STREET_TYPE = /^(?:улица|булевард|площад|жилищен комплекс|квартал)\s+/i
+
+/**
+ * The address-table street for a road name and house number found at a point (from
+ * OpenStreetMap). Streets of the same name are told apart by which catchment polygon
+ * holds the point. Null when nothing matches exactly: the caller then asks the parent.
+ */
+export function streetForLocation(streets, catchments, { road, houseNumber }, lat, lng) {
+  if (!road || !houseNumber) return null
+  const name = String(road).replace(LONG_STREET_TYPE, '')
+  const key = streetKey(name)
+  const candidates = searchStreets(streets, name, 50).filter(street => street.key === key && catchmentSchoolFor(street, houseNumber))
+  if (candidates.length <= 1) return candidates[0] ? { street: candidates[0], number: normalizeHouseNumber(houseNumber) } : null
+  const inside = candidates.filter(street => {
+    const geometry = catchments?.get(catchmentSchoolFor(street, houseNumber))?.geometry
+    return geometry && geometryContains(geometry, lat, lng)
+  })
+  return inside.length === 1 ? { street: inside[0], number: normalizeHouseNumber(houseNumber) } : null
+}
+
+/**
+ * Where a point falls against a school's areas, from the simplified polygons: 'inside',
+ * 'neighbouring' or 'outside'. Only a hint for a pin on the map; the official answer
+ * comes from the address table.
+ */
+export function areaAtPoint(own, neighbours, lat, lng) {
+  if (own.some(feature => geometryContains(feature.geometry, lat, lng))) return 'inside'
+  if (neighbours.some(feature => geometryContains(feature.geometry, lat, lng))) return 'neighbouring'
+  return 'outside'
 }

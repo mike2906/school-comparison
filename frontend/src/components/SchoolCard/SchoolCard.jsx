@@ -39,6 +39,8 @@ import {
 import { getShiftForAgeGroup } from '../../utils/schoolLocation'
 import { parseCoordinate } from '../../utils/coordinates'
 import LocationsPanel from './LocationsPanel'
+import { useSavedVerdict } from '../../hooks/useSavedAdmission'
+import { SavedVerdictLine } from '../Admission/SavedVerdict'
 import NvoDetailTable from './NvoDetailTable'
 
 const SchoolCard = memo(function SchoolCard({
@@ -217,6 +219,9 @@ const SchoolCard = memo(function SchoolCard({
 
     return null
   }, [school, pricing, attributes, i18n.language, t, primaryLocation, activeAgeGroup])
+
+  // Answers saved in the admission calculator, against this school's last admitted child.
+  const savedVerdict = useSavedVerdict(school, activeAgeGroup)
 
   const nvoDetail = useMemo(() => {
     // Sorted by NVO: only the exam the list is ranked by, so no card shows a score from a
@@ -484,7 +489,12 @@ const SchoolCard = memo(function SchoolCard({
         </div>
 
         <div className="space-y-3 text-sm text-neutral-700">
-          {admissionsInfo && (
+          {savedVerdict ? (
+            <div className="flex items-start gap-2" data-testid="saved-verdict-line">
+              <span className="text-[16px]" aria-hidden="true">🎯</span>
+              <SavedVerdictLine verdict={savedVerdict} />
+            </div>
+          ) : admissionsInfo && (
             <div className="space-y-1">
               <div className="flex items-start gap-2">
                 <span className="text-[16px]" aria-hidden="true">{admissionsInfo.icon}</span>

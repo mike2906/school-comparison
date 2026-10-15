@@ -270,3 +270,28 @@ export const reverseGeocode = async (lat, lng, geocodingConfig = {}) => {
 
   return fetchReverseGeocode(latNumber, lngNumber, geocodingConfig)
 }
+
+/**
+ * The street and house number at a point, for matching against an official address list.
+ * Not cached: it is only called when the parent asks to use their current location.
+ * Returns `{ road, houseNumber }` (either may be missing).
+ */
+export const reverseGeocodeStreet = async (lat, lng, geocodingConfig = {}) => {
+  const countryCodes = geocodingConfig.country_codes || 'bg'
+  const now = Date.now()
+  if (now - lastRequestAt < MIN_REQUEST_INTERVAL_MS) {
+    const error = new Error('Too many local requests')
+    error.code = 'TOO_FAST'
+    throw error
+  }
+  lastRequestAt = now
+  const url = `${NOMINATIM_REVERSE_URL}?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}&format=json&zoom=18&addressdetails=1&accept-language=${countryCodes}`
+  const response = await fetch(url, { headers: { 'User-Agent': NOMINATIM_USER_AGENT, Accept: 'application/json' } })
+  if (!response.ok) {
+    const error = new Error('Reverse geocoding failed')
+    error.code = response.status === 429 ? 'RATE_LIMIT' : 'FAILED'
+    throw error
+  }
+  const data = await response.json()
+  return { road: data?.address?.road || null, houseNumber: data?.address?.house_number || null }
+}

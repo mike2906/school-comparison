@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { compareWithCutoff } from '../../admission/calculator'
+import { comparableRound, compareWithCutoff } from '../../admission/calculator'
 import { CutoffValue, rowLabel } from './CutoffTable'
 
 const TONE = {
@@ -21,7 +21,7 @@ function CutoffComparison({ rows, yours, isCurrentRules = () => null }) {
   const { t } = useTranslation()
   const lines = (rows || [])
     .map(row => {
-      const round = row.rounds > 1 && row.latest ? row.latest : row.first
+      const round = comparableRound(row)
       return { row, round, verdict: compareWithCutoff(yours, round) }
     })
     .filter(line => line.verdict)

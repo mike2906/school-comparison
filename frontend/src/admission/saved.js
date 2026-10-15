@@ -1,0 +1,107 @@
+/**
+ * Calculator answers a parent chose to save on this device (docs/ADMISSION_POINTS.md,
+ * decision 7). They stay in this browser's localStorage: nothing here sends them
+ * anywhere. One entry per calculator tab, plus the home address checked against the
+ * official address table, which the catchment maps reuse.
+ *
+ * Shape: { version, home: { streetId, number } | null,
+ *          kindergarten: { startYear, answers, savedOn } | null,
+ *          grade_1: { startYear, addresses, answers, savedOn } | null }
+ */
+
+const STORAGE_KEY = 'admissionAnswers'
+const VERSION = 1
+export const SAVED_STAGES = ['kindergarten', 'grade_1']
+
+const EMPTY = Object.freeze({ version: VERSION, home: null, kindergarten: null, grade_1: null })
+
+function storage() {
+  try {
+    return typeof window === 'undefined' ? null : window.localStorage
+  } catch {
+    return null
+  }
+}
+
+/** Parses stored text; anything unreadable or from another version counts as nothing saved. */
+export function parseSaved(text) {
+  try {
+    const value = JSON.parse(text || 'null')
+    if (!value || value.version !== VERSION) return EMPTY
+    return {
+      version: VERSION,
+      home: isHome(value.home) ? value.home : null,
+      kindergarten: isEntry(value.kindergarten) ? value.kindergarten : null,
+      grade_1: isEntry(value.grade_1) && Array.isArray(value.grade_1.addresses) ? value.grade_1 : null,
+    }
+  } catch {
+    return EMPTY
+  }
+}
+
+function isHome(home) {
+  return Boolean(home && typeof home.streetId === 'string' && typeof home.number === 'string')
+}
+
+function isEntry(entry) {
+  return Boolean(entry && Number.isInteger(entry.startYear) && entry.answers && typeof entry.answers === 'object')
+}
+
+let current = null
+const listeners = new Set()
+
+function read() {
+  if (current == null) current = parseSaved(storage()?.getItem(STORAGE_KEY))
+  return current
+}
+
+function write(next) {
+  current = next
+  const empty = !next.home && SAVED_STAGES.every(stage => !next[stage])
+  try {
+    if (empty) storage()?.removeItem(STORAGE_KEY)
+    else storage()?.setItem(STORAGE_KEY, JSON.stringify(next))
+  } catch {
+    // Full or blocked storage: the answers live for this page view only.
+  }
+  listeners.forEach(listener => listener())
+}
+
+/** For useSyncExternalStore. */
+export function subscribeSaved(listener) {
+  listeners.add(listener)
+  const onStorage = event => {
+    if (event.key !== STORAGE_KEY) return
+    current = null
+    listener()
+  }
+  if (typeof window !== 'undefined') window.addEventListener('storage', onStorage)
+  return () => {
+    listeners.delete(listener)
+    if (typeof window !== 'undefined') window.removeEventListener('storage', onStorage)
+  }
+}
+
+export function getSaved() {
+  return read()
+}
+
+export function saveStage(stage, entry, { home } = {}) {
+  const next = { ...read(), [stage]: { ...entry, savedOn: new Date().toISOString().slice(0, 10) } }
+  if (home !== undefined) next.home = home
+  write(next)
+}
+
+export function saveHome(home) {
+  write({ ...read(), home })
+}
+
+/** Forgets one tab's answers, or everything (answers and home) without a stage. */
+export function forgetSaved(stage = null) {
+  write(stage ? { ...read(), [stage]: null } : EMPTY)
+}
+
+/** Tests only: drop the in-memory copy. */
+export function resetSavedForTests() {
+  current = null
+}
