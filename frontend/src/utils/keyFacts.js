@@ -73,6 +73,15 @@ export function getShifts(locations = []) {
 }
 
 /** A `{ lat, lng }` saved by the search page, or null when absent or malformed. */
+/** The search page's saved location (localStorage `userLocation`), or null. */
+export function readSavedLocation() {
+  try {
+    return parseSavedLocation(window.localStorage.getItem('userLocation'))
+  } catch {
+    return null
+  }
+}
+
 export function parseSavedLocation(raw) {
   if (!raw) return null
   try {

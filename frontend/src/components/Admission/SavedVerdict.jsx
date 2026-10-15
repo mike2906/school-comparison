@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { formatRange } from '../../admission/calculator'
 import { forgetSaved, SAVED_STAGES } from '../../admission/saved'
-import { SEARCH_GROUPS } from '../../admission/schoolVerdict'
+import { savedStageApplies } from '../../admission/schoolVerdict'
 import { useSavedAdmission } from '../../hooks/useSavedAdmission'
 import { CutoffValue, rowLabel } from './CutoffTable'
 
@@ -37,7 +37,8 @@ export function SavedVerdictLine({ verdict }) {
   }
   const line = verdict.lines[0]
   // "Everyone got in" and "no places" say it all; the cut-off cell would repeat it.
-  const showCutoff = line && !['everyone', 'noPlaces'].includes(verdict.verdict)
+  // "Mixed" would show one row's cut-off as if it were the school's.
+  const showCutoff = line && !['everyone', 'noPlaces', 'mixed'].includes(verdict.verdict)
   return (
     <span>
       <Yours verdict={verdict} />
@@ -121,7 +122,7 @@ export function SavedVerdictPanel({ verdict, schoolId }) {
 export function SavedAdmissionBanner({ ageGroup }) {
   const { t } = useTranslation()
   const saved = useSavedAdmission()
-  const stages = SAVED_STAGES.filter(stage => saved[stage] && (!ageGroup || SEARCH_GROUPS[stage].includes(ageGroup)))
+  const stages = SAVED_STAGES.filter(stage => savedStageApplies(stage, saved[stage], ageGroup))
   if (stages.length === 0) return null
   return (
     <div className="mx-3 mt-3 rounded-xl border border-primary-200 bg-primary-50 p-3 text-sm text-primary-900" data-testid="saved-admission-banner">

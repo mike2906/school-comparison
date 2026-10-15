@@ -13,7 +13,8 @@ const LATIN = {
 }
 
 // Street-type words the address table puts in front of the name (УЛ.АВИЦЕНА).
-const STREET_PREFIX = /^(?:ул|бул|пл|ж\.?к|жк|кв|м|в\.?з|пр|алея|местност)\.?\s*/i
+// A dot or space must follow, or М would be cut off МАРИЦА.
+const STREET_PREFIX = /^(?:ул|бул|пл|ж\.?к|жк|кв|м|в\.?з|пр|алея|местност)(?:\.\s*|\s+)/i
 
 /** Lower-case Latin with only letters, digits and single spaces, for matching. */
 export function searchKey(text) {
@@ -263,7 +264,7 @@ export function streetForLocation(streets, catchments, { road, houseNumber }, la
   if (!road || !houseNumber) return null
   const name = String(road).replace(LONG_STREET_TYPE, '')
   const key = streetKey(name)
-  const candidates = searchStreets(streets, name, 50).filter(street => street.key === key && catchmentSchoolFor(street, houseNumber))
+  const candidates = streets.filter(street => street.key === key && catchmentSchoolFor(street, houseNumber))
   if (candidates.length <= 1) return candidates[0] ? { street: candidates[0], number: normalizeHouseNumber(houseNumber) } : null
   const inside = candidates.filter(street => {
     const geometry = catchments?.get(catchmentSchoolFor(street, houseNumber))?.geometry

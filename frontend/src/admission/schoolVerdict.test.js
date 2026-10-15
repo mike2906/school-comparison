@@ -7,7 +7,9 @@ import { fileURLToPath } from 'node:url'
 import { catchmentUrl, indexAddresses, indexCatchments } from './catchments.js'
 import { evaluateKindergarten, GRADE1_INITIAL, KINDERGARTEN_INITIAL } from './inputs.js'
 import { ruleSetFor, stageById } from './calculator.js'
-import { compareRows, kindergartenDistrict, KINDERGARTEN_ASSUMED, savedVerdictFor } from './schoolVerdict.js'
+import { compareRows, kindergartenDistrict, KINDERGARTEN_ASSUMED, savedVerdictsFor } from './schoolVerdict.js'
+
+const savedVerdictFor = (...args) => savedVerdictsFor(...args)[0] ?? null
 
 function ruleFiles(dir) {
   return readdirSync(dir).flatMap(name => {
@@ -68,6 +70,7 @@ test('saved answers show only where they apply', () => {
   const saved = { kindergarten: { startYear: 2026, answers: kgAnswers } }
   assert.equal(savedVerdictFor(kindergarten(home), saved, 'grade_1_4', data), null, 'a first-grade search')
   assert.ok(savedVerdictFor(kindergarten(home), saved, 'first', data))
+  assert.equal(savedVerdictFor(kindergarten(home), saved, 'second', data), null, 'a search for another group')
   assert.equal(savedVerdictFor({ ...kindergarten(home), school_type: 'private' }, saved, null, data), null)
   assert.equal(savedVerdictFor(kindergarten(home), {}, null, data), null)
 })
@@ -122,7 +125,6 @@ test('rows that disagree read as mixed', () => {
 })
 
 test('a school with a preparatory group and first grade gets both saved results', async () => {
-  const { savedVerdictsFor } = await import('./schoolVerdict.js')
   const saved = {
     kindergarten: { startYear: 2026, answers: { ...kgAnswers, birthYear: 2020, additional: 'sen' } },
     grade_1: { startYear: 2026, answers: GRADE1_INITIAL, addresses: [{ check: { streetId: street.id, number, schoolId: ownId }, since: '2018-01-01' }] },

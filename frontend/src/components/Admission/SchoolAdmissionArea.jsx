@@ -16,7 +16,7 @@ import {
 import { CATCHMENT_CAMPAIGNS, loadAddresses, loadCatchments, loadDistricts } from '../../admission/loadCatchments'
 import { saveHome } from '../../admission/saved'
 import { useSavedAdmission } from '../../hooks/useSavedAdmission'
-import { parseSavedLocation } from '../../utils/keyFacts'
+import { readSavedLocation } from '../../utils/keyFacts'
 import { usesSofiaKindergartenSystem } from '../../utils/admission'
 import { getMappableLocations } from '../SchoolDetailPage/LocationMap'
 import { geocodeAddress, reverseGeocodeStreet } from '../../utils/geocoding'
@@ -126,14 +126,6 @@ function streetAt(lat, lng) {
   })
 }
 
-function readSearchLocation() {
-  try {
-    return parseSavedLocation(window.localStorage.getItem('userLocation'))
-  } catch {
-    return null
-  }
-}
-
 /**
  * "Use my current location": the device's position, pinned at once, then the street and
  * number there (OpenStreetMap, on request only) matched to the official address table.
@@ -191,7 +183,7 @@ function CatchmentArea({ ids, point }) {
   const [pin, setPin] = useState(null)
   // A pin from a location (not a checked address): only an approximate answer.
   const [locationPin, setLocationPin] = useState(() => {
-    const saved = readSearchLocation()
+    const saved = readSavedLocation()
     return saved ? [saved.lat, saved.lng] : null
   })
   const current = useCurrentLocation({

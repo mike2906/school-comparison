@@ -52,7 +52,8 @@ const listeners = new Set()
 
 // One listener for changes made in another tab, however many components subscribe.
 function onStorage(event) {
-  if (event.key !== STORAGE_KEY) return
+  // A null key is localStorage.clear() in another tab.
+  if (event.key !== STORAGE_KEY && event.key !== null) return
   current = null
   listeners.forEach(listener => listener())
 }

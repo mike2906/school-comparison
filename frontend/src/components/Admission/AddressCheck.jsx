@@ -107,12 +107,12 @@ function AddressCheck({ onResult, catchments, ownIds = [], nameSchool = true, va
         />
         {suggestions.length > 0 && (
           <ul className="absolute z-10 mt-1 max-h-64 w-full overflow-auto rounded-lg border border-neutral-200 bg-white shadow-lg">
-            {suggestions.map(({ street: option, number: withNumber }) => (
+            {suggestions.map(({ street: option, number: withNumber, carry }) => (
               <li key={`${option.id}|${withNumber}`}>
                 <button
                   type="button"
                   className="w-full px-3 py-2 text-left text-sm hover:bg-neutral-100"
-                  onClick={() => pick(option, withNumber || typed.number)}
+                  onClick={() => pick(option, withNumber || (carry ? typed.number : ''))}
                 >
                   {withNumber ? `${nameOf(option)} ${withNumber}` : nameOf(option)}
                 </button>
@@ -143,18 +143,19 @@ function AddressCheck({ onResult, catchments, ownIds = [], nameSchool = true, va
 function suggestionsFor(streets, text, typed) {
   const out = []
   const seen = new Set()
-  const add = (street, number) => {
+  // `carry`: the street matched without the typed number, which is still the house number.
+  const add = (street, number, carry = false) => {
     const key = `${street.id}|${number}`
     if (seen.has(key) || out.length >= 12) return
     seen.add(key)
-    out.push({ street, number })
+    out.push({ street, number, carry })
   }
   if (typed.number) {
     const matches = searchStreets(streets, typed.street)
     for (const street of matches) if (catchmentSchoolFor(street, typed.number)) add(street, typed.number)
   }
   for (const street of searchStreets(streets, text)) add(street, '')
-  if (typed.number) for (const street of searchStreets(streets, typed.street)) add(street, '')
+  if (typed.number) for (const street of searchStreets(streets, typed.street)) add(street, '', true)
   return out
 }
 

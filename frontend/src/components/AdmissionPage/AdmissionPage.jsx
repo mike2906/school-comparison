@@ -15,10 +15,10 @@ import {
   startYearChoices,
   summaryRowsFor,
 } from '../../admission/calculator'
-import { districtAt, districtByName, schoolCatchmentIds } from '../../admission/catchments'
+import { schoolCatchmentIds } from '../../admission/catchments'
+import { kindergartenDistrictFeature } from '../../admission/schoolVerdict'
 import { loadDistricts } from '../../admission/loadCatchments'
 import { getSaved } from '../../admission/saved'
-import { getMappableLocations } from '../SchoolDetailPage/LocationMap'
 import CutoffTable from '../Admission/CutoffTable'
 import RuleSetNotice from './RuleSetNotice'
 import KindergartenCalculator from './KindergartenCalculator'
@@ -61,12 +61,6 @@ function useDistricts() {
   return districts
 }
 
-function schoolPoint(school) {
-  const points = getMappableLocations(school?.locations)
-  const point = points.find(p => p.location.is_primary) || points[0]
-  return point ? [point.lat, point.lng] : null
-}
-
 /**
  * The admission calculator: kindergarten points, first-grade group and points, and the
  * eighth-grade score, from the rule files in src/admission/rules. Everything is
@@ -103,10 +97,7 @@ function AdmissionPage() {
   const schoolContext = useMemo(() => {
     if (!school) return null
     const info = school.admission_info || {}
-    const point = schoolPoint(school)
-    const district = districts
-      ? districtByName(districts, info.admin_district) || (point ? districtAt(districts, point[0], point[1]) : null)
-      : null
+    const district = kindergartenDistrictFeature(school, districts)
     return {
       id: school.id,
       name: getSchoolName(school, i18n.language),

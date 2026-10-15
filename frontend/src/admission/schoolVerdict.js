@@ -25,13 +25,16 @@ function schoolPoint(school) {
   return location ? [parseCoordinate(location.lat), parseCoordinate(location.lng)] : null
 }
 
-/** A kindergarten's district code: the one kg.sofia.bg gives, else the polygon its pin is in. */
-export function kindergartenDistrict(school, districts) {
+/** A kindergarten's district feature: the one kg.sofia.bg gives, else the polygon its pin is in. */
+export function kindergartenDistrictFeature(school, districts) {
   if (!districts) return null
   const point = schoolPoint(school)
-  const feature = districtByName(districts, school?.admission_info?.admin_district) ||
+  return districtByName(districts, school?.admission_info?.admin_district) ||
     (point ? districtAt(districts, point[0], point[1]) : null)
-  return feature?.properties.code ?? null
+}
+
+export function kindergartenDistrict(school, districts) {
+  return kindergartenDistrictFeature(school, districts)?.properties.code ?? null
 }
 
 /**
@@ -53,9 +56,11 @@ export function compareRows(rows, yours, ruleSet) {
   return { verdict: verdicts.size === 1 ? lines[0].verdict : 'mixed', lines }
 }
 
-function kindergartenVerdict(school, entry, { ruleSets, districts, today }) {
+function kindergartenVerdict(school, entry, { ruleSets, districts, today }, searchGroup) {
   const ageGroup = kindergartenAgeGroup(entry.answers, entry.startYear)
   if (!ageGroup || !KINDERGARTEN_GROUPS.includes(ageGroup)) return null
+  // A search for another group is about another child.
+  if (searchGroup && searchGroup !== ageGroup) return null
   const summary = school.admission_info?.cutoff_summary || []
   // A school's preparatory group is ranked under the kindergarten rules.
   const applies = usesSofiaKindergartenSystem(school) ||
@@ -110,12 +115,15 @@ export function savedVerdictsFor(school, saved, ageGroup, data) {
   return ['kindergarten', 'grade_1'].flatMap(stage => {
     const entry = saved?.[stage]
     if (!entry || (ageGroup && !SEARCH_GROUPS[stage].includes(ageGroup))) return []
-    const verdict = stage === 'kindergarten' ? kindergartenVerdict(school, entry, data) : grade1Verdict(school, entry, data)
+    const verdict = stage === 'kindergarten' ? kindergartenVerdict(school, entry, data, ageGroup) : grade1Verdict(school, entry, data)
     return verdict ? [verdict] : []
   })
 }
 
-/** The first of savedVerdictsFor, or null. */
-export function savedVerdictFor(school, saved, ageGroup, data) {
-  return savedVerdictsFor(school, saved, ageGroup, data)[0] ?? null
+/** Whether a saved tab applies to a search for `ageGroup` (null: any). */
+export function savedStageApplies(stage, entry, ageGroup) {
+  if (!entry) return false
+  if (!ageGroup) return true
+  if (stage === 'kindergarten') return ageGroup === kindergartenAgeGroup(entry.answers, entry.startYear)
+  return SEARCH_GROUPS[stage].includes(ageGroup)
 }
