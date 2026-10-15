@@ -440,6 +440,15 @@ def test_a_fee_for_the_school_or_the_kindergarten_is_not_the_other_levels():
     assert "2_level_fits_school" in rules(kindergarten_only, "Такса за детската градина\n500 €", "school")
 
 
+@pytest.mark.parametrize(
+    "label", ["Preschool and Kindergarten monthly fee", "Pre-school and kindergarten", "Предучилищна и детска градина"]
+)
+def test_preschool_and_kindergarten_still_names_the_kindergarten(label):
+    from app.scrapers.price_evidence import names_other_level
+
+    assert names_other_level(label, "school")
+
+
 def test_rule_6_allows_a_fee_refiled_under_another_category():
     """525's €265 deposit moved from tuition to registration: same fee, not a loss."""
     published = [(row(Decimal("265"), period="ONE_TIME"), SLAVEICHE)]

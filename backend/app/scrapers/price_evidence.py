@@ -509,8 +509,8 @@ _PRE_K_RE = re.compile(r"pre[- ]?(?:kindergarten|k\b)")
 # A fee for both levels names neither as the other: 271's entry fee is for families "чиито
 # деца не са учили преди това в училището или детската градина".
 _BOTH_LEVELS_RE = re.compile(
-    r"(?:училищ\w*|school)\s+(?:или|и|or|and)\s+(?:в\s+|the\s+)?(?:детск\w* градин\w*|kindergarten)"
-    r"|(?:детск\w* градин\w*|kindergarten)\s+(?:или|и|or|and)\s+(?:в\s+|the\s+)?(?:училищ\w*|school)"
+    r"(?<![\w-])(?:училищ\w*|school)\s+(?:или|и|or|and)\s+(?:в\s+|the\s+)?(?:детск\w* градин\w*|kindergarten)"
+    r"|(?:детск\w* градин\w*|kindergarten)\s+(?:или|и|or|and)\s+(?:в\s+|the\s+)?(?<![\w-])(?:училищ\w*|school)\b"
 )
 
 
