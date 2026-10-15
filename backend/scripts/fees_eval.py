@@ -19,7 +19,7 @@ category. Amounts are compared in euro (BGN at 1.95583) within 1 %.
 
     uv run python scripts/fees_eval.py                       # one trial, report + baseline check
     uv run python scripts/fees_eval.py --trials 3            # repeat, scores averaged
-    uv run python scripts/fees_eval.py --write-baseline      # store this run as the baseline
+    uv run python scripts/fees_eval.py --write-baseline      # store this run as the baseline (use --trials 5)
     MODEL_TIER_PRICING=openrouter/... uv run python scripts/fees_eval.py --no-check   # try a model
 
 Calls the model directly (no DB, no ledger); ``--max-usd`` stops the run. Exit code 1 when the
@@ -59,8 +59,10 @@ ACCURACY = BACKEND.parent / "docs" / "accuracy"
 KEY_SETS = ("step3", "step4")
 BGN_PER_EUR = Decimal("1.95583")
 TOLERANCE = Decimal("0.01")
-# A drop past these fails the check: one trial moves by a few points on its own.
-MAX_WRONG_RISE = 0.05
+# Noise, measured 2026-10-15 over 5 trials of the same pages: one trial's wrong rate ran 7 to
+# 16 % and its found rate 35 to 44 %. CI averages 3 trials against a 5-trial baseline, so
+# these margins are about two standard deviations: only a real drop fails the check.
+MAX_WRONG_RISE = 0.06
 MAX_FOUND_DROP = 0.07
 
 
