@@ -43,12 +43,23 @@ from app.services.geocoding.write_gate import OFFICIAL_COORDS_TAG, apply_geocode
 LAYERS_URL = (
     "https://arcgis.sofia.bg/arcgis/rest/services/School_AllPublic/Schools_AllPublic/MapServer"
 )
+# The kindergarten layer behind kg.sofia.bg's map: every building (сграда 2, 3 too), keyed by
+# `integrationid`, which is kg.sofia.bg's esriId (our `source_esri_id=` tag).
+KINDERGARTEN_BUILDINGS_URL = (
+    "https://arcgis.sofia.bg/arcgis/rest/services/Schools/SchoolsZones/MapServer/0"
+)
+ESRI_ID_TAG = "source_esri_id="
+# arcgis.sofia.bg refuses clients it does not take for a browser ("Unsupported Browser").
+BROWSER_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/124.0 Safari/537.36"
+}
 # Layer id -> kind of institution.
 LAYERS = {0: "school", 1: "kindergarten", 2: "nursery"}
 DISTRICTS_LAYER = 3
 PROVIDER = "sofia_municipal_arcgis"
 # Statuses --apply writes.
-MATCHED = {"match", "match_by_name"}
+MATCHED = {"match", "match_by_name", "match_by_id"}
 DEFAULT_REPORT_ROOT = Path(__file__).parent.parent / "reports" / "municipal-points"
 
 # The municipal layers' district spellings -> the ones already stored (kg.sofia.bg, OSM).
@@ -86,6 +97,7 @@ class Point:
     district: Optional[str]
     lat: float
     lng: float
+    integration_id: Optional[str] = None
 
 
 @dataclass
@@ -277,7 +289,7 @@ def _shares_point_with_other_address(point: Point, points: list[Point]) -> bool:
 
 async def fetch_points() -> list[Point]:
     points: list[Point] = []
-    async with httpx.AsyncClient(timeout=30.0, headers={"User-Agent": "Mozilla/5.0"}) as client:
+    async with httpx.AsyncClient(timeout=30.0, headers=BROWSER_HEADERS) as client:
         for layer, kind in LAYERS.items():
             response = await client.get(
                 f"{LAYERS_URL}/{layer}/query",
@@ -300,6 +312,60 @@ async def fetch_points() -> list[Point]:
                     lng=float(geometry["x"]),
                 ))
     return points
+
+
+async def fetch_kindergarten_buildings() -> dict[str, Point]:
+    """kg.sofia.bg's kindergarten buildings by esriId (integrationid)."""
+    async with httpx.AsyncClient(timeout=30.0, headers=BROWSER_HEADERS) as client:
+        response = await client.get(
+            f"{KINDERGARTEN_BUILDINGS_URL}/query",
+            params={"where": "1=1", "outFields": "*", "outSR": 4326, "f": "json"},
+        )
+        response.raise_for_status()
+        payload = response.json()
+    if payload.get("exceededTransferLimit"):
+        raise RuntimeError("The kindergarten layer is paginated; fetch all pages first")
+    buildings: dict[str, Point] = {}
+    for feature in payload["features"]:
+        attrs, geometry = feature["attributes"], feature.get("geometry") or {}
+        integration_id = str(attrs.get("integrationid") or "").strip()
+        if not integration_id or geometry.get("x") is None or geometry.get("y") is None:
+            continue
+        buildings[integration_id] = Point(
+            kind="kindergarten",
+            name=(attrs.get("fullname") or attrs.get("name") or "").strip(),
+            address=(attrs.get("fulladdress") or "").strip(),
+            district=_canonical_district(attrs.get("name_rajon")),
+            lat=float(geometry["y"]),
+            lng=float(geometry["x"]),
+            integration_id=integration_id,
+        )
+    return buildings
+
+
+def esri_id(location: SchoolLocation) -> Optional[str]:
+    for tag in location.location_tags or []:
+        if str(tag).startswith(ESRI_ID_TAG):
+            return str(tag)[len(ESRI_ID_TAG):].strip() or None
+    return None
+
+
+def match_by_id(row: Row, buildings: dict[str, Point]) -> Row:
+    """An unmatched kindergarten building placed by kg.sofia.bg's id for it.
+
+    The id is the join; the point's number or address must still agree with ours, so an id
+    reused for another kindergarten is not taken."""
+    if row.status in MATCHED:
+        return row
+    point = buildings.get(esri_id(row.location) or "")
+    if point is None:
+        return row
+    name = (row.school.name_i18n or {}).get("bg") or ""
+    address = (row.location.address_i18n or {}).get("bg") or ""
+    key = name_key(name)
+    if (key and name_key(point.name) == key) or addresses_agree(address, point.address):
+        return Row(row.location, row.school, "match_by_id", point, [point])
+    return Row(row.location, row.school, "id_disagrees", None, [point])
 
 
 def write_report(rows: list[Row], report_dir: Path) -> Path:
@@ -392,7 +458,7 @@ async def fill_districts(db, apply: bool) -> None:
     exact = [loc for loc in locations if (loc.geocode_meta or {}).get("precision") == "exact"]
     print(f"{len(exact)} exact pins without a district ({len(locations) - len(exact)} approximate skipped)")
     filled = 0
-    async with httpx.AsyncClient(timeout=30.0, headers={"User-Agent": "Mozilla/5.0"}) as client:
+    async with httpx.AsyncClient(timeout=30.0, headers=BROWSER_HEADERS) as client:
         for loc in exact:
             district = await district_at(client, loc.lat, loc.lng)
             print(f"  {loc.id}: {district}")
@@ -423,7 +489,8 @@ async def main() -> None:
         return
 
     points = await fetch_points()
-    print(f"Fetched {len(points)} municipal points")
+    buildings = await fetch_kindergarten_buildings()
+    print(f"Fetched {len(points)} municipal points and {len(buildings)} kindergarten buildings")
     async with async_session_maker() as db:
         pairs = (await db.execute(
             select(SchoolLocation, School)
@@ -436,6 +503,7 @@ async def main() -> None:
             classify(loc, school, points, single_location=locations_per_school[school.id] == 1)
             for loc, school in pairs
         ]
+        rows = [match_by_id(row, buildings) for row in rows]
         for row in rows:
             if row.status in MATCHED and _shares_point_with_other_address(row.point, points):
                 row.status, row.candidates = "shared_point", [row.point]

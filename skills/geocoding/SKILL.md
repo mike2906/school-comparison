@@ -46,6 +46,13 @@ were measured 10 m to 2 km off in Sofia (2026-10-14), so never treat them as exa
 Sofia state schools and kindergartens take the municipality's points
 (`scripts/import_sofia_municipal_points.py`); a single-location school whose register
 address is only its complex matches its one numbered point by name (`match_by_name`).
+Kindergarten buildings the main layer lacks (сграда 2, 3) come from kg.sofia.bg's own map
+layer (`Schools/SchoolsZones` layer 0), joined on our `source_esri_id=` tag (`match_by_id`;
+the number or address must still agree). arcgis.sofia.bg refuses non-browser User-Agents.
+
+`cli confirm-pins [--apply]` publishes a hidden point that already stands on our building:
+Nominatim's nearest building there is our town, street and exact house number. Not when
+the school's own website maps it only over 300 m away (the address may be stale).
 
 `cli website-pins [--apply]` (after geocoding) pins a hidden location on its own website's
 map point only when Nominatim's nearest building there is in our town, on our street, with

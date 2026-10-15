@@ -573,6 +573,35 @@ def social_links_command(school_ids, city, country, limit, apply_changes, report
         console.print(f"Report: {report_path}")
 
 
+@cli.command("confirm-pins")
+@click.option("--school-id", "school_ids", type=int, multiple=True, help="Run these schools (repeatable)")
+@click.option("--city", default="sofia", show_default=True, help="City (only Sofia has the bounds and town name yet)")
+@click.option("--country", default="bg", show_default=True, help="Country code")
+@click.option("--limit", type=int, default=None, help="Maximum schools")
+@click.option("--apply", "apply_changes", is_flag=True, help="Write pins (default is a dry run that writes nothing)")
+@click.option("--out", "report_path", type=click.Path(dir_okay=False, path_type=Path), help="Write the JSON report")
+def confirm_pins_command(school_ids, city, country, limit, apply_changes, report_path):
+    """Publish hidden pins that OpenStreetMap puts at our exact street and house number."""
+    import json
+
+    from app.database import async_session_maker
+    from app.scrapers.stages import confirm_pins as confirm_pins_stage
+
+    async def _run():
+        async with async_session_maker() as db:
+            return await confirm_pins_stage.run_confirm_pins(
+                db, country=country, city=city, school_ids=school_ids, limit=limit, apply=apply_changes
+            )
+
+    report = asyncio.run(_run())
+    mode = "Applied" if apply_changes else "Dry run"
+    console.print(f"{mode}: {report['locations']} locations, outcomes {report['outcomes']}")
+    if report_path is not None:
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(json.dumps(report, ensure_ascii=False, indent=1, default=str), encoding="utf-8")
+        console.print(f"Report: {report_path}")
+
+
 @cli.command("website-pins")
 @click.option("--school-id", "school_ids", type=int, multiple=True, help="Run these schools (repeatable)")
 @click.option("--city", default="sofia", show_default=True, help="City (only Sofia has the bounds and town name yet)")
