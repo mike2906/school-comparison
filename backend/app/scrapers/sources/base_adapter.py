@@ -349,20 +349,37 @@ class BaseSourceAdapter(ABC):
                         ).scalars().all()
                         # Official and hand-corrected points are not recreated: the rows
                         # stay, and a source location that is one of them only refreshes
-                        # its source fields. So do pins a pin stage checked, while the
-                        # source still lists their address.
-                        pinned = [
-                            loc
-                            for loc in existing_locations
-                            if has_pinned_point(loc)
-                            or (
-                                has_checked_pin(loc)
-                                and any(
-                                    _is_pinned_location(loc, incoming.address_i18n)
-                                    for incoming in locations_to_add
-                                )
-                            )
+                        # its source fields. So do exact pins a pin stage checked, while
+                        # the source still lists their address (exactly, or the address
+                        # site-address replaced).
+                        candidates = [
+                            loc for loc in existing_locations if has_pinned_point(loc) or has_checked_pin(loc)
                         ]
+                        unmatched, pairs, new_locations = list(candidates), [], []
+                        for incoming in locations_to_add:
+                            key = _address_key(incoming.address_i18n)
+                            row = next(
+                                (
+                                    loc
+                                    for loc in unmatched
+                                    if (
+                                        _is_pinned_location(loc, incoming.address_i18n)
+                                        if has_pinned_point(loc)
+                                        else key in _address_keys(loc)
+                                    )
+                                ),
+                                None,
+                            )
+                            if row is None:
+                                new_locations.append(incoming)
+                                continue
+                            # One row is one source location: a second address on the
+                            # same street and number is its own building.
+                            unmatched.remove(row)
+                            pairs.append((row, incoming))
+                        # A checked pin the source no longer lists is recreated like the rest.
+                        unmatched = [loc for loc in unmatched if has_pinned_point(loc)]
+                        pinned = [row for row, _ in pairs] + unmatched
                         location_ids = [loc.id for loc in existing_locations if loc not in pinned]
                         if location_ids:
                             # Remove child shift rows first because raw deletes bypass ORM cascades.
@@ -375,29 +392,19 @@ class BaseSourceAdapter(ABC):
                                 delete(SchoolLocation).where(SchoolLocation.id.in_(location_ids))
                             )
                         if pinned:
-                            new_locations = []
-                            unmatched = list(pinned)
-                            for incoming in locations_to_add:
-                                row = next(
-                                    (loc for loc in unmatched if _is_pinned_location(loc, incoming.address_i18n)),
-                                    None,
-                                )
-                                if row is None:
-                                    new_locations.append(incoming)
-                                    continue
-                                # One row is one source location: a second address on the
-                                # same street and number is its own building.
-                                unmatched.remove(row)
+                            for row, incoming in pairs:
                                 # The source's coords_source tag describes its own geocode,
                                 # not the pinned point.
-                                source_tags = [
-                                    tag
-                                    for tag in incoming.location_tags or []
-                                    if not tag.startswith("coords_source=")
-                                ]
-                                await self._sync_source_location(
-                                    row, incoming.model_copy(update={"location_tags": source_tags})
-                                )
+                                update = {
+                                    "location_tags": [
+                                        tag
+                                        for tag in incoming.location_tags or []
+                                        if not tag.startswith("coords_source=")
+                                    ]
+                                }
+                                if _address_key(incoming.address_i18n) != _address_key(row.address_i18n):
+                                    update["district"] = None  # the replaced address's
+                                await self._sync_source_location(row, incoming.model_copy(update=update))
                             if any(loc.is_primary for loc in pinned):
                                 if new_locations and any(loc.is_primary for loc in unmatched):
                                     logger.warning(
@@ -409,7 +416,7 @@ class BaseSourceAdapter(ABC):
                                 new_locations = [
                                     loc.model_copy(update={"is_primary": False}) for loc in new_locations
                                 ]
-                            locations_to_add = new_locations
+                        locations_to_add = new_locations
 
                     for loc in locations_to_add:
                         new_location = SchoolLocation(

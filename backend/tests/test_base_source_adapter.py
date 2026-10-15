@@ -207,7 +207,9 @@ async def test_registry_rerun_keeps_checked_pins_whose_address_it_still_lists(db
                 education_level="primary",
                 locations=[
                     source_location('ул. "Ела" № 6'),
-                    source_location('ул. "Майор Коста Паница"', is_primary=False),
+                    source_location('ул. "Майор Коста Паница"', is_primary=False, district="Красно село"),
+                    # Same number on a street whose words include ours: another building.
+                    source_location('бул. "Роза" № 3', is_primary=False),
                     source_location('ул. "Нова" № 9', is_primary=False),
                 ],
             )
@@ -221,9 +223,14 @@ async def test_registry_rerun_keeps_checked_pins_whose_address_it_still_lists(db
             await db_session.execute(select(SchoolLocation).where(SchoolLocation.school_id == school_id))
         ).scalars()
     }
-    assert set(locations) == {'ул. "Ела" № 6', "гр. Банкя, ул. Тенев баир 2", 'ул. "Нова" № 9'}
+    assert set(locations) == {
+        'ул. "Ела" № 6', "гр. Банкя, ул. Тенев баир 2", 'бул. "Роза" № 3', 'ул. "Нова" № 9'
+    }
     assert (locations['ул. "Ела" № 6'].lat, locations['ул. "Ела" № 6'].lng) == (42.61, 23.31)
     assert locations['ул. "Ела" № 6'].geocode_meta["method"] == "address_register"
     assert "coords_source=geojson" not in locations['ул. "Ела" № 6'].location_tags
     assert locations["гр. Банкя, ул. Тенев баир 2"].geocode_meta["method"] == "site_address"
+    assert locations["гр. Банкя, ул. Тенев баир 2"].district is None  # not the old premises'
+    assert locations['бул. "Роза" № 3'].geocode_meta["precision"] == "approximate"
+    assert [loc.address_i18n["bg"] for loc in locations.values() if loc.is_primary] == ['ул. "Ела" № 6']
     assert locations['ул. "Нова" № 9'].geocode_meta["precision"] == "approximate"
