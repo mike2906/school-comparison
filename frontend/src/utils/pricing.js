@@ -110,7 +110,8 @@ export function selectPricingCohort(pricing = [], { ageGroup = null, intake = tr
  *
  * Used by the detail page so a mixed-year price list is labelled per group instead of
  * inheriting one arbitrary row's year. The year families now enrol for is marked
- * `YEAR_STATUS.NEXT` rather than as another year.
+ * `YEAR_STATUS.NEXT` rather than as another year. A row from a past year that a later year
+ * lists again (same category, period, age groups and amount) is dropped.
  */
 export function groupPricingByAcademicYear(pricing = [], { today = new Date() } = {}) {
   if (!Array.isArray(pricing) || pricing.length === 0) return []
@@ -130,6 +131,30 @@ export function groupPricingByAcademicYear(pricing = [], { today = new Date() } 
   })
   groups.forEach(group => {
     if (isIntakeYear(group, today)) group.yearStatus = YEAR_STATUS.NEXT
+  })
+  // Last year's row for a fee a later year lists again at the same amount (same category,
+  // period and age groups) is history, so it is left out: 596's 2025-26 bus fees under the
+  // same 2026-27 ones read as two prices. A fee that changed price, or that no later year
+  // repeats, still shows under its own year.
+  const sameFee = row => {
+    const amounts = [row.amount, row.amount_min, row.amount_max]
+    if (!amounts.some(value => value != null)) return null
+    const ageGroups = [...rowAgeGroupKeys(row)].sort().join(',')
+    return [row.category, row.currency, pricePeriod(row) || '', ageGroups, ...amounts].join('|')
+  }
+  const latest = new Map()
+  pricing.forEach(row => {
+    const key = sameFee(row)
+    if (key) latest.set(key, Math.max(latest.get(key) ?? -1, yearStartOf(row)))
+  })
+  const repeatedLater = row => {
+    const key = sameFee(row)
+    return key !== null && row.year_status === YEAR_STATUS.DATED_OTHER && !isIntakeYear(row, today) &&
+      latest.get(key) > yearStartOf(row)
+  }
+  groups.forEach(group => {
+    group.rows = group.rows.filter(row => !repeatedLater(row))
+    if (group.rows.length === 0) groups.delete(group.key)
   })
 
   return [...groups.values()].sort((a, b) => {
