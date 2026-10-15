@@ -4,6 +4,7 @@ import AreaMap from './AreaMap'
 import AddressCheck from './AddressCheck'
 import {
   addressFactsForSchool,
+  mapSearchQuery,
   districtAt,
   districtByName,
   districtLabel,
@@ -13,6 +14,7 @@ import {
 import { CATCHMENT_CAMPAIGNS, loadCatchments, loadDistricts } from '../../admission/loadCatchments'
 import { usesSofiaKindergartenSystem } from '../../utils/admission'
 import { getMappableLocations } from '../SchoolDetailPage/LocationMap'
+import { geocodeAddress } from '../../utils/geocoding'
 
 const OFFICIAL_SYSTEM_URL = 'https://kg.sofia.bg/'
 // The municipality's own catchment viewer, opened on one school.
@@ -56,11 +58,50 @@ function Panel({ title, children }) {
   )
 }
 
-function AddressVerdict({ facts }) {
+/** One sentence: in this school's area or not, and whose area the address is in. */
+function AddressVerdict({ facts, schoolName }) {
   const { t } = useTranslation()
   if (!facts || facts.inCatchment == null) return null
   const key = facts.inCatchment ? 'inside' : facts.inNeighbouring ? 'neighbouring' : 'outside'
-  return <p className="mt-3 rounded-lg bg-neutral-50 p-3 text-sm text-neutral-900">{t(`admissionArea.verdict.${key}`)}</p>
+  const text = !facts.inCatchment && schoolName
+    ? t(`admissionArea.verdict.${key}Of`, { school: schoolName })
+    : t(`admissionArea.verdict.${key}`)
+  return <p className="mt-3 rounded-lg bg-neutral-50 p-3 text-sm text-neutral-900">{text}</p>
+}
+
+/**
+ * Puts the checked address on the map, only when the parent asks: finding the point
+ * sends the address to OpenStreetMap's search (the check itself stays in the browser).
+ */
+function ShowOnMap({ address, onPin }) {
+  const { t } = useTranslation()
+  const [state, setState] = useState('idle')
+  useEffect(() => {
+    setState('idle')
+    onPin(null)
+  }, [address])
+  if (!address) return null
+  const show = () => {
+    setState('loading')
+    geocodeAddress(mapSearchQuery(address.street, address.number), { city_suffix: '' }).then(
+      result => {
+        setState('shown')
+        onPin([result.lat, result.lng])
+      },
+      error => setState(error?.code === 'CANCELED' ? 'idle' : 'failed')
+    )
+  }
+  return (
+    <div className="mt-3 text-sm">
+      {state !== 'shown' && (
+        <button type="button" onClick={show} disabled={state === 'loading'} className="font-medium text-primary-700 underline disabled:opacity-60">
+          {state === 'loading' ? t('common.loading') : t('admissionArea.showOnMap')}
+        </button>
+      )}
+      {state === 'failed' && <p className="mt-1 text-amber-800">{t('admissionArea.showOnMapFailed')}</p>}
+      <p className="mt-1 text-xs text-neutral-500">{t(state === 'shown' ? 'admissionArea.showOnMapShown' : 'admissionArea.showOnMapNote')}</p>
+    </div>
+  )
 }
 
 /** First grade at a Sofia municipal school: its catchment, its neighbours, an address check. */
@@ -68,6 +109,7 @@ function CatchmentArea({ ids, point }) {
   const { t } = useTranslation()
   const { data: catchments, failed } = useLoaded(loadCatchments, true)
   const [address, setAddress] = useState(null)
+  const [pin, setPin] = useState(null)
 
   const areas = useMemo(() => {
     if (!catchments) return null
@@ -95,7 +137,7 @@ function CatchmentArea({ ids, point }) {
     <Panel title={title}>
       <p className="text-sm text-neutral-700">{t('admissionArea.catchmentIntro')}</p>
       <div className="mt-4">
-        <AreaMap primary={areas.own} secondary={areas.neighbours} point={point} />
+        <AreaMap primary={areas.own} secondary={areas.neighbours} point={point} pin={pin} />
       </div>
       <Legend
         items={[
@@ -106,9 +148,10 @@ function CatchmentArea({ ids, point }) {
       />
       <h3 className="mt-6 text-lg font-semibold text-neutral-900">{t('admissionArea.checkTitle')}</h3>
       <div className="mt-2">
-        <AddressCheck catchments={catchments.byId} ownIds={ids} onResult={setAddress} />
+        <AddressCheck catchments={catchments.byId} ownIds={ids} onResult={setAddress} nameSchool={false} />
       </div>
-      <AddressVerdict facts={facts} />
+      <AddressVerdict facts={facts} schoolName={address?.schoolId ? catchments.byId.get(address.schoolId)?.properties.name : null} />
+      <ShowOnMap address={address} onPin={setPin} />
       <p className="mt-4 text-xs text-neutral-500">
         {t('admissionArea.catchmentSource', { campaign: CATCHMENT_CAMPAIGNS[0] })}{' '}
         <a href={catchmentViewerUrl(ids[0])} target="_blank" rel="noreferrer" className="underline">arcgis.sofia.bg</a>

@@ -77,8 +77,11 @@ function AdmissionPage() {
   const stage = stageById(params.get('stage'))
   const school = useSchool(params.get('school'))
   const districts = useDistricts()
-  const [startYear, setStartYear] = useState(() => defaultStartYear())
   const today = sofiaToday()
+  // Each tab opens on the campaign a parent applying today is ranked under, until the
+  // parent picks another year.
+  const [chosenYear, setChosenYear] = useState(null)
+  const startYear = chosenYear ?? defaultStartYear(new Date(), { ruleSets: RULE_SETS, stage, today })
 
   useEffect(() => {
     const previous = document.title
@@ -111,6 +114,7 @@ function AdmissionPage() {
   const Calculator = CALCULATORS[stage.id]
 
   const chooseStage = id => {
+    setChosenYear(null)
     const next = new URLSearchParams(params)
     next.set('stage', id)
     setParams(next, { replace: true })
@@ -152,7 +156,7 @@ function AdmissionPage() {
               <select
                 id={id}
                 value={startYear}
-                onChange={event => setStartYear(Number(event.target.value))}
+                onChange={event => setChosenYear(Number(event.target.value))}
                 className={INPUT_CLASS}
               >
                 {startYearChoices().map(year => (
@@ -174,7 +178,7 @@ function AdmissionPage() {
         {selected ? (
           <>
             <div className="mt-4">
-              <RuleSetNotice selected={selected} />
+              <RuleSetNotice selected={selected} today={today} />
             </div>
             <div className="mt-6">
               <Calculator
@@ -184,6 +188,8 @@ function AdmissionPage() {
                 school={schoolContext}
                 kindergarten={schoolContext}
                 districts={districts}
+                cutoffRows={cutoffRows}
+                isCurrentRules={row => sameRules(row.rule_set, selected?.ruleSet)}
               />
             </div>
           </>

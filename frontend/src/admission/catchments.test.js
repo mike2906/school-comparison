@@ -16,6 +16,7 @@ import {
   normalizeHouseNumber,
   searchKey,
   sortedDistricts,
+  mapSearchQuery,
   searchStreets,
 } from './catchments.js'
 
@@ -53,6 +54,11 @@ test('searchStreets lists the city street before same-named village streets', ()
     const found = searchStreets(streets, query)
     assert.equal(found[0].settlement, 'ГР.СОФИЯ', query)
   }
+})
+
+test('mapSearchQuery turns a table address into a map search', () => {
+  assert.equal(mapSearchQuery({ street: 'УЛ.ИВАН ЩЕРЕВ', settlement: 'ГР.СОФИЯ' }, '5'), 'ул. Иван Щерев 5, София, Bulgaria')
+  assert.equal(mapSearchQuery({ street: 'УЛ.ВИТОША', settlement: 'С.БИСТРИЦА' }, '18а'), 'ул. Витоша 18А, Бистрица, Bulgaria')
 })
 
 test('house numbers are read the way the table writes them', () => {

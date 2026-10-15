@@ -18,9 +18,10 @@ function streetLabel(street, districtNames) {
  *
  * `onResult` gets `{ street, number, schoolId }` (schoolId null when the table does not
  * list the number) or null while the address is incomplete. The school the address
- * belongs to is named unless it is one of `ownIds` (the page's own school says so itself).
+ * belongs to is named unless it is one of `ownIds` or `nameSchool` is false (the page
+ * says so itself).
  */
-function AddressCheck({ onResult, catchments, ownIds = [] }) {
+function AddressCheck({ onResult, catchments, ownIds = [], nameSchool = true }) {
   const { t } = useTranslation()
   const id = useId()
   const [streets, setStreets] = useState(null)
@@ -48,7 +49,7 @@ function AddressCheck({ onResult, catchments, ownIds = [] }) {
     onResult(street && number.trim() ? { street, number, schoolId: schoolId ?? null } : null)
   }, [street, number, schoolId])
 
-  const schoolName = schoolId && !ownIds.includes(schoolId) ? catchments?.get(schoolId)?.properties.name : null
+  const schoolName = nameSchool && schoolId && !ownIds.includes(schoolId) ? catchments?.get(schoolId)?.properties.name : null
 
   return (
     <div className="rounded-xl border border-neutral-200 bg-white p-4">

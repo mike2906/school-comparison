@@ -874,11 +874,17 @@
     "verdict": {
       "inside": "This address is inside this school's catchment area.",
       "neighbouring": "This address is in a neighbouring area: it gets 5 extra points if the child is ranked in the last group (outside the catchment).",
-      "outside": "This address is outside this school's catchment area and its neighbouring areas."
+      "outside": "This address is outside this school's catchment area and its neighbouring areas.",
+      "neighbouringOf": "This address is in {{school}}'s catchment area, which neighbours this school's: it gets 5 extra points if the child is ranked in the last group (outside the catchment).",
+      "outsideOf": "This address is in {{school}}'s catchment area, outside this school's catchment area and its neighbouring areas."
     },
     "catchmentSource": "Official Sofia Municipality catchment areas for the {{campaign}} campaign. Always confirm on the municipality map,",
     "districtIntro": "Municipal kindergartens in Sofia have no catchment area. Children whose address is in the same district ({{district}}) get 3 extra points.",
-    "districtSource": "District boundaries from Sofia Municipality. Points are confirmed in the official system,"
+    "districtSource": "District boundaries from Sofia Municipality. Points are confirmed in the official system,",
+    "showOnMap": "Show the address on the map",
+    "showOnMapNote": "To find it on the map, the address is sent to OpenStreetMap's search. The check itself stays in your browser.",
+    "showOnMapShown": "The red dot is the address as OpenStreetMap found it; the spot may be approximate.",
+    "showOnMapFailed": "We couldn't find the address on the map. The check above uses the official list and doesn't depend on this."
   },
   "admissionCalc": {
     "title": "Admission points calculator",
@@ -1052,7 +1058,8 @@
       "score": "Score",
       "invalid": "Check the numbers: NVO results are 0 to 100 and the exam is 0 to 50.",
       "tieBreak": "Equal scores are ordered by the NVO total, then the two grades, then the average 7th-grade grade."
-    }
+    },
+    "runsUntil": "Rankings for {{campaign}} continue until {{date}}; after that, applications are for {{next}}: choose that year above."
   },
   "cutoffs": {
     "title": "Who got in before",
@@ -1076,7 +1083,18 @@
     },
     "calculate": "Calculate your points",
     "quotaScores": "boys {{boys}}, girls {{girls}}",
-    "bornIn": "born {{year}}"
+    "bornIn": "born {{year}}",
+    "compare": {
+      "title": "Compared with the last child admitted",
+      "above": "Your result is above the last child admitted.",
+      "below": "Your result is below the last child admitted.",
+      "tie": "Equal to the last child admitted: ties are decided by a random number.",
+      "unsure": "It depends on your \"Not sure\" answers: the cut-off is within your range.",
+      "everyone": "Everyone who applied was admitted.",
+      "noPlaces": "There were no free places.",
+      "otherRules": "That ranking used different rules.",
+      "note": "The latest ranking is a guide, not a promise: places and applicants change every time."
+    }
   },
   "driveTime": {
     "minutes": "~{{minutes}} min",

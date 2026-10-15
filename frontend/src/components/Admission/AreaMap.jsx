@@ -1,5 +1,5 @@
-import { useMemo } from 'react'
-import { CircleMarker, GeoJSON, MapContainer, TileLayer } from 'react-leaflet'
+import { useEffect, useMemo } from 'react'
+import { CircleMarker, GeoJSON, MapContainer, TileLayer, useMap } from 'react-leaflet'
 import { useTranslation } from 'react-i18next'
 import 'leaflet/dist/leaflet.css'
 
@@ -29,12 +29,23 @@ function boundsOf(features) {
   return Number.isFinite(south) ? [[south, west], [north, east]] : null
 }
 
+/** Widens the view to show `pin` together with the area, when the parent placed one. */
+function FitPin({ bounds, pin }) {
+  const map = useMap()
+  useEffect(() => {
+    if (!pin) return
+    map.fitBounds([...bounds, pin], { padding: [24, 24], maxZoom: 16 })
+  }, [map, bounds, pin])
+  return null
+}
+
 /**
  * A school's admission area: its own area in a strong colour, related areas (the
  * neighbouring catchments) in a light one, and the school's location. The view fits the
- * school's own area and never moves to a parent's address.
+ * school's own area; `pin` (an address the parent chose to show) widens it to include
+ * that point.
  */
-function AreaMap({ primary = [], secondary = [], point = null, label }) {
+function AreaMap({ primary = [], secondary = [], point = null, pin = null, label }) {
   const { t } = useTranslation()
   const bounds = useMemo(() => boundsOf(primary.length ? primary : secondary), [primary, secondary])
   if (!bounds) return null
@@ -73,6 +84,14 @@ function AreaMap({ primary = [], secondary = [], point = null, label }) {
             pathOptions={{ color: '#ffffff', weight: 3, fillColor: '#0f172a', fillOpacity: 1 }}
           />
         )}
+        {pin && (
+          <CircleMarker
+            center={pin}
+            radius={9}
+            pathOptions={{ color: '#ffffff', weight: 3, fillColor: '#dc2626', fillOpacity: 1 }}
+          />
+        )}
+        <FitPin bounds={bounds} pin={pin} />
       </MapContainer>
     </div>
   )
