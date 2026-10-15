@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
-import { formatRange } from '../../admission/calculator'
+import { formatRange, rankingWhen } from '../../admission/calculator'
 import { forgetSaved, SAVED_STAGES } from '../../admission/saved'
 import { savedListFilters, savedStageApplies } from '../../admission/schoolVerdict'
 import { setHideBelow, useHideBelow, useSavedAdmission } from '../../hooks/useSavedAdmission'
@@ -31,7 +31,7 @@ function Yours({ verdict }) {
  * stands. The list's banner says what was assumed.
  */
 export function SavedVerdictLine({ verdict }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   if (verdict.verdict === 'needsAddress') {
     return <span className="text-neutral-600">{t('savedAdmission.verdict.needsAddress')}</span>
   }
@@ -50,6 +50,11 @@ export function SavedVerdictLine({ verdict }) {
       )}
       {' · '}
       <span className={TONE[verdict.verdict] || 'text-neutral-700'}>{t(`savedAdmission.verdict.${verdict.verdict}`)}</span>
+      {/* Which campaign and ranking: a saved answer for next year is compared with this one's. */}
+      {/* Not for "mixed": one row's date would read as the school's. */}
+      {line && verdict.verdict !== 'mixed' && rankingWhen(line.row, line.round, i18n.language) && (
+        <span className="text-neutral-600"> ({rankingWhen(line.row, line.round, i18n.language)})</span>
+      )}
       {verdict.lines.some(l => l.otherRules) && <span className="text-neutral-600"> ({t('cutoffs.otherRules')})</span>}
       <PriorityNote verdict={verdict} className="block text-xs text-neutral-600" />
     </span>
@@ -75,7 +80,7 @@ function PriorityNote({ verdict, className }) {
  * assumptions, a link to change the answers and one to forget them.
  */
 export function SavedVerdictPanel({ verdict, schoolId }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   return (
     <div className="mt-4 rounded-xl border border-primary-200 bg-primary-50 p-4 text-sm" data-testid="saved-verdict">
       <p className="font-medium text-primary-900">{t('savedAdmission.panelTitle')}</p>
@@ -89,10 +94,10 @@ export function SavedVerdictPanel({ verdict, schoolId }) {
           <p className="mt-1"><Yours verdict={verdict} /></p>
           <ul className="mt-2 space-y-1">
             {verdict.lines.map(({ row, round, verdict: lineVerdict, otherRules }) => (
-              <li key={[row.stage, row.age_group, row.birth_year, row.building].join('|')}>
+              <li key={[row.stage, row.age_group, row.birth_year, row.class_code, row.building].join('|')}>
                 <span className="text-neutral-700">
                   {rowLabel(row, t)}
-                  {round.classified_on && ` · ${round.classified_on}`}
+                  {rankingWhen(row, round, i18n.language) && ` · ${rankingWhen(row, round, i18n.language)}`}
                   {': '}
                 </span>
                 <span className="font-medium text-neutral-900"><CutoffValue round={round} /></span>
