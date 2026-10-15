@@ -486,22 +486,59 @@ def test_a_pdf_table_is_given_one_row_per_line():
     ]
 
 
-def test_a_pdf_table_with_a_merged_cell_or_one_column_is_left_out():
+def test_a_pdf_row_with_merged_cells_is_joined_into_one_line():
     from app.scrapers.fee_pages import table_lines
 
-    # 596's primary fees: merged cells pair "Plan 1" with Plan 3's first payment.
-    merged = [["Grade 0", "", "1 x € 8.950"], [None, "Plan 1 - € 8.950", "1 x € 2.650 initial"]]
-    assert table_lines(merged) == []
+    # 596's primary fees: the grade's plans sit in rows whose first cell is merged into the
+    # grade's; they become one line, never "Plan 1" beside Plan 3's first payment alone.
+    merged = [
+        ["Grade", "", "Payment Plan", "Plan 1", "Plan 3"],
+        ["Grade 0", "", "", "1 x € 8.950", ""],
+        [None, None, "Plan 1 - € 8.950", None, "1 x € 2.650 initial"],
+        [None, None, "Plan 3 - € 9.400", None, "9 x € 750 monthly"],
+    ]
+    assert table_lines(merged) == [
+        "Grade |  | Payment Plan | Plan 1 | Plan 3",
+        "Grade 0 |  | Plan 1 - € 8.950 / Plan 3 - € 9.400 | 1 x € 8.950 | 1 x € 2.650 initial / 9 x € 750 monthly",
+    ]
+    # 596's "billed separately" table: the transport row is whole, though the text layer
+    # splits "(two-" from "way service)" across the TRANSPORTATION line.
+    services = [
+        ["Fees", "Details", "Price 2025-2026", "Applicable\nDiscounts"],
+        ["TRANSPORTATION", "Licensed transport", "€ 2,550 annual fee (two-\nway service) / € 1,950", "5% for"],
+        [None, None, "annual fee (one-way\nservice)", "siblings"],
+    ]  # fmt: skip
+    assert table_lines(services)[1] == (
+        "TRANSPORTATION | Licensed transport | € 2,550 annual fee (two- / way service) / € 1,950 / "
+        "annual fee (one-way / service) | 5% for / siblings"
+    )
+
+
+def test_a_pdf_heading_merged_over_several_rows_keeps_the_rows_apart():
+    from app.scrapers.fee_pages import table_lines
+
+    # Only the heading spans the rows: each grade keeps its own amount.
+    table = [["Fee", "Group", "Price"], ["Tuition", "Grade 1", "€ 5,000"], [None, "Grade 2", "€ 6,000"]]
+    assert table_lines(table) == ["Fee | Group | Price", "Tuition | Grade 1 | € 5,000", "Tuition | Grade 2 | € 6,000"]
+
+
+def test_a_pdf_table_with_one_column_or_a_merged_first_cell_is_left_out():
+    from app.scrapers.fee_pages import table_lines
+
     assert table_lines([["ТАКСИ ЗА УЧЕБНАТА 2026/2027\n€ 7880 € 8190"]]) == []
+    assert table_lines([[None, None, "€ 450"], ["Grade 1", "", "€ 500"]]) == []
     assert table_lines([]) == []
 
 
-def test_a_pdf_table_whose_rows_have_no_line_between_them_is_left_out():
+def test_a_pdf_row_whose_label_holds_several_lines_is_left_out():
     from app.scrapers.fee_pages import table_lines
 
     # No rule between the rows: the whole body is one row, and "Grade 1 | € 500" would be read.
     table = [["Grade", "Monthly", "Yearly"], ["Grade 1\nGrade 2\nGrade 3", "€ 450\n€ 500\n€ 550", "€ 4500\n€ 5000\n€ 5500"]]
-    assert table_lines(table) == []
+    assert table_lines(table) == ["Grade | Monthly | Yearly"]
+    # The other rows of the table stay.
+    table.append(["EXTENDED DAY", "€ 700 annual fee", ""])
+    assert table_lines(table) == ["Grade | Monthly | Yearly", "EXTENDED DAY | € 700 annual fee | "]
 
 
 def test_fee_pictures_are_the_ones_named_for_fees():
