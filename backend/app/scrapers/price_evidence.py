@@ -506,8 +506,16 @@ def _is_bare_price_line(line: str) -> bool:
 _PRE_K_RE = re.compile(r"pre[- ]?(?:kindergarten|k\b)")
 
 
+# A fee for both levels names neither as the other: 271's entry fee is for families "чиито
+# деца не са учили преди това в училището или детската градина".
+_BOTH_LEVELS_RE = re.compile(
+    r"(?:училищ\w*|school)\s+(?:или|и|or|and)\s+(?:в\s+|the\s+)?(?:детск\w* градин\w*|kindergarten)"
+    r"|(?:детск\w* градин\w*|kindergarten)\s+(?:или|и|or|and)\s+(?:в\s+|the\s+)?(?:училищ\w*|school)"
+)
+
+
 def names_other_level(text: str, school_family: str) -> bool:
-    lowered = (text or "").casefold()
+    lowered = _BOTH_LEVELS_RE.sub(" ", (text or "").casefold())
     if school_family == "kindergarten":
         return describes_level(lowered, "school")
     lowered = _PRE_K_RE.sub(" ", lowered)
@@ -1152,8 +1160,12 @@ def replacement_regressions(
         # the same amount (a deposit refiled from tuition to registration) is not a loss.
         if len(matches) < len(needed):
             old, text = needed[0]
-            normalized = normalize_text(text)
-            shown = min(len(amount_spans(normalized, value)) for value in old.amounts) if normalized else 0
+            # Each row's own page: 564's two €20 fees are on two pages, once on each.
+            shown = sum(
+                min(len(amount_spans(normalized, value)) for value in old.amounts)
+                for normalized in {normalize_text(page) for _, page in needed if page}
+                if normalized
+            )
             if shown >= len(needed):
                 dropped = len(needed) - len(matches)
                 label = ", ".join(f"{row.category} {', '.join(key)}" for row, _ in needed)
