@@ -1,13 +1,15 @@
 /**
  * Live flows for what a parent reads on a school: finding it by name, the facts read
  * from its website (with open days), its Facebook and Instagram links, fees with their
- * payment plans, comparing fees side by side, and no pin for a school whose location is
+ * payment plans, last year's fees left out once this year lists them again, comparing fees
+ * side by side, and no pin for a school whose location is
  * only approximate (the page says the address is not on the map yet).
  */
 import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
 
 import { planNameLabel } from '../../src/utils/priceLabels.js'
+import { groupPricingByAcademicYear } from '../../src/utils/pricing.js'
 import { upcomingOpenDays } from '../../src/utils/schoolFacts.js'
 import { NoSchoolError, PHONE, address, allSchools, findSchool, open, page, schoolName, t, liveBrowser } from './live.js'
 
@@ -128,6 +130,25 @@ describe('a school page', () => {
     const section = card(t('en', 'pricing.title'))
     await section.getByText(row.pricing_context.plan_name_en, { exact: true }).first().waitFor()
     assert.equal(await section.getByText(row.plan_name, { exact: true }).count(), 0, `"${row.plan_name}" is not shown`)
+  })
+
+  test("last year's fee is left out once a later year lists it again", async testContext => {
+    // 596 showed its 2025-26 bus fees under the 2026-27 ones, which read as two prices.
+    const shownYears = school => new Set(groupPricingByAcademicYear(school.pricing).map(group => group.academicYear))
+    const listed = (await allSchools()).find(s => isPrivate(s) &&
+      (s.pricing || []).some(row => row.academic_year_canonical && !shownYears(s).has(row.academic_year_canonical)))
+    if (!listed) {
+      testContext.diagnostic('No school lists a fee again in a later year; nothing to leave out.')
+      return
+    }
+    const hidden = listed.pricing.find(row => row.academic_year_canonical && !shownYears(listed).has(row.academic_year_canonical))
+    await open('bg', `/schools/${listed.id}`)
+    const section = card(t('bg', 'pricing.title'))
+    await section.waitFor()
+    // The year badge over each year's fees.
+    const badges = await section.locator('span.rounded-lg').allInnerTexts()
+    assert.ok(badges.length > 0, 'the fees show their years')
+    assert.ok(!badges.includes(hidden.academic_year_canonical), `no ${hidden.academic_year_canonical} group`)
   })
 
   test('two private schools with fees compare side by side', async () => {

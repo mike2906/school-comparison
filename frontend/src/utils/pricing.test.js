@@ -101,9 +101,9 @@ test('selectPricingCohort never mixes years within one cohort', () => {
 test('groupPricingByAcademicYear groups by year, newest first, undated last', () => {
   const groups = groupPricingByAcademicYear([
     row({ id: 1 }),
-    dated('2024/2025', { id: 2 }),
+    dated('2024/2025', { id: 2, category: 'food' }),
     current({ id: 3 }),
-    dated('2024/2025', { id: 4 }),
+    dated('2024/2025', { id: 4, category: 'food' }),
   ])
 
   assert.deepEqual(groups.map(g => g.academicYear), ['2026/2027', '2024/2025', null])
@@ -112,12 +112,37 @@ test('groupPricingByAcademicYear groups by year, newest first, undated last', ()
 })
 
 test('groupPricingByAcademicYear gives each group its own status', () => {
-  const groups = groupPricingByAcademicYear([current({ id: 1 }), dated('2025/2026', { id: 2 })])
+  const groups = groupPricingByAcademicYear([current({ id: 1 }), dated('2025/2026', { id: 2, category: 'food' })])
 
   assert.deepEqual(groups.map(g => g.yearStatus), [
     YEAR_STATUS.CURRENT,
     YEAR_STATUS.DATED_OTHER,
   ])
+})
+
+test('groupPricingByAcademicYear leaves out an older fee that a later year lists again', () => {
+  const groups = groupPricingByAcademicYear([
+    current({ id: 1 }),
+    current({ id: 2, category: 'transport' }),
+    dated('2025/2026', { id: 3, category: 'transport' }),
+    dated('2025/2026', { id: 4, category: 'extended_day' }),
+  ])
+
+  assert.deepEqual(groups.map(g => [g.academicYear, g.rows.map(r => r.id)]), [
+    ['2026/2027', [1, 2]],
+    ['2025/2026', [4]],
+  ])
+  // Only the older year goes: this year's fees stay beside next year's.
+  const both = groupPricingByAcademicYear([thisYear(), nextYear()], { today: OCTOBER })
+  assert.equal(both.length, 2)
+  // An undated fee is never dropped.
+  assert.equal(groupPricingByAcademicYear([current({ id: 1 }), row({ id: 2 })]).length, 2)
+  // Last year's fee for an age group this year does not name again still shows (520).
+  const split = groupPricingByAcademicYear([
+    current({ id: 1, plan_name: null, age_group: null }),
+    dated('2025/2026', { id: 2, plan_name: 'Preschool', age_group: null }),
+  ])
+  assert.deepEqual(split.map(g => g.rows.map(r => r.id)), [[1], [2]])
 })
 
 test('groupPricingByAcademicYear returns an empty list for no pricing', () => {
