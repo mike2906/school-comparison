@@ -621,7 +621,8 @@ def hand_pin_command(location_id, lat, lng, address, note, apply_changes):
             )
 
     report = asyncio.run(_run())
-    console.print(f"{'Applied' if apply_changes else 'Dry run'}: {report}")
+    written = apply_changes and report["outcome"] == "placed"
+    console.print(f"{'Applied' if written else 'Dry run' if not apply_changes else 'Not written'}: {report}")
     if report["outcome"] != "placed":
         raise SystemExit(1)
 

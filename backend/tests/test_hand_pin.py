@@ -62,3 +62,12 @@ async def test_a_hand_pin_outside_the_city_or_without_a_note_is_refused(db_sessi
     assert report["outcome"] == "outside_city"
     with pytest.raises(ValueError):
         await set_hand_pin(db_session, location_id, (42.70, 23.13), note=" ")
+
+
+@pytest.mark.asyncio
+async def test_a_hand_pin_on_another_schools_exact_point_is_refused(db_session):
+    location_id = await _location(db_session)
+    other_id = await _location(db_session)
+    await set_hand_pin(db_session, other_id, (42.70, 23.13), note="a", address="ул. Друга 1", apply=True)
+    report = await set_hand_pin(db_session, location_id, (42.70, 23.13), note="b", apply=True)
+    assert report["outcome"] == "point_held" and report["held_by_location_id"] == other_id

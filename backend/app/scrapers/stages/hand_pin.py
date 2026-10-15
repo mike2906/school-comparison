@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import School, SchoolLocation
 from app.scrapers.stages.website_pins import needs_pin
 from app.services.geocoding.bounds import get_city_bounds, point_in_bounds
-from app.services.geocoding.write_gate import MANUAL_FIX_METHOD, OFFICIAL_COORDS_TAG
+from app.services.geocoding.write_gate import MANUAL_FIX_METHOD, OFFICIAL_COORDS_TAG, location_holding_point
 
 
 async def set_hand_pin(
@@ -32,39 +32,46 @@ async def set_hand_pin(
     """Pin the location at ``point`` (and give it ``address``); returns what was (or would be) done."""
     if not note.strip():
         raise ValueError("a hand pin needs a note saying what the point was checked against")
+    address = (address or "").strip() or None
     location = await db.get(SchoolLocation, location_id)
     if location is None:
         return {"location_id": location_id, "outcome": "not_found"}
     await db.refresh(location, with_for_update=True)
     school = await db.get(School, location.school_id)
     bounds = get_city_bounds(school.country_code, school.city)
-    report: dict[str, Any] = {
-        "location_id": location_id,
-        "school_id": location.school_id,
-        "old_address": dict(location.address_i18n or {}),
-        "old_point": (location.lat, location.lng),
-        "address": address or (location.address_i18n or {}).get("bg"),
-        "point": point,
-    }
-    if not needs_pin(location):
-        outcome = "already_shown"
-    elif bounds is None or not point_in_bounds(point[0], point[1], bounds):
-        outcome = "outside_city"
-    else:
-        outcome = "placed"
-    report["outcome"] = outcome
-    if not apply or outcome != "placed":
-        await db.rollback()
-        return report
     previous = {
         "address_i18n": dict(location.address_i18n or {}),
+        "district": location.district,
         "lat": location.lat,
         "lng": location.lng,
         "geocode_meta": location.geocode_meta,
     }
+    report: dict[str, Any] = {
+        "location_id": location_id,
+        "school_id": location.school_id,
+        "old_address": previous["address_i18n"],
+        "old_point": (location.lat, location.lng),
+        "address": address or previous["address_i18n"].get("bg"),
+        "point": point,
+    }
     if address:
         location.address_i18n = {"bg": address}
         location.district = None  # the old address's
+    if not needs_pin(location):
+        outcome = "already_shown"
+    elif bounds is None:
+        outcome = "no_city_bounds"  # the point cannot be checked
+    elif not point_in_bounds(point[0], point[1], bounds):
+        outcome = "outside_city"
+    elif (holder := await location_holding_point(db, location, point[0], point[1])) is not None:
+        outcome = "point_held"  # another address is pinned exactly there
+        report["held_by_location_id"] = holder.id
+    else:
+        outcome = "placed"
+    report["outcome"] = outcome
+    if not apply or outcome != "placed":
+        await db.rollback()  # releases the lock; nothing written
+        return report
     location.lat, location.lng = point
     location.geocode_meta = {
         "method": MANUAL_FIX_METHOD,
