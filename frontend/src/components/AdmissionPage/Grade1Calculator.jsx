@@ -11,6 +11,7 @@ import CutoffComparison from '../Admission/CutoffComparison'
 import { DateField, MobileTotal, Section, YesNo } from './fields'
 import PointsList from './PointsList'
 import { savedListFilters, savedListUrl } from '../../admission/schoolVerdict'
+import { useCatchmentSchoolName } from '../../hooks/useCatchmentSchoolName'
 import SaveAnswers from './SaveAnswers'
 import NextTierHint from './NextTierHint'
 
@@ -64,6 +65,7 @@ function AddressQuestions({ index, value, onChange, school, catchments, measured
     }))
   }
   const checkedHere = Boolean(value.check)
+  const catchmentSchoolName = useCatchmentSchoolName(value.check?.schoolId, catchments?.get(value.check?.schoolId)?.properties.name)
 
   return (
     <div className="space-y-4 rounded-xl border border-neutral-200 p-4">
@@ -79,7 +81,7 @@ function AddressQuestions({ index, value, onChange, school, catchments, measured
       )}
       {checkedHere && ids.length === 0 && (
         <p className="text-sm text-neutral-800">
-          {t('admissionCalc.g1.forCatchmentSchool', { school: catchments?.get(value.check.schoolId)?.properties.name || '' })}
+          {t('admissionCalc.g1.forCatchmentSchool', { school: catchmentSchoolName || '' })}
         </p>
       )}
       {checkedHere && ids.length > 0 && value.inCatchment != null && (

@@ -18,6 +18,8 @@ import { normalizeLanguageFocus } from '../../utils/schoolAttributes'
 import { getMappableLocations } from './LocationMap'
 import { usesSofiaKindergartenSystem } from '../../utils/admission'
 import { openDayDate, openDaysLink, upcomingOpenDays } from '../../utils/schoolFacts'
+import { useSavedVerdicts } from '../../hooks/useSavedAdmission'
+import { SavedVerdictLine, SavedVerdictWord } from '../Admission/SavedVerdict'
 
 function Fact({ label, value, detail, note, detailClass = 'text-neutral-500' }) {
   return (
@@ -55,6 +57,27 @@ function KeyFacts({ school, examAverages, nvoExamType, ageGroup = null }) {
   const isKindergarten = school.education_level === 'kindergarten'
 
   const facts = {}
+
+  // Saved calculator answers against this school's last cut-off lead the strip: on a
+  // phone the full comparison is several screens down.
+  // No age group, as in the full comparison further down, so the two always agree.
+  const comparable = useSavedVerdicts(isPrivate ? null : school)
+    .find(verdict => !['needsAddress', 'noCutoff'].includes(verdict.verdict))
+  if (comparable) {
+    facts.saved = (
+      <Fact
+        key="saved"
+        // Kindergarten answers on a school page are for its preparatory group.
+        label={t('savedAdmission.factLabel', {
+          stage: t(`savedAdmission.stageName.${comparable.stage === 'grade_1' ? 'grade_1' : isKindergarten ? 'kindergarten' : 'preparatory'}`),
+        })}
+        value={<SavedVerdictWord verdict={comparable} />}
+        detail={<SavedVerdictLine verdict={comparable} hideVerdict />}
+        detailClass="text-neutral-700"
+        note={t(`savedAdmission.assumed.${comparable.stage}`)}
+      />
+    )
+  }
 
   // The searched age group's fee when the parent came from a search for one.
   const tuition = isPrivate ? statedTuition(school.pricing, { ageGroup }) : null
@@ -152,7 +175,8 @@ function KeyFacts({ school, examAverages, nvoExamType, ageGroup = null }) {
     )
   }
 
-  const lastAdmitted = !isPrivate && isKindergarten ? getLastAdmittedPoints(school.admission_info) : null
+  // The saved result already shows the last admitted child's points.
+  const lastAdmitted = !isPrivate && isKindergarten && !comparable ? getLastAdmittedPoints(school.admission_info) : null
   if (lastAdmitted?.points != null) {
     facts.lastAdmitted = (
       <Fact
@@ -162,7 +186,7 @@ function KeyFacts({ school, examAverages, nvoExamType, ageGroup = null }) {
         detail={lastAdmitted.year ? t('schoolDetail.yearValue', { year: lastAdmitted.year }) : null}
       />
     )
-  } else if (usesSofiaKindergartenSystem(school)) {
+  } else if (!comparable && usesSofiaKindergartenSystem(school)) {
     // No published thresholds yet: say how admission works instead of leaving a gap.
     facts.lastAdmitted = (
       <Fact
@@ -220,8 +244,8 @@ function KeyFacts({ school, examAverages, nvoExamType, ageGroup = null }) {
   const order = isPrivate
     ? ['tuition', 'openDay', 'languages', 'grades', 'nvo', 'distance']
     : isKindergarten
-      ? ['lastAdmitted', 'openDay', 'distance', 'grades', 'languages']
-      : ['nvo', 'openDay', 'minScore', 'shift', 'distance', 'grades', 'languages']
+      ? ['saved', 'lastAdmitted', 'openDay', 'distance', 'grades', 'languages']
+      : ['saved', 'nvo', 'openDay', 'minScore', 'shift', 'distance', 'grades', 'languages']
   const shown = order.map(key => facts[key]).filter(Boolean)
 
   if (shown.length === 0) return null

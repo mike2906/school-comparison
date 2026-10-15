@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { addressSuggestions, catchmentSchoolFor, splitAddress, streetDisplayName, streetKey } from '../../admission/catchments'
+import { useCatchmentSchoolName } from '../../hooks/useCatchmentSchoolName'
 import { loadAddresses, loadDistricts } from '../../admission/loadCatchments'
 
 /**
@@ -87,7 +88,8 @@ function AddressCheck({ onResult, catchments, ownIds = [], nameSchool = true, va
     if (!withNumber) requestAnimationFrame(() => inputRef.current?.focus())
   }
 
-  const schoolName = nameSchool && schoolId && !ownIds.includes(schoolId) ? catchments?.get(schoolId)?.properties.name : null
+  const otherSchool = nameSchool && schoolId && !ownIds.includes(schoolId) ? schoolId : null
+  const schoolName = useCatchmentSchoolName(otherSchool, catchments?.get(otherSchool)?.properties.name)
 
   return (
     <div className="rounded-xl border border-neutral-200 bg-white p-4">

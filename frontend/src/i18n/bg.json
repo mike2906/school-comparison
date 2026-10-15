@@ -1182,6 +1182,13 @@
     "showFor": {
       "kindergarten": "Покажи списъка за моето дете (родено {{year}}, {{campaign}})",
       "grade_1": "Покажи списъка за 1. клас за {{campaign}}"
+    },
+    "factLabel": "Запазените ви отговори · {{stage}}",
+    "listAssumes": "В списъка с училища: {{assumed}}",
+    "stageName": {
+      "kindergarten": "детска градина",
+      "grade_1": "1. клас",
+      "preparatory": "подготвителна група"
     }
   }
 }

@@ -34,6 +34,8 @@ function SaveAnswers({ stage, onSave, dirty, listUrl, blockedReason = null }) {
             {t(saved ? 'savedAdmission.update' : 'savedAdmission.save')}
           </button>
           <p className="mt-2 text-xs text-neutral-500">{blockedReason || t('savedAdmission.saveNote')}</p>
+          {/* What the list will assume for every school, said before the parent saves. */}
+          {!blockedReason && <p className="mt-1 text-xs text-neutral-500">{t('savedAdmission.listAssumes', { assumed: t(`savedAdmission.assumed.${stage}`) })}</p>}
         </>
       )}
     </div>
