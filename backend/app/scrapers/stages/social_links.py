@@ -138,7 +138,9 @@ def links_block(links: dict[str, str], website_url: Optional[str]) -> dict[str, 
     }
 
 
-def _http_fetch(client, robots) -> Fetch:
+def _http_fetch(client, robots, *, types: tuple[str, ...] = ("html",)) -> Fetch:
+    """Fetch a page (``types``: content types to accept, by substring)."""
+
     async def fetch(url: str) -> Optional[tuple[str, str]]:
         try:
             if not await robots.can_fetch(url, CRAWLER_USER_AGENT):
@@ -147,7 +149,8 @@ def _http_fetch(client, robots) -> Fetch:
         except Exception as exc:  # a site that is down is reported and keeps its stored links
             logger.info("social-links could not read %s: %s", url, exc)
             return None
-        if response.status_code != 200 or "html" not in response.headers.get("content-type", "html"):
+        content_type = response.headers.get("content-type", types[0])
+        if response.status_code != 200 or not any(t in content_type for t in types):
             return None
         return str(response.url), response.text
 

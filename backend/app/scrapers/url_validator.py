@@ -1098,8 +1098,8 @@ async def clear_website_derived_locations(
 ) -> list[dict]:
     """Clear location addresses/pins copied from a website the pipeline no longer trusts.
 
-    The previous registry address is not retained when contact extraction replaces it,
-    so the address fails closed. With ``keep_officially_confirmed_addresses`` an address
+    Contact extraction does not keep the registry address it replaces, so that address
+    fails closed; site-address keeps it, so it goes back. With ``keep_officially_confirmed_addresses`` an address
     an official register point has confirmed is kept (it is registry evidence, not only
     the website's claim). Returns one row per changed location; ``preview`` only
     reports them.
@@ -1138,6 +1138,8 @@ async def clear_website_derived_locations(
             or meta.get("method") == "website_map_link"
             # the pin agent's pick of a map point from the website
             or (meta.get("method") == "agent_pick" and meta.get("provider") == "website_map")
+            # site-address: the site's map and address together
+            or meta.get("method") == "site_address"
         )
         if not (website_address or website_coords):
             continue
@@ -1155,7 +1157,10 @@ async def clear_website_derived_locations(
         if preview:
             continue
         if website_address:
-            location.address_i18n = {}
+            # site-address keeps the address it replaced
+            evidence = meta.get("evidence") if isinstance(meta.get("evidence"), dict) else {}
+            previous = evidence.get("previous_address_i18n")
+            location.address_i18n = dict(previous) if isinstance(previous, dict) else {}
         if website_coords:
             location.lat = None
             location.lng = None
@@ -1167,9 +1172,10 @@ async def clear_website_derived_locations(
                 "address_source=website_contact",
                 "coords_source=website_map_link",
                 "coords_source=pin_agent",
+                "coords_source=school_site_address",
             }
             or (tag == "address_source=website_contact" and not website_address)
-            or (tag == "coords_source=pin_agent" and not website_coords)
+            or (tag in {"coords_source=pin_agent", "coords_source=school_site_address"} and not website_coords)
         ]
         db.add(location)
     return changed + campus_changes

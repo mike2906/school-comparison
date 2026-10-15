@@ -62,6 +62,13 @@ maps are common); a move over 3 km needs our district or the site to agree; a po
 unrelated school is already pinned is not taken (likely an old address). Run it first: it
 has the house numbers OpenStreetMap lacks.
 
+`cli site-address [--apply]` (Sofia, after register-pins) gives a school's one hidden location the
+address its own site gives: the site's map (linked, or the coordinates its own scripts draw a map
+with) within 40 m of a register point whose address the site's text names (Bulgarian or Latin).
+The location's address becomes the register's (old one kept in `geocode_meta.evidence`). Held
+back when the site gives several addresses, when the address is already one of the school's shown
+locations, when an unrelated school is pinned there, or when the school has two hidden locations.
+
 `cli confirm-pins [--apply]` publishes a hidden point that already stands on our building:
 Nominatim's nearest building there is our town, street and exact house number. Not when
 the school's own website maps it only over 300 m away (the address may be stale).
