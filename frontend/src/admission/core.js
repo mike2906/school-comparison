@@ -110,6 +110,27 @@ export function durationTiers(tiers, since, on) {
   return []
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000
+
+/**
+ * The next better duration tier and the day it starts applying, or null when `since` is
+ * unknown or already in the best tier: `{ tier, current, on }` (`on` is YYYY-MM-DD).
+ * "More than N years" starts the day after the anniversary, "at least N years" on it.
+ */
+export function nextDurationTier(tiers, since, on) {
+  if (!isValidSpan(since, on)) return null
+  const current = durationTiers(tiers, since, on)[0] ?? null
+  const index = current ? tiers.indexOf(current) : tiers.length
+  if (index <= 0) return null
+  const tier = tiers[index - 1]
+  const start = parseDay(since)
+  let time
+  if (tier.more_than_years != null) time = anniversary(start, tier.more_than_years) + DAY_MS
+  else if (tier.at_least_years != null) time = anniversary(start, tier.at_least_years)
+  else return null
+  return { tier, current, on: new Date(time).toISOString().slice(0, 10) }
+}
+
 /** Points for a duration tier (see durationTiers); unknown → the range of all tiers. */
 export function durationTierPoints(tiers, since, on) {
   const matched = durationTiers(tiers, since, on).map(t => t.points)

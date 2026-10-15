@@ -242,6 +242,15 @@ only that says which catchment it is in. Only the newest campaign's rows are com
 on the latest round unless that round had no places (then the first). Eighth grade is
 left out: without each class's formula most rows would read "depends".
 
+The list banner has an opt-in switch to hide schools where every saved result is clearly
+below (`clearlyBelowIds`); a tie, "depends", mixed rows, no cut-off or a cut-off ranked
+under other rules keeps the school listed. The switch is a per-browser preference
+(localStorage `admissionHideBelow`).
+
+Under each "address since" date the calculator says when the address reaches the next
+duration tier and what it would then count for (`nextDurationTier` in `core.js`): useful
+to a parent close to an anniversary, since later rankings or campaigns count it.
+
 ## Catchments and districts
 
 Sofia publishes official first-grade catchment polygons (arcgis.sofia.bg, layer

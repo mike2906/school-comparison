@@ -120,6 +120,21 @@ export function savedVerdictsFor(school, saved, ageGroup, data) {
   })
 }
 
+/**
+ * Ids of the schools where every saved result is below the last admitted child. Schools
+ * without a cut-off, with a tie, mixed rounds or a cut-off ranked under other rules stay
+ * listed: only a clear "below" counts.
+ */
+export function clearlyBelowIds(schools, saved, ageGroup, data) {
+  const below = verdict => verdict.verdict === 'below' && !verdict.lines.some(line => line.otherRules)
+  const ids = new Set()
+  for (const school of schools) {
+    const verdicts = savedVerdictsFor(school, saved, ageGroup, data)
+    if (verdicts.length > 0 && verdicts.every(below)) ids.add(school.id)
+  }
+  return ids
+}
+
 /** Whether a saved tab applies to a search for `ageGroup` (null: any). */
 export function savedStageApplies(stage, entry, ageGroup) {
   if (!entry) return false

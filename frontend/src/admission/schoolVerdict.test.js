@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url'
 import { catchmentUrl, indexAddresses, indexCatchments } from './catchments.js'
 import { evaluateKindergarten, GRADE1_INITIAL, KINDERGARTEN_INITIAL } from './inputs.js'
 import { ruleSetFor, stageById } from './calculator.js'
-import { compareRows, kindergartenDistrict, KINDERGARTEN_ASSUMED, savedVerdictsFor } from './schoolVerdict.js'
+import { clearlyBelowIds, compareRows, kindergartenDistrict, KINDERGARTEN_ASSUMED, savedVerdictsFor } from './schoolVerdict.js'
 
 const savedVerdictFor = (...args) => savedVerdictsFor(...args)[0] ?? null
 
@@ -133,4 +133,21 @@ test('a school with a preparatory group and first grade gets both saved results'
   const verdicts = savedVerdictsFor(school, saved, null, data)
   assert.deepEqual(verdicts.map(v => v.stage), ['kindergarten', 'grade_1'])
   assert.equal(verdicts[0].specialPlaces, 'sen', 'SEN places are a separate path, kept beside the verdict')
+})
+
+test('only schools clearly below the last admitted child are hidden', () => {
+  const saved = { kindergarten: { startYear: 2026, answers: kgAnswers } }
+  const ruleSet = ruleSetFor(ruleSets, stageById('kindergarten'), 2026, today).ruleSet
+  const near = evaluateKindergarten(ruleSet, kgAnswers, 2026, { ...KINDERGARTEN_ASSUMED, district: home.code }, today).total.min
+  const school = (id, rows) => ({ ...kindergarten(home, rows), id })
+  const schools = [
+    school(1, [kgRow(near + 5)]),
+    school(2, [kgRow(near - 5)]),
+    school(3, []),
+    school(4, [kgRow(near)]),
+    school(5, [{ ...kgRow(near + 5), rule_set: 'bg/sofia/kindergarten/2019-2020@2001-01-01' }]),
+    { id: 6, school_type: 'private', admission_info: {} },
+  ]
+  const hidden = clearlyBelowIds(schools, saved, null, data)
+  assert.deepEqual([...hidden], [1])
 })

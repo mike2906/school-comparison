@@ -1029,7 +1029,8 @@
       },
       "tieBreak": "Children with equal points are ordered by a random number.",
       "sinceHintToday": "Moves within Sofia do not reset this date. Counted to the date of your ranking; here, to today ({{date}}).",
-      "homeDistrictListHint": "Kindergartens in your own district give 3 extra points; the school list uses this to compare every kindergarten."
+      "homeDistrictListHint": "Kindergartens in your own district give 3 extra points; the school list uses this to compare every kindergarten.",
+      "nextTier": "From {{date}} this address gives {{points}} points instead of {{current}}."
     },
     "g1": {
       "addressTitle": "Address",
@@ -1058,7 +1059,8 @@
       "points": "Extra points",
       "groupNote": "Groups are filled in order: group 1 first. Extra points only matter inside a group that has more children than places.",
       "lockNote": "The address you choose is used for every school and locked after the first ranking.",
-      "forCatchmentSchool": "This address is in the catchment area of {{school}}, so the result below is for that school. Save your answers to compare every school in the list."
+      "forCatchmentSchool": "This address is in the catchment area of {{school}}, so the result below is for that school. Save your answers to compare every school in the list.",
+      "nextTier": "From {{date}} this address puts you in group {{group}} instead of {{current}}."
     },
     "g8": {
       "nvoTitle": "NVO results in 7th grade",
@@ -1169,6 +1171,10 @@
     "saved": "Saved on this device. The school list and school pages now compare your result with each school.",
     "seeList": "See every school in the list",
     "saveNote": "Saved only in this browser, never sent to us. You can forget them here or on any page that uses them.",
-    "needsAddressToSave": "Type your address above to save and compare every school: only a checked address says which catchment it is in."
+    "needsAddressToSave": "Type your address above to save and compare every school: only a checked address says which catchment it is in.",
+    "hideBelow": "Hide schools where you're below the last admitted child",
+    "hiddenCount_one": "{{count}} hidden",
+    "hiddenCount_other": "{{count}} hidden",
+    "hideBelowNote": "Cut-offs change every year, so this is a guide only."
   }
 }
