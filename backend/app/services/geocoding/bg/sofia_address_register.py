@@ -18,7 +18,6 @@ import io
 import math
 import re
 import zipfile
-from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Optional
 
@@ -44,6 +43,8 @@ _SHORT = {
     "доктор": "д-р", "др": "д-р", "полковник": "полк", "подполковник": "подполк",
 }
 _NUMBER = r"(\d+[а-я]?)(?![а-я\d])"
+# What may follow a town's name when no comma does.
+_MARKER = r"(?:ул|бул|пл|алея|ж\.?\s*к|жк|кв|район|р-н|бл|№)"
 
 
 @dataclass(frozen=True)
@@ -86,12 +87,27 @@ def _clean(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
+_STREET_KINDS = {"ул": "ул", "улица": "ул", "бул": "бул", "булевард": "бул", "пл": "пл", "площад": "пл", "алея": "алея"}
+_STREET_KIND_RE = re.compile(r"^(ул|улица|бул|булевард|пл|площад|алея)(?![а-я])\.?\s*")
+
+
 def name_key(name: str) -> str:
-    """A street or complex name in one spelling: no marker, quotes, dots or hyphens, short titles."""
+    """A complex name in one spelling: no marker, quotes, dots or hyphens, short titles;
+    Roman numerals kept ("цар борис iii")."""
     text = _clean(name)
-    text = re.sub(r"^(?:ул|бул|пл|алея|ж\.?\s*к|жк|кв|м-ст|местност)(?![а-я])\.?\s*", "", text)
-    words = re.findall(r"[а-я]+|\d+", text.replace("д-р", "др"))
+    text = re.sub(r"^(?:ж\.?\s*к|жк|кв|м-ст|местност)(?![а-я])\.?\s*", "", text)
+    words = re.findall(r"[а-яa-z]+|\d+", text.replace("д-р", "др"))
     return " ".join(_SHORT.get(w, w) for w in words)
+
+
+def street_key(name: str) -> str:
+    """A street name as ``name_key`` with its kind first ("ул витоша" is not "бул витоша")."""
+    text = _clean(name)
+    kind = _STREET_KIND_RE.match(text)
+    if kind is None:
+        return ""
+    rest = name_key(text[kind.end():])
+    return f"{_STREET_KINDS[kind.group(1)]} {rest}" if rest else ""
 
 
 def _same_name(ours: str, theirs: str) -> bool:
@@ -101,7 +117,10 @@ def _same_name(ours: str, theirs: str) -> bool:
     a, b = ours.split(), theirs.split()
     if len(a) != len(b) or a[-1] != b[-1]:
         return False
-    return all(x == y or (len(x) == 1 and y.startswith(x)) for x, y in zip(a[:-1], b[:-1]))
+    return all(
+        x == y or (len(x) == 1 and x.isalpha() and not x.isascii() and y.startswith(x))
+        for x, y in zip(a[:-1], b[:-1])
+    )
 
 
 def _number(value: str) -> str:
@@ -111,7 +130,7 @@ def _number(value: str) -> str:
 def parse(address: str, district: Optional[str] = None) -> Parsed:
     text = _clean(address)
     settlement = None
-    if match := re.search(r"(?<![а-я])(с|гр)\.\s*([а-я][а-я ]*?)(?=,|$|\s+\d{4})", text):
+    if match := re.search(rf"(?<![а-я])(с|гр)\.\s*([а-я][а-я ]*?)(?=,|$|\s+\d{{4}}|\s+{_MARKER}(?![а-я]))", text):
         name = f"{match.group(1)}. {match.group(2).strip()}"
         settlement = None if name == SOFIA else name
     region = None
@@ -128,17 +147,18 @@ def parse(address: str, district: Optional[str] = None) -> Parsed:
         block = match.group(1)
     if match := re.search(r"(?<![а-я])вх\.?\s*([а-я]|\d+)(?![а-я\d])", text):
         entrance = match.group(1)
-    if match := re.search(r"(?<![а-я])(?:ж\.?\s*к|жк)\.?\s*([^,]+)", text):
+    if match := re.search(r"(?<![а-я])(?:ж\.?\s*к|жк|кв|м-ст)\.?\s*([^,]+)", text):
         complex_ = name_key(match.group(1))
-    if match := re.search(r"(?<![а-я])(?:ул|бул|пл|алея)(?![а-я])\.?\s*([^,№]+?)\s*(?:,|№|$)", text):
-        street = name_key(match.group(1))
+    if match := re.search(r"(?<![а-я])((?:ул|бул|пл|алея)(?![а-я])\.?)\s*([^,№]+?)\s*(?:,|№|$)", text):
+        kind = match.group(1)
+        street = street_key(f"{kind} {match.group(2)}")
         tail = text[match.end() - 1:]
         if num := re.match(rf"\s*(?:№|,\s*№)\s*{_NUMBER}", tail):
             number = num.group(1)
-        elif num := re.search(rf"\s{_NUMBER}$", match.group(1)):
+        elif num := re.search(rf"\s{_NUMBER}$", match.group(2)):
             # "бул. Никола Вапцаров 47": the number written after the name.
             number = num.group(1)
-            street = name_key(match.group(1)[: num.start()])
+            street = street_key(f"{kind} {match.group(2)[: num.start()]}")
     elif match := re.search(rf"(?<![а-я])№\s*{_NUMBER}", text):
         number = match.group(1)
     return Parsed(
@@ -153,8 +173,25 @@ def parse(address: str, district: Optional[str] = None) -> Parsed:
     )
 
 
-def read_register(text: str) -> list[RegisterPoint]:
-    """The register's rows from its CSV text."""
+class Register:
+    """The register's points, looked up by house number and by block."""
+
+    def __init__(self, points: list[RegisterPoint]):
+        self.points = points
+        self.by_number: dict[str, list[RegisterPoint]] = {}
+        self.by_block: dict[str, list[RegisterPoint]] = {}
+        for point in points:
+            if point.number:
+                self.by_number.setdefault(point.number, []).append(point)
+            if point.block:
+                self.by_block.setdefault(point.block, []).append(point)
+
+    def __len__(self) -> int:
+        return len(self.points)
+
+
+def read_register(text: str) -> Register:
+    """The register from its CSV text."""
     points = []
     for row in csv.DictReader(io.StringIO(text), delimiter=";"):
         try:
@@ -167,17 +204,17 @@ def read_register(text: str) -> list[RegisterPoint]:
                 settlement=_clean(row.get("settlement") or ""),
                 complex=name_key(row.get("lareaunit") or ""),
                 block=_number(row.get("block") or ""),
-                street=name_key(row.get("street") or ""),
+                street=street_key(row.get("street") or ""),
                 number=_number(row.get("streetnum") or ""),
                 entrance=_number(row.get("entrance") or ""),
                 lat=lat,
                 lng=lng,
             )
         )
-    return points
+    return Register(points)
 
 
-def read_register_zip(data: bytes) -> list[RegisterPoint]:
+def read_register_zip(data: bytes) -> Register:
     with zipfile.ZipFile(io.BytesIO(data)) as archive:
         name = next(n for n in archive.namelist() if n.lower().endswith(".csv"))
         return read_register(archive.read(name).decode("utf-8-sig"))
@@ -214,15 +251,15 @@ def _settle(rows: list[RegisterPoint], region: Optional[str], spread: float) -> 
     return Match("matched", point, tuple(rows))
 
 
-def match(parsed: Parsed, register: Iterable[RegisterPoint]) -> Match:
+def match(parsed: Parsed, register: Register) -> Match:
     """The register point for our address, or why there is none."""
     if parsed.near:
         return Match("no_address")
-    rows = [r for r in register if _in_settlement(r, parsed.settlement)]
+    result = Match("no_address")
     if parsed.block:
         found = [
-            r for r in rows
-            if r.block == parsed.block
+            r for r in register.by_block.get(parsed.block, [])
+            if _in_settlement(r, parsed.settlement)
             and (
                 (parsed.complex and r.complex and _same_name(parsed.complex, r.complex))
                 or (parsed.street and r.street and _same_name(parsed.street, r.street))
@@ -230,11 +267,16 @@ def match(parsed: Parsed, register: Iterable[RegisterPoint]) -> Match:
         ]
         if parsed.entrance:
             found = [r for r in found if r.entrance == parsed.entrance] or found
-        return _settle(found, parsed.region, BLOCK_SPREAD_M)
+        result = _settle(found, parsed.region, BLOCK_SPREAD_M)
+        if result.outcome == "matched":
+            return result
     if parsed.street and parsed.number:
+        # Also for "ул. X № 10, бл. 2" whose block the register files elsewhere.
         found = [
-            r for r in rows
-            if r.number == parsed.number and r.street and _same_name(parsed.street, r.street)
+            r for r in register.by_number.get(parsed.number, [])
+            if _in_settlement(r, parsed.settlement) and r.street and _same_name(parsed.street, r.street)
         ]
-        return _settle(found, parsed.region, STREET_SPREAD_M)
-    return Match("no_address")
+        street = _settle(found, parsed.region, STREET_SPREAD_M)
+        if street.outcome == "matched" or result.outcome == "no_address":
+            return street
+    return result

@@ -32,13 +32,24 @@ PIN_TAG = "coords_source=sofia_address_register"
 PROVIDER = "sofia_address_register"
 
 
-async def download_register() -> list[register_lib.RegisterPoint]:
+async def download_register() -> register_lib.Register:
+    import asyncio
+
     import httpx
 
-    async with httpx.AsyncClient(timeout=120, follow_redirects=True) as client:
-        response = await client.get(register_lib.CSV_ZIP_URL)
-        response.raise_for_status()
-    return register_lib.read_register_zip(response.content)
+    from app.config import CRAWLER_USER_AGENT
+
+    async with httpx.AsyncClient(timeout=120, follow_redirects=True, headers={"User-Agent": CRAWLER_USER_AGENT}) as client:
+        for attempt in (1, 2, 3):
+            try:
+                response = await client.get(register_lib.CSV_ZIP_URL)
+                response.raise_for_status()
+                return register_lib.read_register_zip(response.content)
+            except httpx.HTTPError:
+                if attempt == 3:
+                    raise
+                await asyncio.sleep(attempt * 5)
+    raise AssertionError("unreachable")
 
 
 async def run_register_pins(
@@ -49,14 +60,12 @@ async def run_register_pins(
     school_ids: Sequence[int] = (),
     limit: Optional[int] = None,
     apply: bool = False,
-    register: Optional[list[register_lib.RegisterPoint]] = None,
+    register: Optional[register_lib.Register] = None,
     fetch: Optional[Fetch] = None,
 ) -> dict[str, Any]:
     """Run over the city's hidden locations that have an address; returns the report."""
     if (country, (city or "").casefold()) != ("bg", "sofia"):
         raise ValueError(f"register-pins has Sofia's address register only, not {city!r}")
-    if register is None:
-        register = await download_register()
     query = (
         select(School.id)
         .where(School.country_code == country, func.lower(School.city) == city.lower())
@@ -67,6 +76,7 @@ async def run_register_pins(
     ids = list((await db.execute(query)).scalars().all())
 
     async def _run(fetch: Fetch) -> list[dict[str, Any]]:
+        nonlocal register
         results: list[dict[str, Any]] = []
         for school_id in ids:
             if limit is not None and len({r["school_id"] for r in results}) >= limit:
@@ -80,6 +90,8 @@ async def run_register_pins(
             hidden = [loc for loc in locations if needs_pin(loc) and _address(loc)]
             if not hidden:
                 continue
+            if register is None:  # only once a location needs it
+                register = await download_register()
             found = {}
             for location in hidden:
                 parsed = register_lib.parse(_address(location), location.district)

@@ -25,6 +25,12 @@ CSV = """rn;region;settlement;lareaunit;block;street;streetnum;entrance;n;e
 3;Оборище;гр. София;"";"";ул. Росица;12;"";42.700000;23.340000
 4;Витоша;гр. София, кв. Драгалевци;"";"";ул. Росица;12;"";42.620000;23.310000
 5;Витоша;гр. София, кв. Драгалевци;"";"";ул. Яна Язова;6;"";42.630000;23.320000
+6;Средец;гр. София;"";"";бул. Витоша;5;"";42.690000;23.320000
+7;Панчарево;с. Лозен;"";"";ул. Първа;1;"";42.600000;23.480000
+8;Панчарево;гр. София;"";"";ул. Първа;1;"";42.640000;23.400000
+9;Красно село;гр. София;"";"";бул. Цар Борис III;5;"";42.680000;23.280000
+10;Изгрев;гр. София;кв. Гео Милев;5;"";"";А;42.680000;23.360000
+11;Лозенец;гр. София;"";"";ул. Тирана;10;"";42.670000;23.330000
 """
 REGISTER = reg.read_register(CSV)
 
@@ -44,6 +50,10 @@ def _match(address, district=None):
         ('район Студентски, бул. "Св. Климент Охридски" № 49', (42.65, 23.35)),  # Св. = Свети
         ('ж. к. Стрелбище, бул. "П. Ю. Тодоров", бл. 10, вх. Ж, ет. 2', (42.68, 23.29)),  # initials
         ('ул. "Яна Язова" № 6', (42.63, 23.32)),  # a кв. of Sofia is still Sofia
+        ("с. Лозен ул. Първа № 1", (42.6, 23.48)),  # the village, with no comma after it
+        ('бул. "Цар Борис III" № 5', (42.68, 23.28)),
+        ("кв. Гео Милев, бл. 5, вх. А", (42.68, 23.36)),  # a кв. complex
+        ('ул. "Тирана" № 10, бл. 2', (42.67, 23.33)),  # the register files the block elsewhere
     ],
 )
 def test_an_address_in_the_register_gets_its_point(address, point):
@@ -67,6 +77,8 @@ def test_a_block_without_an_entrance_takes_the_centre_of_its_entrances():
         ('ул. "Майор Коста Паница"', "no_address"),  # no number
         ('район Младост, ж. к. "Младост 2", до бл. 227', "no_address"),  # next to a block
         ("ж. к. Люлин 6", "no_address"),
+        ('ул. "Витоша" № 5', "not_in_register"),  # бул. Витоша is another street
+        ('бул. "Цар Борис" № 5', "not_in_register"),  # no numeral, another street
         ("гр. Банкя, ул. Майор Коста Паница № 1", "ambiguous"),  # two points 120 m apart
         ('ул. "Росица" № 12', "ambiguous"),  # in two districts
     ],
@@ -84,4 +96,4 @@ def test_the_register_zip_is_read():
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w") as archive:
         archive.writestr("address_sofia.csv", CSV)
-    assert len(reg.read_register_zip(buffer.getvalue())) == len(REGISTER) == 15
+    assert len(reg.read_register_zip(buffer.getvalue())) == len(REGISTER) == 21
