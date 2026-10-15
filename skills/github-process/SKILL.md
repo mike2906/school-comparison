@@ -82,6 +82,8 @@ While the site has no users, agents may change the launch DB and publish without
 - Data only: schema changes go through an Alembic migration and a PR.
 - Before any write: a `pg_dump` backup in the same session, and a dry run or a
   `WHERE`-guarded statement that shows the rows it changes.
+- Run launch-DB writes and publishes as the named repo commands directly; never wrap them in
+  scratchpad scripts or raw psql. If a write has no CLI command, add one by PR first.
 - Publish with the recipe in `skills/common-tasks/SKILL.md` → Publish data to production,
   then check the live API against the launch DB.
 - Report each write and publish to Mike: what changed, why, the backup path, the dump
