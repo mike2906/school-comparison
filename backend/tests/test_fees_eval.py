@@ -55,6 +55,14 @@ def test_score_school_verdicts():
     assert summary["found_rate"] == 1.0
 
 
+def test_same_amount_for_several_groups():
+    key = [_fee("f1", "tuition", 9000, "yearly"), _fee("f2", "tuition", 9000, "yearly"), _fee("f3", "tuition", 9000)]
+    rows = [_row("tuition", 9000, "yearly"), _row("tuition", 9000, "yearly"), _row("tuition", 9000, "yearly")]
+    scored = fees_eval.score_school(rows, key)
+    assert [row["verdict"] for row in scored["rows"]] == ["right", "right", "duplicate"]
+    assert scored["found"] == ["f1", "f2"]
+
+
 def test_check_against_baseline():
     baseline = {"wrong_rate": 0.10, "found_rate": 0.70}
     assert fees_eval.check({"wrong_rate": 0.14, "found_rate": 0.64}, baseline) == []

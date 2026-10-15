@@ -120,6 +120,9 @@ def score_school(rows: list[Any], fees: list[dict[str, Any]]) -> dict[str, Any]:
         elif not same_category:
             reason, fid = f"category {category}, key {at_amount[0]['category']}", at_amount[0]["fid"]
         else:
+            # A site often prints one amount for several groups (505: one price, five grades),
+            # each a key fee: a row takes a fee no earlier row has.
+            same_category.sort(key=lambda fee: fee["fid"] in found)
             match = next((fee for fee in same_category if fee.get("period") == period), None)
             if match is not None:
                 verdict, reason, fid = "right", "", match["fid"]
@@ -275,6 +278,12 @@ def main() -> int:
         for school_id, error in trial["errors"].items():
             print(f"    {school_id}: {error}")
     print(f"Average: wrong {rates['wrong_rate']:.0%}, found {rates['found_rate']:.0%}")
+    found_by_school = ", ".join(
+        f"{school_id} {len(school['found'])}/{school['site_fees']}"
+        for school_id, school in trials[-1]["schools"].items()
+        if school["site_fees"] or school["rows"]
+    )
+    print(f"Found per school (last trial): {found_by_school}")
     wrong_rows = [
         (school_id, row)
         for school_id, school in trials[-1]["schools"].items()
