@@ -4,17 +4,22 @@ import AreaMap from './AreaMap'
 import AddressCheck from './AddressCheck'
 import {
   addressFactsForSchool,
+  areaAtPoint,
   mapSearchQuery,
+  streetForLocation,
   districtAt,
   districtByName,
   districtLabel,
   neighbouringCatchments,
   schoolCatchmentIds,
 } from '../../admission/catchments'
-import { CATCHMENT_CAMPAIGNS, loadCatchments, loadDistricts } from '../../admission/loadCatchments'
+import { CATCHMENT_CAMPAIGNS, loadAddresses, loadCatchments, loadDistricts } from '../../admission/loadCatchments'
+import { saveHome } from '../../admission/saved'
+import { useSavedAdmission } from '../../hooks/useSavedAdmission'
+import { readSavedLocation } from '../../utils/keyFacts'
 import { usesSofiaKindergartenSystem } from '../../utils/admission'
 import { getMappableLocations } from '../SchoolDetailPage/LocationMap'
-import { geocodeAddress } from '../../utils/geocoding'
+import { geocodeAddress, reverseGeocodeStreet } from '../../utils/geocoding'
 
 const OFFICIAL_SYSTEM_URL = 'https://kg.sofia.bg/'
 // The municipality's own catchment viewer, opened on one school.
@@ -113,12 +118,79 @@ function ShowOnMap({ address, onPin }) {
   )
 }
 
-/** First grade at a Sofia municipal school: its catchment, its neighbours, an address check. */
+// The map search allows one request a second; "show on the map" may have just used it.
+function streetAt(lat, lng) {
+  return reverseGeocodeStreet(lat, lng).catch(error => {
+    if (error?.code !== 'TOO_FAST') throw error
+    return new Promise(resolve => setTimeout(resolve, 1100)).then(() => reverseGeocodeStreet(lat, lng))
+  })
+}
+
+/**
+ * "Use my current location": the device's position, pinned at once, then the street and
+ * number there (OpenStreetMap, on request only) matched to the official address table.
+ * The position is kept as the search page's location, like its own "use my location".
+ */
+function useCurrentLocation({ catchments, onPoint, onAddress }) {
+  const [state, setState] = useState('idle')
+  const locate = () => {
+    if (!navigator.geolocation) {
+      setState('unavailable')
+      return
+    }
+    setState('locating')
+    navigator.geolocation.getCurrentPosition(
+      async position => {
+        const { latitude: lat, longitude: lng } = position.coords
+        onPoint([lat, lng])
+        try {
+          window.localStorage.setItem('userLocation', JSON.stringify({ lat, lng, address: null }))
+        } catch {
+          // Blocked storage: the location is used on this page only.
+        }
+        try {
+          const [{ streets }, found] = await Promise.all([loadAddresses(), streetAt(lat, lng)])
+          const match = streetForLocation(streets, catchments, found, lat, lng)
+          if (match) {
+            onAddress({ streetId: match.street.id, number: match.number })
+            setState('found')
+          } else {
+            setState('noAddress')
+          }
+        } catch {
+          setState('noAddress')
+        }
+      },
+      error => setState(error?.code === 1 ? 'denied' : 'unavailable'),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 }
+    )
+  }
+  return { state, locate }
+}
+
+/**
+ * First grade at a Sofia municipal school: its catchment, its neighbours, an address
+ * check. The check starts from the address saved on this device; without one, a location
+ * saved on the search page is pinned with a hint, and "use my current location" comes
+ * before typing an address.
+ */
 function CatchmentArea({ ids, point }) {
   const { t } = useTranslation()
   const { data: catchments, failed } = useLoaded(loadCatchments, true)
+  const savedHome = useSavedAdmission().home
   const [address, setAddress] = useState(null)
+  const [found, setFound] = useState(null)
   const [pin, setPin] = useState(null)
+  // A pin from a location (not a checked address): only an approximate answer.
+  const [locationPin, setLocationPin] = useState(() => {
+    const saved = readSavedLocation()
+    return saved ? [saved.lat, saved.lng] : null
+  })
+  const current = useCurrentLocation({
+    catchments: catchments?.byId,
+    onPoint: point => setLocationPin(point),
+    onAddress: setFound,
+  })
 
   const areas = useMemo(() => {
     if (!catchments) return null
@@ -141,12 +213,16 @@ function CatchmentArea({ ids, point }) {
       .map(id => addressFactsForSchool(catchments.byId, address.schoolId, id))
       .reduce((best, f) => (f.inCatchment ? f : best.inCatchment || best.inNeighbouring ? best : f))
     : null
+  const startValue = found || savedHome
+  const usingSaved = Boolean(savedHome && !found && address && address.streetId === savedHome.streetId && address.number === savedHome.number)
+  const canRemember = Boolean(address?.schoolId && !(savedHome && address.streetId === savedHome.streetId && address.number === savedHome.number))
+  const hint = !address && locationPin ? areaAtPoint(areas.own, areas.neighbours, locationPin[0], locationPin[1]) : null
 
   return (
     <Panel title={title}>
       <p className="text-sm text-neutral-700">{t('admissionArea.catchmentIntro')}</p>
       <div className="mt-4">
-        <AreaMap primary={areas.own} secondary={areas.neighbours} point={point} pin={pin} />
+        <AreaMap primary={areas.own} secondary={areas.neighbours} point={point} pin={pin || (address ? null : locationPin)} />
       </div>
       <Legend
         items={[
@@ -156,10 +232,48 @@ function CatchmentArea({ ids, point }) {
         ]}
       />
       <h3 className="mt-6 text-lg font-semibold text-neutral-900">{t('admissionArea.checkTitle')}</h3>
+      {!savedHome && (
+        <div className="mt-2">
+          <button
+            type="button"
+            onClick={current.locate}
+            disabled={current.state === 'locating'}
+            className="inline-flex h-11 w-full items-center justify-center rounded-lg bg-primary-700 px-4 text-sm font-medium text-white hover:bg-primary-800 disabled:opacity-60 sm:w-auto"
+          >
+            {current.state === 'locating' ? t('common.loading') : t('location.useMyLocation')}
+          </button>
+          <p className="mt-1 text-xs text-neutral-500">{t('admissionArea.locationNote')}</p>
+          {(current.state === 'denied' || current.state === 'unavailable') && (
+            <p className="mt-1 text-sm text-amber-800">{t(current.state === 'denied' ? 'location.errorDenied' : 'location.errorUnavailable')}</p>
+          )}
+          <p className="mt-3 text-sm text-neutral-600">{t('admissionArea.orTypeAddress')}</p>
+        </div>
+      )}
       <div className="mt-2">
-        <AddressCheck catchments={catchments.byId} ownIds={ids} onResult={setAddress} nameSchool={false} />
+        <AddressCheck catchments={catchments.byId} ownIds={ids} onResult={setAddress} nameSchool={false} value={startValue} />
       </div>
+      {hint && (
+        <p className="mt-3 rounded-lg bg-neutral-50 p-3 text-sm text-neutral-800">
+          {t(`admissionArea.locationHint.${hint}`)}{' '}
+          {t(current.state === 'noAddress' ? 'admissionArea.locationNoAddress' : 'admissionArea.locationConfirm')}
+        </p>
+      )}
       <AddressVerdict facts={facts} schoolName={address?.schoolId ? catchments.byId.get(address.schoolId)?.properties.name : null} />
+      {usingSaved && (
+        <p className="mt-2 text-xs text-neutral-600">
+          {t('admissionArea.usingSaved')}{' '}
+          <button type="button" onClick={() => saveHome(null)} className="underline">{t('admissionArea.forgetAddress')}</button>
+        </p>
+      )}
+      {canRemember && (
+        <button
+          type="button"
+          onClick={() => saveHome({ streetId: address.streetId, number: address.number })}
+          className="mt-2 text-sm font-medium text-primary-700 underline"
+        >
+          {t('admissionArea.remember')}
+        </button>
+      )}
       <ShowOnMap address={address} onPin={setPin} />
       <p className="mt-4 text-xs text-neutral-500">
         {t('admissionArea.catchmentSource', { campaign: CATCHMENT_CAMPAIGNS[0] })}{' '}

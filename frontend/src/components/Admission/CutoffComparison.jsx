@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { compareWithCutoff } from '../../admission/calculator'
+import { comparableRound, compareWithCutoff, rankingWhen } from '../../admission/calculator'
 import { CutoffValue, rowLabel } from './CutoffTable'
 
 const TONE = {
@@ -18,10 +18,10 @@ const TONE = {
  * under other rules are marked, since their points don't add up the same way.
  */
 function CutoffComparison({ rows, yours, isCurrentRules = () => null }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const lines = (rows || [])
     .map(row => {
-      const round = row.rounds > 1 && row.latest ? row.latest : row.first
+      const round = comparableRound(row)
       return { row, round, verdict: compareWithCutoff(yours, round) }
     })
     .filter(line => line.verdict)
@@ -31,10 +31,10 @@ function CutoffComparison({ rows, yours, isCurrentRules = () => null }) {
       <p className="font-medium text-neutral-900">{t('cutoffs.compare.title')}</p>
       <ul className="mt-2 space-y-2">
         {lines.map(({ row, round, verdict }) => (
-          <li key={[row.stage, row.age_group, row.birth_year, row.building].join('|')}>
+          <li key={[row.stage, row.age_group, row.birth_year, row.class_code, row.building].join('|')}>
             <div className="text-neutral-700">
               {rowLabel(row, t)}
-              {round.classified_on && ` · ${round.classified_on}`}
+              {rankingWhen(row, round, i18n.language) && ` · ${rankingWhen(row, round, i18n.language)}`}
               {': '}
               <span className="font-medium text-neutral-900"><CutoffValue round={round} /></span>
             </div>

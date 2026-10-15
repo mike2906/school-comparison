@@ -13,7 +13,8 @@ const LATIN = {
 }
 
 // Street-type words the address table puts in front of the name (УЛ.АВИЦЕНА).
-const STREET_PREFIX = /^(?:ул|бул|пл|ж\.?к|жк|кв|м|в\.?з|пр|алея|местност)\.?\s*/i
+// A dot or space must follow, or М would be cut off МАРИЦА.
+const STREET_PREFIX = /^(?:ул|бул|пл|ж\.?к|жк|кв|м|в\.?з|пр|алея|местност)(?:\.\s*|\s+)/i
 
 /** Lower-case Latin with only letters, digits and single spaces, for matching. */
 export function searchKey(text) {
@@ -24,8 +25,73 @@ export function searchKey(text) {
     .trim()
 }
 
-function streetKey(name) {
-  return searchKey(String(name || '').replace(STREET_PREFIX, ''))
+// The same words as a parent types them in Latin ("ul. Ivan Shterev", "blvd Vitosha").
+const LATIN_STREET_PREFIX = /^(?:ul|bul|blvd|boulevard|str|street|zh\.?\s?k|jk|kv)\.?\s+/i
+
+/** The search key of a typed street name, without its type word. */
+export function streetKey(name) {
+  return searchKey(String(name || '').replace(STREET_PREFIX, '').replace(LATIN_STREET_PREFIX, ''))
+}
+
+const TYPE_WORDS = { ул: 'ул.', бул: 'бул.', пл: 'пл.', жк: 'ж.к.', кв: 'кв.', м: 'м.', вз: 'в.з.', пр: 'пр.', гр: 'гр.', с: 'с.' }
+
+function transliterate(text) {
+  return Array.from(text, ch => {
+    const lower = ch.toLowerCase()
+    const latin = LATIN[lower]
+    if (latin == null) return ch
+    return ch === lower ? latin : latin.charAt(0).toUpperCase() + latin.slice(1)
+  }).join('')
+}
+
+/**
+ * An address-table name as a parent reads it: `УЛ.ИВАН ЩЕРЕВ` → `ул. Иван Щерев`, or in
+ * English `ul. Ivan Shterev` (transliterated, as the street signs are).
+ */
+export function displayPlaceName(raw, language) {
+  const text = String(raw || '').trim()
+  const typed = /^(ул|бул|пл|ж\.?к|кв|м|в\.?з|пр|гр|с)\.\s*/i.exec(text)
+  const name = text
+    .slice(typed ? typed[0].length : 0)
+    .toLowerCase()
+    // Capitals start words, and the second half of a double name (Ал. Батенберг, Горна-Баня),
+    // but not an ordinal ending (239-та).
+    .replace(/(^|[\s(.]|(?<=\p{L})-)(\p{L})/gu, (_, before, ch) => before + ch.toUpperCase())
+  const type = typed ? TYPE_WORDS[typed[1].toLowerCase().replace(/\./g, '')] : null
+  const shown = type ? `${type} ${name}` : name
+  return String(language || '').startsWith('bg') ? shown : transliterate(shown)
+}
+
+/** A street with its place: `ул. Земляне (кв. Суходол)`; the district tells same-named streets apart. */
+export function streetDisplayName(street, language, districtName = null) {
+  // `ГР.СОФИЯ,КВ.СЕСЛАВЦИ`: the quarter is what tells streets apart, not the city.
+  const [town, quarter] = String(street.settlement || '').split(',')
+  const place = [
+    quarter ? displayPlaceName(quarter, language) : town !== 'ГР.СОФИЯ' ? displayPlaceName(town, language) : null,
+    districtName ? districtLabel(districtName, language) : null,
+  ].filter(Boolean).join(', ')
+  const name = displayPlaceName(street.street, language)
+  return place ? `${name} (${place})` : name
+}
+
+/**
+ * One typed address split into street and house number: `Иван Щерев 5` →
+ * `{ street: 'Иван Щерев', number: '5' }`, `ж.к. Младост 1, бл. 20, вх. Б` →
+ * `{ street: 'ж.к. Младост 1', number: '20' }`. Without a trailing number, all of it is the street.
+ */
+export function splitAddress(text) {
+  const value = String(text || '')
+    // Entrance, floor and flat after the number say nothing about the catchment:
+    // `бл. 20, вх. Б, ет. 3`. Only after a number, so `Ап. Карамитев` stays a name.
+    .replace(/(\d[a-zа-я]?)(?:[\s,]+(?:вх|ет|ап|entr?|fl|apt)(?:\.\s*|\s+)\S+)+/giu, '$1')
+    // A word still being typed: `Младост 1 бл`, `... 20 вх`.
+    .replace(/[\s,]+(?:бл|блок|вх|ет|ап|bl|block)\.?$/iu, '')
+    // The table lists a block as the house number under its ж.к.: `Младост 1, бл. 20` → `Младост 1 20`.
+    .replace(/[\s,]+(?:бл|блок|bl|block)(?:\.\s*|\s+)(?=\d)/giu, ' ')
+    .trim()
+  const match = /^(.*?\S)[\s,]+(?:№\s*|no\.?\s*)?(\d+\s?[a-zа-я]?)$/iu.exec(value)
+  if (!match || !/\p{L}/u.test(match[1])) return { street: value, number: '' }
+  return { street: match[1].replace(/[\s,]+$/, ''), number: match[2].replace(/\s+/g, '') }
 }
 
 /** Where a campaign's snapshot lives. */
@@ -52,7 +118,8 @@ export function indexAddresses(addresses) {
 }
 
 /**
- * Streets matching what the parent typed, best first. Within a match quality, streets
+ * Streets matching what the parent typed, best first (the whole name, then its start,
+ * then a word in it). Within a match quality, streets
  * in the city come first, then its outer quarters (ГР.СОФИЯ,КВ.…), then same-named
  * streets in Sofia's other towns and villages.
  */
@@ -61,7 +128,7 @@ export function searchStreets(streets, query, limit = 12) {
   if (String(query || '').trim().length < 2 || !key) return []
   const ranked = []
   for (const street of streets) {
-    const rank = street.key.startsWith(key) ? 0 : street.key.includes(` ${key}`) ? 1 : street.key.includes(key) ? 2 : -1
+    const rank = street.key === key ? 0 : street.key.startsWith(key) ? 1 : street.key.includes(` ${key}`) ? 2 : street.key.includes(key) ? 3 : -1
     if (rank >= 0) ranked.push({ rank, street })
   }
   const outsideCity = street => (street.settlement === 'ГР.СОФИЯ' ? 0 : street.settlement?.startsWith('ГР.СОФИЯ') ? 1 : 2)
@@ -71,6 +138,44 @@ export function searchStreets(streets, query, limit = 12) {
     a.street.key.length - b.street.key.length ||
     a.street.key.localeCompare(b.street.key))
   return ranked.slice(0, limit).map(entry => entry.street)
+}
+
+/**
+ * Suggestions for a typed address, in the order of searchStreets: a street listing the
+ * typed number shows with it; one that does not still keeps the number (`carry`) so the
+ * check can say it is not listed. Streets matching the whole text come first when they
+ * match it exactly (ж.к. Младост 1), and last otherwise.
+ * Each entry: `{ street, number, carry }`.
+ */
+const EARLY_CARRY = 3
+
+export function addressSuggestions(streets, text, limit = 12) {
+  const typed = splitAddress(text)
+  const out = []
+  const seen = new Set()
+  const add = (street, number, carry = false) => {
+    if (seen.has(street.id) || out.length >= limit) return
+    seen.add(street.id)
+    out.push({ street, number, carry })
+  }
+  const cleaned = typed.number ? `${typed.street} ${typed.number}` : typed.street
+  const whole = searchStreets(streets, cleaned)
+  const exactKey = streetKey(cleaned)
+  for (const street of whole) if (street.key === exactKey) add(street, '')
+  // A few streets without the number come early (the city street the parent meant, whose
+  // number the table lacks); the rest wait behind names that match the whole text.
+  const later = []
+  let early = 0
+  if (typed.number) {
+    for (const street of searchStreets(streets, typed.street)) {
+      if (catchmentSchoolFor(street, typed.number)) add(street, normalizeHouseNumber(typed.number))
+      else if (early++ < EARLY_CARRY) add(street, '', true)
+      else later.push(street)
+    }
+  }
+  for (const street of whole) add(street, '')
+  for (const street of later) add(street, '', true)
+  return out
 }
 
 const LATIN_NUMBER_LETTERS = { a: 'А', b: 'Б', v: 'В', g: 'Г', d: 'Д', e: 'Е', z: 'З', i: 'И', k: 'К' }
@@ -194,4 +299,36 @@ export function sortedDistricts(districts, language) {
   return [...(districts?.features || [])].sort((a, b) =>
     districtLabel(a.properties.name, language).localeCompare(districtLabel(b.properties.name, language), language)
   )
+}
+
+// The full words OpenStreetMap uses where the address table abbreviates (улица → УЛ.).
+const LONG_STREET_TYPE = /^(?:улица|булевард|площад|жилищен комплекс|квартал)\s+/i
+
+/**
+ * The address-table street for a road name and house number found at a point (from
+ * OpenStreetMap). Streets of the same name are told apart by which catchment polygon
+ * holds the point. Null when nothing matches exactly: the caller then asks the parent.
+ */
+export function streetForLocation(streets, catchments, { road, houseNumber }, lat, lng) {
+  if (!road || !houseNumber) return null
+  const name = String(road).replace(LONG_STREET_TYPE, '')
+  const key = streetKey(name)
+  const candidates = streets.filter(street => street.key === key && catchmentSchoolFor(street, houseNumber))
+  if (candidates.length <= 1) return candidates[0] ? { street: candidates[0], number: normalizeHouseNumber(houseNumber) } : null
+  const inside = candidates.filter(street => {
+    const geometry = catchments?.get(catchmentSchoolFor(street, houseNumber))?.geometry
+    return geometry && geometryContains(geometry, lat, lng)
+  })
+  return inside.length === 1 ? { street: inside[0], number: normalizeHouseNumber(houseNumber) } : null
+}
+
+/**
+ * Where a point falls against a school's areas, from the simplified polygons: 'inside',
+ * 'neighbouring' or 'outside'. Only a hint for a pin on the map; the official answer
+ * comes from the address table.
+ */
+export function areaAtPoint(own, neighbours, lat, lng) {
+  if (own.some(feature => geometryContains(feature.geometry, lat, lng))) return 'inside'
+  if (neighbours.some(feature => geometryContains(feature.geometry, lat, lng))) return 'neighbouring'
+  return 'outside'
 }

@@ -5,6 +5,12 @@ import { fileURLToPath } from 'node:url'
 
 import {
   addressFactsForSchool,
+  addressSuggestions,
+  areaAtPoint,
+  displayPlaceName,
+  splitAddress,
+  streetDisplayName,
+  streetForLocation,
   catchmentSchoolFor,
   catchmentUrl,
   districtAt,
@@ -102,4 +108,70 @@ test('district names are transliterated and sorted for English pages', () => {
   const districts = { features: ['Средец', 'Банкя', 'Възраждане'].map(name => ({ properties: { name } })) }
   assert.deepEqual(sortedDistricts(districts, 'bg').map(f => f.properties.name), ['Банкя', 'Възраждане', 'Средец'])
   assert.deepEqual(sortedDistricts(districts, 'en').map(f => districtLabel(f.properties.name, 'en')), ['Bankya', 'Sredets', 'Vazrazhdane'])
+})
+
+test('table names read like street signs, transliterated in English', () => {
+  assert.equal(displayPlaceName('УЛ.ИВАН ЩЕРЕВ', 'bg'), 'ул. Иван Щерев')
+  assert.equal(displayPlaceName('УЛ.ИВАН ЩЕРЕВ', 'en'), 'ul. Ivan Shterev')
+  assert.equal(displayPlaceName('ЖК.МЛАДОСТ 1', 'en'), 'zh.k. Mladost 1')
+  assert.equal(displayPlaceName('УЛ.ОТЕЦ ГЕНАДИЙ (239-ТА)', 'bg'), 'ул. Отец Генадий (239-та)')
+  assert.equal(displayPlaceName('УЛ.ГЕН.ГУРКО', 'bg'), 'ул. Ген.Гурко')
+  assert.equal(
+    streetDisplayName({ street: 'УЛ.ЗЕМЛЯНЕ', settlement: 'ГР.СОФИЯ,КВ.СУХОДОЛ' }, 'en', 'ВИТОША'),
+    'ul. Zemlyane (kv. Suhodol, Vitosha)',
+  )
+  assert.equal(streetDisplayName({ street: 'УЛ.ИВАН ЩЕРЕВ', settlement: 'ГР.СОФИЯ' }, 'bg'), 'ул. Иван Щерев')
+})
+
+test('one typed address splits into street and number', () => {
+  assert.deepEqual(splitAddress('Иван Щерев 5'), { street: 'Иван Щерев', number: '5' })
+  assert.deepEqual(splitAddress('ул. Иван Щерев, № 5А'), { street: 'ул. Иван Щерев', number: '5А' })
+  assert.deepEqual(splitAddress('Ivan Shterev 12 b'), { street: 'Ivan Shterev', number: '12b' })
+  assert.deepEqual(splitAddress('Витоша'), { street: 'Витоша', number: '' })
+  assert.deepEqual(splitAddress('15'), { street: '15', number: '' })
+  // A typed Latin type word is ignored when searching.
+  assert.equal(searchStreets(streets, 'ul. Ivan Shterev')[0].street, 'УЛ.ИВАН ЩЕРЕВ')
+})
+
+test('a found road and number match one table street', () => {
+  const street = streets.find(s => s.street === 'УЛ.ИВАН ЩЕРЕВ')
+  const [number, schoolId] = [...street.numbers.entries()][0]
+  const geometry = catchments.get(schoolId).geometry
+  const ring = geometry.type === 'Polygon' ? geometry.coordinates[0] : geometry.coordinates[0][0]
+  const [lng, lat] = ring[0]
+  const match = streetForLocation(streets, catchments, { road: 'улица Иван Щерев', houseNumber: number }, lat, lng)
+  assert.equal(match?.street.id, street.id)
+  assert.equal(match.number, number)
+  assert.equal(streetForLocation(streets, catchments, { road: 'улица Иван Щерев', houseNumber: null }, lat, lng), null)
+  assert.equal(streetForLocation(streets, catchments, { road: 'Nowhere', houseNumber: '1' }, lat, lng), null)
+})
+
+test('a point is placed against a school\'s areas', () => {
+  const [id, feature] = [...catchments.entries()][0]
+  const neighbours = neighbouringCatchments(catchments, id)
+  assert.equal(areaAtPoint([feature], neighbours, 0, 0), 'outside')
+})
+
+test('blocks, entrances and flats in a typed address', () => {
+  assert.deepEqual(splitAddress('ж.к. Младост 1, бл. 20'), { street: 'ж.к. Младост 1', number: '20' })
+  assert.deepEqual(splitAddress('жк Младост 1 бл 20 вх Б ет. 3 ап. 12'), { street: 'жк Младост 1', number: '20' })
+  assert.deepEqual(splitAddress('Апостол Карамитев 5'), { street: 'Апостол Карамитев', number: '5' })
+  assert.deepEqual(splitAddress('ул. Ап. Карамитев 5'), { street: 'ул. Ап. Карамитев', number: '5' })
+  assert.deepEqual(splitAddress('жк Младост 1 бл'), { street: 'жк Младост', number: '1' })
+  const [first] = addressSuggestions(streets, 'ж.к. Младост 1, бл. 20')
+  assert.match(first.street.street, /МЛАДОСТ 1$/)
+  assert.equal(first.number, '20')
+})
+
+test('address suggestions keep the city street first', () => {
+  for (const text of ['Латинка 11', 'Стара планина 11', 'Vitosha 20']) {
+    const [first] = addressSuggestions(streets, text)
+    assert.equal(first.street.settlement, 'ГР.СОФИЯ', text)
+  }
+  // A whole name ending in a number is that complex, not house 1 somewhere.
+  const [mladost] = addressSuggestions(streets, 'Младост 1')
+  assert.match(mladost.street.street, /МЛАДОСТ 1$/)
+  assert.equal(mladost.number, '')
+  // Names that merely start with the text still show.
+  assert.ok(addressSuggestions(streets, 'Младост 1').some(s => /МЛАДОСТ 1А$/.test(s.street.street)))
 })

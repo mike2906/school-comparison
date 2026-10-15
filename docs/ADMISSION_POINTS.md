@@ -50,13 +50,17 @@ grade) and the catchment map. Research: `/mnt/project-files/admission-points/res
    grade returns a group and points, never one number.
 7. **Everything runs in the browser.** Answers include disability, deceased parents,
    adoption and foster care. They never leave the page: no API call, no URL parameter,
-   no storage, no analytics or error-report payload carries them. The one exception is
-   on a school page's address check, and only when the parent presses "show on the map":
-   the street and number (nothing else, and not cached in the browser) go to
-   OpenStreetMap's search, as the search
-   page's address box already does, and the map widens to show the pin (Mike,
-   2026-10-15). The backend serves no rules endpoint; rule files ship in the
+   no analytics or error-report payload carries them. Two exceptions, each only when the
+   parent presses a button: "show on the map" sends the checked street and number (not
+   cached) to OpenStreetMap's search, and "use my current location" on a catchment map
+   sends the position to OpenStreetMap's reverse search to find the street and number
+   (Mike, 2026-10-15). The backend serves no rules endpoint; rule files ship in the
    calculator's own bundle chunk.
+   **Saving is opt-in and stays on the device** (Mike, 2026-10-15, reversing "no
+   storage"): "Save on this device" keeps the answers and the checked home address in
+   localStorage (`src/admission/saved.js`), so the search list and school pages can
+   compare every school. Every place that uses them has "forget". Sending them to our
+   server would be collecting user data and needs Mike's own decision.
 8. **Unknown is an answer.** Every question has "not sure". The result is then a range;
    its maximum assumes every unknown is favourable, so the page says "up to".
 9. **Golden tests per rule file.** Each file carries worked examples, including exact
@@ -223,6 +227,30 @@ school year until `current_rankings_until`), and the notice says until when, aft
 the next campaign applies. Address durations for kindergartens are counted to today
 while those later rankings run.
 
+## Saved answers across schools
+
+With answers saved, each state kindergarten and municipal school in the search list and on
+its own page shows the parent's result against its latest published cut-off
+(`src/admission/schoolVerdict.js`, `SavedVerdict.jsx`): above, below, a tie, "depends on
+your not-sure answers", or "no cut-off to compare with". Never a chance or a percentage.
+The calculator re-runs per school with that school's own facts (district for the
+kindergarten bonus, catchment group for first grade) and assumes what the parent could
+not have answered for every school: a kindergarten is their first wish with no sibling
+there; a first-grade school has no sibling or preparatory group of theirs. The list says
+so in a banner. First grade needs an address checked against the official table, since
+only that says which catchment it is in. Only the newest campaign's rows are compared,
+on the latest round unless that round had no places (then the first). Eighth grade is
+left out: without each class's formula most rows would read "depends".
+
+The list banner has an opt-in switch to hide schools where every saved result is clearly
+below (`clearlyBelowIds`); a tie, "depends", mixed rows, no cut-off, a cut-off ranked
+under other rules or a possible social-priority or SEN path keeps the school listed. The switch is a per-browser preference
+(localStorage `admissionHideBelow`).
+
+Under each "address since" date the calculator says when the address reaches the next
+duration tier and what it would then count for (`nextDurationTier` in `core.js`): useful
+to a parent close to an anniversary, since later rankings or campaigns count it.
+
 ## Catchments and districts
 
 Sofia publishes official first-grade catchment polygons (arcgis.sofia.bg, layer
@@ -241,10 +269,18 @@ schools by the same GIS school id (`integrationid` on layer 1). That is not the 
   area is the union of the polygons of the schools that list it as neighbouring (+5
   points, group 4 only); adjacency is not always symmetric, so it is always read in that
   direction. Two shades, not a scale. Each address belongs to exactly one catchment.
-- **Address check.** A parent picks their street and number; the lookup runs in the
-  browser against a compact index built from the address list, loaded only on demand.
-  One sentence answers it, naming the catchment the address is in. A "show on the map"
-  button then geocodes it (see decision 7) and pins it beside the school's area.
+- **Address check.** One field, as on the search page: the parent types "Иван Щерев 5"
+  (or "Ivan Shterev 5") and picks the street; names show transliterated in English.
+  Blocks are house numbers under their ж.к. in the table, so "Младост 1, бл. 20, вх. Б"
+  reads as "Младост 1 20". Suggestions follow street match order (exact name, then city
+  before outer quarters and villages), and a typed number the street does not list is
+  carried so the check can say so; nothing matching says so too. The
+  lookup runs in the browser against a compact index built from the address list, loaded
+  only on demand. One sentence answers it, naming the catchment the address is in. A
+  "show on the map" button then geocodes it (see decision 7) and pins it beside the
+  school's area. The check starts from the address saved on the device; without one, a
+  location saved on the search page is pinned with an approximate hint from the polygons,
+  and "use my current location" (reverse search, then the table) comes before typing.
 - **Kindergartens** in Sofia have no catchment. The district bonus (3 points) depends on
   the kindergarten's district: the one kg.sofia.bg gives (`admission_info.admin_district`,
   from the cut-off capture), else the district polygon its coordinates fall in. The page

@@ -15,9 +15,10 @@ import {
   startYearChoices,
   summaryRowsFor,
 } from '../../admission/calculator'
-import { districtAt, districtByName, schoolCatchmentIds } from '../../admission/catchments'
+import { schoolCatchmentIds } from '../../admission/catchments'
+import { kindergartenDistrictFeature } from '../../admission/schoolVerdict'
 import { loadDistricts } from '../../admission/loadCatchments'
-import { getMappableLocations } from '../SchoolDetailPage/LocationMap'
+import { getSaved } from '../../admission/saved'
 import CutoffTable from '../Admission/CutoffTable'
 import RuleSetNotice from './RuleSetNotice'
 import KindergartenCalculator from './KindergartenCalculator'
@@ -60,16 +61,11 @@ function useDistricts() {
   return districts
 }
 
-function schoolPoint(school) {
-  const points = getMappableLocations(school?.locations)
-  const point = points.find(p => p.location.is_primary) || points[0]
-  return point ? [point.lat, point.lng] : null
-}
-
 /**
  * The admission calculator: kindergarten points, first-grade group and points, and the
  * eighth-grade score, from the rule files in src/admission/rules. Everything is
- * calculated in the browser; no answer is sent, stored or put in the URL.
+ * calculated in the browser; no answer is sent or put in the URL, and answers are stored
+ * only when the parent saves them on this device (src/admission/saved.js).
  */
 function AdmissionPage() {
   const { t, i18n } = useTranslation()
@@ -78,9 +74,14 @@ function AdmissionPage() {
   const school = useSchool(params.get('school'))
   const districts = useDistricts()
   const today = sofiaToday()
-  // Each tab opens on the campaign a parent applying today is ranked under, until the
-  // parent picks another year.
-  const [chosenYear, setChosenYear] = useState(null)
+  // Each tab opens on the year of the answers saved on this device, else on the campaign
+  // a parent applying today is ranked under, until the parent picks another year.
+  const savedYear = id => {
+    const year = getSaved()[id]?.startYear
+    // A year no longer offered would show one year and calculate another.
+    return startYearChoices().includes(year) ? year : null
+  }
+  const [chosenYear, setChosenYear] = useState(() => savedYear(stage.id))
   const startYear = chosenYear ?? defaultStartYear(new Date(), { ruleSets: RULE_SETS, stage, today })
 
   useEffect(() => {
@@ -96,10 +97,7 @@ function AdmissionPage() {
   const schoolContext = useMemo(() => {
     if (!school) return null
     const info = school.admission_info || {}
-    const point = schoolPoint(school)
-    const district = districts
-      ? districtByName(districts, info.admin_district) || (point ? districtAt(districts, point[0], point[1]) : null)
-      : null
+    const district = kindergartenDistrictFeature(school, districts)
     return {
       id: school.id,
       name: getSchoolName(school, i18n.language),
@@ -114,7 +112,7 @@ function AdmissionPage() {
   const Calculator = CALCULATORS[stage.id]
 
   // However the tab changes (a click, a link, Back), it opens on its own default year.
-  useEffect(() => setChosenYear(null), [stage.id])
+  useEffect(() => setChosenYear(savedYear(stage.id)), [stage.id])
 
   const chooseStage = id => {
     const next = new URLSearchParams(params)

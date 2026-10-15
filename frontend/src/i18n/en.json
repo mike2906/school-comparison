@@ -600,7 +600,11 @@
     "admission": "Admission",
     "kgByPointsShort": "By points (kg.sofia.bg)",
     "kgThresholdsLater": "Last-admitted points are not published here yet",
-    "kgThresholdsBelow": "See who got in before, below"
+    "kgThresholdsBelow": "See who got in before, below",
+    "nextOpenDay": "Next open day",
+    "moreOpenDays_one": "{{count}} more date below",
+    "moreOpenDays_other": "{{count}} more dates below",
+    "notOnMap": "Not on the map yet: we have not confirmed where exactly this address is."
   },
   "detailPanel": {
     "label": "School details",
@@ -687,7 +691,7 @@
       "lookups": "When you type an address or pick a point on the map, the address or coordinates are sent to OpenStreetMap’s Nominatim service to look them up. Map images are loaded from CARTO. Both see your IP address, as any website you visit does.",
       "hosting": "The site is served through Cloudflare, and our server keeps standard request logs that include IP addresses, for security and troubleshooting. We count visits with Cloudflare Web Analytics, which uses no cookies and does not follow you across sites.",
       "contact": "If you email us, we use your address only to reply. Questions about privacy: {{email}}.",
-      "calculator": "The admission calculator works entirely in your browser: your answers are never sent to us or saved."
+      "calculator": "The admission calculator works entirely in your browser: your answers are never sent to us. If you press \"Save on this device\", they are kept in your browser (with the address you checked) so the school list can compare every school; you can forget them at any time."
     },
     "cta": "Browse schools"
   },
@@ -869,13 +873,10 @@
     "legendOutside": "Everywhere else in Sofia",
     "mapLabel": "Map of the school's admission area",
     "checkTitle": "Check an address",
-    "street": "Street",
-    "streetPlaceholder": "Start typing a street or neighbourhood",
-    "number": "Number",
     "loadFailed": "The area data could not be loaded. Please try again later.",
     "numberNotListed": "This number is not in the official address list. Check the spelling, or ask the school or district.",
     "addressBelongsTo": "This address belongs to the catchment of {{school}}.",
-    "addressPrivacy": "The check runs in your browser: for it, the address is not sent or saved anywhere.",
+    "addressPrivacy": "The check runs in your browser: the address is not sent anywhere, and it is kept only if you save it on this device.",
     "verdict": {
       "inside": "This address is inside this school's catchment area.",
       "neighbouring": "This address is in a neighbouring area: it gets 5 extra points if the child is ranked in the last group (outside the catchment).",
@@ -889,12 +890,28 @@
     "showOnMap": "Show the address on the map",
     "showOnMapNote": "To find it on the map, the address is sent to OpenStreetMap's search. The check itself stays in your browser.",
     "showOnMapShown": "The red dot is the address as OpenStreetMap found it; the spot may be approximate.",
-    "showOnMapFailed": "We couldn't find the address on the map. The check above uses the official list and doesn't depend on this."
+    "showOnMapFailed": "We couldn't find the address on the map. The check above uses the official list and doesn't depend on this.",
+    "address": "Address",
+    "addressPlaceholder": "Street and number, e.g. Ivan Shterev 5",
+    "addNumber": "Now type the house number.",
+    "locationNote": "To find your street and number, your location is sent to OpenStreetMap's search, only when you press this.",
+    "orTypeAddress": "Or type your address:",
+    "locationHint": {
+      "inside": "Your location looks inside this school's catchment area.",
+      "neighbouring": "Your location looks inside a neighbouring area.",
+      "outside": "Your location looks outside this school's catchment area and its neighbouring areas."
+    },
+    "locationConfirm": "The map is only approximate: type your exact address above for the official answer.",
+    "locationNoAddress": "We couldn't find a house number there: type your address above for the official answer.",
+    "usingSaved": "Using the address saved on this device.",
+    "forgetAddress": "Forget it",
+    "remember": "Remember this address on this device for other schools",
+    "noMatch": "No street in Sofia's address list matches. Type the street or complex name and the number, e.g. \"Ivan Shterev 5\" or \"Mladost 1 20\" for a block."
   },
   "admissionCalc": {
     "title": "Admission points calculator",
     "intro": "Work out your child's points for a Sofia municipal kindergarten or a preparatory group (including one at a school), the group and extra points for first grade, or the score for eighth grade, under the official rules for the year you pick.",
-    "privacy": "Your answers stay in this browser tab. They are not sent to us, saved, or put in the page address.",
+    "privacy": "Your answers stay in this browser. They are not sent to us or put in the page address, and they are kept only if you save them on this device.",
     "privateAnswers": "These answers stay in your browser like all the others. Leave them as No if they do not apply.",
     "disclaimer": "This is an estimate from the published rules, not a decision. The official system and the school or kindergarten decide; places, applicants and rules change every year, and ties are broken by a random number.",
     "stages": {
@@ -930,7 +947,7 @@
       "upheld_final": "A final court ruling on {{date}} upheld these rules."
     },
     "items": {
-      "address_duration": "Address in Sofia, by how long it has not changed",
+      "address_duration": "Address in Sofia: how long it has been in Sofia",
       "same_district": "Address in the kindergarten's district",
       "parent_activity": "Working or studying parents",
       "nursery_attendance": "Attended a nursery",
@@ -1012,7 +1029,9 @@
         "chronic": "Each group admits only a few children with a chronic illness."
       },
       "tieBreak": "Children with equal points are ordered by a random number.",
-      "sinceHintToday": "Moves within Sofia do not reset this date. Counted to the date of your ranking; here, to today ({{date}})."
+      "sinceHintToday": "Moves within Sofia do not reset this date. Counted to the date of your ranking; here, to today ({{date}}).",
+      "homeDistrictListHint": "Kindergartens in your own district give 3 extra points; the school list uses this to compare every kindergarten.",
+      "nextTier": "From {{date}} this address gives {{points}} points instead of {{current}}."
     },
     "g1": {
       "addressTitle": "Address",
@@ -1040,7 +1059,9 @@
       "group": "Group",
       "points": "Extra points",
       "groupNote": "Groups are filled in order: group 1 first. Extra points only matter inside a group that has more children than places.",
-      "lockNote": "The address you choose is used for every school and locked after the first ranking."
+      "lockNote": "The address you choose is used for every school and locked after the first ranking.",
+      "forCatchmentSchool": "This address is in the catchment area of {{school}}, so the result below is for that school. Save your answers to compare every school in the list.",
+      "nextTier": "From {{date}} this address puts you in group {{group}} instead of {{current}}."
     },
     "g8": {
       "nvoTitle": "NVO results in 7th grade",
@@ -1077,16 +1098,16 @@
     "latestRound": "Latest ranking",
     "everyone": "Everyone who applied",
     "noPlaces": "No places",
-    "currentRound": "current ranking",
     "points": "{{points}} points",
     "groupOnly": "Group {{group}}",
     "groupAndPoints": "Group {{group}}, {{points}} points",
-    "tie": "(tie)",
+    "tie": "(tied, decided by a random number)",
     "quota": "places split by gender",
     "otherRules": "different rules",
     "stage": {
       "grade_1": "1st grade",
-      "preparatory": "Preparatory group"
+      "preparatory": "Preparatory group",
+      "grade_8": "8th grade"
     },
     "calculate": "Calculate your points",
     "calculateStage": {
@@ -1095,7 +1116,7 @@
       "grade_1": "1st grade points",
       "grade_8": "8th grade score"
     },
-    "quotaScores": "boys {{boys}}, girls {{girls}}",
+    "quotaScores": "boys {{boys}}, girls {{girls}} points",
     "bornIn": "born {{year}}",
     "compare": {
       "title": "Compared with the last child admitted",
@@ -1108,7 +1129,10 @@
       "otherRules": "That ranking used different rules.",
       "note": "The latest ranking is a guide, not a promise: places and applicants change every time.",
       "sameGroup": "The same group as the last child admitted; the list gives no points to compare."
-    }
+    },
+    "score": "{{score}} points",
+    "groupNoPoints": "Group {{group}}, no extra points",
+    "currentRound": "later ranking for free places"
   },
   "driveTime": {
     "minutes": "~{{minutes}} min",
@@ -1118,5 +1142,46 @@
     "loading": "Working out drive times…",
     "outside": "Drive times are only available in and around Sofia.",
     "unavailable": "Drive times could not be loaded."
+  },
+  "savedAdmission": {
+    "yoursPoints": "Your points: {{points}}",
+    "yoursGroup": "You: group {{group}}, {{points}} points",
+    "lastAdmitted": "last admitted:",
+    "verdict": {
+      "above": "you are above",
+      "below": "you are below",
+      "tie": "equal: decided by a random number",
+      "unsure": "depends on your \"not sure\" answers",
+      "sameGroup": "same group, no points listed to compare",
+      "everyone": "everyone who applied got in",
+      "noPlaces": "there were no free places",
+      "mixed": "differs between groups or buildings",
+      "noCutoff": "no published cut-off to compare with",
+      "needsAddress": "Check your address in the 1st grade calculator to compare schools."
+    },
+    "panelTitle": "Your saved answers at this school",
+    "assumed": {
+      "kindergarten": "Assumes it's your 1st wish, with no sibling there.",
+      "grade_1": "Uses your first address and assumes no sibling or preparatory group at the school."
+    },
+    "banner": {
+      "kindergarten": "Each kindergarten shows your saved points (child born {{year}}) against the last child admitted.",
+      "grade_1": "Each school shows your saved 1st grade group and points against the last child admitted."
+    },
+    "edit": "Change answers",
+    "forget": "Forget these answers",
+    "save": "Save on this device and compare every school",
+    "update": "Update the saved answers",
+    "saved": "Saved on this device. The school list and school pages now compare your result with each school.",
+    "seeList": "See every school in the list",
+    "saveNote": "Saved only in this browser, never sent to us. You can forget them here or on any page that uses them.",
+    "needsAddressToSave": "Type your address above to save and compare every school: only a checked address says which catchment it is in.",
+    "hideBelow": "Hide schools where you're below the last admitted child",
+    "hiddenCount_one": "{{count}} hidden. Cut-offs change every year, so this is a guide only.",
+    "hiddenCount_other": "{{count}} hidden. Cut-offs change every year, so this is a guide only.",
+    "showFor": {
+      "kindergarten": "Show the list for my child (born {{year}}, {{campaign}})",
+      "grade_1": "Show the 1st grade list for {{campaign}}"
+    }
   }
 }

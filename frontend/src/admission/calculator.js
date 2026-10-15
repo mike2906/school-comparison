@@ -153,6 +153,41 @@ export function cutoffValue(round) {
   return null
 }
 
+/** `2026/2027` → `2026/27`, as parents write a school year. */
+export function shortCampaign(campaign) {
+  const match = /^(\d{4})\/\d{2}(\d{2})$/.exec(String(campaign || ''))
+  return match ? `${match[1]}/${match[2]}` : campaign || ''
+}
+
+const DAY_FORMATS = new Map()
+
+/** A day (YYYY-MM-DD) in the reader's language: `2 October 2026`, `2 октомври 2026 г.`. */
+export function formatRankingDay(iso, language) {
+  if (!iso) return ''
+  const date = new Date(`${String(iso).slice(0, 10)}T12:00:00Z`)
+  if (Number.isNaN(date.getTime())) return String(iso)
+  const locale = String(language || '').startsWith('bg') ? 'bg-BG' : 'en-GB'
+  if (!DAY_FORMATS.has(locale)) {
+    DAY_FORMATS.set(locale, new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }))
+  }
+  return DAY_FORMATS.get(locale).format(date)
+}
+
+/** Which ranking a compared cut-off comes from: `2026/27 · 2 Oct 2026`. */
+export function rankingWhen(row, round, language) {
+  return [shortCampaign(row?.campaign), formatRankingDay(round?.classified_on, language)].filter(Boolean).join(' · ')
+}
+
+/**
+ * The round a row is compared on: its latest, unless that round had no places to fill
+ * (later rounds share out what remains), when the first ranking says more.
+ */
+export function comparableRound(row) {
+  const latest = row.rounds > 1 && row.latest ? row.latest : null
+  if (latest && cutoffValue(latest)?.kind !== 'noPlaces') return latest
+  return cutoffValue(row.first) ? row.first : latest || row.first
+}
+
 /** 1 when a range is wholly above `value`, -1 wholly below, 0 when exactly it, else null. */
 function rangeVersus(range, value) {
   if (range.min > value) return 1

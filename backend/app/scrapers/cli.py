@@ -392,7 +392,7 @@ async def _shared_site_check_command(*, school_ids, city, country, dry_run, repo
 
 
 @cli.command("fees-agent")
-@click.option("--school-id", type=int, default=None, help="Run one school (any school type)")
+@click.option("--school-id", "school_ids", type=int, multiple=True, help="Run these schools, any type (repeatable)")
 @click.option("--city", default=None, help="Only schools in this city")
 @click.option("--country", default="bg", show_default=True, help="Country code")
 @click.option("--limit", type=int, default=None, help="Maximum schools")
@@ -403,11 +403,19 @@ async def _shared_site_check_command(*, school_ids, city, country, dry_run, repo
 @click.option(
     "--workers", type=click.IntRange(1, 16), default=8, show_default=True, help="Schools read at a time (1-16)"
 )
-def fees_agent_command(school_id, city, country, limit, max_usd, apply_changes, report_path, after_id, workers):
+@click.option(
+    "--save-pages",
+    "pages_dir",
+    type=click.Path(file_okay=False, path_type=Path),
+    help="Also write each school's found pages here (the fees eval's input)",
+)
+def fees_agent_command(
+    school_ids, city, country, limit, max_usd, apply_changes, report_path, after_id, workers, pages_dir
+):
     """Read private and international schools' fee pages with the fee agent (experimental, not in `all`)."""
     asyncio.run(
         _fees_agent_command(
-            school_id=school_id,
+            school_ids=school_ids,
             city=city,
             country=country,
             limit=limit,
@@ -416,11 +424,14 @@ def fees_agent_command(school_id, city, country, limit, max_usd, apply_changes, 
             report_path=report_path,
             after_id=after_id,
             workers=workers,
+            pages_dir=pages_dir,
         )
     )
 
 
-async def _fees_agent_command(*, school_id, city, country, limit, max_usd, apply, report_path, after_id, workers):
+async def _fees_agent_command(
+    *, school_ids, city, country, limit, max_usd, apply, report_path, after_id, workers, pages_dir
+):
     import json
 
     from app.database import async_session_maker
@@ -436,13 +447,14 @@ async def _fees_agent_command(*, school_id, city, country, limit, max_usd, apply
             db,
             country=country,
             city=city,
-            school_id=school_id,
+            school_ids=school_ids,
             limit=limit,
             max_usd=max_usd,
             apply=apply,
             after_id=after_id,
             lines_path=lines_path,
             workers=workers,
+            pages_dir=pages_dir,
         )
     console.print(
         f"{'Applied' if apply else 'Dry run'}: {report['schools']} schools, ${report['spent_usd']:.4f} spent, "
@@ -602,6 +614,31 @@ def confirm_pins_command(school_ids, city, country, limit, apply_changes, report
         console.print(f"Report: {report_path}")
 
 
+@cli.command("hand-pin")
+@click.option("--location-id", type=int, required=True, help="The hidden location")
+@click.option("--lat", type=float, required=True)
+@click.option("--lng", type=float, required=True)
+@click.option("--address", default=None, help="Its address, when the point's differs from the stored one (Bulgarian)")
+@click.option("--note", required=True, help="What the point was checked against")
+@click.option("--apply", "apply_changes", is_flag=True, help="Write the pin (default is a dry run that writes nothing)")
+def hand_pin_command(location_id, lat, lng, address, note, apply_changes):
+    """Pin one hidden location at a point a person checked (a manual_fix)."""
+    from app.database import async_session_maker
+    from app.scrapers.stages.hand_pin import set_hand_pin
+
+    async def _run():
+        async with async_session_maker() as db:
+            return await set_hand_pin(
+                db, location_id, (lat, lng), note=note, address=address, apply=apply_changes
+            )
+
+    report = asyncio.run(_run())
+    written = apply_changes and report["outcome"] == "placed"
+    console.print(f"{'Applied' if written else 'Dry run' if not apply_changes else 'Not written'}: {report}")
+    if report["outcome"] != "placed":
+        raise SystemExit(1)
+
+
 @cli.command("register-pins")
 @click.option("--school-id", "school_ids", type=int, multiple=True, help="Run these schools (repeatable)")
 @click.option("--limit", type=int, default=None, help="Maximum schools")
@@ -614,17 +651,44 @@ def register_pins_command(school_ids, limit, register_file, apply_changes, repor
 
     from app.database import async_session_maker
     from app.scrapers.stages import register_pins as register_pins_stage
-    from app.services.geocoding.bg.sofia_address_register import read_register, read_register_zip
+    from app.services.geocoding.bg.sofia_address_register import read_register_file
 
-    register = None
-    if register_file is not None and register_file.suffix.lower() == ".csv":
-        register = read_register(register_file.read_text(encoding="utf-8-sig"))
-    elif register_file is not None:
-        register = read_register_zip(register_file.read_bytes())
+    register = read_register_file(register_file) if register_file is not None else None
 
     async def _run():
         async with async_session_maker() as db:
             return await register_pins_stage.run_register_pins(
+                db, school_ids=school_ids, limit=limit, apply=apply_changes, register=register
+            )
+
+    report = asyncio.run(_run())
+    mode = "Applied" if apply_changes else "Dry run"
+    console.print(f"{mode}: {report['locations']} locations, outcomes {report['outcomes']}")
+    if report_path is not None:
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(json.dumps(report, ensure_ascii=False, indent=1, default=str), encoding="utf-8")
+        console.print(f"Report: {report_path}")
+
+
+@cli.command("site-address")
+@click.option("--school-id", "school_ids", type=int, multiple=True, help="Run these schools (repeatable)")
+@click.option("--limit", type=int, default=None, help="Maximum schools")
+@click.option("--register-file", type=click.Path(exists=True, dir_okay=False, path_type=Path), help="A downloaded register CSV or its zip (default: download it)")
+@click.option("--apply", "apply_changes", is_flag=True, help="Write addresses and pins (default is a dry run that writes nothing)")
+@click.option("--out", "report_path", type=click.Path(dir_okay=False, path_type=Path), help="Write the JSON report")
+def site_address_command(school_ids, limit, register_file, apply_changes, report_path):
+    """Give hidden Sofia locations the address their school's own website maps and names."""
+    import json
+
+    from app.database import async_session_maker
+    from app.scrapers.stages import site_address as site_address_stage
+    from app.services.geocoding.bg.sofia_address_register import read_register_file
+
+    register = read_register_file(register_file) if register_file is not None else None
+
+    async def _run():
+        async with async_session_maker() as db:
+            return await site_address_stage.run_site_address(
                 db, school_ids=school_ids, limit=limit, apply=apply_changes, register=register
             )
 

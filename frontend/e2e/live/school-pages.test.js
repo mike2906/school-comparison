@@ -2,12 +2,13 @@
  * Live flows for what a parent reads on a school: finding it by name, the facts read
  * from its website (with open days), its Facebook and Instagram links, fees with their
  * payment plans, comparing fees side by side, and no pin for a school whose location is
- * only approximate.
+ * only approximate (the page says the address is not on the map yet).
  */
 import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
 
 import { planNameLabel } from '../../src/utils/priceLabels.js'
+import { upcomingOpenDays } from '../../src/utils/schoolFacts.js'
 import { NoSchoolError, PHONE, address, allSchools, findSchool, open, page, schoolName, t, liveBrowser } from './live.js'
 
 liveBrowser(PHONE)
@@ -37,13 +38,27 @@ describe('finding a school', () => {
     await page.waitForURL(url => url.pathname === `/en/schools/${school.id}`)
     await page.getByRole('heading', { level: 1, name: schoolName(school, 'en'), exact: true }).waitFor()
   })
+
+  test("a private kindergarten's name keeps its type, as the school writes it", async () => {
+    // '"Частна детска градина СОФИЯ" ЕООД' once showed as a bare "Sofia", which reads as
+    // the city. A name the school's own website gives (a brand) may still drop the type.
+    const typed = /частна детска градина/i
+    const registered = (await allSchools()).filter(s => isPrivate(s) && typed.test(s.name_i18n?.bg || ''))
+    assert.ok(registered.length > 0, 'private kindergartens named in the register')
+    const keeping = registered.filter(s => typed.test(schoolName(s, 'bg')))
+    assert.ok(keeping.length >= registered.length * 0.8, `${keeping.length} of ${registered.length} keep the type`)
+    const school = keeping.find(s => /kindergarten/i.test(schoolName(s, 'en')))
+    assert.ok(school, 'one says "Kindergarten" in English')
+    await open('en', `/schools/${school.id}`)
+    await page.getByRole('heading', { level: 1, name: schoolName(school, 'en'), exact: true }).waitFor()
+  })
 })
 
 describe('a school page', () => {
   test('facts from the school website link their pages, open days included', async testContext => {
     // Open days are listed only while upcoming, so some weeks no school has one; the
     // facts must still show then.
-    const openDays = s => (s.school_facts?.at_a_glance?.open_days || []).length > 0
+    const openDays = s => upcomingOpenDays(s).length > 0
     const school = await findSchool('with an open day', openDays, isPrivate, 200)
       .catch(error => {
         if (!(error instanceof NoSchoolError)) throw error
@@ -61,10 +76,18 @@ describe('a school page', () => {
     }
     const line = facts.locator('dt', { hasText: t('bg', 'schoolFacts.glance.openDays') })
     await line.waitFor()
-    const days = school.school_facts.at_a_glance.open_days
+    const days = upcomingOpenDays(school)
     const expected = days.find(day => day.register_url)?.register_url || days[0].source_url
     const href = await line.locator('xpath=following-sibling::dd[1]//a').getAttribute('href')
     assert.equal(sameUrl(href), sameUrl(expected), 'the open day links its sign-up or announcement page')
+
+    // The next open day also leads the key facts at the top, so nobody has to scroll past
+    // the fees to find it.
+    const strip = page.getByRole('region', { name: t('bg', 'schoolDetail.keyFacts') })
+    const fact = strip.locator('div.rounded-xl', { hasText: t('bg', 'schoolDetail.nextOpenDay') })
+    await fact.waitFor()
+    const nextHref = await fact.getByRole('link').getAttribute('href')
+    assert.equal(sameUrl(nextHref), sameUrl(expected), 'the top open day links the same page')
   })
 
   test("the school's own Facebook or Instagram is linked", async () => {
@@ -124,6 +147,7 @@ describe('a school page', () => {
     await open('bg', `/schools/${listed.id}`)
     await page.getByRole('heading', { name: t('bg', 'schools.locationsAndEnrollment') }).waitFor()
     assert.equal(await page.locator('a[href*="google.com/maps/dir"]').count(), 0, 'no directions to a guessed point')
+    await page.getByText(t('bg', 'schoolDetail.notOnMap')).first().waitFor()
     await page.getByText(address(listed.locations.find(location => address(location, 'bg')), 'bg')).first().waitFor()
   })
 })

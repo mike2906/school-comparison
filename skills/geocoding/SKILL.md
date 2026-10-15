@@ -56,12 +56,30 @@ address register (ГИС-София open data, CC BY 4.0, credited on the About 
 run, `--register-file` for a local copy): street + exact house number, or complex/street + block
 (+ entrance), in our town (с./гр. named in the address, else София and its кв.). Register points
 for one address over 60 m apart (150 m for a block) are ambiguous unless our district settles
-them; "до бл." matches nothing. Held back, like confirm-pins, when the school's website maps it
-only elsewhere. Run it first: it has the house numbers OpenStreetMap lacks.
+them; "до бл." matches nothing. The school's own site wins (Mike, 2026-10-15): held back when
+its website maps it only elsewhere, unless the site's text states our address (stray and old
+maps are common); a move over 3 km needs our district or the site to agree; a point where an
+unrelated school is already pinned is not taken (likely an old address). Run it first: it
+has the house numbers OpenStreetMap lacks.
+
+`cli site-address [--apply]` (Sofia, after register-pins) gives a school's one hidden location the
+address its own site gives: the site's map (linked, or the coordinates its own scripts draw a map
+with) within 40 m of a register point whose address the site's text names (Bulgarian or Latin).
+The location's address becomes the register's (old one kept in `geocode_meta.evidence`). Held
+back when the site gives several addresses, when the address is already one of the school's shown
+locations, when an unrelated school is pinned there, or when the school has two hidden locations.
+
+`cli hand-pin --location-id N --lat --lng [--address] --note "..." [--apply]` pins one hidden
+location by hand (manual_fix, old address and point kept in `manual_fix.previous`) when the
+evidence is the school's own but no stage can read it. Run it as a named command, never as raw SQL.
 
 `cli confirm-pins [--apply]` publishes a hidden point that already stands on our building:
 Nominatim's nearest building there is our town, street and exact house number. Not when
 the school's own website maps it only over 300 m away (the address may be stale).
+
+A registry re-import (`discover`) recreates a school's locations, but keeps official and
+hand-corrected points and, while the source still lists their address (or the address
+site-address replaced), the exact pins these stages checked (`has_checked_pin`).
 
 `cli website-pins [--apply]` (after geocoding) pins a hidden location on its own website's
 map point only when Nominatim's nearest building there is in our town, on our street, with

@@ -1,36 +1,22 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { EVALUATORS } from '../../admission/evaluators'
 import { formatRange, measuredOnFor, sofiaToday } from '../../admission/calculator'
 import { districtLabel, sortedDistricts } from '../../admission/catchments'
-import { calculateAgeGroup } from '../../utils/education'
+import { evaluateKindergarten, KINDERGARTEN_GROUPS, KINDERGARTEN_INITIAL, kindergartenAgeGroup, SOCIAL_FLAGS } from '../../admission/inputs'
+import { getSaved, saveStage } from '../../admission/saved'
+import { useSavedAdmission } from '../../hooks/useSavedAdmission'
 import { birthYearsFor } from '../../utils/ageSelection'
 import { Choice, DateField, Field, INPUT_CLASS, MobileTotal, Section, YesNo } from './fields'
 import PointsList from './PointsList'
+import SaveAnswers from './SaveAnswers'
+import NextTierHint from './NextTierHint'
 import CutoffComparison from '../Admission/CutoffComparison'
+import { savedListFilters, savedListUrl } from '../../admission/schoolVerdict'
 
-const KINDERGARTEN_GROUPS = ['nursery', 'first', 'second', 'third', 'preschool']
-const SOCIAL_FLAGS = ['family_disability_70', 'unknown_or_restricted_parent', 'foster_or_adopted', 'child_at_risk', 'three_plus_children']
-
-const INITIAL = {
-  birthYear: null,
-  inSofia: null,
-  addressSince: null,
-  parentChildSameAddress: null,
-  sameDistrict: null,
-  homeDistrict: null,
-  parentCount: 2,
-  parentActivities: [null, null],
-  twins: false,
-  closeInAge: false,
-  nurseryAttended: null,
-  parentsDeceased: 'none',
-  social: Object.fromEntries(SOCIAL_FLAGS.map(flag => [flag, false])),
-  additional: 'none',
-  transfer: false,
-  siblingThere: null,
-  wishRank: 1,
-}
+// Answers about one kindergarten: never saved, since the list compares every kindergarten
+// (whether one is in the parent's district comes from its own district there).
+const PER_PLACE = { siblingThere: null, wishRank: 1, sameDistrict: null }
+const withoutPlace = answers => ({ ...answers, ...PER_PLACE })
 
 /**
  * Sofia municipal nursery, kindergarten and preparatory-group points. Without a
@@ -39,12 +25,16 @@ const INITIAL = {
  */
 function KindergartenCalculator({ selected, startYear, kindergarten, districts, cutoffRows = [], isCurrentRules }) {
   const { t, i18n } = useTranslation()
-  const [a, setA] = useState(INITIAL)
+  const [a, setA] = useState(() => {
+    const saved = getSaved().kindergarten
+    return saved ? { ...KINDERGARTEN_INITIAL, ...withoutPlace(saved.answers) } : KINDERGARTEN_INITIAL
+  })
+  const saved = useSavedAdmission().kindergarten
   const set = (key, value) => setA(prev => ({ ...prev, [key]: value }))
   const { ruleSet } = selected
   const params = ruleSet.params
 
-  const ageGroup = a.birthYear ? calculateAgeGroup(startYear, a.birthYear) : null
+  const ageGroup = kindergartenAgeGroup(a, startYear)
   const inKindergarten = ageGroup == null || KINDERGARTEN_GROUPS.includes(ageGroup)
   const usesParentAddress = ageGroup == null || params.address_duration.parent_address_age_groups.includes(ageGroup)
   const nurseryApplies = ageGroup == null || params.nursery_attendance.age_groups.includes(ageGroup)
@@ -52,28 +42,14 @@ function KindergartenCalculator({ selected, startYear, kindergarten, districts, 
   const measuredOn = measuredOnFor(ruleSet, today)
 
   const knownDistrict = kindergarten?.districtCode ?? null
-  const context = {
-    district: knownDistrict ?? (a.sameDistrict === true ? 'home' : a.sameDistrict === false ? 'elsewhere' : null),
-    siblingThere: a.siblingThere,
-    wishRank: a.wishRank,
-  }
-  const answers = {
-    ageGroup,
-    inSofia: a.inSofia,
-    addressSince: a.addressSince,
-    parentChildSameAddress: a.parentChildSameAddress,
-    homeDistrict: knownDistrict ? a.homeDistrict : (a.sameDistrict == null ? null : 'home'),
-    parents: a.parentActivities.slice(0, a.parentCount).map(activity => ({ activity })),
-    twins: a.twins,
-    closeInAge: a.closeInAge,
-    nurseryAttended: a.nurseryAttended,
-    social: { parentsDeceased: a.parentsDeceased, ...a.social },
-    additional: a.additional,
-    transfer: a.transfer,
-  }
   const result = inKindergarten
-    ? EVALUATORS[ruleSet.evaluator].evaluate(params, answers, context, { campaign: ruleSet.campaign, measuredOn })
+    ? evaluateKindergarten(ruleSet, a, startYear, { district: knownDistrict, siblingThere: a.siblingThere, wishRank: a.wishRank }, today)
     : null
+  const save = () => saveStage('kindergarten', { startYear, answers: withoutPlace(a) })
+  const dirty = !saved || saved.startYear !== startYear ||
+    JSON.stringify({ ...KINDERGARTEN_INITIAL, ...saved.answers }) !== JSON.stringify(withoutPlace(a))
+  const listFilters = savedListFilters('kindergarten', { startYear, answers: a })
+  const listUrl = listFilters ? savedListUrl(listFilters) : '/search'
 
   const yearOptions = birthYearsFor(startYear, 7).filter(year => year < startYear)
   const activityOptions = [
@@ -127,23 +103,30 @@ function KindergartenCalculator({ selected, startYear, kindergarten, districts, 
                 max={measuredOn}
                 onChange={v => set('addressSince', v)}
               />
-              {knownDistrict ? (
-                <Field label={t('admissionCalc.kg.homeDistrict')} hint={t('admissionCalc.kg.homeDistrictHint', { district: districtLabel(kindergarten.districtName, i18n.language) })}>
-                  {id => (
-                    <select
-                      id={id}
-                      value={a.homeDistrict ?? ''}
-                      onChange={event => set('homeDistrict', event.target.value || null)}
-                      className={INPUT_CLASS}
-                    >
-                      <option value="">{t('admissionCalc.notSure')}</option>
-                      {sortedDistricts(districts, i18n.language).map(f => (
-                        <option key={f.properties.code} value={f.properties.code}>{districtLabel(f.properties.name, i18n.language)}</option>
-                      ))}
-                    </select>
-                  )}
-                </Field>
-              ) : (
+              {a.inSofia !== false && !(usesParentAddress && a.parentChildSameAddress === false) && (
+                <NextTierHint kind="kg" tiers={params.address_duration.tiers} since={a.addressSince} measuredOn={measuredOn} />
+              )}
+              <Field
+                label={t('admissionCalc.kg.homeDistrict')}
+                hint={knownDistrict
+                  ? t('admissionCalc.kg.homeDistrictHint', { district: districtLabel(kindergarten.districtName, i18n.language) })
+                  : t('admissionCalc.kg.homeDistrictListHint')}
+              >
+                {id => (
+                  <select
+                    id={id}
+                    value={a.homeDistrict ?? ''}
+                    onChange={event => set('homeDistrict', event.target.value || null)}
+                    className={INPUT_CLASS}
+                  >
+                    <option value="">{t('admissionCalc.notSure')}</option>
+                    {sortedDistricts(districts, i18n.language).map(f => (
+                      <option key={f.properties.code} value={f.properties.code}>{districtLabel(f.properties.name, i18n.language)}</option>
+                    ))}
+                  </select>
+                )}
+              </Field>
+              {!knownDistrict && (
                 <YesNo label={t('admissionCalc.kg.sameDistrict')} value={a.sameDistrict} onChange={v => set('sameDistrict', v)} />
               )}
             </Section>
@@ -267,6 +250,7 @@ function KindergartenCalculator({ selected, startYear, kindergarten, districts, 
               </p>
             )}
             <p className="mt-4 text-xs text-neutral-500">{t('admissionCalc.kg.tieBreak')}</p>
+            {ageGroup && <SaveAnswers stage="kindergarten" onSave={save} dirty={dirty} listUrl={listUrl} />}
           </div>
         </aside>
       )}

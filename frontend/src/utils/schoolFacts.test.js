@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { atAGlanceKeysIn, atAGlanceLines, factTopicsIn, factsReadDate, getSchoolFacts } from './schoolFacts.js'
+import { atAGlanceKeysIn, atAGlanceLines, factTopicsIn, factsReadDate, getSchoolFacts, openDayDate, upcomingOpenDays } from './schoolFacts.js'
 
 const school = (facts, readAt = '2026-10-13T20:00:00+00:00') => ({ school_facts: { read_at: readAt, facts } })
 const fact = (topic, en, bg = 'Факт', url = 'https://s.example/a') => ({ topic, text_i18n: { en, bg }, source_url: url })
@@ -75,11 +75,25 @@ test('open days list their dates with the sign-up link, or the source page when 
   const [withLink] = atAGlanceLines(school([
     { date: '2026-11-12', register_url: null, source_url: 'https://s.bg/news' },
     { date: '2026-12-03', register_url: 'https://forms.example/x', source_url: 'https://s.bg/news' },
-  ]), 'en', t)
+  ]), 'en', t, '2026-10-15')
   assert.equal(withLink.key, 'openDays')
   assert.equal(withLink.href, 'https://forms.example/x')
   assert.equal(withLink.linkText, 'schoolFacts.glance.register')
-  const [noLink] = atAGlanceLines(school([{ date: '2026-11-12', source_url: 'https://s.bg/news' }]), 'en', t)
+  const [noLink] = atAGlanceLines(school([{ date: '2026-11-12', source_url: 'https://s.bg/news' }]), 'en', t, '2026-10-15')
   assert.equal(noLink.href, 'https://s.bg/news')
   assert.equal(noLink.linkText, 'schoolFacts.source')
+})
+
+test('upcoming open days drop passed dates and come earliest first', () => {
+  const school = { school_facts: { at_a_glance: { open_days: [
+    { date: '2026-11-10' }, { date: '2026-10-14' }, { date: '2026-10-15' }, { date: null }, { date: '26.10.2026' },
+  ] } } }
+  assert.deepEqual(upcomingOpenDays(school, '2026-10-15').map(day => day.date), ['2026-10-15', '2026-11-10'])
+  assert.deepEqual(upcomingOpenDays({}, '2026-10-15'), [])
+  // Only passed days: no open-days line at a glance.
+  assert.deepEqual(atAGlanceLines({ school_facts: { at_a_glance: { open_days: [{ date: '2026-10-01', source_url: 'https://s.bg' }] } } }, 'en', t, '2026-10-15'), [])
+})
+
+test('open day dates are written day first in English', () => {
+  assert.equal(openDayDate('2026-10-26', 'en'), '26 October 2026')
 })

@@ -25,13 +25,47 @@ def _address_key(address_i18n: Optional[dict]) -> str:
     return " ".join(re.findall(r"\w+", address.casefold()))
 
 
+def _address_keys(location) -> list:
+    """A location's address, and the source address a stage replaced with the school's own
+    (site-address keeps it in ``geocode_meta.evidence.previous_address_i18n``), so a re-import
+    of the old address finds this row instead of adding it again."""
+    keys = [_address_key(location.address_i18n)]
+    meta = location.geocode_meta if isinstance(location.geocode_meta, dict) else {}
+    evidence = meta.get("evidence")
+    previous = evidence.get("previous_address_i18n") if isinstance(evidence, dict) else None
+    if isinstance(previous, dict):
+        keys.append(_address_key(previous))
+    return keys
+
+
+def _match_source_rows(existing_locations, incoming_locations) -> tuple[list, list]:
+    """Pairs (row, source location) for the source locations a school already has, and the
+    source locations it has not. A row's current address wins over another row's replaced
+    one; a source location matching a replaced address syncs without its district (the old
+    premises')."""
+    known = {key: loc for loc in existing_locations for key in _address_keys(loc)}
+    known.update({_address_key(loc.address_i18n): loc for loc in existing_locations})
+    matched, new = [], []
+    for incoming in incoming_locations:
+        key = _address_key(incoming.address_i18n)
+        row = known.get(key)
+        if row is None:
+            new.append(incoming)
+        elif key != _address_key(row.address_i18n):
+            matched.append((row, incoming.model_copy(update={"district": None})))
+        else:
+            matched.append((row, incoming))
+    return matched, new
+
+
 def _is_pinned_location(location, address_i18n: Optional[dict]) -> bool:
     """Whether a source address is this pinned location.
 
     A hand correction may have replaced the source's address with the real one; the
-    address it replaced is kept in ``geocode_meta.manual_fix.previous``.
+    address it replaced is kept in ``geocode_meta.manual_fix.previous`` (site-address
+    keeps it in ``geocode_meta.evidence.previous_address_i18n``).
     """
-    known = {_address_key(location.address_i18n)}
+    known = set(_address_keys(location))
     meta = location.geocode_meta if isinstance(location.geocode_meta, dict) else {}
     manual_fix = meta.get("manual_fix")
     previous = manual_fix.get("previous") if isinstance(manual_fix, dict) else None
@@ -121,7 +155,11 @@ class BaseSourceAdapter(ABC):
 
         from app.models import School, SchoolLocation, SchoolLocationAgeGroupShift
         from app.services.geocoding.base import GeocodingResult
-        from app.services.geocoding.write_gate import apply_geocode_result_to_location, has_pinned_point
+        from app.services.geocoding.write_gate import (
+            apply_geocode_result_to_location,
+            has_checked_pin,
+            has_pinned_point,
+        )
 
         logger = logging.getLogger(__name__)
 
@@ -290,15 +328,13 @@ class BaseSourceAdapter(ABC):
                             # A school this source already owns keeps its rows (and their
                             # coordinates) but takes the source's contact and age-group data,
                             # and may gain a location (e.g. a new kindergarten building).
-                            known = {_address_key(loc.address_i18n): loc for loc in existing_locations}
-                            for incoming in locations_to_add:
-                                row = known.get(_address_key(incoming.address_i18n))
-                                if row is not None:
-                                    await self._sync_source_location(row, incoming)
+                            matched, locations_to_add = _match_source_rows(
+                                existing_locations, locations_to_add
+                            )
+                            for row, incoming in matched:
+                                await self._sync_source_location(row, incoming)
                             locations_to_add = [
-                                loc.model_copy(update={"is_primary": False})
-                                for loc in locations_to_add
-                                if _address_key(loc.address_i18n) not in known
+                                loc.model_copy(update={"is_primary": False}) for loc in locations_to_add
                             ]
                         else:
                             locations_to_add = []
@@ -313,8 +349,42 @@ class BaseSourceAdapter(ABC):
                         ).scalars().all()
                         # Official and hand-corrected points are not recreated: the rows
                         # stay, and a source location that is one of them only refreshes
-                        # its source fields.
-                        pinned = [loc for loc in existing_locations if has_pinned_point(loc)]
+                        # its source fields. So do exact pins a pin stage checked, while
+                        # the source still lists their address (exactly, or the address
+                        # site-address replaced).
+                        candidates = [
+                            loc for loc in existing_locations if has_pinned_point(loc) or has_checked_pin(loc)
+                        ]
+                        unmatched, pairs, new_locations = list(candidates), [], []
+                        for incoming in locations_to_add:
+                            key = _address_key(incoming.address_i18n)
+                            # A row at this exact address first, then a replaced address
+                            # (checked pins) or the same building (official and hand pins).
+                            row = next(
+                                (loc for loc in unmatched if _address_key(loc.address_i18n) == key),
+                                None,
+                            ) or next(
+                                (
+                                    loc
+                                    for loc in unmatched
+                                    if (
+                                        _is_pinned_location(loc, incoming.address_i18n)
+                                        if has_pinned_point(loc)
+                                        else key in _address_keys(loc)
+                                    )
+                                ),
+                                None,
+                            )
+                            if row is None:
+                                new_locations.append(incoming)
+                                continue
+                            # One row is one source location: a second address on the
+                            # same street and number is its own building.
+                            unmatched.remove(row)
+                            pairs.append((row, incoming))
+                        # A checked pin the source no longer lists is recreated like the rest.
+                        unmatched = [loc for loc in unmatched if has_pinned_point(loc)]
+                        pinned = [row for row, _ in pairs] + unmatched
                         location_ids = [loc.id for loc in existing_locations if loc not in pinned]
                         if location_ids:
                             # Remove child shift rows first because raw deletes bypass ORM cascades.
@@ -327,29 +397,23 @@ class BaseSourceAdapter(ABC):
                                 delete(SchoolLocation).where(SchoolLocation.id.in_(location_ids))
                             )
                         if pinned:
-                            new_locations = []
-                            unmatched = list(pinned)
-                            for incoming in locations_to_add:
-                                row = next(
-                                    (loc for loc in unmatched if _is_pinned_location(loc, incoming.address_i18n)),
-                                    None,
-                                )
-                                if row is None:
-                                    new_locations.append(incoming)
-                                    continue
-                                # One row is one source location: a second address on the
-                                # same street and number is its own building.
-                                unmatched.remove(row)
+                            official_primary = any(loc.is_primary for loc in pinned if has_pinned_point(loc))
+                            for row, incoming in pairs:
                                 # The source's coords_source tag describes its own geocode,
                                 # not the pinned point.
-                                source_tags = [
-                                    tag
-                                    for tag in incoming.location_tags or []
-                                    if not tag.startswith("coords_source=")
-                                ]
-                                await self._sync_source_location(
-                                    row, incoming.model_copy(update={"location_tags": source_tags})
-                                )
+                                update = {
+                                    "location_tags": [
+                                        tag
+                                        for tag in incoming.location_tags or []
+                                        if not tag.startswith("coords_source=")
+                                    ]
+                                }
+                                if _address_key(incoming.address_i18n) in _address_keys(row)[1:]:
+                                    update["district"] = None  # the address site-address replaced
+                                if not has_pinned_point(row):
+                                    # A checked pin is the source's location: its primary flag too.
+                                    row.is_primary = incoming.is_primary and not official_primary
+                                await self._sync_source_location(row, incoming.model_copy(update=update))
                             if any(loc.is_primary for loc in pinned):
                                 if new_locations and any(loc.is_primary for loc in unmatched):
                                     logger.warning(
@@ -361,7 +425,7 @@ class BaseSourceAdapter(ABC):
                                 new_locations = [
                                     loc.model_copy(update={"is_primary": False}) for loc in new_locations
                                 ]
-                            locations_to_add = new_locations
+                        locations_to_add = new_locations
 
                     for loc in locations_to_add:
                         new_location = SchoolLocation(

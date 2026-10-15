@@ -55,7 +55,7 @@ from app.scrapers.validation.report_entries import _add_fix, _add_issue, _now_is
 from app.services.provider_costs import execute_billable_request
 from app.utils.academic_year import normalize_academic_year
 from app.utils.display_gating import DISPLAY_NAME_FIELD_PATH
-from app.utils.i18n_resolver import resolve_display_name_i18n, resolve_name_i18n
+from app.utils.i18n_resolver import register_core_names, resolve_display_name_i18n, resolve_name_i18n
 from app.utils.website_data import (
     attributes_for_publication,
 )
@@ -573,6 +573,9 @@ async def _check_display_name(
             *resolve_name_i18n(
                 other.name_i18n, attributes_for_publication(other.attributes, other.scrape_status)
             ).values(),
+            # The published name keeps the type ("Частно основно училище „Пролет“"); the
+            # kindergarten's brand candidate is the bare "Пролет".
+            *register_core_names(other.name_i18n),
         ]
         shared = shared_names(candidate.values(), other_names)
         if shared:

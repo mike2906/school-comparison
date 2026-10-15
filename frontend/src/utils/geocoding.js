@@ -131,9 +131,9 @@ const fetchGeocode = async (address, geocodingConfig = {}) => {
   }
 }
 
-const fetchReverseGeocode = async (lat, lng, geocodingConfig = {}) => {
+const fetchReverseGeocode = async (lat, lng, geocodingConfig = {}, { details = false } = {}) => {
   const countryCodes = geocodingConfig.country_codes || 'bg'
-  const cached = readCacheByKey(getReverseCacheKey(lat, lng, countryCodes))
+  const cached = details ? null : readCacheByKey(getReverseCacheKey(lat, lng, countryCodes))
   if (cached) {
     return {
       lat: cached.lat,
@@ -152,7 +152,7 @@ const fetchReverseGeocode = async (lat, lng, geocodingConfig = {}) => {
 
   lastRequestAt = now
 
-  const url = `${NOMINATIM_REVERSE_URL}?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}&format=json&zoom=18&addressdetails=0&accept-language=${countryCodes}`
+  const url = `${NOMINATIM_REVERSE_URL}?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}&format=json&zoom=18&addressdetails=${details ? 1 : 0}&accept-language=${countryCodes}`
   const response = await fetch(url, {
     headers: {
       'User-Agent': NOMINATIM_USER_AGENT,
@@ -179,6 +179,7 @@ const fetchReverseGeocode = async (lat, lng, geocodingConfig = {}) => {
     throw error
   }
 
+  if (details) return { road: data.address?.road || null, houseNumber: data.address?.house_number || null }
   writeReverseCache(lat, lng, countryCodes, data)
 
   return {
@@ -270,3 +271,11 @@ export const reverseGeocode = async (lat, lng, geocodingConfig = {}) => {
 
   return fetchReverseGeocode(latNumber, lngNumber, geocodingConfig)
 }
+
+/**
+ * The street and house number at a point, for matching against an official address list.
+ * Not cached: it is only called when the parent asks to use their current location.
+ * Returns `{ road, houseNumber }` (either may be missing).
+ */
+export const reverseGeocodeStreet = (lat, lng, geocodingConfig = {}) =>
+  fetchReverseGeocode(lat, lng, geocodingConfig, { details: true })

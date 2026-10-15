@@ -19,6 +19,7 @@ import math
 import re
 import zipfile
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Optional
 
 CSV_ZIP_URL = (
@@ -60,6 +61,7 @@ class RegisterPoint:
     entrance: str
     lat: float
     lng: float
+    label: str = ""  # the address as the register writes it, for display
 
 
 @dataclass(frozen=True)
@@ -176,6 +178,22 @@ def parse(address: str, district: Optional[str] = None) -> Parsed:
     )
 
 
+def _label(row: dict) -> str:
+    """"гр. Банкя, ул. Тенев баир 2", "гр. София, ж.к. Младост 4, бл. 460А, вх. 2"."""
+    get = lambda key: (row.get(key) or "").strip()  # noqa: E731
+    parts = [get("settlement"), get("lareaunit")]
+    parts.append(" ".join(p for p in (get("street"), get("streetnum")) if p))
+    if get("block"):
+        parts.append(f"бл. {get('block')}")
+    if get("entrance"):
+        parts.append(f"вх. {get('entrance')}")
+    return ", ".join(p for p in parts if p)
+
+
+def _cell(lat: float, lng: float) -> tuple[int, int]:
+    return round(lat * 1000), round(lng * 1000)  # about 110 m by 80 m
+
+
 class Register:
     """The register's points, looked up by house number and by block."""
 
@@ -183,7 +201,9 @@ class Register:
         self.points = points
         self.by_number: dict[str, list[RegisterPoint]] = {}
         self.by_block: dict[str, list[RegisterPoint]] = {}
+        self.by_cell: dict[tuple[int, int], list[RegisterPoint]] = {}
         for point in points:
+            self.by_cell.setdefault(_cell(point.lat, point.lng), []).append(point)
             if point.number:
                 self.by_number.setdefault(point.number, []).append(point)
             if point.block:
@@ -203,6 +223,18 @@ class Register:
 
     def __len__(self) -> int:
         return len(self.points)
+
+    def near(self, point: tuple[float, float], metres: float) -> list[RegisterPoint]:
+        """Register points within ``metres`` (up to about 80) of ``point``, nearest first."""
+        lat, lng = _cell(*point)
+        found = [
+            p
+            for dlat in (-1, 0, 1)
+            for dlng in (-1, 0, 1)
+            for p in self.by_cell.get((lat + dlat, lng + dlng), [])
+            if distance_m(point, (p.lat, p.lng)) <= metres
+        ]
+        return sorted(found, key=lambda p: distance_m(point, (p.lat, p.lng)))
 
 
 def read_register(text: str) -> Register:
@@ -224,6 +256,7 @@ def read_register(text: str) -> Register:
                 entrance=_number(row.get("entrance") or ""),
                 lat=lat,
                 lng=lng,
+                label=_label(row),
             )
         )
     return Register(points)
@@ -233,6 +266,13 @@ def read_register_zip(data: bytes) -> Register:
     with zipfile.ZipFile(io.BytesIO(data)) as archive:
         name = next(n for n in archive.namelist() if n.lower().endswith(".csv"))
         return read_register(archive.read(name).decode("utf-8-sig"))
+
+
+def read_register_file(path: Path) -> Register:
+    """A downloaded register: the CSV or its zip."""
+    if path.suffix.lower() == ".csv":
+        return read_register(path.read_text(encoding="utf-8-sig"))
+    return read_register_zip(path.read_bytes())
 
 
 def distance_m(a: tuple[float, float], b: tuple[float, float]) -> float:
@@ -306,3 +346,64 @@ def match(parsed: Parsed, register: Register) -> Match:
         if street.outcome == "matched" or result.outcome == "no_address":
             return street
     return result
+
+
+def _latin(text: str) -> str:
+    from app.utils.transliteration import transliterate_bulgarian
+
+    return transliterate_bulgarian(text).casefold()
+
+
+@dataclass(frozen=True)
+class PageText:
+    """A page's text in our spelling and in Latin letters, prepared once per site."""
+
+    cyrillic: str
+    latin: str
+
+
+def page_text(text: str) -> PageText:
+    # Latin text keeps its own letters (``_clean`` turns look-alikes into Cyrillic).
+    latin = re.sub(r"\s+", " ", _QUOTES_RE.sub(" ", text))
+    return PageText(_clean(text), _latin(latin))
+
+
+_KIND_BEFORE_RE = re.compile(r"(?:^|\W)(ул|улица|бул|булевард|ul|ulitsa|bul|blvd|boulevard)\W{0,3}$")
+_KIND_OF = {"улица": "ул", "ul": "ул", "ulitsa": "ул", "bul": "бул", "булевард": "бул", "blvd": "бул", "boulevard": "бул"}
+
+
+def names_address(page: PageText, parsed: Parsed) -> bool:
+    """Whether a page states our address: the end of our street's name (its last two words,
+    initials left out) right next to our exact house number, either way round, in Bulgarian
+    or in Latin letters ("ул. Ралевица № 80А", "80A Ralevitsa Street"); for a block, the
+    complex with its number next to the block number ("Младост 4, бл. 460А"). A street of
+    another kind named just before ("бул. Витоша" for our "ул. Витоша") does not count."""
+    kind = None
+    if parsed.street and parsed.number:
+        kind, *name = parsed.street.split()
+        name = [w for w in name if len(w) > 1][-2:]
+        number, marker = parsed.number, r"(?:(?:№|no\.?|#)\s*)?"
+    elif parsed.block and parsed.complex:
+        name, number, marker = parsed.complex.split(), parsed.block, r"(?:(?:бл|bl)\.?\s*)?"
+    else:
+        return False
+    if not name or not any(len(w) >= 3 and not w.isascii() for w in name):
+        return False  # a name of initials, digits or a Roman numeral alone says too little
+    for text, convert in ((page.cyrillic, lambda w: w), (page.latin, _latin)):
+        words = r"\W+".join(re.escape(convert(w)) for w in name)
+        split = re.fullmatch(r"(\d+)(\D*)", number.casefold())
+        if split is None:
+            return False
+        digits, letter = split.groups()
+        num = re.escape(digits) + (r"\s?" + re.escape(convert(letter)) if letter else "")
+        patterns = (
+            rf"(?<!\w){words}(?!\w)\W{{1,6}}{marker}{num}(?![\w/-])",
+            rf"(?<![\w/-]){num}\s*,?\s*(?:(?:ул|бул|ul|str)\.?\s*)?{words}(?!\w)",
+        )
+        for pattern in patterns:
+            for found in re.finditer(pattern, text):
+                said = _KIND_BEFORE_RE.search(text[max(0, found.start() - 12): found.start()])
+                if kind and said and _KIND_OF.get(said.group(1), said.group(1)) != kind:
+                    continue
+                return True
+    return False

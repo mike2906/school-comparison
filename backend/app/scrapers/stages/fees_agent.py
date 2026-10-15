@@ -16,7 +16,7 @@ import logging
 import re
 from collections.abc import Awaitable, Callable, Iterable, Sequence
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, Optional
@@ -400,8 +400,8 @@ class FeeRead(list):
     discounts: list[AgentDiscount]
 
 
-async def read_fees(school: School, pages: list[PageRead], spend: Spend, missed: Sequence[Decimal]) -> FeeRead:
-    """Read the fees on ``pages``; ``missed`` names amounts an earlier read left out."""
+def reader_message(school: School, pages: list[PageRead], missed: Sequence[Decimal]) -> str:
+    """The reader's whole input for one school; ``missed`` names amounts an earlier read left out."""
     text = reader_text(pages)
     if missed:
         text += (
@@ -410,21 +410,32 @@ async def read_fees(school: School, pages: list[PageRead], spend: Spend, missed:
             "in full and list every fee, including every row of each fee table. Some of these "
             "amounts may be from an older year or not be fees: the rules above still decide."
         )
-    in_price, out_price = get_model_costs("pricing")
-    estimate = (len(text) / 3 * in_price + READ_OUTPUT_TOKENS_RESERVE * out_price) / 1_000_000
-    if not spend.allows(estimate):  # before building the agent; ``hold`` below checks again
-        raise SpendCapReached(f"spent ${spend.spent_usd:.4f} of ${spend.cap_usd}")
-    agent = create_agent(
+    name = (school.name_i18n or {}).get("bg") or (school.name_i18n or {}).get("en")
+    return f"Institution: {name} ({school.school_type} {school.education_level})\n\n{text}"
+
+
+def reader_agent():
+    """The pricing-tier reader; the fees eval runs the same agent on saved pages."""
+    return create_agent(
         "pricing",
         READER_PROMPT,
         AgentFees,
         retries=1,
         model_settings={"temperature": get_settings().extraction_temperature},
     )
-    name = (school.name_i18n or {}).get("bg") or (school.name_i18n or {}).get("en")
+
+
+async def read_fees(school: School, pages: list[PageRead], spend: Spend, missed: Sequence[Decimal]) -> FeeRead:
+    """Read the fees on ``pages``; ``missed`` names amounts an earlier read left out."""
+    message = reader_message(school, pages, missed)
+    in_price, out_price = get_model_costs("pricing")
+    estimate = (len(message) / 3 * in_price + READ_OUTPUT_TOKENS_RESERVE * out_price) / 1_000_000
+    if not spend.allows(estimate):  # before building the agent; ``hold`` below checks again
+        raise SpendCapReached(f"spent ${spend.spent_usd:.4f} of ${spend.cap_usd}")
+    agent = reader_agent()
     with spend.hold(estimate):
         result = await execute_billable_request(
-            lambda: agent.run(f"Institution: {name} ({school.school_type} {school.education_level})\n\n{text}"),
+            lambda: agent.run(message),
             model=get_model("pricing"),
             school_id=school.id,
             stage=STAGE,
@@ -1087,6 +1098,24 @@ async def run_school(
 # ---------------------------------------------------------------------------
 
 
+async def _saved(found: Awaitable[list[PageRead]], school: School, pages_dir: Optional[Path]) -> list[PageRead]:
+    """The found pages, also written to ``pages_dir/<id>.json`` when given."""
+    pages = await found
+    if pages_dir is not None:
+        pages_dir.mkdir(parents=True, exist_ok=True)
+        saved = {
+            "school_id": school.id,
+            "name_i18n": school.name_i18n,
+            "school_type": school.school_type,
+            "education_level": school.education_level,
+            "website_url": school.website_url,
+            "found_at": datetime.date.today().isoformat(),
+            "pages": [asdict(page) for page in pages],
+        }
+        (pages_dir / f"{school.id}.json").write_text(json.dumps(saved, ensure_ascii=False, indent=1), encoding="utf-8")
+    return pages
+
+
 def _append_line(path: Path, result: dict[str, Any]) -> None:
     try:  # a failed write loses one line, not the rest of the run
         with path.open("a", encoding="utf-8") as lines:
@@ -1100,13 +1129,14 @@ async def run_fees_agent(
     *,
     country: str = "bg",
     city: Optional[str] = None,
-    school_id: Optional[int] = None,
+    school_ids: Sequence[int] = (),
     limit: Optional[int] = None,
     max_usd: float = DEFAULT_MAX_USD,
     apply: bool = False,
     after_id: Optional[int] = None,
     lines_path: Optional[Path] = None,
     workers: int = 1,
+    pages_dir: Optional[Path] = None,
 ) -> dict[str, Any]:
     """Run the agent over private and international schools with a website; returns the report.
 
@@ -1116,13 +1146,16 @@ async def run_fees_agent(
     ``after_id`` starts after that school, to carry on a run that stopped. ``lines_path`` gets
     each school's report appended as one JSON line as soon as it is done, so a killed run
     keeps what it read (2026-10-13: a Sofia dry run killed at 55 minutes lost every read).
+
+    ``pages_dir`` gets each school's found pages as ``<id>.json``: the fees eval's input
+    (``scripts/fees_eval.py``).
     """
     from crawl4ai import AsyncWebCrawler, BrowserConfig, CacheMode, CrawlerRunConfig  # type: ignore
 
     query = select(School).where(School.country_code == country, School.website_url.isnot(None))
     query = (
-        query.where(School.id == school_id)
-        if school_id
+        query.where(School.id.in_(school_ids))
+        if school_ids
         else query.where(School.school_type.in_(["private", "international"]))
     )
     if city:
@@ -1131,7 +1164,7 @@ async def run_fees_agent(
         query = query.where(School.id > after_id)
     # Ids, not objects: a rollback after one school's failure expires every loaded object.
     rows = (await db.execute(query.with_only_columns(School.id, School.website_url).order_by(School.id).limit(limit))).all()
-    school_ids = [row.id for row in rows]
+    run_ids = [row.id for row in rows]
     sites = {row.id: row.website_url for row in rows}
 
     spend = Spend(max_usd)
@@ -1175,7 +1208,9 @@ async def run_fees_agent(
                     return await run_school(
                         school_db,
                         await school_db.get(School, current_id),
-                        find=lambda s: find_pages(crawler, run_config, client, s, spend, read_pictures=True),
+                        find=lambda s: _saved(
+                            find_pages(crawler, run_config, client, s, spend, read_pictures=True), s, pages_dir
+                        ),
                         read=lambda s, pages, missed: read_fees(s, pages, spend, missed),
                         apply=apply,
                         gone=lambda url: page_gone(client, url),
@@ -1183,7 +1218,7 @@ async def run_fees_agent(
 
                 results, error = await school_pool.run_schools(
                     db,
-                    school_ids,
+                    run_ids,
                     one,
                     workers=workers,
                     stop_on=(SpendCapReached, ProviderCostCapExceeded),

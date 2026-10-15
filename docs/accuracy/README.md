@@ -43,3 +43,8 @@ uv run python scripts/accuracy_report.py ../docs/accuracy/reference_set.json
 
 The reference ages as schools change their fees; re-read the sites before trusting a re-run
 more than a few months later.
+
+## Re-running a check automatically
+
+The step 3 and step 4 keys also drive the fees eval (`backend/evals/fees/README.md`): the
+reader on saved pages, scored on every PR that changes the fee prompt, checks or model.
