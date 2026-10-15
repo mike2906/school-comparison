@@ -1631,3 +1631,10 @@ def test_a_cleaned_quote_takes_no_period_from_a_cell_it_did_not_quote():
 def test_a_cleaned_quote_without_the_amount_does_not_borrow_it_from_the_row():
     bus = fee(PriceCategory.TRANSPORT, "Transport two-way", amount=2550)
     assert check_fee(bus, PAGE_PDF_TABLE).checks == ["dropped: evidence line does not hold the amount"]
+
+
+def test_a_cleaned_quote_takes_no_period_from_a_cell_line_it_did_not_quote():
+    meals = fee(PriceCategory.FOOD, "Meals € 6", amount=6, period=PricePeriod.MONTHLY)
+    result = check_fee(meals, "EXTRAS\nMeals | € 6 / € 110 monthly\n")
+    assert result.kept
+    assert result.fee.period is None

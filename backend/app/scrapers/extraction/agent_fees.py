@@ -421,20 +421,19 @@ def _page_row(line: str, page_lines: list[str]) -> str | None:
     """The cells of the one page line a cleaned quote of a table row came from.
 
     The later checks read those cells, not the quote: they need the " | " to tell the fee's
-    own period from a payment option's ("€ 8.950 | € 750 x 9 monthly"). Only the fewest
-    cells in a row that hold the quote are kept, so another cell's "monthly" stays out.
+    own period from a payment option's ("€ 8.950 | € 750 x 9 monthly"). Only the shortest
+    run of cells, or of a cell's lines, that holds the quote is kept, so another cell's or
+    line's "monthly" stays out.
     """
     quote = _loose(line)
     rows = {text for text in page_lines if quote in _loose(text)}
     if len(rows) != 1:
         return None
-    cells = rows.pop().split(" | ")
-    spans = [
-        " | ".join(cells[start:end])
-        for start in range(len(cells))
-        for end in range(start + 1, len(cells) + 1)
-        if quote in _loose(" | ".join(cells[start:end]))
-    ]
+    row = rows.pop()
+    # Cells, and a cell's lines: "€ 6 / € 110 monthly" is two lines of one cell.
+    pieces = [0, *(cut for match in re.finditer(r" \| | / ", row) for cut in match.span()), len(row)]
+    starts, ends = pieces[0::2], pieces[1::2]
+    spans = [row[start:end] for start in starts for end in ends if end > start and quote in _loose(row[start:end])]
     return min(spans, key=len)
 
 
