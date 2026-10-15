@@ -226,9 +226,11 @@ def table_lines(table: list[list[str | None]]) -> list[str]:
     - A row whose first cell only is merged ("Tuition" spanning "Grade 1 | € 5,000" and
       "Grade 2 | € 6,000") is a row of its own under the same heading: it takes the
       heading as its first cell.
-    - A row whose first column holds several lines is left out, because the PDF may draw
-      no line between rows there ("Grade 1 / Grade 2 | € 450 / € 500"); the rest of the
-      table is kept. A wrapped label ("OPTIONAL / EXTRACURRICULAR / ACTIVITIES") goes too.
+    - A row whose first column holds several lines is left out when another of its cells
+      has numbers on several lines, because the PDF may draw no line between rows there
+      ("Grade 1 / Grade 2 | € 450 / € 500"); the rest of the table is kept. A wrapped label
+      over one price ("OPTIONAL / EXTRACURRICULAR / ACTIVITIES | € 200 - € 550 per term")
+      stays: there is nothing to pair wrongly.
     - A single-column table, or one that starts with a merged cell, is a fragment."""
     if not table or max(len(row) for row in table) < 2 or table[0][0] is None:
         return []
@@ -245,8 +247,12 @@ def table_lines(table: list[list[str | None]]) -> list[str]:
     return [
         " | ".join(" / ".join(lines) for lines in row)
         for index, row in enumerate(rows)
-        if index == 0 or len(row[0]) <= 1
+        if index == 0 or len(row[0]) <= 1 or not _numbers_on_several_lines(row[1:])
     ]
+
+
+def _numbers_on_several_lines(cells: list[list[str]]) -> bool:
+    return any(sum(1 for line in lines if re.search(r"\d", line)) > 1 for lines in cells)
 
 
 async def fetch_fee_documents(
