@@ -1,0 +1,96 @@
+# Fees eval: the fee reader on saved pages, scored against the blind answer keys
+# (backend/scripts/fees_eval.py). Runs only when a PR touches the reader, its checks, the
+# publish gate or the model choice; about $0.002 per school per trial.
+name: Fees eval
+
+on:
+  pull_request:
+    paths:
+      - backend/app/scrapers/extraction/agent_fees.py
+      - backend/app/scrapers/extraction/price_step.py
+      - backend/app/scrapers/stages/fees_agent.py
+      - backend/app/ai/client.py
+      - backend/app/utils/display_gating.py
+      - backend/scripts/fees_eval.py
+      - backend/evals/fees/**
+      - docs/accuracy/step3/**
+      - docs/accuracy/step4/**
+      - .github/workflows/fees-eval.yml
+  workflow_dispatch:
+    inputs:
+      model:
+        description: "Pricing model to try instead of the default (e.g. openrouter/...); the baseline check is skipped"
+        required: false
+        default: ""
+      trials:
+        description: "Trials"
+        required: false
+        default: "2"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fees-eval-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  eval:
+    name: Fees eval
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      MODEL_TIER_PRICING: ${{ inputs.model }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Skip without a key
+        id: key
+        run: |
+          if [ -z "$OPENROUTER_API_KEY" ]; then
+            echo "::notice::No OPENROUTER_API_KEY secret (or a fork's PR): fees eval skipped."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install uv
+        if: steps.key.outputs.skip != 'true'
+        uses: astral-sh/setup-uv@v8.3.2
+
+      - name: Set up Python
+        if: steps.key.outputs.skip != 'true'
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        if: steps.key.outputs.skip != 'true'
+        run: uv sync --locked
+
+      - name: Run the eval
+        if: steps.key.outputs.skip != 'true'
+        env:
+          TRIALS: ${{ inputs.trials || '2' }}
+        run: |
+          set -o pipefail
+          check=""
+          if [ -n "$MODEL_TIER_PRICING" ]; then check="--no-check"; fi  # the baseline is the default model's
+          uv run python scripts/fees_eval.py --trials "$TRIALS" --max-usd 1.00 $check \
+            --out "$RUNNER_TEMP/fees-eval.json" | tee "$RUNNER_TEMP/fees-eval.txt"
+
+      - name: Summary
+        if: always() && steps.key.outputs.skip != 'true'
+        run: |
+          { echo '```'; cat "$RUNNER_TEMP/fees-eval.txt" 2>/dev/null; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Keep the report
+        if: always() && steps.key.outputs.skip != 'true'
+        uses: actions/upload-artifact@v5
+        with:
+          name: fees-eval
+          path: ${{ runner.temp }}/fees-eval.json
+          if-no-files-found: ignore

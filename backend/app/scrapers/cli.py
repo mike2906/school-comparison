@@ -392,7 +392,7 @@ async def _shared_site_check_command(*, school_ids, city, country, dry_run, repo
 
 
 @cli.command("fees-agent")
-@click.option("--school-id", type=int, default=None, help="Run one school (any school type)")
+@click.option("--school-id", "school_ids", type=int, multiple=True, help="Run these schools, any type (repeatable)")
 @click.option("--city", default=None, help="Only schools in this city")
 @click.option("--country", default="bg", show_default=True, help="Country code")
 @click.option("--limit", type=int, default=None, help="Maximum schools")
@@ -403,11 +403,19 @@ async def _shared_site_check_command(*, school_ids, city, country, dry_run, repo
 @click.option(
     "--workers", type=click.IntRange(1, 16), default=8, show_default=True, help="Schools read at a time (1-16)"
 )
-def fees_agent_command(school_id, city, country, limit, max_usd, apply_changes, report_path, after_id, workers):
+@click.option(
+    "--save-pages",
+    "pages_dir",
+    type=click.Path(file_okay=False, path_type=Path),
+    help="Also write each school's found pages here (the fees eval's input)",
+)
+def fees_agent_command(
+    school_ids, city, country, limit, max_usd, apply_changes, report_path, after_id, workers, pages_dir
+):
     """Read private and international schools' fee pages with the fee agent (experimental, not in `all`)."""
     asyncio.run(
         _fees_agent_command(
-            school_id=school_id,
+            school_ids=school_ids,
             city=city,
             country=country,
             limit=limit,
@@ -416,11 +424,14 @@ def fees_agent_command(school_id, city, country, limit, max_usd, apply_changes, 
             report_path=report_path,
             after_id=after_id,
             workers=workers,
+            pages_dir=pages_dir,
         )
     )
 
 
-async def _fees_agent_command(*, school_id, city, country, limit, max_usd, apply, report_path, after_id, workers):
+async def _fees_agent_command(
+    *, school_ids, city, country, limit, max_usd, apply, report_path, after_id, workers, pages_dir
+):
     import json
 
     from app.database import async_session_maker
@@ -436,13 +447,14 @@ async def _fees_agent_command(*, school_id, city, country, limit, max_usd, apply
             db,
             country=country,
             city=city,
-            school_id=school_id,
+            school_ids=school_ids,
             limit=limit,
             max_usd=max_usd,
             apply=apply,
             after_id=after_id,
             lines_path=lines_path,
             workers=workers,
+            pages_dir=pages_dir,
         )
     console.print(
         f"{'Applied' if apply else 'Dry run'}: {report['schools']} schools, ${report['spent_usd']:.4f} spent, "
