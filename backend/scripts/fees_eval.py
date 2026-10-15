@@ -12,7 +12,8 @@ or the keep rules. A row counts as:
 - right: amount, category and period match a key fee;
 - blank: amount and category match, the row has no period and the key fee has one;
 - wrong: anything else, a row at an amount the key does not have included;
-- duplicate: a second row on a key fee already matched.
+- duplicate: a second row on a key fee already matched. It counts against the wrong rate:
+  a fee published twice is an error a parent sees.
 
 A key fee is found when a row, or one of a row's payment options, matches its amount and
 category. Amounts are compared in euro (BGN at 1.95583) within 1 %.
@@ -98,22 +99,14 @@ def _same(a: Decimal | None, b: Decimal | None) -> bool:
     return a is not None and b is not None and abs(a - b) <= TOLERANCE * max(abs(a), abs(b))
 
 
-def _fee_amounts(fee: dict[str, Any]) -> list[Decimal]:
-    return [
-        value
-        for value in (_euro(fee.get(name), fee.get("currency")) for name in ("amount", "amount_min", "amount_max"))
-        if value is not None
-    ]
-
-
 def _value(field: Any) -> Any:
     return getattr(field, "value", field)
 
 
 def _row_matches(row: Any, fee: dict[str, Any]) -> bool:
-    """Same amount; a range row only matches the same range."""
+    """Same amount; a range only matches the same range, either way round."""
     if row.amount is not None:
-        return any(_same(_euro(row.amount, row.currency), b) for b in _fee_amounts(fee))
+        return _same(_euro(row.amount, row.currency), _euro(fee.get("amount"), fee.get("currency")))
     return _same(_euro(row.amount_min, row.currency), _euro(fee.get("amount_min"), fee.get("currency"))) and _same(
         _euro(row.amount_max, row.currency), _euro(fee.get("amount_max"), fee.get("currency"))
     )
@@ -169,7 +162,8 @@ def score_school(rows: list[Any], fees: list[dict[str, Any]]) -> dict[str, Any]:
                 found |= {
                     fee["fid"]
                     for fee in fees
-                    if fee["category"] == _value(row.category) and any(_same(value, b) for b in _fee_amounts(fee))
+                    if fee["category"] == _value(row.category)
+                    and _same(value, _euro(fee.get("amount"), fee.get("currency")))
                 }
     return {"rows": verdicts, "found": sorted(found), "site_fees": len(fees)}
 
@@ -214,9 +208,8 @@ def summarize(schools: dict[int, dict[str, Any]]) -> dict[str, Any]:
             counts[row["verdict"]] += 1
         counts["found"] += len(school["found"])
         counts["site_fees"] += school["site_fees"]
-    judged = counts["rows"] - counts["duplicate"]
     return counts | {
-        "wrong_rate": round(counts["wrong"] / judged, 4) if judged else 0.0,
+        "wrong_rate": round((counts["wrong"] + counts["duplicate"]) / counts["rows"], 4) if counts["rows"] else 0.0,
         "found_rate": round(counts["found"] / counts["site_fees"], 4) if counts["site_fees"] else 0.0,
     }
 

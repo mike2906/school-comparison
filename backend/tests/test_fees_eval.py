@@ -52,7 +52,7 @@ def test_score_school_verdicts():
     assert [row["verdict"] for row in scored["rows"]] == ["right", "duplicate", "blank", "wrong", "wrong", "right"]
     assert scored["found"] == ["f1", "f2", "f3", "f4"]
     summary = fees_eval.summarize({1: scored})
-    assert summary["wrong_rate"] == round(2 / 5, 4)
+    assert summary["wrong_rate"] == round(3 / 6, 4)  # 2 wrong and 1 duplicate of 6 rows
     assert summary["found_rate"] == 1.0
 
 
@@ -83,6 +83,12 @@ def test_range_row_needs_the_same_range():
     row.amount_min, row.amount_max = 6000, 9500
     scored = fees_eval.score_school([row], key)
     assert scored["rows"][0]["fid"] == "f2"
+
+
+def test_single_amount_does_not_match_a_range():
+    key = [{**_fee("f1", "tuition", None), "amount_min": 10, "amount_max": 20}]
+    scored = fees_eval.score_school([_row("tuition", 10)], key)
+    assert scored["rows"][0]["verdict"] == "wrong" and scored["found"] == []
 
 
 def test_check_against_baseline():
