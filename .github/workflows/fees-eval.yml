@@ -20,6 +20,7 @@ on:
       - backend/evals/fees/**
       - docs/accuracy/step3/**
       - docs/accuracy/step4/**
+      - docs/accuracy/cases/**
       - .github/workflows/fees-eval.yml
   workflow_dispatch:
     inputs:
