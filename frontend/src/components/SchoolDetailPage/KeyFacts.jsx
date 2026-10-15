@@ -17,7 +17,7 @@ import {
 import { normalizeLanguageFocus } from '../../utils/schoolAttributes'
 import { getMappableLocations } from './LocationMap'
 import { usesSofiaKindergartenSystem } from '../../utils/admission'
-import { openDayDate, upcomingOpenDays } from '../../utils/schoolFacts'
+import { openDayDate, openDaysLink, upcomingOpenDays } from '../../utils/schoolFacts'
 
 function readSavedLocation() {
   try {
@@ -184,20 +184,20 @@ function KeyFacts({ school, examAverages, nvoExamType, ageGroup = null }) {
 
   // The next open day leads the strip's second place: it is the one fact with a date a
   // parent can miss. The rest are listed with the website facts further down.
-  const [nextOpenDay, ...laterOpenDays] = upcomingOpenDays(school)
-  if (nextOpenDay) {
-    const href = nextOpenDay.register_url || nextOpenDay.source_url
+  const openDays = upcomingOpenDays(school)
+  if (openDays.length > 0) {
+    const link = openDaysLink(openDays)
     facts.openDay = (
       <Fact
         key="openDay"
         label={t('schoolDetail.nextOpenDay')}
-        value={openDayDate(nextOpenDay.date, i18n.language)}
-        detail={href && (
-          <a href={href} target="_blank" rel="noopener noreferrer nofollow" className="text-primary-700 underline underline-offset-2">
-            {t(nextOpenDay.register_url ? 'schoolFacts.glance.register' : 'schoolFacts.source')}
+        value={openDayDate(openDays[0].date, i18n.language)}
+        detail={link && (
+          <a href={link.href} target="_blank" rel="noopener noreferrer nofollow" className="text-primary-700 underline underline-offset-2">
+            {t(link.register ? 'schoolFacts.glance.register' : 'schoolFacts.source')}
           </a>
         )}
-        note={laterOpenDays.length > 0 ? t('schoolDetail.moreOpenDays', { count: laterOpenDays.length }) : null}
+        note={openDays.length > 1 ? t('schoolDetail.moreOpenDays', { count: openDays.length - 1 }) : null}
       />
     )
   }

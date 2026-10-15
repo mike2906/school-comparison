@@ -82,12 +82,11 @@ describe('a school page', () => {
 
     // The next open day also leads the key facts at the top, so nobody has to scroll past
     // the fees to find it.
-    const next = days[0]
     const strip = page.getByRole('region', { name: t('bg', 'schoolDetail.keyFacts') })
     const fact = strip.locator('div.rounded-xl', { hasText: t('bg', 'schoolDetail.nextOpenDay') })
     await fact.waitFor()
     const nextHref = await fact.getByRole('link').getAttribute('href')
-    assert.equal(sameUrl(nextHref), sameUrl(next.register_url || next.source_url), 'the top open day links its own page')
+    assert.equal(sameUrl(nextHref), sameUrl(expected), 'the top open day links the same page')
   })
 
   test("the school's own Facebook or Instagram is linked", async () => {

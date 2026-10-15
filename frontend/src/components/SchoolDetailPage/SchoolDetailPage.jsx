@@ -635,7 +635,7 @@ function SchoolDetailPage({ schoolId = null, embedded = false, onClose = null })
                           </svg>
                           {t('schoolDetail.directions')}
                         </a>
-                      ) : (
+                      ) : address && (
                         // A pin is published only for a confirmed point, so say why this
                         // address has none rather than leave the map one pin short.
                         <p className="mt-3 text-sm text-neutral-500">{t('schoolDetail.notOnMap')}</p>

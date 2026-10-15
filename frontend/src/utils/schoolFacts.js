@@ -1,3 +1,4 @@
+import { intlLocale } from './format.js'
 import { languageLabel } from './languages.js'
 
 // Facts the school-facts stage read from a school's own pages (API `school_facts`).
@@ -63,13 +64,21 @@ export function upcomingOpenDays(school, today = localToday()) {
   const days = school?.school_facts?.at_a_glance?.open_days
   if (!Array.isArray(days)) return []
   return days
-    .filter(day => typeof day?.date === 'string' && day.date.slice(0, 10) >= today)
+    .filter(day => /^\d{4}-\d{2}-\d{2}/.test(day?.date || '') && day.date.slice(0, 10) >= today)
     .sort((a, b) => a.date.localeCompare(b.date))
 }
 
 // An open day's date written out in `language` ("26 October 2026").
 export function openDayDate(value, language) {
-  return value ? new Date(`${value.slice(0, 10)}T00:00:00`).toLocaleDateString(language, { day: 'numeric', month: 'long', year: 'numeric' }) : ''
+  return value ? new Date(`${value.slice(0, 10)}T00:00:00`).toLocaleDateString(intlLocale(language), { day: 'numeric', month: 'long', year: 'numeric' }) : ''
+}
+
+// Where open days link: a sign-up form if any upcoming day has one (schools tend to use
+// one form for all), else the page announcing the first. `register` says which.
+export function openDaysLink(days) {
+  const signUp = days.find(day => day.register_url)
+  if (signUp) return { href: signUp.register_url, register: true }
+  return days[0]?.source_url ? { href: days[0].source_url, register: false } : null
 }
 
 // The school's fact labels summed up (API `school_facts.at_a_glance`), as
@@ -122,10 +131,11 @@ export function atAGlanceLines(school, language, t, today = undefined) {
     return extra ? `${languageLabel(item.language, t)} (${extra})` : languageLabel(item.language, t)
   }).join(', '))
   const openDays = upcomingOpenDays(school, today)
-  const signUp = openDays.find(day => day.register_url)
-  add('openDays', openDays.map(day => date(day.date)).join(', '), signUp
-    ? { href: signUp.register_url, linkText: t('schoolFacts.glance.register') }
-    : openDays[0]?.source_url && { href: openDays[0].source_url, linkText: t('schoolFacts.source') })
+  const link = openDaysLink(openDays)
+  add('openDays', openDays.map(day => date(day.date)).join(', '), link && {
+    href: link.href,
+    linkText: t(link.register ? 'schoolFacts.glance.register' : 'schoolFacts.source'),
+  })
   add('bus', (glance.bus_areas || []).map(area => name(area, language)).filter(Boolean).join(', '))
   add('support', glance.special_needs_support === true && t('schoolFacts.glance.yes'))
   return lines
