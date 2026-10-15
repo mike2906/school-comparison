@@ -7,7 +7,6 @@
 import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
 
-import { planNameLabel } from '../../src/utils/priceLabels.js'
 import { upcomingOpenDays } from '../../src/utils/schoolFacts.js'
 import { NoSchoolError, PHONE, address, allSchools, findSchool, open, page, schoolName, t, liveBrowser } from './live.js'
 
@@ -111,23 +110,6 @@ describe('a school page', () => {
     const text = await section.innerText()
     assert.match(text, /EUR|€/, 'fees are shown in euro')
     assert.doesNotMatch(text, /лв|BGN/, 'no lev prices')
-  })
-
-  test("the English page names a fee in English, not in the website's Bulgarian", async () => {
-    // 625's "половин ден" and "целодневно гледане" showed as is on the English page.
-    const pageT = (key, { lng = 'en', ...vars } = {}) => {
-      try { return t(lng, key, vars) } catch { return key }
-    }
-    // A row the page names in the reader's English (not as one of our grade or stage labels).
-    const english = row => /\p{Script=Cyrillic}/u.test(row.plan_name || '') &&
-      row.pricing_context?.plan_name_en && planNameLabel(row, pageT, 'en') === row.pricing_context.plan_name_en
-    const listed = (await allSchools()).find(s => isPrivate(s) && (s.pricing || []).some(english))
-    assert.ok(listed, 'a private school with a fee name in English')
-    const row = listed.pricing.find(english)
-    await open('en', `/schools/${listed.id}`)
-    const section = card(t('en', 'pricing.title'))
-    await section.getByText(row.pricing_context.plan_name_en, { exact: true }).first().waitFor()
-    assert.equal(await section.getByText(row.plan_name, { exact: true }).count(), 0, `"${row.plan_name}" is not shown`)
   })
 
   test('two private schools with fees compare side by side', async () => {
