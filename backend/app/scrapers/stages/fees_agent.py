@@ -46,6 +46,7 @@ from app.scrapers.extraction.agent_fees import (
     AgentFee,
     AgentFees,
     CheckedFee,
+    _names_period,
     check_discount,
     check_fee,
     fee_amounts,
@@ -965,11 +966,25 @@ def _with_stored_proof(
         if _prints_once(line, fee) and sum(_holds(text, line) for text in page_lines) == 1
     }
     same_line = [row for row in same_fee if unique & set(_amount_lines(row.pricing_context["evidence"], fee))]
-    if not same_line and (fee.age_group or "").strip():
+    group = " ".join((fee.age_group or "").split()).casefold()
+    own_lines = _amount_lines(fee.evidence, fee)
+    if not same_line and group and all(_holds(line, group) for line in own_lines):
         # The read copied the table in another layout than the stored proof: 596's PDF prints
         # its tuition as text under "ANNUAL TUITION FEES" and again as cells fifty lines down,
-        # and a re-read quoted the cells alone. A proof of the same named group still stands.
-        same_line = [row for row in same_fee if _same_group(row, fee)]
+        # and a re-read quoted the cells alone. A proof of the same named group still stands
+        # when both amount lines name the group ("Grade 0"), and the read's own line names no
+        # other period: "Роботика | 300 лв." in "1–4 клас" is not the "Шах – 300 лв. годишно".
+        same_line = [
+            row
+            for row in same_fee
+            if _same_group(row, fee)
+            and all(_holds(line, group) for line in _amount_lines(row.pricing_context["evidence"], fee))
+            and not any(
+                _names_period(other, "\n".join(own_lines), fee_amounts(fee), fee.category)
+                for other in PricePeriod
+                if other is not row.period
+            )
+        ]
     periods = {row.period for row in same_line}
     if len(periods) != 1 or None in periods:  # none, or stored rows of this fee that disagree
         return result

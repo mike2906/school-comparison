@@ -1725,3 +1725,43 @@ async def test_another_layouts_proof_does_not_pass_to_another_group(db_session, 
     tuition = next(f for f in report["fees"] if f["amount"] == 8950)
     assert tuition["period"] is None, tuition
     assert not _stored_notes(report)
+
+
+async def test_a_stored_proof_of_another_fee_in_the_group_lends_no_period(db_session, frozen_today):
+    page_text = "Извънкласни дейности 1–4 клас\nШах – 300 лв. годишно\nМесечни такси за клубове\nРоботика | 300 лв."
+    school = await _school(db_session)
+    await _proved_row(db_session, school, evidence="Шах – 300 лв. годишно")
+    row = (await _rows(db_session, school))[0]
+    row.category, row.amount, row.currency, row.age_group = PriceCategory.EXTRACURRICULAR, 300, "BGN", "1–4 клас"
+    await db_session.commit()
+    robotics = fee(PriceCategory.EXTRACURRICULAR, "Роботика | 300 лв.", amount=300, age_group="1–4 клас")
+    robotics = robotics.model_copy(update={"currency": "BGN", "academic_year": "2026/2027"})
+    pages = [PageRead(URL, page_text, True)]
+    report = await fees_agent.run_school(
+        db_session, school, find=_find(pages), read=_read([robotics, FEES_STAGE[1]]), apply=False
+    )
+    assert not _stored_notes(report), report["fees"]
+
+
+async def test_a_stored_proof_lends_no_period_when_the_reads_own_line_names_another(db_session, frozen_today):
+    page_text = PAGE_TWO_LAYOUTS.replace(
+        "Grade 0 | Plan 1 - € 8.950 | 1 x € 8.950 | 2 x € 4.575", "Grade 0 | Plan 1 - € 8.950 per semester"
+    )
+    school = await _school(db_session)
+    await _proved_row(db_session, school, evidence=TEXT_PROOF)
+    row = (await _rows(db_session, school))[0]
+    row.amount, row.age_group = 8950, "Grade 0"
+    await db_session.commit()
+    read = fee(
+        PriceCategory.TUITION,
+        "Grade 0 | Plan 1 - € 8.950 per semester",
+        amount=8950,
+        academic_year="2026/2027",
+        age_group="Grade 0",
+    )
+    pages = [PageRead(URL, page_text, True)]
+    report = await fees_agent.run_school(
+        db_session, school, find=_find(pages), read=_read([read, FEES_STAGE[1]]), apply=False
+    )
+    tuition = next(f for f in report["fees"] if f["amount"] == 8950)
+    assert tuition["period"] != "yearly", tuition
