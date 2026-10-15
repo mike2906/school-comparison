@@ -10,6 +10,11 @@ on:
       - backend/app/scrapers/extraction/price_step.py
       - backend/app/scrapers/stages/fees_agent.py
       - backend/app/ai/client.py
+      - backend/app/config.py
+      - backend/app/models/pricing.py
+      - backend/app/scrapers/fee_pages.py
+      - backend/app/scrapers/extraction/text_values.py
+      - backend/app/scrapers/extraction/llm_results.py
       - backend/app/utils/display_gating.py
       - backend/scripts/fees_eval.py
       - backend/evals/fees/**
