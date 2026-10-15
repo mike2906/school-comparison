@@ -49,6 +49,9 @@ IG = "https://www.instagram.com/school_example/"
         ("https://www.instagram.com/sofia_municipality/", None),
         ("https://www.facebook.com/ruo.sofia.grad", None),
         ("https://www.facebook.com/125sou.sofia", ("facebook", "https://www.facebook.com/125sou.sofia")),
+        # A kindergarten with "Столична община" in its own name is the school's page.
+        ("https://www.facebook.com/dg123.stolichna.obshtina", ("facebook", "https://www.facebook.com/dg123.stolichna.obshtina")),
+        ("https://www.facebook.com/ДГ-Слънце-Столична-община", ("facebook", "https://www.facebook.com/дг-слънце-столична-община")),
         ("mailto:a@school.example", None),
     ],
 )
