@@ -332,7 +332,8 @@ def check_fee(fee: AgentFee, page_text: str) -> CheckedFee:
         return _dropped(fee, "dropped: no evidence line")
     if any(line not in page for line in lines):
         page_lines = [_normalized(text) for text in page_text.splitlines() if text.strip()]
-        if any(not _line_on_page(line, page, page_lines) for line in lines):
+        loose_page = _loose(page)
+        if any(not _line_on_page(line, page, page_lines) and _loose(line) not in loose_page for line in lines):
             return _dropped(fee, "dropped: evidence line is not on the page")
     evidence = "\n".join(lines)
     if not amount_on_page(fee, page_numbers(evidence)):
@@ -396,6 +397,25 @@ def _count_is_printed(payments: int, text: str) -> bool:
     after = rf"{count}\s*(?:[^\s\d]+\s+)?{_COUNT_WORD_RE}"
     before = rf"(?<![^\W\d_])[xх×]\s*{count}"
     return re.search(rf"{after}|{before}", text, re.IGNORECASE) is not None
+
+
+# A PDF table row as the page text prints it: "Transport | two- / way | € 2,550", cells split
+# by " | " and a cell's lines by " / ". A reader can quote the row cleaned, "Transport two-way
+# € 2,550" (596 lost every extra to it), so both sides are compared without the joins and with
+# a word's hyphen break closed. Words and numbers must still match in order; a join between two
+# numbers stays a break, so "2 | 550" cannot pass as a quoted "2 550".
+_CELL_JOIN_RE = re.compile(r"\s*(?:\||\s/\s)\s*")
+_HYPHEN_BREAK_RE = re.compile(r"(?<=[^\W\d_])- (?=[^\W\d_])")
+
+
+def _loose(text: str) -> str:
+    def join(match: re.Match[str]) -> str:
+        between_numbers = (
+            text[match.start() - 1 : match.start()].isdigit() and text[match.end() : match.end() + 1].isdigit()
+        )
+        return " ¦ " if between_numbers else " "
+
+    return _HYPHEN_BREAK_RE.sub("-", " ".join(_CELL_JOIN_RE.sub(join, text).split()))
 
 
 _LABEL_LINES_AWAY = 3
