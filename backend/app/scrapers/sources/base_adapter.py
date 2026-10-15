@@ -25,6 +25,19 @@ def _address_key(address_i18n: Optional[dict]) -> str:
     return " ".join(re.findall(r"\w+", address.casefold()))
 
 
+def _address_keys(location) -> list:
+    """A location's address, and the source address a stage replaced with the school's own
+    (site-address keeps it in ``geocode_meta.evidence.previous_address_i18n``), so a re-import
+    of the old address finds this row instead of adding it again."""
+    keys = [_address_key(location.address_i18n)]
+    meta = location.geocode_meta if isinstance(location.geocode_meta, dict) else {}
+    evidence = meta.get("evidence")
+    previous = evidence.get("previous_address_i18n") if isinstance(evidence, dict) else None
+    if isinstance(previous, dict):
+        keys.append(_address_key(previous))
+    return keys
+
+
 def _is_pinned_location(location, address_i18n: Optional[dict]) -> bool:
     """Whether a source address is this pinned location.
 
@@ -290,7 +303,9 @@ class BaseSourceAdapter(ABC):
                             # A school this source already owns keeps its rows (and their
                             # coordinates) but takes the source's contact and age-group data,
                             # and may gain a location (e.g. a new kindergarten building).
-                            known = {_address_key(loc.address_i18n): loc for loc in existing_locations}
+                            known = {
+                                key: loc for loc in existing_locations for key in _address_keys(loc)
+                            }
                             for incoming in locations_to_add:
                                 row = known.get(_address_key(incoming.address_i18n))
                                 if row is not None:

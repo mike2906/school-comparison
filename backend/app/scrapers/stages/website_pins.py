@@ -174,7 +174,7 @@ _SCRIPT_POINT_RES = (
 )
 # A script with more points than this is a list of places (a store finder), not the school.
 MAX_SCRIPT_POINTS = 3
-MAX_SCRIPTS = 5
+MAX_SCRIPTS = 8
 
 
 def script_points(text: str, bounds: dict[str, float]) -> list[tuple[float, float]]:
@@ -191,12 +191,23 @@ def script_points(text: str, bounds: dict[str, float]) -> list[tuple[float, floa
     return points if len(points) <= MAX_SCRIPT_POINTS else []
 
 
+# Libraries that never hold a school's own map code.
+_LIBRARY_RE = re.compile(r"jquery|wp-includes|bootstrap|analytics|gtag|recaptcha|cookie", re.I)
+
+
+def _site_domain(url: str) -> str:
+    host = (urlparse(url).hostname or "").lower()
+    return host[4:] if host.startswith("www.") else host
+
+
 def _same_site_scripts(html: str, base: str) -> list[str]:
-    host = urlparse(base).hostname
+    """The site's own script files (its domain or a subdomain of it), libraries left out."""
+    domain = _site_domain(base)
     urls = []
     for tag in BeautifulSoup(html, "html.parser").find_all("script", src=True):
         url = urljoin(base, tag["src"])
-        if urlparse(url).hostname == host and url not in urls:
+        host = _site_domain(url)
+        if (host == domain or host.endswith("." + domain)) and not _LIBRARY_RE.search(url) and url not in urls:
             urls.append(url)
     return urls[:MAX_SCRIPTS]
 
@@ -386,6 +397,7 @@ async def write_pin(
     previous = dict(location.address_i18n or {})
     if address is not None:
         location.address_i18n = {"bg": address}  # English is derived from it for display
+        location.district = None  # the old premises' district
     applied = await apply_geocode_result_to_location(
         db,
         location,

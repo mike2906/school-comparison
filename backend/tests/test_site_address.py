@@ -57,6 +57,7 @@ async def _school(db, *locations, **kwargs):
 def _hidden(address='ул. "Майор Коста Паница"'):
     return SchoolLocation(
         address_i18n={"bg": address},
+        district="Банкя",
         lat=42.7065,
         lng=23.1435,
         geocode_meta={"precision": "approximate"},
@@ -93,6 +94,14 @@ async def test_a_site_whose_script_map_and_text_give_a_register_address_moves_th
     assert row.address_i18n == {"bg": "гр. Банкя, ул. Тенев баир 2"}
     assert row.geocode_meta["precision"] == "exact" and row.geocode_meta["method"] == "site_address"
     assert row.geocode_meta["evidence"]["previous_address_i18n"] == {"bg": 'ул. "Майор Коста Паница"'}
+    assert row.district is None
+    assert "address_source=website_contact" in row.location_tags
+    assert "geocode=address_changed" not in row.location_tags  # that would re-geocode it
+
+    # A re-import of the old registry address finds this row rather than adding it again.
+    from app.scrapers.sources.base_adapter import _address_key, _address_keys
+
+    assert _address_key({"bg": 'ул. "Майор Коста Паница"'}) in _address_keys(row)
 
 
 @pytest.mark.asyncio
@@ -153,3 +162,15 @@ def test_script_points_read_map_code_within_the_city_only():
 def test_register_near_finds_points_nearest_first():
     found = REGISTER.near((42.703062, 23.135729), 40)
     assert [p.label for p in found] == ["гр. Банкя, ул. Тенев баир 2"]
+
+
+@pytest.mark.asyncio
+async def test_two_schools_mapping_one_address_in_one_run_are_not_both_placed(db_session):
+    await _school(db_session, _hidden())
+    await _school(db_session, _hidden(), name_i18n={"bg": "ЧДГ Друга", "en": "Other"}, website_url="https://other.example/")
+    pages = {HOME: CONTACT, "https://other.example/": CONTACT.replace("/js/build.js", "https://other.example/js/build.js")}
+    scripts = {SCRIPT: MAP_JS, "https://other.example/js/build.js": MAP_JS}
+    report = await stage.run_site_address(
+        db_session, register=REGISTER, fetch=_fetcher(pages), fetch_script=_fetcher(scripts)
+    )
+    assert report["outcomes"] == {"placed": 1, "other_school_here": 1}

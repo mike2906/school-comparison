@@ -23,8 +23,8 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import School, SchoolLocation
+from app.scrapers.campus_sync import WEBSITE_CONTACT_ADDRESS_TAG
 from app.scrapers.fee_pages import fee_http_client
-from app.scrapers.stages.confirm_pins import ELSEWHERE_M
 from app.scrapers.stages.register_pins import SAME_BUILDING_M, _name_words, download_register
 from app.scrapers.stages.social_links import Fetch, _http_fetch
 from app.scrapers.stages.website_pins import _address, _distance_m, needs_pin, read_site, write_pin
@@ -87,10 +87,18 @@ async def run_site_address(
     if school_ids:
         query = query.where(School.id.in_(list(school_ids)))
     ids = list((await db.execute(query)).scalars().all())
-    names = {sid: _name_words(name) for sid, name in (await db.execute(select(School.id, School.name_i18n))).all()}
+    in_city = select(School.id).where(School.country_code == country, func.lower(School.city) == city.lower())
+    names = {
+        sid: _name_words(name)
+        for sid, name in (await db.execute(select(School.id, School.name_i18n).where(School.id.in_(in_city)))).all()
+    }
     pinned = [
         (loc.school_id, (loc.lat, loc.lng))
-        for loc in (await db.execute(select(SchoolLocation).where(SchoolLocation.lat.is_not(None)))).scalars()
+        for loc in (
+            await db.execute(
+                select(SchoolLocation).where(SchoolLocation.lat.is_not(None), SchoolLocation.school_id.in_(in_city))
+            )
+        ).scalars()
         if not needs_pin(loc)
     ]
 
@@ -140,7 +148,7 @@ async def run_site_address(
                 (address,) = found.values()
                 point = (address.lat, address.lng)
                 extra = {"site_address": address.label, "point": point, "site_points": points}
-                if any(_distance_m(point, other) <= ELSEWHERE_M for other in shown):
+                if any(_distance_m(point, other) <= NEAR_M for other in shown):
                     outcome = "already_shown"  # the hidden location is an old address
                 elif any(
                     other != school_id
@@ -151,6 +159,8 @@ async def run_site_address(
                     outcome = "other_school_here"
                 elif len(hidden) > 1:
                     outcome = "several_hidden"
+                else:
+                    pinned.append((school_id, point))  # a later school in this run sees it
             for row in rows:
                 if outcome == "placed" and row["old_point"]:
                     row["moved_m"] = round(_distance_m(row["old_point"], extra["point"]))
@@ -181,6 +191,15 @@ async def run_site_address(
                     unchanged_from=result["old_point"],
                     address=result["site_address"],
                 )
+                if result["outcome"] == "placed":
+                    # Mark the address as the site's (shared-site checks must not count it as
+                    # registry evidence). Not READDRESSED_TAG: that re-geocodes the location.
+                    location = await db.get(SchoolLocation, result["location_id"])
+                    location.location_tags = [
+                        *(t for t in location.location_tags or [] if t != WEBSITE_CONTACT_ADDRESS_TAG),
+                        WEBSITE_CONTACT_ADDRESS_TAG,
+                    ]
+                    await db.commit()
     outcomes: dict[str, int] = {}
     for result in results:
         outcomes[result["outcome"]] = outcomes.get(result["outcome"], 0) + 1
