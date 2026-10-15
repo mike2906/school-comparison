@@ -1,9 +1,10 @@
 import { useTranslation } from 'react-i18next'
-import { cutoffValue } from '../../admission/calculator'
+import { cutoffValue, formatRankingDay, shortCampaign } from '../../admission/calculator'
 
 export function rowLabel(row, t) {
+  // An 8th-grade class by its name; the ministry's code only when it has none.
   const what = row.stage === 'grade_8'
-    ? [row.class_code, row.class_name].filter(Boolean).join(' ')
+    ? `${t('cutoffs.stage.grade_8')}: ${row.class_name || row.class_code}`
     : row.stage === 'grade_1'
       ? t('cutoffs.stage.grade_1')
       : row.stage === 'preparatory'
@@ -20,7 +21,7 @@ export function CutoffValue({ round }) {
   if (!value) return <span className="text-neutral-400">—</span>
   if (value.kind === 'everyone') return <span>{t('cutoffs.everyone')}</span>
   if (value.kind === 'noPlaces') return <span>{t('cutoffs.noPlaces')}</span>
-  if (value.kind === 'score') return <span className="tabular-nums">{value.score}</span>
+  if (value.kind === 'score') return <span className="tabular-nums">{t('cutoffs.score', { score: value.score })}</span>
   if (value.kind === 'quota') {
     return (
       <span className="tabular-nums">
@@ -33,7 +34,9 @@ export function CutoffValue({ round }) {
       <span className="tabular-nums">
         {value.points == null
           ? t('cutoffs.groupOnly', { group: value.group })
-          : t('cutoffs.groupAndPoints', { group: value.group, points: value.points })}
+          : value.points === 0
+            ? t('cutoffs.groupNoPoints', { group: value.group })
+            : t('cutoffs.groupAndPoints', { group: value.group, points: value.points })}
       </span>
     )
   }
@@ -41,7 +44,7 @@ export function CutoffValue({ round }) {
 }
 
 function RoundCell({ round }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   if (!round) return <td className="px-2 py-2 text-neutral-400 sm:px-3">—</td>
   return (
     <td className="px-2 py-2 align-top sm:px-3">
@@ -49,10 +52,8 @@ function RoundCell({ round }) {
         <CutoffValue round={round} />
         {round.tie_at_cutoff && <span className="ml-1 text-xs font-normal text-neutral-500">{t('cutoffs.tie')}</span>}
       </div>
-      <div className="text-xs text-neutral-500">
-        {/* The source's round names are Bulgarian only and sometimes cut off; the column says which round. */}
-        {[round.round_kind === 'current' ? t('cutoffs.currentRound') : null, round.classified_on].filter(Boolean).join(' · ')}
-      </div>
+      {/* The source's round names are Bulgarian only and sometimes cut off; the column says which round. */}
+      <div className="text-xs text-neutral-500">{formatRankingDay(round.classified_on, i18n.language)}</div>
     </td>
   )
 }
@@ -85,7 +86,7 @@ function CutoffTable({ rows, isCurrentRules = () => null }) {
                 <td className="px-2 py-2 align-top sm:px-3">
                   <div className="text-neutral-900">{rowLabel(row, t)}</div>
                   <div className="text-xs text-neutral-500">
-                    {row.campaign}
+                    {shortCampaign(row.campaign)}
                     {row.quota && ` · ${t('cutoffs.quota')}`}
                     {current === false && ` · ${t('cutoffs.otherRules')}`}
                   </div>

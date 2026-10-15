@@ -947,7 +947,7 @@
       "upheld_final": "A final court ruling on {{date}} upheld these rules."
     },
     "items": {
-      "address_duration": "Address in Sofia, by how long it has not changed",
+      "address_duration": "Address in Sofia: how long it has been in Sofia",
       "same_district": "Address in the kindergarten's district",
       "parent_activity": "Working or studying parents",
       "nursery_attendance": "Attended a nursery",
@@ -1098,16 +1098,16 @@
     "latestRound": "Latest ranking",
     "everyone": "Everyone who applied",
     "noPlaces": "No places",
-    "currentRound": "current ranking",
     "points": "{{points}} points",
     "groupOnly": "Group {{group}}",
     "groupAndPoints": "Group {{group}}, {{points}} points",
-    "tie": "(tie)",
+    "tie": "(tied, decided by a random number)",
     "quota": "places split by gender",
     "otherRules": "different rules",
     "stage": {
       "grade_1": "1st grade",
-      "preparatory": "Preparatory group"
+      "preparatory": "Preparatory group",
+      "grade_8": "8th grade"
     },
     "calculate": "Calculate your points",
     "calculateStage": {
@@ -1129,7 +1129,9 @@
       "otherRules": "That ranking used different rules.",
       "note": "The latest ranking is a guide, not a promise: places and applicants change every time.",
       "sameGroup": "The same group as the last child admitted; the list gives no points to compare."
-    }
+    },
+    "score": "{{score}} points",
+    "groupNoPoints": "Group {{group}}, no extra points"
   },
   "driveTime": {
     "minutes": "~{{minutes}} min",

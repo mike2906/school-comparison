@@ -153,6 +153,25 @@ export function cutoffValue(round) {
   return null
 }
 
+/** `2026/2027` → `2026/27`, as parents write a school year. */
+export function shortCampaign(campaign) {
+  const match = /^(\d{4})\/\d{2}(\d{2})$/.exec(String(campaign || ''))
+  return match ? `${match[1]}/${match[2]}` : campaign || ''
+}
+
+/** A ranking day in the reader's language: `2 October 2026`, `2 октомври 2026 г.`. */
+export function formatRankingDay(iso, language) {
+  if (!iso) return ''
+  const bg = String(language || '').startsWith('bg')
+  return new Intl.DateTimeFormat(bg ? 'bg-BG' : 'en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+    .format(new Date(`${iso}T12:00:00Z`))
+}
+
+/** Which ranking a compared cut-off comes from: `2026/27 · 2 Oct 2026`. */
+export function rankingWhen(row, round, language) {
+  return [shortCampaign(row?.campaign), formatRankingDay(round?.classified_on, language)].filter(Boolean).join(' · ')
+}
+
 /**
  * The round a row is compared on: its latest, unless that round had no places to fill
  * (later rounds share out what remains), when the first ranking says more.

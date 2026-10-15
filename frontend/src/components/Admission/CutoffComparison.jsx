@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { comparableRound, compareWithCutoff } from '../../admission/calculator'
+import { comparableRound, compareWithCutoff, rankingWhen } from '../../admission/calculator'
 import { CutoffValue, rowLabel } from './CutoffTable'
 
 const TONE = {
@@ -18,7 +18,7 @@ const TONE = {
  * under other rules are marked, since their points don't add up the same way.
  */
 function CutoffComparison({ rows, yours, isCurrentRules = () => null }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const lines = (rows || [])
     .map(row => {
       const round = comparableRound(row)
@@ -34,7 +34,7 @@ function CutoffComparison({ rows, yours, isCurrentRules = () => null }) {
           <li key={[row.stage, row.age_group, row.birth_year, row.building].join('|')}>
             <div className="text-neutral-700">
               {rowLabel(row, t)}
-              {round.classified_on && ` · ${round.classified_on}`}
+              {` · ${rankingWhen(row, round, i18n.language)}`}
               {': '}
               <span className="font-medium text-neutral-900"><CutoffValue round={round} /></span>
             </div>
