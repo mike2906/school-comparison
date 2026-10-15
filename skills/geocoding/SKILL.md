@@ -69,6 +69,10 @@ The location's address becomes the register's (old one kept in `geocode_meta.evi
 back when the site gives several addresses, when the address is already one of the school's shown
 locations, when an unrelated school is pinned there, or when the school has two hidden locations.
 
+`cli hand-pin --location-id N --lat --lng [--address] --note "..." [--apply]` pins one hidden
+location by hand (manual_fix, old address and point kept in `manual_fix.previous`) when the
+evidence is the school's own but no stage can read it. Run it as a named command, never as raw SQL.
+
 `cli confirm-pins [--apply]` publishes a hidden point that already stands on our building:
 Nominatim's nearest building there is our town, street and exact house number. Not when
 the school's own website maps it only over 300 m away (the address may be stale).

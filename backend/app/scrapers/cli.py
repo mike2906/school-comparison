@@ -602,6 +602,31 @@ def confirm_pins_command(school_ids, city, country, limit, apply_changes, report
         console.print(f"Report: {report_path}")
 
 
+@cli.command("hand-pin")
+@click.option("--location-id", type=int, required=True, help="The hidden location")
+@click.option("--lat", type=float, required=True)
+@click.option("--lng", type=float, required=True)
+@click.option("--address", default=None, help="Its address, when the point's differs from the stored one (Bulgarian)")
+@click.option("--note", required=True, help="What the point was checked against")
+@click.option("--apply", "apply_changes", is_flag=True, help="Write the pin (default is a dry run that writes nothing)")
+def hand_pin_command(location_id, lat, lng, address, note, apply_changes):
+    """Pin one hidden location at a point a person checked (a manual_fix)."""
+    from app.database import async_session_maker
+    from app.scrapers.stages.hand_pin import set_hand_pin
+
+    async def _run():
+        async with async_session_maker() as db:
+            return await set_hand_pin(
+                db, location_id, (lat, lng), note=note, address=address, apply=apply_changes
+            )
+
+    report = asyncio.run(_run())
+    written = apply_changes and report["outcome"] == "placed"
+    console.print(f"{'Applied' if written else 'Dry run' if not apply_changes else 'Not written'}: {report}")
+    if report["outcome"] != "placed":
+        raise SystemExit(1)
+
+
 @cli.command("register-pins")
 @click.option("--school-id", "school_ids", type=int, multiple=True, help="Run these schools (repeatable)")
 @click.option("--limit", type=int, default=None, help="Maximum schools")
