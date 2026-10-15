@@ -4,7 +4,7 @@ import { cutoffValue, formatRankingDay, shortCampaign } from '../../admission/ca
 export function rowLabel(row, t) {
   // An 8th-grade class by its name; the ministry's code only when it has none.
   const what = row.stage === 'grade_8'
-    ? `${t('cutoffs.stage.grade_8')}: ${row.class_name || row.class_code}`
+    ? `${t('cutoffs.stage.grade_8')}: ${[row.class_name, row.class_code && (row.class_name ? `(${row.class_code})` : row.class_code)].filter(Boolean).join(' ')}`
     : row.stage === 'grade_1'
       ? t('cutoffs.stage.grade_1')
       : row.stage === 'preparatory'
@@ -53,7 +53,10 @@ function RoundCell({ round }) {
         {round.tie_at_cutoff && <span className="ml-1 text-xs font-normal text-neutral-500">{t('cutoffs.tie')}</span>}
       </div>
       {/* The source's round names are Bulgarian only and sometimes cut off; the column says which round. */}
-      <div className="text-xs text-neutral-500">{formatRankingDay(round.classified_on, i18n.language)}</div>
+      <div className="text-xs text-neutral-500">
+        {[round.round_kind === 'current' ? t('cutoffs.currentRound') : null, formatRankingDay(round.classified_on, i18n.language)]
+          .filter(Boolean).join(' · ')}
+      </div>
     </td>
   )
 }

@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { campaignEnd, measuredOnFor, pickLanguage } from '../../admission/calculator'
+import { campaignEnd, formatRankingDay, measuredOnFor, pickLanguage } from '../../admission/calculator'
 
 const TONE = {
   verified: 'border-primary-200 bg-primary-50 text-primary-900',
@@ -7,10 +7,6 @@ const TONE = {
   illustration: 'border-red-200 bg-red-50 text-red-900',
 }
 
-function formatDate(iso, language) {
-  return new Intl.DateTimeFormat(language === 'bg' ? 'bg-BG' : 'en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
-    .format(new Date(`${iso}T12:00:00`))
-}
 
 /**
  * How far the rules shown can be trusted for the year asked, any court rulings, and,
@@ -37,7 +33,7 @@ function RuleSetNotice({ selected, today = null }) {
       </p>
       {running && (
         <p className="mt-1">
-          {t('admissionCalc.runsUntil', { campaign, date: formatDate(end, i18n.language), next: `${nextYear}/${nextYear + 1}` })}
+          {t('admissionCalc.runsUntil', { campaign, date: formatRankingDay(end, i18n.language), next: `${nextYear}/${nextYear + 1}` })}
         </p>
       )}
       <p className="mt-1">

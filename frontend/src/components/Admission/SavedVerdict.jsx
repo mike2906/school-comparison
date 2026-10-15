@@ -51,7 +51,10 @@ export function SavedVerdictLine({ verdict }) {
       {' · '}
       <span className={TONE[verdict.verdict] || 'text-neutral-700'}>{t(`savedAdmission.verdict.${verdict.verdict}`)}</span>
       {/* Which campaign and ranking: a saved answer for next year is compared with this one's. */}
-      {line && <span className="text-neutral-600"> ({rankingWhen(line.row, line.round, i18n.language)})</span>}
+      {/* Not for "mixed": one row's date would read as the school's. */}
+      {line && verdict.verdict !== 'mixed' && rankingWhen(line.row, line.round, i18n.language) && (
+        <span className="text-neutral-600"> ({rankingWhen(line.row, line.round, i18n.language)})</span>
+      )}
       {verdict.lines.some(l => l.otherRules) && <span className="text-neutral-600"> ({t('cutoffs.otherRules')})</span>}
       <PriorityNote verdict={verdict} className="block text-xs text-neutral-600" />
     </span>
@@ -91,10 +94,10 @@ export function SavedVerdictPanel({ verdict, schoolId }) {
           <p className="mt-1"><Yours verdict={verdict} /></p>
           <ul className="mt-2 space-y-1">
             {verdict.lines.map(({ row, round, verdict: lineVerdict, otherRules }) => (
-              <li key={[row.stage, row.age_group, row.birth_year, row.building].join('|')}>
+              <li key={[row.stage, row.age_group, row.birth_year, row.class_code, row.building].join('|')}>
                 <span className="text-neutral-700">
                   {rowLabel(row, t)}
-                  {` · ${rankingWhen(row, round, i18n.language)}`}
+                  {rankingWhen(row, round, i18n.language) && ` · ${rankingWhen(row, round, i18n.language)}`}
                   {': '}
                 </span>
                 <span className="font-medium text-neutral-900"><CutoffValue round={round} /></span>

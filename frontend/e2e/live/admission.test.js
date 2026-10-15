@@ -246,8 +246,9 @@ describe('admission from a school page', () => {
     await open('bg', `/schools/${school.id}`)
     await page.getByTestId('saved-verdict').waitFor()
     // Each compared cut-off says which campaign it is from (2026/27), not a bare date.
-    const panel = await page.getByTestId('saved-verdict').innerText()
-    if (!panel.includes(t('bg', 'savedAdmission.verdict.noCutoff'))) assert.match(panel, /\d{4}\/\d{2}\b/)
+    for (const line of await page.getByTestId('saved-verdict').locator('li').allInnerTexts()) {
+      assert.match(line, /\d{4}\/\d{2}\b/, line)
+    }
     const area = page.locator('section').filter({ has: page.getByRole('heading', { name: t('bg', 'admissionArea.catchmentTitle') }) })
     await area.getByText(t('bg', 'admissionArea.verdict.inside')).waitFor()
 

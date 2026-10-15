@@ -159,12 +159,18 @@ export function shortCampaign(campaign) {
   return match ? `${match[1]}/${match[2]}` : campaign || ''
 }
 
-/** A ranking day in the reader's language: `2 October 2026`, `2 октомври 2026 г.`. */
+const DAY_FORMATS = new Map()
+
+/** A day (YYYY-MM-DD) in the reader's language: `2 October 2026`, `2 октомври 2026 г.`. */
 export function formatRankingDay(iso, language) {
   if (!iso) return ''
-  const bg = String(language || '').startsWith('bg')
-  return new Intl.DateTimeFormat(bg ? 'bg-BG' : 'en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
-    .format(new Date(`${iso}T12:00:00Z`))
+  const date = new Date(`${String(iso).slice(0, 10)}T12:00:00Z`)
+  if (Number.isNaN(date.getTime())) return String(iso)
+  const locale = String(language || '').startsWith('bg') ? 'bg-BG' : 'en-GB'
+  if (!DAY_FORMATS.has(locale)) {
+    DAY_FORMATS.set(locale, new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }))
+  }
+  return DAY_FORMATS.get(locale).format(date)
 }
 
 /** Which ranking a compared cut-off comes from: `2026/27 · 2 Oct 2026`. */

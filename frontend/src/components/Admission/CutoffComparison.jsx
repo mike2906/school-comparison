@@ -31,10 +31,10 @@ function CutoffComparison({ rows, yours, isCurrentRules = () => null }) {
       <p className="font-medium text-neutral-900">{t('cutoffs.compare.title')}</p>
       <ul className="mt-2 space-y-2">
         {lines.map(({ row, round, verdict }) => (
-          <li key={[row.stage, row.age_group, row.birth_year, row.building].join('|')}>
+          <li key={[row.stage, row.age_group, row.birth_year, row.class_code, row.building].join('|')}>
             <div className="text-neutral-700">
               {rowLabel(row, t)}
-              {` · ${rankingWhen(row, round, i18n.language)}`}
+              {rankingWhen(row, round, i18n.language) && ` · ${rankingWhen(row, round, i18n.language)}`}
               {': '}
               <span className="font-medium text-neutral-900"><CutoffValue round={round} /></span>
             </div>

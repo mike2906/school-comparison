@@ -1116,7 +1116,7 @@
       "grade_1": "1st grade points",
       "grade_8": "8th grade score"
     },
-    "quotaScores": "boys {{boys}}, girls {{girls}}",
+    "quotaScores": "boys {{boys}}, girls {{girls}} points",
     "bornIn": "born {{year}}",
     "compare": {
       "title": "Compared with the last child admitted",
@@ -1131,7 +1131,8 @@
       "sameGroup": "The same group as the last child admitted; the list gives no points to compare."
     },
     "score": "{{score}} points",
-    "groupNoPoints": "Group {{group}}, no extra points"
+    "groupNoPoints": "Group {{group}}, no extra points",
+    "currentRound": "later ranking for free places"
   },
   "driveTime": {
     "minutes": "~{{minutes}} min",
