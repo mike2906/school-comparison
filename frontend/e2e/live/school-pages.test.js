@@ -1,7 +1,8 @@
 /**
  * Live flows for what a parent reads on a school: finding it by name, the facts read
  * from its website (with open days), its Facebook and Instagram links, fees with their
- * payment plans, last year's fees left out once this year lists them again, comparing fees
+ * payment plans, last year's fees left out once this year lists them again, fees for the
+ * searched age first with the other ages folded away, comparing fees
  * side by side, and no pin for a school whose location is
  * only approximate (the page says the address is not on the map yet).
  */
@@ -9,6 +10,7 @@ import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
 
 import { planNameLabel } from '../../src/utils/priceLabels.js'
+import { rowAgeGroupKeys, splitRowsForAgeGroup } from '../../src/utils/priceRows.js'
 import { groupPricingByAcademicYear } from '../../src/utils/pricing.js'
 import { upcomingOpenDays } from '../../src/utils/schoolFacts.js'
 import { NoSchoolError, PHONE, address, allSchools, findSchool, open, page, schoolName, t, liveBrowser } from './live.js'
@@ -147,6 +149,29 @@ describe('a school page', () => {
     await section.waitFor()
     assert.equal(await section.getByText(hidden.academic_year_canonical, { exact: true }).count(), 0,
       `no ${hidden.academic_year_canonical} group`)
+  })
+
+  test("the searched age's fees lead; other ages' fees are folded away", async () => {
+    // From a search for grades 5-7, a school listing every grade showed all of them at once.
+    const groupOf = school => [...new Set((school.pricing || []).flatMap(row => [...rowAgeGroupKeys(row)]))]
+      .find(group => {
+        const { forGroup, otherAges } = splitRowsForAgeGroup(school.pricing, group)
+        return forGroup.some(row => rowAgeGroupKeys(row).has(group)) && otherAges.length > 0
+      })
+    const listed = (await allSchools()).find(s => isPrivate(s) && groupOf(s))
+    assert.ok(listed, 'a private school with fees for more than one age')
+    const group = groupOf(listed)
+    // As many as the fold lists: a past year's fee repeated later is left out there.
+    const otherCount = groupPricingByAcademicYear(splitRowsForAgeGroup(listed.pricing, group).otherAges)
+      .reduce((sum, yearGroup) => sum + yearGroup.rows.length, 0)
+    await open('bg', `/schools/${listed.id}?group=${group}`)
+    const section = card(t('bg', 'pricing.title'))
+    const name = t('bg', `ageGroups.${group}`)
+    await section.getByText(t('bg', 'pricing.forAgeGroup', { group: name.charAt(0).toLocaleLowerCase('bg') + name.slice(1) })).waitFor()
+    const folded = section.locator('details')
+    assert.equal(await folded.getAttribute('open'), null, 'other ages start folded')
+    await folded.locator('summary', { hasText: t('bg', 'pricing.otherAges', { count: otherCount }) }).click()
+    assert.notEqual(await folded.getAttribute('open'), null, 'other ages open on a tap')
   })
 
   test('two private schools with fees compare side by side', async () => {

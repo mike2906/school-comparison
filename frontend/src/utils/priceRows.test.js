@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { periodFromLabel, periodUnknown, pricePeriod, rowAgeGroupKeys, rowsForAgeGroup } from './priceRows.js'
+import { periodFromLabel, periodUnknown, pricePeriod, rowAgeGroupKeys, rowsForAgeGroup, splitRowsForAgeGroup } from './priceRows.js'
 
 test('periodFromLabel: the period a fee name states', () => {
   const cases = {
@@ -96,6 +96,23 @@ test('rowsForAgeGroup: only the chosen group, plus rows naming none', () => {
   assert.deepEqual(rowsForAgeGroup([first, second], null), [first, second])
   // No row names a group: nothing to choose by.
   assert.deepEqual(rowsForAgeGroup([general], 'third'), [general])
+})
+
+test('splitRowsForAgeGroup: fees naming only other ages set aside, fees naming none kept', () => {
+  const grades1to4 = { id: 1, category: 'tuition', age_group: '1-4 клас' }
+  const grades5to7 = { id: 2, category: 'tuition', age_group: 'V - VII клас' }
+  const grades1to7 = { id: 3, category: 'tuition', plan_name: 'Годишна такса 1-7 клас' }
+  const registration = { id: 4, category: 'registration', plan_name: 'Такса записване' }
+  const rows = [grades1to4, grades5to7, grades1to7, registration]
+  assert.deepEqual(splitRowsForAgeGroup(rows, 'grade_5_7'), {
+    forGroup: [grades5to7, grades1to7, registration],
+    otherAges: [grades1to4],
+  })
+  // Nothing for the age: everything is another age's.
+  assert.deepEqual(splitRowsForAgeGroup([grades1to4], 'grade_8_12'), { forGroup: [], otherAges: [grades1to4] })
+  // No age, or a ?group= we do not know, sets nothing aside.
+  assert.deepEqual(splitRowsForAgeGroup(rows, null), { forGroup: rows, otherAges: [] })
+  assert.deepEqual(splitRowsForAgeGroup(rows, 'grade_9'), { forGroup: rows, otherAges: [] })
 })
 
 test('pricePeriod: tuition paid in one payment is yearly; other fees are not', () => {

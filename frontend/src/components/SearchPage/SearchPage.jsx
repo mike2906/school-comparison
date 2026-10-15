@@ -44,6 +44,7 @@ import { isSchoolInBounds } from '../../utils/mapFit'
 import { LIST_PAGE_SIZE, windowForIndex, scrollTopToCenter } from '../../utils/listWindow'
 
 import { tuitionSortValue } from '../../utils/pricing'
+import { schoolPath } from '../../utils/schoolPath'
 import {
   readViewParams,
   writeViewParams,
@@ -393,7 +394,7 @@ function SearchPage() {
     if (isDesktopViewport()) {
       handleOpenDetails(school)
     } else {
-      navigate(`/schools/${school.id}`)
+      navigate(schoolPath(school.id, filters.ageGroup))
     }
   })
 

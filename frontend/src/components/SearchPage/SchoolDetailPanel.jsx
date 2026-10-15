@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import SchoolDetailPage from '../SchoolDetailPage/SchoolDetailPage'
+import { schoolPath } from '../../utils/schoolPath'
 
 /**
  * A school's detail over the search page, so the map, list, filters and scroll position
@@ -11,6 +12,7 @@ import SchoolDetailPage from '../SchoolDetailPage/SchoolDetailPage'
  */
 function SchoolDetailPanel({ schoolId, onClose, beside = false }) {
   const { t } = useTranslation()
+  const [searchParams] = useSearchParams()
   const panelRef = useRef(null)
   const scrollRef = useRef(null)
 
@@ -55,7 +57,7 @@ function SchoolDetailPanel({ schoolId, onClose, beside = false }) {
           {t('detailPanel.backToResults')}
         </button>
         <Link
-          to={`/schools/${schoolId}`}
+          to={schoolPath(schoolId, searchParams.get('age_group'))}
           className="inline-flex h-10 items-center gap-1 rounded-lg px-2 text-sm font-medium text-primary-700 hover:bg-primary-50"
         >
           {t('detailPanel.openFullPage')}

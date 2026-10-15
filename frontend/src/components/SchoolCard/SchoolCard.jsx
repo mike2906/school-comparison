@@ -24,6 +24,7 @@ import {
   getTrendTooltip,
 } from '../../utils/nvoDisplay'
 import { selectPricingCohort, statedTuition, YEAR_STATUS } from '../../utils/pricing'
+import { schoolPath } from '../../utils/schoolPath'
 
 import {
   AMENITY_PRIORITY,
@@ -684,7 +685,7 @@ const SchoolCard = memo(function SchoolCard({
             {samePlace.map(({ school: member }) => (
               <li key={member.id} className="text-sm">
                 <Link
-                  to={activeAgeGroup ? `/schools/${member.id}?group=${encodeURIComponent(activeAgeGroup)}` : `/schools/${member.id}`}
+                  to={schoolPath(member.id, activeAgeGroup)}
                   onClick={(event) => {
                     event.stopPropagation()
                     if (onOpenDetails && isPlainLeftClick(event) && isDesktopViewport()) {
@@ -728,7 +729,7 @@ const SchoolCard = memo(function SchoolCard({
           )}
         </button>
         <Link
-          to={activeAgeGroup ? `/schools/${school.id}?group=${encodeURIComponent(activeAgeGroup)}` : `/schools/${school.id}`}
+          to={schoolPath(school.id, activeAgeGroup)}
           onClick={handleDetailsClick}
           className="flex-1 min-h-[44px] md:min-h-0 inline-flex items-center justify-center px-3 py-2 text-center text-sm font-medium text-white bg-primary-700 hover:bg-primary-800 rounded-lg transition-colors transition-transform hover:scale-[1.02]"
         >
