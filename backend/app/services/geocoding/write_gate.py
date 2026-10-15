@@ -19,6 +19,12 @@ SOFIA_WRITE_BOUNDS = SOFIA_MUNICIPALITY_BOUNDS
 OFFICIAL_COORDS_TAG = "coords_source=sofia_municipal"
 # A pin corrected by hand (`geocode_meta.method`), with its evidence in `geocode_meta.manual_fix`.
 MANUAL_FIX_METHOD = "manual_fix"
+# Exact pins a pin stage checked against the school's site, OSM or Sofia's address register
+# (website_pins, pin_agent, confirm_pins, register_pins, site_address). A re-import of the
+# same address keeps them: re-geocoding the address would only bring back the hidden point.
+CHECKED_PIN_METHODS = frozenset(
+    {"website_map_link", "agent_pick", "reverse_confirmed", "address_register", "site_address"}
+)
 
 
 def _normalize_address(value: Optional[str]) -> str:
@@ -42,6 +48,17 @@ def has_pinned_point(location: SchoolLocation) -> bool:
         return True
     meta = location.geocode_meta
     return isinstance(meta, dict) and meta.get("method") == MANUAL_FIX_METHOD
+
+
+def has_checked_pin(location: SchoolLocation) -> bool:
+    """Whether the location has an exact pin one of the pin stages checked."""
+    meta = location.geocode_meta if isinstance(location.geocode_meta, dict) else {}
+    return (
+        location.lat is not None
+        and location.lng is not None
+        and meta.get("precision") == "exact"
+        and meta.get("method") in CHECKED_PIN_METHODS
+    )
 
 
 def _result_meta(result: GeocodingResult, *, status: str, reason: Optional[str] = None) -> dict:
