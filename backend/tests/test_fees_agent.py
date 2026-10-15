@@ -1380,3 +1380,88 @@ def test_per_unit_periods_need_a_price_word_not_a_timetable(period, evidence, na
     from app.scrapers.extraction.agent_fees import _names_period
 
     assert _names_period(PricePeriod(period), evidence, [Decimal("30")], PriceCategory.EXTRACURRICULAR) is named
+
+
+# --- A period a stored row proved: 606's flattened table, its period in a sentence below ---
+PAGE_PROVED = (
+    "Такса обучение\n€ 3000\nЕднократна такса за записване: 200 евро.\n"
+    "Годишната такса за обучение се заплаща на три вноски."
+)
+PROOF = "Такса обучение\n€ 3000\nГодишната такса за обучение се заплаща на три вноски."
+
+
+async def _proved_row(db, school, period=PricePeriod.YEARLY, evidence=PROOF, extractor="agent"):
+    page = SourcePage(
+        school_id=school.id,
+        scrape_type=ScrapeType.WEBSITE,
+        source_url=URL,
+        content_hash="old",
+        page_category="pricing",
+        is_valid=True,
+        raw_markdown=PAGE_PROVED,
+    )
+    db.add(page)
+    await db.flush()
+    db.add(
+        Pricing(
+            school_id=school.id,
+            category=PriceCategory.TUITION,
+            amount=3000,
+            currency="EUR",
+            period=period,
+            academic_year="2026/2027",
+            source=PriceSource.SCRAPED_WEBSITE,
+            source_url=URL,
+            source_page_id=page.id,
+            pricing_context={"confidence": 0.9, "extractor": extractor, "evidence": evidence},
+        )
+    )
+    await db.commit()
+
+
+def _bare_read():
+    """The heading left out of the evidence this time: the check clears the period."""
+    return [
+        fee(PriceCategory.TUITION, "€ 3000", amount=3000, period=PricePeriod.YEARLY, academic_year="2026/2027"),
+        FEES_STAGE[1],
+    ]
+
+
+async def _run(db, school, page_text=PAGE_PROVED):
+    pages = [PageRead(URL, page_text, True)]
+    return await fees_agent.run_school(db, school, find=_find(pages), read=_read(_bare_read()), apply=True)
+
+
+async def test_a_period_a_stored_row_proved_comes_back_when_the_read_leaves_its_heading_out(db_session, frozen_today):
+    school = await _school(db_session)
+    await _proved_row(db_session, school)
+    report = await _run(db_session, school)
+    assert report["outcome"] == "written" and report["rows_old_kept"] == 0 and not report["regressions"], report
+    rows = [r for r in await _rows(db_session, school) if float(r.amount) == 3000]
+    assert [(r.period, r.pricing_context["extractor"]) for r in rows] == [(PricePeriod.YEARLY, "agent")]
+    assert "Годишната такса" in rows[0].pricing_context["evidence"]  # the next re-read can prove it again
+    assert any("stored row's evidence" in check for check in rows[0].pricing_context["checks"])
+
+
+async def test_a_stored_proof_no_longer_on_the_page_brings_nothing_back(db_session, frozen_today):
+    school = await _school(db_session)
+    await _proved_row(db_session, school)
+    report = await _run(db_session, school, "Такса обучение\n€ 3000\nЕднократна такса за записване: 200 евро.")
+    rows = [r for r in await _rows(db_session, school) if float(r.amount) == 3000]
+    assert all("stored row's evidence" not in check for f in report["fees"] for check in f.get("checks", []))
+    assert [r.pricing_context.get("checks") for r in rows] == [None]  # the old row, untouched
+
+
+async def test_a_stored_row_without_evidence_proves_nothing(db_session, frozen_today):
+    school = await _school(db_session)
+    await _proved_row(db_session, school, extractor=None)
+    report = await _run(db_session, school)
+    assert report["rows_old_kept"] == 1 and report["regressions"], report
+
+
+async def test_a_stored_proof_must_satisfy_todays_rules(db_session, frozen_today):
+    school = await _school(db_session)  # one_time is never valid for tuition, whatever the old row says
+    await _proved_row(db_session, school, period=PricePeriod.ONE_TIME, evidence="Такса обучение\n€ 3000 еднократно")
+    report = await _run(db_session, school)
+    rows = [r for r in await _rows(db_session, school) if float(r.amount) == 3000]
+    assert all(r.period is not PricePeriod.YEARLY for r in rows), report

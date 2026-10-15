@@ -844,6 +844,60 @@ async def _missed_amounts(
     return sorted((published & shown) - read)
 
 
+async def _stored_period_proofs(db: AsyncSession, school: School) -> list[Pricing]:
+    """The school's published agent rows with a period and the evidence that proved it."""
+    stored = await db.execute(
+        select(Pricing)
+        .where(
+            Pricing.school_id == school.id,
+            Pricing.source == PriceSource.SCRAPED_WEBSITE,
+            Pricing.period.is_not(None),
+        )
+        .options(selectinload(Pricing.source_page).load_only(SourcePage.id, SourcePage.is_valid))
+    )
+    blocked = blocked_pricing_row_ids(school.attributes if isinstance(school.attributes, dict) else None)
+    return [
+        row
+        for row in stored.scalars().all()
+        if (row.pricing_context or {}).get("extractor") == "agent"
+        and str((row.pricing_context or {}).get("evidence") or "").strip()
+        and row.id not in blocked
+        and pricing_row_is_publishable(row)
+    ]
+
+
+def _with_stored_period(result: CheckedFee, page_text: str, proofs: list[Pricing]) -> CheckedFee:
+    """The fee with the period a stored row of the same fee proved, if that proof still holds.
+
+    The reader copies a table's heading or the sentence above it into the evidence in one
+    run and leaves it out in the next, and without it the period is cleared: 16 schools of
+    the 2026-10-15 Sofia dry run lost a yearly or one-off period that way, on unchanged
+    pages. The stored row's evidence is checked again on today's page together with the
+    new read's, by the same rules, so a period comes back only when the page still names it.
+    """
+    fee = result.fee
+    key = _amount_key(PriceRow(fee.category.value, fee.amount, fee.amount_min, fee.amount_max, None, None, None))
+    year = normalize_academic_year(fee.academic_year)
+    same_fee = [
+        row
+        for row in proofs
+        if row.category == fee.category
+        and (row.currency or "").upper() == fee.currency.upper()
+        and _amount_group(row) == key
+        and normalize_academic_year(row.academic_year) in (year, None)
+    ]
+    periods = {row.period for row in same_fee}
+    if len(periods) != 1:  # none, or stored rows of this fee that disagree
+        return result
+    period = periods.pop()
+    evidence = "\n".join([fee.evidence, *(row.pricing_context["evidence"] for row in same_fee)])
+    trial = check_fee(fee.model_copy(update={"period": period, "evidence": evidence}), page_text)
+    if not trial.kept or trial.fee.period != period or trial.confidence < result.confidence:
+        return result
+    note = f"period {period.value} from the stored row's evidence, still on the page"
+    return CheckedFee(trial.fee, trial.confidence, True, [*result.checks, note])
+
+
 def _euro_amounts(fees: list[AgentFee]) -> dict[str, set[Decimal]]:
     """The euro amounts read, by category: 200 лв. of meals is not a 102 € bus fee."""
     euro: dict[str, set[Decimal]] = {}
@@ -980,10 +1034,13 @@ async def run_school(
         added = [fee for fee in added if not _lev_twin(fee, euro)]
         fees = [*fees, *added]
         report["reread"]["added"] = len(added)
+    proofs = await _stored_period_proofs(db, school)
     checked: list[tuple[CheckedFee, SourcePage]] = []
     for fee in fees:
         page = _page_for(fee, priced)
         result = check_fee(fee, page.text) if page else CheckedFee(fee, 0.0, False, ["dropped: not on a page read"])
+        if page and result.kept and result.fee.period is None:
+            result = _with_stored_period(result, page.text, proofs)
         report["fees"].append(_fee_report(result, page))
         if result.kept and page:
             checked.append((result, source_pages[page.url]))
