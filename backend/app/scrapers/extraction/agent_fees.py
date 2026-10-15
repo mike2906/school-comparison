@@ -332,8 +332,10 @@ def check_fee(fee: AgentFee, page_text: str) -> CheckedFee:
         return _dropped(fee, "dropped: no evidence line")
     if any(line not in page for line in lines):
         page_lines = [_normalized(text) for text in page_text.splitlines() if text.strip()]
-        if any(not _line_on_page(line, page, page_lines) for line in lines):
+        found = [line if _line_on_page(line, page, page_lines) else _page_row(line, page_lines) for line in lines]
+        if any(line is None for line in found):
             return _dropped(fee, "dropped: evidence line is not on the page")
+        lines = found
     evidence = "\n".join(lines)
     if not amount_on_page(fee, page_numbers(evidence)):
         return _dropped(fee, "dropped: evidence line does not hold the amount")
@@ -396,6 +398,43 @@ def _count_is_printed(payments: int, text: str) -> bool:
     after = rf"{count}\s*(?:[^\s\d]+\s+)?{_COUNT_WORD_RE}"
     before = rf"(?<![^\W\d_])[xх×]\s*{count}"
     return re.search(rf"{after}|{before}", text, re.IGNORECASE) is not None
+
+
+# A PDF table row as the page text prints it: "Transport | two- / way | € 2,550", cells split
+# by " | " and a cell's lines by " / ". A reader can quote the row cleaned, "Transport two-way
+# € 2,550" (596 lost every extra to it), so both sides are compared without the joins and with
+# a word's hyphen break closed. Words and numbers must still match in order; a join between two
+# numbers stays a break, so "2 | 550" cannot pass as a quoted "2 550".
+_CELL_JOIN_RE = re.compile(r"\s*(?:\||\s/\s)\s*")
+_HYPHEN_BREAK_RE = re.compile(r"(?<=[^\W\d_])- (?=[^\W\d_])")
+
+
+def _loose(text: str) -> str:
+    def join(match: re.Match[str]) -> str:
+        between_numbers = re.search(r"\d[.,]?$", text[: match.start()]) and re.match(r"[.,]?\d", text[match.end() :])
+        return " ¦ " if between_numbers else " "
+
+    return _HYPHEN_BREAK_RE.sub("-", " ".join(_CELL_JOIN_RE.sub(join, text).split()))
+
+
+def _page_row(line: str, page_lines: list[str]) -> str | None:
+    """The cells of the one page line a cleaned quote of a table row came from.
+
+    The later checks read those cells, not the quote: they need the " | " to tell the fee's
+    own period from a payment option's ("€ 8.950 | € 750 x 9 monthly"). Only the shortest
+    run of cells, or of a cell's lines, that holds the quote is kept, so another cell's or
+    line's "monthly" stays out.
+    """
+    quote = _loose(line)
+    rows = {text for text in page_lines if quote in _loose(text)}
+    if len(rows) != 1:
+        return None
+    row = rows.pop()
+    # Cells, and a cell's lines: "€ 6 / € 110 monthly" is two lines of one cell.
+    pieces = [0, *(cut for match in re.finditer(r" \| | / ", row) for cut in match.span()), len(row)]
+    starts, ends = pieces[0::2], pieces[1::2]
+    spans = [row[start:end] for start in starts for end in ends if end > start and quote in _loose(row[start:end])]
+    return min(spans, key=len)
 
 
 _LABEL_LINES_AWAY = 3

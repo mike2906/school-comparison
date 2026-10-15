@@ -21,7 +21,14 @@ from app.models import FieldSource, Pricing, School
 from app.models.pricing import PriceCategory, PricePeriod, PriceSource
 from app.models.scrape_log import ScrapeType
 from app.models.source_page import SourcePage
-from app.scrapers.extraction.agent_fees import HELD_CONFIDENCE, PUBLISH_CONFIDENCE, AgentFee, check_fee, page_numbers
+from app.scrapers.extraction.agent_fees import (
+    HELD_CONFIDENCE,
+    PUBLISH_CONFIDENCE,
+    AgentFee,
+    PaymentOption,
+    check_fee,
+    page_numbers,
+)
 from app.scrapers.stages import fees_agent
 from app.scrapers.stages.fees_agent import PageRead, Spend, SpendCapReached
 from app.utils.display_gating import pricing_row_is_publishable
@@ -1573,3 +1580,61 @@ async def test_one_line_with_two_groups_at_one_price_passes_no_period(db_session
         db_session, school, find=_find(pages), read=_read([secondary, FEES_STAGE[1]]), apply=False
     )
     assert not _stored_notes(report), report["fees"]
+
+
+# 596's extras table in the PDF text, and a reader's cleaned copy of its rows.
+PAGE_PDF_TABLE = "ADDITIONAL SERVICES\nService | Annual fee\nTransport two- / way | € 2,550\nExtended day | € 700\nLunch | 2 | 550 meals\n"
+
+
+def test_a_table_row_quoted_without_its_cell_joins_is_on_the_page():
+    bus = fee(PriceCategory.TRANSPORT, "Transport two-way € 2,550", amount=2550)
+    result = check_fee(bus, PAGE_PDF_TABLE)
+    assert result.kept
+    late = fee(PriceCategory.EXTENDED_DAY, "Extended day € 700", amount=700)
+    assert check_fee(late, PAGE_PDF_TABLE).kept
+
+
+def test_a_loose_quote_still_needs_the_page_words_in_order():
+    bus = fee(PriceCategory.TRANSPORT, "Transport one-way € 2,550", amount=2550)
+    assert check_fee(bus, PAGE_PDF_TABLE).checks == ["dropped: evidence line is not on the page"]
+    swapped = fee(PriceCategory.EXTENDED_DAY, "€ 700 Extended day", amount=700)
+    assert not check_fee(swapped, PAGE_PDF_TABLE).kept
+
+
+def test_a_cell_join_between_two_numbers_does_not_make_one_number():
+    food = fee(PriceCategory.FOOD, "Lunch 2 550 meals", amount=2550)
+    assert check_fee(food, PAGE_PDF_TABLE).checks == ["dropped: evidence line is not on the page"]
+
+
+def test_a_cleaned_quote_is_checked_with_the_page_rows_cells():
+    page = "TUITION\nPlan | Price | Instalments\nGrade 1 | € 8.950 | € 750 x 9 monthly\n"
+    tuition = fee(PriceCategory.TUITION, "Grade 1 € 8.950 € 750 x 9 monthly", amount=8950, period=PricePeriod.MONTHLY)
+    tuition = tuition.model_copy(update={"payment_options": [PaymentOption(payments=9, instalment=750)]})
+    result = check_fee(tuition, page)
+    assert result.kept
+    assert result.fee.period is None
+    assert result.checks[0] == "period monthly cleared: the evidence does not name it"
+
+
+def test_a_cell_join_after_a_number_and_a_dot_does_not_make_one_number():
+    food = fee(PriceCategory.FOOD, "Grade 1. 550 meals", amount=1550)
+    assert not check_fee(food, "Grade 1. | 550 meals\nOther € 1550\n").kept
+
+
+def test_a_cleaned_quote_takes_no_period_from_a_cell_it_did_not_quote():
+    lunch = fee(PriceCategory.FOOD, "Lunch € 5", amount=5, period=PricePeriod.MONTHLY)
+    result = check_fee(lunch, "EXTRAS\nLunch | € 5 | € 100 monthly\n")
+    assert result.kept
+    assert result.fee.period is None
+
+
+def test_a_cleaned_quote_without_the_amount_does_not_borrow_it_from_the_row():
+    bus = fee(PriceCategory.TRANSPORT, "Transport two-way", amount=2550)
+    assert check_fee(bus, PAGE_PDF_TABLE).checks == ["dropped: evidence line does not hold the amount"]
+
+
+def test_a_cleaned_quote_takes_no_period_from_a_cell_line_it_did_not_quote():
+    meals = fee(PriceCategory.FOOD, "Meals € 6", amount=6, period=PricePeriod.MONTHLY)
+    result = check_fee(meals, "EXTRAS\nMeals | € 6 / € 110 monthly\n")
+    assert result.kept
+    assert result.fee.period is None
