@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { catchmentSchoolFor, searchStreets, splitAddress, streetDisplayName } from '../../admission/catchments'
+import { addressSuggestions, catchmentSchoolFor, splitAddress, streetDisplayName } from '../../admission/catchments'
 import { loadAddresses, loadDistricts } from '../../admission/loadCatchments'
 
 /**
@@ -53,7 +53,8 @@ function AddressCheck({ onResult, catchments, ownIds = [], nameSchool = true, va
   const shown = street ? `${nameOf(street)} ${number}`.trimEnd() : text
 
   const typed = splitAddress(text)
-  const suggestions = !streets || street ? [] : suggestionsFor(streets, text, typed)
+  const suggestions = !streets || street ? [] : addressSuggestions(streets, text)
+  const noMatch = Boolean(streets && !street && typed.street.trim().length >= 2 && suggestions.length === 0)
   const schoolId = street && number.trim() ? catchmentSchoolFor(street, number) : undefined
 
   useEffect(() => {
@@ -121,6 +122,7 @@ function AddressCheck({ onResult, catchments, ownIds = [], nameSchool = true, va
           </ul>
         )}
       </div>
+      {noMatch && <p className="mt-3 text-sm text-amber-800">{t('admissionArea.noMatch')}</p>}
       {failed && <p className="mt-3 text-sm text-red-700">{t('admissionArea.loadFailed')}</p>}
       {streets === null && !failed && text && <p className="mt-3 text-sm text-neutral-500">{t('common.loading')}</p>}
       {street && !number.trim() && <p className="mt-3 text-sm text-neutral-600">{t('admissionArea.addNumber')}</p>}
@@ -133,30 +135,6 @@ function AddressCheck({ onResult, catchments, ownIds = [], nameSchool = true, va
       <p className="mt-3 text-xs text-neutral-500">{t('admissionArea.addressPrivacy')}</p>
     </div>
   )
-}
-
-/**
- * Suggestions for what was typed: with a trailing number, the streets that have that
- * number first (shown with it); then streets matching the whole text, which covers names
- * ending in a number (ж.к. Младост 1).
- */
-function suggestionsFor(streets, text, typed) {
-  const out = []
-  const seen = new Set()
-  // `carry`: the street matched without the typed number, which is still the house number.
-  const add = (street, number, carry = false) => {
-    const key = `${street.id}|${number}`
-    if (seen.has(key) || out.length >= 12) return
-    seen.add(key)
-    out.push({ street, number, carry })
-  }
-  if (typed.number) {
-    const matches = searchStreets(streets, typed.street)
-    for (const street of matches) if (catchmentSchoolFor(street, typed.number)) add(street, typed.number)
-  }
-  for (const street of searchStreets(streets, text)) add(street, '')
-  if (typed.number) for (const street of searchStreets(streets, typed.street)) add(street, '', true)
-  return out
 }
 
 export default AddressCheck
