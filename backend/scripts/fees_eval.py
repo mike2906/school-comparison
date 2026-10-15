@@ -65,11 +65,12 @@ KEY_SETS = ("step3", "step4")
 BGN_PER_EUR = Decimal("1.95583")
 TOLERANCE = Decimal("0.01")
 READ_TIMEOUT_SECONDS = 240  # as the stage's read
-# Noise, measured 2026-10-15 over 5 trials of the same pages: one trial's wrong rate ran 7 to
-# 16 % and its found rate 35 to 44 %. CI averages 3 trials against a 5-trial baseline, so
-# these margins are about two standard deviations: only a real drop fails the check.
+# Noise, measured 2026-10-15 over 16 trials of the same pages: one trial's wrong rate ran 6 to
+# 19 % and its found rate 35 to 55 % (OpenRouter routes one model to several providers). CI
+# averages 3 trials against a 6-trial baseline, so these margins are about two standard
+# deviations of that difference: the check catches a large regression, not a small one.
 MAX_WRONG_RISE = 0.06
-MAX_FOUND_DROP = 0.07
+MAX_FOUND_DROP = 0.09
 
 
 def load_key() -> dict[int, list[dict[str, Any]]]:

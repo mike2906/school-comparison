@@ -7,11 +7,13 @@ schema, checks or model moved it. `scripts/fees_eval.py` says what is scored and
 
 - `pages/<school id>.json`: what the finder found for each keyed school, saved with
   `fees-agent --save-pages evals/fees/pages --school-id ... ` (a dry run; writes nothing to the DB).
-- `baseline.json`: the averages the check compares with (`--write-baseline --trials 5`).
+- `baseline.json`: the averages the check compares with (`--write-baseline --trials 6`).
 
 CI (`.github/workflows/fees-eval.yml`) runs 3 trials (about $0.10) on a PR that touches the reader, its
 checks, the publish gate or the model choice, and fails when wrong rows rise more than 6
-points or found fees drop more than 7 points below the baseline. A PR that improves the
+points or found fees drop more than 9 points below the baseline.
+The reader is noisy on identical pages, so smaller moves are not detectable with 3 trials;
+run more trials by hand (`--trials 10 --no-check`) to compare two versions closely. A PR that improves the
 score on purpose writes a new baseline in the same PR. To try another model, run the
 workflow by hand with `model` set (no baseline check), or locally with `MODEL_TIER_PRICING`.
 
