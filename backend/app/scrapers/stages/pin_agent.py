@@ -9,7 +9,8 @@ it picks a candidate by number, and code checks the pick before anything is writ
 ``MAX_NUMBER_GAP`` of ours when both are known; an OSM feature must also be named as this
 school (the only one of that name, of the same kind, private or not alike); and no other
 school may be pinned on that spot. Anything else stays hidden. Runs after ``website-pins`` (which takes exact
-address matches without a model). Default is a dry run that writes nothing. Not in ``all``.
+address matches without a model). Default is a dry run that writes nothing. Not in ``all``:
+``scripts/refresh_pins.sh`` runs both weekly from cron.
 """
 
 from __future__ import annotations
@@ -70,6 +71,8 @@ MAX_NUMBER_GAP = 4
 # Another school's published pin this close means the candidate is that school's building.
 OTHER_SCHOOL_M = 25
 MAX_CANDIDATES = 12
+# Two OSM features of one name this close are one site mapped twice, not two branches.
+SAME_PLACE_M = 60
 
 # Name words shared by many institutions, which say nothing about which one it is.
 _GENERIC_NAME_WORDS = {
@@ -80,9 +83,8 @@ _GENERIC_NAME_WORDS = {
     "чоу", "чсу", "чдг", "дг", "оу", "су", "ну", "пг", "спг", "пмг", "чпг", "чну", "обу",
     "еоод", "оод", "ад", "език", "езиков", "езици",
 }
-# Words that say what kind of institution a name is ("СУ", "СПГЕ", "училище", "ЧДГ").
+# Abbreviations that say what kind of institution a name is ("СУ", "СПГЕ", "ЧДГ").
 _TYPE_ABBREVIATION_RE = re.compile(r"(?<![А-Яа-яA-Za-z])[А-Я]{0,4}(?:У|Г|ГЕ|ДГ|ДЗ|ДЯ)(?![А-Яа-я])")
-_TYPE_WORD_RE = re.compile(r"училищ|гимназ|градин|ясла|колеж|лицей|school|kindergarten|college", re.IGNORECASE)
 # A private institution's name: "ЧСУ", "ЧДГ", "Частна ...", "Private ...".
 _PRIVATE_ABBREVIATION_RE = re.compile(r"(?<![А-Яа-яA-Za-z])Ч[А-Я]{0,3}(?:У|Г|ГЕ|ДГ|ДЗ|ДЯ)(?![А-Яа-я])")
 # Ordinal names are numbers ("Първа английска гимназия" is not "Втора ...").
@@ -95,8 +97,8 @@ _ORDINALS = {
 _PRIVATE_WORD_RE = re.compile(r"частн|private", re.IGNORECASE)
 
 
-def names_a_type(name: Optional[str]) -> bool:
-    return bool(_TYPE_ABBREVIATION_RE.search(name or "") or _TYPE_WORD_RE.search(name or ""))
+def states_private_or_not(name: Optional[str]) -> bool:
+    return bool(_TYPE_ABBREVIATION_RE.search(name or "") or _PRIVATE_WORD_RE.search(name or ""))
 
 
 def is_private_name(name: Optional[str]) -> bool:
@@ -222,12 +224,17 @@ def check_pick(
     at_our_number = _number(address) is not None and _number(address) == _number(candidate.address)
     if not name_matches(school_name, candidate.name, at_our_number=at_our_number):
         return "OSM names another institution there"
-    # A bare name ("ЕСПА") says nothing about private or state.
+    # Only an abbreviation ("СУ", "ЧСУ") or the word "частно" says private or state: a
+    # bare name ("ЕСПА") or a plain type word ("Американски колеж") says neither.
     ours_private = is_private_name(school_name) if private is None else private
-    if names_a_type(candidate.name) and ours_private != is_private_name(candidate.name):
+    if states_private_or_not(candidate.name) and ours_private != is_private_name(candidate.name):
         return "one name is a private institution's, the other not"
     if any(
-        c is not candidate and c.source == "osm_school" and name_matches(school_name, c.name, at_our_number=True)
+        c is not candidate
+        and c.source == "osm_school"
+        and (c.amenity == "kindergarten") == kindergarten  # a school's kindergarten is another institution
+        and _distance_m(c.point, candidate.point) > SAME_PLACE_M  # one site mapped twice (node and building)
+        and name_matches(school_name, c.name, at_our_number=True)
         for c in candidates
     ):
         return "several OSM features have this name"

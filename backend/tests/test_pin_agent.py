@@ -109,6 +109,31 @@ def test_a_bare_osm_name_is_not_called_state():
     assert stage.check_pick("Частно училище ЕСПА", False, "ул. Бигла 56", espa, [espa], SOFIA, ()) is None
 
 
+def test_a_plain_type_word_is_not_called_state():
+    # American College, Виктор Юго: private schools whose names carry no "частно".
+    college = Candidate(point=(42.68, 23.33), source="osm_school", name="Американски колеж в София", address='ул. "Бигла" № 56')
+    assert stage.check_pick("Американски колеж в София", False, "ул. Бигла 56", college, [college], SOFIA, (), private=True) is None
+    hugo = Candidate(point=(42.68, 23.33), source="osm_school", name="Френско училище Виктор Юго", address='ул. "Бигла" № 56')
+    assert stage.check_pick("Френско училище Виктор Юго", False, "ул. Бигла 56", hugo, [hugo], SOFIA, (), private=True) is None
+    # An abbreviation still says it: a state "СУ" is not our private school.
+    state = Candidate(point=(42.68, 23.33), source="osm_school", name="СУ Виктор Юго", address='ул. "Бигла" № 56')
+    assert stage.check_pick("Френско училище Виктор Юго", False, "ул. Бигла 56", state, [state], SOFIA, (), private=True) == (
+        "one name is a private institution's, the other not"
+    )
+
+
+def test_one_site_mapped_twice_or_a_namesake_kindergarten_is_not_a_second_branch():
+    school = Candidate(point=(42.68, 23.33), source="osm_school", name="ЧЕСУ Дорис Тенеди", address='ул. "Бигла" № 56')
+    building = Candidate(point=(42.6803, 23.3302), source="osm_school", name="ЧЕСУ Дорис Тенеди", address='ул. "Бигла" № 56')
+    kindergarten = Candidate(
+        point=(42.70, 23.35), source="osm_school", name="ЧДГ Дорис Тенеди", address='ул. "Казбек" № 1', amenity="kindergarten"
+    )
+    branch = Candidate(point=(42.70, 23.35), source="osm_school", name="ЧЕСУ Дорис Тенеди", address='ул. "Казбек" № 1')
+    args = ("ЧЕСУ Дорис Тенеди", False, "ул. Бигла 56", school)
+    assert stage.check_pick(*args, [school, building, kindergarten], SOFIA, (), private=True) is None
+    assert stage.check_pick(*args, [school, branch], SOFIA, (), private=True) == "several OSM features have this name"
+
+
 def test_is_private_name():
     assert stage.is_private_name("ЧДГ Детски свят")
     assert stage.is_private_name("Частна детска градина")

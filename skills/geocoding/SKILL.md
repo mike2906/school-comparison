@@ -59,8 +59,22 @@ its building from candidates sources gave (website map points with OSM's address
 named OSM schools/kindergartens within 2 km), never typing coordinates. Code then requires
 the pick to be on our street (OSM tags, else Nominatim there), house number within 4 when
 both are known, no other school pinned on the spot; a website point needs the number, an
-OSM feature must be the only one named as the school, same kind, private or not alike. Evidence goes in
+OSM feature must be the only one named as the school, same kind, private or not alike (only
+an abbreviation like ЧСУ/СУ or "частно" says which; one site mapped twice is one feature). Evidence goes in
 `geocode_meta.evidence`; method `agent_pick`, tag `coords_source=pin_agent`.
+
+**Weekly run.** `backend/scripts/refresh_pins.sh` runs both stages from cron on the machine
+with the launch DB, hourly but only a week after the last good run: dry runs first, a stop
+(GitHub issue "Pin refresh stopped") when either would place more than `PINS_MAX_PLACED`
+(10), else backup, apply, catchment dry run (an issue if it would change) and publish.
+About $0.02 a week for Sofia. Setup:
+
+```
+10 * * * * bash /home/mike2906/sofiaschoolcomparison/backend/scripts/refresh_pins.sh
+```
+
+A new city needs its write bounds and its local name in `website_pins.CITY_NAMES`, then
+one supervised run before the cron takes it (`PINS_CITY`).
 
 ## Reusing a point for another record (UF44)
 
