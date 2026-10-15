@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import {
+  calculatorLinksFor,
   cutoffValue,
   campaignEnd,
   compareWithCutoff,
@@ -135,4 +136,28 @@ test('a result is compared with the last admitted child', () => {
   assert.equal(compareWithCutoff({ group: points(2), points: points(5) }, { last_admitted_group: 2 }), 'sameGroup')
   assert.equal(compareWithCutoff({ group: points(4), points: points(10) }, { last_admitted_points: 6 }), null)
   assert.equal(compareWithCutoff({ points: points(10) }, null), null)
+})
+
+test('calculatorLinksFor: a school with a preparatory group links to both tabs', () => {
+  const school = {
+    school_type: 'state',
+    education_level: 'primary',
+    country_code: 'bg',
+    admission_info: {
+      catchment_ids: { 'bg-sofia-gis': ['123'] },
+      cutoff_summary: [{ stage: 'preparatory', age_group: 'preschool' }, { stage: 'grade_1' }],
+    },
+  }
+  assert.deepEqual(calculatorLinksFor(school), [
+    { stage: 'kindergarten', what: 'preparatory' },
+    { stage: 'grade_1', what: 'grade_1' },
+  ])
+  const catchmentOnly = { ...school, admission_info: { catchment_ids: school.admission_info.catchment_ids } }
+  assert.deepEqual(calculatorLinksFor(catchmentOnly), [{ stage: 'grade_1', what: 'grade_1' }])
+  assert.deepEqual(
+    calculatorLinksFor({ school_type: 'state', education_level: 'kindergarten', country_code: 'bg' }),
+    [{ stage: 'kindergarten', what: 'kindergarten' }],
+  )
+  assert.deepEqual(calculatorLinksFor({ admission_info: { cutoff_summary: [{ stage: 'grade_8' }] } }), [{ stage: 'grade_8', what: 'grade_8' }])
+  assert.deepEqual(calculatorLinksFor(null), [])
 })

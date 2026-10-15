@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import CutoffTable from './CutoffTable'
-import { calculatorStagesFor, usesSofiaKindergartenSystem } from '../../utils/admission'
+import { calculatorLinksFor } from '../../admission/calculator'
 
 /**
  * "Who got in before" on a school page: the last admitted result per group or class from
@@ -10,14 +10,11 @@ import { calculatorStagesFor, usesSofiaKindergartenSystem } from '../../utils/ad
 function SchoolCutoffs({ school }) {
   const { t } = useTranslation()
   const rows = school.admission_info?.cutoff_summary || []
-  const stages = calculatorStagesFor(school)
-  if (rows.length === 0 && stages.length === 0) return null
-  // One link says what it calculates when a school has more than one: a school with a
-  // preparatory group links to it as well as to first grade.
-  const label = stage => {
-    if (stages.length === 1) return t('cutoffs.calculate')
-    return t(`cutoffs.calculateStage.${stage === 'kindergarten' && !usesSofiaKindergartenSystem(school) ? 'preparatory' : stage}`)
-  }
+  const links = calculatorLinksFor(school)
+  if (rows.length === 0 && links.length === 0) return null
+  // A link says what it calculates when a school has several, and always for a school's
+  // preparatory group, which a parent would not expect under the kindergarten rules.
+  const label = what => (links.length === 1 && what !== 'preparatory' ? t('cutoffs.calculate') : t(`cutoffs.calculateStage.${what}`))
 
   return (
     <section className="bg-white rounded-2xl shadow-card border border-neutral-200 p-6 md:p-8 mb-6">
@@ -26,15 +23,15 @@ function SchoolCutoffs({ school }) {
       <div className="mt-4">
         {rows.length > 0 ? <CutoffTable rows={rows} /> : <p className="text-sm text-neutral-600">{t('cutoffs.none')}</p>}
       </div>
-      {stages.length > 0 && (
+      {links.length > 0 && (
         <div className="mt-5 flex flex-wrap gap-2">
-          {stages.map(stage => (
+          {links.map(({ stage, what }) => (
             <Link
               key={stage}
               to={`/admission?stage=${stage}&school=${school.id}`}
               className="inline-flex items-center rounded-lg bg-primary-700 px-4 py-2 text-sm font-medium text-white hover:bg-primary-800"
             >
-              {label(stage)}
+              {label(what)}
             </Link>
           ))}
         </div>

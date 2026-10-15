@@ -1,5 +1,3 @@
-import { schoolCatchmentIds } from '../admission/catchments.js'
-
 const NO_REQUIREMENT_PATTERNS = [
   /\b(?:none|no (?:entrance )?(?:test|exam|interview)(?: required)?|(?:test|exam|interview) (?:is )?not required|not required|without (?:an? )?(?:test|exam|interview))\b/i,
   /(?:без|няма)\s+(?:(?:входен|приемен|приемния)\s+)?(?:тест|изпит|интервю|събеседване)/i,
@@ -174,20 +172,6 @@ const NON_DISPLAY_ADMISSION_KEYS = new Set([
 /** True when the cut-off import gave a school kindergarten or nursery rows. */
 export function hasKindergartenCutoffs(admissionInfo) {
   return (admissionInfo?.cutoff_summary || []).some(row => ['nursery', 'kindergarten', 'preparatory'].includes(row.stage))
-}
-
-/**
- * The calculator tabs a school's page links to, in tab order. A school with a
- * preparatory group (ПГУ) is ranked for it like a kindergarten, so it gets the
- * kindergarten tab as well as its first-grade or eighth-grade tab.
- */
-export function calculatorStagesFor(school) {
-  const summary = school?.admission_info?.cutoff_summary || []
-  const stages = []
-  if (usesSofiaKindergartenSystem(school) || summary.some(row => row.stage === 'preparatory')) stages.push('kindergarten')
-  if (schoolCatchmentIds(school).length > 0) stages.push('grade_1')
-  if (summary.some(row => row.stage === 'grade_8')) stages.push('grade_8')
-  return stages
 }
 
 /** True when `admission_info` holds something the admission sections display. */
