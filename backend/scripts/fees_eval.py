@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import datetime
 import json
 import sys
 from decimal import Decimal
@@ -39,17 +40,20 @@ from typing import Any
 BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND))
 
-from app.ai.client import extract_provider_cost_usd, get_model  # noqa: E402
+from app.ai.client import extract_provider_cost_usd, get_model, get_model_costs  # noqa: E402
 from app.models import School  # noqa: E402
 from app.scrapers.extraction.agent_fees import check_fee  # noqa: E402
 from app.scrapers.stages.fees_agent import (  # noqa: E402
+    READ_OUTPUT_TOKENS_RESERVE,
     PageRead,
+    Spend,
     _build_rows,
     _new_source_page,
     _page_for,
     reader_agent,
     reader_message,
 )
+from app.utils import display_gating  # noqa: E402
 from app.utils.display_gating import pricing_row_is_publishable  # noqa: E402
 
 EVAL_DIR = BACKEND / "evals" / "fees"
@@ -59,6 +63,7 @@ ACCURACY = BACKEND.parent / "docs" / "accuracy"
 KEY_SETS = ("step3", "step4")
 BGN_PER_EUR = Decimal("1.95583")
 TOLERANCE = Decimal("0.01")
+READ_TIMEOUT_SECONDS = 240  # as the stage's read
 # Noise, measured 2026-10-15 over 5 trials of the same pages: one trial's wrong rate ran 7 to
 # 16 % and its found rate 35 to 44 %. CI averages 3 trials against a 5-trial baseline, so
 # these margins are about two standard deviations: only a real drop fails the check.
@@ -105,16 +110,22 @@ def _value(field: Any) -> Any:
     return getattr(field, "value", field)
 
 
+def _row_matches(row: Any, fee: dict[str, Any]) -> bool:
+    """Same amount; a range row only matches the same range."""
+    if row.amount is not None:
+        return any(_same(_euro(row.amount, row.currency), b) for b in _fee_amounts(fee))
+    return _same(_euro(row.amount_min, row.currency), _euro(fee.get("amount_min"), fee.get("currency"))) and _same(
+        _euro(row.amount_max, row.currency), _euro(fee.get("amount_max"), fee.get("currency"))
+    )
+
+
 def score_school(rows: list[Any], fees: list[dict[str, Any]]) -> dict[str, Any]:
     """Each row's verdict and the key fees found, for one school."""
     verdicts: list[dict[str, Any]] = []
     found: set[str] = set()
     for row in rows:
         category, period, currency = _value(row.category), _value(row.period), row.currency
-        amounts = [
-            value for value in (_euro(row.amount, currency), _euro(row.amount_min, currency)) if value is not None
-        ]
-        at_amount = [fee for fee in fees if any(_same(a, b) for a in amounts for b in _fee_amounts(fee))]
+        at_amount = [fee for fee in fees if _row_matches(row, fee)]
         same_category = [fee for fee in at_amount if fee["category"] == category]
         verdict, fid = "wrong", None
         if not at_amount:
@@ -136,15 +147,6 @@ def score_school(rows: list[Any], fees: list[dict[str, Any]]) -> dict[str, Any]:
             if fid in found:
                 verdict, reason = "duplicate", f"second row on {fid}"
             found.add(fid)
-        # A fee paid in instalments is one row whose options carry the instalments, each a key fee.
-        for option in (row.pricing_context or {}).get("payment_options") or []:
-            for name in ("total", "instalment", "first_payment"):
-                value = _euro(option.get(name), currency)
-                found |= {
-                    fee["fid"]
-                    for fee in fees
-                    if fee["category"] == category and any(_same(value, b) for b in _fee_amounts(fee))
-                }
         verdicts.append(
             {
                 "category": category,
@@ -157,11 +159,23 @@ def score_school(rows: list[Any], fees: list[dict[str, Any]]) -> dict[str, Any]:
                 "reason": reason,
             }
         )
+    # A fee paid in instalments is one row whose options carry the instalments, each a key fee.
+    # Counted after every row has its verdict, so a row of its own on an instalment is judged
+    # whichever order the reader listed them in.
+    for row in rows:
+        for option in (row.pricing_context or {}).get("payment_options") or []:
+            for name in ("total", "instalment", "first_payment"):
+                value = _euro(option.get(name), row.currency)
+                found |= {
+                    fee["fid"]
+                    for fee in fees
+                    if fee["category"] == _value(row.category) and any(_same(value, b) for b in _fee_amounts(fee))
+                }
     return {"rows": verdicts, "found": sorted(found), "site_fees": len(fees)}
 
 
-async def read_school(saved: dict[str, Any]) -> tuple[list[Any], float]:
-    """The publishable rows one read of the saved pages gives, and the call's cost."""
+async def read_school(saved: dict[str, Any], spend: Spend) -> list[Any]:
+    """The publishable rows one read of the saved pages gives; the call is paid from ``spend``."""
     school = School(
         id=saved["school_id"],
         name_i18n=saved.get("name_i18n") or {},
@@ -174,8 +188,14 @@ async def read_school(saved: dict[str, Any]) -> tuple[list[Any], float]:
     pages = [PageRead(**page) for page in saved["pages"]]
     priced = [page for page in pages if page.prices]
     if not priced:
-        return [], 0.0
-    result = await reader_agent().run(reader_message(school, priced, ()))
+        return []
+    message = reader_message(school, priced, ())
+    in_price, out_price = get_model_costs("pricing")
+    estimate = (len(message) / 3 * in_price + READ_OUTPUT_TOKENS_RESERVE * out_price) / 1_000_000
+    with spend.hold(estimate):  # counted while in flight, so 8 workers cannot all pass the cap
+        result = await asyncio.wait_for(reader_agent().run(message), READ_TIMEOUT_SECONDS)
+    # OpenRouter sometimes reports no cost: the estimate stands in, so the cap still stops the run.
+    spend.spent_usd += extract_provider_cost_usd(result) or estimate
     stand_ins = {page.url: _new_source_page(school, page, None, -(i + 1)) for i, page in enumerate(priced)}
     checked = []
     for fee in result.output.fees:
@@ -183,7 +203,7 @@ async def read_school(saved: dict[str, Any]) -> tuple[list[Any], float]:
         if page is not None and (outcome := check_fee(fee, page.text)).kept:
             checked.append((outcome, stand_ins[page.url]))
     rows, _ = _build_rows(school, checked)
-    return [row for row in rows if pricing_row_is_publishable(row)], extract_provider_cost_usd(result)
+    return [row for row in rows if pricing_row_is_publishable(row)]
 
 
 def summarize(schools: dict[int, dict[str, Any]]) -> dict[str, Any]:
@@ -201,7 +221,7 @@ def summarize(schools: dict[int, dict[str, Any]]) -> dict[str, Any]:
     }
 
 
-async def run_trial(cases: list[dict[str, Any]], key: dict[int, list], workers: int, budget: dict) -> dict[str, Any]:
+async def run_trial(cases: list[dict[str, Any]], key: dict[int, list], workers: int, spend: Spend) -> dict[str, Any]:
     gate = asyncio.Semaphore(workers)
     schools: dict[int, dict[str, Any]] = {}
     errors: dict[int, str] = {}
@@ -209,15 +229,11 @@ async def run_trial(cases: list[dict[str, Any]], key: dict[int, list], workers: 
     async def one(saved: dict[str, Any]) -> None:
         school_id = saved["school_id"]
         async with gate:
-            if budget["spent"] >= budget["cap"]:
-                errors[school_id] = "spend cap reached"
-                return
             try:
-                rows, cost = await read_school(saved)
+                rows = await read_school(saved, spend)
             except Exception as exc:  # one failed read is that school's, not the run's
                 errors[school_id] = f"{type(exc).__name__}: {str(exc)[:200]}"
                 return
-        budget["spent"] += cost
         schools[school_id] = score_school(rows, key[school_id])
 
     await asyncio.gather(*(one(saved) for saved in cases))
@@ -255,8 +271,19 @@ def main() -> int:
     if not cases:
         print(f"No saved pages in {PAGES_DIR} for the keyed schools.")
         return 2
-    budget = {"spent": 0.0, "cap": args.max_usd}
-    trials = [asyncio.run(run_trial(cases, key, args.workers, budget)) for _ in range(args.trials)]
+    if missing and not args.school_id:
+        print(f"Keyed schools without saved pages: {missing}; the score is not comparable.")
+        return 2
+    # The publish gate drops an offer once its end date passes: judge it on the day the pages
+    # were saved, so the score does not move with the calendar.
+    saved_on = max(datetime.date.fromisoformat(case["found_at"]) for case in cases)
+    display_gating._sofia_today = lambda: saved_on
+    spend = Spend(args.max_usd)
+
+    async def all_trials() -> list[dict[str, Any]]:  # one event loop: the provider's client is shared
+        return [await run_trial(cases, key, args.workers, spend) for _ in range(args.trials)]
+
+    trials = asyncio.run(all_trials())
     rates = {
         name: round(sum(t["summary"][name] for t in trials) / len(trials), 4) for name in ("wrong_rate", "found_rate")
     }
@@ -265,7 +292,7 @@ def main() -> int:
         "schools": len(cases),
         "schools_without_pages": missing,
         "trials": args.trials,
-        "spent_usd": round(budget["spent"], 4),
+        "spent_usd": round(spend.spent_usd, 4),
         **rates,
         "per_trial": trials,
     }

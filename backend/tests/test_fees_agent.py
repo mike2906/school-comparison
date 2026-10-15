@@ -606,7 +606,7 @@ async def test_a_failed_school_still_finalises_the_run(db_session, monkeypatch):
     monkeypatch.setattr(fees_agent, "fee_http_client", _nothing)
     monkeypatch.setattr(fees_agent, "pipeline_run_heartbeat", _nothing)
     monkeypatch.setattr(fees_agent, "run_school", _fail)
-    report = await fees_agent.run_fees_agent(db_session, school_id=school.id)
+    report = await fees_agent.run_fees_agent(db_session, school_ids=[school.id])
     assert report["outcomes"] == {"error": 1}
     run = await db_session.get(PipelineRun, report["pipeline_run_id"])
     assert run.status.value != "running"
@@ -669,7 +669,7 @@ async def test_a_browser_that_will_not_start_still_finalises_the_run(db_session,
             return False
 
     monkeypatch.setattr(crawl4ai, "AsyncWebCrawler", _BrokenCrawler)
-    report = await fees_agent.run_fees_agent(db_session, school_id=school.id)
+    report = await fees_agent.run_fees_agent(db_session, school_ids=[school.id])
     assert "chromium did not launch" in report["stopped"] and report["schools"] == 0
     run = await db_session.get(PipelineRun, report["pipeline_run_id"])
     assert run.status.value != "running"

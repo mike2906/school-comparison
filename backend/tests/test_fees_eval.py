@@ -23,6 +23,7 @@ def _row(category, amount, period=None, currency="EUR", options=()):
         period=types.SimpleNamespace(value=period) if period else None,
         amount=amount,
         amount_min=None,
+        amount_max=None,
         currency=currency,
         pricing_context={"label": "x", "payment_options": list(options)},
     )
@@ -61,6 +62,27 @@ def test_same_amount_for_several_groups():
     scored = fees_eval.score_school(rows, key)
     assert [row["verdict"] for row in scored["rows"]] == ["right", "right", "duplicate"]
     assert scored["found"] == ["f1", "f2"]
+
+
+def test_option_and_own_row_score_alike_in_either_order():
+    key = [_fee("f1", "tuition", 7300, "yearly"), _fee("f2", "tuition", 3850)]
+    plan = _row("tuition", 7300, "yearly", options=[{"instalment": 3850}])
+    part = _row("tuition", 3850)
+    first = fees_eval.score_school([plan, part], key)
+    second = fees_eval.score_school([part, plan], key)
+    assert sorted(r["verdict"] for r in first["rows"]) == sorted(r["verdict"] for r in second["rows"])
+    assert first["found"] == second["found"] == ["f1", "f2"]
+
+
+def test_range_row_needs_the_same_range():
+    key = [
+        _fee("f1", "tuition", 6000, "yearly"),
+        {**_fee("f2", "tuition", None), "amount_min": 6000, "amount_max": 9500},
+    ]
+    row = _row("tuition", None, "yearly")
+    row.amount_min, row.amount_max = 6000, 9500
+    scored = fees_eval.score_school([row], key)
+    assert scored["rows"][0]["fid"] == "f2"
 
 
 def test_check_against_baseline():
@@ -110,8 +132,9 @@ async def test_read_school_offline(monkeypatch):
             {"url": URL, "text": f"Такси\n{line}\n", "prices": True, "note": None},
         ],
     }
-    rows, cost = await fees_eval.read_school(saved)
+    spend = fees_eval.Spend(0.10)
+    rows = await fees_eval.read_school(saved, spend)
     assert [(row.amount, row.category.value) for row in rows] == [(7300, "tuition")]  # the invented fee is dropped
-    assert cost == 0.0
+    assert 0 < spend.spent_usd < 0.01  # no cost reported: the estimate is counted
     scored = fees_eval.score_school(rows, [_fee("f1", "tuition", 7300, "yearly"), _fee("f2", "tuition", 3850)])
     assert scored["found"] == ["f1", "f2"]

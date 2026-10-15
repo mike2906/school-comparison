@@ -1088,7 +1088,6 @@ async def run_fees_agent(
     *,
     country: str = "bg",
     city: Optional[str] = None,
-    school_id: Optional[int] = None,
     school_ids: Sequence[int] = (),
     limit: Optional[int] = None,
     max_usd: float = DEFAULT_MAX_USD,
@@ -1113,9 +1112,10 @@ async def run_fees_agent(
     from crawl4ai import AsyncWebCrawler, BrowserConfig, CacheMode, CrawlerRunConfig  # type: ignore
 
     query = select(School).where(School.country_code == country, School.website_url.isnot(None))
-    ids = [*school_ids, *([school_id] if school_id else [])]
     query = (
-        query.where(School.id.in_(ids)) if ids else query.where(School.school_type.in_(["private", "international"]))
+        query.where(School.id.in_(school_ids))
+        if school_ids
+        else query.where(School.school_type.in_(["private", "international"]))
     )
     if city:
         query = query.where(School.city == city)
@@ -1123,7 +1123,7 @@ async def run_fees_agent(
         query = query.where(School.id > after_id)
     # Ids, not objects: a rollback after one school's failure expires every loaded object.
     rows = (await db.execute(query.with_only_columns(School.id, School.website_url).order_by(School.id).limit(limit))).all()
-    school_ids = [row.id for row in rows]
+    run_ids = [row.id for row in rows]
     sites = {row.id: row.website_url for row in rows}
 
     spend = Spend(max_usd)
@@ -1177,7 +1177,7 @@ async def run_fees_agent(
 
                 results, error = await school_pool.run_schools(
                     db,
-                    school_ids,
+                    run_ids,
                     one,
                     workers=workers,
                     stop_on=(SpendCapReached, ProviderCostCapExceeded),
