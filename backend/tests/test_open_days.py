@@ -287,13 +287,7 @@ def test_a_window_already_open_or_beside_a_past_open_day_is_kept():
     def window(**extra):
         return DateFact(topic="admissions", fact_en="x", fact_bg="x", quote="q", source_url=HOME, **extra)
 
-    # 1 October to 30 November with no year, read on 14 October.
-    assert (
-        rules.upcoming(
-            window(applications_open="2026-10-01", applications_close="2026-11-30", year_stated=False), TODAY
-        )
-        is None
-    )
+    assert rules.upcoming(window(applications_open="2026-10-01", applications_close="2026-11-30"), TODAY) is None
     assert rules.upcoming(window(open_days=["2026-10-10"], applications_close="2026-11-30"), TODAY) is None
 
 
@@ -362,3 +356,21 @@ async def test_the_same_open_day_with_a_longer_quote_replaces_the_stored_fact():
     report = await stage.check_school(school, _fetcher({HOME: HOME_TEXT}), calls, TODAY)
     facts = stage.merged([stored], report["add"], report["remove"])
     assert [row["quote"] for row in facts] == [ANNOUNCEMENT] and report["facts"][0]["rank"] == "key"
+
+
+def test_an_application_date_without_a_year_is_not_believed():
+    # "Приемът в 1. клас започва на 21 април": last campaign's page, read in October.
+    fact = DateFact(
+        topic="admissions",
+        fact_en="x",
+        fact_bg="x",
+        quote="q",
+        source_url=HOME,
+        applications_open="2027-04-21",
+        year_stated=False,
+    )
+    assert rules.upcoming(fact, TODAY) == "application date without a year"
+    assert (
+        rules.upcoming(_date_fact(days=["2027-04-16"], year_stated=False), TODAY) == "date without a year too far ahead"
+    )
+    assert rules.upcoming(_date_fact(days=["2026-11-15"], year_stated=False), TODAY) is None

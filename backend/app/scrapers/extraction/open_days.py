@@ -41,7 +41,7 @@ MAX_EXCERPT_CHARS = 6_000
 
 # A date the page gives without a year is read as the next such date; only one this close
 # is believed (an undated line from last spring would otherwise become next spring).
-UNDATED_YEAR_MAX_DAYS = 200
+UNDATED_YEAR_MAX_DAYS = 90
 
 READER_PROMPT = """You read lines from a school's own web pages (each part starts with "=== PAGE <url>") that mention
 open days or applications. List only these facts, each with topic "admissions":
@@ -183,11 +183,12 @@ def upcoming(fact: DateFact, today: datetime.date) -> Optional[str]:
     if not (days or opens or closes):
         return "no date"
     if not fact.year_stated:
-        ahead = [*days, *(x for x in (closes,) if x)]
-        # A window already open (opened 1 October, closes 30 November) may open in the past.
-        if any(not 0 <= (d - today).days <= UNDATED_YEAR_MAX_DAYS for d in ahead) or (
-            opens and not -OPEN_ONLY_WINDOW_DAYS <= (opens - today).days <= UNDATED_YEAR_MAX_DAYS
-        ):
+        # An application window without a year is most often last campaign's page left up
+        # ("приемът започва на 21 април"): only a stated year is believed. An open day
+        # without one is believed only when it is near.
+        if opens or closes:
+            return "application date without a year"
+        if any(not 0 <= (d - today).days <= UNDATED_YEAR_MAX_DAYS for d in days):
             return "date without a year too far ahead"
     open_day = bool(days) and max(days) >= today
     if closes:  # an application window counts until it closes

@@ -126,8 +126,9 @@ and cheaply:
    feed elsewhere on the page changes nothing. Hashes live in
    `attributes["open_days_watch"]` (internal).
 3. **Read only on a change.** One reader call on the lines around the changed mentions
-   (today's date in the prompt; a date without a year is the next one, and only within
-   200 days), then the school-facts checks: quote on a page read, sign-up link on a page,
+   (today's date in the prompt; an open day without a year is the next one, and only within
+   90 days; an application date needs its year on the page, since an undated one is
+   usually last campaign's page), then the school-facts checks: quote on a page read, sign-up link on a page,
    and the judge. Past dates are dropped. A kept date fact is stored with the school's
    facts at least as `more` (the judge grades for choosing a school, and a `minor` fact
    would stay out of the dates at a glance). A page whose stored dates a full facts read
