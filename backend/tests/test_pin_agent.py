@@ -120,6 +120,14 @@ def test_a_plain_type_word_is_not_called_state():
     assert stage.check_pick("Френско училище Виктор Юго", False, "ул. Бигла 56", state, [state], SOFIA, (), private=True) == (
         "one name is a private institution's, the other not"
     )
+    # A state school named with a type word is not our private namesake.
+    neg = Candidate(point=(42.68, 23.33), source="osm_school", name="Немска езикова гимназия", address='ул. "Бигла" № 56')
+    assert stage.check_pick("Частна немска езикова гимназия", False, "ул. Бигла 56", neg, [neg], SOFIA, (), private=True) == (
+        "one name is a private institution's, the other not"
+    )
+    # A person's initial is not an abbreviation.
+    initial = Candidate(point=(42.68, 23.33), source="osm_school", name="Американски колеж Г. Шипков", address='ул. "Бигла" № 56')
+    assert stage.check_pick("Американски колеж Г. Шипков", False, "ул. Бигла 56", initial, [initial], SOFIA, (), private=True) is None
 
 
 def test_one_site_mapped_twice_or_a_namesake_kindergarten_is_not_a_second_branch():

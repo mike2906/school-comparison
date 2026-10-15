@@ -9,10 +9,11 @@
 #
 # Each stage first runs dry: more than PINS_MAX_PLACED (default 10) placements in one week
 # means a bug or a source gone wrong, so the script stops before writing. Otherwise it
-# backs up, applies, and publishes with publish_snapshot.sh when anything was placed.
-# After a placement it dry-runs the catchment match; a change there opens an issue (the
-# match is reviewed by hand) but does not hold the pins back. A stop opens one GitHub
-# issue, "Pin refresh stopped", and the next hour retries. Log and reports:
+# backs up and applies to the schools the dry run placed only (the model's picks can
+# differ between runs), then publishes with publish_snapshot.sh. Before that publish it
+# dry-runs the catchment match; a change there opens an issue (the match is reviewed by
+# hand) but does not hold the pins back. A stop opens one GitHub issue, "Pin refresh
+# stopped"; a stopped run is retried a day later, a failed publish the next hour. Log and reports:
 # $state/refresh_pins.log, $state/pins-*.json (kept a month); a pg_dump before each
 # apply (the last 4 kept) in $backups.
 set -euo pipefail
@@ -40,31 +41,41 @@ stop() {
 	log "STOPPED: $*"
 	issue "Pin refresh stopped" "backend/scripts/refresh_pins.sh on $(hostname) stopped at $(date -u +%Y-%m-%dT%H:%M:%SZ): $*
 
-New pins are not reaching the site until this is fixed; the next hourly run tries again. Log: $state/refresh_pins.log. Close this issue once fixed."
+New pins are not reaching the site until this is fixed; the script tries again a day later (a failed publish, next hour). Log: $state/refresh_pins.log. Close this issue once fixed."
 	exit 1
 }
-placed() { python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["outcomes"].get("placed", 0))' "$1"; }
+report() { python3 -c 'import json, sys; r = json.load(open(sys.argv[1])); print(eval(sys.argv[2], {"r": r}))' "$1" "$2"; }
+placed() { report "$1" 'r["outcomes"].get("placed", 0)'; }
+# --school-id flags for the schools a dry run placed: the apply writes no others.
+placed_ids() { report "$1" '" ".join(f"--school-id {i}" for i in sorted({x["school_id"] for x in r["results"] if x["outcome"] == "placed"}))'; }
 
 # One run at a time; a run still going when cron fires again is left to finish.
 exec 8>>"$state/refresh_pins.lock"
 flock -n 8 || exit 0
+cd "$repo_root/backend"
+cli() { uv run python -m app.scrapers.cli "$@" > /dev/null; }
 
-# "unpublished" marks a run whose pins were written but whose publish failed: publish first.
+# "unpublished" marks a run whose pins were written but not yet published: publish first.
 if [ ! -f "$state/pins_unpublished" ]; then
+	now="$(date -u +%s)"
 	last="$(cat "$state/pins_last_ok" 2>/dev/null || echo 0)"
-	[ $(($(date -u +%s) - last)) -ge $((7 * 24 * 3600)) ] || exit 0
+	[ $((now - last)) -ge $((7 * 24 * 3600)) ] || exit 0
+	# A stopped run is retried a day later, not every hour: each try pays for a dry run.
+	tried="$(cat "$state/pins_last_try" 2>/dev/null || echo 0)"
+	[ $((now - tried)) -ge $((20 * 3600)) ] || exit 0
+	echo "$now" > "$state/pins_last_try"
 
 	stamp="$(date -u +%Y%m%dT%H%M%SZ)"
-	cd "$repo_root/backend"
-	cli() { uv run python -m app.scrapers.cli "$@" > /dev/null; }
-
-	cli website-pins --city "$city" --out "$state/pins-website-dry-$stamp.json" || stop "website-pins dry run failed"
-	cli pin-agent --city "$city" --max-usd "$max_usd" --out "$state/pins-agent-dry-$stamp.json" || stop "pin-agent dry run failed"
-	website="$(placed "$state/pins-website-dry-$stamp.json")"
-	agent="$(placed "$state/pins-agent-dry-$stamp.json")"
+	dry_web="$state/pins-website-dry-$stamp.json"
+	dry_agent="$state/pins-agent-dry-$stamp.json"
+	cli website-pins --city "$city" --out "$dry_web" || stop "website-pins dry run failed"
+	cli pin-agent --city "$city" --max-usd "$max_usd" --out "$dry_agent" || stop "pin-agent dry run failed"
+	[ -z "$(report "$dry_agent" 'r["stopped"] or ""')" ] || stop "pin-agent dry run stopped early: $(report "$dry_agent" 'r["stopped"]')"
+	website="$(placed "$dry_web")"
+	agent="$(placed "$dry_agent")"
 	log "dry run: website-pins $website, pin-agent $agent would be placed"
 	[ "$website" -le "$max_placed" ] && [ "$agent" -le "$max_placed" ] ||
-		stop "the dry run would place $website (website) and $agent (agent) locations, over $max_placed; check the reports $state/pins-*-dry-$stamp.json"
+		stop "the dry run would place $website (website) and $agent (agent) locations, over $max_placed; check $dry_web and $dry_agent"
 
 	if [ $((website + agent)) -gt 0 ]; then
 		backup="$backups/$database-pre-pins-$stamp.dump"
@@ -76,32 +87,33 @@ if [ ! -f "$state/pins_unpublished" ]; then
 
 		# Each pin is written on its own, so pins written before a failure are published next hour.
 		touch "$state/pins_unpublished"
-		cli website-pins --city "$city" --apply --out "$state/pins-website-$stamp.json" || stop "website-pins failed"
-		cli pin-agent --city "$city" --max-usd "$max_usd" --apply --out "$state/pins-agent-$stamp.json" || stop "pin-agent failed"
-		website="$(placed "$state/pins-website-$stamp.json")"
-		agent="$(placed "$state/pins-agent-$stamp.json")"
-		log "applied: website-pins $website, pin-agent $agent placed"
-		[ $((website + agent)) -gt 0 ] || rm -f "$state/pins_unpublished"
-
-		if [ "$city" = sofia ] && [ $((website + agent)) -gt 0 ]; then
-			catchments="$(uv run python scripts/match_sofia_catchments.py 2>&1)" || catchments="the dry run failed: $catchments"
-			if ! grep -q "'schools_changed': 0," <<< "$catchments"; then
-				log "catchment match would change: $(grep -m 1 "schools_changed" <<< "$catchments" || echo "no summary")"
-				issue "Catchment match changed" "After placing pins, backend/scripts/match_sofia_catchments.py (dry run) on $(hostname) at $(date -u +%Y-%m-%dT%H:%M:%SZ) would change:
-
-\`\`\`
-$(head -n 40 <<< "$catchments")
-\`\`\`
-
-Review it and apply with \`--apply\`, then publish. The pins themselves were published."
-			fi
-		fi
+		# shellcheck disable=SC2046  # one word per flag and id
+		[ "$website" = 0 ] || cli website-pins --city "$city" --apply $(placed_ids "$dry_web") --out "$state/pins-website-$stamp.json" ||
+			stop "website-pins failed"
+		# shellcheck disable=SC2046
+		[ "$agent" = 0 ] || cli pin-agent --city "$city" --max-usd "$max_usd" --apply $(placed_ids "$dry_agent") --out "$state/pins-agent-$stamp.json" ||
+			stop "pin-agent failed"
+		log "applied: see $state/pins-*-$stamp.json"
 	fi
 	find "$state" -name 'pins-*.json' -mtime +30 -delete
 	date -u +%s > "$state/pins_last_ok"
 fi
 
 if [ -f "$state/pins_unpublished" ]; then
+	if [ "$city" = sofia ]; then
+		# Pins can move a school into or out of a catchment: the match is reviewed by hand.
+		catchments="$(uv run python scripts/match_sofia_catchments.py 2>&1)" || catchments="the dry run failed: $catchments"
+		if ! grep -Eq "'schools_changed': 0[,}]" <<< "$catchments"; then
+			log "catchment match would change: $(grep -m 1 "schools_changed" <<< "$catchments" || echo "no summary")"
+			issue "Catchment match changed" "After placing pins, backend/scripts/match_sofia_catchments.py (dry run) on $(hostname) at $(date -u +%Y-%m-%dT%H:%M:%SZ) would change:
+
+\`\`\`
+$(head -n 40 <<< "$catchments")
+\`\`\`
+
+Review it, apply with \`--apply\` and publish. The pins themselves are published."
+		fi
+	fi
 	"$repo_root/backend/scripts/publish_snapshot.sh" || stop "publish failed (pins stored, not published; the next run retries)"
 	rm -f "$state/pins_unpublished"
 	log "published"

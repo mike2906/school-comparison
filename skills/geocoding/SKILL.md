@@ -65,12 +65,14 @@ an abbreviation like ЧСУ/СУ or "частно" says which; one site mapped t
 
 **Weekly run.** `backend/scripts/refresh_pins.sh` runs both stages from cron on the machine
 with the launch DB, hourly but only a week after the last good run: dry runs first, a stop
-(GitHub issue "Pin refresh stopped") when either would place more than `PINS_MAX_PLACED`
-(10), else backup, apply, catchment dry run (an issue if it would change) and publish.
-About $0.02 a week for Sofia. Setup:
+(GitHub issue "Pin refresh stopped", retried a day later) when either would place more
+than `PINS_MAX_PLACED` (10); else backup, apply to the dry run's schools only, catchment
+dry run (an issue "Catchment match changed" if it would change) and publish. About $0.04 a
+week for Sofia (two agent passes). Setup, with the PATH cron lacks:
 
 ```
-10 * * * * bash /home/mike2906/sofiaschoolcomparison/backend/scripts/refresh_pins.sh
+PATH=/home/mike2906/.local/bin:/usr/local/bin:/usr/bin:/bin
+25 * * * * bash /home/mike2906/sofiaschoolcomparison/backend/scripts/refresh_pins.sh
 ```
 
 A new city needs its write bounds and its local name in `website_pins.CITY_NAMES`, then
