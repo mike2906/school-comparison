@@ -19,6 +19,7 @@ import math
 import re
 import zipfile
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Optional
 
 CSV_ZIP_URL = (
@@ -265,6 +266,13 @@ def read_register_zip(data: bytes) -> Register:
     with zipfile.ZipFile(io.BytesIO(data)) as archive:
         name = next(n for n in archive.namelist() if n.lower().endswith(".csv"))
         return read_register(archive.read(name).decode("utf-8-sig"))
+
+
+def read_register_file(path: Path) -> Register:
+    """A downloaded register: the CSV or its zip."""
+    if path.suffix.lower() == ".csv":
+        return read_register(path.read_text(encoding="utf-8-sig"))
+    return read_register_zip(path.read_bytes())
 
 
 def distance_m(a: tuple[float, float], b: tuple[float, float]) -> float:

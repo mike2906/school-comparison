@@ -165,7 +165,7 @@ def test_register_near_finds_points_nearest_first():
 
 
 @pytest.mark.asyncio
-async def test_two_schools_mapping_one_address_in_one_run_are_not_both_placed(db_session):
+async def test_two_schools_mapping_one_address_in_one_run_are_both_held_back(db_session):
     await _school(db_session, _hidden())
     await _school(db_session, _hidden(), name_i18n={"bg": "ЧДГ Друга", "en": "Other"}, website_url="https://other.example/")
     pages = {HOME: CONTACT, "https://other.example/": CONTACT.replace("/js/build.js", "https://other.example/js/build.js")}
@@ -173,4 +173,52 @@ async def test_two_schools_mapping_one_address_in_one_run_are_not_both_placed(db
     report = await stage.run_site_address(
         db_session, register=REGISTER, fetch=_fetcher(pages), fetch_script=_fetcher(scripts)
     )
-    assert report["outcomes"] == {"placed": 1, "other_school_here": 1}
+    assert report["outcomes"] == {"other_school_here": 2}
+
+
+@pytest.mark.asyncio
+async def test_an_address_only_in_the_map_script_counts_as_the_sites(db_session):
+    """Дени Дидро's site is built in a script: the pages have no address text."""
+    await _school(db_session, _hidden())
+    pages = {HOME: '<p>Welcome</p><script src="/js/build.js"></script>'}
+    script = MAP_JS + 'var contacts={address:"2 Tenev Bair, Bankya, Sofia City Province, Bulgaria"};'
+    report = await stage.run_site_address(
+        db_session, register=REGISTER, fetch=_fetcher(pages), fetch_script=_fetcher({SCRIPT: script})
+    )
+    assert report["outcomes"] == {"placed": 1}
+
+
+@pytest.mark.asyncio
+async def test_a_reimport_of_the_old_address_syncs_the_moved_row_without_the_old_district(db_session):
+    from app.schemas.scraping import DiscoveredLocation
+    from app.scrapers.sources.base_adapter import _match_source_rows
+
+    await _school(db_session, _hidden())
+    await stage.run_site_address(
+        db_session, register=REGISTER, fetch=_fetcher({HOME: CONTACT}), fetch_script=_fetcher({SCRIPT: MAP_JS}), apply=True
+    )
+    moved = (await db_session.execute(select(SchoolLocation))).scalar_one()
+    old = DiscoveredLocation(address_i18n={"bg": 'ул. "Майор Коста Паница"'}, district="Банкя")
+    matched, new = _match_source_rows([moved], [old])
+    assert new == [] and matched[0][0] is moved and matched[0][1].district is None
+
+    # Another row still at that address is the one the source means.
+    other = _hidden()
+    matched, _ = _match_source_rows([other, moved], [old])
+    assert matched[0][0] is other and matched[0][1].district == "Банкя"
+
+
+@pytest.mark.asyncio
+async def test_a_wrong_website_puts_the_registered_address_back_and_hides_the_pin(db_session):
+    from app.scrapers.url_validator import clear_website_derived_locations
+
+    school = await _school(db_session, _hidden())
+    await stage.run_site_address(
+        db_session, register=REGISTER, fetch=_fetcher({HOME: CONTACT}), fetch_script=_fetcher({SCRIPT: MAP_JS}), apply=True
+    )
+    await clear_website_derived_locations(db_session, school.id)
+    await db_session.commit()
+    row = (await db_session.execute(select(SchoolLocation))).scalar_one()
+    assert row.address_i18n == {"bg": 'ул. "Майор Коста Паница"'}
+    assert row.lat is None and "coords_source=school_site_address" not in row.location_tags
+    assert "address_source=website_contact" not in row.location_tags

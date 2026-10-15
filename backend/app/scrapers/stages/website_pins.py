@@ -214,18 +214,19 @@ def _same_site_scripts(html: str, base: str) -> list[str]:
 
 async def _script_map_points(
     pages: list[tuple[str, str]], fetch_script: Fetch, bounds: dict[str, float]
-) -> list[tuple[float, float]]:
-    """Points a page's own scripts (inline, then same-site files) draw its map with."""
+) -> tuple[list[tuple[float, float]], str]:
+    """Points a page's own scripts (inline, then same-site files) draw its map with, and the
+    script they are in: a site built in a script (Дени Дидро's) has its address text there."""
     for _final, html in pages:
         inline = " ".join(t.get_text() for t in BeautifulSoup(html, "html.parser").find_all("script", src=False))
         if points := script_points(inline, bounds):
-            return points
+            return points, inline
     for final, html in pages:
         for url in _same_site_scripts(html, final):
             script = await fetch_script(url)
             if script is not None and (points := script_points(script[1], bounds)):
-                return points
-    return []
+                return points, script[1]
+    return [], ""
 
 
 def page_text(html: str) -> str:
@@ -245,7 +246,8 @@ async def read_site(
 ) -> Optional[tuple[list[tuple[float, float]], str]]:
     """Map points and visible text of the home page and the contact page, or None when the
     home page could not be read. With ``fetch_script`` and ``bounds``, a site whose pages
-    link no map is read for the points its own scripts draw a map with."""
+    link no map is read for the points its own scripts draw a map with, and that script's
+    text is read with the pages'."""
     home = await fetch(school.website_url)
     if home is None:
         return None
@@ -261,7 +263,8 @@ async def read_site(
             if all(_distance_m(point, seen) >= SAME_POINT_METRES for seen in points):
                 points.append(point)
     if not points and fetch_script is not None and bounds is not None:
-        points = await _script_map_points(pages, fetch_script, bounds)
+        points, script = await _script_map_points(pages, fetch_script, bounds)
+        texts.append(script)
     return points, "\n".join(texts)
 
 
@@ -377,13 +380,15 @@ async def write_pin(
     evidence: Optional[dict[str, Any]] = None,
     unchanged_from: Optional[tuple[float, float]] = None,
     address: Optional[str] = None,
+    extra_tags: Sequence[str] = (),
 ) -> str:
     """Pin a still-hidden location at ``point`` (exact), under a short row lock, and commit.
 
     Returns "placed", "pinned_meanwhile" (another stage pinned it since the read) or
     "rejected" (the write gate refused it; the old point is kept). With ``unchanged_from``,
     a location whose point moved since the read is left alone ("moved_meanwhile"). With
-    ``address``, the location's address becomes it (the old one is kept in the evidence)."""
+    ``address``, the location's address becomes it (the old one is kept in the evidence).
+    ``extra_tags`` are added in the same commit."""
     location = await db.get(SchoolLocation, location_id)
     # Another stage may have pinned it since the read; the lock waits for one still writing.
     await db.refresh(location, with_for_update=True)
@@ -424,7 +429,7 @@ async def write_pin(
         for existing in location.location_tags or []
         if not str(existing).startswith("coords_source=") or existing == OFFICIAL_COORDS_TAG
     ]
-    location.location_tags = [*tags, tag]
+    location.location_tags = [*tags, tag, *(t for t in extra_tags if t not in tags)]
     db.add(location)
     await db.commit()
     return "placed"

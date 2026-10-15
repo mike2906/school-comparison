@@ -38,6 +38,26 @@ def _address_keys(location) -> list:
     return keys
 
 
+def _match_source_rows(existing_locations, incoming_locations) -> tuple[list, list]:
+    """Pairs (row, source location) for the source locations a school already has, and the
+    source locations it has not. A row's current address wins over another row's replaced
+    one; a source location matching a replaced address syncs without its district (the old
+    premises')."""
+    known = {key: loc for loc in existing_locations for key in _address_keys(loc)}
+    known.update({_address_key(loc.address_i18n): loc for loc in existing_locations})
+    matched, new = [], []
+    for incoming in incoming_locations:
+        key = _address_key(incoming.address_i18n)
+        row = known.get(key)
+        if row is None:
+            new.append(incoming)
+        elif key != _address_key(row.address_i18n):
+            matched.append((row, incoming.model_copy(update={"district": None})))
+        else:
+            matched.append((row, incoming))
+    return matched, new
+
+
 def _is_pinned_location(location, address_i18n: Optional[dict]) -> bool:
     """Whether a source address is this pinned location.
 
@@ -303,17 +323,13 @@ class BaseSourceAdapter(ABC):
                             # A school this source already owns keeps its rows (and their
                             # coordinates) but takes the source's contact and age-group data,
                             # and may gain a location (e.g. a new kindergarten building).
-                            known = {
-                                key: loc for loc in existing_locations for key in _address_keys(loc)
-                            }
-                            for incoming in locations_to_add:
-                                row = known.get(_address_key(incoming.address_i18n))
-                                if row is not None:
-                                    await self._sync_source_location(row, incoming)
+                            matched, locations_to_add = _match_source_rows(
+                                existing_locations, locations_to_add
+                            )
+                            for row, incoming in matched:
+                                await self._sync_source_location(row, incoming)
                             locations_to_add = [
-                                loc.model_copy(update={"is_primary": False})
-                                for loc in locations_to_add
-                                if _address_key(loc.address_i18n) not in known
+                                loc.model_copy(update={"is_primary": False}) for loc in locations_to_add
                             ]
                         else:
                             locations_to_add = []

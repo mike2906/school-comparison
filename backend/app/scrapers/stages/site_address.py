@@ -8,9 +8,9 @@ a map with) sits within ``NEAR_M`` of a point in Sofia's address register and it
 name that register address. Then the school's one hidden location takes that address and
 point. Held back when the site gives several addresses, when the address is one of the
 school's shown locations already (the hidden one is then an old address), when an unrelated
-school is pinned there, or when the school has more than one hidden location (which one
-moved is unclear). No model calls. Default is a dry run. Sofia only. Run after
-``register-pins``.
+school is pinned there (or another school's site gives the same address), or when the
+school has more than one hidden location (which one moved is unclear). No model calls.
+Default is a dry run. Sofia only. Run after ``register-pins``.
 """
 
 from __future__ import annotations
@@ -159,12 +159,20 @@ async def run_site_address(
                     outcome = "other_school_here"
                 elif len(hidden) > 1:
                     outcome = "several_hidden"
-                else:
-                    pinned.append((school_id, point))  # a later school in this run sees it
             for row in rows:
                 if outcome == "placed" and row["old_point"]:
                     row["moved_m"] = round(_distance_m(row["old_point"], extra["point"]))
                 results.append({**row, **extra, "outcome": outcome})
+        # Two unrelated schools whose sites give one address: which one is there is unclear.
+        placed = [r for r in results if r["outcome"] == "placed"]
+        for row in placed:
+            if any(
+                other["school_id"] != row["school_id"]
+                and not (names.get(other["school_id"], set()) & names.get(row["school_id"], set()))
+                and _distance_m(row["point"], other["point"]) <= SAME_BUILDING_M
+                for other in placed
+            ):
+                row["outcome"] = "other_school_here"
         return results
 
     if fetch is None:
@@ -190,16 +198,10 @@ async def run_site_address(
                     evidence={"site_address": result["site_address"], "site_points": result["site_points"]},
                     unchanged_from=result["old_point"],
                     address=result["site_address"],
+                    # The address is the site's: shared-site checks must not count it as
+                    # registry evidence. Not READDRESSED_TAG: that re-geocodes the location.
+                    extra_tags=(WEBSITE_CONTACT_ADDRESS_TAG,),
                 )
-                if result["outcome"] == "placed":
-                    # Mark the address as the site's (shared-site checks must not count it as
-                    # registry evidence). Not READDRESSED_TAG: that re-geocodes the location.
-                    location = await db.get(SchoolLocation, result["location_id"])
-                    location.location_tags = [
-                        *(t for t in location.location_tags or [] if t != WEBSITE_CONTACT_ADDRESS_TAG),
-                        WEBSITE_CONTACT_ADDRESS_TAG,
-                    ]
-                    await db.commit()
     outcomes: dict[str, int] = {}
     for result in results:
         outcomes[result["outcome"]] = outcomes.get(result["outcome"], 0) + 1

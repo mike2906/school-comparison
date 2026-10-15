@@ -614,13 +614,9 @@ def register_pins_command(school_ids, limit, register_file, apply_changes, repor
 
     from app.database import async_session_maker
     from app.scrapers.stages import register_pins as register_pins_stage
-    from app.services.geocoding.bg.sofia_address_register import read_register, read_register_zip
+    from app.services.geocoding.bg.sofia_address_register import read_register_file
 
-    register = None
-    if register_file is not None and register_file.suffix.lower() == ".csv":
-        register = read_register(register_file.read_text(encoding="utf-8-sig"))
-    elif register_file is not None:
-        register = read_register_zip(register_file.read_bytes())
+    register = read_register_file(register_file) if register_file is not None else None
 
     async def _run():
         async with async_session_maker() as db:
@@ -649,13 +645,9 @@ def site_address_command(school_ids, limit, register_file, apply_changes, report
 
     from app.database import async_session_maker
     from app.scrapers.stages import site_address as site_address_stage
-    from app.services.geocoding.bg.sofia_address_register import read_register, read_register_zip
+    from app.services.geocoding.bg.sofia_address_register import read_register_file
 
-    register = None
-    if register_file is not None and register_file.suffix.lower() == ".csv":
-        register = read_register(register_file.read_text(encoding="utf-8-sig"))
-    elif register_file is not None:
-        register = read_register_zip(register_file.read_bytes())
+    register = read_register_file(register_file) if register_file is not None else None
 
     async def _run():
         async with async_session_maker() as db:
