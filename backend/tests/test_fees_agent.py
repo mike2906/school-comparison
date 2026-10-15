@@ -1465,3 +1465,84 @@ async def test_a_stored_proof_must_satisfy_todays_rules(db_session, frozen_today
     report = await _run(db_session, school)
     rows = [r for r in await _rows(db_session, school) if float(r.amount) == 3000]
     assert all(r.period is not PricePeriod.YEARLY for r in rows), report
+
+
+@pytest.mark.parametrize(
+    "evidence",
+    [
+        "Прием за Подготвителна група: 5-годишни деца. Необходимо е заплащане на такса за обследване в размер на 20 €.",
+        "„Питагор Junior“ е за 6 годишни деца; таксата за участие е 20 евро.",
+    ],
+)
+def test_an_age_in_years_does_not_make_a_registration_fee_recurring(evidence):
+    checked = check_fee(fee(PriceCategory.REGISTRATION, evidence, amount=20, period=PricePeriod.ONE_TIME), evidence)
+    assert checked.fee.period is PricePeriod.ONE_TIME, checked.checks
+
+
+def test_an_age_in_years_does_not_name_the_yearly_period():
+    line = "Такса за 3-годишни деца: 450 евро"
+    assert check_fee(fee(PriceCategory.TUITION, line, amount=450, period=PricePeriod.YEARLY), line).fee.period is None
+
+
+# --- A table row the read rebuilt in a layout the page does not have (596's secondary tuition) ---
+PAGE_TABLE = "Grade 8 – 9 | Plan 1 – € 9,500 / Plan 2 – € 9,700 | 1 x € 9,500\nЕднократна такса за записване: 200 евро."
+ROW_PROOF = "Grade 8 – 9 | Plan 1 – € 9,500 / Plan 2 – € 9,700 | 1 x € 9,500"
+
+
+async def _table_run(db, school, page_text):
+    rebuilt = fee(
+        PriceCategory.TUITION, "Grade 8 – 9 Plan 1 – € 9,500 1 x € 9,500", amount=9500, academic_year="2026/2027"
+    )
+    pages = [PageRead(URL, page_text, True)]
+    return await fees_agent.run_school(db, school, find=_find(pages), read=_read([rebuilt, FEES_STAGE[1]]), apply=True)
+
+
+async def test_a_fee_whose_copied_line_is_not_on_the_page_stands_on_the_stored_rows_evidence(db_session, frozen_today):
+    school = await _school(db_session)
+    await _proved_row(db_session, school, period=None, evidence=ROW_PROOF)
+    row = (await _rows(db_session, school))[0]
+    row.amount = 9500
+    await db_session.commit()
+    report = await _table_run(db_session, school, PAGE_TABLE)
+    assert report["outcome"] == "written" and report["rows_old_kept"] == 0 and not report["regressions"], report
+    rows = [r for r in await _rows(db_session, school) if float(r.amount) == 9500]
+    assert len(rows) == 1 and "stored row" in " ".join(rows[0].pricing_context["checks"]), rows
+
+
+async def test_a_stored_rows_evidence_the_page_no_longer_has_does_not_rescue_a_fee(db_session, frozen_today):
+    school = await _school(db_session)
+    await _proved_row(db_session, school, period=None, evidence="Grade 8 – 9 | Plan 1 – € 9,500 | 1 x € 9,500")
+    row = (await _rows(db_session, school))[0]
+    row.amount = 9500
+    await db_session.commit()
+    report = await _table_run(
+        db_session, school, "Grade 8 – 9 Plan 1 – € 9,500\nЕднократна такса за записване: 200 евро."
+    )
+    tuition = [f for f in report["fees"] if f.get("amount") == 9500]
+    assert tuition and all(not f["kept"] for f in tuition), report["fees"]
+
+
+def _stored_notes(report):
+    return [check for f in report["fees"] for check in f.get("checks", []) if "stored row" in check]
+
+
+async def test_a_period_proved_for_one_group_does_not_pass_to_another_at_the_same_price(db_session, frozen_today):
+    page_text = "Начален етап: € 3000 годишно\nГимназия: € 3000\nЕднократна такса за записване: 200 евро."
+    school = await _school(db_session)
+    await _proved_row(db_session, school, evidence="Начален етап: € 3000 годишно")
+    secondary = fee(PriceCategory.TUITION, "Гимназия: € 3000", amount=3000, academic_year="2026/2027")
+    pages = [PageRead(URL, page_text, True)]
+    report = await fees_agent.run_school(
+        db_session, school, find=_find(pages), read=_read([secondary, FEES_STAGE[1]]), apply=False
+    )
+    assert not _stored_notes(report), report["fees"]
+
+
+async def test_a_stored_heading_that_moved_away_from_the_amount_proves_nothing(db_session, frozen_today):
+    filler = "\n".join(f"Ред {n}" for n in range(20))
+    page_text = f"Годишната такса за обучение се заплаща на три вноски.\n{filler}\nТакса обучение\n€ 3000\n{PAGE_STAGE}"
+    school = await _school(db_session)
+    await _proved_row(db_session, school)
+    pages = [PageRead(URL, page_text, True)]
+    report = await fees_agent.run_school(db_session, school, find=_find(pages), read=_read(_bare_read()), apply=False)
+    assert not _stored_notes(report), report["fees"]

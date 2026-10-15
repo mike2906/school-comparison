@@ -367,7 +367,9 @@ async def find_pages(
             queue = []
         # Places the picker leaves free go to the keyword links, this year's first: 594's
         # picker chose the application forms over /school-fees-2026-2027/ in one run of two.
-        keyword = [url for url, label in unopened if url not in queue and fallback_links.search(f"{unquote(url)} {label}")]
+        keyword = [
+            url for url, label in unopened if url not in queue and fallback_links.search(f"{unquote(url)} {label}")
+        ]
         this_year = _this_years_pages()
         keyword.sort(key=lambda url: not this_year.search(f"{unquote(url)} {links.get(url, '')}"))
         queue = (queue + keyword)[:MAX_PICKS]
@@ -844,15 +846,11 @@ async def _missed_amounts(
     return sorted((published & shown) - read)
 
 
-async def _stored_period_proofs(db: AsyncSession, school: School) -> list[Pricing]:
-    """The school's published agent rows with a period and the evidence that proved it."""
+async def _stored_proofs(db: AsyncSession, school: School) -> list[Pricing]:
+    """The school's published agent rows, with the evidence that proved them."""
     stored = await db.execute(
         select(Pricing)
-        .where(
-            Pricing.school_id == school.id,
-            Pricing.source == PriceSource.SCRAPED_WEBSITE,
-            Pricing.period.is_not(None),
-        )
+        .where(Pricing.school_id == school.id, Pricing.source == PriceSource.SCRAPED_WEBSITE)
         .options(selectinload(Pricing.source_page).load_only(SourcePage.id, SourcePage.is_valid))
     )
     blocked = blocked_pricing_row_ids(school.attributes if isinstance(school.attributes, dict) else None)
@@ -866,18 +864,63 @@ async def _stored_period_proofs(db: AsyncSession, school: School) -> list[Pricin
     ]
 
 
-def _with_stored_period(result: CheckedFee, page_text: str, proofs: list[Pricing]) -> CheckedFee:
-    """The fee with the period a stored row of the same fee proved, if that proof still holds.
+def _checked(fee: AgentFee, page: PageRead, proofs: list[Pricing]) -> CheckedFee:
+    result = check_fee(fee, page.text)
+    if not result.kept or result.fee.period is None:
+        result = _with_stored_proof(result, page.text, proofs)
+    return result
 
-    The reader copies a table's heading or the sentence above it into the evidence in one
-    run and leaves it out in the next, and without it the period is cleared: 16 schools of
-    the 2026-10-15 Sofia dry run lost a yearly or one-off period that way, on unchanged
-    pages. The stored row's evidence is checked again on today's page together with the
-    new read's, by the same rules, so a period comes back only when the page still names it.
+
+# What a stored row's evidence can stand in for: the read's own copy of the line is not the page's.
+_NOT_COPIED = ("dropped: evidence line is not on the page", "dropped: evidence line does not hold the amount")
+# How far from the amount's line a stored heading or sentence may be found today and still be
+# read as the one over it: a heading that moved to another table no longer heads this amount.
+_PROOF_LINES_AWAY = 12
+
+
+def _lines(text: str) -> list[str]:
+    return [" ".join(line.split()).casefold() for line in text.splitlines() if line.strip()]
+
+
+def _amount_lines(evidence: str, fee: AgentFee) -> list[str]:
+    amounts = set(fee_amounts(fee))
+    return [line for line in _lines(evidence) if amounts & page_numbers(line)]
+
+
+def _proof_still_reads(evidence: str, fee: AgentFee, page_lines: list[str]) -> bool:
+    """Every line of a stored proof is on today's page within a few lines of the amount's own."""
+    places = [[index for index, text in enumerate(page_lines) if line in text] for line in _lines(evidence)]
+    starts = {index for line in _amount_lines(evidence, fee) for index, text in enumerate(page_lines) if line in text}
+    return all(places) and any(
+        all(any(abs(index - start) <= _PROOF_LINES_AWAY for index in found) for found in places) for start in starts
+    )
+
+
+def _same_group(row: Pricing, fee: AgentFee) -> bool:
+    def norm(value: Optional[str]) -> str:
+        return " ".join(str(value or "").split()).casefold()
+
+    return norm(row.age_group) == norm(fee.age_group) and norm(row.plan_name) == norm(fee.plan_name)
+
+
+def _with_stored_proof(result: CheckedFee, page_text: str, proofs: list[Pricing]) -> CheckedFee:
+    """The fee checked with the evidence a stored row of the same fee was proved by, when the
+    read's own evidence falls short and that proof still holds on today's page.
+
+    The reader does not copy the same lines every run. In the 2026-10-15 Sofia dry run it
+    left a table's heading or the sentence above it out of the evidence (610's "Таксата за
+    обучение е на годишна база."), so the period was cleared, and it rebuilt table rows in
+    a layout the page does not have (596's secondary tuition), so the fee was dropped; on
+    unchanged pages. A stored proof is used only when it is this fee's: for a period, it
+    holds the same line of the page for the amount as the new read, a line the page prints
+    once (two groups at one price are two lines); for a dropped fee, it is the same group
+    and plan. Its lines must still sit near the amount, and it goes through the same checks
+    on today's page, so nothing comes back that the page no longer shows.
     """
     fee = result.fee
     key = _amount_key(PriceRow(fee.category.value, fee.amount, fee.amount_min, fee.amount_max, None, None, None))
     year = normalize_academic_year(fee.academic_year)
+    page_lines = _lines(page_text)
     same_fee = [
         row
         for row in proofs
@@ -885,12 +928,27 @@ def _with_stored_period(result: CheckedFee, page_text: str, proofs: list[Pricing
         and (row.currency or "").upper() == fee.currency.upper()
         and _amount_group(row) == key
         and normalize_academic_year(row.academic_year) in (year, None)
+        and _proof_still_reads(row.pricing_context["evidence"], fee, page_lines)
     ]
-    periods = {row.period for row in same_fee}
-    if len(periods) != 1:  # none, or stored rows of this fee that disagree
+    if not result.kept and result.checks and result.checks[0] in _NOT_COPIED:
+        evidence = {row.pricing_context["evidence"] for row in same_fee if _same_group(row, fee)}
+        if len(evidence) != 1:  # none, or stored rows of this group that read differently
+            return result
+        trial = check_fee(fee.model_copy(update={"evidence": evidence.pop()}), page_text)
+        if not trial.kept:
+            return result
+        note = "evidence from the stored row: the read's copy is not on the page"
+        result = CheckedFee(trial.fee, trial.confidence, True, [*trial.checks, note])
+    if result.fee.period is not None:
+        return result
+    fee = result.fee
+    unique = {line for line in _amount_lines(fee.evidence, fee) if sum(line in text for text in page_lines) == 1}
+    same_line = [row for row in same_fee if unique & set(_amount_lines(row.pricing_context["evidence"], fee))]
+    periods = {row.period for row in same_line}
+    if len(periods) != 1 or None in periods:  # none, or stored rows of this fee that disagree
         return result
     period = periods.pop()
-    evidence = "\n".join([fee.evidence, *(row.pricing_context["evidence"] for row in same_fee)])
+    evidence = "\n".join([fee.evidence, *(row.pricing_context["evidence"] for row in same_line)])
     trial = check_fee(fee.model_copy(update={"period": period, "evidence": evidence}), page_text)
     if not trial.kept or trial.fee.period != period or trial.confidence < result.confidence:
         return result
@@ -1012,7 +1070,8 @@ async def run_school(
     # out, read once more, naming them, and add the fees at amounts the first read did not give.
     # A fee the first read gave but the checks drop counts as missed too: 596's first read
     # stitched its secondary tuition from lines not on the page in one run of two.
-    passing = [fee for fee in fees if (page := _page_for(fee, priced)) and check_fee(fee, page.text).kept]
+    proofs = await _stored_proofs(db, school)
+    passing = [fee for fee in fees if (page := _page_for(fee, priced)) and _checked(fee, page, proofs).kept]
     missed = await _missed_amounts(db, school, priced, passing)
     if missed:
         report["reread"] = {"missed": [format(amount, "f") for amount in missed], "added": 0}
@@ -1034,13 +1093,10 @@ async def run_school(
         added = [fee for fee in added if not _lev_twin(fee, euro)]
         fees = [*fees, *added]
         report["reread"]["added"] = len(added)
-    proofs = await _stored_period_proofs(db, school)
     checked: list[tuple[CheckedFee, SourcePage]] = []
     for fee in fees:
         page = _page_for(fee, priced)
-        result = check_fee(fee, page.text) if page else CheckedFee(fee, 0.0, False, ["dropped: not on a page read"])
-        if page and result.kept and result.fee.period is None:
-            result = _with_stored_period(result, page.text, proofs)
+        result = _checked(fee, page, proofs) if page else CheckedFee(fee, 0.0, False, ["dropped: not on a page read"])
         report["fees"].append(_fee_report(result, page))
         if result.kept and page:
             checked.append((result, source_pages[page.url]))

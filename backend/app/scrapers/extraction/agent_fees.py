@@ -243,6 +243,10 @@ _HOW_OFTEN_RE = re.compile(
     r"|седмичн\w*\s+(?:програм|разпис|график)|weekly (?:schedule|timetable)"
 )
 _DEPOSIT_RE = re.compile(r"депозит|капаро|deposit")
+# An age, not a period: "6-годишни деца", "5 годишни", "6-месечни бебета" (564's "такса за
+# обследване" for 5-year-olds lost its one-off period to the "годиш" of the age). As Stage 6's.
+# Without the hyphen only before a child word: "€ 3000 годишно" is a yearly price.
+_AGE_RE = re.compile(r"\d+ ?[-–] ?(?:годиш|месеч)\w*|\d+ (?:годиш|месеч)\w* (?:деца|дете|бебета|възраст)")
 # Only a currency and the marker may sit between a range's ends: "550 – 600", "550 EUR to 600".
 _RANGE_JOIN_RE = re.compile(r"(?:eur|€|евро|лв\.?|лева|bgn)?\s*(?:[–—-]|до|to)", re.IGNORECASE)
 _FIRST_INSTALMENT_BEFORE_RE = re.compile(r"(?<!\d)1\s*[xх×]\s*$")  # latin x, cyrillic х, ×
@@ -259,6 +263,8 @@ def _names_period(period: PricePeriod, evidence: str, amounts: list[Decimal], ca
     # calls it recurring and never one-time: "годишна такса за записване" is paid every year.
     # "срок" is left out: "платима в срок до 15 юни" is a deadline, not a term.
     amount_lines = [line for line in evidence.splitlines() if set(amounts) & page_numbers(line)]
+    evidence = _AGE_RE.sub(" ", evidence)
+    amount_lines = [_AGE_RE.sub(" ", line) for line in amount_lines]
     if period is PricePeriod.ONE_TIME and category is PriceCategory.REGISTRATION:
         if re.search(_PERIOD_WORDS[PricePeriod.ONE_TIME], evidence):
             return True
