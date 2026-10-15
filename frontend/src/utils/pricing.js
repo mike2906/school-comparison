@@ -111,7 +111,7 @@ export function selectPricingCohort(pricing = [], { ageGroup = null, intake = tr
  * Used by the detail page so a mixed-year price list is labelled per group instead of
  * inheriting one arbitrary row's year. The year families now enrol for is marked
  * `YEAR_STATUS.NEXT` rather than as another year. A row from a past year that a later year
- * lists again (same category and amount) is dropped.
+ * lists again (same category, period, age groups and amount) is dropped.
  */
 export function groupPricingByAcademicYear(pricing = [], { today = new Date() } = {}) {
   if (!Array.isArray(pricing) || pricing.length === 0) return []
@@ -132,12 +132,15 @@ export function groupPricingByAcademicYear(pricing = [], { today = new Date() } 
   groups.forEach(group => {
     if (isIntakeYear(group, today)) group.yearStatus = YEAR_STATUS.NEXT
   })
-  // Last year's row for a fee a later year lists again at the same amount is history, so it
-  // is left out: 596's 2025-26 bus fees under the same 2026-27 ones read as two prices. A
-  // fee that changed price, or that no later year repeats, still shows under its own year.
+  // Last year's row for a fee a later year lists again at the same amount (same category,
+  // period and age groups) is history, so it is left out: 596's 2025-26 bus fees under the
+  // same 2026-27 ones read as two prices. A fee that changed price, or that no later year
+  // repeats, still shows under its own year.
   const sameFee = row => {
     const amounts = [row.amount, row.amount_min, row.amount_max]
-    return amounts.some(value => value != null) ? [row.category, row.currency, ...amounts].join('|') : null
+    if (!amounts.some(value => value != null)) return null
+    const ageGroups = [...rowAgeGroupKeys(row)].sort().join(',')
+    return [row.category, row.currency, pricePeriod(row) || '', ageGroups, ...amounts].join('|')
   }
   const latest = new Map()
   pricing.forEach(row => {

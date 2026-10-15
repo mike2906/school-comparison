@@ -140,6 +140,14 @@ test('groupPricingByAcademicYear leaves out a past fee a later year lists again 
     dated('2025/2026', { id: 4, category: 'transport', amount: 120 }),
   ])
   assert.deepEqual(changed.map(g => g.rows.map(r => r.id)), [[1, 3], [2, 4]])
+  // The same number for another grade or another period is another fee.
+  const other = groupPricingByAcademicYear([
+    current({ id: 1, plan_name: '1st grade' }),
+    dated('2025/2026', { id: 2, plan_name: '5th grade' }),
+    current({ id: 3, category: 'food', amount: 90, period: 'yearly' }),
+    dated('2025/2026', { id: 4, category: 'food', amount: 90, period: 'monthly' }),
+  ])
+  assert.deepEqual(other.map(g => g.rows.map(r => r.id)), [[1, 3], [2, 4]])
   // Only a past year goes: this year's fees stay beside next year's, and undated ones stay.
   assert.equal(groupPricingByAcademicYear([thisYear(), nextYear({ amount: 8320 })], { today: OCTOBER }).length, 2)
   assert.equal(groupPricingByAcademicYear([current({ id: 1 }), row({ id: 2 })]).length, 2)
