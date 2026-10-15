@@ -4,8 +4,9 @@ Many hidden (approximate) points are right: an EU GeoJSON or Nominatim point at 
 own house. A point is confirmed when OpenStreetMap's nearest building there is in our town,
 on our street, with exactly our house number (the same check as ``website-pins``). That
 proves the pin matches the address we show, not that the address is current, so a school
-whose own website maps it only somewhere else (over ``ELSEWHERE_M`` away) is left hidden:
-the website suggests it moved. No model calls. Default is a dry run. Sofia only for now
+whose own website maps it only somewhere else (none of its map points within ``ELSEWHERE_M``
+of any of its locations) is left hidden, as is one whose website cannot be read: the
+website may say it moved. No model calls. Default is a dry run. Sofia only for now
 (``website_pins.CITY_NAMES``). Run it before ``website-pins`` and ``pin-agent``.
 """
 
@@ -88,16 +89,26 @@ async def run_confirm_pins(
             ]
             if not hidden:
                 continue
-            site_points: list[tuple[float, float]] = []
+            site_points: Optional[list[tuple[float, float]]] = []
             if school.website_url and school.scrape_status in SITE_ACCEPTED_STATUSES:
                 try:
-                    site_points = await _read_points(school, fetch) or []
-                except Exception:  # an unreadable site says nothing either way
+                    site_points = await _read_points(school, fetch)
+                except Exception:
                     logger.exception("confirm-pins could not read school %s's site", school_id)
+                    site_points = None
+            ours = [(loc.lat, loc.lng) for loc in locations if loc.lat is not None and loc.lng is not None]
+            # The site maps the school, but near none of our locations (a campus map near one
+            # location does not hold back the others).
+            elsewhere = bool(site_points) and not any(
+                _distance_m(point, p) <= ELSEWHERE_M for point in ours for p in site_points or []
+            )
             for location in hidden:
                 point = (location.lat, location.lng)
                 row = {"school_id": school_id, "location_id": location.id, "address": _address(location), "point": point}
-                if site_points and all(_distance_m(point, p) > ELSEWHERE_M for p in site_points):
+                if site_points is None:
+                    results.append({**row, "outcome": "site_not_read"})
+                    continue
+                if elsewhere:
                     results.append({**row, "outcome": "website_map_elsewhere", "site_points": site_points})
                     continue
                 try:
@@ -105,7 +116,12 @@ async def run_confirm_pins(
                 except Exception as exc:  # Nominatim down: report, keep the location as it is
                     results.append({**row, "outcome": "not_checked", "note": str(exc)[:200]})
                     continue
-                outcome = "placed" if found["outcome"] == "placed" else "not_at_address"
+                if found["outcome"] == "placed":
+                    outcome = "placed"
+                elif any(c.get("note") == "outside the city" for c in found["checked"]):
+                    outcome = "outside_city"
+                else:
+                    outcome = "not_at_address"
                 results.append({**row, "outcome": outcome, "checked": found["checked"]})
         return results
 
@@ -127,6 +143,7 @@ async def run_confirm_pins(
                     method="reverse_confirmed",
                     tag=PIN_TAG,
                     evidence={"checked": result["checked"]},
+                    unchanged_from=result["point"],
                 )
                 result["outcome"] = written
     outcomes: dict[str, int] = {}

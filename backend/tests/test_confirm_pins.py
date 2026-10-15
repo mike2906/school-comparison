@@ -106,3 +106,33 @@ async def test_a_school_whose_website_maps_it_elsewhere_stays_hidden(db_session)
     near = '<a href="https://maps.google.com/?q=42.65180,23.33420">map</a>'
     report = await stage.run_confirm_pins(db_session, fetch=_fetcher({HOME: near}), reverse=_reverse(AT_OURS))
     assert report["outcomes"] == {"placed": 1}
+
+
+@pytest.mark.asyncio
+async def test_an_unreadable_website_holds_the_pin_back(db_session):
+    school = _school(website_url=HOME, scrape_status="validated")
+    db_session.add(school)
+    await db_session.flush()
+    db_session.add(_hidden(school.id))
+    await db_session.commit()
+    report = await stage.run_confirm_pins(db_session, fetch=_fetcher({}), reverse=_reverse(AT_OURS))
+    assert report["outcomes"] == {"site_not_read": 1}
+
+
+@pytest.mark.asyncio
+async def test_a_campus_map_near_one_location_does_not_hold_back_another(db_session):
+    school = _school(website_url=HOME, scrape_status="validated")
+    db_session.add(school)
+    await db_session.flush()
+    main = (42.7000, 23.3200)
+    db_session.add_all([
+        SchoolLocation(
+            school_id=school.id, address_i18n={"bg": "ул. Бигла 1"}, lat=main[0], lng=main[1],
+            geocode_meta={"precision": "exact"}, location_tags=[],
+        ),
+        _hidden(school.id),
+    ])
+    await db_session.commit()
+    page = '<a href="https://maps.google.com/?q=42.7000,23.3200">map</a>'
+    report = await stage.run_confirm_pins(db_session, fetch=_fetcher({HOME: page}), reverse=_reverse(AT_OURS))
+    assert report["outcomes"] == {"placed": 1}

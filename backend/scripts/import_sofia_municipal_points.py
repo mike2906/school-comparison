@@ -6,8 +6,8 @@ point with its name, address and район. A location is matched when the poin
 type agree with the school name *and* the addresses agree; everything else is reported for
 review and never written.
 
-Always writes a report first. Default is a dry run; --apply writes only "match" and
-"match_by_name" rows:
+Always writes a report first. Default is a dry run; --apply writes only "match",
+"match_by_name" and "match_by_id" (a kindergarten building by kg.sofia.bg's id) rows:
 coordinates (exact precision, through the geocoding write gate), a missing district, and a
 `coords_source=sofia_municipal` tag, which stops later geocoding runs replacing the point.
 
@@ -326,11 +326,14 @@ async def fetch_kindergarten_buildings() -> dict[str, Point]:
     if payload.get("exceededTransferLimit"):
         raise RuntimeError("The kindergarten layer is paginated; fetch all pages first")
     buildings: dict[str, Point] = {}
+    repeated: set[str] = set()
     for feature in payload["features"]:
         attrs, geometry = feature["attributes"], feature.get("geometry") or {}
         integration_id = str(attrs.get("integrationid") or "").strip()
         if not integration_id or geometry.get("x") is None or geometry.get("y") is None:
             continue
+        if integration_id in buildings:
+            repeated.add(integration_id)
         buildings[integration_id] = Point(
             kind="kindergarten",
             name=(attrs.get("fullname") or attrs.get("name") or "").strip(),
@@ -340,7 +343,8 @@ async def fetch_kindergarten_buildings() -> dict[str, Point]:
             lng=float(geometry["x"]),
             integration_id=integration_id,
         )
-    return buildings
+    # An id on two buildings does not say which one is ours.
+    return {key: point for key, point in buildings.items() if key not in repeated}
 
 
 def esri_id(location: SchoolLocation) -> Optional[str]:
@@ -474,7 +478,7 @@ async def fill_districts(db, apply: bool) -> None:
 
 async def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--apply", action="store_true", help="write the 'match' and 'match_by_name' rows")
+    parser.add_argument("--apply", action="store_true", help="write the 'match', 'match_by_name' and 'match_by_id' rows")
     parser.add_argument("--report-root", type=Path, default=DEFAULT_REPORT_ROOT)
     parser.add_argument(
         "--fill-districts",
@@ -505,7 +509,9 @@ async def main() -> None:
         ]
         rows = [match_by_id(row, buildings) for row in rows]
         for row in rows:
-            if row.status in MATCHED and _shares_point_with_other_address(row.point, points):
+            # A building point is checked against its own layer, the others against theirs.
+            layer = list(buildings.values()) if row.status == "match_by_id" else points
+            if row.status in MATCHED and _shares_point_with_other_address(row.point, layer):
                 row.status, row.candidates = "shared_point", [row.point]
                 row.point = None
         for row in rows:
