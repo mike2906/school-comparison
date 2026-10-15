@@ -14,6 +14,7 @@ model calls. Default is a dry run. Sofia only.
 from __future__ import annotations
 
 import logging
+import re
 from collections.abc import Sequence
 from typing import Any, Optional
 
@@ -34,6 +35,24 @@ PIN_TAG = "coords_source=sofia_address_register"
 PROVIDER = "sofia_address_register"
 # A pin moving further than this needs our address's district, or the school's site, to agree.
 FAR_M = 3000
+# Another school pinned this close to the register point is in the same building.
+SAME_BUILDING_M = 15
+
+
+# Words of a school's name that say what kind of school it is, not which.
+_TYPE_WORDS = {
+    "частна", "частно", "частен", "детска", "градина", "училище", "средно", "основно", "езикова",
+    "профилирана", "професионална", "гимназия", "начално", "обединено", "международно",
+    "английска", "американско", "немско", "френско", "ясла", "яслени", "група", "групи",
+    "kindergarten", "school", "private", "international", "high", "primary", "academy",
+}
+
+
+def _name_words(name_i18n: Optional[dict]) -> set[str]:
+    words = set()
+    for name in (name_i18n or {}).values():
+        words |= {w for w in re.findall(r"[а-яa-z]+", str(name).casefold()) if len(w) >= 4}
+    return words - _TYPE_WORDS
 
 
 async def download_register() -> register_lib.Register:
@@ -78,6 +97,15 @@ async def run_register_pins(
     if school_ids:
         query = query.where(School.id.in_(list(school_ids)))
     ids = list((await db.execute(query)).scalars().all())
+    # Other schools' published pins: a register point on one is that school's building (the
+    # address is likely an old one of ours), so it is not taken.
+    # Schools of one family (Езиков свят's primary and high school) share a building.
+    names = {sid: _name_words(name) for sid, name in (await db.execute(select(School.id, School.name_i18n))).all()}
+    pinned = [
+        (loc.school_id, (loc.lat, loc.lng))
+        for loc in (await db.execute(select(SchoolLocation).where(SchoolLocation.lat.is_not(None)))).scalars()
+        if not needs_pin(loc)
+    ]
 
     async def _run(fetch: Fetch) -> list[dict[str, Any]]:
         nonlocal register
@@ -150,6 +178,13 @@ async def run_register_pins(
                 ):
                     # As far as another district: our district or the school's site must agree.
                     row["outcome"] = "moved_far"
+                elif any(
+                    other != school_id
+                    and not (names.get(other, set()) & names.get(school_id, set()))
+                    and _distance_m(result.point, point) <= SAME_BUILDING_M
+                    for other, point in pinned
+                ):
+                    row["outcome"] = "other_school_here"
                 elif site is None:
                     row["outcome"] = "site_not_read"
                 elif (

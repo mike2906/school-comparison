@@ -58,7 +58,8 @@ run, `--register-file` for a local copy): street + exact house number, or comple
 for one address over 60 m apart (150 m for a block) are ambiguous unless our district settles
 them; "до бл." matches nothing. The school's own site wins (Mike, 2026-10-15): held back when
 its website maps it only elsewhere, unless the site's text states our address (stray and old
-maps are common); a move over 3 km needs our district or the site to agree. Run it first: it
+maps are common); a move over 3 km needs our district or the site to agree; a point where an
+unrelated school is already pinned is not taken (likely an old address). Run it first: it
 has the house numbers OpenStreetMap lacks.
 
 `cli confirm-pins [--apply]` publishes a hidden point that already stands on our building:

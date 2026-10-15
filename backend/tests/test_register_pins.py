@@ -146,3 +146,25 @@ async def test_a_far_move_goes_ahead_when_the_school_site_agrees(db_session):
     page = "<p>We are at 5A Vetrushka Street</p>"
     report = await stage.run_register_pins(db_session, register=REGISTER, fetch=_fetcher({HOME: page}))
     assert report["outcomes"] == {"placed": 1}
+
+
+@pytest.mark.asyncio
+async def test_a_register_point_where_another_school_is_pinned_is_not_taken(db_session):
+    neighbour = _hidden(None)
+    neighbour.lat, neighbour.lng = 42.665715, 23.26397
+    neighbour.geocode_meta = {"precision": "exact"}
+    await _add(db_session, _school(name_i18n={"bg": "ЧДГ Друга", "en": "Other"}), neighbour)
+    await _add(db_session, _school(), _hidden(None))
+    report = await stage.run_register_pins(db_session, register=REGISTER, fetch=_fetcher({}))
+    assert report["outcomes"] == {"other_school_here": 1}
+
+
+@pytest.mark.asyncio
+async def test_a_sister_school_in_the_same_building_does_not_hold_it_back(db_session):
+    sister = _hidden(None)
+    sister.lat, sister.lng = 42.665715, 23.26397
+    sister.geocode_meta = {"precision": "exact"}
+    await _add(db_session, _school(name_i18n={"bg": "ЧОУ Звездичка", "en": "Zvezdichka school"}), sister)
+    await _add(db_session, _school(), _hidden(None))
+    report = await stage.run_register_pins(db_session, register=REGISTER, fetch=_fetcher({}))
+    assert report["outcomes"] == {"placed": 1}
