@@ -1647,3 +1647,21 @@ def test_a_quote_without_the_pages_bold_markers_is_on_the_page():
         PriceCategory.REGISTRATION, "Необходимо е заплащане на такса за обследване в размер на 20 €.", amount=20
     )
     assert check_fee(assessment, page).kept
+
+
+def test_a_cleaned_header_matches_the_table_its_pdf_prints_twice():
+    """596's header is on the page as text and as cells; the reader quoted it without empty cells."""
+    page = (
+        "ANNUAL TUITION FEES 2026-2027\nGrade Payment Plan Plan 1 Plan 2 Plan 3\n"
+        "Grade 0 Plan 1 - € 8.950 1 x € 8.950\n"
+        "Grade | Payment Plan |  | Plan 1 |  | Plan 2 | Plan 3\n"
+        "Grade 0 |  | Plan 1 - € 8.950 / Plan 2 - € 9.150 |  | 1 x € 8.950 | \n"
+    )
+    evidence = (
+        "ANNUAL TUITION FEES 2026-2027\nGrade | Payment Plan | Plan 1 | Plan 2 | Plan 3\n"
+        "Grade 0 |  | Plan 1 - € 8.950 / Plan 2 - € 9.150 |  | 1 x € 8.950 |"
+    )
+    tuition = fee(PriceCategory.TUITION, evidence, amount=8950, period=PricePeriod.YEARLY)
+    result = check_fee(tuition, page)
+    assert result.kept
+    assert result.fee.period is PricePeriod.YEARLY

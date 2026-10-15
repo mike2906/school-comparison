@@ -431,9 +431,11 @@ def _page_row(line: str, page_lines: list[str]) -> str | None:
     """
     quote = _loose(line)
     rows = {text for text in page_lines if quote in _loose(text)}
-    if len(rows) != 1:
+    # A PDF's table comes twice, as text and as cells: 596's header "Grade Payment Plan Plan 1"
+    # and "Grade | Payment Plan |  | Plan 1". The same words are one row; take the cells.
+    if len({_loose(text) for text in rows}) != 1:
         return None
-    row = rows.pop()
+    row = max(rows, key=lambda text: (text.count(" | "), text))
     # Cells, and a cell's lines: "€ 6 / € 110 monthly" is two lines of one cell.
     pieces = [0, *(cut for match in re.finditer(r" \| | / ", row) for cut in match.span()), len(row)]
     starts, ends = pieces[0::2], pieces[1::2]
