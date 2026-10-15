@@ -58,7 +58,9 @@ _PRIVATE_TYPE_PHRASE_RE = re.compile(
     + r")(?![\w-])",
     flags=re.IGNORECASE,
 )
-_PRIVATE_TYPE_ABBREVIATION_RE = re.compile(rf"^(?:{'|'.join(PRIVATE_TYPE_ABBREVIATIONS)})(?![\w-])")
+_PRIVATE_TYPE_ABBREVIATION_RE = re.compile(
+    rf"^(?:{'|'.join(PRIVATE_TYPE_ABBREVIATIONS)})(?![\w-])", flags=re.IGNORECASE
+)
 _LEGAL_ENTITY_SUFFIX_RE = re.compile(
     r"""(?:^|[\s,"'„“”-]+)(?:
         еоод|оод|ад|ет|еад|кд|сд|сдружение|
@@ -124,12 +126,18 @@ def _extract_quoted_core_name(text: str | None) -> str | None:
     return None
 
 
+def _strip_doubled_apostrophes(text: str) -> str:
+    """Register names sometimes quote with doubled apostrophes (''Ягодина''); a single
+    apostrophe belongs to the name."""
+    return re.sub(r"^(?:'')+\s*|\s*(?:'')+$", "", text).strip()
+
+
 def _clean_core_candidate(text: str | None) -> str | None:
     # Register names sometimes quote with doubled apostrophes (''Ягодина'').
-    normalized = re.sub(r"\s+", " ", text or "").strip(' "\'„“”')
+    normalized = _strip_doubled_apostrophes(re.sub(r"\s+", " ", text or "").strip(' "„“”'))
     if not normalized:
         return None
-    cleaned = _LEGAL_ENTITY_SUFFIX_RE.sub("", normalized).strip(' "\'„“”,-')
+    cleaned = _strip_doubled_apostrophes(_LEGAL_ENTITY_SUFFIX_RE.sub("", normalized).strip(' "„“”,-'))
     cleaned = re.sub(r"\s+", " ", cleaned).strip()
     return cleaned or None
 
@@ -160,16 +168,19 @@ def _extract_legal_fallback_name(text: str | None) -> str | None:
             return f"{type_phrase} „{core}“"
         # "ЧДГ ''Ягодина" keeps its abbreviation already; tidy_bg_name quotes it.
         if (type_match := _PRIVATE_TYPE_ABBREVIATION_RE.match(normalized)) and not _PRIVATE_TYPE_ABBREVIATION_RE.match(core):
-            return f"{type_match.group()} „{core}“"
+            return f"{type_match.group().upper()} „{core}“"
         return core
 
     return _clean_core_candidate(normalized)
 
 
 def register_core_names(name_i18n: Mapping[str, Any] | None) -> set[str]:
-    """The bare own name of a register name ("София"), for matching a sibling's brand."""
+    """The bare own name of a register name, in Bulgarian and as the English page derives
+    it ("София", "Sofia"), for matching a sibling's brand."""
     core = _legal_core_name(_clean_i18n_map(name_i18n).get("bg"))
-    return {core} if core else set()
+    if not core:
+        return set()
+    return {core} | ({english} if (english := derive_english_name(core)) else set())
 
 
 def _extract_named_core(text: str | None) -> str | None:
