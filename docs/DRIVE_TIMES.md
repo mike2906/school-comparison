@@ -49,7 +49,11 @@ schools never snap onto motorways or motorway/trunk links.
 
 Chromium with the CPU slowed 6x: ~0.5 s to unpack, ~0.27 s per whole-city search, ~10 MB of
 memory. Snapping uses a grid index built on first use (~0.5 s once), then ~0.5 ms per point,
-so 300 school pins take ~0.16 s (brute force over every road took ~9 s). Not yet measured on a real phone.
+so 300 school pins take ~0.16 s (brute force over every road took ~9 s).
+
+Real phone, OnePlus 13R (Snapdragon 8 Gen 3, 15 October 2026): unpack 48 ms, prepare 34 ms,
+search 26 ms typical and 59 ms slowest, about 10x faster than the slowed-down profile above.
+Budget phones should fall between the two.
 
 ## Licence
 
