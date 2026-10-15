@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCatchmentSchoolName } from '../../hooks/useCatchmentSchoolName'
 import { useTranslation } from 'react-i18next'
 import AreaMap from './AreaMap'
 import AddressCheck from './AddressCheck'
@@ -201,6 +202,8 @@ function CatchmentArea({ ids, point }) {
     return { own, neighbours }
   }, [catchments, ids])
 
+  const addressSchoolName = useCatchmentSchoolName(address?.schoolId, catchments?.byId.get(address?.schoolId)?.properties.name)
+
   const title = t('admissionArea.catchmentTitle')
   if (failed) return <Panel title={title}><p className="text-sm text-red-700">{t('admissionArea.loadFailed')}</p></Panel>
   if (!areas) return <Panel title={title}><p className="text-sm text-neutral-500">{t('common.loading')}</p></Panel>
@@ -258,7 +261,7 @@ function CatchmentArea({ ids, point }) {
           {t(current.state === 'noAddress' ? 'admissionArea.locationNoAddress' : 'admissionArea.locationConfirm')}
         </p>
       )}
-      <AddressVerdict facts={facts} schoolName={address?.schoolId ? catchments.byId.get(address.schoolId)?.properties.name : null} />
+      <AddressVerdict facts={facts} schoolName={addressSchoolName} />
       {usingSaved && (
         <p className="mt-2 text-xs text-neutral-600">
           {t('admissionArea.usingSaved')}{' '}

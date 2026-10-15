@@ -217,6 +217,19 @@ describe('admission from a school page', () => {
     await typeAddress(area, address, 'en')
     await area.getByText(t('en', 'admissionArea.verdict.inside')).waitFor()
     assert.match(await area.getByLabel(t('en', 'admissionArea.address')).inputValue(), /^ul\. [A-Za-z]/)
+
+    // The calculator names the address's school in English too, not by its Cyrillic register name.
+    await open('en', '/admission?stage=grade_1')
+    await typeAddress(page.locator('main'), address, 'en')
+    const [before, after] = t('en', 'admissionCalc.g1.forCatchmentSchool', { school: '§' }).split('§')
+    // The Bulgarian register name shows until the school list has loaded.
+    const sentence = page.getByText(before.trim()).first()
+    const named = async () => {
+      const text = await sentence.innerText()
+      return text.slice(text.indexOf(before) + before.length, text.indexOf(after))
+    }
+    for (let tries = 0; tries < 20 && /[А-Яа-я]/.test(await named()); tries++) await page.waitForTimeout(500)
+    assert.ok(!/[А-Яа-я]/.test(await named()), `school named in English: ${await named()}`)
   })
 
   test('saved first-grade answers compare every school in the list, and can be forgotten', async () => {
@@ -245,6 +258,8 @@ describe('admission from a school page', () => {
     // The school page compares the same answers with that school, and uses the address.
     await open('bg', `/schools/${school.id}`)
     await page.getByTestId('saved-verdict').waitFor()
+    // The same result leads the facts strip at the top of the page.
+    await page.getByText(t('bg', 'savedAdmission.factLabel'), { exact: true }).first().waitFor()
     // Each compared cut-off says which campaign it is from (2026/27), not a bare date.
     for (const line of await page.getByTestId('saved-verdict').locator('li').allInnerTexts()) {
       assert.match(line, /\d{4}\/\d{2}\b/, line)

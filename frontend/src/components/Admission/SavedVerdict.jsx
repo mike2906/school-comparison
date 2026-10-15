@@ -30,7 +30,7 @@ function Yours({ verdict }) {
  * One line on a search card: the saved result, the last admitted child, and where it
  * stands. The list's banner says what was assumed.
  */
-export function SavedVerdictLine({ verdict }) {
+export function SavedVerdictLine({ verdict, hideVerdict = false }) {
   const { t, i18n } = useTranslation()
   if (verdict.verdict === 'needsAddress') {
     return <span className="text-neutral-600">{t('savedAdmission.verdict.needsAddress')}</span>
@@ -48,8 +48,12 @@ export function SavedVerdictLine({ verdict }) {
           {t('savedAdmission.lastAdmitted')} <CutoffValue round={line.round} />
         </>
       )}
-      {' · '}
-      <span className={TONE[verdict.verdict] || 'text-neutral-700'}>{t(`savedAdmission.verdict.${verdict.verdict}`)}</span>
+      {!hideVerdict && (
+        <>
+          {' · '}
+          <span className={TONE[verdict.verdict] || 'text-neutral-700'}>{t(`savedAdmission.verdict.${verdict.verdict}`)}</span>
+        </>
+      )}
       {/* Which campaign and ranking: a saved answer for next year is compared with this one's. */}
       {/* Not for "mixed": one row's date would read as the school's. */}
       {line && verdict.verdict !== 'mixed' && rankingWhen(line.row, line.round, i18n.language) && (
@@ -57,6 +61,16 @@ export function SavedVerdictLine({ verdict }) {
       )}
       {verdict.lines.some(l => l.otherRules) && <span className="text-neutral-600"> ({t('cutoffs.otherRules')})</span>}
       <PriorityNote verdict={verdict} className="block text-xs text-neutral-600" />
+    </span>
+  )
+}
+
+/** The verdict alone, in its colour, sentence case: the school page's key fact. */
+export function SavedVerdictWord({ verdict }) {
+  const { t } = useTranslation()
+  return (
+    <span className={`inline-block first-letter:uppercase ${TONE[verdict.verdict] || 'text-neutral-900'}`}>
+      {t(`savedAdmission.verdict.${verdict.verdict}`)}
     </span>
   )
 }

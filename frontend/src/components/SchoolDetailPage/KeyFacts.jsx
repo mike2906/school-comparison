@@ -18,6 +18,8 @@ import { normalizeLanguageFocus } from '../../utils/schoolAttributes'
 import { getMappableLocations } from './LocationMap'
 import { usesSofiaKindergartenSystem } from '../../utils/admission'
 import { openDayDate, openDaysLink, upcomingOpenDays } from '../../utils/schoolFacts'
+import { useSavedVerdicts } from '../../hooks/useSavedAdmission'
+import { SavedVerdictLine, SavedVerdictWord } from '../Admission/SavedVerdict'
 
 function Fact({ label, value, detail, note, detailClass = 'text-neutral-500' }) {
   return (
@@ -55,6 +57,22 @@ function KeyFacts({ school, examAverages, nvoExamType, ageGroup = null }) {
   const isKindergarten = school.education_level === 'kindergarten'
 
   const facts = {}
+
+  // Saved calculator answers against this school's last cut-off lead the strip: on a
+  // phone the full comparison is several screens down.
+  const comparable = useSavedVerdicts(isPrivate ? null : school, ageGroup)
+    .find(verdict => !['needsAddress', 'noCutoff'].includes(verdict.verdict))
+  if (comparable) {
+    facts.saved = (
+      <Fact
+        key="saved"
+        label={t('savedAdmission.factLabel')}
+        value={<SavedVerdictWord verdict={comparable} />}
+        detail={<SavedVerdictLine verdict={comparable} hideVerdict />}
+        detailClass="text-neutral-700"
+      />
+    )
+  }
 
   // The searched age group's fee when the parent came from a search for one.
   const tuition = isPrivate ? statedTuition(school.pricing, { ageGroup }) : null
@@ -220,8 +238,8 @@ function KeyFacts({ school, examAverages, nvoExamType, ageGroup = null }) {
   const order = isPrivate
     ? ['tuition', 'openDay', 'languages', 'grades', 'nvo', 'distance']
     : isKindergarten
-      ? ['lastAdmitted', 'openDay', 'distance', 'grades', 'languages']
-      : ['nvo', 'openDay', 'minScore', 'shift', 'distance', 'grades', 'languages']
+      ? ['saved', 'lastAdmitted', 'openDay', 'distance', 'grades', 'languages']
+      : ['saved', 'nvo', 'openDay', 'minScore', 'shift', 'distance', 'grades', 'languages']
   const shown = order.map(key => facts[key]).filter(Boolean)
 
   if (shown.length === 0) return null

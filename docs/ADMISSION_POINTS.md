@@ -242,6 +242,9 @@ only that says which catchment it is in. Only the newest campaign's rows are com
 on the latest round unless that round had no places (then the first). Eighth grade is
 left out: without each class's formula most rows would read "depends".
 
+On a school page the saved result also leads the key-facts strip at the top. Before
+saving, the calculator says what the list will assume for every school.
+
 The list banner has an opt-in switch to hide schools where every saved result is clearly
 below (`clearlyBelowIds`); a tie, "depends", mixed rows, no cut-off, a cut-off ranked
 under other rules or a possible social-priority or SEN path keeps the school listed. The switch is a per-browser preference

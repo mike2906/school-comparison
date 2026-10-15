@@ -1182,6 +1182,8 @@
     "showFor": {
       "kindergarten": "Show the list for my child (born {{year}}, {{campaign}})",
       "grade_1": "Show the 1st grade list for {{campaign}}"
-    }
+    },
+    "factLabel": "Your saved answers",
+    "listAssumes": "In the school list: {{assumed}} Pick a school here to answer those for it."
   }
 }
