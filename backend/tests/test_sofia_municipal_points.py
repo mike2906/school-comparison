@@ -240,3 +240,29 @@ async def test_fill_districts_uses_exact_pins_only(db_session, monkeypatch):
     assert exact.district == "Лозенец"
     assert approximate.district is None
     script.district_at.assert_awaited_once()
+
+
+def _id_row(name, address, tags, status="name_only"):
+    location = SimpleNamespace(address_i18n={"bg": address}, location_tags=tags)
+    school = SimpleNamespace(name_i18n={"bg": name})
+    return Row(location, school, status)
+
+
+def test_a_kindergarten_building_is_placed_by_its_kg_sofia_id():
+    from scripts.import_sofia_municipal_points import match_by_id
+
+    building = Point(
+        kind="kindergarten", name="ДГ №175 Слънчеви лъчи - сграда 2", address='ул. "Борис Руменов" №18',
+        district=None, lat=42.654307, lng=23.319173, integration_id="688",
+    )
+    buildings = {"688": building}
+    tags = ["source=kg_sofia_bg", "source_esri_id=688"]
+    row = match_by_id(_id_row("ДГ №175 Слънчеви лъчи", 'м. "Кръстова вада", ул. "Борис Руменов" №18', tags), buildings)
+    assert (row.status, row.point) == ("match_by_id", building)
+    # An id whose point names another kindergarten at another address is not taken.
+    other = match_by_id(_id_row("ДГ №44 Звездица", "ул. Казбек 3", tags), buildings)
+    assert other.status == "id_disagrees" and other.point is None
+    # No id tag, or a row already matched: unchanged.
+    assert match_by_id(_id_row("ДГ №175", "ул. Борис Руменов 18", []), buildings).status == "name_only"
+    matched = _id_row("ДГ №175", "ул. Борис Руменов 18", tags, status="match")
+    assert match_by_id(matched, buildings) is matched

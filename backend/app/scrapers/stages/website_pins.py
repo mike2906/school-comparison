@@ -288,17 +288,22 @@ async def write_pin(
     method: str,
     tag: str,
     evidence: Optional[dict[str, Any]] = None,
+    unchanged_from: Optional[tuple[float, float]] = None,
 ) -> str:
     """Pin a still-hidden location at ``point`` (exact), under a short row lock, and commit.
 
     Returns "placed", "pinned_meanwhile" (another stage pinned it since the read) or
-    "rejected" (the write gate refused it; the old point is kept)."""
+    "rejected" (the write gate refused it; the old point is kept). With ``unchanged_from``,
+    a location whose point moved since the read is left alone ("moved_meanwhile")."""
     location = await db.get(SchoolLocation, location_id)
     # Another stage may have pinned it since the read; the lock waits for one still writing.
     await db.refresh(location, with_for_update=True)
     if not needs_pin(location):
         await db.rollback()
         return "pinned_meanwhile"
+    if unchanged_from is not None and (location.lat, location.lng) != tuple(unchanged_from):
+        await db.rollback()
+        return "moved_meanwhile"
     school = await db.get(School, location.school_id)
     applied = await apply_geocode_result_to_location(
         db,

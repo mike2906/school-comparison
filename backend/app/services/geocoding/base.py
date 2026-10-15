@@ -11,6 +11,7 @@ GeocodingMethod = Literal[
     "municipal_point",
     "official_point_same_address",
     "agent_pick",
+    "reverse_confirmed",
 ]
 GeocodingPrecision = Literal["exact", "approximate"]
 
