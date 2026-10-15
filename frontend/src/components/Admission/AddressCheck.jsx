@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { addressSuggestions, catchmentSchoolFor, splitAddress, streetDisplayName } from '../../admission/catchments'
+import { addressSuggestions, catchmentSchoolFor, splitAddress, streetDisplayName, streetKey } from '../../admission/catchments'
 import { loadAddresses, loadDistricts } from '../../admission/loadCatchments'
 
 /**
@@ -54,7 +54,7 @@ function AddressCheck({ onResult, catchments, ownIds = [], nameSchool = true, va
 
   const typed = splitAddress(text)
   const suggestions = !streets || street ? [] : addressSuggestions(streets, text)
-  const noMatch = Boolean(streets && !street && typed.street.trim().length >= 2 && suggestions.length === 0)
+  const noMatch = Boolean(streets && !street && streetKey(typed.street).length >= 2 && suggestions.length === 0)
   const schoolId = street && number.trim() ? catchmentSchoolFor(street, number) : undefined
 
   useEffect(() => {

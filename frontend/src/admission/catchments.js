@@ -28,7 +28,8 @@ export function searchKey(text) {
 // The same words as a parent types them in Latin ("ul. Ivan Shterev", "blvd Vitosha").
 const LATIN_STREET_PREFIX = /^(?:ul|bul|blvd|boulevard|str|street|zh\.?\s?k|jk|kv)\.?\s+/i
 
-function streetKey(name) {
+/** The search key of a typed street name, without its type word. */
+export function streetKey(name) {
   return searchKey(String(name || '').replace(STREET_PREFIX, '').replace(LATIN_STREET_PREFIX, ''))
 }
 
@@ -80,8 +81,11 @@ export function streetDisplayName(street, language, districtName = null) {
  */
 export function splitAddress(text) {
   const value = String(text || '')
-    // Entrance, floor and flat say nothing about the catchment: `бл. 20, вх. Б, ет. 3`.
-    .replace(/[\s,]+(?:вх|ет|ап|entr?|fl|apt)(?:\.\s*|\s+)\S+/giu, '')
+    // Entrance, floor and flat after the number say nothing about the catchment:
+    // `бл. 20, вх. Б, ет. 3`. Only after a number, so `Ап. Карамитев` stays a name.
+    .replace(/(\d[a-zа-я]?)(?:[\s,]+(?:вх|ет|ап|entr?|fl|apt)(?:\.\s*|\s+)\S+)+/giu, '$1')
+    // A word still being typed: `Младост 1 бл`, `... 20 вх`.
+    .replace(/[\s,]+(?:бл|блок|вх|ет|ап|bl|block)\.?$/iu, '')
     // The table lists a block as the house number under its ж.к.: `Младост 1, бл. 20` → `Младост 1 20`.
     .replace(/[\s,]+(?:бл|блок|bl|block)(?:\.\s*|\s+)(?=\d)/giu, ' ')
     .trim()
@@ -143,6 +147,8 @@ export function searchStreets(streets, query, limit = 12) {
  * match it exactly (ж.к. Младост 1), and last otherwise.
  * Each entry: `{ street, number, carry }`.
  */
+const EARLY_CARRY = 3
+
 export function addressSuggestions(streets, text, limit = 12) {
   const typed = splitAddress(text)
   const out = []
@@ -156,13 +162,19 @@ export function addressSuggestions(streets, text, limit = 12) {
   const whole = searchStreets(streets, cleaned)
   const exactKey = streetKey(cleaned)
   for (const street of whole) if (street.key === exactKey) add(street, '')
+  // A few streets without the number come early (the city street the parent meant, whose
+  // number the table lacks); the rest wait behind names that match the whole text.
+  const later = []
+  let early = 0
   if (typed.number) {
     for (const street of searchStreets(streets, typed.street)) {
       if (catchmentSchoolFor(street, typed.number)) add(street, normalizeHouseNumber(typed.number))
-      else add(street, '', true)
+      else if (early++ < EARLY_CARRY) add(street, '', true)
+      else later.push(street)
     }
   }
   for (const street of whole) add(street, '')
+  for (const street of later) add(street, '', true)
   return out
 }
 

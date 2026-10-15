@@ -144,7 +144,7 @@ export function clearlyBelowIds(schools, saved, ageGroup, data) {
  */
 export function savedListFilters(stage, entry) {
   if (!entry) return null
-  if (stage === 'grade_1') return { schoolType: 'state', targetYear: entry.startYear, ageGroup: 'grade_1_4' }
+  if (stage === 'grade_1') return { schoolType: 'state', targetYear: entry.startYear, ageGroup: 'grade_1_4', birthYear: null }
   const ageGroup = kindergartenAgeGroup(entry.answers, entry.startYear)
   if (!ageGroup || !KINDERGARTEN_GROUPS.includes(ageGroup)) return null
   return { schoolType: 'state', targetYear: entry.startYear, ageGroup, birthYear: entry.answers.birthYear }
