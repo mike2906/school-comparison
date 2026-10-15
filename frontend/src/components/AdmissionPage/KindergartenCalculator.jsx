@@ -11,6 +11,7 @@ import PointsList from './PointsList'
 import SaveAnswers from './SaveAnswers'
 import NextTierHint from './NextTierHint'
 import CutoffComparison from '../Admission/CutoffComparison'
+import { savedListFilters, savedListUrl } from '../../admission/schoolVerdict'
 
 // Answers about one kindergarten: never saved, since the list compares every kindergarten
 // (whether one is in the parent's district comes from its own district there).
@@ -47,12 +48,8 @@ function KindergartenCalculator({ selected, startYear, kindergarten, districts, 
   const save = () => saveStage('kindergarten', { startYear, answers: withoutPlace(a) })
   const dirty = !saved || saved.startYear !== startYear ||
     JSON.stringify({ ...KINDERGARTEN_INITIAL, ...saved.answers }) !== JSON.stringify(withoutPlace(a))
-  const listUrl = `/search?${new URLSearchParams({
-    school_type: 'state',
-    target_year: String(startYear),
-    ...(ageGroup ? { age_group: ageGroup } : {}),
-    ...(a.birthYear ? { birth_year: String(a.birthYear) } : {}),
-  })}`
+  const listFilters = savedListFilters('kindergarten', { startYear, answers: a })
+  const listUrl = listFilters ? savedListUrl(listFilters) : '/search'
 
   const yearOptions = birthYearsFor(startYear, 7).filter(year => year < startYear)
   const activityOptions = [

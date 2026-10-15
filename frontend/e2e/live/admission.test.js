@@ -237,6 +237,10 @@ describe('admission from a school page', () => {
     await page.getByTestId('hide-below').check()
     await page.getByTestId('hidden-count').waitFor()
     await page.getByTestId('hide-below').uncheck()
+    // Opened plainly, the list offers to set itself up for the saved answers.
+    await open('bg', '/search')
+    await page.getByTestId('saved-show-for').click()
+    await page.waitForURL(url => url.searchParams.get('age_group') === 'grade_1_4' && url.searchParams.get('school_type') === 'state')
 
     // The school page compares the same answers with that school, and uses the address.
     await open('bg', `/schools/${school.id}`)

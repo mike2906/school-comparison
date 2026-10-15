@@ -137,6 +137,29 @@ export function clearlyBelowIds(schools, saved, ageGroup, data) {
   return ids
 }
 
+/**
+ * The search filters that show a saved tab's schools: state schools, its intake year and
+ * age group (and the child's birth year for kindergartens). Null when the answers do not
+ * give an age group.
+ */
+export function savedListFilters(stage, entry) {
+  if (!entry) return null
+  if (stage === 'grade_1') return { schoolType: 'state', targetYear: entry.startYear, ageGroup: 'grade_1_4', birthYear: null }
+  const ageGroup = kindergartenAgeGroup(entry.answers, entry.startYear)
+  if (!ageGroup || !KINDERGARTEN_GROUPS.includes(ageGroup)) return null
+  return { schoolType: 'state', targetYear: entry.startYear, ageGroup, birthYear: entry.answers.birthYear }
+}
+
+/** The search URL for savedListFilters. */
+export function savedListUrl(filters) {
+  return `/search?${new URLSearchParams({
+    school_type: filters.schoolType,
+    target_year: String(filters.targetYear),
+    age_group: filters.ageGroup,
+    ...(filters.birthYear ? { birth_year: String(filters.birthYear) } : {}),
+  })}`
+}
+
 /** Whether a saved tab applies to a search for `ageGroup` (null: any). */
 export function savedStageApplies(stage, entry, ageGroup) {
   if (!entry) return false

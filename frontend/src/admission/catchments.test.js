@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 
 import {
   addressFactsForSchool,
+  addressSuggestions,
   areaAtPoint,
   displayPlaceName,
   splitAddress,
@@ -149,4 +150,28 @@ test('a point is placed against a school\'s areas', () => {
   const [id, feature] = [...catchments.entries()][0]
   const neighbours = neighbouringCatchments(catchments, id)
   assert.equal(areaAtPoint([feature], neighbours, 0, 0), 'outside')
+})
+
+test('blocks, entrances and flats in a typed address', () => {
+  assert.deepEqual(splitAddress('ж.к. Младост 1, бл. 20'), { street: 'ж.к. Младост 1', number: '20' })
+  assert.deepEqual(splitAddress('жк Младост 1 бл 20 вх Б ет. 3 ап. 12'), { street: 'жк Младост 1', number: '20' })
+  assert.deepEqual(splitAddress('Апостол Карамитев 5'), { street: 'Апостол Карамитев', number: '5' })
+  assert.deepEqual(splitAddress('ул. Ап. Карамитев 5'), { street: 'ул. Ап. Карамитев', number: '5' })
+  assert.deepEqual(splitAddress('жк Младост 1 бл'), { street: 'жк Младост', number: '1' })
+  const [first] = addressSuggestions(streets, 'ж.к. Младост 1, бл. 20')
+  assert.match(first.street.street, /МЛАДОСТ 1$/)
+  assert.equal(first.number, '20')
+})
+
+test('address suggestions keep the city street first', () => {
+  for (const text of ['Латинка 11', 'Стара планина 11', 'Vitosha 20']) {
+    const [first] = addressSuggestions(streets, text)
+    assert.equal(first.street.settlement, 'ГР.СОФИЯ', text)
+  }
+  // A whole name ending in a number is that complex, not house 1 somewhere.
+  const [mladost] = addressSuggestions(streets, 'Младост 1')
+  assert.match(mladost.street.street, /МЛАДОСТ 1$/)
+  assert.equal(mladost.number, '')
+  // Names that merely start with the text still show.
+  assert.ok(addressSuggestions(streets, 'Младост 1').some(s => /МЛАДОСТ 1А$/.test(s.street.street)))
 })
