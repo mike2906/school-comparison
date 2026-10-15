@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
+  calculatorStagesFor,
   classifyAdmissionRequirement,
   hasDisplayableAdmissionInfo,
   curatedRequirement,
@@ -171,4 +172,21 @@ test('kindergarten cut-offs are recognised from the summary rows', () => {
   assert.equal(hasKindergartenCutoffs({ cutoff_summary: [{ stage: 'nursery' }] }), true)
   assert.equal(hasKindergartenCutoffs({ cutoff_summary: [{ stage: 'grade_8' }] }), false)
   assert.equal(hasKindergartenCutoffs(undefined), false)
+})
+
+test('calculatorStagesFor: a school with a preparatory group links to both tabs', () => {
+  const school = {
+    school_type: 'state',
+    education_level: 'primary',
+    country_code: 'bg',
+    admission_info: {
+      catchment_ids: { 'bg-sofia-gis': ['123'] },
+      cutoff_summary: [{ stage: 'preparatory', age_group: 'preschool' }, { stage: 'grade_1' }],
+    },
+  }
+  assert.deepEqual(calculatorStagesFor(school), ['kindergarten', 'grade_1'])
+  assert.deepEqual(calculatorStagesFor({ ...school, admission_info: { catchment_ids: school.admission_info.catchment_ids } }), ['grade_1'])
+  assert.deepEqual(calculatorStagesFor({ school_type: 'state', education_level: 'kindergarten', country_code: 'bg' }), ['kindergarten'])
+  assert.deepEqual(calculatorStagesFor({ admission_info: { cutoff_summary: [{ stage: 'grade_8' }] } }), ['grade_8'])
+  assert.deepEqual(calculatorStagesFor(null), [])
 })

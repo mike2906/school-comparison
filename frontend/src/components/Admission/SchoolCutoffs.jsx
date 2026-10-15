@@ -1,17 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import CutoffTable from './CutoffTable'
-import { schoolCatchmentIds } from '../../admission/catchments'
-import { usesSofiaKindergartenSystem } from '../../utils/admission'
-
-/** The calculator tab a school's page links to, or null when no calculator fits it. */
-export function calculatorStageFor(school) {
-  const summary = school?.admission_info?.cutoff_summary || []
-  if (usesSofiaKindergartenSystem(school)) return 'kindergarten'
-  if (schoolCatchmentIds(school).length > 0) return 'grade_1'
-  if (summary.some(row => row.stage === 'grade_8')) return 'grade_8'
-  return null
-}
+import { calculatorStagesFor, usesSofiaKindergartenSystem } from '../../utils/admission'
 
 /**
  * "Who got in before" on a school page: the last admitted result per group or class from
@@ -20,8 +10,14 @@ export function calculatorStageFor(school) {
 function SchoolCutoffs({ school }) {
   const { t } = useTranslation()
   const rows = school.admission_info?.cutoff_summary || []
-  const stage = calculatorStageFor(school)
-  if (rows.length === 0 && !stage) return null
+  const stages = calculatorStagesFor(school)
+  if (rows.length === 0 && stages.length === 0) return null
+  // One link says what it calculates when a school has more than one: a school with a
+  // preparatory group links to it as well as to first grade.
+  const label = stage => {
+    if (stages.length === 1) return t('cutoffs.calculate')
+    return t(`cutoffs.calculateStage.${stage === 'kindergarten' && !usesSofiaKindergartenSystem(school) ? 'preparatory' : stage}`)
+  }
 
   return (
     <section className="bg-white rounded-2xl shadow-card border border-neutral-200 p-6 md:p-8 mb-6">
@@ -30,13 +26,18 @@ function SchoolCutoffs({ school }) {
       <div className="mt-4">
         {rows.length > 0 ? <CutoffTable rows={rows} /> : <p className="text-sm text-neutral-600">{t('cutoffs.none')}</p>}
       </div>
-      {stage && (
-        <Link
-          to={`/admission?stage=${stage}&school=${school.id}`}
-          className="mt-5 inline-flex items-center rounded-lg bg-primary-700 px-4 py-2 text-sm font-medium text-white hover:bg-primary-800"
-        >
-          {t('cutoffs.calculate')}
-        </Link>
+      {stages.length > 0 && (
+        <div className="mt-5 flex flex-wrap gap-2">
+          {stages.map(stage => (
+            <Link
+              key={stage}
+              to={`/admission?stage=${stage}&school=${school.id}`}
+              className="inline-flex items-center rounded-lg bg-primary-700 px-4 py-2 text-sm font-medium text-white hover:bg-primary-800"
+            >
+              {label(stage)}
+            </Link>
+          ))}
+        </div>
       )}
     </section>
   )

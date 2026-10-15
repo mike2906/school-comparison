@@ -150,6 +150,14 @@ function AdmissionPage() {
             </button>
           ))}
         </div>
+        {stage.id === 'grade_1' && (
+          <p className="mt-3 rounded-lg bg-neutral-50 p-3 text-sm text-neutral-700">
+            {t('admissionCalc.preparatoryNote')}{' '}
+            <button type="button" onClick={() => chooseStage('kindergarten')} className="font-medium text-primary-700 underline">
+              {t('admissionCalc.preparatoryLink')}
+            </button>
+          </p>
+        )}
         <p className="mt-2 text-xs text-neutral-500">{t('admissionCalc.grade5Note')}</p>
 
         <div className="mt-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">

@@ -888,16 +888,18 @@
   },
   "admissionCalc": {
     "title": "Admission points calculator",
-    "intro": "Work out your child's points for a Sofia municipal kindergarten, the group and extra points for first grade, or the score for eighth grade, under the official rules for the year you pick.",
+    "intro": "Work out your child's points for a Sofia municipal kindergarten or a preparatory group (including one at a school), the group and extra points for first grade, or the score for eighth grade, under the official rules for the year you pick.",
     "privacy": "Your answers stay in this browser tab. They are not sent to us, saved, or put in the page address.",
     "privateAnswers": "These answers stay in your browser like all the others. Leave them as No if they do not apply.",
     "disclaimer": "This is an estimate from the published rules, not a decision. The official system and the school or kindergarten decide; places, applicants and rules change every year, and ties are broken by a random number.",
     "stages": {
-      "kindergarten": "Nursery and kindergarten",
+      "kindergarten": "Kindergarten and preparatory group",
       "grade_1": "1st grade",
       "grade_8": "8th grade"
     },
     "grade5Note": "5th grade has no common points system in Sofia: each school that admits pupils sets its own rules.",
+    "preparatoryNote": "Preparatory groups at schools (the year or two before 1st grade) are ranked like kindergartens, not like 1st grade.",
+    "preparatoryLink": "Calculate preparatory-group points",
     "startYear": "Starting in September of",
     "startYearOption": "{{year}} (school year {{year}}/{{next}})",
     "forSchool": "For",
@@ -1082,6 +1084,12 @@
       "preparatory": "Preparatory group"
     },
     "calculate": "Calculate your points",
+    "calculateStage": {
+      "kindergarten": "Kindergarten points",
+      "preparatory": "Preparatory group points",
+      "grade_1": "1st grade points",
+      "grade_8": "8th grade score"
+    },
     "quotaScores": "boys {{boys}}, girls {{girls}}",
     "bornIn": "born {{year}}",
     "compare": {
