@@ -73,6 +73,10 @@ locations, when an unrelated school is pinned there, or when the school has two 
 Nominatim's nearest building there is our town, street and exact house number. Not when
 the school's own website maps it only over 300 m away (the address may be stale).
 
+A registry re-import (`discover`) recreates a school's locations, but keeps official and
+hand-corrected points and, while the source still lists their address (or the address
+site-address replaced), the exact pins these stages checked (`has_checked_pin`).
+
 `cli website-pins [--apply]` (after geocoding) pins a hidden location on its own website's
 map point only when Nominatim's nearest building there is in our town, on our street, with
 exactly our house number. Sofia only for now: another city needs its write bounds and

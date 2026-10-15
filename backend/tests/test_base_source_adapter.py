@@ -134,3 +134,96 @@ async def test_registry_rerun_keeps_pinned_locations(db_session):
     # Unpinned rows are still recreated from the source, and a pinned primary stays primary.
     assert locations['ул. "Роза" № 3'].lat == 42.70
     assert [loc.address_i18n["bg"] for loc in locations.values() if loc.is_primary] == ['ул. "Ела" № 6']
+
+
+async def test_registry_rerun_keeps_checked_pins_whose_address_it_still_lists(db_session):
+    """A pin stage's checked pin survives a re-import of its address; a moved school's does not."""
+    from sqlalchemy import select
+
+    from app.models import School, SchoolLocation
+
+    school = School(
+        institutional_id="2200002",
+        name_i18n={"bg": "Друго училище"},
+        country_code="bg",
+        school_type="private",
+        education_level="primary",
+        city="sofia",
+    )
+    db_session.add(school)
+    await db_session.flush()
+    register_pin = SchoolLocation(
+        school_id=school.id,
+        address_i18n={"bg": 'ул. "Ела" № 6'},
+        lat=42.61,
+        lng=23.31,
+        is_primary=True,
+        geocode_meta={"method": "address_register", "precision": "exact"},
+        location_tags=["coords_source=sofia_address_register"],
+    )
+    # site-address replaced the registered address with the one the school's site gives.
+    site_pin = SchoolLocation(
+        school_id=school.id,
+        address_i18n={"bg": "гр. Банкя, ул. Тенев баир 2"},
+        lat=42.70,
+        lng=23.13,
+        is_primary=False,
+        geocode_meta={
+            "method": "site_address",
+            "precision": "exact",
+            "evidence": {"previous_address_i18n": {"bg": 'ул. "Майор Коста Паница"'}},
+        },
+    )
+    moved = SchoolLocation(
+        school_id=school.id,
+        address_i18n={"bg": 'ул. "Роза" № 3'},
+        lat=42.64,
+        lng=23.34,
+        is_primary=False,
+        geocode_meta={"method": "agent_pick", "precision": "exact"},
+    )
+    db_session.add_all([register_pin, site_pin, moved])
+    await db_session.commit()
+    school_id = school.id
+
+    def source_location(address, **extra):
+        return DiscoveredLocation(
+            address_i18n={"bg": address},
+            lat=42.69,
+            lng=23.39,
+            geocode_meta={"method": "geojson_name_match", "precision": "approximate"},
+            location_tags=["coords_source=geojson"],
+            **extra,
+        )
+
+    await DummyAdapter(db=db_session).upsert_schools(
+        [
+            DiscoveredSchool(
+                institutional_id="2200002",
+                country_code="bg",
+                city="sofia",
+                name_i18n={"bg": "Друго училище"},
+                school_type="private",
+                education_level="primary",
+                locations=[
+                    source_location('ул. "Ела" № 6'),
+                    source_location('ул. "Майор Коста Паница"', is_primary=False),
+                    source_location('ул. "Нова" № 9', is_primary=False),
+                ],
+            )
+        ]
+    )
+
+    db_session.expire_all()
+    locations = {
+        loc.address_i18n["bg"]: loc
+        for loc in (
+            await db_session.execute(select(SchoolLocation).where(SchoolLocation.school_id == school_id))
+        ).scalars()
+    }
+    assert set(locations) == {'ул. "Ела" № 6', "гр. Банкя, ул. Тенев баир 2", 'ул. "Нова" № 9'}
+    assert (locations['ул. "Ела" № 6'].lat, locations['ул. "Ела" № 6'].lng) == (42.61, 23.31)
+    assert locations['ул. "Ела" № 6'].geocode_meta["method"] == "address_register"
+    assert "coords_source=geojson" not in locations['ул. "Ела" № 6'].location_tags
+    assert locations["гр. Банкя, ул. Тенев баир 2"].geocode_meta["method"] == "site_address"
+    assert locations['ул. "Нова" № 9'].geocode_meta["precision"] == "approximate"

@@ -62,9 +62,10 @@ def _is_pinned_location(location, address_i18n: Optional[dict]) -> bool:
     """Whether a source address is this pinned location.
 
     A hand correction may have replaced the source's address with the real one; the
-    address it replaced is kept in ``geocode_meta.manual_fix.previous``.
+    address it replaced is kept in ``geocode_meta.manual_fix.previous`` (site-address
+    keeps it in ``geocode_meta.evidence.previous_address_i18n``).
     """
-    known = {_address_key(location.address_i18n)}
+    known = set(_address_keys(location))
     meta = location.geocode_meta if isinstance(location.geocode_meta, dict) else {}
     manual_fix = meta.get("manual_fix")
     previous = manual_fix.get("previous") if isinstance(manual_fix, dict) else None
@@ -154,7 +155,11 @@ class BaseSourceAdapter(ABC):
 
         from app.models import School, SchoolLocation, SchoolLocationAgeGroupShift
         from app.services.geocoding.base import GeocodingResult
-        from app.services.geocoding.write_gate import apply_geocode_result_to_location, has_pinned_point
+        from app.services.geocoding.write_gate import (
+            apply_geocode_result_to_location,
+            has_checked_pin,
+            has_pinned_point,
+        )
 
         logger = logging.getLogger(__name__)
 
@@ -344,8 +349,20 @@ class BaseSourceAdapter(ABC):
                         ).scalars().all()
                         # Official and hand-corrected points are not recreated: the rows
                         # stay, and a source location that is one of them only refreshes
-                        # its source fields.
-                        pinned = [loc for loc in existing_locations if has_pinned_point(loc)]
+                        # its source fields. So do pins a pin stage checked, while the
+                        # source still lists their address.
+                        pinned = [
+                            loc
+                            for loc in existing_locations
+                            if has_pinned_point(loc)
+                            or (
+                                has_checked_pin(loc)
+                                and any(
+                                    _is_pinned_location(loc, incoming.address_i18n)
+                                    for incoming in locations_to_add
+                                )
+                            )
+                        ]
                         location_ids = [loc.id for loc in existing_locations if loc not in pinned]
                         if location_ids:
                             # Remove child shift rows first because raw deletes bypass ORM cascades.
