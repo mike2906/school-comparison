@@ -905,7 +905,8 @@
     "locationNoAddress": "We couldn't find a house number there: type your address above for the official answer.",
     "usingSaved": "Using the address saved on this device.",
     "forgetAddress": "Forget it",
-    "remember": "Remember this address on this device for other schools"
+    "remember": "Remember this address on this device for other schools",
+    "noMatch": "No street in Sofia's address list matches. Type the street or complex name and the number, e.g. \"Ivan Shterev 5\" or \"Mladost 1 20\" for a block."
   },
   "admissionCalc": {
     "title": "Admission points calculator",
@@ -1174,6 +1175,10 @@
     "needsAddressToSave": "Type your address above to save and compare every school: only a checked address says which catchment it is in.",
     "hideBelow": "Hide schools where you're below the last admitted child",
     "hiddenCount_one": "{{count}} hidden. Cut-offs change every year, so this is a guide only.",
-    "hiddenCount_other": "{{count}} hidden. Cut-offs change every year, so this is a guide only."
+    "hiddenCount_other": "{{count}} hidden. Cut-offs change every year, so this is a guide only.",
+    "showFor": {
+      "kindergarten": "Show the list for my child (born {{year}}, {{campaign}})",
+      "grade_1": "Show the 1st grade list for {{campaign}}"
+    }
   }
 }

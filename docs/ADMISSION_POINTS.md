@@ -270,7 +270,11 @@ schools by the same GIS school id (`integrationid` on layer 1). That is not the 
   points, group 4 only); adjacency is not always symmetric, so it is always read in that
   direction. Two shades, not a scale. Each address belongs to exactly one catchment.
 - **Address check.** One field, as on the search page: the parent types "Иван Щерев 5"
-  (or "Ivan Shterev 5") and picks the street; names show transliterated in English. The
+  (or "Ivan Shterev 5") and picks the street; names show transliterated in English.
+  Blocks are house numbers under their ж.к. in the table, so "Младост 1, бл. 20, вх. Б"
+  reads as "Младост 1 20". Suggestions follow street match order (exact name, then city
+  before outer quarters and villages), and a typed number the street does not list is
+  carried so the check can say so; nothing matching says so too. The
   lookup runs in the browser against a compact index built from the address list, loaded
   only on demand. One sentence answers it, naming the catchment the address is in. A
   "show on the map" button then geocodes it (see decision 7) and pins it beside the

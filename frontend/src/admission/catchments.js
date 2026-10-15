@@ -28,7 +28,8 @@ export function searchKey(text) {
 // The same words as a parent types them in Latin ("ul. Ivan Shterev", "blvd Vitosha").
 const LATIN_STREET_PREFIX = /^(?:ul|bul|blvd|boulevard|str|street|zh\.?\s?k|jk|kv)\.?\s+/i
 
-function streetKey(name) {
+/** The search key of a typed street name, without its type word. */
+export function streetKey(name) {
   return searchKey(String(name || '').replace(STREET_PREFIX, '').replace(LATIN_STREET_PREFIX, ''))
 }
 
@@ -75,10 +76,19 @@ export function streetDisplayName(street, language, districtName = null) {
 
 /**
  * One typed address split into street and house number: `Иван Щерев 5` →
- * `{ street: 'Иван Щерев', number: '5' }`. Without a trailing number, all of it is the street.
+ * `{ street: 'Иван Щерев', number: '5' }`, `ж.к. Младост 1, бл. 20, вх. Б` →
+ * `{ street: 'ж.к. Младост 1', number: '20' }`. Without a trailing number, all of it is the street.
  */
 export function splitAddress(text) {
-  const value = String(text || '').trim()
+  const value = String(text || '')
+    // Entrance, floor and flat after the number say nothing about the catchment:
+    // `бл. 20, вх. Б, ет. 3`. Only after a number, so `Ап. Карамитев` stays a name.
+    .replace(/(\d[a-zа-я]?)(?:[\s,]+(?:вх|ет|ап|entr?|fl|apt)(?:\.\s*|\s+)\S+)+/giu, '$1')
+    // A word still being typed: `Младост 1 бл`, `... 20 вх`.
+    .replace(/[\s,]+(?:бл|блок|вх|ет|ап|bl|block)\.?$/iu, '')
+    // The table lists a block as the house number under its ж.к.: `Младост 1, бл. 20` → `Младост 1 20`.
+    .replace(/[\s,]+(?:бл|блок|bl|block)(?:\.\s*|\s+)(?=\d)/giu, ' ')
+    .trim()
   const match = /^(.*?\S)[\s,]+(?:№\s*|no\.?\s*)?(\d+\s?[a-zа-я]?)$/iu.exec(value)
   if (!match || !/\p{L}/u.test(match[1])) return { street: value, number: '' }
   return { street: match[1].replace(/[\s,]+$/, ''), number: match[2].replace(/\s+/g, '') }
@@ -108,7 +118,8 @@ export function indexAddresses(addresses) {
 }
 
 /**
- * Streets matching what the parent typed, best first. Within a match quality, streets
+ * Streets matching what the parent typed, best first (the whole name, then its start,
+ * then a word in it). Within a match quality, streets
  * in the city come first, then its outer quarters (ГР.СОФИЯ,КВ.…), then same-named
  * streets in Sofia's other towns and villages.
  */
@@ -117,7 +128,7 @@ export function searchStreets(streets, query, limit = 12) {
   if (String(query || '').trim().length < 2 || !key) return []
   const ranked = []
   for (const street of streets) {
-    const rank = street.key.startsWith(key) ? 0 : street.key.includes(` ${key}`) ? 1 : street.key.includes(key) ? 2 : -1
+    const rank = street.key === key ? 0 : street.key.startsWith(key) ? 1 : street.key.includes(` ${key}`) ? 2 : street.key.includes(key) ? 3 : -1
     if (rank >= 0) ranked.push({ rank, street })
   }
   const outsideCity = street => (street.settlement === 'ГР.СОФИЯ' ? 0 : street.settlement?.startsWith('ГР.СОФИЯ') ? 1 : 2)
@@ -127,6 +138,44 @@ export function searchStreets(streets, query, limit = 12) {
     a.street.key.length - b.street.key.length ||
     a.street.key.localeCompare(b.street.key))
   return ranked.slice(0, limit).map(entry => entry.street)
+}
+
+/**
+ * Suggestions for a typed address, in the order of searchStreets: a street listing the
+ * typed number shows with it; one that does not still keeps the number (`carry`) so the
+ * check can say it is not listed. Streets matching the whole text come first when they
+ * match it exactly (ж.к. Младост 1), and last otherwise.
+ * Each entry: `{ street, number, carry }`.
+ */
+const EARLY_CARRY = 3
+
+export function addressSuggestions(streets, text, limit = 12) {
+  const typed = splitAddress(text)
+  const out = []
+  const seen = new Set()
+  const add = (street, number, carry = false) => {
+    if (seen.has(street.id) || out.length >= limit) return
+    seen.add(street.id)
+    out.push({ street, number, carry })
+  }
+  const cleaned = typed.number ? `${typed.street} ${typed.number}` : typed.street
+  const whole = searchStreets(streets, cleaned)
+  const exactKey = streetKey(cleaned)
+  for (const street of whole) if (street.key === exactKey) add(street, '')
+  // A few streets without the number come early (the city street the parent meant, whose
+  // number the table lacks); the rest wait behind names that match the whole text.
+  const later = []
+  let early = 0
+  if (typed.number) {
+    for (const street of searchStreets(streets, typed.street)) {
+      if (catchmentSchoolFor(street, typed.number)) add(street, normalizeHouseNumber(typed.number))
+      else if (early++ < EARLY_CARRY) add(street, '', true)
+      else later.push(street)
+    }
+  }
+  for (const street of whole) add(street, '')
+  for (const street of later) add(street, '', true)
+  return out
 }
 
 const LATIN_NUMBER_LETTERS = { a: 'А', b: 'Б', v: 'В', g: 'Г', d: 'Д', e: 'Е', z: 'З', i: 'И', k: 'К' }

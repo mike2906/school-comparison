@@ -10,6 +10,7 @@ import AddressCheck from '../Admission/AddressCheck'
 import CutoffComparison from '../Admission/CutoffComparison'
 import { DateField, MobileTotal, Section, YesNo } from './fields'
 import PointsList from './PointsList'
+import { savedListFilters, savedListUrl } from '../../admission/schoolVerdict'
 import SaveAnswers from './SaveAnswers'
 import NextTierHint from './NextTierHint'
 
@@ -156,7 +157,7 @@ function Grade1Calculator({ selected, startYear, school, cutoffRows = [], isCurr
   const home = addresses[0]?.check ? { streetId: addresses[0].check.streetId, number: addresses[0].check.number } : undefined
   const save = () => saveStage('grade_1', toSave(), { home })
   const dirty = !saved || JSON.stringify({ ...toSave(), savedOn: saved.savedOn }) !== JSON.stringify(saved)
-  const listUrl = `/search?${new URLSearchParams({ school_type: 'state', target_year: String(startYear), age_group: 'grade_1_4' })}`
+  const listUrl = savedListUrl(savedListFilters('grade_1', { startYear, answers: a }))
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">

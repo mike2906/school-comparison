@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { formatRange } from '../../admission/calculator'
 import { forgetSaved, SAVED_STAGES } from '../../admission/saved'
-import { savedStageApplies } from '../../admission/schoolVerdict'
+import { savedListFilters, savedStageApplies } from '../../admission/schoolVerdict'
 import { setHideBelow, useHideBelow, useSavedAdmission } from '../../hooks/useSavedAdmission'
 import { CutoffValue, rowLabel } from './CutoffTable'
 
@@ -122,7 +122,8 @@ export function SavedVerdictPanel({ verdict, schoolId }) {
  * Above the search list: whose answers the cards use, what they assume, a way out, and
  * the switch that hides schools where the parent is below the last admitted child.
  */
-export function SavedAdmissionBanner({ ageGroup, hiddenCount = 0 }) {
+export function SavedAdmissionBanner({ filters = {}, onFilterChange = null, hiddenCount = 0 }) {
+  const { ageGroup } = filters
   const { t } = useTranslation()
   const saved = useSavedAdmission()
   const hideBelow = useHideBelow()
@@ -130,18 +131,37 @@ export function SavedAdmissionBanner({ ageGroup, hiddenCount = 0 }) {
   if (stages.length === 0) return null
   return (
     <div className="mx-3 mt-3 rounded-xl border border-primary-200 bg-primary-50 p-3 text-sm text-primary-900" data-testid="saved-admission-banner">
-      {stages.map(stage => (
-        <div key={stage} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-          <p>
-            {t(`savedAdmission.banner.${stage}`, { year: saved[stage].answers.birthYear })}{' '}
-            <span className="text-primary-900/80">{t(`savedAdmission.assumed.${stage}`)}</span>
-          </p>
-          <div className="flex gap-3 text-xs">
-            <Link to={`/admission?stage=${stage}`} className="font-medium underline">{t('savedAdmission.edit')}</Link>
-            <button type="button" onClick={() => forgetSaved(stage)} className="underline">{t('savedAdmission.forget')}</button>
+      {stages.map(stage => {
+        // The list may be open for another year or without the child's age: one tap sets it.
+        const listFilters = savedListFilters(stage, saved[stage])
+        const showFor = onFilterChange && listFilters &&
+          Object.entries(listFilters).some(([key, value]) => (filters[key] ?? null) !== value)
+        return (
+          <div key={stage} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+            <p>
+              {t(`savedAdmission.banner.${stage}`, { year: saved[stage].answers.birthYear })}{' '}
+              <span className="text-primary-900/80">{t(`savedAdmission.assumed.${stage}`)}</span>
+            </p>
+            <div className="flex flex-wrap gap-3 text-xs">
+              {showFor && (
+                <button
+                  type="button"
+                  onClick={() => onFilterChange(listFilters)}
+                  className="font-medium underline"
+                  data-testid="saved-show-for"
+                >
+                  {t(`savedAdmission.showFor.${stage}`, {
+                    year: listFilters.birthYear,
+                    campaign: `${listFilters.targetYear}/${String(listFilters.targetYear + 1).slice(2)}`,
+                  })}
+                </button>
+              )}
+              <Link to={`/admission?stage=${stage}`} className="font-medium underline">{t('savedAdmission.edit')}</Link>
+              <button type="button" onClick={() => forgetSaved(stage)} className="underline">{t('savedAdmission.forget')}</button>
+            </div>
           </div>
-        </div>
-      ))}
+        )
+      })}
       <label className="mt-2 flex items-start gap-2 text-xs">
         <input
           type="checkbox"
