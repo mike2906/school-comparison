@@ -483,6 +483,7 @@ class TestSchoolsEndpoint:
                 pricing_context=_verified_pricing_context(
                     0.9,
                     includes=["Books"],
+                    plan_name_en="Half day",
                     internal_prompt_trace="must not ship",
                 ),
             )
@@ -515,6 +516,7 @@ class TestSchoolsEndpoint:
         assert "internal_note" not in detail["admission_info"]
         assert "internal_prompt_trace" not in detail["pricing"][0]["pricing_context"]
         assert detail["pricing"][0]["pricing_context"]["includes"] == ["Books"]
+        assert detail["pricing"][0]["pricing_context"]["plan_name_en"] == "Half day"
         source = detail["field_sources"][0]
         assert set(source) == {
             "source_type",

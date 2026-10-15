@@ -28,6 +28,9 @@ class PricingContextResponse(BaseModel):
     discounts: list[str] = Field(default_factory=list)
     installments: list[str] = Field(default_factory=list)
     payment_options: list[PaymentOptionResponse] = Field(default_factory=list)
+    # The fees agent's English for the site's plan name and age group (shown on the English page).
+    plan_name_en: Optional[str] = None
+    age_group_en: Optional[str] = None
     includes: list[str] = Field(default_factory=list)
     excludes: list[str] = Field(default_factory=list)
 

@@ -30,9 +30,9 @@ function PricingSection({ pricing, discounts }) {
       ? `${formatShown(price.amount)} ${currency}`
       : t('pricing.priceOnRequest')
 
-    const ageGroupLabel = showAgeGroup ? priceAgeGroupLabel(price, t) : null
+    const ageGroupLabel = showAgeGroup ? priceAgeGroupLabel(price, t, i18n.language) : null
     const options = paymentOptionTexts(price, (value) => `${formatNumber(value)} ${currency}`, t)
-    const planName = planNameBeside(price, t, bandLabel || ageGroupLabel)
+    const planName = planNameBeside(price, t, bandLabel || ageGroupLabel, i18n.language)
 
     return (
       // Stacked on phones: beside the price, a long fee name was squeezed into a column a
@@ -112,7 +112,7 @@ function PricingSection({ pricing, discounts }) {
                         {t(`pricing.${category}`)}
                       </h3>
                       <div className="space-y-4">
-                        {groupRowsByAgeGroup(items, t).map(band => (
+                        {groupRowsByAgeGroup(items, t, i18n.language).map(band => (
                           <div key={band.label || ''} className="space-y-3">
                             {band.label && (
                               <h4 className="text-sm font-medium text-neutral-700 break-words" lang={textLang(band.label, i18n.language)}>{band.label}</h4>

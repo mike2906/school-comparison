@@ -531,6 +531,21 @@ def _single_payment(fee: AgentFee) -> bool:
     return any(_SINGLE_PAYMENT_RE.match(text) for text in [fee.label, *fee.installments])
 
 
+_DIGITS_RE = re.compile(r"\d+")
+
+
+def _english_for(site_words: str | None, english: str | None) -> str | None:
+    """The reader's English for the site's words, kept only when it states the same numbers
+    ("Paid for 6 months at once" for "за 6 месеца"): a changed or added number is a wrong
+    fee description, and the page then shows the site's own words instead."""
+    english = " ".join((english or "").split())
+    if not site_words or not english or len(english) > 100:
+        return None
+    if sorted(_DIGITS_RE.findall(site_words)) != sorted(_DIGITS_RE.findall(english)):
+        return None
+    return english
+
+
 def _build_rows(
     school: School, checked: list[tuple[CheckedFee, SourcePage]]
 ) -> tuple[list[Pricing], list[FieldSource]]:
@@ -539,6 +554,8 @@ def _build_rows(
     built = []
     for result, page in checked:
         fee = result.fee
+        # The name of a way of paying says nothing once the fee carries its payment options.
+        plan_name_dropped = bool(fee.payment_options and _PAYMENT_PLAN_NAME_RE.match(fee.plan_name or ""))
         fields = price_step._normalized_price_fields(
             ExtractedPrice(
                 category=fee.category.value,
@@ -547,9 +564,7 @@ def _build_rows(
                 period=fee.period.value if fee.period else None,
                 amount_min=fee.amount_min,
                 amount_max=fee.amount_max,
-                plan_name=None
-                if fee.payment_options and _PAYMENT_PLAN_NAME_RE.match(fee.plan_name or "")
-                else fee.plan_name,
+                plan_name=None if plan_name_dropped else fee.plan_name,
                 academic_year=fee.academic_year,
                 age_group=fee.age_group,
                 confidence=result.confidence,
@@ -558,24 +573,28 @@ def _build_rows(
         if fields is not None:
             # Single payments of one plan price are the same fee whatever they are called.
             label = "" if _single_payment(fee) else " ".join(fee.label.split()).casefold()
-            built.append((result, page, fields, label))
+            english = {
+                "plan_name_en": None if plan_name_dropped else _english_for(fields.get("plan_name"), fee.plan_name_en),
+                "age_group_en": _english_for(fields.get("age_group"), fee.age_group_en),
+            }
+            built.append((result, page, fields, label, english))
 
     # A plan paid "1 x 8950" restates the plan's 8950 a second time (596): drop such a single
     # payment when the same fee also comes without it, with or without its period.
     def unperiodic(fields: dict) -> tuple:
         return tuple(value for name, value in fields.items() if name != "period")
 
-    restated = {unperiodic(f) for r, _, f, _ in built if not _single_payment(r.fee)}
+    restated = {unperiodic(f) for r, _, f, _, _ in built if not _single_payment(r.fee)}
     built = [b for b in built if not (_single_payment(b[0].fee) and unperiodic(b[2]) in restated)]
     # The same fee on two pages is one row (564 lists its fees on three). On one page a
     # second fee with the same fields but its own label is a fee of its own: two grade
     # tiers at one price when the reader left their groups empty. So each set of fields
     # comes from the one page that lists it most often, once per label.
     labels: dict[tuple, dict[Any, set[str]]] = {}
-    for _, page, fields, label in built:
+    for _, page, fields, label, _ in built:
         labels.setdefault(tuple(fields.values()), {}).setdefault(page.id, set()).add(label)
     taken: set[tuple] = set()
-    for result, page, fields, label in built:
+    for result, page, fields, label, english in built:
         key = tuple(fields.values())
         by_page = labels[key]
         if page.id != max(by_page, key=lambda page_id: len(by_page[page_id])) or (key, label) in taken:
@@ -599,6 +618,8 @@ def _build_rows(
                     "installments": fee.installments,
                     "payment_options": [option.model_dump(exclude_none=True) for option in fee.payment_options],
                     "notes": fee.notes,
+                    # The site's words in English for the English page; the columns keep the site's own.
+                    **{key: value for key, value in english.items() if value},
                 },
             )
         )
@@ -617,7 +638,24 @@ def _build_rows(
                 confidence_score=result.confidence,
             )
         )
+    _name_unnamed_alike(rows)
     return rows, sources
+
+
+def _name_unnamed_alike(rows: list[Pricing]) -> None:
+    """Fees of one kind, group, year and period that the reader left unnamed read as the
+    same fee twice (596's uniforms: "Uniforms" 25, 14, 28, 18). Each takes the site's own
+    label ("Sweatshirt") as its name when the labels tell them apart."""
+    alike: dict[tuple, list[Pricing]] = {}
+    for row in rows:
+        if not row.plan_name:
+            key = (row.category, row.age_group, row.period, row.academic_year)
+            alike.setdefault(key, []).append(row)
+    for group in alike.values():
+        labels = [" ".join(str(row.pricing_context.get("label") or "").split()) for row in group]
+        if len(group) > 1 and all(labels) and len({label.casefold() for label in labels}) == len(labels):
+            for row, label in zip(group, labels):
+                row.plan_name = label[:100]
 
 
 async def _upsert_pages(db: AsyncSession, pages: dict[str, SourcePage], stored: dict[tuple, SourcePage]) -> None:
@@ -833,8 +871,11 @@ def _fee_report(result: CheckedFee, page: Optional[PageRead]) -> dict[str, Any]:
         "currency": fee.currency,
         "period": fee.period.value if fee.period else None,
         "label": fee.label,
+        "plan_name": fee.plan_name,
+        "plan_name_en": fee.plan_name_en,
         "academic_year": fee.academic_year,
         "age_group": fee.age_group,
+        "age_group_en": fee.age_group_en,
         "payment_options": [option.model_dump(exclude_none=True) for option in fee.payment_options],
         "kept": result.kept,
         "confidence": result.confidence,

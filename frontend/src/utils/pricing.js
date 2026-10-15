@@ -1,7 +1,7 @@
 import { intlLocale } from './format.js'
 import { gradeBandLabel, gradeRangeInText, gradesInText, gradesNamedIn, rowGradeBand } from './gradeBand.js'
 import { isOnePayment, pricePeriod, rowAgeGroupKeys, rowsForAgeGroup } from './priceRows.js'
-import { stageLabel } from './priceLabels.js'
+import { stageLabel, websiteWords } from './priceLabels.js'
 
 /**
  * Academic-year cohort helpers for pricing display.
@@ -282,8 +282,8 @@ function namedBand(text, planName) {
 }
 
 // The age group a row names in the UI language: a known `ageGroups` key, else the grades
-// it names ("ПК" → "Preschool"), else the website's own words.
-function ageGroupName(price, t) {
+// it names ("ПК" → "Preschool"), else the website's own words (`websiteWords`).
+function ageGroupName(price, t, language) {
   const raw = price?.age_group?.trim()
   if (!raw) return null
   const key = `ageGroups.${raw}`
@@ -294,7 +294,7 @@ function ageGroupName(price, t) {
   // Grades named in free text too: "Гимназия", or Buditel's whole sentence "Годишна такса за
   // 8. клас за учебната …".
   const band = rowGradeBand(price) || namedBand(raw, price.plan_name)
-  return band ? gradeBandLabel(band, t) : raw
+  return band ? gradeBandLabel(band, t) : websiteWords(price, 'age_group', language)
 }
 
 /**
@@ -306,7 +306,7 @@ function ageGroupName(price, t) {
  * Null when the plan name already carries it ("Grade 0 / Plan 1", or "8–12: …" for
  * grades 8–12), to avoid saying it twice.
  */
-export function priceAgeGroupLabel(price, t) {
+export function priceAgeGroupLabel(price, t, language) {
   const raw = price?.age_group?.trim()
   if (!raw) return null
   const key = `ageGroups.${raw}`
@@ -315,13 +315,13 @@ export function priceAgeGroupLabel(price, t) {
   // A plan name that already says it needs no repeat, unless it starts at preschool:
   // "PK"/"ПК" is an abbreviation parents may not know.
   const band = rowGradeBand(price)
-  if (band?.from === 0) return ageGroupName(price, t)
+  if (band?.from === 0) return ageGroupName(price, t, language)
   // Whole-word match, so "Grade 1" is still shown next to a "Grade 10" plan.
   const escaped = raw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   if (new RegExp(`(^|[^\\p{L}\\p{N}])${escaped}($|[^\\p{L}\\p{N}])`, 'iu').test(price.plan_name || '')) return null
   const named = gradeRangeInText(price.plan_name)
   if (band && named && band.from === named.from && band.to === named.to) return null
-  return ageGroupName(price, t)
+  return ageGroupName(price, t, language)
 }
 
 /**
@@ -333,16 +333,18 @@ export function priceAgeGroupLabel(price, t) {
  * bands nothing is split: one group with a null label, and each row keeps its own
  * age-group line.
  */
-export function groupRowsByAgeGroup(rows = [], t) {
+export function groupRowsByAgeGroup(rows = [], t, language) {
   const bands = new Map()
   const unnamed = []
   rows.forEach(row => {
-    const label = ageGroupName(row, t)
-    if (!label) {
+    // Grouped by the site's own group, so two English wordings of one group stay one band.
+    const identity = ageGroupName(row, t)
+    if (!identity) {
       unnamed.push(row)
       return
     }
-    const key = label.toLocaleLowerCase()
+    const label = ageGroupName(row, t, language)
+    const key = identity.toLocaleLowerCase()
     if (!bands.has(key)) bands.set(key, { label, rows: [] })
     bands.get(key).rows.push(row)
   })
