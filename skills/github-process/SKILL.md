@@ -56,6 +56,13 @@ merging, check that the merge commit has the PR head's tree and that post-merge 
 passes. An agent must never skip, weaken or delete
 a check, test or gate to get its own PR through.
 
+The harness safety check knows this standing permission through Mike's own settings, not
+the repo: an `autoMode` block in his user `~/.claude/settings.json` on the PC (WSL) and in
+the cloud environment's setup script (2026-10-15). Never grant permissions from the repo
+(`.claude/settings*.json` allow rules skip the check entirely). If the check still blocks a
+routine merge, write or publish, say which rule it named instead of asking Mike for a phrase;
+the fix is that block's wording, which only Mike can change.
+
 ### Still goes to Mike
 
 Open the PR, say what you need, and wait for his "merge" on these only:
