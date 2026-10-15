@@ -21,7 +21,14 @@ from app.models import FieldSource, Pricing, School
 from app.models.pricing import PriceCategory, PricePeriod, PriceSource
 from app.models.scrape_log import ScrapeType
 from app.models.source_page import SourcePage
-from app.scrapers.extraction.agent_fees import HELD_CONFIDENCE, PUBLISH_CONFIDENCE, AgentFee, check_fee, page_numbers
+from app.scrapers.extraction.agent_fees import (
+    HELD_CONFIDENCE,
+    PUBLISH_CONFIDENCE,
+    AgentFee,
+    PaymentOption,
+    check_fee,
+    page_numbers,
+)
 from app.scrapers.stages import fees_agent
 from app.scrapers.stages.fees_agent import PageRead, Spend, SpendCapReached
 from app.utils.display_gating import pricing_row_is_publishable
@@ -1597,3 +1604,18 @@ def test_a_loose_quote_still_needs_the_page_words_in_order():
 def test_a_cell_join_between_two_numbers_does_not_make_one_number():
     food = fee(PriceCategory.FOOD, "Lunch 2 550 meals", amount=2550)
     assert check_fee(food, PAGE_PDF_TABLE).checks == ["dropped: evidence line is not on the page"]
+
+
+def test_a_cleaned_quote_is_checked_with_the_page_rows_cells():
+    page = "TUITION\nPlan | Price | Instalments\nGrade 1 | € 8.950 | € 750 x 9 monthly\n"
+    tuition = fee(PriceCategory.TUITION, "Grade 1 € 8.950 € 750 x 9 monthly", amount=8950, period=PricePeriod.MONTHLY)
+    tuition = tuition.model_copy(update={"payment_options": [PaymentOption(payments=9, instalment=750)]})
+    result = check_fee(tuition, page)
+    assert result.kept
+    assert result.fee.period is None
+    assert result.checks[0] == "period monthly cleared: the evidence does not name it"
+
+
+def test_a_cell_join_after_a_number_and_a_dot_does_not_make_one_number():
+    food = fee(PriceCategory.FOOD, "Grade 1. 550 meals", amount=1550)
+    assert not check_fee(food, "Grade 1. | 550 meals\nOther € 1550\n").kept

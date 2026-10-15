@@ -332,9 +332,10 @@ def check_fee(fee: AgentFee, page_text: str) -> CheckedFee:
         return _dropped(fee, "dropped: no evidence line")
     if any(line not in page for line in lines):
         page_lines = [_normalized(text) for text in page_text.splitlines() if text.strip()]
-        loose_page = _loose(page)
-        if any(not _line_on_page(line, page, page_lines) and _loose(line) not in loose_page for line in lines):
+        found = [line if _line_on_page(line, page, page_lines) else _page_row(line, page_lines) for line in lines]
+        if any(line is None for line in found):
             return _dropped(fee, "dropped: evidence line is not on the page")
+        lines = found
     evidence = "\n".join(lines)
     if not amount_on_page(fee, page_numbers(evidence)):
         return _dropped(fee, "dropped: evidence line does not hold the amount")
@@ -410,12 +411,21 @@ _HYPHEN_BREAK_RE = re.compile(r"(?<=[^\W\d_])- (?=[^\W\d_])")
 
 def _loose(text: str) -> str:
     def join(match: re.Match[str]) -> str:
-        between_numbers = (
-            text[match.start() - 1 : match.start()].isdigit() and text[match.end() : match.end() + 1].isdigit()
-        )
+        between_numbers = re.search(r"\d[.,]?$", text[: match.start()]) and re.match(r"[.,]?\d", text[match.end() :])
         return " ¦ " if between_numbers else " "
 
     return _HYPHEN_BREAK_RE.sub("-", " ".join(_CELL_JOIN_RE.sub(join, text).split()))
+
+
+def _page_row(line: str, page_lines: list[str]) -> str | None:
+    """The one page line a cleaned quote of a table row came from, cells and all.
+
+    The later checks read that line, not the quote: they need the " | " cells to tell the
+    fee's own period from a payment option's ("€ 8.950 | € 750 x 9 monthly").
+    """
+    quote = _loose(line)
+    rows = {text for text in page_lines if quote in _loose(text)}
+    return rows.pop() if len(rows) == 1 else None
 
 
 _LABEL_LINES_AWAY = 3
