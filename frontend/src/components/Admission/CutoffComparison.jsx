@@ -6,6 +6,7 @@ const TONE = {
   above: 'text-green-800',
   below: 'text-red-800',
   tie: 'text-amber-800',
+  sameGroup: 'text-amber-800',
   unsure: 'text-neutral-700',
   everyone: 'text-green-800',
   noPlaces: 'text-neutral-700',

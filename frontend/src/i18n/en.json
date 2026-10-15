@@ -1093,7 +1093,8 @@
       "everyone": "Everyone who applied was admitted.",
       "noPlaces": "There were no free places.",
       "otherRules": "That ranking used different rules.",
-      "note": "The latest ranking is a guide, not a promise: places and applicants change every time."
+      "note": "The latest ranking is a guide, not a promise: places and applicants change every time.",
+      "sameGroup": "The same group as the last child admitted; the list gives no points to compare."
     }
   },
   "driveTime": {

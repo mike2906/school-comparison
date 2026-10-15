@@ -113,8 +113,10 @@ function AdmissionPage() {
   const cutoffRows = schoolContext ? summaryRowsFor(schoolContext.cutoffSummary, stage) : []
   const Calculator = CALCULATORS[stage.id]
 
+  // However the tab changes (a click, a link, Back), it opens on its own default year.
+  useEffect(() => setChosenYear(null), [stage.id])
+
   const chooseStage = id => {
-    setChosenYear(null)
     const next = new URLSearchParams(params)
     next.set('stage', id)
     setParams(next, { replace: true })

@@ -69,9 +69,11 @@ const writeReverseCache = (lat, lng, countryCodes, payload) => {
 
 const fetchGeocode = async (address, geocodingConfig = {}) => {
   const countryCodes = geocodingConfig.country_codes || 'bg'
-  const citySuffix = geocodingConfig.city_suffix || ', Sofia, Bulgaria'
+  const citySuffix = geocodingConfig.city_suffix ?? ', Sofia, Bulgaria'
+  // `remember: false` keeps the address out of the local cache (the admission address check).
+  const remember = geocodingConfig.remember !== false
 
-  const cached = readCacheByKey(getCacheKey(address, countryCodes))
+  const cached = remember ? readCacheByKey(getCacheKey(address, countryCodes)) : null
   if (cached) {
     return {
       lat: cached.lat,
@@ -119,7 +121,7 @@ const fetchGeocode = async (address, geocodingConfig = {}) => {
   }
 
   const result = data[0]
-  writeCache(address, countryCodes, result)
+  if (remember) writeCache(address, countryCodes, result)
 
   return {
     lat: parseFloat(result.lat),
@@ -202,7 +204,7 @@ export const geocodeAddress = (address, geocodingConfig = {}) => {
   }
 
   const countryCodes = geocodingConfig.country_codes || 'bg'
-  const cached = readCacheByKey(getCacheKey(trimmed, countryCodes))
+  const cached = geocodingConfig.remember === false ? null : readCacheByKey(getCacheKey(trimmed, countryCodes))
   if (cached) {
     debouncedFetch.cancel()
     if (pendingReject) {

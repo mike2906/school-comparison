@@ -52,7 +52,8 @@ grade) and the catchment map. Research: `/mnt/project-files/admission-points/res
    adoption and foster care. They never leave the page: no API call, no URL parameter,
    no storage, no analytics or error-report payload carries them. The one exception is
    on a school page's address check, and only when the parent presses "show on the map":
-   the street and number (nothing else) go to OpenStreetMap's search, as the search
+   the street and number (nothing else, and not cached in the browser) go to
+   OpenStreetMap's search, as the search
    page's address box already does, and the map widens to show the pin (Mike,
    2026-10-15). The backend serves no rules endpoint; rule files ship in the
    calculator's own bundle chunk.

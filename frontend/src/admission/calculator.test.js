@@ -132,5 +132,7 @@ test('a result is compared with the last admitted child', () => {
   assert.equal(compareWithCutoff({ group: points(3), points: points(20) }, g1), 'below')
   assert.equal(compareWithCutoff({ group: points(2), points: points(5) }, g1), 'above')
   assert.equal(compareWithCutoff({ group: points(1, 3), points: points(5) }, g1), 'unsure')
+  assert.equal(compareWithCutoff({ group: points(2), points: points(5) }, { last_admitted_group: 2 }), 'sameGroup')
+  assert.equal(compareWithCutoff({ group: points(4), points: points(10) }, { last_admitted_points: 6 }), null)
   assert.equal(compareWithCutoff({ points: points(10) }, null), null)
 })

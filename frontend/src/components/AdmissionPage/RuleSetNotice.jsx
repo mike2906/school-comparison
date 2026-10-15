@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { campaignEnd, pickLanguage } from '../../admission/calculator'
+import { campaignEnd, measuredOnFor, pickLanguage } from '../../admission/calculator'
 
 const TONE = {
   verified: 'border-primary-200 bg-primary-50 text-primary-900',
@@ -21,7 +21,9 @@ function RuleSetNotice({ selected, today = null }) {
   const { ruleSet, applies, campaign, events } = selected
   const sources = new Map((ruleSet.sources || []).map(source => [source.id, source]))
   const end = ruleSet.campaign === campaign ? campaignEnd(ruleSet) : null
-  const running = end && today && today <= end && !ruleSet.schedule?.estimated
+  // Only once the main ranking is past, while later rankings still run: before that the
+  // campaign is simply the one to apply for.
+  const running = end && today && today > measuredOnFor(ruleSet) && today <= end && !ruleSet.schedule?.estimated
   const nextYear = Number(campaign.slice(0, 4)) + 1
 
   return (

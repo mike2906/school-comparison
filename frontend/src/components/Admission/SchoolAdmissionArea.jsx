@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import AreaMap from './AreaMap'
 import AddressCheck from './AddressCheck'
@@ -76,19 +76,28 @@ function AddressVerdict({ facts, schoolName }) {
 function ShowOnMap({ address, onPin }) {
   const { t } = useTranslation()
   const [state, setState] = useState('idle')
+  // A lookup started for an earlier address must not pin it after the address changed.
+  const request = useRef(0)
   useEffect(() => {
+    request.current += 1
     setState('idle')
     onPin(null)
   }, [address])
   if (!address) return null
   const show = () => {
+    const mine = ++request.current
     setState('loading')
-    geocodeAddress(mapSearchQuery(address.street, address.number), { city_suffix: '' }).then(
+    // Not cached locally, unlike the search page's address box.
+    geocodeAddress(mapSearchQuery(address.street, address.number), { city_suffix: '', remember: false }).then(
       result => {
+        if (mine !== request.current) return
         setState('shown')
         onPin([result.lat, result.lng])
       },
-      error => setState(error?.code === 'CANCELED' ? 'idle' : 'failed')
+      error => {
+        if (mine !== request.current) return
+        setState(error?.code === 'CANCELED' ? 'idle' : 'failed')
+      }
     )
   }
   return (

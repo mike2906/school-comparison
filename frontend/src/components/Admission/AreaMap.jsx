@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { CircleMarker, GeoJSON, MapContainer, TileLayer, useMap } from 'react-leaflet'
 import { useTranslation } from 'react-i18next'
 import 'leaflet/dist/leaflet.css'
@@ -29,12 +29,17 @@ function boundsOf(features) {
   return Number.isFinite(south) ? [[south, west], [north, east]] : null
 }
 
-/** Widens the view to show `pin` together with the area, when the parent placed one. */
+/**
+ * Widens the view to show `pin` together with the area when the parent places one, and
+ * goes back to the area when the pin is cleared.
+ */
 function FitPin({ bounds, pin }) {
   const map = useMap()
+  const hadPin = useRef(false)
   useEffect(() => {
-    if (!pin) return
-    map.fitBounds([...bounds, pin], { padding: [24, 24], maxZoom: 16 })
+    if (pin) map.fitBounds([...bounds, pin], { padding: [24, 24], maxZoom: 16 })
+    else if (hadPin.current) map.fitBounds(bounds, { padding: [16, 16] })
+    hadPin.current = Boolean(pin)
   }, [map, bounds, pin])
   return null
 }

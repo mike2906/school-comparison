@@ -82,8 +82,10 @@ const LATIN_NUMBER_LETTERS = { a: 'А', b: 'Б', v: 'В', g: 'Г', d: 'Д', e: '
  */
 export function mapSearchQuery(street, number) {
   const words = text => text.toLowerCase().replace(/(^|[\s(-])(\p{L})/gu, (_, before, ch) => before + ch.toUpperCase())
-  const name = String(street.street || '').replace(STREET_PREFIX, '').trim()
-  const prefix = (String(street.street || '').match(STREET_PREFIX)?.[0] || '').toLowerCase().replace(/\.?\s*$/, '.')
+  // Only a dotted type word is a prefix here (МАРИЦА is a name, М.МАРИЦА a locality).
+  const typed = String(street.street || '').match(/^(ул|бул|пл|ж\.?к|кв|м|в\.?з|пр|алея)\.\s*/i)
+  const name = String(street.street || '').slice(typed ? typed[0].length : 0).trim()
+  const prefix = typed ? `${typed[1].toLowerCase()}.` : '.'
   const settlement = String(street.settlement || '').split(',')[0].replace(/^(?:ГР|С)\./, '')
   return `${prefix === '.' ? '' : `${prefix} `}${words(name)} ${normalizeHouseNumber(number) || number}, ${words(settlement)}, Bulgaria`
 }
