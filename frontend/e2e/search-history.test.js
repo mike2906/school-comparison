@@ -82,12 +82,16 @@ after(async () => {
   if (RECORD_FROM) await writeFile(FIXTURES, `${JSON.stringify(answers, null, 2)}\n`)
 })
 
-beforeEach(async () => {
-  unanswered.clear()
-  page = await browser.newPage({ viewport: { width: 1280, height: 900 } })
+async function openPage(options = { viewport: { width: 1280, height: 900 } }) {
+  page = await browser.newPage(options)
   await page.route('**/api/**', answerApi)
   // Map tiles are not part of any journey.
   await page.route(/basemaps\.cartocdn\.com|tile\.openstreetmap\.org/, route => route.abort())
+}
+
+beforeEach(async () => {
+  unanswered.clear()
+  await openPage()
 })
 
 afterEach(async () => {
@@ -163,6 +167,30 @@ describe('search page history', () => {
     assert.equal(path(), `/search?q=${QUERY}`)
     assert.equal(await page.getByPlaceholder(SEARCH_PLACEHOLDER).first().inputValue(), QUERY)
     await page.locator('text=/^1 резултат/').first().waitFor()
+  })
+
+  test('opening a school while the map still zooms to it raises no error', async () => {
+    // Leaflet ends a zoom from a 250 ms timer that outlived the map, so opening a school
+    // right after a name search threw on the school page (leafletGuard.js). On a phone the
+    // result opens the school's own page, and the map fits even while the list tab hides it.
+    await page.close()
+    await openPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })
+    const errors = []
+    page.on('pageerror', error => errors.push(error.message))
+    // Only leaving the search page matters here, not what the school page shows.
+    await page.route(url => /^\/api\/schools\/\d+$/.test(url.pathname), route => route.fulfill({ status: 404, contentType: 'application/json', body: '{}' }))
+    await page.goto(`${site}/search`)
+    await resultCount()
+    await page.getByPlaceholder('Име или №').filter({ visible: true }).first().fill(QUERY)
+    // Tap the result in the same tick the map starts zooming to it.
+    await page.waitForFunction(() => {
+      if (!document.querySelector('.leaflet-zoom-anim')) return false
+      document.querySelector('a[href^="/schools/"]').click()
+      return true
+    }, null, { polling: 'raf' })
+    await page.waitForURL(url => url.pathname.startsWith('/schools/'))
+    await page.waitForTimeout(500)
+    assert.deepEqual(errors, [])
   })
 
   test('switching language keeps the open panel', async () => {
