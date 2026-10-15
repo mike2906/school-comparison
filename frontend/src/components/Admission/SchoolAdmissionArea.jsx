@@ -118,6 +118,14 @@ function ShowOnMap({ address, onPin }) {
   )
 }
 
+// The map search allows one request a second; "show on the map" may have just used it.
+function streetAt(lat, lng) {
+  return reverseGeocodeStreet(lat, lng).catch(error => {
+    if (error?.code !== 'TOO_FAST') throw error
+    return new Promise(resolve => setTimeout(resolve, 1100)).then(() => reverseGeocodeStreet(lat, lng))
+  })
+}
+
 function readSearchLocation() {
   try {
     return parseSavedLocation(window.localStorage.getItem('userLocation'))
@@ -149,7 +157,7 @@ function useCurrentLocation({ catchments, onPoint, onAddress }) {
           // Blocked storage: the location is used on this page only.
         }
         try {
-          const [{ streets }, found] = await Promise.all([loadAddresses(), reverseGeocodeStreet(lat, lng)])
+          const [{ streets }, found] = await Promise.all([loadAddresses(), streetAt(lat, lng)])
           const match = streetForLocation(streets, catchments, found, lat, lng)
           if (match) {
             onAddress({ streetId: match.street.id, number: match.number })

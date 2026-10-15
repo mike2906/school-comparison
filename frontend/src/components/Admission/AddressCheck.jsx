@@ -57,16 +57,18 @@ function AddressCheck({ onResult, catchments, ownIds = [], nameSchool = true, va
   const schoolId = street && number.trim() ? catchmentSchoolFor(street, number) : undefined
 
   useEffect(() => {
-    if (!onResult) return
+    // An address handed in is not reported as missing while the table is still loading.
+    if (!onResult || (valueKey && !streets && !failed)) return
     onResult(street && number.trim() ? { street, streetId: street.id, number, schoolId: schoolId ?? null } : null)
-  }, [street, number, schoolId])
+  }, [street, number, schoolId, Boolean(streets)])
 
   const change = next => {
     start()
     // Typing after a picked street changes its number; editing the street itself starts over.
     if (street) {
       const name = nameOf(street)
-      if (next.startsWith(name)) {
+      // Backspace over the space after the name, with no number yet, lets go of the street.
+      if (next.startsWith(name) && !(next === name && !number)) {
         setNumber(next.slice(name.length).trim())
         return
       }

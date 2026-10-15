@@ -11,8 +11,9 @@ import PointsList from './PointsList'
 import SaveAnswers from './SaveAnswers'
 import CutoffComparison from '../Admission/CutoffComparison'
 
-// Answers about one kindergarten: never saved, since the list compares every kindergarten.
-const PER_PLACE = { siblingThere: null, wishRank: 1 }
+// Answers about one kindergarten: never saved, since the list compares every kindergarten
+// (whether one is in the parent's district comes from its own district there).
+const PER_PLACE = { siblingThere: null, wishRank: 1, sameDistrict: null }
 const withoutPlace = answers => ({ ...answers, ...PER_PLACE })
 
 /**

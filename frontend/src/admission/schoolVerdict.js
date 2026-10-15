@@ -16,7 +16,7 @@ export const KINDERGARTEN_ASSUMED = { siblingThere: false, wishRank: 1 }
 export const GRADE1_ASSUMED = { siblingAtSchool: false, siblingUnderAgeAtSchool: false, preparatoryGroupHere: false }
 
 // Search-page age groups each saved tab applies to (null: no age chosen, both apply).
-const SEARCH_GROUPS = { kindergarten: KINDERGARTEN_GROUPS, grade_1: ['grade_1_4'] }
+export const SEARCH_GROUPS = { kindergarten: KINDERGARTEN_GROUPS, grade_1: ['grade_1_4'] }
 
 function schoolPoint(school) {
   const locations = school?.locations || []

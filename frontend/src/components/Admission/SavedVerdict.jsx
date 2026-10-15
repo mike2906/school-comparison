@@ -1,7 +1,8 @@
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { formatRange } from '../../admission/calculator'
-import { forgetSaved } from '../../admission/saved'
+import { forgetSaved, SAVED_STAGES } from '../../admission/saved'
+import { SEARCH_GROUPS } from '../../admission/schoolVerdict'
 import { useSavedAdmission } from '../../hooks/useSavedAdmission'
 import { CutoffValue, rowLabel } from './CutoffTable'
 
@@ -103,10 +104,7 @@ export function SavedVerdictPanel({ verdict, schoolId }) {
 export function SavedAdmissionBanner({ ageGroup }) {
   const { t } = useTranslation()
   const saved = useSavedAdmission()
-  const stages = [
-    saved.kindergarten && (!ageGroup || ['nursery', 'first', 'second', 'third', 'preschool'].includes(ageGroup)) && 'kindergarten',
-    saved.grade_1 && (!ageGroup || ageGroup === 'grade_1_4') && 'grade_1',
-  ].filter(Boolean)
+  const stages = SAVED_STAGES.filter(stage => saved[stage] && (!ageGroup || SEARCH_GROUPS[stage].includes(ageGroup)))
   if (stages.length === 0) return null
   return (
     <div className="mx-3 mt-3 rounded-xl border border-primary-200 bg-primary-50 p-3 text-sm text-primary-900" data-testid="saved-admission-banner">

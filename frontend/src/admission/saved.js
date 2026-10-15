@@ -50,6 +50,13 @@ function isEntry(entry) {
 let current = null
 const listeners = new Set()
 
+// One listener for changes made in another tab, however many components subscribe.
+function onStorage(event) {
+  if (event.key !== STORAGE_KEY) return
+  current = null
+  listeners.forEach(listener => listener())
+}
+
 function read() {
   if (current == null) current = parseSaved(storage()?.getItem(STORAGE_KEY))
   return current
@@ -69,16 +76,11 @@ function write(next) {
 
 /** For useSyncExternalStore. */
 export function subscribeSaved(listener) {
+  if (listeners.size === 0 && typeof window !== 'undefined') window.addEventListener('storage', onStorage)
   listeners.add(listener)
-  const onStorage = event => {
-    if (event.key !== STORAGE_KEY) return
-    current = null
-    listener()
-  }
-  if (typeof window !== 'undefined') window.addEventListener('storage', onStorage)
   return () => {
     listeners.delete(listener)
-    if (typeof window !== 'undefined') window.removeEventListener('storage', onStorage)
+    if (listeners.size === 0 && typeof window !== 'undefined') window.removeEventListener('storage', onStorage)
   }
 }
 
@@ -96,9 +98,13 @@ export function saveHome(home) {
   write({ ...read(), home })
 }
 
-/** Forgets one tab's answers, or everything (answers and home) without a stage. */
+/**
+ * Forgets one tab's answers, or everything without a stage. First-grade answers hold the
+ * home address too, so forgetting them forgets it.
+ */
 export function forgetSaved(stage = null) {
-  write(stage ? { ...read(), [stage]: null } : EMPTY)
+  if (!stage) write(EMPTY)
+  else write({ ...read(), [stage]: null, ...(stage === 'grade_1' ? { home: null } : {}) })
 }
 
 /** Tests only: drop the in-memory copy. */

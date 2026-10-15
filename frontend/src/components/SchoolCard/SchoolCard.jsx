@@ -489,12 +489,14 @@ const SchoolCard = memo(function SchoolCard({
         </div>
 
         <div className="space-y-3 text-sm text-neutral-700">
-          {savedVerdict ? (
+          {/* A comparison replaces the plain "last admitted" line; without one, both show. */}
+          {savedVerdict && (
             <div className="flex items-start gap-2" data-testid="saved-verdict-line">
               <span className="text-[16px]" aria-hidden="true">🎯</span>
               <SavedVerdictLine verdict={savedVerdict} />
             </div>
-          ) : admissionsInfo && (
+          )}
+          {admissionsInfo && !(savedVerdict && savedVerdict.lines.length > 0) && (
             <div className="space-y-1">
               <div className="flex items-start gap-2">
                 <span className="text-[16px]" aria-hidden="true">{admissionsInfo.icon}</span>

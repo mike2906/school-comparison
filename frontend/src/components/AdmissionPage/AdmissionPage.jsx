@@ -82,7 +82,11 @@ function AdmissionPage() {
   const today = sofiaToday()
   // Each tab opens on the year of the answers saved on this device, else on the campaign
   // a parent applying today is ranked under, until the parent picks another year.
-  const savedYear = id => getSaved()[id]?.startYear ?? null
+  const savedYear = id => {
+    const year = getSaved()[id]?.startYear
+    // A year no longer offered would show one year and calculate another.
+    return startYearChoices().includes(year) ? year : null
+  }
   const [chosenYear, setChosenYear] = useState(() => savedYear(stage.id))
   const startYear = chosenYear ?? defaultStartYear(new Date(), { ruleSets: RULE_SETS, stage, today })
 

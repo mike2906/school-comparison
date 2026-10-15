@@ -54,7 +54,7 @@ export function displayPlaceName(raw, language) {
     .toLowerCase()
     // Capitals start words, and the second half of a double name (Ал. Батенберг, Горна-Баня),
     // but not an ordinal ending (239-та).
-    .replace(/(^|[\s(]|(?<=\p{L})-)(\p{L})/gu, (_, before, ch) => before + ch.toUpperCase())
+    .replace(/(^|[\s(.]|(?<=\p{L})-)(\p{L})/gu, (_, before, ch) => before + ch.toUpperCase())
   const type = typed ? TYPE_WORDS[typed[1].toLowerCase().replace(/\./g, '')] : null
   const shown = type ? `${type} ${name}` : name
   return String(language || '').startsWith('bg') ? shown : transliterate(shown)

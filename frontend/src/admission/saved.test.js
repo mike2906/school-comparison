@@ -23,3 +23,14 @@ test('well-formed entries are kept and malformed ones dropped', () => {
   assert.equal(parsed.grade_1, null, 'first grade without addresses')
   assert.equal(parseSaved(JSON.stringify({ version: 1, home: { streetId: 5 } })).home, null)
 })
+
+test('forgetting first-grade answers forgets the home address they saved', async () => {
+  const { forgetSaved, getSaved, resetSavedForTests, saveStage } = await import('./saved.js')
+  resetSavedForTests()
+  saveStage('grade_1', { startYear: 2026, addresses: [], answers: {} }, { home: { streetId: '1:2', number: '5' } })
+  saveStage('kindergarten', { startYear: 2026, answers: {} })
+  forgetSaved('grade_1')
+  assert.equal(getSaved().grade_1, null)
+  assert.equal(getSaved().home, null)
+  assert.ok(getSaved().kindergarten)
+})

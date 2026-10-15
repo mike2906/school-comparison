@@ -114,6 +114,7 @@ test('table names read like street signs, transliterated in English', () => {
   assert.equal(displayPlaceName('УЛ.ИВАН ЩЕРЕВ', 'en'), 'ul. Ivan Shterev')
   assert.equal(displayPlaceName('ЖК.МЛАДОСТ 1', 'en'), 'zh.k. Mladost 1')
   assert.equal(displayPlaceName('УЛ.ОТЕЦ ГЕНАДИЙ (239-ТА)', 'bg'), 'ул. Отец Генадий (239-та)')
+  assert.equal(displayPlaceName('УЛ.ГЕН.ГУРКО', 'bg'), 'ул. Ген.Гурко')
   assert.equal(
     streetDisplayName({ street: 'УЛ.ЗЕМЛЯНЕ', settlement: 'ГР.СОФИЯ,КВ.СУХОДОЛ' }, 'en', 'ВИТОША'),
     'ul. Zemlyane (kv. Suhodol, Vitosha)',
