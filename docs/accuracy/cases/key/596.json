@@ -8,7 +8,7 @@
  "fetch_failed": [],
  "blocked": false,
  "site_states_no_fees": false,
- "notes": "A targeted case, not a blind key: written 2026-10-15 from the saved pages (backend/evals/fees/pages/596.json) to track the reader's recall of the extras (materials, uniforms, food, transport) that it dropped run to run. Plan 2 and Plan 3 totals are printed and recorded as yearly tuition, as in 556's key; the per-instalment amounts (2 x, 9 x monthly, initial) are not key fees. Fees printed in both 2026-2027 PDFs are one key fee per PDF (Grade 0-7 and Grade 8-12), as a row per band is right. Uniform prices are per item, no period; their column says 'Price 2025-2026' inside the 2026-2027 sheets and they are kept as current. The 2025-2026 PDF is past and not keyed.",
+ "notes": "A targeted case, not a blind key: written 2026-10-15 from the saved pages (backend/evals/fees/pages/596.json) to track the reader's recall of the extras (materials, uniforms, food, transport) that it dropped run to run. Plan 2 and Plan 3 totals are printed and recorded as yearly tuition, as in 556's key; the per-instalment amounts (2 x, 9 x monthly, initial) are not key fees. Fees printed in both 2026-2027 PDFs (registration, materials, uniforms, transport) are one key fee per PDF (Grade 0-7 and Grade 8-12), as a row per band is right. Uniform prices are per item, no period; their column says 'Price 2025-2026' inside the 2026-2027 sheets and they are kept as current. The 2025-2026 PDF is past and not keyed.",
  "site_fees": [
   {
    "fid": "f1",
@@ -270,7 +270,7 @@
    "amount_max": null,
    "currency": "EUR",
    "period": "one_time",
-   "group": null,
+   "group": "Grade 0 - 7",
    "plan": null,
    "year": "2026/2027",
    "url": "https://sofia-school.maplebear.bg/wp-content/uploads/2026/01/MB-Sofia-Tuition-Fees-2026-2027.pdf",
@@ -292,6 +292,20 @@
   },
   {
    "fid": "f21",
+   "category": "registration",
+   "amount": 800,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": "one_time",
+   "group": "Grade 8 – 12",
+   "plan": null,
+   "year": "2026/2027",
+   "url": "https://sofia-school.maplebear.bg/wp-content/uploads/2026/06/MB_Sofia_Secondary_Tuition_Fees_2026-2027.pdf",
+   "quote": "followed by a one-time registration fee of € 800 payable upon enrollment"
+  },
+  {
+   "fid": "f22",
    "category": "materials",
    "amount": 550,
    "amount_min": null,
@@ -303,24 +317,24 @@
    "year": "2026/2027",
    "url": "https://sofia-school.maplebear.bg/wp-content/uploads/2026/01/MB-Sofia-Tuition-Fees-2026-2027.pdf",
    "quote": "EDUCATIONAL MATERIALS FEE: One-time fee for the school year in the amount of € 550"
-  },
-  {
-   "fid": "f22",
-   "category": "uniforms",
-   "amount": 25,
-   "amount_min": null,
-   "amount_max": null,
-   "currency": "EUR",
-   "period": null,
-   "group": "Grade 0 - 7",
-   "plan": "Sweatshirt",
-   "year": "2026/2027",
-   "url": "https://sofia-school.maplebear.bg/wp-content/uploads/2026/01/MB-Sofia-Tuition-Fees-2026-2027.pdf",
-   "quote": "Sweatshirt: € 25"
   },
   {
    "fid": "f23",
    "category": "uniforms",
+   "amount": 25,
+   "amount_min": null,
+   "amount_max": null,
+   "currency": "EUR",
+   "period": null,
+   "group": "Grade 0 - 7",
+   "plan": "Sweatshirt",
+   "year": "2026/2027",
+   "url": "https://sofia-school.maplebear.bg/wp-content/uploads/2026/01/MB-Sofia-Tuition-Fees-2026-2027.pdf",
+   "quote": "Sweatshirt: € 25"
+  },
+  {
+   "fid": "f24",
+   "category": "uniforms",
    "amount": 14,
    "amount_min": null,
    "amount_max": null,
@@ -333,7 +347,7 @@
    "quote": "Polo T-shirt: € 14"
   },
   {
-   "fid": "f24",
+   "fid": "f25",
    "category": "uniforms",
    "amount": 28,
    "amount_min": null,
@@ -347,7 +361,7 @@
    "quote": "Trousers: € 28"
   },
   {
-   "fid": "f25",
+   "fid": "f26",
    "category": "uniforms",
    "amount": 18,
    "amount_min": null,
@@ -361,7 +375,7 @@
    "quote": "Dress: € 18"
   },
   {
-   "fid": "f26",
+   "fid": "f27",
    "category": "transport",
    "amount": 2550,
    "amount_min": null,
@@ -375,7 +389,7 @@
    "quote": "€ 2,550 annual fee (two-way service)"
   },
   {
-   "fid": "f27",
+   "fid": "f28",
    "category": "transport",
    "amount": 1950,
    "amount_min": null,
@@ -389,7 +403,7 @@
    "quote": "€ 1,950 annual fee (one-way service)"
   },
   {
-   "fid": "f28",
+   "fid": "f29",
    "category": "materials",
    "amount": 550,
    "amount_min": null,
@@ -403,7 +417,7 @@
    "quote": "EDUCATIONAL MATERIALS FEE: One-time fee for the school year in the amount of € 550"
   },
   {
-   "fid": "f29",
+   "fid": "f30",
    "category": "uniforms",
    "amount": 25,
    "amount_min": null,
@@ -417,7 +431,7 @@
    "quote": "Sweatshirt: € 25"
   },
   {
-   "fid": "f30",
+   "fid": "f31",
    "category": "uniforms",
    "amount": 14,
    "amount_min": null,
@@ -431,7 +445,7 @@
    "quote": "Polo T-shirt: € 14"
   },
   {
-   "fid": "f31",
+   "fid": "f32",
    "category": "uniforms",
    "amount": 28,
    "amount_min": null,
@@ -445,7 +459,7 @@
    "quote": "Trousers: € 28"
   },
   {
-   "fid": "f32",
+   "fid": "f33",
    "category": "uniforms",
    "amount": 18,
    "amount_min": null,
@@ -459,7 +473,7 @@
    "quote": "Dress: € 18"
   },
   {
-   "fid": "f33",
+   "fid": "f34",
    "category": "transport",
    "amount": 2550,
    "amount_min": null,
@@ -473,7 +487,7 @@
    "quote": "€ 2,550 annual fee (two-way service)"
   },
   {
-   "fid": "f34",
+   "fid": "f35",
    "category": "transport",
    "amount": 1950,
    "amount_min": null,
@@ -487,7 +501,7 @@
    "quote": "€ 1,950 annual fee (one-way service)"
   },
   {
-   "fid": "f35",
+   "fid": "f36",
    "category": "food",
    "amount": null,
    "amount_min": 1290,
@@ -501,7 +515,7 @@
    "quote": "€ 1,290 – € 1,340 annual fee (depending on supplier)"
   },
   {
-   "fid": "f36",
+   "fid": "f37",
    "category": "food",
    "amount": 1340,
    "amount_min": null,
@@ -515,7 +529,7 @@
    "quote": "€ 1,340 annual fee (depending on supplier)"
   },
   {
-   "fid": "f37",
+   "fid": "f38",
    "category": "extended_day",
    "amount": 700,
    "amount_min": null,
@@ -529,7 +543,7 @@
    "quote": "EXTENDED DAY From 4:30 pm to 6:00 pm € 700 annual fee"
   },
   {
-   "fid": "f38",
+   "fid": "f39",
    "category": "extracurricular",
    "amount": null,
    "amount_min": 200,
