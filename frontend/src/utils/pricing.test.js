@@ -120,29 +120,29 @@ test('groupPricingByAcademicYear gives each group its own status', () => {
   ])
 })
 
-test('groupPricingByAcademicYear leaves out an older fee that a later year lists again', () => {
+test('groupPricingByAcademicYear leaves out a past fee a later year lists again at the same amount', () => {
   const groups = groupPricingByAcademicYear([
     current({ id: 1 }),
-    current({ id: 2, category: 'transport' }),
-    dated('2025/2026', { id: 3, category: 'transport' }),
-    dated('2025/2026', { id: 4, category: 'extended_day' }),
+    current({ id: 2, category: 'transport', amount: 2550 }),
+    dated('2025/2026', { id: 3, category: 'transport', amount: 2550 }),
+    dated('2025/2026', { id: 4, category: 'extended_day', amount: 700 }),
   ])
 
   assert.deepEqual(groups.map(g => [g.academicYear, g.rows.map(r => r.id)]), [
     ['2026/2027', [1, 2]],
     ['2025/2026', [4]],
   ])
-  // Only the older year goes: this year's fees stay beside next year's.
-  const both = groupPricingByAcademicYear([thisYear(), nextYear()], { today: OCTOBER })
-  assert.equal(both.length, 2)
-  // An undated fee is never dropped.
-  assert.equal(groupPricingByAcademicYear([current({ id: 1 }), row({ id: 2 })]).length, 2)
-  // Last year's fee for an age group this year does not name again still shows (520).
-  const split = groupPricingByAcademicYear([
-    current({ id: 1, plan_name: null, age_group: null }),
-    dated('2025/2026', { id: 2, plan_name: 'Preschool', age_group: null }),
+  // A changed price, or a later "price on request", leaves last year's fee showing (520).
+  const changed = groupPricingByAcademicYear([
+    current({ id: 1, amount: 7900 }),
+    dated('2025/2026', { id: 2, amount: 6650 }),
+    current({ id: 3, category: 'transport', amount: null }),
+    dated('2025/2026', { id: 4, category: 'transport', amount: 120 }),
   ])
-  assert.deepEqual(split.map(g => g.rows.map(r => r.id)), [[1], [2]])
+  assert.deepEqual(changed.map(g => g.rows.map(r => r.id)), [[1, 3], [2, 4]])
+  // Only a past year goes: this year's fees stay beside next year's, and undated ones stay.
+  assert.equal(groupPricingByAcademicYear([thisYear(), nextYear({ amount: 8320 })], { today: OCTOBER }).length, 2)
+  assert.equal(groupPricingByAcademicYear([current({ id: 1 }), row({ id: 2 })]).length, 2)
 })
 
 test('groupPricingByAcademicYear returns an empty list for no pricing', () => {

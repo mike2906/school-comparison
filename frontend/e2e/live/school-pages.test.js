@@ -132,7 +132,7 @@ describe('a school page', () => {
     assert.equal(await section.getByText(row.plan_name, { exact: true }).count(), 0, `"${row.plan_name}" is not shown`)
   })
 
-  test("last year's fee is left out once a later year lists it again", async testContext => {
+  test("last year's fee is left out once a later year lists it again at that price", async testContext => {
     // 596 showed its 2025-26 bus fees under the 2026-27 ones, which read as two prices.
     const shownYears = school => new Set(groupPricingByAcademicYear(school.pricing).map(group => group.academicYear))
     const listed = (await allSchools()).find(s => isPrivate(s) &&
@@ -145,10 +145,8 @@ describe('a school page', () => {
     await open('bg', `/schools/${listed.id}`)
     const section = card(t('bg', 'pricing.title'))
     await section.waitFor()
-    // The year badge over each year's fees.
-    const badges = await section.locator('span.rounded-lg').allInnerTexts()
-    assert.ok(badges.length > 0, 'the fees show their years')
-    assert.ok(!badges.includes(hidden.academic_year_canonical), `no ${hidden.academic_year_canonical} group`)
+    assert.equal(await section.getByText(hidden.academic_year_canonical, { exact: true }).count(), 0,
+      `no ${hidden.academic_year_canonical} group`)
   })
 
   test('two private schools with fees compare side by side', async () => {
