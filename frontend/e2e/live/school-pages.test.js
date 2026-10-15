@@ -42,6 +42,7 @@ describe('finding a school', () => {
     // the city. A name the school's own website gives (a brand) may still drop the type.
     const typed = /частна детска градина/i
     const registered = (await allSchools()).filter(s => isPrivate(s) && typed.test(s.name_i18n?.bg || ''))
+    assert.ok(registered.length > 0, 'private kindergartens named in the register')
     const keeping = registered.filter(s => typed.test(schoolName(s, 'bg')))
     assert.ok(keeping.length >= registered.length * 0.8, `${keeping.length} of ${registered.length} keep the type`)
     const school = keeping.find(s => /kindergarten/i.test(schoolName(s, 'en')))

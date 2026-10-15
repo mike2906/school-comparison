@@ -3,7 +3,14 @@ from __future__ import annotations
 import re
 from typing import Any, Mapping
 
-from app.utils.display_names import english_address, tidy_bg_address, tidy_bg_name, translate_bg_school_name
+from app.utils.display_names import (
+    PRIVATE_TYPE_ABBREVIATIONS,
+    PRIVATE_TYPE_PHRASES,
+    english_address,
+    tidy_bg_address,
+    tidy_bg_name,
+    translate_bg_school_name,
+)
 
 _SCHOOL_ABBREVIATION_PREFIX = re.compile(r"^(?:ЧОУ|ЧДГ|ЧСУ|ЦДГ|ДГ|НУ|ОУ|СУ|ПГ)\s+", flags=re.IGNORECASE)
 _GENERIC_BG_NAME_MARKERS = {
@@ -43,18 +50,15 @@ _GENERIC_BG_NAME_STRIP_PREFIX = re.compile(
 # name keeps it ("Частна детска градина „София“"): a bare core ("София") reads as the
 # city, and a kindergarten and a school of the same brand would share one name.
 _PRIVATE_TYPE_PHRASE_RE = re.compile(
-    r"""^(частн(?:а|о)\s+(?:
-        детска\ градина|
-        основно\ училище|
-        начално\ училище|
-        средно\ училище|
-        (?:профилирана|професионална|езикова|немска|английска|френска)\ гимназия|
-        гимназия
-    ))\b""",
-    flags=re.IGNORECASE | re.VERBOSE,
+    "^(?:"
+    + "|".join(
+        r"\s+".join(map(re.escape, phrase.split()))
+        for phrase in sorted(PRIVATE_TYPE_PHRASES, key=len, reverse=True)
+    )
+    + r")(?![\w-])",
+    flags=re.IGNORECASE,
 )
-# Register names sometimes quote with doubled apostrophes (''Ягодина'').
-_APOSTROPHES = "' "
+_PRIVATE_TYPE_ABBREVIATION_RE = re.compile(rf"^(?:{'|'.join(PRIVATE_TYPE_ABBREVIATIONS)})(?![\w-])")
 _LEGAL_ENTITY_SUFFIX_RE = re.compile(
     r"""(?:^|[\s,"'„“”-]+)(?:
         еоод|оод|ад|ет|еад|кд|сд|сдружение|
@@ -121,12 +125,25 @@ def _extract_quoted_core_name(text: str | None) -> str | None:
 
 
 def _clean_core_candidate(text: str | None) -> str | None:
-    normalized = re.sub(r"\s+", " ", text or "").strip(' "„“”')
+    # Register names sometimes quote with doubled apostrophes (''Ягодина'').
+    normalized = re.sub(r"\s+", " ", text or "").strip(' "\'„“”')
     if not normalized:
         return None
-    cleaned = _LEGAL_ENTITY_SUFFIX_RE.sub("", normalized).strip(' "„“”,-')
+    cleaned = _LEGAL_ENTITY_SUFFIX_RE.sub("", normalized).strip(' "\'„“”,-')
     cleaned = re.sub(r"\s+", " ", cleaned).strip()
     return cleaned or None
+
+
+def _legal_core_name(text: str | None) -> str | None:
+    """A register name's own name without its type or legal form: "София" in
+    '"Частна детска градина СОФИЯ" ЕООД'. None when the name has no legal form."""
+    normalized = re.sub(r"\s+", " ", text or "").strip(' "„“”')
+    if not normalized or not _LEGAL_ENTITY_SUFFIX_RE.search(normalized):
+        return None
+    core = _extract_named_core(normalized)
+    if core and not _is_generic_bg_label(core):
+        return core
+    return None
 
 
 def _extract_legal_fallback_name(text: str | None) -> str | None:
@@ -134,15 +151,25 @@ def _extract_legal_fallback_name(text: str | None) -> str | None:
     if not normalized or not _LEGAL_ENTITY_SUFFIX_RE.search(normalized):
         return None
 
-    core = _extract_named_core(normalized)
-    if core and not _is_generic_bg_label(core):
-        type_match = _PRIVATE_TYPE_PHRASE_RE.match(normalized)
-        if type_match and type_match.group(1).casefold() not in core.casefold():
-            type_phrase = re.sub(r"\s+", " ", type_match.group(1)).capitalize()
-            return f"{type_phrase} „{core.strip(_APOSTROPHES)}“"
+    core = _legal_core_name(normalized)
+    if core:
+        # A private school keeps its type ("Частна детска градина „София“"): a bare "София"
+        # reads as the city, and a kindergarten and a school of one brand share a name.
+        if type_match := _PRIVATE_TYPE_PHRASE_RE.match(normalized):
+            type_phrase = " ".join(type_match.group().split()).capitalize()
+            return f"{type_phrase} „{core}“"
+        # "ЧДГ ''Ягодина" keeps its abbreviation already; tidy_bg_name quotes it.
+        if (type_match := _PRIVATE_TYPE_ABBREVIATION_RE.match(normalized)) and not _PRIVATE_TYPE_ABBREVIATION_RE.match(core):
+            return f"{type_match.group()} „{core}“"
         return core
 
     return _clean_core_candidate(normalized)
+
+
+def register_core_names(name_i18n: Mapping[str, Any] | None) -> set[str]:
+    """The bare own name of a register name ("София"), for matching a sibling's brand."""
+    core = _legal_core_name(_clean_i18n_map(name_i18n).get("bg"))
+    return {core} if core else set()
 
 
 def _extract_named_core(text: str | None) -> str | None:

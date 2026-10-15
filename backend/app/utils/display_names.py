@@ -257,7 +257,10 @@ _BG_TYPE_PHRASES: tuple[tuple[str, str], ...] = (
     ("частна професионална гимназия", "Private Vocational High School"),
     ("частна немска гимназия", "Private German High School"),
     ("частна математическа гимназия", "Private High School of Mathematics"),
+    ("частна английска гимназия", "Private English High School"),
+    ("частна френска гимназия", "Private French High School"),
     ("частна гимназия", "Private High School"),
+    ("частно училище", "Private School"),
     ("държавна детска градина", "State Kindergarten"),
     ("детска градина", "Kindergarten"),
     ("вечерно средно училище", "Evening Secondary School"),
@@ -352,6 +355,11 @@ _BG_TYPE_PHRASES: tuple[tuple[str, str], ...] = (
     ("към МО", "(Ministry of Defence)"),
     ("в София", "in Sofia"),
 )
+# The private institution types, as a register name starts with them (i18n_resolver keeps
+# them in front of the school's own name).
+PRIVATE_TYPE_PHRASES = tuple(bg for bg, _ in _BG_TYPE_PHRASES if bg.startswith("частн"))
+PRIVATE_TYPE_ABBREVIATIONS = ("ЧДГ", "ЧОУ", "ЧСУ", "ЧПГ")
+
 _BG_TYPE_ABBREVIATIONS = (
     ("ДГ", "Kindergarten"),
     ("СДЯ", "Nursery"),
