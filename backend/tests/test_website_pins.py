@@ -198,3 +198,47 @@ async def test_a_site_not_read_keeps_the_location(db_session):
 async def test_a_city_without_bounds_is_refused(db_session):
     with pytest.raises(ValueError):
         await stage.run_website_pins(db_session, city="plovdiv", fetch=_fetcher({}), reverse=_reverse({}))
+
+
+@pytest.mark.parametrize(
+    "url, point",
+    [
+        # Britanica's contact page: a view 16.6 km across, centred 1.2 km from the school.
+        (
+            "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d16604.1!2d23.30428259687012!3d42.63348875843796"
+            "!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1",
+            None,
+        ),
+        (
+            "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d2932.6!2d23.392435!3d42.664555!2m3",
+            (42.664555, 23.392435),
+        ),
+        # Златарски's old My Maps link: the centre of a view at zoom 13, no marker.
+        ("https://maps.google.com/maps/ms?msid=1&ll=42.649491,23.361912&z=13", None),
+        ("https://maps.google.com/maps?ll=42.649491,23.361912&z=17", (42.649491, 23.361912)),
+        ("https://maps.google.com/maps?q=42.621565,23.368217&z=13", (42.621565, 23.368217)),  # a marker
+        ("https://maps.google.com/maps?ll=42.649491,23.361912&z=13.5", None),
+        ("https://www.google.com/maps/@42.649491,23.361912,13z", None),
+        ("https://www.google.com/maps/@42.649491,23.361912,17z", (42.649491, 23.361912)),
+        ("https://www.openstreetmap.org/#map=13/42.649491/23.361912", None),
+        # A wide view that also carries the place's marker: the marker.
+        (
+            "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d16604!2d23.30!3d42.63!2m3!1f0"
+            "!4m5!3m4!1s0x0:0x1!8m2!3d42.664!4d23.392",
+            (42.664, 23.392),
+        ),
+    ],
+)
+def test_a_wide_map_view_is_not_a_point(url, point):
+    assert stage._link_point(url) == point
+
+
+def test_page_text_keeps_the_schema_org_address():
+    html = (
+        '<script type="application/ld+json">{"address": {"streetAddress": "ул. Момино венче 27"}}</script>'
+        "<script>var x = 1;</script><p>Драгалевци</p>"
+    )
+    text = stage.page_text(html)
+    assert "Момино венче 27" in text and "var x" not in text
+    escaped = '<script type="application/ld+json">{"streetAddress": "\\u0443\\u043b. \\u041b\\u0438\\u0434\\u0438\\u0446\\u0435 14"}</script>'
+    assert "ул. Лидице 14" in stage.page_text(escaped)

@@ -147,3 +147,78 @@ def test_and_between_numbers_is_not_a_letter():
 )
 def test_a_page_names_our_address(text, address, named):
     assert reg.names_address(reg.page_text(text), reg.parse(address)) is named
+
+
+# Real register rows behind hidden schools (2026-10-15).
+REAL = reg.read_register(
+    """rn;region;settlement;lareaunit;block;street;streetnum;entrance;n;e
+33030;Студентски;гр. София;"";"";бул. Климент Охридски;49;"";42.647552;23.355971
+32992;Студентски;гр. София;"";"";бул. Климент Охридски;49;"";42.647038;23.355745
+21826;Студентски;гр. София;"";"";бул. Климент Охридски;49;"";42.646759;23.355808
+21815;Студентски;гр. София;"";"";бул. Климент Охридски;49;"";42.646490;23.355884
+93804;Лозенец;гр. София;"";"";бул. Никола Й. Вапцаров;47;"";42.666340;23.323172
+114996;Младост;гр. София;"";"";ул. Методи Андонов;6;"";42.651766;23.373279
+111565;Панчарево;с. Лозен;"";"";ул. Орлова круша;1;"";42.612153;23.460506
+1;Средец;гр. София;"";"";ул. Иван;3;"";42.690000;23.320000
+"""
+)
+
+
+@pytest.mark.parametrize(
+    "address, point",
+    [
+        # Our typo for the district; the register leaves out "Св." and numbers the campus's gates.
+        ('район Студетски, бул. "Св. Климент Охридски" № 49', (42.646960, 23.355852)),
+        ("бул.Никола Вапцаров 47", (42.66634, 23.323172)),  # no space; the register adds "Й."
+        ("ул.Методи Андонов-6.", (42.651766, 23.373279)),
+        ('район Панчарево, ул. "Орлова круша" № 1', (42.612153, 23.460506)),  # a village of our district
+    ],
+)
+def test_messy_addresses_of_hidden_schools_find_their_point(address, point):
+    found = reg.match(reg.parse(address), REAL)
+    assert found.outcome == "matched"
+    assert found.point == pytest.approx(point, abs=1e-6)
+
+
+@pytest.mark.parametrize(
+    "address, outcome",
+    [
+        ('бул. "Св. Климент Охридски" № 49', "ambiguous"),  # gates 66 m apart need our district
+        ('ул. "Орлова круша" № 1', "not_in_register"),  # a village only through our district
+        ('ул. "Св. Иван" № 3', "not_in_register"),  # one word of name left is too little
+        ('бул. "А. Никола Вапцаров" № 47', "not_in_register"),  # our initial is not the register's
+        ('бул. "Ген. Никола Вапцаров" № 47', "matched"),  # a title the register leaves out
+    ],
+)
+def test_the_loosened_matching_keeps_its_limits(address, outcome):
+    assert reg.match(reg.parse(address), REAL).outcome == outcome
+
+
+def test_our_record_s_district_alone_does_not_reach_villages_or_spread_plots():
+    # Only a district the address itself names: our record's district can be a guess.
+    assert reg.match(reg.parse('ул. "Орлова круша" № 1', "Панчарево"), REAL).outcome == "not_in_register"
+    assert reg.match(reg.parse('бул. "Климент Охридски" № 49', "Студентски"), REAL).outcome == "ambiguous"
+
+
+def test_a_range_of_house_numbers_is_not_one_number():
+    parsed = reg.parse("ул. Иван Вазов 24-26")
+    assert parsed.number is None
+
+
+@pytest.mark.parametrize(
+    "ours, theirs, same",
+    [
+        ("ул ген иван иванов", "ул проф иван иванов", False),  # two titles: two people
+        ("ул иван рилски", "ул иван рилски в", False),  # a last letter is part of the name
+        ("ул а петров иванов", "ул б петров иванов", False),
+        ("бул никола вапцаров", "бул никола й вапцаров", True),
+        ("бул св климент охридски", "бул климент охридски", True),
+    ],
+)
+def test_same_name(ours, theirs, same):
+    assert reg.same_name(ours, theirs) is same
+
+
+def test_a_village_match_does_not_count_as_our_district_agreeing():
+    found = reg.match(reg.parse('район Панчарево, ул. "Орлова круша" № 1'), REAL)
+    assert found.outcome == "matched" and not found.region_checked

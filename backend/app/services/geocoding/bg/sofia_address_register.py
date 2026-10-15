@@ -18,7 +18,7 @@ import io
 import math
 import re
 import zipfile
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Optional
 
@@ -32,6 +32,9 @@ DATASET_URL = "https://urbandata.sofia.bg/dataset/address_sofia-zip"
 STREET_SPREAD_M = 60
 # A block's entrances can be a long building apart.
 BLOCK_SPREAD_M = 150
+# One house number's points this far apart are one plot's gates, when our address names
+# their district.
+PLOT_SPREAD_M = 150
 
 SOFIA = "гр. софия"
 _LATIN_TO_CYRILLIC = str.maketrans("AaBEeKkMHOoPpCcTXxy", "АаВЕеКкМНОоРрСсТХху")
@@ -77,6 +80,7 @@ class Parsed:
     block: Optional[str]
     entrance: Optional[str]
     near: bool  # "до бл." / "до №": next to it, not at it
+    region_named: bool = False  # the address itself names the district, not just our record
 
 
 @dataclass(frozen=True)
@@ -115,9 +119,33 @@ def street_key(name: str) -> str:
     return f"{_STREET_KINDS[kind.group(1)]} {rest}" if rest else ""
 
 
-def _same_name(ours: str, theirs: str) -> bool:
-    """Same name, also when ours shortens first names to initials ("П. Ю. Тодоров")."""
+# Words one side may leave out of a name: "бул. Св. Климент Охридски" is the register's "бул.
+# Климент Охридски", "бул. Никола Вапцаров" its "бул. Никола Й. Вапцаров".
+_TITLES = {"св", "проф", "акад", "д-р", "ген", "полк", "подполк", "арх", "инж"}
+
+
+def _loose(name: str) -> tuple[list[str], set[str], int]:
+    """A name's words without titles or middle initials (a last one-letter word, "Иван
+    Рилски В", is part of the name), its titles, and how many initials were left out."""
+    words = name.split()
+    initials = [i for i, w in enumerate(words) if len(w) == 1 and w.isalpha() and i < len(words) - 1]
+    kept = [w for i, w in enumerate(words) if w not in _TITLES and i not in initials]
+    return kept, {w for w in words if w in _TITLES}, len(initials)
+
+
+def same_name(ours: str, theirs: str) -> bool:
+    """Same name, also when ours shortens first names to initials ("П. Ю. Тодоров"), or one
+    side leaves out a title or middle initial the other has (two words of name must remain;
+    two different titles, or initials on both sides, are two names)."""
     if ours == theirs:
+        return True
+    (a, a_titles, a_initials), (b, b_titles, b_initials) = _loose(ours), _loose(theirs)
+    if (
+        a == b
+        and len([w for w in a if not w.isdigit()]) >= 3  # the kind and two words
+        and (a_titles <= b_titles or b_titles <= a_titles)
+        and not (a_initials and b_initials)
+    ):
         return True
     a, b = ours.split(), theirs.split()
     if len(a) != len(b) or a[-1] != b[-1]:
@@ -138,9 +166,9 @@ def parse(address: str, district: Optional[str] = None) -> Parsed:
     if match := re.search(rf"(?<![а-я])(с|гр)\.\s*([а-я][а-я ]*?)(?=,|$|\s+\d{{4}}|\s+{_MARKER}(?![а-я]))", text):
         name = f"{match.group(1)}. {match.group(2).strip()}"
         settlement = None if name == SOFIA else name
-    region = None
+    region, region_named = None, False
     if match := re.search(r"(?<![а-я])(?:район|р-н)\s+([а-я -]+?)(?=,|$)", text):
-        region = match.group(1).strip()
+        region, region_named = match.group(1).strip(), True
     elif district:
         region = _clean(district)
     if region:
@@ -160,8 +188,8 @@ def parse(address: str, district: Optional[str] = None) -> Parsed:
         tail = text[match.end() - 1:]
         if num := re.match(rf"\s*(?:№|,\s*№)\s*{_NUMBER}", tail):
             number = num.group(1)
-        elif num := re.search(rf"\s{_NUMBER}$", match.group(2)):
-            # "бул. Никола Вапцаров 47": the number written after the name.
+        elif num := re.search(rf"(?:\s|(?<=[а-я])-)\s*{_NUMBER}\W*$", match.group(2)):
+            # "бул. Никола Вапцаров 47", "ул.Методи Андонов-6.": the number written after the name.
             number = num.group(1)
             street = street_key(f"{kind} {match.group(2)[: num.start()]}")
     elif match := re.search(rf"(?<![а-я])№\s*{_NUMBER}", text):
@@ -175,6 +203,7 @@ def parse(address: str, district: Optional[str] = None) -> Parsed:
         block=_number(block) if block else None,
         entrance=_number(entrance) if entrance else None,
         near=near,
+        region_named=region_named,
     )
 
 
@@ -300,13 +329,16 @@ def _together(rows: list[RegisterPoint], spread: float) -> Optional[tuple[float,
     return None
 
 
-def _settle(rows: list[RegisterPoint], region: Optional[str], spread: float) -> Match:
+def _settle(rows: list[RegisterPoint], region: Optional[str], spread: float, plot: bool = False) -> Match:
     if not rows:
         return Match("not_in_register")
     point = _together(rows, spread)
     if point is None and region:
         rows = [r for r in rows if r.region == region] or rows
         point = _together(rows, spread)
+        if point is None and plot and all(r.region == region for r in rows) and len({r.street for r in rows}) == 1:
+            # One large plot with a point per gate (a campus), in the district our address names.
+            point = _together(rows, PLOT_SPREAD_M)
     if point is None:
         return Match("ambiguous", rows=tuple(rows))
     return Match("matched", point, tuple(rows), region_checked=bool(region) and all(r.region == region for r in rows))
@@ -322,8 +354,8 @@ def match(parsed: Parsed, register: Register) -> Match:
             r for r in register.by_block.get(parsed.block, [])
             if _in_settlement(r, parsed.settlement)
             and (
-                (parsed.complex and r.complex and _same_name(parsed.complex, r.complex))
-                or (parsed.street and r.street and _same_name(parsed.street, r.street))
+                (parsed.complex and r.complex and same_name(parsed.complex, r.complex))
+                or (parsed.street and r.street and same_name(parsed.street, r.street))
             )
         ]
         if parsed.entrance:
@@ -335,14 +367,26 @@ def match(parsed: Parsed, register: Register) -> Match:
         # Also for "ул. X № 10, бл. 2" whose block the register files elsewhere.
         found = [
             r for r in register.by_number.get(parsed.number, [])
-            if _in_settlement(r, parsed.settlement) and r.street and _same_name(parsed.street, r.street)
+            if _in_settlement(r, parsed.settlement) and r.street and same_name(parsed.street, r.street)
         ]
+        village = False
+        if not found and parsed.settlement is None and parsed.region_named:
+            # A village of the district we name ("район Панчарево, ул. Орлова круша 1" is in
+            # с. Лозен): the register files it under the village. The village is a guess,
+            # so the match does not count as our district agreeing.
+            found = [
+                r for r in register.by_number.get(parsed.number, [])
+                if r.region == parsed.region and r.street and same_name(parsed.street, r.street)
+            ]
+            village = bool(found)
         if any((_town(r.settlement), r.street) in register.namesakes for r in found):
             # Two streets of this name: only our district says which, and it must be named.
             found = [r for r in found if parsed.region and r.region == parsed.region]
             street = _settle(found, parsed.region, STREET_SPREAD_M) if found else Match("ambiguous")
         else:
-            street = _settle(found, parsed.region, STREET_SPREAD_M)
+            street = _settle(found, parsed.region, STREET_SPREAD_M, plot=parsed.region_named)
+        if village and street.outcome == "matched":
+            street = replace(street, region_checked=False)
         if street.outcome == "matched" or result.outcome == "no_address":
             return street
     return result

@@ -56,7 +56,10 @@ address register (ГИС-София open data, CC BY 4.0, credited on the About 
 run, `--register-file` for a local copy): street + exact house number, or complex/street + block
 (+ entrance), in our town (с./гр. named in the address, else София and its кв.). Register points
 for one address over 60 m apart (150 m for a block) are ambiguous unless our district settles
-them; "до бл." matches nothing. The school's own site wins (Mike, 2026-10-15): held back when
+them (one plot's gates up to 150 m apart when the address itself names the district); "до бл."
+matches nothing. Street names match without titles or a middle initial on one side ("Св.",
+"Й."); a street missing from Sofia is looked for in the villages of a district the address
+names (Лозен for "район Панчарево"), which then needs the site to agree on a far move. The school's own site wins (Mike, 2026-10-15): held back when
 its website maps it only elsewhere, unless the site's text states our address (stray and old
 maps are common); a move over 3 km needs our district or the site to agree; a point where an
 unrelated school is already pinned is not taken (likely an old address). Run it first: it
@@ -64,7 +67,10 @@ has the house numbers OpenStreetMap lacks.
 
 `cli site-address [--apply]` (Sofia, after register-pins) gives a school's one hidden location the
 address its own site gives: the site's map (linked, or the coordinates its own scripts draw a map
-with) within 40 m of a register point whose address the site's text names (Bulgarian or Latin).
+with) within 40 m of a register point whose address the site's text names (Bulgarian or Latin), or
+the address of the EU education map feature our hidden point came from when the site names it
+too and the feature stands at it (Мечо Пух). Site text includes schema.org (JSON-LD) blocks; map
+views wider than about 5 km or zoomed out below 15 are not points.
 The location's address becomes the register's (old one kept in `geocode_meta.evidence`). Held
 back when the site gives several addresses, when the address is already one of the school's shown
 locations, when an unrelated school is pinned there, or when the school has two hidden locations.

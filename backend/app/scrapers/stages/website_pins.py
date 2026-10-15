@@ -12,6 +12,7 @@ of ``all``; run it after geocoding.
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 from collections.abc import Awaitable, Callable, Sequence
@@ -42,7 +43,13 @@ PIN_TAG = "coords_source=website_map_link"
 # Map points closer than this are one building drawn twice.
 SAME_POINT_METRES = 50
 # Google embeds carry the pin as !3d<lat>!4d<lng> (or !2d<lng>!3d<lat> for the view).
-_EMBED_RE = re.compile(r"!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)|!2d(-?\d+\.\d+)!3d(-?\d+\.\d+)")
+_EMBED_MARKER_RE = re.compile(r"!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)")
+# The view: its span in metres (!1d), then its centre.
+_EMBED_VIEW_RE = re.compile(r"(?:!1d(\d+(?:\.\d+)?))?!2d(-?\d+\.\d+)!3d(-?\d+\.\d+)")
+# A Google embed's view wider than this (metres) is not a pin.
+WIDE_VIEW_M = 5000
+# A map link zoomed out further than this, with no marker, shows an area, not a building.
+MIN_VIEW_ZOOM = 15
 _PAIR_RE = re.compile(r"(-?\d{1,2}\.\d{3,})\s*,\s*(-?\d{1,3}\.\d{3,})")
 _MAP_HOST_RE = re.compile(r"(^|\.)(google\.[a-z]{2,3}(\.[a-z]{2})?|openstreetmap\.org)$")
 
@@ -59,21 +66,35 @@ def _link_point(url: str) -> Optional[tuple[float, float]]:
     if "google." in host and not host.startswith("maps.") and not parsed.path.startswith("/maps"):
         return None
     text = unquote(url)
-    if match := _EMBED_RE.search(text):
-        lat, lng = (match.group(1), match.group(2)) if match.group(1) else (match.group(4), match.group(3))
-        return float(lat), float(lng)
+    if match := _EMBED_MARKER_RE.search(text):
+        return float(match.group(1)), float(match.group(2))
+    if match := _EMBED_VIEW_RE.search(text):
+        if match.group(1) and float(match.group(1)) > WIDE_VIEW_M:
+            return None  # the centre of a district-wide view, not the school
+        return float(match.group(3)), float(match.group(2))
     query = parse_qs(parsed.query)
+    wide = any(_wide(v) for v in query.get("z", []) + query.get("zoom", []))
     for name in ("mlat", "marker", "q", "query", "ll", "destination", "center"):
+        if wide and name in ("ll", "center"):
+            continue  # a wide view's centre ("ll=…&z=13"), not a marker
         for value in query.get(name, []):
             if name == "mlat" and query.get("mlon"):
                 return float(value), float(query["mlon"][0])
             if match := _PAIR_RE.search(value):
                 return float(match.group(1)), float(match.group(2))
-    if match := re.search(r"@(-?\d+\.\d+),(-?\d+\.\d+)", text):
-        return float(match.group(1)), float(match.group(2))
-    if match := re.search(r"map=\d+/(-?\d+\.\d+)/(-?\d+\.\d+)", parsed.fragment):  # openstreetmap.org/#map=
-        return float(match.group(1)), float(match.group(2))
+    if match := re.search(r"@(-?\d+\.\d+),(-?\d+\.\d+)(?:,(\d+(?:\.\d+)?)z)?", text):
+        return None if match.group(3) and _wide(match.group(3)) else (float(match.group(1)), float(match.group(2)))
+    if match := re.search(r"map=(\d+(?:\.\d+)?)/(-?\d+\.\d+)/(-?\d+\.\d+)", parsed.fragment):  # openstreetmap.org/#map=
+        return None if _wide(match.group(1)) else (float(match.group(2)), float(match.group(3)))
     return None
+
+
+def _wide(zoom: str) -> bool:
+    """Whether a map zoom level shows an area rather than a building."""
+    try:
+        return float(zoom) < MIN_VIEW_ZOOM
+    except ValueError:
+        return False
 
 
 def map_points(html: str, base: str) -> list[tuple[float, float]]:
@@ -232,9 +253,33 @@ async def _script_map_points(
 def page_text(html: str) -> str:
     """A page's visible text."""
     soup = BeautifulSoup(html, "html.parser")
+    # A schema.org block often gives the address the visible page leaves out (Британика's).
+    linked_data = [_json_text(tag.get_text()) for tag in soup.find_all("script", type="application/ld+json")]
     for tag in soup(["script", "style", "noscript", "template"]):
         tag.decompose()
-    return soup.get_text(" ")
+    return " ".join([soup.get_text(" "), *linked_data])
+
+
+def _json_text(text: str) -> str:
+    """A JSON block's string values (escapes decoded: "\\u0443\\u043b." is "ул.")."""
+    try:
+        data = json.loads(text)
+    except ValueError:
+        return ""
+    values: list[str] = []
+
+    def walk(node: Any) -> None:
+        if isinstance(node, dict):
+            for value in node.values():
+                walk(value)
+        elif isinstance(node, list):
+            for value in node:
+                walk(value)
+        elif isinstance(node, (str, int)) and not isinstance(node, bool):
+            values.append(str(node))
+
+    walk(data)
+    return " ".join(values)
 
 
 async def read_site(
