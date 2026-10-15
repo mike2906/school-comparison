@@ -5,11 +5,14 @@ import L from 'leaflet'
 // still zooming to it), the timer runs on the removed map and throws "Cannot read
 // properties of undefined (reading '_leaflet_pos')". A removed map has no map pane, so
 // the late call is dropped. Imported for its effect by every module that draws a map.
+// A private method: if a Leaflet upgrade renames it, leave Leaflet as it is rather than
+// break every map on import.
 const endZoom = L.Map.prototype._onZoomTransitionEnd
-if (!endZoom.__guarded) {
+if (typeof endZoom === 'function' && !endZoom.__guarded) {
   L.Map.prototype._onZoomTransitionEnd = function guardedZoomEnd(...args) {
     if (!this._mapPane) {
       this._animatingZoom = false
+      delete this._tempFireZoomEvent
       return undefined
     }
     return endZoom.apply(this, args)
