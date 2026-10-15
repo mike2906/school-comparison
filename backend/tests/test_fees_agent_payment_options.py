@@ -111,7 +111,7 @@ def test_rows_keep_the_english_for_the_site_words_they_keep():
     """625 (dgsofia.com): "половин ден" showed in Bulgarian on the English page."""
     page = SourcePage(id=-1, school_id=1, scrape_type=ScrapeType.WEBSITE, source_url=URL)
     half_day = tuition(
-        plan_name="половин ден", plan_name_en="Half day", age_group_en="Preparatory year", payment_options=[]
+        plan_name="половин ден", plan_name_en="Half day", age_group_en="Preparatory year (grade 0)", payment_options=[]
     )
     plan = tuition(plan_name_en="Plan 1", age_group=None, age_group_en="Grade 0")
     rows, _ = fees_agent._build_rows(
@@ -119,7 +119,7 @@ def test_rows_keep_the_english_for_the_site_words_they_keep():
     )
     by_name = {row.plan_name: row.pricing_context for row in rows}
     assert by_name["половин ден"]["plan_name_en"] == "Half day"
-    assert by_name["половин ден"]["age_group_en"] == "Preparatory year"
+    assert by_name["половин ден"]["age_group_en"] == "Preparatory year (grade 0)"
     # The payment plan's name is dropped, and the English for it and for no age group with it.
     assert "plan_name_en" not in by_name[None] and "age_group_en" not in by_name[None]
 
@@ -370,3 +370,12 @@ def test_a_currency_word_is_stored_as_its_code(printed, code):
     # 158: the reader returned "евро" and every fee failed the publish gate's code check.
     fee = tuition(amount=590, evidence="590 евро").model_dump()
     assert AgentFee.model_validate({**fee, "currency": printed}).currency == code
+
+
+def test_english_that_changes_a_number_is_not_kept():
+    page = SourcePage(id=-1, school_id=1, scrape_type=ScrapeType.WEBSITE, source_url=URL)
+    prepaid = tuition(plan_name="Еднократно плащане за 6 месеца", plan_name_en="Paid for 12 months at once", payment_options=[])
+    rows, _ = fees_agent._build_rows(_school(), [(check_fee(prepaid, PAGE_596), page)])
+    assert rows[0].plan_name == "Еднократно плащане за 6 месеца"
+    assert "plan_name_en" not in rows[0].pricing_context
+    assert fees_agent._english_for("за 6 месеца", "Paid for 6 months at once") == "Paid for 6 months at once"

@@ -337,12 +337,14 @@ export function groupRowsByAgeGroup(rows = [], t, language) {
   const bands = new Map()
   const unnamed = []
   rows.forEach(row => {
-    const label = ageGroupName(row, t, language)
-    if (!label) {
+    // Grouped by the site's own group, so two English wordings of one group stay one band.
+    const identity = ageGroupName(row, t)
+    if (!identity) {
       unnamed.push(row)
       return
     }
-    const key = label.toLocaleLowerCase()
+    const label = ageGroupName(row, t, language)
+    const key = identity.toLocaleLowerCase()
     if (!bands.has(key)) bands.set(key, { label, rows: [] })
     bands.get(key).rows.push(row)
   })

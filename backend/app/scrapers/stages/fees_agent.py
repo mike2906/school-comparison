@@ -520,6 +520,21 @@ def _single_payment(fee: AgentFee) -> bool:
     return any(_SINGLE_PAYMENT_RE.match(text) for text in [fee.label, *fee.installments])
 
 
+_DIGITS_RE = re.compile(r"\d+")
+
+
+def _english_for(site_words: str | None, english: str | None) -> str | None:
+    """The reader's English for the site's words, kept only when it states the same numbers
+    ("Paid for 6 months at once" for "за 6 месеца"): a changed or added number is a wrong
+    fee description, and the page then shows the site's own words instead."""
+    english = " ".join((english or "").split())
+    if not site_words or not english or len(english) > 100:
+        return None
+    if sorted(_DIGITS_RE.findall(site_words)) != sorted(_DIGITS_RE.findall(english)):
+        return None
+    return english
+
+
 def _build_rows(
     school: School, checked: list[tuple[CheckedFee, SourcePage]]
 ) -> tuple[list[Pricing], list[FieldSource]]:
@@ -548,8 +563,8 @@ def _build_rows(
             # Single payments of one plan price are the same fee whatever they are called.
             label = "" if _single_payment(fee) else " ".join(fee.label.split()).casefold()
             english = {
-                "plan_name_en": None if plan_name_dropped or not fields.get("plan_name") else fee.plan_name_en,
-                "age_group_en": fee.age_group_en if fields.get("age_group") else None,
+                "plan_name_en": None if plan_name_dropped else _english_for(fields.get("plan_name"), fee.plan_name_en),
+                "age_group_en": _english_for(fields.get("age_group"), fee.age_group_en),
             }
             built.append((result, page, fields, label, english))
 
