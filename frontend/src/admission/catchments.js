@@ -86,8 +86,11 @@ export function mapSearchQuery(street, number) {
   const typed = String(street.street || '').match(/^(ул|бул|пл|ж\.?к|кв|м|в\.?з|пр|алея)\.\s*/i)
   const name = String(street.street || '').slice(typed ? typed[0].length : 0).trim()
   const prefix = typed ? `${typed[1].toLowerCase()}.` : '.'
-  const settlement = String(street.settlement || '').split(',')[0].replace(/^(?:ГР|С)\./, '')
-  return `${prefix === '.' ? '' : `${prefix} `}${words(name)} ${normalizeHouseNumber(number) || number}, ${words(settlement)}, Bulgaria`
+  // `ГР.СОФИЯ,КВ.СЕСЛАВЦИ` keeps its quarter: many street names repeat across quarters.
+  const [town, quarter] = String(street.settlement || '').split(',')
+  const settlement = [quarter && `кв. ${words(quarter.replace(/^КВ\./, ''))}`, words(town.replace(/^(?:ГР|С)\./, ''))]
+    .filter(Boolean).join(', ')
+  return `${prefix === '.' ? '' : `${prefix} `}${words(name)} ${normalizeHouseNumber(number) || number}, ${settlement}, Bulgaria`
 }
 
 /** `12 a` → `12А`, `012б` → `12Б`: the spelling the address table uses. */

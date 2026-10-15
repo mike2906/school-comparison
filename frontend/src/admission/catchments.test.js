@@ -60,6 +60,7 @@ test('mapSearchQuery turns a table address into a map search', () => {
   assert.equal(mapSearchQuery({ street: 'УЛ.ИВАН ЩЕРЕВ', settlement: 'ГР.СОФИЯ' }, '5'), 'ул. Иван Щерев 5, София, Bulgaria')
   assert.equal(mapSearchQuery({ street: 'УЛ.ВИТОША', settlement: 'С.БИСТРИЦА' }, '18а'), 'ул. Витоша 18А, Бистрица, Bulgaria')
   assert.equal(mapSearchQuery({ street: 'МАРИЦА', settlement: 'ГР.СОФИЯ' }, '2'), 'Марица 2, София, Bulgaria')
+  assert.equal(mapSearchQuery({ street: 'УЛ.ВИТОША', settlement: 'ГР.СОФИЯ,КВ.ГОРУБЛЯНЕ' }, '3'), 'ул. Витоша 3, кв. Горубляне, София, Bulgaria')
 })
 
 test('house numbers are read the way the table writes them', () => {

@@ -870,7 +870,7 @@
     "loadFailed": "The area data could not be loaded. Please try again later.",
     "numberNotListed": "This number is not in the official address list. Check the spelling, or ask the school or district.",
     "addressBelongsTo": "This address belongs to the catchment of {{school}}.",
-    "addressPrivacy": "The address is checked in your browser. It is not sent or saved anywhere.",
+    "addressPrivacy": "The check runs in your browser: for it, the address is not sent or saved anywhere.",
     "verdict": {
       "inside": "This address is inside this school's catchment area.",
       "neighbouring": "This address is in a neighbouring area: it gets 5 extra points if the child is ranked in the last group (outside the catchment).",
