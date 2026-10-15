@@ -1027,6 +1027,30 @@ def test_the_same_fee_read_from_two_pages_is_one_row():
     assert len(rows) == len(sources) == 1
 
 
+def test_the_same_fee_with_a_group_on_one_page_only_is_one_row():
+    """596's secondary sheet repeats the primary sheet's transport; a read named it "Secondary School" there."""
+    school = School(id=1, name_i18n={}, country_code="bg", school_type="private", education_level="primary")
+    page = SourcePage(id=-1, school_id=1, scrape_type=ScrapeType.WEBSITE, source_url=URL)
+    other = SourcePage(id=-2, school_id=1, scrape_type=ScrapeType.WEBSITE, source_url=HOME)
+    line = "TRANSPORTATION € 2,550 annual fee (two-way service)"
+
+    def transport(**kw):
+        read = fee(PriceCategory.TRANSPORT, line, amount=2550, period=PricePeriod.YEARLY, **kw)
+        return check_fee(read, line)
+
+    rows, _ = fees_agent._build_rows(
+        school, [(transport(), page), (transport(age_group="Secondary School", plan_name="Two-way"), other)]
+    )
+    assert [(r.age_group, r.plan_name) for r in rows] == [(None, None)]
+    # Another group's fee on the same page, or another plan, stays its own row.
+    rows, _ = fees_agent._build_rows(school, [(transport(), page), (transport(age_group="Grade 1"), page)])
+    assert len(rows) == 2
+    rows, _ = fees_agent._build_rows(
+        school, [(transport(plan_name="One-way"), page), (transport(age_group="Grade 1", plan_name="Two-way"), other)]
+    )
+    assert len(rows) == 2
+
+
 async def test_an_amount_read_as_another_kind_of_fee_replaces_the_old_row(db_session, frozen_today):
     page_text = "Месечна такса: 700 евро\nЕднократна такса за записване: 200 евро.\nХрана: 90 евро"
     school = await _school(db_session)
