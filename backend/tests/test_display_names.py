@@ -264,3 +264,10 @@ def test_a_sibling_school_still_matches_a_kindergarten_brand_by_its_bare_name():
     assert resolve_name_i18n(school)["bg"] == "Частно основно училище „Пролет“"
     assert shared_names(["Пролет"], [*resolve_name_i18n(school).values(), *register_core_names(school)])
     assert register_core_names({"bg": "ДГ №19 Света София"}) == set()
+    # A Latin brand candidate ("Prolet") matches the sibling's English name too.
+    assert shared_names(["Prolet"], [*resolve_name_i18n(school).values(), *register_core_names(school)])
+
+
+def test_register_names_lowercase_abbreviation_and_single_apostrophe():
+    assert resolve_name_i18n({"bg": 'чдг "СЛЪНЦЕ" ЕООД'})["bg"] == "ЧДГ „Слънце“"
+    assert resolve_name_i18n({"bg": '"Частна детска градина Д\'Артанян" ЕООД'})["bg"] == "Частна детска градина „Д'Артанян“"
