@@ -51,6 +51,14 @@ layer (`Schools/SchoolsZones` layer 0), joined on our `source_esri_id=` tag (`ma
 only for hidden locations; the layer's name must carry our number and building, as its ids
 are not always kg.sofia.bg's for the same kindergarten). arcgis.sofia.bg refuses non-browser User-Agents.
 
+`cli register-pins [--apply]` (Sofia) pins a hidden location on Sofia Municipality's official
+address register (ГИС-София open data, CC BY 4.0, credited on the About page; downloaded on each
+run, `--register-file` for a local copy): street + exact house number, or complex/street + block
+(+ entrance), in our town (с./гр. named in the address, else София and its кв.). Register points
+for one address over 60 m apart (150 m for a block) are ambiguous unless our district settles
+them; "до бл." matches nothing. Held back, like confirm-pins, when the school's website maps it
+only elsewhere. Run it first: it has the house numbers OpenStreetMap lacks.
+
 `cli confirm-pins [--apply]` publishes a hidden point that already stands on our building:
 Nominatim's nearest building there is our town, street and exact house number. Not when
 the school's own website maps it only over 300 m away (the address may be stale).

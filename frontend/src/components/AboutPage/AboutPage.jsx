@@ -9,6 +9,11 @@ const SOURCES = [
   { key: 'nvo', href: 'https://data.egov.bg' },
   { key: 'dzi', href: 'https://data.egov.bg' },
   { key: 'prices', href: null },
+  {
+    key: 'addresses',
+    href: 'https://urbandata.sofia.bg/dataset/address_sofia-zip',
+    license: 'https://creativecommons.org/licenses/by/4.0/',
+  },
   { key: 'maps', href: 'https://www.openstreetmap.org/copyright' },
 ]
 
@@ -56,6 +61,16 @@ function AboutPage() {
                   className="mt-2 inline-block text-sm text-primary-700 underline"
                 >
                   {source.href.replace(/^https:\/\//, '')}
+                </a>
+              )}
+              {source.license && (
+                <a
+                  href={source.license}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-2 ml-4 inline-block text-sm text-primary-700 underline"
+                >
+                  {t('about.licenseLink')}
                 </a>
               )}
             </li>

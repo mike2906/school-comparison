@@ -666,11 +666,16 @@
         "title": "Private school fees",
         "body": "Taken from each school’s own website and shown only where the page states the price. Every price is marked with its source, and the comparison page links to the page it came from and shows when we checked it. Fees change, so confirm with the school before deciding."
       },
+      "addresses": {
+        "title": "Building locations in Sofia",
+        "body": "Sofia Municipality’s open data from ГИС-София: the official address register and the points of municipal schools and kindergartens, used under the Creative Commons Attribution 4.0 licence (CC BY 4.0). We match each school’s address to them and do not change the data."
+      },
       "maps": {
         "title": "Maps and distances",
-        "body": "School locations are placed on the map with OpenStreetMap data; map tiles by CARTO. Distances are straight-line, not travel distance."
+        "body": "Where Sofia’s data has no match, a location comes from OpenStreetMap or the school’s own website, and is shown on the map only when it lands on the school’s address. Map tiles by CARTO. Distances are straight-line, not travel distance."
       }
     },
+    "licenseLink": "Licence: CC BY 4.0",
     "ageTitle": "How age groups are worked out",
     "ageBody": "In Bulgaria the group depends on the calendar year of birth, not the exact birthday: group = enrolment year − birth year. Children born on 1 January and 31 December of the same year join the same group.",
     "limitsTitle": "Admission results",

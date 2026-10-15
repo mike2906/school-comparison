@@ -2294,9 +2294,9 @@ the session scratchpad only.
             register and kg.sofia.bg; geocodes as it imports) has no schedule. Every Sofia
             school came from manual runs (13 Feb, 26 Feb, 24 Sep 2026). Schedule it (monthly,
             or before each admission season), followed by the pin steps for locations still
-            hidden (`import_sofia_municipal_points.py`, `confirm-pins`, `website-pins`, `pin-agent`), the
+            hidden (`import_sofia_municipal_points.py`, `register-pins`, `confirm-pins`, `website-pins`, `pin-agent`), the
             catchment re-match and one publish. Each step skips pinned locations, so a run
-            with nothing new costs pennies. `scripts/refresh_pins.sh` already has most of the pin half (not `confirm-pins`)
+            with nothing new costs pennies. `scripts/refresh_pins.sh` already has most of the pin half (not `register-pins` or `confirm-pins`)
             with its stops (dry run first, cap on placements, issue on a stop); it is not on
             cron, by Mike's call to wait for this stage. Until then, run the import and
             the pins by hand before an admission season.
