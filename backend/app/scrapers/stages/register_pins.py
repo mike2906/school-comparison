@@ -3,18 +3,18 @@
 Sofia Municipality's address register (``geocoding/bg/sofia_address_register``) has a point
 for every approved street and house number and every block entrance, which OpenStreetMap
 mostly lacks. A hidden location whose address matches one register point (or one block's
-entrances, close together) is pinned there. As in ``confirm-pins``, a school whose own
-website maps it only elsewhere (none of its map points within ``ELSEWHERE_M`` of the
-register point or of its other locations), or whose website cannot be read, is left
-hidden: the site may say it moved. No model calls. Default is a dry run. Sofia only.
+entrances, close together) is pinned there. The school's own site wins: one whose website
+maps it only elsewhere (none of its map points within ``ELSEWHERE_M`` of the register point
+or of its other locations) is left hidden, as the site may say it moved, unless the site's
+text states our address (stray and old maps are common); one whose website cannot be read
+is left hidden. A pin moving over ``FAR_M`` needs our district or the site to agree. No
+model calls. Default is a dry run. Sofia only.
 """
 
 from __future__ import annotations
 
 import logging
-import re
 from collections.abc import Sequence
-from html import unescape
 from typing import Any, Optional
 
 from sqlalchemy import func, select
@@ -23,8 +23,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import School, SchoolLocation
 from app.scrapers.fee_pages import fee_http_client
 from app.scrapers.stages.confirm_pins import ELSEWHERE_M
-from app.scrapers.stages.social_links import Fetch, _contact_page, _http_fetch
-from app.scrapers.stages.website_pins import SAME_POINT_METRES, _address, _distance_m, map_points, needs_pin, write_pin
+from app.scrapers.stages.social_links import Fetch, _http_fetch
+from app.scrapers.stages.website_pins import _address, _distance_m, needs_pin, read_site, write_pin
 from app.services.geocoding.bg import sofia_address_register as register_lib
 from app.utils.school_facts import SITE_ACCEPTED_STATUSES
 
@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 PIN_TAG = "coords_source=sofia_address_register"
 PROVIDER = "sofia_address_register"
-# A pin moving further than this needs our address's district to agree with the register's.
+# A pin moving further than this needs our address's district, or the school's site, to agree.
 FAR_M = 3000
 
 
@@ -54,29 +54,6 @@ async def download_register() -> register_lib.Register:
                     raise
                 await asyncio.sleep(attempt * 5)
     raise AssertionError("unreachable")
-
-
-def _page_text(html: str) -> str:
-    text = re.sub(r"(?is)<(script|style)\b.*?</\1>", " ", html)
-    return unescape(re.sub(r"<[^>]+>", " ", text))
-
-
-async def _read_site(school: School, fetch: Fetch) -> Optional[tuple[list[tuple[float, float]], str]]:
-    """Map points and text of the home and contact pages, or None when the home page could
-    not be read."""
-    home = await fetch(school.website_url)
-    if home is None:
-        return None
-    final, html = home
-    points, texts = map_points(html, final), [_page_text(html)]
-    contact = _contact_page(html, final, final)
-    page = await fetch(contact) if contact else None
-    if page is not None:
-        texts.append(_page_text(page[1]))
-        for point in map_points(page[1], page[0]):
-            if all(_distance_m(point, seen) >= SAME_POINT_METRES for seen in points):
-                points.append(point)
-    return points, "\n".join(texts)
 
 
 async def run_register_pins(
@@ -119,19 +96,21 @@ async def run_register_pins(
                 continue
             if register is None:  # only once a location needs it
                 register = await download_register()
-            found = {}
+            found, parsed = {}, {}
             for location in hidden:
-                parsed = register_lib.parse(_address(location), location.district)
-                found[location.id] = register_lib.match(parsed, register)
+                parsed[location.id] = register_lib.parse(_address(location), location.district)
+                found[location.id] = register_lib.match(parsed[location.id], register)
             site: Optional[tuple[list[tuple[float, float]], str]] = ([], "")
             if any(m.outcome == "matched" for m in found.values()) and school.website_url and (
                 school.scrape_status in SITE_ACCEPTED_STATUSES
             ):
                 try:
-                    site = await _read_site(school, fetch)
+                    site = await read_site(school, fetch)
                 except Exception:
                     logger.exception("register-pins could not read school %s's site", school_id)
                     site = None
+            site_points, text = site if site is not None else ([], "")
+            prepared = register_lib.page_text(text)
             others = [
                 (loc.lat, loc.lng) for loc in locations if not needs_pin(loc) and loc.lat is not None and loc.lng is not None
             ]
@@ -155,11 +134,12 @@ async def run_register_pins(
                 row["register"] = [
                     {k: v for k, v in vars(r).items() if v} for r in result.rows[:5]
                 ]
-                site_points, site_text = site if site is not None else ([], "")
                 # The school's own site wins: its text giving our address outweighs its map (a
-                # stray or old map is common), and its map at the register point backs it up.
-                site_names_it = register_lib.names_address(site_text, register_lib.parse(_address(location)))
-                site_map_here = any(_distance_m(result.point, p) <= ELSEWHERE_M for p in site_points)
+                # stray or old map is common); a map with every point at the register point backs it.
+                site_names_it = register_lib.names_address(prepared, parsed[location.id])
+                site_map_here = bool(site_points) and all(
+                    _distance_m(result.point, p) <= ELSEWHERE_M for p in site_points
+                )
                 if site_names_it:
                     row["site_names_address"] = True
                 if (

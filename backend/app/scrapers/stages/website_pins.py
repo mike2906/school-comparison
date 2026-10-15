@@ -18,6 +18,7 @@ from collections.abc import Awaitable, Callable, Sequence
 from typing import Any, Optional
 from urllib.parse import parse_qs, unquote, urlparse
 
+from bs4 import BeautifulSoup
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -164,21 +165,37 @@ async def place(
     return {"outcome": outcome, "point": matches[0] if outcome == "placed" else None, "checked": checked}
 
 
-async def _read_points(school: School, fetch: Fetch) -> Optional[list[tuple[float, float]]]:
-    """Map points on the home page and the contact page, or None when the home page could
-    not be read."""
+def page_text(html: str) -> str:
+    """A page's visible text."""
+    soup = BeautifulSoup(html, "html.parser")
+    for tag in soup(["script", "style", "noscript", "template"]):
+        tag.decompose()
+    return soup.get_text(" ")
+
+
+async def read_site(school: School, fetch: Fetch) -> Optional[tuple[list[tuple[float, float]], str]]:
+    """Map points and visible text of the home page and the contact page, or None when the
+    home page could not be read."""
     home = await fetch(school.website_url)
     if home is None:
         return None
     final, html = home
-    points = map_points(html, final)
+    points, texts = map_points(html, final), [page_text(html)]
     contact = _contact_page(html, final, final)
     page = await fetch(contact) if contact else None
     if page is not None:
+        texts.append(page_text(page[1]))
         for point in map_points(page[1], page[0]):
             if all(_distance_m(point, seen) >= SAME_POINT_METRES for seen in points):
                 points.append(point)
-    return points
+    return points, "\n".join(texts)
+
+
+async def _read_points(school: School, fetch: Fetch) -> Optional[list[tuple[float, float]]]:
+    """Map points on the home page and the contact page, or None when the home page could
+    not be read."""
+    site = await read_site(school, fetch)
+    return None if site is None else site[0]
 
 
 async def run_website_pins(

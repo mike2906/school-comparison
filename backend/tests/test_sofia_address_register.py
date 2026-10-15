@@ -129,11 +129,21 @@ def test_and_between_numbers_is_not_a_letter():
         ("гр. София,улица Триадица №5А", 'ул. "Триадица" № 5А', True),
         ("2 Tenev Bair, Bankya", "гр. Банкя, ул. Тенев баир 2", True),
         ("ж.к. Младост 4, бл. 460А, вх. 2", "ж.к. Младост 4, бл. 460А", True),
+        ("ул. Ралевица № 80 А", 'ул. Ралевица № 80А', True),  # a space before the letter
+        ("ж.к. „Младост 2\", ул. „Генерал-Майор Васил Делов“ 10", 'ул. "Генерал Васил Делов" № 10', True),
         ("ул. Ралевица № 8", 'ул. Ралевица № 80А', False),
+        ("ж.к. Младост 1, бл. 460А", "ж.к. Младост 4, бл. 460А", False),  # another complex
+        ("5 пъти седмично", 'ул. "П. Ю. Тодоров" № 5', False),  # initials alone
+        ("бул. Витоша 5", 'ул. "Витоша" № 5', False),  # another kind of street
+        ("ул. Стефан Караджа 5", 'ул. "Хаджи Димитър Караджа" № 5', False),
+        ("III 5 клас", 'бул. "Цар Борис III" № 5', False),
+        ("ул. Ралевица 12, 5 етаж", 'ул. Ралевица № 5', False),  # a floor
+        ("ул. Ралевица, бл. 5", 'ул. Ралевица № 5', False),  # a block is not a house
+        ("Ралевица 1/5", 'ул. Ралевица № 5', False),
         ("ул. Ралевица 80", 'ул. Ралевица № 80А', False),
         ("Младост 1, бл. 460", "ж.к. Младост 4, бл. 460А", False),
         ("ул. Ралевица № 80А", 'ул. "Майор Коста Паница"', False),  # no number of ours
     ],
 )
 def test_a_page_names_our_address(text, address, named):
-    assert reg.names_address(text, reg.parse(address)) is named
+    assert reg.names_address(reg.page_text(text), reg.parse(address)) is named

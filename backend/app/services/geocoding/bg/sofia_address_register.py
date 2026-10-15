@@ -314,26 +314,53 @@ def _latin(text: str) -> str:
     return transliterate_bulgarian(text).casefold()
 
 
-def names_address(page_text: str, parsed: Parsed) -> bool:
-    """Whether a page states our address: the street (or complex) name next to our house
-    (or block) number, in Bulgarian or in Latin letters ("80A Ralevitsa Street")."""
+@dataclass(frozen=True)
+class PageText:
+    """A page's text in our spelling and in Latin letters, prepared once per site."""
+
+    cyrillic: str
+    latin: str
+
+
+def page_text(text: str) -> PageText:
+    # Latin text keeps its own letters (``_clean`` turns look-alikes into Cyrillic).
+    latin = re.sub(r"\s+", " ", _QUOTES_RE.sub(" ", text))
+    return PageText(_clean(text), _latin(latin))
+
+
+_KIND_BEFORE_RE = re.compile(r"(?:^|\W)(ул|улица|бул|булевард|ul|ulitsa|bul|blvd|boulevard)\W{0,3}$")
+_KIND_OF = {"улица": "ул", "ul": "ул", "ulitsa": "ул", "bul": "бул", "булевард": "бул", "blvd": "бул", "boulevard": "бул"}
+
+
+def names_address(page: PageText, parsed: Parsed) -> bool:
+    """Whether a page states our address: the end of our street's name (its last two words,
+    initials left out) right next to our exact house number, either way round, in Bulgarian
+    or in Latin letters ("ул. Ралевица № 80А", "80A Ralevitsa Street"); for a block, the
+    complex with its number next to the block number ("Младост 4, бл. 460А"). A street of
+    another kind named just before ("бул. Витоша" for our "ул. Витоша") does not count."""
+    kind = None
     if parsed.street and parsed.number:
-        words, number = parsed.street.split()[1:], parsed.number  # without "ул"
-    elif parsed.block and (parsed.complex or parsed.street):
-        words = parsed.complex.split() if parsed.complex else (parsed.street or "").split()[1:]
-        number = parsed.block
+        kind, *name = parsed.street.split()
+        name = [w for w in name if len(w) > 1][-2:]
+        number, marker = parsed.number, r"(?:(?:№|no\.?|#)\s*)?"
+    elif parsed.block and parsed.complex:
+        name, number, marker = parsed.complex.split(), parsed.block, r"(?:(?:бл|bl)\.?\s*)?"
     else:
         return False
-    words = [w for w in words if not w.isdigit()]
-    if not words or len(words[-1]) < 3:
-        return False
-    cyrillic, latin = _clean(page_text), _latin(page_text)
-    for text, convert in ((cyrillic, lambda w: w), (latin, _latin)):
-        last, first = re.escape(convert(words[-1])), re.escape(convert(words[0]))
-        num = re.escape(convert(number.casefold()))
-        # "Ралевица № 80А", "Младост 4, бл. 460А" / "80A Ralevitsa", "2 Tenev Bair"
-        after = rf"(?<!\w){last}\w*\W{{1,15}}(?:\d+\W{{1,6}})?(?:(?:№|no\.?|#|бл\.?|bl\.?)\s*)?{num}(?!\w)"
-        before = rf"(?<!\w){num}\s*,?\s*(?:(?:ул|бул|str|ul|ulitsa)\.?\s*)?{first}"
-        if re.search(after, text) or re.search(before, text):
-            return True
+    if not name or not any(len(w) >= 3 and not w.isascii() for w in name):
+        return False  # a name of initials, digits or a Roman numeral alone says too little
+    for text, convert in ((page.cyrillic, lambda w: w), (page.latin, _latin)):
+        words = r"\W+".join(re.escape(convert(w)) for w in name)
+        digits, letter = re.match(r"(\d+)(.*)", number.casefold()).groups()
+        num = re.escape(digits) + (r"\s?" + re.escape(convert(letter)) if letter else "")
+        patterns = (
+            rf"(?<!\w){words}(?!\w)\W{{1,6}}{marker}{num}(?![\w/-])",
+            rf"(?<![\w/-]){num}\s*,?\s*(?:(?:ул|бул|ul|str)\.?\s*)?{words}(?!\w)",
+        )
+        for pattern in patterns:
+            for found in re.finditer(pattern, text):
+                said = _KIND_BEFORE_RE.search(text[max(0, found.start() - 12): found.start()])
+                if kind and said and _KIND_OF.get(said.group(1), said.group(1)) != kind:
+                    continue
+                return True
     return False
