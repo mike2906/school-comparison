@@ -1,5 +1,6 @@
 /**
- * Browser journeys for the search page's URL and history handling (Lane D R3b).
+ * Browser journeys for the search page's URL and history handling (Lane D R3b), and for
+ * leaving it while its map is still zooming (`src/utils/leafletGuard.js`).
  *
  * `SearchPage` keeps its state and the URL in step through ordered effects and refs;
  * these drive a real browser through the paths a parent takes and check both. They run
@@ -21,6 +22,7 @@ import { loadEnv, preview } from 'vite'
 const FIXTURES = new URL('./fixtures/api.json', import.meta.url)
 const RECORD_FROM = process.env.E2E_RECORD_API?.replace(/\/+$/, '')
 const SEARCH_PLACEHOLDER = 'Търсене на конкретно училище...'
+const PHONE_SEARCH_PLACEHOLDER = 'Име или №'
 // A state school with a detail page in the fixtures, and a name the search finds once.
 const SCHOOL_ID = 95
 const SCHOOL_BG = '18 СУ „Уилям Гладстон“'
@@ -181,15 +183,17 @@ describe('search page history', () => {
     await page.route(url => /^\/api\/schools\/\d+$/.test(url.pathname), route => route.fulfill({ status: 404, contentType: 'application/json', body: '{}' }))
     await page.goto(`${site}/search`)
     await resultCount()
-    await page.getByPlaceholder('Име или №').filter({ visible: true }).first().fill(QUERY)
-    // Tap the result in the same tick the map starts zooming to it.
+    await page.getByPlaceholder(PHONE_SEARCH_PLACEHOLDER).filter({ visible: true }).first().fill(QUERY)
+    // Tap the one result in the same frame the map starts zooming to it.
     await page.waitForFunction(() => {
-      if (!document.querySelector('.leaflet-zoom-anim')) return false
-      document.querySelector('a[href^="/schools/"]').click()
+      const results = [...document.querySelectorAll('a[href^="/schools/"]')].filter(a => a.offsetParent)
+      if (!document.querySelector('.leaflet-zoom-anim') || results.length !== 1) return false
+      results[0].click()
       return true
-    }, null, { polling: 'raf' })
+    }, null, { polling: 'raf', timeout: 10_000 })
     await page.waitForURL(url => url.pathname.startsWith('/schools/'))
-    await page.waitForTimeout(500)
+    // Leaflet's zoom-end timer was set before this one, so it has run when this ends.
+    await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 500)))
     assert.deepEqual(errors, [])
   })
 
