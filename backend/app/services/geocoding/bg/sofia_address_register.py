@@ -351,7 +351,10 @@ def names_address(page: PageText, parsed: Parsed) -> bool:
         return False  # a name of initials, digits or a Roman numeral alone says too little
     for text, convert in ((page.cyrillic, lambda w: w), (page.latin, _latin)):
         words = r"\W+".join(re.escape(convert(w)) for w in name)
-        digits, letter = re.match(r"(\d+)(.*)", number.casefold()).groups()
+        split = re.fullmatch(r"(\d+)(\D*)", number.casefold())
+        if split is None:
+            return False
+        digits, letter = split.groups()
         num = re.escape(digits) + (r"\s?" + re.escape(convert(letter)) if letter else "")
         patterns = (
             rf"(?<!\w){words}(?!\w)\W{{1,6}}{marker}{num}(?![\w/-])",
