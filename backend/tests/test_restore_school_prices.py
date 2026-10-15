@@ -54,6 +54,7 @@ async def test_one_schools_website_prices_come_back_from_the_dump(async_engine, 
         )
     )
     school, other = _school("Re-read"), _school("Untouched")
+    school.attributes = {"fee_discounts": {"siblings": "10%"}, "kept": 1}
     db_session.add_all([school, other])
     await db_session.flush()
     good = [_price(school, 8950), _price(school, 9050)]
@@ -73,6 +74,7 @@ async def test_one_schools_website_prices_come_back_from_the_dump(async_engine, 
     for row in rows:
         await db_session.delete(row)
     db_session.add_all([_price(school, 1), _evidence(school, "bad"), _price(other, 600)])
+    school.attributes = {"fee_discounts": {"siblings": "50%"}, "kept": 2}
     await db_session.commit()
 
     blocks = copy_blocks(dump, ["pg_restore"])
@@ -88,7 +90,9 @@ async def test_one_schools_website_prices_come_back_from_the_dump(async_engine, 
         website = sorted(row.id for row in rows if row.source is PriceSource.SCRAPED_WEBSITE)
         notes = (await db.execute(select(FieldSource.notes).where(FieldSource.school_id == school.id))).scalars().all()
         others = (await db.execute(select(Pricing.amount).where(Pricing.school_id == other.id))).scalars().all()
+        attributes = (await db.get(School, school.id)).attributes
     assert website == good_ids
     assert any(row.source is PriceSource.OFFICIAL and row.amount == 100 for row in rows)
     assert notes == ["good"]
     assert sorted(others) == [500, 600]
+    assert attributes == {"fee_discounts": {"siblings": "10%"}, "kept": 2}

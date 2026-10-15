@@ -1,8 +1,9 @@
 """Put one school's website price rows back as they were in a pg_dump backup.
 
 For undoing a fee re-read that came out worse than what is live (596 on 2026-10-15). The
-school's scraped-website ``pricing`` rows and their ``field_sources`` evidence are replaced by
-the dump's, in one transaction; nothing else changes. Run ``run --stage validate-data`` for
+school's scraped-website ``pricing`` rows, their ``field_sources`` evidence and its
+``attributes["fee_discounts"]`` are replaced by the dump's, in one transaction; nothing else
+changes. Run ``run --stage validate-data`` for
 the school afterwards, so its blocked-row list matches the restored rows.
 
 Run from ``backend/`` on the machine with the launch DB (the dump is read with the database
@@ -25,6 +26,7 @@ from pathlib import Path
 from sqlalchemy import text
 
 from app.database import async_session_maker
+from app.models import School
 
 TABLES = ("pricing", "field_sources")
 # Only what a fee re-read replaces: the school's scraped-website rows.
@@ -37,7 +39,8 @@ _COPY_RE = re.compile(r"^COPY public\.(\w+) \((.*)\) FROM stdin;$")
 
 def copy_blocks(dump: Path, pg_restore: list[str]) -> dict[str, tuple[list[str], bytes]]:
     """The dump's COPY data for TABLES: each table's columns and its rows in COPY text format."""
-    args = [*pg_restore, "--data-only", "-f", "-", *(f"--table={table}" for table in TABLES)]
+    tables = (*TABLES, "schools")
+    args = [*pg_restore, "--data-only", "-f", "-", *(f"--table={table}" for table in tables)]
     with dump.open("rb") as source:
         out = subprocess.run(args, stdin=source, capture_output=True, check=True).stdout
     blocks: dict[str, tuple[list[str], bytes]] = {}
@@ -72,6 +75,18 @@ async def restore(
             print(f"{table}: {now} rows now, {then} in the dump")
             await db.execute(text(f"DELETE FROM {table} WHERE {KEEP[table]}"), params)
             await db.execute(text(f"INSERT INTO {table} SELECT * FROM restore_{table} WHERE {KEEP[table]}"), params)
+        # The read's fee discounts (attributes["fee_discounts"]) go back with its rows.
+        columns, rows = blocks["schools"]
+        await db.execute(text("CREATE TEMP TABLE restore_schools (LIKE schools) ON COMMIT DROP"))
+        await raw.copy_to_table("restore_schools", source=io.BytesIO(rows), columns=columns, format="text")
+        query = text("SELECT attributes FROM restore_schools WHERE id = :school_id")
+        old = (await db.execute(query, {"school_id": school_id})).scalar() or {}
+        school = await db.get(School, school_id)
+        attributes = {key: value for key, value in (school.attributes or {}).items() if key != "fee_discounts"}
+        if "fee_discounts" in old:
+            attributes["fee_discounts"] = old["fee_discounts"]
+        print(f"fee_discounts: {'restored' if 'fee_discounts' in old else 'none in the dump'}")
+        school.attributes = attributes
         if apply:
             await db.commit()
             print("restored")
