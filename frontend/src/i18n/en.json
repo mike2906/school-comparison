@@ -600,7 +600,11 @@
     "admission": "Admission",
     "kgByPointsShort": "By points (kg.sofia.bg)",
     "kgThresholdsLater": "Last-admitted points are not published here yet",
-    "kgThresholdsBelow": "See who got in before, below"
+    "kgThresholdsBelow": "See who got in before, below",
+    "nextOpenDay": "Next open day",
+    "moreOpenDays_one": "{{count}} more date below",
+    "moreOpenDays_other": "{{count}} more dates below",
+    "notOnMap": "Not on the map yet: we have not confirmed where exactly this address is."
   },
   "detailPanel": {
     "label": "School details",

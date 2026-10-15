@@ -17,6 +17,7 @@ import {
 import { normalizeLanguageFocus } from '../../utils/schoolAttributes'
 import { getMappableLocations } from './LocationMap'
 import { usesSofiaKindergartenSystem } from '../../utils/admission'
+import { openDayDate, openDaysLink, upcomingOpenDays } from '../../utils/schoolFacts'
 
 function readSavedLocation() {
   try {
@@ -181,6 +182,26 @@ function KeyFacts({ school, examAverages, nvoExamType, ageGroup = null }) {
     )
   }
 
+  // The next open day leads the strip's second place: it is the one fact with a date a
+  // parent can miss. The rest are listed with the website facts further down.
+  const openDays = upcomingOpenDays(school)
+  if (openDays.length > 0) {
+    const link = openDaysLink(openDays)
+    facts.openDay = (
+      <Fact
+        key="openDay"
+        label={t('schoolDetail.nextOpenDay')}
+        value={openDayDate(openDays[0].date, i18n.language)}
+        detail={link && (
+          <a href={link.href} target="_blank" rel="noopener noreferrer nofollow" className="text-primary-700 underline underline-offset-2">
+            {t(link.register ? 'schoolFacts.glance.register' : 'schoolFacts.source')}
+          </a>
+        )}
+        note={openDays.length > 1 ? t('schoolDetail.moreOpenDays', { count: openDays.length - 1 }) : null}
+      />
+    )
+  }
+
   const shifts = getShifts(locations)
   if (shifts.length > 0) {
     facts.shift = (
@@ -205,10 +226,10 @@ function KeyFacts({ school, examAverages, nvoExamType, ageGroup = null }) {
   }
 
   const order = isPrivate
-    ? ['tuition', 'languages', 'grades', 'nvo', 'distance']
+    ? ['tuition', 'openDay', 'languages', 'grades', 'nvo', 'distance']
     : isKindergarten
-      ? ['lastAdmitted', 'distance', 'grades', 'languages']
-      : ['nvo', 'minScore', 'shift', 'distance', 'grades', 'languages']
+      ? ['lastAdmitted', 'openDay', 'distance', 'grades', 'languages']
+      : ['nvo', 'openDay', 'minScore', 'shift', 'distance', 'grades', 'languages']
   const shown = order.map(key => facts[key]).filter(Boolean)
 
   if (shown.length === 0) return null
