@@ -119,3 +119,21 @@ def test_a_match_says_whether_our_district_was_checked():
 
 def test_and_between_numbers_is_not_a_letter():
     assert reg.parse('ул. "Тирана" № 16 и 18').number == "16"
+
+
+@pytest.mark.parametrize(
+    "text, address, named",
+    [
+        ("Visit us at 80A Ralevitsa Street", 'ул. Ралевица № 80А', True),
+        ("Адрес: гр. София, ул. „Ралевица“ № 80А", 'ул. Ралевица № 80А', True),
+        ("гр. София,улица Триадица №5А", 'ул. "Триадица" № 5А', True),
+        ("2 Tenev Bair, Bankya", "гр. Банкя, ул. Тенев баир 2", True),
+        ("ж.к. Младост 4, бл. 460А, вх. 2", "ж.к. Младост 4, бл. 460А", True),
+        ("ул. Ралевица № 8", 'ул. Ралевица № 80А', False),
+        ("ул. Ралевица 80", 'ул. Ралевица № 80А', False),
+        ("Младост 1, бл. 460", "ж.к. Младост 4, бл. 460А", False),
+        ("ул. Ралевица № 80А", 'ул. "Майор Коста Паница"', False),  # no number of ours
+    ],
+)
+def test_a_page_names_our_address(text, address, named):
+    assert reg.names_address(text, reg.parse(address)) is named

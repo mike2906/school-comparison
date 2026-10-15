@@ -306,3 +306,34 @@ def match(parsed: Parsed, register: Register) -> Match:
         if street.outcome == "matched" or result.outcome == "no_address":
             return street
     return result
+
+
+def _latin(text: str) -> str:
+    from app.utils.transliteration import transliterate_bulgarian
+
+    return transliterate_bulgarian(text).casefold()
+
+
+def names_address(page_text: str, parsed: Parsed) -> bool:
+    """Whether a page states our address: the street (or complex) name next to our house
+    (or block) number, in Bulgarian or in Latin letters ("80A Ralevitsa Street")."""
+    if parsed.street and parsed.number:
+        words, number = parsed.street.split()[1:], parsed.number  # without "ул"
+    elif parsed.block and (parsed.complex or parsed.street):
+        words = parsed.complex.split() if parsed.complex else (parsed.street or "").split()[1:]
+        number = parsed.block
+    else:
+        return False
+    words = [w for w in words if not w.isdigit()]
+    if not words or len(words[-1]) < 3:
+        return False
+    cyrillic, latin = _clean(page_text), _latin(page_text)
+    for text, convert in ((cyrillic, lambda w: w), (latin, _latin)):
+        last, first = re.escape(convert(words[-1])), re.escape(convert(words[0]))
+        num = re.escape(convert(number.casefold()))
+        # "Ралевица № 80А", "Младост 4, бл. 460А" / "80A Ralevitsa", "2 Tenev Bair"
+        after = rf"(?<!\w){last}\w*\W{{1,15}}(?:\d+\W{{1,6}})?(?:(?:№|no\.?|#|бл\.?|bl\.?)\s*)?{num}(?!\w)"
+        before = rf"(?<!\w){num}\s*,?\s*(?:(?:ул|бул|str|ul|ulitsa)\.?\s*)?{first}"
+        if re.search(after, text) or re.search(before, text):
+            return True
+    return False

@@ -12,7 +12,9 @@ hidden: the site may say it moved. No model calls. Default is a dry run. Sofia o
 from __future__ import annotations
 
 import logging
+import re
 from collections.abc import Sequence
+from html import unescape
 from typing import Any, Optional
 
 from sqlalchemy import func, select
@@ -21,8 +23,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import School, SchoolLocation
 from app.scrapers.fee_pages import fee_http_client
 from app.scrapers.stages.confirm_pins import ELSEWHERE_M
-from app.scrapers.stages.social_links import Fetch, _http_fetch
-from app.scrapers.stages.website_pins import _address, _distance_m, _read_points, needs_pin, write_pin
+from app.scrapers.stages.social_links import Fetch, _contact_page, _http_fetch
+from app.scrapers.stages.website_pins import SAME_POINT_METRES, _address, _distance_m, map_points, needs_pin, write_pin
 from app.services.geocoding.bg import sofia_address_register as register_lib
 from app.utils.school_facts import SITE_ACCEPTED_STATUSES
 
@@ -52,6 +54,29 @@ async def download_register() -> register_lib.Register:
                     raise
                 await asyncio.sleep(attempt * 5)
     raise AssertionError("unreachable")
+
+
+def _page_text(html: str) -> str:
+    text = re.sub(r"(?is)<(script|style)\b.*?</\1>", " ", html)
+    return unescape(re.sub(r"<[^>]+>", " ", text))
+
+
+async def _read_site(school: School, fetch: Fetch) -> Optional[tuple[list[tuple[float, float]], str]]:
+    """Map points and text of the home and contact pages, or None when the home page could
+    not be read."""
+    home = await fetch(school.website_url)
+    if home is None:
+        return None
+    final, html = home
+    points, texts = map_points(html, final), [_page_text(html)]
+    contact = _contact_page(html, final, final)
+    page = await fetch(contact) if contact else None
+    if page is not None:
+        texts.append(_page_text(page[1]))
+        for point in map_points(page[1], page[0]):
+            if all(_distance_m(point, seen) >= SAME_POINT_METRES for seen in points):
+                points.append(point)
+    return points, "\n".join(texts)
 
 
 async def run_register_pins(
@@ -98,15 +123,15 @@ async def run_register_pins(
             for location in hidden:
                 parsed = register_lib.parse(_address(location), location.district)
                 found[location.id] = register_lib.match(parsed, register)
-            site_points: Optional[list[tuple[float, float]]] = []
+            site: Optional[tuple[list[tuple[float, float]], str]] = ([], "")
             if any(m.outcome == "matched" for m in found.values()) and school.website_url and (
                 school.scrape_status in SITE_ACCEPTED_STATUSES
             ):
                 try:
-                    site_points = await _read_points(school, fetch)
+                    site = await _read_site(school, fetch)
                 except Exception:
                     logger.exception("register-pins could not read school %s's site", school_id)
-                    site_points = None
+                    site = None
             others = [
                 (loc.lat, loc.lng) for loc in locations if not needs_pin(loc) and loc.lat is not None and loc.lng is not None
             ]
@@ -130,13 +155,27 @@ async def run_register_pins(
                 row["register"] = [
                     {k: v for k, v in vars(r).items() if v} for r in result.rows[:5]
                 ]
-                if row["moved_m"] is not None and row["moved_m"] > FAR_M and not result.region_checked:
-                    # As far as another district: our address must name the district to go there.
+                site_points, site_text = site if site is not None else ([], "")
+                # The school's own site wins: its text giving our address outweighs its map (a
+                # stray or old map is common), and its map at the register point backs it up.
+                site_names_it = register_lib.names_address(site_text, register_lib.parse(_address(location)))
+                site_map_here = any(_distance_m(result.point, p) <= ELSEWHERE_M for p in site_points)
+                if site_names_it:
+                    row["site_names_address"] = True
+                if (
+                    row["moved_m"] is not None
+                    and row["moved_m"] > FAR_M
+                    and not result.region_checked
+                    and not (site_names_it or site_map_here)
+                ):
+                    # As far as another district: our district or the school's site must agree.
                     row["outcome"] = "moved_far"
-                elif site_points is None:
+                elif site is None:
                     row["outcome"] = "site_not_read"
-                elif site_points and not any(
-                    _distance_m(point, p) <= ELSEWHERE_M for point in [result.point, *others] for p in site_points
+                elif (
+                    site_points
+                    and not site_names_it
+                    and not any(_distance_m(point, p) <= ELSEWHERE_M for point in [result.point, *others] for p in site_points)
                 ):
                     row["outcome"] = "website_map_elsewhere"
                     row["site_points"] = site_points
