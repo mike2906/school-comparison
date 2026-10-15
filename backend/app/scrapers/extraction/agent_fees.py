@@ -418,14 +418,24 @@ def _loose(text: str) -> str:
 
 
 def _page_row(line: str, page_lines: list[str]) -> str | None:
-    """The one page line a cleaned quote of a table row came from, cells and all.
+    """The cells of the one page line a cleaned quote of a table row came from.
 
-    The later checks read that line, not the quote: they need the " | " cells to tell the
-    fee's own period from a payment option's ("€ 8.950 | € 750 x 9 monthly").
+    The later checks read those cells, not the quote: they need the " | " to tell the fee's
+    own period from a payment option's ("€ 8.950 | € 750 x 9 monthly"). Only the fewest
+    cells in a row that hold the quote are kept, so another cell's "monthly" stays out.
     """
     quote = _loose(line)
     rows = {text for text in page_lines if quote in _loose(text)}
-    return rows.pop() if len(rows) == 1 else None
+    if len(rows) != 1:
+        return None
+    cells = rows.pop().split(" | ")
+    spans = [
+        " | ".join(cells[start:end])
+        for start in range(len(cells))
+        for end in range(start + 1, len(cells) + 1)
+        if quote in _loose(" | ".join(cells[start:end]))
+    ]
+    return min(spans, key=len)
 
 
 _LABEL_LINES_AWAY = 3

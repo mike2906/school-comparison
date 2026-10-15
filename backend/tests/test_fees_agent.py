@@ -1619,3 +1619,15 @@ def test_a_cleaned_quote_is_checked_with_the_page_rows_cells():
 def test_a_cell_join_after_a_number_and_a_dot_does_not_make_one_number():
     food = fee(PriceCategory.FOOD, "Grade 1. 550 meals", amount=1550)
     assert not check_fee(food, "Grade 1. | 550 meals\nOther € 1550\n").kept
+
+
+def test_a_cleaned_quote_takes_no_period_from_a_cell_it_did_not_quote():
+    lunch = fee(PriceCategory.FOOD, "Lunch € 5", amount=5, period=PricePeriod.MONTHLY)
+    result = check_fee(lunch, "EXTRAS\nLunch | € 5 | € 100 monthly\n")
+    assert result.kept
+    assert result.fee.period is None
+
+
+def test_a_cleaned_quote_without_the_amount_does_not_borrow_it_from_the_row():
+    bus = fee(PriceCategory.TRANSPORT, "Transport two-way", amount=2550)
+    assert check_fee(bus, PAGE_PDF_TABLE).checks == ["dropped: evidence line does not hold the amount"]
