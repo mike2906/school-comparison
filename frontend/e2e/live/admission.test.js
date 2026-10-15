@@ -119,6 +119,32 @@ describe('admission from a school page', () => {
     }
   })
 
+  test('a school with a preparatory group opens the kindergarten tab for it', async () => {
+    const school = await findSchool(
+      'with a preparatory group and a first-grade catchment',
+      () => true,
+      s => schoolCatchmentIds(s).length > 0 &&
+        (s.admission_info?.cutoff_summary || []).some(row => row.stage === 'preparatory'),
+    )
+    await open('bg', `/schools/${school.id}`)
+    const cutoffs = page.locator('section').filter({ has: page.getByRole('heading', { name: t('bg', 'cutoffs.title') }) })
+    await cutoffs.getByRole('link', { name: t('bg', 'cutoffs.calculateStage.grade_1') }).waitFor()
+    await cutoffs.getByRole('link', { name: t('bg', 'cutoffs.calculateStage.preparatory') }).click()
+    await page.waitForURL(url => url.pathname === '/admission' && url.searchParams.get('stage') === 'kindergarten')
+    await page.getByRole('tab', { name: t('bg', 'admissionCalc.stages.kindergarten'), selected: true }).waitFor()
+
+    // Six years before the start year is the preparatory group, which this school ranks.
+    const start = Number((await campaign()).slice(0, 4))
+    await page.getByLabel(t('bg', 'admissionCalc.kg.birthYear')).selectOption(String(start - 6))
+    await page.getByText(t('bg', 'admissionCalc.kg.group', { group: t('bg', 'ageGroups.preschool') })).waitFor()
+  })
+
+  test('the first-grade tab points to the preparatory group', async () => {
+    await open('bg', '/admission?stage=grade_1')
+    await page.getByRole('button', { name: t('bg', 'admissionCalc.preparatoryLink') }).click()
+    await page.getByRole('tab', { name: t('bg', 'admissionCalc.stages.kindergarten'), selected: true }).waitFor()
+  })
+
   test('an eighth-grade school shows its class cut-offs', async () => {
     const school = await findSchool(
       'with 8th-grade cut-offs',

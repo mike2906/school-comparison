@@ -4,6 +4,8 @@
  * cut-offs to show beside a result. Pure functions, so they run under `node --test`.
  */
 import { selectRuleSet, statusEventsOn } from './core.js'
+import { schoolCatchmentIds } from './catchments.js'
+import { usesSofiaKindergartenSystem } from '../utils/admission.js'
 
 /** Calculator tabs: the rule-file stage and the cut-off stages read with it. */
 export const STAGES = [
@@ -11,6 +13,22 @@ export const STAGES = [
   { id: 'grade_1', ruleStage: 'grade_1', city: 'sofia', cutoffStages: ['grade_1'] },
   { id: 'grade_8', ruleStage: 'grade_8', city: 'sofia', cutoffStages: ['grade_8'] },
 ]
+
+/**
+ * The calculator links on a school's page, in tab order: `{ stage, what }`, where `what`
+ * names what the link calculates. A school with a preparatory group (ПГУ) is ranked for
+ * it under the kindergarten rules, so it links to the kindergarten tab as `preparatory`
+ * as well as to its first-grade or eighth-grade tab.
+ */
+export function calculatorLinksFor(school) {
+  const summary = school?.admission_info?.cutoff_summary || []
+  const links = []
+  if (usesSofiaKindergartenSystem(school)) links.push({ stage: 'kindergarten', what: 'kindergarten' })
+  else if (summary.some(row => row.stage === 'preparatory')) links.push({ stage: 'kindergarten', what: 'preparatory' })
+  if (schoolCatchmentIds(school).length > 0) links.push({ stage: 'grade_1', what: 'grade_1' })
+  if (summary.some(row => row.stage === 'grade_8')) links.push({ stage: 'grade_8', what: 'grade_8' })
+  return links
+}
 
 export function stageById(id) {
   return STAGES.find(stage => stage.id === id) || STAGES[0]

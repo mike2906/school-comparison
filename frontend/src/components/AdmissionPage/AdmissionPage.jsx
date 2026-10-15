@@ -121,6 +121,14 @@ function AdmissionPage() {
     next.set('stage', id)
     setParams(next, { replace: true })
   }
+  // From the first-grade note: keep the school only when it has a preparatory group,
+  // otherwise the kindergarten tab would read as if it had one.
+  const openPreparatory = () => {
+    const next = new URLSearchParams(params)
+    next.set('stage', 'kindergarten')
+    if (!schoolContext?.cutoffSummary.some(row => row.stage === 'preparatory')) next.delete('school')
+    setParams(next, { replace: true })
+  }
   const clearSchool = () => {
     const next = new URLSearchParams(params)
     next.delete('school')
@@ -150,6 +158,14 @@ function AdmissionPage() {
             </button>
           ))}
         </div>
+        {stage.id === 'grade_1' && (
+          <p className="mt-3 rounded-lg bg-neutral-50 p-3 text-sm text-neutral-700">
+            {t('admissionCalc.preparatoryNote')}{' '}
+            <button type="button" onClick={openPreparatory} className="font-medium text-primary-700 underline">
+              {t('admissionCalc.preparatoryLink')}
+            </button>
+          </p>
+        )}
         <p className="mt-2 text-xs text-neutral-500">{t('admissionCalc.grade5Note')}</p>
 
         <div className="mt-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
