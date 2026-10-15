@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import {
+  nextDurationTier,
   addRanges,
   bestOf,
   campaignForStartYear,
@@ -122,4 +123,14 @@ test('impossible, future and leap-day dates', () => {
 test('campaignForStartYear names the school year', () => {
   assert.equal(campaignForStartYear(2026), '2026/2027')
   assert.equal(campaignForStartYear(2099), '2099/2100')
+})
+
+test('nextDurationTier says when an address reaches the next step', () => {
+  const tiers = [{ more_than_years: 3, points: 8 }, { at_least_years: 1, points: 5 }, { points: 3 }]
+  assert.deepEqual(nextDurationTier(tiers, '2026-03-12', '2026-10-15'), { tier: tiers[1], current: tiers[2], on: '2027-03-12' })
+  // "More than 3 years" starts the day after the third anniversary.
+  assert.deepEqual(nextDurationTier(tiers, '2024-03-12', '2026-10-15'), { tier: tiers[0], current: tiers[1], on: '2027-03-13' })
+  assert.equal(nextDurationTier(tiers, '2020-01-01', '2026-10-15'), null, 'already in the best tier')
+  assert.equal(nextDurationTier(tiers, null, '2026-10-15'), null)
+  assert.equal(nextDurationTier(tiers, '2027-01-01', '2026-10-15'), null, 'a future date is unknown')
 })

@@ -9,6 +9,7 @@ import { birthYearsFor } from '../../utils/ageSelection'
 import { Choice, DateField, Field, INPUT_CLASS, MobileTotal, Section, YesNo } from './fields'
 import PointsList from './PointsList'
 import SaveAnswers from './SaveAnswers'
+import NextTierHint from './NextTierHint'
 import CutoffComparison from '../Admission/CutoffComparison'
 
 // Answers about one kindergarten: never saved, since the list compares every kindergarten
@@ -105,6 +106,9 @@ function KindergartenCalculator({ selected, startYear, kindergarten, districts, 
                 max={measuredOn}
                 onChange={v => set('addressSince', v)}
               />
+              {a.inSofia !== false && !(usesParentAddress && a.parentChildSameAddress === false) && (
+                <NextTierHint kind="kg" tiers={params.address_duration.tiers} since={a.addressSince} measuredOn={measuredOn} />
+              )}
               <Field
                 label={t('admissionCalc.kg.homeDistrict')}
                 hint={knownDistrict

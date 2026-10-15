@@ -11,6 +11,7 @@ import CutoffComparison from '../Admission/CutoffComparison'
 import { DateField, MobileTotal, Section, YesNo } from './fields'
 import PointsList from './PointsList'
 import SaveAnswers from './SaveAnswers'
+import NextTierHint from './NextTierHint'
 
 // Answers about one school: never saved, since the list compares every school.
 const PER_PLACE = { siblingAtSchool: null, siblingYoung: null, preparatoryGroupHere: null }
@@ -36,7 +37,7 @@ function useCatchments() {
  * answered. With a school on the page the check is about that school; without one, the
  * result is for the school whose catchment the address is in.
  */
-function AddressQuestions({ index, value, onChange, school, catchments, measuredOn }) {
+function AddressQuestions({ index, value, onChange, school, catchments, measuredOn, tiers }) {
   const { t } = useTranslation()
   const ids = school?.catchmentIds || []
   // The address as last checked, so a saved one comes back filled in.
@@ -113,6 +114,7 @@ function AddressQuestions({ index, value, onChange, school, catchments, measured
           onChange={v => onChange(prev => ({ ...prev, since: v }))}
         />
       )}
+      {value.inCatchment === true && <NextTierHint kind="g1" tiers={tiers} since={value.since} measuredOn={measuredOn} />}
     </div>
   )
 }
@@ -169,6 +171,8 @@ function Grade1Calculator({ selected, startYear, school, cutoffRows = [], isCurr
               school={school}
               catchments={catchments}
               measuredOn={measuredOn}
+              // A young sibling at the school is group 1 however long the address.
+              tiers={context.siblingUnderAgeAtSchool === true ? null : params.groups.tiers}
             />
           ))}
           {addresses.length === 1 ? (

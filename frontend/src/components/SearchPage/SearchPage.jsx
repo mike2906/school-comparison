@@ -19,6 +19,7 @@ import Layout from '../Layout/Layout'
 import LanguageToggle from '../LanguageToggle/LanguageToggle'
 import SchoolMap from '../Map/SchoolMap'
 import { SavedAdmissionBanner } from '../Admission/SavedVerdict'
+import { useHiddenBelow } from '../../hooks/useSavedAdmission'
 import SchoolCard from '../SchoolCard/SchoolCard'
 import SchoolCardSkeleton from '../SchoolCard/SchoolCardSkeleton'
 import SchoolDetailPanel from './SchoolDetailPanel'
@@ -611,14 +612,19 @@ function SearchPage() {
     return schoolsWithDistance.map(school => ({ ...school, driveSeconds: driveTimes.seconds.get(school.id) ?? null }))
   }, [schoolsWithDistance, driveTimes.seconds])
 
+  const hiddenBelow = useHiddenBelow(schools, filters.ageGroup)
   const distanceLimit = userLocation && distanceFilter !== 'any' ? parseFloat(distanceFilter) : null
 
-  const filteredSchools = useMemo(() => {
+  const matchingSchools = useMemo(() => {
     return schoolsWithDrive.filter(school => (
       (!distanceLimit || (typeof school.distance === 'number' && school.distance <= distanceLimit)) &&
       schoolMatchesQuery(school, nameQuery)
     ))
   }, [schoolsWithDrive, distanceLimit, nameQuery])
+  const filteredSchools = useMemo(
+    () => (hiddenBelow.size ? matchingSchools.filter(school => !hiddenBelow.has(school.id)) : matchingSchools),
+    [matchingSchools, hiddenBelow]
+  )
 
   const boundedSchools = useMemo(() => {
     if (!searchInBounds || !mapBounds) return filteredSchools
@@ -1318,7 +1324,7 @@ function SearchPage() {
                   </div>
                 )}
 
-                <SavedAdmissionBanner ageGroup={filters.ageGroup} />
+                <SavedAdmissionBanner ageGroup={filters.ageGroup} hiddenCount={matchingSchools.length - filteredSchools.length} />
 
                 {isFirstLoad && (
                   <div className="p-4 space-y-4">

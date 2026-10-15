@@ -97,6 +97,11 @@ describe('admission calculator', () => {
     // An address inside the catchment for years is group 1 (of 1–4, 1 is best).
     const group = page.locator('aside p', { hasText: new RegExp(`^${g1('group')}$`) }).first().locator('xpath=following-sibling::p[1]')
     await group.filter({ hasText: /^1$/ }).waitFor()
+    assert.equal(await page.getByTestId('next-tier-hint').count(), 0, 'the best group has nothing to wait for')
+
+    // Two years in the catchment is group 2: the hint gives the day the address reaches group 1.
+    await page.getByLabel(g1('since')).first().fill(`${start - 2}-01-15`)
+    await page.getByTestId('next-tier-hint').filter({ hasText: `${start + 1}-01-16` }).waitFor()
   })
 
   test('eighth grade: each formula gives the score the rules say', async () => {
@@ -228,6 +233,10 @@ describe('admission from a school page', () => {
     await page.waitForURL(url => url.pathname === '/search' && url.searchParams.get('age_group') === 'grade_1_4')
     await page.getByTestId('saved-admission-banner').waitFor()
     await page.getByTestId('saved-verdict-line').first().waitFor()
+    // Hiding schools where the saved result is below the last admitted child.
+    await page.getByTestId('hide-below').check()
+    await page.getByTestId('hidden-count').waitFor()
+    await page.getByTestId('hide-below').uncheck()
 
     // The school page compares the same answers with that school, and uses the address.
     await open('bg', `/schools/${school.id}`)

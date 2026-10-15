@@ -120,6 +120,23 @@ export function savedVerdictsFor(school, saved, ageGroup, data) {
   })
 }
 
+/**
+ * Ids of the schools where every saved result is below the last admitted child. Schools
+ * without a cut-off, with a tie, mixed rounds, a cut-off ranked under other rules or a
+ * possible priority path stay listed: only a clear "below" counts.
+ */
+export function clearlyBelowIds(schools, saved, ageGroup, data) {
+  const below = verdict => verdict.verdict === 'below' && !verdict.lines.some(line => line.otherRules) &&
+    // Social priority and SEN places are separate ways in that the cut-off says nothing about.
+    !(verdict.stage === 'kindergarten' && verdict.socialPriority !== false) && !verdict.specialPlaces
+  const ids = new Set()
+  for (const school of schools) {
+    const verdicts = savedVerdictsFor(school, saved, ageGroup, data)
+    if (verdicts.length > 0 && verdicts.every(below)) ids.add(school.id)
+  }
+  return ids
+}
+
 /** Whether a saved tab applies to a search for `ageGroup` (null: any). */
 export function savedStageApplies(stage, entry, ageGroup) {
   if (!entry) return false

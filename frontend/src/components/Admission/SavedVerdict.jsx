@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { formatRange } from '../../admission/calculator'
 import { forgetSaved, SAVED_STAGES } from '../../admission/saved'
 import { savedStageApplies } from '../../admission/schoolVerdict'
-import { useSavedAdmission } from '../../hooks/useSavedAdmission'
+import { setHideBelow, useHideBelow, useSavedAdmission } from '../../hooks/useSavedAdmission'
 import { CutoffValue, rowLabel } from './CutoffTable'
 
 const TONE = {
@@ -118,10 +118,14 @@ export function SavedVerdictPanel({ verdict, schoolId }) {
   )
 }
 
-/** Above the search list: whose answers the cards use, what they assume, and a way out. */
-export function SavedAdmissionBanner({ ageGroup }) {
+/**
+ * Above the search list: whose answers the cards use, what they assume, a way out, and
+ * the switch that hides schools where the parent is below the last admitted child.
+ */
+export function SavedAdmissionBanner({ ageGroup, hiddenCount = 0 }) {
   const { t } = useTranslation()
   const saved = useSavedAdmission()
+  const hideBelow = useHideBelow()
   const stages = SAVED_STAGES.filter(stage => savedStageApplies(stage, saved[stage], ageGroup))
   if (stages.length === 0) return null
   return (
@@ -138,6 +142,23 @@ export function SavedAdmissionBanner({ ageGroup }) {
           </div>
         </div>
       ))}
+      <label className="mt-2 flex items-start gap-2 text-xs">
+        <input
+          type="checkbox"
+          checked={hideBelow}
+          onChange={event => setHideBelow(event.target.checked)}
+          className="mt-0.5 shrink-0"
+          data-testid="hide-below"
+        />
+        <span>
+          <span className="font-medium">{t('savedAdmission.hideBelow')}</span>
+          {hideBelow && (
+            <span className="block text-primary-900/80" data-testid="hidden-count">
+              {t('savedAdmission.hiddenCount', { count: hiddenCount })}
+            </span>
+          )}
+        </span>
+      </label>
     </div>
   )
 }
