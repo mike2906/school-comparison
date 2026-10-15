@@ -492,14 +492,14 @@ def test_a_pdf_row_with_merged_cells_is_joined_into_one_line():
     # 596's primary fees: the grade's plans sit in rows whose first cell is merged into the
     # grade's; they become one line, never "Plan 1" beside Plan 3's first payment alone.
     merged = [
-        ["Grade", "Plan 1", "Plan 3"],
-        ["Grade 0", "", "1 x € 8.950"],
-        [None, "Plan 1 - € 8.950", "1 x € 2.650 initial"],
-        [None, None, "9 x € 750 monthly"],
+        ["Grade", "", "Payment Plan", "Plan 1", "Plan 3"],
+        ["Grade 0", "", "", "1 x € 8.950", ""],
+        [None, None, "Plan 1 - € 8.950", None, "1 x € 2.650 initial"],
+        [None, None, "Plan 3 - € 9.400", None, "9 x € 750 monthly"],
     ]
     assert table_lines(merged) == [
-        "Grade | Plan 1 | Plan 3",
-        "Grade 0 | Plan 1 - € 8.950 | 1 x € 8.950 / 1 x € 2.650 initial / 9 x € 750 monthly",
+        "Grade |  | Payment Plan | Plan 1 | Plan 3",
+        "Grade 0 |  | Plan 1 - € 8.950 / Plan 3 - € 9.400 | 1 x € 8.950 | 1 x € 2.650 initial / 9 x € 750 monthly",
     ]
     # 596's "billed separately" table: the transport row is whole, though the text layer
     # splits "(two-" from "way service)" across the TRANSPORTATION line.
@@ -514,11 +514,19 @@ def test_a_pdf_row_with_merged_cells_is_joined_into_one_line():
     )
 
 
+def test_a_pdf_heading_merged_over_several_rows_keeps_the_rows_apart():
+    from app.scrapers.fee_pages import table_lines
+
+    # Only the heading spans the rows: each grade keeps its own amount.
+    table = [["Fee", "Group", "Price"], ["Tuition", "Grade 1", "€ 5,000"], [None, "Grade 2", "€ 6,000"]]
+    assert table_lines(table) == ["Fee | Group | Price", "Tuition | Grade 1 | € 5,000", "Tuition | Grade 2 | € 6,000"]
+
+
 def test_a_pdf_table_with_one_column_or_a_merged_first_cell_is_left_out():
     from app.scrapers.fee_pages import table_lines
 
     assert table_lines([["ТАКСИ ЗА УЧЕБНАТА 2026/2027\n€ 7880 € 8190"]]) == []
-    assert table_lines([[None, "€ 450"], ["Grade 1", "€ 500"]]) == []
+    assert table_lines([[None, None, "€ 450"], ["Grade 1", "", "€ 500"]]) == []
     assert table_lines([]) == []
 
 
