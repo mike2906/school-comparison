@@ -69,7 +69,14 @@ function kindergartenVerdict(school, entry, { ruleSets, districts, today }) {
   const rows = summaryRowsFor(summary, stageById('kindergarten'))
     .filter(row => row.age_group === ageGroup && (row.birth_year == null || row.birth_year === entry.answers.birthYear))
   const yours = { points: result.total }
-  return { stage: 'kindergarten', yours, ...compareRows(rows, yours, selected.ruleSet) }
+  return {
+    stage: 'kindergarten',
+    yours,
+    // Separate paths the cut-off (the general queue) says nothing about.
+    socialPriority: result.socialPriority,
+    specialPlaces: result.specialPlaces,
+    ...compareRows(rows, yours, selected.ruleSet),
+  }
 }
 
 function grade1Verdict(school, entry, { ruleSets, catchments, today }) {
@@ -94,16 +101,21 @@ function grade1Verdict(school, entry, { ruleSets, catchments, today }) {
 }
 
 /**
- * The saved result for one school, or null when no saved answers apply to it. `ageGroup`
- * is the search page's age filter: a saved tab shows only for the age groups it covers.
+ * The saved results for one school, one per saved tab that applies to it (a school with a
+ * preparatory group and first grade can have both). `ageGroup` is the search page's age
+ * filter: a saved tab shows only for the age groups it covers.
  * `data`: { ruleSets, districts, catchments, today }.
  */
-export function savedVerdictFor(school, saved, ageGroup, data) {
-  for (const stage of ['kindergarten', 'grade_1']) {
+export function savedVerdictsFor(school, saved, ageGroup, data) {
+  return ['kindergarten', 'grade_1'].flatMap(stage => {
     const entry = saved?.[stage]
-    if (!entry || (ageGroup && !SEARCH_GROUPS[stage].includes(ageGroup))) continue
+    if (!entry || (ageGroup && !SEARCH_GROUPS[stage].includes(ageGroup))) return []
     const verdict = stage === 'kindergarten' ? kindergartenVerdict(school, entry, data) : grade1Verdict(school, entry, data)
-    if (verdict) return verdict
-  }
-  return null
+    return verdict ? [verdict] : []
+  })
+}
+
+/** The first of savedVerdictsFor, or null. */
+export function savedVerdictFor(school, saved, ageGroup, data) {
+  return savedVerdictsFor(school, saved, ageGroup, data)[0] ?? null
 }

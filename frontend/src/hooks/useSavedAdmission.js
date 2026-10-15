@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { getSaved, subscribeSaved } from '../admission/saved'
-import { savedVerdictFor } from '../admission/schoolVerdict'
+import { savedVerdictsFor } from '../admission/schoolVerdict'
 import { sofiaToday } from '../admission/calculator'
 import { loadCatchments, loadDistricts } from '../admission/loadCatchments'
 
@@ -39,15 +39,15 @@ function useVerdictData(enabled) {
 }
 
 /**
- * The saved answers against one school's cut-offs (src/admission/schoolVerdict.js), or
- * null without saved answers that apply. Nothing loads until something is saved.
+ * The saved answers against one school's cut-offs (src/admission/schoolVerdict.js), one
+ * per saved tab that applies; empty without any. Nothing loads until something is saved.
  */
-export function useSavedVerdict(school, ageGroup = null) {
+export function useSavedVerdicts(school, ageGroup = null) {
   const saved = useSavedAdmission()
   const hasSaved = Boolean(saved.kindergarten || saved.grade_1)
   const data = useVerdictData(hasSaved)
   return useMemo(() => {
-    if (!hasSaved || !data || !school) return null
-    return savedVerdictFor(school, saved, ageGroup, { ...data, today: sofiaToday() })
+    if (!hasSaved || !data || !school) return []
+    return savedVerdictsFor(school, saved, ageGroup, { ...data, today: sofiaToday() })
   }, [hasSaved, data, school, saved, ageGroup])
 }

@@ -120,3 +120,15 @@ test('rows that disagree read as mixed', () => {
   assert.equal(compareRows([{ first: { last_admitted_points: 8 } }], yours, null).verdict, 'above')
   assert.equal(compareRows([{ first: {} }], yours, null).verdict, 'noCutoff')
 })
+
+test('a school with a preparatory group and first grade gets both saved results', async () => {
+  const { savedVerdictsFor } = await import('./schoolVerdict.js')
+  const saved = {
+    kindergarten: { startYear: 2026, answers: { ...kgAnswers, birthYear: 2020, additional: 'sen' } },
+    grade_1: { startYear: 2026, answers: GRADE1_INITIAL, addresses: [{ check: { streetId: street.id, number, schoolId: ownId }, since: '2018-01-01' }] },
+  }
+  const school = g1School(ownId, [g1Row, { stage: 'preparatory', age_group: 'preschool', rounds: 1, first: { last_admitted_points: 5 } }])
+  const verdicts = savedVerdictsFor(school, saved, null, data)
+  assert.deepEqual(verdicts.map(v => v.stage), ['kindergarten', 'grade_1'])
+  assert.equal(verdicts[0].specialPlaces, 'sen', 'SEN places are a separate path, kept beside the verdict')
+})

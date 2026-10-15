@@ -49,6 +49,22 @@ export function SavedVerdictLine({ verdict }) {
       )}
       {' · '}
       <span className={TONE[verdict.verdict] || 'text-neutral-700'}>{t(`savedAdmission.verdict.${verdict.verdict}`)}</span>
+      {verdict.lines.some(l => l.otherRules) && <span className="text-neutral-600"> ({t('cutoffs.otherRules')})</span>}
+      <PriorityNote verdict={verdict} className="block text-xs text-neutral-600" />
+    </span>
+  )
+}
+
+/** Social priority and SEN / chronic-illness places: admission paths a cut-off says nothing about. */
+function PriorityNote({ verdict, className }) {
+  const { t } = useTranslation()
+  // As on the calculator: null means a "not sure" answer may give priority.
+  const priority = verdict.stage === 'kindergarten' && verdict.socialPriority !== false
+  if (!priority && !verdict.specialPlaces) return null
+  return (
+    <span className={className}>
+      {priority && t('admissionCalc.kg.socialPriority')}
+      {verdict.specialPlaces && ` ${t(`admissionCalc.kg.specialPlaces.${verdict.specialPlaces}`)}`}
     </span>
   )
 }
@@ -87,6 +103,7 @@ export function SavedVerdictPanel({ verdict, schoolId }) {
           </ul>
         </>
       )}
+      <PriorityNote verdict={verdict} className="mt-2 block text-xs text-neutral-700" />
       <p className="mt-2 text-xs text-neutral-600">{t(`savedAdmission.assumed.${verdict.stage}`)} {t('cutoffs.compare.note')}</p>
       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
         <Link to={`/admission?stage=${verdict.stage}&school=${schoolId}`} className="font-medium text-primary-700 underline">
