@@ -30,6 +30,8 @@ logger = logging.getLogger(__name__)
 
 PIN_TAG = "coords_source=sofia_address_register"
 PROVIDER = "sofia_address_register"
+# A pin moving further than this needs our address's district to agree with the register's.
+FAR_M = 3000
 
 
 async def download_register() -> register_lib.Register:
@@ -128,7 +130,10 @@ async def run_register_pins(
                 row["register"] = [
                     {k: v for k, v in vars(r).items() if v} for r in result.rows[:5]
                 ]
-                if site_points is None:
+                if row["moved_m"] is not None and row["moved_m"] > FAR_M and not result.region_checked:
+                    # As far as another district: our address must name the district to go there.
+                    row["outcome"] = "moved_far"
+                elif site_points is None:
                     row["outcome"] = "site_not_read"
                 elif site_points and not any(
                     _distance_m(point, p) <= ELSEWHERE_M for point in [result.point, *others] for p in site_points

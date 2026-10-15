@@ -31,6 +31,10 @@ CSV = """rn;region;settlement;lareaunit;block;street;streetnum;entrance;n;e
 9;Красно село;гр. София;"";"";бул. Цар Борис III;5;"";42.680000;23.280000
 10;Изгрев;гр. София;кв. Гео Милев;5;"";"";А;42.680000;23.360000
 11;Лозенец;гр. София;"";"";ул. Тирана;10;"";42.670000;23.330000
+12;Оборище;гр. София;"";"";ул. Стара планина;13;"";42.697000;23.334000
+13;Кремиковци;гр. София, кв. Кремиковци;"";"";ул. Стара планина;13;"";42.786000;23.506000
+14;Кремиковци;гр. София, кв. Кремиковци;"";"";ул. Стара планина;16;"";42.786578;23.506657
+15;Витоша;гр. София;"";"";ул. Александър Малинов;79Б;"";42.640000;23.370000
 """
 REGISTER = reg.read_register(CSV)
 
@@ -54,6 +58,8 @@ def _match(address, district=None):
         ('бул. "Цар Борис III" № 5', (42.68, 23.28)),
         ("кв. Гео Милев, бл. 5, вх. А", (42.68, 23.36)),  # a кв. complex
         ('ул. "Тирана" № 10, бл. 2', (42.67, 23.33)),  # the register files the block elsewhere
+        ("ул. Александър Малинов № 79 Б", (42.64, 23.37)),  # a space before the letter
+        ('район Кремиковци, ул. "Стара планина" № 16', (42.786578, 23.506657)),  # district named
     ],
 )
 def test_an_address_in_the_register_gets_its_point(address, point):
@@ -96,4 +102,20 @@ def test_the_register_zip_is_read():
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w") as archive:
         archive.writestr("address_sofia.csv", CSV)
-    assert len(reg.read_register_zip(buffer.getvalue())) == len(REGISTER) == 21
+    assert len(reg.read_register_zip(buffer.getvalue())) == len(REGISTER) == 25
+
+
+def test_a_street_name_used_for_two_streets_needs_our_district():
+    # Only Кремиковци's ул. Стара планина has № 16, but the name is two streets in Sofia.
+    assert _match('ул. "Стара планина" № 16').outcome == "ambiguous"
+    assert _match('ул. "Стара планина" № 13', district="Оборище").point == (42.697, 23.334)
+    assert _match('район Оборище, ул. "Стара планина" № 16').outcome == "ambiguous"
+
+
+def test_a_match_says_whether_our_district_was_checked():
+    assert _match('район Витоша, ул. "Ветрушка" № 5а').region_checked
+    assert not _match('ул. "Ветрушка" № 5а').region_checked
+
+
+def test_and_between_numbers_is_not_a_letter():
+    assert reg.parse('ул. "Тирана" № 16 и 18').number == "16"

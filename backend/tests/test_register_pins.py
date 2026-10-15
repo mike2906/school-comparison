@@ -109,3 +109,16 @@ async def test_a_pinned_location_is_left_alone(db_session):
 async def test_only_sofia_has_a_register(db_session):
     with pytest.raises(ValueError):
         await stage.run_register_pins(db_session, city="plovdiv", register=REGISTER, fetch=_fetcher({}))
+
+
+@pytest.mark.asyncio
+async def test_a_pin_moving_kilometres_needs_our_district_to_agree(db_session):
+    far = _hidden(None, address='ул. "Ветрушка" № 5а')
+    far.lat, far.lng = 42.70, 23.32  # about 6 km away
+    await _add(db_session, _school(), far)
+    report = await stage.run_register_pins(db_session, register=REGISTER, fetch=_fetcher({}))
+    assert report["outcomes"] == {"moved_far": 1}
+    far.address_i18n = {"bg": 'район Витоша, ул. "Ветрушка" № 5а'}
+    await db_session.commit()
+    report = await stage.run_register_pins(db_session, register=REGISTER, fetch=_fetcher({}))
+    assert report["outcomes"] == {"placed": 1}

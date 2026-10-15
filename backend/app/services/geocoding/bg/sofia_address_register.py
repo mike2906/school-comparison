@@ -42,7 +42,9 @@ _SHORT = {
     "свети": "св", "света": "св", "професор": "проф", "генерал": "ген", "академик": "акад",
     "доктор": "д-р", "др": "д-р", "полковник": "полк", "подполковник": "подполк",
 }
-_NUMBER = r"(\d+[а-я]?)(?![а-я\d])"
+_NUMBER = r"(\d+(?:[а-я]|\s[а-е])?)(?![а-я\d])"  # "5а", "79 б" (not "16 и 18")
+# A street name used for two streets: one house number over this far apart.
+NAMESAKE_M = 500
 # What may follow a town's name when no comma does.
 _MARKER = r"(?:ул|бул|пл|алея|ж\.?\s*к|жк|кв|район|р-н|бл|№)"
 
@@ -80,6 +82,7 @@ class Match:
     outcome: str  # "matched", "no_address", "not_in_register", "ambiguous"
     point: Optional[tuple[float, float]] = None
     rows: tuple[RegisterPoint, ...] = ()
+    region_checked: bool = False  # our address or district names the register row's district
 
 
 def _clean(text: str) -> str:
@@ -185,6 +188,18 @@ class Register:
                 self.by_number.setdefault(point.number, []).append(point)
             if point.block:
                 self.by_block.setdefault(point.block, []).append(point)
+        # Street names that are two streets in one town (ул. Стара планина in Оборище and
+        # in Кремиковци): the same house number twice, far apart.
+        self.namesakes: set[tuple[str, str]] = set()
+        for number_points in self.by_number.values():
+            seen: dict[tuple[str, str], tuple[float, float]] = {}
+            for point in number_points:
+                if not point.street:
+                    continue
+                key = (_town(point.settlement), point.street)
+                first = seen.setdefault(key, (point.lat, point.lng))
+                if distance_m(first, (point.lat, point.lng)) > NAMESAKE_M:
+                    self.namesakes.add(key)
 
     def __len__(self) -> int:
         return len(self.points)
@@ -226,6 +241,11 @@ def distance_m(a: tuple[float, float], b: tuple[float, float]) -> float:
     return math.hypot((a[0] - b[0]) * 111_320, (a[1] - b[1]) * 111_320 * math.cos(lat))
 
 
+def _town(settlement: str) -> str:
+    """Sofia's кв. settlements are Sofia."""
+    return SOFIA if settlement.startswith(SOFIA) else settlement
+
+
 def _in_settlement(row: RegisterPoint, settlement: Optional[str]) -> bool:
     if settlement is None:  # Sofia, its кв. included ("гр. софия, кв. драгалевци")
         return row.settlement == SOFIA or row.settlement.startswith(SOFIA + ",")
@@ -249,7 +269,7 @@ def _settle(rows: list[RegisterPoint], region: Optional[str], spread: float) -> 
         point = _together(rows, spread)
     if point is None:
         return Match("ambiguous", rows=tuple(rows))
-    return Match("matched", point, tuple(rows))
+    return Match("matched", point, tuple(rows), region_checked=bool(region) and all(r.region == region for r in rows))
 
 
 def match(parsed: Parsed, register: Register) -> Match:
@@ -277,7 +297,12 @@ def match(parsed: Parsed, register: Register) -> Match:
             r for r in register.by_number.get(parsed.number, [])
             if _in_settlement(r, parsed.settlement) and r.street and _same_name(parsed.street, r.street)
         ]
-        street = _settle(found, parsed.region, STREET_SPREAD_M)
+        if any((_town(r.settlement), r.street) in register.namesakes for r in found):
+            # Two streets of this name: only our district says which, and it must be named.
+            found = [r for r in found if parsed.region and r.region == parsed.region]
+            street = _settle(found, parsed.region, STREET_SPREAD_M) if found else Match("ambiguous")
+        else:
+            street = _settle(found, parsed.region, STREET_SPREAD_M)
         if street.outcome == "matched" or result.outcome == "no_address":
             return street
     return result
