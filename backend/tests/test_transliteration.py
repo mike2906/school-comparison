@@ -128,8 +128,8 @@ def test_resolve_name_i18n_strips_legal_suffixes_when_no_display_name_exists():
     )
 
     assert resolved == {
-        "bg": "Меридиан 22",
-        "en": "Meridian 22",
+        "bg": "Частно основно училище „Меридиан 22“",
+        "en": 'Private Primary School "Meridian 22"',
     }
 
 
@@ -139,8 +139,8 @@ def test_resolve_name_i18n_strips_association_suffix_when_no_display_name_exists
     )
 
     assert resolved == {
-        "bg": "Милеа",
-        "en": "Milea",
+        "bg": "Частно основно училище „Милеа“",
+        "en": 'Private Primary School "Milea"',
     }
 
 

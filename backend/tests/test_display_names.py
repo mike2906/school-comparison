@@ -93,13 +93,13 @@ from app.utils.i18n_resolver import resolve_address_i18n, resolve_name_i18n
         # Legal-form suffixes and prefixes, wrapping and unbalanced quotes.
         (
             '"ЧАСТНА ДЕТСКА ГРАДИНА ГЕРМАНИ БГ" ЕАД',
-            "Германи БГ",
-            "Germani BG",
+            "Частна детска градина „Германи БГ“",
+            'Private Kindergarten "Germani BG"',
         ),
         (
             '"ЧАСТНА ДЕТСКА ГРАДИНА "ПРОЛЕТ" ООД',
-            "Пролет",
-            "Prolet",
+            "Частна детска градина „Пролет“",
+            'Private Kindergarten "Prolet"',
         ),
         (
             'ФОНДАЦИЯ "ЧАСТНО СРЕДНО УЧИЛИЩЕ "РОНАЛД ЛАУДЕР"',
@@ -122,8 +122,20 @@ from app.utils.i18n_resolver import resolve_address_i18n, resolve_name_i18n
             "First Private High School of Mathematics",
         ),
         # A lone caps brand in a mixed-case name is kept; a caps run is recased.
-        ('"Частна детска градина "НЕМО" ООД', "НЕМО", "NEMO"),
-        ('Частна детска градина "ПОД 1 ПОКРИВ" ЕООД', "Под 1 Покрив", "Pod 1 Pokriv"),
+        ('"Частна детска градина "НЕМО" ООД', "Частна детска градина „НЕМО“", 'Private Kindergarten "NEMO"'),
+        (
+            'Частна детска градина "ПОД 1 ПОКРИВ" ЕООД',
+            "Частна детска градина „Под 1 Покрив“",
+            'Private Kindergarten "Pod 1 Pokriv"',
+        ),
+        # The type stays: a bare "София" would read as the city (issue from Mike, 2026-10-15).
+        ('"Частна детска градина СОФИЯ" ЕООД', "Частна детска градина „София“", 'Private Kindergarten "Sofia"'),
+        ("\"Частна детска градина ''Ягодина'' ООД", "Частна детска градина „Ягодина“", 'Private Kindergarten "Yagodina"'),
+        (
+            '"ЧАСТНА ГИМНАЗИЯ ПО ПРИРОДНИ НАУКИ И ПРЕДПРИЕМАЧЕСТВО "АСЕН ЙОРДАНОВ" ЕООД',
+            "Частна гимназия „Асен Йорданов“",
+            'Private High School "Asen Yordanov"',
+        ),
     ],
 )
 def test_resolve_name_cleans_register_formatting(stored_bg, expected_bg, expected_en):

@@ -39,6 +39,22 @@ _GENERIC_BG_NAME_STRIP_PREFIX = re.compile(
     )\s+""",
     flags=re.IGNORECASE | re.VERBOSE,
 )
+# The institution type at the start of a private school's register name. The display
+# name keeps it ("Частна детска градина „София“"): a bare core ("София") reads as the
+# city, and a kindergarten and a school of the same brand would share one name.
+_PRIVATE_TYPE_PHRASE_RE = re.compile(
+    r"""^(частн(?:а|о)\s+(?:
+        детска\ градина|
+        основно\ училище|
+        начално\ училище|
+        средно\ училище|
+        (?:профилирана|професионална|езикова|немска|английска|френска)\ гимназия|
+        гимназия
+    ))\b""",
+    flags=re.IGNORECASE | re.VERBOSE,
+)
+# Register names sometimes quote with doubled apostrophes (''Ягодина'').
+_APOSTROPHES = "' "
 _LEGAL_ENTITY_SUFFIX_RE = re.compile(
     r"""(?:^|[\s,"'„“”-]+)(?:
         еоод|оод|ад|ет|еад|кд|сд|сдружение|
@@ -120,6 +136,10 @@ def _extract_legal_fallback_name(text: str | None) -> str | None:
 
     core = _extract_named_core(normalized)
     if core and not _is_generic_bg_label(core):
+        type_match = _PRIVATE_TYPE_PHRASE_RE.match(normalized)
+        if type_match and type_match.group(1).casefold() not in core.casefold():
+            type_phrase = re.sub(r"\s+", " ", type_match.group(1)).capitalize()
+            return f"{type_phrase} „{core.strip(_APOSTROPHES)}“"
         return core
 
     return _clean_core_candidate(normalized)

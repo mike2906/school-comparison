@@ -257,6 +257,7 @@ _BG_TYPE_PHRASES: tuple[tuple[str, str], ...] = (
     ("частна професионална гимназия", "Private Vocational High School"),
     ("частна немска гимназия", "Private German High School"),
     ("частна математическа гимназия", "Private High School of Mathematics"),
+    ("частна гимназия", "Private High School"),
     ("държавна детска градина", "State Kindergarten"),
     ("детска градина", "Kindergarten"),
     ("вечерно средно училище", "Evening Secondary School"),
