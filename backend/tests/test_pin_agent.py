@@ -360,3 +360,63 @@ async def test_city_osm_treats_a_timed_out_partial_answer_as_failed(monkeypatch)
         city = stage.CityOsm(client, SOFIA)
         assert await city(42.6, 23.3) == []
     assert city.failed
+
+
+def test_a_streetless_address_takes_a_named_osm_feature_next_to_our_point():
+    """Ерих Кестнер's address is only "ж. к. Люлин 6"; OSM names the school next to our point."""
+    kestner = Candidate(point=(42.712226, 23.253326), source="osm_school", name="ЧНЕГ „Ерих Кестнер“")
+    args = ("Частна немска гимназия Ерих Кестнер", False, "ж. к. Люлин 6", kestner, [kestner], SOFIA, ())
+    assert stage.check_pick(*args, private=True, near=(42.7125, 23.2540)) is None
+    # Too far from our point, or another name, or no point to compare: refused.
+    assert stage.check_pick(*args, private=True, near=(42.73, 23.28)) == "not on our street"
+    assert stage.check_pick(*args, private=True) == "not on our street"
+    other = Candidate(point=(42.712226, 23.253326), source="osm_school", name="ЧОУ Веда")
+    assert stage.check_pick("Частна немска гимназия Ерих Кестнер", False, "ж. к. Люлин 6", other, [other], SOFIA, (), private=True, near=(42.7125, 23.2540)) == (
+        "OSM names another institution there"
+    )
+    # An address with a street still needs the street.
+    assert stage.check_pick("Частна немска гимназия Ерих Кестнер", False, "ул. Бигла 56", kestner, [kestner], SOFIA, (), private=True, near=(42.7125, 23.2540)) == (
+        "not on our street"
+    )
+
+
+def test_the_schools_site_map_elsewhere_refuses_an_osm_pick():
+    named = Candidate(point=(42.68, 23.33), source="osm_school", name="НПМГ Чакалов", address='ул. "Бигла"')
+    far_site = Candidate(point=(42.70, 23.33), source="website_map", address="ул. Казбек 3")
+    near_site = Candidate(point=(42.6805, 23.3305), source="website_map", address='ул. "Бигла" № 52')
+    check = lambda points: stage.check_pick(  # noqa: E731
+        "НПМГ Акад. Чакалов", False, "ул. Бигла 56", named, [named], SOFIA, (), site_points=points
+    )
+    assert check([far_site.point]) == "the school's site maps it elsewhere"
+    assert check([far_site.point, near_site.point]) is None
+    assert check([]) is None
+
+
+def test_a_school_and_a_high_school_of_one_name_are_two_institutions():
+    school = Candidate(point=(42.678, 23.3808), source="osm_school", name="ЧОУ „Образователни технологии“", address="ул. Гео Милев 158")
+    high = Candidate(point=(42.6808, 23.3815), source="osm_school", name="ЧПГ „Образователни технологии“", address="ул. Гео Милев 158")
+    args = ("Частна профилирана гимназия Образователни технологии", False, "ул. Гео Милев 158")
+    assert stage.check_pick(*args, high, [school, high], SOFIA, (), private=True) is None
+    # The model picking the other kind's building is still refused.
+    assert stage.check_pick(*args, school, [school, high], SOFIA, (), private=True) == "several OSM features have this name"
+    # Two spellings of one kind (СОУ, СУ) are still two branches.
+    sou = Candidate(point=(42.678, 23.3808), source="osm_school", name="СОУ Христо Ботев", address="ул. Гео Милев 158")
+    su = Candidate(point=(42.69, 23.39), source="osm_school", name="СУ Христо Ботев", address="ул. Гео Милев 1")
+    assert stage.check_pick("Средно училище Христо Ботев", False, "ул. Гео Милев 158", sou, [sou, su], SOFIA, (), private=False) == (
+        "several OSM features have this name"
+    )
+
+
+def test_a_streetless_address_needs_a_neighbourhood():
+    kestner = Candidate(point=(42.712226, 23.253326), source="osm_school", name="ЧНЕГ „Ерих Кестнер“")
+    assert stage.check_pick("Частна немска гимназия Ерих Кестнер", False, "гр. София", kestner, [kestner], SOFIA, (), private=True, near=(42.7125, 23.2540)) == (
+        "not on our street"
+    )
+
+
+def test_type_family():
+    assert stage._type_family("ЧПГ Образователни технологии") == "gymnasium"
+    assert stage._type_family("СОУ Христо Ботев") == "school"
+    assert stage._type_family("ЧДГ Слънце") == "kindergarten"
+    assert stage._type_family("Частно средно училище с детска градина Х") == "school"
+    assert stage._type_family("Слънце") is None

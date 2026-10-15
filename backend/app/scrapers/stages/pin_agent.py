@@ -8,7 +8,9 @@ it picks a candidate by number, and code checks the pick before anything is writ
 (``check_pick``). The pick must always be on our street, its house number within
 ``MAX_NUMBER_GAP`` of ours when both are known; an OSM feature must also be named as this
 school (the only one of that name, of the same kind, private or not alike); and no other
-school may be pinned on that spot. Anything else stays hidden. Runs after ``website-pins`` (which takes exact
+school may be pinned on that spot. An address with only a neighbourhood ("ж.к. Люлин 6") takes
+an OSM feature named as the school within ``STREETLESS_M`` instead of the street; an OSM pick
+the school's own site maps elsewhere is refused (a single-location school). Anything else stays hidden. Runs after ``website-pins`` (which takes exact
 address matches without a model). Default is a dry run that writes nothing. Not in ``all``:
 ``scripts/refresh_pins.sh`` runs both weekly from cron.
 """
@@ -35,6 +37,7 @@ from app.models.pipeline_run import PipelineRun
 from app.scrapers.fee_pages import fee_http_client
 from app.scrapers.shared_site_check import level_family
 from app.scrapers.stages import common as stage_common
+from app.scrapers.stages.confirm_pins import ELSEWHERE_M
 from app.scrapers.stages.fees_agent import Spend, SpendCapReached
 from app.scrapers.stages.social_links import Fetch, _http_fetch
 from app.scrapers.stages.website_pins import (
@@ -48,7 +51,7 @@ from app.scrapers.stages.website_pins import (
     same_town,
     write_pin,
 )
-from app.services.geocoding.bg.address_match import house_number, same_building, same_street
+from app.services.geocoding.bg.address_match import has_area, has_street, house_number, same_building, same_street
 from app.services.geocoding.bounds import get_city_bounds, point_in_bounds
 from app.services.pipeline_runs import finalize_pipeline_run, pipeline_run_heartbeat, start_pipeline_run
 from app.services.provider_costs import ProviderCostError, execute_billable_request, provider_cost_scope
@@ -73,6 +76,9 @@ OTHER_SCHOOL_M = 25
 MAX_CANDIDATES = 12
 # Two OSM features of one name this close are one site mapped twice, not two branches.
 SAME_PLACE_M = 60
+# An address with no street (only "ж.к. Люлин 6"): an OSM feature named as this school this
+# close to the location's point may be taken.
+STREETLESS_M = 300
 
 # Name words shared by many institutions, which say nothing about which one it is.
 _GENERIC_NAME_WORDS = {
@@ -211,6 +217,8 @@ def check_pick(
     other_pins: Sequence[tuple[tuple[float, float], str]],
     *,
     private: Optional[bool] = None,
+    near: Optional[tuple[float, float]] = None,
+    site_points: Sequence[tuple[float, float]] = (),
 ) -> Optional[str]:
     """Why the picked candidate cannot be written, or None when it can.
 
@@ -228,15 +236,30 @@ def check_pick(
         for pin, pin_address in other_pins
     ):  # schools sharing one building (the same address) may share its pin
         return "another school is pinned there"
-    if not candidate.address or not same_street(address, candidate.address):
-        return "not on our street"
-    if _numbers_far_apart(address, candidate.address):
-        return "another house number"
+    # Our address names no street ("ж.к. Люлин 6"): an OSM feature named as this school, next
+    # to the location's point, stands in for the street (the name checks below still apply).
+    streetless = (
+        candidate.source == "osm_school"
+        and not has_street(address)
+        and has_area(address)
+        and near is not None
+        and _distance_m(near, candidate.point) <= STREETLESS_M
+    )
+    if not streetless:
+        if not candidate.address or not same_street(address, candidate.address):
+            return "not on our street"
+        if _numbers_far_apart(address, candidate.address):
+            return "another house number"
     if candidate.source != "osm_school":
         return None if on_our_street(address, candidate.address) else "no house number to compare"
     if (candidate.amenity == "kindergarten") != kindergarten:
         return "OSM maps another kind of institution there"
-    at_our_number = _number(address) is not None and _number(address) == _number(candidate.address)
+    # The school's own site wins (Mike, 2026-10-15): not where its map shows none of it.
+    if site_points and all(_distance_m(candidate.point, p) > ELSEWHERE_M for p in site_points):
+        return "the school's site maps it elsewhere"
+    at_our_number = (
+        not streetless and _number(address) is not None and _number(address) == _number(candidate.address)
+    )
     if not name_matches(school_name, candidate.name, at_our_number=at_our_number):
         return "OSM names another institution there"
     ours_private = is_private_name(school_name) if private is None else private
@@ -246,6 +269,12 @@ def check_pick(
         c is not candidate
         and c.source == "osm_school"
         and (c.amenity == "kindergarten") == kindergarten  # a school's kindergarten is another institution
+        # A school and a high school of one name ("ЧОУ" and "ЧПГ Образователни технологии")
+        # are two institutions, when the pick is of our kind.
+        and not (
+            _type_family(c.name) not in (None, _type_family(candidate.name))
+            and _type_family(candidate.name) == _type_family(school_name)
+        )
         # One site mapped twice (a node and its building): close by, at no other address.
         and not (
             _distance_m(c.point, candidate.point) <= SAME_PLACE_M
@@ -255,6 +284,23 @@ def check_pick(
         for c in candidates
     ):
         return "several OSM features have this name"
+    return None
+
+
+def _type_family(name: Optional[str]) -> Optional[str]:
+    """What kind of institution a name says: "kindergarten", "gymnasium" (ПГ, ПМГ, СПГЕ,
+    "гимназия") or "school" (ОУ, СУ, СОУ, "училище"); None when it does not say."""
+    match = _TYPE_ABBREVIATION_RE.search(name or "")
+    if match:
+        abbreviation = match.group()
+        if re.search(r"Д[ГЗЯ]$", abbreviation):
+            return "kindergarten"
+        return "school" if abbreviation.endswith("У") else "gymnasium"
+    text = (name or "").casefold()
+    # "Училище с детска градина" is a school.
+    for family, word in (("gymnasium", "гимназ"), ("school", "училищ"), ("kindergarten", "градин")):
+        if word in text:
+            return family
     return None
 
 
@@ -380,6 +426,7 @@ async def place_location(
     bounds: dict[str, float],
     town: str,
     other_pins: Sequence[tuple[tuple[float, float], str]],
+    only_location: bool = True,
 ) -> dict[str, Any]:
     """The report row for one location; ``point`` is set when the pick passed the checks."""
     address = _address(location)
@@ -420,6 +467,9 @@ async def place_location(
     refused = check_pick(
         name, level_family(school.education_level) == "kindergarten", address, chosen, candidates, bounds, other_pins,
         private=school.school_type != "state",
+        near=(float(location.lat), float(location.lng)) if location.lat is not None and location.lng is not None else None,
+        # A school of several locations may map only its main campus (as in confirm-pins).
+        site_points=[p for p in website_points or [] if point_in_bounds(*p, bounds)] if only_location else (),
     )
     if refused:
         return row | {"outcome": "refused", "refused": refused}
@@ -496,7 +546,7 @@ async def run_pin_agent(
                 try:
                     row |= await place_location(
                         school, location, website_points, reverse=reverse, lookup=lookup, call=call,
-                        bounds=bounds, town=town, other_pins=others,
+                        bounds=bounds, town=town, other_pins=others, only_location=len(locations) == 1,
                     )
                 except (SpendCapReached, ProviderCostError) as exc:
                     stopped = str(exc)
