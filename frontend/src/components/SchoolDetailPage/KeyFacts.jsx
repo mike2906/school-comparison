@@ -17,6 +17,7 @@ import {
 import { normalizeLanguageFocus } from '../../utils/schoolAttributes'
 import { getMappableLocations } from './LocationMap'
 import { usesSofiaKindergartenSystem } from '../../utils/admission'
+import { openDayDate, upcomingOpenDays } from '../../utils/schoolFacts'
 
 function readSavedLocation() {
   try {
@@ -181,6 +182,26 @@ function KeyFacts({ school, examAverages, nvoExamType, ageGroup = null }) {
     )
   }
 
+  // The next open day leads the strip's second place: it is the one fact with a date a
+  // parent can miss. The rest are listed with the website facts further down.
+  const [nextOpenDay, ...laterOpenDays] = upcomingOpenDays(school)
+  if (nextOpenDay) {
+    const href = nextOpenDay.register_url || nextOpenDay.source_url
+    facts.openDay = (
+      <Fact
+        key="openDay"
+        label={t('schoolDetail.nextOpenDay')}
+        value={openDayDate(nextOpenDay.date, i18n.language)}
+        detail={href && (
+          <a href={href} target="_blank" rel="noopener noreferrer nofollow" className="text-primary-700 underline underline-offset-2">
+            {t(nextOpenDay.register_url ? 'schoolFacts.glance.register' : 'schoolFacts.source')}
+          </a>
+        )}
+        note={laterOpenDays.length > 0 ? t('schoolDetail.moreOpenDays', { count: laterOpenDays.length }) : null}
+      />
+    )
+  }
+
   const shifts = getShifts(locations)
   if (shifts.length > 0) {
     facts.shift = (
@@ -205,10 +226,10 @@ function KeyFacts({ school, examAverages, nvoExamType, ageGroup = null }) {
   }
 
   const order = isPrivate
-    ? ['tuition', 'languages', 'grades', 'nvo', 'distance']
+    ? ['tuition', 'openDay', 'languages', 'grades', 'nvo', 'distance']
     : isKindergarten
-      ? ['lastAdmitted', 'distance', 'grades', 'languages']
-      : ['nvo', 'minScore', 'shift', 'distance', 'grades', 'languages']
+      ? ['lastAdmitted', 'openDay', 'distance', 'grades', 'languages']
+      : ['nvo', 'openDay', 'minScore', 'shift', 'distance', 'grades', 'languages']
   const shown = order.map(key => facts[key]).filter(Boolean)
 
   if (shown.length === 0) return null

@@ -49,10 +49,33 @@ export function factsReadDate(school) {
 
 const name = (item, language) => item?.[language] || item?.bg || ''
 
+// Today as YYYY-MM-DD in the parent's own time zone.
+function localToday() {
+  const now = new Date()
+  const pad = value => String(value).padStart(2, '0')
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
+}
+
+// The school's open days from today on, earliest first (API `at_a_glance.open_days`).
+// The API drops passed days when the data is published, but a published copy can be
+// days old, so the page checks again.
+export function upcomingOpenDays(school, today = localToday()) {
+  const days = school?.school_facts?.at_a_glance?.open_days
+  if (!Array.isArray(days)) return []
+  return days
+    .filter(day => typeof day?.date === 'string' && day.date.slice(0, 10) >= today)
+    .sort((a, b) => a.date.localeCompare(b.date))
+}
+
+// An open day's date written out in `language` ("26 October 2026").
+export function openDayDate(value, language) {
+  return value ? new Date(`${value.slice(0, 10)}T00:00:00`).toLocaleDateString(language, { day: 'numeric', month: 'long', year: 'numeric' }) : ''
+}
+
 // The school's fact labels summed up (API `school_facts.at_a_glance`), as
 // [{ key, value }] lines in display order, `value` in `language`; lines with nothing to
 // say are left out. `t` is i18next's.
-export function atAGlanceLines(school, language, t) {
+export function atAGlanceLines(school, language, t, today = undefined) {
   const glance = school?.school_facts?.at_a_glance
   if (!glance) return []
   const grade = value => (value === 0 ? t('schoolFacts.glance.kindergarten') : t('schoolFacts.glance.grade', { grade: value }))
@@ -64,7 +87,7 @@ export function atAGlanceLines(school, language, t) {
       : t('schoolFacts.glance.grades', { from: row.grade, to: row.grade_to })
   }
   const forGrades = (row, what) => (grades(row) ? `${grades(row)}: ${what}` : what)
-  const date = value => (value ? new Date(`${value}T00:00:00`).toLocaleDateString(language, { day: 'numeric', month: 'long', year: 'numeric' }) : '')
+  const date = value => openDayDate(value, language)
   const lines = []
   const add = (key, value, link) => value && lines.push(link ? { key, value, ...link } : { key, value })
 
@@ -98,7 +121,7 @@ export function atAGlanceLines(school, language, t) {
     ].filter(Boolean).join(', ')
     return extra ? `${languageLabel(item.language, t)} (${extra})` : languageLabel(item.language, t)
   }).join(', '))
-  const openDays = glance.open_days || []
+  const openDays = upcomingOpenDays(school, today)
   const signUp = openDays.find(day => day.register_url)
   add('openDays', openDays.map(day => date(day.date)).join(', '), signUp
     ? { href: signUp.register_url, linkText: t('schoolFacts.glance.register') }

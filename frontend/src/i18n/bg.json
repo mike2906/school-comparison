@@ -600,7 +600,11 @@
     "admission": "Прием",
     "kgByPointsShort": "По точки (kg.sofia.bg)",
     "kgThresholdsLater": "Точките на последно приетите още не са публикувани тук",
-    "kgThresholdsBelow": "Вижте кой е приет досега по-долу"
+    "kgThresholdsBelow": "Вижте кой е приет досега по-долу",
+    "nextOpenDay": "Следващ ден на отворените врати",
+    "moreOpenDays_one": "Още {{count}} дата по-долу",
+    "moreOpenDays_other": "Още {{count}} дати по-долу",
+    "notOnMap": "Още не е на картата: не сме потвърдили точното място на този адрес."
   },
   "detailPanel": {
     "label": "Подробности за училището",
