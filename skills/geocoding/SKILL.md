@@ -96,7 +96,8 @@ kindergartens have no free source that places them.
 
 `cli pin-agent [--apply]` runs after it: one cheap model call per hidden location picks
 its building from candidates sources gave (website map points with OSM's address there,
-named OSM schools/kindergartens within 2 km), never typing coordinates. Code then requires
+named OSM schools/kindergartens within 2 km, or up to 3 named as the school anywhere in the
+city when none near our point is: the point may be a wrong geocode), never typing coordinates. Code then requires
 the pick to be on our street (OSM tags, else Nominatim there), house number within 4 when
 both are known, no other school pinned on the spot; a website point needs the number, an
 OSM feature must be the only one named as the school, same kind, private or not alike (only
