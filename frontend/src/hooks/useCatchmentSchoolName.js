@@ -25,6 +25,8 @@ export function useCatchmentSchoolName(catchmentSchoolId, catchmentName) {
   }, [wanted, schools])
   if (!catchmentSchoolId) return null
   if (!wanted) return catchmentName || null
-  const own = schools?.find(school => schoolCatchmentIds(school).includes(catchmentSchoolId))
+  // The school, not a kindergarten that shares its catchment id.
+  const own = schools?.find(school =>
+    school.education_level !== 'kindergarten' && schoolCatchmentIds(school).includes(catchmentSchoolId))
   return own ? getSchoolName(own, i18n.language) : catchmentName || null
 }

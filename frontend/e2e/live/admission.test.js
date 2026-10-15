@@ -259,7 +259,7 @@ describe('admission from a school page', () => {
     await open('bg', `/schools/${school.id}`)
     await page.getByTestId('saved-verdict').waitFor()
     // The same result leads the facts strip at the top of the page.
-    await page.getByText(t('bg', 'savedAdmission.factLabel'), { exact: true }).first().waitFor()
+    await page.getByText(t('bg', 'savedAdmission.factLabel', { stage: t('bg', 'savedAdmission.stageName.grade_1') }), { exact: true }).first().waitFor()
     // Each compared cut-off says which campaign it is from (2026/27), not a bare date.
     for (const line of await page.getByTestId('saved-verdict').locator('li').allInnerTexts()) {
       assert.match(line, /\d{4}\/\d{2}\b/, line)

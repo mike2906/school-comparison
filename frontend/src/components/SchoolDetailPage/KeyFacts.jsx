@@ -60,16 +60,21 @@ function KeyFacts({ school, examAverages, nvoExamType, ageGroup = null }) {
 
   // Saved calculator answers against this school's last cut-off lead the strip: on a
   // phone the full comparison is several screens down.
-  const comparable = useSavedVerdicts(isPrivate ? null : school, ageGroup)
+  // No age group, as in the full comparison further down, so the two always agree.
+  const comparable = useSavedVerdicts(isPrivate ? null : school)
     .find(verdict => !['needsAddress', 'noCutoff'].includes(verdict.verdict))
   if (comparable) {
     facts.saved = (
       <Fact
         key="saved"
-        label={t('savedAdmission.factLabel')}
+        // Kindergarten answers on a school page are for its preparatory group.
+        label={t('savedAdmission.factLabel', {
+          stage: t(`savedAdmission.stageName.${comparable.stage === 'grade_1' ? 'grade_1' : isKindergarten ? 'kindergarten' : 'preparatory'}`),
+        })}
         value={<SavedVerdictWord verdict={comparable} />}
         detail={<SavedVerdictLine verdict={comparable} hideVerdict />}
         detailClass="text-neutral-700"
+        note={t(`savedAdmission.assumed.${comparable.stage}`)}
       />
     )
   }
@@ -170,7 +175,8 @@ function KeyFacts({ school, examAverages, nvoExamType, ageGroup = null }) {
     )
   }
 
-  const lastAdmitted = !isPrivate && isKindergarten ? getLastAdmittedPoints(school.admission_info) : null
+  // The saved result already shows the last admitted child's points.
+  const lastAdmitted = !isPrivate && isKindergarten && !comparable ? getLastAdmittedPoints(school.admission_info) : null
   if (lastAdmitted?.points != null) {
     facts.lastAdmitted = (
       <Fact
@@ -180,7 +186,7 @@ function KeyFacts({ school, examAverages, nvoExamType, ageGroup = null }) {
         detail={lastAdmitted.year ? t('schoolDetail.yearValue', { year: lastAdmitted.year }) : null}
       />
     )
-  } else if (usesSofiaKindergartenSystem(school)) {
+  } else if (!comparable && usesSofiaKindergartenSystem(school)) {
     // No published thresholds yet: say how admission works instead of leaving a gap.
     facts.lastAdmitted = (
       <Fact

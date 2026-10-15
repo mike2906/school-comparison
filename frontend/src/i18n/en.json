@@ -1183,7 +1183,12 @@
       "kindergarten": "Show the list for my child (born {{year}}, {{campaign}})",
       "grade_1": "Show the 1st grade list for {{campaign}}"
     },
-    "factLabel": "Your saved answers",
-    "listAssumes": "In the school list: {{assumed}} Pick a school here to answer those for it."
+    "factLabel": "Your saved answers · {{stage}}",
+    "listAssumes": "In the school list: {{assumed}}",
+    "stageName": {
+      "kindergarten": "kindergarten",
+      "grade_1": "1st grade",
+      "preparatory": "preparatory group"
+    }
   }
 }
