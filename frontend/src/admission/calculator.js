@@ -153,6 +153,16 @@ export function cutoffValue(round) {
   return null
 }
 
+/**
+ * The round a row is compared on: its latest, unless that round had no places to fill
+ * (later rounds share out what remains), when the first ranking says more.
+ */
+export function comparableRound(row) {
+  const latest = row.rounds > 1 && row.latest ? row.latest : null
+  if (latest && cutoffValue(latest)?.kind !== 'noPlaces') return latest
+  return cutoffValue(row.first) ? row.first : latest || row.first
+}
+
 /** 1 when a range is wholly above `value`, -1 wholly below, 0 when exactly it, else null. */
 function rangeVersus(range, value) {
   if (range.min > value) return 1

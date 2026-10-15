@@ -18,6 +18,7 @@ import { useStableCallback } from '../../hooks/useStableCallback'
 import Layout from '../Layout/Layout'
 import LanguageToggle from '../LanguageToggle/LanguageToggle'
 import SchoolMap from '../Map/SchoolMap'
+import { SavedAdmissionBanner } from '../Admission/SavedVerdict'
 import SchoolCard from '../SchoolCard/SchoolCard'
 import SchoolCardSkeleton from '../SchoolCard/SchoolCardSkeleton'
 import SchoolDetailPanel from './SchoolDetailPanel'
@@ -1316,6 +1317,8 @@ function SearchPage() {
                     </button>
                   </div>
                 )}
+
+                <SavedAdmissionBanner ageGroup={filters.ageGroup} />
 
                 {isFirstLoad && (
                   <div className="p-4 space-y-4">

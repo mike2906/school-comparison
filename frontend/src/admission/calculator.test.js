@@ -8,6 +8,7 @@ import {
   calculatorLinksFor,
   cutoffValue,
   campaignEnd,
+  comparableRound,
   compareWithCutoff,
   defaultStartYear,
   formatRange,
@@ -160,4 +161,14 @@ test('calculatorLinksFor: a school with a preparatory group links to both tabs',
   )
   assert.deepEqual(calculatorLinksFor({ admission_info: { cutoff_summary: [{ stage: 'grade_8' }] } }), [{ stage: 'grade_8', what: 'grade_8' }])
   assert.deepEqual(calculatorLinksFor(null), [])
+})
+
+test('a row is compared on its latest round unless that one had no places', () => {
+  const first = { last_admitted_points: 12 }
+  assert.equal(comparableRound({ rounds: 1, first }), first)
+  const latest = { last_admitted_points: 9 }
+  assert.equal(comparableRound({ rounds: 3, first, latest }), latest)
+  assert.equal(comparableRound({ rounds: 3, first, latest: { places: 0 } }), first)
+  const everyone = { undersubscribed: true }
+  assert.equal(comparableRound({ rounds: 2, first, latest: everyone }), everyone, 'everyone got in now: worth saying')
 })

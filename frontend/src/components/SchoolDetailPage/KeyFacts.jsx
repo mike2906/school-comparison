@@ -4,7 +4,7 @@ import {
   getLatestNvoFact,
   getOfferedAgeGroups,
   getShifts,
-  parseSavedLocation,
+  readSavedLocation,
 } from '../../utils/keyFacts'
 import { calculateDistance } from '../../utils/distance'
 import { formatAmount, formatKm, intlLocale } from '../../utils/format'
@@ -18,14 +18,6 @@ import { normalizeLanguageFocus } from '../../utils/schoolAttributes'
 import { getMappableLocations } from './LocationMap'
 import { usesSofiaKindergartenSystem } from '../../utils/admission'
 import { openDayDate, openDaysLink, upcomingOpenDays } from '../../utils/schoolFacts'
-
-function readSavedLocation() {
-  try {
-    return parseSavedLocation(window.localStorage.getItem('userLocation'))
-  } catch {
-    return null
-  }
-}
 
 function Fact({ label, value, detail, note, detailClass = 'text-neutral-500' }) {
   return (
