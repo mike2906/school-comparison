@@ -1668,8 +1668,10 @@ def test_a_cleaned_header_matches_the_table_its_pdf_prints_twice():
 
 
 # 596's primary PDF: the tuition table as text under its heading, and again as cells far below.
+# A price above the heading keeps it from being the page's title (_title_names_period).
 PAGE_TWO_LAYOUTS = "\n".join(
     [
+        "Application fee: € 100",
         "ANNUAL TUITION FEES 2026-2027",
         "Grade Payment Plan Plan 1 Plan 2 Plan 3",
         "Grade 0 Plan 1 - € 8.950 1 x € 8.950 2 x € 4.575 1 x € 2.650 initial",
@@ -1789,3 +1791,63 @@ async def test_a_stored_proof_of_another_row_with_the_group_in_a_column_lends_no
         db_session, school, find=_find(pages), read=_read([robotics, FEES_STAGE[1]]), apply=False
     )
     assert not _stored_notes(report), report["fees"]
+
+
+# --- 596's gaps in the fees eval: ranges with a currency on each end, the title's period ---
+
+
+@pytest.mark.parametrize(
+    "line, low, high, period",
+    [
+        ("FOOD Licensed catering company € 1,290 – € 1,340 annual /", 1290, 1340, PricePeriod.YEARLY),
+        ("€ 200 - € 550 per term,", 200, 550, PricePeriod.TERM),
+        ("2,524 BGN – 2,620 BGN annual fee", 2524, 2620, PricePeriod.YEARLY),
+    ],
+)
+def test_a_range_with_a_currency_on_each_end_publishes(line, low, high, period):
+    result = check_fee(fee(PriceCategory.FOOD, line, amount_min=low, amount_max=high, period=period), line)
+    assert published(result) and result.fee.period is period, result.checks
+
+
+def test_two_priced_items_are_still_no_range():
+    line = "Sweatshirt: € 25 - Polo T-shirt: € 14"
+    result = check_fee(fee(PriceCategory.UNIFORMS, line, amount_min=14, amount_max=25), line)
+    assert result.kept and not published(result)
+
+
+PAGE_TITLED = "\n".join(
+    [
+        "Maple Bear Sofia School",
+        "ANNUAL TUITION FEES 2026-2027",
+        "REGISTRATION FEE: One-time fee for initial enrollment of € 800, paid upon enrollment.",
+        "Grade 0 Plan 1 - € 8.950 1 x € 8.950 2 x € 4.575 1 x € 2.650 initial",
+        "Plan 2 - € 9.150 9 x € 750 monthly",
+        "Plan 3 - € 9.400",
+    ]
+)
+
+
+@pytest.mark.parametrize(
+    "evidence, amount, period, kept",
+    [
+        ("Grade 0 Plan 1 - € 8.950 1 x € 8.950 2 x € 4.575 1 x € 2.650 initial", 8950, PricePeriod.YEARLY, True),
+        ("Plan 3 - € 9.400", 9400, PricePeriod.YEARLY, True),
+        ("Plan 3 - € 9.400", 9400, PricePeriod.MONTHLY, False),  # the title names the year
+        ("Grade 0 Plan 1 - € 8.950 1 x € 8.950 2 x € 4.575 1 x € 2.650 initial", 4575, PricePeriod.YEARLY, False),
+        ("Plan 2 - € 9.150 9 x € 750 monthly", 9150, PricePeriod.YEARLY, False),  # its line says monthly
+    ],
+)
+def test_a_page_titled_annual_tuition_names_the_period_of_its_tuition(evidence, amount, period, kept):
+    result = check_fee(fee(PriceCategory.TUITION, evidence, amount=amount, period=period), PAGE_TITLED)
+    assert published(result)
+    assert result.fee.period is (period if kept else None), result.checks
+
+
+def test_the_title_names_no_period_for_other_fees_or_below_a_price():
+    extra = check_fee(
+        fee(PriceCategory.MATERIALS, "Plan 3 - € 9.400", amount=9400, period=PricePeriod.YEARLY), PAGE_TITLED
+    )
+    assert extra.fee.period is None
+    below = "Registration: € 800\n" + PAGE_TITLED
+    tuition = check_fee(fee(PriceCategory.TUITION, "Plan 3 - € 9.400", amount=9400, period=PricePeriod.YEARLY), below)
+    assert tuition.fee.period is None

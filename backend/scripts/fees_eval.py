@@ -146,9 +146,13 @@ def score_school(rows: list[Any], fees: list[dict[str, Any]]) -> dict[str, Any]:
             {
                 "category": category,
                 "amount": str(row.amount) if row.amount is not None else None,
+                "amount_range": [str(row.amount_min), str(row.amount_max)] if row.amount is None else None,
                 "currency": currency,
                 "period": period,
+                "age_group": getattr(row, "age_group", None),
+                "plan_name": getattr(row, "plan_name", None),
                 "label": (row.pricing_context or {}).get("label"),
+                "checks": (row.pricing_context or {}).get("checks") or [],
                 "verdict": verdict,
                 "fid": fid,
                 "reason": reason,
@@ -170,8 +174,11 @@ def score_school(rows: list[Any], fees: list[dict[str, Any]]) -> dict[str, Any]:
     return {"rows": verdicts, "found": sorted(found), "site_fees": len(fees)}
 
 
-async def read_school(saved: dict[str, Any], spend: Spend) -> list[Any]:
-    """The publishable rows one read of the saved pages gives; the call is paid from ``spend``."""
+async def read_school(saved: dict[str, Any], spend: Spend, unpublished: list | None = None) -> list[Any]:
+    """The publishable rows one read of the saved pages gives; the call is paid from ``spend``.
+
+    ``unpublished`` collects the fees the read gave that the checks or the gate kept off the
+    site, with the reason: whether a missing fee was never read or was dropped."""
     school = School(
         id=saved["school_id"],
         name_i18n=saved.get("name_i18n") or {},
@@ -194,12 +201,31 @@ async def read_school(saved: dict[str, Any], spend: Spend) -> list[Any]:
     spend.spent_usd += extract_provider_cost_usd(result) or estimate
     stand_ins = {page.url: _new_source_page(school, page, None, -(i + 1)) for i, page in enumerate(priced)}
     checked = []
+    notes = unpublished if unpublished is not None else []
     for fee in result.output.fees:
         page = _page_for(fee, priced)
-        if page is not None and (outcome := check_fee(fee, page.text)).kept:
+        outcome = check_fee(fee, page.text) if page is not None else None
+        if outcome is not None and outcome.kept:
             checked.append((outcome, stand_ins[page.url]))
+        else:
+            notes.append(_note(fee, outcome.checks if outcome else ["no page at its source_url"]))
     rows, _ = _build_rows(school, checked)
-    return [row for row in rows if pricing_row_is_publishable(row)]
+    published = [row for row in rows if pricing_row_is_publishable(row)]
+    for row in rows:
+        if row not in published:
+            notes.append(
+                {
+                    "category": _value(row.category),
+                    "amounts": [str(v) for v in (row.amount, row.amount_min, row.amount_max) if v is not None],
+                    "checks": (row.pricing_context or {}).get("checks") or ["publish gate"],
+                }
+            )
+    return published
+
+
+def _note(fee: Any, checks: list[str]) -> dict[str, Any]:
+    amounts = (fee.amount, fee.amount_min, fee.amount_max)
+    return {"category": _value(fee.category), "amounts": [str(v) for v in amounts if v is not None], "checks": checks}
 
 
 def summarize(schools: dict[int, dict[str, Any]]) -> dict[str, Any]:
@@ -223,16 +249,18 @@ async def run_trial(cases: list[dict[str, Any]], key: dict[int, list], workers: 
 
     async def one(saved: dict[str, Any]) -> None:
         school_id = saved["school_id"]
+        unpublished: list[dict[str, Any]] = []
         async with gate:
             try:
                 try:
-                    rows = await read_school(saved, spend)
+                    rows = await read_school(saved, spend, unpublished)
                 except TimeoutError:  # a slow provider: one more try, as the stage's retry
-                    rows = await read_school(saved, spend)
+                    unpublished.clear()
+                    rows = await read_school(saved, spend, unpublished)
             except Exception as exc:  # one failed read is that school's, not the run's
                 errors[school_id] = f"{type(exc).__name__}: {str(exc)[:200]}"
                 return
-        schools[school_id] = score_school(rows, key[school_id])
+        schools[school_id] = score_school(rows, key[school_id]) | {"unpublished": unpublished}
 
     await asyncio.gather(*(one(saved) for saved in cases))
     return {"summary": summarize(schools), "schools": dict(sorted(schools.items())), "errors": errors}
