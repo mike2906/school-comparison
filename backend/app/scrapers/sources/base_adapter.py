@@ -358,7 +358,12 @@ class BaseSourceAdapter(ABC):
                         unmatched, pairs, new_locations = list(candidates), [], []
                         for incoming in locations_to_add:
                             key = _address_key(incoming.address_i18n)
+                            # A row at this exact address first, then a replaced address
+                            # (checked pins) or the same building (official and hand pins).
                             row = next(
+                                (loc for loc in unmatched if _address_key(loc.address_i18n) == key),
+                                None,
+                            ) or next(
                                 (
                                     loc
                                     for loc in unmatched
@@ -392,6 +397,7 @@ class BaseSourceAdapter(ABC):
                                 delete(SchoolLocation).where(SchoolLocation.id.in_(location_ids))
                             )
                         if pinned:
+                            official_primary = any(loc.is_primary for loc in pinned if has_pinned_point(loc))
                             for row, incoming in pairs:
                                 # The source's coords_source tag describes its own geocode,
                                 # not the pinned point.
@@ -402,8 +408,11 @@ class BaseSourceAdapter(ABC):
                                         if not tag.startswith("coords_source=")
                                     ]
                                 }
-                                if _address_key(incoming.address_i18n) != _address_key(row.address_i18n):
-                                    update["district"] = None  # the replaced address's
+                                if _address_key(incoming.address_i18n) in _address_keys(row)[1:]:
+                                    update["district"] = None  # the address site-address replaced
+                                if not has_pinned_point(row):
+                                    # A checked pin is the source's location: its primary flag too.
+                                    row.is_primary = incoming.is_primary and not official_primary
                                 await self._sync_source_location(row, incoming.model_copy(update=update))
                             if any(loc.is_primary for loc in pinned):
                                 if new_locations and any(loc.is_primary for loc in unmatched):

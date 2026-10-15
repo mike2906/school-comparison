@@ -234,3 +234,69 @@ async def test_registry_rerun_keeps_checked_pins_whose_address_it_still_lists(db
     assert locations['бул. "Роза" № 3'].geocode_meta["precision"] == "approximate"
     assert [loc.address_i18n["bg"] for loc in locations.values() if loc.is_primary] == ['ул. "Ела" № 6']
     assert locations['ул. "Нова" № 9'].geocode_meta["precision"] == "approximate"
+
+
+async def test_a_kept_checked_pin_takes_the_sources_primary_flag(db_session):
+    from sqlalchemy import select
+
+    from app.models import School, SchoolLocation
+
+    school = School(
+        institutional_id="2200003",
+        name_i18n={"bg": "Трето училище"},
+        country_code="bg",
+        school_type="private",
+        education_level="primary",
+        city="sofia",
+    )
+    db_session.add(school)
+    await db_session.flush()
+    db_session.add_all(
+        [
+            SchoolLocation(
+                school_id=school.id,
+                address_i18n={"bg": "ул. Стара 1"},
+                lat=42.6,
+                lng=23.3,
+                is_primary=True,
+                geocode_meta={"precision": "approximate"},
+            ),
+            SchoolLocation(
+                school_id=school.id,
+                address_i18n={"bg": "ул. Ела 6"},
+                lat=42.61,
+                lng=23.31,
+                is_primary=False,
+                geocode_meta={"method": "address_register", "precision": "exact"},
+            ),
+        ]
+    )
+    await db_session.commit()
+    school_id = school.id
+
+    await DummyAdapter(db=db_session).upsert_schools(
+        [
+            DiscoveredSchool(
+                institutional_id="2200003",
+                country_code="bg",
+                city="sofia",
+                name_i18n={"bg": "Трето училище"},
+                school_type="private",
+                education_level="primary",
+                locations=[
+                    DiscoveredLocation(address_i18n={"bg": "ул. Ела 6"}, is_primary=True),
+                    DiscoveredLocation(address_i18n={"bg": "ул. Нова 9"}, is_primary=False),
+                ],
+            )
+        ]
+    )
+    db_session.expire_all()
+    rows = (
+        (await db_session.execute(select(SchoolLocation).where(SchoolLocation.school_id == school_id)))
+        .scalars()
+        .all()
+    )
+    assert sorted((row.address_i18n["bg"], row.is_primary) for row in rows) == [
+        ("ул. Ела 6", True),
+        ("ул. Нова 9", False),
+    ]
