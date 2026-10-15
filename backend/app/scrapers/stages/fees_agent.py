@@ -568,9 +568,10 @@ def _ungrouped_elsewhere(entry: tuple, built: list[tuple]) -> bool:
     return any(
         other_page.id != page.id
         and other["age_group"] is None
+        and other_result.confidence >= entry[0].confidence  # never give way to a held row
         and same(other)
         and {name: value for name, value in other.items() if name not in ("age_group", "plan_name")} == rest
-        for _, other_page, other, _, _ in built
+        for other_result, other_page, other, _, _ in built
     )
 
 

@@ -146,7 +146,9 @@ def score_school(rows: list[Any], fees: list[dict[str, Any]]) -> dict[str, Any]:
             {
                 "category": category,
                 "amount": str(row.amount) if row.amount is not None else None,
-                "amount_range": [str(row.amount_min), str(row.amount_max)] if row.amount is None else None,
+                "amount_range": [str(v) if v is not None else None for v in (row.amount_min, row.amount_max)]
+                if row.amount is None
+                else None,
                 "currency": currency,
                 "period": period,
                 "age_group": getattr(row, "age_group", None),

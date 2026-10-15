@@ -9,6 +9,7 @@ fetches are stubbed in the stage tests.
 
 from __future__ import annotations
 
+import dataclasses
 import json
 from decimal import Decimal
 
@@ -1049,6 +1050,10 @@ def test_the_same_fee_with_a_group_on_one_page_only_is_one_row():
         school, [(transport(plan_name="One-way"), page), (transport(age_group="Grade 1", plan_name="Two-way"), other)]
     )
     assert len(rows) == 2
+    # A held ungrouped row does not take the place of a publishable grouped one.
+    held = dataclasses.replace(transport(), confidence=HELD_CONFIDENCE)
+    rows, _ = fees_agent._build_rows(school, [(held, page), (transport(age_group="Grade 1"), other)])
+    assert len(rows) == 2
 
 
 async def test_an_amount_read_as_another_kind_of_fee_replaces_the_old_row(db_session, frozen_today):
@@ -1880,4 +1885,17 @@ def test_the_title_names_no_period_for_other_fees_or_below_a_price():
 def test_an_evidence_heading_naming_another_period_beats_the_title():
     page = PAGE_TITLED + "\nMonthly tuition plan\nGrade 1: € 900"
     read = fee(PriceCategory.TUITION, "Monthly tuition plan\nGrade 1: € 900", amount=900, period=PricePeriod.YEARLY)
+    assert check_fee(read, page).fee.period is None
+
+
+@pytest.mark.parametrize(
+    "page, evidence, amount",
+    [
+        ("Tuition fees for the school year 2026/2027\nGrade 1 | € 650", "Grade 1 | € 650", 650),  # a bare "year"
+        (PAGE_TITLED + "\nMonthly tuition - nursery\nNursery | € 900", "Nursery | € 900", 900),  # a second sheet
+        ("ANNUAL TUITION FEES\nGrade 5 | € 4.575 x 2", "Grade 5 | € 4.575 x 2", 4575),  # an instalment
+    ],
+)
+def test_the_title_lends_no_period_where_it_may_not_head_the_fee(page, evidence, amount):
+    read = fee(PriceCategory.TUITION, evidence, amount=amount, period=PricePeriod.YEARLY)
     assert check_fee(read, page).fee.period is None
