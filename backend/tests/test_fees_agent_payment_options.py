@@ -379,3 +379,12 @@ def test_english_that_changes_a_number_is_not_kept():
     assert rows[0].plan_name == "Еднократно плащане за 6 месеца"
     assert "plan_name_en" not in rows[0].pricing_context
     assert fees_agent._english_for("за 6 месеца", "Paid for 6 months at once") == "Paid for 6 months at once"
+
+
+def test_unnamed_fees_alike_take_their_labels():
+    """596: four uniform prices all showed as "Uniforms"."""
+    page = SourcePage(id=-1, school_id=1, scrape_type=ScrapeType.WEBSITE, source_url=URL)
+    a = tuition(plan_name=None, label="Plan 2", payment_options=[], amount=9150)
+    b = tuition(plan_name=None, label="Plan 3", payment_options=[], amount=9400)
+    rows, _ = fees_agent._build_rows(_school(), [(check_fee(a, PAGE_596), page), (check_fee(b, PAGE_596), page)])
+    assert sorted(row.plan_name for row in rows) == ["Plan 2", "Plan 3"]

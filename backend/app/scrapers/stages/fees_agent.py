@@ -627,7 +627,24 @@ def _build_rows(
                 confidence_score=result.confidence,
             )
         )
+    _name_unnamed_alike(rows)
     return rows, sources
+
+
+def _name_unnamed_alike(rows: list[Pricing]) -> None:
+    """Fees of one kind, group, year and period that the reader left unnamed read as the
+    same fee twice (596's uniforms: "Uniforms" 25, 14, 28, 18). Each takes the site's own
+    label ("Sweatshirt") as its name when the labels tell them apart."""
+    alike: dict[tuple, list[Pricing]] = {}
+    for row in rows:
+        if not row.plan_name:
+            key = (row.category, row.age_group, row.period, row.academic_year)
+            alike.setdefault(key, []).append(row)
+    for group in alike.values():
+        labels = [" ".join(str(row.pricing_context.get("label") or "").split()) for row in group]
+        if len(group) > 1 and all(labels) and len({label.casefold() for label in labels}) == len(labels):
+            for row, label in zip(group, labels):
+                row.plan_name = label[:100]
 
 
 async def _upsert_pages(db: AsyncSession, pages: dict[str, SourcePage], stored: dict[tuple, SourcePage]) -> None:
