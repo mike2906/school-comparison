@@ -13,7 +13,6 @@ of ``all``; run it after geocoding.
 from __future__ import annotations
 
 import logging
-import math
 import re
 from collections.abc import Awaitable, Callable, Sequence
 from typing import Any, Optional
@@ -27,6 +26,7 @@ from app.scrapers.fee_pages import fee_http_client
 from app.scrapers.stages.social_links import Fetch, _contact_page, _http_fetch, page_links
 from app.services.geocoding.base import GeocodingResult
 from app.services.geocoding.bg.address_match import same_building, same_house_number
+from app.services.geocoding.bg.sofia_address_register import distance_m
 from app.services.geocoding.bounds import get_city_bounds, point_in_bounds
 from app.services.geocoding.write_gate import OFFICIAL_COORDS_TAG, apply_geocode_result_to_location, has_pinned_point
 from app.utils.display_gating import UNVERIFIED_PIN_PRECISION
@@ -46,11 +46,7 @@ _PAIR_RE = re.compile(r"(-?\d{1,2}\.\d{3,})\s*,\s*(-?\d{1,3}\.\d{3,})")
 _MAP_HOST_RE = re.compile(r"(^|\.)(google\.[a-z]{2,3}(\.[a-z]{2})?|openstreetmap\.org)$")
 
 
-def _distance_m(a: tuple[float, float], b: tuple[float, float]) -> float:
-    lat = math.radians((a[0] + b[0]) / 2)
-    dy = (a[0] - b[0]) * 111_320
-    dx = (a[1] - b[1]) * 111_320 * math.cos(lat)
-    return math.hypot(dx, dy)
+_distance_m = distance_m
 
 
 def _link_point(url: str) -> Optional[tuple[float, float]]:

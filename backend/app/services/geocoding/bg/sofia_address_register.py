@@ -220,7 +220,8 @@ def read_register_zip(data: bytes) -> Register:
         return read_register(archive.read(name).decode("utf-8-sig"))
 
 
-def _distance_m(a: tuple[float, float], b: tuple[float, float]) -> float:
+def distance_m(a: tuple[float, float], b: tuple[float, float]) -> float:
+    """Metres between two nearby points (equirectangular; fine at city scale)."""
     lat = math.radians((a[0] + b[0]) / 2)
     return math.hypot((a[0] - b[0]) * 111_320, (a[1] - b[1]) * 111_320 * math.cos(lat))
 
@@ -234,7 +235,7 @@ def _in_settlement(row: RegisterPoint, settlement: Optional[str]) -> bool:
 def _together(rows: list[RegisterPoint], spread: float) -> Optional[tuple[float, float]]:
     """The rows' centre when every row is within ``spread`` of it, else None."""
     centre = (sum(r.lat for r in rows) / len(rows), sum(r.lng for r in rows) / len(rows))
-    if all(_distance_m(centre, (r.lat, r.lng)) <= spread for r in rows):
+    if all(distance_m(centre, (r.lat, r.lng)) <= spread for r in rows):
         return round(centre[0], 6), round(centre[1], 6)
     return None
 
