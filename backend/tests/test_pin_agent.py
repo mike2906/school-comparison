@@ -125,6 +125,12 @@ def test_a_plain_type_word_is_not_called_state():
     assert stage.check_pick("Частна немска езикова гимназия", False, "ул. Бигла 56", neg, [neg], SOFIA, (), private=True) == (
         "one name is a private institution's, the other not"
     )
+    # OSM's "ЧСУ" agrees with a private school whose own name has no "частно".
+    chsu = Candidate(point=(42.68, 23.33), source="osm_school", name="ЧСУ Виктор Юго", address='ул. "Бигла" № 56')
+    assert stage.check_pick("Френско училище Виктор Юго", False, "ул. Бигла 56", chsu, [chsu], SOFIA, (), private=True) is None
+    assert stage.check_pick("Френско училище Виктор Юго", False, "ул. Бигла 56", chsu, [chsu], SOFIA, (), private=False) == (
+        "one name is a private institution's, the other not"
+    )
     # A person's initial is not an abbreviation.
     initial = Candidate(point=(42.68, 23.33), source="osm_school", name="Американски колеж Г. Шипков", address='ул. "Бигла" № 56')
     assert stage.check_pick("Американски колеж Г. Шипков", False, "ул. Бигла 56", initial, [initial], SOFIA, (), private=True) is None
@@ -140,6 +146,9 @@ def test_one_site_mapped_twice_or_a_namesake_kindergarten_is_not_a_second_branch
     args = ("ЧЕСУ Дорис Тенеди", False, "ул. Бигла 56", school)
     assert stage.check_pick(*args, [school, building, kindergarten], SOFIA, (), private=True) is None
     assert stage.check_pick(*args, [school, branch], SOFIA, (), private=True) == "several OSM features have this name"
+    # Two branches across the street, each at its own address, are still two.
+    across = Candidate(point=(42.6803, 23.3302), source="osm_school", name="ЧЕСУ Дорис Тенеди", address='ул. "Бигла" № 61')
+    assert stage.check_pick(*args, [school, across], SOFIA, (), private=True) == "several OSM features have this name"
 
 
 def test_is_private_name():

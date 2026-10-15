@@ -70,7 +70,10 @@ if [ ! -f "$state/pins_unpublished" ]; then
 	dry_agent="$state/pins-agent-dry-$stamp.json"
 	cli website-pins --city "$city" --out "$dry_web" || stop "website-pins dry run failed"
 	cli pin-agent --city "$city" --max-usd "$max_usd" --out "$dry_agent" || stop "pin-agent dry run failed"
-	[ -z "$(report "$dry_agent" 'r["stopped"] or ""')" ] || stop "pin-agent dry run stopped early: $(report "$dry_agent" 'r["stopped"]')"
+	# A run cut short, without OSM, or with many errors is not a good run: retry tomorrow.
+	healthy() { report "$1" '(r.get("stopped") or r.get("osm_unavailable") or "") or (r["outcomes"].get("error", 0) * 10 > max(r["locations"], 1) and "too many errors") or ""'; }
+	problem="$(healthy "$dry_web")$(healthy "$dry_agent")"
+	[ -z "$problem" ] || stop "a dry run was not complete: $problem"
 	website="$(placed "$dry_web")"
 	agent="$(placed "$dry_agent")"
 	log "dry run: website-pins $website, pin-agent $agent would be placed"
@@ -93,7 +96,14 @@ if [ ! -f "$state/pins_unpublished" ]; then
 		# shellcheck disable=SC2046
 		[ "$agent" = 0 ] || cli pin-agent --city "$city" --max-usd "$max_usd" --apply $(placed_ids "$dry_agent") --out "$state/pins-agent-$stamp.json" ||
 			stop "pin-agent failed"
-		log "applied: see $state/pins-*-$stamp.json"
+		# The apply re-runs the model on the same schools; it must not place more than the cap.
+		website="$( [ "$website" = 0 ] && echo 0 || placed "$state/pins-website-$stamp.json")"
+		agent="$( [ "$agent" = 0 ] && echo 0 || placed "$state/pins-agent-$stamp.json")"
+		log "applied: website-pins $website, pin-agent $agent placed"
+		if [ "$website" -gt "$max_placed" ] || [ "$agent" -gt "$max_placed" ]; then
+			rm -f "$state/pins_unpublished"
+			stop "the apply placed $website (website) and $agent (agent), over $max_placed: NOT published by this script, but the next publish by any script ships them. Check $state/pins-*-$stamp.json; restore $backup if wrong"
+		fi
 	fi
 	find "$state" -name 'pins-*.json' -mtime +30 -delete
 	date -u +%s > "$state/pins_last_ok"

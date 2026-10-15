@@ -102,16 +102,18 @@ _PRIVATE_WORD_RE = re.compile(r"частн|private", re.IGNORECASE)
 def private_status_differs(school_name: str, ours_private: bool, osm_name: Optional[str]) -> bool:
     """Whether the OSM name shows another private-or-state status than ours.
 
-    A bare name ("ЕСПА") shows none. A type word shows one only against our own name:
-    "Немска езикова гимназия" is not "Частна немска езикова гимназия", but a private school
-    whose own name carries no "частно" (American College) may match it as named."""
-    if not (_TYPE_ABBREVIATION_RE.search(osm_name or "") or _TYPE_WORD_RE.search(osm_name or "")):
-        return False
-    osm_private = is_private_name(osm_name)
-    if osm_private != is_private_name(school_name):
-        return True
-    # Same signal in both names: an abbreviation still says it ("ОДЗ" is a state kindergarten).
-    return ours_private != osm_private and bool(_TYPE_ABBREVIATION_RE.search(osm_name or ""))
+    "ЧСУ"/"частно" says private and a plain abbreviation ("СУ", "ОДЗ") says state, against
+    the school's known status. A type word alone ("гимназия", "колеж") says state only
+    against a name of ours that says private: "Немска езикова гимназия" is not "Частна
+    немска езикова гимназия", while American College, private without "частно" in its
+    name, may match itself. A bare name ("ЕСПА") says nothing."""
+    if is_private_name(osm_name):
+        return not ours_private
+    if _TYPE_ABBREVIATION_RE.search(osm_name or ""):
+        return ours_private
+    if _TYPE_WORD_RE.search(osm_name or ""):
+        return is_private_name(school_name)
+    return False
 
 
 def is_private_name(name: Optional[str]) -> bool:
@@ -244,7 +246,11 @@ def check_pick(
         c is not candidate
         and c.source == "osm_school"
         and (c.amenity == "kindergarten") == kindergarten  # a school's kindergarten is another institution
-        and _distance_m(c.point, candidate.point) > SAME_PLACE_M  # one site mapped twice (node and building)
+        # One site mapped twice (a node and its building): close by, at no other address.
+        and not (
+            _distance_m(c.point, candidate.point) <= SAME_PLACE_M
+            and (not c.address or not candidate.address or same_building(c.address, candidate.address))
+        )
         and name_matches(school_name, c.name, at_our_number=True)
         for c in candidates
     ):
