@@ -1,6 +1,6 @@
 {
  "model": "openrouter/openai/gpt-6-luna",
- "trials": 3,
- "wrong_rate": 0.0889,
- "found_rate": 0.3468
+ "trials": 5,
+ "wrong_rate": 0.1089,
+ "found_rate": 0.4
 }
