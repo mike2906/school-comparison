@@ -161,14 +161,16 @@ describe('a school page', () => {
     const listed = (await allSchools()).find(s => isPrivate(s) && groupOf(s))
     assert.ok(listed, 'a private school with fees for more than one age')
     const group = groupOf(listed)
-    const { otherAges } = splitRowsForAgeGroup(listed.pricing, group)
+    // As many as the fold lists: a past year's fee repeated later is left out there.
+    const otherCount = groupPricingByAcademicYear(splitRowsForAgeGroup(listed.pricing, group).otherAges)
+      .reduce((sum, yearGroup) => sum + yearGroup.rows.length, 0)
     await open('bg', `/schools/${listed.id}?group=${group}`)
     const section = card(t('bg', 'pricing.title'))
     const name = t('bg', `ageGroups.${group}`)
     await section.getByText(t('bg', 'pricing.forAgeGroup', { group: name.charAt(0).toLocaleLowerCase('bg') + name.slice(1) })).waitFor()
     const folded = section.locator('details')
     assert.equal(await folded.getAttribute('open'), null, 'other ages start folded')
-    await folded.locator('summary', { hasText: t('bg', 'pricing.otherAges', { count: otherAges.length }) }).click()
+    await folded.locator('summary', { hasText: t('bg', 'pricing.otherAges', { count: otherCount }) }).click()
     assert.notEqual(await folded.getAttribute('open'), null, 'other ages open on a tap')
   })
 

@@ -1,10 +1,11 @@
+import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { displayPrice, groupPricingByAcademicYear, groupRowsByAgeGroup, priceAgeGroupLabel, YEAR_STATUS } from '../../utils/pricing'
 import { sharedPriceSource, sourceSiteName } from '../../utils/priceSources'
 import { groupPricingByCategory } from './helpers'
 import { formatAmount } from '../../utils/format'
 import PriceSource from './PriceSource'
-import { pricePeriod, periodUnknown, splitRowsForAgeGroup } from '../../utils/priceRows'
+import { pricePeriod, periodUnknown, rowAgeGroupKeys, splitRowsForAgeGroup } from '../../utils/priceRows'
 import { planNameBeside, textLang } from '../../utils/priceLabels'
 import { paymentOptionTexts } from '../../utils/paymentOptions'
 import { feeDiscountLines } from '../../utils/feeDiscounts'
@@ -19,7 +20,16 @@ import { feeDiscountLines } from '../../utils/feeDiscounts'
  */
 function PricingSection({ pricing, discounts, ageGroup = null }) {
   const { t, i18n } = useTranslation()
-  const { forGroup, otherAges } = splitRowsForAgeGroup(pricing, ageGroup)
+  const { forGroup, otherAges, namesGroup, otherCount } = useMemo(() => {
+    const split = splitRowsForAgeGroup(pricing, ageGroup)
+    return {
+      ...split,
+      // Fees naming no age are no fee *for* the age: with only those, the school names none.
+      namesGroup: split.forGroup.some(row => rowAgeGroupKeys(row).has(ageGroup)),
+      // As many as the fold shows: a past year's fee repeated later is left out there too.
+      otherCount: groupPricingByAcademicYear(split.otherAges).reduce((sum, group) => sum + group.rows.length, 0),
+    }
+  }, [pricing, ageGroup])
   // Mid-sentence: "fees for grades 1-4", "таксите за първа група".
   const groupLabel = otherAges.length > 0 ? t(`ageGroups.${ageGroup}`) : null
   const groupName = groupLabel && groupLabel.charAt(0).toLocaleLowerCase(i18n.language) + groupLabel.slice(1)
@@ -144,14 +154,14 @@ function PricingSection({ pricing, discounts, ageGroup = null }) {
 
       {groupName && (
         <p className="mb-6 text-sm text-neutral-600">
-          {t(forGroup.length > 0 ? 'pricing.forAgeGroup' : 'pricing.noneForAgeGroup', { group: groupName })}
+          {t(namesGroup ? 'pricing.forAgeGroup' : 'pricing.noneForAgeGroup', { group: groupName })}
         </p>
       )}
       {forGroup.length > 0 && renderYears(forGroup)}
       {groupName && (
-        <details className="mt-8" open={forGroup.length === 0}>
+        <details className="mt-8" open={!namesGroup}>
           <summary className="cursor-pointer select-none text-sm font-semibold text-primary-700 hover:text-primary-800">
-            {t('pricing.otherAges', { count: otherAges.length })}
+            {t('pricing.otherAges', { count: otherCount })}
           </summary>
           <div className="mt-6">{renderYears(otherAges)}</div>
         </details>
