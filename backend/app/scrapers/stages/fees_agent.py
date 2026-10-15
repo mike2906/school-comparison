@@ -35,7 +35,7 @@ from app.database import async_session_maker
 from app.models import Pricing, School
 from app.models.field_source import FieldSource, SourceConfidence, SourceType
 from app.models.pipeline_run import PipelineRun
-from app.models.pricing import PriceCategory, PriceSource
+from app.models.pricing import PriceCategory, PricePeriod, PriceSource
 from app.models.scrape_log import ScrapeType
 from app.models.source_page import SourcePage
 from app.schemas.extraction import ExtractedPrice
@@ -49,6 +49,7 @@ from app.scrapers.extraction.agent_fees import (
     check_discount,
     check_fee,
     fee_amounts,
+    number_spans,
     page_numbers,
     read_amounts,
 )
@@ -857,8 +858,10 @@ async def _stored_proofs(db: AsyncSession, school: School) -> list[Pricing]:
     return [
         row
         for row in stored.scalars().all()
-        if (row.pricing_context or {}).get("extractor") == "agent"
-        and str((row.pricing_context or {}).get("evidence") or "").strip()
+        if isinstance(row.pricing_context, dict)
+        and row.pricing_context.get("extractor") == "agent"
+        and isinstance(row.pricing_context.get("evidence"), str)
+        and row.pricing_context["evidence"].strip()
         and row.id not in blocked
         and pricing_row_is_publishable(row)
     ]
@@ -867,7 +870,7 @@ async def _stored_proofs(db: AsyncSession, school: School) -> list[Pricing]:
 def _checked(fee: AgentFee, page: PageRead, proofs: list[Pricing]) -> CheckedFee:
     result = check_fee(fee, page.text)
     if not result.kept or result.fee.period is None:
-        result = _with_stored_proof(result, page.text, proofs)
+        result = _with_stored_proof(result, page.text, proofs, fee.period)
     return result
 
 
@@ -887,10 +890,22 @@ def _amount_lines(evidence: str, fee: AgentFee) -> list[str]:
     return [line for line in _lines(evidence) if amounts & page_numbers(line)]
 
 
+def _holds(text: str, line: str) -> bool:
+    """The page line holds the evidence line as whole words: "€ 300" is not in "€ 3000"."""
+    return re.search(rf"(?<!\w){re.escape(line)}(?!\w)", text) is not None
+
+
+def _prints_once(line: str, fee: AgentFee) -> bool:
+    """The line prints the fee's amount once: "Начален | € 3000 | Гимназия | € 3000" is two groups."""
+    return all(sum(amount in values for _, _, values in number_spans(line)) == 1 for amount in fee_amounts(fee))
+
+
 def _proof_still_reads(evidence: str, fee: AgentFee, page_lines: list[str]) -> bool:
     """Every line of a stored proof is on today's page within a few lines of the amount's own."""
-    places = [[index for index, text in enumerate(page_lines) if line in text] for line in _lines(evidence)]
-    starts = {index for line in _amount_lines(evidence, fee) for index, text in enumerate(page_lines) if line in text}
+    places = [[index for index, text in enumerate(page_lines) if _holds(text, line)] for line in _lines(evidence)]
+    starts = {
+        index for line in _amount_lines(evidence, fee) for index, text in enumerate(page_lines) if _holds(text, line)
+    }
     return all(places) and any(
         all(any(abs(index - start) <= _PROOF_LINES_AWAY for index in found) for found in places) for start in starts
     )
@@ -903,7 +918,9 @@ def _same_group(row: Pricing, fee: AgentFee) -> bool:
     return norm(row.age_group) == norm(fee.age_group) and norm(row.plan_name) == norm(fee.plan_name)
 
 
-def _with_stored_proof(result: CheckedFee, page_text: str, proofs: list[Pricing]) -> CheckedFee:
+def _with_stored_proof(
+    result: CheckedFee, page_text: str, proofs: list[Pricing], read_period: Optional[PricePeriod]
+) -> CheckedFee:
     """The fee checked with the evidence a stored row of the same fee was proved by, when the
     read's own evidence falls short and that proof still holds on today's page.
 
@@ -942,12 +959,18 @@ def _with_stored_proof(result: CheckedFee, page_text: str, proofs: list[Pricing]
     if result.fee.period is not None:
         return result
     fee = result.fee
-    unique = {line for line in _amount_lines(fee.evidence, fee) if sum(line in text for text in page_lines) == 1}
+    unique = {
+        line
+        for line in _amount_lines(fee.evidence, fee)
+        if _prints_once(line, fee) and sum(_holds(text, line) for text in page_lines) == 1
+    }
     same_line = [row for row in same_fee if unique & set(_amount_lines(row.pricing_context["evidence"], fee))]
     periods = {row.period for row in same_line}
     if len(periods) != 1 or None in periods:  # none, or stored rows of this fee that disagree
         return result
     period = periods.pop()
+    if read_period not in (None, period):  # the read says another period: no proof settles which
+        return result
     evidence = "\n".join([fee.evidence, *(row.pricing_context["evidence"] for row in same_line)])
     trial = check_fee(fee.model_copy(update={"period": period, "evidence": evidence}), page_text)
     if not trial.kept or trial.fee.period != period or trial.confidence < result.confidence:
@@ -1276,7 +1299,9 @@ async def run_fees_agent(
     if after_id is not None:
         query = query.where(School.id > after_id)
     # Ids, not objects: a rollback after one school's failure expires every loaded object.
-    rows = (await db.execute(query.with_only_columns(School.id, School.website_url).order_by(School.id).limit(limit))).all()
+    rows = (
+        await db.execute(query.with_only_columns(School.id, School.website_url).order_by(School.id).limit(limit))
+    ).all()
     run_ids = [row.id for row in rows]
     sites = {row.id: row.website_url for row in rows}
 
