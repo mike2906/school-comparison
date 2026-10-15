@@ -47,6 +47,7 @@ from app.scrapers.extraction.agent_fees import (
     AgentFees,
     CheckedFee,
     _names_period,
+    _without_option_lines,
     check_discount,
     check_fee,
     fee_amounts,
@@ -912,6 +913,10 @@ def _proof_still_reads(evidence: str, fee: AgentFee, page_lines: list[str]) -> b
     )
 
 
+def _words(text: str) -> set[str]:
+    return set(re.findall(r"\w+", text.casefold()))
+
+
 def _same_group(row: Pricing, fee: AgentFee) -> bool:
     def norm(value: Optional[str]) -> str:
         return " ".join(str(value or "").split()).casefold()
@@ -973,14 +978,16 @@ def _with_stored_proof(
         # its tuition as text under "ANNUAL TUITION FEES" and again as cells fifty lines down,
         # and a re-read quoted the cells alone. A proof of the same named group still stands
         # when both amount lines name the group ("Grade 0"), and the read's own line names no
-        # other period: "Роботика | 300 лв." in "1–4 клас" is not the "Шах – 300 лв. годишно".
+        # other period (a payment option's "9 x € 750 monthly" aside), and the stored proof holds every word of the read's line: "Роботика |
+        # 1–4 клас | 300 лв." is not the "Шах | 1–4 клас | 300 лв. годишно".
         same_line = [
             row
             for row in same_fee
             if _same_group(row, fee)
             and all(_holds(line, group) for line in _amount_lines(row.pricing_context["evidence"], fee))
+            and _words("\n".join(own_lines)) <= _words(row.pricing_context["evidence"])
             and not any(
-                _names_period(other, "\n".join(own_lines), fee_amounts(fee), fee.category)
+                _names_period(other, _without_option_lines(own_lines, fee), fee_amounts(fee), fee.category)
                 for other in PricePeriod
                 if other is not row.period
             )

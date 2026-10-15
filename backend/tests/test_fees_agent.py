@@ -1672,25 +1672,26 @@ PAGE_TWO_LAYOUTS = "\n".join(
     [
         "ANNUAL TUITION FEES 2026-2027",
         "Grade Payment Plan Plan 1 Plan 2 Plan 3",
-        "Grade 0 Plan 1 - € 8.950 1 x € 8.950 2 x € 4.575",
-        "Grade 2 - 4 Plan 1 - € 8.950 1 x € 8.950 2 x € 4.575",
+        "Grade 0 Plan 1 - € 8.950 1 x € 8.950 2 x € 4.575 1 x € 2.650 initial",
+        "9 x € 750 monthly",
+        "Grade 2 - 4 Plan 1 - € 8.950 1 x € 8.950 2 x € 4.575 1 x € 2.650 initial",
+        "9 x € 750 monthly",
         "Еднократна такса за записване: 200 евро.",
         *(f"Activity {n} - by semester" for n in range(20)),
         "Grade | Payment Plan | Plan 1 | Plan 2",
-        "Grade 0 | Plan 1 - € 8.950 | 1 x € 8.950 | 2 x € 4.575",
-        "Grade 2 - 4 | Plan 1 - € 8.950 | 1 x € 8.950 | 2 x € 4.575",
+        "Grade 0 | Plan 1 - € 8.950 | 1 x € 8.950 | 2 x € 4.575 | 1 x € 2.650 initial / 9 x € 750 monthly",
+        "Grade 2 - 4 | Plan 1 - € 8.950 | 1 x € 8.950 | 2 x € 4.575 | 1 x € 2.650 initial / 9 x € 750 monthly",
     ]
 )
-TEXT_PROOF = "ANNUAL TUITION FEES 2026-2027\nGrade Payment Plan Plan 1 Plan 2 Plan 3\nGrade 0 Plan 1 - € 8.950 1 x € 8.950 2 x € 4.575"
+TEXT_PROOF = (
+    "ANNUAL TUITION FEES 2026-2027\nGrade Payment Plan Plan 1 Plan 2 Plan 3\n"
+    "Grade 0 Plan 1 - € 8.950 1 x € 8.950 2 x € 4.575 1 x € 2.650 initial\n9 x € 750 monthly"
+)
 
 
 def _cells_read(group):
-    row = (
-        "Grade 0 | Plan 1 - € 8.950 | 1 x € 8.950 | 2 x € 4.575"
-        if group == "Grade 0"
-        else ("Grade 2 - 4 | Plan 1 - € 8.950 | 1 x € 8.950 | 2 x € 4.575")
-    )
-    return fee(
+    row = f"{group} | Plan 1 - € 8.950 | 1 x € 8.950 | 2 x € 4.575 | 1 x € 2.650 initial / 9 x € 750 monthly"
+    read = fee(
         PriceCategory.TUITION,
         f"Grade | Payment Plan | Plan 1 | Plan 2\n{row}",
         amount=8950,
@@ -1698,6 +1699,12 @@ def _cells_read(group):
         academic_year="2026/2027",
         age_group=group,
     )
+    plans = [
+        PaymentOption(payments=1, instalment=8950),
+        PaymentOption(payments=2, instalment=4575),
+        PaymentOption(payments=9, first_payment=2650, instalment=750),
+    ]
+    return read.model_copy(update={"payment_options": plans})
 
 
 async def _two_layouts(db, school, group):
@@ -1745,7 +1752,8 @@ async def test_a_stored_proof_of_another_fee_in_the_group_lends_no_period(db_ses
 
 async def test_a_stored_proof_lends_no_period_when_the_reads_own_line_names_another(db_session, frozen_today):
     page_text = PAGE_TWO_LAYOUTS.replace(
-        "Grade 0 | Plan 1 - € 8.950 | 1 x € 8.950 | 2 x € 4.575", "Grade 0 | Plan 1 - € 8.950 per semester"
+        "Grade 0 | Plan 1 - € 8.950 | 1 x € 8.950 | 2 x € 4.575 | 1 x € 2.650 initial / 9 x € 750 monthly",
+        "Grade 0 | Plan 1 - € 8.950 per semester",
     )
     school = await _school(db_session)
     await _proved_row(db_session, school, evidence=TEXT_PROOF)
@@ -1765,3 +1773,19 @@ async def test_a_stored_proof_lends_no_period_when_the_reads_own_line_names_anot
     )
     tuition = next(f for f in report["fees"] if f["amount"] == 8950)
     assert tuition["period"] != "yearly", tuition
+
+
+async def test_a_stored_proof_of_another_row_with_the_group_in_a_column_lends_no_period(db_session, frozen_today):
+    page_text = "Клубове по интереси\nШах | 1–4 клас | 300 лв. годишно\nМесечни такси\nРоботика | 1–4 клас | 300 лв."
+    school = await _school(db_session)
+    await _proved_row(db_session, school, evidence="Шах | 1–4 клас | 300 лв. годишно")
+    row = (await _rows(db_session, school))[0]
+    row.category, row.amount, row.currency, row.age_group = PriceCategory.EXTRACURRICULAR, 300, "BGN", "1–4 клас"
+    await db_session.commit()
+    robotics = fee(PriceCategory.EXTRACURRICULAR, "Роботика | 1–4 клас | 300 лв.", amount=300, age_group="1–4 клас")
+    robotics = robotics.model_copy(update={"currency": "BGN", "academic_year": "2026/2027"})
+    pages = [PageRead(URL, page_text, True)]
+    report = await fees_agent.run_school(
+        db_session, school, find=_find(pages), read=_read([robotics, FEES_STAGE[1]]), apply=False
+    )
+    assert not _stored_notes(report), report["fees"]
