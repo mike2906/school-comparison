@@ -75,6 +75,24 @@ export function searchStreets(streets, query, limit = 12) {
 
 const LATIN_NUMBER_LETTERS = { a: 'А', b: 'Б', v: 'В', g: 'Г', d: 'Д', e: 'Е', z: 'З', i: 'И', k: 'К' }
 
+/**
+ * The address table's street and number as a map-search query: `УЛ.ИВАН ЩЕРЕВ` and `5`
+ * in ГР.СОФИЯ become `ул. Иван Щерев 5, София, Bulgaria`. Only used when the parent asks
+ * to see the address on the map, since that sends it to a search service.
+ */
+export function mapSearchQuery(street, number) {
+  const words = text => text.toLowerCase().replace(/(^|[\s(-])(\p{L})/gu, (_, before, ch) => before + ch.toUpperCase())
+  // Only a dotted type word is a prefix here (МАРИЦА is a name, М.МАРИЦА a locality).
+  const typed = String(street.street || '').match(/^(ул|бул|пл|ж\.?к|кв|м|в\.?з|пр|алея)\.\s*/i)
+  const name = String(street.street || '').slice(typed ? typed[0].length : 0).trim()
+  const prefix = typed ? `${typed[1].toLowerCase()}.` : '.'
+  // `ГР.СОФИЯ,КВ.СЕСЛАВЦИ` keeps its quarter: many street names repeat across quarters.
+  const [town, quarter] = String(street.settlement || '').split(',')
+  const settlement = [quarter && `кв. ${words(quarter.replace(/^КВ\./, ''))}`, words(town.replace(/^(?:ГР|С)\./, ''))]
+    .filter(Boolean).join(', ')
+  return `${prefix === '.' ? '' : `${prefix} `}${words(name)} ${normalizeHouseNumber(number) || number}, ${settlement}, Bulgaria`
+}
+
 /** `12 a` → `12А`, `012б` → `12Б`: the spelling the address table uses. */
 export function normalizeHouseNumber(raw) {
   const compact = String(raw || '').replace(/\s+/g, '').toUpperCase()

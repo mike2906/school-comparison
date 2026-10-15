@@ -6,6 +6,8 @@ import { fileURLToPath } from 'node:url'
 
 import {
   cutoffValue,
+  campaignEnd,
+  compareWithCutoff,
   defaultStartYear,
   formatRange,
   measuredOnFor,
@@ -30,6 +32,12 @@ const RULE_SETS = ruleFiles(fileURLToPath(new URL('./rules', import.meta.url)))
 test('from October the next September is the default start year', () => {
   assert.equal(defaultStartYear(new Date(2026, 8, 30)), 2026)
   assert.equal(defaultStartYear(new Date(2026, 9, 1)), 2027)
+  // A tab whose campaign is still ranking stays on it: kindergartens until 27 November.
+  const kg = stageById('kindergarten')
+  assert.equal(defaultStartYear(new Date(2026, 9, 15), { ruleSets: RULE_SETS, stage: kg, today: '2026-10-15' }), 2026)
+  assert.equal(defaultStartYear(new Date(2026, 10, 28), { ruleSets: RULE_SETS, stage: kg, today: '2026-11-28' }), 2027)
+  assert.equal(defaultStartYear(new Date(2026, 9, 15), { ruleSets: RULE_SETS, stage: stageById('grade_1'), today: '2026-10-15' }), 2027)
+  assert.equal(campaignEnd(RULE_SETS.find(r => r.id === 'bg/sofia/kindergarten/2026-2027')), '2026-11-27')
   assert.deepEqual(startYearChoices(new Date(2026, 9, 14)), [2026, 2027, 2028])
   assert.deepEqual(startYearChoices(new Date(2026, 2, 1)), [2026, 2027])
 })
@@ -107,4 +115,24 @@ test('ranges and texts are formatted for the page', () => {
   assert.equal(pickLanguage({ bg: 'Наредба' }, 'en'), 'Наредба')
   assert.equal(pickLanguage('plain', 'en'), 'plain')
   assert.equal(sofiaToday(new Date('2026-10-14T22:30:00Z')), '2026-10-15', 'Sofia is ahead of UTC')
+})
+
+test('a result is compared with the last admitted child', () => {
+  const points = (min, max = min) => ({ min, max })
+  const round = { last_admitted_points: 16 }
+  assert.equal(compareWithCutoff({ points: points(19) }, round), 'above')
+  assert.equal(compareWithCutoff({ points: points(12) }, round), 'below')
+  assert.equal(compareWithCutoff({ points: points(16) }, round), 'tie')
+  assert.equal(compareWithCutoff({ points: points(12, 19) }, round), 'unsure')
+  assert.equal(compareWithCutoff({ points: points(3) }, { undersubscribed: true }), 'everyone')
+  assert.equal(compareWithCutoff({ points: points(3) }, { places: 0 }), 'noPlaces')
+  // First grade: a lower group ranks first; points only matter inside the same group.
+  const g1 = { last_admitted_group: 2, last_admitted_points: 4 }
+  assert.equal(compareWithCutoff({ group: points(1), points: points(0) }, g1), 'above')
+  assert.equal(compareWithCutoff({ group: points(3), points: points(20) }, g1), 'below')
+  assert.equal(compareWithCutoff({ group: points(2), points: points(5) }, g1), 'above')
+  assert.equal(compareWithCutoff({ group: points(1, 3), points: points(5) }, g1), 'unsure')
+  assert.equal(compareWithCutoff({ group: points(2), points: points(5) }, { last_admitted_group: 2 }), 'sameGroup')
+  assert.equal(compareWithCutoff({ group: points(4), points: points(10) }, { last_admitted_points: 6 }), null)
+  assert.equal(compareWithCutoff({ points: points(10) }, null), null)
 })

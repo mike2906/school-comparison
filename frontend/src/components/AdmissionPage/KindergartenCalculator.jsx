@@ -7,6 +7,7 @@ import { calculateAgeGroup } from '../../utils/education'
 import { birthYearsFor } from '../../utils/ageSelection'
 import { Choice, DateField, Field, INPUT_CLASS, MobileTotal, Section, YesNo } from './fields'
 import PointsList from './PointsList'
+import CutoffComparison from '../Admission/CutoffComparison'
 
 const KINDERGARTEN_GROUPS = ['nursery', 'first', 'second', 'third', 'preschool']
 const SOCIAL_FLAGS = ['family_disability_70', 'unknown_or_restricted_parent', 'foster_or_adopted', 'child_at_risk', 'three_plus_children']
@@ -36,7 +37,7 @@ const INITIAL = {
  * kindergarten the district is a yes/no question; with one, the parent picks their own
  * district and it is compared with the kindergarten's.
  */
-function KindergartenCalculator({ selected, startYear, kindergarten, districts }) {
+function KindergartenCalculator({ selected, startYear, kindergarten, districts, cutoffRows = [], isCurrentRules }) {
   const { t, i18n } = useTranslation()
   const [a, setA] = useState(INITIAL)
   const set = (key, value) => setA(prev => ({ ...prev, [key]: value }))
@@ -249,6 +250,14 @@ function KindergartenCalculator({ selected, startYear, kindergarten, districts }
             <div className="mt-4">
               <PointsList items={result.items} />
             </div>
+            {ageGroup && (
+              <CutoffComparison
+                // Only this child's group and birth year: other groups rank other children.
+                rows={cutoffRows.filter(row => row.age_group === ageGroup && (row.birth_year == null || row.birth_year === a.birthYear))}
+                yours={{ points: result.total }}
+                isCurrentRules={isCurrentRules}
+              />
+            )}
             {result.socialPriority !== false && (
               <p className="mt-4 rounded-lg bg-neutral-50 p-3 text-xs text-neutral-700">{t('admissionCalc.kg.socialPriority')}</p>
             )}

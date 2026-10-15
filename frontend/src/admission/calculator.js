@@ -17,12 +17,40 @@ export function stageById(id) {
 }
 
 /**
- * The September a parent is most likely planning for. Sofia's kindergarten and
- * first-grade campaigns run from spring to September, so from October on the next one
- * is the open question.
+ * The last date a rule file's schedule says applications or rankings run (Sofia
+ * kindergartens keep ranking until `current_rankings_until`), or null without dates.
  */
-export function defaultStartYear(now = new Date()) {
-  return now.getMonth() >= 9 ? now.getFullYear() + 1 : now.getFullYear()
+export function campaignEnd(ruleSet) {
+  const schedule = ruleSet?.schedule || {}
+  const dates = [
+    schedule.applications_close,
+    schedule.first_ranking,
+    schedule.first_general_ranking,
+    ...(schedule.general_rankings || []),
+    ...(schedule.rankings || []),
+    schedule.current_rankings_until,
+  ].filter(Boolean).sort()
+  return dates.length ? dates[dates.length - 1] : null
+}
+
+/**
+ * The September a parent is most likely planning for. With a tab, it is the earliest
+ * campaign from this year on that is still taking applications or ranking on `today`
+ * (Sofia kindergartens rank for this school year until late November), so the rules
+ * shown are the ones a parent applying now is ranked under. Otherwise, from October on
+ * the next campaign is the open question.
+ */
+export function defaultStartYear(now = new Date(), { ruleSets = [], stage = null, today = sofiaToday(now) } = {}) {
+  const next = now.getMonth() >= 9 ? now.getFullYear() + 1 : now.getFullYear()
+  if (!stage) return next
+  for (let year = now.getFullYear(); year < next; year += 1) {
+    const campaign = `${year}/${year + 1}`
+    // The same file the tab would show, and only if it was written for that campaign.
+    const ruleSet = selectRuleSet(ruleSets, { country: 'bg', city: stage.city, stage: stage.ruleStage, campaign })?.ruleSet
+    const end = ruleSet?.campaign === campaign ? campaignEnd(ruleSet) : null
+    if (end && today <= end) return year
+  }
+  return next
 }
 
 /** Start years to offer: this calendar year's campaign, the default and the one after. */
@@ -105,6 +133,43 @@ export function cutoffValue(round) {
   }
   if (round.last_admitted_points != null) return { kind: 'points', points: round.last_admitted_points }
   return null
+}
+
+/** 1 when a range is wholly above `value`, -1 wholly below, 0 when exactly it, else null. */
+function rangeVersus(range, value) {
+  if (range.min > value) return 1
+  if (range.max < value) return -1
+  return range.min === value && range.max === value ? 0 : null
+}
+
+/**
+ * How a calculated result stands against a round's last admitted child: 'above',
+ * 'below', 'tie' (ties are drawn by lot), 'unsure' (the result's range spans the
+ * cut-off), 'sameGroup' (first grade, same group, no points listed), 'everyone' (all
+ * applicants got in), 'noPlaces', or null when they can't be
+ * compared. `yours` is `{ points }` for kindergartens or `{ group, points }` for first
+ * grade, where a lower group ranks first and points only order children within a group.
+ */
+export function compareWithCutoff(yours, round) {
+  const value = cutoffValue(round)
+  if (!value || !yours?.points) return null
+  if (value.kind === 'everyone' || value.kind === 'noPlaces') return value.kind
+  let versus
+  if (value.kind === 'points') {
+    // A first-grade row without its group can't be compared: the group ranks first.
+    if (yours.group) return null
+    versus = rangeVersus(yours.points, value.points)
+  } else if (value.kind === 'group' && yours.group) {
+    const group = rangeVersus(yours.group, value.group)
+    if (group == null) return 'unsure'
+    if (group !== 0) return group < 0 ? 'above' : 'below'
+    // Same group, and the list gives no points to compare within it.
+    if (value.points == null) return 'sameGroup'
+    versus = rangeVersus(yours.points, value.points)
+  } else {
+    return null
+  }
+  return versus === 1 ? 'above' : versus === -1 ? 'below' : versus === 0 ? 'tie' : 'unsure'
 }
 
 /** A rule file's `{ bg, en }` text in the page language, or a plain string as is. */

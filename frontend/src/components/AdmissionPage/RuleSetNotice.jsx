@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { pickLanguage } from '../../admission/calculator'
+import { campaignEnd, measuredOnFor, pickLanguage } from '../../admission/calculator'
 
 const TONE = {
   verified: 'border-primary-200 bg-primary-50 text-primary-900',
@@ -7,11 +7,24 @@ const TONE = {
   illustration: 'border-red-200 bg-red-50 text-red-900',
 }
 
-/** How far the rules shown can be trusted for the year asked, and any court rulings. */
-function RuleSetNotice({ selected }) {
+function formatDate(iso, language) {
+  return new Intl.DateTimeFormat(language === 'bg' ? 'bg-BG' : 'en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+    .format(new Date(`${iso}T12:00:00`))
+}
+
+/**
+ * How far the rules shown can be trusted for the year asked, any court rulings, and,
+ * while the campaign is still ranking, until when (then the next year's rules apply).
+ */
+function RuleSetNotice({ selected, today = null }) {
   const { t, i18n } = useTranslation()
   const { ruleSet, applies, campaign, events } = selected
   const sources = new Map((ruleSet.sources || []).map(source => [source.id, source]))
+  const end = ruleSet.campaign === campaign ? campaignEnd(ruleSet) : null
+  // Only once the main ranking is past, while later rankings still run: before that the
+  // campaign is simply the one to apply for.
+  const running = end && today && today > measuredOnFor(ruleSet) && today <= end && !ruleSet.schedule?.estimated
+  const nextYear = Number(campaign.slice(0, 4)) + 1
 
   return (
     <div className={`rounded-xl border p-4 text-sm ${TONE[applies]}`}>
@@ -22,6 +35,11 @@ function RuleSetNotice({ selected }) {
           checked: ruleSet.verified?.on,
         })}
       </p>
+      {running && (
+        <p className="mt-1">
+          {t('admissionCalc.runsUntil', { campaign, date: formatDate(end, i18n.language), next: `${nextYear}/${nextYear + 1}` })}
+        </p>
+      )}
       <p className="mt-1">
         {pickLanguage(ruleSet.title, i18n.language)}
         {ruleSet.official_system_url && (

@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { cutoffValue } from '../../admission/calculator'
 
-function rowLabel(row, t) {
+export function rowLabel(row, t) {
   const what = row.stage === 'grade_8'
     ? [row.class_code, row.class_name].filter(Boolean).join(' ')
     : row.stage === 'grade_1'
@@ -14,7 +14,7 @@ function rowLabel(row, t) {
   return [what, born, row.building].filter(Boolean).join(' · ')
 }
 
-function CutoffValue({ round }) {
+export function CutoffValue({ round }) {
   const { t } = useTranslation()
   const value = cutoffValue(round)
   if (!value) return <span className="text-neutral-400">—</span>

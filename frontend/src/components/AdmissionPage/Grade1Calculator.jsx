@@ -5,6 +5,7 @@ import { formatRange, measuredOnFor } from '../../admission/calculator'
 import { addressFactsForSchool } from '../../admission/catchments'
 import { loadCatchments } from '../../admission/loadCatchments'
 import AddressCheck from '../Admission/AddressCheck'
+import CutoffComparison from '../Admission/CutoffComparison'
 import { DateField, MobileTotal, Section, YesNo } from './fields'
 import PointsList from './PointsList'
 
@@ -92,7 +93,7 @@ function AddressQuestions({ index, value, onChange, school, catchments, measured
  * First grade at a Sofia municipal school: a group (1 is best) for each address the
  * parent could apply with, then extra points inside the group.
  */
-function Grade1Calculator({ selected, startYear, school }) {
+function Grade1Calculator({ selected, startYear, school, cutoffRows = [], isCurrentRules }) {
   const { t } = useTranslation()
   const { ruleSet } = selected
   const params = ruleSet.params
@@ -220,6 +221,7 @@ function Grade1Calculator({ selected, startYear, school }) {
             <div className="mt-4">
               <PointsList items={result.items} />
             </div>
+            <CutoffComparison rows={cutoffRows} yours={result} isCurrentRules={isCurrentRules} />
           </div>
         ))}
         <p className="text-xs text-neutral-600">{t('admissionCalc.g1.groupNote')}</p>

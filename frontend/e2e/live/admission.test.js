@@ -107,6 +107,16 @@ describe('admission from a school page', () => {
     // The calculator repeats the school's cut-offs under the form.
     await page.getByRole('heading', { name: t('bg', 'cutoffs.title') }).waitFor()
     await page.getByRole('tab', { name: t('bg', 'admissionCalc.stages.kindergarten'), selected: true }).waitFor()
+
+    // A child born in a year this kindergarten ranked: the result card compares the
+    // total with that group's last admitted child.
+    const start = Number((await campaign()).slice(0, 4))
+    const row = school.admission_info.cutoff_summary.find(r =>
+      r.birth_year && r.campaign === `${start}/${start + 1}` && (r.latest || r.first)?.last_admitted_points != null)
+    if (row) {
+      await page.getByLabel(t('bg', 'admissionCalc.kg.birthYear')).selectOption(String(row.birth_year))
+      await page.locator('aside').getByText(t('bg', 'cutoffs.compare.title')).waitFor()
+    }
   })
 
   test('an eighth-grade school shows its class cut-offs', async () => {

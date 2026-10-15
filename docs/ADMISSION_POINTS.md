@@ -50,9 +50,13 @@ grade) and the catchment map. Research: `/mnt/project-files/admission-points/res
    grade returns a group and points, never one number.
 7. **Everything runs in the browser.** Answers include disability, deceased parents,
    adoption and foster care. They never leave the page: no API call, no URL parameter,
-   no storage, no analytics or error-report payload carries them, and a typed address
-   never moves the map (tile requests would reveal the area). The backend serves no
-   rules endpoint; rule files ship in the calculator's own bundle chunk.
+   no storage, no analytics or error-report payload carries them. The one exception is
+   on a school page's address check, and only when the parent presses "show on the map":
+   the street and number (nothing else, and not cached in the browser) go to
+   OpenStreetMap's search, as the search
+   page's address box already does, and the map widens to show the pin (Mike,
+   2026-10-15). The backend serves no rules endpoint; rule files ship in the
+   calculator's own bundle chunk.
 8. **Unknown is an answer.** Every question has "not sure". The result is then a range;
    its maximum assumes every unknown is favourable, so the page says "up to".
 9. **Golden tests per rule file.** Each file carries worked examples, including exact
@@ -206,6 +210,19 @@ Owned by the cut-off capture (`docs/ADMISSION_CUTOFFS.md`, PR #304): an archive 
 snapshots per city, stage, campaign and round, and `admission_info.cutoffs` /
 `cutoff_summary` in the API, each row tagged with `rule_set` (`<id>@<version>`).
 
+**On the calculator.** With a school chosen, the result card compares the parent's
+total (kindergarten: the child's age group and birth year) or group and points (first
+grade) with the last admitted child of the school's latest ranking: above, below, tie
+(drawn by lot), or "depends on your not-sure answers" when the range spans it. Rows
+ranked under other rules are marked. Eighth grade has no comparison, since the class's
+formula isn't known.
+
+**Which year opens.** Each tab opens on the earliest campaign still ranking today
+(`campaignEnd` reads the rule file's schedule: Sofia kindergartens rank for the current
+school year until `current_rankings_until`), and the notice says until when, after which
+the next campaign applies. Address durations for kindergartens are counted to today
+while those later rankings run.
+
 ## Catchments and districts
 
 Sofia publishes official first-grade catchment polygons (arcgis.sofia.bg, layer
@@ -225,8 +242,9 @@ schools by the same GIS school id (`integrationid` on layer 1). That is not the 
   points, group 4 only); adjacency is not always symmetric, so it is always read in that
   direction. Two shades, not a scale. Each address belongs to exactly one catchment.
 - **Address check.** A parent picks their street and number; the lookup runs in the
-  browser against a compact index built from the address list, loaded only on demand,
-  and the map is not moved to the address.
+  browser against a compact index built from the address list, loaded only on demand.
+  One sentence answers it, naming the catchment the address is in. A "show on the map"
+  button then geocodes it (see decision 7) and pins it beside the school's area.
 - **Kindergartens** in Sofia have no catchment. The district bonus (3 points) depends on
   the kindergarten's district: the one kg.sofia.bg gives (`admission_info.admin_district`,
   from the cut-off capture), else the district polygon its coordinates fall in. The page
